@@ -33,6 +33,8 @@ apps/backend/generated/
 
 # Debug
 npm-debug.log*
+# Node.js diagnostic reports (generated on crash/fatal error)
+report.*.json
 
 # Misc
 .DS_Store

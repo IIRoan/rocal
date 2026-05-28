@@ -3,6 +3,7 @@ import {
   buildIcsExternalId,
   normalizeIcsTimezone,
   parseCalendarMethod,
+  type IcsParticipant,
   type IcsParseResult,
   type IcsRecurrenceRule,
   type ParsedIcsEvent,
@@ -27,6 +28,8 @@ type IcsEventLike = Pick<
   | "datetype"
   | "rrule"
   | "recurrenceid"
+  | "organizer"
+  | "attendee"
 > & {
   recurrences?: Record<string, Omit<ical.VEvent, "recurrences">>;
 };
@@ -80,6 +83,15 @@ const CALENDAR_TIMEZONE_KEYS = [
 ] as const;
 const DATE_TIME_PARTS_FORMATTER_CACHE = new Map<string, Intl.DateTimeFormat>();
 
+function normalizeParticipantEmail(email: string | null | undefined): string {
+  return (
+    email
+      ?.trim()
+      .replace(/^mailto:/i, "")
+      .toLowerCase() ?? ""
+  );
+}
+
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null;
 }
@@ -129,6 +141,148 @@ function getTextValue(
   }
 
   return undefined;
+}
+
+function getParameterValue(
+  value: unknown,
+  keys: readonly string[],
+): string | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const sources = [value];
+  if (isRecord(value.params)) {
+    sources.push(value.params);
+  }
+  if (isRecord(value.parameters)) {
+    sources.push(value.parameters);
+  }
+
+  for (const source of sources) {
+    for (const key of keys) {
+      const direct = getTextValue(source[key] as string | ical.ParameterValue);
+      if (direct) {
+        return direct;
+      }
+
+      const lower = getTextValue(
+        source[key.toLowerCase()] as string | ical.ParameterValue,
+      );
+      if (lower) {
+        return lower;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function parseParticipantValue(
+  value: unknown,
+  fallbackRole: IcsParticipant["role"],
+): IcsParticipant | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const email =
+    typeof value === "string"
+      ? normalizeParticipantEmail(value)
+      : normalizeParticipantEmail(
+          getTextValue(
+            (isRecord(value)
+              ? (value.val as string | ical.ParameterValue | undefined)
+              : undefined) ??
+              (isRecord(value)
+                ? (value.email as string | ical.ParameterValue | undefined)
+                : undefined),
+          ),
+        );
+
+  if (!email) {
+    return undefined;
+  }
+
+  const displayName = getParameterValue(value, ["CN", "name"]);
+  const partStat = getParameterValue(value, [
+    "PARTSTAT",
+    "status",
+  ])?.toUpperCase();
+  const roleParam = getParameterValue(value, ["ROLE"])?.toUpperCase();
+  const role =
+    fallbackRole === "organizer" || roleParam === "CHAIR"
+      ? "organizer"
+      : "attendee";
+
+  const status: IcsParticipant["status"] =
+    role === "organizer"
+      ? "accepted"
+      : partStat === "ACCEPTED"
+        ? "accepted"
+        : partStat === "DECLINED"
+          ? "declined"
+          : partStat === "TENTATIVE"
+            ? "tentative"
+            : "pending";
+
+  return {
+    email,
+    ...(displayName ? { displayName } : {}),
+    role,
+    status,
+  };
+}
+
+function collectParticipants(
+  event: IcsEventLike,
+): IcsParticipant[] | undefined {
+  const participantsByEmail = new Map<string, IcsParticipant>();
+
+  const addParticipant = (participant: IcsParticipant | undefined) => {
+    if (!participant) {
+      return;
+    }
+
+    const existing = participantsByEmail.get(participant.email);
+    if (!existing) {
+      participantsByEmail.set(participant.email, participant);
+      return;
+    }
+
+    participantsByEmail.set(participant.email, {
+      ...existing,
+      ...participant,
+      role:
+        existing.role === "organizer" || participant.role === "organizer"
+          ? "organizer"
+          : "attendee",
+      status:
+        existing.role === "organizer" || participant.role === "organizer"
+          ? "accepted"
+          : (participant.status ?? existing.status),
+      displayName: participant.displayName || existing.displayName,
+    });
+  };
+
+  addParticipant(parseParticipantValue(event.organizer, "organizer"));
+
+  const attendeeValue = event.attendee;
+  const attendeeEntries = Array.isArray(attendeeValue)
+    ? attendeeValue
+    : attendeeValue && isRecord(attendeeValue) && !("val" in attendeeValue)
+      ? Object.values(attendeeValue)
+      : attendeeValue
+        ? [attendeeValue]
+        : [];
+
+  for (const attendee of attendeeEntries) {
+    addParticipant(parseParticipantValue(attendee, "attendee"));
+  }
+
+  return participantsByEmail.size > 0
+    ? Array.from(participantsByEmail.values())
+    : undefined;
 }
 
 function coerceDate(value: unknown): Date | undefined {
@@ -461,6 +615,13 @@ function isAllDayEvent(
   );
 }
 
+/**
+ * Returns the IANA timezone attached to an event's start/end date by node-ical.
+ * Returns undefined for "floating" events (RFC 5545 §3.3.5) — those have no
+ * timezone and are meant to be interpreted in the viewer's local time. Callers
+ * should fall back to the user's configured timezone rather than UTC so that
+ * floating events are stored as close to local intent as possible.
+ */
 function getEventTimezone(
   event: Pick<ical.VEvent, "start" | "end">,
 ): string | undefined {
@@ -549,6 +710,7 @@ function parseVEvent(
     location: getTextValue(event.location),
     recurrence: recurrenceRule,
     timezone,
+    participants: collectParticipants(event),
   };
 }
 

@@ -53,6 +53,15 @@ export type DeleteAccountResponse = {
   deletedUserId: string;
 };
 
+export type InvitationImportSummary = {
+  messagesScanned: number;
+  icsPartsFound: number;
+  eventsCreated: number;
+  eventsUpdated: number;
+  eventsDeleted: number;
+  errors: string[];
+};
+
 export class CalendarApiService {
   private client: HttpClient;
   private e2ee: E2eeProvider;
@@ -208,6 +217,51 @@ export class CalendarApiService {
       return await this.hydrateEncryptedEvent(response);
     } catch (error) {
       throw this.transformError(error, "Failed to fetch event");
+    }
+  }
+
+  async getInvitationByExternalId(
+    externalId: string,
+  ): Promise<CalendarEvent | null> {
+    try {
+      const response = await this.client.get<{ event: CalendarEvent | null }>(
+        `/api/events/invitations/by-external-id?externalId=${encodeURIComponent(externalId)}`,
+      );
+      return response.event
+        ? await this.hydrateEncryptedEvent(response.event)
+        : null;
+    } catch (error) {
+      throw this.transformError(error, "Failed to fetch calendar invitation");
+    }
+  }
+
+  async importInvitationIcs(
+    icsContent: string,
+  ): Promise<InvitationImportSummary> {
+    try {
+      return await this.client.post<InvitationImportSummary>(
+        "/api/events/invitations/import-ics",
+        { icsContent },
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to import calendar invitation");
+    }
+  }
+
+  async respondToInvitation(
+    id: string,
+    status: "accepted" | "declined" | "tentative",
+  ): Promise<CalendarEvent | { deleted: true }> {
+    try {
+      const response = await this.client.post<
+        CalendarEvent | { deleted: true }
+      >(`/api/events/${id}/rsvp`, { status });
+      if ("deleted" in response && response.deleted) {
+        return { deleted: true };
+      }
+      return await this.hydrateEncryptedEvent(response as CalendarEvent);
+    } catch (error) {
+      throw this.transformError(error, "Failed to respond to invitation");
     }
   }
 

@@ -1,13 +1,21 @@
 /** @jest-environment jsdom */
 
 import React, { act } from "react";
-import { afterEach, describe, expect, it, jest } from "@jest/globals";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
 import { MessageList } from "../../components/mail/message-list";
 import type { JmapEmailMessage } from "@/lib/mail/types";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
-  .IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 jest.mock("@gsap/react", () => ({
   useGSAP: jest.fn(),
@@ -102,6 +110,22 @@ describe("MessageList", () => {
   let container: HTMLDivElement | null = null;
   let root: Root | null = null;
 
+  beforeEach(() => {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: jest.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      })),
+    });
+  });
+
   const message: JmapEmailMessage = {
     id: "message-1",
     threadId: "thread-1",
@@ -161,7 +185,9 @@ describe("MessageList", () => {
     expect(row).not.toBeNull();
 
     act(() => {
-      row?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      row?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
     });
 
     expect(onSelect).toHaveBeenCalledWith("message-1");

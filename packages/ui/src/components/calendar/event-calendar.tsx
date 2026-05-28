@@ -71,6 +71,20 @@ const DayView = dynamic(() => import("./day-view").then((mod) => mod.DayView), {
     />
   ),
 });
+const ThreeDayView = dynamic(
+  () =>
+    import("./mobile-three-day-view").then((mod) => mod.MobileThreeDayView),
+  {
+    ssr: false,
+    loading: () => (
+      <EventLoadingSkeleton
+        view="3day"
+        compactView={false}
+        className="absolute inset-0 z-10"
+      />
+    ),
+  },
+);
 const MonthView = dynamic(
   () => import("./month-view").then((mod) => mod.MonthView),
   {
@@ -290,6 +304,7 @@ export function EventCalendar({
   useDropdownShortcuts([
     { key: "m", action: () => setView("month") },
     { key: "w", action: () => setView("week") },
+    { key: "t", action: () => setView("3day") },
     { key: "d", action: () => setView("day") },
     { key: "a", action: () => setView("agenda") },
   ]);
@@ -1083,6 +1098,12 @@ export function EventCalendar({
                       icon: Columns3,
                       shortcut: "W",
                     },
+                    {
+                      value: "3day",
+                      label: "3 Days",
+                      icon: Columns3,
+                      shortcut: "T",
+                    },
                     { value: "day", label: "Day", icon: Square, shortcut: "D" },
                     {
                       value: "agenda",
@@ -1183,6 +1204,18 @@ export function EventCalendar({
                   onEventEdit={onEventEdit}
                   onEventDelete={(event) => handleEventDelete(event.id)}
                   onEventView={onEventEdit}
+                />
+              )}
+              {view === "3day" && (
+                <ThreeDayView
+                  currentDate={currentDate}
+                  events={deferredEvents}
+                  onEventSelect={handleEventSelect}
+                  onEventCreate={handleEventCreate}
+                  timeFormat={timeFormat}
+                  weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
+                  workingDays={workingDays}
+                  timezone={timezone}
                 />
               )}
               {view === "agenda" && (

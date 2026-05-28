@@ -6,6 +6,12 @@ import type {
   StalwartJmapEnvelope,
   StalwartJmapMethodCall,
 } from "../lib/stalwart-admin";
+import {
+  createEmptyMailCalendarImportSummary,
+  MailCalendarIngestionService,
+  type MailCalendarImportSummary,
+  type MailCalendarIngestionEmail,
+} from "./mail-calendar-ingestion.service";
 
 const logger = createLogger("backend:mail-sync");
 
@@ -39,8 +45,8 @@ type JmapEmail = {
   subject?: string | null;
   receivedAt?: string;
   keywords?: Record<string, boolean>;
-  bodyStructure?: Record<string, unknown>;
-  bodyValues?: Record<string, unknown>;
+  bodyStructure?: MailCalendarIngestionEmail["bodyStructure"];
+  bodyValues?: MailCalendarIngestionEmail["bodyValues"];
   textBody?: Array<{ partId?: string }>;
   htmlBody?: Array<{ partId?: string }>;
   attachments?: Array<{ name?: string | null; type?: string | null }>;
@@ -66,6 +72,10 @@ type JmapChangesResponse = {
   destroyed?: string[];
 };
 
+type JmapQueryResponse = {
+  ids?: string[];
+};
+
 export type MailSyncCollection<T> = {
   oldState: string | null;
   newState: string;
@@ -82,6 +92,14 @@ export type MailSyncResult = {
   email: MailSyncCollection<JmapEmail>;
   mailbox: MailSyncCollection<JmapMailbox>;
   thread: MailSyncCollection<MailSyncThreadRecord>;
+  calendarImport: MailCalendarImportSummary;
+};
+
+export type MailReceiptSyncResult = {
+  accountId: string;
+  userId: string;
+  changedTypes: string[];
+  sync: MailSyncResult;
 };
 
 type AuthorizedDirectoryEntry = {
@@ -152,6 +170,9 @@ export class MailSyncService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly jmapAdminClient: StalwartJmapAdminClientLike,
+    private readonly mailCalendarIngestion: MailCalendarIngestionService = new MailCalendarIngestionService(
+      prisma,
+    ),
   ) {}
 
   private readCached<T>(
@@ -309,6 +330,62 @@ export class MailSyncService {
     return [entry.stalwartAccountId];
   }
 
+  async syncKnownChangedAccounts(): Promise<MailReceiptSyncResult[]> {
+    const entries = await this.prisma.mailDirectoryEntry.findMany({
+      where: {
+        userId: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        userId: true,
+        stalwartAccountId: true,
+      },
+    });
+    const results: MailReceiptSyncResult[] = [];
+
+    for (const entry of entries) {
+      if (!entry.userId) {
+        continue;
+      }
+
+      try {
+        this.cacheAuthorizedDirectoryEntry(entry.userId, entry);
+        const { hasChanges, changedTypes } = await this.detectChanges({
+          userId: entry.userId,
+          accountId: entry.stalwartAccountId,
+        });
+
+        if (!hasChanges) {
+          continue;
+        }
+
+        const sync = await this.syncForUser({
+          userId: entry.userId,
+          accountId: entry.stalwartAccountId,
+        });
+
+        results.push({
+          accountId: entry.stalwartAccountId,
+          userId: entry.userId,
+          changedTypes: sync.changedTypes.length
+            ? sync.changedTypes
+            : changedTypes,
+          sync,
+        });
+      } catch (error) {
+        logger.warn("Receipt-time mail sync failed", {
+          accountId: entry.stalwartAccountId,
+          userId: entry.userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return results;
+  }
+
   async syncForUser(input: {
     userId: string;
     accountId: string;
@@ -326,7 +403,10 @@ export class MailSyncService {
     const existingState = await this.getSyncState(directoryEntry.id);
 
     if (!existingState) {
-      const initialized = await this.initializeSyncState(directoryEntry);
+      const initialized = await this.initializeSyncState(
+        directoryEntry,
+        input.userId,
+      );
       logger.info("Initialized mail sync state", {
         accountId,
         emailState: initialized.email.newState,
@@ -374,6 +454,10 @@ export class MailSyncService {
         ? ["Thread"]
         : []),
     ];
+    const calendarImport = await this.ingestCalendarEventsFromMail({
+      userId: input.userId,
+      records: emailChanges.records,
+    });
 
     logger.info("Mail sync completed", {
       accountId,
@@ -390,11 +474,36 @@ export class MailSyncService {
       email: emailChanges,
       mailbox: mailboxChanges,
       thread: threadChanges,
+      calendarImport,
     };
+  }
+
+  private async ingestCalendarEventsFromMail(input: {
+    userId: string;
+    records: JmapEmail[];
+  }): Promise<MailCalendarImportSummary> {
+    try {
+      return await this.mailCalendarIngestion.ingestFromEmails({
+        userId: input.userId,
+        emails: input.records,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unknown calendar import error";
+      logger.error("Mail calendar import failed", error);
+      return {
+        ...createEmptyMailCalendarImportSummary(),
+        messagesScanned: input.records.length,
+        errors: [message],
+      };
+    }
   }
 
   private async initializeSyncState(
     directoryEntry: AuthorizedDirectoryEntry,
+    userId: string,
   ): Promise<MailSyncResult> {
     const [mailboxResponse, emailResponse, threadResponse] = await Promise.all([
       this.getMailboxes(directoryEntry.stalwartAccountId),
@@ -428,6 +537,14 @@ export class MailSyncService {
       select: mailSyncStateSelect,
     });
     this.cacheSyncState(persistedState);
+    const recentEmails = await this.getRecentEmails(
+      directoryEntry.stalwartAccountId,
+      50,
+    );
+    const calendarImport = await this.ingestCalendarEventsFromMail({
+      userId,
+      records: recentEmails,
+    });
 
     return {
       accountId: directoryEntry.stalwartAccountId,
@@ -446,6 +563,7 @@ export class MailSyncService {
         oldState: null,
         newState: threadResponse.state,
       }),
+      calendarImport,
     };
   }
 
@@ -668,6 +786,19 @@ export class MailSyncService {
     );
 
     return response.list ?? [];
+  }
+
+  private async getRecentEmails(
+    accountId: string,
+    limit: number,
+  ): Promise<JmapEmail[]> {
+    const response = await this.callMethod<JmapQueryResponse>("Email/query", {
+      accountId,
+      sort: [{ property: "receivedAt", isAscending: false }],
+      limit,
+    });
+    const ids = response.ids ?? [];
+    return ids.length > 0 ? this.getEmails(accountId, ids) : [];
   }
 
   private async getThreads(

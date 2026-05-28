@@ -6,7 +6,10 @@ import { requireAuth } from "../lib/auth-guard";
 import { env } from "../lib/env";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { resolveRouteUser } from "../lib/request-user";
-import { MailRealtimeService } from "../services/mail-realtime.service";
+import {
+  MailRealtimeService,
+  resolveChangedTypes,
+} from "../services/mail-realtime.service";
 import type { MailSyncService } from "../services/mail-sync.service";
 import { defaultMailSyncService } from "./mail-sync";
 
@@ -16,6 +19,8 @@ const encoder = new TextEncoder();
 export const defaultMailRealtimeService = new MailRealtimeService({
   eventSourceUrl: `${env.stalwartBaseUrl.replace(/\/+$/, "")}/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}`,
   adminToken: env.stalwartAdminToken,
+  syncProvider: defaultMailSyncService,
+  receiptPollIntervalMs: 10_000,
 });
 
 async function writeChunk(
@@ -70,6 +75,7 @@ export function createRealtimeMailRoutes(
           let closed = false;
           let keepaliveId: ReturnType<typeof setInterval> | null = null;
           let pollId: ReturnType<typeof setInterval> | null = null;
+          let pollInFlight = false;
 
           const unsubscribe = realtimeService.subscribe({
             subscriberId,
@@ -119,7 +125,8 @@ export function createRealtimeMailRoutes(
           // Polling JMAP /changes with the user's accountId is the reliable delivery path.
           if (accountIds.length > 0) {
             pollId = setInterval(() => {
-              if (closed) return;
+              if (closed || pollInFlight) return;
+              pollInFlight = true;
               void (async () => {
                 for (const accountId of accountIds) {
                   try {
@@ -130,19 +137,28 @@ export function createRealtimeMailRoutes(
                       });
 
                     if (!hasChanges || closed) continue;
+                    const sync = await mailSyncService.syncForUser({
+                      userId: user.id,
+                      accountId,
+                    });
+                    const resolvedChangedTypes = resolveChangedTypes(
+                      sync.changedTypes,
+                      changedTypes,
+                    );
 
                     logger.info("Mail poll detected changes", {
                       userId: user.id,
                       accountId,
-                      changedTypes,
+                      changedTypes: resolvedChangedTypes,
                     });
                     scheduleWrite(
                       writer,
                       `event: mail.changed\ndata: ${JSON.stringify({
                         type: "mail.changed",
                         accountId,
-                        changedTypes,
+                        changedTypes: resolvedChangedTypes,
                         receivedAt: new Date().toISOString(),
+                        sync,
                       })}\n\n`,
                       close,
                     );
@@ -155,8 +171,10 @@ export function createRealtimeMailRoutes(
                     });
                   }
                 }
-              })();
-            }, 30_000);
+              })().finally(() => {
+                pollInFlight = false;
+              });
+            }, 10_000);
           }
 
           logger.info("Mail SSE client connected", {

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
   addDays,
   addHours,
@@ -494,7 +495,13 @@ export function MobileThreeDayView({
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">
+                      <div
+                        className={cn(
+                          "text-sm font-medium truncate",
+                          isCancelledCalendarEvent(event) &&
+                            "line-through opacity-70",
+                        )}
+                      >
                         {event.title || "Untitled Event"}
                       </div>
                       <div className="text-xs text-muted-foreground">

@@ -1,8 +1,8 @@
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { Elysia } from "elysia";
 
-jest.mock("../../lib/prisma", () => ({
-  prisma: {
+jest.mock("../../lib/prisma", () => {
+  const prisma = {
     calendar: {
       findMany: jest.fn(async (): Promise<any> => []),
       findFirst: jest.fn(async (): Promise<any> => null),
@@ -19,8 +19,18 @@ jest.mock("../../lib/prisma", () => ({
     calendarSubscription: {
       findFirst: jest.fn(async (): Promise<any> => null),
     },
-  },
-}));
+  };
+
+  return {
+    prisma: {
+      ...prisma,
+      $transaction: jest.fn(
+        async (callback: (tx: typeof prisma) => Promise<any>) =>
+          callback(prisma),
+      ),
+    },
+  };
+});
 
 jest.mock("../../lib/auth-utils", () => ({
   ensureAuthenticatedUser: jest.fn(
@@ -57,6 +67,9 @@ const mockEnsureAuthenticatedUser =
     typeof ensureAuthenticatedUser
   >;
 const mockPrisma = prisma as unknown as {
+  $transaction: jest.Mock<
+    (callback: (tx: any) => Promise<any>) => Promise<any>
+  >;
   calendar: {
     findMany: jest.Mock<() => Promise<any>>;
     findFirst: jest.Mock<() => Promise<any>>;

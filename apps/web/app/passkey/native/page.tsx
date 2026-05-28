@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createLogger } from "@workspace/logger";
 import {
   buildNativePasskeyCallbackURL,
@@ -62,13 +62,22 @@ function getWebAuthnSupportError() {
 }
 
 export default function NativePasskeyBridgePage() {
-  const [mode, setMode] = useState<BridgeMode>("sign-in");
-  const [callbackURL, setCallbackURL] = useState<string | null>(null);
-  const [bridgeToken, setBridgeToken] = useState<string | null>(null);
-  const [passkeyName, setPasskeyName] = useState("This device");
-  const [isMounted, setIsMounted] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const initialParams = useMemo(
+    () =>
+      typeof window === "undefined"
+        ? {
+            mode: "sign-in" as BridgeMode,
+            callbackURL: null,
+            bridgeToken: null,
+            passkeyName: "This device",
+          }
+        : readSearchParams(),
+    [],
+  );
+  const { mode, callbackURL, bridgeToken, passkeyName } = initialParams;
 
   const emitLog = useCallback(
     (
@@ -82,20 +91,23 @@ export default function NativePasskeyBridgePage() {
   );
 
   useEffect(() => {
-    const params = readSearchParams();
-    setMode(params.mode);
-    setCallbackURL(params.callbackURL);
-    setBridgeToken(params.bridgeToken);
-    setPasskeyName(params.passkeyName);
-    setIsMounted(true);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setIsMounted(true);
+      }
+    });
 
     emitLog("info", "Mounted passkey bridge page", {
-      mode: params.mode,
-      callbackUrl: summarizeUrl(params.callbackURL),
-      hasBridgeToken: Boolean(params.bridgeToken),
-      passkeyName: params.passkeyName,
+      mode,
+      callbackUrl: summarizeUrl(callbackURL),
+      hasBridgeToken: Boolean(bridgeToken),
+      passkeyName,
     });
-  }, [emitLog]);
+    return () => {
+      cancelled = true;
+    };
+  }, [bridgeToken, callbackURL, emitLog, mode, passkeyName]);
 
   const isValidCallback = isValidNativePasskeyCallbackURL(callbackURL);
 
@@ -158,10 +170,6 @@ export default function NativePasskeyBridgePage() {
   }, [callbackURL, emitLog, mode, redirectToApp]);
 
   const handleContinue = useCallback(async () => {
-    if (!isMounted) {
-      return;
-    }
-
     if (!callbackURL || !isValidCallback) {
       emitLog("warn", "Continue blocked by invalid callback URL", {
         callbackUrl: summarizeUrl(callbackURL),
@@ -303,7 +311,6 @@ export default function NativePasskeyBridgePage() {
     bridgeToken,
     callbackURL,
     emitLog,
-    isMounted,
     isValidCallback,
     mode,
     passkeyName,

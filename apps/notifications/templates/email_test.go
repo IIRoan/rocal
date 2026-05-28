@@ -7,6 +7,7 @@ import (
 
 func TestRenderEventReminderIncludesTemplateData(t *testing.T) {
 	html, err := RenderEventReminder(EmailTemplateData{
+		EventID:        "evt-1",
 		EventTitle:     "Quarterly Planning",
 		EventDate:      "Friday, Apr 18",
 		EventTime:      "9:00 AM - 10:00 AM",
@@ -28,6 +29,7 @@ func TestRenderEventReminderIncludesTemplateData(t *testing.T) {
 		"Quarterly Planning",
 		"Friday, Apr 18",
 		"Amsterdam",
+		"evt-1",
 		"https://app.solace.test/dashboard?eventId=evt-1",
 		"https://app.solace.test/settings",
 	}
@@ -41,6 +43,7 @@ func TestRenderEventReminderIncludesTemplateData(t *testing.T) {
 
 func TestGeneratePlainTextEmailIncludesOptionalFields(t *testing.T) {
 	text := GeneratePlainTextEmail(EmailTemplateData{
+		EventID:        "evt-2",
 		EventTitle:     "Design Review",
 		EventDate:      "Saturday, Apr 19",
 		EventTime:      "3:00 PM - 4:00 PM",
@@ -58,6 +61,7 @@ func TestGeneratePlainTextEmailIncludesOptionalFields(t *testing.T) {
 		"Design Review",
 		"Location: Remote",
 		"Duration: 1h",
+		"Event ID: evt-2",
 		"Open event: https://app.solace.test/dashboard?eventId=evt-2",
 		"Settings: https://app.solace.test/settings",
 	}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 
 import type { CalendarEvent } from "../../generated/prisma/index.js";
 import {
+  areParsedEventParticipantsDifferent,
   convertParsedEventToCalendarEvent,
   isEventModified,
   parseICSFile,
@@ -28,10 +29,16 @@ function createCalendarEvent(
     reminder: null,
     recurrence: null,
     parentEventId: null,
+    isCancelled: false,
     isSynced: false,
     externalId: null,
     subscriptionId: null,
     syncedAt: null,
+    stalwartAccountId: null,
+    stalwartCalendarId: null,
+    stalwartEventId: null,
+    stalwartUid: null,
+    stalwartSyncedAt: null,
     userId: "user-1",
     calendarId: "calendar-1",
     categoryId: null,
@@ -72,6 +79,29 @@ describe("ics-parser", () => {
         timezone: "Etc/UTC",
       }),
     ]);
+  });
+
+  it("strips Google invite boilerplate from imported descriptions", () => {
+    const result = parseICSFile(
+      [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:event-2",
+        "DTSTART:20240201T100000Z",
+        "DTEND:20240201T110000Z",
+        "SUMMARY:Imported event",
+        "DESCRIPTION:Planning sync\\n-::~:~::~:~:~:~:~:~:~:~:~:~\\nJoin with Google Meet: https://meet.google.com/jvo-kwba-ijs\\nPlease do not edit this section.",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n"),
+      "UTC",
+    );
+
+    // Separator lines and "Please do not edit" are stripped; Meet link is kept
+    expect(result.events[0]?.description).toBe(
+      "Planning sync\nJoin with Google Meet: https://meet.google.com/jvo-kwba-ijs",
+    );
   });
 
   it("converts a parsed ICS event into a calendar create input", () => {
@@ -188,6 +218,47 @@ describe("ics-parser", () => {
         recurrence: { frequency: "weekly", interval: 1 },
         timezone: "Europe/Amsterdam",
       }),
+    ).toBe(true);
+  });
+
+  it("detects no participant change when normalized lists match regardless of order", () => {
+    expect(
+      areParsedEventParticipantsDifferent(
+        [
+          {
+            email: "bob@example.com",
+            displayName: null,
+            role: "attendee",
+            status: "pending",
+          },
+          {
+            email: "alice@example.com",
+            displayName: "Alice",
+            role: "organizer",
+            status: "accepted",
+          },
+        ],
+        [
+          { email: "alice@example.com", displayName: "Alice", role: "organizer" },
+          { email: "bob@example.com", role: "attendee", status: "pending" },
+        ],
+      ),
+    ).toBe(false);
+  });
+
+  it("detects a participant change when emails differ", () => {
+    expect(
+      areParsedEventParticipantsDifferent(
+        [
+          {
+            email: "alice@example.com",
+            displayName: null,
+            role: "attendee",
+            status: "pending",
+          },
+        ],
+        [{ email: "bob@example.com", role: "attendee" }],
+      ),
     ).toBe(true);
   });
 });

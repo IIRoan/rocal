@@ -1,5 +1,9 @@
 import type { PrismaClient } from "../generated/prisma/index.js";
 import type {
+  EventParticipantInput,
+  EventParticipantStatus,
+} from "@workspace/calendar-core";
+import type {
   IEventService,
   EventSearchInput,
   EventListInput,
@@ -19,18 +23,46 @@ import {
   normalizeEventEncryptionMode,
   resolveEventPersistencePolicy,
 } from "../lib/event-encryption";
-import { buildIcsEventFile } from "@workspace/calendar-ics";
+import {
+  buildIcsEventFile,
+  type IcsBuildEventInput,
+} from "@workspace/calendar-ics";
 import { toIcsBuildEvent, toSafeIcsFilename } from "../lib/ics-export";
 import { createLogger } from "@workspace/logger";
+import {
+  mapEventParticipant,
+  resolveParticipantInputs,
+  sortEventParticipants,
+  EVENT_PARTICIPANT_USER_SELECT,
+  type EventParticipantRecord,
+} from "../lib/event-participants";
+import { EventParticipantService } from "./event-participant.service";
+import type {
+  StalwartCalendarClientLike,
+  StalwartCalendarEventRecord,
+} from "../lib/stalwart-calendar";
+import {
+  buildStalwartEventPayload,
+  mapStalwartParticipantsToSolace,
+  mapStalwartEventToSolace,
+  type ResolvedStalwartParticipant,
+} from "../lib/stalwart-calendar-mapping";
 
 const logger = createLogger("backend:event-service");
 
 const INITIALIZED_USER_CACHE_LIMIT = 5000;
+const MAX_REMINDER_MINUTES = 43200; // 30 days
 
 export class EventService implements IEventService {
   private readonly initializedUsers = new Set<string>();
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly eventParticipantService: EventParticipantService = new EventParticipantService(
+      prisma,
+    ),
+    private readonly stalwartClient?: StalwartCalendarClientLike | null,
+  ) {}
 
   private hasEncryptedPayload(value?: string | null): boolean {
     return typeof value === "string" && value.trim().length > 0;
@@ -50,6 +82,377 @@ export class EventService implements IEventService {
     });
 
     return userSettings?.timezone || "UTC";
+  }
+
+  private async getStalwartAccountId(userId: string): Promise<string | null> {
+    if (!this.stalwartClient) {
+      return null;
+    }
+
+    const mailbox = await this.prisma.mailDirectoryEntry.findUnique({
+      where: { userId },
+      select: { stalwartAccountId: true },
+    });
+
+    return mailbox?.stalwartAccountId ?? null;
+  }
+
+  private async resolveStalwartParticipants(
+    userId: string,
+    participants: EventParticipantInput[] = [],
+  ): Promise<ResolvedStalwartParticipant[]> {
+    const owner = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, name: true },
+    });
+    return resolveParticipantInputs({
+      owner: owner?.email?.trim()
+        ? {
+            email: owner.email,
+            name: owner.name,
+          }
+        : null,
+      participants,
+    });
+  }
+
+  private async ensureRemoteCalendar(input: {
+    accountId: string;
+    calendar: {
+      id: string;
+      name: string;
+      color: string;
+      isVisible: boolean;
+      isDefault: boolean;
+      stalwartCalendarId?: string | null;
+      kind: string;
+      isSyncOnly: boolean;
+    };
+  }): Promise<string | null> {
+    if (
+      !this.stalwartClient ||
+      input.calendar.kind !== "owned" ||
+      input.calendar.isSyncOnly
+    ) {
+      return null;
+    }
+
+    if (input.calendar.stalwartCalendarId) {
+      return input.calendar.stalwartCalendarId;
+    }
+
+    const remote = await this.stalwartClient.createCalendar(input.accountId, {
+      name: input.calendar.name,
+      color: input.calendar.color,
+      isVisible: input.calendar.isVisible,
+      isDefault: input.calendar.isDefault,
+    });
+    await this.prisma.calendar.update({
+      where: { id: input.calendar.id },
+      data: {
+        stalwartAccountId: input.accountId,
+        stalwartCalendarId: remote.id,
+        stalwartSyncedAt: new Date(),
+      },
+    });
+
+    return remote.id;
+  }
+
+  private async syncStalwartEvents(input: {
+    userId: string;
+    accountId: string;
+    startDate: Date;
+    endDate: Date;
+  }): Promise<void> {
+    if (!this.stalwartClient) return;
+
+    const ids = await this.stalwartClient.queryEventIds({
+      accountId: input.accountId,
+      filter: {
+        after: input.startDate.toISOString(),
+        before: input.endDate.toISOString(),
+      },
+      limit: 500,
+    });
+    await this.syncStalwartEventsByIds({
+      userId: input.userId,
+      accountId: input.accountId,
+      eventIds: ids,
+    });
+  }
+
+  private async syncStalwartEventsByIds(input: {
+    userId: string;
+    accountId: string;
+    eventIds: string[];
+  }): Promise<void> {
+    if (!this.stalwartClient || input.eventIds.length === 0) {
+      return;
+    }
+
+    const remoteEvents = await this.stalwartClient.getEvents({
+      accountId: input.accountId,
+      ids: input.eventIds,
+    });
+    await this.upsertStalwartEventsFromRemote({
+      userId: input.userId,
+      accountId: input.accountId,
+      remoteEvents,
+    });
+  }
+
+  private async syncStalwartEventByUid(input: {
+    userId: string;
+    accountId: string;
+    uid: string;
+  }): Promise<void> {
+    if (!this.stalwartClient || !input.uid.trim()) {
+      return;
+    }
+
+    const ids = await this.stalwartClient.queryEventIds({
+      accountId: input.accountId,
+      filter: {
+        uid: input.uid.trim(),
+      },
+      limit: 10,
+    });
+    await this.syncStalwartEventsByIds({
+      userId: input.userId,
+      accountId: input.accountId,
+      eventIds: ids,
+    });
+  }
+
+  private async upsertStalwartEventsFromRemote(input: {
+    userId: string;
+    accountId: string;
+    remoteEvents: StalwartCalendarEventRecord[];
+  }): Promise<void> {
+    if (input.remoteEvents.length === 0) {
+      return;
+    }
+
+    const calendars = await this.prisma.calendar.findMany({
+      where: { userId: input.userId, stalwartCalendarId: { not: null } },
+      select: {
+        id: true,
+        stalwartCalendarId: true,
+      },
+    });
+    const calendarByRemoteId = new Map(
+      calendars.map((calendar) => [calendar.stalwartCalendarId!, calendar.id]),
+    );
+
+    for (const remoteEvent of input.remoteEvents) {
+      const mapped = mapStalwartEventToSolace(remoteEvent);
+      const calendarId = mapped.stalwartCalendarId
+        ? calendarByRemoteId.get(mapped.stalwartCalendarId)
+        : null;
+      if (!calendarId) continue;
+
+      const existing = await this.prisma.calendarEvent.findFirst({
+        where: {
+          userId: input.userId,
+          OR: [
+            { stalwartEventId: mapped.stalwartEventId },
+            ...(mapped.stalwartUid ? [{ externalId: mapped.stalwartUid }] : []),
+          ],
+        },
+        select: {
+          id: true,
+          encryptionState: true,
+        },
+      });
+      const encrypted = existing?.encryptionState === "encrypted";
+      const data = {
+        ...(encrypted
+          ? {}
+          : {
+              title: mapped.title,
+              description: mapped.description,
+              location: mapped.location,
+            }),
+        start: mapped.start,
+        end: mapped.end,
+        allDay: mapped.allDay,
+        timezone: mapped.timezone,
+        recurrence: mapped.recurrence,
+        reminder: mapped.reminder,
+        calendarId,
+        externalId: mapped.stalwartUid,
+        stalwartAccountId: input.accountId,
+        stalwartCalendarId: mapped.stalwartCalendarId,
+        stalwartEventId: mapped.stalwartEventId,
+        stalwartUid: mapped.stalwartUid,
+        stalwartSyncedAt: new Date(),
+      };
+
+      let localEventId = existing?.id;
+      if (existing) {
+        await this.prisma.calendarEvent.update({
+          where: { id: existing.id },
+          data,
+        });
+      } else {
+        const createdEvent = await this.prisma.calendarEvent.create({
+          data: {
+            ...data,
+            title: mapped.title,
+            description: mapped.description,
+            location: mapped.location,
+            color: null,
+            categoryId: null,
+            userId: input.userId,
+          },
+        });
+        localEventId = createdEvent.id;
+      }
+
+      if (localEventId) {
+        const syncedParticipants =
+          await this.eventParticipantService.syncParticipants({
+            eventId: localEventId,
+            participants: mapStalwartParticipantsToSolace(
+              remoteEvent.participants,
+            ),
+            tx: this.prisma,
+          });
+        await syncedParticipants.sendPendingInvitations();
+      }
+    }
+  }
+
+  private async buildParticipantMap(eventIds: string[]) {
+    if (eventIds.length === 0) {
+      return new Map<string, ReturnType<typeof mapEventParticipant>[]>();
+    }
+
+    const participants: EventParticipantRecord[] =
+      await this.prisma.eventParticipant.findMany({
+        where: {
+          eventId: { in: eventIds },
+        },
+        include: {
+          user: { select: EVENT_PARTICIPANT_USER_SELECT },
+        },
+      });
+
+    const participantMap = new Map<
+      string,
+      ReturnType<typeof mapEventParticipant>[]
+    >();
+    for (const participant of participants) {
+      const eventParticipants = participantMap.get(participant.eventId) ?? [];
+      eventParticipants.push(
+        mapEventParticipant(participant as EventParticipantRecord),
+      );
+      participantMap.set(participant.eventId, eventParticipants);
+    }
+
+    for (const [eventId, eventParticipants] of participantMap) {
+      participantMap.set(eventId, sortEventParticipants(eventParticipants));
+    }
+
+    return participantMap;
+  }
+
+  private shouldHideDeclinedInvitationEvent(
+    userId: string,
+    participants: ReturnType<typeof mapEventParticipant>[] | null | undefined,
+  ): boolean {
+    const participant = participants?.find(
+      (entry) => entry.userId === userId && entry.role !== "organizer",
+    );
+    return participant?.status === "declined";
+  }
+
+  private isAttendeeCopyForUser(
+    userId: string,
+    participants:
+      | Array<{
+          userId?: string | null;
+          role?: string | null;
+        }>
+      | null
+      | undefined,
+  ): boolean {
+    const participant = participants?.find((entry) => entry.userId === userId);
+    return participant?.role === "attendee";
+  }
+
+  private async attachParticipantsToSearchEvents(
+    events: Record<string, unknown>[],
+    userId: string,
+  ) {
+    const participantMap = await this.buildParticipantMap(
+      events
+        .map((event) =>
+          typeof event.id === "string" && event.id ? event.id : null,
+        )
+        .filter((eventId): eventId is string => eventId !== null),
+    );
+
+    return events
+      .map((event) => ({
+        ...event,
+        participants:
+          typeof event.id === "string"
+            ? (participantMap.get(event.id) ?? [])
+            : [],
+      }))
+      .filter(
+        (event) =>
+          !this.shouldHideDeclinedInvitationEvent(
+            userId,
+            event.participants as ReturnType<typeof mapEventParticipant>[],
+          ),
+      );
+  }
+
+  private buildInvitationEventPayload(input: {
+    eventId: string;
+    externalId?: string | null;
+    title: string;
+    description?: string | null;
+    start: Date;
+    end: Date;
+    allDay: boolean;
+    timezone: string;
+    location?: string | null;
+    recurrence?: string | null;
+    createdAt?: Date;
+    updatedAt?: Date;
+  }): IcsBuildEventInput {
+    const parsedRecurrence = input.recurrence
+      ? RecurrenceEngine.parseRecurrenceRule(input.recurrence)
+      : null;
+
+    return {
+      uid: input.externalId || `${input.eventId}@solace-calendar.local`,
+      title: input.title,
+      description: input.description ?? null,
+      start: input.start,
+      end: input.end,
+      allDay: input.allDay,
+      timezone: input.timezone,
+      location: input.location ?? null,
+      recurrence: parsedRecurrence
+        ? {
+            frequency: parsedRecurrence.frequency,
+            interval: parsedRecurrence.interval,
+            count: parsedRecurrence.count,
+            until: parsedRecurrence.until?.toISOString(),
+            timezone: parsedRecurrence.timezone,
+            byWeekDay: parsedRecurrence.byWeekDay,
+            byMonthDay: parsedRecurrence.byMonthDay,
+            byMonth: parsedRecurrence.byMonth,
+          }
+        : undefined,
+      createdAt: input.createdAt,
+      updatedAt: input.updatedAt,
+    };
   }
 
   async search(
@@ -154,41 +557,44 @@ export class EventService implements IEventService {
 
     const total = (countResult as { total: number }[])?.[0]?.total ?? 0;
 
-    const events = (results as Record<string, unknown>[]).map((row) => ({
-      id: row.id,
-      title: row.title,
-      description: row.description,
-      start: row.start,
-      end: row.end,
-      allDay: row.all_day,
-      location: row.location,
-      color: row.color,
-      timezone: row.timezone,
-      recurrence: row.recurrence,
-      encryptedContent: row.encrypted_content,
-      blindIndexTokens: row.blind_index_tokens,
-      encryptionState: row.encryption_state,
-      encryptionKeyVersion: row.encryption_key_version,
-      calendarId: row.calendar_id,
-      categoryId: row.category_id,
-      userId: row.user_id,
-      calendar: row["calendar.id"]
-        ? {
-            id: row["calendar.id"],
-            name: row["calendar.name"],
-            color: row["calendar.color"],
-          }
-        : null,
-      category: row["category.id"]
-        ? {
-            id: row["category.id"],
-            name: row["category.name"],
-            color: row["category.color"],
-          }
-        : null,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    }));
+    const events = await this.attachParticipantsToSearchEvents(
+      (results as Record<string, unknown>[]).map((row) => ({
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        start: row.start,
+        end: row.end,
+        allDay: row.all_day,
+        location: row.location,
+        color: row.color,
+        timezone: row.timezone,
+        recurrence: row.recurrence,
+        encryptedContent: row.encrypted_content,
+        blindIndexTokens: row.blind_index_tokens,
+        encryptionState: row.encryption_state,
+        encryptionKeyVersion: row.encryption_key_version,
+        calendarId: row.calendar_id,
+        categoryId: row.category_id,
+        userId: row.user_id,
+        calendar: row["calendar.id"]
+          ? {
+              id: row["calendar.id"],
+              name: row["calendar.name"],
+              color: row["calendar.color"],
+            }
+          : null,
+        category: row["category.id"]
+          ? {
+              id: row["category.id"],
+              name: row["category.name"],
+              color: row["category.color"],
+            }
+          : null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+      userId,
+    );
 
     return { events, total };
   }
@@ -236,6 +642,16 @@ export class EventService implements IEventService {
       throw new ValidationError("End date must be after start date");
     }
 
+    const stalwartAccountId = await this.getStalwartAccountId(userId);
+    if (stalwartAccountId) {
+      await this.syncStalwartEvents({
+        userId,
+        accountId: stalwartAccountId,
+        startDate,
+        endDate,
+      });
+    }
+
     const [regularEvents, recurringEvents] = await Promise.all([
       this.prisma.calendarEvent.findMany({
         where: {
@@ -257,6 +673,13 @@ export class EventService implements IEventService {
         include: {
           category: true,
           calendar: true,
+          participants: {
+            include: {
+              user: {
+                select: EVENT_PARTICIPANT_USER_SELECT,
+              },
+            },
+          },
         },
       }),
       this.prisma.calendarEvent.findMany({
@@ -269,6 +692,13 @@ export class EventService implements IEventService {
           category: true,
           calendar: true,
           recurrenceExceptions: true,
+          participants: {
+            include: {
+              user: {
+                select: EVENT_PARTICIPANT_USER_SELECT,
+              },
+            },
+          },
         },
       }),
     ]);
@@ -359,6 +789,13 @@ export class EventService implements IEventService {
         include: {
           category: true,
           calendar: true,
+          participants: {
+            include: {
+              user: {
+                select: EVENT_PARTICIPANT_USER_SELECT,
+              },
+            },
+          },
         },
       }),
       this.prisma.eventCategory.findMany({
@@ -380,7 +817,20 @@ export class EventService implements IEventService {
       ...regularEvents,
       ...recurringInstances,
       ...modifiedInstances,
-    ].sort((a, b) => a.start.getTime() - b.start.getTime());
+    ]
+      .map((event) => ({
+        ...event,
+        participants: sortEventParticipants(
+          (event.participants ?? []).map((participant) =>
+            mapEventParticipant(participant as EventParticipantRecord),
+          ),
+        ),
+      }))
+      .filter(
+        (event) =>
+          !this.shouldHideDeclinedInvitationEvent(userId, event.participants),
+      )
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
 
     return {
       events,
@@ -394,6 +844,13 @@ export class EventService implements IEventService {
       const include = {
         category: true,
         calendar: true,
+        participants: {
+          include: {
+            user: {
+              select: EVENT_PARTICIPANT_USER_SELECT,
+            },
+          },
+        },
       };
 
       let event = await this.prisma.calendarEvent.findFirst({
@@ -419,11 +876,247 @@ export class EventService implements IEventService {
         throw new ValidationError("Event not found or access denied");
       }
 
-      return event;
+      if (
+        this.stalwartClient &&
+        event.stalwartAccountId &&
+        event.stalwartEventId
+      ) {
+        await this.syncStalwartEventsByIds({
+          userId,
+          accountId: event.stalwartAccountId,
+          eventIds: [event.stalwartEventId],
+        });
+        event = await this.prisma.calendarEvent.findFirst({
+          where: {
+            id: event.id,
+            userId,
+          },
+          include,
+        });
+      }
+
+      if (!event) {
+        throw new ValidationError("Event not found or access denied");
+      }
+
+      return {
+        ...event,
+        participants: sortEventParticipants(
+          (event.participants ?? []).map((participant) =>
+            mapEventParticipant(participant as EventParticipantRecord),
+          ),
+        ),
+      };
     } catch (error) {
       logger.error("Event fetch error:", error);
       throw error;
     }
+  }
+
+  async getInvitationByExternalId(
+    userId: string,
+    externalId: string,
+  ): Promise<unknown | null> {
+    const normalizedExternalId = externalId.trim();
+    if (!normalizedExternalId) {
+      throw new ValidationError("External event id is required", "externalId");
+    }
+
+    const stalwartAccountId = await this.getStalwartAccountId(userId);
+    if (stalwartAccountId) {
+      await this.syncStalwartEventByUid({
+        userId,
+        accountId: stalwartAccountId,
+        uid: normalizedExternalId,
+      });
+    }
+
+    const event = await this.prisma.calendarEvent.findFirst({
+      where: {
+        userId,
+        externalId: normalizedExternalId,
+        subscriptionId: null,
+      },
+      include: {
+        category: true,
+        calendar: true,
+        participants: {
+          include: {
+            user: {
+              select: EVENT_PARTICIPANT_USER_SELECT,
+            },
+          },
+        },
+      },
+    });
+
+    if (!event) {
+      return null;
+    }
+
+    return {
+      ...event,
+      participants: sortEventParticipants(
+        (event.participants ?? []).map((participant) =>
+          mapEventParticipant(participant as EventParticipantRecord),
+        ),
+      ),
+    };
+  }
+
+  async respondToInvitation(input: {
+    userId: string;
+    eventId: string;
+    status: Exclude<EventParticipantStatus, "pending">;
+  }): Promise<unknown> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: input.userId },
+      select: { email: true },
+    });
+    const userEmail = user?.email?.trim().toLowerCase() ?? null;
+
+    const event = await this.prisma.calendarEvent.findFirst({
+      where: {
+        id: input.eventId,
+        userId: input.userId,
+        subscriptionId: null,
+      },
+      include: {
+        category: true,
+        calendar: true,
+        participants: {
+          include: {
+            user: {
+              select: EVENT_PARTICIPANT_USER_SELECT,
+            },
+          },
+        },
+      },
+    });
+
+    if (!event) {
+      throw new ValidationError("Event not found or access denied");
+    }
+
+    const attendee = event.participants.find((participant) => {
+      const participantEmail = participant.email?.trim().toLowerCase();
+      return (
+        participant.role !== "organizer" &&
+        (participant.userId === input.userId ||
+          (userEmail && participantEmail === userEmail))
+      );
+    });
+
+    if (!attendee) {
+      throw new ValidationError(
+        "This event does not have an attendee invitation for your account.",
+        "eventId",
+      );
+    }
+
+    const nextParticipants = event.participants.map((participant) => ({
+      email: participant.email,
+      displayName: participant.displayName ?? undefined,
+      role: participant.role as "organizer" | "attendee",
+      status:
+        participant.id === attendee.id
+          ? input.status
+          : (participant.status as EventParticipantStatus),
+    }));
+
+    if (
+      this.stalwartClient &&
+      event.stalwartAccountId &&
+      event.stalwartCalendarId &&
+      event.stalwartEventId
+    ) {
+      await this.stalwartClient.updateEvent({
+        accountId: event.stalwartAccountId,
+        eventId: event.stalwartEventId,
+        patch: buildStalwartEventPayload({
+          calendarId: event.stalwartCalendarId,
+          uid:
+            event.stalwartUid ||
+            event.externalId ||
+            `${event.id}@solace-calendar.local`,
+          title: event.title,
+          description: event.description,
+          start: event.start,
+          end: event.end,
+          allDay: event.allDay,
+          timezone: event.timezone || "UTC",
+          location: event.location,
+          recurrence: event.recurrence,
+          reminder: event.reminder,
+          participants: nextParticipants,
+        }),
+        sendSchedulingMessages: true,
+      });
+
+      if (input.status === "declined") {
+        // Remove the event from the Stalwart calendar after sending the DECLINED iTIP reply
+        await this.stalwartClient.deleteEvent({
+          accountId: event.stalwartAccountId,
+          eventId: event.stalwartEventId,
+        });
+      } else {
+        await this.syncStalwartEventsByIds({
+          userId: input.userId,
+          accountId: event.stalwartAccountId,
+          eventIds: [event.stalwartEventId],
+        });
+      }
+    } else {
+      await this.prisma.eventParticipant.update({
+        where: { id: attendee.id },
+        data: { status: input.status },
+      });
+    }
+
+    // When declining, delete the event from the local DB and return a deleted marker
+    if (input.status === "declined") {
+      await this.prisma.eventNotification.deleteMany({
+        where: { eventId: input.eventId },
+      });
+      await this.prisma.notificationLog.deleteMany({
+        where: { eventId: input.eventId },
+      });
+      await this.prisma.calendarEvent.delete({
+        where: { id: input.eventId },
+      });
+      return { deleted: true as const };
+    }
+
+    const updatedEvent = await this.prisma.calendarEvent.findFirst({
+      where: {
+        id: input.eventId,
+        userId: input.userId,
+      },
+      include: {
+        category: true,
+        calendar: true,
+        participants: {
+          include: {
+            user: {
+              select: EVENT_PARTICIPANT_USER_SELECT,
+            },
+          },
+        },
+      },
+    });
+
+    if (!updatedEvent) {
+      throw new ValidationError("Event not found or access denied");
+    }
+
+    return {
+      ...updatedEvent,
+      participants: sortEventParticipants(
+        (updatedEvent.participants ?? []).map((participant) =>
+          mapEventParticipant(participant as EventParticipantRecord),
+        ),
+      ),
+    };
   }
 
   async create(input: EventCreateInput): Promise<unknown> {
@@ -444,6 +1137,7 @@ export class EventService implements IEventService {
         encryptedContent,
         blindIndexTokens,
         encryptionKeyVersion,
+        participants,
       } = input;
       let { reminder } = input;
 
@@ -589,10 +1283,10 @@ export class EventService implements IEventService {
         if (
           isNaN(reminderValue) ||
           reminderValue < 0 ||
-          reminderValue > 43200
+          reminderValue > MAX_REMINDER_MINUTES
         ) {
           throw new ValidationError(
-            "Reminder must be a number between 0 and 43200 minutes",
+            `Reminder must be a number between 0 and ${MAX_REMINDER_MINUTES} minutes`,
             "reminder",
           );
         }
@@ -635,35 +1329,119 @@ export class EventService implements IEventService {
         calendarForceFullEncryption,
       });
 
-      const event = await this.prisma.calendarEvent.create({
-        data: {
-          title: persistencePolicy.title,
-          description: persistencePolicy.description,
-          ...(encryptedContent !== undefined ? { encryptedContent } : {}),
-          ...(blindIndexTokens !== undefined
-            ? { blindIndexTokens: JSON.stringify(blindIndexTokens) }
-            : {}),
-          encryptionState: persistencePolicy.encryptionState,
-          ...(encryptionKeyVersion !== undefined
-            ? { encryptionKeyVersion }
-            : {}),
-          start: startDate,
-          end: endDate,
-          timezone: eventTimezone,
-          allDay: allDay || false,
-          location: persistencePolicy.location,
-          color: color || null,
-          calendarId,
-          categoryId: categoryId || null,
-          reminder: reminder ?? null,
-          recurrence: recurrence || null,
-          userId,
-        },
-        include: {
-          category: true,
-          calendar: true,
-        },
-      });
+      const stalwartAccountId = await this.getStalwartAccountId(userId);
+      const stalwartCalendarId = stalwartAccountId
+        ? await this.ensureRemoteCalendar({
+            accountId: stalwartAccountId,
+            calendar,
+          })
+        : null;
+      const stalwartUid = `${crypto.randomUUID()}@solace-calendar.local`;
+      let stalwartEventId: string | null = null;
+
+      if (this.stalwartClient && stalwartAccountId && stalwartCalendarId) {
+        const remoteEvent = await this.stalwartClient.createEvent({
+          accountId: stalwartAccountId,
+          event: buildStalwartEventPayload({
+            calendarId: stalwartCalendarId,
+            uid: stalwartUid,
+            title: persistencePolicy.title || title,
+            description: persistencePolicy.description,
+            start: startDate,
+            end: endDate,
+            allDay: allDay || false,
+            timezone: eventTimezone,
+            location: persistencePolicy.location,
+            recurrence: recurrence || null,
+            reminder: reminder ?? null,
+            participants: await this.resolveStalwartParticipants(
+              userId,
+              participants ?? [],
+            ),
+          }),
+        });
+        stalwartEventId = remoteEvent.id;
+      }
+
+      let event;
+      try {
+        event = await this.prisma.calendarEvent.create({
+          data: {
+            title: persistencePolicy.title,
+            description: persistencePolicy.description,
+            ...(encryptedContent !== undefined ? { encryptedContent } : {}),
+            ...(blindIndexTokens !== undefined
+              ? { blindIndexTokens: JSON.stringify(blindIndexTokens) }
+              : {}),
+            encryptionState: persistencePolicy.encryptionState,
+            ...(encryptionKeyVersion !== undefined
+              ? { encryptionKeyVersion }
+              : {}),
+            start: startDate,
+            end: endDate,
+            timezone: eventTimezone,
+            allDay: allDay || false,
+            location: persistencePolicy.location,
+            color: color || null,
+            calendarId,
+            categoryId: categoryId || null,
+            reminder: reminder ?? null,
+            recurrence: recurrence || null,
+            userId,
+            externalId: stalwartUid,
+            stalwartAccountId,
+            stalwartCalendarId,
+            stalwartEventId,
+            stalwartUid,
+            stalwartSyncedAt: stalwartEventId ? new Date() : null,
+          },
+          include: {
+            category: true,
+            calendar: true,
+          },
+        });
+      } catch (error) {
+        if (this.stalwartClient && stalwartAccountId && stalwartEventId) {
+          try {
+            await this.stalwartClient.deleteEvent({
+              accountId: stalwartAccountId,
+              eventId: stalwartEventId,
+              sendSchedulingMessages: false,
+            });
+          } catch (cleanupError) {
+            logger.error("Failed to clean up remote event after local DB create failure", {
+              stalwartEventId,
+              originalError: error instanceof Error ? error.message : String(error),
+              cleanupError: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+            });
+          }
+        }
+        throw error;
+      }
+
+      const participantResult =
+        await this.eventParticipantService.syncParticipants({
+          eventId: event.id,
+          participants: participants ?? [],
+          ownerUserId: userId,
+          sendInvitations: true,
+          calendarName: calendar.name,
+          invitationEvent: this.buildInvitationEventPayload({
+            eventId: event.id,
+            externalId: event.externalId,
+            title: title.trim(),
+            description: description?.trim() || null,
+            start: startDate,
+            end: endDate,
+            allDay: allDay || false,
+            timezone: eventTimezone,
+            location: location?.trim() || null,
+            recurrence: recurrence || null,
+            createdAt: event.createdAt,
+            updatedAt: event.updatedAt,
+          }),
+        });
+      await participantResult.sendPendingInvitations();
 
       try {
         if (reminder && reminder > 0) {
@@ -716,7 +1494,10 @@ export class EventService implements IEventService {
         logger.error("Failed to create notifications:", notificationError);
       }
 
-      return event;
+      return {
+        ...event,
+        participants: participantResult.participants,
+      };
     } catch (error) {
       logger.error("Event creation error:", error);
       throw error;
@@ -744,7 +1525,7 @@ export class EventService implements IEventService {
           id,
           userId,
         },
-        include: { category: true },
+        include: { category: true, participants: true },
       });
 
       if (!existingEvent) {
@@ -754,6 +1535,15 @@ export class EventService implements IEventService {
       if (existingEvent.isSynced) {
         throw new ValidationError(
           "Cannot edit synced events. Synced events are read-only.",
+        );
+      }
+
+      if (
+        this.isAttendeeCopyForUser(userId, existingEvent.participants) &&
+        !existingEvent.isCancelled
+      ) {
+        throw new ValidationError(
+          "Imported invitation events are read-only for attendees.",
         );
       }
 
@@ -883,10 +1673,10 @@ export class EventService implements IEventService {
         if (
           isNaN(reminderValue) ||
           reminderValue < 0 ||
-          reminderValue > 43200
+          reminderValue > MAX_REMINDER_MINUTES
         ) {
           throw new ValidationError(
-            "Reminder must be a number between 0 and 43200 minutes",
+            `Reminder must be a number between 0 and ${MAX_REMINDER_MINUTES} minutes`,
             "reminder",
           );
         }
@@ -901,10 +1691,15 @@ export class EventService implements IEventService {
           },
           select: {
             id: true,
+            name: true,
+            color: true,
             kind: true,
             isSyncOnly: true,
+            isVisible: true,
+            isDefault: true,
             icsShareEnabled: true,
             forceFullEncryption: true,
+            stalwartCalendarId: true,
           },
         }));
 
@@ -1073,6 +1868,73 @@ export class EventService implements IEventService {
         updateData.encryptionKeyVersion = input.encryptionKeyVersion;
       }
 
+      const stalwartAccountId =
+        existingEvent.stalwartAccountId ??
+        (await this.getStalwartAccountId(userId));
+      const stalwartCalendarId = stalwartAccountId
+        ? await this.ensureRemoteCalendar({
+            accountId: stalwartAccountId,
+            calendar: finalCalendar,
+          })
+        : null;
+      let stalwartEventId = existingEvent.stalwartEventId;
+
+      if (this.stalwartClient && stalwartAccountId && stalwartCalendarId) {
+        const remotePayload = buildStalwartEventPayload({
+          calendarId: stalwartCalendarId,
+          uid:
+            existingEvent.stalwartUid ||
+            existingEvent.externalId ||
+            `${existingEvent.id}@solace-calendar.local`,
+          title: persistencePolicy.title || nextTitle,
+          description: persistencePolicy.description,
+          start: finalStartDate,
+          end: finalEndDate,
+          allDay:
+            input.allDay !== undefined ? input.allDay : existingEvent.allDay,
+          timezone: eventTimezone,
+          location: persistencePolicy.location,
+          recurrence:
+            input.recurrence !== undefined
+              ? input.recurrence
+              : existingEvent.recurrence,
+          reminder: finalReminderValue,
+          participants:
+            input.participants !== undefined
+              ? await this.resolveStalwartParticipants(
+                  userId,
+                  input.participants,
+                )
+              : undefined,
+        });
+
+        if (stalwartEventId) {
+          await this.stalwartClient.updateEvent({
+            accountId: stalwartAccountId,
+            eventId: stalwartEventId,
+            patch: remotePayload,
+          });
+        } else {
+          const remoteEvent = await this.stalwartClient.createEvent({
+            accountId: stalwartAccountId,
+            event: remotePayload,
+          });
+          stalwartEventId = remoteEvent.id;
+        }
+      }
+
+      if (stalwartAccountId && stalwartCalendarId && stalwartEventId) {
+        updateData.externalId =
+          existingEvent.stalwartUid ||
+          existingEvent.externalId ||
+          `${existingEvent.id}@solace-calendar.local`;
+        updateData.stalwartAccountId = stalwartAccountId;
+        updateData.stalwartCalendarId = stalwartCalendarId;
+        updateData.stalwartEventId = stalwartEventId;
+        updateData.stalwartUid = updateData.externalId;
+        updateData.stalwartSyncedAt = new Date();
+      }
+
       updateData.updatedAt = new Date();
 
       const updatedEvent = await this.prisma.calendarEvent.update({
@@ -1086,6 +1948,42 @@ export class EventService implements IEventService {
           calendar: true,
         },
       });
+
+      if (input.participants !== undefined) {
+        const participantResult =
+          await this.eventParticipantService.syncParticipants({
+            eventId: updatedEvent.id,
+            participants: input.participants,
+            ownerUserId: userId,
+            sendInvitations: true,
+            calendarName: finalCalendar.name,
+            // If the event is encrypted and the plaintext title isn't available in this
+            // update, skip invitation emails (invitees would receive an empty-title ICS).
+            invitationEvent: nextTitle
+              ? this.buildInvitationEventPayload({
+                  eventId: updatedEvent.id,
+                  externalId: updatedEvent.externalId,
+                  title: nextTitle,
+                  description: nextDescription,
+                  start: finalStartDate,
+                  end: finalEndDate,
+                  allDay:
+                    input.allDay !== undefined
+                      ? input.allDay
+                      : existingEvent.allDay,
+                  timezone: eventTimezone,
+                  location: nextLocation,
+                  recurrence:
+                    input.recurrence !== undefined
+                      ? input.recurrence
+                      : existingEvent.recurrence,
+                  createdAt: updatedEvent.createdAt,
+                  updatedAt: updatedEvent.updatedAt,
+                })
+              : undefined,
+          });
+        await participantResult.sendPendingInvitations();
+      }
 
       // Update notifications if event time or reminder changed
       try {
@@ -1174,7 +2072,12 @@ export class EventService implements IEventService {
         // Notification failure shouldn't fail the event update
       }
 
-      return updatedEvent;
+      const participantMap = await this.buildParticipantMap([updatedEvent.id]);
+
+      return {
+        ...updatedEvent,
+        participants: participantMap.get(updatedEvent.id) ?? [],
+      };
     } catch (error: unknown) {
       logger.error("Event update error:", error);
 
@@ -1215,6 +2118,9 @@ export class EventService implements IEventService {
           id,
           userId,
         },
+        include: {
+          participants: true,
+        },
       });
 
       if (!existingEvent) {
@@ -1228,21 +2134,40 @@ export class EventService implements IEventService {
         );
       }
 
-      const deletedNotifications =
-        await this.prisma.eventNotification.deleteMany({
-          where: { eventId: id },
+      if (
+        this.isAttendeeCopyForUser(userId, existingEvent.participants) &&
+        !existingEvent.isCancelled
+      ) {
+        throw new ValidationError(
+          "Imported invitation events are read-only for attendees.",
+        );
+      }
+
+      if (
+        this.stalwartClient &&
+        existingEvent.stalwartAccountId &&
+        existingEvent.stalwartEventId
+      ) {
+        await this.stalwartClient.deleteEvent({
+          accountId: existingEvent.stalwartAccountId,
+          eventId: existingEvent.stalwartEventId,
         });
+      }
+
+      const [deletedNotifications] = await this.prisma.$transaction([
+        this.prisma.eventNotification.deleteMany({
+          where: { eventId: id },
+        }),
+        this.prisma.notificationLog.deleteMany({
+          where: { eventId: id },
+        }),
+        this.prisma.calendarEvent.delete({
+          where: { id },
+        }),
+      ]);
       logger.ok(
         `Deleted ${deletedNotifications.count} notifications for event ${id}`,
       );
-
-      await this.prisma.notificationLog.deleteMany({
-        where: { eventId: id },
-      });
-
-      await this.prisma.calendarEvent.delete({
-        where: { id },
-      });
 
       return {
         success: true,
@@ -1268,6 +2193,20 @@ export class EventService implements IEventService {
           id: { in: eventIds },
           userId,
         },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  image: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       if (events.length !== eventIds.length) {
@@ -1281,6 +2220,17 @@ export class EventService implements IEventService {
       if (syncedEvents.length > 0) {
         throw new ValidationError(
           `Cannot modify synced events. The following synced events are read-only: ${syncedEvents.map((e) => e.title).join(", ")}`,
+        );
+      }
+
+      const attendeeEvents = events.filter(
+        (event) =>
+          this.isAttendeeCopyForUser(userId, event.participants) &&
+          !event.isCancelled,
+      );
+      if (attendeeEvents.length > 0) {
+        throw new ValidationError(
+          `Imported invitation events are read-only for attendees: ${attendeeEvents.map((event) => event.title).join(", ")}`,
         );
       }
 
@@ -1319,6 +2269,33 @@ export class EventService implements IEventService {
             );
           }
 
+          const stalwartAccountId = await this.getStalwartAccountId(userId);
+          const targetStalwartCalendarId = stalwartAccountId
+            ? await this.ensureRemoteCalendar({
+                accountId: stalwartAccountId,
+                calendar: targetCalendar,
+              })
+            : null;
+
+          if (
+            this.stalwartClient &&
+            stalwartAccountId &&
+            targetStalwartCalendarId
+          ) {
+            for (const event of events) {
+              if (!event.stalwartEventId) continue;
+              await this.stalwartClient.updateEvent({
+                accountId: event.stalwartAccountId ?? stalwartAccountId,
+                eventId: event.stalwartEventId,
+                patch: {
+                  calendarIds: {
+                    [targetStalwartCalendarId]: true,
+                  },
+                },
+              });
+            }
+          }
+
           result = await this.prisma.calendarEvent.updateMany({
             where: {
               id: { in: eventIds },
@@ -1326,6 +2303,7 @@ export class EventService implements IEventService {
             },
             data: {
               calendarId: targetCalendarId,
+              stalwartCalendarId: targetStalwartCalendarId,
               updatedAt: new Date(),
             },
           });
@@ -1339,6 +2317,19 @@ export class EventService implements IEventService {
         }
 
         case "delete": {
+          for (const event of events) {
+            if (
+              this.stalwartClient &&
+              event.stalwartAccountId &&
+              event.stalwartEventId
+            ) {
+              await this.stalwartClient.deleteEvent({
+                accountId: event.stalwartAccountId,
+                eventId: event.stalwartEventId,
+              });
+            }
+          }
+
           const deletedNotifications =
             await this.prisma.eventNotification.deleteMany({
               where: { eventId: { in: eventIds } },
@@ -1399,6 +2390,25 @@ export class EventService implements IEventService {
               },
             });
 
+            const duplicatedParticipants =
+              await this.eventParticipantService.syncParticipants({
+                eventId: duplicated.id,
+                participants: (event.participants ?? [])
+                  .filter((participant) => participant.role !== "organizer")
+                  .map((participant) => ({
+                    email: participant.email,
+                    displayName:
+                      participant.displayName ??
+                      participant.user?.name ??
+                      undefined,
+                    role: "attendee" as const,
+                    status: participant.status as EventParticipantStatus,
+                  })),
+                ownerUserId: userId,
+                tx: this.prisma,
+              });
+            await duplicatedParticipants.sendPendingInvitations();
+
             try {
               if (event.reminder && event.reminder > 0) {
                 const userSettings = await this.prisma.userSettings.findUnique({
@@ -1453,7 +2463,10 @@ export class EventService implements IEventService {
               );
             }
 
-            duplicatedEvents.push(duplicated);
+            duplicatedEvents.push({
+              ...duplicated,
+              participants: duplicatedParticipants.participants,
+            });
           }
 
           return {
@@ -1505,6 +2518,18 @@ export class EventService implements IEventService {
       },
       include: {
         calendar: true,
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+              },
+            },
+          },
+        },
       },
     });
 

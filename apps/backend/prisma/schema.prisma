@@ -133,6 +133,9 @@ model Calendar {
   isSyncOnly      Boolean           @default(false) @map("is_sync_only") // Read-only calendar synced from external subscription
   icsShareToken   String?           @unique @map("ics_share_token")
   icsShareEnabled Boolean           @default(false) @map("ics_share_enabled")
+  stalwartAccountId String?         @map("stalwart_account_id")
+  stalwartCalendarId String?        @map("stalwart_calendar_id")
+  stalwartSyncedAt DateTime?        @map("stalwart_synced_at")
   userId          String            @map("user_id")
   user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   events          CalendarEvent[]
@@ -142,6 +145,8 @@ model Calendar {
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
   @@unique([userId, name])
+  @@unique([userId, stalwartCalendarId])
+  @@index([stalwartAccountId])
   @@map("calendar")
 }
 
@@ -183,11 +188,17 @@ model CalendarEvent {
   reminder             Int? // minutes before event to remind
   recurrence           String? // JSON string for recurrence rules (daily, weekly, monthly, etc.)
   parentEventId        String?               @map("parent_event_id") // For recurring event instances
+  isCancelled          Boolean               @default(false) @map("is_cancelled")
   // Sync fields for external calendar events
   isSynced             Boolean               @default(false) @map("is_synced") // Whether this event came from external calendar
   externalId           String?               @map("external_id") // UID from the .ics file
   subscriptionId       String?               @map("subscription_id") // Which subscription this event came from
   syncedAt             DateTime?             @map("synced_at") // When this event was last synced
+  stalwartAccountId    String?               @map("stalwart_account_id")
+  stalwartCalendarId   String?               @map("stalwart_calendar_id")
+  stalwartEventId      String?               @map("stalwart_event_id")
+  stalwartUid          String?               @map("stalwart_uid")
+  stalwartSyncedAt     DateTime?             @map("stalwart_synced_at")
   // Relationships
   userId               String                @map("user_id")
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -203,6 +214,8 @@ model CalendarEvent {
 
   @@index([isSynced, subscriptionId])
   @@index([externalId, subscriptionId])
+  @@unique([userId, stalwartEventId])
+  @@index([stalwartAccountId, stalwartCalendarId])
   @@index([userId, start, end])
   @@index([userId, recurrence, parentEventId])
   @@map("calendar_event")
@@ -212,14 +225,17 @@ model EventParticipant {
   id        String        @id @default(cuid())
   eventId   String        @map("event_id")
   event     CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  userId    String        @map("user_id")
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status    String        @default("pending") // pending, accepted, declined
+  userId    String?       @map("user_id")
+  user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email     String
+  displayName String?     @map("display_name")
+  status    String        @default("pending") // pending, accepted, declined, tentative
   role      String        @default("attendee") // organizer, attendee
   createdAt DateTime      @default(now()) @map("created_at")
   updatedAt DateTime      @updatedAt @map("updated_at")
 
-  @@unique([eventId, userId])
+  @@index([eventId, userId])
+  @@unique([eventId, email])
   @@map("event_participant")
 }
 

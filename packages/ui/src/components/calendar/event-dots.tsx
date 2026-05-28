@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import { CalendarEvent, type CalendarView } from "./types";
 import { EncryptionStatusBadge } from "./encryption-status";
 import { EventItem } from "./event-item";
@@ -113,7 +114,15 @@ export function EventDots({
                 >
                   <span className="flex items-center gap-1 min-w-0 truncate">
                     <EncryptionStatusBadge item={event} asIcon />
-                    <span className="truncate">{event.title}</span>
+                    <span
+                      className={cn(
+                        "truncate",
+                        isCancelledCalendarEvent(event) &&
+                          "line-through opacity-70",
+                      )}
+                    >
+                      {event.title}
+                    </span>
                   </span>
                 </div>
               ))}
@@ -165,7 +174,15 @@ export function EventDots({
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm flex items-center gap-1.5 min-w-0">
                     <EncryptionStatusBadge item={event} asIcon />
-                    <span className="truncate">{event.title}</span>
+                    <span
+                      className={cn(
+                        "truncate",
+                        isCancelledCalendarEvent(event) &&
+                          "line-through opacity-70",
+                      )}
+                    >
+                      {event.title}
+                    </span>
                   </div>
                   {event.location && (
                     <div className="text-xs text-muted-foreground truncate mt-0.5">

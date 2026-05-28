@@ -108,11 +108,13 @@ export function E2eeBootstrap() {
 
     if (!userId) {
       resetE2eeBootstrap();
-      setMode("hidden");
-      setPassword("");
-      setConfirmPassword("");
-      setError(null);
-      setIsEmailPasswordUser(false);
+      queueMicrotask(() => {
+        setMode("hidden");
+        setPassword("");
+        setConfirmPassword("");
+        setError(null);
+        setIsEmailPasswordUser(false);
+      });
 
       if (previousUserId) {
         clearAuthPasswords();
@@ -132,7 +134,11 @@ export function E2eeBootstrap() {
     previousUserIdRef.current = userId;
 
     let isCancelled = false;
-    setError(null);
+    queueMicrotask(() => {
+      if (!isCancelled) {
+        setError(null);
+      }
+    });
 
     void (async () => {
       // Restore password from the encrypted cookie so cross-tab and

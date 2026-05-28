@@ -118,14 +118,18 @@ describe("EventEditorPopover", () => {
           anchorPosition={{ x: 120, y: 120 }}
           badgeItem={null as any}
           calendars={[] as any}
+          canEditEvent={true}
           dialogTitle="Popover Editor"
           eventForm={eventForm}
           handleEventDelete={() => {}}
           handleEventDownloadIcs={() => {}}
           handleEventSave={() => {}}
+          invitationResponsePending={null}
+          invitationStatus={null}
           isViewMode={false}
           leadingSlot={null}
           localSettings={localSettings as any}
+          onInvitationResponse={() => {}}
           onOpenChange={onOpenChange}
           open={true}
           recurringModal={null}
