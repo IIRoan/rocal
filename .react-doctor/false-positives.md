@@ -64,3 +64,12 @@ Patterns that fire diagnostics but are safe to suppress.
 - **Why FP**: The image preview renders an attachment served as a blob/data URL
   generated client-side. `next/image` requires a configured domain allowlist
   and cannot optimize blob/data URLs. The eslint-disable comment is intentional.
+
+## react-doctor/js-tosorted-immutable — native tsconfig ES2022
+
+- **Files**: `apps/native/app/calendar-manage/index.tsx:76`,
+  `apps/native/app/(tabs)/settings/index.tsx:197`
+- **Why FP**: `Array.prototype.toSorted` is ES2023. The native app tsconfig
+  uses `lib: ["DOM", "ES2022"]` and `target: ES2022`. The existing
+  `[...arr].sort(compareFn)` pattern is already immutable (spread creates a
+  new array). Upgrading to ES2023 lib is deferred.
