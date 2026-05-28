@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import type { CalendarEvent } from "../../generated/prisma/index.js";
+import type { EventParticipantRecord } from "../../lib/event-participants";
 import { toIcsBuildEvent, toSafeIcsFilename } from "../../lib/ics-export";
 
 function createCalendarEvent(
@@ -99,5 +100,39 @@ describe("ics-export", () => {
   it("falls back to calendar.ics when the name collapses to an empty value", () => {
     expect(toSafeIcsFilename("   ")).toBe("calendar.ics");
     expect(toSafeIcsFilename("!!!")).toBe("calendar.ics");
+  });
+
+  it("includes mapped participants when event has participants", () => {
+    const participant: EventParticipantRecord = {
+      id: "p-1",
+      eventId: "event-1",
+      userId: "user-1",
+      email: "alice@example.com",
+      displayName: "Alice",
+      role: "organizer",
+      status: "accepted",
+      createdAt: new Date("2024-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2024-01-01T00:00:00.000Z"),
+      user: {
+        id: "user-1",
+        name: "Alice",
+        email: "alice@example.com",
+        image: null,
+      },
+    };
+
+    const result = toIcsBuildEvent({
+      ...createCalendarEvent(),
+      participants: [participant],
+    });
+
+    expect(result.participants).toEqual([
+      {
+        email: "alice@example.com",
+        displayName: "Alice",
+        role: "organizer",
+        status: "accepted",
+      },
+    ]);
   });
 });

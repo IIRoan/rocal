@@ -1402,11 +1402,19 @@ export class EventService implements IEventService {
         });
       } catch (error) {
         if (this.stalwartClient && stalwartAccountId && stalwartEventId) {
-          await this.stalwartClient.deleteEvent({
-            accountId: stalwartAccountId,
-            eventId: stalwartEventId,
-            sendSchedulingMessages: false,
-          });
+          try {
+            await this.stalwartClient.deleteEvent({
+              accountId: stalwartAccountId,
+              eventId: stalwartEventId,
+              sendSchedulingMessages: false,
+            });
+          } catch (cleanupError) {
+            logger.error("Failed to clean up remote event after local DB create failure", {
+              stalwartEventId,
+              originalError: error instanceof Error ? error.message : String(error),
+              cleanupError: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+            });
+          }
         }
         throw error;
       }
@@ -2146,21 +2154,20 @@ export class EventService implements IEventService {
         });
       }
 
-      const deletedNotifications =
-        await this.prisma.eventNotification.deleteMany({
+      const [deletedNotifications] = await this.prisma.$transaction([
+        this.prisma.eventNotification.deleteMany({
           where: { eventId: id },
-        });
+        }),
+        this.prisma.notificationLog.deleteMany({
+          where: { eventId: id },
+        }),
+        this.prisma.calendarEvent.delete({
+          where: { id },
+        }),
+      ]);
       logger.ok(
         `Deleted ${deletedNotifications.count} notifications for event ${id}`,
       );
-
-      await this.prisma.notificationLog.deleteMany({
-        where: { eventId: id },
-      });
-
-      await this.prisma.calendarEvent.delete({
-        where: { id },
-      });
 
       return {
         success: true,

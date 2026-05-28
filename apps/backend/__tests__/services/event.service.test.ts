@@ -858,6 +858,9 @@ describe("EventService Stalwart integration", () => {
       notificationLog: {
         deleteMany: jest.fn(async () => ({ count: 0 })),
       },
+      $transaction: jest.fn(async (ops: Promise<unknown>[]) =>
+        Promise.all(ops),
+      ),
     };
     const service = new EventService(prisma as never);
 
