@@ -26,6 +26,10 @@ import {
   getSubscriptionType,
   sortSubscriptions,
 } from "../../src/lib/subscription-utils";
+import {
+  SectionHeader,
+  EmptyCard,
+} from "../../src/components/ui/list-components";
 
 type ReadOnlyCalendarEntry = {
   subscription: CalendarSubscription;
@@ -310,47 +314,6 @@ export default function SubscriptionListScreen() {
   );
 }
 
-function SectionHeader({
-  title,
-  count,
-  theme,
-}: {
-  title: string;
-  count: number;
-  theme: ThemeTokens;
-}) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-
-  return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={styles.sectionCount}>{count}</Text>
-    </View>
-  );
-}
-
-function EmptyCard({
-  icon,
-  title,
-  text,
-  theme,
-}: {
-  icon: React.ComponentProps<typeof Feather>["name"];
-  title: string;
-  text: string;
-  theme: ThemeTokens;
-}) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-
-  return (
-    <View style={styles.emptyCard}>
-      <Feather name={icon} size={18} color={theme.colors.mutedForeground} />
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptyText}>{text}</Text>
-    </View>
-  );
-}
-
 function ReadOnlyCalendarRow({
   entry,
   onOpen,
@@ -521,21 +484,6 @@ function createStyles(theme: ThemeTokens) {
       borderRadius: theme.borderRadius.md,
       backgroundColor: theme.colors.primaryBase,
     },
-    sectionHeader: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "space-between" as const,
-      paddingTop: theme.spacing["2"],
-    },
-    emptyCard: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: theme.colors.card,
-      padding: theme.spacing["4"],
-      alignItems: "flex-start" as const,
-      gap: theme.spacing["2"],
-    },
     rowCard: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
@@ -609,29 +557,6 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryForeground,
-    },
-    sectionTitle: {
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    sectionCount: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    emptyTitle: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    emptyText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
     },
     rowTitle: {
       fontSize: theme.typography.fontSize.sm.size,

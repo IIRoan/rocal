@@ -42,9 +42,12 @@ import { toIcsBuildEvent, toSafeIcsFilename } from "../lib/ics-export";
 import { createLogger } from "@workspace/logger";
 import {
   mapEventParticipant,
+  mapAndSortParticipants,
   resolveParticipantInputs,
   sortEventParticipants,
   EVENT_PARTICIPANT_USER_SELECT,
+  EVENT_WITH_RELATIONS_INCLUDE,
+  EVENT_WITH_RECURRENCE_INCLUDE,
   type EventParticipantRecord,
 } from "../lib/event-participants";
 import { EventParticipantService } from "./event-participant.service";
@@ -680,17 +683,7 @@ export class EventService implements IEventService {
             },
           ],
         },
-        include: {
-          category: true,
-          calendar: true,
-          participants: {
-            include: {
-              user: {
-                select: EVENT_PARTICIPANT_USER_SELECT,
-              },
-            },
-          },
-        },
+        include: EVENT_WITH_RELATIONS_INCLUDE,
       }),
       this.prisma.calendarEvent.findMany({
         where: {
@@ -698,18 +691,7 @@ export class EventService implements IEventService {
           recurrence: { not: null },
           parentEventId: null,
         },
-        include: {
-          category: true,
-          calendar: true,
-          recurrenceExceptions: true,
-          participants: {
-            include: {
-              user: {
-                select: EVENT_PARTICIPANT_USER_SELECT,
-              },
-            },
-          },
-        },
+        include: EVENT_WITH_RECURRENCE_INCLUDE,
       }),
     ]);
 
@@ -796,17 +778,7 @@ export class EventService implements IEventService {
           parentEventId: { not: null },
           start: { gte: startDate, lte: endDate },
         },
-        include: {
-          category: true,
-          calendar: true,
-          participants: {
-            include: {
-              user: {
-                select: EVENT_PARTICIPANT_USER_SELECT,
-              },
-            },
-          },
-        },
+        include: EVENT_WITH_RELATIONS_INCLUDE,
       }),
       this.prisma.eventCategory.findMany({
         where: {
@@ -830,11 +802,7 @@ export class EventService implements IEventService {
     ]
       .map((event) => ({
         ...event,
-        participants: sortEventParticipants(
-          (event.participants ?? []).map((participant) =>
-            mapEventParticipant(participant as EventParticipantRecord),
-          ),
-        ),
+        participants: mapAndSortParticipants(event),
       }))
       .filter(
         (event) =>
@@ -911,11 +879,7 @@ export class EventService implements IEventService {
 
       return {
         ...event,
-        participants: sortEventParticipants(
-          (event.participants ?? []).map((participant) =>
-            mapEventParticipant(participant as EventParticipantRecord),
-          ),
-        ),
+        participants: mapAndSortParticipants(event),
       };
     } catch (error) {
       logger.error("Event fetch error:", error);
@@ -947,17 +911,7 @@ export class EventService implements IEventService {
         externalId: normalizedExternalId,
         subscriptionId: null,
       },
-      include: {
-        category: true,
-        calendar: true,
-        participants: {
-          include: {
-            user: {
-              select: EVENT_PARTICIPANT_USER_SELECT,
-            },
-          },
-        },
-      },
+      include: EVENT_WITH_RELATIONS_INCLUDE,
     });
 
     if (!event) {
@@ -966,11 +920,7 @@ export class EventService implements IEventService {
 
     return {
       ...event,
-      participants: sortEventParticipants(
-        (event.participants ?? []).map((participant) =>
-          mapEventParticipant(participant as EventParticipantRecord),
-        ),
-      ),
+      participants: mapAndSortParticipants(event),
     };
   }
 
@@ -991,17 +941,7 @@ export class EventService implements IEventService {
         userId: input.userId,
         subscriptionId: null,
       },
-      include: {
-        category: true,
-        calendar: true,
-        participants: {
-          include: {
-            user: {
-              select: EVENT_PARTICIPANT_USER_SELECT,
-            },
-          },
-        },
-      },
+      include: EVENT_WITH_RELATIONS_INCLUDE,
     });
 
     if (!event) {
@@ -1102,17 +1042,7 @@ export class EventService implements IEventService {
         id: input.eventId,
         userId: input.userId,
       },
-      include: {
-        category: true,
-        calendar: true,
-        participants: {
-          include: {
-            user: {
-              select: EVENT_PARTICIPANT_USER_SELECT,
-            },
-          },
-        },
-      },
+      include: EVENT_WITH_RELATIONS_INCLUDE,
     });
 
     if (!updatedEvent) {
@@ -1121,11 +1051,7 @@ export class EventService implements IEventService {
 
     return {
       ...updatedEvent,
-      participants: sortEventParticipants(
-        (updatedEvent.participants ?? []).map((participant) =>
-          mapEventParticipant(participant as EventParticipantRecord),
-        ),
-      ),
+      participants: mapAndSortParticipants(updatedEvent),
     };
   }
 

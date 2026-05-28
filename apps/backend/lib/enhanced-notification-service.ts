@@ -25,6 +25,11 @@ import { Resend } from "resend";
 import { render } from "@react-email/render";
 import { createLogger } from "@workspace/logger";
 import { errorMessage } from "./errors";
+import {
+  isRetryableError,
+  isRetryableDatabaseError,
+  isRetryableUpdateError,
+} from "./error-classification";
 // Conditional import to avoid Next.js build issues
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let EventReminderEmail: ((...args: any[]) => React.JSX.Element) | undefined;
@@ -605,7 +610,7 @@ export class EnhancedNotificationService {
         lastError = error instanceof Error ? error : new Error("Unknown error");
 
         // Check if this is a retryable error (database connection, deadlock, etc.)
-        if (this.isRetryableUpdateError(error) && attempt < maxRetries) {
+        if (isRetryableUpdateError(error) && attempt < maxRetries) {
           const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
           logger.warn(
             `⚠️ Update attempt ${attempt} failed for event ${eventId}, retrying in ${delay}ms: ${lastError.message}`,
@@ -1027,7 +1032,7 @@ export class EnhancedNotificationService {
           const message = errorMessage(error);
 
           // Enhanced error handling with better categorization
-          const shouldRetry = this.shouldRetryError(error);
+          const shouldRetry = isRetryableError(error);
           const retryAfterMinutes = this.calculateRetryDelay(error);
 
           await this.handleNotificationFailure(notification, {
@@ -1156,7 +1161,7 @@ export class EnhancedNotificationService {
       return { success: true, shouldRetry: false };
     } catch (error) {
       const message = errorMessage(error);
-      const shouldRetry = this.shouldRetryError(error);
+      const shouldRetry = isRetryableError(error);
       const retryAfterMinutes = this.calculateRetryDelay(error);
 
       return {
@@ -1342,7 +1347,7 @@ export class EnhancedNotificationService {
 
         // Use smarter retry logic based on error type
         const shouldContinueRetrying =
-          this.shouldRetryError(error) && updatedRetryInfo.retryCount <= 3;
+          isRetryableError(error) && updatedRetryInfo.retryCount <= 3;
 
         if (shouldContinueRetrying) {
           const retryDelay = this.calculateRetryDelay(error) * MS_PER_MINUTE; // Convert to milliseconds
@@ -1420,64 +1425,6 @@ export class EnhancedNotificationService {
       logger.error("Failed to log permanent failure:", error);
       // Don't throw - this is just for logging
     }
-  }
-
-  /**
-   * Determine if an error should trigger a retry
-   * @param error - The error that occurred
-   * @returns Whether the error is retryable
-   */
-  private shouldRetryError(error: unknown): boolean {
-    if (!(error instanceof Error)) {
-      return false;
-    }
-
-    const errorMessage = error.message.toLowerCase();
-
-    // Retryable errors (transient failures)
-    const retryableErrors = [
-      "network",
-      "timeout",
-      "connection",
-      "temporary",
-      "rate limit",
-      "service unavailable",
-      "internal server error",
-      "bad gateway",
-      "gateway timeout",
-      "econnreset",
-      "enotfound",
-      "etimedout",
-    ];
-
-    // Non-retryable errors (permanent failures)
-    const nonRetryableErrors = [
-      "invalid email",
-      "authentication failed",
-      "unauthorized",
-      "forbidden",
-      "not found",
-      "bad request",
-      "validation",
-      "malformed",
-    ];
-
-    // Check for non-retryable errors first
-    for (const nonRetryable of nonRetryableErrors) {
-      if (errorMessage.includes(nonRetryable)) {
-        return false;
-      }
-    }
-
-    // Check for retryable errors
-    for (const retryable of retryableErrors) {
-      if (errorMessage.includes(retryable)) {
-        return true;
-      }
-    }
-
-    // Default to retryable for unknown errors (conservative approach)
-    return true;
   }
 
   /**
@@ -2051,7 +1998,7 @@ export class EnhancedNotificationService {
           error instanceof Error ? error : new Error("Unknown database error");
 
         // Check if this is a retryable database error
-        if (this.isRetryableDatabaseError(error) && attempt < maxRetries) {
+        if (isRetryableDatabaseError(error) && attempt < maxRetries) {
           const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
           logger.warn(
             `⚠️ Database operation attempt ${attempt} failed, retrying in ${delay}ms: ${lastError.message}`,
@@ -2072,124 +2019,6 @@ export class EnhancedNotificationService {
       lastError ||
       new Error("Database operation failed after all retry attempts")
     );
-  }
-
-  /**
-   * Check if a database error is retryable
-   * @param error - The error to check
-   * @returns Whether the error should trigger a retry
-   */
-  private isRetryableDatabaseError(error: unknown): boolean {
-    if (!(error instanceof Error)) {
-      return false;
-    }
-
-    const errorMessage = error.message.toLowerCase();
-    const errorCode = (error as { code?: string }).code;
-
-    // Retryable database errors
-    const retryableErrors = [
-      "connection",
-      "timeout",
-      "deadlock",
-      "lock",
-      "busy",
-      "network",
-      "econnreset",
-      "enotfound",
-      "etimedout",
-      "server has gone away",
-      "lost connection",
-      "connection refused",
-      "too many connections",
-      "connection pool",
-      "transaction",
-    ];
-
-    // Retryable error codes (Prisma/PostgreSQL specific)
-    const retryableErrorCodes = [
-      "P1001", // Can't reach database server
-      "P1002", // Database server timeout
-      "P1008", // Operations timed out
-      "P1017", // Server has closed the connection
-      "P2024", // Timed out fetching a new connection
-      "P2034", // Transaction failed due to a write conflict
-      "40001", // Serialization failure
-      "40P01", // Deadlock detected
-      "53300", // Too many connections
-      "08000", // Connection exception
-      "08003", // Connection does not exist
-      "08006", // Connection failure
-    ];
-
-    // Check error codes first
-    if (errorCode && retryableErrorCodes.includes(errorCode)) {
-      return true;
-    }
-
-    // Check error message
-    for (const retryableError of retryableErrors) {
-      if (errorMessage.includes(retryableError)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * Check if an update error is retryable (for concurrent update handling)
-   * @param error - The error to check
-   * @returns Whether the error should trigger a retry
-   */
-  private isRetryableUpdateError(error: unknown): boolean {
-    if (!(error instanceof Error)) {
-      return false;
-    }
-
-    const errorMessage = error.message.toLowerCase();
-    const errorCode = (error as { code?: string }).code;
-
-    // Retryable update errors (concurrent access, deadlocks, etc.)
-    const retryableUpdateErrors = [
-      "deadlock",
-      "lock",
-      "conflict",
-      "concurrent",
-      "serialization",
-      "unique constraint",
-      "foreign key constraint",
-      "transaction",
-      "could not serialize",
-      "update conflict",
-      "version mismatch",
-    ];
-
-    // Retryable update error codes
-    const retryableUpdateErrorCodes = [
-      "P2002", // Unique constraint failed
-      "P2003", // Foreign key constraint failed
-      "P2034", // Transaction failed due to a write conflict
-      "40001", // Serialization failure
-      "40P01", // Deadlock detected
-      "23505", // Unique violation
-      "23503", // Foreign key violation
-    ];
-
-    // Check error codes first
-    if (errorCode && retryableUpdateErrorCodes.includes(errorCode)) {
-      return true;
-    }
-
-    // Check error message
-    for (const retryableError of retryableUpdateErrors) {
-      if (errorMessage.includes(retryableError)) {
-        return true;
-      }
-    }
-
-    // Also check if it's a general database error
-    return this.isRetryableDatabaseError(error);
   }
 
   /**
