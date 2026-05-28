@@ -1,6 +1,6 @@
 import { createLogger } from "@workspace/logger";
 import type { PrismaClient } from "../generated/prisma/index.js";
-import { ForbiddenError, ValidationError } from "../lib/errors";
+import { ForbiddenError, ValidationError, errorString} from "../lib/errors";
 import type {
   StalwartJmapAdminClientLike,
   StalwartJmapEnvelope,
@@ -378,7 +378,7 @@ export class MailSyncService {
         logger.warn("Receipt-time mail sync failed", {
           accountId: entry.stalwartAccountId,
           userId: entry.userId,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorString(error),
         });
       }
     }

@@ -6,7 +6,7 @@ import type {
   CalendarDeleteInput,
   CalendarDeleteResult,
 } from "../contracts/calendar.contract";
-import { ValidationError } from "../lib/errors";
+import { ValidationError, errorString} from "../lib/errors";
 import { createLogger } from "@workspace/logger";
 import {
   assertValidEntityColor,
@@ -62,7 +62,7 @@ export class CalendarService implements ICalendarService {
       logger.warn("Failed to roll back created Stalwart calendar", {
         accountId,
         calendarId,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorString(error),
       });
     }
   }
@@ -91,7 +91,7 @@ export class CalendarService implements ICalendarService {
       logger.warn("Failed to roll back updated Stalwart calendar", {
         accountId: input.accountId,
         calendarId: input.calendarId,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorString(error),
       });
     }
   }
