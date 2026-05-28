@@ -12,6 +12,9 @@ import { buildStalwartEventPayload } from "../lib/stalwart-calendar-mapping";
 
 const logger = createLogger("backend:mail-calendar-ingestion");
 
+const MAX_ICS_CONTENT_BYTES = 1_048_576; // 1 MB
+const MAX_ICS_EVENTS_PER_FILE = 100;
+
 const CALENDAR_MIME_TYPES = new Set([
   "text/calendar",
   "text/x-vcalendar",
@@ -432,11 +435,19 @@ export class MailCalendarIngestionService {
           });
         } catch (error) {
           if (this.stalwartClient && stalwartAccountId && remoteEventId) {
-            await this.stalwartClient.deleteEvent({
-              accountId: stalwartAccountId,
-              eventId: remoteEventId,
-              sendSchedulingMessages: false,
-            });
+            try {
+              await this.stalwartClient.deleteEvent({
+                accountId: stalwartAccountId,
+                eventId: remoteEventId,
+                sendSchedulingMessages: false,
+              });
+            } catch (cleanupError) {
+              logger.error("Failed to clean up remote event after local DB create failure", {
+                remoteEventId,
+                originalError: error instanceof Error ? error.message : String(error),
+                cleanupError: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+              });
+            }
           }
           throw error;
         }
@@ -552,6 +563,13 @@ export class MailCalendarIngestionService {
 
     for (const payload of input.payloadSources) {
       try {
+        if (Buffer.byteLength(payload.icsContent, "utf8") > MAX_ICS_CONTENT_BYTES) {
+          summary.errors.push(
+            `${payload.sourceId}: ICS content exceeds the 1 MB size limit and was skipped.`,
+          );
+          continue;
+        }
+
         const parseResult = parseICSFile(payload.icsContent, timezone);
         summary.errors.push(
           ...parseResult.errors.map((error) => `${payload.sourceId}: ${error}`),
@@ -560,6 +578,13 @@ export class MailCalendarIngestionService {
         if (parseResult.events.length === 0) {
           summary.errors.push(
             `${payload.sourceId}: no valid ICS events found.`,
+          );
+          continue;
+        }
+
+        if (parseResult.events.length > MAX_ICS_EVENTS_PER_FILE) {
+          summary.errors.push(
+            `${payload.sourceId}: ICS file contains ${parseResult.events.length} events which exceeds the limit of ${MAX_ICS_EVENTS_PER_FILE}; skipped.`,
           );
           continue;
         }
