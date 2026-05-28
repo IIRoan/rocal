@@ -1393,22 +1393,21 @@ function AccountInfoCard({
   const displayEmail = email?.trim() || null;
   const title = displayName ?? displayEmail ?? "Solace account";
   const initial = title.charAt(0).toUpperCase() || "S";
+  const cardStyle = {
+    flexDirection: "row" as const,
+    gap: theme.spacing["3"],
+    paddingHorizontal: theme.spacing["3"],
+    paddingVertical: theme.spacing["3"],
+    marginHorizontal: theme.spacing["1"],
+    marginBottom: theme.spacing["1"],
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.muted + "30",
+  };
 
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        gap: theme.spacing["3"],
-        paddingHorizontal: theme.spacing["3"],
-        paddingVertical: theme.spacing["3"],
-        marginHorizontal: theme.spacing["1"],
-        marginBottom: theme.spacing["1"],
-        borderRadius: theme.borderRadius.lg,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: theme.colors.border,
-        backgroundColor: theme.colors.muted + "30",
-      }}
-    >
+    <View style={cardStyle}>
       {/* Avatar */}
       {imageUrl && !imgError ? (
         <ImageNative
@@ -1695,6 +1694,17 @@ function ProfilePictureCard({
   isPending: boolean;
   theme: ThemeTokens;
 }) {
+  const urlInputStyle = {
+    height: 44,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.muted + "50",
+    paddingHorizontal: theme.spacing["3"],
+    fontSize: theme.typography.fontSize.sm.size,
+    color: theme.colors.foreground,
+  };
+
   return (
     <View
       style={{
@@ -1747,16 +1757,7 @@ function ProfilePictureCard({
           autoCorrect={false}
           keyboardType="url"
           editable={!isPending}
-          style={{
-            height: 44,
-            borderRadius: theme.borderRadius.lg,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: theme.colors.border,
-            backgroundColor: theme.colors.muted + "50",
-            paddingHorizontal: theme.spacing["3"],
-            fontSize: theme.typography.fontSize.sm.size,
-            color: theme.colors.foreground,
-          }}
+          style={urlInputStyle}
         />
       </View>
 
@@ -1840,6 +1841,17 @@ function PasswordField({
   autoComplete: "password" | "new-password";
   theme: ThemeTokens;
 }) {
+  const inputStyle = {
+    borderWidth: 1,
+    borderColor: theme.colors.input,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing["3"],
+    paddingVertical: theme.spacing["3"],
+    fontSize: theme.typography.fontSize.base.size,
+    color: theme.colors.foreground,
+    backgroundColor: theme.colors.background,
+  };
+
   return (
     <View>
       <Text
@@ -1864,16 +1876,7 @@ function PasswordField({
         }
         placeholder={label}
         placeholderTextColor={theme.colors.mutedForeground}
-        style={{
-          borderWidth: 1,
-          borderColor: theme.colors.input,
-          borderRadius: theme.borderRadius.md,
-          paddingHorizontal: theme.spacing["3"],
-          paddingVertical: theme.spacing["3"],
-          fontSize: theme.typography.fontSize.base.size,
-          color: theme.colors.foreground,
-          backgroundColor: theme.colors.background,
-        }}
+        style={inputStyle}
       />
     </View>
   );
