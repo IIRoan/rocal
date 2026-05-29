@@ -27,7 +27,7 @@ export class MailApiError extends Error {
 }
 
 /**
- * `fetch` wrapper that injects the auth cookie and `credentials: "include"`.
+ * `fetch` wrapper that injects the native Better Auth headers.
  * Exposed so the JMAP client can reuse the same authenticated transport.
  */
 export function mailFetch(input: string, init?: RequestInit): Promise<Response> {
@@ -35,7 +35,7 @@ export function mailFetch(input: string, init?: RequestInit): Promise<Response> 
     ...((init?.headers as Record<string, string> | undefined) ?? {}),
     ...getAuthHeaders(),
   };
-  return fetch(input, { ...init, headers, credentials: "include" });
+  return fetch(input, { ...init, headers, credentials: "omit" });
 }
 
 async function parseJson<T>(response: Response): Promise<T> {

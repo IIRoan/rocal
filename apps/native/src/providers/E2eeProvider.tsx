@@ -41,6 +41,7 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
 import { SECURE_STORE_KEYS } from "../lib/constants";
 import { getAuthHeaders } from "../lib/api";
+import { readChunkedSecureValue, writeChunkedSecureValue } from "../lib/secure-store-chunked";
 import { createLogger } from "@workspace/logger";
 import { useAuth, type AuthMethod } from "./AuthProvider";
 import { useTheme } from "./ThemeProvider";
@@ -162,7 +163,7 @@ export function E2eeProvider({
 
       const deviceResponse = await fetch(`${apiBaseUrl}/e2ee/device`, {
         method: "PUT",
-        credentials: "include",
+        credentials: "omit",
         headers: {
           "Content-Type": "application/json",
           ...getAuthHeaders(),
@@ -185,7 +186,7 @@ export function E2eeProvider({
         SECURE_STORE_KEYS.E2EE_DEVICE_ID,
         deviceId,
       );
-      await SecureStore.setItemAsync(
+      await writeChunkedSecureValue(
         SECURE_STORE_KEYS.E2EE_PRIVATE_KEY,
         JSON.stringify(exportedPrivateKey),
       );
@@ -227,7 +228,7 @@ export function E2eeProvider({
 
       const response = await fetch(`${apiBaseUrl}/e2ee/password`, {
         method: "PUT",
-        credentials: "include",
+        credentials: "omit",
         headers: {
           "Content-Type": "application/json",
           ...getAuthHeaders(),
@@ -275,7 +276,7 @@ export function E2eeProvider({
         }
 
         const response = await fetch(`${apiBaseUrl}/e2ee/bootstrap`, {
-          credentials: "include",
+          credentials: "omit",
           headers: getAuthHeaders(),
         });
 
@@ -306,7 +307,7 @@ export function E2eeProvider({
         const deviceId = await SecureStore.getItemAsync(
           SECURE_STORE_KEYS.E2EE_DEVICE_ID,
         );
-        const privateKeyJwk = await SecureStore.getItemAsync(
+        const privateKeyJwk = await readChunkedSecureValue(
           SECURE_STORE_KEYS.E2EE_PRIVATE_KEY,
         );
 
