@@ -14,14 +14,6 @@ jest.mock("react-native", () => ({
   },
 }));
 
-jest.mock("expo-constants", () => ({
-  __esModule: true,
-  default: {
-    executionEnvironment: "standalone",
-    appOwnership: "standalone",
-  },
-}));
-
 jest.mock("../lib/auth-client", () => ({
   authClient: {
     getSession: jest.fn(),

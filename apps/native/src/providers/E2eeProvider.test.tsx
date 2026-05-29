@@ -9,10 +9,7 @@ import type {
 } from "@workspace/calendar-core";
 import * as SecureStore from "expo-secure-store";
 import { createE2eeModule } from "@workspace/e2ee";
-import {
-  createNativeCryptoProvider,
-  installCryptoPolyfill,
-} from "../lib/native-crypto-provider";
+import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
 import { useAuth } from "./AuthProvider";
 import { useTheme } from "./ThemeProvider";
 import { E2eeProvider, useE2ee } from "./E2eeProvider";
@@ -96,7 +93,6 @@ jest.mock("../lib/api", () => ({
 
 jest.mock("../lib/native-crypto-provider", () => ({
   createNativeCryptoProvider: jest.fn(),
-  installCryptoPolyfill: jest.fn(),
 }));
 
 jest.mock("./AuthProvider", () => ({
@@ -131,7 +127,6 @@ const mockGetItemAsync = jest.mocked(SecureStore.getItemAsync);
 const mockSetItemAsync = jest.mocked(SecureStore.setItemAsync);
 const mockCreateE2eeModule = jest.mocked(createE2eeModule);
 const mockCreateNativeCryptoProvider = jest.mocked(createNativeCryptoProvider);
-const mockInstallCryptoPolyfill = jest.mocked(installCryptoPolyfill);
 const mockUseAuth = jest.mocked(useAuth);
 const mockUseTheme = jest.mocked(useTheme);
 
@@ -329,7 +324,6 @@ describe("E2eeProvider", () => {
     mockSetItemAsync.mockReset();
     mockCreateE2eeModule.mockReset();
     mockCreateNativeCryptoProvider.mockReset();
-    mockInstallCryptoPolyfill.mockReset();
     mockUseAuth.mockReset();
     mockUseTheme.mockReset();
 
@@ -356,7 +350,6 @@ describe("E2eeProvider", () => {
 
     mockGetItemAsync.mockResolvedValue(null);
     mockSetItemAsync.mockResolvedValue();
-    mockInstallCryptoPolyfill.mockResolvedValue(undefined);
     mockCreateE2eeModule.mockReturnValue(mockE2eeModule as never);
     mockCreateNativeCryptoProvider.mockReturnValue(mockCryptoProvider as never);
 

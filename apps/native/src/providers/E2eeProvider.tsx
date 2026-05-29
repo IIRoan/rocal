@@ -38,10 +38,7 @@ import type {
   UpdateEventRequest,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
-import {
-  createNativeCryptoProvider,
-  installCryptoPolyfill,
-} from "../lib/native-crypto-provider";
+import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
 import { SECURE_STORE_KEYS } from "../lib/constants";
 import { getAuthHeaders } from "../lib/api";
 import { createLogger } from "@workspace/logger";
@@ -117,8 +114,6 @@ export function E2eeProvider({
     if (moduleRef.current) {
       return moduleRef.current;
     }
-
-    await installCryptoPolyfill();
 
     const crypto = createNativeCryptoProvider();
     if (!crypto) {

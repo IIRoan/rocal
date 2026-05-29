@@ -10,6 +10,7 @@ import type {
   MailDemoConfig as SharedMailDemoConfig,
   MailOAuthConfig as SharedMailOAuthConfig,
   MailVaultKdfParams as SharedMailVaultKdfParams,
+  MessageEncryptionState as SharedMessageEncryptionState,
 } from "@workspace/calendar-core";
 
 export type MailVaultKdfParams = SharedMailVaultKdfParams;
@@ -104,9 +105,8 @@ export type JmapEmailChanges = {
  * Whether a message is plaintext, server-side encrypted-at-rest, or end-to-end
  * (PGP) encrypted. Only `plain` messages can be rendered fully on-device; PGP
  * messages require the secure web client to decrypt.
+ *
+ * Re-exported from `@workspace/calendar-core` so web and native share one
+ * canonical definition.
  */
-export type MessageEncryptionState =
-  | "plain"
-  | "inline_pgp"
-  | "pgp_mime"
-  | "unknown_encrypted";
+export type MessageEncryptionState = SharedMessageEncryptionState;

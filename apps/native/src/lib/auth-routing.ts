@@ -1,7 +1,6 @@
 export const AUTH_SIGN_IN_ROUTE = "/sign-in";
 export const AUTH_SIGN_UP_ROUTE = "/sign-up";
 export const CALENDAR_HOME_ROUTE = "/calendar";
-export const SEARCH_ROUTE = "/search";
 export const SETTINGS_ROUTE = "/settings";
 export const SETTINGS_TIMEZONE_ROUTE = "/settings/timezone";
 

@@ -90,16 +90,18 @@ http://192.168.88.246:4001/api/auth/callback/github
 
 ## Native passkeys
 
-- Native now uses a browser-based Better Auth passkey bridge across Expo Go and normal native runtimes, so the same passkey actions work without native-only modules.
+- Native uses a browser-based Better Auth passkey bridge, so passkey actions work without native-only modules.
 - `app.config.ts` automatically adds the iOS `associatedDomains` entry when `PASSKEY_ORIGIN`, `NEXT_PUBLIC_APP_URL`, or `EXPO_PUBLIC_APP_URL` points at a non-local HTTPS origin.
 - iOS still needs `https://<domain>/.well-known/apple-app-site-association`.
 - Android still needs `https://<domain>/.well-known/assetlinks.json` with `delegate_permission/common.get_login_creds`.
-- Expo Go does not expose the native passkey module, so `EXPO_PUBLIC_APP_URL` should point at a reachable web deployment for the browser bridge.
+- `EXPO_PUBLIC_APP_URL` should point at a reachable web deployment for the browser bridge.
 
-## Expo Go E2EE
+## E2EE crypto
 
-- Expo Go now uses a JavaScript crypto fallback for E2EE when native SubtleCrypto is unavailable.
-- Encryption still works, but first-time device bootstrap can be slower than in a development or production build with native crypto support.
+- React Native (Hermes) does not provide a WebCrypto `subtle` implementation, so E2EE runs on a pure-JavaScript provider backed by `node-forge`.
+- `expo-crypto` supplies the hardware-backed CSPRNG (`getRandomValues`, `randomUUID`).
+- If a native `crypto.subtle` polyfill (e.g. `react-native-quick-crypto`) is ever added, `createNativeCryptoProvider` will transparently prefer it.
+- Encryption works in development and production builds; first-time device bootstrap can be slightly slower on the JavaScript provider.
 
 ## Build commands
 
@@ -116,13 +118,7 @@ bun run build:ios
 
 `build:android` and `build:ios` use the `production` profile.
 
-## Expo Go and OTA updates
-
-For Expo Go locally:
-
-```bash
-bun run start:go
-```
+## OTA updates
 
 To publish an update manually to the branch used by the production channel:
 

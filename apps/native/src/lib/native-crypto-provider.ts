@@ -1,76 +1,153 @@
+/**
+ * Mobile CryptoProvider implementation for native iOS/Android builds.
+ *
+ * React Native (Hermes) does not ship a WebCrypto `subtle` implementation, so
+ * E2EE runs on the pure-JavaScript provider backed by `node-forge`. If the
+ * runtime *does* expose a real `crypto.subtle` (for example via a future
+ * native polyfill such as `react-native-quick-crypto`), we transparently use it
+ * instead.
+ *
+ * `expo-crypto` always provides a hardware-backed CSPRNG (`getRandomValues`,
+ * `randomUUID`), so those primitives are used regardless of the subtle backend.
+ */
 import type { CryptoProvider } from "@workspace/e2ee";
+import * as ExpoCrypto from "expo-crypto";
+import { Platform } from "react-native";
+import { createLogger } from "@workspace/logger";
+import {
+  detectRuntime,
+  getRuntimeDisplayName,
+  supportsSubtleCrypto,
+} from "@workspace/runtime";
 import { createJsCryptoProvider } from "./js-crypto-provider";
 
-let provider: CryptoProvider | null = null;
+const log = createLogger("native:crypto");
+const runtime = detectRuntime({ platformOs: Platform.OS });
 
-export async function installCryptoPolyfill(): Promise<void> {
-  installBase64Polyfill();
+let backendLogged = false;
+
+function logBackendOnce(message: string) {
+  if (backendLogged) return;
+  backendLogged = true;
+  log.info(message);
 }
 
-export function createNativeCryptoProvider(): CryptoProvider | null {
-  provider ??= createJsCryptoProvider();
-  return provider;
+/**
+ * Resolve the native `crypto.subtle` implementation, or `null` when the runtime
+ * does not provide a usable one (the common case on Hermes).
+ */
+function resolveSubtleCrypto(): SubtleCrypto | null {
+  const cryptoRef = globalThis.crypto;
+  if (!cryptoRef?.subtle) {
+    return null;
+  }
+
+  if (!supportsSubtleCrypto({ runtime, cryptoRef })) {
+    return null;
+  }
+
+  return cryptoRef.subtle;
 }
 
-function installBase64Polyfill() {
-  const globalScope = globalThis as typeof globalThis & {
-    atob?: (value: string) => string;
-    btoa?: (value: string) => string;
+function createSubtleCryptoProvider(subtle: SubtleCrypto): CryptoProvider {
+  return {
+    randomUUID: () => ExpoCrypto.randomUUID(),
+    getRandomValues: (buffer: Uint8Array): Uint8Array =>
+      ExpoCrypto.getRandomValues(buffer),
+    subtle: {
+      generateKey: (
+        algorithm: any,
+        extractable: boolean,
+        keyUsages: string[],
+      ) =>
+        subtle.generateKey(
+          algorithm,
+          extractable,
+          keyUsages as KeyUsage[],
+        ) as unknown as Promise<CryptoKey>,
+      importKey: (
+        format: string,
+        keyData: any,
+        algorithm: any,
+        extractable: boolean,
+        keyUsages: string[],
+      ) =>
+        subtle.importKey(
+          format as any,
+          keyData,
+          algorithm,
+          extractable,
+          keyUsages as KeyUsage[],
+        ),
+      exportKey: (format: string, key: CryptoKey) =>
+        subtle.exportKey(format as any, key) as unknown as Promise<ArrayBuffer>,
+      encrypt: (algorithm: any, key: CryptoKey, data: BufferSource) =>
+        subtle.encrypt(algorithm, key, data),
+      decrypt: (algorithm: any, key: CryptoKey, data: BufferSource) =>
+        subtle.decrypt(algorithm, key, data),
+      wrapKey: (
+        format: string,
+        key: CryptoKey,
+        wrappingKey: CryptoKey,
+        algorithm: any,
+      ) => subtle.wrapKey(format as any, key, wrappingKey, algorithm),
+      unwrapKey: (
+        format: string,
+        wrappedKey: BufferSource,
+        unwrappingKey: CryptoKey,
+        unwrapAlgo: any,
+        unwrappedKeyAlgo: any,
+        extractable: boolean,
+        keyUsages: string[],
+      ) =>
+        subtle.unwrapKey(
+          format as any,
+          wrappedKey,
+          unwrappingKey,
+          unwrapAlgo,
+          unwrappedKeyAlgo,
+          extractable,
+          keyUsages as KeyUsage[],
+        ),
+      sign: (algorithm: any, key: CryptoKey, data: BufferSource) =>
+        subtle.sign(algorithm, key, data),
+      deriveKey: (
+        algorithm: any,
+        baseKey: CryptoKey,
+        derivedKeyType: any,
+        extractable: boolean,
+        keyUsages: string[],
+      ) =>
+        subtle.deriveKey(
+          algorithm,
+          baseKey,
+          derivedKeyType,
+          extractable,
+          keyUsages as KeyUsage[],
+        ),
+    },
   };
-
-  globalScope.btoa ??= encodeBase64;
-  globalScope.atob ??= decodeBase64;
 }
 
-const BASE64_ALPHABET =
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+/**
+ * Build a {@link CryptoProvider} for the current native runtime.
+ *
+ * Prefers a real native `crypto.subtle` when one is available; otherwise falls
+ * back to the pure-JavaScript provider so E2EE keeps working on Hermes.
+ */
+export function createNativeCryptoProvider(): CryptoProvider {
+  const subtle = resolveSubtleCrypto();
 
-function encodeBase64(value: string): string {
-  let output = "";
-
-  for (let index = 0; index < value.length; index += 3) {
-    const first = value.charCodeAt(index) & 0xff;
-    const second =
-      index + 1 < value.length ? value.charCodeAt(index + 1) & 0xff : 0;
-    const third =
-      index + 2 < value.length ? value.charCodeAt(index + 2) & 0xff : 0;
-    const combined = (first << 16) | (second << 8) | third;
-
-    output += BASE64_ALPHABET[(combined >> 18) & 0x3f];
-    output += BASE64_ALPHABET[(combined >> 12) & 0x3f];
-    output +=
-      index + 1 < value.length ? BASE64_ALPHABET[(combined >> 6) & 0x3f] : "=";
-    output += index + 2 < value.length ? BASE64_ALPHABET[combined & 0x3f] : "=";
+  if (subtle) {
+    logBackendOnce(
+      `Using native SubtleCrypto for E2EE on ${getRuntimeDisplayName(runtime)}.`,
+    );
+    return createSubtleCryptoProvider(subtle);
   }
 
-  return output;
-}
-
-function decodeBase64(value: string): string {
-  const normalized = value.replace(/\s/g, "");
-  let output = "";
-
-  for (let index = 0; index < normalized.length; index += 4) {
-    const first = BASE64_ALPHABET.indexOf(normalized[index] ?? "A");
-    const second = BASE64_ALPHABET.indexOf(normalized[index + 1] ?? "A");
-    const third =
-      normalized[index + 2] === "="
-        ? 0
-        : BASE64_ALPHABET.indexOf(normalized[index + 2] ?? "A");
-    const fourth =
-      normalized[index + 3] === "="
-        ? 0
-        : BASE64_ALPHABET.indexOf(normalized[index + 3] ?? "A");
-    const combined = (first << 18) | (second << 12) | (third << 6) | fourth;
-
-    output += String.fromCharCode((combined >> 16) & 0xff);
-    if (normalized[index + 2] !== "=") {
-      output += String.fromCharCode((combined >> 8) & 0xff);
-    }
-    if (normalized[index + 3] !== "=") {
-      output += String.fromCharCode(combined & 0xff);
-    }
-  }
-
-  return output;
+  logBackendOnce(
+    `Using the JavaScript crypto fallback for E2EE on ${getRuntimeDisplayName(runtime)}. ` +
+      "First-time key setup can be slightly slower.",
+  );
+  return createJsCryptoProvider();
 }

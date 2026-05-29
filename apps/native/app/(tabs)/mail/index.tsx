@@ -17,6 +17,7 @@ import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useSidebar } from "../../../src/providers/SidebarProvider";
+import { useCommandPalette } from "../../../src/providers/CommandPaletteProvider";
 import { AppSwitcher } from "../../../src/components/AppSwitcher";
 import { MailMessageRow } from "../../../src/components/mail/MailMessageRow";
 import {
@@ -38,6 +39,7 @@ const SENDER_AS_RECIPIENT_ROLES = new Set(["sent", "drafts"]);
 export default function MailScreen() {
   const { theme } = useTheme();
   const { toggle: toggleSidebar } = useSidebar();
+  const { open: openCommandPalette } = useCommandPalette();
   const router = useRouter();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -101,14 +103,24 @@ export default function MailScreen() {
         <Feather name="menu" size={22} color={theme.colors.foreground} />
       </Pressable>
       <AppSwitcher active="mail" />
-      <Pressable
-        onPress={openWebMailCompose}
-        style={styles.iconButton}
-        accessibilityRole="button"
-        accessibilityLabel="Compose message"
-      >
-        <Feather name="edit" size={20} color={theme.colors.foreground} />
-      </Pressable>
+      <View style={styles.headerRight}>
+        <Pressable
+          onPress={openCommandPalette}
+          style={styles.iconButton}
+          accessibilityRole="button"
+          accessibilityLabel="Search and commands"
+        >
+          <Feather name="search" size={20} color={theme.colors.foreground} />
+        </Pressable>
+        <Pressable
+          onPress={openWebMailCompose}
+          style={styles.iconButton}
+          accessibilityRole="button"
+          accessibilityLabel="Compose message"
+        >
+          <Feather name="edit" size={20} color={theme.colors.foreground} />
+        </Pressable>
+      </View>
     </View>
   );
 
@@ -320,6 +332,10 @@ function createStyles(theme: ThemeTokens) {
       height: 38,
       alignItems: "center" as const,
       justifyContent: "center" as const,
+    },
+    headerRight: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
     },
     mailboxBarWrap: {
       borderBottomWidth: 1,
