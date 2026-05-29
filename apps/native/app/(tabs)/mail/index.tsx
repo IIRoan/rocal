@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -17,6 +17,7 @@ import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useSidebar } from "../../../src/providers/SidebarProvider";
+import { useMailSelection } from "../../../src/providers/MailSelectionProvider";
 import { useCommandPalette } from "../../../src/providers/CommandPaletteProvider";
 import { AppSwitcher } from "../../../src/components/AppSwitcher";
 import { MailMessageRow } from "../../../src/components/mail/MailMessageRow";
@@ -30,7 +31,6 @@ import { getMailboxIcon, getPrimaryMailboxId } from "../../../src/lib/mail/mail-
 import {
   isWebMailAvailable,
   openWebMail,
-  openWebMailCompose,
 } from "../../../src/lib/mail/mail-web-bridge";
 import type { JmapEmailMessage, JmapMailbox } from "../../../src/lib/mail/types";
 
@@ -48,9 +48,7 @@ export default function MailScreen() {
   const runtimeQuery = useMailRuntime(provisioned);
   const runtime = runtimeQuery.data;
 
-  const [selectedMailboxId, setSelectedMailboxId] = useState<string | null>(
-    null,
-  );
+  const { selectedMailboxId, setSelectedMailboxId } = useMailSelection();
 
   useEffect(() => {
     if (!runtime || selectedMailboxId) return;
@@ -59,7 +57,7 @@ export default function MailScreen() {
       runtime.mailboxes[0]?.id ??
       null;
     setSelectedMailboxId(inbox);
-  }, [runtime, selectedMailboxId]);
+  }, [runtime, selectedMailboxId, setSelectedMailboxId]);
 
   const messagesQuery = useMailboxMessages(runtime, selectedMailboxId);
   const { markAsRead } = useMailMutations(runtime, selectedMailboxId);
@@ -113,7 +111,7 @@ export default function MailScreen() {
           <Feather name="search" size={20} color={theme.colors.foreground} />
         </Pressable>
         <Pressable
-          onPress={openWebMailCompose}
+          onPress={() => router.push("/(tabs)/mail/compose" as never)}
           style={styles.iconButton}
           accessibilityRole="button"
           accessibilityLabel="Compose message"

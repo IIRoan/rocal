@@ -6,10 +6,13 @@ import {
   getInitials,
   getMailboxIcon,
   getPrimaryMailboxId,
+  isLikelyEmail,
   isMessageFlagged,
   isMessageRead,
+  parseEmailList,
   sortMailboxes,
   sortMessagesByDate,
+  validateComposeInput,
 } from "./mail-helpers";
 
 function mailbox(partial: Partial<JmapMailbox> & { id: string }): JmapMailbox {
@@ -186,5 +189,70 @@ describe("getInitials", () => {
   it("returns a question mark when nothing usable is provided", () => {
     expect(getInitials(undefined)).toBe("?");
     expect(getInitials([])).toBe("?");
+  });
+});
+
+describe("isLikelyEmail", () => {
+  it("accepts well-formed addresses", () => {
+    expect(isLikelyEmail("user@example.com")).toBe(true);
+    expect(isLikelyEmail("  user.name+tag@sub.example.co  ")).toBe(true);
+  });
+
+  it("rejects malformed addresses", () => {
+    expect(isLikelyEmail("user")).toBe(false);
+    expect(isLikelyEmail("user@host")).toBe(false);
+    expect(isLikelyEmail("user @example.com")).toBe(false);
+    expect(isLikelyEmail("")).toBe(false);
+  });
+});
+
+describe("parseEmailList", () => {
+  it("splits on commas, semicolons, and whitespace", () => {
+    expect(parseEmailList("a@x.com, b@x.com; c@x.com d@x.com")).toEqual([
+      "a@x.com",
+      "b@x.com",
+      "c@x.com",
+      "d@x.com",
+    ]);
+  });
+
+  it("trims and de-duplicates case-insensitively", () => {
+    expect(parseEmailList("  A@x.com , a@X.com ,b@x.com")).toEqual([
+      "A@x.com",
+      "b@x.com",
+    ]);
+  });
+
+  it("returns an empty array for blank input", () => {
+    expect(parseEmailList("")).toEqual([]);
+    expect(parseEmailList("   ")).toEqual([]);
+  });
+});
+
+describe("validateComposeInput", () => {
+  it("parses recipient fields and reports no errors when valid", () => {
+    const result = validateComposeInput({
+      to: "a@x.com, b@x.com",
+      cc: "c@x.com",
+      bcc: "",
+      subject: "Hello",
+    });
+    expect(result.to).toEqual(["a@x.com", "b@x.com"]);
+    expect(result.cc).toEqual(["c@x.com"]);
+    expect(result.bcc).toEqual([]);
+    expect(result.errors).toEqual({});
+  });
+
+  it("requires at least one recipient", () => {
+    const result = validateComposeInput({ to: "", subject: "Hi" });
+    expect(result.errors.to).toBeDefined();
+  });
+
+  it("flags invalid email addresses", () => {
+    const result = validateComposeInput({
+      to: "a@x.com, not-an-email",
+      subject: "Hi",
+    });
+    expect(result.errors.recipients).toContain("not-an-email");
   });
 });

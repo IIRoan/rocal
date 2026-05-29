@@ -21,7 +21,7 @@ import { useCommandPalette } from "../providers/CommandPaletteProvider";
 import { useSheet } from "../providers/SheetProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
 import { calendarApiService } from "../lib/api";
-import { openWebMailCompose } from "../lib/mail/mail-web-bridge";
+
 import { BottomSheet } from "./BottomSheet";
 import {
   buildCommandActions,
@@ -129,7 +129,7 @@ export function CommandPalette() {
           router.replace("/(tabs)/mail" as never);
           break;
         case "compose-mail":
-          void openWebMailCompose();
+          router.push("/(tabs)/mail/compose" as never);
           break;
         case "open-settings":
           router.replace("/(tabs)/settings" as never);

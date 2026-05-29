@@ -11,7 +11,7 @@ import { useAuth } from "../../providers/AuthProvider";
 import { QUERY_KEYS } from "../query-keys";
 import { getMailAccountStatus } from "./mail-api";
 import { buildMailRuntime, type MailRuntime } from "./mail-runtime";
-import { sortMessagesByDate } from "./mail-helpers";
+import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
 import type { JmapEmailMessage } from "./types";
 
 const RUNTIME_STALE_MS = 5 * 60_000;
@@ -53,7 +53,6 @@ export function useMailboxMessages(
       );
       return { messages: sortMessagesByDate(messages), total };
     },
-    placeholderData: (previous) => previous,
   });
 }
 
@@ -115,4 +114,64 @@ export function useMailMutations(
   });
 
   return { markAsRead, toggleFlagged, moveToTrash };
+}
+
+export interface ComposeMessageInput {
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  textBody: string;
+}
+
+/**
+ * Resolves the identity + drafts/sent mailboxes needed to send mail, or `null`
+ * when the runtime is not ready or has no usable sending identity.
+ */
+export function resolveComposeContext(runtime: MailRuntime | undefined): {
+  identityId: string;
+  fromEmail: string;
+  draftsMailboxId: string;
+  sentMailboxId: string | null;
+} | null {
+  if (!runtime) return null;
+  const identity = runtime.identities[0];
+  if (!identity?.email) return null;
+
+  const draftsMailboxId =
+    getPrimaryMailboxId(runtime.mailboxes, "drafts") ??
+    runtime.mailboxes[0]?.id ??
+    null;
+  if (!draftsMailboxId) return null;
+
+  return {
+    identityId: identity.id,
+    fromEmail: identity.email,
+    draftsMailboxId,
+    sentMailboxId: getPrimaryMailboxId(runtime.mailboxes, "sent"),
+  };
+}
+
+export function useSendMessage(runtime: MailRuntime | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: ComposeMessageInput) => {
+      const context = resolveComposeContext(runtime);
+      if (!runtime || !context) {
+        throw new Error("Your mailbox is not ready to send messages yet.");
+      }
+      return runtime.client.sendMessage(runtime.session, {
+        ...context,
+        to: input.to,
+        cc: input.cc,
+        bcc: input.bcc,
+        subject: input.subject,
+        textBody: input.textBody,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mail", "messages"] });
+    },
+  });
 }

@@ -290,6 +290,10 @@ export function SidebarMiniCalendar({
   const monthSwipeResponder = useMemo(
     () =>
       PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_, gestureState) =>
+          pageWidth > 1 &&
+          Math.abs(gestureState.dx) > 6 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
         onMoveShouldSetPanResponder: (_, gestureState) =>
           pageWidth > 1 &&
           Math.abs(gestureState.dx) > 12 &&
