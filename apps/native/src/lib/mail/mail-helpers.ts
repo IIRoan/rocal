@@ -113,3 +113,57 @@ export function getInitials(address: MailAddress[] | undefined): string {
   if (parts.length === 1) return parts[0]!.charAt(0).toUpperCase();
   return (parts[0]!.charAt(0) + parts[1]!.charAt(0)).toUpperCase();
 }
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function isLikelyEmail(value: string): boolean {
+  return EMAIL_PATTERN.test(value.trim());
+}
+
+/** Splits a free-text recipient field (commas, semicolons, whitespace). */
+export function parseEmailList(value: string): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const token of value.split(/[,;\s]+/)) {
+    const trimmed = token.trim();
+    if (!trimmed) continue;
+    const lower = trimmed.toLowerCase();
+    if (seen.has(lower)) continue;
+    seen.add(lower);
+    result.push(trimmed);
+  }
+  return result;
+}
+
+export interface ComposeValidationResult {
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  errors: { to?: string; subject?: string; recipients?: string };
+}
+
+/** Validates and normalises native compose form input. */
+export function validateComposeInput(input: {
+  to: string;
+  cc?: string;
+  bcc?: string;
+  subject: string;
+}): ComposeValidationResult {
+  const to = parseEmailList(input.to);
+  const cc = parseEmailList(input.cc ?? "");
+  const bcc = parseEmailList(input.bcc ?? "");
+  const errors: ComposeValidationResult["errors"] = {};
+
+  if (to.length === 0) {
+    errors.to = "Add at least one recipient.";
+  }
+
+  const invalid = [...to, ...cc, ...bcc].filter(
+    (address) => !isLikelyEmail(address),
+  );
+  if (invalid.length > 0) {
+    errors.recipients = `Invalid email address: ${invalid[0]}`;
+  }
+
+  return { to, cc, bcc, errors };
+}

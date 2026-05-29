@@ -31,12 +31,18 @@ import { useTheme } from "../providers/ThemeProvider";
 import { useAuth } from "../providers/AuthProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
 import { useSidebar } from "../providers/SidebarProvider";
+import { useMailSelection } from "../providers/MailSelectionProvider";
 import { useCommandPalette } from "../providers/CommandPaletteProvider";
 import { calendarApiService } from "../lib/api";
 import { QUERY_KEYS } from "../lib/query-keys";
 import { buildSidebarCalendarSections } from "./app-sidebar-utils";
 import { SidebarMiniCalendar } from "./SidebarMiniCalendar";
 import { AppSwitcher } from "./AppSwitcher";
+import {
+  useMailAccount,
+  useMailRuntime,
+} from "../lib/mail/use-mail";
+import { getMailboxIcon, sortMailboxes } from "../lib/mail/mail-helpers";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.78;
@@ -59,6 +65,7 @@ export function AppSidebar() {
   const { selectedDate, setCurrentDate, setSelectedDate } = useCalendarView();
   const { isOpen, open, close } = useSidebar();
   const { open: openCommandPalette } = useCommandPalette();
+  const { selectedMailboxId, setSelectedMailboxId } = useMailSelection();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const router = useRouter();
@@ -79,6 +86,17 @@ export function AppSidebar() {
   const calendarSections = useMemo(
     () => buildSidebarCalendarSections(calendars, theme),
     [calendars, theme],
+  );
+
+  const isMailContext = pathname.includes("/mail");
+
+  const mailAccountQuery = useMailAccount();
+  const mailProvisioned = mailAccountQuery.data?.provisioned ?? false;
+  const mailRuntimeQuery = useMailRuntime(isMailContext && mailProvisioned);
+  const mailRuntime = mailRuntimeQuery.data;
+  const sortedMailboxes = useMemo(
+    () => (mailRuntime ? sortMailboxes(mailRuntime.mailboxes) : []),
+    [mailRuntime],
   );
 
   const calendarById = useMemo(
@@ -228,6 +246,17 @@ export function AppSidebar() {
     [toggleCalendarVisibilityMutation],
   );
 
+  const handleSelectMailbox = useCallback(
+    (mailboxId: string) => {
+      setSelectedMailboxId(mailboxId);
+      close();
+      if (!pathname.includes("/mail")) {
+        setTimeout(() => router.replace("/(tabs)/mail" as any), 80);
+      }
+    },
+    [close, pathname, router, setSelectedMailboxId],
+  );
+
   const handleSelectCalendarDate = useCallback(
     (date: Date) => {
       setCurrentDate(date);
@@ -343,7 +372,22 @@ export function AppSidebar() {
                 <AppSwitcher onNavigate={close} />
               </View>
 
-              <View style={styles.sectionBlock}>
+              {isMailContext ? (
+                <MailSidebarBody
+                  styles={styles}
+                  theme={theme}
+                  isLoading={
+                    mailAccountQuery.isLoading || mailRuntimeQuery.isLoading
+                  }
+                  provisioned={mailProvisioned}
+                  mailboxes={sortedMailboxes}
+                  selectedMailboxId={selectedMailboxId}
+                  onSelectMailbox={handleSelectMailbox}
+                  onCompose={() => handleNavigate("/(tabs)/mail/compose")}
+                />
+              ) : (
+                <>
+                  <View style={styles.sectionBlock}>
                 <View style={styles.primaryActionRow}>
                   <Pressable
                     onPress={() => handleNavigate("/event/create")}
@@ -491,8 +535,112 @@ export function AppSidebar() {
                   ))
                 )}
               </View>
+                </>
+              )}
             </ScrollView>
           </Animated.View>
+      </View>
+    </>
+  );
+}
+
+function MailSidebarBody({
+  styles,
+  theme,
+  isLoading,
+  provisioned,
+  mailboxes,
+  selectedMailboxId,
+  onSelectMailbox,
+  onCompose,
+}: {
+  styles: ReturnType<typeof createStyles>;
+  theme: ThemeTokens;
+  isLoading: boolean;
+  provisioned: boolean;
+  mailboxes: { id: string; name: string; role?: string | null }[];
+  selectedMailboxId: string | null;
+  onSelectMailbox: (id: string) => void;
+  onCompose: () => void;
+}) {
+  return (
+    <>
+      <View style={styles.sectionBlock}>
+        <View style={styles.primaryActionRow}>
+          <Pressable
+            onPress={onCompose}
+            style={({ pressed }) => [
+              styles.newEventButton,
+              pressed && styles.newEventButtonPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Compose message"
+          >
+            <Feather
+              name="edit"
+              size={16}
+              color={theme.colors.primaryForeground}
+            />
+            <Text style={styles.newEventText}>Compose</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View>
+        <View style={styles.calendarsSectionHeader}>
+          <Text style={styles.sectionLabel}>Mailboxes</Text>
+        </View>
+
+        {isLoading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={theme.colors.primaryBase} />
+          </View>
+        ) : !provisioned ? (
+          <Text style={styles.emptyText}>
+            Your mailbox is being set up. Check back soon.
+          </Text>
+        ) : mailboxes.length === 0 ? (
+          <Text style={styles.emptyText}>No mailboxes found.</Text>
+        ) : (
+          mailboxes.map((mailbox) => {
+            const active = mailbox.id === selectedMailboxId;
+            return (
+              <Pressable
+                key={mailbox.id}
+                onPress={() => onSelectMailbox(mailbox.id)}
+                style={({ pressed }) => [
+                  styles.calendarRow,
+                  active && styles.mailRowActive,
+                  pressed && styles.pressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={mailbox.name}
+              >
+                <Feather
+                  name={
+                    getMailboxIcon(mailbox) as keyof typeof Feather.glyphMap
+                  }
+                  size={16}
+                  color={
+                    active
+                      ? theme.colors.primaryBase
+                      : theme.colors.mutedForeground
+                  }
+                />
+                <Text
+                  style={[
+                    styles.calendarRowLabel,
+                    active && styles.mailRowLabelActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {mailbox.name}
+                </Text>
+              </Pressable>
+            );
+          })
+        )}
       </View>
     </>
   );
@@ -660,6 +808,9 @@ function createStyles(theme: ThemeTokens) {
       width: 10,
       height: 10,
     },
+    mailRowActive: {
+      backgroundColor: primaryTint,
+    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
@@ -709,6 +860,10 @@ function createStyles(theme: ThemeTokens) {
     },
     calendarRowLabelHidden: {
       color: theme.colors.mutedForeground,
+    },
+    mailRowLabelActive: {
+      color: theme.colors.primaryBase,
+      fontWeight: "600" as TextStyle["fontWeight"],
     },
     emptyText: {
       fontSize: theme.typography.fontSize.xs.size,
