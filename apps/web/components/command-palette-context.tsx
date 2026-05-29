@@ -84,7 +84,7 @@ export function CommandPaletteProvider({
   const [previewEvent, setPreviewEvent] = useState<CalendarEvent | null>(null);
 
   const openSearchPalette = () => {
-    setInitialView("search");
+    setInitialView("main");
     setIsOpen(true);
   };
 

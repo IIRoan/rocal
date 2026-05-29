@@ -631,6 +631,11 @@ export function useMailApp() {
     const stored = localStorage.getItem("mail:blockTrackingPixels");
     return stored === null ? true : stored === "true";
   });
+  const [mailDarkMode, setMailDarkModeState] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem("mail:darkMode");
+    return stored === null ? true : stored === "true";
+  });
 
   const setBlockRemoteImages = useCallback((val: boolean) => {
     setBlockRemoteImagesState(val);
@@ -640,6 +645,11 @@ export function useMailApp() {
   const setBlockTrackingPixels = useCallback((val: boolean) => {
     setBlockTrackingPixelsState(val);
     localStorage.setItem("mail:blockTrackingPixels", String(val));
+  }, []);
+
+  const setMailDarkMode = useCallback((val: boolean) => {
+    setMailDarkModeState(val);
+    localStorage.setItem("mail:darkMode", String(val));
   }, []);
 
   const accountEmail = session?.user?.email?.trim().toLowerCase() ?? "";
@@ -806,6 +816,44 @@ export function useMailApp() {
     setSelectedMessageId(messageId);
     setSelectedConversationMessageId(null);
   }, []);
+
+  const openMessageById = useCallback(async (messageId: string) => {
+    const mb = activeMailboxRef.current;
+    if (!mb) return;
+
+    if (mb.messages.some((message) => message.id === messageId)) {
+      handleSelectMessageId(messageId);
+      return;
+    }
+
+    setIsBusy(true);
+    try {
+      const [message] = await mb.client.getMessagesByIds(mb.session, [
+        messageId,
+      ]);
+      if (!message) {
+        toast.error("Could not find that message.");
+        return;
+      }
+
+      setActiveMailbox((current) =>
+        current
+          ? {
+              ...current,
+              messages: sortMessages(
+                mergeConversationSourceMessages(current.messages, [message]),
+              ),
+            }
+          : current,
+      );
+      handleSelectMessageId(message.id);
+    } catch (error) {
+      log.error("Failed to open message by id", error);
+      toast.error(getErrorMessage(error, "Could not open that message."));
+    } finally {
+      setIsBusy(false);
+    }
+  }, [handleSelectMessageId]);
 
   const handleSelectConversationMessageId = useCallback((messageId: string) => {
     setSelectedConversationMessageId(messageId);
@@ -2425,6 +2473,7 @@ export function useMailApp() {
     selectedMessage,
     selectedMessageId,
     setSelectedMessageId: handleSelectMessageId,
+    openMessageById,
     selectedConversationMessages,
     isConversationLoading,
     setSelectedConversationMessageId: handleSelectConversationMessageId,
@@ -2456,6 +2505,8 @@ export function useMailApp() {
     setBlockRemoteImages,
     blockTrackingPixels,
     setBlockTrackingPixels,
+    mailDarkMode,
+    setMailDarkMode,
     refreshMailboxMessages,
     loadMoreMessages,
     hasMoreMessages: activeMailbox
