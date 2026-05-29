@@ -93,7 +93,7 @@ const config: ExpoConfig = {
   plugins: configuredPlugins,
   ios: {
     ...appJsonConfig.ios,
-    associatedDomains,
+    ...(associatedDomains.length > 0 ? { associatedDomains } : {}),
   },
   extra: {
     ...appJsonConfig.extra,
