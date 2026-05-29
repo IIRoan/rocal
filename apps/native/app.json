@@ -15,11 +15,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.solace.mobile",
+      "bundleIdentifier": "onl.solace.mobile",
       "buildNumber": "1"
     },
     "android": {
-      "package": "com.solace.mobile",
+      "package": "onl.solace.mobile",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
