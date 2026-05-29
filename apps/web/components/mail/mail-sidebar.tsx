@@ -38,6 +38,7 @@ import {
   Settings2,
   EyeOff,
   Eye,
+  Search,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -228,6 +229,7 @@ export interface MailSidebarProps {
   onSelectMailbox: (mailboxId: string) => void;
   onCompose: () => void;
   onOpenPalette: () => void;
+  onOpenSearch?: () => void;
   onOpenMailboxes: () => void;
   onSignOut: () => void;
   onReorderMailboxes: (reordered: JmapMailbox[]) => void;
@@ -240,6 +242,7 @@ export function MailSidebar({
   onSelectMailbox,
   onCompose,
   onOpenPalette,
+  onOpenSearch,
   onOpenMailboxes,
   onSignOut,
   onReorderMailboxes,
@@ -317,6 +320,11 @@ export function MailSidebar({
             <Link className="inline-flex justify-center" href="/">
               <Logo width="28" height="28" className="text-primary" />
             </Link>
+            {onOpenSearch && (
+              <SidebarIconButton label="Search" onClick={onOpenSearch}>
+                <Search size={15} strokeWidth={2} />
+              </SidebarIconButton>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -330,15 +338,28 @@ export function MailSidebar({
         ) : (
           <div className="flex items-center justify-between">
             <SidebarAppSwitcher activeApp={activeApp} />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 rounded-lg text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground"
-              onClick={toggleSidebar}
-              aria-label="Collapse sidebar"
-            >
-              <PanelLeftClose size={16} strokeWidth={2} />
-            </Button>
+            <div className="flex items-center gap-0.5">
+              {onOpenSearch && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 rounded-lg text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground"
+                  onClick={onOpenSearch}
+                  aria-label="Search"
+                >
+                  <Search size={15} strokeWidth={2} />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-lg text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground"
+                onClick={toggleSidebar}
+                aria-label="Collapse sidebar"
+              >
+                <PanelLeftClose size={16} strokeWidth={2} />
+              </Button>
+            </div>
           </div>
         )}
       </SidebarHeader>

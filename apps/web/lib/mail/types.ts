@@ -140,6 +140,15 @@ export type MailSyncCollection<T> = {
   records: T[];
 };
 
+export type JmapEmailChanges = {
+  oldState: string;
+  newState: string;
+  hasMoreChanges?: boolean;
+  created: string[];
+  updated: string[];
+  destroyed: string[];
+};
+
 export type MailSyncResponse = {
   accountId: string;
   initialized: boolean;

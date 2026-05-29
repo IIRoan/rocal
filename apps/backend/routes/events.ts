@@ -136,6 +136,58 @@ export const eventsRoutes = new Elysia({
         },
       )
       .get(
+        "/search-corpus",
+        async ({
+          query,
+          authenticatedUser,
+          request,
+        }: {
+          query: {
+            limit?: number;
+            offset?: number;
+            updatedAfter?: string;
+          };
+          authenticatedUser?: AuthenticatedUser;
+          request: Request;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          return eventService.searchCorpus({
+            userId: user.id,
+            limit: query.limit,
+            offset: query.offset,
+            updatedAfter: query.updatedAfter,
+          });
+        },
+        {
+          query: strictObject({
+            limit: t.Optional(
+              t.Number({
+                description: "Max corpus records to return (default 100, max 200)",
+                minimum: 1,
+                maximum: 200,
+              }),
+            ),
+            offset: t.Optional(
+              t.Number({
+                description: "Offset for paginated local-index sync",
+                minimum: 0,
+              }),
+            ),
+            updatedAfter: t.Optional(
+              t.String({
+                description:
+                  "Only return events updated after this ISO 8601 timestamp",
+              }),
+            ),
+          }),
+          detail: {
+            summary: "List calendar events for private local search indexing",
+            description:
+              "Returns a paginated event corpus for authenticated device-local search indexing, preserving event encryption fields for client-side hydration.",
+          },
+        },
+      )
+      .get(
         "/",
         async ({
           query: { start, end },
