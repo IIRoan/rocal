@@ -120,7 +120,7 @@ export function CommandPaletteMainSearchView({
             ? "Search mail and calendar..."
               : isCommandMode
                 ? "Type a command..."
-                : "Search or jump to..."
+                : "Search mail, calendar & settings…"
           }
           value={searchQuery}
           {...searchInputInteractionProps}
@@ -232,6 +232,10 @@ export function CommandPaletteMainSearchView({
               <div className="px-3 py-4 text-center text-sm text-muted-foreground">
                 No mail or calendar results found for &quot;{debouncedQuery}&quot;
               </div>
+            ) : !debouncedQuery.trim() ? (
+              <p className="px-4 pt-1 pb-2 text-[11px] text-muted-foreground/50">
+                Searches mail, calendar, and settings
+              </p>
             ) : null}
           </>
         )}
