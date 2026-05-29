@@ -15,6 +15,12 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="mail"
+        options={{
+          title: "Mail",
+        }}
+      />
+      <Tabs.Screen
         name="search"
         options={{
           title: "Search",

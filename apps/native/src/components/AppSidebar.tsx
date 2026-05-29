@@ -40,6 +40,7 @@ import { calendarApiService } from "../lib/api";
 import { QUERY_KEYS } from "../lib/query-keys";
 import { buildSidebarCalendarSections } from "./app-sidebar-utils";
 import { SidebarMiniCalendar } from "./SidebarMiniCalendar";
+import { AppSwitcher } from "./AppSwitcher";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.78;
@@ -303,6 +304,10 @@ export function AppSidebar() {
               contentContainerStyle={styles.sidebarScrollContent}
               showsVerticalScrollIndicator={false}
             >
+              <View style={styles.sectionBlock}>
+                <AppSwitcher onNavigate={close} />
+              </View>
+
               <View style={styles.sectionBlock}>
                 <View style={styles.primaryActionRow}>
                   <Pressable

@@ -15,4 +15,9 @@ export const QUERY_KEYS = {
   notifications: (eventId: string) => ["notifications", eventId] as const,
   calendarShareLink: (calendarId: string) =>
     ["calendarShareLink", calendarId] as const,
+  mailAccount: () => ["mail", "account"] as const,
+  mailRuntime: () => ["mail", "runtime"] as const,
+  mailMessages: (mailboxId: string | null) =>
+    ["mail", "messages", mailboxId] as const,
+  mailMessage: (messageId: string) => ["mail", "message", messageId] as const,
 } as const;
