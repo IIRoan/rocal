@@ -107,6 +107,7 @@ jest.mock("lucide-react", () => {
   const Icon = () => null;
   return {
     ArrowLeft: Icon,
+    ChevronRight: Icon,
     Ellipsis: Icon,
     Inbox: Icon,
     Loader2: Icon,
@@ -117,10 +118,11 @@ jest.mock("lucide-react", () => {
     Plus: Icon,
     RefreshCcw: Icon,
     RotateCcw: Icon,
+    Search: Icon,
     Send: Icon,
     ShieldCheck: Icon,
-    SlidersHorizontal: Icon,
     UserRoundPlus: Icon,
+    X: Icon,
   };
 });
 

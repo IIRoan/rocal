@@ -11,7 +11,6 @@ import {
   CheckSquare,
   Square,
   MoreHorizontal,
-  Search,
   Star,
   Paperclip,
   MessageSquare,
@@ -38,7 +37,6 @@ import { cn } from "@workspace/ui/lib/utils";
 import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import { formatAddress, formatMessageDate } from "./mail-helpers";
 import { SenderAvatar } from "./mail-avatar";
-import { filterMessages } from "@/lib/mail/message-filter";
 import { buildMailConversations } from "@/lib/mail/conversation-thread";
 
 const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
@@ -107,7 +105,6 @@ export function MessageList({
 }: MessageListProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBarVisible, setIsBarVisible] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [bulkActionsOpen, setBulkActionsOpen] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -176,14 +173,13 @@ export function MessageList({
     return () => observer.disconnect();
   }, [hasMore, onLoadMore, isLoadingMore]);
 
-  const visibleMessages = filterMessages(messages, searchQuery);
   const threadRows = useMemo(() => {
     // Merge primary messages with related cross-mailbox messages (e.g. Sent)
     // so thread grouping reflects the full conversation, not just the current mailbox.
-    const seenIds = new Set(visibleMessages.map((m) => m.id));
+    const seenIds = new Set(messages.map((m) => m.id));
     const extras = relatedMessages.filter((m) => !seenIds.has(m.id));
-    return buildMailConversations([...visibleMessages, ...extras]);
-  }, [visibleMessages, relatedMessages]);
+    return buildMailConversations([...messages, ...extras]);
+  }, [messages, relatedMessages]);
 
   if (messages.length === 0) {
     return (
@@ -198,30 +194,10 @@ export function MessageList({
       ref={scrollRef}
       className="flex h-full flex-col overflow-y-auto pb-6 safe-area-inset-bottom"
     >
-      <div
-        className={cn(
-          "sticky top-0 z-20 border-b border-border/40 bg-background/95 backdrop-blur-sm",
-          isMobile ? "px-2.5 py-1.5" : "px-3 py-2",
-        )}
-      >
-        <div className="flex items-center gap-2 rounded-md bg-muted/60 px-2.5 py-1.5 focus-within:bg-muted/80 transition-colors">
-          <Search
-            className="size-3.5 shrink-0 text-muted-foreground/60"
-            strokeWidth={2}
-          />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search…"
-            className="flex-1 border-0 border-none bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/50 outline-none focus:outline-none focus:ring-0 focus:border-none [&:focus-visible]:outline-none"
-          />
-        </div>
-      </div>
       {isBarVisible && (
         <div
           ref={barRef}
-          className="sticky top-[41px] z-10 flex items-center justify-between px-3 py-1.5 border-b border-border/40 bg-background/95 backdrop-blur-sm"
+          className="sticky top-0 z-10 flex items-center justify-between px-3 py-1.5 border-b border-border/40 bg-background/95 backdrop-blur-sm"
         >
           <div className="flex items-center gap-1.5">
             <button
@@ -322,14 +298,7 @@ export function MessageList({
       )}
 
       <div className="flex flex-col divide-y divide-border/40">
-        {visibleMessages.length === 0 && searchQuery ? (
-          <div className="flex items-center justify-center py-12">
-            <p className="text-sm text-muted-foreground">
-              No results for &quot;{searchQuery}&quot;
-            </p>
-          </div>
-        ) : (
-          threadRows.map((row) => {
+        {threadRows.map((row) => {
             const message = row.latestMessage;
             const isSelected = row.messageIds.includes(selectedMessageId ?? "");
             const selectedCount = row.messageIds.filter((id) =>
@@ -656,10 +625,9 @@ export function MessageList({
                 </ContextMenuContent>
               </ContextMenu>
             );
-          })
-        )}
+          })}
       </div>
-      {hasMore && !searchQuery && (
+      {hasMore && (
         <div
           ref={sentinelRef}
           className="flex items-center justify-center py-4"

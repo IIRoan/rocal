@@ -43,6 +43,8 @@ import type {
   DisableCalendarShareLinkResponsePayload,
   EventSearchResult,
   EventSearchParams,
+  EventSearchCorpusResult,
+  EventSearchCorpusParams,
 } from "@workspace/calendar-core";
 
 const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
@@ -277,8 +279,8 @@ export class CalendarApiService {
         searchParams.set("blindIndexTokens", blindIndexTokens.join(","));
       }
 
-      if (params.limit) searchParams.set("limit", String(params.limit));
-      if (params.offset) searchParams.set("offset", String(params.offset));
+      if (params.limit != null) searchParams.set("limit", String(params.limit));
+      if (params.offset != null) searchParams.set("offset", String(params.offset));
       if (params.startDate) searchParams.set("startDate", params.startDate);
       if (params.endDate) searchParams.set("endDate", params.endDate);
 
@@ -292,6 +294,36 @@ export class CalendarApiService {
       };
     } catch (error) {
       throw this.transformError(error, "Failed to search events");
+    }
+  }
+
+  async getEventSearchCorpus(
+    params: EventSearchCorpusParams = {},
+    signal?: AbortSignal,
+  ): Promise<EventSearchCorpusResult> {
+    try {
+      const searchParams = new URLSearchParams();
+      if (params.limit != null) searchParams.set("limit", String(params.limit));
+      if (params.offset != null) searchParams.set("offset", String(params.offset));
+      if (params.updatedAfter) {
+        searchParams.set("updatedAfter", params.updatedAfter);
+      }
+
+      const query = searchParams.toString();
+      const response = await this.client.get<EventSearchCorpusResult>(
+        `/api/events/search-corpus${query ? `?${query}` : ""}`,
+        { signal },
+      );
+
+      return {
+        ...response,
+        events: await this.hydrateEncryptedEvents(response.events),
+      };
+    } catch (error) {
+      throw this.transformError(
+        error,
+        "Failed to load event search corpus",
+      );
     }
   }
 

@@ -5,6 +5,7 @@ import type {
 } from "@workspace/calendar-core";
 import type {
   IEventService,
+  EventSearchCorpusInput,
   EventSearchInput,
   EventListInput,
   EventCreateInput,
@@ -611,6 +612,60 @@ export class EventService implements IEventService {
     );
 
     return { events, total };
+  }
+
+  async searchCorpus(
+    input: EventSearchCorpusInput,
+  ): Promise<{ events: unknown[]; total: number; nextOffset: number | null }> {
+    const limit = Math.min(Math.max(Number(input.limit) || 100, 1), 200);
+    const offset = Math.max(Number(input.offset) || 0, 0);
+    const updatedAfter = input.updatedAfter
+      ? new Date(input.updatedAfter)
+      : null;
+
+    if (updatedAfter && Number.isNaN(updatedAfter.getTime())) {
+      throw new ValidationError(
+        "Invalid updatedAfter date format. Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)",
+      );
+    }
+
+    const where = {
+      userId: input.userId,
+      ...(updatedAfter ? { updatedAt: { gt: updatedAfter } } : {}),
+      NOT: {
+        participants: {
+          some: {
+            userId: input.userId,
+            role: { not: "organizer" },
+            status: "declined",
+          },
+        },
+      },
+    };
+
+    const [events, total] = await Promise.all([
+      this.prisma.calendarEvent.findMany({
+        where,
+        include: EVENT_WITH_RELATIONS_INCLUDE,
+        orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.calendarEvent.count({ where }),
+    ]);
+
+    const visibleEvents = events.map((event) => ({
+      ...event,
+      participants: mapAndSortParticipants(event),
+    }));
+
+    const consumed = offset + events.length;
+
+    return {
+      events: visibleEvents,
+      total,
+      nextOffset: consumed < total ? consumed : null,
+    };
   }
 
   async list(input: EventListInput): Promise<{
