@@ -1,9 +1,11 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Alert,
   Dimensions,
   Image,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -13,13 +15,6 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePathname, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
@@ -48,8 +43,13 @@ const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.78;
 const EDGE_SWIPE_WIDTH = 24;
 const OPEN_THRESHOLD = 60;
 const CLOSE_THRESHOLD = 35;
-const VELOCITY_THRESHOLD = 400;
-const DRAWER_SPRING = { damping: 24, stiffness: 280, mass: 0.8 };
+const VELOCITY_THRESHOLD = 0.5;
+const DRAWER_SPRING = {
+  damping: 24,
+  stiffness: 280,
+  mass: 0.8,
+  useNativeDriver: true,
+};
 
 const logoSource = require("../assets/logo.png");
 
@@ -112,61 +112,96 @@ export function AppSidebar() {
     },
   });
 
-  const translateX = useSharedValue(-SIDEBAR_WIDTH);
+  const translateX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
 
-  React.useEffect(() => {
-    translateX.value = withSpring(isOpen ? 0 : -SIDEBAR_WIDTH, DRAWER_SPRING);
-  }, [isOpen, translateX]);
+  const animateSidebar = useCallback(
+    (toValue: number) => {
+      Animated.spring(translateX, {
+        toValue,
+        ...DRAWER_SPRING,
+      }).start();
+    },
+    [translateX],
+  );
 
-  const sidebarAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
+  useEffect(() => {
+    animateSidebar(isOpen ? 0 : -SIDEBAR_WIDTH);
+  }, [animateSidebar, isOpen]);
 
-  const overlayAnimatedStyle = useAnimatedStyle(() => {
-    const progress = (translateX.value + SIDEBAR_WIDTH) / SIDEBAR_WIDTH;
-    return { opacity: progress * 0.5 };
-  });
+  const overlayOpacity = useMemo(
+    () =>
+      translateX.interpolate({
+        inputRange: [-SIDEBAR_WIDTH, 0],
+        outputRange: [0, 0.5],
+        extrapolate: "clamp",
+      }),
+    [translateX],
+  );
 
-  const edgePanGesture = Gesture.Pan()
-    .activeOffsetX(10)
-    .failOffsetX(-5)
-    .onUpdate((event) => {
-      const next = -SIDEBAR_WIDTH + event.translationX;
-      translateX.value = Math.min(0, Math.max(-SIDEBAR_WIDTH, next));
-    })
-    .onEnd((event) => {
-      if (
-        event.translationX > OPEN_THRESHOLD ||
-        event.velocityX > VELOCITY_THRESHOLD
-      ) {
-        translateX.value = withSpring(0, DRAWER_SPRING);
-        runOnJS(open)();
-      } else {
-        translateX.value = withSpring(-SIDEBAR_WIDTH, DRAWER_SPRING);
-        runOnJS(close)();
-      }
-    });
+  const edgePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          gestureState.dx > 10 && Math.abs(gestureState.dy) < 20,
+        onPanResponderMove: (_, gestureState) => {
+          const next = -SIDEBAR_WIDTH + gestureState.dx;
+          translateX.setValue(Math.min(0, Math.max(-SIDEBAR_WIDTH, next)));
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (
+            gestureState.dx > OPEN_THRESHOLD ||
+            gestureState.vx > VELOCITY_THRESHOLD
+          ) {
+            open();
+            animateSidebar(0);
+            return;
+          }
 
-  const closePanGesture = Gesture.Pan()
-    .activeOffsetX([-6, 20])
-    .failOffsetY([-15, 15])
-    .onUpdate((event) => {
-      "worklet";
-      const clamped = Math.min(5, Math.max(event.translationX, -SIDEBAR_WIDTH));
-      translateX.value = clamped;
-    })
-    .onEnd((event) => {
-      "worklet";
-      if (
-        event.translationX < -CLOSE_THRESHOLD ||
-        event.velocityX < -VELOCITY_THRESHOLD
-      ) {
-        translateX.value = withSpring(-SIDEBAR_WIDTH, DRAWER_SPRING);
-        runOnJS(close)();
-      } else {
-        translateX.value = withSpring(0, DRAWER_SPRING);
-      }
-    });
+          close();
+          animateSidebar(-SIDEBAR_WIDTH);
+        },
+        onPanResponderTerminate: () => {
+          close();
+          animateSidebar(-SIDEBAR_WIDTH);
+        },
+      }),
+    [animateSidebar, close, open, translateX],
+  );
+
+  const closePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          isOpen &&
+          Math.abs(gestureState.dx) > 6 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onPanResponderGrant: () => {
+          translateX.stopAnimation();
+        },
+        onPanResponderMove: (_, gestureState) => {
+          const clamped = Math.min(0, Math.max(-SIDEBAR_WIDTH, gestureState.dx));
+          translateX.setValue(clamped);
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (
+            gestureState.dx < -CLOSE_THRESHOLD ||
+            gestureState.vx < -VELOCITY_THRESHOLD
+          ) {
+            close();
+            animateSidebar(-SIDEBAR_WIDTH);
+            return;
+          }
+
+          open();
+          animateSidebar(0);
+        },
+        onPanResponderTerminate: () => {
+          open();
+          animateSidebar(0);
+        },
+      }),
+    [animateSidebar, close, isOpen, open, translateX],
+  );
 
   const handleNavigate = useCallback(
     (route: string) => {
@@ -215,14 +250,10 @@ export function AppSidebar() {
   return (
     <>
       {!isOpen && (
-        <GestureDetector gesture={edgePanGesture}>
-          <Animated.View
-            style={[
-              styles.edgeZone,
-              { height: "100%", paddingTop: insets.top },
-            ]}
-          />
-        </GestureDetector>
+        <View
+          {...edgePanResponder.panHandlers}
+          style={[styles.edgeZone, { height: "100%", paddingTop: insets.top }]}
+        />
       )}
 
       <View
@@ -238,25 +269,22 @@ export function AppSidebar() {
           Platform.OS === "web" ? undefined : isOpen ? "auto" : "none"
         }
       >
-        <GestureDetector gesture={closePanGesture}>
-          <Animated.View style={[styles.overlay, overlayAnimatedStyle]}>
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={close}
-              accessibilityRole="button"
-              accessibilityLabel="Close sidebar"
-            />
-          </Animated.View>
-        </GestureDetector>
+        <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={close}
+            accessibilityRole="button"
+            accessibilityLabel="Close sidebar"
+          />
+        </Animated.View>
 
-        <GestureDetector gesture={closePanGesture}>
-          <Animated.View
-            style={[
-              styles.sidebar,
-              sidebarAnimatedStyle,
-              { width: SIDEBAR_WIDTH },
-            ]}
-          >
+        <Animated.View
+          {...closePanResponder.panHandlers}
+          style={[
+            styles.sidebar,
+            { width: SIDEBAR_WIDTH, transform: [{ translateX }] },
+          ]}
+        >
             <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
               <View style={styles.headerRow}>
                 <View style={styles.headerBrand}>
@@ -352,7 +380,6 @@ export function AppSidebar() {
                 <SidebarMiniCalendar
                   weekStartDay={1}
                   selectedDate={selectedDate}
-                  drawerCloseGesture={closePanGesture}
                   onDayPress={handleSelectCalendarDate}
                 />
               </View>
@@ -466,7 +493,6 @@ export function AppSidebar() {
               </View>
             </ScrollView>
           </Animated.View>
-        </GestureDetector>
       </View>
     </>
   );

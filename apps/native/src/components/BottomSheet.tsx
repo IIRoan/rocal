@@ -1,4 +1,16 @@
 import {
+  Animated,
+  Keyboard,
+  PanResponder,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+  type KeyboardEvent as RNKeyboardEvent,
+  type ViewStyle,
+} from "react-native";
+import {
   forwardRef,
   useCallback,
   useEffect,
@@ -7,73 +19,39 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  Keyboard,
-  Platform,
-  Pressable,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-  type ViewStyle,
- KeyboardEvent as RNKeyboardEvent } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  Extrapolation,
-  interpolate,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
-import { useSwipePanelGesture } from "../lib/useSwipePanelGesture";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-/**
- * Maximum height as a fraction of the screen — matches the shadcn/vaul
- * `max-h-[80vh]` default but bumped to 92% for the event form which is tall.
- */
 const MAX_SHEET_RATIO = 0.92;
-
-/** Velocity (px/s) at which a flick commits the dismiss — Spotify-style medium flick. */
-const DISMISS_VELOCITY = 300;
-/** Drag distance (px) required to commit without a flick. */
+const DISMISS_VELOCITY = 0.3;
 const DISMISS_DISTANCE = 60;
-
-/** Spring for open / snap-back (feels like vaul). */
-const SPRING_CONFIG = { damping: 28, stiffness: 280, mass: 0.8 };
-/** Snappier spring for the exit so the sheet leaves quickly after a commit. */
-const SPRING_CLOSE = { damping: 24, stiffness: 320, mass: 0.7 };
-
-/** Overlay fade duration (ms). */
+const SPRING_CONFIG = {
+  damping: 28,
+  stiffness: 280,
+  mass: 0.8,
+  useNativeDriver: true,
+} as const;
+const SPRING_CLOSE = {
+  damping: 24,
+  stiffness: 320,
+  mass: 0.7,
+  useNativeDriver: true,
+} as const;
 const OVERLAY_DURATION = 200;
 
-// ─── Props ───────────────────────────────────────────────────────────────────
-
 export interface BottomSheetProps {
-  /** Whether the sheet is visible. */
   visible: boolean;
-  /** Called when the sheet requests dismissal. */
   onDismiss: () => void;
-  /** Called after the close animation fully finishes. */
   onCloseComplete?: () => void;
-  /** Content rendered inside the sheet. Children manage their own scrolling. */
   children: React.ReactNode;
-  /** Accessibility title for the sheet container. */
   title?: string;
-  /** Allow dragging the sheet body down to dismiss. */
   swipeContentToDismiss?: boolean;
 }
 
 export interface BottomSheetHandle {
   dismiss: () => void;
 }
-
-// ─── Component ───────────────────────────────────────────────────────────────
 
 export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
   function BottomSheet(
@@ -84,7 +62,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       children,
       title,
       swipeContentToDismiss = false,
-    }: BottomSheetProps,
+    },
     ref,
   ) {
     const { theme } = useTheme();
@@ -93,23 +71,16 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const { height: screenHeight } = useWindowDimensions();
     const [allowsPointerEvents, setAllowsPointerEvents] = useState(visible);
     const isClosingRef = useRef(false);
+    const isOpenRef = useRef(false);
 
     const maxHeight = screenHeight * MAX_SHEET_RATIO;
-
-    // Animated values
-    const translateY = useSharedValue(maxHeight);
-    const overlayOpacity = useSharedValue(0);
-    const isOpen = useSharedValue(false);
-    const keyboardHeight = useSharedValue(0);
-
-    // ── Keyboard avoidance ───────────────────────────────────────────────────
-    // Only listen while the sheet is visible so keyboard events from other
-    // screens (e.g. search on the calendar tab) don't shift a hidden sheet.
+    const translateY = useRef(new Animated.Value(maxHeight)).current;
+    const overlayOpacity = useRef(new Animated.Value(0)).current;
+    const keyboardHeight = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
       if (!visible) {
-        // Reset immediately when the sheet is not visible
-        keyboardHeight.value = 0;
+        keyboardHeight.setValue(0);
         return;
       }
 
@@ -122,11 +93,18 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         const kbHeight = e.endCoordinates.height;
         const offset =
           Platform.OS === "ios" ? kbHeight - insets.bottom : kbHeight;
-        keyboardHeight.value = withSpring(Math.max(0, offset), SPRING_CONFIG);
+
+        Animated.spring(keyboardHeight, {
+          toValue: Math.max(0, offset),
+          ...SPRING_CONFIG,
+        }).start();
       };
 
       const onHide = () => {
-        keyboardHeight.value = withSpring(0, SPRING_CONFIG);
+        Animated.spring(keyboardHeight, {
+          toValue: 0,
+          ...SPRING_CONFIG,
+        }).start();
       };
 
       const sub1 = Keyboard.addListener(showEvent, onShow);
@@ -135,52 +113,71 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       return () => {
         sub1.remove();
         sub2.remove();
-        keyboardHeight.value = 0;
+        keyboardHeight.setValue(0);
       };
     }, [visible, keyboardHeight, insets.bottom]);
-
-    // ── Open / close ─────────────────────────────────────────────────────────
-
-    const open = useCallback(() => {
-      isClosingRef.current = false;
-      setAllowsPointerEvents(true);
-      isOpen.value = true;
-      overlayOpacity.value = withTiming(1, { duration: OVERLAY_DURATION });
-      translateY.value = withSpring(0, SPRING_CONFIG);
-    }, [translateY, overlayOpacity, isOpen]);
 
     const handleCloseComplete = useCallback(() => {
       isClosingRef.current = false;
       onCloseComplete?.();
     }, [onCloseComplete]);
 
+    const open = useCallback(() => {
+      isClosingRef.current = false;
+      isOpenRef.current = true;
+      setAllowsPointerEvents(true);
+      Animated.parallel([
+        Animated.timing(overlayOpacity, {
+          toValue: 1,
+          duration: OVERLAY_DURATION,
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateY, {
+          toValue: 0,
+          ...SPRING_CONFIG,
+        }),
+      ]).start();
+    }, [overlayOpacity, translateY]);
+
     const close = useCallback(
       (notifyParent: boolean) => {
-        if (isClosingRef.current) return;
+        if (isClosingRef.current) {
+          return;
+        }
 
         isClosingRef.current = true;
         setAllowsPointerEvents(false);
         Keyboard.dismiss();
-        keyboardHeight.value = 0;
-        overlayOpacity.value = withTiming(0, { duration: 150 });
-        translateY.value = withSpring(maxHeight, SPRING_CLOSE, (finished) => {
+        keyboardHeight.setValue(0);
+
+        Animated.parallel([
+          Animated.timing(overlayOpacity, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+          Animated.spring(translateY, {
+            toValue: maxHeight,
+            ...SPRING_CLOSE,
+          }),
+        ]).start(({ finished }) => {
           if (finished) {
-            isOpen.value = false;
-            runOnJS(handleCloseComplete)();
+            isOpenRef.current = false;
+            handleCloseComplete();
           }
         });
+
         if (notifyParent) {
           onDismiss();
         }
       },
       [
-        translateY,
-        overlayOpacity,
+        handleCloseComplete,
+        keyboardHeight,
         maxHeight,
         onDismiss,
-        isOpen,
-        keyboardHeight,
-        handleCloseComplete,
+        overlayOpacity,
+        translateY,
       ],
     );
 
@@ -188,122 +185,90 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       close(true);
     }, [close]);
 
+    const snapOpen = useCallback(() => {
+      Animated.spring(translateY, {
+        toValue: 0,
+        ...SPRING_CONFIG,
+      }).start();
+    }, [translateY]);
+
     useImperativeHandle(ref, () => ({ dismiss: requestClose }), [requestClose]);
 
     useEffect(() => {
       if (visible) {
         open();
-      } else if (isOpen.value && !isClosingRef.current) {
+      } else if (isOpenRef.current && !isClosingRef.current) {
         close(false);
       }
-    }, [visible, open, close, isOpen]);
+    }, [close, open, visible]);
 
-    // ── Handle pan gesture (drag the handle pill to dismiss) ─────────────────
+    useEffect(() => {
+      if (!visible) {
+        translateY.setValue(maxHeight);
+        overlayOpacity.setValue(0);
+      }
+    }, [maxHeight, overlayOpacity, translateY, visible]);
 
-    const handlePan = useSwipePanelGesture(translateY, {
-      restValue: 0,
-      lowerBound: 0,
-      upperBound: maxHeight,
-      rubberBandBelow: 0.4, // subtle bounce when pulled upward past open
-      rubberBandAbove: 0,
-      onCommitDown: requestClose,
-      commitDistance: DISMISS_DISTANCE,
-      commitVelocity: DISMISS_VELOCITY,
-      springConfig: SPRING_CLOSE,
-    })
-      .activeOffsetY([-5, 5])
-      .failOffsetX([-20, 20]);
+    const dragPanResponder = useMemo(
+      () =>
+        PanResponder.create({
+          onMoveShouldSetPanResponder: (_, gestureState) =>
+            Math.abs(gestureState.dy) > 5 &&
+            Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+          onPanResponderGrant: () => {
+            translateY.stopAnimation();
+          },
+          onPanResponderMove: (_, gestureState) => {
+            translateY.setValue(Math.max(0, gestureState.dy));
+          },
+          onPanResponderRelease: (_, gestureState) => {
+            if (
+              gestureState.dy > DISMISS_DISTANCE ||
+              gestureState.vy > DISMISS_VELOCITY
+            ) {
+              requestClose();
+              return;
+            }
 
-    // ── Overlay pan gesture (swipe down on the backdrop to dismiss) ──────────
-    // This covers the entire screen area behind the sheet, so swiping down
-    // anywhere outside the sheet content will dismiss it.
+            snapOpen();
+          },
+          onPanResponderTerminate: () => {
+            snapOpen();
+          },
+        }),
+      [requestClose, snapOpen, translateY],
+    );
 
-    const overlayPan = useSwipePanelGesture(translateY, {
-      restValue: 0,
-      lowerBound: 0,
-      upperBound: maxHeight,
-      rubberBandBelow: 0,
-      rubberBandAbove: 0,
-      onCommitDown: requestClose,
-      commitDistance: DISMISS_DISTANCE,
-      commitVelocity: DISMISS_VELOCITY,
-      springConfig: SPRING_CLOSE,
-    })
-      .activeOffsetY(5)
-      .failOffsetX([-20, 20]);
+    const contentPanHandlers = swipeContentToDismiss
+      ? dragPanResponder.panHandlers
+      : undefined;
 
-    const contentPan = useSwipePanelGesture(translateY, {
-      restValue: 0,
-      lowerBound: 0,
-      upperBound: maxHeight,
-      rubberBandBelow: 0,
-      rubberBandAbove: 0,
-      onCommitDown: requestClose,
-      commitDistance: DISMISS_DISTANCE,
-      commitVelocity: DISMISS_VELOCITY,
-      springConfig: SPRING_CLOSE,
-    })
-      .activeOffsetY(5)
-      .failOffsetX([-20, 20])
-      .enabled(swipeContentToDismiss);
-
-    const contentGesture = Gesture.Simultaneous(contentPan, Gesture.Native());
-
-    // ── Animated styles ──────────────────────────────────────────────────────
-
-    // Overlay dims progressively as the sheet is dragged down — gives the
-    // user clear visual feedback that the dismiss is in-progress.
-    const overlayAnimatedStyle = useAnimatedStyle(() => {
-      const dragFade = interpolate(
-        translateY.value,
-        [0, maxHeight * 0.5],
-        [1, 0.3],
-        Extrapolation.CLAMP,
-      );
-      return { opacity: overlayOpacity.value * dragFade };
-    });
-
-    // Sheet scales down slightly and corners round more as it's dragged —
-    // matches the Spotify / Apple Music sheet-dismiss feel.
-    const sheetAnimatedStyle = useAnimatedStyle(() => {
-      const progress = translateY.value / maxHeight;
-      const scale = interpolate(
-        progress,
-        [0, 0.6],
-        [1, 0.96],
-        Extrapolation.CLAMP,
-      );
-      const radius = interpolate(
-        progress,
-        [0, 0.15],
-        [16, 26],
-        Extrapolation.CLAMP,
-      );
-      return {
-        transform: [
-          { translateY: translateY.value - keyboardHeight.value },
-          { scale },
-        ],
-        borderTopLeftRadius: radius,
-        borderTopRightRadius: radius,
-        // Explicit height (not just maxHeight) so flex:1 children have a
-        // definite boundary — required for ScrollViews inside the sheet to
-        // calculate overflow and allow scrolling.
-        height: maxHeight,
-        paddingBottom: insets.bottom,
-      };
-    });
-
-    const handleIndicatorOpacity = useAnimatedStyle(() => ({
-      opacity: interpolate(
-        translateY.value,
-        [0, maxHeight * 0.5],
-        [1, 0.4],
-        Extrapolation.CLAMP,
-      ),
-    }));
-
-    // ── Render ───────────────────────────────────────────────────────────────
+    const combinedTranslateY = useMemo(
+      () => Animated.subtract(translateY, keyboardHeight),
+      [keyboardHeight, translateY],
+    );
+    const dragFade = useMemo(
+      () =>
+        translateY.interpolate({
+          inputRange: [0, maxHeight * 0.5],
+          outputRange: [1, 0.3],
+          extrapolate: "clamp",
+        }),
+      [maxHeight, translateY],
+    );
+    const effectiveOverlayOpacity = useMemo(
+      () => Animated.multiply(overlayOpacity, dragFade),
+      [dragFade, overlayOpacity],
+    );
+    const handlePillOpacity = useMemo(
+      () =>
+        translateY.interpolate({
+          inputRange: [0, maxHeight * 0.5],
+          outputRange: [1, 0.4],
+          extrapolate: "clamp",
+        }),
+      [maxHeight, translateY],
+    );
 
     return (
       <View
@@ -323,44 +288,43 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
               : "none"
         }
       >
-        {/* Overlay — tap or swipe down to dismiss */}
-        <GestureDetector gesture={overlayPan}>
-          <Animated.View style={[styles.overlay, overlayAnimatedStyle]}>
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={requestClose}
-              accessibilityRole="button"
-              accessibilityLabel="Close sheet"
-            />
-          </Animated.View>
-        </GestureDetector>
-
-        {/* Sheet container */}
         <Animated.View
-          style={[styles.sheet, sheetAnimatedStyle]}
+          style={[styles.overlay, { opacity: effectiveOverlayOpacity }]}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={requestClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close sheet"
+          />
+        </Animated.View>
+
+        <Animated.View
+          style={[
+            styles.sheet,
+            {
+              height: maxHeight,
+              paddingBottom: insets.bottom,
+              transform: [{ translateY: combinedTranslateY }],
+            },
+          ]}
           accessibilityRole="none"
           accessibilityLabel={title}
         >
-          {/* Handle — drag down to dismiss */}
-          <GestureDetector gesture={handlePan}>
-            <View style={styles.handleArea}>
-              <Animated.View
-                style={[styles.handlePill, handleIndicatorOpacity]}
-              />
-            </View>
-          </GestureDetector>
+          <View {...dragPanResponder.panHandlers} style={styles.handleArea}>
+            <Animated.View
+              style={[styles.handlePill, { opacity: handlePillOpacity }]}
+            />
+          </View>
 
-          {/* Content — children manage their own scrolling */}
-          <GestureDetector gesture={contentGesture}>
-            <View style={styles.contentWrapper}>{children}</View>
-          </GestureDetector>
+          <View {...contentPanHandlers} style={styles.contentWrapper}>
+            {children}
+          </View>
         </Animated.View>
       </View>
     );
   },
 );
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
 
 function createStyles(theme: ThemeTokens) {
   const view = {
@@ -388,7 +352,6 @@ function createStyles(theme: ThemeTokens) {
       left: 0,
       right: 0,
       backgroundColor: theme.colors.card,
-      // Border-radius is animated in sheetAnimatedStyle
       ...(Platform.OS === "ios"
         ? {
             shadowColor: "#000",
@@ -398,6 +361,8 @@ function createStyles(theme: ThemeTokens) {
           }
         : { elevation: 16 }),
       overflow: "hidden" as const,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
     },
 
     handleArea: {
@@ -405,7 +370,6 @@ function createStyles(theme: ThemeTokens) {
       paddingBottom: 12,
       alignItems: "center" as const,
       justifyContent: "center" as const,
-      // Extend the hit area slightly without growing visually
       marginHorizontal: -16,
       paddingHorizontal: 16,
     },

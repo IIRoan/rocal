@@ -6,6 +6,7 @@ const baseConfig: ExpoConfig = {
   version: "1.0.0",
   orientation: "portrait",
   scheme: "solace",
+  newArchEnabled: false,
   userInterfaceStyle: "automatic",
   runtimeVersion: {
     policy: "appVersion",
@@ -41,11 +42,15 @@ const baseConfig: ExpoConfig = {
 const expoOwner = process.env.EXPO_OWNER || baseConfig.owner;
 const expoProjectId =
   process.env.EXPO_PROJECT_ID || baseConfig.extra?.eas?.projectId;
+const enableIosAssociatedDomains =
+  process.env.EXPO_ENABLE_IOS_ASSOCIATED_DOMAINS === "true";
 const passkeyOrigin =
   process.env.PASSKEY_ORIGIN ||
   process.env.NEXT_PUBLIC_APP_URL ||
   process.env.EXPO_PUBLIC_APP_URL;
-const passkeyAssociatedDomain = getPasskeyAssociatedDomain(passkeyOrigin);
+const passkeyAssociatedDomain = enableIosAssociatedDomains
+  ? getPasskeyAssociatedDomain(passkeyOrigin)
+  : null;
 
 function getPasskeyAssociatedDomain(origin?: string | null): string | null {
   if (!origin) {
