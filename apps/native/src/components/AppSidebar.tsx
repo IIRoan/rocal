@@ -36,6 +36,7 @@ import { useTheme } from "../providers/ThemeProvider";
 import { useAuth } from "../providers/AuthProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
 import { useSidebar } from "../providers/SidebarProvider";
+import { useCommandPalette } from "../providers/CommandPaletteProvider";
 import { calendarApiService } from "../lib/api";
 import { QUERY_KEYS } from "../lib/query-keys";
 import { buildSidebarCalendarSections } from "./app-sidebar-utils";
@@ -57,6 +58,7 @@ export function AppSidebar() {
   const { user, isAuthenticated } = useAuth();
   const { selectedDate, setCurrentDate, setSelectedDate } = useCalendarView();
   const { isOpen, open, close } = useSidebar();
+  const { open: openCommandPalette } = useCommandPalette();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const router = useRouter();
@@ -176,6 +178,11 @@ export function AppSidebar() {
     [close, router],
   );
 
+  const handleOpenSearch = useCallback(() => {
+    close();
+    setTimeout(() => openCommandPalette(), 100);
+  }, [close, openCommandPalette]);
+
   const handleToggleCalendarVisibility = useCallback(
     (calendar: Calendar) => {
       toggleCalendarVisibilityMutation.mutate({
@@ -258,7 +265,7 @@ export function AppSidebar() {
                 </View>
                 <View style={styles.headerActions}>
                   <Pressable
-                    onPress={() => handleNavigate("/(tabs)/search")}
+                    onPress={handleOpenSearch}
                     style={({ pressed }) => [
                       styles.headerIconButton,
                       pressed && styles.pressed,

@@ -15,7 +15,6 @@ import {
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -155,8 +154,6 @@ export default function SettingsScreen() {
 
     return getAuthCapabilities({
       platformOs: Platform.OS,
-      expoExecutionEnvironment: Constants.executionEnvironment,
-      expoAppOwnership: Constants.appOwnership,
       hasPublicKeyCredential:
         typeof globalThis.PublicKeyCredential === "function",
       hasSecurePasskeyBridgeOrigin:
@@ -932,7 +929,7 @@ export default function SettingsScreen() {
           ) : (
             <HintRow
               text={
-                Platform.OS === "web" || Constants.appOwnership === "expo"
+                Platform.OS === "web"
                   ? passkeySupportMessage
                   : `${passkeySupportMessage} Native passkeys also need the passkey domain, apple-app-site-association, and assetlinks setup to match your build.`
               }

@@ -7,8 +7,10 @@ import { ThemeProvider } from "../src/providers/ThemeProvider";
 import { E2eeProvider, useE2ee } from "../src/providers/E2eeProvider";
 import { SheetProvider } from "../src/providers/SheetProvider";
 import { SidebarProvider } from "../src/providers/SidebarProvider";
+import { CommandPaletteProvider } from "../src/providers/CommandPaletteProvider";
 import { CalendarViewProvider } from "../src/providers/CalendarViewProvider";
 import { AppSidebar } from "../src/components/AppSidebar";
+import { CommandPalette } from "../src/components/CommandPalette";
 import { calendarApiService } from "../src/lib/api";
 import { getAuthRedirectPath } from "../src/lib/auth-routing";
 import { API_BASE_URL } from "../src/lib/constants";
@@ -77,8 +79,11 @@ export default function RootLayout() {
                 <CalendarViewProvider>
                   <NavigationGuard>
                     <SheetProvider>
-                      <Slot />
-                      <AppSidebar />
+                      <CommandPaletteProvider>
+                        <Slot />
+                        <AppSidebar />
+                        <CommandPalette />
+                      </CommandPaletteProvider>
                     </SheetProvider>
                   </NavigationGuard>
                 </CalendarViewProvider>

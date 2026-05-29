@@ -33,6 +33,8 @@ interface CalendarViewSwitcherProps {
   monthStripExpanded?: boolean;
   /** Callback to toggle month strip expand/collapse */
   onToggleMonthStrip?: () => void;
+  /** Callback to open the command palette / search. */
+  onSearchPress?: () => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -46,6 +48,7 @@ export function CalendarViewSwitcher({
   onBackwardPress,
   monthStripExpanded,
   onToggleMonthStrip,
+  onSearchPress,
 }: CalendarViewSwitcherProps) {
   const { theme } = useTheme();
   const { toggle: toggleSidebar } = useSidebar();
@@ -109,6 +112,17 @@ export function CalendarViewSwitcher({
         >
           <Text style={styles.navArrow}>›</Text>
         </Pressable>
+
+        {onSearchPress ? (
+          <Pressable
+            onPress={onSearchPress}
+            style={styles.searchButton}
+            accessibilityRole="button"
+            accessibilityLabel="Search and commands"
+          >
+            <Feather name="search" size={20} color={theme.colors.foreground} />
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -135,6 +149,11 @@ function createStyles(theme: ThemeTokens) {
       paddingHorizontal: theme.spacing["2"],
       paddingVertical: theme.spacing["1"],
       marginRight: theme.spacing["1"],
+    },
+    searchButton: {
+      paddingHorizontal: theme.spacing["2"],
+      paddingVertical: theme.spacing["1"],
+      marginLeft: theme.spacing["1"],
     },
     dateHeaderButton: {
       flex: 1,
