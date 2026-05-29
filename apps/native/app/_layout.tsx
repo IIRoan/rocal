@@ -7,6 +7,7 @@ import { ThemeProvider } from "../src/providers/ThemeProvider";
 import { E2eeProvider, useE2ee } from "../src/providers/E2eeProvider";
 import { SheetProvider } from "../src/providers/SheetProvider";
 import { SidebarProvider } from "../src/providers/SidebarProvider";
+import { MailSelectionProvider } from "../src/providers/MailSelectionProvider";
 import { CommandPaletteProvider } from "../src/providers/CommandPaletteProvider";
 import { CalendarViewProvider } from "../src/providers/CalendarViewProvider";
 import { AppSidebar } from "../src/components/AppSidebar";
@@ -76,17 +77,19 @@ export default function RootLayout() {
           <ThemeProvider>
             <E2eeProvider>
               <SidebarProvider>
-                <CalendarViewProvider>
-                  <NavigationGuard>
-                    <SheetProvider>
-                      <CommandPaletteProvider>
-                        <Slot />
-                        <AppSidebar />
-                        <CommandPalette />
-                      </CommandPaletteProvider>
-                    </SheetProvider>
-                  </NavigationGuard>
-                </CalendarViewProvider>
+                <MailSelectionProvider>
+                  <CalendarViewProvider>
+                    <NavigationGuard>
+                      <SheetProvider>
+                        <CommandPaletteProvider>
+                          <Slot />
+                          <AppSidebar />
+                          <CommandPalette />
+                        </CommandPaletteProvider>
+                      </SheetProvider>
+                    </NavigationGuard>
+                  </CalendarViewProvider>
+                </MailSelectionProvider>
               </SidebarProvider>
             </E2eeProvider>
           </ThemeProvider>
