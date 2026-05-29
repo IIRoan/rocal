@@ -3,6 +3,7 @@ import {
   Alert,
   Pressable,
   StyleSheet,
+  Text,
   View,
   type TextStyle,
   type ViewStyle,
@@ -179,9 +180,9 @@ export function SwipeableEventRow({
           accessibilityRole="button"
           accessibilityLabel={`Delete ${eventTitle}`}
         >
-          <Animated.Text style={[styles.deleteText, deleteTextAnimatedStyle]}>
-            Delete
-          </Animated.Text>
+          <Animated.View style={deleteTextAnimatedStyle}>
+            <Text style={styles.deleteText}>Delete</Text>
+          </Animated.View>
         </Pressable>
       </Animated.View>
 
