@@ -131,6 +131,88 @@ describe("EventService.search", () => {
   });
 });
 
+describe("EventService.searchCorpus", () => {
+  it("filters declined attendee copies before pagination", async () => {
+    const visibleEvent = eventFixture({
+      id: "event-visible",
+      title: "Visible event",
+      participants: [
+        {
+          id: "participant-visible",
+          eventId: "event-visible",
+          userId: "user-1",
+          email: "testingprod15@solace.onl",
+          displayName: "Test User",
+          role: "attendee",
+          status: "accepted",
+          user: {
+            id: "user-1",
+            name: "Test User",
+            email: "testingprod15@solace.onl",
+            image: null,
+          },
+        },
+      ],
+    });
+    const prisma = {
+      calendarEvent: {
+        findMany: jest.fn(async () => [visibleEvent] as never),
+        count: jest.fn(async () => 2),
+      },
+    };
+
+    const service = new EventService(prisma as never);
+    const result = await service.searchCorpus({
+      userId: "user-1",
+      limit: 1,
+      offset: 0,
+    });
+
+    expect(prisma.calendarEvent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: "user-1",
+          NOT: {
+            participants: {
+              some: {
+                userId: "user-1",
+                role: { not: "organizer" },
+                status: "declined",
+              },
+            },
+          },
+        },
+        take: 1,
+        skip: 0,
+      }),
+    );
+    expect(prisma.calendarEvent.count).toHaveBeenCalledWith({
+      where: {
+        userId: "user-1",
+        NOT: {
+          participants: {
+            some: {
+              userId: "user-1",
+              role: { not: "organizer" },
+              status: "declined",
+            },
+          },
+        },
+      },
+    });
+    expect(result).toEqual({
+      events: [
+        expect.objectContaining({
+          id: "event-visible",
+          title: "Visible event",
+        }),
+      ],
+      total: 2,
+      nextOffset: 1,
+    });
+  });
+});
+
 describe("EventService.list", () => {
   it("hides declined invite copies from the calendar results", async () => {
     const declinedEvent = eventFixture({
