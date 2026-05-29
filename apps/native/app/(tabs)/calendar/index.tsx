@@ -13,6 +13,7 @@ import {
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useSheet } from "../../../src/providers/SheetProvider";
+import { useCommandPalette } from "../../../src/providers/CommandPaletteProvider";
 import { useCalendarView } from "../../../src/providers/CalendarViewProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
@@ -39,6 +40,7 @@ import type { TimelinePage } from "../../../src/components/calendar/TimelinePage
 export default function CalendarScreen() {
   const { theme } = useTheme();
   const { openEventSheet } = useSheet();
+  const { open: openCommandPalette } = useCommandPalette();
   const {
     activeView,
     currentDate,
@@ -345,6 +347,7 @@ export default function CalendarScreen() {
         onBackwardPress={handleNavigateBackward}
         monthStripExpanded={monthStripExpanded}
         onToggleMonthStrip={handleToggleMonthStrip}
+        onSearchPress={openCommandPalette}
       />
 
       {/* For non-timeline views, show strip + separator above the content */}

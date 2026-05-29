@@ -7,7 +7,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { authClient } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
@@ -101,8 +100,6 @@ export function AuthProvider({
 
     return getAuthCapabilities({
       platformOs: Platform.OS,
-      expoExecutionEnvironment: Constants.executionEnvironment,
-      expoAppOwnership: Constants.appOwnership,
       hasPublicKeyCredential:
         typeof globalThis.PublicKeyCredential === "function",
       hasSecurePasskeyBridgeOrigin:

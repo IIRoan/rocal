@@ -11,13 +11,17 @@ import { Feather } from "@expo/vector-icons";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
 import { useSidebar } from "../providers/SidebarProvider";
+import { useCommandPalette } from "../providers/CommandPaletteProvider";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface ScreenHeaderProps {
   /** Title displayed in the header. */
   title: string;
-  /** Optional right-side action. */
+  /**
+   * Optional right-side action. When omitted, a command palette / search
+   * button is shown by default.
+   */
   rightAction?: React.ReactNode;
 }
 
@@ -26,6 +30,7 @@ interface ScreenHeaderProps {
 export function ScreenHeader({ title, rightAction }: ScreenHeaderProps) {
   const { theme } = useTheme();
   const { toggle } = useSidebar();
+  const { open: openCommandPalette } = useCommandPalette();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
@@ -46,7 +51,14 @@ export function ScreenHeader({ title, rightAction }: ScreenHeaderProps) {
       {rightAction ? (
         <View style={styles.rightSlot}>{rightAction}</View>
       ) : (
-        <View style={styles.rightPlaceholder} />
+        <Pressable
+          onPress={openCommandPalette}
+          style={styles.rightSlot}
+          accessibilityRole="button"
+          accessibilityLabel="Search and commands"
+        >
+          <Feather name="search" size={20} color={theme.colors.foreground} />
+        </Pressable>
       )}
     </View>
   );
@@ -72,9 +84,6 @@ function createStyles(theme: ThemeTokens) {
     rightSlot: {
       minWidth: 38,
       alignItems: "flex-end" as const,
-    },
-    rightPlaceholder: {
-      width: 38,
     },
   } satisfies Record<string, ViewStyle>;
 

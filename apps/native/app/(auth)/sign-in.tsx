@@ -14,7 +14,6 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import Constants from "expo-constants";
 import { Link, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
@@ -71,8 +70,6 @@ export default function SignInScreen() {
 
     return getAuthCapabilities({
       platformOs: Platform.OS,
-      expoExecutionEnvironment: Constants.executionEnvironment,
-      expoAppOwnership: Constants.appOwnership,
       hasPublicKeyCredential:
         typeof globalThis.PublicKeyCredential === "function",
       hasSecurePasskeyBridgeOrigin:

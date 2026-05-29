@@ -1,11 +1,21 @@
+/**
+ * Whether a message is plaintext, server-side encrypted-at-rest, or end-to-end
+ * (PGP / internal) encrypted. Only `plain` messages can be rendered fully
+ * on-device; encrypted messages require the secure web client to decrypt.
+ */
+export type MessageEncryptionState =
+  | "plain"
+  | "inline_pgp"
+  | "pgp_mime"
+  | "internal_e2ee"
+  | "unknown_encrypted";
+
 export type MailVaultKdfParams = {
   saltB64: string;
   memoryKiB: number;
   iterations: number;
   parallelism: number;
-};
-
-export type MailOAuthConfig = {
+};export type MailOAuthConfig = {
   issuer: string;
   discoveryUrl: string;
   authorizationEndpoint: string;

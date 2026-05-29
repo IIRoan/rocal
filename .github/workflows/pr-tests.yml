@@ -63,3 +63,10 @@ jobs:
         with:
           name: notifications-coverage
           path: apps/notifications/coverage.out
+
+      - name: Upload native coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-coverage
+          path: apps/native/coverage
