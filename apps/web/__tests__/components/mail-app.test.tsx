@@ -10,6 +10,7 @@ import {
   jest,
 } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const mockToggleSidebar = jest.fn();
 const mockUseIsMobile = jest.fn(() => false);
@@ -418,6 +419,7 @@ const mockMailOAuthConfig = {
 
 let container: HTMLDivElement;
 let root: Root;
+let queryClient: QueryClient;
 
 function setInputValue(input: HTMLInputElement, value: string) {
   act(() => {
@@ -477,6 +479,12 @@ describe("MailApp", () => {
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
+    queryClient = new QueryClient({
+      defaultOptions: {
+        mutations: { retry: false },
+        queries: { retry: false },
+      },
+    });
     mockToast.mockReset();
     mockToastError.mockReset();
     mockToggleSidebar.mockReset();
@@ -661,7 +669,11 @@ describe("MailApp", () => {
 
   async function renderApp() {
     await act(async () => {
-      root.render(<MailApp />);
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <MailApp />
+        </QueryClientProvider>,
+      );
       await Promise.resolve();
     });
   }
@@ -859,7 +871,11 @@ describe("MailApp", () => {
     );
 
     await act(async () => {
-      root.render(<MailApp />);
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <MailApp />
+        </QueryClientProvider>,
+      );
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -1367,7 +1383,11 @@ describe("MailApp", () => {
     );
 
     await act(async () => {
-      root.render(<MailApp />);
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <MailApp />
+        </QueryClientProvider>,
+      );
       await Promise.resolve();
       await Promise.resolve();
     });
