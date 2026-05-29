@@ -11,6 +11,7 @@ import { Platform } from "react-native";
 import { authClient } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { API_BASE_URL } from "../lib/constants";
+import { getAuthHeaders } from "../lib/api";
 import {
   deleteStoredPasskey,
   getDefaultPasskeyName,
@@ -21,7 +22,7 @@ import {
   resolvePasskeyBridgeBaseUrl,
   signInWithBrowserPasskey,
 } from "../lib/passkey-browser-bridge";
-import { getSessionCookie, waitForSessionCookie } from "../lib/session-cookie";
+import { waitForSessionCookie } from "../lib/session-cookie";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -109,10 +110,9 @@ export function AuthProvider({
 
   // ── Session hydration ────────────────────────────────────────────────
   const fetchAuthStatus = useCallback(async () => {
-    const cookie = getSessionCookie();
     const response = await fetch(`${API_BASE_URL}/api/account/auth-status`, {
-      credentials: "include",
-      headers: cookie ? { cookie } : undefined,
+      credentials: "omit",
+      headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
