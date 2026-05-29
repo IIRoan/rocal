@@ -3,7 +3,6 @@
 import React, { useMemo, useEffect, useRef } from "react";
 import {
   addHours,
-  areIntervalsOverlapping,
   eachHourOfInterval,
   format,
   getHours,
@@ -18,11 +17,29 @@ import { eventOverlapsRange } from "./utils";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
 import { cn } from "../../lib/utils";
+import { CurrentTimeIndicator } from "./current-time-indicator";
+import { layoutTimelineEvents } from "./timeline-layout";
 
 // Show entire 24 hours for mobile
 const MobileStartHour = 0;
 const MobileEndHour = 23;
 const MobileCellHeight = 60; // Cells for each hour
+
+function formatCurrentTimeLabel(
+  currentTime: { hours: number; minutes: number } | null,
+  timeFormat: "12h" | "24h",
+) {
+  if (!currentTime) return undefined;
+
+  const minutes = currentTime.minutes.toString().padStart(2, "0");
+
+  if (timeFormat === "24h") {
+    return `${currentTime.hours.toString().padStart(2, "0")}:${minutes}`;
+  }
+
+  const hour = currentTime.hours % 12 || 12;
+  return `${hour}:${minutes}`;
+}
 
 interface MobileDayViewProps {
   currentDate: Date;
@@ -34,15 +51,6 @@ interface MobileDayViewProps {
   workingDays?: number[];
   showMonthPicker?: boolean;
   weekStartDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
-}
-
-interface PositionedEvent {
-  event: CalendarEvent;
-  top: number;
-  height: number;
-  left: number;
-  width: number;
-  zIndex: number;
 }
 
 export function MobileDayView({
@@ -86,134 +94,11 @@ export function MobileDayView({
   }, [currentDate, events]);
 
   const positionedEvents = useMemo(() => {
-    const result: PositionedEvent[] = [];
-    const dayStart = startOfDay(currentDate);
-
-    const sortedEvents = [...timeEvents].sort((a, b) => {
-      const aStart = new Date(a.start);
-      const bStart = new Date(b.start);
-      const aEnd = new Date(a.end);
-      const bEnd = new Date(b.end);
-
-      if (aStart < bStart) return -1;
-      if (aStart > bStart) return 1;
-
-      const aDuration = (aEnd.getTime() - aStart.getTime()) / 60000;
-      const bDuration = (bEnd.getTime() - bStart.getTime()) / 60000;
-      return bDuration - aDuration;
+    return layoutTimelineEvents(timeEvents, currentDate, {
+      cellHeight: MobileCellHeight,
+      sortByDurationOnTie: true,
+      widthStrategy: "mobile-cascade",
     });
-
-    const columns: { event: CalendarEvent; end: Date }[][] = [];
-    const eventColumnMapping: Map<CalendarEvent, number> = new Map();
-
-    sortedEvents.forEach((event) => {
-      const eventStart = new Date(event.start);
-      const eventEnd = new Date(event.end);
-
-      const adjustedStart = isSameDay(currentDate, eventStart)
-        ? eventStart
-        : dayStart;
-      const adjustedEnd = isSameDay(currentDate, eventEnd)
-        ? eventEnd
-        : addHours(dayStart, 24);
-
-      let columnIndex = 0;
-      let placed = false;
-
-      while (!placed) {
-        const col = columns[columnIndex] || [];
-        if (col.length === 0) {
-          columns[columnIndex] = col;
-          placed = true;
-        } else {
-          const overlaps = col.some((c) =>
-            areIntervalsOverlapping(
-              { start: adjustedStart, end: adjustedEnd },
-              { start: new Date(c.event.start), end: new Date(c.event.end) },
-            ),
-          );
-          if (!overlaps) {
-            placed = true;
-          } else {
-            columnIndex++;
-          }
-        }
-      }
-
-      const currentColumn = columns[columnIndex] || [];
-      columns[columnIndex] = currentColumn;
-      currentColumn.push({ event, end: adjustedEnd });
-      eventColumnMapping.set(event, columnIndex);
-    });
-
-    sortedEvents.forEach((event) => {
-      const eventStart = new Date(event.start);
-      const eventEnd = new Date(event.end);
-
-      const adjustedStart = isSameDay(currentDate, eventStart)
-        ? eventStart
-        : dayStart;
-      const adjustedEnd = isSameDay(currentDate, eventEnd)
-        ? eventEnd
-        : addHours(dayStart, 24);
-
-      const startHour =
-        getHours(adjustedStart) + getMinutes(adjustedStart) / 60;
-      const endHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
-
-      // Calculate position for full 24-hour day
-      const top = startHour * MobileCellHeight;
-      const height = Math.max((endHour - startHour) * MobileCellHeight, 22);
-
-      const columnIndex = eventColumnMapping.get(event) ?? 0;
-
-      const overlappingEvents = sortedEvents.filter((otherEvent) => {
-        if (otherEvent.id === event.id) return false;
-        const otherStart = new Date(otherEvent.start);
-        const otherEnd = new Date(otherEvent.end);
-
-        return areIntervalsOverlapping(
-          { start: adjustedStart, end: adjustedEnd },
-          { start: otherStart, end: otherEnd },
-        );
-      });
-
-      const overlappingColumns = overlappingEvents.length + 1;
-
-      let width: number;
-      let left: number;
-
-      // Mobile-optimized width calculation - wider events for better readability
-      if (overlappingColumns === 1) {
-        width = 0.95;
-        left = 0.02;
-      } else if (overlappingColumns === 2) {
-        width = columnIndex === 0 ? 0.92 : 0.78;
-        left = columnIndex === 0 ? 0.02 : 0.18;
-      } else if (overlappingColumns === 3) {
-        const widths = [0.88, 0.74, 0.6];
-        const positions = [0.02, 0.12, 0.28];
-        width = widths[columnIndex] || 0.55;
-        left = positions[columnIndex] || 0.38;
-      } else {
-        const baseWidth = 0.72;
-        const widthDecrement = 0.06;
-        width = Math.max(0.55, baseWidth - columnIndex * widthDecrement);
-        const offsetIncrement = 0.1;
-        left = Math.min(columnIndex * offsetIncrement, 0.35);
-      }
-
-      result.push({
-        event,
-        top,
-        height,
-        left,
-        width,
-        zIndex: 10 + columnIndex,
-      });
-    });
-
-    return result;
   }, [currentDate, timeEvents]);
 
   const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
@@ -221,11 +106,9 @@ export function MobileDayView({
     onEventSelect(event);
   };
 
-  const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
-    currentDate,
-    "day",
-    timezone,
-  );
+  const { currentTimePosition, currentTimeVisible, currentTime } =
+    useCurrentTimeIndicator(currentDate, "day", timezone);
+  const currentTimeLabel = formatCurrentTimeLabel(currentTime, timeFormat);
 
   // Auto-scroll to current time or 9 AM
   useEffect(() => {
@@ -307,18 +190,12 @@ export function MobileDayView({
 
           {/* Current time indicator - enhanced for mobile */}
           {currentTimeVisible && (
-            <div
-              className="pointer-events-none absolute right-2 left-0 z-20"
-              style={{ top: `${currentTimePosition}%` }}
-            >
-              <div className="relative flex items-center">
-                <div className="bg-primary text-primary-foreground absolute -left-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm">
-                  {format(new Date(), timeFormat === "24h" ? "HH:mm" : "h:mm")}
-                </div>
-                <div className="bg-primary h-[2px] w-full shadow-sm"></div>
-                <div className="bg-primary absolute -right-1 h-2.5 w-2.5 rounded-full shadow-sm"></div>
-              </div>
-            </div>
+            <CurrentTimeIndicator
+              position={currentTimePosition}
+              label={currentTimeLabel}
+              showEndDot
+              className="right-2"
+            />
           )}
 
           {/* Time grid cells for creating events */}

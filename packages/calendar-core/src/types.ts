@@ -41,12 +41,24 @@ export interface EventSearchResult {
   total: number;
 }
 
+export interface EventSearchCorpusResult {
+  events: CalendarEvent[];
+  total: number;
+  nextOffset: number | null;
+}
+
 export interface EventSearchParams {
   q: string;
   limit?: number;
   offset?: number;
   startDate?: string;
   endDate?: string;
+}
+
+export interface EventSearchCorpusParams {
+  limit?: number;
+  offset?: number;
+  updatedAfter?: string;
 }
 
 // ─── Core Calendar Types ─────────────────────────────────────────────────────

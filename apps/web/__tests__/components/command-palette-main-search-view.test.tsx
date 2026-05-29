@@ -11,12 +11,12 @@ import {
 } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
 
-jest.mock("../../components/command-palette/event-search-results", () => ({
-  EventSearchResults: ({
-    events,
+jest.mock("../../components/command-palette/unified-search-results", () => ({
+  UnifiedSearchResults: ({
+    results,
   }: {
-    events: Array<{ id: string; title: string }>;
-  }) => <div data-testid="event-search-results">{events[0]?.title}</div>,
+    results: Array<{ id: string; title: string }>;
+  }) => <div data-testid="unified-search-results">{results[0]?.title}</div>,
 }));
 
 jest.mock("lucide-react", () => {
@@ -52,7 +52,7 @@ describe("CommandPaletteMainSearchView", () => {
     container.remove();
   });
 
-  it("renders event search results without crashing when event search is visible", async () => {
+  it("renders unified search results without crashing when search is visible", async () => {
     const search = {
       clearSearchQuery: () => {},
       debouncedQuery: "plan",
@@ -74,6 +74,28 @@ describe("CommandPaletteMainSearchView", () => {
           userId: "user-1",
         },
       ],
+      searchResults: [
+        {
+          id: "calendar:event-1",
+          source: "calendar",
+          eventId: "event-1",
+          title: "Planning",
+          score: 9,
+          encryptionStatus: "plaintext",
+          matchedFields: ["title"],
+          event: {
+            allDay: false,
+            calendarId: "calendar-1",
+            createdAt: new Date("2026-04-24T09:00:00.000Z"),
+            end: new Date("2026-04-24T11:00:00.000Z"),
+            id: "event-1",
+            start: new Date("2026-04-24T10:00:00.000Z"),
+            title: "Planning",
+            updatedAt: new Date("2026-04-24T09:00:00.000Z"),
+            userId: "user-1",
+          },
+        },
+      ],
       searchInputInteractionProps: {
         onBlur: () => {},
         onChange: () => {},
@@ -87,9 +109,10 @@ describe("CommandPaletteMainSearchView", () => {
       selectCommand: () => {},
       selectedIndex: 0,
       selectNavigationItem: () => {},
-      selectSearchEvent: () => {},
+      selectSearchResult: () => {},
       showEventSearch: true,
       totalSearchEvents: 1,
+      totalSearchResults: 1,
       visibleNavigationItems: [],
     } satisfies UseCommandPaletteSearchResult;
 
@@ -99,7 +122,7 @@ describe("CommandPaletteMainSearchView", () => {
     });
 
     expect(
-      container.querySelector('[data-testid="event-search-results"]'),
+      container.querySelector('[data-testid="unified-search-results"]'),
     ).not.toBeNull();
     expect(container.textContent).toContain("Planning");
   });

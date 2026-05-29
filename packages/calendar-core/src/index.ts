@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./mail-types";
+export * from "./search-types";
 export * from "./color-utils";
 export * from "./date-utils";
 export * from "./event-utils";

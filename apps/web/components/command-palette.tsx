@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { format } from "date-fns";
 import { createLogger } from "@workspace/logger";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { UnifiedSearchResult } from "@workspace/calendar-core";
 import { useSettings } from "@/hooks/use-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useCalendarContext } from "@workspace/ui/components/calendar";
@@ -47,7 +48,9 @@ import {
 } from "@workspace/ui/components/ui/drawer";
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Settings, Loader2, ArrowLeft } from "lucide-react";
-import { useNumberedShortcuts, useIsMobile } from "@workspace/ui/hooks";
+import { useNumberedShortcuts, useIsMobile, usePrefersReducedMotion } from "@workspace/ui/hooks";
+import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
+import type { JmapEmailMessage } from "@/lib/mail/types";
 
 const log = createLogger("command-palette");
 
@@ -467,29 +470,32 @@ export function CommandPalette({
     [updateSetting, onOpenChange, goForward],
   );
 
-  const handleSearchEventSelect = (event: CalendarEvent) => {
-    const eventStart = new Date(event.start);
+  const handleSearchResultSelect = useCallback(
+    (result: UnifiedSearchResult<JmapEmailMessage>) => {
+      if (result.source === "mail") {
+        onOpenChange(false);
+        window.location.href = `/mail?messageId=${encodeURIComponent(result.messageId)}`;
+        return;
+      }
 
-    // Navigate the calendar to the event's date and switch to week view
-    // Week view shows the time grid and auto-scrolls to ~9AM on mount,
-    // so the user lands near the event's time slot
-    setCurrentDate(eventStart);
-    setCalendarView("week");
+      const eventStart = new Date(result.event.start);
+      setCurrentDate(eventStart);
+      setCalendarView("week");
 
-    // Update the URL with proper date and view params
-    const dateParam = format(eventStart, "yyyy-MM-dd");
-    const params = new URLSearchParams(window.location.search);
-    params.set("date", dateParam);
-    params.set("view", "week");
-    const newUrl = `${window.location.pathname}?${params.toString()}`;
-    window.history.pushState(null, "", newUrl);
+      const dateParam = format(eventStart, "yyyy-MM-dd");
+      const params = new URLSearchParams(window.location.search);
+      params.set("date", dateParam);
+      params.set("view", "week");
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.pushState(null, "", newUrl);
 
-    // Close the palette and open the event editor
-    onOpenChange(false);
-    if (onEventEdit) {
-      onEventEdit(event);
-    }
-  };
+      onOpenChange(false);
+      if (onEventEdit) {
+        onEventEdit(result.event);
+      }
+    },
+    [onEventEdit, onOpenChange, setCalendarView, setCurrentDate],
+  );
 
   const paletteSearch = useCommandPaletteSearch({
     open,
@@ -501,8 +507,33 @@ export function CommandPalette({
     onOpenChange,
     executeCommand,
     goForward,
-    onSearchEventSelect: handleSearchEventSelect,
+    onSearchResultSelect: handleSearchResultSelect,
   });
+
+  // Widen the spotlight dialog when both mail and calendar results are visible side-by-side
+  const hasBothResults =
+    paletteSearch.showEventSearch &&
+    paletteSearch.searchResults.some((r) => r.source === "mail") &&
+    paletteSearch.searchResults.some((r) => r.source === "calendar");
+
+  const dialogInnerRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  useGSAP(
+    () => {
+      const inner = dialogInnerRef.current;
+      if (!inner) return;
+      const dialogEl = inner.closest<HTMLElement>('[data-slot="dialog-content"]');
+      if (!dialogEl) return;
+      const targetW = hasBothResults ? 760 : 560;
+      if (prefersReducedMotion) {
+        gsap.set(dialogEl, { width: targetW });
+        return;
+      }
+      gsap.to(dialogEl, { width: targetW, duration: 0.22, ease: "power2.inOut" });
+    },
+    { dependencies: [hasBothResults, prefersReducedMotion] },
+  );
 
   if (loading || !localSettings) {
     return (
@@ -553,7 +584,7 @@ export function CommandPalette({
       case "main":
         return "Command Palette";
       case "search":
-        return "Search Events";
+        return "Search Mail and Calendar";
       case "appearance":
         return "Appearance Settings";
       case "notifications":
@@ -843,10 +874,12 @@ export function CommandPalette({
             aria-describedby={undefined}
             className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl flex flex-col"
           >
-            <VisuallyHidden>
-              <DialogTitle>{getDialogTitle()}</DialogTitle>
-            </VisuallyHidden>
-            {paletteContent}
+            <div ref={dialogInnerRef} style={{ display: "contents" }}>
+              <VisuallyHidden>
+                <DialogTitle>{getDialogTitle()}</DialogTitle>
+              </VisuallyHidden>
+              {paletteContent}
+            </div>
           </DialogContent>
         </Dialog>
       )}

@@ -1,4 +1,5 @@
 import type {
+  JmapEmailChanges,
   JmapEmailMessage,
   JmapIdentity,
   JmapMailbox,
@@ -389,6 +390,154 @@ export class StalwartJmapClient {
     );
 
     return { messages: result.list ?? [], total: queryResult.total ?? 0 };
+  }
+
+  async searchMailboxMessages(
+    session: JmapSession,
+    mailboxId: string,
+    query: string,
+    limit = 40,
+  ): Promise<{ messages: JmapEmailMessage[]; total: number }> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/query",
+          {
+            accountId,
+            filter: {
+              inMailbox: mailboxId,
+              text: query,
+            },
+            sort: [{ property: "receivedAt", isAscending: false }],
+            limit,
+            position: 0,
+          },
+          "q1",
+        ],
+        [
+          "Email/get",
+          {
+            accountId,
+            "#ids": {
+              resultOf: "q1",
+              name: "Email/query",
+              path: "/ids",
+            },
+            properties: EMAIL_GET_PROPERTIES,
+            fetchTextBodyValues: true,
+            fetchHTMLBodyValues: true,
+            fetchAllBodyValues: true,
+          },
+          "g1",
+        ],
+      ],
+    );
+    const queryResult = this.getMethodResult<{
+      ids?: string[];
+      total?: number;
+    }>(envelope, "Email/query");
+    const result = this.getMethodResult<{ list?: JmapEmailMessage[] }>(
+      envelope,
+      "Email/get",
+    );
+    return { messages: result.list ?? [], total: queryResult.total ?? 0 };
+  }
+
+  async getMailboxMessageIds(
+    session: JmapSession,
+    mailboxId: string,
+    options: { limit?: number; position?: number } = {},
+  ): Promise<{ ids: string[]; total: number; queryState?: string }> {
+    const { limit = 100, position = 0 } = options;
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/query",
+          {
+            accountId,
+            filter: {
+              inMailbox: mailboxId,
+            },
+            sort: [
+              {
+                property: "receivedAt",
+                isAscending: false,
+              },
+            ],
+            limit,
+            position,
+          },
+          "q1",
+        ],
+      ],
+    );
+    const result = this.getMethodResult<{
+      ids?: string[];
+      total?: number;
+      queryState?: string;
+    }>(envelope, "Email/query");
+
+    return {
+      ids: result.ids ?? [],
+      total: result.total ?? 0,
+      queryState: result.queryState,
+    };
+  }
+
+  async getMailboxMessagesForIndex(
+    session: JmapSession,
+    mailboxId: string,
+    options: { limit?: number; position?: number } = {},
+  ): Promise<{ messages: JmapEmailMessage[]; total: number; queryState?: string }> {
+    const { ids, total, queryState } = await this.getMailboxMessageIds(
+      session,
+      mailboxId,
+      options,
+    );
+    const messages = await this.getMessagesByIds(session, ids);
+    return { messages, total, queryState };
+  }
+
+  async getEmailChanges(
+    session: JmapSession,
+    sinceState: string,
+    options: { maxChanges?: number } = {},
+  ): Promise<JmapEmailChanges> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/changes",
+          {
+            accountId,
+            sinceState,
+            maxChanges: options.maxChanges ?? 500,
+          },
+          "c1",
+        ],
+      ],
+    );
+    const result = this.getMethodResult<Partial<JmapEmailChanges>>(
+      envelope,
+      "Email/changes",
+    );
+
+    return {
+      oldState: result.oldState ?? sinceState,
+      newState: result.newState ?? sinceState,
+      hasMoreChanges: result.hasMoreChanges,
+      created: result.created ?? [],
+      updated: result.updated ?? [],
+      destroyed: result.destroyed ?? [],
+    };
   }
 
   async getMessagesByIds(

@@ -12,7 +12,9 @@ import {
   type MouseEventHandler,
   type RefObject,
 } from "react";
+import type { UnifiedSearchResult } from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
+import type { JmapEmailMessage } from "@/lib/mail/types";
 
 import {
   COMMANDS,
@@ -35,7 +37,7 @@ import {
   isTextEntryElement,
   stopEventPropagation,
 } from "@/lib/event-propagation";
-import { useEventSearch } from "./use-event-search";
+import { useUnifiedSearch } from "./use-unified-search";
 
 type PaletteSearchItem = (typeof SEARCH_INDEX)[number];
 
@@ -57,7 +59,9 @@ type UseCommandPaletteSearchOptions = {
   onOpenChange: (open: boolean) => void;
   executeCommand: (command: Command) => void;
   goForward: (view: PaletteView) => void;
-  onSearchEventSelect: (event: CalendarEvent) => void;
+  onSearchResultSelect: (
+    result: UnifiedSearchResult<JmapEmailMessage>,
+  ) => void;
 };
 
 export type UseCommandPaletteSearchResult = {
@@ -69,6 +73,7 @@ export type UseCommandPaletteSearchResult = {
   listRef: RefObject<HTMLDivElement | null>;
   matchingCommands: Command[];
   searchEvents: CalendarEvent[];
+  searchResults: UnifiedSearchResult<JmapEmailMessage>[];
   searchInputInteractionProps: SearchInputInteractionProps;
   searchInputRef: RefObject<HTMLInputElement | null>;
   searchLoading: boolean;
@@ -76,9 +81,12 @@ export type UseCommandPaletteSearchResult = {
   selectCommand: (command: Command) => void;
   selectedIndex: number;
   selectNavigationItem: (item: PaletteSearchItem) => void;
-  selectSearchEvent: (event: CalendarEvent) => void;
+  selectSearchResult: (
+    result: UnifiedSearchResult<JmapEmailMessage>,
+  ) => void;
   showEventSearch: boolean;
   totalSearchEvents: number;
+  totalSearchResults: number;
   visibleNavigationItems: PaletteSearchItem[];
 };
 
@@ -92,7 +100,7 @@ export function useCommandPaletteSearch({
   onOpenChange,
   executeCommand,
   goForward,
-  onSearchEventSelect,
+  onSearchResultSelect,
 }: UseCommandPaletteSearchOptions): UseCommandPaletteSearchResult {
   const [debouncedQuery, setDebouncedQuery] = useState(initialSearchQuery);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -122,11 +130,27 @@ export function useCommandPaletteSearch({
     [filteredItems, isCommandMode, debouncedQuery],
   );
   const showEventSearch = !isCommandMode && debouncedQuery.trim().length >= 2;
-  const { data: searchEvents = [], isFetching: searchLoading } = useEventSearch(
-    debouncedQuery,
-    showEventSearch,
+  const {
+    results: rawSearchResults,
+    isFetching: searchLoading,
+  } = useUnifiedSearch({
+    query: debouncedQuery,
+    enabled: showEventSearch,
+    includeMail: true,
+    includeCalendar: true,
+    limit: 15,
+  });
+  // Reorder so array indices match the visual layout (mail first, then calendar)
+  const searchResults = useMemo(() => {
+    const mail = rawSearchResults.filter((r) => r.source === "mail");
+    const calendar = rawSearchResults.filter((r) => r.source === "calendar");
+    return [...mail, ...calendar];
+  }, [rawSearchResults]);
+  const searchEvents = searchResults.flatMap((result) =>
+    result.source === "calendar" ? [result.event] : [],
   );
-  const totalSearchEvents = showEventSearch ? searchEvents.length : 0;
+  const totalSearchEvents = showEventSearch ? searchResults.length : 0;
+  const totalSearchResults = showEventSearch ? searchResults.length : 0;
   const currentListLength = getCommandPaletteListLength({
     isCommandMode,
     matchingCommandCount: matchingCommands.length,
@@ -138,7 +162,7 @@ export function useCommandPaletteSearch({
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery);
-    }, 150);
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -232,11 +256,11 @@ export function useCommandPaletteSearch({
     [goForward],
   );
 
-  const selectSearchEvent = useCallback(
-    (event: CalendarEvent) => {
-      onSearchEventSelect(event);
+  const selectSearchResult = useCallback(
+    (result: UnifiedSearchResult<JmapEmailMessage>) => {
+      onSearchResultSelect(result);
     },
-    [onSearchEventSelect],
+    [onSearchResultSelect],
   );
 
   const handleSearchInputChange = useCallback<
@@ -292,7 +316,7 @@ export function useCommandPaletteSearch({
         totalSearchEvents,
         isSearchOnly,
         matchingCommands,
-        searchEvents,
+        searchEvents: searchResults,
         filteredItems: visibleNavigationItems,
       });
 
@@ -301,7 +325,7 @@ export function useCommandPaletteSearch({
           selectCommand(selection.command);
           break;
         case "search-event":
-          selectSearchEvent(selection.event);
+          selectSearchResult(selection.event);
           break;
         case "navigation":
           selectNavigationItem(selection.item);
@@ -321,10 +345,10 @@ export function useCommandPaletteSearch({
       totalSearchEvents,
       isSearchOnly,
       matchingCommands,
-      searchEvents,
+      searchResults,
       visibleNavigationItems,
       selectCommand,
-      selectSearchEvent,
+      selectSearchResult,
       selectNavigationItem,
     ],
   );
@@ -349,16 +373,18 @@ export function useCommandPaletteSearch({
     listRef,
     matchingCommands,
     searchEvents,
+    searchResults,
     searchInputInteractionProps,
     searchInputRef,
     searchLoading,
     searchQuery,
     selectCommand,
+    selectSearchResult,
     selectedIndex,
     selectNavigationItem,
-    selectSearchEvent,
     showEventSearch,
     totalSearchEvents,
+    totalSearchResults,
     visibleNavigationItems,
   };
 }

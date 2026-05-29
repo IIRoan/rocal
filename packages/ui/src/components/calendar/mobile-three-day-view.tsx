@@ -9,7 +9,6 @@ import {
   eachHourOfInterval,
   format,
   getHours,
-  getMinutes,
   isSameDay,
   isToday,
   startOfDay,
@@ -24,6 +23,8 @@ import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator"
 import { cn } from "../../lib/utils";
 import { Drawer, DrawerContent, DrawerShell, DrawerTitle } from "../ui/drawer";
 import { resolveInlineColorValue } from "./utils";
+import { CurrentTimeIndicator } from "./current-time-indicator";
+import { layoutTimelineEvents } from "./timeline-layout";
 
 const CELL_HEIGHT = 60;
 
@@ -36,15 +37,6 @@ interface MobileThreeDayViewProps {
   weekStartDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   workingDays?: number[];
   timezone?: string;
-}
-
-interface PositionedEvent {
-  event: CalendarEvent;
-  top: number;
-  height: number;
-  left: number;
-  width: number;
-  zIndex: number;
 }
 
 export function MobileThreeDayView({
@@ -99,110 +91,10 @@ export function MobileThreeDayView({
         (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
       );
 
-      const positionedEvents: PositionedEvent[] = [];
-      const dayStart = startOfDay(day);
-
-      const columns: { event: CalendarEvent; start: Date; end: Date }[][] = [];
-      const eventColumnMapping: Map<CalendarEvent, number> = new Map();
-
-      dayEvents.forEach((event) => {
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end);
-
-        const adjustedStart = isSameDay(day, eventStart)
-          ? eventStart
-          : dayStart;
-        const adjustedEnd = isSameDay(day, eventEnd)
-          ? eventEnd
-          : addHours(dayStart, 24);
-
-        let columnIndex = 0;
-        let placed = false;
-
-        while (!placed) {
-          const col = columns[columnIndex] || [];
-          if (col.length === 0) {
-            columns[columnIndex] = col;
-            placed = true;
-          } else {
-            const overlaps = col.some((c) =>
-              areIntervalsOverlapping(
-                { start: adjustedStart, end: adjustedEnd },
-                { start: c.start, end: c.end },
-              ),
-            );
-            if (!overlaps) {
-              placed = true;
-            } else {
-              columnIndex++;
-            }
-          }
-        }
-
-        const currentColumn = columns[columnIndex] || [];
-        columns[columnIndex] = currentColumn;
-        currentColumn.push({ event, start: adjustedStart, end: adjustedEnd });
-        eventColumnMapping.set(event, columnIndex);
+      return layoutTimelineEvents(dayEvents, day, {
+        cellHeight: CELL_HEIGHT,
+        widthStrategy: "simple-no-overflow",
       });
-
-      dayEvents.forEach((event) => {
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end);
-
-        const adjustedStart = isSameDay(day, eventStart)
-          ? eventStart
-          : dayStart;
-        const adjustedEnd = isSameDay(day, eventEnd)
-          ? eventEnd
-          : addHours(dayStart, 24);
-
-        const startHour =
-          getHours(adjustedStart) + getMinutes(adjustedStart) / 60;
-        const endHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
-
-        const top = startHour * CELL_HEIGHT;
-        const height = Math.max((endHour - startHour) * CELL_HEIGHT, 22);
-
-        const columnIndex = eventColumnMapping.get(event) ?? 0;
-
-        const overlappingCount =
-          dayEvents.filter((other) => {
-            if (other.id === event.id) return false;
-            const oStart = new Date(other.start);
-            const oEnd = new Date(other.end);
-            return areIntervalsOverlapping(
-              { start: adjustedStart, end: adjustedEnd },
-              { start: oStart, end: oEnd },
-            );
-          }).length + 1;
-
-        let width: number;
-        let left: number;
-
-        if (overlappingCount === 1) {
-          width = 1;
-          left = 0;
-        } else if (overlappingCount === 2) {
-          width = 0.495;
-          left = columnIndex === 0 ? 0 : 0.505;
-        } else {
-          const gap = 0.005;
-          const totalGap = (overlappingCount - 1) * gap;
-          width = (1 - totalGap) / overlappingCount;
-          left = columnIndex * (width + gap);
-        }
-
-        positionedEvents.push({
-          event,
-          top,
-          height,
-          left,
-          width,
-          zIndex: 10 + columnIndex,
-        });
-      });
-
-      return positionedEvents;
     });
   }, [days, events]);
 
@@ -398,15 +290,7 @@ export function MobileThreeDayView({
 
               {/* Current time indicator */}
               {currentTimeVisible && isToday(day) && (
-                <div
-                  className="pointer-events-none absolute right-0 left-0 z-20"
-                  style={{ top: `${currentTimePosition}%` }}
-                >
-                  <div className="relative flex items-center">
-                    <div className="bg-primary absolute -left-0.5 h-2 w-2 rounded-full" />
-                    <div className="bg-primary h-[2px] w-full" />
-                  </div>
-                </div>
+                <CurrentTimeIndicator position={currentTimePosition} />
               )}
 
               {/* Time grid cells */}
