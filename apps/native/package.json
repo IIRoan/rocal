@@ -6,8 +6,6 @@
   "scripts": {
     "dev": "bun run ./scripts/dev.ts",
     "dev:expo": "expo start",
-    "start:go": "bun run ./scripts/dev.ts --go",
-    "start:go:expo": "expo start --go",
     "build:dev:ios": "eas build --platform ios --profile development",
     "build:dev:android": "eas build --platform android --profile development",
     "build:preview:ios": "eas build --platform ios --profile preview",
