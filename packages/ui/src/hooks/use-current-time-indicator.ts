@@ -58,6 +58,10 @@ export function useCurrentTimeIndicator(
 ) {
   const [currentTimePosition, setCurrentTimePosition] = useState<number>(0);
   const [currentTimeVisible, setCurrentTimeVisible] = useState<boolean>(false);
+  const [currentTime, setCurrentTime] = useState<{
+    hours: number;
+    minutes: number;
+  } | null>(null);
 
   useEffect(() => {
     const calculateTimePosition = () => {
@@ -94,6 +98,7 @@ export function useCurrentTimeIndicator(
 
       setCurrentTimePosition(position);
       setCurrentTimeVisible(isCurrentTimeVisible);
+      setCurrentTime({ hours, minutes });
     };
 
     // Calculate immediately
@@ -105,5 +110,5 @@ export function useCurrentTimeIndicator(
     return () => clearInterval(interval);
   }, [currentDate, view, timezone]);
 
-  return { currentTimePosition, currentTimeVisible };
+  return { currentTimePosition, currentTimeVisible, currentTime };
 }

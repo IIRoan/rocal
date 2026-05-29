@@ -266,6 +266,7 @@ const defaultProps: MessageReaderProps = {
   isBusy: false,
   blockRemoteImages: false,
   blockTrackingPixels: false,
+  mailDarkMode: false,
   mailboxes: [],
   currentMailboxId: null,
   labels: [],
@@ -605,7 +606,7 @@ describe("MessageReader — linked calendar event", () => {
     expect(
       mockCalendarApiService.getInvitationByExternalId,
     ).toHaveBeenNthCalledWith(2, "google-event-1@example.com");
-    expect(container.textContent).toContain("Cancelled invitation");
+    expect(container.textContent).toContain("The organiser cancelled this event");
     expect(container.textContent).toContain("Remove from calendar");
   });
 });

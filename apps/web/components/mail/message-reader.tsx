@@ -62,6 +62,13 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
 import { Button } from "@workspace/ui/components/ui/button";
+import {
+  InvitationBanner,
+  InvitationBannerHeader,
+  InvitationBannerMeta,
+  InvitationBannerMetaItem,
+  InvitationBannerActions,
+} from "@workspace/ui/components/ui/invitation-banner";
 import { Separator } from "@workspace/ui/components/ui/separator";
 import {
   Tooltip,
@@ -348,47 +355,183 @@ function MailSecurityBadge({
 
 // ─── HTML email renderer ──────────────────────────────────────────────────────
 
+/** Check whether any <style> tag contains a prefers-color-scheme:dark block. */
+function emailHasOwnDarkMode(html: string): boolean {
+  return /@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)/i.test(html);
+}
+
+/**
+ * Automatic dark-mode transform applied to emails that don't ship their own
+ * `@media (prefers-color-scheme: dark)` rules. Inverts light backgrounds to
+ * dark and dark text to light while preserving images and brand accent colours.
+ */
+const AUTO_DARK_CSS = `
+  @media (prefers-color-scheme: dark) {
+    html, body {
+      background-color: #1a1a1a !important;
+      color: #e0e0e0 !important;
+    }
+    /* Invert background/text on common block elements */
+    div, td, th, tr, table, p, span, li, h1, h2, h3, h4, h5, h6, blockquote, section, article, header, footer {
+      background-color: inherit;
+      color: inherit;
+    }
+    /* Invert explicitly white/light backgrounds on containers */
+    [style*="background-color: #fff"],
+    [style*="background-color: #ffffff"],
+    [style*="background-color: white"],
+    [style*="background:#fff"],
+    [style*="background:#ffffff"],
+    [style*="background: #fff"],
+    [style*="background: #ffffff"],
+    [style*="background-color:#fff"],
+    [style*="background-color:#ffffff"] {
+      background-color: #1a1a1a !important;
+    }
+    [style*="background-color: #f"],
+    [style*="background-color:#f"] {
+      filter: brightness(0.25) contrast(1.1);
+    }
+    /* Dark text → light */
+    [style*="color: #000"],
+    [style*="color:#000"],
+    [style*="color: #111"],
+    [style*="color:#111"],
+    [style*="color: #1a1a1a"],
+    [style*="color: #202124"],
+    [style*="color:#202124"],
+    [style*="color: #2d0c0c"],
+    [style*="color:#2d0c0c"],
+    [style*="color: #3c4043"],
+    [style*="color:#3c4043"],
+    [style*="color: #3c4042"],
+    [style*="color:#3c4042"],
+    [style*="color: black"],
+    [style*="color:black"] {
+      color: #e0e0e0 !important;
+    }
+    /* Mid-grey secondary text → lighter grey */
+    [style*="color: #5f6368"],
+    [style*="color:#5f6368"],
+    [style*="color: #70757a"],
+    [style*="color:#70757a"],
+    [style*="color: #666"],
+    [style*="color:#666"] {
+      color: #9aa0a6 !important;
+    }
+    /* Light pastel info/alert banners → dark equivalents */
+    [style*="background-color: #fce8e6"],
+    [style*="background-color:#fce8e6"] {
+      background-color: #442c2c !important;
+      color: #f8b4b4 !important;
+    }
+    [style*="background-color: #e8f0fe"],
+    [style*="background-color:#e8f0fe"] {
+      background-color: #1e2a3a !important;
+      color: #8ab4f8 !important;
+    }
+    [style*="background-color: #e6f4ea"],
+    [style*="background-color:#e6f4ea"] {
+      background-color: #1e3a2a !important;
+      color: #81c995 !important;
+    }
+    [style*="background-color: #fef7e0"],
+    [style*="background-color:#fef7e0"] {
+      background-color: #3a341e !important;
+      color: #fdd663 !important;
+    }
+    /* Borders */
+    [style*="border"] {
+      border-color: #3a3a3a !important;
+    }
+    /* Keep images readable */
+    img { filter: brightness(0.95) contrast(1.05); }
+    /* Links */
+    a { color: #8ab4f8 !important; }
+    a[style*="color: #1a73e8"],
+    a[style*="color:#1a73e8"],
+    a[style*="color: #185abc"],
+    a[style*="color:#185abc"] {
+      color: #8ab4f8 !important;
+    }
+  }
+`;
+
 function HtmlEmailRenderer({
   html,
   blockRemoteImages,
   blockTrackingPixels,
+  isDark,
 }: {
   html: string;
   blockRemoteImages: boolean;
   blockTrackingPixels: boolean;
+  isDark: boolean;
 }) {
   const processedHtml = useMemo(() => {
-    if (!blockTrackingPixels) return html;
     try {
       const doc = new DOMParser().parseFromString(
         `<!DOCTYPE html><html><body>${html}</body></html>`,
         "text/html",
       );
-      doc.querySelectorAll("img").forEach((img) => {
-        const w = parseInt(
-          img.getAttribute("width") ?? img.style.width ?? "100",
-          10,
-        );
-        const h = parseInt(
-          img.getAttribute("height") ?? img.style.height ?? "100",
-          10,
-        );
-        if ((w > 0 && w <= 2) || (h > 0 && h <= 2)) img.remove();
-      });
+
+      // Strip tracking pixels (1x1 or 2x2 images)
+      if (blockTrackingPixels) {
+        doc.querySelectorAll("img").forEach((img) => {
+          const w = parseInt(
+            img.getAttribute("width") ?? img.style.width ?? "100",
+            10,
+          );
+          const h = parseInt(
+            img.getAttribute("height") ?? img.style.height ?? "100",
+            10,
+          );
+          if ((w > 0 && w <= 2) || (h > 0 && h <= 2)) img.remove();
+        });
+      }
+
+      // In light mode, strip dark-mode artifacts so the email's own
+      // prefers-color-scheme:dark rules don't fire (system dark mode can
+      // leak into iframes on some browsers).
+      if (!isDark) {
+        doc
+          .querySelectorAll(
+            'meta[name="color-scheme"], meta[name="supported-color-schemes"]',
+          )
+          .forEach((el) => el.remove());
+
+        doc.querySelectorAll("style").forEach((style) => {
+          style.textContent = (style.textContent ?? "").replace(
+            /@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/gi,
+            "",
+          );
+        });
+      }
+
       return doc.body.innerHTML;
     } catch {
       return html;
     }
-  }, [html, blockTrackingPixels]);
+  }, [html, blockTrackingPixels, isDark]);
+
+  const hasOwnDark = useMemo(() => emailHasOwnDarkMode(html), [html]);
 
   const srcDoc = useMemo(() => {
     const csp = blockRemoteImages
       ? `<meta http-equiv="Content-Security-Policy" content="img-src 'none'; connect-src 'none';">`
       : "";
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="color-scheme" content="light">${csp}<base target="_blank"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;color-scheme:light}body{background:#fff;font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;font-size:14px;line-height:1.6;padding:16px 20px;color:#111;word-break:break-word;overflow-wrap:anywhere;overflow-x:hidden}img{max-width:100%;height:auto}a{color:#2563eb}p{margin:0 0 1em}p:last-child{margin:0}</style></head><body>${processedHtml}</body></html>`;
-  }, [processedHtml, blockRemoteImages]);
+    const scheme = isDark ? "dark" : "light";
+    const bg = isDark ? "#1a1a1a" : "#fff";
+    const fg = isDark ? "#e0e0e0" : "#111";
+    const linkColor = isDark ? "#8ab4f8" : "#2563eb";
 
-  // No resize logic — iframe fills flex-1 and scrolls internally
+    // If the email has its own dark-mode rules, let them work; otherwise inject
+    // automatic dark translation styles.
+    const autoDarkStyles = isDark && !hasOwnDark ? AUTO_DARK_CSS : "";
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="color-scheme" content="${scheme}">${csp}<base target="_blank"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;color-scheme:${scheme}}body{background:${bg};font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;font-size:14px;line-height:1.6;padding:16px 20px;color:${fg};word-break:break-word;overflow-wrap:anywhere;overflow-x:hidden}img{max-width:100%;height:auto}a{color:${linkColor}}p{margin:0 0 1em}p:last-child{margin:0}</style>${autoDarkStyles ? `<style>${autoDarkStyles}</style>` : ""}</head><body>${processedHtml}</body></html>`;
+  }, [processedHtml, blockRemoteImages, isDark, hasOwnDark]);
+
   return (
     <iframe
       srcDoc={srcDoc}
@@ -574,6 +717,7 @@ export interface MessageReaderProps {
   isBusy: boolean;
   blockRemoteImages: boolean;
   blockTrackingPixels: boolean;
+  mailDarkMode: boolean;
   mailboxes: JmapMailbox[];
   currentMailboxId: string | null;
   labels?: LabelDef[];
@@ -656,6 +800,7 @@ export function MessageReader({
   isBusy,
   blockRemoteImages,
   blockTrackingPixels,
+  mailDarkMode,
   mailboxes,
   currentMailboxId,
   labels = EMPTY_ARRAY,
@@ -687,6 +832,7 @@ export function MessageReader({
   accountEmail,
 }: MessageReaderProps) {
   const queryClient = useQueryClient();
+  const isDark = mailDarkMode;
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#6366f1");
   const [isSavingLabel, setIsSavingLabel] = useState(false);
@@ -2436,7 +2582,14 @@ export function MessageReader({
   );
 
   const linkedEventCard = linkedCalendarEvent && (
-    <div className="mx-4 mb-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+    <div
+      className={cn(
+        "mx-4 mb-0 rounded-lg rounded-b-none border border-primary/20 bg-primary/5 px-4 py-3",
+        (mailCalendarInvite?.method === "REQUEST" ||
+          mailCalendarInvite?.method === "CANCEL") &&
+          "rounded-t-none border-t-0",
+      )}
+    >
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
           <CalendarDays className="size-4" strokeWidth={2.25} />
@@ -2551,301 +2704,256 @@ export function MessageReader({
   const isPending = !invitationStatus || invitationStatus === "pending";
   const calendarInviteCard = shouldShowCalendarInviteCard &&
     mailCalendarInvite && (
-      <div
-        className={cn(
-          "mx-4 mb-2 overflow-hidden rounded-lg border",
-          invitationRemovedFromCalendar
-            ? "border-border/40 bg-muted/20 opacity-60"
-            : "border-primary/20 bg-primary/5",
-        )}
+      <InvitationBanner
+        variant="invitation"
+        inactive={invitationRemovedFromCalendar}
+        className="mb-0 rounded-b-none"
       >
-        {/* Event info */}
-        <div className="flex items-start justify-between gap-3 px-4 pt-3 pb-2.5">
-          <div className="min-w-0 flex-1">
-            <div
-              className={cn(
-                "text-sm font-semibold leading-snug",
-                invitationRemovedFromCalendar
-                  ? "text-muted-foreground"
-                  : "text-foreground",
-              )}
-            >
-              {mailCalendarInvite.title}
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-              {mailCalendarInvite.start && (
-                <span className="inline-flex items-center gap-1">
-                  <Clock className="size-3" />
-                  {mailCalendarInvite.start.toLocaleString(undefined, {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                    hour12:
-                      timeFormat === "12h"
-                        ? true
-                        : timeFormat === "24h"
-                          ? false
-                          : undefined,
-                    timeZone: timezone ?? undefined,
-                  })}
+        <InvitationBannerHeader
+          title={mailCalendarInvite.title}
+          action={
+            <div className="flex items-center gap-2">
+              {currentCalendarInviteEvent?.loading ? (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="size-3 animate-spin" />
+                  Adding…
                 </span>
-              )}
-              {mailCalendarInvite.location && (
-                <span className="inline-flex items-center gap-1">
-                  <MapPin className="size-3 shrink-0" />
-                  <span className="max-w-[200px] truncate">
-                    {mailCalendarInvite.location}
-                  </span>
+              ) : currentCalendarInviteEvent?.error ? (
+                <span className="text-xs text-destructive">
+                  {currentCalendarInviteEvent.error}
                 </span>
+              ) : inviteDeclined ? (
+                <span className="text-xs text-muted-foreground">
+                  Declined, removed
+                </span>
+              ) : !currentCalendarInviteEvent?.event ? (
+                <span className="text-xs text-muted-foreground">
+                  Processing…
+                </span>
+              ) : isPending ? (
+                <>
+                  <Button
+                    size="xs"
+                    disabled={inviteResponsePending !== null}
+                    onClick={() => void handleInvitationResponse("accepted")}
+                    className="gap-1"
+                  >
+                    {inviteResponsePending === "accepted" ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <Check className="size-3" />
+                    )}
+                    Accept
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    disabled={inviteResponsePending !== null}
+                    onClick={() => void handleInvitationResponse("tentative")}
+                  >
+                    {inviteResponsePending === "tentative" && (
+                      <Loader2 className="size-3 animate-spin" />
+                    )}
+                    Maybe
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    disabled={inviteResponsePending !== null}
+                    onClick={() => void handleInvitationResponse("declined")}
+                    className="text-muted-foreground"
+                  >
+                    {inviteResponsePending === "declined" && (
+                      <Loader2 className="size-3 animate-spin" />
+                    )}
+                    Decline
+                  </Button>
+                </>
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      disabled={inviteResponsePending !== null}
+                      className="gap-1.5"
+                    >
+                      {inviteResponsePending !== null && (
+                        <Loader2 className="size-3 animate-spin" />
+                      )}
+                      {invitationStatus === "tentative" ? "Maybe" : "Accepted"}
+                      <ChevronDown className="size-3 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-28">
+                    <DropdownMenuItem
+                      onClick={() => void handleInvitationResponse("accepted")}
+                      className={cn(
+                        invitationStatus === "accepted" && "font-medium",
+                      )}
+                    >
+                      <Check
+                        className={cn(
+                          "size-4",
+                          invitationStatus !== "accepted" && "opacity-0",
+                        )}
+                      />
+                      Accept
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => void handleInvitationResponse("tentative")}
+                      className={cn(
+                        invitationStatus === "tentative" && "font-medium",
+                      )}
+                    >
+                      <Check
+                        className={cn(
+                          "size-4",
+                          invitationStatus !== "tentative" && "opacity-0",
+                        )}
+                      />
+                      Maybe
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => void handleInvitationResponse("declined")}
+                    >
+                      <Check className="size-4 opacity-0" />
+                      Decline
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
+              {currentCalendarInviteEvent?.event &&
+                !invitationRemovedFromCalendar && (
+                  <Button
+                    asChild
+                    variant="secondary"
+                    size="xs"
+                    className="gap-1.5"
+                  >
+                    <a
+                      href={`/calendar?eventId=${encodeURIComponent(currentCalendarInviteEvent.event.id)}`}
+                    >
+                      Open
+                      <ExternalLink className="size-3" />
+                    </a>
+                  </Button>
+                )}
             </div>
-          </div>
-          {currentCalendarInviteEvent?.event &&
-            !invitationRemovedFromCalendar && (
-              <Button
-                asChild
-                variant="ghost"
-                size="icon"
-                className="-mr-1.5 -mt-0.5 size-7 shrink-0 text-muted-foreground hover:text-foreground"
-              >
-                <a
-                  href={`/calendar?eventId=${encodeURIComponent(currentCalendarInviteEvent.event.id)}`}
-                >
-                  <ExternalLink className="size-3.5" />
-                </a>
-              </Button>
-            )}
-        </div>
-
-        {/* Action bar */}
-        <div
-          className={cn(
-            "flex items-center gap-2 border-t px-4 py-2",
-            invitationRemovedFromCalendar
-              ? "border-border/30"
-              : "border-primary/10",
+          }
+        />
+        <InvitationBannerMeta>
+          {mailCalendarInvite.start && (
+            <InvitationBannerMetaItem icon={Clock}>
+              {mailCalendarInvite.start.toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+                hour12:
+                  timeFormat === "12h"
+                    ? true
+                    : timeFormat === "24h"
+                      ? false
+                      : undefined,
+                timeZone: timezone ?? undefined,
+              })}
+            </InvitationBannerMetaItem>
           )}
-        >
-          {currentCalendarInviteEvent?.loading ? (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="size-3 animate-spin" />
-              Adding to calendar…
-            </span>
-          ) : currentCalendarInviteEvent?.error ? (
-            <span className="text-xs text-destructive">
-              {currentCalendarInviteEvent.error}
-            </span>
-          ) : inviteDeclined ? (
-            <span className="text-xs text-muted-foreground">
-              Declined, removed from your calendar
-            </span>
-          ) : !currentCalendarInviteEvent?.event ? (
-            <span className="text-xs text-muted-foreground">
-              Processing invite…
-            </span>
-          ) : isPending ? (
-            <>
-              <Button
-                size="xs"
-                disabled={inviteResponsePending !== null}
-                onClick={() => void handleInvitationResponse("accepted")}
-                className="gap-1"
-              >
-                {inviteResponsePending === "accepted" ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <Check className="size-3" />
-                )}
-                Accept
-              </Button>
-              <Button
-                size="xs"
-                variant="outline"
-                disabled={inviteResponsePending !== null}
-                onClick={() => void handleInvitationResponse("tentative")}
-              >
-                {inviteResponsePending === "tentative" && (
-                  <Loader2 className="size-3 animate-spin" />
-                )}
-                Maybe
-              </Button>
-              <Button
-                size="xs"
-                variant="ghost"
-                disabled={inviteResponsePending !== null}
-                onClick={() => void handleInvitationResponse("declined")}
-                className="text-muted-foreground"
-              >
-                {inviteResponsePending === "declined" && (
-                  <Loader2 className="size-3 animate-spin" />
-                )}
-                Decline
-              </Button>
-            </>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="xs"
-                  variant="secondary"
-                  disabled={inviteResponsePending !== null}
-                  className="gap-1.5"
-                >
-                  {inviteResponsePending !== null && (
-                    <Loader2 className="size-3 animate-spin" />
-                  )}
-                  {invitationStatus === "tentative" ? "Maybe" : "Accepted"}
-                  <ChevronDown className="size-3 opacity-50" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-28">
-                <DropdownMenuItem
-                  onClick={() => void handleInvitationResponse("accepted")}
-                  className={cn(
-                    invitationStatus === "accepted" && "font-medium",
-                  )}
-                >
-                  <Check
-                    className={cn(
-                      "size-4",
-                      invitationStatus !== "accepted" && "opacity-0",
-                    )}
-                  />
-                  Accept
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => void handleInvitationResponse("tentative")}
-                  className={cn(
-                    invitationStatus === "tentative" && "font-medium",
-                  )}
-                >
-                  <Check
-                    className={cn(
-                      "size-4",
-                      invitationStatus !== "tentative" && "opacity-0",
-                    )}
-                  />
-                  Maybe
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  variant="destructive"
-                  onClick={() => void handleInvitationResponse("declined")}
-                >
-                  <Check className="size-4 opacity-0" />
-                  Decline
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {mailCalendarInvite.location && (
+            <InvitationBannerMetaItem icon={MapPin}>
+              {mailCalendarInvite.location}
+            </InvitationBannerMetaItem>
           )}
-        </div>
-      </div>
+        </InvitationBannerMeta>
+      </InvitationBanner>
     );
 
   const shouldShowCalendarCancellationCard =
     mailCalendarInvite?.method === "CANCEL";
   const calendarCancellationCard = shouldShowCalendarCancellationCard &&
     mailCalendarInvite && (
-      <div className="mx-4 mb-2 overflow-hidden rounded-xl border border-destructive/20 bg-card shadow-sm">
-        <div className="border-b border-destructive/10 bg-destructive/[0.06] px-4 py-3">
-          <div className="flex items-start gap-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-              <CalendarDays className="size-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="text-sm font-semibold text-foreground">
-                  Cancelled invitation
-                </div>
-                <span className="inline-flex items-center rounded-full border border-destructive/20 bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
-                  Cancelled
-                </span>
-              </div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                The organiser sent a cancellation update for this event. Solace
-                keeps it visible until you remove it yourself.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-4 py-3">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-muted-foreground line-through leading-snug decoration-destructive/50">
-              {mailCalendarInvite.title}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              {mailCalendarInvite.start && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-1">
-                  <Clock className="size-3" />
-                  <span className="line-through">
-                    {mailCalendarInvite.start.toLocaleString(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                      hour12:
-                        timeFormat === "12h"
-                          ? true
-                          : timeFormat === "24h"
-                            ? false
-                            : undefined,
-                      timeZone: timezone ?? undefined,
-                    })}
-                  </span>
-                </span>
-              )}
-              {mailCalendarInvite.location && (
-                <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-muted/60 px-2 py-1">
-                  <MapPin className="size-3 shrink-0" />
-                  <span className="max-w-[220px] truncate line-through">
-                    {mailCalendarInvite.location}
-                  </span>
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
-            {currentCalendarInviteEvent?.loading ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 text-xs text-muted-foreground">
-                <Loader2 className="size-3 animate-spin" />
-                Checking calendar…
-              </span>
-            ) : inviteCancelled ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-700 dark:text-emerald-400">
-                <Check className="size-3" />
-                Removed from your calendar
-              </span>
-            ) : currentCalendarInviteEvent?.event ? (
-              <>
-                <span className="text-xs text-muted-foreground">
-                  This cancelled copy is still on your calendar.
-                </span>
-                <Button
-                  size="xs"
-                  variant="outline"
-                  disabled={cancelProcessPending}
-                  onClick={() => void handleCancelRemove()}
-                  className="ml-auto gap-1 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                >
-                  {cancelProcessPending ? (
-                    <Loader2 className="size-3 animate-spin" />
-                  ) : (
-                    <Trash2 className="size-3" />
-                  )}
-                  Remove from calendar
-                </Button>
-              </>
-            ) : (
+      <InvitationBanner
+        variant="invitationCancelled"
+        className="mb-0 rounded-b-none"
+      >
+        <InvitationBannerHeader
+          title={mailCalendarInvite.title}
+          description="The organiser cancelled this event. Solace keeps it visible until you remove it yourself."
+        />
+        <InvitationBannerMeta>
+          {mailCalendarInvite.start && (
+            <InvitationBannerMetaItem icon={Clock}>
+              {mailCalendarInvite.start.toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+                hour12:
+                  timeFormat === "12h"
+                    ? true
+                    : timeFormat === "24h"
+                      ? false
+                      : undefined,
+                timeZone: timezone ?? undefined,
+              })}
+            </InvitationBannerMetaItem>
+          )}
+          {mailCalendarInvite.location && (
+            <InvitationBannerMetaItem icon={MapPin}>
+              {mailCalendarInvite.location}
+            </InvitationBannerMetaItem>
+          )}
+        </InvitationBannerMeta>
+        <InvitationBannerActions>
+          {currentCalendarInviteEvent?.loading ? (
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="size-3 animate-spin" />
+              Checking calendar…
+            </span>
+          ) : inviteCancelled ? (
+            <span className="inline-flex items-center gap-1.5 text-xs text-success">
+              <Check className="size-3" />
+              Removed from your calendar
+            </span>
+          ) : currentCalendarInviteEvent?.event ? (
+            <>
               <span className="text-xs text-muted-foreground">
-                This cancellation was already applied in your calendar.
+                This cancelled copy is still on your calendar.
               </span>
-            )}
-          </div>
-        </div>
-      </div>
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={cancelProcessPending}
+                onClick={() => void handleCancelRemove()}
+                className="ml-auto gap-1 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                {cancelProcessPending ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Trash2 className="size-3" />
+                )}
+                Remove from calendar
+              </Button>
+            </>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              This cancellation was already applied in your calendar.
+            </span>
+          )}
+        </InvitationBannerActions>
+      </InvitationBanner>
     );
 
+  const hasCardAboveBody =
+    mailCalendarInvite?.method === "REQUEST" ||
+    mailCalendarInvite?.method === "CANCEL" ||
+    Boolean(linkedCalendarEvent);
   const bodyContent = renderAsHtml ? (
-    <div className="flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col">
+    <div
+      className={cn(
+        "flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col",
+        hasCardAboveBody && "rounded-t-none border-t-0",
+      )}
+    >
       {blockRemoteImages && (
         <div className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-border/30 text-[11px] text-muted-foreground bg-muted/30">
           <Lock className="size-3 shrink-0" strokeWidth={2.25} />
@@ -2856,6 +2964,7 @@ export function MessageReader({
         html={showQuote ? displayHtml! : cleanHtml}
         blockRemoteImages={blockRemoteImages}
         blockTrackingPixels={blockTrackingPixels}
+        isDark={isDark}
       />
       {htmlHasQuote && (
         <div className="shrink-0 border-t border-border/40 px-3 py-1.5 bg-muted/20">
@@ -2871,11 +2980,22 @@ export function MessageReader({
       )}
     </div>
   ) : (
-    <div className="flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col">
-      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 bg-white [color-scheme:light]">
+    <div
+      className={cn(
+        "flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col",
+        hasCardAboveBody && "rounded-t-none border-t-0",
+      )}
+    >
+      <div className={cn(
+        "flex-1 min-h-0 overflow-y-auto px-5 py-4",
+        isDark ? "bg-[#1a1a1a] [color-scheme:dark]" : "bg-white [color-scheme:light]",
+      )}>
         {displayText ? (
           <>
-            <div className="text-sm leading-relaxed text-[#111] whitespace-pre-wrap">
+            <div className={cn(
+              "text-sm leading-relaxed whitespace-pre-wrap",
+              isDark ? "text-[#e0e0e0]" : "text-[#111]",
+            )}>
               {(() => {
                 const activeText = showQuote ? displayText : plaintextBody;
                 if (
@@ -2904,7 +3024,7 @@ export function MessageReader({
             )}
           </>
         ) : (
-          <span className="text-sm italic text-[#666]">No message body</span>
+          <span className={cn("text-sm italic", isDark ? "text-[#888]" : "text-[#666]")}>No message body</span>
         )}
       </div>
       {/* Quoted chain toggle — pinned outside the scroll, same style as HTML version */}
@@ -3167,11 +3287,13 @@ export function MessageReader({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {toolbar}
-      {header}
-      {conversationStrip}
-      {calendarInviteCard}
-      {calendarCancellationCard}
-      {linkedEventCard}
+      <div className="shrink min-h-0 overflow-y-auto">
+        {header}
+        {conversationStrip}
+        {calendarInviteCard}
+        {calendarCancellationCard}
+        {linkedEventCard}
+      </div>
       {bodyContent}
       {replyBar}
       {/* Raw HTML source dialog */}

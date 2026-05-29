@@ -4,7 +4,7 @@ import { Input } from "@workspace/ui/components/ui/input";
 import { ChevronRight, Search } from "lucide-react";
 
 import type { UseCommandPaletteSearchResult } from "@/hooks/use-command-palette-search";
-import { EventSearchResults } from "./event-search-results";
+import { UnifiedSearchResults } from "./unified-search-results";
 
 type CommandPaletteMainSearchViewProps = {
   search: UseCommandPaletteSearchResult;
@@ -16,8 +16,8 @@ function SearchOnlyEmptyState({ debouncedQuery }: { debouncedQuery: string }) {
       <Search className="size-8 text-muted-foreground/20" />
       <p className="text-sm text-muted-foreground">
         {debouncedQuery.trim().length >= 2
-          ? `No events found for "${debouncedQuery}"`
-          : "Type to search your events"}
+          ? `No mail or calendar results found for "${debouncedQuery}"`
+          : "Type to search mail and calendar"}
       </p>
     </div>
   );
@@ -28,7 +28,7 @@ function SearchOnlyIntroState() {
     <div className="flex flex-col items-center justify-center py-10 gap-2">
       <Search className="size-8 text-muted-foreground/20" />
       <p className="text-sm text-muted-foreground">
-        Search across all your events by title, description, or location
+        Search across your mail and calendar from one place
       </p>
     </div>
   );
@@ -80,17 +80,17 @@ export function CommandPaletteMainSearchView({
     isSearchOnly,
     listRef,
     matchingCommands,
-    searchEvents,
+    searchResults,
     searchInputInteractionProps,
     searchInputRef,
     searchLoading,
     searchQuery,
     selectCommand,
+    selectSearchResult,
     selectedIndex,
     selectNavigationItem,
-    selectSearchEvent,
     showEventSearch,
-    totalSearchEvents,
+    totalSearchResults,
     visibleNavigationItems,
   } = search;
 
@@ -117,10 +117,10 @@ export function CommandPaletteMainSearchView({
           type="text"
           placeholder={
             isSearchOnly
-              ? "Search events..."
+            ? "Search mail and calendar..."
               : isCommandMode
                 ? "Type a command..."
-                : "Search or jump to..."
+                : "Search mail, calendar & settings…"
           }
           value={searchQuery}
           {...searchInputInteractionProps}
@@ -170,11 +170,11 @@ export function CommandPaletteMainSearchView({
           )
         ) : isSearchOnly ? (
           showEventSearch ? (
-            searchEvents.length > 0 || searchLoading ? (
-              <EventSearchResults
-                events={searchEvents}
+            searchResults.length > 0 || searchLoading ? (
+              <UnifiedSearchResults
+                results={searchResults}
                 isLoading={searchLoading}
-                onSelect={selectSearchEvent}
+                onSelect={selectSearchResult}
                 selectedIndex={selectedIndex}
                 baseIndex={0}
               />
@@ -187,10 +187,10 @@ export function CommandPaletteMainSearchView({
         ) : (
           <>
             {showEventSearch && (
-              <EventSearchResults
-                events={searchEvents}
+              <UnifiedSearchResults
+                results={searchResults}
                 isLoading={searchLoading}
-                onSelect={selectSearchEvent}
+                onSelect={selectSearchResult}
                 selectedIndex={selectedIndex}
                 baseIndex={0}
               />
@@ -203,7 +203,7 @@ export function CommandPaletteMainSearchView({
               </div>
             ) : visibleNavigationItems.length > 0 ? (
               <div className="px-2">
-                {showEventSearch && searchEvents.length > 0 && (
+                {showEventSearch && searchResults.length > 0 && (
                   <div className="px-2 pt-1 pb-1">
                     <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wide">
                       Settings
@@ -211,7 +211,7 @@ export function CommandPaletteMainSearchView({
                   </div>
                 )}
                 {visibleNavigationItems.map((item, index) => {
-                  const globalIndex = totalSearchEvents + index;
+                  const globalIndex = totalSearchResults + index;
 
                   return (
                     <NavigationResultButton
@@ -227,11 +227,15 @@ export function CommandPaletteMainSearchView({
                 })}
               </div>
             ) : showEventSearch &&
-              searchEvents.length === 0 &&
+              searchResults.length === 0 &&
               !searchLoading ? (
               <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-                No events found for &quot;{debouncedQuery}&quot;
+                No mail or calendar results found for &quot;{debouncedQuery}&quot;
               </div>
+            ) : !debouncedQuery.trim() ? (
+              <p className="px-4 pt-1 pb-2 text-[11px] text-muted-foreground/50">
+                Searches mail, calendar, and settings
+              </p>
             ) : null}
           </>
         )}

@@ -369,6 +369,113 @@ describe("StalwartJmapClient", () => {
     );
   });
 
+  it("queries paginated mailbox ids for local search indexing", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            methodResponses: [
+              [
+                "Email/query",
+                {
+                  ids: ["m1", "m2"],
+                  total: 10,
+                  queryState: "state-1",
+                },
+                "q1",
+              ],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+
+    await expect(
+      client.getMailboxMessageIds(
+        {
+          apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+          accounts: { account: {} },
+          primaryAccounts: { "urn:ietf:params:jmap:mail": "account" },
+        },
+        "inbox",
+        { limit: 2, position: 4 },
+      ),
+    ).resolves.toEqual({
+      ids: ["m1", "m2"],
+      total: 10,
+      queryState: "state-1",
+    });
+
+    const request = JSON.parse(
+      String(fetcher.mock.calls[0]?.[1]?.body),
+    ) as { methodCalls: Array<[string, Record<string, unknown>, string]> };
+    expect(request.methodCalls[0]?.[0]).toBe("Email/query");
+    expect(request.methodCalls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        accountId: "account",
+        filter: { inMailbox: "inbox" },
+        limit: 2,
+        position: 4,
+      }),
+    );
+  });
+
+  it("reads Email/changes for incremental local search refreshes", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            methodResponses: [
+              [
+                "Email/changes",
+                {
+                  oldState: "state-1",
+                  newState: "state-2",
+                  created: ["new"],
+                  updated: ["updated"],
+                  destroyed: ["gone"],
+                },
+                "c1",
+              ],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+
+    await expect(
+      client.getEmailChanges(
+        {
+          apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+          accounts: { account: {} },
+          primaryAccounts: { "urn:ietf:params:jmap:mail": "account" },
+        },
+        "state-1",
+      ),
+    ).resolves.toEqual({
+      oldState: "state-1",
+      newState: "state-2",
+      hasMoreChanges: undefined,
+      created: ["new"],
+      updated: ["updated"],
+      destroyed: ["gone"],
+    });
+  });
+
   it("surfaces bearer-auth failures without mentioning passwords", async () => {
     const client = new StalwartJmapClient({
       baseUrl: "http://localhost:4001/api/mail/jmap",

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  SlidersHorizontal,
   RotateCcw,
   ArrowLeft,
   Pencil,
   Menu,
+  Search,
+  X,
 } from "lucide-react";
 import {
   SidebarProvider,
@@ -14,8 +15,10 @@ import {
   useSidebar,
 } from "@workspace/ui/components/ui/sidebar";
 import { Button } from "@workspace/ui/components/ui/button";
+import { Input } from "@workspace/ui/components/ui/input";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { useIsMobile } from "@workspace/ui/hooks";
+import { useQuery } from "@tanstack/react-query";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useSettings } from "@/hooks/use-settings";
 import { MobileAppSwitcher } from "@/components/mobile-app-switcher";
@@ -25,6 +28,7 @@ import { ComposeDialog, ComposeForm } from "./compose-dialog";
 import { AttachmentPreviewDialog } from "./attachment-preview-dialog";
 import { MessageList } from "./message-list";
 import { MessageReader } from "./message-reader";
+import type { JmapEmailMessage } from "@/lib/mail/types";
 
 interface MobileMailHeaderProps {
   selectedMailboxName: string;
@@ -36,7 +40,6 @@ interface MobileMailHeaderProps {
   isBusy: boolean;
   isRefreshing: boolean;
   onBack: () => void;
-  onOpenPalette: () => void;
   onRefresh: () => void;
   onCompose: () => void;
 }
@@ -51,7 +54,6 @@ function MobileMailHeader({
   isBusy,
   isRefreshing,
   onBack,
-  onOpenPalette,
   onRefresh,
   onCompose,
 }: MobileMailHeaderProps) {
@@ -137,16 +139,6 @@ function MobileMailHeader({
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="size-9 rounded-xl text-muted-foreground"
-                  onClick={onOpenPalette}
-                  aria-label="Open mail filters"
-                  title="Filter"
-                >
-                  <SlidersHorizontal size={16} strokeWidth={2.25} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
                   className="size-9 rounded-xl text-muted-foreground disabled:opacity-40"
                   disabled={isRefreshing || isBusy}
                   onClick={onRefresh}
@@ -182,6 +174,7 @@ export function MailApp() {
     selectedMessage,
     selectedMessageId,
     setSelectedMessageId,
+    openMessageById,
     selectedConversationMessages,
     isConversationLoading,
     setSelectedConversationMessageId,
@@ -213,6 +206,8 @@ export function MailApp() {
     setBlockRemoteImages,
     blockTrackingPixels,
     setBlockTrackingPixels,
+    mailDarkMode,
+    setMailDarkMode,
     refreshMailboxMessages,
     handleManualRefresh,
     isRefreshing,
@@ -258,6 +253,40 @@ export function MailApp() {
     string | undefined
   >();
   const isMobile = useIsMobile();
+  const handledDeepLinkMessageIdRef = useRef<string | null>(null);
+  const [mailListSearch, setMailListSearch] = useState("");
+  const [debouncedMailListSearch, setDebouncedMailListSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedMailListSearch(mailListSearch), 300);
+    return () => clearTimeout(timer);
+  }, [mailListSearch]);
+
+  const mailboxId = activeMailbox?.selectedMailboxId ?? null;
+
+  const {
+    data: serverSearchResults,
+    isFetching: isSearching,
+  } = useQuery<JmapEmailMessage[]>({
+    queryKey: ["mail-inline-search", mailboxId, debouncedMailListSearch],
+    queryFn: async () => {
+      if (!activeMailbox || !mailboxId || !debouncedMailListSearch.trim()) return [];
+      const { messages } = await activeMailbox.client.searchMailboxMessages(
+        activeMailbox.session,
+        mailboxId,
+        debouncedMailListSearch.trim(),
+        40,
+      );
+      return messages;
+    },
+    enabled: Boolean(debouncedMailListSearch.trim() && activeMailbox && mailboxId),
+    staleTime: 10_000,
+    placeholderData: (prev) => prev,
+  });
+
+  const filteredListMessages: JmapEmailMessage[] = debouncedMailListSearch.trim()
+    ? (serverSearchResults ?? [])
+    : (activeMailbox?.messages ?? []);
 
   const handleSelectMessage = (id: string | null) => {
     setSelectedMessageId(id);
@@ -282,6 +311,27 @@ export function MailApp() {
   const handleCloseMessage = () => {
     setSelectedMessageId(null);
   };
+
+  useEffect(() => {
+    if (!activeMailbox || typeof window === "undefined") return;
+    const messageId = new URLSearchParams(window.location.search).get(
+      "messageId",
+    );
+    if (!messageId || handledDeepLinkMessageIdRef.current === messageId) return;
+
+    handledDeepLinkMessageIdRef.current = messageId;
+    void openMessageById(messageId);
+  }, [activeMailbox, openMessageById]);
+
+  // Clear inline search when switching mailboxes
+  const prevMailboxIdRef = useRef<string | null | undefined>(null);
+  useEffect(() => {
+    const currentId = activeMailbox?.selectedMailboxId ?? null;
+    if (prevMailboxIdRef.current !== null && prevMailboxIdRef.current !== currentId) {
+      setMailListSearch("");
+    }
+    prevMailboxIdRef.current = currentId;
+  }, [activeMailbox?.selectedMailboxId]);
 
   // Archive = move to the first mailbox with role "archive"
   const archiveMailbox = activeMailbox?.mailboxes.find(
@@ -321,6 +371,7 @@ export function MailApp() {
           onSelectMailbox={(id) => void refreshMailboxMessages(id)}
           onCompose={() => setIsComposeOpen(true)}
           onOpenPalette={() => setIsPaletteOpen(true)}
+          onOpenSearch={() => setIsPaletteOpen(true)}
           onOpenMailboxes={() => {
             setPaletteInitialView("mailboxes");
             setIsPaletteOpen(true);
@@ -345,7 +396,6 @@ export function MailApp() {
                   isBusy={isBusy}
                   isRefreshing={isRefreshing}
                   onBack={handleBack}
-                  onOpenPalette={() => setIsPaletteOpen(true)}
                   onRefresh={() => void handleManualRefresh()}
                   onCompose={() => setIsComposeOpen(true)}
                 />
@@ -397,10 +447,45 @@ export function MailApp() {
                       </div>
                     </header>
                   )}
+                  {/* Inline search input — desktop only */}
+                  {!isMobile && (
+                    <div className="px-3 py-2 border-b border-border/40 shrink-0">
+                      <div className="relative flex items-center">
+                        <Search
+                          size={13}
+                          strokeWidth={2}
+                          className="absolute left-2.5 text-muted-foreground/50 pointer-events-none"
+                        />
+                        <Input
+                          value={mailListSearch}
+                          onChange={(e) => setMailListSearch(e.target.value)}
+                          placeholder="Search all messages…"
+                          className="h-7 pl-7 pr-7 text-xs bg-muted/40 border-0 shadow-none rounded-md focus-visible:ring-1 focus-visible:ring-ring/40 placeholder:text-muted-foreground/40"
+                        />
+                        {isSearching && debouncedMailListSearch && (
+                          <RotateCcw
+                            size={11}
+                            strokeWidth={2}
+                            className="absolute right-2 text-muted-foreground/40 animate-spin pointer-events-none"
+                          />
+                        )}
+                        {mailListSearch && !isSearching && (
+                          <button
+                            type="button"
+                            onClick={() => setMailListSearch("")}
+                            className="absolute right-2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                            aria-label="Clear search"
+                          >
+                            <X size={12} strokeWidth={2.5} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <MessageList
                     key={activeMailbox.selectedMailboxId ?? "mailbox-list"}
-                    messages={activeMailbox.messages}
-                    relatedMessages={conversationSourceMessages}
+                    messages={filteredListMessages}
+                    relatedMessages={debouncedMailListSearch ? [] : conversationSourceMessages}
                     selectedMessageId={selectedMessageId}
                     onSelect={handleSelectMessage}
                     mailboxes={activeMailbox.mailboxes}
@@ -423,8 +508,8 @@ export function MailApp() {
                     labels={labels}
                     timeFormat={timeFormat}
                     timezone={settings?.timezone}
-                    onLoadMore={() => void loadMoreMessages()}
-                    hasMore={hasMoreMessages}
+                    onLoadMore={debouncedMailListSearch ? undefined : () => void loadMoreMessages()}
+                    hasMore={debouncedMailListSearch ? false : hasMoreMessages}
                     isLoadingMore={isLoadingMore}
                   />
                 </div>
@@ -469,6 +554,7 @@ export function MailApp() {
                       isBusy={isBusy}
                       blockRemoteImages={blockRemoteImages}
                       blockTrackingPixels={blockTrackingPixels}
+                      mailDarkMode={mailDarkMode}
                       mailboxes={activeMailbox.mailboxes}
                       currentMailboxId={activeMailbox.selectedMailboxId}
                       onReply={handleReply}
@@ -572,6 +658,8 @@ export function MailApp() {
         onToggleBlockTrackingPixels={() =>
           setBlockTrackingPixels(!blockTrackingPixels)
         }
+        mailDarkMode={mailDarkMode}
+        onToggleMailDarkMode={() => setMailDarkMode(!mailDarkMode)}
         mailboxes={activeMailbox?.mailboxes ?? []}
         onCreateMailbox={(name) => handleCreateMailbox(name)}
         onDeleteMailbox={(id) => handleDeleteMailbox(id)}
@@ -579,6 +667,8 @@ export function MailApp() {
         labels={labels}
         onCreateLabel={(name, color) => handleCreateLabel(name, color)}
         onDeleteLabel={(id) => handleDeleteLabel(id)}
+        messages={activeMailbox?.messages ?? []}
+        onSelectMessage={(id) => void openMessageById(id)}
       />
 
       <ComposeDialog

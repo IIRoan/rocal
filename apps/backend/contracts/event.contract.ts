@@ -10,6 +10,13 @@ export type EventSearchInput = {
   endDate?: string;
 };
 
+export type EventSearchCorpusInput = {
+  userId: string;
+  limit?: number;
+  offset?: number;
+  updatedAfter?: string;
+};
+
 export type EventListInput = {
   userId: string;
   start: string;
@@ -87,6 +94,9 @@ export interface IEventService {
   search(
     input: EventSearchInput,
   ): Promise<{ events: unknown[]; total: number }>;
+  searchCorpus(
+    input: EventSearchCorpusInput,
+  ): Promise<{ events: unknown[]; total: number; nextOffset: number | null }>;
   list(
     input: EventListInput,
   ): Promise<{

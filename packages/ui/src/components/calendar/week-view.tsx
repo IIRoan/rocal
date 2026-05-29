@@ -4,14 +4,11 @@ import React, { useLayoutEffect, useMemo, useRef } from "react";
 import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
   addHours,
-  areIntervalsOverlapping,
-  differenceInMinutes,
   eachDayOfInterval,
   eachHourOfInterval,
   endOfWeek,
   format,
   getHours,
-  getMinutes,
   isBefore,
   isSameDay,
   isToday,
@@ -38,6 +35,8 @@ import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator"
 
 import { StartHour, EndHour } from "./constants";
 import { cn } from "../../lib/utils";
+import { CurrentTimeIndicator } from "./current-time-indicator";
+import { layoutTimelineEvents } from "./timeline-layout";
 
 interface WeekViewProps {
   currentDate: Date;
@@ -53,16 +52,6 @@ interface WeekViewProps {
   onEventEdit?: (event: CalendarEvent) => void;
   onEventDelete?: (event: CalendarEvent) => void;
   onEventView?: (event: CalendarEvent) => void;
-}
-
-interface PositionedEvent {
-  event: CalendarEvent;
-  top: number;
-  height: number;
-  left: number;
-  width: number;
-  zIndex: number;
-  dayIndex: number;
 }
 
 export const WeekView = React.memo(function WeekView({
@@ -160,146 +149,14 @@ export const WeekView = React.memo(function WeekView({
         return aStart.getTime() - bStart.getTime();
       });
 
-      // Calculate positions for each event using improved layout algorithm
-      const positionedEvents: PositionedEvent[] = [];
-      const dayStart = startOfDay(day);
-
-      // Track columns for overlapping events
-      const columns: { event: CalendarEvent; start: Date; end: Date }[][] = [];
-      const eventColumnMapping: Map<CalendarEvent, number> = new Map();
-
-      // First pass: assign events to columns
-      dayEvents.forEach((event) => {
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end);
-
-        // Adjust start and end times if they're outside this day
-        const adjustedStart = isSameDay(day, eventStart)
-          ? eventStart
-          : dayStart;
-        const adjustedEnd = isSameDay(day, eventEnd)
-          ? eventEnd
-          : addHours(dayStart, 24);
-
-        // Find a column for this event group
-        let columnIndex = 0;
-        let placed = false;
-
-        while (!placed) {
-          const col = columns[columnIndex] || [];
-          if (col.length === 0) {
-            columns[columnIndex] = col;
-            placed = true;
-          } else {
-            const overlaps = col.some((c) =>
-              areIntervalsOverlapping(
-                { start: adjustedStart, end: adjustedEnd },
-                { start: c.start, end: c.end },
-              ),
-            );
-            if (!overlaps) {
-              placed = true;
-            } else {
-              columnIndex++;
-            }
-          }
-        }
-
-        // Ensure column is initialized before pushing
-        const currentColumn = columns[columnIndex] || [];
-        columns[columnIndex] = currentColumn;
-        currentColumn.push({
-          event: event,
-          start: adjustedStart,
-          end: adjustedEnd,
-        });
-        eventColumnMapping.set(event, columnIndex);
-      });
-
-      // Second pass: calculate positions for events
-      dayEvents.forEach((event) => {
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end);
-
-        // Adjust start and end times if they're outside this day
-        const adjustedStart = isSameDay(day, eventStart)
-          ? eventStart
-          : dayStart;
-        const adjustedEnd = isSameDay(day, eventEnd)
-          ? eventEnd
-          : addHours(dayStart, 24);
-
-        // Calculate top position and height
-        const startHour =
-          getHours(adjustedStart) + getMinutes(adjustedStart) / 60;
-        const endHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
-
-        const top = (startHour - StartHour) * WeekCellsHeight;
-        const height = Math.max((endHour - startHour) * WeekCellsHeight, 22);
-
-        const columnIndex = eventColumnMapping.get(event) ?? 0;
-        const totalColumns = columns.length;
-
-        // Calculate overlapping events for this specific time slot
-        const overlappingEvents = dayEvents.filter((otherEvent) => {
-          if (otherEvent === event) return false;
-
-          const otherStart = new Date(otherEvent.start);
-          const otherEnd = new Date(otherEvent.end);
-
-          return areIntervalsOverlapping(
-            { start: adjustedStart, end: adjustedEnd },
-            { start: otherStart, end: otherEnd },
-          );
-        });
-
-        const overlappingColumns = overlappingEvents.length + 1;
-
-        // Use improved width and positioning calculation with mobile optimization
-        let width: number;
-        let left: number;
-
-        // Simple approach for all overlap scenarios - GUARANTEE no overflow
-        if (overlappingColumns === 1) {
-          width = 1;
-          left = 0;
-        } else if (overlappingColumns === 2) {
-          width = 0.495;
-          left = columnIndex === 0 ? 0 : 0.505;
-        } else if (overlappingColumns === 3) {
-          width = 0.33;
-          left = columnIndex === 0 ? 0 : columnIndex === 1 ? 0.34 : 0.67;
-        } else if (overlappingColumns === 4) {
-          width = 0.2475;
-          left =
-            columnIndex === 0
-              ? 0
-              : columnIndex === 1
-                ? 0.255
-                : columnIndex === 2
-                  ? 0.51
-                  : 0.765;
-        } else {
-          // For 5+ events, guarantee no overflow
-          const gap = 0.005;
-          const totalGap = (overlappingColumns - 1) * gap;
-          const availableWidth = 1 - totalGap;
-          width = availableWidth / overlappingColumns;
-          left = columnIndex === 0 ? 0 : columnIndex * (width + gap);
-        }
-
-        positionedEvents.push({
-          event: event,
-          top,
-          height,
-          left,
-          width,
-          zIndex: 10 + columnIndex, // Higher columns get higher z-index
-          dayIndex: 0, // Will be set correctly when rendering
-        });
-      });
-
-      return positionedEvents;
+      return layoutTimelineEvents(dayEvents, day, {
+        cellHeight: WeekCellsHeight,
+        startHour: StartHour,
+        widthStrategy: "no-overflow",
+      }).map((positionedEvent) => ({
+        ...positionedEvent,
+        dayIndex: 0,
+      }));
     });
 
     return result;
@@ -542,15 +399,10 @@ export const WeekView = React.memo(function WeekView({
 
             {/* Current time indicator - only show for today's column */}
             {currentTimeVisible && isToday(day) && (
-              <div
-                className="pointer-events-none absolute right-0 left-0 z-20"
-                style={{ top: `${currentTimePosition}%` }}
-              >
-                <div className="relative flex items-center">
-                  <div className="bg-[var(--calendar-accent)] absolute -left-1 h-2 w-2 rounded-full"></div>
-                  <div className="bg-[var(--calendar-accent)] h-[2px] w-full"></div>
-                </div>
-              </div>
+              <CurrentTimeIndicator
+                position={currentTimePosition}
+                variant="calendar-accent"
+              />
             )}
             {hours.map((hour, hourIndex) => {
               const hourValue = getHours(hour);
