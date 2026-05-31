@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { createElement, useState } from "react";
+import { useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -30,38 +28,31 @@ import {
   Archive,
   AlertTriangle,
   Mail,
-  Plus,
-  PanelLeftClose,
-  PanelLeftOpen,
   GripVertical,
   ChevronRight,
   Settings2,
   EyeOff,
   Eye,
-  Search,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { createElement } from "react";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
-  useSidebar,
 } from "@workspace/ui/components/ui/sidebar";
-import { Button } from "@workspace/ui/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/ui/tooltip";
-import { NavUser } from "@workspace/ui/components/navigation";
-import { Logo, SidebarAppSwitcher } from "@workspace/ui/components/layout";
+import {
+  SidebarShell,
+  SidebarPrimaryAction,
+  SidebarIconButton,
+} from "@workspace/ui/components/layout";
 import type { JmapMailbox } from "@/lib/mail/types";
 import type { ActiveMailboxState } from "@/hooks/use-mail-app";
 
@@ -101,35 +92,6 @@ function getMailboxIcon(role: string | null | undefined): LucideIcon {
     default:
       return Mail;
   }
-}
-
-function SidebarIconButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick?: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-9 rounded-lg text-muted-foreground/70 hover:bg-muted/80 hover:text-foreground transition-colors"
-          onClick={onClick}
-          aria-label={label}
-        >
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="right" align="center">
-        {label}
-      </TooltipContent>
-    </Tooltip>
-  );
 }
 
 function MailboxIcon({
@@ -248,10 +210,6 @@ export function MailSidebar({
   onReorderMailboxes,
   isBusy,
 }: MailSidebarProps) {
-  const { state, toggleSidebar } = useSidebar();
-  const pathname = usePathname();
-  const isCollapsed = state === "collapsed";
-  const activeApp = pathname?.startsWith("/calendar") ? "calendar" : "mail";
   const [hiddenMailboxIds, setHiddenMailboxIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -309,90 +267,21 @@ export function MailSidebar({
   }
 
   return (
-    <Sidebar variant="inset" collapsible="icon">
-      <SidebarHeader
-        className={
-          isCollapsed ? "items-center pt-4 px-2 pb-3" : "pt-4 px-4 pb-3"
-        }
-      >
-        {isCollapsed ? (
-          <>
-            <Link className="inline-flex justify-center" href="/">
-              <Logo width="28" height="28" className="text-primary" />
-            </Link>
-            {onOpenSearch && (
-              <SidebarIconButton label="Search" onClick={onOpenSearch}>
-                <Search size={15} strokeWidth={2} />
-              </SidebarIconButton>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 rounded-lg text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground"
-              onClick={toggleSidebar}
-              aria-label="Expand sidebar"
+    <SidebarShell
+      activeApp="mail"
+      onOpenSearch={onOpenSearch}
+      user={user}
+      onLogout={onSignOut}
+      onOpenSettings={onOpenPalette}
+    >
+      {({ isCollapsed }) => (
+        <>
+          <SidebarPrimaryAction label="Compose" onClick={onCompose} />
+
+          {activeMailbox && (
+            <SidebarGroup
+              className={`px-2 flex-1 overflow-y-auto ${isCollapsed ? "pt-2" : "pt-3"}`}
             >
-              <PanelLeftOpen size={16} strokeWidth={2} />
-            </Button>
-          </>
-        ) : (
-          <div className="flex items-center justify-between">
-            <SidebarAppSwitcher activeApp={activeApp} />
-            <div className="flex items-center gap-0.5">
-              {onOpenSearch && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 rounded-lg text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground"
-                  onClick={onOpenSearch}
-                  aria-label="Search"
-                >
-                  <Search size={15} strokeWidth={2} />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8 rounded-lg text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground"
-                onClick={toggleSidebar}
-                aria-label="Collapse sidebar"
-              >
-                <PanelLeftClose size={16} strokeWidth={2} />
-              </Button>
-            </div>
-          </div>
-        )}
-      </SidebarHeader>
-
-      <SidebarContent className="gap-0 flex flex-col overflow-hidden">
-        <SidebarGroup
-          className={`px-2 shrink-0 ${isCollapsed ? "pt-2" : "pt-1"}`}
-        >
-          {isCollapsed ? (
-            <SidebarGroupContent className="flex flex-col items-center">
-              <SidebarIconButton label="Compose" onClick={onCompose}>
-                <Plus size={18} strokeWidth={2.5} className="text-primary" />
-              </SidebarIconButton>
-            </SidebarGroupContent>
-          ) : (
-            <SidebarGroupContent>
-              <Button
-                onClick={onCompose}
-                variant="outline"
-                className="w-full h-9 rounded-xl border-border/60 text-foreground/80 font-medium text-[13px] hover:bg-muted/60 hover:text-foreground transition-colors"
-                style={{ fontWeight: 470 }}
-              >
-                <Plus size={15} strokeWidth={2} />
-                Compose
-              </Button>
-            </SidebarGroupContent>
-          )}
-        </SidebarGroup>
-
-        {activeMailbox && (
-          <SidebarGroup
-            className={`px-2 flex-1 overflow-y-auto ${isCollapsed ? "pt-2" : "pt-3"}`}
-          >
             {isCollapsed ? (
               <SidebarGroupContent className="flex flex-col items-center gap-1">
                 {sorted.map((mailbox) => {
@@ -539,19 +428,10 @@ export function MailSidebar({
                 </SidebarGroupContent>
               </>
             )}
-          </SidebarGroup>
-        )}
-      </SidebarContent>
-
-      <SidebarFooter className="p-2 border-t border-border/40">
-        <NavUser
-          user={user}
-          onLogout={onSignOut}
-          onOpenSettings={onOpenPalette}
-        />
-      </SidebarFooter>
-
-      <SidebarRail />
-    </Sidebar>
+            </SidebarGroup>
+          )}
+        </>
+      )}
+    </SidebarShell>
   );
 }

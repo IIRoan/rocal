@@ -22,7 +22,7 @@ import {
   DrawerTitle,
   DrawerDescription,
 } from "../ui/drawer";
-import { SidebarProvider } from "../ui/sidebar";
+import { SidebarProvider, SIDEBAR_WIDTH_MOBILE } from "../ui/sidebar";
 import { VisuallyHidden } from "../ui/visually-hidden";
 import { useCalendarContext } from "./calendar-context";
 import { useIsMobile } from "../../hooks/use-mobile";
@@ -422,7 +422,8 @@ export function MobileCalendarWrapper({
         <SheetContent
           side="left"
           showClose={false}
-          className="h-[100dvh] w-[92vw] max-w-[360px] rounded-none border-r border-border p-0 safe-area-inset-bottom"
+          style={{ width: SIDEBAR_WIDTH_MOBILE }}
+          className="h-[100dvh] max-w-[92vw] rounded-none border-r border-border p-0 safe-area-inset-bottom"
         >
           <VisuallyHidden>
             <SheetTitle>Calendar Sidebar</SheetTitle>
