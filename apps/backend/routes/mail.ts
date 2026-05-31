@@ -22,6 +22,7 @@ function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
 }
 
+const logger = createLogger("backend:mail-jmap-proxy");
 async function deriveVaultKeyMaterial(userId: string): Promise<string> {
   const hmacKey = env.mailVaultHmacKey;
   if (!hmacKey) {
@@ -46,7 +47,67 @@ async function deriveVaultKeyMaterial(userId: string): Promise<string> {
     .replace(/=+$/g, "");
 }
 
-const logger = createLogger("backend:mail-jmap-proxy");
+/**
+ * Pre-computes the argon2id-derived vault decryption key for native clients.
+ *
+ * Native apps (Hermes JS engine) cannot run argon2id efficiently — the
+ * pure-JS implementation blocks the main thread and may crash due to
+ * memory pressure. The backend has WASM-backed hash-wasm and can compute
+ * argon2id(keyMaterial, vaultSalt, kdfParams) server-side, returning the
+ * 32-byte AES-GCM key as base64. The native app then uses this key directly.
+ *
+ * Returns null if the user has no vault backup yet.
+ */
+async function deriveVaultKeyForNative(
+  userId: string,
+  keyMaterial: string,
+): Promise<string | null> {
+  const entry = await prisma.mailDirectoryEntry.findUnique({
+    where: { userId },
+    select: {
+      vaultBackup: {
+        select: {
+          kdfSaltB64: true,
+          kdfMemoryKiB: true,
+          kdfIterations: true,
+          kdfParallelism: true,
+        },
+      },
+    },
+  });
+
+  if (!entry?.vaultBackup) {
+    logger.warn("[deriveVaultKeyForNative] no vault backup found for userId=%s", userId);
+    return null;
+  }
+
+  const { kdfSaltB64, kdfMemoryKiB, kdfIterations, kdfParallelism } = entry.vaultBackup;
+  logger.debug(
+    "[deriveVaultKeyForNative] running argon2id: memoryKiB=%d iterations=%d parallelism=%d saltLen=%d",
+    kdfMemoryKiB, kdfIterations, kdfParallelism, kdfSaltB64.length,
+  );
+
+  // kdfSaltB64 may be standard base64 or base64url — normalize to standard before decode.
+  const saltBase64 = kdfSaltB64.replace(/-/g, "+").replace(/_/g, "/");
+
+  const { argon2id } = await import("hash-wasm");
+  const derived = await argon2id({
+    password: keyMaterial,
+    salt: Buffer.from(saltBase64, "base64"),
+    memorySize: kdfMemoryKiB,
+    iterations: kdfIterations,
+    parallelism: kdfParallelism,
+    hashLength: 32,
+    outputType: "binary",
+  });
+
+  logger.debug("[deriveVaultKeyForNative] argon2id succeeded, returning derivedKeyB64");
+  return Buffer.from(derived)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
 
 const publicJmapProxyBaseUrl = `${normalizeBaseUrl(env.backendUrl)}/api/mail/jmap`;
 
@@ -341,7 +402,24 @@ export function createMailRoutes(
         }
         try {
           const keyMaterial = await deriveVaultKeyMaterial(session.session.userId);
-          return { keyMaterial, version: "v1" };
+          // Pre-compute the argon2id output for native clients (Hermes cannot run
+          // argon2id efficiently). Returns null if no vault backup exists yet.
+          let derivedKeyB64: string | null = null;
+          try {
+            derivedKeyB64 = await deriveVaultKeyForNative(session.session.userId, keyMaterial);
+          } catch (derivedErr) {
+            logger.error(
+              "[vault-key-material] deriveVaultKeyForNative failed for userId=%s: %s",
+              session.session.userId,
+              derivedErr instanceof Error ? derivedErr.message : String(derivedErr),
+            );
+          }
+          logger.debug(
+            "[vault-key-material] responding hasDerivedKey=%s for userId=%s",
+            derivedKeyB64 ? "yes" : "no",
+            session.session.userId,
+          );
+          return { keyMaterial, derivedKeyB64, version: "v1" };
         } catch (err) {
           const message =
             errorMessage(err, "Could not derive vault key material.");

@@ -29,7 +29,11 @@ import {
   classifyMessageEncryption,
   extractMessageBodies,
 } from "../../../../src/lib/mail/message-security";
-import { openWebMail } from "../../../../src/lib/mail/mail-web-bridge";
+import {
+  decryptMailMessage,
+  decryptPgpMimeMessage,
+  type MailDecryptResult,
+} from "../../../../src/lib/mail/mail-crypto";
 import type { JmapEmailMessage } from "../../../../src/lib/mail/types";
 
 export default function MailMessageScreen() {
@@ -60,7 +64,33 @@ export default function MailMessageScreen() {
   const bodies = message ? extractMessageBodies(message) : null;
   const encryption = message ? classifyMessageEncryption(message) : "plain";
   const isEncrypted = encryption !== "plain";
-  const bodyText = bodies?.text ?? bodies?.html ?? null;
+  const rawBodyText = bodies?.text ?? bodies?.html ?? null;
+
+  const decryptQuery = useQuery<MailDecryptResult>({
+    queryKey: QUERY_KEYS.mailDecrypted(messageId),
+    enabled: isEncrypted && Boolean(runtime) && Boolean(message),
+    retry: 1,
+    staleTime: Infinity,
+    gcTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      if (!runtime || !message) throw new Error("Runtime or message not available");
+      if (encryption === "inline_pgp") {
+        if (!rawBodyText) throw new Error("No armored PGP body found in this message");
+        return decryptMailMessage(runtime, messageId, rawBodyText);
+      }
+      if (encryption === "pgp_mime") {
+        return decryptPgpMimeMessage(runtime, messageId, message.bodyStructure);
+      }
+      throw new Error(`Unsupported encryption type: ${encryption}`);
+    },
+  });
+
+  // Resolve what body text to show (prefer decrypted result over raw)
+  const decryptedText: string | null = decryptQuery.data?.plaintext ?? null;
+  const displayText: string | null = isEncrypted ? decryptedText : rawBodyText;
+
+  const isDecrypting = isEncrypted && (decryptQuery.isLoading || decryptQuery.isFetching);
+  const decryptError = isEncrypted ? decryptQuery.error : null;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -76,14 +106,8 @@ export default function MailMessageScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {message?.subject?.trim() || "Message"}
         </Text>
-        <Pressable
-          onPress={() => openWebMail(messageId)}
-          style={styles.iconButton}
-          accessibilityRole="button"
-          accessibilityLabel="Open in secure web mail"
-        >
-          <Feather name="external-link" size={20} color={theme.colors.foreground} />
-        </Pressable>
+        {/* Spacer to keep header symmetric */}
+        <View style={styles.iconButton} />
       </View>
 
       {messageQuery.isLoading && !message ? (
@@ -146,33 +170,92 @@ export default function MailMessageScreen() {
 
           <View style={styles.divider} />
 
-          {isEncrypted ? (
-            <View style={styles.encryptedCard}>
-              <Feather name="lock" size={28} color={theme.colors.primaryBase} />
-              <Text style={styles.encryptedTitle}>
-                End-to-end encrypted message
-              </Text>
-              <Text style={styles.mutedText}>
-                This message is encrypted with your private key. Open it in the
-                secure web client to read it.
-              </Text>
-              <Pressable
-                onPress={() => openWebMail(messageId)}
-                style={styles.primaryButton}
-              >
-                <Text style={styles.primaryButtonText}>
-                  Open in secure web mail
-                </Text>
-              </Pressable>
+          {isDecrypting ? (
+            <View style={styles.centered}>
+              <ActivityIndicator color={theme.colors.primaryBase} />
+              <Text style={styles.mutedText}>Decrypting message…</Text>
             </View>
-          ) : bodyText ? (
-            <Text style={styles.bodyText}>{bodyText}</Text>
+          ) : decryptError ? (
+            <DecryptErrorCard
+              theme={theme}
+              styles={styles}
+              error={getErrorMessage(decryptError, "Decryption failed")}
+              onRetry={() => decryptQuery.refetch()}
+            />
+          ) : displayText ? (
+            <>
+              {decryptQuery.data && (
+                <SignatureBadge
+                  theme={theme}
+                  styles={styles}
+                  state={decryptQuery.data.signatureVerificationState}
+                />
+              )}
+              <Text style={styles.bodyText}>{displayText}</Text>
+            </>
           ) : (
             <Text style={styles.mutedText}>This message has no content.</Text>
           )}
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function DecryptErrorCard({
+  theme,
+  styles,
+  error,
+  onRetry,
+}: {
+  theme: ThemeTokens;
+  styles: ReturnType<typeof createStyles>;
+  error: string;
+  onRetry: () => void;
+}) {
+  return (
+    <View style={styles.errorCard}>
+      <Feather name="alert-triangle" size={24} color={theme.colors.destructive} />
+      <Text style={styles.errorTitle}>Could not decrypt message</Text>
+      <Text style={styles.mutedText}>{error}</Text>
+      <Pressable onPress={onRetry} style={styles.retryButton}>
+        <Text style={styles.retryButtonText}>Retry</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function SignatureBadge({
+  theme,
+  styles,
+  state,
+}: {
+  theme: ThemeTokens;
+  styles: ReturnType<typeof createStyles>;
+  state: MailDecryptResult["signatureVerificationState"];
+}) {
+  if (state === "not_signed") return null;
+
+  const icon =
+    state === "verified" ? "check-circle" : state === "failed" ? "x-circle" : "help-circle";
+  const color =
+    state === "verified"
+      ? ((theme.colors as unknown as Record<string, string>)["success"] ?? theme.colors.primaryBase)
+      : state === "failed"
+        ? theme.colors.destructive
+        : theme.colors.mutedForeground;
+  const label =
+    state === "verified"
+      ? "Signature verified"
+      : state === "failed"
+        ? "Signature verification failed"
+        : "Unverified signature";
+
+  return (
+    <View style={styles.signatureBadge}>
+      <Feather name={icon as any} size={14} color={color} />
+      <Text style={[styles.signatureBadgeText, { color }]}>{label}</Text>
+    </View>
   );
 }
 
@@ -254,20 +337,34 @@ function createStyles(theme: ThemeTokens) {
       height: 1,
       backgroundColor: theme.colors.border,
     },
-    encryptedCard: {
+    signatureBadge: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["1"],
+    },
+    errorCard: {
       alignItems: "center" as const,
       gap: theme.spacing["3"],
       padding: theme.spacing["4"],
       borderRadius: theme.borderRadius.lg,
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: theme.colors.destructive,
       backgroundColor: theme.colors.card,
     },
-    primaryButton: {
+    retryButton: {
       paddingHorizontal: theme.spacing["4"],
       paddingVertical: theme.spacing["2"],
       borderRadius: theme.borderRadius.md,
       backgroundColor: theme.colors.primaryBase,
+    },
+    unsupportedCard: {
+      alignItems: "center" as const,
+      gap: theme.spacing["2"],
+      padding: theme.spacing["4"],
+      borderRadius: theme.borderRadius.lg,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.card,
     },
   } satisfies Record<string, ViewStyle>;
 
@@ -315,17 +412,21 @@ function createStyles(theme: ThemeTokens) {
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.mutedForeground,
     },
-    encryptedTitle: {
+    errorTitle: {
       fontSize: theme.typography.fontSize.base.size,
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
+      color: theme.colors.destructive,
     },
-    primaryButtonText: {
+    retryButtonText: {
       fontSize: theme.typography.fontSize.sm.size,
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryForeground,
+    },
+    signatureBadgeText: {
+      fontSize: theme.typography.fontSize.xs.size,
+      color: theme.colors.mutedForeground,
     },
   } satisfies Record<string, TextStyle>;
 
