@@ -23,4 +23,12 @@ export const SECURE_STORE_KEYS = {
   E2EE_PRIVATE_KEY: "E2EE_PRIVATE_KEY",
   PUSH_TOKEN: "PUSH_TOKEN",
   THEME_PREFERENCE: "THEME_PREFERENCE",
+  /** Login password persisted for mail vault decryption. Cleared on sign-out. */
+  MAIL_VAULT_PASSWORD: "MAIL_VAULT_PASSWORD",
+  /**
+   * Pre-computed argon2id vault decryption key (32 bytes, base64url).
+   * Provided by the backend to avoid running argon2id on the JS main thread.
+   * Cleared on sign-out.
+   */
+  MAIL_VAULT_DERIVED_KEY: "MAIL_VAULT_DERIVED_KEY",
 } as const;

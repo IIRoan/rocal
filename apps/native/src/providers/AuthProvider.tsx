@@ -23,6 +23,12 @@ import {
   signInWithBrowserPasskey,
 } from "../lib/passkey-browser-bridge";
 import { waitForSessionCookie } from "../lib/session-cookie";
+import {
+  saveMailVaultPassword,
+  clearMailVaultPassword,
+  clearDerivedVaultKey,
+} from "../lib/mail/mail-password-cache";
+import { clearVaultCache } from "../lib/mail/mail-crypto";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -240,6 +246,9 @@ export function AuthProvider({
       }
 
       setEmailPasswordAuthHints(password);
+      // Persist password to SecureStore so the mail vault can be unlocked
+      // even after an app restart (in-memory ref is lost on restart).
+      await saveMailVaultPassword(password);
 
       try {
         await finalizeAuthenticatedSession(result.data, "Sign-in");
@@ -274,6 +283,8 @@ export function AuthProvider({
       }
 
       setEmailPasswordAuthHints(password);
+      // Persist password to SecureStore (mirrors signIn behaviour above).
+      await saveMailVaultPassword(password);
 
       try {
         await finalizeAuthenticatedSession(result.data, "Sign-up");
@@ -296,6 +307,10 @@ export function AuthProvider({
     } catch {
       // Best-effort — clear local state regardless.
     }
+    // Clear the persisted mail vault password, derived key, and in-memory vault cache.
+    await clearMailVaultPassword();
+    await clearDerivedVaultKey();
+    clearVaultCache();
     clearSession();
   }, [clearSession]);
 
