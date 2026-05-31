@@ -7,6 +7,7 @@
  * (PGP end-to-end encrypted).
  */
 import type {
+  JmapBodyStructure,
   JmapBodyValue,
   JmapEmailMessage,
   MessageEncryptionState,
@@ -66,6 +67,21 @@ export function extractMessageBodies(message: JmapEmailMessage): {
     text: firstValue,
     html: null,
   };
+}
+
+/**
+ * Extracts the blobId of the PGP/MIME ciphertext part.
+ *
+ * RFC 3156 structure:
+ *   multipart/encrypted
+ *     └─ subParts[0]: application/pgp-encrypted  (version notice)
+ *     └─ subParts[1]: application/octet-stream   (armored ciphertext)
+ */
+export function extractPgpMimeCiphertextBlobId(
+  bodyStructure: JmapBodyStructure | undefined,
+): string | null {
+  if (bodyStructure?.type?.toLowerCase() !== "multipart/encrypted") return null;
+  return bodyStructure.subParts?.[1]?.blobId ?? null;
 }
 
 export function classifyMessageEncryption(
