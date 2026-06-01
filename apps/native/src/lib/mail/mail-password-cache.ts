@@ -128,3 +128,115 @@ export async function clearDerivedVaultKey(): Promise<void> {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Decrypted PGP private key cache (chunked — SecureStore limit is ~2 KB/item)
+// ---------------------------------------------------------------------------
+
+const PGP_KEY_CHUNK_SIZE = 1800;
+
+/**
+ * Caches the unprotected (passphrase-free) armored PGP private key.
+ *
+ * The key is stored in 1 800-char chunks so no single item exceeds SecureStore's
+ * ~2 KB limit. On the next app session, the cached key is used directly —
+ * skipping the ~14 s S2K derivation that happens when decrypting an
+ * encrypted PGP key on Hermes.
+ *
+ * The key is protected at rest by the iOS Keychain / Android Keystore.
+ */
+export async function saveCachedPrivateKey(armoredKey: string): Promise<void> {
+  if (!armoredKey) return;
+  try {
+    const chunks: string[] = [];
+    for (let i = 0; i < armoredKey.length; i += PGP_KEY_CHUNK_SIZE) {
+      chunks.push(armoredKey.slice(i, i + PGP_KEY_CHUNK_SIZE));
+    }
+    await SecureStore.setItemAsync(
+      SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_COUNT,
+      String(chunks.length),
+    );
+    await Promise.all(
+      chunks.map((chunk, i) =>
+        SecureStore.setItemAsync(`${SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_PART}${i}`, chunk),
+      ),
+    );
+    log.debug(
+      "[mail-password-cache] saveCachedPrivateKey: saved %d chunk(s) to SecureStore",
+      chunks.length,
+    );
+  } catch (err) {
+    log.warn(
+      "[mail-password-cache] saveCachedPrivateKey: failed to persist:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
+/**
+ * Loads the cached unprotected armored PGP private key.
+ * Returns `null` if not cached or if any chunk is missing / corrupted.
+ */
+export async function loadCachedPrivateKey(): Promise<string | null> {
+  try {
+    const countStr = await SecureStore.getItemAsync(
+      SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_COUNT,
+    );
+    if (!countStr) return null;
+    const count = parseInt(countStr, 10);
+    if (isNaN(count) || count <= 0) return null;
+
+    const chunks = await Promise.all(
+      Array.from({ length: count }, (_, i) =>
+        SecureStore.getItemAsync(`${SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_PART}${i}`),
+      ),
+    );
+
+    if (chunks.some((c) => c === null)) {
+      log.warn("[mail-password-cache] loadCachedPrivateKey: incomplete cache, ignoring");
+      return null;
+    }
+
+    log.debug(
+      "[mail-password-cache] loadCachedPrivateKey: loaded %d chunk(s) from SecureStore",
+      count,
+    );
+    return (chunks as string[]).join("");
+  } catch (err) {
+    log.warn(
+      "[mail-password-cache] loadCachedPrivateKey: failed to read:",
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
+  }
+}
+
+/**
+ * Clears the cached PGP private key. Called on sign-out.
+ */
+export async function clearCachedPrivateKey(): Promise<void> {
+  try {
+    const countStr = await SecureStore.getItemAsync(
+      SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_COUNT,
+    );
+    if (countStr) {
+      const count = parseInt(countStr, 10);
+      if (!isNaN(count) && count > 0) {
+        await Promise.all(
+          Array.from({ length: count }, (_, i) =>
+            SecureStore.deleteItemAsync(
+              `${SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_PART}${i}`,
+            ).catch(() => {}),
+          ),
+        );
+      }
+      await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_COUNT);
+    }
+    log.debug("[mail-password-cache] clearCachedPrivateKey: cleared");
+  } catch (err) {
+    log.warn(
+      "[mail-password-cache] clearCachedPrivateKey: failed:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}

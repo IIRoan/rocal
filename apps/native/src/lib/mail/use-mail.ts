@@ -9,7 +9,8 @@ import {
 } from "@tanstack/react-query";
 import { useAuth } from "../../providers/AuthProvider";
 import { QUERY_KEYS } from "../query-keys";
-import { getMailAccountStatus } from "./mail-api";
+import { getMailAccountStatus, getMailConfig } from "./mail-api";
+import { bootstrapMailboxForAccount } from "./account-bootstrap";
 import { buildMailRuntime, type MailRuntime } from "./mail-runtime";
 import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
 import type { JmapEmailMessage } from "./types";
@@ -28,6 +29,17 @@ export function useMailAccount() {
   });
 }
 
+export function useMailConfig() {
+  const { isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: QUERY_KEYS.mailConfig(),
+    queryFn: getMailConfig,
+    enabled: isAuthenticated,
+    staleTime: 5 * 60_000,
+    retry: 1,
+  });
+}
+
 export function useMailRuntime(enabled: boolean) {
   return useQuery<MailRuntime>({
     queryKey: QUERY_KEYS.mailRuntime(),
@@ -35,6 +47,35 @@ export function useMailRuntime(enabled: boolean) {
     enabled,
     staleTime: RUNTIME_STALE_MS,
     retry: 1,
+  });
+}
+
+export function useProvisionMailbox() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!user?.id || !user.email) {
+        throw new Error("Sign in before creating a mailbox.");
+      }
+
+      return bootstrapMailboxForAccount({
+        userId: user.id,
+        email: user.email,
+        displayName: user.name ?? null,
+      });
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.mailAccount(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.mailRuntime(),
+        }),
+      ]);
+    },
   });
 }
 
