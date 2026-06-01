@@ -36,8 +36,8 @@ export type MailRuntime = {
 };
 
 /**
- * Builds an authenticated JMAP runtime for the signed-in user. Requires that
- * the user has already provisioned a mailbox on the web client.
+ * Builds an authenticated JMAP runtime for the signed-in user after mailbox
+ * provisioning has completed on either native or web.
  */
 export async function buildMailRuntime(): Promise<MailRuntime> {
   const config = await getMailConfig();

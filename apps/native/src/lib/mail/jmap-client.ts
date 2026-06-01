@@ -694,6 +694,25 @@ export class StalwartJmapClient {
     );
   }
 
+  async getBlobDownloadInfo(
+    session: JmapSession,
+    blobId: string,
+    name: string,
+    type: string,
+  ): Promise<{ url: string; authHeader: string }> {
+    const accountId = this.requirePrimaryAccountId(session);
+    if (!session.downloadUrl) {
+      throw new Error("No download URL in JMAP session.");
+    }
+    const url = session.downloadUrl
+      .replace("{accountId}", encodeURIComponent(accountId))
+      .replace("{blobId}", encodeURIComponent(blobId))
+      .replace("{name}", encodeURIComponent(name))
+      .replace("{type}", encodeURIComponent(type));
+    const authHeader = await this.getAuthorizationHeader();
+    return { url, authHeader };
+  }
+
   async getBlobAsText(session: JmapSession, blobId: string): Promise<string> {
     const accountId = this.requirePrimaryAccountId(session);
     if (!session.downloadUrl) {

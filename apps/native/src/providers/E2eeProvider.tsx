@@ -40,6 +40,7 @@ import type {
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
 import { SECURE_STORE_KEYS } from "../lib/constants";
+import { getE2eeApiUrl } from "../lib/e2ee-api-url";
 import { getAuthHeaders } from "../lib/api";
 import { readChunkedSecureValue, writeChunkedSecureValue } from "../lib/secure-store-chunked";
 import { createLogger } from "@workspace/logger";
@@ -111,6 +112,42 @@ export function E2eeProvider({
     setIsGateSubmitting(false);
   }, []);
 
+  const signOutForManualE2eeRecovery = useCallback(
+    async ({
+      userId,
+      apiBaseUrl,
+      reason,
+      error,
+    }: {
+      userId: string;
+      apiBaseUrl: string;
+      reason: string;
+      error?: unknown;
+    }) => {
+      log.warn(
+        "Native E2EE requires manual recovery; signing out instead of showing a password gate",
+        {
+          userId,
+          apiBaseUrl,
+          reason,
+          error,
+        },
+      );
+      sessionRef.current = null;
+      resetGate();
+      setIsEnabled(false);
+      try {
+        await signOut();
+      } catch (signOutError) {
+        log.warn("Failed to sign out after native E2EE recovery requirement", {
+          userId,
+          signOutError,
+        });
+      }
+    },
+    [resetGate, signOut],
+  );
+
   const getModule = useCallback(async (): Promise<E2eeModule | null> => {
     if (moduleRef.current) {
       return moduleRef.current;
@@ -161,7 +198,7 @@ export function E2eeProvider({
         keyPair.privateKey,
       );
 
-      const deviceResponse = await fetch(`${apiBaseUrl}/e2ee/device`, {
+      const deviceResponse = await fetch(getE2eeApiUrl(apiBaseUrl, "/device"), {
         method: "PUT",
         credentials: "omit",
         headers: {
@@ -226,7 +263,7 @@ export function E2eeProvider({
         password,
       );
 
-      const response = await fetch(`${apiBaseUrl}/e2ee/password`, {
+      const response = await fetch(getE2eeApiUrl(apiBaseUrl, "/password"), {
         method: "PUT",
         credentials: "omit",
         headers: {
@@ -275,13 +312,20 @@ export function E2eeProvider({
           return;
         }
 
-        const response = await fetch(`${apiBaseUrl}/e2ee/bootstrap`, {
+        const bootstrapUrl = getE2eeApiUrl(apiBaseUrl, "/bootstrap");
+        const response = await fetch(bootstrapUrl, {
           credentials: "omit",
           headers: getAuthHeaders(),
         });
 
         if (!response.ok) {
-          log.warn("E2EE bootstrap endpoint returned", response.status);
+          log.warn(
+            "E2EE bootstrap endpoint returned a non-OK response",
+            {
+              status: response.status,
+              url: bootstrapUrl,
+            },
+          );
           if (isCurrentBootstrap()) {
             setIsReady(true);
           }
@@ -401,12 +445,13 @@ export function E2eeProvider({
             return;
           }
 
-          setGateState({
-            mode: "unlock",
+          await signOutForManualE2eeRecovery({
             userId,
             apiBaseUrl,
-            authMethod,
-            passwordEnvelope: bootstrapData.passwordEnvelope,
+            reason:
+              authMethod === "email-password"
+                ? "pending-auth-password-did-not-unlock-envelope"
+                : "password-envelope-present-without-usable-auth-password",
           });
           return;
         }
@@ -416,12 +461,10 @@ export function E2eeProvider({
             return;
           }
 
-          setGateState({
-            mode: "legacy",
+          await signOutForManualE2eeRecovery({
             userId,
             apiBaseUrl,
-            authMethod,
-            passwordEnvelope: null,
+            reason: "legacy-device-recovery-required",
           });
           return;
         }
@@ -459,12 +502,13 @@ export function E2eeProvider({
           }
         }
 
-        setGateState({
-          mode: "setup",
+        await signOutForManualE2eeRecovery({
           userId,
           apiBaseUrl,
-          authMethod,
-          passwordEnvelope: null,
+          reason:
+            authMethod === "email-password"
+              ? "password-envelope-auto-store-failed"
+              : "encryption-password-setup-required",
         });
       } catch (error) {
         if (isCurrentBootstrap()) {
@@ -483,6 +527,7 @@ export function E2eeProvider({
       lastAuthMethod,
       registerDeviceForSession,
       resetGate,
+      signOutForManualE2eeRecovery,
       storePasswordEnvelopeForActiveSession,
     ],
   );

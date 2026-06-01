@@ -18,7 +18,7 @@ import {
 import * as Linking from "expo-linking";
 import { API_BASE_URL, APP_SCHEME } from "./constants";
 import { getSessionCookie } from "./session-cookie";
-import { triggerSessionClear } from "../providers/AuthProvider";
+import { triggerSessionClear } from "./session-clear";
 
 export function getNativeExpoOrigin() {
   return Linking.createURL("", { scheme: APP_SCHEME });

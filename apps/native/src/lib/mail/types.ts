@@ -9,6 +9,7 @@ import type {
   MailAccountStatus as SharedMailAccountStatus,
   MailDemoConfig as SharedMailDemoConfig,
   MailOAuthConfig as SharedMailOAuthConfig,
+  MailSignup as SharedMailSignup,
   MailVaultKdfParams as SharedMailVaultKdfParams,
   MessageEncryptionState as SharedMessageEncryptionState,
 } from "@workspace/calendar-core";
@@ -17,6 +18,18 @@ export type MailVaultKdfParams = SharedMailVaultKdfParams;
 export type MailOAuthConfig = SharedMailOAuthConfig;
 export type MailDemoConfig = SharedMailDemoConfig;
 export type MailAccountStatus = SharedMailAccountStatus;
+export type MailSignupResponse = SharedMailSignup;
+
+export type MailBootstrapRequest = {
+  publicKeyArmored: string;
+  fingerprint: string;
+  algorithm: string;
+  createdAt: string;
+  vaultVersion: number;
+  encryptedVaultB64: string;
+  kdf: string;
+  kdfParams: MailVaultKdfParams;
+};
 
 export type MailAddress = {
   email: string;

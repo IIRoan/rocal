@@ -5,8 +5,10 @@
  *
  *   1. Fetch the encrypted vault backup from the backend.
  *   2. Fetch server-side key material from `vaultKeyMaterialEndpoint`.
- *   3. Try key-material first, fall back to the user's login password.
- *   4. Unlock the vault using pure-JS argon2id (no WASM — see native-vault-crypto.ts).
+ *   3. Try server key-material first, then fall back to saved passwords when
+ *      the vault KDF is safe enough to run on Hermes.
+ *   4. Migrate older password-based vaults to server key-material in the
+ *      background when native unlock succeeds.
  *   5. Decrypt PGP-encrypted mail messages in-process using openpgp.js.
  *   6. For PGP/MIME messages, parse the decrypted MIME body with postal-mime.
  *
@@ -16,17 +18,36 @@
  * Debug log prefix: [mail-crypto]
  */
 import * as openpgp from "openpgp";
-import PostalMime from "postal-mime";
 import { createLogger } from "@workspace/logger";
-import { mailFetch } from "./mail-api";
+import { mailFetch, upsertAccountVaultBackup } from "./mail-api";
 import { API_BASE_URL } from "../constants";
-import { unlockEncryptedMailVaultWithDerivedKey, type UserKeyVault } from "./native-vault-crypto";
-import { loadDerivedVaultKey, saveDerivedVaultKey } from "./mail-password-cache";
+import {
+  createEncryptedMailVault,
+  unlockEncryptedMailVault,
+  unlockEncryptedMailVaultWithDerivedKey,
+  type UserKeyVault,
+} from "./native-vault-crypto";
+import {
+  loadMailVaultPassword,
+  loadDerivedVaultKey,
+  saveDerivedVaultKey,
+  loadCachedPrivateKey,
+  saveCachedPrivateKey,
+} from "./mail-password-cache";
 import { extractPgpMimeCiphertextBlobId } from "./message-security";
+import { parseMimeBody } from "./mail-mime-parser";
 import type { JmapBodyStructure, MailVaultKdfParams } from "./types";
 import type { MailRuntime } from "./mail-runtime";
 
 const log = createLogger("mail-crypto");
+const KEY_MATERIAL_KDF: Partial<MailVaultKdfParams> = {
+  memoryKiB: 8192,
+  iterations: 1,
+  parallelism: 1,
+};
+const MAX_SAFE_NATIVE_ARGON2_MEMORY_KIB = 8192;
+const MAX_SAFE_NATIVE_ARGON2_ITERATIONS = 1;
+const MAX_SAFE_NATIVE_ARGON2_PARALLELISM = 1;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -137,6 +158,66 @@ async function fetchKeyMaterial(endpoint: string): Promise<KeyMaterialResult> {
   };
 }
 
+function canAttemptLocalVaultUnlock(kdfParams: MailVaultKdfParams): boolean {
+  return (
+    kdfParams.memoryKiB <= MAX_SAFE_NATIVE_ARGON2_MEMORY_KIB &&
+    kdfParams.iterations <= MAX_SAFE_NATIVE_ARGON2_ITERATIONS &&
+    kdfParams.parallelism <= MAX_SAFE_NATIVE_ARGON2_PARALLELISM
+  );
+}
+
+function getPassphraseCandidates(input: {
+  keyMaterial?: string | null;
+  fallbackPassword?: string | null;
+  storedPassword?: string | null;
+}): string[] {
+  return Array.from(
+    new Set(
+      [input.keyMaterial, input.fallbackPassword, input.storedPassword].filter(
+        (value): value is string => Boolean(value),
+      ),
+    ),
+  );
+}
+
+async function migrateVaultToKeyMaterial(input: {
+  unlockedVault: UserKeyVault;
+  oldPassphrase: string;
+  newPassphrase: string;
+  vaultVersion: number;
+}): Promise<void> {
+  try {
+    const decryptedPrivateKey = await openpgp.decryptKey({
+      privateKey: await openpgp.readPrivateKey({
+        armoredKey: input.unlockedVault.encryptedPrivateKeyArmored,
+      }),
+      passphrase: input.oldPassphrase,
+    });
+    const reEncrypted = await openpgp.encryptKey({
+      privateKey: decryptedPrivateKey,
+      passphrase: input.newPassphrase,
+    });
+    const migratedVault: UserKeyVault = {
+      ...input.unlockedVault,
+      encryptedPrivateKeyArmored: reEncrypted.armor(),
+    };
+    const encrypted = await createEncryptedMailVault(
+      migratedVault,
+      input.newPassphrase,
+      KEY_MATERIAL_KDF,
+    );
+
+    await upsertAccountVaultBackup({
+      vaultVersion: input.vaultVersion,
+      encryptedVaultB64: encrypted.encryptedVaultB64,
+      kdf: encrypted.kdf,
+      kdfParams: encrypted.kdfParams,
+    });
+  } catch (error) {
+    log.warn("Background vault migration to key material failed", { error });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Vault unlock helpers
 // ---------------------------------------------------------------------------
@@ -146,6 +227,10 @@ async function fetchKeyMaterial(endpoint: string): Promise<KeyMaterialResult> {
  *
  * The private key is itself protected by keyMaterial (the HMAC-derived key
  * from the server — NOT the argon2id derived key used for AES-GCM).
+ *
+ * After a successful S2K decryption the unprotected armored key is written to
+ * SecureStore so subsequent app sessions can bypass the expensive (~14 s on
+ * Hermes) S2K derivation entirely.
  */
 async function decryptVaultPrivateKey(
   vault: UserKeyVault,
@@ -174,12 +259,48 @@ async function decryptVaultPrivateKey(
         `Failed to decrypt PGP private key: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+    // Cache the unprotected key so we skip S2K on the next app session.
+    saveCachedPrivateKey(privateKey.armor()).catch(() => {});
   } else {
     log.debug("[mail-crypto] decryptVaultPrivateKey: private key is already decrypted (no passphrase needed)");
   }
 
   log.debug("[mail-crypto] decryptVaultPrivateKey: private key ready");
   return privateKey;
+}
+
+async function loadCachedPrivateKeyForVault(
+  vault: UserKeyVault,
+): Promise<openpgp.PrivateKey | null> {
+  const cachedArmored = await loadCachedPrivateKey();
+  if (!cachedArmored) {
+    return null;
+  }
+
+  try {
+    const candidate = await openpgp.readPrivateKey({ armoredKey: cachedArmored });
+    if (
+      candidate.isDecrypted() &&
+      candidate.getFingerprint().toUpperCase() ===
+        vault.publicKeyFingerprint.toUpperCase()
+    ) {
+      log.debug(
+        "[mail-crypto] loadCachedPrivateKeyForVault: using cached decrypted private key",
+      );
+      return candidate;
+    }
+
+    log.debug(
+      "[mail-crypto] loadCachedPrivateKeyForVault: cached key fingerprint mismatch or not decrypted",
+    );
+    return null;
+  } catch (error) {
+    log.warn(
+      "[mail-crypto] loadCachedPrivateKeyForVault: cached key unreadable: %s",
+      error instanceof Error ? error.message : String(error),
+    );
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -231,9 +352,11 @@ async function doLoadVault(
   runtime: MailRuntime,
   fallbackPassword?: string | null,
 ): Promise<UnlockedVault> {
-  log.debug("[mail-crypto] doLoadVault: starting vault load, backendBaseUrl=%s", API_BASE_URL);
+  log.debug(
+    "[mail-crypto] doLoadVault: starting vault load, backendBaseUrl=%s",
+    API_BASE_URL,
+  );
 
-  // Step 1: Fetch vault backup from backend
   log.debug("[mail-crypto] doLoadVault: step 1 — fetching vault backup");
   let backup: VaultBackupRecord;
   try {
@@ -245,27 +368,33 @@ async function doLoadVault(
   }
 
   if (backup.kdf !== "argon2id") {
-    log.warn("[mail-crypto] doLoadVault: unexpected KDF: %s (expected argon2id)", backup.kdf);
+    log.warn(
+      "[mail-crypto] doLoadVault: unexpected KDF: %s (expected argon2id)",
+      backup.kdf,
+    );
   }
 
-  log.debug("[mail-crypto] doLoadVault: kdfParams memoryKiB=%d iterations=%d parallelism=%d",
-    backup.kdfParams.memoryKiB, backup.kdfParams.iterations, backup.kdfParams.parallelism);
+  log.debug(
+    "[mail-crypto] doLoadVault: kdfParams memoryKiB=%d iterations=%d parallelism=%d",
+    backup.kdfParams.memoryKiB,
+    backup.kdfParams.iterations,
+    backup.kdfParams.parallelism,
+  );
 
-  // Step 2: Always fetch key material from server.
-  //   - `keyMaterial` is used as the OpenPGP private key passphrase (always needed).
-  //   - `derivedKeyB64` (if present) is the argon2id output pre-computed server-side
-  //     so Hermes never has to run argon2id locally.
   log.debug("[mail-crypto] doLoadVault: step 2 — fetching key material from server");
   const keyMaterialEndpoint = runtime.config.vaultKeyMaterialEndpoint;
   let keyMaterial: string | null = null;
   let derivedKeyB64: string | null = null;
 
   if (keyMaterialEndpoint) {
-    log.debug("[mail-crypto] doLoadVault: fetching key material from %s", keyMaterialEndpoint);
+    log.debug(
+      "[mail-crypto] doLoadVault: fetching key material from %s",
+      keyMaterialEndpoint,
+    );
     try {
       const result = await fetchKeyMaterial(keyMaterialEndpoint);
       keyMaterial = result.keyMaterial;
-      derivedKeyB64 = result.derivedKeyB64;
+      derivedKeyB64 = result.derivedKeyB64 ?? null;
       log.debug(
         "[mail-crypto] doLoadVault: key material received (length=%d hasDerivedKey=%s)",
         keyMaterial?.length ?? 0,
@@ -278,22 +407,18 @@ async function doLoadVault(
       );
     }
   } else {
-    log.debug("[mail-crypto] doLoadVault: no vaultKeyMaterialEndpoint configured, skipping key-material");
+    log.debug(
+      "[mail-crypto] doLoadVault: no vaultKeyMaterialEndpoint configured, skipping key-material",
+    );
   }
 
-  // Step 3a: Fast path — derived key from server or SecureStore cache.
-  //
-  // `derivedKeyB64` is the argon2id(keyMaterial, salt, kdfParams) output,
-  // computed by the backend with WASM. We use it as the AES-GCM key to decrypt
-  // the vault envelope, but we ALWAYS use `keyMaterial` as the OpenPGP private
-  // key passphrase (the PGP key was sealed with keyMaterial, not the derived key).
-  log.debug("[mail-crypto] doLoadVault: step 3 — trying derived-key fast path (no argon2id)");
-
-  // If the server didn't return a derived key, check the SecureStore cache.
+  log.debug("[mail-crypto] doLoadVault: step 3 — trying derived-key fast path");
   if (!derivedKeyB64) {
     const cachedDerivedKey = await loadDerivedVaultKey();
     if (cachedDerivedKey) {
-      log.debug("[mail-crypto] doLoadVault: no server derived key — using SecureStore cached key");
+      log.debug(
+        "[mail-crypto] doLoadVault: no server derived key — using SecureStore cached key",
+      );
       derivedKeyB64 = cachedDerivedKey;
     } else {
       log.debug("[mail-crypto] doLoadVault: no derived key in SecureStore either");
@@ -308,7 +433,9 @@ async function doLoadVault(
         backup.encryptedVaultB64,
         derivedKeyB64,
       );
-      log.debug("[mail-crypto] doLoadVault: derived key vault decrypt SUCCEEDED — saving to cache");
+      log.debug(
+        "[mail-crypto] doLoadVault: derived key vault decrypt SUCCEEDED — saving to cache",
+      );
       await saveDerivedVaultKey(derivedKeyB64);
     } catch (err) {
       log.warn(
@@ -318,40 +445,95 @@ async function doLoadVault(
     }
 
     if (unlockedVault) {
-      // keyMaterial is the passphrase for the PGP private key inside the vault.
-      // It MUST be available — if the key-material endpoint was unreachable,
-      // we cannot finish decryption even though the vault itself was unlocked.
+      const cachedPrivateKey =
+        await loadCachedPrivateKeyForVault(unlockedVault);
+      if (cachedPrivateKey) {
+        log.debug(
+          "[mail-crypto] doLoadVault: SUCCESS via derived-key fast path with cached private key",
+        );
+        return {
+          vault: unlockedVault,
+          passphrase: keyMaterial ?? "",
+          privateKey: cachedPrivateKey,
+        };
+      }
+
       if (!keyMaterial) {
         throw new Error(
-          "keyMaterial unavailable — vault was decrypted but PGP private key passphrase could not be fetched. " +
-          "Check your network connection and try again.",
+          "keyMaterial unavailable — vault was decrypted but the PGP private-key passphrase could not be fetched. Check your network connection and try again.",
         );
       }
 
-      log.debug("[mail-crypto] doLoadVault: decrypting PGP private key with keyMaterial");
       const privateKey = await decryptVaultPrivateKey(unlockedVault, keyMaterial);
+
       log.debug("[mail-crypto] doLoadVault: SUCCESS via derived-key fast path");
       return { vault: unlockedVault, passphrase: keyMaterial, privateKey };
     }
-    // Vault decrypt failed — fall through to the abort below
   }
 
-  // Step 3b: Argon2id fallback — only reached if:
-  //  (a) backend did not return derivedKeyB64, AND
-  //  (b) no cached derived key in SecureStore
-  //
-  // WARNING: argon2id is synchronous and WILL block the Hermes JS thread.
-  // With memoryKiB=65536, this causes the engine to crash (OOM), which
-  // restarts the component and loops forever. We ABORT instead of running it
-  // to prevent the crash loop, and show a clear error to the user.
-  log.error(
-    "[mail-crypto] doLoadVault: ABORTING — no derived key available and argon2id would crash Hermes " +
-    "(memoryKiB=%d). Backend must return derivedKeyB64. Check backend logs.",
-    backup.kdfParams.memoryKiB,
+  const storedPassword = await loadMailVaultPassword();
+  const passphraseCandidates = getPassphraseCandidates({
+    keyMaterial,
+    fallbackPassword,
+    storedPassword,
+  });
+
+  if (passphraseCandidates.length === 0) {
+    throw new Error(
+      "Mail vault could not be unlocked because no server key material or saved sign-in password is available on this device.",
+    );
+  }
+
+  if (!canAttemptLocalVaultUnlock(backup.kdfParams)) {
+    log.error(
+      "[mail-crypto] doLoadVault: ABORTING — local argon2id migration is too expensive for Hermes (memoryKiB=%d iterations=%d parallelism=%d)",
+      backup.kdfParams.memoryKiB,
+      backup.kdfParams.iterations,
+      backup.kdfParams.parallelism,
+    );
+    throw new Error(
+      "Mail vault could not be unlocked on this device because it still needs a high-cost password migration. Open secure web mail once to migrate the vault, then try again here.",
+    );
+  }
+
+  log.debug(
+    "[mail-crypto] doLoadVault: step 3b — trying local passphrase candidates",
   );
+
+  for (const passphrase of passphraseCandidates) {
+    try {
+      const unlockedVault = await unlockEncryptedMailVault(
+        backup.encryptedVaultB64,
+        passphrase,
+        backup.kdfParams,
+      );
+      const privateKey =
+        (await loadCachedPrivateKeyForVault(unlockedVault)) ??
+        (await decryptVaultPrivateKey(unlockedVault, passphrase));
+
+      if (keyMaterial && passphrase !== keyMaterial) {
+        void migrateVaultToKeyMaterial({
+          unlockedVault,
+          oldPassphrase: passphrase,
+          newPassphrase: keyMaterial,
+          vaultVersion: backup.vaultVersion,
+        });
+      }
+
+      log.debug(
+        "[mail-crypto] doLoadVault: SUCCESS via local passphrase candidate",
+      );
+      return { vault: unlockedVault, passphrase, privateKey };
+    } catch (err) {
+      log.warn(
+        "[mail-crypto] doLoadVault: local passphrase candidate failed: %s",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
   throw new Error(
-    "Mail vault could not be unlocked: the backend did not provide a pre-computed decryption key. " +
-    "This may be a temporary server issue — please try again in a moment, or sign out and sign back in.",
+    "Mail vault could not be unlocked with the available server key material or saved passwords. Sign out and sign back in with your email password once, or open secure web mail to finish migration.",
   );
 }
 
@@ -435,7 +617,7 @@ export async function decryptPgpMimeMessage(
   // Steps 3–4: decrypt PGP + check signatures (shared with inline path)
   const pgpResult = await decryptArmoredMessage(runtime, messageId, armoredMessage, senderPublicKeyArmored);
 
-  // Step 5: parse decrypted MIME body with postal-mime
+  // Step 5: parse decrypted MIME body with the native MIME parser
   log.debug(
     "[mail-crypto] decryptPgpMimeMessage: parsing MIME body length=%d id=%s",
     pgpResult.plaintext.length,
@@ -444,9 +626,9 @@ export async function decryptPgpMimeMessage(
   let parsedText: string | null = null;
   let parsedHtml: string | null = null;
   try {
-    const parsed = await PostalMime.parse(pgpResult.plaintext);
-    parsedText = parsed.text ?? null;
-    parsedHtml = parsed.html ?? null;
+    const parsed = parseMimeBody(pgpResult.plaintext);
+    parsedText = parsed.text;
+    parsedHtml = parsed.html;
     log.debug(
       "[mail-crypto] decryptPgpMimeMessage: MIME parsed text=%s html=%s id=%s",
       parsedText != null ? `${parsedText.length}b` : "null",

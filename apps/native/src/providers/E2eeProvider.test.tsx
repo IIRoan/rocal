@@ -401,7 +401,7 @@ describe("E2eeProvider", () => {
       }),
     );
     mockFetch.mockImplementation(async (url: string) => {
-      if (url.endsWith("/e2ee/bootstrap")) {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
         return jsonResponse(
           createBootstrapResponse({
             passwordEnvelope: createPasswordRecord(),
@@ -409,7 +409,7 @@ describe("E2eeProvider", () => {
         );
       }
 
-      if (url.endsWith("/e2ee/device")) {
+      if (url.endsWith("/api/e2ee/device")) {
         return jsonResponse({});
       }
 
@@ -429,7 +429,7 @@ describe("E2eeProvider", () => {
       }),
     );
     expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.solace.test/e2ee/device",
+      "https://api.solace.test/api/e2ee/device",
       expect.objectContaining({
         method: "PUT",
       }),
@@ -453,7 +453,7 @@ describe("E2eeProvider", () => {
       new Error("wrong password"),
     );
     mockFetch.mockImplementation(async (url: string) => {
-      if (url.endsWith("/e2ee/bootstrap")) {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
         return jsonResponse(
           createBootstrapResponse({
             passwordEnvelope: createPasswordRecord(),
@@ -488,11 +488,14 @@ describe("E2eeProvider", () => {
       }),
     );
     mockFetch.mockImplementation(async (url: string) => {
-      if (url.endsWith("/e2ee/bootstrap")) {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
         return jsonResponse(createBootstrapResponse());
       }
 
-      if (url.endsWith("/e2ee/device") || url.endsWith("/e2ee/password")) {
+      if (
+        url.endsWith("/api/e2ee/device") ||
+        url.endsWith("/api/e2ee/password")
+      ) {
         return jsonResponse({});
       }
 
@@ -512,7 +515,7 @@ describe("E2eeProvider", () => {
       "secret-password",
     );
     expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.solace.test/e2ee/password",
+      "https://api.solace.test/api/e2ee/password",
       expect.objectContaining({
         method: "PUT",
       }),
@@ -532,11 +535,14 @@ describe("E2eeProvider", () => {
       }),
     );
     mockFetch.mockImplementation(async (url: string) => {
-      if (url.endsWith("/e2ee/bootstrap")) {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
         return jsonResponse(createBootstrapResponse());
       }
 
-      if (url.endsWith("/e2ee/device") || url.endsWith("/e2ee/password")) {
+      if (
+        url.endsWith("/api/e2ee/device") ||
+        url.endsWith("/api/e2ee/password")
+      ) {
         return jsonResponse({});
       }
 
@@ -561,7 +567,7 @@ describe("E2eeProvider", () => {
       "fresh-encryption-password",
     );
     expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.solace.test/e2ee/password",
+      "https://api.solace.test/api/e2ee/password",
       expect.objectContaining({
         method: "PUT",
       }),
@@ -578,11 +584,11 @@ describe("E2eeProvider", () => {
       }),
     );
     mockFetch.mockImplementation(async (url: string) => {
-      if (url.endsWith("/e2ee/bootstrap")) {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
         return jsonResponse(createBootstrapResponse());
       }
 
-      if (url.endsWith("/e2ee/device")) {
+      if (url.endsWith("/api/e2ee/device")) {
         return jsonResponse({});
       }
 
@@ -616,7 +622,7 @@ describe("E2eeProvider", () => {
       new Error("wrong password"),
     );
     mockFetch.mockImplementation(async (url: string) => {
-      if (url.endsWith("/e2ee/bootstrap")) {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
         return jsonResponse(
           createBootstrapResponse({
             passwordEnvelope: createPasswordRecord(),

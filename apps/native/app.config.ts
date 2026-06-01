@@ -6,7 +6,7 @@ const baseConfig: ExpoConfig = {
   version: "1.0.0",
   orientation: "portrait",
   scheme: "solace",
-  newArchEnabled: false,
+  newArchEnabled: true,
   userInterfaceStyle: "automatic",
   runtimeVersion: {
     policy: "appVersion",

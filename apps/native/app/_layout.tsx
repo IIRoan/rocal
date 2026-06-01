@@ -1,6 +1,7 @@
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useEffect } from "react";
 import { Slot, useRouter, useSegments } from "expo-router";
+import "../src/lib/install-native-crypto";
 import { QueryProvider } from "../src/providers/QueryProvider";
 import { AuthProvider, useAuth } from "../src/providers/AuthProvider";
 import { ThemeProvider } from "../src/providers/ThemeProvider";
