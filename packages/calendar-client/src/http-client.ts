@@ -285,13 +285,6 @@ export class HttpClient {
           typeof value === "string"
         ) {
           const dateValue = new Date(value);
-          if (key === "start" || key === "end") {
-            log.debug(`HTTP Client - Transforming ${key}:`, {
-              original: value,
-              transformed: dateValue.toString(),
-              iso: dateValue.toISOString(),
-            });
-          }
           transformed[key] = dateValue;
         } else {
           transformed[key] = this.transformDates(value);

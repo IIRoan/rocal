@@ -1,10 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useColorScheme,
   View,
   type TextStyle,
   type ViewStyle,
@@ -13,6 +15,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
+type SharingModule = typeof import("expo-sharing");
+let Sharing: SharingModule | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  Sharing = require("expo-sharing") as SharingModule;
+} catch {
+  Sharing = null;
+}
 import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../../src/providers/ThemeProvider";
@@ -34,10 +45,18 @@ import {
   decryptPgpMimeMessage,
   type MailDecryptResult,
 } from "../../../../src/lib/mail/mail-crypto";
-import type { JmapEmailMessage } from "../../../../src/lib/mail/types";
+import { HtmlEmailView } from "../../../../src/components/mail/HtmlEmailView";
+import { AttachmentPreviewModal } from "../../../../src/components/mail/AttachmentPreviewModal";
+import {
+  resolveAttachmentPreviewKind,
+  type MailAttachmentPreviewKind,
+} from "../../../../src/lib/mail/attachment-preview";
+import type { JmapAttachment, JmapEmailMessage } from "../../../../src/lib/mail/types";
 
 export default function MailMessageScreen() {
   const { theme } = useTheme();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
   const router = useRouter();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -64,7 +83,6 @@ export default function MailMessageScreen() {
   const bodies = message ? extractMessageBodies(message) : null;
   const encryption = message ? classifyMessageEncryption(message) : "plain";
   const isEncrypted = encryption !== "plain";
-  const rawBodyText = bodies?.text ?? bodies?.html ?? null;
 
   const decryptQuery = useQuery<MailDecryptResult>({
     queryKey: QUERY_KEYS.mailDecrypted(messageId),
@@ -74,6 +92,7 @@ export default function MailMessageScreen() {
     gcTime: 5 * 60 * 1000,
     queryFn: async () => {
       if (!runtime || !message) throw new Error("Runtime or message not available");
+      const rawBodyText = bodies?.text ?? bodies?.html ?? null;
       if (encryption === "inline_pgp") {
         if (!rawBodyText) throw new Error("No armored PGP body found in this message");
         return decryptMailMessage(runtime, messageId, rawBodyText);
@@ -85,12 +104,151 @@ export default function MailMessageScreen() {
     },
   });
 
-  // Resolve what body text to show (prefer decrypted result over raw)
-  const decryptedText: string | null = decryptQuery.data?.plaintext ?? null;
-  const displayText: string | null = isEncrypted ? decryptedText : rawBodyText;
-
+  const htmlContent: string | null = decryptQuery.data?.html ?? (isEncrypted ? null : (bodies?.html ?? null));
+  const plainContent: string | null = decryptQuery.data?.plaintext ?? (isEncrypted ? null : (bodies?.text ?? null));
+  const isHtmlEmail = Boolean(htmlContent);
   const isDecrypting = isEncrypted && (decryptQuery.isLoading || decryptQuery.isFetching);
   const decryptError = isEncrypted ? decryptQuery.error : null;
+
+  const [downloadingBlobId, setDownloadingBlobId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{
+    attachment: JmapAttachment;
+    kind: MailAttachmentPreviewKind;
+  } | null>(null);
+
+  const downloadAttachmentToCache = async (
+    attachment: JmapAttachment,
+  ): Promise<string> => {
+    if (!attachment.blobId || !runtime) {
+      throw new Error("Attachment is not available.");
+    }
+    const name = attachment.name ?? "attachment";
+    const type = attachment.type ?? "application/octet-stream";
+    const { url, authHeader } = await runtime.client.getBlobDownloadInfo(
+      runtime.session,
+      attachment.blobId,
+      name,
+      type,
+    );
+    const safeName = name.replace(/[^a-zA-Z0-9._-]/g, "_") || "attachment";
+    const localUri = (FileSystem.cacheDirectory ?? "") + safeName;
+    const { status } = await FileSystem.downloadAsync(localUri, url, {
+      headers: { Authorization: authHeader },
+    });
+    if (status !== 200) throw new Error(`Download failed (${status})`);
+    return localUri;
+  };
+
+  const shareUri = async (uri: string, type: string, name: string) => {
+    if (!Sharing) {
+      Alert.alert(
+        "Sharing not available",
+        "The sharing module is not loaded.",
+      );
+      return;
+    }
+    const canShare = await Sharing.isAvailableAsync();
+    if (!canShare) {
+      Alert.alert(
+        "Sharing not available",
+        "File sharing is not supported on this device.",
+      );
+      return;
+    }
+    await Sharing.shareAsync(uri, { mimeType: type, dialogTitle: name });
+  };
+
+  const handleOpenAttachment = async (attachment: JmapAttachment) => {
+    if (!attachment.blobId || !runtime) return;
+    const kind = resolveAttachmentPreviewKind({
+      name: attachment.name,
+      type: attachment.type,
+    });
+
+    if (kind) {
+      setPreview({ attachment, kind });
+      return;
+    }
+
+    // No inline preview available — download then share/open externally.
+    const name = attachment.name ?? "attachment";
+    const type = attachment.type ?? "application/octet-stream";
+    setDownloadingBlobId(attachment.blobId);
+    try {
+      const localUri = await downloadAttachmentToCache(attachment);
+      await shareUri(localUri, type, name);
+    } catch (err) {
+      Alert.alert(
+        "Download failed",
+        getErrorMessage(err, "Could not download attachment."),
+      );
+    } finally {
+      setDownloadingBlobId(null);
+    }
+  };
+
+  const messageHeader = message ? (
+    <>
+      <Text style={styles.subject}>
+        {message.subject?.trim() || "(no subject)"}
+      </Text>
+
+      <View style={styles.metaBlock}>
+        <MetaRow theme={theme} label="From" value={formatAddressFull(message.from)} />
+        <MetaRow theme={theme} label="To" value={formatAddressFull(message.to)} />
+        {message.cc?.length ? (
+          <MetaRow theme={theme} label="Cc" value={formatAddressFull(message.cc)} />
+        ) : null}
+        <MetaRow
+          theme={theme}
+          label="Date"
+          value={formatMessageDate(message.receivedAt)}
+        />
+      </View>
+
+      {(message.attachments?.length ?? 0) > 0 ? (
+        <View style={styles.attachmentBlock}>
+          {message.attachments!.map((attachment, index) => {
+            const key = attachment.blobId ?? `${attachment.name}-${index}`;
+            const isDownloading = downloadingBlobId === attachment.blobId;
+            const previewKind = resolveAttachmentPreviewKind({
+              name: attachment.name,
+              type: attachment.type,
+            });
+            return (
+              <Pressable
+                key={key}
+                onPress={() => handleOpenAttachment(attachment)}
+                disabled={isDownloading}
+                style={({ pressed }) => [
+                  styles.attachmentChip,
+                  pressed && styles.attachmentChipPressed,
+                ]}
+              >
+                {isDownloading ? (
+                  <ActivityIndicator size={13} color={theme.colors.mutedForeground} />
+                ) : (
+                  <Feather name="paperclip" size={13} color={theme.colors.mutedForeground} />
+                )}
+                <Text style={styles.attachmentName} numberOfLines={1}>
+                  {attachment.name ?? "attachment"}
+                </Text>
+                {!isDownloading && (
+                  <Feather
+                    name={previewKind ? "eye" : "download"}
+                    size={11}
+                    color={theme.colors.mutedForeground}
+                  />
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+
+      <View style={styles.divider} />
+    </>
+  ) : null;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -106,7 +264,6 @@ export default function MailMessageScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {message?.subject?.trim() || "Message"}
         </Text>
-        {/* Spacer to keep header symmetric */}
         <View style={styles.iconButton} />
       </View>
 
@@ -116,11 +273,7 @@ export default function MailMessageScreen() {
         </View>
       ) : messageQuery.isError && !message ? (
         <View style={styles.centered}>
-          <Feather
-            name="alert-triangle"
-            size={36}
-            color={theme.colors.destructive}
-          />
+          <Feather name="alert-triangle" size={36} color={theme.colors.destructive} />
           <Text style={styles.mutedText}>
             {getErrorMessage(messageQuery.error, "Failed to load message")}
           </Text>
@@ -131,44 +284,7 @@ export default function MailMessageScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.body}>
-          <Text style={styles.subject}>
-            {message.subject?.trim() || "(no subject)"}
-          </Text>
-
-          <View style={styles.metaBlock}>
-            <MetaRow theme={theme} label="From" value={formatAddressFull(message.from)} />
-            <MetaRow theme={theme} label="To" value={formatAddressFull(message.to)} />
-            {message.cc?.length ? (
-              <MetaRow theme={theme} label="Cc" value={formatAddressFull(message.cc)} />
-            ) : null}
-            <MetaRow
-              theme={theme}
-              label="Date"
-              value={formatMessageDate(message.receivedAt)}
-            />
-          </View>
-
-          {(message.attachments?.length ?? 0) > 0 ? (
-            <View style={styles.attachmentBlock}>
-              {message.attachments!.map((attachment, index) => (
-                <View
-                  key={attachment.blobId ?? `${attachment.name}-${index}`}
-                  style={styles.attachmentChip}
-                >
-                  <Feather
-                    name="paperclip"
-                    size={13}
-                    color={theme.colors.mutedForeground}
-                  />
-                  <Text style={styles.attachmentName} numberOfLines={1}>
-                    {attachment.name ?? "attachment"}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          <View style={styles.divider} />
+          {messageHeader}
 
           {isDecrypting ? (
             <View style={styles.centered}>
@@ -182,7 +298,7 @@ export default function MailMessageScreen() {
               error={getErrorMessage(decryptError, "Decryption failed")}
               onRetry={() => decryptQuery.refetch()}
             />
-          ) : displayText ? (
+          ) : isHtmlEmail ? (
             <>
               {decryptQuery.data && (
                 <SignatureBadge
@@ -191,12 +307,47 @@ export default function MailMessageScreen() {
                   state={decryptQuery.data.signatureVerificationState}
                 />
               )}
-              <Text style={styles.bodyText}>{displayText}</Text>
+              {/* key={messageId} forces WebView remount when navigating between messages */}
+              <HtmlEmailView
+                key={messageId}
+                html={htmlContent!}
+                isDark={isDark}
+              />
+            </>
+          ) : plainContent ? (
+            <>
+              {decryptQuery.data && (
+                <SignatureBadge
+                  theme={theme}
+                  styles={styles}
+                  state={decryptQuery.data.signatureVerificationState}
+                />
+              )}
+              <Text style={styles.bodyText}>{plainContent}</Text>
             </>
           ) : (
             <Text style={styles.mutedText}>This message has no content.</Text>
           )}
         </ScrollView>
+      )}
+
+      {preview && (
+        <AttachmentPreviewModal
+          visible
+          name={preview.attachment.name ?? "attachment"}
+          kind={preview.kind}
+          theme={theme}
+          isDark={isDark}
+          loadUri={() => downloadAttachmentToCache(preview.attachment)}
+          onClose={() => setPreview(null)}
+          onShare={(uri) =>
+            shareUri(
+              uri,
+              preview.attachment.type ?? "application/octet-stream",
+              preview.attachment.name ?? "attachment",
+            )
+          }
+        />
       )}
     </SafeAreaView>
   );
@@ -325,13 +476,16 @@ function createStyles(theme: ThemeTokens) {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: theme.spacing["1"],
-      maxWidth: 200,
+      maxWidth: 220,
       paddingHorizontal: theme.spacing["2"],
       paddingVertical: theme.spacing["1"],
       borderRadius: theme.borderRadius.md,
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.card,
+    },
+    attachmentChipPressed: {
+      opacity: 0.65,
     },
     divider: {
       height: 1,

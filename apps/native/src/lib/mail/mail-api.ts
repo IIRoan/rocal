@@ -5,7 +5,13 @@
  * Better Auth session cookie manually, since React Native's `fetch` does not
  * attach cookies automatically (mirrors the calendar `HttpClient` pattern).
  */
-import type { MailAccountStatus, MailDemoConfig } from "./types";
+import type {
+  MailAccountStatus,
+  MailBootstrapRequest,
+  MailDemoConfig,
+  MailSignupResponse,
+  MailVaultKdfParams,
+} from "./types";
 import { API_BASE_URL } from "../constants";
 import { getAuthHeaders } from "../api";
 
@@ -67,6 +73,46 @@ export async function getMailAccountStatus(): Promise<MailAccountStatus> {
     method: "GET",
   });
   return parseJson<MailAccountStatus>(response);
+}
+
+export async function bootstrapAccountMailbox(
+  request: MailBootstrapRequest,
+): Promise<MailSignupResponse> {
+  const response = await mailFetch(`${backendBaseUrl}/api/mail/account/bootstrap`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+  return parseJson<MailSignupResponse>(response);
+}
+
+export async function upsertAccountVaultBackup(request: {
+  vaultVersion: number;
+  encryptedVaultB64: string;
+  kdf: string;
+  kdfParams: MailVaultKdfParams;
+}) {
+  const response = await mailFetch(`${backendBaseUrl}/api/mail/account/vault-backup`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+  return parseJson(response);
+}
+
+export async function getVaultKeyMaterial(
+  vaultKeyMaterialEndpoint: string,
+): Promise<{ keyMaterial: string; derivedKeyB64?: string | null; version: string }> {
+  const response = await mailFetch(vaultKeyMaterialEndpoint, {
+    method: "GET",
+  });
+  return parseJson<{ keyMaterial: string; derivedKeyB64?: string | null; version: string }>(
+    response,
+  );
 }
 
 type MailTokenResponse = {

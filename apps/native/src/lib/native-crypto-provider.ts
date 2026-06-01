@@ -3,9 +3,8 @@
  *
  * React Native (Hermes) does not ship a WebCrypto `subtle` implementation, so
  * E2EE runs on the pure-JavaScript provider backed by `node-forge`. If the
- * runtime *does* expose a real `crypto.subtle` (for example via a future
- * native polyfill such as `react-native-quick-crypto`), we transparently use it
- * instead.
+ * runtime *does* expose a real `crypto.subtle` (for example via the installed
+ * `react-native-quick-crypto` polyfill), we transparently use it instead.
  *
  * `expo-crypto` always provides a hardware-backed CSPRNG (`getRandomValues`,
  * `randomUUID`), so those primitives are used regardless of the subtle backend.
@@ -26,10 +25,28 @@ const runtime = detectRuntime({ platformOs: Platform.OS });
 
 let backendLogged = false;
 
-function logBackendOnce(message: string) {
+function logBackendOnce(level: "info" | "warn", message: string) {
   if (backendLogged) return;
   backendLogged = true;
-  log.info(message);
+  log[level](message);
+}
+
+function buildFallbackMessage() {
+  const runtimeName = getRuntimeDisplayName(runtime);
+
+  if (runtime.isExpoGo) {
+    return (
+      `Using the JavaScript crypto fallback for calendar E2EE on ${runtimeName} because Expo Go does not expose crypto.subtle. ` +
+      "Mail OpenPGP still uses the native mail vault path, but first-time calendar key setup is slower. " +
+      "Use a rebuilt development client with native WebCrypto support to remove this warning."
+    );
+  }
+
+  return (
+    `Using the JavaScript crypto fallback for calendar E2EE on ${runtimeName} because this runtime does not expose a usable crypto.subtle implementation. ` +
+    "Mail OpenPGP still uses the native mail vault path, but first-time calendar key setup is slower until native WebCrypto is available. " +
+    "If you just enabled react-native-quick-crypto, rebuild the native app so the new module is linked."
+  );
 }
 
 /**
@@ -140,14 +157,12 @@ export function createNativeCryptoProvider(): CryptoProvider {
 
   if (subtle) {
     logBackendOnce(
+      "info",
       `Using native SubtleCrypto for E2EE on ${getRuntimeDisplayName(runtime)}.`,
     );
     return createSubtleCryptoProvider(subtle);
   }
 
-  logBackendOnce(
-    `Using the JavaScript crypto fallback for E2EE on ${getRuntimeDisplayName(runtime)}. ` +
-      "First-time key setup can be slightly slower.",
-  );
+  logBackendOnce("warn", buildFallbackMessage());
   return createJsCryptoProvider();
 }

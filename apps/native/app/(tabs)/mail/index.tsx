@@ -23,7 +23,9 @@ import { AppSwitcher } from "../../../src/components/AppSwitcher";
 import { MailMessageRow } from "../../../src/components/mail/MailMessageRow";
 import {
   useMailAccount,
+  useMailConfig,
   useMailMutations,
+  useProvisionMailbox,
   useMailRuntime,
   useMailboxMessages,
 } from "../../../src/lib/mail/use-mail";
@@ -44,6 +46,8 @@ export default function MailScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const accountQuery = useMailAccount();
+  const configQuery = useMailConfig();
+  const provisionMailbox = useProvisionMailbox();
   const provisioned = accountQuery.data?.provisioned ?? false;
   const runtimeQuery = useMailRuntime(provisioned);
   const runtime = runtimeQuery.data;
@@ -137,7 +141,20 @@ export default function MailScreen() {
           onRetry={() => accountQuery.refetch()}
         />
       ) : !provisioned ? (
-        <SetupState theme={theme} />
+        <SetupState
+          theme={theme}
+          canCreateMailbox={configQuery.data?.signupEnabled ?? true}
+          isSettingUp={provisionMailbox.isPending}
+          errorMessage={
+            provisionMailbox.error
+              ? getErrorMessage(
+                  provisionMailbox.error,
+                  "Could not create your mailbox.",
+                )
+              : null
+          }
+          onSetup={() => provisionMailbox.mutate()}
+        />
       ) : runtimeQuery.isLoading ? (
         <CenteredState theme={theme}>
           <ActivityIndicator color={theme.colors.primaryBase} />
@@ -238,25 +255,65 @@ function ErrorState({
   );
 }
 
-function SetupState({ theme }: { theme: ThemeTokens }) {
+function SetupState({
+  theme,
+  canCreateMailbox,
+  isSettingUp,
+  errorMessage,
+  onSetup,
+}: {
+  theme: ThemeTokens;
+  canCreateMailbox: boolean;
+  isSettingUp: boolean;
+  errorMessage: string | null;
+  onSetup: () => void;
+}) {
   const styles = useMemo(() => createStyles(theme), [theme]);
   return (
     <View style={styles.centered}>
       <Feather name="mail" size={44} color={theme.colors.primaryBase} />
       <Text style={styles.setupTitle}>Set up your mailbox</Text>
       <Text style={styles.mutedText}>
-        Your encrypted mailbox is created in the secure web client. Once it’s
-        ready, your messages appear here automatically.
+        Create your encrypted mailbox on this device. Solace generates a random
+        OpenPGP keypair locally, uploads only the public key, and stores your
+        private key in an encrypted vault backup.
       </Text>
-      {isWebMailAvailable() ? (
+      {errorMessage ? (
+        <Text style={styles.errorText}>{errorMessage}</Text>
+      ) : null}
+      {canCreateMailbox ? (
+        <Pressable
+          onPress={onSetup}
+          disabled={isSettingUp}
+          style={[
+            styles.primaryButton,
+            isSettingUp && styles.primaryButtonDisabled,
+          ]}
+        >
+          {isSettingUp ? (
+            <ActivityIndicator
+              size="small"
+              color={theme.colors.primaryForeground}
+            />
+          ) : null}
+          <Text style={styles.primaryButtonText}>
+            {isSettingUp ? "Creating mailbox…" : "Create mailbox here"}
+          </Text>
+        </Pressable>
+      ) : isWebMailAvailable() ? (
         <Pressable onPress={() => openWebMail()} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>Open secure web mail</Text>
         </Pressable>
       ) : (
         <Text style={styles.mutedText}>
-          Configure the web app URL (EXPO_PUBLIC_APP_URL) to enable setup.
+          Mailbox setup is disabled for this environment.
         </Text>
       )}
+      {canCreateMailbox && isWebMailAvailable() ? (
+        <Pressable onPress={() => openWebMail()} style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>Open secure web mail</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -376,10 +433,16 @@ function createStyles(theme: ThemeTokens) {
       flexGrow: 1,
     },
     primaryButton: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["2"],
       paddingHorizontal: theme.spacing["4"],
       paddingVertical: theme.spacing["2"],
       borderRadius: theme.borderRadius.md,
       backgroundColor: theme.colors.primaryBase,
+    },
+    primaryButtonDisabled: {
+      opacity: 0.7,
     },
     secondaryButton: {
       paddingHorizontal: theme.spacing["4"],
