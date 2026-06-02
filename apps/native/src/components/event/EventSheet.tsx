@@ -24,6 +24,7 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../providers/AuthProvider";
+import { useToast } from "../../providers/ToastProvider";
 import { calendarApiService } from "../../lib/api";
 import { QUERY_KEYS } from "../../lib/query-keys";
 import {
@@ -162,6 +163,7 @@ export function EventSheet({
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
   const bottomSheetRef = useRef<BottomSheetHandle>(null);
   const createSnapshotRef = useRef<CacheSnapshot>([]);
   const deleteSnapshotRef = useRef<CacheSnapshot>([]);
@@ -267,13 +269,11 @@ export function EventSheet({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Event created");
     },
     onError: (err: unknown) => {
       rollbackFromSnapshot(queryClient, createSnapshotRef.current);
-      Alert.alert(
-        "Couldn't create event",
-        getErrorMessage(err, "Failed to create event"),
-      );
+      toast(getErrorMessage(err, "Failed to create event"), "error");
     },
   });
 
@@ -296,6 +296,7 @@ export function EventSheet({
         });
       }
       setServerErrors([]);
+      toast("Event updated");
       dismissSheet();
     },
     onError: (err: unknown) => {
@@ -336,13 +337,11 @@ export function EventSheet({
           queryKey: QUERY_KEYS.eventDetail(eventId),
         });
       }
+      toast("Event deleted");
     },
     onError: (err: unknown) => {
       rollbackFromSnapshot(queryClient, deleteSnapshotRef.current);
-      Alert.alert(
-        "Couldn't delete event",
-        getErrorMessage(err, "Failed to delete event"),
-      );
+      toast(getErrorMessage(err, "Failed to delete event"), "error");
     },
   });
 

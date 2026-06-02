@@ -24,6 +24,7 @@ import { StackScreenHeader } from "../../../src/components/StackScreenHeader";
 import { LoadingScreen } from "../../../src/components/ui/loading";
 import { ColorPicker } from "../../../src/components/event/ColorPicker";
 import { useTheme } from "../../../src/providers/ThemeProvider";
+import { useToast } from "../../../src/providers/ToastProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import {
@@ -40,6 +41,7 @@ export default function SubscriptionEditScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [name, setName] = useState("");
   const [color, setColor] = useState<string>("indigo");
@@ -96,13 +98,11 @@ export default function SubscriptionEditScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.subscriptions() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Calendar updated");
       router.back();
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to save changes",
-        getErrorMessage(error, "Failed to update read-only calendar"),
-      );
+      toast(getErrorMessage(error, "Failed to update read-only calendar"), "error");
     },
   });
 
@@ -113,13 +113,11 @@ export default function SubscriptionEditScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.subscriptions() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Calendar removed");
       router.back();
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to remove calendar",
-        getErrorMessage(error, "Failed to remove read-only calendar"),
-      );
+      toast(getErrorMessage(error, "Failed to remove read-only calendar"), "error");
     },
   });
 
@@ -132,19 +130,18 @@ export default function SubscriptionEditScreen() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
 
       if (result.status === "error") {
-        Alert.alert(
-          "Sync finished with issues",
+        toast(
           result.message ??
             result.errors?.join("\n") ??
             "The calendar feed returned an error.",
+          "error",
         );
+      } else {
+        toast("Calendar synced");
       }
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to sync calendar",
-        getErrorMessage(error, "Failed to sync calendar"),
-      );
+      toast(getErrorMessage(error, "Failed to sync calendar"), "error");
     },
   });
 
@@ -161,10 +158,7 @@ export default function SubscriptionEditScreen() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to update visibility",
-        getErrorMessage(error, "Failed to update calendar visibility"),
-      );
+      toast(getErrorMessage(error, "Failed to update calendar visibility"), "error");
     },
   });
 
@@ -235,7 +229,7 @@ export default function SubscriptionEditScreen() {
     }
 
     await Clipboard.setStringAsync(subscription.url);
-    Alert.alert("Copied", "The source URL is now on your clipboard.");
+    toast("Source URL copied to clipboard");
   }, [subscription?.url]);
 
   if (subscriptionsLoading) {

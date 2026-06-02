@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   StyleSheet,
   Text,
   View,
@@ -14,6 +13,7 @@ import type { CreateEventRequest } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { useAuth } from "../../src/providers/AuthProvider";
+import { useToast } from "../../src/providers/ToastProvider";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
 import {
@@ -35,6 +35,7 @@ export default function EventCreateScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   // ─── Query params (optional pre-fill from tapping a time slot) ───────────
 
@@ -80,6 +81,7 @@ export default function EventCreateScreen() {
     onSuccess: () => {
       // Replace optimistic data with real server data
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Event created");
     },
     onError: (err: unknown) => {
       // Roll back the optimistic event
@@ -88,7 +90,7 @@ export default function EventCreateScreen() {
         err && typeof err === "object" && "message" in err
           ? (err as { message: string }).message
           : "Failed to create event";
-      Alert.alert("Couldn't create event", message);
+      toast(message, "error");
     },
   });
 

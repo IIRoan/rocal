@@ -37,6 +37,7 @@ import {
   useTheme,
   type ThemePreference,
 } from "../../src/providers/ThemeProvider";
+import { useToast } from "../../src/providers/ToastProvider";
 import { authClient } from "../../src/lib/auth-client";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { calendarApiService } from "../../src/lib/api";
@@ -136,6 +137,7 @@ export default function SettingsScreen() {
   const queryClient = useQueryClient();
   const { push } = useRouter();
   const { user, signOut, registerPasskey, deletePasskey } = useAuth();
+  const { toast } = useToast();
   const passkeysQuery = authClient.useListPasskeys();
   const accountsQuery = useQuery({
     queryKey: ["auth", "accounts", user?.id ?? null],
@@ -338,10 +340,7 @@ export default function SettingsScreen() {
         queryClient.setQueryData(QUERY_KEYS.calendars(), context.previous);
       }
 
-      Alert.alert(
-        "Unable to update default calendar",
-        getErrorMessage(error, "Failed to update default calendar"),
-      );
+      toast(getErrorMessage(error, "Failed to update default calendar"), "error");
     },
     onSettled: () => {
       setPendingDefaultCalendarId(null);
@@ -358,16 +357,10 @@ export default function SettingsScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      Alert.alert(
-        "Settings reset",
-        "Your mobile preferences have been restored to the shared defaults.",
-      );
+      toast("Settings reset to defaults");
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to reset settings",
-        getErrorMessage(error, "Failed to reset settings"),
-      );
+      toast(getErrorMessage(error, "Failed to reset settings"), "error");
     },
   });
 
@@ -444,10 +437,7 @@ export default function SettingsScreen() {
           setIsSigningOut(true);
           signOut()
             .catch((error) => {
-              Alert.alert(
-                "Unable to sign out",
-                getErrorMessage(error, "Failed to sign out"),
-              );
+              toast(getErrorMessage(error, "Failed to sign out"), "error");
             })
             .finally(() => {
               setIsSigningOut(false);
@@ -475,10 +465,7 @@ export default function SettingsScreen() {
                 await signOut();
               })
               .catch((error) => {
-                Alert.alert(
-                  "Unable to delete account",
-                  getErrorMessage(error, "Failed to delete account"),
-                );
+                toast(getErrorMessage(error, "Failed to delete account"), "error");
               })
               .finally(() => {
                 setIsDeletingAccount(false);
@@ -535,10 +522,7 @@ export default function SettingsScreen() {
           );
         }
 
-        Alert.alert(
-          "Password updated",
-          "Use your new password the next time you sign in with email. After email sign-in, Solace also uses it to protect your encryption keys.",
-        );
+        toast("Password updated");
       } else if (activePasswordSheet === "set-password") {
         setIsSettingPassword(true);
         const result = await (
@@ -558,10 +542,7 @@ export default function SettingsScreen() {
         }
 
         await accountsQuery?.refetch?.();
-        Alert.alert(
-          "Email password added",
-          "You can now sign in with email and password.",
-        );
+        toast("Email password added");
       }
 
       resetChangePasswordForm();
@@ -595,15 +576,9 @@ export default function SettingsScreen() {
       }
       setShowProfilePictureForm(false);
       setProfilePictureUrlInput("");
-      Alert.alert(
-        "Profile picture updated",
-        "Your profile picture has been saved.",
-      );
+      toast("Profile picture updated");
     } catch (error) {
-      Alert.alert(
-        "Unable to update profile picture",
-        getErrorMessage(error, "Failed to update profile picture"),
-      );
+      toast(getErrorMessage(error, "Failed to update profile picture"), "error");
     } finally {
       setIsUpdatingProfilePicture(false);
     }
@@ -671,15 +646,9 @@ export default function SettingsScreen() {
     try {
       await registerPasskey();
       await passkeysQuery.refetch();
-      Alert.alert(
-        "Passkey added",
-        "You can now sign in faster on supported devices.",
-      );
+      toast("Passkey added");
     } catch (error) {
-      Alert.alert(
-        "Unable to add passkey",
-        getErrorMessage(error, "Failed to add passkey"),
-      );
+      toast(getErrorMessage(error, "Failed to add passkey"), "error");
     } finally {
       setIsRegisteringPasskey(false);
     }
@@ -700,12 +669,12 @@ export default function SettingsScreen() {
             onPress: () => {
               setPendingPasskeyDeletionId(passkey.id);
               deletePasskey(passkey.id)
-                .then(() => passkeysQuery.refetch())
+                .then(() => {
+                  passkeysQuery.refetch();
+                  toast("Passkey removed");
+                })
                 .catch((error) => {
-                  Alert.alert(
-                    "Unable to delete passkey",
-                    getErrorMessage(error, "Failed to delete passkey"),
-                  );
+                  toast(getErrorMessage(error, "Failed to delete passkey"), "error");
                 })
                 .finally(() => {
                   setPendingPasskeyDeletionId(null);

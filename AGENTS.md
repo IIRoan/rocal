@@ -55,6 +55,10 @@ The native app authenticates against the backend using Better Auth with session-
 
 The native mobile app replaces the previous web-based mobile approach and shares the same backend/auth setup as the web app.
 
+### Native Data Mutation Convention
+
+When mutating data that already exists in the React Query cache (e.g. toggling a star, marking as read, assigning a label), **always use optimistic `onMutate` patches** that update the cached item in-place via `setQueryData`. Never blanket-invalidate the entire `["mail"]` query scope — this causes full refetches that show loading spinners and discard the user's scroll position. Only `invalidateQueries({ queryKey: ["mail", "messages"] })` on destructive mutations (delete, move) where the item leaves the list. On mutation failure, call `invalidateMessages()` to refetch and restore server truth.
+
 ## Common Development Commands
 
 Execute commands from the repository root unless stated otherwise.

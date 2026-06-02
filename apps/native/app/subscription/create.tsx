@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,6 +25,7 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { StackScreenHeader } from "../../src/components/StackScreenHeader";
 import { ColorPicker } from "../../src/components/event/ColorPicker";
 import { useTheme } from "../../src/providers/ThemeProvider";
+import { useToast } from "../../src/providers/ToastProvider";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
 import {
@@ -36,11 +36,6 @@ import {
   type SubscriptionFieldErrors,
 } from "../../src/lib/subscription-utils";
 
-type Notice = {
-  tone: "success" | "error";
-  text: string;
-};
-
 type PickedIcsFile = {
   name: string;
   content: string;
@@ -50,13 +45,13 @@ export default function SubscriptionCreateScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [feedName, setFeedName] = useState("");
   const [feedUrl, setFeedUrl] = useState("");
   const [feedColor, setFeedColor] = useState<string>("indigo");
   const [feedErrors, setFeedErrors] = useState<SubscriptionFieldErrors>({});
   const [holidaySearch, setHolidaySearch] = useState("");
-  const [notice, setNotice] = useState<Notice | null>(null);
   const [pickedFile, setPickedFile] = useState<PickedIcsFile | null>(null);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>("");
 
@@ -133,16 +128,10 @@ export default function SubscriptionCreateScreen() {
         setFeedErrors({});
       }
 
-      setNotice({
-        tone: "success",
-        text: `Added ${variables.name}`,
-      });
+      toast(`Added ${variables.name}`);
     },
     onError: (error) => {
-      setNotice({
-        tone: "error",
-        text: getErrorMessage(error, "Failed to add read-only calendar"),
-      });
+      toast(getErrorMessage(error, "Failed to add read-only calendar"), "error");
     },
   });
 
@@ -160,18 +149,12 @@ export default function SubscriptionCreateScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
       setPickedFile(null);
-      setNotice({
-        tone: "success",
-        text: `Imported ${result.eventsCreated} of ${result.eventsTotal} events${
-          result.calendarName ? ` into ${result.calendarName}` : ""
-        }`,
-      });
+      toast(`Imported ${result.eventsCreated} of ${result.eventsTotal} events${
+        result.calendarName ? ` into ${result.calendarName}` : ""
+      }`);
     },
     onError: (error) => {
-      setNotice({
-        tone: "error",
-        text: getErrorMessage(error, "Failed to import .ics file"),
-      });
+      toast(getErrorMessage(error, "Failed to import .ics file"), "error");
     },
   });
 
@@ -183,7 +166,6 @@ export default function SubscriptionCreateScreen() {
     });
 
     setFeedErrors(nextErrors);
-    setNotice(null);
 
     if (nextErrors.name || nextErrors.url || nextErrors.color) {
       return;
@@ -210,40 +192,29 @@ export default function SubscriptionCreateScreen() {
 
       const asset = result.assets[0];
       if (!asset || !asset.name.toLowerCase().endsWith(".ics")) {
-        Alert.alert(
-          "Unsupported file",
-          "Choose a .ics calendar file to import.",
-        );
+        toast("Choose a .ics calendar file to import", "error");
         return;
       }
 
       const file = new File(asset.uri);
       const content = await file.text();
       setPickedFile({ name: asset.name, content });
-      setNotice(null);
     } catch (error) {
-      Alert.alert(
-        "Unable to open file",
-        getErrorMessage(error, "Failed to read the selected file"),
-      );
+      toast(getErrorMessage(error, "Failed to read the selected file"), "error");
     }
   }, []);
 
   const handleImportFile = useCallback(() => {
     if (!pickedFile) {
-      Alert.alert("Choose a file", "Pick a .ics file before importing.");
+      toast("Pick a .ics file before importing", "error");
       return;
     }
 
     if (!selectedCalendarId) {
-      Alert.alert(
-        "Choose a calendar",
-        "Select an owned calendar to receive the imported events.",
-      );
+      toast("Select an owned calendar to receive the imported events", "error");
       return;
     }
 
-    setNotice(null);
     importIcsMutation.mutate({
       calendarId: selectedCalendarId,
       icsContent: pickedFile.content,
@@ -253,7 +224,6 @@ export default function SubscriptionCreateScreen() {
 
   const handleAddHolidayCalendar = useCallback(
     (holidayCalendar: (typeof NATIONAL_HOLIDAY_CALENDARS)[number]) => {
-      setNotice(null);
       createSubscriptionMutation.mutate({
         name: holidayCalendar.label,
         url: holidayCalendar.url,
@@ -282,34 +252,6 @@ export default function SubscriptionCreateScreen() {
             import directly into one of your owned calendars.
           </Text>
         </View>
-
-        {notice ? (
-          <View
-            style={[
-              styles.noticeCard,
-              notice.tone === "error" && styles.noticeCardError,
-            ]}
-          >
-            <Feather
-              name={notice.tone === "error" ? "alert-circle" : "check-circle"}
-              size={16}
-              color={
-                notice.tone === "error"
-                  ? theme.colors.destructive
-                  : theme.colors.primaryBase
-              }
-            />
-            <Text
-              style={
-                notice.tone === "error"
-                  ? styles.noticeTextError
-                  : styles.noticeText
-              }
-            >
-              {notice.text}
-            </Text>
-          </View>
-        ) : null}
 
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -581,21 +523,6 @@ function createStyles(theme: ThemeTokens) {
       padding: theme.spacing["4"],
       gap: theme.spacing["1"],
     },
-    noticeCard: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
-      borderWidth: 1,
-      borderColor: theme.colors.primaryBase + "26",
-      borderRadius: theme.borderRadius.md,
-      backgroundColor: theme.colors.primaryBase + "0D",
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["3"],
-    },
-    noticeCardError: {
-      borderColor: theme.colors.destructive + "26",
-      backgroundColor: theme.colors.destructive + "0D",
-    },
     card: {
       borderWidth: 1,
       borderColor: theme.colors.border,
@@ -692,18 +619,6 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.mutedForeground,
-    },
-    noticeText: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-    },
-    noticeTextError: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.destructive,
     },
     cardTitle: {
       fontSize: theme.typography.fontSize.base.size,

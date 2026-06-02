@@ -19,6 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
+import { useToast } from "../../../src/providers/ToastProvider";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import {
   useCachedMessage,
@@ -39,6 +40,7 @@ export default function ComposeScreen() {
     messageId?: string;
   }>();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const { toast } = useToast();
 
   const accountQuery = useMailAccount();
   const provisioned = accountQuery.data?.provisioned ?? false;
@@ -94,7 +96,10 @@ export default function ComposeScreen() {
         textBody: body,
       },
       {
-        onSuccess: () => router.back(),
+        onSuccess: () => {
+          toast("Message sent");
+          router.back();
+        },
         onError: (err) =>
           setError(getErrorMessage(err, "Failed to send message")),
       },

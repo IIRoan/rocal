@@ -703,6 +703,33 @@ export class StalwartJmapClient {
     );
   }
 
+  async setMessageLabel(
+    session: JmapSession,
+    messageId: string,
+    labelId: string,
+    assigned: boolean,
+  ): Promise<void> {
+    const accountId = this.requirePrimaryAccountId(session);
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/set",
+          {
+            accountId,
+            update: {
+              [messageId]: {
+                [`keywords/label:${labelId}`]: assigned ? true : null,
+              },
+            },
+          },
+          "c1",
+        ],
+      ],
+    );
+  }
+
   async getBlobDownloadInfo(
     session: JmapSession,
     blobId: string,

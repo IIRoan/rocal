@@ -13,7 +13,7 @@ import { getMailAccountStatus, getMailConfig } from "./mail-api";
 import { bootstrapMailboxForAccount } from "./account-bootstrap";
 import { buildMailRuntime, type MailRuntime } from "./mail-runtime";
 import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
-import type { JmapEmailMessage } from "./types";
+import type { JmapEmailMessage, LabelDef } from "./types";
 
 const RUNTIME_STALE_MS = 5 * 60_000;
 const MESSAGES_LIMIT = 30;
@@ -113,20 +113,78 @@ export function useCachedMessage(
   return undefined;
 }
 
+/** Find a cached message by id across all mailbox lists. */
+function findCachedMessage(
+  queryClient: ReturnType<typeof useQueryClient>,
+  messageId: string,
+): JmapEmailMessage | undefined {
+  const lists = queryClient.getQueriesData<{
+    messages: JmapEmailMessage[];
+    total: number;
+  }>({ queryKey: ["mail", "messages"] });
+  for (const [, data] of lists) {
+    const found = data?.messages?.find((m) => m.id === messageId);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/** Patch a single message inside all cached mailbox lists. */
+function patchMessageInCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  messageId: string,
+  patch: (msg: JmapEmailMessage) => Partial<JmapEmailMessage>,
+) {
+  const lists = queryClient.getQueriesData<{
+    messages: JmapEmailMessage[];
+    total: number;
+  }>({ queryKey: ["mail", "messages"] });
+  for (const [key, data] of lists) {
+    if (!data?.messages) continue;
+    const idx = data.messages.findIndex((m) => m.id === messageId);
+    if (idx === -1) continue;
+    const updated = [...data.messages];
+    updated[idx] = { ...updated[idx], ...patch(updated[idx]) };
+    queryClient.setQueryData(key, { ...data, messages: updated });
+  }
+}
+
+/** Patch the single message detail query so the detail screen updates immediately. */
+function patchSingleMessageInCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  messageId: string,
+  patch: (msg: JmapEmailMessage) => Partial<JmapEmailMessage>,
+) {
+  const key = QUERY_KEYS.mailMessage(messageId);
+  const data = queryClient.getQueryData<JmapEmailMessage>(key);
+  if (data) {
+    queryClient.setQueryData(key, { ...data, ...patch(data) });
+  }
+}
+
 export function useMailMutations(
   runtime: MailRuntime | undefined,
   mailboxId: string | null,
 ) {
   const queryClient = useQueryClient();
 
-  const invalidate = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["mail"] });
+  const invalidateMessages = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["mail", "messages"] });
   }, [queryClient]);
 
   const markAsRead = useMutation({
     mutationFn: (messageId: string) =>
       runtime!.client.markAsRead(runtime!.session, messageId),
-    onSuccess: invalidate,
+    onMutate: (messageId) => {
+      patchMessageInCache(queryClient, messageId, (msg) => ({
+        keywords: { ...msg.keywords, $seen: true },
+      }));
+      patchSingleMessageInCache(queryClient, messageId, (msg) => ({
+        keywords: { ...msg.keywords, $seen: true },
+      }));
+    },
+    onSuccess: invalidateMessages,
+    onError: () => invalidateMessages(),
   });
 
   const toggleFlagged = useMutation({
@@ -136,13 +194,36 @@ export function useMailMutations(
         input.messageId,
         input.flagged,
       ),
-    onSuccess: invalidate,
+    onMutate: (input) => {
+      patchMessageInCache(queryClient, input.messageId, (msg) => ({
+        keywords: { ...msg.keywords, $flagged: input.flagged },
+      }));
+      patchSingleMessageInCache(queryClient, input.messageId, (msg) => ({
+        keywords: { ...msg.keywords, $flagged: input.flagged },
+      }));
+    },
+    onError: () => {
+      invalidateMessages();
+    },
   });
 
   const markAsUnread = useMutation({
     mutationFn: (messageId: string) =>
       runtime!.client.markAsUnread(runtime!.session, messageId),
-    onSuccess: invalidate,
+    onMutate: (messageId) => {
+      patchMessageInCache(queryClient, messageId, (msg) => {
+        const keywords = { ...msg.keywords };
+        delete keywords.$seen;
+        return { keywords };
+      });
+      patchSingleMessageInCache(queryClient, messageId, (msg) => {
+        const keywords = { ...msg.keywords };
+        delete keywords.$seen;
+        return { keywords };
+      });
+    },
+    onSuccess: invalidateMessages,
+    onError: () => invalidateMessages(),
   });
 
   const moveToTrash = useMutation({
@@ -155,13 +236,13 @@ export function useMailMutations(
         trashId,
       );
     },
-    onSuccess: invalidate,
+    onSuccess: invalidateMessages,
   });
 
   const deleteMessage = useMutation({
     mutationFn: (messageId: string) =>
       runtime!.client.deleteMessage(runtime!.session, messageId),
-    onSuccess: invalidate,
+    onSuccess: invalidateMessages,
   });
 
   const moveToMailbox = useMutation({
@@ -171,7 +252,39 @@ export function useMailMutations(
         input.messageId,
         input.targetMailboxId,
       ),
-    onSuccess: invalidate,
+    onSuccess: invalidateMessages,
+  });
+
+  const setMessageLabel = useMutation({
+    mutationFn: (input: { messageId: string; labelId: string; assigned: boolean }) =>
+      runtime!.client.setMessageLabel(
+        runtime!.session,
+        input.messageId,
+        input.labelId,
+        input.assigned,
+      ),
+    onMutate: (input) => {
+      const keywordKey = `label:${input.labelId}` as const;
+      patchMessageInCache(queryClient, input.messageId, (msg) => {
+        const keywords = { ...msg.keywords };
+        if (input.assigned) {
+          keywords[keywordKey] = true;
+        } else {
+          delete keywords[keywordKey];
+        }
+        return { keywords };
+      });
+      patchSingleMessageInCache(queryClient, input.messageId, (msg) => {
+        const keywords = { ...msg.keywords };
+        if (input.assigned) {
+          keywords[keywordKey] = true;
+        } else {
+          delete keywords[keywordKey];
+        }
+        return { keywords };
+      });
+    },
+    onError: () => invalidateMessages(),
   });
 
   return {
@@ -181,6 +294,7 @@ export function useMailMutations(
     moveToTrash,
     deleteMessage,
     moveToMailbox,
+    setMessageLabel,
   };
 }
 

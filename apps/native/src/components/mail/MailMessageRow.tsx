@@ -8,6 +8,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { FontAwesome } from "@expo/vector-icons";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import {
@@ -21,13 +22,16 @@ import {
   classifyMessageEncryption,
   extractMessageBodies,
 } from "../../lib/mail/message-security";
-import type { JmapEmailMessage } from "../../lib/mail/types";
+import { getAllMessageLabels } from "../../lib/mail/use-labels";
+import type { JmapEmailMessage, LabelDef } from "../../lib/mail/types";
 
 interface MailMessageRowProps {
   message: JmapEmailMessage;
   /** When true, shows recipient ("To") instead of sender (Sent/Drafts). */
   showRecipient?: boolean;
+  labels?: LabelDef[];
   onPress: (message: JmapEmailMessage) => void;
+  onLongPress?: (message: JmapEmailMessage) => void;
 }
 
 function buildPreview(message: JmapEmailMessage): string {
@@ -39,7 +43,9 @@ function buildPreview(message: JmapEmailMessage): string {
 function MailMessageRowComponent({
   message,
   showRecipient = false,
+  labels = [],
   onPress,
+  onLongPress,
 }: MailMessageRowProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -48,6 +54,7 @@ function MailMessageRowComponent({
   const flagged = isMessageFlagged(message);
   const encryption = classifyMessageEncryption(message);
   const isEncrypted = encryption !== "plain";
+  const messageLabels = getAllMessageLabels(message, labels);
   const addresses = showRecipient ? message.to : message.from;
   const name = formatAddress(addresses);
   const subject = message.subject?.trim() || "(no subject)";
@@ -58,6 +65,7 @@ function MailMessageRowComponent({
   return (
     <Pressable
       onPress={() => onPress(message)}
+      onLongPress={onLongPress ? () => onLongPress(message) : undefined}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       accessibilityRole="button"
       accessibilityLabel={`${name}: ${subject}`}
@@ -93,10 +101,10 @@ function MailMessageRowComponent({
             {subject}
           </Text>
           {flagged ? (
-            <Feather
+            <FontAwesome
               name="star"
               size={12}
-              color={theme.colors.primaryBase}
+              color="#fbbf24"
               style={styles.flagIcon}
             />
           ) : null}
@@ -105,6 +113,25 @@ function MailMessageRowComponent({
         <Text style={styles.preview} numberOfLines={1}>
           {preview}
         </Text>
+
+        {messageLabels.length > 0 ? (
+          <View style={styles.labelRow}>
+            {messageLabels.map((label) => (
+              <View
+                key={label.id}
+                style={[
+                  styles.labelChip,
+                  { borderColor: `${label.color}50`, backgroundColor: `${label.color}18` },
+                ]}
+              >
+                <View style={[styles.labelDot, { backgroundColor: label.color }]} />
+                <Text style={[styles.labelText, { color: label.color }]} numberOfLines={1}>
+                  {label.name}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </View>
 
       {!read ? <View style={styles.unreadDot} /> : null}
@@ -163,6 +190,26 @@ function createStyles(theme: ThemeTokens) {
       backgroundColor: theme.colors.primaryBase,
       marginTop: 6,
     },
+    labelRow: {
+      flexDirection: "row" as const,
+      flexWrap: "wrap" as const,
+      gap: 4,
+      marginTop: 2,
+    },
+    labelChip: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 3,
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: theme.borderRadius.full,
+      borderWidth: 1,
+    },
+    labelDot: {
+      width: 6,
+      height: 6,
+      borderRadius: theme.borderRadius.full,
+    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
@@ -199,6 +246,11 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
+    },
+    labelText: {
+      fontSize: theme.typography.fontSize.xs.size - 1,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
     },
   } satisfies Record<string, TextStyle>;
 

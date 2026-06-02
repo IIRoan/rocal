@@ -25,6 +25,7 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { StackScreenHeader } from "../../../src/components/StackScreenHeader";
 import { ColorPicker } from "../../../src/components/event/ColorPicker";
 import { useTheme } from "../../../src/providers/ThemeProvider";
+import { useToast } from "../../../src/providers/ToastProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { resolveCalendarSwatchColor } from "../../../src/lib/calendar-color-utils";
@@ -41,6 +42,7 @@ export default function CalendarEditScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [name, setName] = useState("");
   const [color, setColor] = useState<EventColor>("blue");
@@ -108,13 +110,11 @@ export default function CalendarEditScreen() {
         queryKey: QUERY_KEYS.calendarShareLink(id!),
       });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Calendar saved");
       router.back();
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to save calendar",
-        getErrorMessage(error, "Failed to update calendar"),
-      );
+      toast(getErrorMessage(error, "Failed to update calendar"), "error");
     },
   });
 
@@ -130,13 +130,11 @@ export default function CalendarEditScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Calendar deleted");
       router.back();
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to delete calendar",
-        getErrorMessage(error, "Failed to delete calendar"),
-      );
+      toast(getErrorMessage(error, "Failed to delete calendar"), "error");
     },
   });
 
@@ -150,12 +148,10 @@ export default function CalendarEditScreen() {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.calendarShareLink(id!),
       });
+      toast("Share link enabled");
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to update share link",
-        getErrorMessage(error, "Failed to enable calendar sharing"),
-      );
+      toast(getErrorMessage(error, "Failed to enable calendar sharing"), "error");
     },
   });
 
@@ -165,12 +161,10 @@ export default function CalendarEditScreen() {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.calendarShareLink(id!),
       });
+      toast("Share link disabled");
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to disable share link",
-        getErrorMessage(error, "Failed to disable calendar sharing"),
-      );
+      toast(getErrorMessage(error, "Failed to disable calendar sharing"), "error");
     },
   });
 
@@ -256,7 +250,7 @@ export default function CalendarEditScreen() {
     }
 
     await Clipboard.setStringAsync(shareLink.shareUrl);
-    Alert.alert("Copied", "The share link is now on your clipboard.");
+    toast("Share link copied to clipboard");
   }, [shareLink?.shareUrl]);
 
   if (calendarLoading) {

@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Animated,
-  Alert,
   Dimensions,
   Image,
   PanResponder,
@@ -29,6 +28,7 @@ import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
 import { useAuth } from "../providers/AuthProvider";
+import { useToast } from "../providers/ToastProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
 import { useSidebar } from "../providers/SidebarProvider";
 import { useMailSelection } from "../providers/MailSelectionProvider";
@@ -71,6 +71,7 @@ const logoSource = require("../assets/logo.png");
 export function AppSidebar() {
   const { theme } = useTheme();
   const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const { selectedDate, setCurrentDate, setSelectedDate } = useCalendarView();
   const { isOpen, open, close } = useSidebar();
   const { open: openCommandPalette } = useCommandPalette();
@@ -131,10 +132,7 @@ export function AppSidebar() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to update visibility",
-        getErrorMessage(error, "Failed to update calendar visibility"),
-      );
+      toast(getErrorMessage(error, "Failed to update calendar visibility"), "error");
     },
     onSettled: () => {
       setPendingVisibilityCalendarId(null);
