@@ -8,8 +8,13 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { usePathname, useRouter } from "expo-router";
+import { useRouter, useSegments } from "expo-router";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import {
+  CALENDAR_TAB_ROUTE,
+  MAIL_TAB_ROUTE,
+  isMailRouteSegments,
+} from "../lib/navigation-routes";
 import { useTheme } from "../providers/ThemeProvider";
 
 type AppKey = "calendar" | "mail";
@@ -24,9 +29,9 @@ const APPS: {
     key: "calendar",
     label: "Calendar",
     icon: "calendar",
-    href: "/(tabs)/calendar",
+    href: CALENDAR_TAB_ROUTE,
   },
-  { key: "mail", label: "Mail", icon: "mail", href: "/(tabs)/mail" },
+  { key: "mail", label: "Mail", icon: "mail", href: MAIL_TAB_ROUTE },
 ];
 
 interface AppSwitcherProps {
@@ -43,11 +48,11 @@ interface AppSwitcherProps {
 export function AppSwitcher({ active, onNavigate }: AppSwitcherProps) {
   const { theme } = useTheme();
   const router = useRouter();
-  const pathname = usePathname();
+  const segments = useSegments();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const activeKey: AppKey =
-    active ?? (pathname.includes("/mail") ? "mail" : "calendar");
+    active ?? (isMailRouteSegments(segments) ? "mail" : "calendar");
 
   return (
     <View style={styles.container} accessibilityRole="tablist">

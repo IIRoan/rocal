@@ -19,7 +19,6 @@ import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useSidebar } from "../../../src/providers/SidebarProvider";
 import { useMailSelection } from "../../../src/providers/MailSelectionProvider";
 import { useCommandPalette } from "../../../src/providers/CommandPaletteProvider";
-import { AppSwitcher } from "../../../src/components/AppSwitcher";
 import { CenteredLoader } from "../../../src/components/ui/loading";
 import { MailMessageRow } from "../../../src/components/mail/MailMessageRow";
 import {
@@ -105,7 +104,6 @@ export default function MailScreen() {
       >
         <Feather name="menu" size={22} color={theme.colors.foreground} />
       </Pressable>
-      <AppSwitcher active="mail" />
       <View style={styles.headerRight}>
         <Pressable
           onPress={openCommandPalette}

@@ -1,8 +1,16 @@
-export const AUTH_SIGN_IN_ROUTE = "/sign-in";
-export const AUTH_SIGN_UP_ROUTE = "/sign-up";
-export const CALENDAR_HOME_ROUTE = "/calendar";
-export const SETTINGS_ROUTE = "/settings";
-export const SETTINGS_TIMEZONE_ROUTE = "/settings/timezone";
+import {
+  AUTH_SIGN_IN_ROUTE,
+  CALENDAR_HOME_ROUTE,
+  isAuthRouteSegments,
+} from "./navigation-routes";
+
+export {
+  AUTH_SIGN_IN_ROUTE,
+  AUTH_SIGN_UP_ROUTE,
+  CALENDAR_HOME_ROUTE,
+  SETTINGS_ROUTE,
+  SETTINGS_TIMEZONE_ROUTE,
+} from "./navigation-routes";
 
 interface AuthRedirectInput {
   isAuthenticated: boolean;
@@ -12,7 +20,7 @@ interface AuthRedirectInput {
 
 function getRouteState(segments: string[]) {
   const currentSegment = segments[0];
-  const inAuthGroup = currentSegment === "(auth)";
+  const inAuthGroup = isAuthRouteSegments(segments);
   const atRoot = segments.length === 0 || currentSegment === "index";
   const atNotFound = currentSegment === "+not-found";
 

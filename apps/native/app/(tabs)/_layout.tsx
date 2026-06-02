@@ -20,12 +20,7 @@ export default function TabsLayout() {
           title: "Mail",
         }}
       />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: "Settings",
-        }}
-      />
+
     </Tabs>
   );
 }

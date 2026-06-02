@@ -1,7 +1,7 @@
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import { Slot, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import "../src/lib/install-native-crypto";
 import { QueryProvider } from "../src/providers/QueryProvider";
@@ -21,6 +21,7 @@ import {
   getAuthRedirectPath,
   shouldRenderAuthenticatedChrome,
 } from "../src/lib/auth-routing";
+import { NATIVE_STACK_SCREEN_OPTIONS } from "../src/lib/navigation-routes";
 import { API_BASE_URL } from "../src/lib/constants";
 import {
   prepareAuthenticatedCryptoSession,
@@ -150,6 +151,10 @@ function AuthenticatedChrome() {
   );
 }
 
+function RootNavigator() {
+  return <Stack screenOptions={NATIVE_STACK_SCREEN_OPTIONS} />;
+}
+
 // ---------------------------------------------------------------------------
 // Root layout
 // ---------------------------------------------------------------------------
@@ -167,7 +172,7 @@ export default function RootLayout() {
                     <NavigationGuard>
                       <SheetProvider>
                         <CommandPaletteProvider>
-                          <Slot />
+                          <RootNavigator />
                           <AuthenticatedChrome />
                         </CommandPaletteProvider>
                       </SheetProvider>
