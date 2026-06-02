@@ -22,6 +22,11 @@ import { useCommandPalette } from "../providers/CommandPaletteProvider";
 import { useSheet } from "../providers/SheetProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
 import { calendarApiService } from "../lib/api";
+import {
+  CALENDAR_TAB_ROUTE,
+  MAIL_TAB_ROUTE,
+  SETTINGS_ROUTE,
+} from "../lib/navigation-routes";
 
 import { BottomSheet } from "./BottomSheet";
 import {
@@ -99,7 +104,7 @@ export function CommandPalette() {
   }, []);
 
   const navigateToCalendar = useCallback(() => {
-    router.replace("/(tabs)/calendar" as never);
+    router.replace(CALENDAR_TAB_ROUTE as never);
   }, [router]);
 
   const runAction = useCallback(
@@ -128,13 +133,13 @@ export function CommandPalette() {
           navigateToCalendar();
           break;
         case "open-mail":
-          router.replace("/(tabs)/mail" as never);
+          router.replace(MAIL_TAB_ROUTE as never);
           break;
         case "compose-mail":
-          router.push("/(tabs)/mail/compose" as never);
+          router.push(`${MAIL_TAB_ROUTE}/compose` as never);
           break;
         case "open-settings":
-          router.replace("/(tabs)/settings" as never);
+          router.push(SETTINGS_ROUTE as never);
           break;
       }
     },

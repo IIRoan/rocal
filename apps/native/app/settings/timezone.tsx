@@ -19,9 +19,9 @@ import type {
   UpdateSettingsRequest,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
-import { useTheme } from "../../../src/providers/ThemeProvider";
-import { calendarApiService } from "../../../src/lib/api";
-import { QUERY_KEYS } from "../../../src/lib/query-keys";
+import { useTheme } from "../../src/providers/ThemeProvider";
+import { calendarApiService } from "../../src/lib/api";
+import { QUERY_KEYS } from "../../src/lib/query-keys";
 
 // ─── Timezone Data ───────────────────────────────────────────────────────────
 
