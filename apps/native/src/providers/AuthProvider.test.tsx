@@ -14,6 +14,16 @@ jest.mock("react-native", () => ({
   },
 }));
 
+jest.mock("expo-linking", () => ({
+  createURL: jest.fn(() => "solace://"),
+}));
+
+jest.mock("expo-secure-store", () => ({
+  deleteItemAsync: jest.fn(),
+  getItemAsync: jest.fn(),
+  setItemAsync: jest.fn(),
+}));
+
 jest.mock("../lib/auth-client", () => ({
   authClient: {
     getSession: jest.fn(),
@@ -51,6 +61,17 @@ jest.mock("../lib/passkey-browser-bridge", () => ({
 jest.mock("../lib/session-cookie", () => ({
   getSessionCookie: jest.fn(() => "better-auth.session=token"),
   waitForSessionCookie: jest.fn(),
+}));
+
+jest.mock("../lib/mail/mail-password-cache", () => ({
+  saveMailVaultPassword: jest.fn(),
+  clearMailVaultPassword: jest.fn(),
+  clearDerivedVaultKey: jest.fn(),
+  clearCachedPrivateKey: jest.fn(),
+}));
+
+jest.mock("../lib/mail/mail-crypto", () => ({
+  clearVaultCache: jest.fn(),
 }));
 
 (
