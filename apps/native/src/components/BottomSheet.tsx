@@ -1,7 +1,5 @@
 import {
-  Animated,
   Keyboard,
-  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -20,38 +18,128 @@ import {
   useState,
 } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  clamp,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { useTheme } from "../providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
-const MAX_SHEET_RATIO = 0.92;
-const DISMISS_VELOCITY = 0.3;
-const DISMISS_DISTANCE = 60;
-const SPRING_CONFIG = {
-  damping: 28,
-  stiffness: 280,
-  mass: 0.8,
-  useNativeDriver: true,
-} as const;
-const SPRING_CLOSE = {
-  damping: 24,
-  stiffness: 320,
-  mass: 0.7,
-  useNativeDriver: true,
-} as const;
-const OVERLAY_DURATION = 200;
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+const SCRIM_COLOR = "rgba(0,0,0,0.42)";
+const HANDLE_HEIGHT = 24; // paddingTop + pill + paddingBottom
+const RUBBER_BAND = 0.55;
+
+const SPRING_OPEN = { damping: 32, stiffness: 280, mass: 0.9, overshootClamping: false } as const;
+const SPRING_SETTLE = { damping: 30, stiffness: 260, mass: 0.85, overshootClamping: false } as const;
+const SPRING_CLOSE = { damping: 26, stiffness: 340, mass: 0.75, overshootClamping: true } as const;
+const CLOSE_DURATION = 220;
+const OVERLAY_DURATION = 180;
+
+const DISMISS_VELOCITY = 500;
+const SNAP_VELOCITY_THRESHOLD = 250;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Compute translateY offsets for each snap point. Sorted ascending (lowest = tallest sheet). */
+function snapOffsets(
+  points: number[],
+  maxHeight: number,
+  screenHeight: number,
+): number[] {
+  return points
+    .map((p) => maxHeight - p * screenHeight)
+    .sort((a, b) => a - b);
+}
+
+/** Find the index of the nearest value in a sorted array. */
+function nearestIndex(value: number, sorted: number[]): number {
+  "worklet";
+  let best = 0;
+  let bestDist = Math.abs(value - sorted[0]);
+  for (let i = 1; i < sorted.length; i++) {
+    const d = Math.abs(value - sorted[i]);
+    if (d < bestDist) {
+      bestDist = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/** Determine the target snap offset from current position + velocity. */
+function resolveSnap(
+  currentY: number,
+  velocityY: number,
+  offsets: number[],
+  maxHeight: number,
+): { target: number; dismiss: boolean } {
+  "worklet";
+  const lowestOffset = offsets[offsets.length - 1]; // shortest sheet
+  const highestOffset = offsets[0]; // tallest sheet
+
+  // Dismiss if pulled well below the lowest snap or flicked down fast
+  if (currentY > lowestOffset + 80 || velocityY > DISMISS_VELOCITY) {
+    return { target: maxHeight, dismiss: true };
+  }
+
+  // Velocity-driven snap
+  if (Math.abs(velocityY) > SNAP_VELOCITY_THRESHOLD) {
+    const idx = nearestIndex(currentY, offsets);
+    if (velocityY > 0) {
+      // Dragging down → shorter sheet (higher offset index)
+      const next = Math.min(idx + 1, offsets.length - 1);
+      return { target: offsets[next], dismiss: false };
+    } else {
+      // Dragging up → taller sheet (lower offset index)
+      const next = Math.max(idx - 1, 0);
+      return { target: offsets[next], dismiss: false };
+    }
+  }
+
+  // Proximity snap
+  const idx = nearestIndex(currentY, offsets);
+  return { target: offsets[idx], dismiss: false };
+}
+
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface BottomSheetProps {
   visible: boolean;
   onDismiss: () => void;
   onCloseComplete?: () => void;
   children: React.ReactNode;
-  title?: string;
+  /**
+   * Snap points as fractions of screen height, sorted ascending.
+   * The sheet will rest at these positions. Default: [0.92].
+   * Use e.g. [0.45] for compact action menus, [0.5, 0.92] for expandable sheets.
+   */
+  snapPoints?: number[];
+  /** Which snap index to open at. Default: last (tallest). */
+  initialSnapIndex?: number;
+  /**
+   * When true, a downward drag on the sheet content (in addition to the handle)
+   * can collapse or dismiss the sheet. Set this to true only when the content's
+   * scroll view is scrolled to the very top — pass false whenever the user has
+   * scrolled down so that the scroll view retains full control of touches.
+   * Defaults to false.
+   */
   swipeContentToDismiss?: boolean;
 }
 
 export interface BottomSheetHandle {
   dismiss: () => void;
+  /** Snap to a specific snap index. */
+  snapTo: (index: number) => void;
 }
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
   function BottomSheet(
@@ -60,7 +148,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       onDismiss,
       onCloseComplete,
       children,
-      title,
+      snapPoints: snapPointsProp = [0.92],
+      initialSnapIndex,
       swipeContentToDismiss = false,
     },
     ref,
@@ -69,18 +158,64 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const styles = useMemo(() => createStyles(theme), [theme]);
     const insets = useSafeAreaInsets();
     const { height: screenHeight } = useWindowDimensions();
-    const [allowsPointerEvents, setAllowsPointerEvents] = useState(visible);
-    const isClosingRef = useRef(false);
-    const isOpenRef = useRef(false);
+    const [mounted, setMounted] = useState(false);
+    const isClosing = useSharedValue(false);
+    const isDragging = useSharedValue(false);
 
-    const maxHeight = screenHeight * MAX_SHEET_RATIO;
-    const translateY = useRef(new Animated.Value(maxHeight)).current;
-    const overlayOpacity = useRef(new Animated.Value(0)).current;
-    const keyboardHeight = useRef(new Animated.Value(0)).current;
+    // Sort snap points ascending
+    const sortedSnaps = useMemo(
+      () => [...snapPointsProp].sort((a, b) => a - b),
+      [snapPointsProp],
+    );
+    const maxSnap = sortedSnaps[sortedSnaps.length - 1];
+    const maxHeight = screenHeight * maxSnap;
+    const offsets = useMemo(
+      () => snapOffsets(sortedSnaps, maxHeight, screenHeight),
+      [sortedSnaps, maxHeight, screenHeight],
+    );
+
+    // The translateY value: maxHeight = hidden, offsets[i] = at snap i, 0 = tallest sheet
+    const translateY = useSharedValue(maxHeight);
+    const backdropOpacity = useSharedValue(0);
+    const keyboardOffset = useSharedValue(0);
+    const dragStartY = useSharedValue(0);
+    const preKeyboardSnapY = useSharedValue<number | null>(null);
+
+    // ── Lifecycle ────────────────────────────────────────────────────────
+
+    const finishUnmount = useCallback(() => {
+      isClosing.value = false;
+      setMounted(false);
+      onCloseComplete?.();
+    }, [onCloseComplete, isClosing]);
+
+    const requestClose = useCallback(() => {
+      if (isClosing.value) return;
+      isClosing.value = true;
+      Keyboard.dismiss();
+      keyboardOffset.value = 0;
+      onDismiss();
+    }, [onDismiss, isClosing, keyboardOffset]);
+
+    const snapTo = useCallback(
+      (index: number) => {
+        const clamped = Math.max(0, Math.min(index, offsets.length - 1));
+        translateY.value = withSpring(offsets[clamped], SPRING_SETTLE);
+      },
+      [offsets, translateY],
+    );
+
+    useImperativeHandle(
+      ref,
+      () => ({ dismiss: requestClose, snapTo }),
+      [requestClose, snapTo],
+    );
+
+    // ── Keyboard tracking ───────────────────────────────────────────────
 
     useEffect(() => {
       if (!visible) {
-        keyboardHeight.setValue(0);
+        keyboardOffset.value = 0;
         return;
       }
 
@@ -90,207 +225,210 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
       const onShow = (e: RNKeyboardEvent) => {
-        const kbHeight = e.endCoordinates.height;
-        const offset =
-          Platform.OS === "ios" ? kbHeight - insets.bottom : kbHeight;
-
-        Animated.spring(keyboardHeight, {
-          toValue: Math.max(0, offset),
-          ...SPRING_CONFIG,
-        }).start();
+        const kb = e.endCoordinates.height;
+        const offset = Platform.OS === "ios" ? kb - insets.bottom : kb;
+        if (preKeyboardSnapY.value === null) {
+          preKeyboardSnapY.value = translateY.value;
+        }
+        translateY.value = withSpring(offsets[0], SPRING_SETTLE);
+        keyboardOffset.value = withSpring(Math.max(0, offset), SPRING_SETTLE);
       };
 
       const onHide = () => {
-        Animated.spring(keyboardHeight, {
-          toValue: 0,
-          ...SPRING_CONFIG,
-        }).start();
+        if (preKeyboardSnapY.value !== null && !isClosing.value) {
+          translateY.value = withSpring(preKeyboardSnapY.value, SPRING_SETTLE);
+        }
+        preKeyboardSnapY.value = null;
+        keyboardOffset.value = withSpring(0, SPRING_SETTLE);
       };
 
-      const sub1 = Keyboard.addListener(showEvent, onShow);
-      const sub2 = Keyboard.addListener(hideEvent, onHide);
-
+      const s1 = Keyboard.addListener(showEvent, onShow);
+      const s2 = Keyboard.addListener(hideEvent, onHide);
       return () => {
-        sub1.remove();
-        sub2.remove();
-        keyboardHeight.setValue(0);
+        s1.remove();
+        s2.remove();
+        preKeyboardSnapY.value = null;
+        keyboardOffset.value = 0;
       };
-    }, [visible, keyboardHeight, insets.bottom]);
+    }, [
+      visible,
+      keyboardOffset,
+      insets.bottom,
+      isClosing,
+      offsets,
+      preKeyboardSnapY,
+      translateY,
+    ]);
 
-    const handleCloseComplete = useCallback(() => {
-      isClosingRef.current = false;
-      onCloseComplete?.();
-    }, [onCloseComplete]);
+    // ── Open / close animations ─────────────────────────────────────────
 
-    const open = useCallback(() => {
-      isClosingRef.current = false;
-      isOpenRef.current = true;
-      setAllowsPointerEvents(true);
-      Animated.parallel([
-        Animated.timing(overlayOpacity, {
-          toValue: 1,
-          duration: OVERLAY_DURATION,
-          useNativeDriver: true,
-        }),
-        Animated.spring(translateY, {
-          toValue: 0,
-          ...SPRING_CONFIG,
-        }),
-      ]).start();
-    }, [overlayOpacity, translateY]);
-
-    const close = useCallback(
-      (notifyParent: boolean) => {
-        if (isClosingRef.current) {
-          return;
-        }
-
-        isClosingRef.current = true;
-        setAllowsPointerEvents(false);
-        Keyboard.dismiss();
-        keyboardHeight.setValue(0);
-
-        Animated.parallel([
-          Animated.timing(overlayOpacity, {
-            toValue: 0,
-            duration: 150,
-            useNativeDriver: true,
-          }),
-          Animated.spring(translateY, {
-            toValue: maxHeight,
-            ...SPRING_CLOSE,
-          }),
-        ]).start(({ finished }) => {
-          if (finished) {
-            isOpenRef.current = false;
-            handleCloseComplete();
-          }
-        });
-
-        if (notifyParent) {
-          onDismiss();
-        }
-      },
-      [
-        handleCloseComplete,
-        keyboardHeight,
-        maxHeight,
-        onDismiss,
-        overlayOpacity,
-        translateY,
-      ],
-    );
-
-    const requestClose = useCallback(() => {
-      close(true);
-    }, [close]);
-
-    const snapOpen = useCallback(() => {
-      Animated.spring(translateY, {
-        toValue: 0,
-        ...SPRING_CONFIG,
-      }).start();
-    }, [translateY]);
-
-    useImperativeHandle(ref, () => ({ dismiss: requestClose }), [requestClose]);
+    useEffect(() => {
+      if (visible) setMounted(true);
+    }, [visible]);
 
     useEffect(() => {
       if (visible) {
-        open();
-      } else if (isOpenRef.current && !isClosingRef.current) {
-        close(false);
+        isClosing.value = false;
+        preKeyboardSnapY.value = null;
+        const targetIdx =
+          initialSnapIndex !== undefined
+            ? Math.min(initialSnapIndex, offsets.length - 1)
+            : offsets.length - 1;
+        translateY.value = withSpring(offsets[targetIdx], SPRING_OPEN);
+        backdropOpacity.value = withTiming(1, { duration: OVERLAY_DURATION });
+      } else {
+        Keyboard.dismiss();
+        preKeyboardSnapY.value = null;
+        keyboardOffset.value = 0;
+        translateY.value = withSpring(maxHeight, SPRING_CLOSE, (finished) => {
+          if (finished) runOnJS(finishUnmount)();
+        });
+        backdropOpacity.value = withTiming(0, { duration: CLOSE_DURATION });
       }
-    }, [close, open, visible]);
+    }, [
+      visible,
+      maxHeight,
+      offsets,
+      initialSnapIndex,
+      translateY,
+      backdropOpacity,
+      keyboardOffset,
+      isClosing,
+      finishUnmount,
+      preKeyboardSnapY,
+    ]);
 
+    // Re-snap when offsets change while open (e.g. snapPoints change)
     useEffect(() => {
-      if (!visible) {
-        translateY.setValue(maxHeight);
-        overlayOpacity.setValue(0);
+      if (mounted && !isClosing.value && translateY.value < maxHeight) {
+        translateY.value = withSpring(offsets[offsets.length - 1], SPRING_SETTLE);
       }
-    }, [maxHeight, overlayOpacity, translateY, visible]);
+    }, [offsets, maxHeight, mounted, translateY]);
 
-    const dragPanResponder = useMemo(
+    // ── Handle drag gesture ─────────────────────────────────────────────
+
+    const handleGesture = useMemo(
       () =>
-        PanResponder.create({
-          onMoveShouldSetPanResponder: (_, gestureState) =>
-            Math.abs(gestureState.dy) > 5 &&
-            Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
-          onPanResponderGrant: () => {
-            translateY.stopAnimation();
-          },
-          onPanResponderMove: (_, gestureState) => {
-            translateY.setValue(Math.max(0, gestureState.dy));
-          },
-          onPanResponderRelease: (_, gestureState) => {
-            if (
-              gestureState.dy > DISMISS_DISTANCE ||
-              gestureState.vy > DISMISS_VELOCITY
-            ) {
-              requestClose();
-              return;
+        Gesture.Pan()
+          .activeOffsetY(6)
+          .failOffsetX([-20, 20])
+          .onStart(() => {
+            "worklet";
+            isDragging.value = true;
+            dragStartY.value = translateY.value;
+            // Cancel any running spring so the gesture takes over immediately
+            translateY.value = translateY.value;
+          })
+          .onUpdate((e) => {
+            "worklet";
+            const raw = dragStartY.value + e.translationY;
+            const topBound = offsets[0]; // tallest sheet offset (closest to 0)
+            const bottomBound = offsets[offsets.length - 1]; // shortest sheet offset
+
+            if (raw < topBound) {
+              // Rubber-band above tallest snap
+              const over = topBound - raw;
+              translateY.value = topBound - over * RUBBER_BAND;
+            } else if (raw > bottomBound) {
+              // Rubber-band below shortest snap (toward dismiss)
+              const over = raw - bottomBound;
+              translateY.value = bottomBound + over * RUBBER_BAND;
+            } else {
+              translateY.value = raw;
             }
-
-            snapOpen();
-          },
-          onPanResponderTerminate: () => {
-            snapOpen();
-          },
-        }),
-      [requestClose, snapOpen, translateY],
+          })
+          .onEnd((e) => {
+            "worklet";
+            isDragging.value = false;
+            const { target, dismiss } = resolveSnap(
+              translateY.value,
+              e.velocityY,
+              offsets,
+              maxHeight,
+            );
+            if (dismiss) {
+              runOnJS(requestClose)();
+            } else {
+              translateY.value = withSpring(target, SPRING_SETTLE);
+            }
+          })
+          .onFinalize(() => {
+            "worklet";
+            isDragging.value = false;
+          }),
+      [offsets, maxHeight, translateY, isDragging, dragStartY, requestClose],
     );
 
-    const contentPanHandlers = swipeContentToDismiss
-      ? dragPanResponder.panHandlers
-      : undefined;
+    // ── Content swipe-to-dismiss gesture ────────────────────────────────
+    // Enabled only when swipeContentToDismiss=true (caller reports scroll is at top).
+    // failOffsetY([-5, 99999]): fails immediately on any upward drag so inner
+    // ScrollViews retain full control of scroll-up events. Only downward drag
+    // past activeOffsetY(10) activates the sheet dismiss.
 
-    const combinedTranslateY = useMemo(
-      () => Animated.subtract(translateY, keyboardHeight),
-      [keyboardHeight, translateY],
-    );
-    const dragFade = useMemo(
+    const contentGesture = useMemo(
       () =>
-        translateY.interpolate({
-          inputRange: [0, maxHeight * 0.5],
-          outputRange: [1, 0.3],
-          extrapolate: "clamp",
-        }),
-      [maxHeight, translateY],
+        Gesture.Pan()
+          .enabled(swipeContentToDismiss)
+          .activeOffsetY(10)
+          .failOffsetX([-20, 20])
+          .failOffsetY([-5, 99999])
+          .onStart(() => {
+            "worklet";
+            dragStartY.value = translateY.value;
+          })
+          .onUpdate((e) => {
+            "worklet";
+            if (e.translationY > 0) {
+              const raw = dragStartY.value + e.translationY;
+              const bottomBound = offsets[offsets.length - 1];
+              if (raw > bottomBound) {
+                const over = raw - bottomBound;
+                translateY.value = bottomBound + over * RUBBER_BAND;
+              } else {
+                translateY.value = raw;
+              }
+            }
+          })
+          .onEnd((e) => {
+            "worklet";
+            const { target, dismiss } = resolveSnap(
+              translateY.value,
+              e.velocityY,
+              offsets,
+              maxHeight,
+            );
+            if (dismiss) {
+              runOnJS(requestClose)();
+            } else {
+              translateY.value = withSpring(target, SPRING_SETTLE);
+            }
+          }),
+      [offsets, maxHeight, translateY, dragStartY, requestClose, swipeContentToDismiss],
     );
-    const effectiveOverlayOpacity = useMemo(
-      () => Animated.multiply(overlayOpacity, dragFade),
-      [dragFade, overlayOpacity],
-    );
-    const handlePillOpacity = useMemo(
-      () =>
-        translateY.interpolate({
-          inputRange: [0, maxHeight * 0.5],
-          outputRange: [1, 0.4],
-          extrapolate: "clamp",
-        }),
-      [maxHeight, translateY],
-    );
+
+    // ── Animated styles ─────────────────────────────────────────────────
+
+    const backdropStyle = useAnimatedStyle(() => {
+      // Fade backdrop in proportion to how far the sheet is pulled down
+      const progress = 1 - translateY.value / maxHeight;
+      return {
+        opacity: backdropOpacity.value * clamp(progress, 0, 1),
+      };
+    });
+
+    const sheetStyle = useAnimatedStyle(() => ({
+      transform: [{ translateY: translateY.value }],
+    }));
+
+    const contentWrapperAnimatedStyle = useAnimatedStyle(() => ({
+      paddingBottom: keyboardOffset.value,
+    }));
+
+    if (!mounted) return null;
 
     return (
-      <View
-        style={[
-          styles.wrapper,
-          Platform.OS === "web"
-            ? ({
-                pointerEvents: allowsPointerEvents ? "auto" : "none",
-              } as unknown as ViewStyle)
-            : null,
-        ]}
-        pointerEvents={
-          Platform.OS === "web"
-            ? undefined
-            : allowsPointerEvents
-              ? "auto"
-              : "none"
-        }
-      >
-        <Animated.View
-          style={[styles.overlay, { opacity: effectiveOverlayOpacity }]}
-        >
+      <View style={styles.wrapper} pointerEvents="auto">
+        <Animated.View style={[styles.overlay, backdropStyle]}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={requestClose}
@@ -300,92 +438,86 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         </Animated.View>
 
         <Animated.View
-          style={[
-            styles.sheet,
-            {
-              height: maxHeight,
-              paddingBottom: insets.bottom,
-              transform: [{ translateY: combinedTranslateY }],
-            },
-          ]}
-          accessibilityRole="none"
-          accessibilityLabel={title}
+          style={[styles.sheet, { height: maxHeight }, sheetStyle]}
         >
-          <View {...dragPanResponder.panHandlers} style={styles.handleArea}>
-            <Animated.View
-              style={[styles.handlePill, { opacity: handlePillOpacity }]}
-            />
-          </View>
+          <GestureDetector gesture={handleGesture}>
+            <View style={styles.handleArea}>
+              <View style={styles.handlePill} />
+            </View>
+          </GestureDetector>
 
-          <View {...contentPanHandlers} style={styles.contentWrapper}>
-            {children}
-          </View>
+          <GestureDetector gesture={contentGesture}>
+            <Animated.View
+              style={[styles.contentWrapper, contentWrapperAnimatedStyle]}
+            >
+              {children}
+            </Animated.View>
+          </GestureDetector>
         </Animated.View>
       </View>
     );
   },
 );
 
+// ─── Styles ─────────────────────────────────────────────────────────────────
+
 function createStyles(theme: ThemeTokens) {
-  const view = {
+  return StyleSheet.create({
     wrapper: {
-      position: "absolute" as const,
+      position: "absolute",
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
       zIndex: 1000,
-    },
+    } as ViewStyle,
 
     overlay: {
-      position: "absolute" as const,
+      position: "absolute",
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: "transparent",
-    },
+      backgroundColor: SCRIM_COLOR,
+    } as ViewStyle,
 
     sheet: {
-      position: "absolute" as const,
+      position: "absolute",
       bottom: 0,
       left: 0,
       right: 0,
       backgroundColor: theme.colors.card,
+      borderTopLeftRadius: 14,
+      borderTopRightRadius: 14,
       ...(Platform.OS === "ios"
         ? {
             shadowColor: "#000",
-            shadowOffset: { width: 0, height: -3 },
-            shadowOpacity: 0.16,
-            shadowRadius: 18,
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.18,
+            shadowRadius: 24,
           }
-        : { elevation: 16 }),
-      overflow: "hidden" as const,
-      borderTopLeftRadius: 16,
-      borderTopRightRadius: 16,
-    },
+        : { elevation: 24 }),
+      overflow: "hidden",
+    } as ViewStyle,
 
     handleArea: {
-      paddingTop: 14,
-      paddingBottom: 12,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      marginHorizontal: -16,
-      paddingHorizontal: 16,
-    },
+      height: HANDLE_HEIGHT,
+      paddingTop: 10,
+      paddingBottom: 10,
+      alignItems: "center",
+      justifyContent: "center",
+    } as ViewStyle,
 
     handlePill: {
-      width: 48,
+      width: 36,
       height: 5,
-      borderRadius: 9999,
+      borderRadius: 3,
       backgroundColor: theme.colors.muted,
-    },
+    } as ViewStyle,
 
     contentWrapper: {
       flex: 1,
       minHeight: 0,
-    },
-  } satisfies Record<string, ViewStyle>;
-
-  return StyleSheet.create(view);
+    } as ViewStyle,
+  });
 }

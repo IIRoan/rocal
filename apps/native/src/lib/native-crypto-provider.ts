@@ -74,12 +74,17 @@ function createSubtleCryptoProvider(subtle: SubtleCrypto): CryptoProvider {
     subtle: {
       generateKey: (
         algorithm: any,
-        extractable: boolean,
+        _extractable: boolean,
         keyUsages: string[],
       ) =>
+        // Always generate extractable keys on native. The e2ee module creates
+        // RSA wrapping keys with extractable:false, but we must persist them to
+        // SecureStore (the secure enclave IS the key store here). The native
+        // WebCrypto runtime enforces the flag strictly, so without this override
+        // exportKey("jwk", privateKey) throws InvalidAccessError.
         subtle.generateKey(
           algorithm,
-          extractable,
+          true,
           keyUsages as KeyUsage[],
         ) as unknown as Promise<CryptoKey>,
       importKey: (

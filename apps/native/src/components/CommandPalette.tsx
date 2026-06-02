@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import type { CalendarEvent } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCommandPalette } from "../providers/CommandPaletteProvider";
 import { useSheet } from "../providers/SheetProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
@@ -41,6 +42,7 @@ const SEARCH_LIMIT = 8;
  */
 export function CommandPalette() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { isOpen, close } = useCommandPalette();
   const { openEventSheet } = useSheet();
@@ -170,7 +172,6 @@ export function CommandPalette() {
       visible={isOpen}
       onDismiss={close}
       onCloseComplete={handleCloseComplete}
-      title="Command palette"
     >
       <View style={styles.searchRow}>
         <Feather
@@ -204,7 +205,7 @@ export function CommandPalette() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 8 }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >

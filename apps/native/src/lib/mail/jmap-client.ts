@@ -614,6 +614,15 @@ export class StalwartJmapClient {
     }
   }
 
+  async deleteMessage(session: JmapSession, messageId: string): Promise<void> {
+    const accountId = this.requirePrimaryAccountId(session);
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Email/set", { accountId, destroy: [messageId] }, "c1"]],
+    );
+  }
+
   async moveToMailbox(
     session: JmapSession,
     messageId: string,
