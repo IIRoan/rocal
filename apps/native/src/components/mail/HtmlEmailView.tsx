@@ -7,6 +7,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
+import type { ThemeTokens } from "@workspace/design-tokens";
 import {
   buildEmailHtmlDocument,
   emailHasOwnDarkMode,
@@ -59,6 +60,7 @@ const FIT_AND_REPORT_SCRIPT = `
 interface HtmlEmailViewProps {
   html: string;
   isDark: boolean;
+  theme?: ThemeTokens;
   blockRemoteImages?: boolean;
   blockTrackingPixels?: boolean;
   style?: ViewStyle;
@@ -67,6 +69,7 @@ interface HtmlEmailViewProps {
 export function HtmlEmailView({
   html,
   isDark,
+  theme,
   blockRemoteImages = false,
   blockTrackingPixels = true,
   style,
@@ -147,7 +150,7 @@ export function HtmlEmailView({
             { backgroundColor: bg },
           ]}
         >
-          <ActivityIndicator />
+          <ActivityIndicator color={theme?.colors.primaryBase} />
         </View>
       )}
     </View>

@@ -34,6 +34,10 @@ import {
   SectionHeader,
   EmptyCard,
 } from "../../src/components/ui/list-components";
+import {
+  LoadingScreen,
+  InlineLoader,
+} from "../../src/components/ui/loading";
 
 type ReadOnlyCalendarEntry = {
   subscription: CalendarSubscription;
@@ -242,12 +246,7 @@ export default function CalendarManageScreen() {
   // ─── Loading state ─────────────────────────────────────────────────────────
 
   if (isLoading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-        <Text style={styles.loadingText}>Loading calendars…</Text>
-      </SafeAreaView>
-    );
+    return <LoadingScreen theme={theme} message="Loading calendars…" />;
   }
 
   // ─── Error state ───────────────────────────────────────────────────────────
@@ -350,10 +349,7 @@ export default function CalendarManageScreen() {
           theme={theme}
         />
         {subscriptionsLoading ? (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color={theme.colors.primaryBase} />
-            <Text style={styles.loadingInlineText}>Loading subscriptions…</Text>
-          </View>
+          <InlineLoader theme={theme} message="Loading subscriptions…" />
         ) : readOnlyCalendars.length === 0 ? (
           <EmptyCard
             icon="rss"
@@ -695,13 +691,6 @@ function createStyles(theme: ThemeTokens) {
       borderRadius: theme.borderRadius.full,
       backgroundColor: theme.colors.muted,
     },
-    loadingRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-    },
     emptyContainer: {
       flex: 1,
       justifyContent: "center" as const,
@@ -753,17 +742,6 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
       color: theme.colors.mutedForeground,
-    },
-    loadingInlineText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    loadingText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-      marginTop: theme.spacing["2"],
     },
     errorText: {
       fontSize: theme.typography.fontSize.base.size,

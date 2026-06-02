@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   Modal,
   Pressable,
@@ -15,6 +14,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { getErrorMessage } from "@workspace/calendar-core";
 import type { MailAttachmentPreviewKind } from "../../lib/mail/attachment-preview";
+import { CenteredLoader } from "../ui/loading";
 
 type WebViewModule = typeof import("react-native-webview");
 type WebViewComponent = WebViewModule["WebView"];
@@ -122,9 +122,7 @@ export function AttachmentPreviewModal({
 
         <View style={styles.content}>
           {isLoading ? (
-            <View style={styles.centered}>
-              <ActivityIndicator color={theme.colors.primaryBase} />
-            </View>
+            <CenteredLoader theme={theme} />
           ) : error ? (
             <View style={styles.centered}>
               <Feather

@@ -18,6 +18,7 @@ import type { Calendar, CalendarSubscription } from "@workspace/calendar-core";
 import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { StackScreenHeader } from "../../src/components/StackScreenHeader";
+import { LoadingScreen } from "../../src/components/ui/loading";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
@@ -188,12 +189,7 @@ export default function SubscriptionListScreen() {
   );
 
   if (isLoading && subscriptions.length === 0) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-        <Text style={styles.loadingText}>Loading read-only calendars…</Text>
-      </SafeAreaView>
-    );
+    return <LoadingScreen theme={theme} message="Loading read-only calendars…" />;
   }
 
   if (isError) {
@@ -522,11 +518,6 @@ function createStyles(theme: ThemeTokens) {
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    loadingText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
     errorText: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,

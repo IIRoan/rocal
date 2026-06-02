@@ -43,6 +43,7 @@ import {
   useMailRuntime,
 } from "../lib/mail/use-mail";
 import { getMailboxIcon, sortMailboxes } from "../lib/mail/mail-helpers";
+import { InlineLoader } from "./ui/loading";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.78;
@@ -466,12 +467,7 @@ export function AppSidebar() {
                 </View>
 
                 {calendarsLoading ? (
-                  <View style={styles.loadingRow}>
-                    <ActivityIndicator
-                      size="small"
-                      color={theme.colors.primaryBase}
-                    />
-                  </View>
+                  <InlineLoader theme={theme} />
                 ) : calendars.length === 0 ? (
                   <Text style={styles.emptyText}>
                     No calendars yet. Tap + to create one.
@@ -592,9 +588,7 @@ function MailSidebarBody({
         </View>
 
         {isLoading ? (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color={theme.colors.primaryBase} />
-          </View>
+          <InlineLoader theme={theme} />
         ) : !provisioned ? (
           <Text style={styles.emptyText}>
             Your mailbox is being set up. Check back soon.
@@ -779,10 +773,6 @@ function createStyles(theme: ThemeTokens) {
       borderRadius: 9999,
       alignItems: "center" as const,
       justifyContent: "center" as const,
-    },
-    loadingRow: {
-      alignItems: "center" as const,
-      paddingVertical: theme.spacing["3"],
     },
     pressed: {
       opacity: 0.6,

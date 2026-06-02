@@ -20,6 +20,7 @@ import { useSidebar } from "../../../src/providers/SidebarProvider";
 import { useMailSelection } from "../../../src/providers/MailSelectionProvider";
 import { useCommandPalette } from "../../../src/providers/CommandPaletteProvider";
 import { AppSwitcher } from "../../../src/components/AppSwitcher";
+import { CenteredLoader } from "../../../src/components/ui/loading";
 import { MailMessageRow } from "../../../src/components/mail/MailMessageRow";
 import {
   useMailAccount,
@@ -131,9 +132,7 @@ export default function MailScreen() {
       {header}
 
       {accountQuery.isLoading ? (
-        <CenteredState theme={theme}>
-          <ActivityIndicator color={theme.colors.primaryBase} />
-        </CenteredState>
+        <CenteredLoader theme={theme} />
       ) : accountQuery.isError ? (
         <ErrorState
           theme={theme}
@@ -156,10 +155,7 @@ export default function MailScreen() {
           onSetup={() => provisionMailbox.mutate()}
         />
       ) : runtimeQuery.isLoading ? (
-        <CenteredState theme={theme}>
-          <ActivityIndicator color={theme.colors.primaryBase} />
-          <Text style={styles.mutedText}>Connecting to your mailbox…</Text>
-        </CenteredState>
+        <CenteredLoader theme={theme} message="Connecting to your mailbox…" />
       ) : runtimeQuery.isError ? (
         <ErrorState
           theme={theme}
@@ -193,18 +189,16 @@ export default function MailScreen() {
             }
             ListEmptyComponent={
               messagesQuery.isLoading ? (
-                <CenteredState theme={theme}>
-                  <ActivityIndicator color={theme.colors.primaryBase} />
-                </CenteredState>
+                <CenteredLoader theme={theme} />
               ) : (
-                <CenteredState theme={theme}>
+                <View style={styles.centered}>
                   <Feather
                     name="inbox"
                     size={40}
                     color={theme.colors.mutedForeground}
                   />
                   <Text style={styles.mutedText}>No messages here</Text>
-                </CenteredState>
+                </View>
               )
             }
           />
@@ -212,17 +206,6 @@ export default function MailScreen() {
       )}
     </SafeAreaView>
   );
-}
-
-function CenteredState({
-  theme,
-  children,
-}: {
-  theme: ThemeTokens;
-  children: React.ReactNode;
-}) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  return <View style={styles.centered}>{children}</View>;
 }
 
 function ErrorState({

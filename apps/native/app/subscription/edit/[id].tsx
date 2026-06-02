@@ -21,6 +21,7 @@ import { getErrorMessage } from "@workspace/calendar-core";
 import type { UpdateSubscriptionRequest } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { StackScreenHeader } from "../../../src/components/StackScreenHeader";
+import { LoadingScreen } from "../../../src/components/ui/loading";
 import { ColorPicker } from "../../../src/components/event/ColorPicker";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { calendarApiService } from "../../../src/lib/api";
@@ -238,12 +239,7 @@ export default function SubscriptionEditScreen() {
   }, [subscription?.url]);
 
   if (subscriptionsLoading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-        <Text style={styles.helperText}>Loading calendar…</Text>
-      </SafeAreaView>
-    );
+    return <LoadingScreen theme={theme} message="Loading calendar…" />;
   }
 
   if (!subscription) {

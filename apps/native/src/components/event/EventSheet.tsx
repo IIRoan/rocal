@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -36,6 +35,7 @@ import {
   type CacheSnapshot,
 } from "../../lib/optimistic-events";
 import { BottomSheet, type BottomSheetHandle } from "../BottomSheet";
+import { CenteredLoader } from "../ui/loading";
 
 import { EventForm } from "./EventForm";
 import { toLocalISOString } from "./event-form-utils";
@@ -467,10 +467,7 @@ export function EventSheet({
         swipeContentToDismiss={canSwipeViewContentToDismiss}
       >
         {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-            <Text style={styles.loadingText}>Loading…</Text>
-          </View>
+          <CenteredLoader theme={theme} message="Loading…" />
         ) : viewMode === "view" && event ? (
           <>
             {/* ── View mode body ─────────────────────────────────── */}
@@ -911,12 +908,6 @@ function createStyles(theme: ThemeTokens) {
       marginTop: 8,
     },
 
-    // ── Loading ────────────────────────────────────────────────────────
-    loadingContainer: {
-      paddingVertical: 40,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
@@ -965,11 +956,6 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.destructive,
-    },
-    loadingText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.mutedForeground,
-      marginTop: 8,
     },
     errorText: {
       fontSize: theme.typography.fontSize.sm.size,
