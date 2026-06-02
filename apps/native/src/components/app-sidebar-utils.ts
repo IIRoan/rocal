@@ -4,7 +4,7 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import {
   CALENDAR_HOME_ROUTE,
   SETTINGS_ROUTE,
-} from "../lib/auth-routing";
+} from "../lib/navigation-routes";
 import { resolveCalendarSwatchColor } from "../lib/calendar-color-utils";
 
 export type SidebarIconName =

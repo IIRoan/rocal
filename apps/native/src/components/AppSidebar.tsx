@@ -16,7 +16,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { usePathname, useRouter } from "expo-router";
+import { useRouter, useSegments } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import {
   keepPreviousData,
@@ -34,6 +34,14 @@ import { useSidebar } from "../providers/SidebarProvider";
 import { useMailSelection } from "../providers/MailSelectionProvider";
 import { useCommandPalette } from "../providers/CommandPaletteProvider";
 import { calendarApiService } from "../lib/api";
+import {
+  CALENDAR_TAB_ROUTE,
+  MAIL_TAB_ROUTE,
+  SETTINGS_ROUTE,
+  isCalendarRouteSegments,
+  isMailRouteSegments,
+  isSidebarGestureRootSegments,
+} from "../lib/navigation-routes";
 import { QUERY_KEYS } from "../lib/query-keys";
 import { buildSidebarCalendarSections } from "./app-sidebar-utils";
 import { SidebarMiniCalendar } from "./SidebarMiniCalendar";
@@ -68,7 +76,7 @@ export function AppSidebar() {
   const { open: openCommandPalette } = useCommandPalette();
   const { selectedMailboxId, setSelectedMailboxId } = useMailSelection();
   const insets = useSafeAreaInsets();
-  const pathname = usePathname();
+  const segments = useSegments();
   const router = useRouter();
   const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -89,7 +97,9 @@ export function AppSidebar() {
     [calendars, theme],
   );
 
-  const isMailContext = pathname.includes("/mail");
+  const isMailContext = isMailRouteSegments(segments);
+  const isCalendarContext = isCalendarRouteSegments(segments);
+  const isMainScreen = isSidebarGestureRootSegments(segments);
 
   const mailAccountQuery = useMailAccount();
   const mailProvisioned = mailAccountQuery.data?.provisioned ?? false;
@@ -251,11 +261,11 @@ export function AppSidebar() {
     (mailboxId: string) => {
       setSelectedMailboxId(mailboxId);
       close();
-      if (!pathname.includes("/mail")) {
-        setTimeout(() => router.replace("/(tabs)/mail" as any), 80);
+      if (!isMailContext) {
+        setTimeout(() => router.replace(MAIL_TAB_ROUTE as any), 80);
       }
     },
-    [close, pathname, router, setSelectedMailboxId],
+    [close, isMailContext, router, setSelectedMailboxId],
   );
 
   const handleSelectCalendarDate = useCallback(
@@ -264,27 +274,23 @@ export function AppSidebar() {
       setSelectedDate(date);
       close();
 
-      if (
-        pathname.includes("/calendar") ||
-        pathname === "/" ||
-        pathname === "/(tabs)/calendar"
-      ) {
+      if (isCalendarContext) {
         return;
       }
 
-      setTimeout(() => router.replace("/(tabs)/calendar" as any), 80);
+      setTimeout(() => router.replace(CALENDAR_TAB_ROUTE as any), 80);
     },
-    [close, pathname, router, setCurrentDate, setSelectedDate],
+    [close, isCalendarContext, router, setCurrentDate, setSelectedDate],
   );
 
   return (
     <>
-      {!isOpen && (
+      {!isOpen && isMainScreen ? (
         <View
           {...edgePanResponder.panHandlers}
           style={[styles.edgeZone, { height: "100%", paddingTop: insets.top }]}
         />
-      )}
+      ) : null}
 
       <View
         style={[
@@ -338,7 +344,7 @@ export function AppSidebar() {
                     />
                   </Pressable>
                   <Pressable
-                    onPress={() => handleNavigate("/(tabs)/settings")}
+                    onPress={() => handleNavigate(SETTINGS_ROUTE)}
                     style={({ pressed }) => [
                       styles.avatarButton,
                       pressed && styles.pressed,
@@ -384,7 +390,7 @@ export function AppSidebar() {
                   mailboxes={sortedMailboxes}
                   selectedMailboxId={selectedMailboxId}
                   onSelectMailbox={handleSelectMailbox}
-                  onCompose={() => handleNavigate("/(tabs)/mail/compose")}
+                  onCompose={() => handleNavigate(`${MAIL_TAB_ROUTE}/compose`)}
                 />
               ) : (
                 <>

@@ -36,29 +36,29 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import {
   useTheme,
   type ThemePreference,
-} from "../../../src/providers/ThemeProvider";
-import { authClient } from "../../../src/lib/auth-client";
-import { useAuth } from "../../../src/providers/AuthProvider";
-import { calendarApiService } from "../../../src/lib/api";
-import { SETTINGS_TIMEZONE_ROUTE } from "../../../src/lib/auth-routing";
-import { formatStoredPasskeyDescription } from "../../../src/lib/passkey-auth";
-import { getAuthCapabilities } from "../../../src/lib/auth-capabilities";
+} from "../../src/providers/ThemeProvider";
+import { authClient } from "../../src/lib/auth-client";
+import { useAuth } from "../../src/providers/AuthProvider";
+import { calendarApiService } from "../../src/lib/api";
+import { SETTINGS_TIMEZONE_ROUTE } from "../../src/lib/auth-routing";
+import { formatStoredPasskeyDescription } from "../../src/lib/passkey-auth";
+import { getAuthCapabilities } from "../../src/lib/auth-capabilities";
 import {
   isPasskeyBridgeOriginSecure,
   resolvePasskeyBridgeBaseUrl,
-} from "../../../src/lib/passkey-browser-bridge";
-import { QUERY_KEYS } from "../../../src/lib/query-keys";
+} from "../../src/lib/passkey-browser-bridge";
+import { QUERY_KEYS } from "../../src/lib/query-keys";
 import {
   THEME_OPTIONS,
   VIEW_OPTIONS,
   WEEK_START_OPTIONS,
   TIME_FORMAT_OPTIONS,
   WEEKDAY_OPTIONS,
-} from "../../../src/lib/settings-options";
-import { getSettingsAccountActions } from "../../../src/lib/settings-screen-utils";
-import { ScreenHeader } from "../../../src/components/ScreenHeader";
-import { BottomSheet } from "../../../src/components/BottomSheet";
-import { LoadingScreen } from "../../../src/components/ui/loading";
+} from "../../src/lib/settings-options";
+import { getSettingsAccountActions } from "../../src/lib/settings-screen-utils";
+import { ScreenHeader } from "../../src/components/ScreenHeader";
+import { BottomSheet } from "../../src/components/BottomSheet";
+import { LoadingScreen } from "../../src/components/ui/loading";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

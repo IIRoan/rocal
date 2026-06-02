@@ -51,7 +51,7 @@ describe("getAuthRedirectPath", () => {
       getAuthRedirectPath({
         isAuthenticated: true,
         isLoading: false,
-        segments: ["(tabs)", "settings"],
+        segments: ["settings"],
       }),
     ).toBeNull();
   });
@@ -83,7 +83,7 @@ describe("shouldRenderAuthenticatedChrome", () => {
       shouldRenderAuthenticatedChrome({
         isAuthenticated: true,
         isLoading: false,
-        segments: ["(tabs)", "settings"],
+        segments: ["settings", "timezone"],
       }),
     ).toBe(true);
   });
