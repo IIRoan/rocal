@@ -58,6 +58,7 @@ import {
 import { getSettingsAccountActions } from "../../../src/lib/settings-screen-utils";
 import { ScreenHeader } from "../../../src/components/ScreenHeader";
 import { BottomSheet } from "../../../src/components/BottomSheet";
+import { LoadingScreen } from "../../../src/components/ui/loading";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -720,12 +721,7 @@ export default function SettingsScreen() {
   // ─── Loading state ─────────────────────────────────────────────────────────
 
   if (isLoading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-        <Text style={styles.loadingText}>Loading settings…</Text>
-      </SafeAreaView>
-    );
+    return <LoadingScreen theme={theme} message="Loading settings…" />;
   }
 
   // ─── Error state ───────────────────────────────────────────────────────────
@@ -2123,12 +2119,6 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
-    },
-    loadingText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-      marginTop: theme.spacing["2"],
     },
     errorText: {
       fontSize: theme.typography.fontSize.base.size,

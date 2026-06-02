@@ -48,6 +48,7 @@ import {
   type MailDecryptResult,
 } from "../../../../src/lib/mail/mail-crypto";
 import { HtmlEmailView } from "../../../../src/components/mail/HtmlEmailView";
+import { CenteredLoader } from "../../../../src/components/ui/loading";
 import { AttachmentPreviewModal } from "../../../../src/components/mail/AttachmentPreviewModal";
 import { BottomSheet } from "../../../../src/components/BottomSheet";
 
@@ -399,9 +400,7 @@ export default function MailMessageScreen() {
       </View>
 
       {messageQuery.isLoading && !message ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={theme.colors.primaryBase} />
-        </View>
+        <CenteredLoader theme={theme} />
       ) : messageQuery.isError && !message ? (
         <View style={styles.centered}>
           <Feather name="alert-triangle" size={36} color={theme.colors.destructive} />
@@ -419,10 +418,7 @@ export default function MailMessageScreen() {
             {messageHeader}
 
             {isDecrypting ? (
-              <View style={styles.centered}>
-                <ActivityIndicator color={theme.colors.primaryBase} />
-                <Text style={styles.mutedText}>Decrypting message…</Text>
-              </View>
+              <CenteredLoader theme={theme} message="Decrypting message…" />
             ) : decryptError ? (
               <DecryptErrorCard
                 theme={theme}
@@ -443,6 +439,7 @@ export default function MailMessageScreen() {
                   key={messageId}
                   html={htmlContent!}
                   isDark={isDark}
+                  theme={theme}
                 />
               </>
             ) : plainContent ? (

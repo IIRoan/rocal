@@ -28,6 +28,10 @@ import { useTheme } from "../../../src/providers/ThemeProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { resolveCalendarSwatchColor } from "../../../src/lib/calendar-color-utils";
+import {
+  LoadingScreen,
+  InlineLoader,
+} from "../../../src/components/ui/loading";
 
 type DeleteAction = "delete_events" | "move_events";
 
@@ -256,12 +260,7 @@ export default function CalendarEditScreen() {
   }, [shareLink?.shareUrl]);
 
   if (calendarLoading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-        <Text style={styles.loadingText}>Loading calendar…</Text>
-      </SafeAreaView>
-    );
+    return <LoadingScreen theme={theme} message="Loading calendar…" />;
   }
 
   if (!calendar) {
@@ -384,13 +383,7 @@ export default function CalendarEditScreen() {
           </Text>
 
           {shareBusy ? (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator
-                size="small"
-                color={theme.colors.primaryBase}
-              />
-              <Text style={styles.helperText}>Updating share link…</Text>
-            </View>
+            <InlineLoader theme={theme} message="Updating share link…" />
           ) : shareLink?.enabled ? (
             <>
               {shareLink.shareUrl ? (
@@ -666,11 +659,6 @@ function createStyles(theme: ThemeTokens) {
       justifyContent: "center" as const,
       paddingHorizontal: theme.spacing["4"],
     },
-    loadingRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
-    },
     selectionList: {
       gap: theme.spacing["2"],
     },
@@ -802,11 +790,6 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.destructive,
-    },
-    loadingText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
     },
   } satisfies Record<string, TextStyle>;
 
