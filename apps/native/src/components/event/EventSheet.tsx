@@ -23,6 +23,7 @@ import type {
 import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../providers/AuthProvider";
 import { calendarApiService } from "../../lib/api";
 import { QUERY_KEYS } from "../../lib/query-keys";
@@ -35,7 +36,8 @@ import {
   type CacheSnapshot,
 } from "../../lib/optimistic-events";
 import { BottomSheet, type BottomSheetHandle } from "../BottomSheet";
-import { EventForm, type EventFormHandle } from "./EventForm";
+
+import { EventForm } from "./EventForm";
 import { toLocalISOString } from "./event-form-utils";
 import {
   formatEventDate,
@@ -156,11 +158,11 @@ export function EventSheet({
   onCloseComplete,
 }: EventSheetProps) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const bottomSheetRef = useRef<BottomSheetHandle>(null);
-  const formRef = useRef<EventFormHandle>(null);
   const createSnapshotRef = useRef<CacheSnapshot>([]);
   const deleteSnapshotRef = useRef<CacheSnapshot>([]);
 
@@ -364,10 +366,6 @@ export function EventSheet({
     }
   }, [viewMode, isViewOrEdit, event, dismissSheet]);
 
-  const handleFormSubmitPress = useCallback(() => {
-    formRef.current?.submit();
-  }, []);
-
   const isRecurring = !!(event?.recurrence || event?.parentEventId);
 
   const handleEditPress = useCallback(() => {
@@ -449,12 +447,6 @@ export function EventSheet({
     createMutation.isPending ||
     updateMutation.isPending ||
     deleteMutation.isPending;
-  const sheetTitle = isCreate
-    ? "Create Event"
-    : viewMode === "view"
-      ? "Event Details"
-      : "Edit Event";
-  const isEditing = viewMode === "edit";
   const iconColor = theme.colors.mutedForeground;
   const iconBg = theme.colors.mutedForeground + "18";
 
@@ -472,92 +464,8 @@ export function EventSheet({
         visible={visible}
         onDismiss={handleSheetDismissRequest}
         onCloseComplete={onCloseComplete}
-        title={sheetTitle}
         swipeContentToDismiss={canSwipeViewContentToDismiss}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          {isEditing ? (
-            <Pressable
-              style={styles.headerTextButton}
-              onPress={handleCancel}
-              accessibilityRole="button"
-              accessibilityLabel="Cancel editing event"
-            >
-              <Text style={styles.headerTextButtonLabel}>Cancel</Text>
-            </Pressable>
-          ) : (
-            <Pressable
-              style={styles.headerIconButton}
-              onPress={dismissSheet}
-              accessibilityRole="button"
-              accessibilityLabel="Close event drawer"
-            >
-              <Feather
-                name="x"
-                size={18}
-                color={theme.colors.mutedForeground}
-              />
-            </Pressable>
-          )}
-
-          <Text
-            style={styles.headerTitle}
-            accessibilityRole="header"
-            numberOfLines={1}
-          >
-            {sheetTitle}
-          </Text>
-
-          {isEditing ? (
-            <Pressable
-              style={[
-                styles.headerPillAction,
-                { backgroundColor: theme.colors.primaryBase },
-                isPending && styles.headerActionDisabled,
-              ]}
-              onPress={handleFormSubmitPress}
-              disabled={isPending}
-              accessibilityRole="button"
-              accessibilityLabel={isCreate ? "Create event" : "Save event"}
-            >
-              {isPending ? (
-                <ActivityIndicator
-                  size="small"
-                  color={theme.colors.primaryForeground}
-                />
-              ) : (
-                <Text
-                  style={[
-                    styles.headerPillActionText,
-                    { color: theme.colors.primaryForeground },
-                  ]}
-                >
-                  {isCreate ? "Create" : "Save"}
-                </Text>
-              )}
-            </Pressable>
-          ) : event?.id ? (
-            <Pressable
-              style={styles.headerTextButton}
-              onPress={handleEditPress}
-              accessibilityRole="button"
-              accessibilityLabel="Edit event"
-            >
-              <Text
-                style={[
-                  styles.headerTextButtonLabel,
-                  { color: theme.colors.primaryBase },
-                ]}
-              >
-                Edit
-              </Text>
-            </Pressable>
-          ) : (
-            <View style={styles.headerTextButton} />
-          )}
-        </View>
-
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primaryBase} />
@@ -568,7 +476,10 @@ export function EventSheet({
             {/* ── View mode body ─────────────────────────────────── */}
             <ScrollView
               style={styles.viewScroll}
-              contentContainerStyle={styles.viewBody}
+              contentContainerStyle={[
+                styles.viewBody,
+                { paddingBottom: Math.max(insets.bottom, 16) + 88 },
+              ]}
               showsVerticalScrollIndicator={false}
               bounces={false}
               overScrollMode="never"
@@ -743,12 +654,51 @@ export function EventSheet({
                 </View>
               )}
             </ScrollView>
+            <View
+              style={[
+                styles.bottomActionBar,
+                { paddingBottom: Math.max(insets.bottom, 12) },
+              ]}
+            >
+              <Pressable
+                style={styles.secondaryActionButton}
+                onPress={dismissSheet}
+                accessibilityRole="button"
+                accessibilityLabel="Close event drawer"
+              >
+                <Text style={styles.secondaryActionText}>Close</Text>
+              </Pressable>
+              {event.id ? (
+                <Pressable
+                  style={[
+                    styles.primaryActionButton,
+                    { backgroundColor: theme.colors.primaryBase },
+                  ]}
+                  onPress={handleEditPress}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit event"
+                >
+                  <Feather
+                    name="edit-2"
+                    size={14}
+                    color={theme.colors.primaryForeground}
+                  />
+                  <Text
+                    style={[
+                      styles.primaryActionText,
+                      { color: theme.colors.primaryForeground },
+                    ]}
+                  >
+                    Edit
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           </>
         ) : (
           /* ── Edit / Create mode ──────────────────────────────── */
           <View style={styles.editBody}>
             <EventForm
-              ref={formRef}
               key={
                 isCreate ? "create" : `edit-${eventId}-${editScope ?? "none"}`
               }
@@ -758,7 +708,6 @@ export function EventSheet({
               onSubmit={handleSubmit}
               onCancel={handleCancel}
               initialValues={initialValues}
-              actionsPlacement="external"
             />
           </View>
         )}
@@ -814,41 +763,6 @@ export function EventSheet({
 
 function createStyles(theme: ThemeTokens) {
   const view = {
-    header: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border + "66",
-    },
-    headerIconButton: {
-      width: 36,
-      height: 36,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      borderRadius: 18,
-    },
-    headerTextButton: {
-      minWidth: 64,
-      height: 36,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      paddingHorizontal: 4,
-    },
-    headerPillAction: {
-      minWidth: 64,
-      height: 32,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      borderRadius: 9999,
-      paddingHorizontal: 14,
-    },
-    headerActionDisabled: {
-      opacity: 0.6,
-    },
-
-    // ── View body ──────────────────────────────────────────────────────
     viewBody: {
       paddingHorizontal: 16,
       paddingTop: 12,
@@ -856,6 +770,34 @@ function createStyles(theme: ThemeTokens) {
     },
     viewScroll: {
       flex: 1,
+    },
+    bottomActionBar: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.colors.border + "66",
+      backgroundColor: theme.colors.card,
+    },
+    secondaryActionButton: {
+      minHeight: 46,
+      paddingHorizontal: 18,
+      borderRadius: theme.borderRadius.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+    },
+    primaryActionButton: {
+      flex: 1,
+      minHeight: 46,
+      borderRadius: theme.borderRadius.lg,
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      gap: 8,
     },
     editBody: {
       flex: 1,
@@ -978,21 +920,12 @@ function createStyles(theme: ThemeTokens) {
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    headerTitle: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.base.size,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-      textAlign: "center" as const,
-      marginHorizontal: 8,
-    },
-    headerTextButtonLabel: {
+    secondaryActionText: {
       fontSize: theme.typography.fontSize.sm.size,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
-    headerPillActionText: {
+    primaryActionText: {
       fontSize: theme.typography.fontSize.sm.size,
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],

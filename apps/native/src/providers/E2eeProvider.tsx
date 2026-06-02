@@ -8,19 +8,6 @@ import React, {
 } from "react";
 import * as SecureStore from "expo-secure-store";
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type TextStyle,
-  type ViewStyle,
-} from "react-native";
-import {
   createE2eeModule,
   hydrateEncryptedEventWithoutSession,
   ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
@@ -37,15 +24,13 @@ import type {
   UpdateCategoryRequest,
   UpdateEventRequest,
 } from "@workspace/calendar-core";
-import type { ThemeTokens } from "@workspace/design-tokens";
 import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
 import { SECURE_STORE_KEYS } from "../lib/constants";
 import { getE2eeApiUrl } from "../lib/e2ee-api-url";
 import { getAuthHeaders } from "../lib/api";
 import { readChunkedSecureValue, writeChunkedSecureValue } from "../lib/secure-store-chunked";
 import { createLogger } from "@workspace/logger";
-import { useAuth, type AuthMethod } from "./AuthProvider";
-import { useTheme } from "./ThemeProvider";
+import { useAuth } from "./AuthProvider";
 
 const log = createLogger("native:e2ee");
 
@@ -55,16 +40,6 @@ interface E2eeSession {
   deviceId: string;
   userId: string;
   apiBaseUrl: string;
-}
-
-type GateMode = "setup" | "unlock" | "legacy";
-
-interface E2eeGateState {
-  mode: GateMode;
-  userId: string;
-  apiBaseUrl: string;
-  authMethod: AuthMethod;
-  passwordEnvelope: E2eeBootstrapResponse["passwordEnvelope"];
 }
 
 export interface E2eeContextValue {
@@ -83,70 +58,14 @@ export function E2eeProvider({
 }: {
   children: React.ReactNode;
 }): React.ReactNode {
-  const {
-    clearPendingAuthPassword,
-    consumePendingAuthPassword,
-    lastAuthMethod,
-    signOut,
-  } = useAuth();
-  const { theme } = useTheme();
-  const styles = useMemo(() => createGateStyles(theme), [theme]);
+  const { clearPendingAuthPassword, consumePendingAuthPassword } = useAuth();
 
   const [isReady, setIsReady] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
-  const [gateState, setGateState] = useState<E2eeGateState | null>(null);
-  const [gatePassword, setGatePassword] = useState("");
-  const [gateConfirmPassword, setGateConfirmPassword] = useState("");
-  const [gateError, setGateError] = useState<string | null>(null);
-  const [isGateSubmitting, setIsGateSubmitting] = useState(false);
 
   const sessionRef = useRef<E2eeSession | null>(null);
   const moduleRef = useRef<E2eeModule | null>(null);
   const bootstrapGenerationRef = useRef(0);
-
-  const resetGate = useCallback(() => {
-    setGateState(null);
-    setGatePassword("");
-    setGateConfirmPassword("");
-    setGateError(null);
-    setIsGateSubmitting(false);
-  }, []);
-
-  const signOutForManualE2eeRecovery = useCallback(
-    async ({
-      userId,
-      apiBaseUrl,
-      reason,
-      error,
-    }: {
-      userId: string;
-      apiBaseUrl: string;
-      reason: string;
-      error?: unknown;
-    }) => {
-      log.warn(
-        "Native E2EE requires manual recovery; signing out instead of showing a password gate",
-        {
-          userId,
-          apiBaseUrl,
-          reason,
-          error,
-        },
-      );
-      sessionRef.current = null;
-      resetGate();
-      setIsEnabled(false);
-      try {
-        await signOut();
-      } catch (signOutError) {
-        log.warn("Failed to sign out after native E2EE recovery requirement", {
-          userId,
-          signOutError,
-        });
-      }
-    },
-    [resetGate, signOut],
-  );
 
   const getModule = useCallback(async (): Promise<E2eeModule | null> => {
     if (moduleRef.current) {
@@ -295,7 +214,6 @@ export function E2eeProvider({
         bootstrapGenerationRef.current === generation;
 
       sessionRef.current = null;
-      resetGate();
       setIsEnabled(false);
       setIsReady(false);
 
@@ -402,71 +320,56 @@ export function E2eeProvider({
         }
 
         const pendingPassword = consumePendingAuthPassword();
-        const authMethod = lastAuthMethod;
 
-        if (bootstrapData.passwordEnvelope) {
-          if (pendingPassword) {
-            try {
-              const { accountKey, blindIndexKey } =
-                await e2ee.unwrapPasswordEnvelope(
-                  pendingPassword,
-                  bootstrapData.passwordEnvelope,
-                );
-              const nextSession = await registerDeviceForSession({
-                e2ee,
-                userId,
-                apiBaseUrl,
-                accountKey,
-                blindIndexKey,
-              });
-
-              if (!isCurrentBootstrap()) {
-                return;
-              }
-
-              sessionRef.current = nextSession;
-              log.info("Unlocked native E2EE with pending auth password", {
-                userId,
-                deviceId: nextSession.deviceId,
-              });
-              return;
-            } catch (error) {
-              log.info(
-                "Pending auth password did not unlock native E2EE envelope",
-                {
-                  userId,
-                  error,
-                },
+        // If a password envelope exists, try to unlock it with the auth
+        // password that was captured at sign-in time. This covers email/
+        // password users on a new device.
+        if (bootstrapData.passwordEnvelope && pendingPassword) {
+          try {
+            const { accountKey, blindIndexKey } =
+              await e2ee.unwrapPasswordEnvelope(
+                pendingPassword,
+                bootstrapData.passwordEnvelope,
               );
+            const nextSession = await registerDeviceForSession({
+              e2ee,
+              userId,
+              apiBaseUrl,
+              accountKey,
+              blindIndexKey,
+            });
+
+            if (!isCurrentBootstrap()) {
+              return;
             }
-          }
 
-          if (!isCurrentBootstrap()) {
+            sessionRef.current = nextSession;
+            log.info("Unlocked native E2EE with pending auth password", {
+              userId,
+              deviceId: nextSession.deviceId,
+            });
             return;
+          } catch (error) {
+            log.warn(
+              "Pending auth password did not unlock E2EE envelope; starting fresh device session",
+              { userId, error },
+            );
           }
+        }
 
-          await signOutForManualE2eeRecovery({
-            userId,
-            apiBaseUrl,
-            reason:
-              authMethod === "email-password"
-                ? "pending-auth-password-did-not-unlock-envelope"
-                : "password-envelope-present-without-usable-auth-password",
-          });
+        if (!isCurrentBootstrap()) {
           return;
         }
 
-        if (bootstrapData.devices.length > 0) {
-          if (!isCurrentBootstrap()) {
-            return;
-          }
-
-          await signOutForManualE2eeRecovery({
-            userId,
-            apiBaseUrl,
-            reason: "legacy-device-recovery-required",
-          });
-          return;
+        // No envelope, couldn't unlock it, or passkey user — start a fresh
+        // E2EE session on this device. Encrypted content from other devices
+        // will show as placeholders until the user signs in from an existing
+        // device or re-registers.
+        if (bootstrapData.passwordEnvelope && !pendingPassword) {
+          log.warn(
+            "Password envelope exists but no auth password is available; starting fresh E2EE session",
+            { userId },
+          );
         }
 
         const accountKey = await e2ee.generateAccountKey();
@@ -493,23 +396,15 @@ export function E2eeProvider({
               apiBaseUrl,
               password: pendingPassword,
             });
-            return;
           } catch (error) {
-            log.warn("Failed to auto-store native E2EE password envelope", {
+            log.warn("Failed to auto-store E2EE password envelope", {
               userId,
               error,
             });
           }
         }
 
-        await signOutForManualE2eeRecovery({
-          userId,
-          apiBaseUrl,
-          reason:
-            authMethod === "email-password"
-              ? "password-envelope-auto-store-failed"
-              : "encryption-password-setup-required",
-        });
+        return;
       } catch (error) {
         if (isCurrentBootstrap()) {
           log.error("E2EE bootstrap failed:", error);
@@ -521,13 +416,9 @@ export function E2eeProvider({
       }
     },
     [
-      clearPendingAuthPassword,
       consumePendingAuthPassword,
       getModule,
-      lastAuthMethod,
       registerDeviceForSession,
-      resetGate,
-      signOutForManualE2eeRecovery,
       storePasswordEnvelopeForActiveSession,
     ],
   );
@@ -535,11 +426,10 @@ export function E2eeProvider({
   const clearSession = useCallback(() => {
     bootstrapGenerationRef.current += 1;
     sessionRef.current = null;
-    resetGate();
     setIsEnabled(false);
     setIsReady(false);
     clearPendingAuthPassword();
-  }, [clearPendingAuthPassword, resetGate]);
+  }, [clearPendingAuthPassword]);
 
   const resetEncryptionPassword = useCallback(
     async (password: string) => {
@@ -566,124 +456,25 @@ export function E2eeProvider({
     [getModule, storePasswordEnvelopeForActiveSession],
   );
 
-  const handleGateSubmit = useCallback(async () => {
-    if (!gateState || gateState.mode === "legacy") {
-      return;
-    }
-
-    if (gateState.mode === "setup") {
-      if (gatePassword.length < 8) {
-        setGateError("Use at least 8 characters for your encryption password.");
-        return;
-      }
-
-      if (gatePassword !== gateConfirmPassword) {
-        setGateError("Passwords do not match.");
-        return;
-      }
-    } else if (!gatePassword) {
-      setGateError(
-        gateState.authMethod === "email-password"
-          ? "Enter your email sign-in password."
-          : "Enter your encryption password.",
-      );
-      return;
-    }
-
-    setIsGateSubmitting(true);
-    setGateError(null);
-
-    try {
-      const e2ee = await getModule();
-      if (!e2ee) {
-        throw new Error("E2EE is unavailable in this runtime.");
-      }
-
-      if (gateState.mode === "unlock") {
-        if (!gateState.passwordEnvelope) {
-          throw new Error("Missing E2EE password envelope.");
-        }
-
-        const { accountKey, blindIndexKey } = await e2ee.unwrapPasswordEnvelope(
-          gatePassword,
-          gateState.passwordEnvelope,
-        );
-
-        const nextSession = await registerDeviceForSession({
-          e2ee,
-          userId: gateState.userId,
-          apiBaseUrl: gateState.apiBaseUrl,
-          accountKey,
-          blindIndexKey,
-        });
-
-        sessionRef.current = nextSession;
-      } else {
-        await storePasswordEnvelopeForActiveSession({
-          e2ee,
-          userId: gateState.userId,
-          apiBaseUrl: gateState.apiBaseUrl,
-          password: gatePassword,
-        });
-      }
-
-      resetGate();
-    } catch (error) {
-      log.warn("Failed to complete native E2EE gate", {
-        userId: gateState.userId,
-        mode: gateState.mode,
-        error,
-      });
-      setGateError(getGateErrorMessage(gateState));
-    } finally {
-      setIsGateSubmitting(false);
-    }
-  }, [
-    gateConfirmPassword,
-    gatePassword,
-    gateState,
-    getModule,
-    registerDeviceForSession,
-    resetGate,
-    storePasswordEnvelopeForActiveSession,
-  ]);
-
-  const handleGateRetry = useCallback(() => {
-    if (!gateState) {
-      return;
-    }
-
-    void bootstrap(gateState.userId, gateState.apiBaseUrl);
-  }, [bootstrap, gateState]);
-
-  const handleGateSignOut = useCallback(async () => {
-    setIsGateSubmitting(true);
-    setGateError(null);
-
-    try {
-      await signOut();
-    } finally {
-      resetGate();
-      setIsGateSubmitting(false);
-    }
-  }, [resetGate, signOut]);
-
   const provider = useMemo<IE2eeProvider>(() => {
     const getSession = (): E2eeSession | null => sessionRef.current;
+    const getRequiredSession = (): E2eeSession => {
+      const session = getSession();
+      if (!session) {
+        throw new Error("Encryption setup has not completed on this device.");
+      }
+      return session;
+    };
 
     return {
       async attachEventEncryptionShadow<
         T extends CreateEventRequest | UpdateEventRequest,
       >(request: T): Promise<T> {
-        const session = getSession();
-        if (!session) {
-          return request;
-        }
-
         try {
+          const session = getRequiredSession();
           const e2ee = await getModule();
           if (!e2ee) {
-            return request;
+            throw new Error("Native encryption runtime is unavailable.");
           }
 
           const payload = {
@@ -711,27 +502,22 @@ export function E2eeProvider({
             ...request,
             encryptedContent: JSON.stringify(encrypted),
             blindIndexTokens,
-            encryptionState: "shadow_write",
             encryptionKeyVersion: 1,
           } as T;
         } catch (error) {
           log.error("Failed to encrypt event:", error);
-          return request;
+          throw error;
         }
       },
 
       async attachCalendarEncryptionShadow<
         T extends CreateCalendarRequest | UpdateCalendarRequest,
       >(request: T): Promise<T> {
-        const session = getSession();
-        if (!session) {
-          return request;
-        }
-
         try {
+          const session = getRequiredSession();
           const e2ee = await getModule();
           if (!e2ee) {
-            return request;
+            throw new Error("Native encryption runtime is unavailable.");
           }
 
           const encrypted = await e2ee.encryptJsonPayload(
@@ -751,27 +537,22 @@ export function E2eeProvider({
             ...request,
             encryptedName: JSON.stringify(encrypted),
             blindIndexTokens,
-            encryptionState: "shadow_write",
             encryptionKeyVersion: 1,
           } as T;
         } catch (error) {
           log.error("Failed to encrypt calendar:", error);
-          return request;
+          throw error;
         }
       },
 
       async attachCategoryEncryptionShadow<
         T extends CreateCategoryRequest | UpdateCategoryRequest,
       >(request: T): Promise<T> {
-        const session = getSession();
-        if (!session) {
-          return request;
-        }
-
         try {
+          const session = getRequiredSession();
           const e2ee = await getModule();
           if (!e2ee) {
-            return request;
+            throw new Error("Native encryption runtime is unavailable.");
           }
 
           const encrypted = await e2ee.encryptJsonPayload(
@@ -791,12 +572,11 @@ export function E2eeProvider({
             ...request,
             encryptedName: JSON.stringify(encrypted),
             blindIndexTokens,
-            encryptionState: "shadow_write",
             encryptionKeyVersion: 1,
           } as T;
         } catch (error) {
           log.error("Failed to encrypt category:", error);
-          return request;
+          throw error;
         }
       },
 
@@ -890,298 +670,13 @@ export function E2eeProvider({
     ],
   );
 
-  const isUnlock = gateState?.mode === "unlock";
-  const isLegacy = gateState?.mode === "legacy";
-  const usesAccountPassword = gateState?.authMethod === "email-password";
-
-  const title = isUnlock
-    ? "Unlock encrypted data"
-    : isLegacy
-      ? "Finish encryption migration"
-      : "Protect your encryption keys";
-
-  const description = isUnlock
-    ? usesAccountPassword
-      ? "Solace normally reuses your email sign-in password to unlock encrypted data on this device. If that did not finish automatically, enter the same password here. If you recently changed it, use your previous password."
-      : "Enter your encryption password to unlock encrypted data on this device."
-    : isLegacy
-      ? "This account still uses the older device-only key flow. Open a device that can already decrypt your data, sign in there, and save an encryption password once."
-      : usesAccountPassword
-        ? "Solace normally reuses your email sign-in password to protect your encryption keys. Re-enter it here only if automatic setup did not finish."
-        : "Choose an encryption password to protect your end-to-end encryption keys for recovery and legacy device flows.";
-
-  const passwordLabel = isUnlock
-    ? usesAccountPassword
-      ? "Email sign-in password"
-      : "Encryption password"
-    : usesAccountPassword
-      ? "Email sign-in password"
-      : "Encryption password";
-
-  const primaryLabel = isGateSubmitting
-    ? "Working..."
-    : isUnlock
-      ? "Unlock"
-      : isLegacy
-        ? "Retry"
-        : usesAccountPassword
-          ? "Continue"
-          : "Save password";
-
   return (
     <E2eeContext.Provider value={value}>
       {children}
-
-      {gateState ? (
-        <Modal
-          transparent
-          visible
-          animationType="fade"
-          onRequestClose={() => undefined}
-        >
-          <View style={styles.modalOverlay}>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : undefined}
-              style={styles.modalContainer}
-            >
-              <View style={styles.modalCard}>
-                <View style={styles.header}>
-                  <Text style={styles.title}>{title}</Text>
-                </View>
-
-                <View style={styles.body}>
-                  <Text style={styles.description}>{description}</Text>
-
-                  {!isLegacy ? (
-                    <>
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.label}>{passwordLabel}</Text>
-                        <TextInput
-                          value={gatePassword}
-                          onChangeText={setGatePassword}
-                          secureTextEntry
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          autoFocus
-                          editable={!isGateSubmitting}
-                          style={[
-                            styles.input,
-                            gateError ? styles.inputError : undefined,
-                          ]}
-                          textContentType={
-                            isUnlock ? "password" : "newPassword"
-                          }
-                          autoComplete={isUnlock ? "password" : "new-password"}
-                        />
-                      </View>
-
-                      {gateState.mode === "setup" ? (
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.label}>Confirm password</Text>
-                          <TextInput
-                            value={gateConfirmPassword}
-                            onChangeText={setGateConfirmPassword}
-                            secureTextEntry
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            editable={!isGateSubmitting}
-                            style={[
-                              styles.input,
-                              gateError ? styles.inputError : undefined,
-                            ]}
-                            textContentType="newPassword"
-                            autoComplete="new-password"
-                          />
-                        </View>
-                      ) : null}
-                    </>
-                  ) : null}
-
-                  {gateError ? (
-                    <View style={styles.errorContainer}>
-                      <Text style={styles.errorText}>{gateError}</Text>
-                    </View>
-                  ) : null}
-                </View>
-
-                <View style={styles.footer}>
-                  <Pressable
-                    onPress={handleGateSignOut}
-                    disabled={isGateSubmitting}
-                    style={({ pressed }) => [
-                      styles.secondaryButton,
-                      pressed && !isGateSubmitting && styles.secondaryPressed,
-                      isGateSubmitting && styles.buttonDisabled,
-                    ]}
-                  >
-                    <Text style={styles.secondaryButtonText}>Sign out</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={isLegacy ? handleGateRetry : handleGateSubmit}
-                    disabled={isGateSubmitting}
-                    style={({ pressed }) => [
-                      styles.primaryButton,
-                      pressed && !isGateSubmitting && styles.primaryPressed,
-                      isGateSubmitting && styles.buttonDisabled,
-                    ]}
-                  >
-                    {isGateSubmitting ? (
-                      <ActivityIndicator
-                        color={theme.colors.primaryForeground}
-                      />
-                    ) : (
-                      <Text style={styles.primaryButtonText}>
-                        {primaryLabel}
-                      </Text>
-                    )}
-                  </Pressable>
-                </View>
-              </View>
-            </KeyboardAvoidingView>
-          </View>
-        </Modal>
-      ) : null}
     </E2eeContext.Provider>
   );
 }
 
-function getGateErrorMessage(gateState: E2eeGateState): string {
-  if (gateState.mode === "unlock") {
-    return gateState.authMethod === "email-password"
-      ? "That password did not match. If you recently changed your email sign-in password, use the previous one here."
-      : "That password did not unlock your encrypted data.";
-  }
-
-  return "Could not save your encryption password. Try again.";
-}
-
-function createGateStyles(theme: ThemeTokens) {
-  return StyleSheet.create({
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: "rgba(15, 23, 42, 0.5)",
-      justifyContent: "center",
-      paddingHorizontal: theme.spacing["4"],
-    },
-    modalContainer: {
-      width: "100%",
-    },
-    modalCard: {
-      borderRadius: theme.borderRadius.xl,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-      overflow: "hidden",
-    },
-    header: {
-      paddingHorizontal: theme.spacing["4"],
-      paddingVertical: theme.spacing["3"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
-    },
-    title: {
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      color: theme.colors.foreground,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-    },
-    body: {
-      gap: theme.spacing["3"],
-      paddingHorizontal: theme.spacing["4"],
-      paddingVertical: theme.spacing["4"],
-    },
-    description: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    fieldGroup: {
-      gap: theme.spacing["2"],
-    },
-    label: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
-    input: {
-      minHeight: 48,
-      borderRadius: theme.borderRadius.lg,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.input ?? theme.colors.card,
-      color: theme.colors.foreground,
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["3"],
-    },
-    inputError: {
-      borderColor: theme.colors.destructive,
-    },
-    errorContainer: {
-      borderRadius: theme.borderRadius.lg,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: `${theme.colors.destructive}55`,
-      backgroundColor: `${theme.colors.destructive}18`,
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2.5"] ?? 10,
-    },
-    errorText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.destructive,
-    },
-    footer: {
-      flexDirection: "row",
-      gap: theme.spacing["2"],
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border,
-      paddingHorizontal: theme.spacing["4"],
-      paddingVertical: theme.spacing["3"],
-    },
-    secondaryButton: {
-      flex: 1,
-      minHeight: 44,
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: theme.borderRadius.lg,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-    } satisfies ViewStyle,
-    secondaryPressed: {
-      backgroundColor: theme.colors.accent,
-    },
-    secondaryButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
-    primaryButton: {
-      flex: 1,
-      minHeight: 44,
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: theme.colors.primaryBase,
-    } satisfies ViewStyle,
-    primaryPressed: {
-      opacity: 0.9,
-    },
-    primaryButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.primaryForeground,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-    },
-    buttonDisabled: {
-      opacity: 0.6,
-    },
-  });
-}
 
 export function useE2ee(): E2eeContextValue {
   const ctx = useContext(E2eeContext);
