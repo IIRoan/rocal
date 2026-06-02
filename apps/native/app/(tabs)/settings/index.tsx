@@ -14,7 +14,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -39,7 +39,6 @@ import {
 } from "../../../src/providers/ThemeProvider";
 import { authClient } from "../../../src/lib/auth-client";
 import { useAuth } from "../../../src/providers/AuthProvider";
-import { useE2ee } from "../../../src/providers/E2eeProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { SETTINGS_TIMEZONE_ROUTE } from "../../../src/lib/auth-routing";
 import { formatStoredPasskeyDescription } from "../../../src/lib/passkey-auth";
@@ -131,11 +130,11 @@ function formatWorkingDaysLabel(daysSet: Set<number>): string {
 
 export default function SettingsScreen() {
   const { theme, themePreference, setThemePreference } = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
   const { push } = useRouter();
   const { user, signOut, registerPasskey, deletePasskey } = useAuth();
-  const { resetEncryptionPassword } = useE2ee();
   const passkeysQuery = authClient.useListPasskeys();
   const accountsQuery = useQuery({
     queryKey: ["auth", "accounts", user?.id ?? null],
@@ -219,7 +218,7 @@ export default function SettingsScreen() {
     string | null
   >(null);
   const [activePasswordSheet, setActivePasswordSheet] = useState<
-    "change-password" | "set-password" | "reset-encryption-password" | null
+    "change-password" | "set-password" | null
   >(null);
   const [currentPasswordInput, setCurrentPasswordInput] = useState("");
   const [newPasswordInput, setNewPasswordInput] = useState("");
@@ -228,8 +227,6 @@ export default function SettingsScreen() {
     null,
   );
   const [isSettingPassword, setIsSettingPassword] = useState(false);
-  const [isResettingEncryptionPassword, setIsResettingEncryptionPassword] =
-    useState(false);
   const linkedAccounts = useMemo(
     () => accountsQuery.data ?? ([] as LinkedAuthAccountLike[]),
     [accountsQuery.data],
@@ -562,21 +559,7 @@ export default function SettingsScreen() {
         await accountsQuery?.refetch?.();
         Alert.alert(
           "Email password added",
-          "You can now sign in with email and password. OAuth and passkey sign-in still use your separate encryption password unless you reset it below.",
-        );
-      } else {
-        setIsResettingEncryptionPassword(true);
-        const stored = await resetEncryptionPassword(newPasswordInput);
-
-        if (!stored) {
-          throw new Error(
-            "Unlock your encrypted data on this device first, then try again.",
-          );
-        }
-
-        Alert.alert(
-          "Encryption password reset",
-          "OAuth and passkey sign-in will now use your new encryption password on new devices. This keeps your encrypted data intact and only replaces the password wrapper around your keys.",
+          "You can now sign in with email and password.",
         );
       }
 
@@ -589,7 +572,6 @@ export default function SettingsScreen() {
     } finally {
       setIsChangingPassword(false);
       setIsSettingPassword(false);
-      setIsResettingEncryptionPassword(false);
     }
   }, [
     accountsQuery,
@@ -597,7 +579,6 @@ export default function SettingsScreen() {
     confirmPasswordInput,
     currentPasswordInput,
     newPasswordInput,
-    resetEncryptionPassword,
     resetChangePasswordForm,
   ]);
 
@@ -645,21 +626,6 @@ export default function SettingsScreen() {
         setPasswordChangeError(null);
         setActivePasswordSheet((current) => {
           const next = current === "set-password" ? null : "set-password";
-          if (!next) {
-            resetChangePasswordForm();
-          }
-          return next;
-        });
-        return;
-      }
-
-      if (key === "reset-encryption-password") {
-        setPasswordChangeError(null);
-        setActivePasswordSheet((current) => {
-          const next =
-            current === "reset-encryption-password"
-              ? null
-              : "reset-encryption-password";
           if (!next) {
             resetChangePasswordForm();
           }
@@ -876,25 +842,10 @@ export default function SettingsScreen() {
         {/* ── Security ─────────────────────────────────────────────────── */}
         <SectionLabel text="Security" theme={theme} isFirst={false} />
         <View style={styles.sectionItems}>
-          <SettingToggleRow
-            icon="shield"
-            label="Full Event Encryption"
-            description="Keep event content ciphertext-only on the server"
-            value={(settings?.eventEncryptionMode ?? "hybrid") === "full"}
-            onValueChange={(v) =>
-              updateSetting({ eventEncryptionMode: v ? "full" : "hybrid" })
-            }
-            isPending={pendingKeys.has("eventEncryptionMode")}
+          <HintRow
+            text="Event content is always end-to-end encrypted on mobile. Reminder emails only include timing details."
             theme={theme}
           />
-          {settings?.eventEncryptionMode === "full" && (
-            <View style={styles.hintRow}>
-              <Text style={styles.hintText}>
-                Reminder emails will only include timing details when full
-                encryption is active.
-              </Text>
-            </View>
-          )}
           {isPasskeySupported ? (
             <>
               <ActionRow
@@ -951,8 +902,8 @@ export default function SettingsScreen() {
             <HintRow
               text={
                 hasPasswordAccount
-                  ? "OAuth and passkey sign-in still use a separate encryption password. Resetting that encryption password only replaces the password wrapper around your existing keys and does not change your OAuth login method."
-                  : "OAuth and passkey sign-in use a separate encryption password. Setting an email password adds email sign-in to this account, while resetting the encryption password only replaces the password wrapper around your existing keys."
+                  ? "Email sign-in updates your login password. Existing encrypted data stays intact."
+                  : "Adding an email password gives this account an email sign-in option without changing your existing encrypted data."
               }
               theme={theme}
             />
@@ -971,9 +922,7 @@ export default function SettingsScreen() {
                   ? isChangingPassword
                   : action.key === "set-password"
                     ? isSettingPassword
-                    : action.key === "reset-encryption-password"
-                      ? isResettingEncryptionPassword
-                      : action.key === "change-profile-picture"
+                    : action.key === "change-profile-picture"
                         ? isUpdatingProfilePicture
                         : action.key === "reset-preferences"
                           ? resetSettingsMutation.isPending
@@ -992,23 +941,8 @@ export default function SettingsScreen() {
       <BottomSheet
         visible={activePicker !== null}
         onDismiss={() => setActivePicker(null)}
-        title={
-          lastPicker === "theme"
-            ? "Theme"
-            : lastPicker === "defaultView"
-              ? "Default View"
-              : lastPicker === "timeFormat"
-                ? "Time Format"
-                : lastPicker === "weekStart"
-                  ? "Week Starts On"
-                  : lastPicker === "defaultCalendar"
-                    ? "Default Calendar"
-                    : lastPicker === "workingDays"
-                      ? "Working Days"
-                      : ""
-        }
       >
-        <View style={{ paddingVertical: 8 }}>
+        <View style={{ paddingVertical: 8, paddingBottom: insets.bottom + 8 }}>
           {lastPicker === "theme" &&
             THEME_OPTIONS.map((opt) => (
               <SheetPickerOption
@@ -1118,8 +1052,8 @@ export default function SettingsScreen() {
           setShowProfilePictureForm(false);
           setProfilePictureUrlInput("");
         }}
-        title="Change Profile Picture"
       >
+        <View style={{ paddingBottom: insets.bottom + 8 }}>
         <ProfilePictureCard
           value={profilePictureUrlInput}
           onChange={setProfilePictureUrlInput}
@@ -1131,6 +1065,7 @@ export default function SettingsScreen() {
           isPending={isUpdatingProfilePicture}
           theme={theme}
         />
+        </View>
       </BottomSheet>
 
       {/* Change password bottom sheet */}
@@ -1140,14 +1075,8 @@ export default function SettingsScreen() {
           setActivePasswordSheet(null);
           resetChangePasswordForm();
         }}
-        title={
-          activePasswordSheet === "change-password"
-            ? "Change Password"
-            : activePasswordSheet === "set-password"
-              ? "Set Email Password"
-              : "Reset Encryption Password"
-        }
       >
+        <View style={{ paddingBottom: insets.bottom + 8 }}>
         <PasswordChangeCard
           mode={activePasswordSheet ?? "change-password"}
           currentPassword={currentPasswordInput}
@@ -1162,13 +1091,10 @@ export default function SettingsScreen() {
             resetChangePasswordForm();
           }}
           error={passwordChangeError}
-          isPending={
-            isChangingPassword ||
-            isSettingPassword ||
-            isResettingEncryptionPassword
-          }
+          isPending={isChangingPassword || isSettingPassword}
           theme={theme}
         />
+        </View>
       </BottomSheet>
     </SafeAreaView>
   );
@@ -1485,7 +1411,7 @@ function PasswordChangeCard({
   isPending,
   theme,
 }: {
-  mode: "change-password" | "set-password" | "reset-encryption-password";
+  mode: "change-password" | "set-password";
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
@@ -1499,7 +1425,6 @@ function PasswordChangeCard({
   theme: ThemeTokens;
 }) {
   const isChangePassword = mode === "change-password";
-  const isResetEncryptionPassword = mode === "reset-encryption-password";
 
   return (
     <ScrollView
@@ -1523,9 +1448,7 @@ function PasswordChangeCard({
         >
           {isChangePassword
             ? "Change Password"
-            : isResetEncryptionPassword
-              ? "Reset Encryption Password"
-              : "Set Email Password"}
+            : "Set Email Password"}
         </Text>
         <Text
           style={{
@@ -1536,9 +1459,7 @@ function PasswordChangeCard({
         >
           {isChangePassword
             ? "Update your email sign-in password. After email sign-in, Solace also uses it to protect your encryption keys."
-            : isResetEncryptionPassword
-              ? "Choose a new encryption password for OAuth or passkey sign-in. This only replaces the password wrapper around your existing encryption keys and does not change your OAuth login method."
-              : "Add an email sign-in password to this account. This gives you an email/password sign-in option without changing the separate encryption password used by OAuth or passkey sign-in."}
+            : "Add an email sign-in password to this account. This gives you an email/password sign-in option without changing your existing encrypted data."}
         </Text>
       </View>
 
@@ -1576,22 +1497,14 @@ function PasswordChangeCard({
           />
         ) : null}
         <PasswordField
-          label={
-            isResetEncryptionPassword
-              ? "New encryption password"
-              : "New password"
-          }
+          label="New password"
           value={newPassword}
           onChangeText={onNewPasswordChange}
           autoComplete="new-password"
           theme={theme}
         />
         <PasswordField
-          label={
-            isResetEncryptionPassword
-              ? "Confirm new encryption password"
-              : "Confirm new password"
-          }
+          label="Confirm new password"
           value={confirmPassword}
           onChangeText={onConfirmPasswordChange}
           autoComplete="new-password"
@@ -1618,9 +1531,7 @@ function PasswordChangeCard({
           accessibilityLabel={
             isChangePassword
               ? "Update password"
-              : isResetEncryptionPassword
-                ? "Reset encryption password"
-                : "Set email password"
+              : "Set email password"
           }
         >
           {isPending ? (
@@ -1635,11 +1546,7 @@ function PasswordChangeCard({
                   .semibold as TextStyle["fontWeight"],
               }}
             >
-              {isChangePassword
-                ? "Update Password"
-                : isResetEncryptionPassword
-                  ? "Reset Encryption Password"
-                  : "Set Password"}
+              {isChangePassword ? "Update Password" : "Set Password"}
             </Text>
           )}
         </Pressable>

@@ -10,6 +10,20 @@ interface AuthRedirectInput {
   segments: string[];
 }
 
+function getRouteState(segments: string[]) {
+  const currentSegment = segments[0];
+  const inAuthGroup = currentSegment === "(auth)";
+  const atRoot = segments.length === 0 || currentSegment === "index";
+  const atNotFound = currentSegment === "+not-found";
+
+  return {
+    currentSegment,
+    inAuthGroup,
+    atRoot,
+    atNotFound,
+  };
+}
+
 export function getAuthRedirectPath({
   isAuthenticated,
   isLoading,
@@ -17,10 +31,7 @@ export function getAuthRedirectPath({
 }: AuthRedirectInput): string | null {
   if (isLoading) return null;
 
-  const currentSegment = segments[0];
-  const inAuthGroup = currentSegment === "(auth)";
-  const atRoot = segments.length === 0 || currentSegment === "index";
-  const atNotFound = currentSegment === "+not-found";
+  const { inAuthGroup, atRoot, atNotFound } = getRouteState(segments);
 
   if (!isAuthenticated && !inAuthGroup) {
     return AUTH_SIGN_IN_ROUTE;
@@ -31,4 +42,17 @@ export function getAuthRedirectPath({
   }
 
   return null;
+}
+
+export function shouldRenderAuthenticatedChrome({
+  isAuthenticated,
+  isLoading,
+  segments,
+}: AuthRedirectInput): boolean {
+  if (isLoading || !isAuthenticated) {
+    return false;
+  }
+
+  const { inAuthGroup, atRoot, atNotFound } = getRouteState(segments);
+  return !inAuthGroup && !atRoot && !atNotFound;
 }

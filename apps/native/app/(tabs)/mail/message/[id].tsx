@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,7 +12,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -30,6 +31,7 @@ import { useTheme } from "../../../../src/providers/ThemeProvider";
 import { QUERY_KEYS } from "../../../../src/lib/query-keys";
 import {
   useCachedMessage,
+  useMailMutations,
   useMailRuntime,
 } from "../../../../src/lib/mail/use-mail";
 import {
@@ -47,14 +49,19 @@ import {
 } from "../../../../src/lib/mail/mail-crypto";
 import { HtmlEmailView } from "../../../../src/components/mail/HtmlEmailView";
 import { AttachmentPreviewModal } from "../../../../src/components/mail/AttachmentPreviewModal";
+import { BottomSheet } from "../../../../src/components/BottomSheet";
+
 import {
   resolveAttachmentPreviewKind,
   type MailAttachmentPreviewKind,
 } from "../../../../src/lib/mail/attachment-preview";
 import type { JmapAttachment, JmapEmailMessage } from "../../../../src/lib/mail/types";
 
+type MessageSheetView = "menu" | "move" | "html" | null;
+
 export default function MailMessageScreen() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const router = useRouter();
@@ -80,6 +87,8 @@ export default function MailMessageScreen() {
   });
 
   const message = messageQuery.data ?? null;
+  const { markAsUnread, toggleFlagged, moveToTrash, deleteMessage, moveToMailbox } =
+    useMailMutations(runtime, null);
   const bodies = message ? extractMessageBodies(message) : null;
   const encryption = message ? classifyMessageEncryption(message) : "plain";
   const isEncrypted = encryption !== "plain";
@@ -109,13 +118,42 @@ export default function MailMessageScreen() {
   const isHtmlEmail = Boolean(htmlContent);
   const isDecrypting = isEncrypted && (decryptQuery.isLoading || decryptQuery.isFetching);
   const decryptError = isEncrypted ? decryptQuery.error : null;
+  const rawHtmlSource = decryptQuery.data?.html ?? bodies?.html ?? null;
 
   const [downloadingBlobId, setDownloadingBlobId] = useState<string | null>(null);
   const [preview, setPreview] = useState<{
     attachment: JmapAttachment;
     kind: MailAttachmentPreviewKind;
   } | null>(null);
+  const [activeSheetView, setActiveSheetView] = useState<MessageSheetView>(null);
 
+  const currentMailboxId = message
+    ? Object.keys(message.mailboxIds ?? {})[0] ?? null
+    : null;
+  const currentMailbox = runtime?.mailboxes.find((mailbox) =>
+    currentMailboxId ? mailbox.id === currentMailboxId : false,
+  );
+  const currentMailboxRole = currentMailbox?.role ?? null;
+  const isFlagged = Boolean(message?.keywords?.["$flagged"]);
+  const isSeen = Boolean(message?.keywords?.["$seen"]);
+  const inboxMailboxId =
+    runtime?.mailboxes.find((mailbox) => mailbox.role === "inbox")?.id ?? null;
+  const archiveMailboxId =
+    runtime?.mailboxes.find((mailbox) => mailbox.role === "archive")?.id ?? null;
+  const moveTargets = useMemo(() => {
+    if (!runtime || !message) {
+      return [];
+    }
+
+    const activeMailboxIds = new Set(Object.keys(message.mailboxIds ?? {}));
+    return runtime.mailboxes.filter((mailbox) => !activeMailboxIds.has(mailbox.id));
+  }, [message, runtime]);
+  const isActionBusy =
+    markAsUnread.isPending ||
+    toggleFlagged.isPending ||
+    moveToTrash.isPending ||
+    deleteMessage.isPending ||
+    moveToMailbox.isPending;
   const downloadAttachmentToCache = async (
     attachment: JmapAttachment,
   ): Promise<string> => {
@@ -185,6 +223,99 @@ export default function MailMessageScreen() {
     } finally {
       setDownloadingBlobId(null);
     }
+  };
+
+  const handleReply = () => {
+    if (!messageId) return;
+    router.push({
+      pathname: "/(tabs)/mail/compose",
+      params: { mode: "reply", messageId },
+    });
+  };
+
+  const handleForward = () => {
+    if (!messageId) return;
+    setActiveSheetView(null);
+    router.push({
+      pathname: "/(tabs)/mail/compose",
+      params: { mode: "forward", messageId },
+    });
+  };
+
+  const handleToggleStar = () => {
+    if (!message) return;
+    toggleFlagged.mutate({
+      messageId: message.id,
+      flagged: !isFlagged,
+    });
+    setActiveSheetView(null);
+  };
+
+  const handleMarkUnread = () => {
+    if (!message) return;
+    markAsUnread.mutate(message.id, {
+      onSuccess: () => setActiveSheetView(null),
+      onError: (error) =>
+        Alert.alert(
+          "Could not update message",
+          getErrorMessage(error, "Failed to mark message as unread."),
+        ),
+    });
+  };
+
+  const handleMoveToTrash = () => {
+    if (!message) return;
+    const mutation = currentMailboxRole === "trash" ? deleteMessage : moveToTrash;
+    mutation.mutate(message.id, {
+      onSuccess: () => router.back(),
+      onError: (error) =>
+        Alert.alert(
+          "Could not delete message",
+          getErrorMessage(
+            error,
+            currentMailboxRole === "trash"
+              ? "Failed to delete the message."
+              : "Failed to move message to trash.",
+          ),
+        ),
+    });
+  };
+
+  const handleMoveToMailbox = (targetMailboxId: string) => {
+    if (!message) return;
+    moveToMailbox.mutate(
+      { messageId: message.id, targetMailboxId },
+      {
+        onSuccess: () => {
+          setActiveSheetView(null);
+          router.back();
+        },
+        onError: (error) =>
+          Alert.alert(
+            "Could not move message",
+            getErrorMessage(error, "Failed to move the message."),
+          ),
+      },
+    );
+  };
+
+  const handleArchive = () => {
+    if (!archiveMailboxId) {
+      Alert.alert("Archive unavailable", "No archive mailbox is configured.");
+      return;
+    }
+    handleMoveToMailbox(archiveMailboxId);
+  };
+
+  const handleRestoreToInbox = () => {
+    if (!inboxMailboxId) {
+      Alert.alert(
+        "Restore unavailable",
+        "No inbox mailbox is configured for this account.",
+      );
+      return;
+    }
+    handleMoveToMailbox(inboxMailboxId);
   };
 
   const messageHeader = message ? (
@@ -283,52 +414,87 @@ export default function MailMessageScreen() {
           <Text style={styles.mutedText}>Message not found.</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.body}>
-          {messageHeader}
+        <>
+          <ScrollView contentContainerStyle={styles.body}>
+            {messageHeader}
 
-          {isDecrypting ? (
-            <View style={styles.centered}>
-              <ActivityIndicator color={theme.colors.primaryBase} />
-              <Text style={styles.mutedText}>Decrypting message…</Text>
-            </View>
-          ) : decryptError ? (
-            <DecryptErrorCard
-              theme={theme}
-              styles={styles}
-              error={getErrorMessage(decryptError, "Decryption failed")}
-              onRetry={() => decryptQuery.refetch()}
-            />
-          ) : isHtmlEmail ? (
-            <>
-              {decryptQuery.data && (
-                <SignatureBadge
-                  theme={theme}
-                  styles={styles}
-                  state={decryptQuery.data.signatureVerificationState}
-                />
-              )}
-              {/* key={messageId} forces WebView remount when navigating between messages */}
-              <HtmlEmailView
-                key={messageId}
-                html={htmlContent!}
-                isDark={isDark}
+            {isDecrypting ? (
+              <View style={styles.centered}>
+                <ActivityIndicator color={theme.colors.primaryBase} />
+                <Text style={styles.mutedText}>Decrypting message…</Text>
+              </View>
+            ) : decryptError ? (
+              <DecryptErrorCard
+                theme={theme}
+                styles={styles}
+                error={getErrorMessage(decryptError, "Decryption failed")}
+                onRetry={() => decryptQuery.refetch()}
               />
-            </>
-          ) : plainContent ? (
-            <>
-              {decryptQuery.data && (
-                <SignatureBadge
-                  theme={theme}
-                  styles={styles}
-                  state={decryptQuery.data.signatureVerificationState}
+            ) : isHtmlEmail ? (
+              <>
+                {decryptQuery.data && (
+                  <SignatureBadge
+                    theme={theme}
+                    styles={styles}
+                    state={decryptQuery.data.signatureVerificationState}
+                  />
+                )}
+                <HtmlEmailView
+                  key={messageId}
+                  html={htmlContent!}
+                  isDark={isDark}
                 />
-              )}
-              <Text style={styles.bodyText}>{plainContent}</Text>
-            </>
-          ) : (
-            <Text style={styles.mutedText}>This message has no content.</Text>
-          )}
-        </ScrollView>
+              </>
+            ) : plainContent ? (
+              <>
+                {decryptQuery.data && (
+                  <SignatureBadge
+                    theme={theme}
+                    styles={styles}
+                    state={decryptQuery.data.signatureVerificationState}
+                  />
+                )}
+                <Text style={styles.bodyText}>{plainContent}</Text>
+              </>
+            ) : (
+              <Text style={styles.mutedText}>This message has no content.</Text>
+            )}
+          </ScrollView>
+
+          <View style={styles.bottomBar}>
+            {archiveMailboxId ? (
+              <BottomBarButton
+                theme={theme}
+                icon="archive"
+                label="Archive"
+                disabled={isActionBusy}
+                onPress={handleArchive}
+              />
+            ) : null}
+            <BottomBarButton
+              theme={theme}
+              icon="corner-up-left"
+              label="Reply"
+              disabled={isActionBusy}
+              onPress={handleReply}
+            />
+            <BottomBarButton
+              theme={theme}
+              icon="trash-2"
+              label={currentMailboxRole === "trash" ? "Delete" : "Trash"}
+              disabled={isActionBusy}
+              destructive
+              onPress={handleMoveToTrash}
+            />
+            <BottomBarButton
+              theme={theme}
+              icon="more-horizontal"
+              label="More"
+              disabled={isActionBusy}
+              onPress={() => setActiveSheetView("menu")}
+            />
+          </View>
+        </>
       )}
 
       {preview && (
@@ -349,6 +515,92 @@ export default function MailMessageScreen() {
           }
         />
       )}
+
+      <BottomSheet
+        visible={activeSheetView !== null}
+        onDismiss={() => setActiveSheetView(null)}
+        snapPoints={activeSheetView === "html" ? [0.92] : [0.45]}
+      >
+        {activeSheetView === "menu" ? (
+          <View style={[styles.sheetContent, { paddingBottom: insets.bottom + 8 }]}>
+            <View style={styles.sheetList}>
+              <SheetRow icon="corner-up-right" label="Forward" onPress={handleForward} theme={theme} />
+              <SheetRow icon="star" label={isFlagged ? "Unstar" : "Star"} onPress={handleToggleStar} theme={theme} showDivider />
+              {isSeen ? (
+                <SheetRow icon="mail" label="Mark as unread" onPress={handleMarkUnread} theme={theme} showDivider />
+              ) : null}
+              {(currentMailboxRole === "trash" ||
+                currentMailboxRole === "junk") &&
+              inboxMailboxId ? (
+                <SheetRow icon="inbox" label="Restore to inbox" onPress={handleRestoreToInbox} theme={theme} showDivider />
+              ) : null}
+              {moveTargets.length > 0 ? (
+                <SheetRow icon="folder" label="Move to…" accessory="chevron-right" onPress={() => setActiveSheetView("move")} theme={theme} showDivider />
+              ) : null}
+              {rawHtmlSource ? (
+                <SheetRow icon="code" label="View HTML source" accessory="chevron-right" onPress={() => setActiveSheetView("html")} theme={theme} showDivider />
+              ) : null}
+            </View>
+            <View style={styles.sheetList}>
+              <SheetRow
+                icon="trash-2"
+                label={currentMailboxRole === "trash" ? "Delete message" : "Move to trash"}
+                destructive
+                onPress={handleMoveToTrash}
+                disabled={isActionBusy}
+                theme={theme}
+              />
+            </View>
+          </View>
+        ) : activeSheetView === "move" ? (
+          <View style={[styles.sheetContent, { paddingBottom: insets.bottom + 8 }]}>
+            <Pressable
+              onPress={() => setActiveSheetView("menu")}
+              style={styles.sheetNavButton}
+              accessibilityRole="button"
+              accessibilityLabel="Back to message actions"
+            >
+              <Feather name="chevron-left" size={20} color={theme.colors.mutedForeground} />
+              <Text style={styles.sheetNavLabel}>Actions</Text>
+            </Pressable>
+            <View style={styles.sheetList}>
+              {moveTargets.map((mailbox, index) => (
+                <SheetRow
+                  key={mailbox.id}
+                  icon="folder"
+                  label={mailbox.name}
+                  onPress={() => handleMoveToMailbox(mailbox.id)}
+                  theme={theme}
+                  showDivider={index > 0}
+                />
+              ))}
+            </View>
+          </View>
+        ) : activeSheetView === "html" ? (
+          <View style={styles.sheetView}>
+            <Pressable
+              onPress={() => setActiveSheetView("menu")}
+              style={styles.sheetNavButton}
+              accessibilityRole="button"
+              accessibilityLabel="Back to message actions"
+            >
+              <Feather name="chevron-left" size={20} color={theme.colors.mutedForeground} />
+              <Text style={styles.sheetNavLabel}>Actions</Text>
+            </Pressable>
+            <ScrollView
+              style={styles.sheetScroll}
+              contentContainerStyle={[styles.sheetContent, { paddingBottom: insets.bottom + 8 }]}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.htmlSourceCard}>
+                <Text selectable style={styles.htmlSourceText}>
+                  {rawHtmlSource ?? ""}
+                </Text>
+              </View>
+            </ScrollView>
+          </View>
+        ) : null}
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -428,6 +680,109 @@ function MetaRow({
   );
 }
 
+function BottomBarButton({
+  theme,
+  icon,
+  label,
+  disabled,
+  destructive,
+  onPress,
+}: {
+  theme: ThemeTokens;
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  disabled?: boolean;
+  destructive?: boolean;
+  onPress: () => void;
+}) {
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const color = destructive ? theme.colors.destructive : theme.colors.foreground;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.bottomBarButton,
+        pressed && styles.bottomBarButtonPressed,
+        disabled && styles.bottomBarButtonDisabled,
+      ]}
+    >
+      <Feather name={icon} size={18} color={color} />
+      <Text style={[styles.bottomBarButtonText, destructive && { color }]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function SheetRow({
+  theme,
+  icon,
+  label,
+  accessory,
+  destructive,
+  disabled,
+  onPress,
+  showDivider,
+}: {
+  theme: ThemeTokens;
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  accessory?: keyof typeof Feather.glyphMap;
+  destructive?: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+  showDivider?: boolean;
+}) {
+  const iconColor = destructive ? theme.colors.destructive : theme.colors.mutedForeground;
+  const textColor = destructive ? theme.colors.destructive : theme.colors.foreground;
+
+  return (
+    <View>
+      {showDivider ? (
+        <View
+          style={{
+            height: StyleSheet.hairlineWidth,
+            backgroundColor: theme.colors.border + "50",
+            marginLeft: 44,
+          }}
+        />
+      ) : null}
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        style={({ pressed }) => [
+          {
+            flexDirection: "row" as const,
+            alignItems: "center" as const,
+            gap: 12,
+            paddingHorizontal: 14,
+            paddingVertical: 13,
+            opacity: pressed ? 0.6 : disabled ? 0.45 : 1,
+          },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+      >
+        <Feather name={icon} size={18} color={iconColor} />
+        <Text
+          style={{
+            flex: 1,
+            fontSize: theme.typography.fontSize.base.size,
+            color: textColor,
+          }}
+        >
+          {label}
+        </Text>
+        {accessory ? (
+          <Feather name={accessory} size={16} color={theme.colors.mutedForeground} />
+        ) : null}
+      </Pressable>
+    </View>
+  );
+}
+
 function createStyles(theme: ThemeTokens) {
   const view = {
     container: {
@@ -459,6 +814,7 @@ function createStyles(theme: ThemeTokens) {
     body: {
       padding: theme.spacing["4"],
       gap: theme.spacing["3"],
+      paddingBottom: theme.spacing["6"] + 84,
     },
     metaBlock: {
       gap: theme.spacing["1"],
@@ -519,6 +875,59 @@ function createStyles(theme: ThemeTokens) {
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.card,
+    },
+    bottomBar: {
+      flexDirection: "row" as const,
+      justifyContent: "space-around" as const,
+      alignItems: "center" as const,
+      paddingHorizontal: theme.spacing["3"],
+      paddingVertical: theme.spacing["2"],
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
+    },
+    bottomBarButton: {
+      flex: 1,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      gap: theme.spacing["1"],
+      paddingVertical: theme.spacing["1"],
+      borderRadius: theme.borderRadius.md,
+    },
+    bottomBarButtonPressed: {
+      opacity: 0.7,
+    },
+    bottomBarButtonDisabled: {
+      opacity: 0.45,
+    },
+    sheetView: {
+      flex: 1,
+    },
+    sheetScroll: {
+      flex: 1,
+    },
+    sheetContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+      gap: 8,
+    },
+    sheetList: {
+      marginHorizontal: 16,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.muted + "22",
+      overflow: "hidden" as const,
+    },
+    sheetNavButton: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 2,
+      paddingHorizontal: 16,
+      paddingBottom: 4,
+    },
+    htmlSourceCard: {
+      padding: theme.spacing["3"],
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.muted + "28",
     },
   } satisfies Record<string, ViewStyle>;
 
@@ -581,6 +990,24 @@ function createStyles(theme: ThemeTokens) {
     signatureBadgeText: {
       fontSize: theme.typography.fontSize.xs.size,
       color: theme.colors.mutedForeground,
+    },
+    bottomBarButtonText: {
+      fontSize: theme.typography.fontSize.xs.size,
+      color: theme.colors.foreground,
+    },
+    sheetNavLabel: {
+      fontSize: theme.typography.fontSize.sm.size,
+      color: theme.colors.mutedForeground,
+    },
+    htmlSourceText: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.foreground,
+      fontFamily: Platform.select({
+        ios: "Menlo",
+        android: "monospace",
+        default: "monospace",
+      }),
     },
   } satisfies Record<string, TextStyle>;
 

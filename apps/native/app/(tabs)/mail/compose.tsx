@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -13,22 +13,31 @@ import {
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
+import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import {
+  useCachedMessage,
   resolveComposeContext,
   useMailAccount,
   useMailRuntime,
   useSendMessage,
 } from "../../../src/lib/mail/use-mail";
 import { validateComposeInput } from "../../../src/lib/mail/mail-helpers";
+import { extractMessageBodies } from "../../../src/lib/mail/message-security";
+import type { JmapEmailMessage } from "../../../src/lib/mail/types";
 
 export default function ComposeScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    mode?: string;
+    messageId?: string;
+  }>();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const accountQuery = useMailAccount();
@@ -36,6 +45,7 @@ export default function ComposeScreen() {
   const runtimeQuery = useMailRuntime(provisioned);
   const runtime = runtimeQuery.data;
   const sendMessage = useSendMessage(runtime);
+  const cachedMessage = useCachedMessage(params.messageId ?? "");
 
   const composeContext = resolveComposeContext(runtime);
 
@@ -46,6 +56,22 @@ export default function ComposeScreen() {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [hasInitializedFromParams, setHasInitializedFromParams] =
+    useState(false);
+
+  const sourceMessageQuery = useQuery<JmapEmailMessage | null>({
+    queryKey: QUERY_KEYS.mailMessage(params.messageId ?? ""),
+    enabled:
+      Boolean(params.messageId) && Boolean(runtime) && !Boolean(cachedMessage),
+    queryFn: async () => {
+      const list = await runtime!.client.getMessagesByIds(runtime!.session, [
+        params.messageId!,
+      ]);
+      return list[0] ?? null;
+    },
+    initialData: cachedMessage ?? undefined,
+  });
+  const sourceMessage = sourceMessageQuery.data ?? cachedMessage ?? null;
 
   const handleSend = useCallback(() => {
     setError(null);
@@ -76,6 +102,23 @@ export default function ComposeScreen() {
   }, [to, cc, bcc, subject, body, sendMessage, router]);
 
   const canSend = Boolean(composeContext) && !sendMessage.isPending;
+
+  useEffect(() => {
+    if (hasInitializedFromParams || !sourceMessage) {
+      return;
+    }
+
+    if (params.mode === "reply") {
+      setTo(getReplyRecipients(sourceMessage));
+      setSubject(prefixSubject(sourceMessage.subject, "Re:"));
+      setBody(buildReplyBody(sourceMessage));
+    } else if (params.mode === "forward") {
+      setSubject(prefixSubject(sourceMessage.subject, "Fwd:"));
+      setBody(buildForwardBody(sourceMessage));
+    }
+
+    setHasInitializedFromParams(true);
+  }, [hasInitializedFromParams, params.mode, sourceMessage]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -208,6 +251,79 @@ export default function ComposeScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+function prefixSubject(
+  value: string | null | undefined,
+  prefix: "Re:" | "Fwd:",
+) {
+  const normalized = value?.trim() || "(no subject)";
+  return normalized.toLowerCase().startsWith(prefix.toLowerCase())
+    ? normalized
+    : `${prefix} ${normalized}`;
+}
+
+function getReplyRecipients(message: JmapEmailMessage): string {
+  return (message.from ?? [])
+    .map((entry) => entry.email?.trim())
+    .filter((value): value is string => Boolean(value))
+    .join(", ");
+}
+
+function buildReplyBody(message: JmapEmailMessage): string {
+  const sender =
+    message.from?.[0]?.name?.trim() ||
+    message.from?.[0]?.email?.trim() ||
+    "Unknown sender";
+  const receivedAt = message.receivedAt
+    ? new Date(message.receivedAt).toLocaleString()
+    : "Unknown date";
+  const bodies = extractMessageBodies(message);
+  const source = bodies.text?.trim() || stripHtmlToText(bodies.html);
+  const quoted = source
+    .split(/\r?\n/)
+    .map((line) => `> ${line}`)
+    .join("\n");
+
+  return `\n\nOn ${receivedAt}, ${sender} wrote:\n${quoted}`;
+}
+
+function buildForwardBody(message: JmapEmailMessage): string {
+  const bodies = extractMessageBodies(message);
+  const textBody = bodies.text?.trim() || stripHtmlToText(bodies.html);
+  const from = getReplyRecipients(message) || "Unknown sender";
+  const to = (message.to ?? [])
+    .map((entry) => entry.email?.trim())
+    .filter((value): value is string => Boolean(value))
+    .join(", ");
+  const cc = (message.cc ?? [])
+    .map((entry) => entry.email?.trim())
+    .filter((value): value is string => Boolean(value))
+    .join(", ");
+  const date = message.receivedAt
+    ? new Date(message.receivedAt).toLocaleString()
+    : "Unknown date";
+
+  return [
+    "",
+    "",
+    "---------- Forwarded message ----------",
+    `From: ${from}`,
+    `Date: ${date}`,
+    ...(to ? [`To: ${to}`] : []),
+    ...(cc ? [`Cc: ${cc}`] : []),
+    `Subject: ${message.subject?.trim() || "(no subject)"}`,
+    "",
+    textBody,
+  ].join("\n");
+}
+
+function stripHtmlToText(html: string | null | undefined): string {
+  if (!html) {
+    return "";
+  }
+
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function Field({

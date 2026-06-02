@@ -11,76 +11,14 @@ import * as SecureStore from "expo-secure-store";
 import { createE2eeModule } from "@workspace/e2ee";
 import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
 import { useAuth } from "./AuthProvider";
-import { useTheme } from "./ThemeProvider";
 import { E2eeProvider, useE2ee } from "./E2eeProvider";
 
-jest.mock("react-native", () => {
-  const React = jest.requireActual<typeof import("react")>("react");
-
-  return {
-    ActivityIndicator: () => <div data-testid="activity-indicator" />,
-    KeyboardAvoidingView: ({ children }: { children: React.ReactNode }) => (
-      <div>{children}</div>
-    ),
-    Modal: ({
-      children,
-      visible,
-    }: {
-      children: React.ReactNode;
-      visible?: boolean;
-    }) => (visible ? <div data-testid="modal">{children}</div> : null),
-    Platform: {
-      OS: "ios",
-    },
-    Pressable: ({
-      children,
-      disabled,
-      onPress,
-    }: {
-      children:
-        | React.ReactNode
-        | ((state: { pressed: boolean }) => React.ReactNode);
-      disabled?: boolean;
-      onPress?: () => void;
-    }) => (
-      <button type="button" disabled={disabled} onClick={onPress}>
-        {typeof children === "function"
-          ? children({ pressed: false })
-          : children}
-      </button>
-    ),
-    StyleSheet: {
-      create: <T,>(styles: T) => styles,
-      hairlineWidth: 1,
-    },
-    Text: ({ children }: { children: React.ReactNode }) => (
-      <span>{children}</span>
-    ),
-    TextInput: ({
-      value,
-      onChangeText,
-      secureTextEntry,
-      editable = true,
-    }: {
-      value?: string;
-      onChangeText?: (value: string) => void;
-      secureTextEntry?: boolean;
-      editable?: boolean;
-    }) => (
-      <input
-        value={value}
-        type={secureTextEntry ? "password" : "text"}
-        disabled={!editable}
-        onChange={(event) =>
-          onChangeText?.((event.target as HTMLInputElement).value)
-        }
-      />
-    ),
-    View: ({ children }: { children: React.ReactNode }) => (
-      <div>{children}</div>
-    ),
-  };
-});
+jest.mock("react-native", () => ({
+  StyleSheet: {
+    create: <T,>(styles: T) => styles,
+    hairlineWidth: 1,
+  },
+}));
 
 jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn(),
@@ -97,10 +35,6 @@ jest.mock("../lib/native-crypto-provider", () => ({
 
 jest.mock("./AuthProvider", () => ({
   useAuth: jest.fn(),
-}));
-
-jest.mock("./ThemeProvider", () => ({
-  useTheme: jest.fn(),
 }));
 
 jest.mock("@workspace/logger", () => ({
@@ -128,42 +62,6 @@ const mockSetItemAsync = jest.mocked(SecureStore.setItemAsync);
 const mockCreateE2eeModule = jest.mocked(createE2eeModule);
 const mockCreateNativeCryptoProvider = jest.mocked(createNativeCryptoProvider);
 const mockUseAuth = jest.mocked(useAuth);
-const mockUseTheme = jest.mocked(useTheme);
-
-const mockTheme = {
-  spacing: {
-    "2": 8,
-    "2.5": 10,
-    "3": 12,
-    "4": 16,
-  },
-  borderRadius: {
-    lg: 12,
-    xl: 16,
-  },
-  colors: {
-    border: "#d4d4d8",
-    card: "#ffffff",
-    foreground: "#18181b",
-    mutedForeground: "#52525b",
-    input: "#ffffff",
-    destructive: "#dc2626",
-    accent: "#f4f4f5",
-    primaryBase: "#ef5a3c",
-    primaryForeground: "#ffffff",
-  },
-  typography: {
-    fontSize: {
-      base: { size: 16, lineHeight: 24 },
-      sm: { size: 14, lineHeight: 20 },
-    },
-    fontWeight: {
-      medium: "500",
-      semibold: "600",
-    },
-  },
-  shadows: {},
-} as const;
 
 const accountKey = { type: "account-key" } as unknown as CryptoKey;
 const blindIndexKey = { type: "blind-index-key" } as unknown as CryptoKey;
@@ -212,16 +110,6 @@ function jsonResponse(data: unknown, status = 200) {
   };
 }
 
-function setInputValue(input: HTMLInputElement, value: string) {
-  const descriptor = Object.getOwnPropertyDescriptor(
-    window.HTMLInputElement.prototype,
-    "value",
-  );
-
-  descriptor?.set?.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
 function createMockAuthContext(
   overrides?: Partial<ReturnType<typeof useAuth>>,
 ): ReturnType<typeof useAuth> {
@@ -241,16 +129,6 @@ function createMockAuthContext(
     consumePendingAuthPassword: jest.fn(() => null),
     clearPendingAuthPassword: jest.fn(),
     ...overrides,
-  };
-}
-
-function createMockThemeContext(): ReturnType<typeof useTheme> {
-  return {
-    theme: mockTheme as unknown as ReturnType<typeof useTheme>["theme"],
-    colorScheme: "light",
-    isDark: false,
-    themePreference: "system",
-    setThemePreference: jest.fn(),
   };
 }
 
@@ -277,7 +155,6 @@ describe("E2eeProvider", () => {
   let mockFetch: jest.Mock;
   let consumePendingAuthPassword: jest.Mock;
   let clearPendingAuthPassword: jest.Mock;
-  let signOut: jest.Mock;
 
   function E2eeProbe() {
     capturedE2ee = useE2ee();
@@ -296,6 +173,22 @@ describe("E2eeProvider", () => {
           <E2eeProbe />
         </E2eeProvider>,
       );
+      // React 18+ concurrent mode defers scheduler work via MessageChannel /
+      // setTimeout. Advance fake timers inside act so those callbacks fire
+      // before act exits, preventing "update not wrapped in act" warnings.
+      jest.runAllTimers();
+      await Promise.resolve();
+    });
+    if (!capturedE2ee) {
+      throw new Error("renderProvider: E2eeProbe did not render — E2eeProvider may have thrown during initial render.");
+    }
+  }
+
+  // Flush async bootstrap state updates: advance fake timers then drain the
+  // microtask queue. Wrapping in act ensures React commits the updates.
+  async function flushBootstrap() {
+    await act(async () => {
+      jest.runAllTimers();
       await Promise.resolve();
     });
   }
@@ -309,6 +202,7 @@ describe("E2eeProvider", () => {
   }
 
   beforeEach(() => {
+    jest.useFakeTimers();
     capturedE2ee = null;
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -318,14 +212,12 @@ describe("E2eeProvider", () => {
 
     consumePendingAuthPassword = jest.fn().mockReturnValue(null);
     clearPendingAuthPassword = jest.fn();
-    signOut = jest.fn().mockResolvedValue(undefined);
 
     mockGetItemAsync.mockReset();
     mockSetItemAsync.mockReset();
     mockCreateE2eeModule.mockReset();
     mockCreateNativeCryptoProvider.mockReset();
     mockUseAuth.mockReset();
-    mockUseTheme.mockReset();
 
     mockCryptoProvider.subtle.exportKey.mockReset();
     mockCryptoProvider.subtle.importKey.mockReset();
@@ -343,10 +235,8 @@ describe("E2eeProvider", () => {
         clearPendingAuthPassword,
         consumePendingAuthPassword,
         lastAuthMethod: "unknown",
-        signOut,
       }),
     );
-    mockUseTheme.mockReturnValue(createMockThemeContext());
 
     mockGetItemAsync.mockResolvedValue(null);
     mockSetItemAsync.mockResolvedValue();
@@ -384,9 +274,15 @@ describe("E2eeProvider", () => {
   });
 
   afterEach(() => {
+    // Flush any timers that may have been scheduled during the test before
+    // unmounting, to avoid "not wrapped in act" warnings from leaked updates.
+    act(() => {
+      jest.runAllTimers();
+    });
     act(() => {
       root.unmount();
     });
+    jest.useRealTimers();
     container.remove();
   });
 
@@ -397,7 +293,6 @@ describe("E2eeProvider", () => {
         clearPendingAuthPassword,
         consumePendingAuthPassword,
         lastAuthMethod: "email-password",
-        signOut,
       }),
     );
     mockFetch.mockImplementation(async (url: string) => {
@@ -421,6 +316,7 @@ describe("E2eeProvider", () => {
     await act(async () => {
       await getE2ee().bootstrap("user-1", "https://api.solace.test");
     });
+    await flushBootstrap();
 
     expect(mockE2eeModule.unwrapPasswordEnvelope).toHaveBeenCalledWith(
       "secret-password",
@@ -434,23 +330,21 @@ describe("E2eeProvider", () => {
         method: "PUT",
       }),
     );
-    expect(container.textContent).not.toContain("Unlock encrypted data");
     expect(getE2ee().isReady).toBe(true);
     expect(getE2ee().isEnabled).toBe(true);
   });
 
-  it("shows the email-password unlock gate when automatic unlock fails", async () => {
-    consumePendingAuthPassword.mockReturnValue("secret-password");
+  it("starts a fresh E2EE session when the auto-unlock fails (e.g. password changed)", async () => {
+    consumePendingAuthPassword.mockReturnValue("wrong-password");
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
         consumePendingAuthPassword,
         lastAuthMethod: "email-password",
-        signOut,
       }),
     );
     mockE2eeModule.unwrapPasswordEnvelope.mockRejectedValue(
-      new Error("wrong password"),
+      new Error("decryption failed"),
     );
     mockFetch.mockImplementation(async (url: string) => {
       if (url.endsWith("/api/e2ee/bootstrap")) {
@@ -461,6 +355,10 @@ describe("E2eeProvider", () => {
         );
       }
 
+      if (url.endsWith("/api/e2ee/device")) {
+        return jsonResponse({});
+      }
+
       throw new Error(`Unexpected fetch: ${url}`);
     });
 
@@ -469,12 +367,16 @@ describe("E2eeProvider", () => {
     await act(async () => {
       await getE2ee().bootstrap("user-1", "https://api.solace.test");
     });
+    await flushBootstrap();
 
-    expect(container.textContent).toContain("Unlock encrypted data");
-    expect(container.textContent).toContain(
-      "Solace normally reuses your email sign-in password to unlock encrypted data on this device. If that did not finish automatically, enter the same password here. If you recently changed it, use your previous password.",
+    // Unlock failed → starts a fresh device session with newly-generated keys.
+    expect(getE2ee().isReady).toBe(true);
+    expect(getE2ee().isEnabled).toBe(true);
+    expect(mockE2eeModule.generateAccountKey).toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.solace.test/api/e2ee/device",
+      expect.objectContaining({ method: "PUT" }),
     );
-    expect(container.textContent).toContain("Email sign-in password");
   });
 
   it("auto-saves a password envelope for first-device email sign-in", async () => {
@@ -484,7 +386,6 @@ describe("E2eeProvider", () => {
         clearPendingAuthPassword,
         consumePendingAuthPassword,
         lastAuthMethod: "email-password",
-        signOut,
       }),
     );
     mockFetch.mockImplementation(async (url: string) => {
@@ -507,6 +408,7 @@ describe("E2eeProvider", () => {
     await act(async () => {
       await getE2ee().bootstrap("user-1", "https://api.solace.test");
     });
+    await flushBootstrap();
 
     expect(mockE2eeModule.generateAccountKey).toHaveBeenCalled();
     expect(mockE2eeModule.createPasswordEnvelope).toHaveBeenCalledWith(
@@ -521,7 +423,6 @@ describe("E2eeProvider", () => {
       }),
     );
     expect(clearPendingAuthPassword).toHaveBeenCalled();
-    expect(container.textContent).not.toContain("Protect your encryption keys");
   });
 
   it("can reset the active encryption password after bootstrap completes", async () => {
@@ -531,7 +432,6 @@ describe("E2eeProvider", () => {
         clearPendingAuthPassword,
         consumePendingAuthPassword,
         lastAuthMethod: "email-password",
-        signOut,
       }),
     );
     mockFetch.mockImplementation(async (url: string) => {
@@ -554,6 +454,7 @@ describe("E2eeProvider", () => {
     await act(async () => {
       await getE2ee().bootstrap("user-1", "https://api.solace.test");
     });
+    await flushBootstrap();
 
     mockE2eeModule.createPasswordEnvelope.mockClear();
 
@@ -574,13 +475,12 @@ describe("E2eeProvider", () => {
     );
   });
 
-  it("shows the separate encryption-password setup gate for passkey sign-in", async () => {
+  it("starts a fresh E2EE session for passkey sign-in on a new device", async () => {
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
-        consumePendingAuthPassword,
+        consumePendingAuthPassword, // returns null — no password from passkey auth
         lastAuthMethod: "passkey",
-        signOut,
       }),
     );
     mockFetch.mockImplementation(async (url: string) => {
@@ -600,34 +500,37 @@ describe("E2eeProvider", () => {
     await act(async () => {
       await getE2ee().bootstrap("user-1", "https://api.solace.test");
     });
+    await flushBootstrap();
 
-    expect(container.textContent).toContain("Protect your encryption keys");
-    expect(container.textContent).toContain(
-      "Choose an encryption password to protect your end-to-end encryption keys for recovery and legacy device flows.",
+    expect(getE2ee().isReady).toBe(true);
+    expect(getE2ee().isEnabled).toBe(true);
+    expect(mockE2eeModule.generateAccountKey).toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.solace.test/api/e2ee/device",
+      expect.objectContaining({ method: "PUT" }),
     );
-    expect(container.textContent).toContain("Encryption password");
-    expect(container.textContent).toContain("Save password");
   });
 
-  it("shows the separate encryption-password error when passkey unlock fails", async () => {
+  it("starts a fresh E2EE session for passkey users when a password envelope exists", async () => {
+    // Passkey users have no pending auth password, so they can't unwrap an
+    // existing password envelope. The provider should start a fresh session
+    // rather than disabling E2EE.
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
-        consumePendingAuthPassword,
+        consumePendingAuthPassword, // returns null
         lastAuthMethod: "passkey",
-        signOut,
       }),
-    );
-    mockE2eeModule.unwrapPasswordEnvelope.mockRejectedValue(
-      new Error("wrong password"),
     );
     mockFetch.mockImplementation(async (url: string) => {
       if (url.endsWith("/api/e2ee/bootstrap")) {
         return jsonResponse(
-          createBootstrapResponse({
-            passwordEnvelope: createPasswordRecord(),
-          }),
+          createBootstrapResponse({ passwordEnvelope: createPasswordRecord() }),
         );
+      }
+
+      if (url.endsWith("/api/e2ee/device")) {
+        return jsonResponse({});
       }
 
       throw new Error(`Unexpected fetch: ${url}`);
@@ -638,20 +541,14 @@ describe("E2eeProvider", () => {
     await act(async () => {
       await getE2ee().bootstrap("user-1", "https://api.solace.test");
     });
+    await flushBootstrap();
 
-    const [passwordInput] = Array.from(container.querySelectorAll("input"));
-    const unlockButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent === "Unlock",
-    );
-
-    await act(async () => {
-      setInputValue(passwordInput as HTMLInputElement, "incorrect-password");
-      unlockButton?.click();
-      await Promise.resolve();
-    });
-
-    expect(container.textContent).toContain(
-      "That password did not unlock your encrypted data.",
+    expect(getE2ee().isReady).toBe(true);
+    expect(getE2ee().isEnabled).toBe(true);
+    expect(mockE2eeModule.generateAccountKey).toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.solace.test/api/e2ee/device",
+      expect.objectContaining({ method: "PUT" }),
     );
   });
 });

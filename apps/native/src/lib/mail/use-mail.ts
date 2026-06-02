@@ -120,10 +120,8 @@ export function useMailMutations(
   const queryClient = useQueryClient();
 
   const invalidate = useCallback(() => {
-    queryClient.invalidateQueries({
-      queryKey: QUERY_KEYS.mailMessages(mailboxId),
-    });
-  }, [queryClient, mailboxId]);
+    queryClient.invalidateQueries({ queryKey: ["mail"] });
+  }, [queryClient]);
 
   const markAsRead = useMutation({
     mutationFn: (messageId: string) =>
@@ -141,6 +139,12 @@ export function useMailMutations(
     onSuccess: invalidate,
   });
 
+  const markAsUnread = useMutation({
+    mutationFn: (messageId: string) =>
+      runtime!.client.markAsUnread(runtime!.session, messageId),
+    onSuccess: invalidate,
+  });
+
   const moveToTrash = useMutation({
     mutationFn: (messageId: string) => {
       const trashId =
@@ -154,7 +158,30 @@ export function useMailMutations(
     onSuccess: invalidate,
   });
 
-  return { markAsRead, toggleFlagged, moveToTrash };
+  const deleteMessage = useMutation({
+    mutationFn: (messageId: string) =>
+      runtime!.client.deleteMessage(runtime!.session, messageId),
+    onSuccess: invalidate,
+  });
+
+  const moveToMailbox = useMutation({
+    mutationFn: (input: { messageId: string; targetMailboxId: string }) =>
+      runtime!.client.moveToMailbox(
+        runtime!.session,
+        input.messageId,
+        input.targetMailboxId,
+      ),
+    onSuccess: invalidate,
+  });
+
+  return {
+    markAsRead,
+    markAsUnread,
+    toggleFlagged,
+    moveToTrash,
+    deleteMessage,
+    moveToMailbox,
+  };
 }
 
 export interface ComposeMessageInput {

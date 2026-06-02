@@ -51,6 +51,10 @@ export function getSessionCookie(): string {
   return parseSessionCookie(getChunkedSecureValueSync(COOKIE_STORE_KEY));
 }
 
+export async function getSessionCookieAsync(): Promise<string> {
+  return parseSessionCookie(await readChunkedSecureValue(COOKIE_STORE_KEY));
+}
+
 export async function waitForSessionCookie(
   timeoutMs = 3_000,
   pollIntervalMs = 50,

@@ -1,7 +1,6 @@
 export type SettingsAccountActionKey =
   | "change-password"
   | "set-password"
-  | "reset-encryption-password"
   | "change-profile-picture"
   | "reset-preferences"
   | "sign-out"
@@ -29,16 +28,7 @@ const SET_PASSWORD_ACTION: SettingsAccountAction = {
   icon: "lock",
   label: "Set Email Password",
   description:
-    "Add an email sign-in password. This does not change the separate encryption password used by OAuth or passkey sign-in.",
-  destructive: false,
-};
-
-const RESET_ENCRYPTION_PASSWORD_ACTION: SettingsAccountAction = {
-  key: "reset-encryption-password",
-  icon: "rotate-ccw",
-  label: "Reset Encryption Password",
-  description:
-    "Choose a new encryption password for OAuth or passkey sign-in without changing your OAuth login method.",
+    "Add an email sign-in password without changing your existing encrypted data.",
   destructive: false,
 };
 
@@ -89,10 +79,6 @@ export function getSettingsAccountActions({
     authActions.push(CHANGE_PASSWORD_ACTION);
   } else if (hasOAuthAccount) {
     authActions.push(SET_PASSWORD_ACTION);
-  }
-
-  if (hasOAuthAccount) {
-    authActions.push(RESET_ENCRYPTION_PASSWORD_ACTION);
   }
 
   return canSignOut
