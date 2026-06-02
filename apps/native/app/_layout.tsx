@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "../src/providers/AuthProvider";
 import { ThemeProvider } from "../src/providers/ThemeProvider";
 import { E2eeProvider, useE2ee } from "../src/providers/E2eeProvider";
 import { SheetProvider } from "../src/providers/SheetProvider";
+import { ToastProvider } from "../src/providers/ToastProvider";
 import { SidebarProvider, useSidebar } from "../src/providers/SidebarProvider";
 import { MailSelectionProvider } from "../src/providers/MailSelectionProvider";
 import { CommandPaletteProvider } from "../src/providers/CommandPaletteProvider";
@@ -170,12 +171,14 @@ export default function RootLayout() {
                 <MailSelectionProvider>
                   <CalendarViewProvider>
                     <NavigationGuard>
-                      <SheetProvider>
-                        <CommandPaletteProvider>
-                          <RootNavigator />
-                          <AuthenticatedChrome />
-                        </CommandPaletteProvider>
-                      </SheetProvider>
+                      <ToastProvider>
+                        <SheetProvider>
+                          <CommandPaletteProvider>
+                            <RootNavigator />
+                            <AuthenticatedChrome />
+                          </CommandPaletteProvider>
+                        </SheetProvider>
+                      </ToastProvider>
                     </NavigationGuard>
                   </CalendarViewProvider>
                 </MailSelectionProvider>

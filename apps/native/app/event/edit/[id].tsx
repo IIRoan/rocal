@@ -16,6 +16,7 @@ import type {
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
+import { useToast } from "../../../src/providers/ToastProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { EventForm } from "../../../src/components/event/EventForm";
@@ -53,6 +54,7 @@ export default function EventEditScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // ─── Route params ──────────────────────────────────────────────────────────
 
@@ -100,6 +102,7 @@ export default function EventEditScreen() {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.eventDetail(id!),
       });
+      toast("Event updated");
       router.back();
     },
     onError: (err: unknown) => {
