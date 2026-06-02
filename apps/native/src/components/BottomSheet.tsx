@@ -277,6 +277,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         translateY.value = withSpring(offsets[targetIdx], SPRING_OPEN);
         backdropOpacity.value = withTiming(1, { duration: OVERLAY_DURATION });
       } else {
+        isClosing.value = true;
         Keyboard.dismiss();
         preKeyboardSnapY.value = null;
         keyboardOffset.value = 0;

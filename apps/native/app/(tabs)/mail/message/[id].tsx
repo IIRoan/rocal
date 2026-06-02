@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -16,6 +15,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
+import { FontAwesome } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 type SharingModule = typeof import("expo-sharing");
 let Sharing: SharingModule | null = null;
@@ -28,6 +28,7 @@ try {
 import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../../src/providers/ThemeProvider";
+import { useToast } from "../../../../src/providers/ToastProvider";
 import { QUERY_KEYS } from "../../../../src/lib/query-keys";
 import {
   useCachedMessage,
@@ -56,9 +57,11 @@ import {
   resolveAttachmentPreviewKind,
   type MailAttachmentPreviewKind,
 } from "../../../../src/lib/mail/attachment-preview";
-import type { JmapAttachment, JmapEmailMessage } from "../../../../src/lib/mail/types";
+import type { JmapAttachment, JmapEmailMessage, LabelDef } from "../../../../src/lib/mail/types";
+import { useLabels, getAllMessageLabels } from "../../../../src/lib/mail/use-labels";
+import { MailLabelsSheet } from "../../../../src/components/mail/MailLabelsSheet";
 
-type MessageSheetView = "menu" | "move" | "html" | null;
+type MessageSheetView = "menu" | "move" | "label" | "html" | null;
 
 export default function MailMessageScreen() {
   const { theme } = useTheme();
@@ -67,8 +70,10 @@ export default function MailMessageScreen() {
   const isDark = colorScheme === "dark";
   const router = useRouter();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const { toast } = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
   const messageId = typeof id === "string" ? id : "";
+  const { labels, createLabel, deleteLabel } = useLabels();
 
   const runtimeQuery = useMailRuntime(true);
   const runtime = runtimeQuery.data;
@@ -88,7 +93,7 @@ export default function MailMessageScreen() {
   });
 
   const message = messageQuery.data ?? null;
-  const { markAsUnread, toggleFlagged, moveToTrash, deleteMessage, moveToMailbox } =
+  const { markAsUnread, toggleFlagged, moveToTrash, deleteMessage, moveToMailbox, setMessageLabel } =
     useMailMutations(runtime, null);
   const bodies = message ? extractMessageBodies(message) : null;
   const encryption = message ? classifyMessageEncryption(message) : "plain";
@@ -128,6 +133,7 @@ export default function MailMessageScreen() {
   } | null>(null);
   const [activeSheetView, setActiveSheetView] = useState<MessageSheetView>(null);
 
+
   const currentMailboxId = message
     ? Object.keys(message.mailboxIds ?? {})[0] ?? null
     : null;
@@ -137,6 +143,7 @@ export default function MailMessageScreen() {
   const currentMailboxRole = currentMailbox?.role ?? null;
   const isFlagged = Boolean(message?.keywords?.["$flagged"]);
   const isSeen = Boolean(message?.keywords?.["$seen"]);
+  const messageLabels = message ? getAllMessageLabels(message, labels) : [];
   const inboxMailboxId =
     runtime?.mailboxes.find((mailbox) => mailbox.role === "inbox")?.id ?? null;
   const archiveMailboxId =
@@ -180,18 +187,12 @@ export default function MailMessageScreen() {
 
   const shareUri = async (uri: string, type: string, name: string) => {
     if (!Sharing) {
-      Alert.alert(
-        "Sharing not available",
-        "The sharing module is not loaded.",
-      );
+      toast("The sharing module is not loaded", "error");
       return;
     }
     const canShare = await Sharing.isAvailableAsync();
     if (!canShare) {
-      Alert.alert(
-        "Sharing not available",
-        "File sharing is not supported on this device.",
-      );
+      toast("File sharing is not supported on this device", "error");
       return;
     }
     await Sharing.shareAsync(uri, { mimeType: type, dialogTitle: name });
@@ -217,10 +218,7 @@ export default function MailMessageScreen() {
       const localUri = await downloadAttachmentToCache(attachment);
       await shareUri(localUri, type, name);
     } catch (err) {
-      Alert.alert(
-        "Download failed",
-        getErrorMessage(err, "Could not download attachment."),
-      );
+      toast(getErrorMessage(err, "Could not download attachment."), "error");
     } finally {
       setDownloadingBlobId(null);
     }
@@ -249,35 +247,41 @@ export default function MailMessageScreen() {
       messageId: message.id,
       flagged: !isFlagged,
     });
+    toast(isFlagged ? "Unstarred" : "Starred");
     setActiveSheetView(null);
   };
 
   const handleMarkUnread = () => {
     if (!message) return;
     markAsUnread.mutate(message.id, {
-      onSuccess: () => setActiveSheetView(null),
+      onSuccess: () => {
+        setActiveSheetView(null);
+        toast("Marked as unread");
+      },
       onError: (error) =>
-        Alert.alert(
-          "Could not update message",
-          getErrorMessage(error, "Failed to mark message as unread."),
-        ),
+        toast(getErrorMessage(error, "Failed to mark message as unread."), "error"),
     });
   };
 
   const handleMoveToTrash = () => {
     if (!message) return;
+    setActiveSheetView(null);
     const mutation = currentMailboxRole === "trash" ? deleteMessage : moveToTrash;
+    const successMessage = currentMailboxRole === "trash" ? "Message deleted" : "Message moved to trash";
     mutation.mutate(message.id, {
-      onSuccess: () => router.back(),
+      onSuccess: () => {
+        toast(successMessage);
+        router.back();
+      },
       onError: (error) =>
-        Alert.alert(
-          "Could not delete message",
+        toast(
           getErrorMessage(
             error,
             currentMailboxRole === "trash"
               ? "Failed to delete the message."
               : "Failed to move message to trash.",
           ),
+          "error",
         ),
     });
   };
@@ -289,20 +293,18 @@ export default function MailMessageScreen() {
       {
         onSuccess: () => {
           setActiveSheetView(null);
+          toast("Message moved");
           router.back();
         },
         onError: (error) =>
-          Alert.alert(
-            "Could not move message",
-            getErrorMessage(error, "Failed to move the message."),
-          ),
+          toast(getErrorMessage(error, "Failed to move the message."), "error"),
       },
     );
   };
 
   const handleArchive = () => {
     if (!archiveMailboxId) {
-      Alert.alert("Archive unavailable", "No archive mailbox is configured.");
+      toast("No archive mailbox is configured", "info");
       return;
     }
     handleMoveToMailbox(archiveMailboxId);
@@ -310,10 +312,7 @@ export default function MailMessageScreen() {
 
   const handleRestoreToInbox = () => {
     if (!inboxMailboxId) {
-      Alert.alert(
-        "Restore unavailable",
-        "No inbox mailbox is configured for this account.",
-      );
+      toast("No inbox mailbox is configured for this account", "info");
       return;
     }
     handleMoveToMailbox(inboxMailboxId);
@@ -321,9 +320,41 @@ export default function MailMessageScreen() {
 
   const messageHeader = message ? (
     <>
-      <Text style={styles.subject}>
-        {message.subject?.trim() || "(no subject)"}
-      </Text>
+      <View style={styles.subjectRow}>
+        <Text style={styles.subject}>
+          {message.subject?.trim() || "(no subject)"}
+        </Text>
+        <Pressable
+          onPress={handleToggleStar}
+          disabled={toggleFlagged.isPending}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={isFlagged ? "Unstar" : "Star"}
+        >
+          <FontAwesome
+            name={isFlagged ? "star" : "star-o"}
+            size={18}
+            color={isFlagged ? "#fbbf24" : theme.colors.mutedForeground}
+            style={!isFlagged ? { opacity: 0.4 } : undefined}
+          />
+        </Pressable>
+      </View>
+
+      {messageLabels.length > 0 ? (
+        <View style={styles.labelRow}>
+          {messageLabels.map((label) => (
+            <View
+              key={label.id}
+              style={[styles.labelChip, { borderColor: `${label.color}50`, backgroundColor: `${label.color}18` }]}
+            >
+              <View style={[styles.labelDot, { backgroundColor: label.color }]} />
+              <Text style={[styles.labelText, { color: label.color }]} numberOfLines={1}>
+                {label.name}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       <View style={styles.metaBlock}>
         <MetaRow theme={theme} label="From" value={formatAddressFull(message.from)} />
@@ -516,7 +547,7 @@ export default function MailMessageScreen() {
       <BottomSheet
         visible={activeSheetView !== null}
         onDismiss={() => setActiveSheetView(null)}
-        snapPoints={activeSheetView === "html" ? [0.92] : [0.45]}
+        snapPoints={activeSheetView === "html" ? [0.92] : activeSheetView === "label" ? [0.65] : [0.45]}
       >
         {activeSheetView === "menu" ? (
           <View style={[styles.sheetContent, { paddingBottom: insets.bottom + 8 }]}>
@@ -526,6 +557,7 @@ export default function MailMessageScreen() {
               {isSeen ? (
                 <SheetRow icon="mail" label="Mark as unread" onPress={handleMarkUnread} theme={theme} showDivider />
               ) : null}
+              <SheetRow icon="tag" label="Labels" accessory="chevron-right" onPress={() => setActiveSheetView("label")} theme={theme} showDivider />
               {(currentMailboxRole === "trash" ||
                 currentMailboxRole === "junk") &&
               inboxMailboxId ? (
@@ -573,6 +605,34 @@ export default function MailMessageScreen() {
               ))}
             </View>
           </View>
+        ) : activeSheetView === "label" ? (
+          <MailLabelsSheet
+            theme={theme}
+            labels={labels}
+            messageKeywords={message?.keywords}
+            insetsBottom={insets.bottom}
+            onBack={() => setActiveSheetView("menu")}
+            onToggleLabel={(labelId, assigned) => {
+              if (!message) return;
+              setMessageLabel.mutate({ messageId: message.id, labelId, assigned });
+              setActiveSheetView(null);
+              const label = labels.find((l) => l.id === labelId);
+              toast(assigned ? `Added "${label?.name ?? labelId}"` : `Removed "${label?.name ?? labelId}"`);
+            }}
+            onCreateLabel={async (name, color) => {
+              const newLabel = await createLabel(name, color);
+              if (message) {
+                setMessageLabel.mutate({ messageId: message.id, labelId: newLabel.id, assigned: true });
+                toast(`Created "${newLabel.name}"`);
+              }
+              setActiveSheetView(null);
+            }}
+            onDeleteLabel={async (labelId) => {
+              const label = labels.find((l) => l.id === labelId);
+              await deleteLabel(labelId);
+              toast(`Deleted "${label?.name ?? labelId}"`);
+            }}
+          />
         ) : activeSheetView === "html" ? (
           <View style={styles.sheetView}>
             <Pressable
@@ -816,6 +876,25 @@ function createStyles(theme: ThemeTokens) {
     metaBlock: {
       gap: theme.spacing["1"],
     },
+    labelRow: {
+      flexDirection: "row" as const,
+      flexWrap: "wrap" as const,
+      gap: 6,
+    },
+    labelChip: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: theme.borderRadius.full,
+      borderWidth: 1,
+    },
+    labelDot: {
+      width: 8,
+      height: 8,
+      borderRadius: theme.borderRadius.full,
+    },
     metaRow: {
       flexDirection: "row" as const,
       gap: theme.spacing["2"],
@@ -937,7 +1016,13 @@ function createStyles(theme: ThemeTokens) {
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
+    subjectRow: {
+      flexDirection: "row" as const,
+      alignItems: "flex-start" as const,
+      gap: theme.spacing["2"],
+    },
     subject: {
+      flex: 1,
       fontSize: theme.typography.fontSize.xl.size,
       lineHeight: theme.typography.fontSize.xl.lineHeight,
       fontWeight: theme.typography.fontWeight
@@ -965,6 +1050,11 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
       color: theme.colors.foreground,
+    },
+    labelText: {
+      fontSize: theme.typography.fontSize.xs.size - 1,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
     },
     mutedText: {
       textAlign: "center" as const,

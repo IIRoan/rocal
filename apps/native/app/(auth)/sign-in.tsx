@@ -30,6 +30,7 @@ import {
 } from "../../src/lib/auth-routing";
 import { getAuthCapabilities } from "../../src/lib/auth-capabilities";
 import { useTheme } from "../../src/providers/ThemeProvider";
+import { useToast } from "../../src/providers/ToastProvider";
 import { ThemeToggle } from "../../src/components/ThemeToggle";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
@@ -62,6 +63,7 @@ function resolvePasswordResetRedirectUrl(): string | null {
 
 export default function SignInScreen() {
   const { signIn, signInWithPasskey, requiresPasskeyStepUp } = useAuth();
+  const { toast } = useToast();
   const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -172,6 +174,7 @@ export default function SignInScreen() {
         "Check your email",
         "If an account exists for that email, we sent a password reset link for your email sign-in password.",
       );
+      toast("Password reset link sent");
       setIsResetMode(false);
     } catch (err: any) {
       const message =

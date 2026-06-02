@@ -123,3 +123,9 @@ export type JmapEmailChanges = {
  * canonical definition.
  */
 export type MessageEncryptionState = SharedMessageEncryptionState;
+
+export type LabelDef = {
+  id: string;
+  name: string;
+  color: string;
+};

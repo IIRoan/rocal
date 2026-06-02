@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +20,7 @@ import {
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../src/providers/ThemeProvider";
+import { useToast } from "../../src/providers/ToastProvider";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
 import { StackScreenHeader } from "../../src/components/StackScreenHeader";
@@ -51,6 +51,7 @@ export default function CalendarManageScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { push, back } = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // ─── Data fetching ─────────────────────────────────────────────────────────
 
@@ -122,10 +123,7 @@ export default function CalendarManageScreen() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
     onError: (mutationError) => {
-      Alert.alert(
-        "Unable to update visibility",
-        getErrorMessage(mutationError, "Failed to update calendar visibility"),
-      );
+      toast(getErrorMessage(mutationError, "Failed to update calendar visibility"), "error");
     },
     onSettled: (_data, _error, { id }) => {
       setTogglingIds((prev) => {
@@ -146,12 +144,10 @@ export default function CalendarManageScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Default calendar updated");
     },
     onError: (mutationError) => {
-      Alert.alert(
-        "Unable to update default calendar",
-        getErrorMessage(mutationError, "Failed to update default calendar"),
-      );
+      toast(getErrorMessage(mutationError, "Failed to update default calendar"), "error");
     },
     onSettled: () => {
       setPendingDefaultCalendarId(null);
@@ -170,19 +166,18 @@ export default function CalendarManageScreen() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
 
       if (result.status === "error") {
-        Alert.alert(
-          "Sync finished with issues",
+        toast(
           result.message ??
             result.errors?.join("\n") ??
             "The calendar feed returned an error.",
+          "error",
         );
+      } else {
+        toast("Calendar synced");
       }
     },
     onError: (mutationError) => {
-      Alert.alert(
-        "Unable to sync calendar",
-        getErrorMessage(mutationError, "Failed to sync calendar"),
-      );
+      toast(getErrorMessage(mutationError, "Failed to sync calendar"), "error");
     },
     onSettled: () => {
       setPendingSyncSubscriptionId(null);

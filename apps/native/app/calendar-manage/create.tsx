@@ -20,6 +20,7 @@ import type {
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../src/providers/ThemeProvider";
+import { useToast } from "../../src/providers/ToastProvider";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
 import { ColorPicker } from "../../src/components/event/ColorPicker";
@@ -32,6 +33,7 @@ export default function CalendarCreateScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // ─── Form state ────────────────────────────────────────────────────────────
 
@@ -49,6 +51,7 @@ export default function CalendarCreateScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Calendar created");
       router.back();
     },
     onError: (err: unknown) => {
