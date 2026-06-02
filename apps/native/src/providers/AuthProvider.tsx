@@ -220,13 +220,12 @@ export function AuthProvider({
         );
       }
 
-      setEmailPasswordAuthHints(password);
-      // Persist password to SecureStore so the mail vault can be unlocked
-      // even after an app restart (in-memory ref is lost on restart).
-      await saveMailVaultPassword(password);
-
       try {
         await finalizeAuthenticatedSession(result.data, "Sign-in");
+        setEmailPasswordAuthHints(password);
+        // Persist password to SecureStore so the mail vault can be unlocked
+        // even after an app restart (in-memory ref is lost on restart).
+        await saveMailVaultPassword(password);
         const authStatus = await fetchAuthStatus();
         setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
         return { requiresPasskeyStepUp: authStatus.requiresPasskeyStepUp };
@@ -257,12 +256,11 @@ export function AuthProvider({
         );
       }
 
-      setEmailPasswordAuthHints(password);
-      // Persist password to SecureStore (mirrors signIn behaviour above).
-      await saveMailVaultPassword(password);
-
       try {
         await finalizeAuthenticatedSession(result.data, "Sign-up");
+        setEmailPasswordAuthHints(password);
+        // Persist password to SecureStore (mirrors signIn behaviour above).
+        await saveMailVaultPassword(password);
         setRequiresPasskeyStepUp(false);
       } catch (error) {
         resetAuthMethodHints();
