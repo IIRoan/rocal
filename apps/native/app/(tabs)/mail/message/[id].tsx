@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -16,15 +16,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import { FontAwesome } from "@expo/vector-icons";
-import * as FileSystem from "expo-file-system/legacy";
-type SharingModule = typeof import("expo-sharing");
-let Sharing: SharingModule | null = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  Sharing = require("expo-sharing") as SharingModule;
-} catch {
-  Sharing = null;
-}
 import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../../src/providers/ThemeProvider";
@@ -42,7 +33,14 @@ import {
 import {
   classifyMessageEncryption,
   extractMessageBodies,
+  resolveDisplayAttachments,
 } from "../../../../src/lib/mail/message-security";
+import {
+  openCachedAttachment,
+  shareCachedAttachment,
+  writeAttachmentToCache,
+} from "../../../../src/lib/mail/attachment-cache";
+import { useConversationThread } from "../../../../src/lib/mail/use-conversation-thread";
 import {
   decryptMailMessage,
   decryptPgpMimeMessage,
@@ -51,7 +49,14 @@ import {
 import { HtmlEmailView } from "../../../../src/components/mail/HtmlEmailView";
 import { CenteredLoader } from "../../../../src/components/ui/loading";
 import { AttachmentPreviewModal } from "../../../../src/components/mail/AttachmentPreviewModal";
+import { ConversationThreadStrip } from "../../../../src/components/mail/ConversationThreadStrip";
+import { useAuth } from "../../../../src/providers/AuthProvider";
 import { BottomSheet } from "../../../../src/components/BottomSheet";
+import {
+  SheetList,
+  SheetNavButton,
+  SheetRow,
+} from "../../../../src/components/sheet";
 
 import {
   resolveAttachmentPreviewKind,
@@ -71,12 +76,16 @@ export default function MailMessageScreen() {
   const router = useRouter();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { toast } = useToast();
+  const { user } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const messageId = typeof id === "string" ? id : "";
-  const { labels, createLabel, deleteLabel } = useLabels();
 
   const runtimeQuery = useMailRuntime(true);
   const runtime = runtimeQuery.data;
+  const { labels, createLabel, deleteLabel, refreshLabels } = useLabels({
+    runtime,
+    enabled: Boolean(runtime),
+  });
   const cached = useCachedMessage(messageId);
 
   const messageQuery = useQuery<JmapEmailMessage | null>({
@@ -93,6 +102,8 @@ export default function MailMessageScreen() {
   });
 
   const message = messageQuery.data ?? null;
+  const { conversationMessages, isLoading: isConversationLoading } =
+    useConversationThread(runtime, message);
   const { markAsUnread, toggleFlagged, moveToTrash, deleteMessage, moveToMailbox, setMessageLabel } =
     useMailMutations(runtime, null);
   const bodies = message ? extractMessageBodies(message) : null;
@@ -119,6 +130,13 @@ export default function MailMessageScreen() {
     },
   });
 
+  // After decrypt unlocks the vault, refresh label names/colors from the vault backup.
+  useEffect(() => {
+    if (decryptQuery.isSuccess) {
+      refreshLabels();
+    }
+  }, [decryptQuery.isSuccess, refreshLabels]);
+
   const htmlContent: string | null = decryptQuery.data?.html ?? (isEncrypted ? null : (bodies?.html ?? null));
   const plainContent: string | null = decryptQuery.data?.plaintext ?? (isEncrypted ? null : (bodies?.text ?? null));
   const isHtmlEmail = Boolean(htmlContent);
@@ -133,6 +151,23 @@ export default function MailMessageScreen() {
   } | null>(null);
   const [activeSheetView, setActiveSheetView] = useState<MessageSheetView>(null);
 
+  const displayAttachments = useMemo(
+    () =>
+      resolveDisplayAttachments({
+        encryption,
+        isDecrypting,
+        decryptSucceeded: decryptQuery.isSuccess,
+        decryptedAttachments: decryptQuery.data?.attachments,
+        messageAttachments: message?.attachments,
+      }),
+    [
+      encryption,
+      isDecrypting,
+      decryptQuery.isSuccess,
+      decryptQuery.data?.attachments,
+      message?.attachments,
+    ],
+  );
 
   const currentMailboxId = message
     ? Object.keys(message.mailboxIds ?? {})[0] ?? null
@@ -162,44 +197,14 @@ export default function MailMessageScreen() {
     moveToTrash.isPending ||
     deleteMessage.isPending ||
     moveToMailbox.isPending;
-  const downloadAttachmentToCache = async (
-    attachment: JmapAttachment,
-  ): Promise<string> => {
-    if (!attachment.blobId || !runtime) {
-      throw new Error("Attachment is not available.");
-    }
-    const name = attachment.name ?? "attachment";
-    const type = attachment.type ?? "application/octet-stream";
-    const { url, authHeader } = await runtime.client.getBlobDownloadInfo(
-      runtime.session,
-      attachment.blobId,
-      name,
-      type,
-    );
-    const safeName = name.replace(/[^a-zA-Z0-9._-]/g, "_") || "attachment";
-    const localUri = (FileSystem.cacheDirectory ?? "") + safeName;
-    const { status } = await FileSystem.downloadAsync(localUri, url, {
-      headers: { Authorization: authHeader },
+  const cacheAttachment = async (attachment: JmapAttachment, cacheKey: string) =>
+    writeAttachmentToCache({
+      attachment,
+      cacheKey,
+      runtime,
     });
-    if (status !== 200) throw new Error(`Download failed (${status})`);
-    return localUri;
-  };
 
-  const shareUri = async (uri: string, type: string, name: string) => {
-    if (!Sharing) {
-      toast("The sharing module is not loaded", "error");
-      return;
-    }
-    const canShare = await Sharing.isAvailableAsync();
-    if (!canShare) {
-      toast("File sharing is not supported on this device", "error");
-      return;
-    }
-    await Sharing.shareAsync(uri, { mimeType: type, dialogTitle: name });
-  };
-
-  const handleOpenAttachment = async (attachment: JmapAttachment) => {
-    if (!attachment.blobId || !runtime) return;
+  const handleOpenAttachment = async (attachment: JmapAttachment, cacheKey: string) => {
     const kind = resolveAttachmentPreviewKind({
       name: attachment.name,
       type: attachment.type,
@@ -211,12 +216,10 @@ export default function MailMessageScreen() {
     }
 
     // No inline preview available — download then share/open externally.
-    const name = attachment.name ?? "attachment";
-    const type = attachment.type ?? "application/octet-stream";
-    setDownloadingBlobId(attachment.blobId);
+    setDownloadingBlobId(cacheKey);
     try {
-      const localUri = await downloadAttachmentToCache(attachment);
-      await shareUri(localUri, type, name);
+      const cached = await cacheAttachment(attachment, cacheKey);
+      await shareCachedAttachment(cached);
     } catch (err) {
       toast(getErrorMessage(err, "Could not download attachment."), "error");
     } finally {
@@ -369,11 +372,11 @@ export default function MailMessageScreen() {
         />
       </View>
 
-      {(message.attachments?.length ?? 0) > 0 ? (
+      {displayAttachments.length > 0 ? (
         <View style={styles.attachmentBlock}>
-          {message.attachments!.map((attachment, index) => {
-            const key = attachment.blobId ?? `${attachment.name}-${index}`;
-            const isDownloading = downloadingBlobId === attachment.blobId;
+          {displayAttachments.map((attachment, index) => {
+            const key = attachment.blobId ?? `inline-${index}`;
+            const isDownloading = downloadingBlobId === key;
             const previewKind = resolveAttachmentPreviewKind({
               name: attachment.name,
               type: attachment.type,
@@ -381,7 +384,7 @@ export default function MailMessageScreen() {
             return (
               <Pressable
                 key={key}
-                onPress={() => handleOpenAttachment(attachment)}
+                onPress={() => handleOpenAttachment(attachment, key)}
                 disabled={isDownloading}
                 style={({ pressed }) => [
                   styles.attachmentChip,
@@ -447,6 +450,25 @@ export default function MailMessageScreen() {
         <>
           <ScrollView contentContainerStyle={styles.body}>
             {messageHeader}
+
+            {isConversationLoading ? (
+              <ActivityIndicator
+                size="small"
+                color={theme.colors.mutedForeground}
+                style={{ marginBottom: theme.spacing["2"] }}
+              />
+            ) : (
+              <ConversationThreadStrip
+                messages={conversationMessages}
+                activeMessageId={messageId}
+                accountEmail={user?.email ?? runtime?.session.username ?? null}
+                onSelectMessage={(id) => {
+                  if (id !== messageId) {
+                    router.replace(`/(tabs)/mail/message/${id}` as never);
+                  }
+                }}
+              />
+            )}
 
             {isDecrypting ? (
               <CenteredLoader theme={theme} message="Decrypting message…" />
@@ -532,15 +554,27 @@ export default function MailMessageScreen() {
           kind={preview.kind}
           theme={theme}
           isDark={isDark}
-          loadUri={() => downloadAttachmentToCache(preview.attachment)}
-          onClose={() => setPreview(null)}
-          onShare={(uri) =>
-            shareUri(
-              uri,
-              preview.attachment.type ?? "application/octet-stream",
-              preview.attachment.name ?? "attachment",
+          loadCached={() =>
+            cacheAttachment(
+              preview.attachment,
+              preview.attachment.blobId ?? `preview-${preview.attachment.name ?? "attachment"}`,
             )
           }
+          onClose={() => setPreview(null)}
+          onShare={async (cached) => {
+            try {
+              await shareCachedAttachment(cached);
+            } catch (err) {
+              toast(getErrorMessage(err, "Could not share attachment."), "error");
+            }
+          }}
+          onOpen={async (cached) => {
+            try {
+              await openCachedAttachment(cached);
+            } catch (err) {
+              toast(getErrorMessage(err, "Could not open attachment."), "error");
+            }
+          }}
         />
       )}
 
@@ -551,63 +585,52 @@ export default function MailMessageScreen() {
       >
         {activeSheetView === "menu" ? (
           <View style={[styles.sheetContent, { paddingBottom: insets.bottom + 8 }]}>
-            <View style={styles.sheetList}>
-              <SheetRow icon="corner-up-right" label="Forward" onPress={handleForward} theme={theme} />
-              <SheetRow icon="star" label={isFlagged ? "Unstar" : "Star"} onPress={handleToggleStar} theme={theme} showDivider />
+            <SheetList>
+              <SheetRow icon="corner-up-right" label="Forward" onPress={handleForward} />
+              <SheetRow icon="star" label={isFlagged ? "Unstar" : "Star"} onPress={handleToggleStar} showDivider />
               {isSeen ? (
-                <SheetRow icon="mail" label="Mark as unread" onPress={handleMarkUnread} theme={theme} showDivider />
+                <SheetRow icon="mail" label="Mark as unread" onPress={handleMarkUnread} showDivider />
               ) : null}
-              <SheetRow icon="tag" label="Labels" accessory="chevron-right" onPress={() => setActiveSheetView("label")} theme={theme} showDivider />
+              <SheetRow icon="tag" label="Labels" accessory="chevron-right" onPress={() => setActiveSheetView("label")} showDivider />
               {(currentMailboxRole === "trash" ||
                 currentMailboxRole === "junk") &&
               inboxMailboxId ? (
-                <SheetRow icon="inbox" label="Restore to inbox" onPress={handleRestoreToInbox} theme={theme} showDivider />
+                <SheetRow icon="inbox" label="Restore to inbox" onPress={handleRestoreToInbox} showDivider />
               ) : null}
               {moveTargets.length > 0 ? (
-                <SheetRow icon="folder" label="Move to…" accessory="chevron-right" onPress={() => setActiveSheetView("move")} theme={theme} showDivider />
+                <SheetRow icon="folder" label="Move to…" accessory="chevron-right" onPress={() => setActiveSheetView("move")} showDivider />
               ) : null}
               {rawHtmlSource ? (
-                <SheetRow icon="code" label="View HTML source" accessory="chevron-right" onPress={() => setActiveSheetView("html")} theme={theme} showDivider />
+                <SheetRow icon="code" label="View HTML source" accessory="chevron-right" onPress={() => setActiveSheetView("html")} showDivider />
               ) : null}
-            </View>
-            <View style={styles.sheetList}>
+            </SheetList>
+            <SheetList>
               <SheetRow
                 icon="trash-2"
                 label={currentMailboxRole === "trash" ? "Delete message" : "Move to trash"}
                 destructive
                 onPress={handleMoveToTrash}
                 disabled={isActionBusy}
-                theme={theme}
               />
-            </View>
+            </SheetList>
           </View>
         ) : activeSheetView === "move" ? (
           <View style={[styles.sheetContent, { paddingBottom: insets.bottom + 8 }]}>
-            <Pressable
-              onPress={() => setActiveSheetView("menu")}
-              style={styles.sheetNavButton}
-              accessibilityRole="button"
-              accessibilityLabel="Back to message actions"
-            >
-              <Feather name="chevron-left" size={20} color={theme.colors.mutedForeground} />
-              <Text style={styles.sheetNavLabel}>Actions</Text>
-            </Pressable>
-            <View style={styles.sheetList}>
+            <SheetNavButton label="Actions" onPress={() => setActiveSheetView("menu")} />
+            <SheetList>
               {moveTargets.map((mailbox, index) => (
                 <SheetRow
                   key={mailbox.id}
                   icon="folder"
                   label={mailbox.name}
                   onPress={() => handleMoveToMailbox(mailbox.id)}
-                  theme={theme}
                   showDivider={index > 0}
                 />
               ))}
-            </View>
+            </SheetList>
           </View>
         ) : activeSheetView === "label" ? (
           <MailLabelsSheet
-            theme={theme}
             labels={labels}
             messageKeywords={message?.keywords}
             insetsBottom={insets.bottom}
@@ -635,15 +658,7 @@ export default function MailMessageScreen() {
           />
         ) : activeSheetView === "html" ? (
           <View style={styles.sheetView}>
-            <Pressable
-              onPress={() => setActiveSheetView("menu")}
-              style={styles.sheetNavButton}
-              accessibilityRole="button"
-              accessibilityLabel="Back to message actions"
-            >
-              <Feather name="chevron-left" size={20} color={theme.colors.mutedForeground} />
-              <Text style={styles.sheetNavLabel}>Actions</Text>
-            </Pressable>
+            <SheetNavButton label="Actions" onPress={() => setActiveSheetView("menu")} />
             <ScrollView
               style={styles.sheetScroll}
               contentContainerStyle={[styles.sheetContent, { paddingBottom: insets.bottom + 8 }]}
@@ -770,73 +785,6 @@ function BottomBarButton({
         {label}
       </Text>
     </Pressable>
-  );
-}
-
-function SheetRow({
-  theme,
-  icon,
-  label,
-  accessory,
-  destructive,
-  disabled,
-  onPress,
-  showDivider,
-}: {
-  theme: ThemeTokens;
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  accessory?: keyof typeof Feather.glyphMap;
-  destructive?: boolean;
-  disabled?: boolean;
-  onPress: () => void;
-  showDivider?: boolean;
-}) {
-  const iconColor = destructive ? theme.colors.destructive : theme.colors.mutedForeground;
-  const textColor = destructive ? theme.colors.destructive : theme.colors.foreground;
-
-  return (
-    <View>
-      {showDivider ? (
-        <View
-          style={{
-            height: StyleSheet.hairlineWidth,
-            backgroundColor: theme.colors.border + "50",
-            marginLeft: 44,
-          }}
-        />
-      ) : null}
-      <Pressable
-        onPress={onPress}
-        disabled={disabled}
-        style={({ pressed }) => [
-          {
-            flexDirection: "row" as const,
-            alignItems: "center" as const,
-            gap: 12,
-            paddingHorizontal: 14,
-            paddingVertical: 13,
-            opacity: pressed ? 0.6 : disabled ? 0.45 : 1,
-          },
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-      >
-        <Feather name={icon} size={18} color={iconColor} />
-        <Text
-          style={{
-            flex: 1,
-            fontSize: theme.typography.fontSize.base.size,
-            color: textColor,
-          }}
-        >
-          {label}
-        </Text>
-        {accessory ? (
-          <Feather name={accessory} size={16} color={theme.colors.mutedForeground} />
-        ) : null}
-      </Pressable>
-    </View>
   );
 }
 
@@ -987,19 +935,7 @@ function createStyles(theme: ThemeTokens) {
       paddingBottom: 8,
       gap: 8,
     },
-    sheetList: {
-      marginHorizontal: 16,
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: theme.colors.muted + "22",
-      overflow: "hidden" as const,
-    },
-    sheetNavButton: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 2,
-      paddingHorizontal: 16,
-      paddingBottom: 4,
-    },
+
     htmlSourceCard: {
       padding: theme.spacing["3"],
       borderRadius: theme.borderRadius.lg,
@@ -1082,10 +1018,7 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.xs.size,
       color: theme.colors.foreground,
     },
-    sheetNavLabel: {
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.mutedForeground,
-    },
+
     htmlSourceText: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,

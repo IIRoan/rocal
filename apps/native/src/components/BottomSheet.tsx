@@ -44,6 +44,7 @@ const OVERLAY_DURATION = 180;
 
 const DISMISS_VELOCITY = 500;
 const SNAP_VELOCITY_THRESHOLD = 250;
+const MAX_SNAP_FRACTION = 0.80; // cap sheet height at 80 % of screen
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -119,6 +120,7 @@ export interface BottomSheetProps {
    * Snap points as fractions of screen height, sorted ascending.
    * The sheet will rest at these positions. Default: [0.92].
    * Use e.g. [0.45] for compact action menus, [0.5, 0.92] for expandable sheets.
+   * Values are capped at 0.80 (80 % of screen height) so the sheet never covers the full screen.
    */
   snapPoints?: number[];
   /** Which snap index to open at. Default: last (tallest). */
@@ -162,9 +164,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const isClosing = useSharedValue(false);
     const isDragging = useSharedValue(false);
 
-    // Sort snap points ascending
+    // Sort snap points ascending and clamp to MAX_SNAP_FRACTION
     const sortedSnaps = useMemo(
-      () => [...snapPointsProp].sort((a, b) => a - b),
+      () => [...snapPointsProp].map((p) => Math.min(p, MAX_SNAP_FRACTION)).sort((a, b) => a - b),
       [snapPointsProp],
     );
     const maxSnap = sortedSnaps[sortedSnaps.length - 1];
@@ -425,6 +427,16 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       paddingBottom: keyboardOffset.value,
     }));
 
+    // Capture the last non-null children while the sheet is open so that
+    // if the parent sets children to null during the close animation (e.g.
+    // because a mutation succeeded and cleared the view state) we still
+    // render the previous content until the sheet fully unmounts.
+    const lastChildrenRef = useRef<React.ReactNode>(null);
+    if (visible) {
+      lastChildrenRef.current = children;
+    }
+    const renderedChildren = visible ? children : lastChildrenRef.current;
+
     if (!mounted) return null;
 
     return (
@@ -451,7 +463,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
             <Animated.View
               style={[styles.contentWrapper, contentWrapperAnimatedStyle]}
             >
-              {children}
+              {renderedChildren}
             </Animated.View>
           </GestureDetector>
         </Animated.View>

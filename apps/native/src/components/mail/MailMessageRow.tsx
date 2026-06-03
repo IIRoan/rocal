@@ -14,6 +14,7 @@ import { useTheme } from "../../providers/ThemeProvider";
 import {
   formatAddress,
   formatMessageDate,
+  formatThreadSenders,
   getInitials,
   isMessageFlagged,
   isMessageRead,
@@ -27,6 +28,10 @@ import type { JmapEmailMessage, LabelDef } from "../../lib/mail/types";
 
 interface MailMessageRowProps {
   message: JmapEmailMessage;
+  threadMessages?: JmapEmailMessage[];
+  threadCount?: number;
+  threadUnreadCount?: number;
+  hasAttachments?: boolean;
   /** When true, shows recipient ("To") instead of sender (Sent/Drafts). */
   showRecipient?: boolean;
   labels?: LabelDef[];
@@ -42,6 +47,10 @@ function buildPreview(message: JmapEmailMessage): string {
 
 function MailMessageRowComponent({
   message,
+  threadMessages,
+  threadCount = 1,
+  threadUnreadCount = 0,
+  hasAttachments = false,
   showRecipient = false,
   labels = [],
   onPress,
@@ -50,17 +59,24 @@ function MailMessageRowComponent({
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const read = isMessageRead(message);
+  const read = threadCount > 1 ? threadUnreadCount === 0 : isMessageRead(message);
   const flagged = isMessageFlagged(message);
+  const showThreadBadge = threadCount > 1;
   const encryption = classifyMessageEncryption(message);
   const isEncrypted = encryption !== "plain";
   const messageLabels = getAllMessageLabels(message, labels);
   const addresses = showRecipient ? message.to : message.from;
-  const name = formatAddress(addresses);
+  const threadSenders =
+    threadCount > 1 && threadMessages?.length
+      ? formatThreadSenders(threadMessages)
+      : null;
+  const name = threadSenders ?? formatAddress(addresses);
   const subject = message.subject?.trim() || "(no subject)";
   const preview = isEncrypted
     ? "End-to-end encrypted message"
-    : buildPreview(message);
+    : threadCount > 1
+      ? `${threadCount} messages · ${buildPreview(message)}`
+      : buildPreview(message);
 
   return (
     <Pressable
@@ -82,7 +98,45 @@ function MailMessageRowComponent({
           >
             {name}
           </Text>
-          <Text style={styles.date}>{formatMessageDate(message.receivedAt)}</Text>
+          <View style={styles.meta}>
+            {showThreadBadge ? (
+              <View
+                style={[
+                  styles.threadBadge,
+                  threadUnreadCount > 0 && styles.threadBadgeUnread,
+                ]}
+              >
+                <Feather
+                  name="message-square"
+                  size={10}
+                  color={
+                    threadUnreadCount > 0
+                      ? theme.colors.primaryBase
+                      : theme.colors.mutedForeground
+                  }
+                />
+                <Text
+                  style={[
+                    styles.threadBadgeText,
+                    threadUnreadCount > 0 && styles.threadBadgeTextUnread,
+                  ]}
+                >
+                  {threadUnreadCount > 0 && threadUnreadCount < threadCount
+                    ? `${threadUnreadCount}/${threadCount}`
+                    : threadCount}
+                </Text>
+              </View>
+            ) : null}
+            {hasAttachments ? (
+              <Feather
+                name="paperclip"
+                size={12}
+                color={theme.colors.mutedForeground}
+                accessibilityLabel="Has attachments"
+              />
+            ) : null}
+            <Text style={styles.date}>{formatMessageDate(message.receivedAt)}</Text>
+          </View>
         </View>
 
         <View style={styles.subjectLine}>
@@ -134,7 +188,7 @@ function MailMessageRowComponent({
         ) : null}
       </View>
 
-      {!read ? <View style={styles.unreadDot} /> : null}
+      {!read && !showThreadBadge ? <View style={styles.unreadDot} /> : null}
     </Pressable>
   );
 }
@@ -171,6 +225,24 @@ function createStyles(theme: ThemeTokens) {
       alignItems: "center" as const,
       justifyContent: "space-between" as const,
       gap: theme.spacing["2"],
+    },
+    meta: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["1"],
+      flexShrink: 0,
+    },
+    threadBadge: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 2,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: theme.borderRadius.full,
+      backgroundColor: theme.colors.muted,
+    },
+    threadBadgeUnread: {
+      backgroundColor: theme.colors.primaryBase + "1f",
     },
     subjectLine: {
       flexDirection: "row" as const,
@@ -230,6 +302,14 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
       color: theme.colors.mutedForeground,
+    },
+    threadBadgeText: {
+      fontSize: theme.typography.fontSize.xs.size - 2,
+      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      color: theme.colors.mutedForeground,
+    },
+    threadBadgeTextUnread: {
+      color: theme.colors.primaryBase,
     },
     subject: {
       flexShrink: 1,

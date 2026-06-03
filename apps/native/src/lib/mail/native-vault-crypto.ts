@@ -22,6 +22,12 @@ const log = createLogger("native:vault-crypto");
 // Shared types (mirrors web's vault-crypto types)
 // ---------------------------------------------------------------------------
 
+export type LabelDef = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 export type UserKeyVault = {
   userId: string;
   email: string;
@@ -33,6 +39,8 @@ export type UserKeyVault = {
   kdfParams: MailVaultKdfParams;
   vaultVersion: number;
   createdAt: string;
+  /** User-defined mail labels — synced across web and native via the vault backup. */
+  labels?: LabelDef[];
 };
 
 type VaultEnvelope = {
