@@ -3,6 +3,9 @@ import {
   classifyMessageEncryption,
   extractMessageBodies,
   isEncryptedState,
+  isHiddenAttachment,
+  messageHasVisibleAttachments,
+  resolveDisplayAttachments,
 } from "./message-security";
 
 function message(
@@ -117,6 +120,88 @@ describe("classifyMessageEncryption", () => {
         }),
       ),
     ).toBe("plain");
+  });
+});
+
+describe("isHiddenAttachment", () => {
+  it.each([
+    [{ type: "application/pgp-encrypted", name: "x" }, true],
+    [{ type: "application/pgp-keys", name: "key" }, true],
+    [{ type: "application/octet-stream", name: "encrypted.asc" }, true],
+    [{ type: "application/octet-stream", name: "file.pgp" }, true],
+    [{ type: "application/octet-stream", name: "file.gpg" }, true],
+    [{ type: "application/pdf", name: "report.pdf" }, false],
+    [{ type: "application/pkcs7-signature", name: "smime.p7s" }, false],
+  ])("flags %j as hidden=%s", (attachment, hidden) => {
+    expect(isHiddenAttachment(attachment)).toBe(hidden);
+  });
+});
+
+describe("messageHasVisibleAttachments", () => {
+  it("ignores hidden PGP control attachments", () => {
+    expect(
+      messageHasVisibleAttachments({
+        attachments: [
+          { name: "encrypted.asc", type: "application/octet-stream" },
+        ],
+      }),
+    ).toBe(false);
+    expect(
+      messageHasVisibleAttachments({
+        attachments: [{ name: "logo.png", type: "image/png" }],
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("resolveDisplayAttachments", () => {
+  const pdf = { name: "doc.pdf", type: "application/pdf" };
+  const pgpControl = { name: "encrypted.asc", type: "application/octet-stream" };
+
+  it("hides envelope attachments while PGP/MIME decrypts", () => {
+    expect(
+      resolveDisplayAttachments({
+        encryption: "pgp_mime",
+        isDecrypting: true,
+        decryptSucceeded: false,
+        messageAttachments: [pgpControl, pdf],
+      }),
+    ).toEqual([]);
+  });
+
+  it("uses decrypted attachments after PGP/MIME decrypt", () => {
+    expect(
+      resolveDisplayAttachments({
+        encryption: "pgp_mime",
+        isDecrypting: false,
+        decryptSucceeded: true,
+        decryptedAttachments: [pdf],
+        messageAttachments: [pgpControl],
+      }),
+    ).toEqual([pdf]);
+  });
+
+  it("does not fall back to envelope attachments after PGP/MIME decrypt", () => {
+    expect(
+      resolveDisplayAttachments({
+        encryption: "pgp_mime",
+        isDecrypting: false,
+        decryptSucceeded: true,
+        decryptedAttachments: [],
+        messageAttachments: [pgpControl, pdf],
+      }),
+    ).toEqual([]);
+  });
+
+  it("filters hidden parts on plain messages", () => {
+    expect(
+      resolveDisplayAttachments({
+        encryption: "plain",
+        isDecrypting: false,
+        decryptSucceeded: false,
+        messageAttachments: [pgpControl, pdf],
+      }),
+    ).toEqual([pdf]);
   });
 });
 

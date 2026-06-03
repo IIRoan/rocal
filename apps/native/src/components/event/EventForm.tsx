@@ -37,6 +37,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { format } from "date-fns";
 import { useTheme } from "../../providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import {
+  SheetActions,
+  SheetPrimaryButton,
+  SheetSecondaryButton,
+} from "../sheet";
 import type {
   Calendar,
   CreateEventRequest,
@@ -878,58 +883,18 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
           </ScrollView>
 
           {actionsPlacement === "footer" ? (
-            <View
-              style={[
-                styles.footer,
-                { paddingBottom: Math.max(12, insets.bottom) },
-              ]}
-            >
+            <SheetActions>
               {onCancel && (
-                <Pressable
-                  style={styles.cancelButton}
-                  onPress={onCancel}
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancel"
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </Pressable>
+                <SheetSecondaryButton label="Cancel" onPress={onCancel} />
               )}
-              <View style={styles.footerSpacer} />
-              <Pressable
-                style={[
-                  styles.saveButton,
-                  { backgroundColor: theme.colors.primaryBase },
-                  isSubmitting && styles.saveButtonDisabled,
-                ]}
+              <SheetPrimaryButton
+                label={isEditMode ? "Save" : "Create"}
+                icon="save"
                 onPress={handleSubmit}
+                loading={isSubmitting}
                 disabled={isSubmitting}
-                accessibilityRole="button"
-                accessibilityLabel={isEditMode ? "Save event" : "Create event"}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={theme.colors.primaryForeground}
-                  />
-                ) : (
-                  <>
-                    <Feather
-                      name="save"
-                      size={14}
-                      color={theme.colors.primaryForeground}
-                    />
-                    <Text
-                      style={[
-                        styles.saveButtonText,
-                        { color: theme.colors.primaryForeground },
-                      ]}
-                    >
-                      {isEditMode ? "Save" : "Create"}
-                    </Text>
-                  </>
-                )}
-              </Pressable>
-            </View>
+              />
+            </SheetActions>
           ) : null}
         </View>
 
@@ -1842,44 +1807,7 @@ function createStyles(theme: ThemeTokens) {
       borderColor: "transparent",
     },
 
-    // Footer
-    footer: {
-      flexShrink: 0,
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 12,
-      paddingTop: 12,
-      paddingHorizontal: theme.spacing["4"],
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: softBorder,
-      backgroundColor: mutedSurface,
-    },
-    footerSpacer: {
-      flex: 1,
-    },
-    cancelButton: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: theme.borderRadius.md,
-      borderWidth: 1,
-      borderColor: softBorder,
-      backgroundColor: theme.colors.background,
-    },
-    saveButton: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      gap: 6,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: theme.borderRadius.md,
-    },
-    saveButtonDisabled: {
-      opacity: 0.6,
-    },
+
   } satisfies Record<string, ViewStyle | TextStyle>;
 
   const text = {
@@ -1960,15 +1888,7 @@ function createStyles(theme: ThemeTokens) {
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.destructive,
     },
-    cancelButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    saveButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
+
   } satisfies Record<string, TextStyle>;
 
   return { ...StyleSheet.create(view), ...StyleSheet.create(text) };

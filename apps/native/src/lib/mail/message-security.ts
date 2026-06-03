@@ -7,6 +7,7 @@
  * (PGP end-to-end encrypted).
  */
 import type {
+  JmapAttachment,
   JmapBodyStructure,
   JmapBodyValue,
   JmapEmailMessage,
@@ -126,4 +127,54 @@ export function classifyMessageEncryption(
 
 export function isEncryptedState(state: MessageEncryptionState): boolean {
   return state !== "plain";
+}
+
+/**
+ * Returns true for raw PGP control parts that should not be shown as
+ * user-visible attachments (e.g. `encrypted.asc`, `application/pgp-encrypted`).
+ *
+ * Mirrors the filtering the web app applies when it replaces raw attachments
+ * with decrypted ones after PGP/MIME decryption.
+ */
+export function messageHasVisibleAttachments(message: {
+  attachments?: { name?: string | null; type?: string | null }[];
+}): boolean {
+  return (message.attachments ?? []).some((attachment) => !isHiddenAttachment(attachment));
+}
+
+export function isHiddenAttachment(attachment: { name?: string | null; type?: string | null }): boolean {
+  const type = attachment.type?.toLowerCase() ?? "";
+  const name = attachment.name?.toLowerCase() ?? "";
+  return (
+    type === "application/pgp-encrypted" ||
+    type === "application/pgp-keys" ||
+    (name.endsWith(".asc") && name !== "smime.p7s") ||
+    name.endsWith(".pgp") ||
+    name.endsWith(".gpg")
+  );
+}
+
+/**
+ * Resolves which attachments to show in the message reader.
+ * PGP/MIME uses decrypted attachments only (empty while decrypting / on failure).
+ */
+export function resolveDisplayAttachments(input: {
+  encryption: MessageEncryptionState;
+  isDecrypting: boolean;
+  decryptSucceeded: boolean;
+  decryptedAttachments?: JmapAttachment[];
+  messageAttachments?: JmapAttachment[];
+}): JmapAttachment[] {
+  if (input.encryption === "pgp_mime") {
+    if (input.isDecrypting) {
+      return [];
+    }
+    if (input.decryptSucceeded) {
+      return (input.decryptedAttachments ?? []).filter((a) => !isHiddenAttachment(a));
+    }
+    return [];
+  }
+
+  const raw = input.decryptedAttachments ?? input.messageAttachments ?? [];
+  return raw.filter((a) => !isHiddenAttachment(a));
 }

@@ -6,15 +6,19 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { getErrorMessage } from "@workspace/calendar-core";
 import type { MailAttachmentPreviewKind } from "../../lib/mail/attachment-preview";
+import type { CachedAttachment } from "../../lib/mail/attachment-cache";
 import { CenteredLoader } from "../ui/loading";
+
+const SHEET_HEIGHT_FRACTION = 0.8;
 
 type WebViewModule = typeof import("react-native-webview");
 type WebViewComponent = WebViewModule["WebView"];
@@ -33,10 +37,10 @@ interface AttachmentPreviewModalProps {
   kind: MailAttachmentPreviewKind;
   theme: ThemeTokens;
   isDark: boolean;
-  /** Downloads the blob to a local cache file and resolves its file:// uri. */
-  loadUri: () => Promise<string>;
+  loadCached: () => Promise<CachedAttachment>;
   onClose: () => void;
-  onShare: (uri: string) => void;
+  onShare: (cached: CachedAttachment) => void;
+  onOpen?: (cached: CachedAttachment) => void;
 }
 
 export function AttachmentPreviewModal({
@@ -45,19 +49,24 @@ export function AttachmentPreviewModal({
   kind,
   theme,
   isDark,
-  loadUri,
+  loadCached,
   onClose,
   onShare,
+  onOpen,
 }: AttachmentPreviewModalProps) {
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [uri, setUri] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
+  const { height: screenHeight } = useWindowDimensions();
+  const sheetHeight = screenHeight * SHEET_HEIGHT_FRACTION;
+  const [cached, setCached] = useState<CachedAttachment | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const canOpenExternally = kind === "image" || kind === "pdf";
 
   useEffect(() => {
     if (!visible) {
-      setUri(null);
+      setCached(null);
       setTextContent(null);
       setError(null);
       setIsLoading(true);
@@ -67,11 +76,11 @@ export function AttachmentPreviewModal({
     (async () => {
       try {
         setIsLoading(true);
-        const localUri = await loadUri();
+        const result = await loadCached();
         if (cancelled) return;
-        setUri(localUri);
+        setCached(result);
         if (kind === "text") {
-          const content = await FileSystem.readAsStringAsync(localUri);
+          const content = await FileSystem.readAsStringAsync(result.uri);
           if (!cancelled) setTextContent(content);
         }
       } catch (err) {
@@ -85,103 +94,174 @@ export function AttachmentPreviewModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, kind, loadUri]);
+  }, [visible, kind, loadCached]);
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
       onRequestClose={onClose}
-      transparent={false}
+      transparent
     >
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <View style={styles.header}>
-          <Pressable
-            onPress={onClose}
-            style={styles.iconButton}
-            accessibilityLabel="Close preview"
-          >
-            <Feather name="x" size={22} color={theme.colors.foreground} />
-          </Pressable>
-          <Text style={styles.title} numberOfLines={1}>
-            {name}
-          </Text>
-          <Pressable
-            onPress={() => uri && onShare(uri)}
-            disabled={!uri}
-            style={styles.iconButton}
-            accessibilityLabel="Share attachment"
-          >
-            <Feather
-              name="share"
-              size={20}
-              color={uri ? theme.colors.foreground : theme.colors.mutedForeground}
-            />
-          </Pressable>
-        </View>
-
-        <View style={styles.content}>
-          {isLoading ? (
-            <CenteredLoader theme={theme} />
-          ) : error ? (
-            <View style={styles.centered}>
-              <Feather
-                name="alert-triangle"
-                size={32}
-                color={theme.colors.destructive}
-              />
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : kind === "image" && uri ? (
-            <ScrollView
-              style={styles.flex}
-              contentContainerStyle={styles.imageScroll}
-              maximumZoomScale={4}
-              minimumZoomScale={1}
-              centerContent
+      <View style={styles.backdrop}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close preview"
+        />
+        <View
+          style={[
+            styles.sheet,
+            {
+              height: sheetHeight,
+              paddingBottom: insets.bottom,
+            },
+          ]}
+        >
+          <View style={styles.header}>
+            <Pressable
+              onPress={onClose}
+              style={styles.iconButton}
+              accessibilityLabel="Close preview"
             >
-              <Image
-                source={{ uri }}
-                style={styles.image}
-                resizeMode="contain"
-              />
-            </ScrollView>
-          ) : kind === "text" && textContent !== null ? (
-            <ScrollView style={styles.flex} contentContainerStyle={styles.textScroll}>
-              <Text style={styles.textBody}>{textContent}</Text>
-            </ScrollView>
-          ) : kind === "pdf" && uri && WebView ? (
-            <WebView
-              originWhitelist={["*"]}
-              source={{ uri }}
-              style={styles.flex}
-              javaScriptEnabled={false}
-              backgroundColor={isDark ? "#1a1a1a" : "#ffffff"}
-            />
-          ) : (
-            <View style={styles.centered}>
-              <Feather name="file" size={40} color={theme.colors.mutedForeground} />
-              <Text style={styles.mutedText}>
-                Preview not available for this file.
-              </Text>
-              {uri && (
-                <Pressable onPress={() => onShare(uri)} style={styles.openButton}>
-                  <Text style={styles.openButtonText}>Open</Text>
+              <Feather name="x" size={22} color={theme.colors.foreground} />
+            </Pressable>
+            <Text style={styles.title} numberOfLines={1}>
+              {name}
+            </Text>
+            <View style={styles.headerActions}>
+              {canOpenExternally && onOpen ? (
+                <Pressable
+                  onPress={() => cached && onOpen(cached)}
+                  disabled={!cached}
+                  style={styles.iconButton}
+                  accessibilityLabel="Open in another app"
+                >
+                  <Feather
+                    name="external-link"
+                    size={20}
+                    color={
+                      cached ? theme.colors.foreground : theme.colors.mutedForeground
+                    }
+                  />
                 </Pressable>
-              )}
+              ) : null}
+              <Pressable
+                onPress={() => cached && onShare(cached)}
+                disabled={!cached}
+                style={styles.iconButton}
+                accessibilityLabel="Share attachment"
+              >
+                <Feather
+                  name="share"
+                  size={20}
+                  color={cached ? theme.colors.foreground : theme.colors.mutedForeground}
+                />
+              </Pressable>
             </View>
-          )}
+          </View>
+
+          <View style={styles.content}>
+            {isLoading ? (
+              <CenteredLoader theme={theme} />
+            ) : error ? (
+              <View style={styles.centered}>
+                <Feather
+                  name="alert-triangle"
+                  size={32}
+                  color={theme.colors.destructive}
+                />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : kind === "image" && cached ? (
+              <>
+                <ScrollView
+                  style={styles.flex}
+                  contentContainerStyle={styles.imageScroll}
+                  maximumZoomScale={4}
+                  minimumZoomScale={1}
+                  centerContent
+                >
+                  <Image
+                    source={{ uri: cached.uri }}
+                    style={styles.image}
+                    resizeMode="contain"
+                  />
+                </ScrollView>
+                {onOpen ? (
+                  <View style={styles.footer}>
+                    <Pressable
+                      onPress={() => onOpen(cached)}
+                      style={styles.openButton}
+                    >
+                      <Text style={styles.openButtonText}>Open in another app</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </>
+            ) : kind === "text" && textContent !== null ? (
+              <ScrollView style={styles.flex} contentContainerStyle={styles.textScroll}>
+                <Text style={styles.textBody}>{textContent}</Text>
+              </ScrollView>
+            ) : kind === "pdf" && cached && WebView ? (
+              <>
+                <WebView
+                  originWhitelist={["*"]}
+                  source={{ uri: cached.uri }}
+                  style={styles.flex}
+                  backgroundColor={isDark ? "#1a1a1a" : "#ffffff"}
+                  allowFileAccess
+                  allowFileAccessFromFileURLs
+                  allowingReadAccessToURL={cached.uri}
+                />
+                {onOpen ? (
+                  <View style={styles.footer}>
+                    <Pressable
+                      onPress={() => onOpen(cached)}
+                      style={styles.openButton}
+                    >
+                      <Text style={styles.openButtonText}>Open in another app</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              <View style={styles.centered}>
+                <Feather name="file" size={40} color={theme.colors.mutedForeground} />
+                <Text style={styles.mutedText}>
+                  Preview not available for this file.
+                </Text>
+                {cached && onOpen ? (
+                  <Pressable onPress={() => onOpen(cached)} style={styles.openButton}>
+                    <Text style={styles.openButtonText}>Open</Text>
+                  </Pressable>
+                ) : cached ? (
+                  <Pressable onPress={() => onShare(cached)} style={styles.openButton}>
+                    <Text style={styles.openButtonText}>Share</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            )}
+          </View>
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
 
 function createStyles(theme: ThemeTokens) {
   return StyleSheet.create({
-    container: {
+    backdrop: {
       flex: 1,
-      backgroundColor: theme.colors.background,
+      justifyContent: "flex-end",
+      backgroundColor: "rgba(0,0,0,0.42)",
+    },
+    sheet: {
+      backgroundColor: theme.colors.card,
+      borderTopLeftRadius: 14,
+      borderTopRightRadius: 14,
+      overflow: "hidden",
     },
     flex: {
       flex: 1,
@@ -208,8 +288,19 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight.semibold as "600",
       color: theme.colors.foreground,
     },
+    headerActions: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    footer: {
+      paddingHorizontal: theme.spacing["4"],
+      paddingVertical: theme.spacing["3"],
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
     content: {
       flex: 1,
+      minHeight: 0,
     },
     centered: {
       flex: 1,
@@ -226,7 +317,7 @@ function createStyles(theme: ThemeTokens) {
     image: {
       width: "100%",
       height: "100%",
-      minHeight: 300,
+      minHeight: 200,
     },
     textScroll: {
       padding: theme.spacing["4"],

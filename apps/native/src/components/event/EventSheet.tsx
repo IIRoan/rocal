@@ -37,6 +37,11 @@ import {
 } from "../../lib/optimistic-events";
 import { BottomSheet, type BottomSheetHandle } from "../BottomSheet";
 import { CenteredLoader } from "../ui/loading";
+import {
+  SheetActions,
+  SheetPrimaryButton,
+  SheetSecondaryButton,
+} from "../sheet";
 
 import { EventForm } from "./EventForm";
 import { toLocalISOString } from "./event-form-utils";
@@ -650,46 +655,16 @@ export function EventSheet({
                 </View>
               )}
             </ScrollView>
-            <View
-              style={[
-                styles.bottomActionBar,
-                { paddingBottom: Math.max(insets.bottom, 12) },
-              ]}
-            >
-              <Pressable
-                style={styles.secondaryActionButton}
-                onPress={dismissSheet}
-                accessibilityRole="button"
-                accessibilityLabel="Close event drawer"
-              >
-                <Text style={styles.secondaryActionText}>Close</Text>
-              </Pressable>
+            <SheetActions>
+              <SheetSecondaryButton label="Close" onPress={dismissSheet} />
               {event.id ? (
-                <Pressable
-                  style={[
-                    styles.primaryActionButton,
-                    { backgroundColor: theme.colors.primaryBase },
-                  ]}
+                <SheetPrimaryButton
+                  label="Edit"
+                  icon="edit-2"
                   onPress={handleEditPress}
-                  accessibilityRole="button"
-                  accessibilityLabel="Edit event"
-                >
-                  <Feather
-                    name="edit-2"
-                    size={14}
-                    color={theme.colors.primaryForeground}
-                  />
-                  <Text
-                    style={[
-                      styles.primaryActionText,
-                      { color: theme.colors.primaryForeground },
-                    ]}
-                  >
-                    Edit
-                  </Text>
-                </Pressable>
+                />
               ) : null}
-            </View>
+            </SheetActions>
           </>
         ) : (
           /* ── Edit / Create mode ──────────────────────────────── */
@@ -767,34 +742,7 @@ function createStyles(theme: ThemeTokens) {
     viewScroll: {
       flex: 1,
     },
-    bottomActionBar: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 12,
-      paddingHorizontal: 16,
-      paddingTop: 12,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border + "66",
-      backgroundColor: theme.colors.card,
-    },
-    secondaryActionButton: {
-      minHeight: 46,
-      paddingHorizontal: 18,
-      borderRadius: theme.borderRadius.lg,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-    },
-    primaryActionButton: {
-      flex: 1,
-      minHeight: 46,
-      borderRadius: theme.borderRadius.lg,
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      gap: 8,
-    },
+
     editBody: {
       flex: 1,
       minHeight: 0,
@@ -910,16 +858,7 @@ function createStyles(theme: ThemeTokens) {
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    secondaryActionText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    primaryActionText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-    },
+
     viewEventTitle: {
       fontSize: theme.typography.fontSize.xl.size,
       fontWeight: theme.typography.fontWeight

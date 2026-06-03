@@ -1,22 +1,26 @@
 /**
  * Labels for mail messages on native.
  *
- * Label definitions ({ id, name, color }) are persisted locally in
- * expo-secure-store so they survive app restarts.  Label *assignments*
- * live on the server as `keywords/label:<id>` on each email, so they
- * are always in sync with whatever the web client sets.
- *
- * Users create their own labels with a name and color. The default state
- * is an empty list — the web app's labels (stored in the encrypted vault)
- * are not accessible from native since it cannot decrypt the vault.
+ * Label definitions ({ id, name, color }) live in the encrypted mail vault
+ * (same store as the web client). Label *assignments* are stored on the server
+ * as `keywords/label:<id>` on each email.
  */
 import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as SecureStore from "expo-secure-store";
+import * as ExpoCrypto from "expo-crypto";
 import { QUERY_KEYS } from "../query-keys";
+import {
+  ensureVaultLoaded,
+  getVaultLabels,
+  isVaultLoaded,
+  saveVaultLabels,
+} from "./mail-crypto";
+import type { MailRuntime } from "./mail-runtime";
 import type { LabelDef, JmapEmailMessage } from "./types";
 
-const STORAGE_KEY = "mail_labels_v1";
+/** @deprecated Legacy on-device store — migrated into the vault on first unlock. */
+const LEGACY_STORAGE_KEY = "mail_labels_v1";
 
 /** Color palette available when creating a new label. */
 export const LABEL_COLOR_OPTIONS = [
@@ -61,7 +65,7 @@ export function getAllMessageLabels(
 
   for (const key of Object.keys(message.keywords)) {
     if (!key.startsWith("label:")) continue;
-    const id = key.slice(6); // strip "label:"
+    const id = key.slice(6);
     if (knownIds.has(id)) continue;
     known.push({ id, name: id, color: "#6b7280" });
   }
@@ -69,9 +73,9 @@ export function getAllMessageLabels(
   return known;
 }
 
-async function loadLabels(): Promise<LabelDef[]> {
+async function loadLegacyLocalLabels(): Promise<LabelDef[]> {
   try {
-    const raw = await SecureStore.getItemAsync(STORAGE_KEY);
+    const raw = await SecureStore.getItemAsync(LEGACY_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as LabelDef[];
     return Array.isArray(parsed) ? parsed : [];
@@ -80,50 +84,125 @@ async function loadLabels(): Promise<LabelDef[]> {
   }
 }
 
-async function saveLabels(labels: LabelDef[]): Promise<void> {
-  await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(labels));
+async function clearLegacyLocalLabels(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(LEGACY_STORAGE_KEY);
+  } catch {
+    // Non-fatal
+  }
 }
+
+function mergeLabelsById(...groups: LabelDef[][]): LabelDef[] {
+  const byId = new Map<string, LabelDef>();
+  for (const group of groups) {
+    for (const label of group) {
+      byId.set(label.id, label);
+    }
+  }
+  return Array.from(byId.values());
+}
+
+async function migrateLegacyLabelsIntoVault(
+  runtime: MailRuntime,
+  vaultLabels: LabelDef[],
+): Promise<LabelDef[]> {
+  const legacy = await loadLegacyLocalLabels();
+  if (legacy.length === 0) return vaultLabels;
+
+  const merged = mergeLabelsById(vaultLabels, legacy);
+  if (merged.length !== vaultLabels.length) {
+    await saveVaultLabels(merged);
+  }
+  await clearLegacyLocalLabels();
+  return merged;
+}
+
+async function loadLabelsFromVault(runtime: MailRuntime): Promise<LabelDef[]> {
+  if (!isVaultLoaded()) {
+    try {
+      await ensureVaultLoaded(runtime);
+    } catch {
+      // Vault unlock is optional for listing mail — label names may be missing
+      // until the user opens an encrypted message or creates a label.
+      return [];
+    }
+  }
+
+  const vaultLabels = getVaultLabels();
+  return migrateLegacyLabelsIntoVault(runtime, vaultLabels);
+}
+
+type UseLabelsOptions = {
+  runtime?: MailRuntime | null;
+  /** When false, skips vault access (e.g. mailbox not provisioned yet). */
+  enabled?: boolean;
+};
 
 /**
  * Hook that provides label definitions + CRUD helpers.
- * Labels start empty — the user creates them with a name and color.
- * They are stored locally on-device and synced with the server
- * via `keywords/label:<id>` on each message.
- *
- * Uses React Query so every consumer shares the same cache and
- * sees updates immediately after creation or deletion.
+ * Labels are stored in the encrypted vault (shared with web) and synced via
+ * the server vault backup. Assignments use `keywords/label:<id>` on messages.
  */
-export function useLabels() {
+export function useLabels(options: UseLabelsOptions = {}) {
+  const { runtime = null, enabled = true } = options;
   const queryClient = useQueryClient();
+  const canLoad = enabled && Boolean(runtime);
 
   const query = useQuery({
     queryKey: QUERY_KEYS.mailLabels(),
-    queryFn: loadLabels,
+    queryFn: () => loadLabelsFromVault(runtime!),
+    enabled: canLoad,
     staleTime: Infinity,
+    retry: false,
   });
 
   const labels = query.data ?? [];
 
+  const persistLabels = useCallback(
+    async (updated: LabelDef[]) => {
+      if (!runtime) {
+        throw new Error("Mail is not ready yet.");
+      }
+      await ensureVaultLoaded(runtime);
+      await saveVaultLabels(updated);
+      queryClient.setQueryData(QUERY_KEYS.mailLabels(), updated);
+    },
+    [queryClient, runtime],
+  );
+
   const createLabel = useCallback(
     async (name: string, color: string): Promise<LabelDef> => {
-      const id = `label-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-      const newLabel: LabelDef = { id, name, color };
+      const newLabel: LabelDef = {
+        id: ExpoCrypto.randomUUID(),
+        name,
+        color,
+      };
       const updated = [...labels, newLabel];
-      await saveLabels(updated);
-      queryClient.setQueryData(QUERY_KEYS.mailLabels(), updated);
+      await persistLabels(updated);
       return newLabel;
     },
-    [labels, queryClient],
+    [labels, persistLabels],
   );
 
   const deleteLabel = useCallback(
     async (labelId: string): Promise<void> => {
       const updated = labels.filter((l) => l.id !== labelId);
-      await saveLabels(updated);
-      queryClient.setQueryData(QUERY_KEYS.mailLabels(), updated);
+      await persistLabels(updated);
     },
-    [labels, queryClient],
+    [labels, persistLabels],
   );
 
-  return { labels, loaded: query.isSuccess, createLabel, deleteLabel };
+  const refreshLabels = useCallback(() => {
+    if (canLoad) {
+      void query.refetch();
+    }
+  }, [canLoad, query]);
+
+  return {
+    labels,
+    loaded: query.isSuccess,
+    createLabel,
+    deleteLabel,
+    refreshLabels,
+  };
 }

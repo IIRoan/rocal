@@ -24,6 +24,11 @@ import { useCommandPalette } from "../../../src/providers/CommandPaletteProvider
 import { CenteredLoader } from "../../../src/components/ui/loading";
 import { MailMessageRow } from "../../../src/components/mail/MailMessageRow";
 import { BottomSheet } from "../../../src/components/BottomSheet";
+import {
+  SheetList,
+  SheetNavButton,
+  SheetRow,
+} from "../../../src/components/sheet";
 import { MailLabelsSheet } from "../../../src/components/mail/MailLabelsSheet";
 import {
   useMailAccount,
@@ -35,6 +40,9 @@ import {
 } from "../../../src/lib/mail/use-mail";
 import { useLabels } from "../../../src/lib/mail/use-labels";
 import { getMailboxIcon, getPrimaryMailboxId } from "../../../src/lib/mail/mail-helpers";
+import { buildMailConversations } from "../../../src/lib/mail/conversation-thread";
+import { useConversationListExtras } from "../../../src/lib/mail/use-conversation-thread";
+import { messageHasVisibleAttachments } from "../../../src/lib/mail/message-security";
 import {
   isWebMailAvailable,
   openWebMail,
@@ -71,6 +79,30 @@ export default function MailScreen() {
   }, [runtime, selectedMailboxId, setSelectedMailboxId]);
 
   const messagesQuery = useMailboxMessages(runtime, selectedMailboxId);
+  const companionMailboxId = useMemo(() => {
+    const mailboxes = runtime?.mailboxes ?? [];
+    const selected = mailboxes.find((mailbox) => mailbox.id === selectedMailboxId);
+    const role = selected?.role?.toLowerCase();
+    if (role === "inbox") {
+      return getPrimaryMailboxId(mailboxes, "sent");
+    }
+    if (role === "sent") {
+      return getPrimaryMailboxId(mailboxes, "inbox");
+    }
+    return null;
+  }, [runtime?.mailboxes, selectedMailboxId]);
+  const companionMessagesQuery = useMailboxMessages(
+    runtime,
+    companionMailboxId && companionMailboxId !== selectedMailboxId
+      ? companionMailboxId
+      : null,
+  );
+  const mailboxMessages = messagesQuery.data?.messages ?? [];
+  const conversationExtras = useConversationListExtras(
+    runtime,
+    mailboxMessages,
+    companionMessagesQuery.data?.messages ?? [],
+  );
   const {
     markAsRead,
     markAsUnread,
@@ -80,7 +112,10 @@ export default function MailScreen() {
     moveToMailbox,
     setMessageLabel,
   } = useMailMutations(runtime, selectedMailboxId);
-  const { labels, createLabel, deleteLabel } = useLabels();
+  const { labels, createLabel, deleteLabel } = useLabels({
+    runtime,
+    enabled: provisioned,
+  });
   const { toast } = useToast();
   const insets = useSafeAreaInsets();
 
@@ -174,6 +209,12 @@ export default function MailScreen() {
     return runtime.mailboxes.filter((mailbox) => !activeMailboxIds.has(mailbox.id));
   }, [activeSheetMessage, runtime]);
 
+  const threadRows = useMemo(() => {
+    const seen = new Set(mailboxMessages.map((message) => message.id));
+    const extras = conversationExtras.filter((message) => !seen.has(message.id));
+    return buildMailConversations([...mailboxMessages, ...extras]);
+  }, [mailboxMessages, conversationExtras]);
+
   const isActionBusy =
     markAsUnread.isPending ||
     toggleFlagged.isPending ||
@@ -182,16 +223,39 @@ export default function MailScreen() {
     moveToMailbox.isPending;
 
   const renderItem = useCallback(
-    ({ item }: { item: JmapEmailMessage }) => (
-      <MailMessageRow
-        message={item}
-        showRecipient={showRecipient}
-        labels={labels}
-        onPress={handleOpenMessage}
-        onLongPress={handleLongPress}
-      />
-    ),
-    [handleOpenMessage, handleLongPress, showRecipient, labels],
+    ({ item }: { item: (typeof threadRows)[number] }) => {
+      const primaryIds = new Set(
+        (messagesQuery.data?.messages ?? []).map((message) => message.id),
+      );
+      const unreadCount = item.messages.filter(
+        (entry) => primaryIds.has(entry.id) && !entry.keywords?.["$seen"],
+      ).length;
+      const hasAttachments = item.messages.some((entry) =>
+        messageHasVisibleAttachments(entry),
+      );
+
+      return (
+        <MailMessageRow
+          message={item.latestMessage}
+          threadMessages={item.messages}
+          threadCount={item.messages.length}
+          threadUnreadCount={unreadCount}
+          hasAttachments={hasAttachments}
+          showRecipient={showRecipient}
+          labels={labels}
+          onPress={handleOpenMessage}
+          onLongPress={handleLongPress}
+        />
+      );
+    },
+    [
+      handleOpenMessage,
+      handleLongPress,
+      showRecipient,
+      labels,
+      messagesQuery.data?.messages,
+      threadRows,
+    ],
   );
 
   const header = (
@@ -272,16 +336,19 @@ export default function MailScreen() {
             onSelect={setSelectedMailboxId}
           />
           <FlatList
-            data={messagesQuery.data?.messages ?? []}
+            data={threadRows}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
             ItemSeparatorComponent={() => (
               <View style={styles.separator} />
             )}
             refreshing={messagesQuery.isFetching && !messagesQuery.isLoading}
-            onRefresh={() => messagesQuery.refetch()}
+            onRefresh={() => {
+              void messagesQuery.refetch();
+              void companionMessagesQuery.refetch();
+            }}
             contentContainerStyle={
-              (messagesQuery.data?.messages?.length ?? 0) === 0
+              threadRows.length === 0
                 ? styles.emptyListContent
                 : undefined
             }
@@ -305,29 +372,24 @@ export default function MailScreen() {
 
       <BottomSheet
         visible={activeSheetView !== null}
-        onDismiss={() => {
-          setActiveSheetView(null);
-          setActiveSheetMessage(null);
-        }}
+        onDismiss={() => setActiveSheetView(null)}
+        onCloseComplete={() => setActiveSheetMessage(null)}
         snapPoints={activeSheetView === "label" ? [0.65] : activeSheetView === "move" ? [0.55] : [0.45]}
       >
         {activeSheetView === "menu" && activeSheetMessage ? (
           <View style={{ paddingBottom: insets.bottom + 8, paddingHorizontal: 16, gap: 8 }}>
-            <View style={[styles.sheetList, { backgroundColor: theme.colors.muted + "22" }]}>
+            <SheetList>
               <SheetRow
                 icon="star"
                 label={activeSheetMessage.keywords?.["$flagged"] ? "Unstar" : "Star"}
                 iconColor={activeSheetMessage.keywords?.["$flagged"] ? "#fbbf24" : undefined}
                 onPress={handleToggleStar}
-                theme={theme}
-                showDivider={false}
               />
               {activeSheetMessage.keywords?.["$seen"] ? (
                 <SheetRow
                   icon="mail"
                   label="Mark as unread"
                   onPress={handleMarkUnread}
-                  theme={theme}
                   showDivider
                 />
               ) : null}
@@ -336,7 +398,6 @@ export default function MailScreen() {
                 label="Labels"
                 accessory="chevron-right"
                 onPress={() => setActiveSheetView("label")}
-                theme={theme}
                 showDivider
               />
               {moveTargets.length > 0 ? (
@@ -345,7 +406,6 @@ export default function MailScreen() {
                   label="Move to…"
                   accessory="chevron-right"
                   onPress={() => setActiveSheetView("move")}
-                  theme={theme}
                   showDivider
                 />
               ) : null}
@@ -355,38 +415,27 @@ export default function MailScreen() {
                 destructive
                 onPress={handleMoveToTrash}
                 disabled={isActionBusy}
-                theme={theme}
                 showDivider={moveTargets.length > 0 || activeSheetMessage.keywords?.["$seen"]}
               />
-            </View>
+            </SheetList>
           </View>
         ) : activeSheetView === "move" && activeSheetMessage ? (
           <View style={{ paddingBottom: insets.bottom + 8, paddingHorizontal: 16, gap: 8 }}>
-            <Pressable
-              onPress={() => setActiveSheetView("menu")}
-              style={styles.sheetNavButton}
-              accessibilityRole="button"
-              accessibilityLabel="Back to message actions"
-            >
-              <Feather name="chevron-left" size={20} color={theme.colors.mutedForeground} />
-              <Text style={[styles.sheetNavLabel, { color: theme.colors.mutedForeground }]}>Actions</Text>
-            </Pressable>
-            <View style={[styles.sheetList, { backgroundColor: theme.colors.muted + "22" }]}>
+            <SheetNavButton label="Actions" onPress={() => setActiveSheetView("menu")} />
+            <SheetList>
               {moveTargets.map((mailbox, index) => (
                 <SheetRow
                   key={mailbox.id}
                   icon="folder"
                   label={mailbox.name}
                   onPress={() => handleMoveToMailbox(mailbox.id)}
-                  theme={theme}
                   showDivider={index > 0}
                 />
               ))}
-            </View>
+            </SheetList>
           </View>
         ) : activeSheetView === "label" && activeSheetMessage ? (
           <MailLabelsSheet
-            theme={theme}
             labels={labels}
             messageKeywords={activeSheetMessage.keywords}
             insetsBottom={insets.bottom}
@@ -557,75 +606,6 @@ function MailboxBar({
   );
 }
 
-function SheetRow({
-  theme,
-  icon,
-  label,
-  accessory,
-  destructive,
-  disabled,
-  onPress,
-  showDivider,
-  iconColor: iconColorProp,
-}: {
-  theme: ThemeTokens;
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  accessory?: keyof typeof Feather.glyphMap;
-  destructive?: boolean;
-  disabled?: boolean;
-  onPress: () => void;
-  showDivider?: boolean;
-  iconColor?: string;
-}) {
-  const iconColor = iconColorProp ?? (destructive ? theme.colors.destructive : theme.colors.mutedForeground);
-  const textColor = destructive ? theme.colors.destructive : theme.colors.foreground;
-
-  return (
-    <View>
-      {showDivider ? (
-        <View
-          style={{
-            height: StyleSheet.hairlineWidth,
-            backgroundColor: theme.colors.border + "50",
-            marginLeft: 44,
-          }}
-        />
-      ) : null}
-      <Pressable
-        onPress={onPress}
-        disabled={disabled}
-        style={({ pressed }) => [
-          {
-            flexDirection: "row" as const,
-            alignItems: "center" as const,
-            gap: 12,
-            paddingHorizontal: 14,
-            paddingVertical: 13,
-            opacity: pressed ? 0.6 : disabled ? 0.45 : 1,
-          },
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-      >
-        <Feather name={icon} size={18} color={iconColor} />
-        <Text
-          style={{
-            flex: 1,
-            fontSize: theme.typography.fontSize.base.size,
-            color: textColor,
-          }}
-        >
-          {label}
-        </Text>
-        {accessory ? (
-          <Feather name={accessory} size={16} color={theme.colors.mutedForeground} />
-        ) : null}
-      </Pressable>
-    </View>
-  );
-}
-
 function createStyles(theme: ThemeTokens) {
   const view = {
     container: {
@@ -710,18 +690,7 @@ function createStyles(theme: ThemeTokens) {
       borderWidth: 1,
       borderColor: theme.colors.border,
     },
-    sheetList: {
-      marginHorizontal: 16,
-      borderRadius: theme.borderRadius.lg,
-      overflow: "hidden" as const,
-    },
-    sheetNavButton: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 2,
-      paddingHorizontal: 16,
-      paddingBottom: 4,
-    },
+
   } satisfies Record<string, ViewStyle>;
 
   const text = {
@@ -764,10 +733,7 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
-    sheetNavLabel: {
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.mutedForeground,
-    },
+
   } satisfies Record<string, TextStyle>;
 
   return { ...StyleSheet.create(view), ...StyleSheet.create(text) };

@@ -59,6 +59,11 @@ import {
 import { getSettingsAccountActions } from "../../src/lib/settings-screen-utils";
 import { ScreenHeader } from "../../src/components/ScreenHeader";
 import { BottomSheet } from "../../src/components/BottomSheet";
+import {
+  SheetActions,
+  SheetPrimaryButton,
+  SheetSecondaryButton,
+} from "../../src/components/sheet";
 import { LoadingScreen } from "../../src/components/ui/loading";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1477,73 +1482,19 @@ function PasswordChangeCard({
         />
       </View>
 
-      <View style={{ gap: theme.spacing["2"] }}>
-        <Pressable
+      <SheetActions>
+        <SheetPrimaryButton
+          label={isChangePassword ? "Update Password" : "Set Password"}
           onPress={onSubmit}
+          loading={isPending}
           disabled={isPending}
-          style={({ pressed }) => [
-            {
-              minHeight: 48,
-              borderRadius: theme.borderRadius.lg,
-              backgroundColor: theme.colors.primaryBase,
-              alignItems: "center",
-              justifyContent: "center",
-            },
-            pressed && { opacity: 0.9 },
-            isPending && { opacity: 0.6 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={
-            isChangePassword
-              ? "Update password"
-              : "Set email password"
-          }
-        >
-          {isPending ? (
-            <ActivityIndicator color={theme.colors.primaryForeground} />
-          ) : (
-            <Text
-              style={{
-                fontSize: theme.typography.fontSize.sm.size,
-                lineHeight: theme.typography.fontSize.sm.lineHeight,
-                color: theme.colors.primaryForeground,
-                fontWeight: theme.typography.fontWeight
-                  .semibold as TextStyle["fontWeight"],
-              }}
-            >
-              {isChangePassword ? "Update Password" : "Set Password"}
-            </Text>
-          )}
-        </Pressable>
-        <Pressable
+        />
+        <SheetSecondaryButton
+          label="Cancel"
           onPress={onCancel}
           disabled={isPending}
-          style={({ pressed }) => [
-            {
-              minHeight: 44,
-              borderRadius: theme.borderRadius.lg,
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: theme.colors.border,
-              alignItems: "center",
-              justifyContent: "center",
-            },
-            pressed && { backgroundColor: theme.colors.accent },
-            isPending && { opacity: 0.6 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Cancel password update"
-        >
-          <Text
-            style={{
-              fontSize: theme.typography.fontSize.sm.size,
-              lineHeight: theme.typography.fontSize.sm.lineHeight,
-              color: theme.colors.foreground,
-            }}
-          >
-            Cancel
-          </Text>
-        </Pressable>
-      </View>
+        />
+      </SheetActions>
     </ScrollView>
   );
 }
@@ -1630,69 +1581,19 @@ function ProfilePictureCard({
         />
       </View>
 
-      <View style={{ gap: theme.spacing["2"] }}>
-        <Pressable
+      <SheetActions>
+        <SheetPrimaryButton
+          label="Save"
           onPress={onSubmit}
+          loading={isPending}
           disabled={isPending}
-          style={({ pressed }) => [
-            {
-              minHeight: 48,
-              borderRadius: theme.borderRadius.lg,
-              backgroundColor: theme.colors.primaryBase,
-              alignItems: "center",
-              justifyContent: "center",
-            },
-            (pressed || isPending) && { opacity: 0.7 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Save profile picture"
-        >
-          {isPending ? (
-            <ActivityIndicator
-              size="small"
-              color={theme.colors.primaryForeground}
-            />
-          ) : (
-            <Text
-              style={{
-                fontSize: theme.typography.fontSize.sm.size,
-                color: theme.colors.primaryForeground,
-                fontWeight: theme.typography.fontWeight
-                  .semibold as TextStyle["fontWeight"],
-              }}
-            >
-              Save
-            </Text>
-          )}
-        </Pressable>
-        <Pressable
+        />
+        <SheetSecondaryButton
+          label="Cancel"
           onPress={onCancel}
           disabled={isPending}
-          style={({ pressed }) => [
-            {
-              minHeight: 44,
-              borderRadius: theme.borderRadius.lg,
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: theme.colors.border,
-              alignItems: "center",
-              justifyContent: "center",
-            },
-            pressed && { backgroundColor: theme.colors.accent },
-            isPending && { opacity: 0.6 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Cancel"
-        >
-          <Text
-            style={{
-              fontSize: theme.typography.fontSize.sm.size,
-              color: theme.colors.foreground,
-            }}
-          >
-            Cancel
-          </Text>
-        </Pressable>
-      </View>
+        />
+      </SheetActions>
     </View>
   );
 }

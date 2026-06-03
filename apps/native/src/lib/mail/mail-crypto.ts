@@ -36,7 +36,12 @@ import {
 } from "./mail-password-cache";
 import { extractPgpMimeCiphertextBlobId } from "./message-security";
 import { parseMimeBody } from "./mail-mime-parser";
-import type { JmapBodyStructure, MailVaultKdfParams } from "./types";
+import type {
+  JmapAttachment,
+  JmapBodyStructure,
+  LabelDef,
+  MailVaultKdfParams,
+} from "./types";
 import type { MailRuntime } from "./mail-runtime";
 
 const log = createLogger("mail-crypto");
@@ -57,6 +62,8 @@ export type MailDecryptResult = {
   plaintext: string;
   /** HTML body, present after PGP/MIME decryption + MIME parse. */
   html?: string | null;
+  /** Attachments extracted from decrypted PGP/MIME payload. */
+  attachments?: JmapAttachment[];
   signatureVerificationState: MailSignatureVerificationState;
   hasVerifiedSignature: boolean;
 };
@@ -625,14 +632,17 @@ export async function decryptPgpMimeMessage(
   );
   let parsedText: string | null = null;
   let parsedHtml: string | null = null;
+  let parsedAttachments: JmapAttachment[] = [];
   try {
     const parsed = parseMimeBody(pgpResult.plaintext);
     parsedText = parsed.text;
     parsedHtml = parsed.html;
+    parsedAttachments = parsed.attachments;
     log.debug(
-      "[mail-crypto] decryptPgpMimeMessage: MIME parsed text=%s html=%s id=%s",
+      "[mail-crypto] decryptPgpMimeMessage: MIME parsed text=%s html=%s attachments=%d id=%s",
       parsedText != null ? `${parsedText.length}b` : "null",
       parsedHtml != null ? `${parsedHtml.length}b` : "null",
+      parsed.attachments?.length ?? 0,
       messageId,
     );
   } catch (err) {
@@ -648,6 +658,7 @@ export async function decryptPgpMimeMessage(
   return {
     plaintext: parsedText ?? pgpResult.plaintext,
     html: parsedHtml,
+    attachments: parsedAttachments,
     signatureVerificationState: pgpResult.signatureVerificationState,
     hasVerifiedSignature: pgpResult.hasVerifiedSignature,
   };
@@ -756,4 +767,47 @@ export function isVaultLoaded(): boolean {
  */
 export function getLoadedVaultFingerprint(): string | null {
   return cachedVault?.vault.publicKeyFingerprint ?? null;
+}
+
+/** Returns label definitions from the in-memory vault, or `[]` if not loaded. */
+export function getVaultLabels(): LabelDef[] {
+  return cachedVault?.vault.labels ?? [];
+}
+
+/**
+ * Persists updated label definitions into the encrypted vault backup so web and
+ * native stay in sync.
+ */
+export async function saveVaultLabels(labels: LabelDef[]): Promise<void> {
+  if (!cachedVault) {
+    throw new Error("Mail vault is not loaded");
+  }
+
+  const updatedVault: UserKeyVault = {
+    ...cachedVault.vault,
+    labels,
+  };
+
+  const { kdfParams } = cachedVault.vault;
+  const encrypted = await createEncryptedMailVault(
+    updatedVault,
+    cachedVault.passphrase,
+    kdfParams
+      ? {
+          saltB64: kdfParams.saltB64,
+          memoryKiB: kdfParams.memoryKiB,
+          iterations: kdfParams.iterations,
+          parallelism: kdfParams.parallelism,
+        }
+      : KEY_MATERIAL_KDF,
+  );
+
+  cachedVault = { ...cachedVault, vault: updatedVault };
+
+  await upsertAccountVaultBackup({
+    vaultVersion: updatedVault.vaultVersion,
+    encryptedVaultB64: encrypted.encryptedVaultB64,
+    kdf: encrypted.kdf,
+    kdfParams: encrypted.kdfParams,
+  });
 }

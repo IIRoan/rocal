@@ -730,6 +730,27 @@ export class StalwartJmapClient {
     );
   }
 
+  async downloadBlob(
+    session: JmapSession,
+    blobId: string,
+    name: string,
+    type: string,
+  ): Promise<Uint8Array> {
+    const { url, authHeader } = await this.getBlobDownloadInfo(
+      session,
+      blobId,
+      name,
+      type,
+    );
+    const response = await this.fetcher(url, {
+      headers: { Authorization: authHeader },
+    });
+    if (!response.ok) {
+      throw new Error(`Blob download failed with status ${response.status}.`);
+    }
+    return new Uint8Array(await response.arrayBuffer());
+  }
+
   async getBlobDownloadInfo(
     session: JmapSession,
     blobId: string,
