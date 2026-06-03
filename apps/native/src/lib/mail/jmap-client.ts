@@ -677,6 +677,80 @@ export class StalwartJmapClient {
     );
   }
 
+  async bulkMoveToTrash(
+    session: JmapSession,
+    messageIds: string[],
+    trashMailboxId: string | null,
+  ): Promise<void> {
+    if (messageIds.length === 0) return;
+    const accountId = this.requirePrimaryAccountId(session);
+    if (trashMailboxId) {
+      const update = Object.fromEntries(
+        messageIds.map((id) => [id, { mailboxIds: { [trashMailboxId]: true } }]),
+      );
+      await this.call(
+        session,
+        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+        [["Email/set", { accountId, update }, "c1"]],
+      );
+    } else {
+      await this.call(
+        session,
+        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+        [["Email/set", { accountId, destroy: messageIds }, "c1"]],
+      );
+    }
+  }
+
+  async bulkMoveToMailbox(
+    session: JmapSession,
+    messageIds: string[],
+    targetMailboxId: string,
+  ): Promise<void> {
+    if (messageIds.length === 0) return;
+    const accountId = this.requirePrimaryAccountId(session);
+    const update = Object.fromEntries(
+      messageIds.map((id) => [id, { mailboxIds: { [targetMailboxId]: true } }]),
+    );
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Email/set", { accountId, update }, "c1"]],
+    );
+  }
+
+  async bulkMarkAsRead(
+    session: JmapSession,
+    messageIds: string[],
+  ): Promise<void> {
+    if (messageIds.length === 0) return;
+    const accountId = this.requirePrimaryAccountId(session);
+    const update = Object.fromEntries(
+      messageIds.map((id) => [id, { "keywords/$seen": true }]),
+    );
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Email/set", { accountId, update }, "c1"]],
+    );
+  }
+
+  async bulkMarkAsUnread(
+    session: JmapSession,
+    messageIds: string[],
+  ): Promise<void> {
+    if (messageIds.length === 0) return;
+    const accountId = this.requirePrimaryAccountId(session);
+    const update = Object.fromEntries(
+      messageIds.map((id) => [id, { "keywords/$seen": null }]),
+    );
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Email/set", { accountId, update }, "c1"]],
+    );
+  }
+
   async toggleFlagged(
     session: JmapSession,
     messageId: string,

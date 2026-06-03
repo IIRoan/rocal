@@ -258,12 +258,13 @@ export function AppSidebar() {
   const handleSelectMailbox = useCallback(
     (mailboxId: string) => {
       setSelectedMailboxId(mailboxId);
+      void queryClient.invalidateQueries({ queryKey: ["mail", "messages"] });
       close();
       if (!isMailContext) {
         setTimeout(() => router.replace(MAIL_TAB_ROUTE as any), 80);
       }
     },
-    [close, isMailContext, router, setSelectedMailboxId],
+    [close, isMailContext, queryClient, router, setSelectedMailboxId],
   );
 
   const handleSelectCalendarDate = useCallback(

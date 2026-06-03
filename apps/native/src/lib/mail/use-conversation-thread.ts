@@ -78,25 +78,50 @@ export function usePrefetchThreadMessages(
   }, [queries]);
 }
 
+function filterMessagesToMailboxes(
+  messages: JmapEmailMessage[],
+  allowedMailboxIds: ReadonlySet<string>,
+): JmapEmailMessage[] {
+  if (allowedMailboxIds.size === 0) return [];
+  return messages.filter((message) =>
+    Object.keys(message.mailboxIds ?? {}).some((mailboxId) =>
+      allowedMailboxIds.has(mailboxId),
+    ),
+  );
+}
+
 export function useConversationListExtras(
   runtime: MailRuntime | undefined,
   mailboxMessages: JmapEmailMessage[],
   companionMessages: JmapEmailMessage[],
+  allowedMailboxIds: string[],
 ) {
   const queryClient = useQueryClient();
   const prefetchedThreadMessages = usePrefetchThreadMessages(
     runtime,
     mailboxMessages,
   );
+  const allowedMailboxIdSet = useMemo(
+    () => new Set(allowedMailboxIds),
+    [allowedMailboxIds],
+  );
 
   return useMemo(
     () =>
       mergeConversationSourceMessages(
-        companionMessages,
-        prefetchedThreadMessages,
-        getCachedThreadMessages(queryClient),
+        filterMessagesToMailboxes(companionMessages, allowedMailboxIdSet),
+        filterMessagesToMailboxes(prefetchedThreadMessages, allowedMailboxIdSet),
+        filterMessagesToMailboxes(
+          getCachedThreadMessages(queryClient),
+          allowedMailboxIdSet,
+        ),
       ),
-    [companionMessages, prefetchedThreadMessages, queryClient],
+    [
+      companionMessages,
+      prefetchedThreadMessages,
+      queryClient,
+      allowedMailboxIdSet,
+    ],
   );
 }
 

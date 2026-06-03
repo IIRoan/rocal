@@ -11,7 +11,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useSegments } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import type { CalendarEvent } from "@workspace/calendar-core";
@@ -21,12 +21,18 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCommandPalette } from "../providers/CommandPaletteProvider";
 import { useSheet } from "../providers/SheetProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
+import { useMailSelection } from "../providers/MailSelectionProvider";
 import { calendarApiService } from "../lib/api";
 import {
   CALENDAR_TAB_ROUTE,
   MAIL_TAB_ROUTE,
   SETTINGS_ROUTE,
+  isMailRouteSegments,
 } from "../lib/navigation-routes";
+import { useMailAccount } from "../lib/mail/use-mail";
+import { useMailRuntime } from "../lib/mail/use-mail";
+import { formatAddress } from "../lib/mail/mail-helpers";
+import type { JmapEmailMessage } from "../lib/mail/types";
 
 import { BottomSheet } from "./BottomSheet";
 import {
@@ -34,6 +40,7 @@ import {
   filterCommandActions,
   groupCommandActions,
   type CommandAction,
+  type CommandPaletteScope,
 } from "./command-palette/command-actions";
 
 const SEARCH_MIN_LENGTH = 2;
@@ -41,9 +48,8 @@ const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_LIMIT = 8;
 
 /**
- * Global, gesture-driven command palette rendered once at the root. Reuses the
- * shared `BottomSheet` so it shares the calendar's smooth drag-to-dismiss feel.
- * Combines quick actions (navigation, views, compose) with live event search.
+ * Global command palette. Scope follows the active tab: mail screens search
+ * messages and show mail actions only; calendar screens search events.
  */
 export function CommandPalette() {
   const { theme } = useTheme();
@@ -53,19 +59,28 @@ export function CommandPalette() {
   const { openEventSheet } = useSheet();
   const { setActiveView, setCurrentDate, setSelectedDate } = useCalendarView();
   const router = useRouter();
+  const segments = useSegments();
   const inputRef = useRef<TextInput>(null);
+
+  const scope: CommandPaletteScope = isMailRouteSegments(segments)
+    ? "mail"
+    : "calendar";
 
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  // Focus the input shortly after the sheet animates open.
+  const accountQuery = useMailAccount();
+  const mailProvisioned = accountQuery.data?.provisioned ?? false;
+  const runtimeQuery = useMailRuntime(scope === "mail" && mailProvisioned);
+  const runtime = runtimeQuery.data;
+  const { selectedMailboxId } = useMailSelection();
+
   useEffect(() => {
     if (!isOpen) return;
     const timeout = setTimeout(() => inputRef.current?.focus(), 250);
     return () => clearTimeout(timeout);
   }, [isOpen]);
 
-  // Debounce the query that drives the event search.
   useEffect(() => {
     const timeout = setTimeout(
       () => setDebouncedQuery(query),
@@ -77,25 +92,46 @@ export function CommandPalette() {
   const trimmedQuery = debouncedQuery.trim();
   const searchEnabled = isOpen && trimmedQuery.length >= SEARCH_MIN_LENGTH;
 
-  const { data: searchData, isFetching: searchFetching } = useQuery({
-    queryKey: ["command-palette-search", trimmedQuery],
+  const { data: eventSearchData, isFetching: eventSearchFetching } = useQuery({
+    queryKey: ["command-palette-search", "events", trimmedQuery],
     queryFn: ({ signal }) =>
       calendarApiService.searchEvents(
         { q: trimmedQuery, limit: SEARCH_LIMIT },
         signal,
       ),
-    enabled: searchEnabled,
+    enabled: scope === "calendar" && searchEnabled,
     staleTime: 10_000,
   });
 
-  const actions = useMemo(() => buildCommandActions(), []);
+  const { data: mailSearchData, isFetching: mailSearchFetching } = useQuery({
+    queryKey: [
+      "command-palette-search",
+      "mail",
+      selectedMailboxId,
+      trimmedQuery,
+    ],
+    queryFn: () =>
+      runtime!.client.searchMailboxMessages(
+        runtime!.session,
+        selectedMailboxId!,
+        trimmedQuery,
+        SEARCH_LIMIT,
+      ),
+    enabled:
+      scope === "mail" &&
+      searchEnabled &&
+      Boolean(runtime && selectedMailboxId),
+    staleTime: 10_000,
+  });
+
+  const actions = useMemo(() => buildCommandActions(scope), [scope]);
   const filteredActions = useMemo(
     () => filterCommandActions(actions, query),
     [actions, query],
   );
   const actionSections = useMemo(
-    () => groupCommandActions(filteredActions),
-    [filteredActions],
+    () => groupCommandActions(filteredActions, scope),
+    [filteredActions, scope],
   );
 
   const handleCloseComplete = useCallback(() => {
@@ -168,9 +204,24 @@ export function CommandPalette() {
     [close, openEventSheet, setCurrentDate, setSelectedDate, navigateToCalendar],
   );
 
-  const events = searchData?.events ?? [];
+  const handleMailMessagePress = useCallback(
+    (message: JmapEmailMessage) => {
+      close();
+      router.push(`/(tabs)/mail/message/${message.id}` as never);
+    },
+    [close, router],
+  );
+
+  const events = eventSearchData?.events ?? [];
+  const mailMessages = mailSearchData?.messages ?? [];
   const showSearchResults = trimmedQuery.length >= SEARCH_MIN_LENGTH;
   const noActionMatches = !showSearchResults && filteredActions.length === 0;
+  const searchPlaceholder =
+    scope === "mail"
+      ? "Search mail or run a command…"
+      : "Search events or run a command…";
+  const searchFetching =
+    scope === "mail" ? mailSearchFetching : eventSearchFetching;
 
   return (
     <BottomSheet
@@ -187,7 +238,7 @@ export function CommandPalette() {
         <TextInput
           ref={inputRef}
           style={styles.searchInput}
-          placeholder="Search events or run a command…"
+          placeholder={searchPlaceholder}
           placeholderTextColor={theme.colors.mutedForeground}
           value={query}
           onChangeText={setQuery}
@@ -217,7 +268,9 @@ export function CommandPalette() {
         {showSearchResults ? (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionLabel}>Events</Text>
+              <Text style={styles.sectionLabel}>
+                {scope === "mail" ? "Messages" : "Events"}
+              </Text>
               {searchFetching ? (
                 <ActivityIndicator
                   size="small"
@@ -225,7 +278,21 @@ export function CommandPalette() {
                 />
               ) : null}
             </View>
-            {events.length === 0 && !searchFetching ? (
+            {scope === "mail" ? (
+              mailMessages.length === 0 && !searchFetching ? (
+                <Text style={styles.emptyText}>No matching messages.</Text>
+              ) : (
+                mailMessages.map((message) => (
+                  <MailMessageResultRow
+                    key={message.id}
+                    message={message}
+                    theme={theme}
+                    styles={styles}
+                    onPress={handleMailMessagePress}
+                  />
+                ))
+              )
+            ) : events.length === 0 && !searchFetching ? (
               <Text style={styles.emptyText}>No matching events.</Text>
             ) : (
               events.map((event) => (
@@ -325,6 +392,48 @@ function EventResultRow({
       <View style={styles.rowTextWrap}>
         <Text style={styles.rowLabel} numberOfLines={1}>
           {event.title || "Untitled event"}
+        </Text>
+        {subtitle ? (
+          <Text style={styles.rowSubtitle} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
+function MailMessageResultRow({
+  message,
+  theme,
+  styles,
+  onPress,
+}: {
+  message: JmapEmailMessage;
+  theme: ThemeTokens;
+  styles: Styles;
+  onPress: (message: JmapEmailMessage) => void;
+}) {
+  const title = message.subject?.trim() || "(no subject)";
+  const from = formatAddress(message.from);
+  const receivedAt = message.receivedAt
+    ? format(new Date(message.receivedAt), "MMM d")
+    : null;
+  const subtitle = [from, receivedAt].filter(Boolean).join(" · ");
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      onPress={() => onPress(message)}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+    >
+      <View style={styles.rowIcon}>
+        <Feather name="mail" size={18} color={theme.colors.foreground} />
+      </View>
+      <View style={styles.rowTextWrap}>
+        <Text style={styles.rowLabel} numberOfLines={1}>
+          {title}
         </Text>
         {subtitle ? (
           <Text style={styles.rowSubtitle} numberOfLines={1}>

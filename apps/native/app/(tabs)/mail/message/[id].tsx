@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -22,6 +22,8 @@ import { useTheme } from "../../../../src/providers/ThemeProvider";
 import { useToast } from "../../../../src/providers/ToastProvider";
 import { QUERY_KEYS } from "../../../../src/lib/query-keys";
 import {
+  releaseMarkAsReadSuppression,
+  suppressMarkAsRead,
   useCachedMessage,
   useMailMutations,
   useMailRuntime,
@@ -52,11 +54,16 @@ import { AttachmentPreviewModal } from "../../../../src/components/mail/Attachme
 import { ConversationThreadStrip } from "../../../../src/components/mail/ConversationThreadStrip";
 import { useAuth } from "../../../../src/providers/AuthProvider";
 import { BottomSheet } from "../../../../src/components/BottomSheet";
+import { SheetNavButton, SheetRow } from "../../../../src/components/sheet";
+import { MailSheetPanel } from "../../../../src/components/mail/MailSheetPanel";
+import { MailSheetList } from "../../../../src/components/mail/MailSheetList";
 import {
-  SheetList,
-  SheetNavButton,
-  SheetRow,
-} from "../../../../src/components/sheet";
+  MailBottomAction,
+  MailBottomActionBar,
+  MailBottomActionDivider,
+  mailBottomBarTotalHeight,
+} from "../../../../src/components/mail/MailBottomActionBar";
+import { mailSpacing } from "../../../../src/components/mail/mail-ui";
 
 import {
   resolveAttachmentPreviewKind,
@@ -65,16 +72,21 @@ import {
 import type { JmapAttachment, JmapEmailMessage, LabelDef } from "../../../../src/lib/mail/types";
 import { useLabels, getAllMessageLabels } from "../../../../src/lib/mail/use-labels";
 import { MailLabelsSheet } from "../../../../src/components/mail/MailLabelsSheet";
+import { sheetBottomPadding } from "../../../../src/components/sheet/sheet-padding";
 
 type MessageSheetView = "menu" | "move" | "label" | "html" | null;
 
 export default function MailMessageScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const sheetPad = sheetBottomPadding(insets.bottom);
+  const mailPad = mailSpacing(theme);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const router = useRouter();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const scrollBottomPad =
+    theme.spacing["6"] + mailBottomBarTotalHeight(insets.bottom);
   const { toast } = useToast();
   const { user } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -104,8 +116,16 @@ export default function MailMessageScreen() {
   const message = messageQuery.data ?? null;
   const { conversationMessages, isLoading: isConversationLoading } =
     useConversationThread(runtime, message);
-  const { markAsUnread, toggleFlagged, moveToTrash, deleteMessage, moveToMailbox, setMessageLabel } =
-    useMailMutations(runtime, null);
+  const {
+    markAsRead,
+    markAsUnread,
+    toggleFlagged,
+    moveToTrash,
+    deleteMessage,
+    moveToMailbox,
+    setMessageLabel,
+  } = useMailMutations(runtime, null);
+  const skipMarkReadRef = useRef(false);
   const bodies = message ? extractMessageBodies(message) : null;
   const encryption = message ? classifyMessageEncryption(message) : "plain";
   const isEncrypted = encryption !== "plain";
@@ -136,6 +156,21 @@ export default function MailMessageScreen() {
       refreshLabels();
     }
   }, [decryptQuery.isSuccess, refreshLabels]);
+
+  // Mark unread messages as read once per visit (not when the user marks unread mid-session).
+  useEffect(() => {
+    if (!runtime || !messageId || skipMarkReadRef.current) return;
+    if (message?.keywords?.["$seen"]) return;
+    markAsRead.mutate(messageId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when opening this message
+  }, [messageId, runtime]);
+
+  useEffect(() => {
+    skipMarkReadRef.current = false;
+    return () => {
+      releaseMarkAsReadSuppression(messageId);
+    };
+  }, [messageId]);
 
   const htmlContent: string | null = decryptQuery.data?.html ?? (isEncrypted ? null : (bodies?.html ?? null));
   const plainContent: string | null = decryptQuery.data?.plaintext ?? (isEncrypted ? null : (bodies?.text ?? null));
@@ -256,11 +291,11 @@ export default function MailMessageScreen() {
 
   const handleMarkUnread = () => {
     if (!message) return;
+    skipMarkReadRef.current = true;
+    suppressMarkAsRead(message.id);
+    setActiveSheetView(null);
     markAsUnread.mutate(message.id, {
-      onSuccess: () => {
-        setActiveSheetView(null);
-        toast("Marked as unread");
-      },
+      onSuccess: () => toast("Marked as unread"),
       onError: (error) =>
         toast(getErrorMessage(error, "Failed to mark message as unread."), "error"),
     });
@@ -425,7 +460,7 @@ export default function MailMessageScreen() {
           accessibilityRole="button"
           accessibilityLabel="Back to messages"
         >
-          <Feather name="arrow-left" size={22} color={theme.colors.foreground} />
+          <Feather name="arrow-left" size={18} color={theme.colors.foreground} />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {message?.subject?.trim() || "Message"}
@@ -447,8 +482,11 @@ export default function MailMessageScreen() {
           <Text style={styles.mutedText}>Message not found.</Text>
         </View>
       ) : (
-        <>
-          <ScrollView contentContainerStyle={styles.body}>
+        <View style={styles.messageBody}>
+          <ScrollView
+            style={styles.messageScroll}
+            contentContainerStyle={[styles.body, { paddingBottom: scrollBottomPad }]}
+          >
             {messageHeader}
 
             {isConversationLoading ? (
@@ -511,40 +549,41 @@ export default function MailMessageScreen() {
             )}
           </ScrollView>
 
-          <View style={styles.bottomBar}>
+          <MailBottomActionBar bottomInset={insets.bottom}>
             {archiveMailboxId ? (
-              <BottomBarButton
-                theme={theme}
-                icon="archive"
-                label="Archive"
-                disabled={isActionBusy}
-                onPress={handleArchive}
-              />
+              <>
+                <MailBottomAction
+                  icon="archive"
+                  label="Archive"
+                  disabled={isActionBusy}
+                  onPress={handleArchive}
+                />
+                <MailBottomActionDivider />
+              </>
             ) : null}
-            <BottomBarButton
-              theme={theme}
+            <MailBottomAction
               icon="corner-up-left"
               label="Reply"
               disabled={isActionBusy}
               onPress={handleReply}
             />
-            <BottomBarButton
-              theme={theme}
+            <MailBottomActionDivider />
+            <MailBottomAction
               icon="trash-2"
               label={currentMailboxRole === "trash" ? "Delete" : "Trash"}
               disabled={isActionBusy}
               destructive
               onPress={handleMoveToTrash}
             />
-            <BottomBarButton
-              theme={theme}
+            <MailBottomActionDivider />
+            <MailBottomAction
               icon="more-horizontal"
               label="More"
               disabled={isActionBusy}
               onPress={() => setActiveSheetView("menu")}
             />
-          </View>
-        </>
+          </MailBottomActionBar>
+        </View>
       )}
 
       {preview && (
@@ -584,57 +623,59 @@ export default function MailMessageScreen() {
         snapPoints={activeSheetView === "html" ? [0.92] : activeSheetView === "label" ? [0.65] : [0.45]}
       >
         {activeSheetView === "menu" ? (
-          <View style={[styles.sheetContent, { paddingBottom: insets.bottom + 8 }]}>
-            <SheetList>
-              <SheetRow icon="corner-up-right" label="Forward" onPress={handleForward} />
-              <SheetRow icon="star" label={isFlagged ? "Unstar" : "Star"} onPress={handleToggleStar} showDivider />
+          <MailSheetPanel bottomInset={insets.bottom}>
+            <MailSheetList>
+              <SheetRow variant="mail" icon="corner-up-right" label="Forward" onPress={handleForward} />
+              <SheetRow variant="mail" icon="star" label={isFlagged ? "Unstar" : "Star"} onPress={handleToggleStar} showDivider />
               {isSeen ? (
-                <SheetRow icon="mail" label="Mark as unread" onPress={handleMarkUnread} showDivider />
+                <SheetRow variant="mail" icon="mail" label="Mark as unread" onPress={handleMarkUnread} showDivider />
               ) : null}
-              <SheetRow icon="tag" label="Labels" accessory="chevron-right" onPress={() => setActiveSheetView("label")} showDivider />
+              <SheetRow variant="mail" icon="tag" label="Labels" accessory="chevron-right" onPress={() => setActiveSheetView("label")} showDivider />
               {(currentMailboxRole === "trash" ||
                 currentMailboxRole === "junk") &&
               inboxMailboxId ? (
-                <SheetRow icon="inbox" label="Restore to inbox" onPress={handleRestoreToInbox} showDivider />
+                <SheetRow variant="mail" icon="inbox" label="Restore to inbox" onPress={handleRestoreToInbox} showDivider />
               ) : null}
               {moveTargets.length > 0 ? (
-                <SheetRow icon="folder" label="Move to…" accessory="chevron-right" onPress={() => setActiveSheetView("move")} showDivider />
+                <SheetRow variant="mail" icon="folder" label="Move to…" accessory="chevron-right" onPress={() => setActiveSheetView("move")} showDivider />
               ) : null}
               {rawHtmlSource ? (
-                <SheetRow icon="code" label="View HTML source" accessory="chevron-right" onPress={() => setActiveSheetView("html")} showDivider />
+                <SheetRow variant="mail" icon="code" label="View HTML source" accessory="chevron-right" onPress={() => setActiveSheetView("html")} showDivider />
               ) : null}
-            </SheetList>
-            <SheetList>
+            </MailSheetList>
+            <MailSheetList>
               <SheetRow
+                variant="mail"
                 icon="trash-2"
                 label={currentMailboxRole === "trash" ? "Delete message" : "Move to trash"}
                 destructive
                 onPress={handleMoveToTrash}
                 disabled={isActionBusy}
               />
-            </SheetList>
-          </View>
+            </MailSheetList>
+          </MailSheetPanel>
         ) : activeSheetView === "move" ? (
-          <View style={[styles.sheetContent, { paddingBottom: insets.bottom + 8 }]}>
+          <MailSheetPanel bottomInset={insets.bottom}>
             <SheetNavButton label="Actions" onPress={() => setActiveSheetView("menu")} />
-            <SheetList>
+            <MailSheetList>
               {moveTargets.map((mailbox, index) => (
                 <SheetRow
                   key={mailbox.id}
+                  variant="mail"
                   icon="folder"
                   label={mailbox.name}
                   onPress={() => handleMoveToMailbox(mailbox.id)}
                   showDivider={index > 0}
                 />
               ))}
-            </SheetList>
-          </View>
+            </MailSheetList>
+          </MailSheetPanel>
         ) : activeSheetView === "label" ? (
-          <MailLabelsSheet
-            labels={labels}
-            messageKeywords={message?.keywords}
-            insetsBottom={insets.bottom}
-            onBack={() => setActiveSheetView("menu")}
+          <MailSheetPanel bottomInset={insets.bottom}>
+            <MailLabelsSheet
+              labels={labels}
+              messageKeywords={message?.keywords}
+              onBack={() => setActiveSheetView("menu")}
             onToggleLabel={(labelId, assigned) => {
               if (!message) return;
               setMessageLabel.mutate({ messageId: message.id, labelId, assigned });
@@ -655,13 +696,18 @@ export default function MailMessageScreen() {
               await deleteLabel(labelId);
               toast(`Deleted "${label?.name ?? labelId}"`);
             }}
-          />
+            />
+          </MailSheetPanel>
         ) : activeSheetView === "html" ? (
           <View style={styles.sheetView}>
             <SheetNavButton label="Actions" onPress={() => setActiveSheetView("menu")} />
             <ScrollView
               style={styles.sheetScroll}
-              contentContainerStyle={[styles.sheetContent, { paddingBottom: insets.bottom + 8 }]}
+              contentContainerStyle={{
+                paddingHorizontal: mailPad.sheetH,
+                paddingBottom: sheetPad,
+                gap: 8,
+              }}
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.htmlSourceCard}>
@@ -752,55 +798,25 @@ function MetaRow({
   );
 }
 
-function BottomBarButton({
-  theme,
-  icon,
-  label,
-  disabled,
-  destructive,
-  onPress,
-}: {
-  theme: ThemeTokens;
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  disabled?: boolean;
-  destructive?: boolean;
-  onPress: () => void;
-}) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  const color = destructive ? theme.colors.destructive : theme.colors.foreground;
-
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.bottomBarButton,
-        pressed && styles.bottomBarButtonPressed,
-        disabled && styles.bottomBarButtonDisabled,
-      ]}
-    >
-      <Feather name={icon} size={18} color={color} />
-      <Text style={[styles.bottomBarButtonText, destructive && { color }]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 function createStyles(theme: ThemeTokens) {
   const view = {
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
     },
+    messageBody: {
+      flex: 1,
+    },
+    messageScroll: {
+      flex: 1,
+    },
     header: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: theme.spacing["2"],
       paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-      borderBottomWidth: 1,
+      paddingVertical: theme.spacing["3"],
+      borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: theme.colors.border,
     },
     iconButton: {
@@ -819,7 +835,6 @@ function createStyles(theme: ThemeTokens) {
     body: {
       padding: theme.spacing["4"],
       gap: theme.spacing["3"],
-      paddingBottom: theme.spacing["6"] + 84,
     },
     metaBlock: {
       gap: theme.spacing["1"],
@@ -900,42 +915,12 @@ function createStyles(theme: ThemeTokens) {
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.card,
     },
-    bottomBar: {
-      flexDirection: "row" as const,
-      justifyContent: "space-around" as const,
-      alignItems: "center" as const,
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.border,
-      backgroundColor: theme.colors.background,
-    },
-    bottomBarButton: {
-      flex: 1,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      gap: theme.spacing["1"],
-      paddingVertical: theme.spacing["1"],
-      borderRadius: theme.borderRadius.md,
-    },
-    bottomBarButtonPressed: {
-      opacity: 0.7,
-    },
-    bottomBarButtonDisabled: {
-      opacity: 0.45,
-    },
     sheetView: {
       flex: 1,
     },
     sheetScroll: {
       flex: 1,
     },
-    sheetContent: {
-      paddingHorizontal: 16,
-      paddingBottom: 8,
-      gap: 8,
-    },
-
     htmlSourceCard: {
       padding: theme.spacing["3"],
       borderRadius: theme.borderRadius.lg,
@@ -1014,11 +999,6 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.xs.size,
       color: theme.colors.mutedForeground,
     },
-    bottomBarButtonText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      color: theme.colors.foreground,
-    },
-
     htmlSourceText: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,

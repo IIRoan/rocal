@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -13,7 +12,6 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { FontAwesome } from "@expo/vector-icons";
 import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
@@ -23,13 +21,24 @@ import { useMailSelection } from "../../../src/providers/MailSelectionProvider";
 import { useCommandPalette } from "../../../src/providers/CommandPaletteProvider";
 import { CenteredLoader } from "../../../src/components/ui/loading";
 import { MailMessageRow } from "../../../src/components/mail/MailMessageRow";
-import { BottomSheet } from "../../../src/components/BottomSheet";
 import {
-  SheetList,
-  SheetNavButton,
-  SheetRow,
-} from "../../../src/components/sheet";
-import { MailLabelsSheet } from "../../../src/components/mail/MailLabelsSheet";
+  MAIL_COMPOSE_LIST_EXTRA,
+} from "../../../src/components/mail/MailComposeButton";
+import { mailBottomBarTotalHeight } from "../../../src/components/mail/MailBulkToolbar";
+import { BottomSheet } from "../../../src/components/BottomSheet";
+import { MailBulkMoveSheet } from "../../../src/components/mail/MailBulkMoveSheet";
+import { MailBulkMoreSheet } from "../../../src/components/mail/MailBulkMoreSheet";
+import { MailBulkLabelsSheet } from "../../../src/components/mail/MailBulkLabelsSheet";
+import { MailSheetPanel } from "../../../src/components/mail/MailSheetPanel";
+import { MailListHeader } from "../../../src/components/mail/MailListHeader";
+import { MailListBottomChrome } from "../../../src/components/mail/MailListBottomChrome";
+import { MailListAnimatedFooter } from "../../../src/components/mail/MailListAnimatedFooter";
+import { MailSelectionAnimProvider } from "../../../src/components/mail/mail-selection-anim";
+import {
+  MAIL_ICON,
+  mailListSeparatorInset,
+} from "../../../src/components/mail/mail-ui";
+import { sheetCompactBottomPadding } from "../../../src/components/sheet/sheet-padding";
 import {
   useMailAccount,
   useMailConfig,
@@ -39,7 +48,7 @@ import {
   useMailboxMessages,
 } from "../../../src/lib/mail/use-mail";
 import { useLabels } from "../../../src/lib/mail/use-labels";
-import { getMailboxIcon, getPrimaryMailboxId } from "../../../src/lib/mail/mail-helpers";
+import { getPrimaryMailboxId } from "../../../src/lib/mail/mail-helpers";
 import { buildMailConversations } from "../../../src/lib/mail/conversation-thread";
 import { useConversationListExtras } from "../../../src/lib/mail/use-conversation-thread";
 import { messageHasVisibleAttachments } from "../../../src/lib/mail/message-security";
@@ -47,11 +56,12 @@ import {
   isWebMailAvailable,
   openWebMail,
 } from "../../../src/lib/mail/mail-web-bridge";
-import type { JmapEmailMessage, JmapMailbox } from "../../../src/lib/mail/types";
+import type { JmapEmailMessage } from "../../../src/lib/mail/types";
 
-type ListSheetView = "menu" | "label" | "move" | null;
+type ListSheetView = "bulkMore" | "bulkMove" | "bulkLabel" | null;
 
 const SENDER_AS_RECIPIENT_ROLES = new Set(["sent", "drafts"]);
+const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
 
 export default function MailScreen() {
   const { theme } = useTheme();
@@ -98,29 +108,53 @@ export default function MailScreen() {
       : null,
   );
   const mailboxMessages = messagesQuery.data?.messages ?? [];
+  const companionMessages = useMemo(() => {
+    if (!companionMailboxId) return [];
+    return companionMessagesQuery.data?.messages ?? [];
+  }, [companionMailboxId, companionMessagesQuery.data?.messages]);
+
+  const allowedMailboxIds = useMemo(
+    () =>
+      [selectedMailboxId, companionMailboxId].filter(
+        (id): id is string => Boolean(id),
+      ),
+    [selectedMailboxId, companionMailboxId],
+  );
+
   const conversationExtras = useConversationListExtras(
     runtime,
     mailboxMessages,
-    companionMessagesQuery.data?.messages ?? [],
+    companionMessages,
+    allowedMailboxIds,
   );
   const {
-    markAsRead,
-    markAsUnread,
     toggleFlagged,
-    moveToTrash,
-    deleteMessage,
-    moveToMailbox,
     setMessageLabel,
+    bulkMarkAsRead,
+    bulkMarkAsUnread,
+    bulkMoveToTrash,
+    bulkMoveToMailbox,
   } = useMailMutations(runtime, selectedMailboxId);
-  const { labels, createLabel, deleteLabel } = useLabels({
+  const { labels } = useLabels({
     runtime,
     enabled: provisioned,
   });
   const { toast } = useToast();
   const insets = useSafeAreaInsets();
 
-  const [activeSheetMessage, setActiveSheetMessage] = useState<JmapEmailMessage | null>(null);
   const [activeSheetView, setActiveSheetView] = useState<ListSheetView>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const sheetPadCompact = sheetCompactBottomPadding(insets.bottom);
+  const selectionActive = selectedIds.size > 0;
+  const bulkIds = useMemo(() => Array.from(selectedIds), [selectedIds]);
+  const composeListPadding = MAIL_COMPOSE_LIST_EXTRA + insets.bottom;
+  const bulkListPadding = mailBottomBarTotalHeight(insets.bottom);
+  const showMailChrome = provisioned && Boolean(runtime);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [selectedMailboxId]);
 
   const selectedMailbox = runtime?.mailboxes.find(
     (m) => m.id === selectedMailboxId,
@@ -129,85 +163,10 @@ export default function MailScreen() {
     ? SENDER_AS_RECIPIENT_ROLES.has(selectedMailbox.role)
     : false;
 
-  const handleOpenMessage = useCallback(
-    (message: JmapEmailMessage) => {
-      if (runtime && !message.keywords?.["$seen"]) {
-        markAsRead.mutate(message.id);
-      }
-      router.push(`/(tabs)/mail/message/${message.id}` as never);
-    },
-    [router, runtime, markAsRead],
+  const primaryMessageIds = useMemo(
+    () => new Set(mailboxMessages.map((message) => message.id)),
+    [mailboxMessages],
   );
-
-  const handleLongPress = useCallback((message: JmapEmailMessage) => {
-    setActiveSheetMessage(message);
-    setActiveSheetView("menu");
-  }, []);
-
-  const handleToggleStar = useCallback(() => {
-    if (!activeSheetMessage) return;
-    const isFlagged = Boolean(activeSheetMessage.keywords?.["$flagged"]);
-    toggleFlagged.mutate({ messageId: activeSheetMessage.id, flagged: !isFlagged });
-    toast(isFlagged ? "Unstarred" : "Starred");
-    setActiveSheetView(null);
-  }, [activeSheetMessage, toggleFlagged, toast]);
-
-  const handleMarkUnread = useCallback(() => {
-    if (!activeSheetMessage) return;
-    markAsUnread.mutate(activeSheetMessage.id, {
-      onSuccess: () => {
-        setActiveSheetView(null);
-        toast("Marked as unread");
-      },
-      onError: (error) =>
-        toast(getErrorMessage(error, "Failed to mark message as unread."), "error"),
-    });
-  }, [activeSheetMessage, markAsUnread, toast]);
-
-  const handleMoveToTrash = useCallback(() => {
-    if (!activeSheetMessage) return;
-    setActiveSheetView(null);
-    const currentMailboxId = Object.keys(activeSheetMessage.mailboxIds ?? {})[0] ?? null;
-    const currentMailbox = runtime?.mailboxes.find((m) => m.id === currentMailboxId);
-    const isInTrash = currentMailbox?.role === "trash";
-    const mutation = isInTrash ? deleteMessage : moveToTrash;
-    const successMessage = isInTrash ? "Message deleted" : "Message moved to trash";
-    mutation.mutate(activeSheetMessage.id, {
-      onSuccess: () => toast(successMessage),
-      onError: (error) =>
-        toast(
-          getErrorMessage(
-            error,
-            isInTrash ? "Failed to delete the message." : "Failed to move message to trash.",
-          ),
-          "error",
-        ),
-    });
-  }, [activeSheetMessage, deleteMessage, moveToTrash, runtime, toast]);
-
-  const handleMoveToMailbox = useCallback(
-    (targetMailboxId: string) => {
-      if (!activeSheetMessage) return;
-      moveToMailbox.mutate(
-        { messageId: activeSheetMessage.id, targetMailboxId },
-        {
-          onSuccess: () => {
-            setActiveSheetView(null);
-            toast("Message moved");
-          },
-          onError: (error) =>
-            toast(getErrorMessage(error, "Failed to move the message."), "error"),
-        },
-      );
-    },
-    [activeSheetMessage, moveToMailbox, toast],
-  );
-
-  const moveTargets = useMemo(() => {
-    if (!runtime || !activeSheetMessage) return [];
-    const activeMailboxIds = new Set(Object.keys(activeSheetMessage.mailboxIds ?? {}));
-    return runtime.mailboxes.filter((mailbox) => !activeMailboxIds.has(mailbox.id));
-  }, [activeSheetMessage, runtime]);
 
   const threadRows = useMemo(() => {
     const seen = new Set(mailboxMessages.map((message) => message.id));
@@ -215,24 +174,302 @@ export default function MailScreen() {
     return buildMailConversations([...mailboxMessages, ...extras]);
   }, [mailboxMessages, conversationExtras]);
 
+  const selectableIds = useMemo(
+    () =>
+      threadRows.flatMap((row) =>
+        row.messageIds.filter((id) => primaryMessageIds.has(id)),
+      ),
+    [threadRows, primaryMessageIds],
+  );
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const messageById = useMemo(() => {
+    const map = new Map<string, JmapEmailMessage>();
+    for (const message of mailboxMessages) {
+      map.set(message.id, message);
+    }
+    for (const message of conversationExtras) {
+      if (!map.has(message.id)) {
+        map.set(message.id, message);
+      }
+    }
+    return map;
+  }, [mailboxMessages, conversationExtras]);
+
+  const unreadSelectedIds = useMemo(
+    () => bulkIds.filter((id) => !messageById.get(id)?.keywords?.["$seen"]),
+    [bulkIds, messageById],
+  );
+
+  const readSelectedIds = useMemo(
+    () => bulkIds.filter((id) => messageById.get(id)?.keywords?.["$seen"]),
+    [bulkIds, messageById],
+  );
+
+  const unflaggedSelectedIds = useMemo(
+    () => bulkIds.filter((id) => !messageById.get(id)?.keywords?.["$flagged"]),
+    [bulkIds, messageById],
+  );
+
+  const flaggedSelectedIds = useMemo(
+    () => bulkIds.filter((id) => messageById.get(id)?.keywords?.["$flagged"]),
+    [bulkIds, messageById],
+  );
+
+  const handleOpenMessage = useCallback(
+    (message: JmapEmailMessage) => {
+      router.push(`/(tabs)/mail/message/${message.id}` as never);
+    },
+    [router],
+  );
+
+  const toggleThreadSelection = useCallback((messageIds: string[]) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = messageIds.every((id) => next.has(id));
+      for (const id of messageIds) {
+        if (allSelected) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleSelect = useCallback(
+    (message: JmapEmailMessage, threadMessageIds: string[]) => {
+      const ids = threadMessageIds.filter((id) => primaryMessageIds.has(id));
+      if (ids.length === 0) {
+        toggleThreadSelection([message.id]);
+        return;
+      }
+      toggleThreadSelection(ids);
+    },
+    [primaryMessageIds, toggleThreadSelection],
+  );
+
+  const handleLongPress = useCallback(
+    (message: JmapEmailMessage, threadMessageIds: string[]) => {
+      handleToggleSelect(message, threadMessageIds);
+    },
+    [handleToggleSelect],
+  );
+
+  const bulkMoveTargets = useMemo(() => {
+    if (!runtime) return [];
+    return runtime.mailboxes.filter(
+      (mailbox) =>
+        mailbox.id !== selectedMailboxId &&
+        !MOVE_EXCLUDED_ROLES.has(mailbox.role?.toLowerCase() ?? ""),
+    );
+  }, [runtime, selectedMailboxId]);
+
+  const bulkMoveSnapPoints = useMemo(() => {
+    const count = Math.max(bulkMoveTargets.length, 1);
+    const fraction = 0.12 + Math.min(count, 7) * 0.05;
+    return [Math.min(0.48, Math.max(0.24, fraction))];
+  }, [bulkMoveTargets.length]);
+
+  const trashMailboxId = useMemo(
+    () => runtime?.mailboxes.find((m) => m.role === "trash")?.id ?? null,
+    [runtime?.mailboxes],
+  );
+  const isInTrash = selectedMailboxId === trashMailboxId;
+
+  const handleBulkMarkRead = useCallback(() => {
+    if (unreadSelectedIds.length === 0) return;
+    bulkMarkAsRead.mutate(unreadSelectedIds, {
+      onSuccess: () => {
+        clearSelection();
+        setActiveSheetView(null);
+        toast(
+          unreadSelectedIds.length === 1
+            ? "Marked 1 as read"
+            : `Marked ${unreadSelectedIds.length} as read`,
+        );
+      },
+      onError: (error) =>
+        toast(getErrorMessage(error, "Failed to mark messages as read."), "error"),
+    });
+  }, [unreadSelectedIds, bulkMarkAsRead, clearSelection, toast]);
+
+  const handleBulkMarkUnread = useCallback(() => {
+    if (readSelectedIds.length === 0) return;
+    bulkMarkAsUnread.mutate(readSelectedIds, {
+      onSuccess: () => {
+        clearSelection();
+        setActiveSheetView(null);
+        toast(
+          readSelectedIds.length === 1
+            ? "Marked 1 as unread"
+            : `Marked ${readSelectedIds.length} as unread`,
+        );
+      },
+      onError: (error) =>
+        toast(getErrorMessage(error, "Failed to mark messages as unread."), "error"),
+    });
+  }, [readSelectedIds, bulkMarkAsUnread, clearSelection, toast]);
+
+  const handleBulkTrash = useCallback(() => {
+    if (bulkIds.length === 0) return;
+    setActiveSheetView(null);
+    bulkMoveToTrash.mutate(bulkIds, {
+      onSuccess: () => {
+        clearSelection();
+        toast(
+          isInTrash
+            ? `Deleted ${bulkIds.length} messages`
+            : `Moved ${bulkIds.length} to trash`,
+        );
+      },
+      onError: (error) =>
+        toast(
+          getErrorMessage(
+            error,
+            isInTrash ? "Failed to delete messages." : "Failed to move messages to trash.",
+          ),
+          "error",
+        ),
+    });
+  }, [bulkIds, bulkMoveToTrash, clearSelection, isInTrash, toast]);
+
+  const handleBulkMove = useCallback(
+    (targetMailboxId: string) => {
+      if (bulkIds.length === 0) return;
+      const targetName =
+        runtime?.mailboxes.find((m) => m.id === targetMailboxId)?.name ?? "mailbox";
+      bulkMoveToMailbox.mutate(
+        { messageIds: bulkIds, targetMailboxId },
+        {
+          onSuccess: () => {
+            clearSelection();
+            setActiveSheetView(null);
+            toast(`Moved ${bulkIds.length} to ${targetName}`);
+          },
+          onError: (error) =>
+            toast(getErrorMessage(error, "Failed to move messages."), "error"),
+        },
+      );
+    },
+    [bulkIds, bulkMoveToMailbox, clearSelection, runtime?.mailboxes, toast],
+  );
+
+  const [bulkActionPending, setBulkActionPending] = useState(false);
+
   const isActionBusy =
-    markAsUnread.isPending ||
+    bulkActionPending ||
+    bulkMarkAsRead.isPending ||
+    bulkMarkAsUnread.isPending ||
+    bulkMoveToTrash.isPending ||
+    bulkMoveToMailbox.isPending ||
     toggleFlagged.isPending ||
-    moveToTrash.isPending ||
-    deleteMessage.isPending ||
-    moveToMailbox.isPending;
+    setMessageLabel.isPending;
+
+  const handleBulkStar = useCallback(async () => {
+    if (unflaggedSelectedIds.length === 0) return;
+    setBulkActionPending(true);
+    setActiveSheetView(null);
+    try {
+      await Promise.all(
+        unflaggedSelectedIds.map((id) =>
+          toggleFlagged.mutateAsync({ messageId: id, flagged: true }),
+        ),
+      );
+      toast(
+        unflaggedSelectedIds.length === 1
+          ? "Starred 1 message"
+          : `Starred ${unflaggedSelectedIds.length} messages`,
+      );
+      clearSelection();
+    } catch (error) {
+      toast(getErrorMessage(error, "Failed to star messages."), "error");
+    } finally {
+      setBulkActionPending(false);
+    }
+  }, [unflaggedSelectedIds, toggleFlagged, clearSelection, toast]);
+
+  const handleBulkUnstar = useCallback(async () => {
+    if (flaggedSelectedIds.length === 0) return;
+    setBulkActionPending(true);
+    setActiveSheetView(null);
+    try {
+      await Promise.all(
+        flaggedSelectedIds.map((id) =>
+          toggleFlagged.mutateAsync({ messageId: id, flagged: false }),
+        ),
+      );
+      toast(
+        flaggedSelectedIds.length === 1
+          ? "Unstarred 1 message"
+          : `Unstarred ${flaggedSelectedIds.length} messages`,
+      );
+      clearSelection();
+    } catch (error) {
+      toast(getErrorMessage(error, "Failed to unstar messages."), "error");
+    } finally {
+      setBulkActionPending(false);
+    }
+  }, [flaggedSelectedIds, toggleFlagged, clearSelection, toast]);
+
+  const handleBulkApplyLabel = useCallback(
+    async (labelId: string) => {
+      if (bulkIds.length === 0) return;
+      const label = labels.find((l) => l.id === labelId);
+      setBulkActionPending(true);
+      setActiveSheetView(null);
+      try {
+        await Promise.all(
+          bulkIds.map((id) =>
+            setMessageLabel.mutateAsync({ messageId: id, labelId, assigned: true }),
+          ),
+        );
+        toast(`Applied "${label?.name ?? labelId}" to ${bulkIds.length} messages`);
+        clearSelection();
+      } catch (error) {
+        toast(getErrorMessage(error, "Failed to apply label."), "error");
+      } finally {
+        setBulkActionPending(false);
+      }
+    },
+    [bulkIds, labels, setMessageLabel, clearSelection, toast],
+  );
+
+  const bulkSheetSnapPoints = useMemo(() => {
+    if (activeSheetView === "bulkLabel") return [0.55];
+    if (activeSheetView === "bulkMove") return bulkMoveSnapPoints;
+    if (activeSheetView === "bulkMore") return [0.32];
+    return [0.4];
+  }, [activeSheetView, bulkMoveSnapPoints]);
+
+  const listExtraData = useMemo(
+    () => ({
+      mailboxId: selectedMailboxId,
+      selectionActive,
+      selectedKey: Array.from(selectedIds).sort().join(","),
+    }),
+    [selectedMailboxId, selectionActive, selectedIds],
+  );
 
   const renderItem = useCallback(
     ({ item }: { item: (typeof threadRows)[number] }) => {
-      const primaryIds = new Set(
-        (messagesQuery.data?.messages ?? []).map((message) => message.id),
-      );
       const unreadCount = item.messages.filter(
-        (entry) => primaryIds.has(entry.id) && !entry.keywords?.["$seen"],
+        (entry) => primaryMessageIds.has(entry.id) && !entry.keywords?.["$seen"],
       ).length;
       const hasAttachments = item.messages.some((entry) =>
         messageHasVisibleAttachments(entry),
       );
+      const rowSelectableIds = item.messageIds.filter((id) =>
+        primaryMessageIds.has(id),
+      );
+      const selectedCount = rowSelectableIds.filter((id) => selectedIds.has(id)).length;
+      const isRowSelected =
+        selectedCount > 0 ||
+        (rowSelectableIds.length === 0 && selectedIds.has(item.latestMessage.id));
 
       return (
         <MailMessageRow
@@ -243,55 +480,58 @@ export default function MailScreen() {
           hasAttachments={hasAttachments}
           showRecipient={showRecipient}
           labels={labels}
+          selectionActive={selectionActive}
+          selected={isRowSelected}
           onPress={handleOpenMessage}
-          onLongPress={handleLongPress}
+          onLongPress={(message) => handleLongPress(message, item.messageIds)}
+          onToggleSelect={(message) =>
+            handleToggleSelect(message, item.messageIds)
+          }
         />
       );
     },
     [
       handleOpenMessage,
       handleLongPress,
+      handleToggleSelect,
       showRecipient,
       labels,
-      messagesQuery.data?.messages,
+      primaryMessageIds,
+      selectedIds,
+      selectionActive,
       threadRows,
     ],
   );
 
-  const header = (
-    <View style={styles.header}>
-      <Pressable
-        onPress={toggleSidebar}
-        style={styles.iconButton}
-        accessibilityRole="button"
-        accessibilityLabel="Open menu"
-      >
-        <Feather name="menu" size={22} color={theme.colors.foreground} />
-      </Pressable>
-      <View style={styles.headerRight}>
-        <Pressable
-          onPress={openCommandPalette}
-          style={styles.iconButton}
-          accessibilityRole="button"
-          accessibilityLabel="Search and commands"
-        >
-          <Feather name="search" size={20} color={theme.colors.foreground} />
-        </Pressable>
-        <Pressable
-          onPress={() => router.push("/(tabs)/mail/compose" as never)}
-          style={styles.iconButton}
-          accessibilityRole="button"
-          accessibilityLabel="Compose message"
-        >
-          <Feather name="edit" size={20} color={theme.colors.foreground} />
-        </Pressable>
-      </View>
-    </View>
+  const listFooter = useMemo(
+    () =>
+      showMailChrome ? (
+        <MailListAnimatedFooter
+          composePadding={composeListPadding}
+          bulkPadding={bulkListPadding}
+        />
+      ) : null,
+    [showMailChrome, composeListPadding, bulkListPadding],
   );
 
+  const handleSelectAll = useCallback(() => {
+    const allSelected =
+      selectableIds.length > 0 &&
+      selectableIds.every((id) => selectedIds.has(id));
+    setSelectedIds(allSelected ? new Set() : new Set(selectableIds));
+  }, [selectableIds, selectedIds]);
+
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      {header}
+    <MailSelectionAnimProvider active={selectionActive}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <MailListHeader
+          selectedCount={selectedIds.size}
+          totalCount={selectableIds.length}
+          onMenu={toggleSidebar}
+          onSearch={openCommandPalette}
+          onClearSelection={clearSelection}
+          onSelectAll={handleSelectAll}
+        />
 
       {accountQuery.isLoading ? (
         <CenteredLoader theme={theme} />
@@ -328,16 +568,13 @@ export default function MailScreen() {
           onRetry={() => runtimeQuery.refetch()}
         />
       ) : (
-        <>
-          <MailboxBar
-            theme={theme}
-            mailboxes={runtime?.mailboxes ?? []}
-            selectedId={selectedMailboxId}
-            onSelect={setSelectedMailboxId}
-          />
+        <View style={styles.listArea}>
           <FlatList
+            key={selectedMailboxId ?? "mailbox"}
+            style={styles.listFlex}
             data={threadRows}
             keyExtractor={(item) => item.id}
+            extraData={listExtraData}
             renderItem={renderItem}
             ItemSeparatorComponent={() => (
               <View style={styles.separator} />
@@ -348,10 +585,9 @@ export default function MailScreen() {
               void companionMessagesQuery.refetch();
             }}
             contentContainerStyle={
-              threadRows.length === 0
-                ? styles.emptyListContent
-                : undefined
+              threadRows.length === 0 ? styles.emptyListContent : undefined
             }
+            ListFooterComponent={listFooter}
             ListEmptyComponent={
               messagesQuery.isLoading ? (
                 <CenteredLoader theme={theme} />
@@ -359,7 +595,7 @@ export default function MailScreen() {
                 <View style={styles.centered}>
                   <Feather
                     name="inbox"
-                    size={40}
+                    size={MAIL_ICON.emptyState}
                     color={theme.colors.mutedForeground}
                   />
                   <Text style={styles.mutedText}>No messages here</Text>
@@ -367,100 +603,62 @@ export default function MailScreen() {
               )
             }
           />
-        </>
+        </View>
       )}
+
+      {showMailChrome ? (
+        <MailListBottomChrome
+          bottomInset={insets.bottom}
+          composeOnPress={() => router.push("/(tabs)/mail/compose" as never)}
+          bulk={{
+            isInTrash,
+            canMarkRead: unreadSelectedIds.length > 0,
+            canMarkUnread: readSelectedIds.length > 0,
+            busy: isActionBusy,
+            onMarkRead: handleBulkMarkRead,
+            onMarkUnread: handleBulkMarkUnread,
+            onTrash: handleBulkTrash,
+            onMore: () => setActiveSheetView("bulkMore"),
+          }}
+        />
+      ) : null}
 
       <BottomSheet
         visible={activeSheetView !== null}
         onDismiss={() => setActiveSheetView(null)}
-        onCloseComplete={() => setActiveSheetMessage(null)}
-        snapPoints={activeSheetView === "label" ? [0.65] : activeSheetView === "move" ? [0.55] : [0.45]}
+        snapPoints={bulkSheetSnapPoints}
       >
-        {activeSheetView === "menu" && activeSheetMessage ? (
-          <View style={{ paddingBottom: insets.bottom + 8, paddingHorizontal: 16, gap: 8 }}>
-            <SheetList>
-              <SheetRow
-                icon="star"
-                label={activeSheetMessage.keywords?.["$flagged"] ? "Unstar" : "Star"}
-                iconColor={activeSheetMessage.keywords?.["$flagged"] ? "#fbbf24" : undefined}
-                onPress={handleToggleStar}
-              />
-              {activeSheetMessage.keywords?.["$seen"] ? (
-                <SheetRow
-                  icon="mail"
-                  label="Mark as unread"
-                  onPress={handleMarkUnread}
-                  showDivider
-                />
-              ) : null}
-              <SheetRow
-                icon="tag"
-                label="Labels"
-                accessory="chevron-right"
-                onPress={() => setActiveSheetView("label")}
-                showDivider
-              />
-              {moveTargets.length > 0 ? (
-                <SheetRow
-                  icon="folder"
-                  label="Move to…"
-                  accessory="chevron-right"
-                  onPress={() => setActiveSheetView("move")}
-                  showDivider
-                />
-              ) : null}
-              <SheetRow
-                icon="trash-2"
-                label="Move to trash"
-                destructive
-                onPress={handleMoveToTrash}
-                disabled={isActionBusy}
-                showDivider={moveTargets.length > 0 || activeSheetMessage.keywords?.["$seen"]}
-              />
-            </SheetList>
-          </View>
-        ) : activeSheetView === "move" && activeSheetMessage ? (
-          <View style={{ paddingBottom: insets.bottom + 8, paddingHorizontal: 16, gap: 8 }}>
-            <SheetNavButton label="Actions" onPress={() => setActiveSheetView("menu")} />
-            <SheetList>
-              {moveTargets.map((mailbox, index) => (
-                <SheetRow
-                  key={mailbox.id}
-                  icon="folder"
-                  label={mailbox.name}
-                  onPress={() => handleMoveToMailbox(mailbox.id)}
-                  showDivider={index > 0}
-                />
-              ))}
-            </SheetList>
-          </View>
-        ) : activeSheetView === "label" && activeSheetMessage ? (
-          <MailLabelsSheet
-            labels={labels}
-            messageKeywords={activeSheetMessage.keywords}
-            insetsBottom={insets.bottom}
-            onBack={() => setActiveSheetView("menu")}
-            onToggleLabel={(labelId, assigned) => {
-              setMessageLabel.mutate({ messageId: activeSheetMessage.id, labelId, assigned });
-              setActiveSheetView(null);
-              const label = labels.find((l) => l.id === labelId);
-              toast(assigned ? `Added "${label?.name ?? labelId}"` : `Removed "${label?.name ?? labelId}"`);
-            }}
-            onCreateLabel={async (name, color) => {
-              const newLabel = await createLabel(name, color);
-              setMessageLabel.mutate({ messageId: activeSheetMessage.id, labelId: newLabel.id, assigned: true });
-              toast(`Created "${newLabel.name}"`);
-              setActiveSheetView(null);
-            }}
-            onDeleteLabel={async (labelId) => {
-              const label = labels.find((l) => l.id === labelId);
-              await deleteLabel(labelId);
-              toast(`Deleted "${label?.name ?? labelId}"`);
-            }}
+        {activeSheetView === "bulkMore" ? (
+          <MailSheetPanel bottomInset={insets.bottom}>
+            <MailBulkMoreSheet
+              showStar={unflaggedSelectedIds.length > 0}
+              showUnstar={flaggedSelectedIds.length > 0}
+              showMove={bulkMoveTargets.length > 0}
+              onStar={() => void handleBulkStar()}
+              onUnstar={() => void handleBulkUnstar()}
+              onLabels={() => setActiveSheetView("bulkLabel")}
+              onMove={() => setActiveSheetView("bulkMove")}
+            />
+          </MailSheetPanel>
+        ) : activeSheetView === "bulkMove" ? (
+          <MailBulkMoveSheet
+            mailboxes={bulkMoveTargets}
+            bottomInset={sheetPadCompact}
+            disabled={isActionBusy || bulkIds.length === 0}
+            onSelectMailbox={handleBulkMove}
           />
+        ) : activeSheetView === "bulkLabel" ? (
+          <MailSheetPanel bottomInset={insets.bottom}>
+            <MailBulkLabelsSheet
+              labels={labels}
+              onBack={() => setActiveSheetView("bulkMore")}
+              onApplyLabel={(labelId) => void handleBulkApplyLabel(labelId)}
+            />
+          </MailSheetPanel>
         ) : null}
       </BottomSheet>
-    </SafeAreaView>
+      </SafeAreaView>
+    </MailSelectionAnimProvider>
   );
 }
 
@@ -478,7 +676,7 @@ function ErrorState({
     <View style={styles.centered}>
       <Feather
         name="alert-triangle"
-        size={36}
+        size={MAIL_ICON.emptyState}
         color={theme.colors.destructive}
       />
       <Text style={styles.errorText}>{message}</Text>
@@ -510,7 +708,7 @@ function SetupState({
   const styles = useMemo(() => createStyles(theme), [theme]);
   return (
     <View style={styles.centered}>
-      <Feather name="mail" size={44} color={theme.colors.primaryBase} />
+      <Feather name="mail" size={MAIL_ICON.emptyState} color={theme.colors.primaryBase} />
       <Text style={styles.setupTitle}>Set up your mailbox</Text>
       <Text style={styles.mutedText}>
         Create your encrypted mailbox on this device. Solace generates a random
@@ -557,109 +755,25 @@ function SetupState({
   );
 }
 
-function MailboxBar({
-  theme,
-  mailboxes,
-  selectedId,
-  onSelect,
-}: {
-  theme: ThemeTokens;
-  mailboxes: JmapMailbox[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  return (
-    <View style={styles.mailboxBarWrap}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.mailboxBar}
-      >
-        {mailboxes.map((mailbox) => {
-          const active = mailbox.id === selectedId;
-          return (
-            <Pressable
-              key={mailbox.id}
-              onPress={() => onSelect(mailbox.id)}
-              style={[styles.chip, active && styles.chipActive]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-            >
-              <Feather
-                name={getMailboxIcon(mailbox) as keyof typeof Feather.glyphMap}
-                size={14}
-                color={
-                  active
-                    ? theme.colors.primaryForeground
-                    : theme.colors.mutedForeground
-                }
-              />
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                {mailbox.name}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
-
 function createStyles(theme: ThemeTokens) {
+  const separatorInset = mailListSeparatorInset(theme);
+
   const view = {
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
+      position: "relative",
     },
-    header: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "space-between" as const,
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+    listArea: {
+      flex: 1,
     },
-    iconButton: {
-      width: 38,
-      height: 38,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-    },
-    headerRight: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-    },
-    mailboxBarWrap: {
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
-    },
-    mailboxBar: {
-      flexDirection: "row" as const,
-      gap: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-    },
-    chip: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["1"],
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["1"],
-      borderRadius: theme.borderRadius.full,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-    },
-    chipActive: {
-      backgroundColor: theme.colors.primaryBase,
-      borderColor: theme.colors.primaryBase,
+    listFlex: {
+      flex: 1,
     },
     separator: {
-      height: 1,
-      marginLeft: theme.spacing["4"] + 40 + theme.spacing["3"],
-      backgroundColor: theme.colors.border,
+      height: StyleSheet.hairlineWidth,
+      marginLeft: separatorInset,
+      backgroundColor: theme.colors.border + "80",
     },
     centered: {
       flex: 1,
@@ -712,15 +826,6 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
-    },
-    chipText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.mutedForeground,
-    },
-    chipTextActive: {
-      color: theme.colors.primaryForeground,
     },
     primaryButtonText: {
       fontSize: theme.typography.fontSize.sm.size,
