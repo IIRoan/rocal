@@ -1,6 +1,8 @@
 import type { Feather } from "@expo/vector-icons";
 import type { CalendarView } from "@workspace/calendar-core";
 
+export type CommandPaletteScope = "calendar" | "mail";
+
 /** Identifiers for every quick action exposed by the command palette. */
 export type CommandActionId =
   | "new-event"
@@ -28,11 +30,39 @@ export interface CommandAction {
   view?: CalendarView;
 }
 
-/**
- * The full, ordered list of quick actions. Pure and deterministic so it can be
- * unit-tested and reused by the palette UI, which maps each id to a handler.
- */
-export function buildCommandActions(): CommandAction[] {
+export function buildCommandActions(
+  scope: CommandPaletteScope = "calendar",
+): CommandAction[] {
+  return scope === "mail" ? buildMailCommandActions() : buildCalendarCommandActions();
+}
+
+function buildMailCommandActions(): CommandAction[] {
+  return [
+    {
+      id: "compose-mail",
+      label: "Compose email",
+      group: "Mail",
+      icon: "edit",
+      keywords: ["new mail", "write", "send", "message"],
+    },
+    {
+      id: "open-settings",
+      label: "Settings",
+      group: "Navigation",
+      icon: "settings",
+      keywords: ["preferences", "account", "options"],
+    },
+    {
+      id: "open-calendar",
+      label: "Go to Calendar",
+      group: "Navigation",
+      icon: "calendar",
+      keywords: ["calendar", "events", "schedule"],
+    },
+  ];
+}
+
+function buildCalendarCommandActions(): CommandAction[] {
   return [
     {
       id: "new-event",
@@ -141,8 +171,12 @@ export function filterCommandActions(
 /** Groups actions in their natural order for sectioned rendering. */
 export function groupCommandActions(
   actions: CommandAction[],
+  scope: CommandPaletteScope = "calendar",
 ): { group: CommandActionGroup; actions: CommandAction[] }[] {
-  const order: CommandActionGroup[] = ["Calendar", "Mail", "Navigation"];
+  const order: CommandActionGroup[] =
+    scope === "mail"
+      ? ["Mail", "Navigation"]
+      : ["Calendar", "Mail", "Navigation"];
   return order
     .map((group) => ({
       group,

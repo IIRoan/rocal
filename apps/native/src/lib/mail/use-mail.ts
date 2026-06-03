@@ -129,6 +129,34 @@ function findCachedMessage(
   return undefined;
 }
 
+/** Patch multiple messages inside all cached mailbox lists. */
+function patchManyMessagesInCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  messageIds: string[],
+  patch: (msg: JmapEmailMessage) => Partial<JmapEmailMessage>,
+) {
+  const idSet = new Set(messageIds);
+  const lists = queryClient.getQueriesData<{
+    messages: JmapEmailMessage[];
+    total: number;
+  }>({ queryKey: ["mail", "messages"] });
+  for (const [key, data] of lists) {
+    if (!data?.messages) continue;
+    let changed = false;
+    const updated = data.messages.map((msg) => {
+      if (!idSet.has(msg.id)) return msg;
+      changed = true;
+      return { ...msg, ...patch(msg) };
+    });
+    if (changed) {
+      queryClient.setQueryData(key, { ...data, messages: updated });
+    }
+  }
+  for (const messageId of messageIds) {
+    patchSingleMessageInCache(queryClient, messageId, patch);
+  }
+}
+
 /** Patch a single message inside all cached mailbox lists. */
 function patchMessageInCache(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -147,6 +175,17 @@ function patchMessageInCache(
     updated[idx] = { ...updated[idx], ...patch(updated[idx]) };
     queryClient.setQueryData(key, { ...data, messages: updated });
   }
+}
+
+/** Message ids the user marked unread while viewing — skip mark-as-read until they leave. */
+const suppressMarkAsReadIds = new Set<string>();
+
+export function suppressMarkAsRead(messageId: string) {
+  suppressMarkAsReadIds.add(messageId);
+}
+
+export function releaseMarkAsReadSuppression(messageId: string) {
+  suppressMarkAsReadIds.delete(messageId);
 }
 
 /** Patch the single message detail query so the detail screen updates immediately. */
@@ -173,9 +212,14 @@ export function useMailMutations(
   }, [queryClient]);
 
   const markAsRead = useMutation({
-    mutationFn: (messageId: string) =>
-      runtime!.client.markAsRead(runtime!.session, messageId),
+    mutationFn: (messageId: string) => {
+      if (suppressMarkAsReadIds.has(messageId)) {
+        return Promise.resolve();
+      }
+      return runtime!.client.markAsRead(runtime!.session, messageId);
+    },
     onMutate: (messageId) => {
+      if (suppressMarkAsReadIds.has(messageId)) return;
       patchMessageInCache(queryClient, messageId, (msg) => ({
         keywords: { ...msg.keywords, $seen: true },
       }));
@@ -183,7 +227,6 @@ export function useMailMutations(
         keywords: { ...msg.keywords, $seen: true },
       }));
     },
-    onSuccess: invalidateMessages,
     onError: () => invalidateMessages(),
   });
 
@@ -222,7 +265,6 @@ export function useMailMutations(
         return { keywords };
       });
     },
-    onSuccess: invalidateMessages,
     onError: () => invalidateMessages(),
   });
 
@@ -287,6 +329,54 @@ export function useMailMutations(
     onError: () => invalidateMessages(),
   });
 
+  const bulkMarkAsRead = useMutation({
+    mutationFn: (messageIds: string[]) =>
+      runtime!.client.bulkMarkAsRead(runtime!.session, messageIds),
+    onMutate: (messageIds) => {
+      patchManyMessagesInCache(queryClient, messageIds, (msg) => ({
+        keywords: { ...msg.keywords, $seen: true },
+      }));
+    },
+    onError: () => invalidateMessages(),
+  });
+
+  const bulkMarkAsUnread = useMutation({
+    mutationFn: (messageIds: string[]) =>
+      runtime!.client.bulkMarkAsUnread(runtime!.session, messageIds),
+    onMutate: (messageIds) => {
+      patchManyMessagesInCache(queryClient, messageIds, (msg) => {
+        const keywords = { ...msg.keywords };
+        delete keywords.$seen;
+        return { keywords };
+      });
+    },
+    onError: () => invalidateMessages(),
+  });
+
+  const bulkMoveToTrash = useMutation({
+    mutationFn: (messageIds: string[]) => {
+      const trashId =
+        runtime!.mailboxes.find((m) => m.role === "trash")?.id ?? null;
+      const isInTrash = mailboxId === trashId;
+      return runtime!.client.bulkMoveToTrash(
+        runtime!.session,
+        messageIds,
+        isInTrash ? null : trashId,
+      );
+    },
+    onSuccess: invalidateMessages,
+  });
+
+  const bulkMoveToMailbox = useMutation({
+    mutationFn: (input: { messageIds: string[]; targetMailboxId: string }) =>
+      runtime!.client.bulkMoveToMailbox(
+        runtime!.session,
+        input.messageIds,
+        input.targetMailboxId,
+      ),
+    onSuccess: invalidateMessages,
+  });
+
   return {
     markAsRead,
     markAsUnread,
@@ -295,6 +385,10 @@ export function useMailMutations(
     deleteMessage,
     moveToMailbox,
     setMessageLabel,
+    bulkMarkAsRead,
+    bulkMarkAsUnread,
+    bulkMoveToTrash,
+    bulkMoveToMailbox,
   };
 }
 
