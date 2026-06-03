@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View, type TextStyle, type ViewStyle } fro
 import { Feather } from "@expo/vector-icons";
 import { useTheme } from "../../providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import { MAIL_ICON } from "../mail/mail-ui";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,8 @@ export interface SheetRowProps {
   onPress: () => void;
   showDivider?: boolean;
   iconColor?: string;
+  /** Tighter rhythm aligned with native mail screens. */
+  variant?: "default" | "mail";
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -27,9 +30,12 @@ export function SheetRow({
   onPress,
   showDivider,
   iconColor: iconColorProp,
+  variant = "default",
 }: SheetRowProps) {
   const { theme } = useTheme();
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, variant);
+  const iconSize = variant === "mail" ? MAIL_ICON.sheet : 18;
+  const accessorySize = variant === "mail" ? MAIL_ICON.sheetAccessory : 16;
 
   const iconColor =
     iconColorProp ??
@@ -50,12 +56,12 @@ export function SheetRow({
         accessibilityRole="button"
         accessibilityLabel={label}
       >
-        <Feather name={icon} size={18} color={iconColor} />
+        <Feather name={icon} size={iconSize} color={iconColor} />
         <Text style={[styles.label, { color: textColor }]}>{label}</Text>
         {accessory ? (
           <Feather
             name={accessory}
-            size={16}
+            size={accessorySize}
             color={theme.colors.mutedForeground}
           />
         ) : null}
@@ -66,19 +72,24 @@ export function SheetRow({
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
-function createStyles(theme: ThemeTokens) {
+function createStyles(theme: ThemeTokens, variant: "default" | "mail") {
+  const isMail = variant === "mail";
+  const iconCol = isMail ? MAIL_ICON.sheet : 18;
+  const rowPadH = isMail ? theme.spacing["4"] : 14;
+  const rowPadV = isMail ? theme.spacing["3"] : 13;
+
   return StyleSheet.create({
     divider: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: theme.colors.border + "50",
-      marginLeft: 44,
+      marginLeft: rowPadH + iconCol + 12,
     } as ViewStyle,
     row: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 13,
+      gap: theme.spacing["3"],
+      paddingHorizontal: rowPadH,
+      paddingVertical: rowPadV,
     } as ViewStyle,
     rowPressed: {
       opacity: 0.6,
