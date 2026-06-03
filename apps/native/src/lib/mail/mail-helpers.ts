@@ -10,6 +10,18 @@ const MAILBOX_ROLE_ORDER: Record<string, number> = {
   trash: 5,
 };
 
+export function formatThreadSenders(messages: JmapEmailMessage[]): string {
+  const uniqueSenders = Array.from(
+    new Set(messages.map((message) => formatAddress(message.from))),
+  );
+
+  if (uniqueSenders.length <= 2) {
+    return uniqueSenders.join(", ");
+  }
+
+  return `${uniqueSenders.slice(0, 2).join(", ")} +${uniqueSenders.length - 2}`;
+}
+
 export function formatAddress(addresses: MailAddress[] | undefined): string {
   const first = addresses?.[0];
   if (!first) return "Unknown";

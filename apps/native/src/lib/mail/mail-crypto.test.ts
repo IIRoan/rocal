@@ -634,7 +634,11 @@ describe("mail-crypto", () => {
       mockGetBlobAsText.mockResolvedValueOnce(armoredCiphertext);
       mockReadMessage.mockResolvedValueOnce({});
       mockDecrypt.mockResolvedValueOnce({ data: "Content-Type: text/plain\r\n\r\nHello MIME world", signatures: [] });
-      mockParseMimeBody.mockReturnValueOnce({ text: "Hello MIME world", html: null });
+      mockParseMimeBody.mockReturnValueOnce({
+        text: "Hello MIME world",
+        html: null,
+        attachments: [],
+      });
 
       const runtime = buildRuntime();
       const result = await decryptPgpMimeMessage(runtime, "msg-mime-001", MOCK_BODY_STRUCTURE as any);
@@ -645,6 +649,7 @@ describe("mail-crypto", () => {
       expect(mockParseMimeBody).toHaveBeenCalled();
       expect(result.plaintext).toBe("Hello MIME world");
       expect(result.html).toBeNull();
+      expect(result.attachments).toEqual([]);
       expect(result.signatureVerificationState).toBe("not_signed");
     });
 
@@ -656,6 +661,7 @@ describe("mail-crypto", () => {
       mockParseMimeBody.mockReturnValueOnce({
         text: "plain text",
         html: "<p>HTML content</p>",
+        attachments: [],
       });
 
       const runtime = buildRuntime();
@@ -676,6 +682,7 @@ describe("mail-crypto", () => {
       const result = await decryptPgpMimeMessage(runtime, "msg-mime-003", MOCK_BODY_STRUCTURE as any);
 
       expect(result.plaintext).toBe("raw decrypted content");
+      expect(result.attachments).toEqual([]);
     });
 
     it("throws when ciphertext blobId cannot be located", async () => {

@@ -5,16 +5,14 @@ import {
   Text,
   TextInput,
   View,
-  type TextStyle,
-  type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import type { ThemeTokens } from "@workspace/design-tokens";
 import type { LabelDef } from "../../lib/mail/types";
 import { LABEL_COLOR_OPTIONS } from "../../lib/mail/use-labels";
+import { useTheme } from "../../providers/ThemeProvider";
+import { SheetList, SheetNavButton } from "../sheet";
 
 interface MailLabelsSheetProps {
-  theme: ThemeTokens;
   labels: LabelDef[];
   messageKeywords: Record<string, boolean> | undefined;
   insetsBottom: number;
@@ -25,7 +23,6 @@ interface MailLabelsSheetProps {
 }
 
 export function MailLabelsSheet({
-  theme,
   labels,
   messageKeywords,
   insetsBottom,
@@ -34,6 +31,7 @@ export function MailLabelsSheet({
   onDeleteLabel,
   onBack,
 }: MailLabelsSheetProps) {
+  const { theme } = useTheme();
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#6366f1");
 
@@ -46,19 +44,9 @@ export function MailLabelsSheet({
 
   return (
     <View style={{ paddingBottom: insetsBottom + 8 }}>
-      <Pressable
-        onPress={onBack}
-        style={styles.sheetNavButton}
-        accessibilityRole="button"
-        accessibilityLabel="Back to message actions"
-      >
-        <Feather name="chevron-left" size={20} color={theme.colors.mutedForeground} />
-        <Text style={[styles.sheetNavLabel, { color: theme.colors.mutedForeground }]}>
-          Actions
-        </Text>
-      </Pressable>
+      <SheetNavButton label="Actions" onPress={onBack} />
 
-      <View style={[styles.sheetList, { backgroundColor: theme.colors.muted + "22" }]}>
+      <SheetList>
         {labels.map((label, index) => {
           const isAssigned = messageKeywords?.[`label:${label.id}`] === true;
           return (
@@ -174,7 +162,7 @@ export function MailLabelsSheet({
             </View>
           </View>
         </Pressable>
-      </View>
+      </SheetList>
 
       {labels.length > 0 ? (
         <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
@@ -227,21 +215,6 @@ export function MailLabelsSheet({
 }
 
 const styles = StyleSheet.create({
-  sheetNavButton: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 2,
-    paddingHorizontal: 16,
-    paddingBottom: 4,
-  },
-  sheetNavLabel: {
-    fontSize: 14,
-  },
-  sheetList: {
-    marginHorizontal: 16,
-    borderRadius: 12,
-    overflow: "hidden" as const,
-  },
   labelDot: {
     width: 8,
     height: 8,
