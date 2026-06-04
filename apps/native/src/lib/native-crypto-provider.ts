@@ -1,17 +1,16 @@
 /**
- * Mobile CryptoProvider implementation.
+ * Mobile CryptoProvider implementation for native iOS/Android builds.
  *
- * Wraps Expo/runtime crypto when available and otherwise falls back to a
- * pure JavaScript provider so Expo Go never depends on native-only crypto
- * modules.
+ * React Native (Hermes) does not ship a WebCrypto `subtle` implementation, so
+ * E2EE runs on the pure-JavaScript provider backed by `node-forge`. If the
+ * runtime *does* expose a real `crypto.subtle` (for example via the installed
+ * `react-native-quick-crypto` polyfill), we transparently use it instead.
  *
- * `expo-crypto` provides `getRandomValues` and `randomUUID`. If the runtime
- * also exposes `crypto.subtle`, we use it. Otherwise we fall back to the JS
- * provider from `node-forge`.
+ * `expo-crypto` always provides a hardware-backed CSPRNG (`getRandomValues`,
+ * `randomUUID`), so those primitives are used regardless of the subtle backend.
  */
 import type { CryptoProvider } from "@workspace/e2ee";
 import * as ExpoCrypto from "expo-crypto";
-import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { createLogger } from "@workspace/logger";
 import {
@@ -22,74 +21,70 @@ import {
 import { createJsCryptoProvider } from "./js-crypto-provider";
 
 const log = createLogger("native:crypto");
-const runtime = detectRuntime({
-  platformOs: Platform.OS,
-  expoExecutionEnvironment: Constants.executionEnvironment,
-  expoAppOwnership: Constants.appOwnership,
-});
+const runtime = detectRuntime({ platformOs: Platform.OS });
 
-let jsFallbackLogged = false;
+let backendLogged = false;
 
-function isExpoGoRuntime(): boolean {
-  return runtime.isExpoGo;
+function logBackendOnce(level: "info" | "warn", message: string) {
+  if (backendLogged) return;
+  backendLogged = true;
+  log[level](message);
 }
 
-function logJsFallbackMessage(message: string) {
-  if (jsFallbackLogged) return;
-  jsFallbackLogged = true;
-  log.warn(
-    `${message} Crypto operations stay available, but first-time key setup can be slower.`,
+function buildFallbackMessage() {
+  const runtimeName = getRuntimeDisplayName(runtime);
+
+  if (runtime.isExpoGo) {
+    return (
+      `Using the JavaScript crypto fallback for calendar E2EE on ${runtimeName} because Expo Go does not expose crypto.subtle. ` +
+      "Mail OpenPGP still uses the native mail vault path, but first-time calendar key setup is slower. " +
+      "Use a rebuilt development client with native WebCrypto support to remove this warning."
+    );
+  }
+
+  return (
+    `Using the JavaScript crypto fallback for calendar E2EE on ${runtimeName} because this runtime does not expose a usable crypto.subtle implementation. ` +
+    "Mail OpenPGP still uses the native mail vault path, but first-time calendar key setup is slower until native WebCrypto is available. " +
+    "If you just enabled react-native-quick-crypto, rebuild the native app so the new module is linked."
   );
 }
 
-export async function installCryptoPolyfill(): Promise<void> {
-  if (isExpoGoRuntime() || !globalThis.crypto?.subtle) {
-    logJsFallbackMessage(
-      `${getRuntimeDisplayName(runtime)} is using the JavaScript crypto fallback for E2EE.`,
-    );
+/**
+ * Resolve the native `crypto.subtle` implementation, or `null` when the runtime
+ * does not provide a usable one (the common case on Hermes).
+ */
+function resolveSubtleCrypto(): SubtleCrypto | null {
+  const cryptoRef = globalThis.crypto;
+  if (!cryptoRef?.subtle) {
+    return null;
   }
+
+  if (!supportsSubtleCrypto({ runtime, cryptoRef })) {
+    return null;
+  }
+
+  return cryptoRef.subtle;
 }
 
-/**
- * Build a CryptoProvider backed by native crypto primitives.
- *
- * Call `installCryptoPolyfill()` before calling this function if you want the
- * runtime/fallback log to happen during bootstrap.
- *
- * Falls back to a pure JavaScript provider when native SubtleCrypto is not
- * available.
- */
-export function createNativeCryptoProvider(): CryptoProvider {
-  if (isExpoGoRuntime()) {
-    logJsFallbackMessage(
-      `${getRuntimeDisplayName(runtime)} detected. Using the JavaScript crypto fallback for E2EE.`,
-    );
-    return createJsCryptoProvider();
-  }
-
-  const subtle = globalThis.crypto?.subtle;
-
-  if (!supportsSubtleCrypto({ runtime, cryptoRef: globalThis.crypto })) {
-    logJsFallbackMessage(
-      `SubtleCrypto is not available in ${getRuntimeDisplayName(runtime)}. Using the JavaScript crypto fallback for E2EE.`,
-    );
-    return createJsCryptoProvider();
-  }
-
+function createSubtleCryptoProvider(subtle: SubtleCrypto): CryptoProvider {
   return {
     randomUUID: () => ExpoCrypto.randomUUID(),
-    getRandomValues: (buffer: Uint8Array): Uint8Array => {
-      return ExpoCrypto.getRandomValues(buffer);
-    },
+    getRandomValues: (buffer: Uint8Array): Uint8Array =>
+      ExpoCrypto.getRandomValues(buffer),
     subtle: {
       generateKey: (
         algorithm: any,
-        extractable: boolean,
+        _extractable: boolean,
         keyUsages: string[],
       ) =>
+        // Always generate extractable keys on native. The e2ee module creates
+        // RSA wrapping keys with extractable:false, but we must persist them to
+        // SecureStore (the secure enclave IS the key store here). The native
+        // WebCrypto runtime enforces the flag strictly, so without this override
+        // exportKey("jwk", privateKey) throws InvalidAccessError.
         subtle.generateKey(
           algorithm,
-          extractable,
+          true,
           keyUsages as KeyUsage[],
         ) as unknown as Promise<CryptoKey>,
       importKey: (
@@ -154,4 +149,25 @@ export function createNativeCryptoProvider(): CryptoProvider {
         ),
     },
   };
+}
+
+/**
+ * Build a {@link CryptoProvider} for the current native runtime.
+ *
+ * Prefers a real native `crypto.subtle` when one is available; otherwise falls
+ * back to the pure-JavaScript provider so E2EE keeps working on Hermes.
+ */
+export function createNativeCryptoProvider(): CryptoProvider {
+  const subtle = resolveSubtleCrypto();
+
+  if (subtle) {
+    logBackendOnce(
+      "info",
+      `Using native SubtleCrypto for E2EE on ${getRuntimeDisplayName(runtime)}.`,
+    );
+    return createSubtleCryptoProvider(subtle);
+  }
+
+  logBackendOnce("warn", buildFallbackMessage());
+  return createJsCryptoProvider();
 }

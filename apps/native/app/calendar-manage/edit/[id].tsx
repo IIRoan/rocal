@@ -12,7 +12,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen } from "../../../src/components/layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
@@ -25,9 +25,14 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { StackScreenHeader } from "../../../src/components/StackScreenHeader";
 import { ColorPicker } from "../../../src/components/event/ColorPicker";
 import { useTheme } from "../../../src/providers/ThemeProvider";
+import { useToast } from "../../../src/providers/ToastProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { resolveCalendarSwatchColor } from "../../../src/lib/calendar-color-utils";
+import {
+  LoadingScreen,
+  InlineLoader,
+} from "../../../src/components/ui/loading";
 
 type DeleteAction = "delete_events" | "move_events";
 
@@ -37,6 +42,7 @@ export default function CalendarEditScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [name, setName] = useState("");
   const [color, setColor] = useState<EventColor>("blue");
@@ -104,13 +110,11 @@ export default function CalendarEditScreen() {
         queryKey: QUERY_KEYS.calendarShareLink(id!),
       });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Calendar saved");
       router.back();
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to save calendar",
-        getErrorMessage(error, "Failed to update calendar"),
-      );
+      toast(getErrorMessage(error, "Failed to update calendar"), "error");
     },
   });
 
@@ -126,13 +130,11 @@ export default function CalendarEditScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Calendar deleted");
       router.back();
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to delete calendar",
-        getErrorMessage(error, "Failed to delete calendar"),
-      );
+      toast(getErrorMessage(error, "Failed to delete calendar"), "error");
     },
   });
 
@@ -146,11 +148,12 @@ export default function CalendarEditScreen() {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.calendarShareLink(id!),
       });
+      toast("Share link enabled");
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to update share link",
+      toast(
         getErrorMessage(error, "Failed to enable calendar sharing"),
+        "error",
       );
     },
   });
@@ -161,11 +164,12 @@ export default function CalendarEditScreen() {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.calendarShareLink(id!),
       });
+      toast("Share link disabled");
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to disable share link",
+      toast(
         getErrorMessage(error, "Failed to disable calendar sharing"),
+        "error",
       );
     },
   });
@@ -252,23 +256,20 @@ export default function CalendarEditScreen() {
     }
 
     await Clipboard.setStringAsync(shareLink.shareUrl);
-    Alert.alert("Copied", "The share link is now on your clipboard.");
+    toast("Share link copied to clipboard");
   }, [shareLink?.shareUrl]);
 
   if (calendarLoading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-        <Text style={styles.loadingText}>Loading calendar…</Text>
-      </SafeAreaView>
-    );
+    return <LoadingScreen theme={theme} message="Loading calendar…" />;
   }
 
   if (!calendar) {
     return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>Calendar not found.</Text>
-      </SafeAreaView>
+      <AppScreen>
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>Calendar not found.</Text>
+        </View>
+      </AppScreen>
     );
   }
 
@@ -278,9 +279,7 @@ export default function CalendarEditScreen() {
     disableShareMutation.isPending;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StackScreenHeader title="Edit Calendar" />
-
+    <AppScreen header={<StackScreenHeader title="Edit Calendar" />}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -384,13 +383,7 @@ export default function CalendarEditScreen() {
           </Text>
 
           {shareBusy ? (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator
-                size="small"
-                color={theme.colors.primaryBase}
-              />
-              <Text style={styles.helperText}>Updating share link…</Text>
-            </View>
+            <InlineLoader theme={theme} message="Updating share link…" />
           ) : shareLink?.enabled ? (
             <>
               {shareLink.shareUrl ? (
@@ -533,7 +526,7 @@ export default function CalendarEditScreen() {
           )}
         </Pressable>
       </ScrollView>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
@@ -666,11 +659,6 @@ function createStyles(theme: ThemeTokens) {
       justifyContent: "center" as const,
       paddingHorizontal: theme.spacing["4"],
     },
-    loadingRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
-    },
     selectionList: {
       gap: theme.spacing["2"],
     },
@@ -802,11 +790,6 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.destructive,
-    },
-    loadingText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
     },
   } satisfies Record<string, TextStyle>;
 

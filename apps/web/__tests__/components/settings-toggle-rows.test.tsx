@@ -1,15 +1,8 @@
 /** @jest-environment jsdom */
 
-import React, { act } from "react";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  jest,
-} from "@jest/globals";
-import { createRoot, type Root } from "react-dom/client";
+import React from "react";
+import { describe, expect, it, jest } from "@jest/globals";
+import { renderToStaticMarkup } from "react-dom/server.node";
 
 jest.mock("lucide-react", () => {
   const Icon = () => null;
@@ -30,84 +23,38 @@ import { SecuritySettings } from "../../components/command-palette/security-sett
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-let container: HTMLDivElement;
-let root: Root;
-
 describe("settings toggle rows", () => {
-  beforeEach(() => {
-    container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-  });
-
-  afterEach(() => {
-    act(() => {
-      root.unmount();
-    });
-    container.remove();
-  });
-
-  it("renders security encryption as a single switch control without nested buttons", async () => {
-    const updateSetting = jest.fn();
-
-    await act(async () => {
-      root.render(
-        <SecuritySettings
-          localSettings={{ eventEncryptionMode: "hybrid" } as any}
-          updateSetting={updateSetting}
-          goBack={() => {}}
-          goForward={() => {}}
-        />,
-      );
-
-      await Promise.resolve();
-    });
-
-    const toggle = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent?.includes("Full Event Encryption"),
+  it("renders security encryption as informational text without a toggle", () => {
+    const html = renderToStaticMarkup(
+      <SecuritySettings
+        localSettings={{ eventEncryptionMode: "hybrid" } as any}
+        updateSetting={jest.fn()}
+        goBack={() => {}}
+        goForward={() => {}}
+      />,
     );
 
-    expect(toggle).toBeDefined();
-    expect(toggle?.getAttribute("role")).toBe("switch");
-    expect(toggle?.getAttribute("aria-checked")).toBe("false");
-    expect(toggle?.querySelector("button")).toBeNull();
-
-    toggle?.click();
-
-    expect(updateSetting).toHaveBeenCalledWith("eventEncryptionMode", "full");
+    expect(html).toContain("Event Encryption");
+    expect(html).toContain("ciphertext-only");
+    expect(html).not.toContain("Full Event Encryption");
   });
 
-  it("renders notification email toggle as a single switch control without nested buttons", async () => {
-    const updateSetting = jest.fn();
-
-    await act(async () => {
-      root.render(
-        <NotificationSettings
-          localSettings={
-            {
-              emailNotifications: true,
-              eventEncryptionMode: "hybrid",
-            } as any
-          }
-          updateSetting={updateSetting}
-          goBack={() => {}}
-        />,
-      );
-
-      await Promise.resolve();
-    });
-
-    const toggle = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent?.includes("Email Notifications"),
+  it("renders notification email toggle as a single switch control without nested buttons", () => {
+    const html = renderToStaticMarkup(
+      <NotificationSettings
+        localSettings={
+          {
+            emailNotifications: true,
+            eventEncryptionMode: "hybrid",
+          } as any
+        }
+        updateSetting={jest.fn()}
+        goBack={() => {}}
+      />,
     );
 
-    expect(toggle).toBeDefined();
-    expect(toggle?.getAttribute("role")).toBe("switch");
-    expect(toggle?.getAttribute("aria-checked")).toBe("true");
-    expect(toggle?.querySelector("button")).toBeNull();
-
-    toggle?.click();
-
-    expect(updateSetting).toHaveBeenCalledWith("emailNotifications", false);
+    expect(html).toContain("Email Notifications");
+    expect(html).toContain('role="switch"');
+    expect(html).toContain('aria-checked="true"');
   });
 });

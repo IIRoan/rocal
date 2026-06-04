@@ -1,8 +1,9 @@
-import {
+import React, {
   useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -17,6 +18,7 @@ import {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   cancelAnimation,
+  Easing,
   Extrapolation,
   interpolate,
   runOnJS,
@@ -32,11 +34,15 @@ import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import {
   MAX_DOTS,
+  COMPACT_STRIP_EXPANDED_WEEK_ROWS,
   getOrderedDayLabels,
   generateGridDates,
+  getCompactStripWeekRowOffset,
+  getMonthDayEvents,
   groupEventsByDay,
   resolveEventDotColor,
 } from "./month-grid-utils";
+import { useCurrentDateTime } from "./useCurrentDateTime";
 import { useSwipePanelGesture } from "../../lib/useSwipePanelGesture";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -53,10 +59,6 @@ const SWIPE_COMMIT_THRESHOLD = 50;
 const VELOCITY_COMMIT = 600;
 /** Rubber-band factor for overscroll resistance. */
 const RUBBER_BAND_FACTOR = 0.3;
-/** Duration of the page settle animation (ms). */
-const PAGE_DURATION = 210;
-/** Spring config for snap-back. */
-const PAGE_SPRING = { damping: 30, stiffness: 320, mass: 0.8 };
 /** Spring config for expand/collapse height animation. */
 const HEIGHT_SPRING = {
   damping: 26,
@@ -66,6 +68,35 @@ const HEIGHT_SPRING = {
 };
 const VERTICAL_COMMIT_DISTANCE = 22;
 const VERTICAL_VELOCITY_COMMIT = 360;
+/** Duration of the month page settle animation (ms). */
+const PAGE_DURATION = 240;
+const PAGE_EASING = Easing.out(Easing.cubic);
+/** Toolbar-driven expand/collapse (ms). */
+const EXPAND_TIMING_MS = 260;
+/** Spring config for snap-back after an uncommitted swipe. */
+const PAGE_SPRING = { damping: 30, stiffness: 320, mass: 0.8 };
+
+function rubberBand(offset: number, limit: number, factor: number): number {
+  "worklet";
+  if (Math.abs(offset) < limit) return offset;
+  const sign = offset < 0 ? -1 : 1;
+  const overshoot = Math.abs(offset) - limit;
+  return sign * (limit + overshoot * factor);
+}
+
+function monthStart(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function monthEventsByDay(
+  events: DecoratedCalendarEvent[],
+  monthDate: Date,
+): Map<string, DecoratedCalendarEvent[]> {
+  const filtered = events.filter((event) =>
+    isSameMonth(new Date(event.start), monthDate),
+  );
+  return groupEventsByDay(filtered);
+}
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -99,16 +130,17 @@ interface CompactMonthStripProps {
    * header or week row is shown.
    */
   collapseToHandleOnly?: boolean;
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function rubberBand(offset: number, limit: number, factor: number): number {
-  "worklet";
-  if (Math.abs(offset) < limit) return offset;
-  const sign = offset < 0 ? -1 : 1;
-  const overshoot = Math.abs(offset) - limit;
-  return sign * (limit + overshoot * factor);
+  /** When false, no drag handle (toolbar toggles expand). Default true. */
+  showHandle?: boolean;
+  /** S M T W … row above the grid. Off for toolbar-expanded month picker. */
+  showDayOfWeekHeader?: boolean;
+  /** Flush under {@link CalendarScreenHeader} — shared border, tight padding. */
+  embeddedInHeader?: boolean;
+  /**
+   * Toolbar (or parent) owns expand/collapse — skip drag-to-expand on the grid
+   * and drive height from the `expanded` prop with a short timing animation.
+   */
+  externalExpandControl?: boolean;
 }
 
 function getMonthRowTarget(
@@ -172,9 +204,10 @@ interface MonthPageProps {
   expandedContentHeight: number;
   onDayPress: (date: Date) => void;
   showSelectedDateHighlight: boolean;
+  weekStartDay: number;
 }
 
-function MonthPage({
+const MonthPage = React.memo(function MonthPage({
   monthDate,
   gridDates,
   selectedDate,
@@ -190,7 +223,12 @@ function MonthPage({
   expandedContentHeight,
   onDayPress,
   showSelectedDateHighlight,
+  weekStartDay,
 }: MonthPageProps) {
+  const expandedWeekRowOffset = useMemo(
+    () => getCompactStripWeekRowOffset(monthDate, weekStartDay),
+    [monthDate, weekStartDay],
+  );
   const activeRowIndex = useMemo(
     () =>
       getActiveRowIndexForMonth(
@@ -236,14 +274,22 @@ function MonthPage({
           {rowDates.map((date) => {
             const dateKey = format(date, "yyyy-MM-dd");
             const isCurrentMonth = isSameMonth(date, monthDate);
-            const isToday = isSameDay(date, today);
+            const isToday = isCurrentMonth && isSameDay(date, today);
             const isSelected =
-              selectedDate != null && isSameDay(date, selectedDate);
+              isCurrentMonth &&
+              selectedDate != null &&
+              isSameDay(date, selectedDate);
             const isHighlighted =
-              highlightedDates?.some((highlightedDate) =>
+              isCurrentMonth &&
+              (highlightedDates?.some((highlightedDate) =>
                 isSameDay(date, highlightedDate),
-              ) ?? false;
-            const dayEvents = eventsByDay.get(dateKey) ?? [];
+              ) ??
+                false);
+            const dayEvents = getMonthDayEvents(
+              eventsByDay,
+              date,
+              isCurrentMonth,
+            );
 
             return (
               <Pressable
@@ -317,8 +363,15 @@ function MonthPage({
   return (
     <Animated.View style={[styles.monthPageContent, pageAnimatedStyle]}>
       {showExpandedRows
-        ? Array.from({ length: 6 }, (_, index) =>
-            renderDatesRow(gridDates.slice(index * 7, index * 7 + 7), index),
+        ? Array.from(
+            { length: COMPACT_STRIP_EXPANDED_WEEK_ROWS },
+            (_, index) => {
+              const rowIndex = expandedWeekRowOffset + index;
+              return renderDatesRow(
+                gridDates.slice(rowIndex * 7, rowIndex * 7 + 7),
+                rowIndex,
+              );
+            },
           )
         : collapsedRowDates != null
           ? renderDatesRow(collapsedRowDates, "collapsed-custom")
@@ -328,11 +381,11 @@ function MonthPage({
             )}
     </Animated.View>
   );
-}
+});
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function CompactMonthStrip({
+function CompactMonthStripComponent({
   currentDate,
   selectedDate,
   highlightedDates,
@@ -346,36 +399,63 @@ export function CompactMonthStrip({
   swipeEnabled = true,
   showSelectedDateHighlight = true,
   collapseToHandleOnly = false,
+  showHandle = true,
+  showDayOfWeekHeader = true,
+  embeddedInHeader = false,
+  externalExpandControl = false,
 }: CompactMonthStripProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  const today = useMemo(() => new Date(), []);
+  const styles = useMemo(
+    () => createStyles(theme, embeddedInHeader),
+    [theme, embeddedInHeader],
+  );
+  const dayHeaderHeight = showDayOfWeekHeader ? HEADER_ROW_HEIGHT : 0;
+  const today = useCurrentDateTime();
 
   const dayLabels = useMemo(
     () => getOrderedDayLabels(weekStartDay),
     [weekStartDay],
   );
-  const eventsByDay = useMemo(() => groupEventsByDay(events), [events]);
+  const [pagedMonth, setPagedMonth] = useState(() => monthStart(currentDate));
+  const carouselMonth = swipeEnabled ? pagedMonth : currentDate;
+  const parentMonthKey = format(currentDate, "yyyy-MM");
+  const skipParentMonthSyncRef = useRef(false);
+  const pendingMonthCommitRef = useRef<1 | -1 | null>(null);
+
+  useEffect(() => {
+    if (!swipeEnabled) {
+      setPagedMonth(monthStart(currentDate));
+      return;
+    }
+    if (skipParentMonthSyncRef.current) {
+      skipParentMonthSyncRef.current = false;
+      return;
+    }
+    setPagedMonth(monthStart(currentDate));
+  }, [parentMonthKey, swipeEnabled, currentDate]);
+
   const pages = useMemo(() => {
     if (!swipeEnabled) {
       return [
         {
-          key: `0-${format(currentDate, "yyyy-MM")}`,
+          key: format(currentDate, "yyyy-MM"),
           monthDate: currentDate,
           gridDates: generateGridDates(currentDate, weekStartDay),
+          eventsByDay: monthEventsByDay(events, currentDate),
         },
       ];
     }
 
     return [-1, 0, 1].map((offset) => {
-      const monthDate = addMonths(currentDate, offset);
+      const monthDate = addMonths(carouselMonth, offset);
       return {
-        key: `${offset}-${format(monthDate, "yyyy-MM")}`,
+        key: String(offset),
         monthDate,
         gridDates: generateGridDates(monthDate, weekStartDay),
+        eventsByDay: monthEventsByDay(events, monthDate),
       };
     });
-  }, [currentDate, swipeEnabled, weekStartDay]);
+  }, [carouselMonth, currentDate, events, swipeEnabled, weekStartDay]);
 
   // ─── Animated height for expand/collapse ─────────────────────────────────
 
@@ -383,25 +463,66 @@ export function CompactMonthStrip({
   // the parent timeline header already renders the day columns.
   const collapsedContentHeight = collapseToHandleOnly
     ? 0
-    : HEADER_ROW_HEIGHT + WEEK_ROW_HEIGHT;
-  const expandedContentHeight = HEADER_ROW_HEIGHT + WEEK_ROW_HEIGHT * 6;
+    : dayHeaderHeight + WEEK_ROW_HEIGHT;
+  const expandedContentHeight =
+    dayHeaderHeight + WEEK_ROW_HEIGHT * COMPACT_STRIP_EXPANDED_WEEK_ROWS;
   const animatedContentHeight = useSharedValue(
     expanded ? expandedContentHeight : collapsedContentHeight,
   );
   const [showExpandedRows, setShowExpandedRows] = useState(expanded);
+  const expandAnimationSessionRef = useRef(0);
 
   useEffect(() => {
-    setShowExpandedRows(expanded);
     cancelAnimation(animatedContentHeight);
-    animatedContentHeight.value = withSpring(
-      expanded ? expandedContentHeight : collapsedContentHeight,
-      HEIGHT_SPRING,
-    );
+    const target = expanded ? expandedContentHeight : collapsedContentHeight;
+    const session = ++expandAnimationSessionRef.current;
+
+    if (expanded) {
+      setShowExpandedRows(true);
+    }
+
+    if (embeddedInHeader && expanded) {
+      animatedContentHeight.value = target;
+      return;
+    }
+
+    if (expanded) {
+      if (externalExpandControl) {
+        animatedContentHeight.value = withTiming(target, {
+          duration: EXPAND_TIMING_MS,
+        });
+      } else {
+        animatedContentHeight.value = withSpring(target, HEIGHT_SPRING);
+      }
+      return;
+    }
+
+    const onCollapseFinished = (finished?: boolean) => {
+      if (finished && expandAnimationSessionRef.current === session) {
+        runOnJS(setShowExpandedRows)(false);
+      }
+    };
+
+    if (externalExpandControl) {
+      animatedContentHeight.value = withTiming(
+        target,
+        { duration: EXPAND_TIMING_MS },
+        onCollapseFinished,
+      );
+    } else {
+      animatedContentHeight.value = withSpring(
+        target,
+        HEIGHT_SPRING,
+        onCollapseFinished,
+      );
+    }
   }, [
     expanded,
     expandedContentHeight,
     collapsedContentHeight,
     animatedContentHeight,
+    embeddedInHeader,
+    externalExpandControl,
   ]);
 
   const contentAreaAnimatedStyle = useAnimatedStyle(() => ({
@@ -411,19 +532,51 @@ export function CompactMonthStrip({
   // ─── Horizontal pan gesture for month navigation ──────────────────────────
 
   const [pageWidth, setPageWidth] = useState(1);
+  const pageWidthShared = useSharedValue(1);
   const translateX = useSharedValue(-1);
 
+  const carouselCenterKey = swipeEnabled
+    ? format(pagedMonth, "yyyy-MM")
+    : parentMonthKey;
+
   useLayoutEffect(() => {
-    translateX.value = swipeEnabled ? -pageWidth : 0;
-  }, [currentDate, pageWidth, swipeEnabled, translateX]);
+    pageWidthShared.value = pageWidth;
+    if (!swipeEnabled) {
+      translateX.value = 0;
+      return;
+    }
+    if (pageWidth > 1) {
+      cancelAnimation(translateX);
+      translateX.value = -pageWidth;
+    }
+
+    const pendingDirection = pendingMonthCommitRef.current;
+    if (pendingDirection != null) {
+      pendingMonthCommitRef.current = null;
+      onMonthChange?.(pendingDirection);
+    }
+  }, [
+    carouselCenterKey,
+    onMonthChange,
+    pageWidth,
+    pageWidthShared,
+    swipeEnabled,
+    translateX,
+  ]);
+
+  const commitMonthNavigation = useCallback((direction: 1 | -1) => {
+    skipParentMonthSyncRef.current = true;
+    pendingMonthCommitRef.current = direction;
+    setPagedMonth((prev) => monthStart(addMonths(prev, direction)));
+  }, []);
 
   const handleNavigateLeft = useCallback(() => {
-    onMonthChange?.(1);
-  }, [onMonthChange]);
+    commitMonthNavigation(1);
+  }, [commitMonthNavigation]);
 
   const handleNavigateRight = useCallback(() => {
-    onMonthChange?.(-1);
-  }, [onMonthChange]);
+    commitMonthNavigation(-1);
+  }, [commitMonthNavigation]);
 
   const handleGridLayout = useCallback((event: LayoutChangeEvent) => {
     const nextWidth = Math.max(1, event.nativeEvent.layout.width);
@@ -432,68 +585,104 @@ export function CompactMonthStrip({
     );
   }, []);
 
-  const horizontalPan = Gesture.Pan()
-    .enabled(swipeEnabled && onMonthChange != null && pageWidth > 1)
-    .activeOffsetX([-12, 12])
-    .failOffsetY([-8, 8])
-    .onBegin(() => {
-      "worklet";
-      cancelAnimation(translateX);
-    })
-    .onUpdate((e) => {
-      "worklet";
-      translateX.value =
-        -pageWidth +
-        rubberBand(e.translationX, pageWidth * 0.9, RUBBER_BAND_FACTOR);
-    })
-    .onEnd((e) => {
-      "worklet";
-      const committedLeft =
-        e.translationX < -SWIPE_COMMIT_THRESHOLD ||
-        e.velocityX < -VELOCITY_COMMIT;
-      const committedRight =
-        e.translationX > SWIPE_COMMIT_THRESHOLD ||
-        e.velocityX > VELOCITY_COMMIT;
+  const horizontalPan = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(swipeEnabled && onMonthChange != null)
+        .activeOffsetX([-12, 12])
+        .failOffsetY([-8, 8])
+        .onBegin(() => {
+          "worklet";
+          cancelAnimation(translateX);
+        })
+        .onUpdate((e) => {
+          "worklet";
+          const width = pageWidthShared.value;
+          if (width <= 1) return;
+          translateX.value =
+            -width +
+            rubberBand(e.translationX, width * 0.9, RUBBER_BAND_FACTOR);
+        })
+        .onEnd((e) => {
+          "worklet";
+          const width = pageWidthShared.value;
+          if (width <= 1) {
+            translateX.value = withSpring(-width, PAGE_SPRING);
+            return;
+          }
 
-      if (committedLeft) {
-        translateX.value = withTiming(
-          -pageWidth * 2,
-          { duration: PAGE_DURATION },
-          (finished) => {
-            if (finished) {
-              runOnJS(handleNavigateLeft)();
-            }
-          },
-        );
-      } else if (committedRight) {
-        translateX.value = withTiming(
-          0,
-          { duration: PAGE_DURATION },
-          (finished) => {
-            if (finished) {
-              runOnJS(handleNavigateRight)();
-            }
-          },
-        );
-      } else {
-        translateX.value = withSpring(-pageWidth, PAGE_SPRING);
-      }
-    });
+          const committedLeft =
+            e.translationX < -SWIPE_COMMIT_THRESHOLD ||
+            e.velocityX < -VELOCITY_COMMIT;
+          const committedRight =
+            e.translationX > SWIPE_COMMIT_THRESHOLD ||
+            e.velocityX > VELOCITY_COMMIT;
+
+          if (committedLeft) {
+            translateX.value = withTiming(
+              -width * 2,
+              { duration: PAGE_DURATION, easing: PAGE_EASING },
+              (finished) => {
+                if (finished) {
+                  runOnJS(handleNavigateLeft)();
+                }
+              },
+            );
+          } else if (committedRight) {
+            translateX.value = withTiming(
+              0,
+              { duration: PAGE_DURATION, easing: PAGE_EASING },
+              (finished) => {
+                if (finished) {
+                  runOnJS(handleNavigateRight)();
+                }
+              },
+            );
+          } else {
+            translateX.value = withSpring(-width, PAGE_SPRING);
+          }
+        }),
+    [
+      handleNavigateLeft,
+      handleNavigateRight,
+      onMonthChange,
+      pageWidthShared,
+      swipeEnabled,
+      translateX,
+    ],
+  );
+
+  const stripAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
 
   // ─── Vertical pan gesture for expand/collapse ─────────────────────────────
 
-  const verticalPanConfig = {
-    restValue: expanded ? expandedContentHeight : collapsedContentHeight,
-    lowerBound: collapsedContentHeight,
-    upperBound: expandedContentHeight,
-    onCommitDown: expanded ? undefined : onToggleExpand,
-    onCommitUp: expanded ? onToggleExpand : undefined,
-    commitDistance: VERTICAL_COMMIT_DISTANCE,
-    commitVelocity: VERTICAL_VELOCITY_COMMIT,
-    rubberBandBelow: RUBBER_BAND_FACTOR,
-    rubberBandAbove: RUBBER_BAND_FACTOR,
-    springConfig: HEIGHT_SPRING,
-  };
+  const allowGridDragToExpand = !externalExpandControl && !embeddedInHeader;
+
+  const verticalPanConfig = useMemo(
+    () => ({
+      restValue: expanded ? expandedContentHeight : collapsedContentHeight,
+      lowerBound: collapsedContentHeight,
+      upperBound: expandedContentHeight,
+      onCommitDown:
+        allowGridDragToExpand && !expanded ? onToggleExpand : undefined,
+      onCommitUp:
+        allowGridDragToExpand && expanded ? onToggleExpand : undefined,
+      commitDistance: VERTICAL_COMMIT_DISTANCE,
+      commitVelocity: VERTICAL_VELOCITY_COMMIT,
+      rubberBandBelow: RUBBER_BAND_FACTOR,
+      rubberBandAbove: RUBBER_BAND_FACTOR,
+      springConfig: HEIGHT_SPRING,
+    }),
+    [
+      allowGridDragToExpand,
+      collapsedContentHeight,
+      expanded,
+      expandedContentHeight,
+      onToggleExpand,
+    ],
+  );
 
   const verticalPan = useSwipePanelGesture(
     animatedContentHeight,
@@ -502,35 +691,61 @@ export function CompactMonthStrip({
     .activeOffsetY([-6, 6])
     .failOffsetX([-10, 10]);
 
+  const handleVerticalPanConfig = useMemo(
+    () => ({
+      restValue: expanded ? expandedContentHeight : collapsedContentHeight,
+      lowerBound: collapsedContentHeight,
+      upperBound: expandedContentHeight,
+      onCommitDown: !embeddedInHeader && !expanded ? onToggleExpand : undefined,
+      onCommitUp: !embeddedInHeader && expanded ? onToggleExpand : undefined,
+      commitDistance: VERTICAL_COMMIT_DISTANCE,
+      commitVelocity: VERTICAL_VELOCITY_COMMIT,
+      rubberBandBelow: RUBBER_BAND_FACTOR,
+      rubberBandAbove: RUBBER_BAND_FACTOR,
+      springConfig: HEIGHT_SPRING,
+    }),
+    [
+      collapsedContentHeight,
+      embeddedInHeader,
+      expanded,
+      expandedContentHeight,
+      onToggleExpand,
+    ],
+  );
+
   const handleVerticalPan = useSwipePanelGesture(
     animatedContentHeight,
-    verticalPanConfig,
+    handleVerticalPanConfig,
   )
     .activeOffsetY([-6, 6])
     .failOffsetX([-18, 18]);
 
-  const composedGesture = swipeEnabled
-    ? Gesture.Race(horizontalPan, verticalPan)
-    : verticalPan;
-
-  const stripAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: translateX.value }],
-    };
-  }, [translateX]);
+  const composedGesture = useMemo(() => {
+    if (swipeEnabled && allowGridDragToExpand) {
+      return Gesture.Race(horizontalPan, verticalPan);
+    }
+    if (swipeEnabled) {
+      return horizontalPan;
+    }
+    if (allowGridDragToExpand) {
+      return verticalPan;
+    }
+    return Gesture.Pan().enabled(false);
+  }, [allowGridDragToExpand, horizontalPan, swipeEnabled, verticalPan]);
 
   return (
     <View style={styles.container}>
       {/* Content area — only this clips during expand/collapse */}
       <Animated.View style={[styles.contentArea, contentAreaAnimatedStyle]}>
-        {/* Day-of-week header labels (static — don't slide) */}
-        <View style={styles.headerRow}>
-          {dayLabels.map((label) => (
-            <View key={label} style={styles.headerCell}>
-              <Text style={styles.headerText}>{label}</Text>
-            </View>
-          ))}
-        </View>
+        {showDayOfWeekHeader ? (
+          <View style={styles.headerRow}>
+            {dayLabels.map((label) => (
+              <View key={label} style={styles.headerCell}>
+                <Text style={styles.headerText}>{label}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         {/* Grid area */}
         <GestureDetector gesture={composedGesture}>
@@ -555,7 +770,7 @@ export function CompactMonthStrip({
                       highlightedDates={highlightedDates}
                       collapsedRowDates={collapsedRowDates}
                       today={today}
-                      eventsByDay={eventsByDay}
+                      eventsByDay={page.eventsByDay}
                       theme={theme}
                       styles={styles}
                       showExpandedRows={showExpandedRows}
@@ -564,6 +779,7 @@ export function CompactMonthStrip({
                       expandedContentHeight={expandedContentHeight}
                       onDayPress={onDayPress}
                       showSelectedDateHighlight={showSelectedDateHighlight}
+                      weekStartDay={weekStartDay}
                     />
                   </View>
                 ))}
@@ -578,7 +794,7 @@ export function CompactMonthStrip({
                 highlightedDates={highlightedDates}
                 collapsedRowDates={collapsedRowDates}
                 today={today}
-                eventsByDay={eventsByDay}
+                eventsByDay={pages[0].eventsByDay}
                 theme={theme}
                 styles={styles}
                 showExpandedRows={showExpandedRows}
@@ -587,40 +803,50 @@ export function CompactMonthStrip({
                 expandedContentHeight={expandedContentHeight}
                 onDayPress={onDayPress}
                 showSelectedDateHighlight={showSelectedDateHighlight}
+                weekStartDay={weekStartDay}
               />
             </View>
           )}
         </GestureDetector>
       </Animated.View>
 
-      {/* Handle lives outside the clipped area — always fully visible */}
-      <GestureDetector gesture={handleVerticalPan}>
-        <Pressable
-          onPress={onToggleExpand}
-          style={styles.handle}
-          hitSlop={{ top: 8, bottom: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel={
-            expanded ? "Collapse month calendar" : "Expand month calendar"
-          }
-        >
-          <View style={styles.handleBar} />
-        </Pressable>
-      </GestureDetector>
+      {showHandle ? (
+        <GestureDetector gesture={handleVerticalPan}>
+          <Pressable
+            onPress={onToggleExpand}
+            style={styles.handle}
+            hitSlop={{ top: 8, bottom: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={
+              expanded ? "Collapse month calendar" : "Expand month calendar"
+            }
+          >
+            <View style={styles.handleBar} />
+          </Pressable>
+        </GestureDetector>
+      ) : null}
     </View>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
-function createStyles(theme: ThemeTokens) {
+function createStyles(theme: ThemeTokens, embeddedInHeader: boolean) {
   const view = {
     container: {
       backgroundColor: theme.colors.background,
-      paddingHorizontal: theme.spacing["2"],
+      paddingHorizontal: embeddedInHeader
+        ? theme.spacing["3"]
+        : theme.spacing["2"],
+      paddingTop: theme.spacing["2"],
+      paddingBottom: embeddedInHeader ? theme.spacing["1"] : undefined,
       zIndex: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
+      ...(embeddedInHeader
+        ? {}
+        : {
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: theme.colors.border,
+          }),
     },
     headerRow: {
       flexDirection: "row" as const,
@@ -724,5 +950,7 @@ function createStyles(theme: ThemeTokens) {
 
   return { ...StyleSheet.create(view), ...StyleSheet.create(text) };
 }
+
+export const CompactMonthStrip = React.memo(CompactMonthStripComponent);
 
 export type { CompactMonthStripProps };

@@ -7,11 +7,11 @@ import React, {
   useRef,
   useState,
 } from "react";
-import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { authClient } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { API_BASE_URL } from "../lib/constants";
+import { getAuthHeaders } from "../lib/api";
 import {
   deleteStoredPasskey,
   getDefaultPasskeyName,
@@ -22,7 +22,15 @@ import {
   resolvePasskeyBridgeBaseUrl,
   signInWithBrowserPasskey,
 } from "../lib/passkey-browser-bridge";
-import { getSessionCookie, waitForSessionCookie } from "../lib/session-cookie";
+import { waitForSessionCookie } from "../lib/session-cookie";
+import {
+  saveMailVaultPassword,
+  clearMailVaultPassword,
+  clearDerivedVaultKey,
+  clearCachedPrivateKey,
+} from "../lib/mail/mail-password-cache";
+import { clearVaultCache } from "../lib/mail/mail-crypto";
+import { registerClearSession } from "../lib/session-clear";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -101,8 +109,6 @@ export function AuthProvider({
 
     return getAuthCapabilities({
       platformOs: Platform.OS,
-      expoExecutionEnvironment: Constants.executionEnvironment,
-      expoAppOwnership: Constants.appOwnership,
       hasPublicKeyCredential:
         typeof globalThis.PublicKeyCredential === "function",
       hasSecurePasskeyBridgeOrigin:
@@ -112,10 +118,9 @@ export function AuthProvider({
 
   // ── Session hydration ────────────────────────────────────────────────
   const fetchAuthStatus = useCallback(async () => {
-    const cookie = getSessionCookie();
     const response = await fetch(`${API_BASE_URL}/api/account/auth-status`, {
-      credentials: "include",
-      headers: cookie ? { cookie } : undefined,
+      credentials: "omit",
+      headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -128,33 +133,6 @@ export function AuthProvider({
       requiresPasskeyStepUp: boolean;
     };
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadSession() {
-      try {
-        const result = await authClient.getSession();
-        if (!cancelled && result?.data) {
-          setUser(result.data.user as User);
-          setSession((result.data as any).session as Session);
-          const authStatus = await fetchAuthStatus();
-          if (!cancelled) {
-            setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
-          }
-        }
-      } catch {
-        // No valid session — stay unauthenticated.
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    }
-
-    loadSession();
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchAuthStatus]);
 
   // ── Auth actions ─────────────────────────────────────────────────────
 
@@ -242,10 +220,12 @@ export function AuthProvider({
         );
       }
 
-      setEmailPasswordAuthHints(password);
-
       try {
         await finalizeAuthenticatedSession(result.data, "Sign-in");
+        setEmailPasswordAuthHints(password);
+        // Persist password to SecureStore so the mail vault can be unlocked
+        // even after an app restart (in-memory ref is lost on restart).
+        await saveMailVaultPassword(password);
         const authStatus = await fetchAuthStatus();
         setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
         return { requiresPasskeyStepUp: authStatus.requiresPasskeyStepUp };
@@ -276,10 +256,11 @@ export function AuthProvider({
         );
       }
 
-      setEmailPasswordAuthHints(password);
-
       try {
         await finalizeAuthenticatedSession(result.data, "Sign-up");
+        setEmailPasswordAuthHints(password);
+        // Persist password to SecureStore (mirrors signIn behaviour above).
+        await saveMailVaultPassword(password);
         setRequiresPasskeyStepUp(false);
       } catch (error) {
         resetAuthMethodHints();
@@ -299,8 +280,56 @@ export function AuthProvider({
     } catch {
       // Best-effort — clear local state regardless.
     }
+    // Clear the persisted mail vault password, derived key, cached PGP key, and in-memory vault cache.
+    await clearMailVaultPassword();
+    await clearDerivedVaultKey();
+    await clearCachedPrivateKey();
+    clearVaultCache();
     clearSession();
   }, [clearSession]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSession() {
+      try {
+        const result = await authClient.getSession();
+        if (!cancelled && result?.data) {
+          setUser(result.data.user as User);
+          setSession((result.data as any).session as Session);
+          try {
+            const authStatus = await fetchAuthStatus();
+            if (!cancelled) {
+              if (!authStatus.authenticated) {
+                await signOut();
+              } else {
+                setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
+              }
+            }
+          } catch {
+            if (!cancelled) {
+              await signOut();
+            }
+          }
+        } else {
+          if (!cancelled) {
+            await signOut();
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          await signOut();
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    loadSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchAuthStatus, signOut]);
 
   const signInWithPasskey = useCallback(async () => {
     if (!authCapabilities.supportsPasskeys) {
@@ -447,35 +476,3 @@ export function useAuth(): AuthContextValue {
   return ctx;
 }
 
-// ---------------------------------------------------------------------------
-// Utility — call from HTTP interceptors on 401/403
-// ---------------------------------------------------------------------------
-
-/**
- * Force-clear the auth state from outside the React tree.
- *
- * This is exposed so that the HTTP client's `getHeaders` callback (or a
- * response interceptor) can terminate the session on 401/403 without
- * needing a React hook.
- */
-let _clearSessionRef: (() => void) | null = null;
-
-export function registerClearSession(fn: () => void) {
-  _clearSessionRef = fn;
-}
-
-export function triggerSessionClear() {
-  _clearSessionRef?.();
-}
-
-/**
- * Internal provider wrapper that registers the clearSession ref.
- * Used by AuthProvider above.
- */
-export function AuthProviderWithClearRef({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return <AuthProvider>{children}</AuthProvider>;
-}

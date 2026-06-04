@@ -1,7 +1,6 @@
 import React from "react";
 import { Key, ChevronRight, ArrowLeft, Shield } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
-import { SettingToggleRow } from "./setting-toggle-row";
 import { PasswordSection } from "./password-section";
 
 interface SecuritySettingsProps {
@@ -24,7 +23,6 @@ interface SecuritySettingsProps {
 
 export function SecuritySettings({
   localSettings,
-  updateSetting,
   goBack,
   goForward,
   hasPasswordAccount = false,
@@ -36,7 +34,6 @@ export function SecuritySettings({
   handleSetPassword,
   handleResetEncryptionPassword,
 }: SecuritySettingsProps) {
-  const isFullEncryptionEnabled = localSettings.eventEncryptionMode === "full";
   const showPasswordSection = hasPasswordAccount || hasOAuthAccount;
 
   return (
@@ -55,22 +52,16 @@ export function SecuritySettings({
           Event Encryption
         </div>
         <div className="p-1">
-          <SettingToggleRow
-            checked={isFullEncryptionEnabled}
-            description="Disable calendar share links and keep event content ciphertext-only."
-            icon={Shield}
-            label="Full Event Encryption"
-            onToggle={() =>
-              updateSetting(
-                "eventEncryptionMode",
-                isFullEncryptionEnabled ? "hybrid" : "full",
-              )
-            }
-          />
-          <div className="px-3 pb-2 pt-1 text-xs text-muted-foreground leading-relaxed">
-            Full mode keeps event title, description, and location off the
-            server. Reminder emails stay available but only include timing
-            details.
+          <div className="flex items-start gap-3 rounded-md px-3 py-2">
+            <Shield className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0">
+              <div className="text-sm">Event Encryption</div>
+              <div className="text-xs text-muted-foreground leading-relaxed">
+                Event title, description, and location stay ciphertext-only.
+                Reminder emails remain available but only include timing
+                details.
+              </div>
+            </div>
           </div>
         </div>
 

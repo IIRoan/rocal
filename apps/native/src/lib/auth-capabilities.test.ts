@@ -1,12 +1,10 @@
 import { getAuthCapabilities } from "./auth-capabilities";
 
 describe("getAuthCapabilities", () => {
-  it("uses the browser bridge for passkeys in Expo Go", () => {
+  it("uses the browser bridge for passkeys on native iOS", () => {
     expect(
       getAuthCapabilities({
         platformOs: "ios",
-        expoExecutionEnvironment: "storeClient",
-        expoAppOwnership: "expo",
         hasSecurePasskeyBridgeOrigin: true,
       }),
     ).toEqual({
@@ -14,16 +12,14 @@ describe("getAuthCapabilities", () => {
       supportsGitHubOAuth: true,
       supportsPasskeys: true,
       passkeyMode: "browser-bridge",
-      passkeyMessage:
-        "Passkeys open in your browser while you're using Expo Go.",
+      passkeyMessage: "Passkeys open in your browser on native.",
     });
   });
 
-  it("supports passkeys in native builds when the native module is available", () => {
+  it("uses the browser bridge on native even without browser WebAuthn globals", () => {
     expect(
       getAuthCapabilities({
         platformOs: "android",
-        expoExecutionEnvironment: "standalone",
         hasSecurePasskeyBridgeOrigin: true,
       }),
     ).toEqual({
@@ -31,25 +27,23 @@ describe("getAuthCapabilities", () => {
       supportsGitHubOAuth: true,
       supportsPasskeys: true,
       passkeyMode: "browser-bridge",
-      passkeyMessage:
-        "Passkeys open in your browser on native so the flow also works in Expo Go.",
+      passkeyMessage: "Passkeys open in your browser on native.",
     });
   });
 
-  it("uses the browser bridge in native builds even without browser WebAuthn globals", () => {
+  it("marks native passkeys unsupported when the bridge origin is insecure", () => {
     expect(
       getAuthCapabilities({
         platformOs: "ios",
-        expoExecutionEnvironment: "standalone",
-        hasSecurePasskeyBridgeOrigin: true,
+        hasSecurePasskeyBridgeOrigin: false,
       }),
     ).toEqual({
       supportsPassword: true,
       supportsGitHubOAuth: true,
-      supportsPasskeys: true,
-      passkeyMode: "browser-bridge",
+      supportsPasskeys: false,
+      passkeyMode: "unsupported",
       passkeyMessage:
-        "Passkeys open in your browser on native so the flow also works in Expo Go.",
+        "Passkeys require an HTTPS app URL (or localhost) on native. Set EXPO_PUBLIC_APP_URL to an https:// tunnel or hosted frontend.",
     });
   });
 
@@ -80,24 +74,6 @@ describe("getAuthCapabilities", () => {
       supportsPasskeys: false,
       passkeyMode: "unsupported",
       passkeyMessage: "Passkeys are unavailable in this browser.",
-    });
-  });
-
-  it("marks Expo Go passkeys unsupported when the bridge origin is insecure", () => {
-    expect(
-      getAuthCapabilities({
-        platformOs: "ios",
-        expoExecutionEnvironment: "storeClient",
-        expoAppOwnership: "expo",
-        hasSecurePasskeyBridgeOrigin: false,
-      }),
-    ).toEqual({
-      supportsPassword: true,
-      supportsGitHubOAuth: true,
-      supportsPasskeys: false,
-      passkeyMode: "unsupported",
-      passkeyMessage:
-        "Passkeys require an HTTPS app URL (or localhost) in Expo Go. Set EXPO_PUBLIC_APP_URL to an https:// tunnel or hosted frontend.",
     });
   });
 });

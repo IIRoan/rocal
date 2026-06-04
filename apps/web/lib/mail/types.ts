@@ -264,12 +264,7 @@ export function parseMailRealtimeEvent(value: unknown): MailRealtimeEvent {
   return mailRealtimeEventSchema.parse(value) as MailRealtimeEvent;
 }
 
-export type MessageEncryptionState =
-  | "plain"
-  | "inline_pgp"
-  | "pgp_mime"
-  | "internal_e2ee"
-  | "unknown_encrypted";
+export type { MessageEncryptionState } from "@workspace/calendar-core";
 
 export type LabelDef = {
   id: string;

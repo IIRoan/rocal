@@ -23,6 +23,11 @@ const VIEW_LABELS: Record<CalendarView, string> = {
  * - 3-Day view: "Jan 14 – 16" or "Dec 31 – Jan 2" (cross-month)
  * - Agenda view: "January 2025"
  */
+/** Month-only title for the calendar tab toolbar (e.g. "Jun 2025"). */
+export function formatCalendarToolbarTitle(currentDate: Date): string {
+  return format(currentDate, "MMM yyyy");
+}
+
 export function formatViewDateHeader(
   view: CalendarView,
   currentDate: Date,

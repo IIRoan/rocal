@@ -135,8 +135,10 @@ describe("EventEditorPopover", () => {
           recurringModal={null}
           setShowDescription={() => {}}
           setShowLocation={() => {}}
+          setShowParticipants={() => {}}
           showDescription={false}
           showLocation={false}
+          showParticipants={false}
         />,
       );
 

@@ -3,9 +3,8 @@ import { partitionCalendarsByKind } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import {
   CALENDAR_HOME_ROUTE,
-  SEARCH_ROUTE,
   SETTINGS_ROUTE,
-} from "../lib/auth-routing";
+} from "../lib/navigation-routes";
 import { resolveCalendarSwatchColor } from "../lib/calendar-color-utils";
 
 export type SidebarIconName =
@@ -49,7 +48,6 @@ const SIDEBAR_PRIMARY_MENU_ITEMS: SidebarMenuItem[] = [
     icon: "calendar",
     route: CALENDAR_HOME_ROUTE,
   },
-  { key: "search", label: "Search", icon: "search", route: SEARCH_ROUTE },
   {
     key: "settings",
     label: "Settings",

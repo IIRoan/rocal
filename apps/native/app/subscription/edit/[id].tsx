@@ -12,7 +12,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen } from "../../../src/components/layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -21,8 +21,10 @@ import { getErrorMessage } from "@workspace/calendar-core";
 import type { UpdateSubscriptionRequest } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { StackScreenHeader } from "../../../src/components/StackScreenHeader";
+import { LoadingScreen } from "../../../src/components/ui/loading";
 import { ColorPicker } from "../../../src/components/event/ColorPicker";
 import { useTheme } from "../../../src/providers/ThemeProvider";
+import { useToast } from "../../../src/providers/ToastProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import {
@@ -39,6 +41,7 @@ export default function SubscriptionEditScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [name, setName] = useState("");
   const [color, setColor] = useState<string>("indigo");
@@ -95,12 +98,13 @@ export default function SubscriptionEditScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.subscriptions() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Calendar updated");
       router.back();
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to save changes",
+      toast(
         getErrorMessage(error, "Failed to update read-only calendar"),
+        "error",
       );
     },
   });
@@ -112,12 +116,13 @@ export default function SubscriptionEditScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.subscriptions() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Calendar removed");
       router.back();
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to remove calendar",
+      toast(
         getErrorMessage(error, "Failed to remove read-only calendar"),
+        "error",
       );
     },
   });
@@ -131,19 +136,18 @@ export default function SubscriptionEditScreen() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
 
       if (result.status === "error") {
-        Alert.alert(
-          "Sync finished with issues",
+        toast(
           result.message ??
             result.errors?.join("\n") ??
             "The calendar feed returned an error.",
+          "error",
         );
+      } else {
+        toast("Calendar synced");
       }
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to sync calendar",
-        getErrorMessage(error, "Failed to sync calendar"),
-      );
+      toast(getErrorMessage(error, "Failed to sync calendar"), "error");
     },
   });
 
@@ -160,9 +164,9 @@ export default function SubscriptionEditScreen() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to update visibility",
+      toast(
         getErrorMessage(error, "Failed to update calendar visibility"),
+        "error",
       );
     },
   });
@@ -234,32 +238,31 @@ export default function SubscriptionEditScreen() {
     }
 
     await Clipboard.setStringAsync(subscription.url);
-    Alert.alert("Copied", "The source URL is now on your clipboard.");
+    toast("Source URL copied to clipboard");
   }, [subscription?.url]);
 
   if (subscriptionsLoading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-        <Text style={styles.helperText}>Loading calendar…</Text>
-      </SafeAreaView>
-    );
+    return <LoadingScreen theme={theme} message="Loading calendar…" />;
   }
 
   if (!subscription) {
     return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>Read-only calendar not found.</Text>
-      </SafeAreaView>
+      <AppScreen>
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>Read-only calendar not found.</Text>
+        </View>
+      </AppScreen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StackScreenHeader
-        title={isHoliday ? "Holiday Calendar" : "External Feed"}
-      />
-
+    <AppScreen
+      header={
+        <StackScreenHeader
+          title={isHoliday ? "Holiday Calendar" : "External Feed"}
+        />
+      }
+    >
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -397,7 +400,7 @@ export default function SubscriptionEditScreen() {
           </Pressable>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
