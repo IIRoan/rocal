@@ -56,7 +56,7 @@ apps/native/app/
 └── +not-found.tsx
 ```
 
-Reusable native UI: `apps/native/src/components/` (`sheet/`, `event/`, `calendar/`, `mail/`, `ScreenHeader`, `AppSidebar`, …).
+Reusable native UI: `apps/native/src/components/` (`layout/` — `AppScreen`, `NavigationHeader`, `SurfaceToolbar`; `sheet/`, `event/`, `calendar/`, `mail/`, `AppSidebar`, …). Layout tokens: `apps/native/src/lib/app-layout.ts`.
 
 ### Mobile App Context
 
@@ -129,7 +129,7 @@ Search both codebases for domain terms (`participants`, `recurrence`, `mailbox`,
 1. **`useTheme()` + `createStyles(theme)`** — co-locate styles at file bottom like existing screens (`settings/index.tsx`, `EventForm.tsx`, `SheetRow.tsx`).
 2. **Use design tokens** — `theme.colors.*`, `theme.spacing.*`, `theme.typography.*`, `theme.borderRadius.*`. No magic numbers when a token exists.
 3. **Icons: `@expo/vector-icons` Feather** — same set as the rest of the app.
-4. **Reuse shell components** — `ScreenHeader`, `StackScreenHeader`, `SheetRow`, `SheetList`, `SheetActions`, `BottomSheet`, mail `MAIL_ICON` sizing where in mail context.
+4. **Reuse shell components** — `AppScreen`, `NavigationHeader`, `SurfaceToolbar`, `StackScreenHeader`, `SheetRow`, `SheetList`, `SheetActions`, `BottomSheet`. Layout tokens live in `apps/native/src/lib/app-layout.ts`.
 5. **Lists and forms** — hairline dividers (`StyleSheet.hairlineWidth`), 44px touch targets, section labels in `theme.typography.fontSize.sm`. Match `EventForm` toggle pills and settings rows — don't invent new form layouts.
 6. **Info/help on native** — tap-triggered `Alert` or sheet (see participants info on `EventForm`). Don't rely on hover.
 

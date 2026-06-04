@@ -6,7 +6,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen, NavigationHeader } from "../../src/components/layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { CreateEventRequest } from "@workspace/calendar-core";
@@ -140,12 +140,10 @@ export default function EventCreateScreen() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle} accessibilityRole="header">
-          Create Event
-        </Text>
-      </View>
+    <AppScreen
+      header={<NavigationHeader variant="form" title="Create Event" />}
+      edges={["top"]}
+    >
       <EventForm
         calendars={calendars ?? []}
         serverErrors={serverErrors}
@@ -154,7 +152,7 @@ export default function EventCreateScreen() {
         onCancel={handleCancel}
         initialValues={initialValues}
       />
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

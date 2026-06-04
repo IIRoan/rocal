@@ -10,7 +10,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen } from "../../src/components/layout";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
@@ -131,7 +131,10 @@ export default function SubscriptionCreateScreen() {
       toast(`Added ${variables.name}`);
     },
     onError: (error) => {
-      toast(getErrorMessage(error, "Failed to add read-only calendar"), "error");
+      toast(
+        getErrorMessage(error, "Failed to add read-only calendar"),
+        "error",
+      );
     },
   });
 
@@ -149,9 +152,11 @@ export default function SubscriptionCreateScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
       setPickedFile(null);
-      toast(`Imported ${result.eventsCreated} of ${result.eventsTotal} events${
-        result.calendarName ? ` into ${result.calendarName}` : ""
-      }`);
+      toast(
+        `Imported ${result.eventsCreated} of ${result.eventsTotal} events${
+          result.calendarName ? ` into ${result.calendarName}` : ""
+        }`,
+      );
     },
     onError: (error) => {
       toast(getErrorMessage(error, "Failed to import .ics file"), "error");
@@ -200,7 +205,10 @@ export default function SubscriptionCreateScreen() {
       const content = await file.text();
       setPickedFile({ name: asset.name, content });
     } catch (error) {
-      toast(getErrorMessage(error, "Failed to read the selected file"), "error");
+      toast(
+        getErrorMessage(error, "Failed to read the selected file"),
+        "error",
+      );
     }
   }, []);
 
@@ -234,9 +242,7 @@ export default function SubscriptionCreateScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StackScreenHeader title="Add Read-only Calendar" />
-
+    <AppScreen header={<StackScreenHeader title="Add Read-only Calendar" />}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -492,7 +498,7 @@ export default function SubscriptionCreateScreen() {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

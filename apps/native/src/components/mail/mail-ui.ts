@@ -1,12 +1,11 @@
 import { StyleSheet, type TextStyle, type ViewStyle } from "react-native";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import { LAYOUT_ICON } from "../../lib/app-layout";
 
 /** Shared icon sizes across the native mail experience. */
 export const MAIL_ICON = {
-  /** Same as {@link ScreenHeader} menu. */
-  headerMenu: 22,
-  /** Same as {@link ScreenHeader} search. */
-  headerSearch: 20,
+  headerMenu: LAYOUT_ICON.menu,
+  headerSearch: LAYOUT_ICON.search,
   /** Bottom bulk bar + message detail actions. */
   toolbar: 20,
   sheet: 20,
@@ -45,9 +44,9 @@ export function mailRadii(theme: ThemeTokens) {
 
 export function mailSpacing(theme: ThemeTokens) {
   return {
-    /** Screen header horizontal — aligns with calendar / settings headers. */
+    /** Matches {@link layoutHeaderInsets} / {@link layoutScrollContent}. */
     headerH: theme.spacing["3"],
-    headerV: theme.spacing["3"],
+    headerV: theme.spacing["2"],
     screenH: theme.spacing["4"],
     rowV: theme.spacing["3"],
     rowH: theme.spacing["4"],
@@ -88,13 +87,15 @@ export function mailTypography(theme: ThemeTokens) {
     captionStrong: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
     overline: {
       fontSize: 10,
       lineHeight: 12,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       letterSpacing: 0.6,
       textTransform: "uppercase" as const,
       color: theme.colors.mutedForeground,

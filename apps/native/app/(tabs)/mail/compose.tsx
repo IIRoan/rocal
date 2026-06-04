@@ -12,9 +12,13 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
+import { AppScreen, NavigationHeader } from "../../../src/components/layout";
+import {
+  layoutFormContent,
+  layoutFormFieldBorder,
+} from "../../../src/lib/app-layout";
 import { useQuery } from "@tanstack/react-query";
 import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -126,40 +130,37 @@ export default function ComposeScreen() {
   }, [hasInitializedFromParams, params.mode, sourceMessage]);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.iconButton}
-          accessibilityRole="button"
-          accessibilityLabel="Cancel"
-        >
-          <Feather name="x" size={22} color={theme.colors.foreground} />
-        </Pressable>
-        <Text style={styles.headerTitle}>New message</Text>
-        <Pressable
-          onPress={handleSend}
-          disabled={!canSend}
-          style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
-          accessibilityRole="button"
-          accessibilityLabel="Send message"
-        >
-          {sendMessage.isPending ? (
-            <ActivityIndicator
-              size="small"
-              color={theme.colors.primaryForeground}
-            />
-          ) : (
-            <Feather
-              name="send"
-              size={16}
-              color={theme.colors.primaryForeground}
-            />
-          )}
-          <Text style={styles.sendButtonText}>Send</Text>
-        </Pressable>
-      </View>
-
+    <AppScreen
+      header={
+        <NavigationHeader
+          variant="compose"
+          title="New message"
+          trailing={
+            <Pressable
+              onPress={handleSend}
+              disabled={!canSend}
+              style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
+            >
+              {sendMessage.isPending ? (
+                <ActivityIndicator
+                  size="small"
+                  color={theme.colors.primaryForeground}
+                />
+              ) : (
+                <Feather
+                  name="send"
+                  size={16}
+                  color={theme.colors.primaryForeground}
+                />
+              )}
+              <Text style={styles.sendButtonText}>Send</Text>
+            </Pressable>
+          }
+        />
+      }
+    >
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -254,7 +255,7 @@ export default function ComposeScreen() {
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
@@ -328,7 +329,10 @@ function stripHtmlToText(html: string | null | undefined): string {
     return "";
   }
 
-  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function Field({
@@ -372,27 +376,8 @@ function Field({
 
 function createStyles(theme: ThemeTokens) {
   const view = {
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
     flex: {
       flex: 1,
-    },
-    header: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
-    },
-    iconButton: {
-      width: 38,
-      height: 38,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
     },
     sendButton: {
       flexDirection: "row" as const,
@@ -406,10 +391,7 @@ function createStyles(theme: ThemeTokens) {
     sendButtonDisabled: {
       opacity: 0.5,
     },
-    body: {
-      padding: theme.spacing["4"],
-      gap: theme.spacing["2"],
-    },
+    body: layoutFormContent(theme),
     fromRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
@@ -420,20 +402,12 @@ function createStyles(theme: ThemeTokens) {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: theme.spacing["2"],
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+      ...layoutFormFieldBorder(theme),
       paddingVertical: theme.spacing["2"],
     },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    headerTitle: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.base.size,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
     sendButtonText: {
       fontSize: theme.typography.fontSize.sm.size,
       fontWeight: theme.typography.fontWeight

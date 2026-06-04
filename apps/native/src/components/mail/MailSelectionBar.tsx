@@ -15,6 +15,7 @@ import Animated, {
 } from "react-native-reanimated";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
+import { layoutHairlineBorder } from "../../lib/app-layout";
 import { mailColors, mailSpacing, mailTypography } from "./mail-ui";
 
 const BAR_TIMING = {
@@ -55,7 +56,10 @@ export function MailSelectionBar({
     <Animated.View style={[styles.bar, barStyle]}>
       <Pressable
         onPress={onClear}
-        style={({ pressed }) => [styles.unselectButton, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.unselectButton,
+          pressed && styles.pressed,
+        ]}
         accessibilityRole="button"
         accessibilityLabel="Unselect all messages"
       >
@@ -69,11 +73,19 @@ export function MailSelectionBar({
 
       <Pressable
         onPress={onSelectAll}
-        style={({ pressed }) => [styles.selectAllButton, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.selectAllButton,
+          pressed && styles.pressed,
+        ]}
         accessibilityRole="button"
         accessibilityLabel={allSelected ? "Deselect all" : "Select all"}
       >
-        <Text style={[styles.selectAllText, allSelected && styles.selectAllTextActive]}>
+        <Text
+          style={[
+            styles.selectAllText,
+            allSelected && styles.selectAllTextActive,
+          ]}
+        >
           {allSelected ? "Deselect all" : "Select all"}
         </Text>
       </Pressable>
@@ -94,8 +106,7 @@ function createStyles(theme: ThemeTokens) {
       paddingHorizontal: pad.headerH,
       paddingVertical: pad.headerV,
       backgroundColor: colors.selectionBar,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+      ...layoutHairlineBorder(theme),
     } as ViewStyle,
     unselectButton: {
       minWidth: 72,

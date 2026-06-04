@@ -14,30 +14,16 @@ import type { CalendarView } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { formatViewDateHeader } from "./view-switcher-utils";
 
-// ─── Props ───────────────────────────────────────────────────────────────────
-
 interface CalendarViewSwitcherProps {
-  /** The currently active view */
   activeView: CalendarView;
-  /** The current date being displayed (for the header title) */
   currentDate: Date;
-  /** Week start day for week view header formatting (default: 0 = Sunday) */
   weekStartDay?: number;
-  /** Callback to navigate to today */
   onTodayPress?: () => void;
-  /** Callback to navigate forward */
   onForwardPress?: () => void;
-  /** Callback to navigate backward */
   onBackwardPress?: () => void;
-  /** Whether the month strip is expanded */
   monthStripExpanded?: boolean;
-  /** Callback to toggle month strip expand/collapse */
   onToggleMonthStrip?: () => void;
-  /** Callback to open the command palette / search. */
-  onSearchPress?: () => void;
 }
-
-// ─── Component ───────────────────────────────────────────────────────────────
 
 export function CalendarViewSwitcher({
   activeView,
@@ -48,7 +34,6 @@ export function CalendarViewSwitcher({
   onBackwardPress,
   monthStripExpanded,
   onToggleMonthStrip,
-  onSearchPress,
 }: CalendarViewSwitcherProps) {
   const { theme } = useTheme();
   const { toggle: toggleSidebar } = useSidebar();
@@ -61,7 +46,6 @@ export function CalendarViewSwitcher({
 
   return (
     <View style={styles.container}>
-      {/* Navigation row: menu, back, date header, today, forward */}
       <View style={styles.navRow}>
         <Pressable
           onPress={toggleSidebar}
@@ -112,23 +96,10 @@ export function CalendarViewSwitcher({
         >
           <Text style={styles.navArrow}>›</Text>
         </Pressable>
-
-        {onSearchPress ? (
-          <Pressable
-            onPress={onSearchPress}
-            style={styles.searchButton}
-            accessibilityRole="button"
-            accessibilityLabel="Search and commands"
-          >
-            <Feather name="search" size={20} color={theme.colors.foreground} />
-          </Pressable>
-        ) : null}
       </View>
     </View>
   );
 }
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
 
 function createStyles(theme: ThemeTokens) {
   const view = {
@@ -149,11 +120,6 @@ function createStyles(theme: ThemeTokens) {
       paddingHorizontal: theme.spacing["2"],
       paddingVertical: theme.spacing["1"],
       marginRight: theme.spacing["1"],
-    },
-    searchButton: {
-      paddingHorizontal: theme.spacing["2"],
-      paddingVertical: theme.spacing["1"],
-      marginLeft: theme.spacing["1"],
     },
     dateHeaderButton: {
       flex: 1,

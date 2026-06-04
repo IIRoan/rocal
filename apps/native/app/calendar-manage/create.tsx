@@ -11,7 +11,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen, NavigationHeader } from "../../src/components/layout";
 import { useRouter } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -24,8 +24,6 @@ import { useToast } from "../../src/providers/ToastProvider";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
 import { ColorPicker } from "../../src/components/event/ColorPicker";
-import { StackScreenHeader } from "../../src/components/StackScreenHeader";
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function CalendarCreateScreen() {
@@ -99,8 +97,9 @@ export default function CalendarCreateScreen() {
   const allErrors = [...validationErrors, ...serverErrors];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StackScreenHeader title="Create Calendar" />
+    <AppScreen
+      header={<NavigationHeader variant="stack" title="Create Calendar" />}
+    >
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -198,7 +197,7 @@ export default function CalendarCreateScreen() {
           </Pressable>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

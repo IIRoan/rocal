@@ -9,7 +9,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen } from "../../src/components/layout";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -80,7 +80,12 @@ export default function SubscriptionListScreen() {
     () =>
       sortedSubscriptions.flatMap((subscription) =>
         getSubscriptionType(subscription) === "holiday"
-          ? [{ subscription, calendar: calendarById.get(subscription.calendar.id) }]
+          ? [
+              {
+                subscription,
+                calendar: calendarById.get(subscription.calendar.id),
+              },
+            ]
           : [],
       ),
     [calendarById, sortedSubscriptions],
@@ -90,7 +95,12 @@ export default function SubscriptionListScreen() {
     () =>
       sortedSubscriptions.flatMap((subscription) =>
         getSubscriptionType(subscription) === "external"
-          ? [{ subscription, calendar: calendarById.get(subscription.calendar.id) }]
+          ? [
+              {
+                subscription,
+                calendar: calendarById.get(subscription.calendar.id),
+              },
+            ]
           : [],
       ),
     [calendarById, sortedSubscriptions],
@@ -112,7 +122,10 @@ export default function SubscriptionListScreen() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
     onError: (mutationError) => {
-      toast(getErrorMessage(mutationError, "Failed to update calendar visibility"), "error");
+      toast(
+        getErrorMessage(mutationError, "Failed to update calendar visibility"),
+        "error",
+      );
     },
     onSettled: () => {
       setPendingVisibilityCalendarId(null);
@@ -163,7 +176,10 @@ export default function SubscriptionListScreen() {
   const handleToggleVisibility = useCallback(
     (entry: ReadOnlyCalendarEntry) => {
       if (!entry.calendar) {
-        toast("This subscription is still loading. Try again in a moment.", "info");
+        toast(
+          "This subscription is still loading. Try again in a moment.",
+          "info",
+        );
         return;
       }
 
@@ -183,38 +199,44 @@ export default function SubscriptionListScreen() {
   );
 
   if (isLoading && subscriptions.length === 0) {
-    return <LoadingScreen theme={theme} message="Loading read-only calendars…" />;
+    return (
+      <LoadingScreen theme={theme} message="Loading read-only calendars…" />
+    );
   }
 
   if (isError) {
     return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>
-          {getErrorMessage(error, "Failed to load read-only calendars")}
-        </Text>
-        <Pressable style={styles.primaryButton} onPress={handleOpenCreate}>
-          <Text style={styles.primaryButtonText}>Add Calendar</Text>
-        </Pressable>
-      </SafeAreaView>
+      <AppScreen>
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>
+            {getErrorMessage(error, "Failed to load read-only calendars")}
+          </Text>
+          <Pressable style={styles.primaryButton} onPress={handleOpenCreate}>
+            <Text style={styles.primaryButtonText}>Add Calendar</Text>
+          </Pressable>
+        </View>
+      </AppScreen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StackScreenHeader
-        title="Read-only Calendars"
-        rightAction={
-          <Pressable
-            style={styles.headerAction}
-            onPress={handleOpenCreate}
-            accessibilityRole="button"
-            accessibilityLabel="Add read-only calendar"
-          >
-            <Feather name="plus" size={18} color={theme.colors.primaryBase} />
-          </Pressable>
-        }
-      />
-
+    <AppScreen
+      header={
+        <StackScreenHeader
+          title="Read-only Calendars"
+          rightAction={
+            <Pressable
+              style={styles.headerAction}
+              onPress={handleOpenCreate}
+              accessibilityRole="button"
+              accessibilityLabel="Add read-only calendar"
+            >
+              <Feather name="plus" size={18} color={theme.colors.primaryBase} />
+            </Pressable>
+          }
+        />
+      }
+    >
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -294,7 +316,7 @@ export default function SubscriptionListScreen() {
           ))
         )}
       </ScrollView>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
