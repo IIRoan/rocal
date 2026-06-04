@@ -1,4 +1,10 @@
-import { startOfMonth, startOfWeek, addDays, format } from "date-fns";
+import {
+  startOfMonth,
+  startOfWeek,
+  addDays,
+  format,
+  isSameMonth,
+} from "date-fns";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 import type { CalendarColor, ThemeTokens } from "@workspace/design-tokens";
 
@@ -63,6 +69,38 @@ export function generateGridDates(
     dates.push(addDays(gridStart, i));
   }
   return dates;
+}
+
+/** Week rows shown when CompactMonthStrip is fully expanded (never 6). */
+export const COMPACT_STRIP_EXPANDED_WEEK_ROWS = 5;
+
+/**
+ * First week-row index (0–1) for the expanded compact strip's 5-row window.
+ * When a month spans six grid rows, drops the leading padding week.
+ */
+export function getCompactStripWeekRowOffset(
+  currentDate: Date,
+  weekStartDay: number,
+): number {
+  const gridDates = generateGridDates(currentDate, weekStartDay);
+  const month = startOfMonth(currentDate);
+  let minRow = 5;
+  let maxRow = 0;
+
+  for (let i = 0; i < gridDates.length; i++) {
+    if (isSameMonth(gridDates[i]!, month)) {
+      const row = Math.floor(i / 7);
+      minRow = Math.min(minRow, row);
+      maxRow = Math.max(maxRow, row);
+    }
+  }
+
+  const span = maxRow - minRow + 1;
+  if (span <= COMPACT_STRIP_EXPANDED_WEEK_ROWS) {
+    return minRow;
+  }
+
+  return Math.max(0, maxRow - (COMPACT_STRIP_EXPANDED_WEEK_ROWS - 1));
 }
 
 /**
@@ -136,5 +174,8 @@ export function getCompactStripCollapsedHeight(
 
 /** Returns the fully expanded content height for CompactMonthStrip. */
 export function getCompactStripExpandedHeight(): number {
-  return COMPACT_STRIP_HEADER_ROW_HEIGHT + COMPACT_STRIP_WEEK_ROW_HEIGHT * 6;
+  return (
+    COMPACT_STRIP_HEADER_ROW_HEIGHT +
+    COMPACT_STRIP_WEEK_ROW_HEIGHT * COMPACT_STRIP_EXPANDED_WEEK_ROWS
+  );
 }

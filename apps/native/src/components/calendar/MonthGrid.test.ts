@@ -6,6 +6,8 @@ import {
   resolveEventDotColor,
   getCompactStripCollapsedHeight,
   getCompactStripExpandedHeight,
+  getCompactStripWeekRowOffset,
+  COMPACT_STRIP_EXPANDED_WEEK_ROWS,
   COMPACT_STRIP_WEEK_ROW_HEIGHT,
   COMPACT_STRIP_HEADER_ROW_HEIGHT,
 } from "./month-grid-utils";
@@ -228,10 +230,21 @@ describe("getCompactStripCollapsedHeight", () => {
   });
 });
 
+describe("getCompactStripWeekRowOffset", () => {
+  it("starts at row 0 for June 2025 with Sunday week start", () => {
+    expect(getCompactStripWeekRowOffset(new Date(2025, 5, 1), 0)).toBe(0);
+  });
+
+  it("skips leading padding row for June 2025 with Monday week start", () => {
+    expect(getCompactStripWeekRowOffset(new Date(2025, 5, 1), 1)).toBe(1);
+  });
+});
+
 describe("getCompactStripExpandedHeight", () => {
-  it("expanded height spans exactly 6 week rows plus the header row", () => {
+  it("expanded height spans exactly five week rows plus the header row", () => {
     expect(getCompactStripExpandedHeight()).toBe(
-      COMPACT_STRIP_HEADER_ROW_HEIGHT + COMPACT_STRIP_WEEK_ROW_HEIGHT * 6,
+      COMPACT_STRIP_HEADER_ROW_HEIGHT +
+        COMPACT_STRIP_WEEK_ROW_HEIGHT * COMPACT_STRIP_EXPANDED_WEEK_ROWS,
     );
   });
 
