@@ -15,14 +15,45 @@ import {
   CalendarApiService,
   NoopE2eeProvider,
 } from "@workspace/calendar-client";
-import { API_BASE_URL } from "./constants";
-import { getSessionCookie } from "./session-cookie";
-import { triggerSessionClear } from "../providers/AuthProvider";
+import * as Linking from "expo-linking";
+import { API_BASE_URL, APP_SCHEME } from "./constants";
+import {
+  getSessionCookie,
+  getSessionCookieAsync,
+  waitForSessionCookie,
+} from "./session-cookie";
+import { triggerSessionClear } from "./session-clear";
+
+export function getNativeExpoOrigin() {
+  return Linking.createURL("", { scheme: APP_SCHEME });
+}
 
 export function getAuthHeaders(): Record<string, string> {
   const cookie = getSessionCookie();
-  if (cookie) return { cookie };
-  return {};
+  const expoOrigin = getNativeExpoOrigin();
+
+  return {
+    ...(cookie ? { cookie } : {}),
+    ...(expoOrigin ? { "expo-origin": expoOrigin } : {}),
+    "x-skip-oauth-proxy": "true",
+  };
+}
+
+export async function getAuthHeadersAsync(): Promise<Record<string, string>> {
+  let cookie = await getSessionCookieAsync();
+  if (!cookie) {
+    const didFindCookie = await waitForSessionCookie(750, 50);
+    if (didFindCookie) {
+      cookie = await getSessionCookieAsync();
+    }
+  }
+  const expoOrigin = getNativeExpoOrigin();
+
+  return {
+    ...(cookie ? { cookie } : {}),
+    ...(expoOrigin ? { "expo-origin": expoOrigin } : {}),
+    "x-skip-oauth-proxy": "true",
+  };
 }
 
 export const httpClient = new HttpClient({
@@ -30,8 +61,8 @@ export const httpClient = new HttpClient({
   timeout: 10_000,
   retries: 3,
   retryDelay: 1_000,
-  credentials: "include",
-  getHeaders: getAuthHeaders,
+  credentials: "omit",
+  getHeaders: getAuthHeadersAsync,
   onAuthError: triggerSessionClear,
 });
 

@@ -1,10 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View, type ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  keepPreviousData,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { addMonths, subMonths } from "date-fns";
+import {
+  buildPaddedCalendarMonthRanges,
   type DecoratedCalendarEvent,
   getDefaultCalendarDateRange,
+  getPaddedCalendarMonthRange,
   createCalendarMap,
   createVisibleCalendarIdSet,
   transformCalendarEvents,
@@ -31,14 +39,12 @@ import { DayTimeline } from "../../../src/components/calendar/DayTimeline";
 import { ThreeDayTimeline } from "../../../src/components/calendar/ThreeDayTimeline";
 import { AgendaList } from "../../../src/components/calendar/AgendaList";
 import type { TimelinePage } from "../../../src/components/calendar/TimelinePager";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-// ─── Component ───────────────────────────────────────────────────────────────
+import { mergeMonthEventResponses } from "../../../src/components/calendar/month-events-utils";
 
 export default function CalendarScreen() {
   const { theme } = useTheme();
   const { openEventSheet } = useSheet();
+  const queryClient = useQueryClient();
   const {
     activeView,
     currentDate,
@@ -49,11 +55,7 @@ export default function CalendarScreen() {
   } = useCalendarView();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  // ─── State ───────────────────────────────────────────────────────────────────
-
   const [monthStripExpanded, setMonthStripExpanded] = useState(false);
-
-  // ─── Data fetching ─────────────────────────────────────────────────────────
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: QUERY_KEYS.settings(),
@@ -65,7 +67,6 @@ export default function CalendarScreen() {
     queryFn: () => calendarApiService.getCalendars(),
   });
 
-  // Fetch events for the detail view's date range
   const detailDateRange = useMemo(() => {
     const weekStartDay = settings?.weekStartDay ?? 0;
 
@@ -89,16 +90,27 @@ export default function CalendarScreen() {
     });
   }, [selectedDate, activeView, settings?.weekStartDay]);
 
-  // Fetch the current/adjacent month windows so swipe pages already have dots.
-  const monthDateRange = useMemo(
-    () =>
-      getSurroundingCalendarDateRange({
-        currentDate,
-        view: "month",
-        weekStartDay: settings?.weekStartDay,
-        pageRadius: 1,
-      }),
-    [currentDate, settings?.weekStartDay],
+  const monthEventsCenter = currentDate;
+
+  const previousMonth = useMemo(
+    () => subMonths(monthEventsCenter, 1),
+    [monthEventsCenter],
+  );
+  const nextMonth = useMemo(
+    () => addMonths(monthEventsCenter, 1),
+    [monthEventsCenter],
+  );
+  const previousMonthRange = useMemo(
+    () => getPaddedCalendarMonthRange(previousMonth),
+    [previousMonth],
+  );
+  const currentMonthRange = useMemo(
+    () => getPaddedCalendarMonthRange(monthEventsCenter),
+    [monthEventsCenter],
+  );
+  const nextMonthRange = useMemo(
+    () => getPaddedCalendarMonthRange(nextMonth),
+    [nextMonth],
   );
 
   const {
@@ -113,20 +125,70 @@ export default function CalendarScreen() {
     queryFn: () =>
       calendarApiService.getEvents(detailDateRange.start, detailDateRange.end),
     enabled: !settingsLoading,
-    placeholderData: (previousData) => previousData,
+    placeholderData:
+      activeView === "month" ? undefined : (previousData) => previousData,
   });
 
-  const { data: monthEventsData } = useQuery({
-    queryKey: QUERY_KEYS.events(
-      monthDateRange.start.toISOString(),
-      monthDateRange.end.toISOString(),
-    ),
-    queryFn: () =>
-      calendarApiService.getEvents(monthDateRange.start, monthDateRange.end),
-    enabled: !settingsLoading,
-  });
+  useEffect(() => {
+    for (const range of buildPaddedCalendarMonthRanges(monthEventsCenter, {
+      adjacentMonthDepth: 2,
+    })) {
+      void queryClient.prefetchQuery({
+        queryKey: QUERY_KEYS.events(
+          range.start.toISOString(),
+          range.end.toISOString(),
+        ),
+        queryFn: () => calendarApiService.getEvents(range.start, range.end),
+        staleTime: 120_000,
+      });
+    }
+  }, [monthEventsCenter, queryClient]);
 
-  // ─── Sync default view from settings ───────────────────────────────────────
+  const { data: previousMonthEventsData, isPending: isPreviousMonthPending } =
+    useQuery({
+      queryKey: QUERY_KEYS.events(
+        previousMonthRange.start.toISOString(),
+        previousMonthRange.end.toISOString(),
+      ),
+      queryFn: () =>
+        calendarApiService.getEvents(
+          previousMonthRange.start,
+          previousMonthRange.end,
+        ),
+      enabled: !settingsLoading,
+      staleTime: 120_000,
+      placeholderData: keepPreviousData,
+    });
+
+  const { data: currentMonthEventsData, isPending: isCurrentMonthPending } =
+    useQuery({
+      queryKey: QUERY_KEYS.events(
+        currentMonthRange.start.toISOString(),
+        currentMonthRange.end.toISOString(),
+      ),
+      queryFn: () =>
+        calendarApiService.getEvents(
+          currentMonthRange.start,
+          currentMonthRange.end,
+        ),
+      enabled: !settingsLoading,
+      staleTime: 120_000,
+      placeholderData: keepPreviousData,
+    });
+
+  const { data: nextMonthEventsData, isPending: isNextMonthPending } = useQuery(
+    {
+      queryKey: QUERY_KEYS.events(
+        nextMonthRange.start.toISOString(),
+        nextMonthRange.end.toISOString(),
+      ),
+      queryFn: () =>
+        calendarApiService.getEvents(nextMonthRange.start, nextMonthRange.end),
+      enabled: !settingsLoading,
+      staleTime: 120_000,
+      placeholderData: keepPreviousData,
+    },
+  );
 
   useEffect(() => {
     if (settings?.defaultView) {
@@ -134,18 +196,12 @@ export default function CalendarScreen() {
     }
   }, [settings?.defaultView, setActiveView]);
 
-  // ─── Event deletion (swipe-to-delete in agenda) ───────────────────────────
-
-  const queryClient = useQueryClient();
-
   const deleteEventMutation = useMutation({
     mutationFn: (eventId: string) => calendarApiService.deleteEvent(eventId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
   });
-
-  // ─── Event transformation ──────────────────────────────────────────────────
 
   const calendarList = useMemo(() => calendars ?? [], [calendars]);
   const calendarMap = useMemo(
@@ -161,7 +217,16 @@ export default function CalendarScreen() {
     [calendarList, calendarMap],
   );
 
-  // Events for the detail view (day/week/3day/agenda)
+  const mergedMonthEventsData = useMemo(
+    () =>
+      mergeMonthEventResponses([
+        previousMonthEventsData,
+        currentMonthEventsData,
+        nextMonthEventsData,
+      ]),
+    [currentMonthEventsData, nextMonthEventsData, previousMonthEventsData],
+  );
+
   const decoratedDetailEvents = useMemo(
     () =>
       transformCalendarEvents(
@@ -172,18 +237,24 @@ export default function CalendarScreen() {
     [detailEventsData?.events, calendarMap, visibleCalendarIds],
   );
 
-  // Events for the month strip dots
   const decoratedMonthEvents = useMemo(
     () =>
       transformCalendarEvents(
-        monthEventsData?.events ?? [],
+        mergedMonthEventsData.events,
         calendarMap,
         visibleCalendarIds,
       ),
-    [monthEventsData?.events, calendarMap, visibleCalendarIds],
+    [mergedMonthEventsData.events, calendarMap, visibleCalendarIds],
   );
 
-  // ─── Loading state ─────────────────────────────────────────────────────────
+  const isMonthStripEventsPending =
+    isPreviousMonthPending || isCurrentMonthPending || isNextMonthPending;
+
+  const stableMonthStripEventsRef = useRef(decoratedMonthEvents);
+  if (!isMonthStripEventsPending) {
+    stableMonthStripEventsRef.current = decoratedMonthEvents;
+  }
+  const monthStripEvents = stableMonthStripEventsRef.current;
 
   const loadingState = resolveCalendarLoadingState({
     settingsLoading,
@@ -195,21 +266,39 @@ export default function CalendarScreen() {
     eventCount: decoratedDetailEvents.length,
   });
 
-  // ─── Handlers ─────────────────────────────────────────────────────────────
+  const monthStartDate = useCallback((date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+  }, []);
+
+  const navigateMonth = useCallback(
+    (direction: 1 | -1, moveSelection = !monthStripExpanded) => {
+      const advanceMonth = (base: Date) => {
+        const next = navigateCalendarDate(base, "month", direction);
+        return monthStartDate(next);
+      };
+
+      setCurrentDate((previousDate) => advanceMonth(previousDate));
+      if (moveSelection) {
+        setSelectedDate((previousDate) => advanceMonth(previousDate));
+      }
+    },
+    [monthStartDate, monthStripExpanded, setCurrentDate, setSelectedDate],
+  );
 
   const handleNavigateForward = useCallback(() => {
-    const next = navigateCalendarDate(currentDate, "month", 1);
-    const firstOfMonth = new Date(next.getFullYear(), next.getMonth(), 1);
-    setCurrentDate(firstOfMonth);
-    setSelectedDate(firstOfMonth);
-  }, [currentDate, setCurrentDate, setSelectedDate]);
+    navigateMonth(1, !monthStripExpanded);
+  }, [navigateMonth, monthStripExpanded]);
 
   const handleNavigateBackward = useCallback(() => {
-    const prev = navigateCalendarDate(currentDate, "month", -1);
-    const firstOfMonth = new Date(prev.getFullYear(), prev.getMonth(), 1);
-    setCurrentDate(firstOfMonth);
-    setSelectedDate(firstOfMonth);
-  }, [currentDate, setCurrentDate, setSelectedDate]);
+    navigateMonth(-1, !monthStripExpanded);
+  }, [navigateMonth, monthStripExpanded]);
+
+  const handleMonthChange = useCallback(
+    (direction: 1 | -1) => {
+      navigateMonth(direction, false);
+    },
+    [navigateMonth],
+  );
 
   const handleTodayPress = useCallback(() => {
     const now = new Date();
@@ -217,21 +306,14 @@ export default function CalendarScreen() {
     setSelectedDate(now);
   }, [setCurrentDate, setSelectedDate]);
 
-  // When a day is tapped in the month strip, select it and navigate
-  const handleDayPress = useCallback((date: Date) => {
-    setSelectedDate(date);
-    setCurrentDate(date);
-    setMonthStripExpanded(false);
-  }, [setCurrentDate, setSelectedDate]);
-
-  const handleMonthChange = useCallback((direction: 1 | -1) => {
-    setCurrentDate((prev) => {
-      const next = navigateCalendarDate(prev, "month", direction);
-      const firstOfMonth = new Date(next.getFullYear(), next.getMonth(), 1);
-      setSelectedDate(firstOfMonth);
-      return firstOfMonth;
-    });
-  }, [setCurrentDate, setSelectedDate]);
+  const handleDayPress = useCallback(
+    (date: Date) => {
+      setSelectedDate(date);
+      setCurrentDate(date);
+      setMonthStripExpanded(false);
+    },
+    [setCurrentDate, setSelectedDate],
+  );
 
   const handleToggleMonthStrip = useCallback(() => {
     setMonthStripExpanded((prev) => !prev);
@@ -280,24 +362,8 @@ export default function CalendarScreen() {
     [deleteEventMutation],
   );
 
-  // ─── Render ────────────────────────────────────────────────────────────────
-
   const isTimelineView =
     activeView === "week" || activeView === "3day" || activeView === "day";
-
-  const standaloneCompactStrip = (
-    <CompactMonthStrip
-      currentDate={currentDate}
-      selectedDate={selectedDate}
-      events={decoratedMonthEvents}
-      weekStartDay={settings?.weekStartDay ?? 0}
-      expanded={monthStripExpanded}
-      onDayPress={handleDayPress}
-      onMonthChange={handleMonthChange}
-      onToggleExpand={handleToggleMonthStrip}
-      collapseToHandleOnly={activeView === "day"}
-    />
-  );
 
   const renderTimelineHeaderPage = useCallback(
     (page: TimelinePage) => (
@@ -316,11 +382,12 @@ export default function CalendarScreen() {
         }
         events={decoratedMonthEvents}
         weekStartDay={settings?.weekStartDay ?? 0}
-        expanded={monthStripExpanded}
+        expanded={false}
         onDayPress={handleDayPress}
         onToggleExpand={handleToggleMonthStrip}
         swipeEnabled={false}
         showSelectedDateHighlight={activeView !== "week"}
+        collapseToHandleOnly={activeView === "day"}
       />
     ),
     [
@@ -328,14 +395,12 @@ export default function CalendarScreen() {
       decoratedMonthEvents,
       handleDayPress,
       handleToggleMonthStrip,
-      monthStripExpanded,
       settings?.weekStartDay,
     ],
   );
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      {/* Header: menu, date title, mini-calendar toggle */}
       <CalendarViewSwitcher
         activeView={activeView}
         currentDate={currentDate}
@@ -347,31 +412,44 @@ export default function CalendarScreen() {
         onToggleMonthStrip={handleToggleMonthStrip}
       />
 
-      {/* For non-timeline views, show strip + separator above the content */}
-      {!isTimelineView && (
+      {(monthStripExpanded || !isTimelineView) && (
         <>
-          {standaloneCompactStrip}
+          <CompactMonthStrip
+            currentDate={currentDate}
+            selectedDate={selectedDate}
+            events={monthStripEvents}
+            weekStartDay={settings?.weekStartDay ?? 0}
+            expanded={monthStripExpanded}
+            externalExpandControl={monthStripExpanded}
+            swipeEnabled
+            showHandle
+            onDayPress={handleDayPress}
+            onMonthChange={handleMonthChange}
+            onToggleExpand={handleToggleMonthStrip}
+          />
           <View style={styles.separator} />
         </>
       )}
 
-      {/* Detail view */}
       {loadingState.isAllInitialLoading ? (
         <SkeletonLoader view={activeView} />
       ) : activeView === "month" ? (
-        <MonthGrid
-          currentDate={currentDate}
-          selectedDate={selectedDate}
-          events={decoratedDetailEvents}
-          weekStartDay={settings?.weekStartDay ?? 0}
-          onDayPress={handleDayPress}
-        />
+        monthStripExpanded ? null : (
+          <MonthGrid
+            currentDate={currentDate}
+            selectedDate={selectedDate}
+            events={decoratedDetailEvents}
+            weekStartDay={settings?.weekStartDay ?? 0}
+            onDayPress={handleDayPress}
+          />
+        )
       ) : activeView === "agenda" ? (
         <SwipeableCalendarView
           onSwipeLeft={() => handleDetailNavigate(1)}
           onSwipeRight={() => handleDetailNavigate(-1)}
         >
           <AgendaList
+            key={selectedDate.toISOString()}
             events={decoratedDetailEvents}
             timeFormat={settings?.timeFormat ?? "12h"}
             refreshing={detailEventsLoading}
@@ -392,7 +470,9 @@ export default function CalendarScreen() {
               onNavigate={handleDetailNavigate}
               onEventPress={handleEventPress}
               onTimeSlotPress={handleTimeSlotPress}
-              renderHeaderPage={renderTimelineHeaderPage}
+              renderHeaderPage={
+                monthStripExpanded ? undefined : renderTimelineHeaderPage
+              }
             />
           )}
           {activeView === "day" && (
@@ -404,7 +484,9 @@ export default function CalendarScreen() {
               onNavigate={handleDetailNavigate}
               onEventPress={handleEventPress}
               onTimeSlotPress={handleTimeSlotPress}
-              renderHeaderPage={renderTimelineHeaderPage}
+              renderHeaderPage={
+                monthStripExpanded ? undefined : renderTimelineHeaderPage
+              }
             />
           )}
           {activeView === "3day" && (
@@ -416,7 +498,9 @@ export default function CalendarScreen() {
               onNavigate={handleDetailNavigate}
               onEventPress={handleEventPress}
               onTimeSlotPress={handleTimeSlotPress}
-              renderHeaderPage={renderTimelineHeaderPage}
+              renderHeaderPage={
+                monthStripExpanded ? undefined : renderTimelineHeaderPage
+              }
             />
           )}
         </>
@@ -424,8 +508,6 @@ export default function CalendarScreen() {
     </SafeAreaView>
   );
 }
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
 
 function createStyles(theme: ThemeTokens) {
   const view = {

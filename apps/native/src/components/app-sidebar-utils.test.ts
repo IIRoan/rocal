@@ -33,7 +33,6 @@ describe("AppSidebar screen model", () => {
 
     expect(items.map((item) => item.key)).toEqual([
       "calendar",
-      "search",
       "settings",
     ]);
     expect(items.some((item) => item.key === "sign-out")).toBe(false);
@@ -44,7 +43,6 @@ describe("AppSidebar screen model", () => {
 
     expect(items.map((item) => item.route)).toEqual([
       "/calendar",
-      "/search",
       "/settings",
     ]);
   });

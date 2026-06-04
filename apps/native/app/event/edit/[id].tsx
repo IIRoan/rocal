@@ -1,13 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   StyleSheet,
   Text,
   View,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen, NavigationHeader } from "../../../src/components/layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -17,9 +16,11 @@ import type {
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
+import { useToast } from "../../../src/providers/ToastProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { EventForm } from "../../../src/components/event/EventForm";
+import { LoadingScreen } from "../../../src/components/ui/loading";
 import { toLocalISOString } from "../../../src/components/event/event-form-utils";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -53,6 +54,7 @@ export default function EventEditScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // ─── Route params ──────────────────────────────────────────────────────────
 
@@ -100,6 +102,7 @@ export default function EventEditScreen() {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.eventDetail(id!),
       });
+      toast("Event updated");
       router.back();
     },
     onError: (err: unknown) => {
@@ -135,23 +138,16 @@ export default function EventEditScreen() {
   // ─── Loading state ─────────────────────────────────────────────────────────
 
   if (eventLoading || calendarsLoading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-        <Text style={styles.loadingText}>Loading…</Text>
-      </SafeAreaView>
-    );
+    return <LoadingScreen theme={theme} message="Loading…" />;
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle} accessibilityRole="header">
-          Edit Event
-        </Text>
-      </View>
+    <AppScreen
+      header={<NavigationHeader variant="form" title="Edit Event" />}
+      edges={["top"]}
+    >
       <EventForm
         calendars={calendars ?? []}
         serverErrors={serverErrors}
@@ -160,7 +156,7 @@ export default function EventEditScreen() {
         onCancel={handleCancel}
         initialValues={initialValues}
       />
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
@@ -171,13 +167,6 @@ function createStyles(theme: ThemeTokens) {
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
-    },
-    centered: {
-      flex: 1,
-      justifyContent: "center" as const,
-      alignItems: "center" as const,
-      backgroundColor: theme.colors.background,
-      padding: theme.spacing["4"],
     },
     header: {
       paddingHorizontal: theme.spacing["4"],
@@ -194,12 +183,6 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
-    },
-    loadingText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-      marginTop: theme.spacing["2"],
     },
   } satisfies Record<string, TextStyle>;
 

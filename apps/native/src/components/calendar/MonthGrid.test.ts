@@ -1,10 +1,13 @@
 import {
   getOrderedDayLabels,
   generateGridDates,
+  getMonthDayEvents,
   groupEventsByDay,
   resolveEventDotColor,
   getCompactStripCollapsedHeight,
   getCompactStripExpandedHeight,
+  getCompactStripWeekRowOffset,
+  COMPACT_STRIP_EXPANDED_WEEK_ROWS,
   COMPACT_STRIP_WEEK_ROW_HEIGHT,
   COMPACT_STRIP_HEADER_ROW_HEIGHT,
 } from "./month-grid-utils";
@@ -124,6 +127,33 @@ describe("groupEventsByDay", () => {
   });
 });
 
+describe("getMonthDayEvents", () => {
+  const event = {
+    id: "1",
+    title: "Event 1",
+    start: new Date(2025, 0, 31, 10),
+    end: new Date(2025, 0, 31, 11),
+    calendarId: "cal-1",
+    userId: "user-1",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as DecoratedCalendarEvent;
+
+  it("returns events for dates in the rendered month", () => {
+    const map = groupEventsByDay([event]);
+
+    expect(getMonthDayEvents(map, new Date(2025, 0, 31), true)).toEqual([
+      event,
+    ]);
+  });
+
+  it("hides events for padded outside-month dates", () => {
+    const map = groupEventsByDay([event]);
+
+    expect(getMonthDayEvents(map, new Date(2025, 0, 31), false)).toEqual([]);
+  });
+});
+
 // ─── resolveEventDotColor ────────────────────────────────────────────────────
 
 describe("resolveEventDotColor", () => {
@@ -200,10 +230,21 @@ describe("getCompactStripCollapsedHeight", () => {
   });
 });
 
+describe("getCompactStripWeekRowOffset", () => {
+  it("starts at row 0 for June 2025 with Sunday week start", () => {
+    expect(getCompactStripWeekRowOffset(new Date(2025, 5, 1), 0)).toBe(0);
+  });
+
+  it("skips leading padding row for June 2025 with Monday week start", () => {
+    expect(getCompactStripWeekRowOffset(new Date(2025, 5, 1), 1)).toBe(1);
+  });
+});
+
 describe("getCompactStripExpandedHeight", () => {
-  it("expanded height spans exactly 6 week rows plus the header row", () => {
+  it("expanded height spans exactly five week rows plus the header row", () => {
     expect(getCompactStripExpandedHeight()).toBe(
-      COMPACT_STRIP_HEADER_ROW_HEIGHT + COMPACT_STRIP_WEEK_ROW_HEIGHT * 6,
+      COMPACT_STRIP_HEADER_ROW_HEIGHT +
+        COMPACT_STRIP_WEEK_ROW_HEIGHT * COMPACT_STRIP_EXPANDED_WEEK_ROWS,
     );
   });
 

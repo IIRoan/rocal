@@ -1,3 +1,8 @@
+const path = require("path");
+const { createReactDedupeMapper } = require("../../jest.react-dedupe.cjs");
+
+const repoRoot = path.join(__dirname, "../..");
+
 module.exports = {
   displayName: "web",
   rootDir: ".",
@@ -14,6 +19,7 @@ module.exports = {
   },
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   moduleNameMapper: {
+    ...createReactDedupeMapper(repoRoot),
     "^@/(.*)$": "<rootDir>/$1",
     "^@workspace/logger$": "<rootDir>/../../packages/logger/src/index.ts",
     "^@workspace/calendar-core$":

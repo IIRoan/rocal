@@ -2,6 +2,7 @@ module.exports = {
   displayName: "native",
   rootDir: ".",
   testEnvironment: "node",
+  setupFiles: ["<rootDir>/jest.setup.ts"],
   testMatch: ["<rootDir>/src/**/*.test.ts", "<rootDir>/src/**/*.test.tsx"],
   transform: {
     "^.+\\.(js|jsx|ts|tsx)$": [
@@ -9,8 +10,19 @@ module.exports = {
       { configFile: require.resolve("../../babel.config.cts") },
     ],
   },
+  // Allow babel-jest to transform ESM-only packages inside node_modules
+  transformIgnorePatterns: [
+    "/node_modules/(?!@noble/(?:hashes|curves|ciphers)/)",
+  ],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   moduleNameMapper: {
+    // Force a single React instance to prevent "Invalid hook call" errors
+    // caused by react-dom (19.2.0) bundling its own react (19.2.0) while the
+    // app imports react@19.1.0 from the root. Redirecting all react imports to
+    // react-dom's peer version keeps them in sync.
+    "^react$": "<rootDir>/../../node_modules/react-dom/node_modules/react/index.js",
+    "^react/jsx-runtime$": "<rootDir>/../../node_modules/react-dom/node_modules/react/jsx-runtime.js",
+    "^react/jsx-dev-runtime$": "<rootDir>/../../node_modules/react-dom/node_modules/react/jsx-dev-runtime.js",
     "^@/(.*)$": "<rootDir>/$1",
     "^@workspace/design-tokens$":
       "<rootDir>/../../packages/design-tokens/src/index.ts",

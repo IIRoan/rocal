@@ -107,6 +107,7 @@ export function EventEditor({
   } = eventForm;
   const [showDescription, setShowDescription] = useState(false);
   const [showLocation, setShowLocation] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
   const [inviteResponsePending, setInviteResponsePending] =
     useState<EventEditorInvitationResponseStatus | null>(null);
   const lastPreviewPayloadRef = useRef<string>("");
@@ -117,6 +118,7 @@ export function EventEditor({
       requestAnimationFrame(() => {
         setShowDescription(false);
         setShowLocation(false);
+        setShowParticipants(false);
       });
     }
   }, [open, resetForm]);
@@ -144,6 +146,10 @@ export function EventEditor({
 
       if (eventToEdit.location) {
         setShowLocation(true);
+      }
+
+      if ((eventToEdit.participants?.length ?? 0) > 0) {
+        setShowParticipants(true);
       }
     });
   }, [
@@ -282,6 +288,9 @@ export function EventEditor({
   const handleToggleNotifications = useCallback(() => {
     setShowNotifications(!showNotifications);
   }, [setShowNotifications, showNotifications]);
+  const handleToggleParticipants = useCallback(() => {
+    setShowParticipants((current) => !current);
+  }, []);
 
   const canEditSelectedEvent = useMemo(
     () => (selectedEvent ? canCurrentUserEditEvent(selectedEvent) : true),
@@ -400,18 +409,22 @@ export function EventEditor({
         onToggleDescription={handleToggleDescription}
         onToggleLocation={handleToggleLocation}
         onToggleNotifications={handleToggleNotifications}
+        onToggleParticipants={handleToggleParticipants}
         onToggleRecurring={handleToggleRecurring}
         showDescription={showDescription}
         showLocation={showLocation}
         showNotifications={showNotifications}
+        showParticipants={showParticipants}
       />
       <EventEditorBody
         eventForm={eventForm}
         isViewMode={isViewMode}
         showLocation={showLocation}
         showDescription={showDescription}
+        showParticipants={showParticipants}
         setShowLocation={setShowLocation}
         setShowDescription={setShowDescription}
+        setShowParticipants={setShowParticipants}
         localSettings={localSettings}
         calendars={calendars}
         desktop
@@ -487,8 +500,10 @@ export function EventEditor({
                   isViewMode={isViewMode}
                   showLocation={showLocation}
                   showDescription={showDescription}
+                  showParticipants={showParticipants}
                   setShowLocation={setShowLocation}
                   setShowDescription={setShowDescription}
+                  setShowParticipants={setShowParticipants}
                   localSettings={localSettings}
                   calendars={calendars}
                 />
@@ -524,8 +539,10 @@ export function EventEditor({
         recurringModal={recurringModal}
         setShowLocation={setShowLocation}
         setShowDescription={setShowDescription}
+        setShowParticipants={setShowParticipants}
         showLocation={showLocation}
         showDescription={showDescription}
+        showParticipants={showParticipants}
       />
     );
   }

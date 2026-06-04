@@ -1,6 +1,21 @@
-import { formatViewDateHeader } from "./view-switcher-utils";
+import {
+  formatCalendarToolbarTitle,
+  formatViewDateHeader,
+} from "./view-switcher-utils";
 
 // ─── formatViewDateHeader ────────────────────────────────────────────────────
+
+describe("formatCalendarToolbarTitle", () => {
+  it("returns abbreviated month and year only", () => {
+    const date = new Date(2025, 5, 10);
+    expect(formatCalendarToolbarTitle(date)).toBe("Jun 2025");
+  });
+
+  it("does not include day numbers for week-focused dates", () => {
+    const date = new Date(2025, 0, 15);
+    expect(formatCalendarToolbarTitle(date)).toBe("Jan 2025");
+  });
+});
 
 describe("formatViewDateHeader", () => {
   // Month view
