@@ -1,8 +1,9 @@
-import {
+import React, {
   useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -34,9 +35,11 @@ import {
   MAX_DOTS,
   getOrderedDayLabels,
   generateGridDates,
+  getMonthDayEvents,
   groupEventsByDay,
   resolveEventDotColor,
 } from "./month-grid-utils";
+import { useCurrentDateTime } from "./useCurrentDateTime";
 import { useSwipePanelGesture } from "../../lib/useSwipePanelGesture";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -53,10 +56,6 @@ const SWIPE_COMMIT_THRESHOLD = 50;
 const VELOCITY_COMMIT = 600;
 /** Rubber-band factor for overscroll resistance. */
 const RUBBER_BAND_FACTOR = 0.3;
-/** Duration of the page settle animation (ms). */
-const PAGE_DURATION = 210;
-/** Spring config for snap-back. */
-const PAGE_SPRING = { damping: 30, stiffness: 320, mass: 0.8 };
 /** Spring config for expand/collapse height animation. */
 const HEIGHT_SPRING = {
   damping: 26,
@@ -66,6 +65,22 @@ const HEIGHT_SPRING = {
 };
 const VERTICAL_COMMIT_DISTANCE = 22;
 const VERTICAL_VELOCITY_COMMIT = 360;
+/** Duration of the month page settle animation (ms). */
+const PAGE_DURATION = 210;
+/** Spring config for snap-back after an uncommitted swipe. */
+const PAGE_SPRING = { damping: 30, stiffness: 320, mass: 0.8 };
+
+function rubberBand(offset: number, limit: number, factor: number): number {
+  "worklet";
+  if (Math.abs(offset) < limit) return offset;
+  const sign = offset < 0 ? -1 : 1;
+  const overshoot = Math.abs(offset) - limit;
+  return sign * (limit + overshoot * factor);
+}
+
+function monthStart(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -99,16 +114,12 @@ interface CompactMonthStripProps {
    * header or week row is shown.
    */
   collapseToHandleOnly?: boolean;
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function rubberBand(offset: number, limit: number, factor: number): number {
-  "worklet";
-  if (Math.abs(offset) < limit) return offset;
-  const sign = offset < 0 ? -1 : 1;
-  const overshoot = Math.abs(offset) - limit;
-  return sign * (limit + overshoot * factor);
+  /** When false, no drag handle (toolbar toggles expand). Default true. */
+  showHandle?: boolean;
+  /** S M T W … row above the grid. Off for toolbar-expanded month picker. */
+  showDayOfWeekHeader?: boolean;
+  /** Flush under {@link CalendarScreenHeader} — shared border, tight padding. */
+  embeddedInHeader?: boolean;
 }
 
 function getMonthRowTarget(
@@ -174,7 +185,7 @@ interface MonthPageProps {
   showSelectedDateHighlight: boolean;
 }
 
-function MonthPage({
+const MonthPage = React.memo(function MonthPage({
   monthDate,
   gridDates,
   selectedDate,
@@ -236,14 +247,22 @@ function MonthPage({
           {rowDates.map((date) => {
             const dateKey = format(date, "yyyy-MM-dd");
             const isCurrentMonth = isSameMonth(date, monthDate);
-            const isToday = isSameDay(date, today);
+            const isToday = isCurrentMonth && isSameDay(date, today);
             const isSelected =
-              selectedDate != null && isSameDay(date, selectedDate);
+              isCurrentMonth &&
+              selectedDate != null &&
+              isSameDay(date, selectedDate);
             const isHighlighted =
-              highlightedDates?.some((highlightedDate) =>
+              isCurrentMonth &&
+              (highlightedDates?.some((highlightedDate) =>
                 isSameDay(date, highlightedDate),
-              ) ?? false;
-            const dayEvents = eventsByDay.get(dateKey) ?? [];
+              ) ??
+                false);
+            const dayEvents = getMonthDayEvents(
+              eventsByDay,
+              date,
+              isCurrentMonth,
+            );
 
             return (
               <Pressable
@@ -328,11 +347,11 @@ function MonthPage({
             )}
     </Animated.View>
   );
-}
+});
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function CompactMonthStrip({
+function CompactMonthStripComponent({
   currentDate,
   selectedDate,
   highlightedDates,
@@ -346,21 +365,46 @@ export function CompactMonthStrip({
   swipeEnabled = true,
   showSelectedDateHighlight = true,
   collapseToHandleOnly = false,
+  showHandle = true,
+  showDayOfWeekHeader = true,
+  embeddedInHeader = false,
 }: CompactMonthStripProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  const today = useMemo(() => new Date(), []);
+  const styles = useMemo(
+    () => createStyles(theme, embeddedInHeader),
+    [theme, embeddedInHeader],
+  );
+  const dayHeaderHeight = showDayOfWeekHeader ? HEADER_ROW_HEIGHT : 0;
+  const today = useCurrentDateTime();
 
   const dayLabels = useMemo(
     () => getOrderedDayLabels(weekStartDay),
     [weekStartDay],
   );
   const eventsByDay = useMemo(() => groupEventsByDay(events), [events]);
+
+  const [pagedMonth, setPagedMonth] = useState(() => monthStart(currentDate));
+  const carouselMonth = swipeEnabled ? pagedMonth : currentDate;
+  const parentMonthKey = format(currentDate, "yyyy-MM");
+  const skipParentMonthSyncRef = useRef(false);
+
+  useEffect(() => {
+    if (!swipeEnabled) {
+      setPagedMonth(monthStart(currentDate));
+      return;
+    }
+    if (skipParentMonthSyncRef.current) {
+      skipParentMonthSyncRef.current = false;
+      return;
+    }
+    setPagedMonth(monthStart(currentDate));
+  }, [parentMonthKey, swipeEnabled, currentDate]);
+
   const pages = useMemo(() => {
     if (!swipeEnabled) {
       return [
         {
-          key: `0-${format(currentDate, "yyyy-MM")}`,
+          key: format(currentDate, "yyyy-MM"),
           monthDate: currentDate,
           gridDates: generateGridDates(currentDate, weekStartDay),
         },
@@ -368,14 +412,14 @@ export function CompactMonthStrip({
     }
 
     return [-1, 0, 1].map((offset) => {
-      const monthDate = addMonths(currentDate, offset);
+      const monthDate = addMonths(carouselMonth, offset);
       return {
         key: `${offset}-${format(monthDate, "yyyy-MM")}`,
         monthDate,
         gridDates: generateGridDates(monthDate, weekStartDay),
       };
     });
-  }, [currentDate, swipeEnabled, weekStartDay]);
+  }, [carouselMonth, currentDate, swipeEnabled, weekStartDay]);
 
   // ─── Animated height for expand/collapse ─────────────────────────────────
 
@@ -383,8 +427,8 @@ export function CompactMonthStrip({
   // the parent timeline header already renders the day columns.
   const collapsedContentHeight = collapseToHandleOnly
     ? 0
-    : HEADER_ROW_HEIGHT + WEEK_ROW_HEIGHT;
-  const expandedContentHeight = HEADER_ROW_HEIGHT + WEEK_ROW_HEIGHT * 6;
+    : dayHeaderHeight + WEEK_ROW_HEIGHT;
+  const expandedContentHeight = dayHeaderHeight + WEEK_ROW_HEIGHT * 6;
   const animatedContentHeight = useSharedValue(
     expanded ? expandedContentHeight : collapsedContentHeight,
   );
@@ -393,15 +437,19 @@ export function CompactMonthStrip({
   useEffect(() => {
     setShowExpandedRows(expanded);
     cancelAnimation(animatedContentHeight);
-    animatedContentHeight.value = withSpring(
-      expanded ? expandedContentHeight : collapsedContentHeight,
-      HEIGHT_SPRING,
-    );
+    const target = expanded ? expandedContentHeight : collapsedContentHeight;
+    if (embeddedInHeader && expanded) {
+      animatedContentHeight.value = target;
+      return;
+    }
+    animatedContentHeight.value = withSpring(target, HEIGHT_SPRING);
   }, [
     expanded,
     expandedContentHeight,
     collapsedContentHeight,
     animatedContentHeight,
+    dayHeaderHeight,
+    embeddedInHeader,
   ]);
 
   const contentAreaAnimatedStyle = useAnimatedStyle(() => ({
@@ -412,18 +460,39 @@ export function CompactMonthStrip({
 
   const [pageWidth, setPageWidth] = useState(1);
   const translateX = useSharedValue(-1);
+  const pageWidthRef = useRef(pageWidth);
+  pageWidthRef.current = pageWidth;
 
   useLayoutEffect(() => {
-    translateX.value = swipeEnabled ? -pageWidth : 0;
-  }, [currentDate, pageWidth, swipeEnabled, translateX]);
+    if (!swipeEnabled) {
+      translateX.value = 0;
+      return;
+    }
+    if (pageWidth > 1) {
+      translateX.value = -pageWidth;
+    }
+  }, [pageWidth, swipeEnabled, translateX]);
+
+  const commitMonthNavigation = useCallback(
+    (direction: 1 | -1) => {
+      skipParentMonthSyncRef.current = true;
+      setPagedMonth((prev) => monthStart(addMonths(prev, direction)));
+      const width = pageWidthRef.current;
+      if (width > 1) {
+        translateX.value = -width;
+      }
+      onMonthChange?.(direction);
+    },
+    [onMonthChange, translateX],
+  );
 
   const handleNavigateLeft = useCallback(() => {
-    onMonthChange?.(1);
-  }, [onMonthChange]);
+    commitMonthNavigation(1);
+  }, [commitMonthNavigation]);
 
   const handleNavigateRight = useCallback(() => {
-    onMonthChange?.(-1);
-  }, [onMonthChange]);
+    commitMonthNavigation(-1);
+  }, [commitMonthNavigation]);
 
   const handleGridLayout = useCallback((event: LayoutChangeEvent) => {
     const nextWidth = Math.max(1, event.nativeEvent.layout.width);
@@ -480,14 +549,26 @@ export function CompactMonthStrip({
       }
     });
 
+  const stripAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
   // ─── Vertical pan gesture for expand/collapse ─────────────────────────────
 
   const verticalPanConfig = {
     restValue: expanded ? expandedContentHeight : collapsedContentHeight,
     lowerBound: collapsedContentHeight,
     upperBound: expandedContentHeight,
-    onCommitDown: expanded ? undefined : onToggleExpand,
-    onCommitUp: expanded ? onToggleExpand : undefined,
+    onCommitDown: embeddedInHeader
+      ? undefined
+      : expanded
+        ? undefined
+        : onToggleExpand,
+    onCommitUp: embeddedInHeader
+      ? undefined
+      : expanded
+        ? onToggleExpand
+        : undefined,
     commitDistance: VERTICAL_COMMIT_DISTANCE,
     commitVelocity: VERTICAL_VELOCITY_COMMIT,
     rubberBandBelow: RUBBER_BAND_FACTOR,
@@ -509,28 +590,26 @@ export function CompactMonthStrip({
     .activeOffsetY([-6, 6])
     .failOffsetX([-18, 18]);
 
-  const composedGesture = swipeEnabled
-    ? Gesture.Race(horizontalPan, verticalPan)
-    : verticalPan;
-
-  const stripAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: translateX.value }],
-    };
-  }, [translateX]);
+  const composedGesture =
+    swipeEnabled && !embeddedInHeader
+      ? Gesture.Race(horizontalPan, verticalPan)
+      : swipeEnabled
+        ? horizontalPan
+        : verticalPan;
 
   return (
     <View style={styles.container}>
       {/* Content area — only this clips during expand/collapse */}
       <Animated.View style={[styles.contentArea, contentAreaAnimatedStyle]}>
-        {/* Day-of-week header labels (static — don't slide) */}
-        <View style={styles.headerRow}>
-          {dayLabels.map((label) => (
-            <View key={label} style={styles.headerCell}>
-              <Text style={styles.headerText}>{label}</Text>
-            </View>
-          ))}
-        </View>
+        {showDayOfWeekHeader ? (
+          <View style={styles.headerRow}>
+            {dayLabels.map((label) => (
+              <View key={label} style={styles.headerCell}>
+                <Text style={styles.headerText}>{label}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         {/* Grid area */}
         <GestureDetector gesture={composedGesture}>
@@ -593,34 +672,43 @@ export function CompactMonthStrip({
         </GestureDetector>
       </Animated.View>
 
-      {/* Handle lives outside the clipped area — always fully visible */}
-      <GestureDetector gesture={handleVerticalPan}>
-        <Pressable
-          onPress={onToggleExpand}
-          style={styles.handle}
-          hitSlop={{ top: 8, bottom: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel={
-            expanded ? "Collapse month calendar" : "Expand month calendar"
-          }
-        >
-          <View style={styles.handleBar} />
-        </Pressable>
-      </GestureDetector>
+      {showHandle ? (
+        <GestureDetector gesture={handleVerticalPan}>
+          <Pressable
+            onPress={onToggleExpand}
+            style={styles.handle}
+            hitSlop={{ top: 8, bottom: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={
+              expanded ? "Collapse month calendar" : "Expand month calendar"
+            }
+          >
+            <View style={styles.handleBar} />
+          </Pressable>
+        </GestureDetector>
+      ) : null}
     </View>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
-function createStyles(theme: ThemeTokens) {
+function createStyles(theme: ThemeTokens, embeddedInHeader: boolean) {
   const view = {
     container: {
       backgroundColor: theme.colors.background,
-      paddingHorizontal: theme.spacing["2"],
+      paddingHorizontal: embeddedInHeader
+        ? theme.spacing["3"]
+        : theme.spacing["2"],
+      paddingTop: theme.spacing["2"],
+      paddingBottom: embeddedInHeader ? theme.spacing["1"] : undefined,
       zIndex: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
+      ...(embeddedInHeader
+        ? {}
+        : {
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: theme.colors.border,
+          }),
     },
     headerRow: {
       flexDirection: "row" as const,
@@ -724,5 +812,7 @@ function createStyles(theme: ThemeTokens) {
 
   return { ...StyleSheet.create(view), ...StyleSheet.create(text) };
 }
+
+export const CompactMonthStrip = React.memo(CompactMonthStripComponent);
 
 export type { CompactMonthStripProps };

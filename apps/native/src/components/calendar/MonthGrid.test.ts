@@ -1,6 +1,7 @@
 import {
   getOrderedDayLabels,
   generateGridDates,
+  getMonthDayEvents,
   groupEventsByDay,
   resolveEventDotColor,
   getCompactStripCollapsedHeight,
@@ -121,6 +122,33 @@ describe("groupEventsByDay", () => {
     const map = groupEventsByDay(events);
     expect(map.get("2025-01-15")).toHaveLength(2);
     expect(map.get("2025-01-16")).toHaveLength(1);
+  });
+});
+
+describe("getMonthDayEvents", () => {
+  const event = {
+    id: "1",
+    title: "Event 1",
+    start: new Date(2025, 0, 31, 10),
+    end: new Date(2025, 0, 31, 11),
+    calendarId: "cal-1",
+    userId: "user-1",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as DecoratedCalendarEvent;
+
+  it("returns events for dates in the rendered month", () => {
+    const map = groupEventsByDay([event]);
+
+    expect(getMonthDayEvents(map, new Date(2025, 0, 31), true)).toEqual([
+      event,
+    ]);
+  });
+
+  it("hides events for padded outside-month dates", () => {
+    const map = groupEventsByDay([event]);
+
+    expect(getMonthDayEvents(map, new Date(2025, 0, 31), false)).toEqual([]);
   });
 });
 

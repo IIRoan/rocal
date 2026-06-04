@@ -10,13 +10,16 @@ import { MailSelectionBar } from "./MailSelectionBar";
 import { MailTopToolbar } from "./MailTopToolbar";
 import { headerChromeMotion } from "./mail-selection-anim-utils";
 import { useSelectionProgress } from "./mail-selection-anim";
-import { mailSpacing } from "./mail-ui";
+import { Feather } from "@expo/vector-icons";
+import { LAYOUT_METRICS, layoutHairlineBorder } from "../../lib/app-layout";
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
 interface MailListHeaderProps {
   selectedCount: number;
   totalCount: number;
+  mailboxName?: string;
+  mailboxIcon?: keyof typeof Feather.glyphMap;
   onMenu: () => void;
   onSearch: () => void;
   onClearSelection: () => void;
@@ -26,6 +29,8 @@ interface MailListHeaderProps {
 export function MailListHeader({
   selectedCount,
   totalCount,
+  mailboxName,
+  mailboxIcon,
   onMenu,
   onSearch,
   onClearSelection,
@@ -67,7 +72,12 @@ export function MailListHeader({
         style={[styles.layer, toolbarStyle]}
         animatedProps={toolbarPointerProps}
       >
-        <MailTopToolbar onMenu={onMenu} onSearch={onSearch} />
+        <MailTopToolbar
+          onMenu={onMenu}
+          onSearch={onSearch}
+          mailboxName={mailboxName}
+          mailboxIcon={mailboxIcon}
+        />
       </AnimatedView>
       <AnimatedView
         style={[styles.layer, selectionStyle]}
@@ -85,14 +95,11 @@ export function MailListHeader({
 }
 
 function createStyles(theme: ThemeTokens) {
-  const pad = mailSpacing(theme);
-
   return StyleSheet.create({
     shell: {
-      minHeight: pad.headerV * 2 + 28,
+      minHeight: LAYOUT_METRICS.headerMinHeight,
       backgroundColor: theme.colors.background,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+      ...layoutHairlineBorder(theme),
       overflow: "hidden",
     } as ViewStyle,
     layer: {

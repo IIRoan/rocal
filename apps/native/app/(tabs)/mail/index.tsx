@@ -9,10 +9,8 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppScreen } from "../../../src/components/layout";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { getErrorMessage } from "@workspace/calendar-core";
@@ -49,7 +47,11 @@ import {
   useMailboxMessages,
 } from "../../../src/lib/mail/use-mail";
 import { useLabels } from "../../../src/lib/mail/use-labels";
-import { getPrimaryMailboxId } from "../../../src/lib/mail/mail-helpers";
+import {
+  getMailboxIcon,
+  getPrimaryMailboxId,
+} from "../../../src/lib/mail/mail-helpers";
+import { layoutListSeparator } from "../../../src/lib/app-layout";
 import { buildMailConversations } from "../../../src/lib/mail/conversation-thread";
 import { useConversationListExtras } from "../../../src/lib/mail/use-conversation-thread";
 import { messageHasVisibleAttachments } from "../../../src/lib/mail/message-security";
@@ -547,16 +549,26 @@ export default function MailScreen() {
 
   return (
     <MailSelectionAnimProvider active={selectionActive}>
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <MailListHeader
-          selectedCount={selectedIds.size}
-          totalCount={selectableIds.length}
-          onMenu={toggleSidebar}
-          onSearch={openCommandPalette}
-          onClearSelection={clearSelection}
-          onSelectAll={handleSelectAll}
-        />
-
+      <AppScreen
+        header={
+          <MailListHeader
+            selectedCount={selectedIds.size}
+            totalCount={selectableIds.length}
+            mailboxName={selectedMailbox?.name ?? "Mail"}
+            mailboxIcon={
+              selectedMailbox
+                ? (getMailboxIcon(
+                    selectedMailbox,
+                  ) as keyof typeof Feather.glyphMap)
+                : "mail"
+            }
+            onMenu={toggleSidebar}
+            onSearch={openCommandPalette}
+            onClearSelection={clearSelection}
+            onSelectAll={handleSelectAll}
+          />
+        }
+      >
         {accountQuery.isLoading ? (
           <CenteredLoader theme={theme} />
         ) : accountQuery.isError ? (
@@ -679,7 +691,7 @@ export default function MailScreen() {
             </MailSheetPanel>
           ) : null}
         </BottomSheet>
-      </SafeAreaView>
+      </AppScreen>
     </MailSelectionAnimProvider>
   );
 }
@@ -797,9 +809,8 @@ function createStyles(theme: ThemeTokens) {
       flex: 1,
     },
     separator: {
-      height: StyleSheet.hairlineWidth,
+      ...layoutListSeparator(theme),
       marginLeft: separatorInset,
-      backgroundColor: theme.colors.border + "80",
     },
     centered: {
       flex: 1,

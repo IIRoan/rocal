@@ -12,7 +12,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen } from "../../../src/components/layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
@@ -151,7 +151,10 @@ export default function CalendarEditScreen() {
       toast("Share link enabled");
     },
     onError: (error) => {
-      toast(getErrorMessage(error, "Failed to enable calendar sharing"), "error");
+      toast(
+        getErrorMessage(error, "Failed to enable calendar sharing"),
+        "error",
+      );
     },
   });
 
@@ -164,7 +167,10 @@ export default function CalendarEditScreen() {
       toast("Share link disabled");
     },
     onError: (error) => {
-      toast(getErrorMessage(error, "Failed to disable calendar sharing"), "error");
+      toast(
+        getErrorMessage(error, "Failed to disable calendar sharing"),
+        "error",
+      );
     },
   });
 
@@ -259,9 +265,11 @@ export default function CalendarEditScreen() {
 
   if (!calendar) {
     return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>Calendar not found.</Text>
-      </SafeAreaView>
+      <AppScreen>
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>Calendar not found.</Text>
+        </View>
+      </AppScreen>
     );
   }
 
@@ -271,9 +279,7 @@ export default function CalendarEditScreen() {
     disableShareMutation.isPending;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StackScreenHeader title="Edit Calendar" />
-
+    <AppScreen header={<StackScreenHeader title="Edit Calendar" />}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -520,7 +526,7 @@ export default function CalendarEditScreen() {
           )}
         </Pressable>
       </ScrollView>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

@@ -36,10 +36,12 @@ import { calendarApiService } from "../lib/api";
 import {
   MAX_DOTS,
   generateGridDates,
+  getMonthDayEvents,
   getOrderedDayLabels,
   groupEventsByDay,
   resolveEventDotColor,
 } from "./calendar/month-grid-utils";
+import { useCurrentDateTime } from "./calendar/useCurrentDateTime";
 
 interface SidebarMiniCalendarProps {
   weekStartDay?: number;
@@ -95,7 +97,7 @@ export function SidebarMiniCalendar({
   const { theme } = useTheme();
   const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const today = useMemo(() => new Date(), []);
+  const today = useCurrentDateTime();
   const fallbackSelectedDate = useMemo(() => new Date(), []);
   const effectiveSelectedDate = selectedDate ?? fallbackSelectedDate;
   const [calendarMonth, setCalendarMonth] = useState<Date>(
@@ -375,11 +377,15 @@ export function SidebarMiniCalendar({
             style={styles.weekRow}
           >
             {week.map((date) => {
-              const isSelected = isSameDay(date, effectiveSelectedDate);
               const inCurrentMonth = isSameMonth(date, pageMonth);
-              const isCurrentDay = isSameDay(date, today);
-              const dayEvents =
-                pageEventsByDay.get(format(date, "yyyy-MM-dd")) ?? [];
+              const isSelected =
+                inCurrentMonth && isSameDay(date, effectiveSelectedDate);
+              const isCurrentDay = inCurrentMonth && isSameDay(date, today);
+              const dayEvents = getMonthDayEvents(
+                pageEventsByDay,
+                date,
+                inCurrentMonth,
+              );
 
               return (
                 <Pressable

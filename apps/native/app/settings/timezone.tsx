@@ -10,7 +10,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen, StackScreenHeader } from "../../src/components/layout";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -178,27 +178,7 @@ export default function TimezoneScreen() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={({ pressed }) => [
-            styles.backButton,
-            pressed && { opacity: 0.6 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Feather
-            name="arrow-left"
-            size={16}
-            color={theme.colors.mutedForeground}
-          />
-        </Pressable>
-        <Text style={styles.headerTitle}>Timezone</Text>
-      </View>
-
+    <AppScreen header={<StackScreenHeader title="Timezone" />}>
       {/* Search */}
       <View style={styles.searchRow}>
         <Feather name="search" size={16} color={theme.colors.mutedForeground} />
@@ -272,7 +252,7 @@ export default function TimezoneScreen() {
           )}
         />
       )}
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

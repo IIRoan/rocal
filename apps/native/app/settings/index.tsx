@@ -14,10 +14,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -60,7 +57,9 @@ import {
   WEEKDAY_OPTIONS,
 } from "../../src/lib/settings-options";
 import { getSettingsAccountActions } from "../../src/lib/settings-screen-utils";
+import { AppScreen } from "../../src/components/layout";
 import { StackScreenHeader } from "../../src/components/StackScreenHeader";
+import { layoutScrollContent } from "../../src/lib/app-layout";
 import { BottomSheet } from "../../src/components/BottomSheet";
 import {
   SheetActions,
@@ -721,21 +720,18 @@ export default function SettingsScreen() {
         ? (error as { message: string }).message
         : "Failed to load settings";
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <StackScreenHeader title="Settings" />
+      <AppScreen header={<StackScreenHeader title="Settings" />}>
         <View style={styles.centered}>
           <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
-      </SafeAreaView>
+      </AppScreen>
     );
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StackScreenHeader title="Settings" />
-
+    <AppScreen header={<StackScreenHeader title="Settings" />}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -1084,7 +1080,7 @@ export default function SettingsScreen() {
           />
         </View>
       </BottomSheet>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
