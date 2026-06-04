@@ -66,7 +66,7 @@ export function CalendarViewSwitcher({
         </Pressable>
 
         <Pressable
-          onPress={onToggleMonthStrip}
+          onPress={() => onToggleMonthStrip?.()}
           style={styles.dateHeaderButton}
           accessibilityRole="button"
           accessibilityLabel={
