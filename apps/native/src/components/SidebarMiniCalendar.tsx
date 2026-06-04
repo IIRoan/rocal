@@ -3,10 +3,13 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
+  Animated,
   LayoutChangeEvent,
+  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -14,15 +17,6 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  cancelAnimation,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import {
   keepPreviousData,
@@ -42,16 +36,18 @@ import { calendarApiService } from "../lib/api";
 import {
   MAX_DOTS,
   generateGridDates,
+  getMonthDayEvents,
   getOrderedDayLabels,
   groupEventsByDay,
   resolveEventDotColor,
 } from "./calendar/month-grid-utils";
+import { useCurrentDateTime } from "./calendar/useCurrentDateTime";
 
 interface SidebarMiniCalendarProps {
   weekStartDay?: number;
   selectedDate?: Date;
   onDayPress?: (date: Date) => void;
-  drawerCloseGesture?: ReturnType<typeof Gesture.Pan>;
+  drawerCloseGesture?: unknown;
 }
 
 type MiniCalendarEventsResponse = Awaited<
@@ -97,19 +93,18 @@ export function SidebarMiniCalendar({
   weekStartDay = 1,
   selectedDate,
   onDayPress,
-  drawerCloseGesture,
 }: SidebarMiniCalendarProps) {
   const { theme } = useTheme();
   const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const today = useMemo(() => new Date(), []);
+  const today = useCurrentDateTime();
   const fallbackSelectedDate = useMemo(() => new Date(), []);
   const effectiveSelectedDate = selectedDate ?? fallbackSelectedDate;
   const [calendarMonth, setCalendarMonth] = useState<Date>(
     selectedDate ?? new Date(),
   );
   const [pageWidth, setPageWidth] = useState(1);
-  const translateX = useSharedValue(-1);
+  const translateX = useRef(new Animated.Value(-1)).current;
 
   useEffect(() => {
     if (!selectedDate) return;
@@ -244,7 +239,7 @@ export function SidebarMiniCalendar({
   );
 
   useLayoutEffect(() => {
-    translateX.value = -pageWidth;
+    translateX.setValue(-pageWidth);
   }, [calendarMonth, pageWidth, translateX]);
 
   const handleGoToToday = () => {
@@ -264,26 +259,26 @@ export function SidebarMiniCalendar({
         return;
       }
 
-      translateX.value = withTiming(
-        direction > 0 ? -pageWidth * 2 : 0,
-        { duration: PAGE_DURATION },
-        (finished) => {
-          if (finished) {
-            runOnJS(commitMonthChange)(direction);
-          }
-        },
-      );
+      Animated.timing(translateX, {
+        toValue: direction > 0 ? -pageWidth * 2 : 0,
+        duration: PAGE_DURATION,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) {
+          commitMonthChange(direction);
+        }
+      });
     },
     [commitMonthChange, pageWidth, translateX],
   );
 
   const handlePreviousMonth = useCallback(() => {
-    cancelAnimation(translateX);
+    translateX.stopAnimation();
     animateMonthChange(-1);
   }, [animateMonthChange, translateX]);
 
   const handleNextMonth = useCallback(() => {
-    cancelAnimation(translateX);
+    translateX.stopAnimation();
     animateMonthChange(1);
   }, [animateMonthChange, translateX]);
 
@@ -294,65 +289,80 @@ export function SidebarMiniCalendar({
     );
   }, []);
 
-  const monthSwipeGesture = useMemo(() => {
-    const gesture = Gesture.Pan()
-      .enabled(pageWidth > 1)
-      .activeOffsetX([-12, 12])
-      .failOffsetY([-8, 8])
-      .onBegin(() => {
-        "worklet";
-        cancelAnimation(translateX);
-      })
-      .onUpdate((event) => {
-        "worklet";
-        translateX.value =
-          -pageWidth +
-          rubberBand(event.translationX, pageWidth * 0.9, RUBBER_BAND_FACTOR);
-      })
-      .onEnd((event) => {
-        "worklet";
-        const committedLeft =
-          event.translationX < -SWIPE_COMMIT_THRESHOLD ||
-          event.velocityX < -VELOCITY_COMMIT;
-        const committedRight =
-          event.translationX > SWIPE_COMMIT_THRESHOLD ||
-          event.velocityX > VELOCITY_COMMIT;
-
-        if (committedLeft) {
-          translateX.value = withTiming(
-            -pageWidth * 2,
-            { duration: PAGE_DURATION },
-            (finished) => {
-              if (finished) {
-                runOnJS(commitMonthChange)(1);
-              }
-            },
+  const monthSwipeResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_, gestureState) =>
+          pageWidth > 1 &&
+          Math.abs(gestureState.dx) > 6 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          pageWidth > 1 &&
+          Math.abs(gestureState.dx) > 12 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onPanResponderGrant: () => {
+          translateX.stopAnimation();
+        },
+        onPanResponderMove: (_, gestureState) => {
+          translateX.setValue(
+            -pageWidth +
+              rubberBand(
+                gestureState.dx,
+                pageWidth * 0.9,
+                RUBBER_BAND_FACTOR,
+              ),
           );
-        } else if (committedRight) {
-          translateX.value = withTiming(
-            0,
-            { duration: PAGE_DURATION },
-            (finished) => {
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          const committedLeft =
+            gestureState.dx < -SWIPE_COMMIT_THRESHOLD ||
+            gestureState.vx < -VELOCITY_COMMIT / 1000;
+          const committedRight =
+            gestureState.dx > SWIPE_COMMIT_THRESHOLD ||
+            gestureState.vx > VELOCITY_COMMIT / 1000;
+
+          if (committedLeft) {
+            Animated.timing(translateX, {
+              toValue: -pageWidth * 2,
+              duration: PAGE_DURATION,
+              useNativeDriver: true,
+            }).start(({ finished }) => {
               if (finished) {
-                runOnJS(commitMonthChange)(-1);
+                commitMonthChange(1);
               }
-            },
-          );
-        } else {
-          translateX.value = withSpring(-pageWidth, PAGE_SPRING);
-        }
-      });
+            });
+            return;
+          }
 
-    return drawerCloseGesture
-      ? gesture.blocksExternalGesture(drawerCloseGesture)
-      : gesture;
-  }, [commitMonthChange, drawerCloseGesture, pageWidth, translateX]);
+          if (committedRight) {
+            Animated.timing(translateX, {
+              toValue: 0,
+              duration: PAGE_DURATION,
+              useNativeDriver: true,
+            }).start(({ finished }) => {
+              if (finished) {
+                commitMonthChange(-1);
+              }
+            });
+            return;
+          }
 
-  const stripAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: translateX.value }],
-    };
-  }, [translateX]);
+          Animated.spring(translateX, {
+            toValue: -pageWidth,
+            ...PAGE_SPRING,
+            useNativeDriver: true,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(translateX, {
+            toValue: -pageWidth,
+            ...PAGE_SPRING,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [commitMonthChange, pageWidth, translateX],
+  );
 
   const renderMonthPage = useCallback(
     (
@@ -367,11 +377,15 @@ export function SidebarMiniCalendar({
             style={styles.weekRow}
           >
             {week.map((date) => {
-              const isSelected = isSameDay(date, effectiveSelectedDate);
               const inCurrentMonth = isSameMonth(date, pageMonth);
-              const isCurrentDay = isSameDay(date, today);
-              const dayEvents =
-                pageEventsByDay.get(format(date, "yyyy-MM-dd")) ?? [];
+              const isSelected =
+                inCurrentMonth && isSameDay(date, effectiveSelectedDate);
+              const isCurrentDay = inCurrentMonth && isSameDay(date, today);
+              const dayEvents = getMonthDayEvents(
+                pageEventsByDay,
+                date,
+                inCurrentMonth,
+              );
 
               return (
                 <Pressable
@@ -488,8 +502,7 @@ export function SidebarMiniCalendar({
         </View>
       </View>
 
-      <GestureDetector gesture={monthSwipeGesture}>
-        <View>
+      <View {...monthSwipeResponder.panHandlers}>
           <View style={styles.weekdaysRow}>
             {dayLabels.map((label, index) => (
               <View key={`${label}-${index}`} style={styles.weekdayCell}>
@@ -503,7 +516,7 @@ export function SidebarMiniCalendar({
               style={[
                 styles.pagesStrip,
                 { width: pageWidth * pages.length },
-                stripAnimatedStyle,
+                { transform: [{ translateX }] },
               ]}
             >
               {pages.map((page) => (
@@ -520,8 +533,7 @@ export function SidebarMiniCalendar({
               ))}
             </Animated.View>
           </View>
-        </View>
-      </GestureDetector>
+      </View>
     </View>
   );
 }

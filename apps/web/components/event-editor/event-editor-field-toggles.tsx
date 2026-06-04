@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Bell, FileText, MapPin, RotateCcw } from "lucide-react";
+import { Bell, FileText, MapPin, RotateCcw, Users } from "lucide-react";
 
 type EventEditorFieldTogglesProps = {
   className?: string;
@@ -7,10 +7,12 @@ type EventEditorFieldTogglesProps = {
   onToggleDescription: () => void;
   onToggleLocation: () => void;
   onToggleNotifications: () => void;
+  onToggleParticipants: () => void;
   onToggleRecurring: () => void;
   showDescription: boolean;
   showLocation: boolean;
   showNotifications: boolean;
+  showParticipants: boolean;
 };
 
 function EventEditorFieldToggleButton({
@@ -47,10 +49,12 @@ export function EventEditorFieldToggles({
   onToggleDescription,
   onToggleLocation,
   onToggleNotifications,
+  onToggleParticipants,
   onToggleRecurring,
   showDescription,
   showLocation,
   showNotifications,
+  showParticipants,
 }: EventEditorFieldTogglesProps) {
   return (
     <div className={className}>
@@ -77,6 +81,12 @@ export function EventEditorFieldToggles({
         icon={Bell}
         label="Reminder"
         onClick={onToggleNotifications}
+      />
+      <EventEditorFieldToggleButton
+        active={showParticipants}
+        icon={Users}
+        label="Participants"
+        onClick={onToggleParticipants}
       />
     </div>
   );

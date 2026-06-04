@@ -12,10 +12,12 @@ export function EventEditorDesktopHeader({
   onToggleDescription,
   onToggleLocation,
   onToggleNotifications,
+  onToggleParticipants,
   onToggleRecurring,
   showDescription,
   showLocation,
   showNotifications,
+  showParticipants,
 }: EventEditorDesktopHeaderProps) {
   return (
     <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
@@ -36,10 +38,12 @@ export function EventEditorDesktopHeader({
           onToggleDescription={onToggleDescription}
           onToggleLocation={onToggleLocation}
           onToggleNotifications={onToggleNotifications}
+          onToggleParticipants={onToggleParticipants}
           onToggleRecurring={onToggleRecurring}
           showDescription={showDescription}
           showLocation={showLocation}
           showNotifications={showNotifications}
+          showParticipants={showParticipants}
         />
       )}
     </div>

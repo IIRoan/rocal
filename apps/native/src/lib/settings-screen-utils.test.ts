@@ -48,7 +48,7 @@ describe("Settings screen account actions", () => {
     ]);
   });
 
-  it("shows set-password and encryption-reset actions for OAuth-only accounts", () => {
+  it("shows set-password for OAuth-only accounts", () => {
     expect(
       getSettingsAccountActions({
         canSignOut: true,
@@ -60,10 +60,6 @@ describe("Settings screen account actions", () => {
       })),
     ).toEqual([
       { key: "set-password", label: "Set Email Password" },
-      {
-        key: "reset-encryption-password",
-        label: "Reset Encryption Password",
-      },
       { key: "change-profile-picture", label: "Profile Picture" },
       { key: "reset-preferences", label: "Reset Preferences" },
       { key: "sign-out", label: "Sign Out" },
@@ -90,7 +86,6 @@ describe("Settings screen account actions", () => {
       }).map((action) => action.key),
     ).toEqual([
       "change-password",
-      "reset-encryption-password",
       "change-profile-picture",
       "reset-preferences",
       "sign-out",
@@ -110,7 +105,6 @@ describe("Settings screen account actions", () => {
       })),
     ).toEqual([
       { key: "set-password", destructive: false },
-      { key: "reset-encryption-password", destructive: false },
       { key: "change-profile-picture", destructive: false },
       { key: "reset-preferences", destructive: true },
       { key: "sign-out", destructive: true },

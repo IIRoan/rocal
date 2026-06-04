@@ -15,4 +15,13 @@ export const QUERY_KEYS = {
   notifications: (eventId: string) => ["notifications", eventId] as const,
   calendarShareLink: (calendarId: string) =>
     ["calendarShareLink", calendarId] as const,
+  mailConfig: () => ["mail", "config"] as const,
+  mailAccount: () => ["mail", "account"] as const,
+  mailRuntime: () => ["mail", "runtime"] as const,
+  mailMessages: (mailboxId: string | null) =>
+    ["mail", "messages", mailboxId] as const,
+  mailMessage: (messageId: string) => ["mail", "message", messageId] as const,
+  mailDecrypted: (messageId: string) => ["mail", "decrypted", messageId] as const,
+  mailLabels: () => ["mail", "labels"] as const,
+  mailThread: (threadId: string | null) => ["mail", "thread", threadId] as const,
 } as const;

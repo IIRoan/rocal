@@ -1,20 +1,19 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   View,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen, NavigationHeader } from "../../src/components/layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { CreateEventRequest } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { useAuth } from "../../src/providers/AuthProvider";
+import { useToast } from "../../src/providers/ToastProvider";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
 import {
@@ -25,6 +24,7 @@ import {
   type CacheSnapshot,
 } from "../../src/lib/optimistic-events";
 import { EventForm } from "../../src/components/event/EventForm";
+import { LoadingScreen } from "../../src/components/ui/loading";
 import { toLocalISOString } from "../../src/components/event/event-form-utils";
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -35,6 +35,7 @@ export default function EventCreateScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   // ─── Query params (optional pre-fill from tapping a time slot) ───────────
 
@@ -80,6 +81,7 @@ export default function EventCreateScreen() {
     onSuccess: () => {
       // Replace optimistic data with real server data
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Event created");
     },
     onError: (err: unknown) => {
       // Roll back the optimistic event
@@ -88,7 +90,7 @@ export default function EventCreateScreen() {
         err && typeof err === "object" && "message" in err
           ? (err as { message: string }).message
           : "Failed to create event";
-      Alert.alert("Couldn't create event", message);
+      toast(message, "error");
     },
   });
 
@@ -132,23 +134,16 @@ export default function EventCreateScreen() {
   // ─── Loading state ─────────────────────────────────────────────────────────
 
   if (calendarsLoading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-        <Text style={styles.loadingText}>Loading…</Text>
-      </SafeAreaView>
-    );
+    return <LoadingScreen theme={theme} message="Loading…" />;
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle} accessibilityRole="header">
-          Create Event
-        </Text>
-      </View>
+    <AppScreen
+      header={<NavigationHeader variant="form" title="Create Event" />}
+      edges={["top"]}
+    >
       <EventForm
         calendars={calendars ?? []}
         serverErrors={serverErrors}
@@ -157,7 +152,7 @@ export default function EventCreateScreen() {
         onCancel={handleCancel}
         initialValues={initialValues}
       />
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
@@ -168,13 +163,6 @@ function createStyles(theme: ThemeTokens) {
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
-    },
-    centered: {
-      flex: 1,
-      justifyContent: "center" as const,
-      alignItems: "center" as const,
-      backgroundColor: theme.colors.background,
-      padding: theme.spacing["4"],
     },
     header: {
       paddingHorizontal: theme.spacing["4"],
@@ -191,12 +179,6 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
-    },
-    loadingText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-      marginTop: theme.spacing["2"],
     },
   } satisfies Record<string, TextStyle>;
 

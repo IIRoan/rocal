@@ -751,4 +751,7 @@ export {
   SidebarSeparator,
   SidebarTrigger,
   useSidebar,
+  SIDEBAR_WIDTH,
+  SIDEBAR_WIDTH_MOBILE,
+  SIDEBAR_WIDTH_ICON,
 };

@@ -1,15 +1,56 @@
 import type { ExpoConfig } from "expo/config";
 
-const { expo: appJsonConfig } = require("./app.json") as { expo: ExpoConfig };
+const baseConfig: ExpoConfig = {
+  name: "Solace",
+  slug: "solace",
+  version: "1.0.0",
+  orientation: "portrait",
+  scheme: "solace",
+  newArchEnabled: true,
+  userInterfaceStyle: "automatic",
+  runtimeVersion: {
+    policy: "appVersion",
+  },
+  updates: {
+    checkAutomatically: "ON_LOAD",
+    fallbackToCacheTimeout: 0,
+  },
+  ios: {
+    supportsTablet: true,
+    bundleIdentifier: "onl.solace.mobile",
+    buildNumber: "1",
+  },
+  android: {
+    package: "onl.solace.mobile",
+    versionCode: 1,
+    adaptiveIcon: {
+      backgroundColor: "#ffffff",
+    },
+  },
+  plugins: ["expo-router", "expo-secure-store"],
+  experiments: {
+    typedRoutes: true,
+  },
+  extra: {
+    eas: {
+      projectId: "1047b680-b99f-4671-9824-23b9a0487125",
+    },
+  },
+  owner: "iroan",
+};
 
-const expoOwner = process.env.EXPO_OWNER || appJsonConfig.owner;
+const expoOwner = process.env.EXPO_OWNER || baseConfig.owner;
 const expoProjectId =
-  process.env.EXPO_PROJECT_ID || appJsonConfig.extra?.eas?.projectId;
+  process.env.EXPO_PROJECT_ID || baseConfig.extra?.eas?.projectId;
+const enableIosAssociatedDomains =
+  process.env.EXPO_ENABLE_IOS_ASSOCIATED_DOMAINS === "true";
 const passkeyOrigin =
   process.env.PASSKEY_ORIGIN ||
   process.env.NEXT_PUBLIC_APP_URL ||
   process.env.EXPO_PUBLIC_APP_URL;
-const passkeyAssociatedDomain = getPasskeyAssociatedDomain(passkeyOrigin);
+const passkeyAssociatedDomain = enableIosAssociatedDomains
+  ? getPasskeyAssociatedDomain(passkeyOrigin)
+  : null;
 
 function getPasskeyAssociatedDomain(origin?: string | null): string | null {
   if (!origin) {
@@ -56,7 +97,7 @@ function withoutPlugin(
 
 const configuredPlugins = [
   ...withoutPlugin(
-    withoutPlugin(appJsonConfig.plugins, "expo-web-browser"),
+    withoutPlugin(baseConfig.plugins, "expo-web-browser"),
     "expo-build-properties",
   ),
   "expo-web-browser",
@@ -66,21 +107,12 @@ const configuredPlugins = [
       ios: {
         deploymentTarget: "15.1",
       },
-      android: {
-        compileSdkVersion: 34,
-      },
     },
-  ] as [
-    string,
-    {
-      ios: { deploymentTarget: string };
-      android: { compileSdkVersion: number };
-    },
-  ],
+  ] as [string, { ios: { deploymentTarget: string } }],
 ] satisfies NonNullable<ExpoConfig["plugins"]>;
 const associatedDomains = Array.from(
   new Set([
-    ...(appJsonConfig.ios?.associatedDomains ?? []),
+    ...(baseConfig.ios?.associatedDomains ?? []),
     ...(passkeyAssociatedDomain
       ? [`webcredentials:${passkeyAssociatedDomain}`]
       : []),
@@ -88,24 +120,24 @@ const associatedDomains = Array.from(
 );
 
 const config: ExpoConfig = {
-  ...appJsonConfig,
+  ...baseConfig,
   owner: expoOwner,
   plugins: configuredPlugins,
   ios: {
-    ...appJsonConfig.ios,
-    associatedDomains,
+    ...baseConfig.ios,
+    ...(associatedDomains.length > 0 ? { associatedDomains } : {}),
   },
   extra: {
-    ...appJsonConfig.extra,
+    ...baseConfig.extra,
     eas: expoProjectId
       ? {
-          ...(appJsonConfig.extra?.eas ?? {}),
+          ...(baseConfig.extra?.eas ?? {}),
           projectId: expoProjectId,
         }
-      : appJsonConfig.extra?.eas,
+      : baseConfig.extra?.eas,
   },
   updates: {
-    ...appJsonConfig.updates,
+    ...baseConfig.updates,
     url: expoProjectId ? `https://u.expo.dev/${expoProjectId}` : undefined,
   },
 };

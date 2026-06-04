@@ -37,8 +37,10 @@ type EventEditorPopoverProps = {
   recurringModal: React.ReactNode;
   setShowDescription: (value: boolean) => void;
   setShowLocation: (value: boolean) => void;
+  setShowParticipants: (value: boolean) => void;
   showDescription: boolean;
   showLocation: boolean;
+  showParticipants: boolean;
 };
 
 export function EventEditorPopover({
@@ -62,8 +64,10 @@ export function EventEditorPopover({
   recurringModal,
   setShowDescription,
   setShowLocation,
+  setShowParticipants,
   showDescription,
   showLocation,
+  showParticipants,
 }: EventEditorPopoverProps) {
   const popoverRef = React.useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -237,7 +241,7 @@ export function EventEditorPopover({
       resizeObserver?.disconnect();
       mutationObserver?.disconnect();
     };
-  }, [anchorPosition, open, showDescription, showLocation]);
+  }, [anchorPosition, open, showDescription, showLocation, showParticipants]);
 
   React.useEffect(() => {
     if (!open) {
@@ -389,20 +393,24 @@ export function EventEditorPopover({
           onToggleNotifications={() =>
             eventForm.setShowNotifications(!eventForm.showNotifications)
           }
+          onToggleParticipants={() => setShowParticipants(!showParticipants)}
           onToggleRecurring={() =>
             eventForm.setIsRecurring(!eventForm.isRecurring)
           }
           showDescription={showDescription}
           showLocation={showLocation}
           showNotifications={eventForm.showNotifications}
+          showParticipants={showParticipants}
         />
         <EventEditorBody
           eventForm={eventForm}
           isViewMode={isViewMode}
           showLocation={showLocation}
           showDescription={showDescription}
+          showParticipants={showParticipants}
           setShowLocation={setShowLocation}
           setShowDescription={setShowDescription}
+          setShowParticipants={setShowParticipants}
           localSettings={localSettings}
           calendars={calendars}
           desktop

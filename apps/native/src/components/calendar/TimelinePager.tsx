@@ -33,6 +33,7 @@ import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { getCalendarPageDate } from "./navigation-utils";
+import { useCurrentDateTime } from "./useCurrentDateTime";
 import {
   HOUR_HEIGHT,
   TIME_GUTTER_WIDTH,
@@ -132,7 +133,7 @@ export function TimelinePager({
     translateX.value = -pageWidth;
   }, [currentDateKey, pageWidth, translateX, view, weekStartDay]);
 
-  const today = useMemo(() => new Date(), []);
+  const today = useCurrentDateTime();
   const nowMinutes = today.getHours() * 60 + today.getMinutes();
   const nowTop = (nowMinutes / 60) * HOUR_HEIGHT;
 

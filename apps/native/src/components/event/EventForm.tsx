@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Keyboard,
   Modal,
   Pressable,
@@ -26,6 +27,7 @@ import { Feather } from "@expo/vector-icons";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Extrapolation,
+  cancelAnimation,
   interpolate,
   runOnJS,
   useAnimatedStyle,
@@ -37,10 +39,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { format } from "date-fns";
 import { useTheme } from "../../providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
-import type {
-  Calendar,
-  CreateEventRequest,
-  EventParticipantInput,
+import {
+  SheetActions,
+  SheetPrimaryButton,
+  SheetSecondaryButton,
+} from "../sheet";
+import {
+  PARTICIPANTS_INVITE_HELP_TEXT,
+  type Calendar,
+  type CreateEventRequest,
+  type EventParticipantInput,
 } from "@workspace/calendar-core";
 import { RecurrencePicker } from "./RecurrencePicker";
 import {
@@ -175,6 +183,9 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     );
     const [showReminder, setShowReminder] = useState(
       (initialValues?.reminder ?? 0) > 0,
+    );
+    const [showParticipants, setShowParticipants] = useState(
+      (initialValues?.participants?.length ?? 0) > 0,
     );
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [generalErrors, setGeneralErrors] = useState<string[]>([]);
@@ -380,6 +391,11 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       setParticipants((current) =>
         current.filter((participant) => participant.email !== email),
       );
+    }, []);
+
+    const showParticipantsInviteHelp = useCallback(() => {
+      Keyboard.dismiss();
+      Alert.alert("Participants", PARTICIPANTS_INVITE_HELP_TEXT);
     }, []);
 
     // ── Render ───────────────────────────────────────────────────────────────
@@ -681,6 +697,18 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       theme={theme}
                     />
                   </View>
+                  <View style={styles.toggleRow}>
+                    <TogglePill
+                      icon="users"
+                      label="Participants"
+                      active={showParticipants}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setShowParticipants((v) => !v);
+                      }}
+                      theme={theme}
+                    />
+                  </View>
                 </View>
               </View>
 
@@ -688,7 +716,8 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
               {(showLocation ||
                 showDescription ||
                 showRecurring ||
-                showReminder) && (
+                showReminder ||
+                showParticipants) && (
                 <View style={styles.expandableSection}>
                   {showLocation && (
                     <TextInput
@@ -790,146 +819,123 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       </View>
                     </View>
                   )}
+
+                  {showParticipants && (
+                    <View style={styles.participantsSection}>
+                      <View style={styles.participantHeaderRow}>
+                        <Text style={styles.reminderLabel}>Participants</Text>
+                        <Pressable
+                          style={styles.participantInfoButton}
+                          onPress={showParticipantsInviteHelp}
+                          accessibilityRole="button"
+                          accessibilityLabel="About participant invitations"
+                          hitSlop={8}
+                        >
+                          <Feather
+                            name="info"
+                            size={14}
+                            color={theme.colors.mutedForeground}
+                          />
+                        </Pressable>
+                      </View>
+                      <View style={styles.participantComposer}>
+                        <TextInput
+                          style={[
+                            styles.expandableInput,
+                            styles.participantInput,
+                            fieldErrors.participants ? styles.inputError : null,
+                          ]}
+                          value={participantDraft}
+                          onChangeText={setParticipantDraft}
+                          placeholder="Add attendee by email"
+                          placeholderTextColor={theme.colors.mutedForeground}
+                          keyboardType="email-address"
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          returnKeyType="done"
+                          onSubmitEditing={addParticipant}
+                          accessibilityLabel="Add attendee by email"
+                        />
+                        <Pressable
+                          style={styles.participantAddButton}
+                          onPress={addParticipant}
+                          accessibilityRole="button"
+                          accessibilityLabel="Add attendee"
+                        >
+                          <Feather
+                            name="user-plus"
+                            size={16}
+                            color={theme.colors.foreground}
+                          />
+                        </Pressable>
+                      </View>
+                      {renderFieldError("participants")}
+
+                      {participants.length > 0 ? (
+                        <View style={styles.participantList}>
+                          {participants.map((participant) => (
+                            <View
+                              key={participant.email}
+                              style={styles.participantRow}
+                            >
+                              <View style={styles.participantAvatar}>
+                                <Text style={styles.participantAvatarText}>
+                                  {(participant.displayName?.trim() ||
+                                    participant.email)
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                </Text>
+                              </View>
+                              <View style={styles.participantMeta}>
+                                <Text style={styles.participantName}>
+                                  {participant.displayName || participant.email}
+                                </Text>
+                                <Text style={styles.participantSubtitle}>
+                                  {participant.role === "organizer"
+                                    ? "Organizer"
+                                    : participant.email}
+                                </Text>
+                              </View>
+                              {participant.role !== "organizer" && (
+                                <Pressable
+                                  style={styles.participantRemoveButton}
+                                  onPress={() =>
+                                    removeParticipant(participant.email)
+                                  }
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Remove ${participant.email}`}
+                                >
+                                  <Feather
+                                    name="x"
+                                    size={16}
+                                    color={theme.colors.mutedForeground}
+                                  />
+                                </Pressable>
+                              )}
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+                    </View>
+                  )}
                 </View>
               )}
-
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Participants</Text>
-                <View style={styles.participantComposer}>
-                  <TextInput
-                    style={[
-                      styles.expandableInput,
-                      styles.participantInput,
-                      fieldErrors.participants ? styles.inputError : null,
-                    ]}
-                    value={participantDraft}
-                    onChangeText={setParticipantDraft}
-                    placeholder="Add attendee by email"
-                    placeholderTextColor={theme.colors.mutedForeground}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="done"
-                    onSubmitEditing={addParticipant}
-                    accessibilityLabel="Add attendee by email"
-                  />
-                  <Pressable
-                    style={styles.participantAddButton}
-                    onPress={addParticipant}
-                    accessibilityRole="button"
-                    accessibilityLabel="Add attendee"
-                  >
-                    <Feather
-                      name="user-plus"
-                      size={16}
-                      color={theme.colors.foreground}
-                    />
-                  </Pressable>
-                </View>
-                {renderFieldError("participants")}
-
-                {participants.length > 0 ? (
-                  <View style={styles.participantList}>
-                    {participants.map((participant) => (
-                      <View key={participant.email} style={styles.participantRow}>
-                        <View style={styles.participantAvatar}>
-                          <Text style={styles.participantAvatarText}>
-                            {(participant.displayName?.trim() ||
-                              participant.email)
-                              .slice(0, 2)
-                              .toUpperCase()}
-                          </Text>
-                        </View>
-                        <View style={styles.participantMeta}>
-                          <Text style={styles.participantName}>
-                            {participant.displayName || participant.email}
-                          </Text>
-                          <Text style={styles.participantSubtitle}>
-                            {participant.role === "organizer"
-                              ? "Organizer"
-                              : participant.email}
-                          </Text>
-                        </View>
-                        {participant.role !== "organizer" && (
-                          <Pressable
-                            style={styles.participantRemoveButton}
-                            onPress={() => removeParticipant(participant.email)}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Remove ${participant.email}`}
-                          >
-                            <Feather
-                              name="x"
-                              size={16}
-                              color={theme.colors.mutedForeground}
-                            />
-                          </Pressable>
-                        )}
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <Text style={styles.participantHint}>
-                    Invited attendees will be shown on the event and receive an
-                    email invite.
-                  </Text>
-                )}
-              </View>
             </View>
           </ScrollView>
 
           {actionsPlacement === "footer" ? (
-            <View
-              style={[
-                styles.footer,
-                { paddingBottom: Math.max(12, insets.bottom) },
-              ]}
-            >
+            <SheetActions>
               {onCancel && (
-                <Pressable
-                  style={styles.cancelButton}
-                  onPress={onCancel}
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancel"
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </Pressable>
+                <SheetSecondaryButton label="Cancel" onPress={onCancel} />
               )}
-              <View style={styles.footerSpacer} />
-              <Pressable
-                style={[
-                  styles.saveButton,
-                  { backgroundColor: theme.colors.primaryBase },
-                  isSubmitting && styles.saveButtonDisabled,
-                ]}
+              <SheetPrimaryButton
+                label={isEditMode ? "Save" : "Create"}
+                icon="save"
                 onPress={handleSubmit}
+                loading={isSubmitting}
                 disabled={isSubmitting}
-                accessibilityRole="button"
-                accessibilityLabel={isEditMode ? "Save event" : "Create event"}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={theme.colors.primaryForeground}
-                  />
-                ) : (
-                  <>
-                    <Feather
-                      name="save"
-                      size={14}
-                      color={theme.colors.primaryForeground}
-                    />
-                    <Text
-                      style={[
-                        styles.saveButtonText,
-                        { color: theme.colors.primaryForeground },
-                      ]}
-                    >
-                      {isEditMode ? "Save" : "Create"}
-                    </Text>
-                  </>
-                )}
-              </Pressable>
-            </View>
+              />
+            </SheetActions>
           ) : null}
         </View>
 
@@ -1122,10 +1128,33 @@ function PickerSheet({
   const { height } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
   const styles = useMemo(() => createModalStyles(theme), [theme]);
+  const closeSequenceRef = useRef(0);
+  const closeFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const translateY = useSharedValue(height);
   const overlayOpacity = useSharedValue(0);
 
-  const finishUnmount = useCallback(() => setMounted(false), []);
+  const clearCloseFallbackTimer = useCallback(() => {
+    if (closeFallbackTimerRef.current !== null) {
+      clearTimeout(closeFallbackTimerRef.current);
+      closeFallbackTimerRef.current = null;
+    }
+  }, []);
+
+  const finishUnmount = useCallback(() => {
+    clearCloseFallbackTimer();
+    setMounted(false);
+  }, [clearCloseFallbackTimer]);
+  const finishUnmountIfCurrent = useCallback(
+    (sequence: number) => {
+      if (sequence !== closeSequenceRef.current || visible) {
+        return;
+      }
+      finishUnmount();
+    },
+    [finishUnmount, visible],
+  );
   const requestClose = useCallback(() => {
     onClose();
   }, [onClose]);
@@ -1137,19 +1166,63 @@ function PickerSheet({
   }, [visible]);
 
   useEffect(() => {
-    translateY.value = visible
-      ? withSpring(0, PICKER_SPRING)
-      : withTiming(height, { duration: PICKER_CLOSE_DURATION }, (finished) => {
-          if (finished) runOnJS(finishUnmount)();
-        });
-    overlayOpacity.value = withTiming(visible ? 1 : 0, {
+    if (visible) {
+      clearCloseFallbackTimer();
+      closeSequenceRef.current += 1;
+      cancelAnimation(translateY);
+      cancelAnimation(overlayOpacity);
+      translateY.value = height;
+      overlayOpacity.value = 0;
+      translateY.value = withSpring(0, PICKER_SPRING);
+      overlayOpacity.value = withTiming(1, {
+        duration: PICKER_CLOSE_DURATION,
+      });
+      return;
+    }
+
+    const closeSequence = closeSequenceRef.current + 1;
+    closeSequenceRef.current = closeSequence;
+    clearCloseFallbackTimer();
+    cancelAnimation(translateY);
+    cancelAnimation(overlayOpacity);
+    translateY.value = withTiming(
+      height,
+      { duration: PICKER_CLOSE_DURATION },
+      (finished) => {
+        if (finished) {
+          runOnJS(finishUnmountIfCurrent)(closeSequence);
+        }
+      },
+    );
+    overlayOpacity.value = withTiming(0, {
       duration: PICKER_CLOSE_DURATION,
     });
-  }, [visible, height, translateY, overlayOpacity, finishUnmount]);
+    closeFallbackTimerRef.current = setTimeout(() => {
+      finishUnmountIfCurrent(closeSequence);
+    }, PICKER_CLOSE_DURATION + 120);
+  }, [
+    visible,
+    height,
+    translateY,
+    overlayOpacity,
+    clearCloseFallbackTimer,
+    finishUnmountIfCurrent,
+  ]);
+
+  useEffect(
+    () => () => {
+      clearCloseFallbackTimer();
+    },
+    [clearCloseFallbackTimer],
+  );
 
   const panGesture = Gesture.Pan()
     .activeOffsetY(8)
     .failOffsetX([-20, 20])
+    .onStart(() => {
+      "worklet";
+      cancelAnimation(translateY);
+    })
     .onUpdate((e) => {
       "worklet";
       if (e.translationY > 0) {
@@ -1821,6 +1894,23 @@ function createStyles(theme: ThemeTokens) {
       justifyContent: "center" as const,
     },
 
+    // Participants
+    participantsSection: {
+      gap: theme.spacing["2"],
+    },
+    participantHeaderRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["1"],
+    },
+    participantInfoButton: {
+      width: 28,
+      height: 28,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      borderRadius: theme.borderRadius.md,
+    },
+
     // Reminder
     reminderSection: {
       gap: theme.spacing["2"],
@@ -1842,44 +1932,7 @@ function createStyles(theme: ThemeTokens) {
       borderColor: "transparent",
     },
 
-    // Footer
-    footer: {
-      flexShrink: 0,
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 12,
-      paddingTop: 12,
-      paddingHorizontal: theme.spacing["4"],
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: softBorder,
-      backgroundColor: mutedSurface,
-    },
-    footerSpacer: {
-      flex: 1,
-    },
-    cancelButton: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: theme.borderRadius.md,
-      borderWidth: 1,
-      borderColor: softBorder,
-      backgroundColor: theme.colors.background,
-    },
-    saveButton: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      gap: 6,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: theme.borderRadius.md,
-    },
-    saveButtonDisabled: {
-      opacity: 0.6,
-    },
+
   } satisfies Record<string, ViewStyle | TextStyle>;
 
   const text = {
@@ -1945,11 +1998,6 @@ function createStyles(theme: ThemeTokens) {
       lineHeight: theme.typography.fontSize.xs.lineHeight,
       color: theme.colors.mutedForeground,
     },
-    participantHint: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
     fieldError: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
@@ -1960,15 +2008,7 @@ function createStyles(theme: ThemeTokens) {
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.destructive,
     },
-    cancelButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    saveButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
+
   } satisfies Record<string, TextStyle>;
 
   return { ...StyleSheet.create(view), ...StyleSheet.create(text) };

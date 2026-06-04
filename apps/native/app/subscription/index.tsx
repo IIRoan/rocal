@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,7 +9,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen } from "../../src/components/layout";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -18,7 +17,9 @@ import type { Calendar, CalendarSubscription } from "@workspace/calendar-core";
 import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { StackScreenHeader } from "../../src/components/StackScreenHeader";
+import { LoadingScreen } from "../../src/components/ui/loading";
 import { useTheme } from "../../src/providers/ThemeProvider";
+import { useToast } from "../../src/providers/ToastProvider";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
 import {
@@ -41,6 +42,7 @@ export default function SubscriptionListScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { push } = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const {
     data: subscriptions = [],
@@ -78,7 +80,12 @@ export default function SubscriptionListScreen() {
     () =>
       sortedSubscriptions.flatMap((subscription) =>
         getSubscriptionType(subscription) === "holiday"
-          ? [{ subscription, calendar: calendarById.get(subscription.calendar.id) }]
+          ? [
+              {
+                subscription,
+                calendar: calendarById.get(subscription.calendar.id),
+              },
+            ]
           : [],
       ),
     [calendarById, sortedSubscriptions],
@@ -88,7 +95,12 @@ export default function SubscriptionListScreen() {
     () =>
       sortedSubscriptions.flatMap((subscription) =>
         getSubscriptionType(subscription) === "external"
-          ? [{ subscription, calendar: calendarById.get(subscription.calendar.id) }]
+          ? [
+              {
+                subscription,
+                calendar: calendarById.get(subscription.calendar.id),
+              },
+            ]
           : [],
       ),
     [calendarById, sortedSubscriptions],
@@ -110,9 +122,9 @@ export default function SubscriptionListScreen() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
     onError: (mutationError) => {
-      Alert.alert(
-        "Unable to update visibility",
+      toast(
         getErrorMessage(mutationError, "Failed to update calendar visibility"),
+        "error",
       );
     },
     onSettled: () => {
@@ -132,19 +144,18 @@ export default function SubscriptionListScreen() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
 
       if (result.status === "error") {
-        Alert.alert(
-          "Sync finished with issues",
+        toast(
           result.message ??
             result.errors?.join("\n") ??
             "The calendar feed returned an error.",
+          "error",
         );
+      } else {
+        toast("Calendar synced");
       }
     },
     onError: (mutationError) => {
-      Alert.alert(
-        "Unable to sync calendar",
-        getErrorMessage(mutationError, "Failed to sync calendar"),
-      );
+      toast(getErrorMessage(mutationError, "Failed to sync calendar"), "error");
     },
     onSettled: () => {
       setPendingSyncSubscriptionId(null);
@@ -165,9 +176,9 @@ export default function SubscriptionListScreen() {
   const handleToggleVisibility = useCallback(
     (entry: ReadOnlyCalendarEntry) => {
       if (!entry.calendar) {
-        Alert.alert(
-          "Calendar unavailable",
+        toast(
           "This subscription is still loading. Try again in a moment.",
+          "info",
         );
         return;
       }
@@ -189,42 +200,43 @@ export default function SubscriptionListScreen() {
 
   if (isLoading && subscriptions.length === 0) {
     return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-        <Text style={styles.loadingText}>Loading read-only calendars…</Text>
-      </SafeAreaView>
+      <LoadingScreen theme={theme} message="Loading read-only calendars…" />
     );
   }
 
   if (isError) {
     return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>
-          {getErrorMessage(error, "Failed to load read-only calendars")}
-        </Text>
-        <Pressable style={styles.primaryButton} onPress={handleOpenCreate}>
-          <Text style={styles.primaryButtonText}>Add Calendar</Text>
-        </Pressable>
-      </SafeAreaView>
+      <AppScreen>
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>
+            {getErrorMessage(error, "Failed to load read-only calendars")}
+          </Text>
+          <Pressable style={styles.primaryButton} onPress={handleOpenCreate}>
+            <Text style={styles.primaryButtonText}>Add Calendar</Text>
+          </Pressable>
+        </View>
+      </AppScreen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StackScreenHeader
-        title="Read-only Calendars"
-        rightAction={
-          <Pressable
-            style={styles.headerAction}
-            onPress={handleOpenCreate}
-            accessibilityRole="button"
-            accessibilityLabel="Add read-only calendar"
-          >
-            <Feather name="plus" size={18} color={theme.colors.primaryBase} />
-          </Pressable>
-        }
-      />
-
+    <AppScreen
+      header={
+        <StackScreenHeader
+          title="Read-only Calendars"
+          rightAction={
+            <Pressable
+              style={styles.headerAction}
+              onPress={handleOpenCreate}
+              accessibilityRole="button"
+              accessibilityLabel="Add read-only calendar"
+            >
+              <Feather name="plus" size={18} color={theme.colors.primaryBase} />
+            </Pressable>
+          }
+        />
+      }
+    >
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -304,7 +316,7 @@ export default function SubscriptionListScreen() {
           ))
         )}
       </ScrollView>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
@@ -522,11 +534,6 @@ function createStyles(theme: ThemeTokens) {
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    loadingText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
     errorText: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,

@@ -3,6 +3,7 @@ import {
   Alert,
   Pressable,
   StyleSheet,
+  Text,
   View,
   type TextStyle,
   type ViewStyle,
@@ -17,6 +18,7 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "../../providers/ThemeProvider";
+import { useToast } from "../../providers/ToastProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -57,6 +59,7 @@ export function SwipeableEventRow({
   enabled = true,
 }: SwipeableEventRowProps) {
   const { theme } = useTheme();
+  const { toast } = useToast();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   // ── Shared values for gesture animation ──────────────────────────────────
@@ -93,6 +96,7 @@ export function SwipeableEventRow({
             // Animate row off-screen then trigger delete
             translateX.value = withTiming(-500, { duration: 200 }, () => {
               runOnJS(onDelete)(eventId);
+              runOnJS(toast)("Event deleted");
             });
           },
         },
@@ -179,9 +183,9 @@ export function SwipeableEventRow({
           accessibilityRole="button"
           accessibilityLabel={`Delete ${eventTitle}`}
         >
-          <Animated.Text style={[styles.deleteText, deleteTextAnimatedStyle]}>
-            Delete
-          </Animated.Text>
+          <Animated.View style={deleteTextAnimatedStyle}>
+            <Text style={styles.deleteText}>Delete</Text>
+          </Animated.View>
         </Pressable>
       </Animated.View>
 

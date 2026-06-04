@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,7 +9,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen } from "../../src/components/layout";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -21,6 +20,7 @@ import {
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../src/providers/ThemeProvider";
+import { useToast } from "../../src/providers/ToastProvider";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
 import { StackScreenHeader } from "../../src/components/StackScreenHeader";
@@ -34,6 +34,7 @@ import {
   SectionHeader,
   EmptyCard,
 } from "../../src/components/ui/list-components";
+import { LoadingScreen, InlineLoader } from "../../src/components/ui/loading";
 
 type ReadOnlyCalendarEntry = {
   subscription: CalendarSubscription;
@@ -47,6 +48,7 @@ export default function CalendarManageScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { push, back } = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // ─── Data fetching ─────────────────────────────────────────────────────────
 
@@ -118,9 +120,9 @@ export default function CalendarManageScreen() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
     onError: (mutationError) => {
-      Alert.alert(
-        "Unable to update visibility",
+      toast(
         getErrorMessage(mutationError, "Failed to update calendar visibility"),
+        "error",
       );
     },
     onSettled: (_data, _error, { id }) => {
@@ -142,11 +144,12 @@ export default function CalendarManageScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast("Default calendar updated");
     },
     onError: (mutationError) => {
-      Alert.alert(
-        "Unable to update default calendar",
+      toast(
         getErrorMessage(mutationError, "Failed to update default calendar"),
+        "error",
       );
     },
     onSettled: () => {
@@ -166,19 +169,18 @@ export default function CalendarManageScreen() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
 
       if (result.status === "error") {
-        Alert.alert(
-          "Sync finished with issues",
+        toast(
           result.message ??
             result.errors?.join("\n") ??
             "The calendar feed returned an error.",
+          "error",
         );
+      } else {
+        toast("Calendar synced");
       }
     },
     onError: (mutationError) => {
-      Alert.alert(
-        "Unable to sync calendar",
-        getErrorMessage(mutationError, "Failed to sync calendar"),
-      );
+      toast(getErrorMessage(mutationError, "Failed to sync calendar"), "error");
     },
     onSettled: () => {
       setPendingSyncSubscriptionId(null);
@@ -242,12 +244,7 @@ export default function CalendarManageScreen() {
   // ─── Loading state ─────────────────────────────────────────────────────────
 
   if (isLoading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-        <Text style={styles.loadingText}>Loading calendars…</Text>
-      </SafeAreaView>
-    );
+    return <LoadingScreen theme={theme} message="Loading calendars…" />;
   }
 
   // ─── Error state ───────────────────────────────────────────────────────────
@@ -258,66 +255,53 @@ export default function CalendarManageScreen() {
         ? (error as { message: string }).message
         : "Failed to load calendars";
     return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>{errorMessage}</Text>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => back()}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Text style={styles.backButtonText}>Go back</Text>
-        </Pressable>
-      </SafeAreaView>
+      <AppScreen>
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+          <Pressable
+            style={styles.backButton}
+            onPress={() => back()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Text style={styles.backButtonText}>Go back</Text>
+          </Pressable>
+        </View>
+      </AppScreen>
     );
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StackScreenHeader
-        title="Calendar Management"
-        rightAction={
-          <Pressable
-            style={styles.headerAction}
-            onPress={handleCreate}
-            accessibilityRole="button"
-            accessibilityLabel="Create new calendar"
-          >
-            <Feather name="plus" size={18} color={theme.colors.primaryBase} />
-          </Pressable>
-        }
-      />
+    <AppScreen
+      header={
+        <StackScreenHeader
+          title="Calendar Management"
+          rightAction={
+            <Pressable
+              style={styles.headerAction}
+              onPress={handleCreate}
+              accessibilityRole="button"
+              accessibilityLabel="Create new calendar"
+            >
+              <Feather name="plus" size={18} color={theme.colors.primaryBase} />
+            </Pressable>
+          }
+        />
+      }
+    >
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.heroCard}>
-          <Text style={styles.heroTitle}>
-            Manage every calendar in one place
-          </Text>
-          <Text style={styles.heroText}>
-            Owned calendars can be edited, shared, and set as default. Read-only
-            calendars stay synced from feeds and holiday catalogs.
-          </Text>
-          <View style={styles.heroActions}>
-            <Pressable style={styles.primaryButton} onPress={handleCreate}>
-              <Text style={styles.primaryButtonText}>New Calendar</Text>
-            </Pressable>
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={handleAddOrImport}
-            >
-              <Text style={styles.secondaryButtonText}>Add or Import</Text>
-            </Pressable>
-          </View>
-        </View>
-
         <SectionHeader
           title="Owned Calendars"
           count={sortedOwnedCalendars.length}
+          actionLabel="New"
+          onAction={handleCreate}
           theme={theme}
         />
         {sortedOwnedCalendars.length === 0 ? (
@@ -350,10 +334,7 @@ export default function CalendarManageScreen() {
           theme={theme}
         />
         {subscriptionsLoading ? (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color={theme.colors.primaryBase} />
-            <Text style={styles.loadingInlineText}>Loading subscriptions…</Text>
-          </View>
+          <InlineLoader theme={theme} message="Loading subscriptions…" />
         ) : readOnlyCalendars.length === 0 ? (
           <EmptyCard
             icon="rss"
@@ -386,7 +367,7 @@ export default function CalendarManageScreen() {
           ))
         )}
       </ScrollView>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
@@ -624,36 +605,6 @@ function createStyles(theme: ThemeTokens) {
       paddingBottom: theme.spacing["8"],
       gap: theme.spacing["3"],
     },
-    heroCard: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: theme.colors.card,
-      padding: theme.spacing["4"],
-      gap: theme.spacing["3"],
-    },
-    heroActions: {
-      flexDirection: "row" as const,
-      gap: theme.spacing["3"],
-    },
-    primaryButton: {
-      flex: 1,
-      minHeight: 44,
-      borderRadius: theme.borderRadius.md,
-      backgroundColor: theme.colors.primaryBase,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-    },
-    secondaryButton: {
-      flex: 1,
-      minHeight: 44,
-      borderRadius: theme.borderRadius.md,
-      backgroundColor: theme.colors.muted,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-    },
     rowCard: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
@@ -695,13 +646,6 @@ function createStyles(theme: ThemeTokens) {
       borderRadius: theme.borderRadius.full,
       backgroundColor: theme.colors.muted,
     },
-    loadingRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-    },
     emptyContainer: {
       flex: 1,
       justifyContent: "center" as const,
@@ -718,31 +662,6 @@ function createStyles(theme: ThemeTokens) {
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
-    heroTitle: {
-      fontSize: theme.typography.fontSize.lg.size,
-      lineHeight: theme.typography.fontSize.lg.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    heroText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    primaryButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.primaryForeground,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-    },
-    secondaryButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
     rowTitle: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
@@ -753,17 +672,6 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
       color: theme.colors.mutedForeground,
-    },
-    loadingInlineText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    loadingText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-      marginTop: theme.spacing["2"],
     },
     errorText: {
       fontSize: theme.typography.fontSize.base.size,

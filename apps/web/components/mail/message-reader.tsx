@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { getErrorMessage } from "@workspace/calendar-core";
+import {
+  buildEmailHtmlDocument,
+  emailHasOwnDarkMode,
+  getErrorMessage,
+  processEmailHtml,
+} from "@workspace/calendar-core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
@@ -355,108 +360,6 @@ function MailSecurityBadge({
 
 // ─── HTML email renderer ──────────────────────────────────────────────────────
 
-/** Check whether any <style> tag contains a prefers-color-scheme:dark block. */
-function emailHasOwnDarkMode(html: string): boolean {
-  return /@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)/i.test(html);
-}
-
-/**
- * Automatic dark-mode transform applied to emails that don't ship their own
- * `@media (prefers-color-scheme: dark)` rules. Inverts light backgrounds to
- * dark and dark text to light while preserving images and brand accent colours.
- */
-const AUTO_DARK_CSS = `
-  @media (prefers-color-scheme: dark) {
-    html, body {
-      background-color: #1a1a1a !important;
-      color: #e0e0e0 !important;
-    }
-    /* Invert background/text on common block elements */
-    div, td, th, tr, table, p, span, li, h1, h2, h3, h4, h5, h6, blockquote, section, article, header, footer {
-      background-color: inherit;
-      color: inherit;
-    }
-    /* Invert explicitly white/light backgrounds on containers */
-    [style*="background-color: #fff"],
-    [style*="background-color: #ffffff"],
-    [style*="background-color: white"],
-    [style*="background:#fff"],
-    [style*="background:#ffffff"],
-    [style*="background: #fff"],
-    [style*="background: #ffffff"],
-    [style*="background-color:#fff"],
-    [style*="background-color:#ffffff"] {
-      background-color: #1a1a1a !important;
-    }
-    [style*="background-color: #f"],
-    [style*="background-color:#f"] {
-      filter: brightness(0.25) contrast(1.1);
-    }
-    /* Dark text → light */
-    [style*="color: #000"],
-    [style*="color:#000"],
-    [style*="color: #111"],
-    [style*="color:#111"],
-    [style*="color: #1a1a1a"],
-    [style*="color: #202124"],
-    [style*="color:#202124"],
-    [style*="color: #2d0c0c"],
-    [style*="color:#2d0c0c"],
-    [style*="color: #3c4043"],
-    [style*="color:#3c4043"],
-    [style*="color: #3c4042"],
-    [style*="color:#3c4042"],
-    [style*="color: black"],
-    [style*="color:black"] {
-      color: #e0e0e0 !important;
-    }
-    /* Mid-grey secondary text → lighter grey */
-    [style*="color: #5f6368"],
-    [style*="color:#5f6368"],
-    [style*="color: #70757a"],
-    [style*="color:#70757a"],
-    [style*="color: #666"],
-    [style*="color:#666"] {
-      color: #9aa0a6 !important;
-    }
-    /* Light pastel info/alert banners → dark equivalents */
-    [style*="background-color: #fce8e6"],
-    [style*="background-color:#fce8e6"] {
-      background-color: #442c2c !important;
-      color: #f8b4b4 !important;
-    }
-    [style*="background-color: #e8f0fe"],
-    [style*="background-color:#e8f0fe"] {
-      background-color: #1e2a3a !important;
-      color: #8ab4f8 !important;
-    }
-    [style*="background-color: #e6f4ea"],
-    [style*="background-color:#e6f4ea"] {
-      background-color: #1e3a2a !important;
-      color: #81c995 !important;
-    }
-    [style*="background-color: #fef7e0"],
-    [style*="background-color:#fef7e0"] {
-      background-color: #3a341e !important;
-      color: #fdd663 !important;
-    }
-    /* Borders */
-    [style*="border"] {
-      border-color: #3a3a3a !important;
-    }
-    /* Keep images readable */
-    img { filter: brightness(0.95) contrast(1.05); }
-    /* Links */
-    a { color: #8ab4f8 !important; }
-    a[style*="color: #1a73e8"],
-    a[style*="color:#1a73e8"],
-    a[style*="color: #185abc"],
-    a[style*="color:#185abc"] {
-      color: #8ab4f8 !important;
-    }
-  }
-`;
-
 function HtmlEmailRenderer({
   html,
   blockRemoteImages,
@@ -469,67 +372,18 @@ function HtmlEmailRenderer({
   isDark: boolean;
 }) {
   const processedHtml = useMemo(() => {
-    try {
-      const doc = new DOMParser().parseFromString(
-        `<!DOCTYPE html><html><body>${html}</body></html>`,
-        "text/html",
-      );
-
-      // Strip tracking pixels (1x1 or 2x2 images)
-      if (blockTrackingPixels) {
-        doc.querySelectorAll("img").forEach((img) => {
-          const w = parseInt(
-            img.getAttribute("width") ?? img.style.width ?? "100",
-            10,
-          );
-          const h = parseInt(
-            img.getAttribute("height") ?? img.style.height ?? "100",
-            10,
-          );
-          if ((w > 0 && w <= 2) || (h > 0 && h <= 2)) img.remove();
-        });
-      }
-
-      // In light mode, strip dark-mode artifacts so the email's own
-      // prefers-color-scheme:dark rules don't fire (system dark mode can
-      // leak into iframes on some browsers).
-      if (!isDark) {
-        doc
-          .querySelectorAll(
-            'meta[name="color-scheme"], meta[name="supported-color-schemes"]',
-          )
-          .forEach((el) => el.remove());
-
-        doc.querySelectorAll("style").forEach((style) => {
-          style.textContent = (style.textContent ?? "").replace(
-            /@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/gi,
-            "",
-          );
-        });
-      }
-
-      return doc.body.innerHTML;
-    } catch {
-      return html;
-    }
-  }, [html, blockTrackingPixels, isDark]);
+    return processEmailHtml({ html, isDark, blockTrackingPixels });
+  }, [html, isDark, blockTrackingPixels]);
 
   const hasOwnDark = useMemo(() => emailHasOwnDarkMode(html), [html]);
 
   const srcDoc = useMemo(() => {
-    const csp = blockRemoteImages
-      ? `<meta http-equiv="Content-Security-Policy" content="img-src 'none'; connect-src 'none';">`
-      : "";
-    const scheme = isDark ? "dark" : "light";
-    const bg = isDark ? "#1a1a1a" : "#fff";
-    const fg = isDark ? "#e0e0e0" : "#111";
-    const linkColor = isDark ? "#8ab4f8" : "#2563eb";
-
-    // If the email has its own dark-mode rules, let them work; otherwise inject
-    // automatic dark translation styles.
-    const autoDarkStyles = isDark && !hasOwnDark ? AUTO_DARK_CSS : "";
-
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="color-scheme" content="${scheme}">${csp}<base target="_blank"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;color-scheme:${scheme}}body{background:${bg};font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;font-size:14px;line-height:1.6;padding:16px 20px;color:${fg};word-break:break-word;overflow-wrap:anywhere;overflow-x:hidden}img{max-width:100%;height:auto}a{color:${linkColor}}p{margin:0 0 1em}p:last-child{margin:0}</style>${autoDarkStyles ? `<style>${autoDarkStyles}</style>` : ""}</head><body>${processedHtml}</body></html>`;
+    return buildEmailHtmlDocument({
+      processedHtml,
+      blockRemoteImages,
+      isDark,
+      hasOwnDark,
+    });
   }, [processedHtml, blockRemoteImages, isDark, hasOwnDark]);
 
   return (

@@ -246,13 +246,6 @@ describe("Setting changes - optimistic updates", () => {
     expect(updated.browserNotifications).toBe(false);
   });
 
-  it("changes event encryption mode optimistically", () => {
-    const updated = applyOptimisticUpdate(settings, {
-      eventEncryptionMode: "full",
-    });
-    expect(updated.eventEncryptionMode).toBe("full");
-  });
-
   it("applies multiple settings at once", () => {
     const updated = applyOptimisticUpdate(settings, {
       compactView: true,

@@ -1,9 +1,10 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Animated,
   Dimensions,
   Image,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -13,15 +14,8 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { usePathname, useRouter } from "expo-router";
+import { useRouter, useSegments } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import {
   keepPreviousData,
@@ -34,30 +28,56 @@ import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
 import { useAuth } from "../providers/AuthProvider";
+import { useToast } from "../providers/ToastProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
 import { useSidebar } from "../providers/SidebarProvider";
+import { useMailSelection } from "../providers/MailSelectionProvider";
+import { useCommandPalette } from "../providers/CommandPaletteProvider";
 import { calendarApiService } from "../lib/api";
+import {
+  CALENDAR_TAB_ROUTE,
+  MAIL_TAB_ROUTE,
+  SETTINGS_ROUTE,
+  isCalendarRouteSegments,
+  isMailRouteSegments,
+  isSidebarGestureRootSegments,
+} from "../lib/navigation-routes";
 import { QUERY_KEYS } from "../lib/query-keys";
 import { buildSidebarCalendarSections } from "./app-sidebar-utils";
 import { SidebarMiniCalendar } from "./SidebarMiniCalendar";
+import { AppSwitcher } from "./AppSwitcher";
+import {
+  useMailAccount,
+  useMailRuntime,
+} from "../lib/mail/use-mail";
+import { getMailboxIcon, sortMailboxes } from "../lib/mail/mail-helpers";
+import { InlineLoader } from "./ui/loading";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.78;
 const EDGE_SWIPE_WIDTH = 24;
 const OPEN_THRESHOLD = 60;
 const CLOSE_THRESHOLD = 35;
-const VELOCITY_THRESHOLD = 400;
-const DRAWER_SPRING = { damping: 24, stiffness: 280, mass: 0.8 };
+const VELOCITY_THRESHOLD = 0.5;
+const DRAWER_SPRING = {
+  damping: 24,
+  stiffness: 280,
+  mass: 0.8,
+  useNativeDriver: true,
+};
 
 const logoSource = require("../assets/logo.png");
 
 export function AppSidebar() {
   const { theme } = useTheme();
   const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const { selectedDate, setCurrentDate, setSelectedDate } = useCalendarView();
   const { isOpen, open, close } = useSidebar();
+  const { open: openCommandPalette } = useCommandPalette();
+  const { selectedMailboxId, setSelectedMailboxId } = useMailSelection();
   const insets = useSafeAreaInsets();
-  const pathname = usePathname();
+  const segments = useSegments();
   const router = useRouter();
   const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -76,6 +96,19 @@ export function AppSidebar() {
   const calendarSections = useMemo(
     () => buildSidebarCalendarSections(calendars, theme),
     [calendars, theme],
+  );
+
+  const isMailContext = isMailRouteSegments(segments);
+  const isCalendarContext = isCalendarRouteSegments(segments);
+  const isMainScreen = isSidebarGestureRootSegments(segments);
+
+  const mailAccountQuery = useMailAccount();
+  const mailProvisioned = mailAccountQuery.data?.provisioned ?? false;
+  const mailRuntimeQuery = useMailRuntime(isMailContext && mailProvisioned);
+  const mailRuntime = mailRuntimeQuery.data;
+  const sortedMailboxes = useMemo(
+    () => (mailRuntime ? sortMailboxes(mailRuntime.mailboxes) : []),
+    [mailRuntime],
   );
 
   const calendarById = useMemo(
@@ -99,71 +132,103 @@ export function AppSidebar() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
     onError: (error) => {
-      Alert.alert(
-        "Unable to update visibility",
-        getErrorMessage(error, "Failed to update calendar visibility"),
-      );
+      toast(getErrorMessage(error, "Failed to update calendar visibility"), "error");
     },
     onSettled: () => {
       setPendingVisibilityCalendarId(null);
     },
   });
 
-  const translateX = useSharedValue(-SIDEBAR_WIDTH);
+  const translateX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
 
-  React.useEffect(() => {
-    translateX.value = withSpring(isOpen ? 0 : -SIDEBAR_WIDTH, DRAWER_SPRING);
-  }, [isOpen, translateX]);
+  const animateSidebar = useCallback(
+    (toValue: number) => {
+      Animated.spring(translateX, {
+        toValue,
+        ...DRAWER_SPRING,
+      }).start();
+    },
+    [translateX],
+  );
 
-  const sidebarAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
+  useEffect(() => {
+    animateSidebar(isOpen ? 0 : -SIDEBAR_WIDTH);
+  }, [animateSidebar, isOpen]);
 
-  const overlayAnimatedStyle = useAnimatedStyle(() => {
-    const progress = (translateX.value + SIDEBAR_WIDTH) / SIDEBAR_WIDTH;
-    return { opacity: progress * 0.5 };
-  });
+  const overlayOpacity = useMemo(
+    () =>
+      translateX.interpolate({
+        inputRange: [-SIDEBAR_WIDTH, 0],
+        outputRange: [0, 0.5],
+        extrapolate: "clamp",
+      }),
+    [translateX],
+  );
 
-  const edgePanGesture = Gesture.Pan()
-    .activeOffsetX(10)
-    .failOffsetX(-5)
-    .onUpdate((event) => {
-      const next = -SIDEBAR_WIDTH + event.translationX;
-      translateX.value = Math.min(0, Math.max(-SIDEBAR_WIDTH, next));
-    })
-    .onEnd((event) => {
-      if (
-        event.translationX > OPEN_THRESHOLD ||
-        event.velocityX > VELOCITY_THRESHOLD
-      ) {
-        translateX.value = withSpring(0, DRAWER_SPRING);
-        runOnJS(open)();
-      } else {
-        translateX.value = withSpring(-SIDEBAR_WIDTH, DRAWER_SPRING);
-        runOnJS(close)();
-      }
-    });
+  const edgePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          gestureState.dx > 10 && Math.abs(gestureState.dy) < 20,
+        onPanResponderMove: (_, gestureState) => {
+          const next = -SIDEBAR_WIDTH + gestureState.dx;
+          translateX.setValue(Math.min(0, Math.max(-SIDEBAR_WIDTH, next)));
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (
+            gestureState.dx > OPEN_THRESHOLD ||
+            gestureState.vx > VELOCITY_THRESHOLD
+          ) {
+            open();
+            animateSidebar(0);
+            return;
+          }
 
-  const closePanGesture = Gesture.Pan()
-    .activeOffsetX([-6, 20])
-    .failOffsetY([-15, 15])
-    .onUpdate((event) => {
-      "worklet";
-      const clamped = Math.min(5, Math.max(event.translationX, -SIDEBAR_WIDTH));
-      translateX.value = clamped;
-    })
-    .onEnd((event) => {
-      "worklet";
-      if (
-        event.translationX < -CLOSE_THRESHOLD ||
-        event.velocityX < -VELOCITY_THRESHOLD
-      ) {
-        translateX.value = withSpring(-SIDEBAR_WIDTH, DRAWER_SPRING);
-        runOnJS(close)();
-      } else {
-        translateX.value = withSpring(0, DRAWER_SPRING);
-      }
-    });
+          close();
+          animateSidebar(-SIDEBAR_WIDTH);
+        },
+        onPanResponderTerminate: () => {
+          close();
+          animateSidebar(-SIDEBAR_WIDTH);
+        },
+      }),
+    [animateSidebar, close, open, translateX],
+  );
+
+  const closePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          isOpen &&
+          Math.abs(gestureState.dx) > 6 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onPanResponderGrant: () => {
+          translateX.stopAnimation();
+        },
+        onPanResponderMove: (_, gestureState) => {
+          const clamped = Math.min(0, Math.max(-SIDEBAR_WIDTH, gestureState.dx));
+          translateX.setValue(clamped);
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (
+            gestureState.dx < -CLOSE_THRESHOLD ||
+            gestureState.vx < -VELOCITY_THRESHOLD
+          ) {
+            close();
+            animateSidebar(-SIDEBAR_WIDTH);
+            return;
+          }
+
+          open();
+          animateSidebar(0);
+        },
+        onPanResponderTerminate: () => {
+          open();
+          animateSidebar(0);
+        },
+      }),
+    [animateSidebar, close, isOpen, open, translateX],
+  );
 
   const handleNavigate = useCallback(
     (route: string) => {
@@ -175,6 +240,11 @@ export function AppSidebar() {
     [close, router],
   );
 
+  const handleOpenSearch = useCallback(() => {
+    close();
+    setTimeout(() => openCommandPalette(), 100);
+  }, [close, openCommandPalette]);
+
   const handleToggleCalendarVisibility = useCallback(
     (calendar: Calendar) => {
       toggleCalendarVisibilityMutation.mutate({
@@ -185,37 +255,41 @@ export function AppSidebar() {
     [toggleCalendarVisibilityMutation],
   );
 
+  const handleSelectMailbox = useCallback(
+    (mailboxId: string) => {
+      setSelectedMailboxId(mailboxId);
+      void queryClient.invalidateQueries({ queryKey: ["mail", "messages"] });
+      close();
+      if (!isMailContext) {
+        setTimeout(() => router.replace(MAIL_TAB_ROUTE as any), 80);
+      }
+    },
+    [close, isMailContext, queryClient, router, setSelectedMailboxId],
+  );
+
   const handleSelectCalendarDate = useCallback(
     (date: Date) => {
       setCurrentDate(date);
       setSelectedDate(date);
       close();
 
-      if (
-        pathname.includes("/calendar") ||
-        pathname === "/" ||
-        pathname === "/(tabs)/calendar"
-      ) {
+      if (isCalendarContext) {
         return;
       }
 
-      setTimeout(() => router.replace("/(tabs)/calendar" as any), 80);
+      setTimeout(() => router.replace(CALENDAR_TAB_ROUTE as any), 80);
     },
-    [close, pathname, router, setCurrentDate, setSelectedDate],
+    [close, isCalendarContext, router, setCurrentDate, setSelectedDate],
   );
 
   return (
     <>
-      {!isOpen && (
-        <GestureDetector gesture={edgePanGesture}>
-          <Animated.View
-            style={[
-              styles.edgeZone,
-              { height: "100%", paddingTop: insets.top },
-            ]}
-          />
-        </GestureDetector>
-      )}
+      {!isOpen && isMainScreen ? (
+        <View
+          {...edgePanResponder.panHandlers}
+          style={[styles.edgeZone, { height: "100%", paddingTop: insets.top }]}
+        />
+      ) : null}
 
       <View
         style={[
@@ -230,25 +304,22 @@ export function AppSidebar() {
           Platform.OS === "web" ? undefined : isOpen ? "auto" : "none"
         }
       >
-        <GestureDetector gesture={closePanGesture}>
-          <Animated.View style={[styles.overlay, overlayAnimatedStyle]}>
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={close}
-              accessibilityRole="button"
-              accessibilityLabel="Close sidebar"
-            />
-          </Animated.View>
-        </GestureDetector>
+        <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={close}
+            accessibilityRole="button"
+            accessibilityLabel="Close sidebar"
+          />
+        </Animated.View>
 
-        <GestureDetector gesture={closePanGesture}>
-          <Animated.View
-            style={[
-              styles.sidebar,
-              sidebarAnimatedStyle,
-              { width: SIDEBAR_WIDTH },
-            ]}
-          >
+        <Animated.View
+          {...closePanResponder.panHandlers}
+          style={[
+            styles.sidebar,
+            { width: SIDEBAR_WIDTH, transform: [{ translateX }] },
+          ]}
+        >
             <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
               <View style={styles.headerRow}>
                 <View style={styles.headerBrand}>
@@ -257,7 +328,7 @@ export function AppSidebar() {
                 </View>
                 <View style={styles.headerActions}>
                   <Pressable
-                    onPress={() => handleNavigate("/(tabs)/search")}
+                    onPress={handleOpenSearch}
                     style={({ pressed }) => [
                       styles.headerIconButton,
                       pressed && styles.pressed,
@@ -272,7 +343,7 @@ export function AppSidebar() {
                     />
                   </Pressable>
                   <Pressable
-                    onPress={() => handleNavigate("/(tabs)/settings")}
+                    onPress={() => handleNavigate(SETTINGS_ROUTE)}
                     style={({ pressed }) => [
                       styles.avatarButton,
                       pressed && styles.pressed,
@@ -304,6 +375,25 @@ export function AppSidebar() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.sectionBlock}>
+                <AppSwitcher onNavigate={close} />
+              </View>
+
+              {isMailContext ? (
+                <MailSidebarBody
+                  styles={styles}
+                  theme={theme}
+                  isLoading={
+                    mailAccountQuery.isLoading || mailRuntimeQuery.isLoading
+                  }
+                  provisioned={mailProvisioned}
+                  mailboxes={sortedMailboxes}
+                  selectedMailboxId={selectedMailboxId}
+                  onSelectMailbox={handleSelectMailbox}
+                  onCompose={() => handleNavigate(`${MAIL_TAB_ROUTE}/compose`)}
+                />
+              ) : (
+                <>
+                  <View style={styles.sectionBlock}>
                 <View style={styles.primaryActionRow}>
                   <Pressable
                     onPress={() => handleNavigate("/event/create")}
@@ -340,7 +430,6 @@ export function AppSidebar() {
                 <SidebarMiniCalendar
                   weekStartDay={1}
                   selectedDate={selectedDate}
-                  drawerCloseGesture={closePanGesture}
                   onDayPress={handleSelectCalendarDate}
                 />
               </View>
@@ -383,12 +472,7 @@ export function AppSidebar() {
                 </View>
 
                 {calendarsLoading ? (
-                  <View style={styles.loadingRow}>
-                    <ActivityIndicator
-                      size="small"
-                      color={theme.colors.primaryBase}
-                    />
-                  </View>
+                  <InlineLoader theme={theme} />
                 ) : calendars.length === 0 ? (
                   <Text style={styles.emptyText}>
                     No calendars yet. Tap + to create one.
@@ -452,9 +536,110 @@ export function AppSidebar() {
                   ))
                 )}
               </View>
+                </>
+              )}
             </ScrollView>
           </Animated.View>
-        </GestureDetector>
+      </View>
+    </>
+  );
+}
+
+function MailSidebarBody({
+  styles,
+  theme,
+  isLoading,
+  provisioned,
+  mailboxes,
+  selectedMailboxId,
+  onSelectMailbox,
+  onCompose,
+}: {
+  styles: ReturnType<typeof createStyles>;
+  theme: ThemeTokens;
+  isLoading: boolean;
+  provisioned: boolean;
+  mailboxes: { id: string; name: string; role?: string | null }[];
+  selectedMailboxId: string | null;
+  onSelectMailbox: (id: string) => void;
+  onCompose: () => void;
+}) {
+  return (
+    <>
+      <View style={styles.sectionBlock}>
+        <View style={styles.primaryActionRow}>
+          <Pressable
+            onPress={onCompose}
+            style={({ pressed }) => [
+              styles.newEventButton,
+              pressed && styles.newEventButtonPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Compose message"
+          >
+            <Feather
+              name="edit"
+              size={16}
+              color={theme.colors.primaryForeground}
+            />
+            <Text style={styles.newEventText}>Compose</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View>
+        <View style={styles.calendarsSectionHeader}>
+          <Text style={styles.sectionLabel}>Mailboxes</Text>
+        </View>
+
+        {isLoading ? (
+          <InlineLoader theme={theme} />
+        ) : !provisioned ? (
+          <Text style={styles.emptyText}>
+            Your mailbox is being set up. Check back soon.
+          </Text>
+        ) : mailboxes.length === 0 ? (
+          <Text style={styles.emptyText}>No mailboxes found.</Text>
+        ) : (
+          mailboxes.map((mailbox) => {
+            const active = mailbox.id === selectedMailboxId;
+            return (
+              <Pressable
+                key={mailbox.id}
+                onPress={() => onSelectMailbox(mailbox.id)}
+                style={({ pressed }) => [
+                  styles.calendarRow,
+                  active && styles.mailRowActive,
+                  pressed && styles.pressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={mailbox.name}
+              >
+                <Feather
+                  name={
+                    getMailboxIcon(mailbox) as keyof typeof Feather.glyphMap
+                  }
+                  size={16}
+                  color={
+                    active
+                      ? theme.colors.primaryBase
+                      : theme.colors.mutedForeground
+                  }
+                />
+                <Text
+                  style={[
+                    styles.calendarRowLabel,
+                    active && styles.mailRowLabelActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {mailbox.name}
+                </Text>
+              </Pressable>
+            );
+          })
+        )}
       </View>
     </>
   );
@@ -594,10 +779,6 @@ function createStyles(theme: ThemeTokens) {
       alignItems: "center" as const,
       justifyContent: "center" as const,
     },
-    loadingRow: {
-      alignItems: "center" as const,
-      paddingVertical: theme.spacing["3"],
-    },
     pressed: {
       opacity: 0.6,
     },
@@ -621,6 +802,9 @@ function createStyles(theme: ThemeTokens) {
     calendarDotPlaceholder: {
       width: 10,
       height: 10,
+    },
+    mailRowActive: {
+      backgroundColor: primaryTint,
     },
   } satisfies Record<string, ViewStyle>;
 
@@ -671,6 +855,10 @@ function createStyles(theme: ThemeTokens) {
     },
     calendarRowLabelHidden: {
       color: theme.colors.mutedForeground,
+    },
+    mailRowLabelActive: {
+      color: theme.colors.primaryBase,
+      fontWeight: "600" as TextStyle["fontWeight"],
     },
     emptyText: {
       fontSize: theme.typography.fontSize.xs.size,

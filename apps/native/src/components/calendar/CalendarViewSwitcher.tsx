@@ -14,28 +14,16 @@ import type { CalendarView } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { formatViewDateHeader } from "./view-switcher-utils";
 
-// ─── Props ───────────────────────────────────────────────────────────────────
-
 interface CalendarViewSwitcherProps {
-  /** The currently active view */
   activeView: CalendarView;
-  /** The current date being displayed (for the header title) */
   currentDate: Date;
-  /** Week start day for week view header formatting (default: 0 = Sunday) */
   weekStartDay?: number;
-  /** Callback to navigate to today */
   onTodayPress?: () => void;
-  /** Callback to navigate forward */
   onForwardPress?: () => void;
-  /** Callback to navigate backward */
   onBackwardPress?: () => void;
-  /** Whether the month strip is expanded */
   monthStripExpanded?: boolean;
-  /** Callback to toggle month strip expand/collapse */
   onToggleMonthStrip?: () => void;
 }
-
-// ─── Component ───────────────────────────────────────────────────────────────
 
 export function CalendarViewSwitcher({
   activeView,
@@ -58,7 +46,6 @@ export function CalendarViewSwitcher({
 
   return (
     <View style={styles.container}>
-      {/* Navigation row: menu, back, date header, today, forward */}
       <View style={styles.navRow}>
         <Pressable
           onPress={toggleSidebar}
@@ -79,7 +66,7 @@ export function CalendarViewSwitcher({
         </Pressable>
 
         <Pressable
-          onPress={onToggleMonthStrip}
+          onPress={() => onToggleMonthStrip?.()}
           style={styles.dateHeaderButton}
           accessibilityRole="button"
           accessibilityLabel={
@@ -113,8 +100,6 @@ export function CalendarViewSwitcher({
     </View>
   );
 }
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
 
 function createStyles(theme: ThemeTokens) {
   const view = {

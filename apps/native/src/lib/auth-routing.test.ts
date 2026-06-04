@@ -2,6 +2,7 @@ import {
   AUTH_SIGN_IN_ROUTE,
   CALENDAR_HOME_ROUTE,
   getAuthRedirectPath,
+  shouldRenderAuthenticatedChrome,
 } from "./auth-routing";
 
 describe("getAuthRedirectPath", () => {
@@ -50,8 +51,40 @@ describe("getAuthRedirectPath", () => {
       getAuthRedirectPath({
         isAuthenticated: true,
         isLoading: false,
-        segments: ["(tabs)", "settings"],
+        segments: ["settings"],
       }),
     ).toBeNull();
+  });
+});
+
+describe("shouldRenderAuthenticatedChrome", () => {
+  it("hides chrome while auth state is loading", () => {
+    expect(
+      shouldRenderAuthenticatedChrome({
+        isAuthenticated: true,
+        isLoading: true,
+        segments: ["(tabs)", "calendar"],
+      }),
+    ).toBe(false);
+  });
+
+  it("hides chrome on auth routes", () => {
+    expect(
+      shouldRenderAuthenticatedChrome({
+        isAuthenticated: true,
+        isLoading: false,
+        segments: ["(auth)", "sign-in"],
+      }),
+    ).toBe(false);
+  });
+
+  it("shows chrome for authenticated app routes", () => {
+    expect(
+      shouldRenderAuthenticatedChrome({
+        isAuthenticated: true,
+        isLoading: false,
+        segments: ["settings", "timezone"],
+      }),
+    ).toBe(true);
   });
 });

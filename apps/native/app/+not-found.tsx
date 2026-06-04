@@ -14,7 +14,6 @@ import { useAuth } from "../src/providers/AuthProvider";
 import {
   AUTH_SIGN_IN_ROUTE,
   CALENDAR_HOME_ROUTE,
-  SEARCH_ROUTE,
   SETTINGS_ROUTE,
 } from "../src/lib/auth-routing";
 import { useTheme } from "../src/providers/ThemeProvider";
@@ -77,19 +76,6 @@ export default function NotFoundScreen() {
             accessibilityLabel="Go to settings"
           >
             <Text style={styles.secondaryButtonText}>Settings</Text>
-          </Pressable>
-
-          {/* Go to Search */}
-          <Pressable
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              pressed && styles.secondaryButtonPressed,
-            ]}
-            onPress={() => router.replace(SEARCH_ROUTE)}
-            accessibilityRole="button"
-            accessibilityLabel="Go to search"
-          >
-            <Text style={styles.secondaryButtonText}>Search</Text>
           </Pressable>
 
           {/* Sign out */}
