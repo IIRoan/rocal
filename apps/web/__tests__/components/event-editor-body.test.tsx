@@ -148,8 +148,10 @@ describe("EventEditorBody", () => {
           localSettings={{ timeFormat: "24h" } as any}
           setShowDescription={() => {}}
           setShowLocation={() => {}}
+          setShowParticipants={() => {}}
           showDescription={true}
           showLocation={true}
+          showParticipants={true}
           eventForm={
             {
               eventAllDay: false,
@@ -249,8 +251,10 @@ describe("EventEditorBody", () => {
           localSettings={{ timeFormat: "24h" } as any}
           setShowDescription={() => {}}
           setShowLocation={() => {}}
+          setShowParticipants={() => {}}
           showDescription={true}
           showLocation={true}
+          showParticipants={true}
           eventForm={
             {
               eventAllDay: false,
