@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Keyboard,
   Modal,
   Pressable,
@@ -42,10 +43,11 @@ import {
   SheetPrimaryButton,
   SheetSecondaryButton,
 } from "../sheet";
-import type {
-  Calendar,
-  CreateEventRequest,
-  EventParticipantInput,
+import {
+  PARTICIPANTS_INVITE_HELP_TEXT,
+  type Calendar,
+  type CreateEventRequest,
+  type EventParticipantInput,
 } from "@workspace/calendar-core";
 import { RecurrencePicker } from "./RecurrencePicker";
 import {
@@ -180,6 +182,9 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     );
     const [showReminder, setShowReminder] = useState(
       (initialValues?.reminder ?? 0) > 0,
+    );
+    const [showParticipants, setShowParticipants] = useState(
+      (initialValues?.participants?.length ?? 0) > 0,
     );
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [generalErrors, setGeneralErrors] = useState<string[]>([]);
@@ -385,6 +390,11 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       setParticipants((current) =>
         current.filter((participant) => participant.email !== email),
       );
+    }, []);
+
+    const showParticipantsInviteHelp = useCallback(() => {
+      Keyboard.dismiss();
+      Alert.alert("Participants", PARTICIPANTS_INVITE_HELP_TEXT);
     }, []);
 
     // ── Render ───────────────────────────────────────────────────────────────
@@ -686,6 +696,18 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       theme={theme}
                     />
                   </View>
+                  <View style={styles.toggleRow}>
+                    <TogglePill
+                      icon="users"
+                      label="Participants"
+                      active={showParticipants}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setShowParticipants((v) => !v);
+                      }}
+                      theme={theme}
+                    />
+                  </View>
                 </View>
               </View>
 
@@ -693,7 +715,8 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
               {(showLocation ||
                 showDescription ||
                 showRecurring ||
-                showReminder) && (
+                showReminder ||
+                showParticipants) && (
                 <View style={styles.expandableSection}>
                   {showLocation && (
                     <TextInput
@@ -795,90 +818,107 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       </View>
                     </View>
                   )}
+
+                  {showParticipants && (
+                    <View style={styles.participantsSection}>
+                      <View style={styles.participantHeaderRow}>
+                        <Text style={styles.reminderLabel}>Participants</Text>
+                        <Pressable
+                          style={styles.participantInfoButton}
+                          onPress={showParticipantsInviteHelp}
+                          accessibilityRole="button"
+                          accessibilityLabel="About participant invitations"
+                          hitSlop={8}
+                        >
+                          <Feather
+                            name="info"
+                            size={14}
+                            color={theme.colors.mutedForeground}
+                          />
+                        </Pressable>
+                      </View>
+                      <View style={styles.participantComposer}>
+                        <TextInput
+                          style={[
+                            styles.expandableInput,
+                            styles.participantInput,
+                            fieldErrors.participants ? styles.inputError : null,
+                          ]}
+                          value={participantDraft}
+                          onChangeText={setParticipantDraft}
+                          placeholder="Add attendee by email"
+                          placeholderTextColor={theme.colors.mutedForeground}
+                          keyboardType="email-address"
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          returnKeyType="done"
+                          onSubmitEditing={addParticipant}
+                          accessibilityLabel="Add attendee by email"
+                        />
+                        <Pressable
+                          style={styles.participantAddButton}
+                          onPress={addParticipant}
+                          accessibilityRole="button"
+                          accessibilityLabel="Add attendee"
+                        >
+                          <Feather
+                            name="user-plus"
+                            size={16}
+                            color={theme.colors.foreground}
+                          />
+                        </Pressable>
+                      </View>
+                      {renderFieldError("participants")}
+
+                      {participants.length > 0 ? (
+                        <View style={styles.participantList}>
+                          {participants.map((participant) => (
+                            <View
+                              key={participant.email}
+                              style={styles.participantRow}
+                            >
+                              <View style={styles.participantAvatar}>
+                                <Text style={styles.participantAvatarText}>
+                                  {(participant.displayName?.trim() ||
+                                    participant.email)
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                </Text>
+                              </View>
+                              <View style={styles.participantMeta}>
+                                <Text style={styles.participantName}>
+                                  {participant.displayName || participant.email}
+                                </Text>
+                                <Text style={styles.participantSubtitle}>
+                                  {participant.role === "organizer"
+                                    ? "Organizer"
+                                    : participant.email}
+                                </Text>
+                              </View>
+                              {participant.role !== "organizer" && (
+                                <Pressable
+                                  style={styles.participantRemoveButton}
+                                  onPress={() =>
+                                    removeParticipant(participant.email)
+                                  }
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Remove ${participant.email}`}
+                                >
+                                  <Feather
+                                    name="x"
+                                    size={16}
+                                    color={theme.colors.mutedForeground}
+                                  />
+                                </Pressable>
+                              )}
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+                    </View>
+                  )}
                 </View>
               )}
-
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Participants</Text>
-                <View style={styles.participantComposer}>
-                  <TextInput
-                    style={[
-                      styles.expandableInput,
-                      styles.participantInput,
-                      fieldErrors.participants ? styles.inputError : null,
-                    ]}
-                    value={participantDraft}
-                    onChangeText={setParticipantDraft}
-                    placeholder="Add attendee by email"
-                    placeholderTextColor={theme.colors.mutedForeground}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="done"
-                    onSubmitEditing={addParticipant}
-                    accessibilityLabel="Add attendee by email"
-                  />
-                  <Pressable
-                    style={styles.participantAddButton}
-                    onPress={addParticipant}
-                    accessibilityRole="button"
-                    accessibilityLabel="Add attendee"
-                  >
-                    <Feather
-                      name="user-plus"
-                      size={16}
-                      color={theme.colors.foreground}
-                    />
-                  </Pressable>
-                </View>
-                {renderFieldError("participants")}
-
-                {participants.length > 0 ? (
-                  <View style={styles.participantList}>
-                    {participants.map((participant) => (
-                      <View key={participant.email} style={styles.participantRow}>
-                        <View style={styles.participantAvatar}>
-                          <Text style={styles.participantAvatarText}>
-                            {(participant.displayName?.trim() ||
-                              participant.email)
-                              .slice(0, 2)
-                              .toUpperCase()}
-                          </Text>
-                        </View>
-                        <View style={styles.participantMeta}>
-                          <Text style={styles.participantName}>
-                            {participant.displayName || participant.email}
-                          </Text>
-                          <Text style={styles.participantSubtitle}>
-                            {participant.role === "organizer"
-                              ? "Organizer"
-                              : participant.email}
-                          </Text>
-                        </View>
-                        {participant.role !== "organizer" && (
-                          <Pressable
-                            style={styles.participantRemoveButton}
-                            onPress={() => removeParticipant(participant.email)}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Remove ${participant.email}`}
-                          >
-                            <Feather
-                              name="x"
-                              size={16}
-                              color={theme.colors.mutedForeground}
-                            />
-                          </Pressable>
-                        )}
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <Text style={styles.participantHint}>
-                    Invited attendees will be shown on the event and receive an
-                    email invite.
-                  </Text>
-                )}
-              </View>
             </View>
           </ScrollView>
 
@@ -1786,6 +1826,23 @@ function createStyles(theme: ThemeTokens) {
       justifyContent: "center" as const,
     },
 
+    // Participants
+    participantsSection: {
+      gap: theme.spacing["2"],
+    },
+    participantHeaderRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["1"],
+    },
+    participantInfoButton: {
+      width: 28,
+      height: 28,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      borderRadius: theme.borderRadius.md,
+    },
+
     // Reminder
     reminderSection: {
       gap: theme.spacing["2"],
@@ -1871,11 +1928,6 @@ function createStyles(theme: ThemeTokens) {
     participantSubtitle: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    participantHint: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.mutedForeground,
     },
     fieldError: {

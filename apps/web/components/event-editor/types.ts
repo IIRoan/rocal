@@ -22,8 +22,10 @@ export type EventEditorBodyProps = {
   localSettings: UserSettings | null | undefined;
   setShowDescription: (value: boolean) => void;
   setShowLocation: (value: boolean) => void;
+  setShowParticipants: (value: boolean) => void;
   showDescription: boolean;
   showLocation: boolean;
+  showParticipants: boolean;
 };
 
 export type EventEditorFooterProps = {
@@ -52,8 +54,10 @@ export type EventEditorDesktopHeaderProps = {
   onToggleDescription: () => void;
   onToggleLocation: () => void;
   onToggleNotifications: () => void;
+  onToggleParticipants: () => void;
   onToggleRecurring: () => void;
   showDescription: boolean;
   showLocation: boolean;
   showNotifications: boolean;
+  showParticipants: boolean;
 };
