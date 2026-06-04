@@ -6,7 +6,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { MailBulkToolbar } from "./MailBulkToolbar";
 import { MailComposeButton } from "./MailComposeButton";
-import { bottomChromeMotion, useSelectionProgress } from "./mail-selection-anim";
+import { bottomChromeMotion } from "./mail-selection-anim-utils";
+import { useSelectionProgress } from "./mail-selection-anim";
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
@@ -36,10 +37,7 @@ export function MailListBottomChrome({
     const motion = bottomChromeMotion(progress.value, "outgoing");
     return {
       opacity: motion.opacity,
-      transform: [
-        { translateY: motion.translateY },
-        { scale: motion.scale },
-      ],
+      transform: [{ translateY: motion.translateY }, { scale: motion.scale }],
     };
   });
 
@@ -47,10 +45,7 @@ export function MailListBottomChrome({
     const motion = bottomChromeMotion(progress.value, "incoming");
     return {
       opacity: motion.opacity,
-      transform: [
-        { translateY: motion.translateY },
-        { scale: motion.scale },
-      ],
+      transform: [{ translateY: motion.translateY }, { scale: motion.scale }],
     };
   });
 
@@ -72,7 +67,10 @@ export function MailListBottomChrome({
       >
         <MailComposeButton bottomInset={bottomInset} onPress={composeOnPress} />
       </AnimatedView>
-      <AnimatedView style={[styles.bulkLayer, bulkStyle]} animatedProps={bulkPointerProps}>
+      <AnimatedView
+        style={[styles.bulkLayer, bulkStyle]}
+        animatedProps={bulkPointerProps}
+      >
         <MailBulkToolbar bottomInset={bottomInset} {...bulk} />
       </AnimatedView>
     </View>

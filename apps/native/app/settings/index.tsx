@@ -14,7 +14,10 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -57,7 +60,7 @@ import {
   WEEKDAY_OPTIONS,
 } from "../../src/lib/settings-options";
 import { getSettingsAccountActions } from "../../src/lib/settings-screen-utils";
-import { ScreenHeader } from "../../src/components/ScreenHeader";
+import { StackScreenHeader } from "../../src/components/StackScreenHeader";
 import { BottomSheet } from "../../src/components/BottomSheet";
 import {
   SheetActions,
@@ -345,7 +348,10 @@ export default function SettingsScreen() {
         queryClient.setQueryData(QUERY_KEYS.calendars(), context.previous);
       }
 
-      toast(getErrorMessage(error, "Failed to update default calendar"), "error");
+      toast(
+        getErrorMessage(error, "Failed to update default calendar"),
+        "error",
+      );
     },
     onSettled: () => {
       setPendingDefaultCalendarId(null);
@@ -470,7 +476,10 @@ export default function SettingsScreen() {
                 await signOut();
               })
               .catch((error) => {
-                toast(getErrorMessage(error, "Failed to delete account"), "error");
+                toast(
+                  getErrorMessage(error, "Failed to delete account"),
+                  "error",
+                );
               })
               .finally(() => {
                 setIsDeletingAccount(false);
@@ -583,7 +592,10 @@ export default function SettingsScreen() {
       setProfilePictureUrlInput("");
       toast("Profile picture updated");
     } catch (error) {
-      toast(getErrorMessage(error, "Failed to update profile picture"), "error");
+      toast(
+        getErrorMessage(error, "Failed to update profile picture"),
+        "error",
+      );
     } finally {
       setIsUpdatingProfilePicture(false);
     }
@@ -679,7 +691,10 @@ export default function SettingsScreen() {
                   toast("Passkey removed");
                 })
                 .catch((error) => {
-                  toast(getErrorMessage(error, "Failed to delete passkey"), "error");
+                  toast(
+                    getErrorMessage(error, "Failed to delete passkey"),
+                    "error",
+                  );
                 })
                 .finally(() => {
                   setPendingPasskeyDeletionId(null);
@@ -706,8 +721,11 @@ export default function SettingsScreen() {
         ? (error as { message: string }).message
         : "Failed to load settings";
     return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>{errorMessage}</Text>
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <StackScreenHeader title="Settings" />
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -716,7 +734,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <ScreenHeader title="Settings" />
+      <StackScreenHeader title="Settings" />
 
       <ScrollView
         style={styles.scrollView}
@@ -893,12 +911,12 @@ export default function SettingsScreen() {
                   : action.key === "set-password"
                     ? isSettingPassword
                     : action.key === "change-profile-picture"
-                        ? isUpdatingProfilePicture
-                        : action.key === "reset-preferences"
-                          ? resetSettingsMutation.isPending
-                          : action.key === "delete-account"
-                            ? isDeletingAccount
-                            : isSigningOut
+                      ? isUpdatingProfilePicture
+                      : action.key === "reset-preferences"
+                        ? resetSettingsMutation.isPending
+                        : action.key === "delete-account"
+                          ? isDeletingAccount
+                          : isSigningOut
               }
             />
           ))}
@@ -1024,17 +1042,17 @@ export default function SettingsScreen() {
         }}
       >
         <View style={{ paddingBottom: insets.bottom + 8 }}>
-        <ProfilePictureCard
-          value={profilePictureUrlInput}
-          onChange={setProfilePictureUrlInput}
-          onSubmit={handleSubmitProfilePicture}
-          onCancel={() => {
-            setShowProfilePictureForm(false);
-            setProfilePictureUrlInput("");
-          }}
-          isPending={isUpdatingProfilePicture}
-          theme={theme}
-        />
+          <ProfilePictureCard
+            value={profilePictureUrlInput}
+            onChange={setProfilePictureUrlInput}
+            onSubmit={handleSubmitProfilePicture}
+            onCancel={() => {
+              setShowProfilePictureForm(false);
+              setProfilePictureUrlInput("");
+            }}
+            isPending={isUpdatingProfilePicture}
+            theme={theme}
+          />
         </View>
       </BottomSheet>
 
@@ -1047,23 +1065,23 @@ export default function SettingsScreen() {
         }}
       >
         <View style={{ paddingBottom: insets.bottom + 8 }}>
-        <PasswordChangeCard
-          mode={activePasswordSheet ?? "change-password"}
-          currentPassword={currentPasswordInput}
-          newPassword={newPasswordInput}
-          confirmPassword={confirmPasswordInput}
-          onCurrentPasswordChange={setCurrentPasswordInput}
-          onNewPasswordChange={setNewPasswordInput}
-          onConfirmPasswordChange={setConfirmPasswordInput}
-          onSubmit={handleSubmitPasswordChange}
-          onCancel={() => {
-            setActivePasswordSheet(null);
-            resetChangePasswordForm();
-          }}
-          error={passwordChangeError}
-          isPending={isChangingPassword || isSettingPassword}
-          theme={theme}
-        />
+          <PasswordChangeCard
+            mode={activePasswordSheet ?? "change-password"}
+            currentPassword={currentPasswordInput}
+            newPassword={newPasswordInput}
+            confirmPassword={confirmPasswordInput}
+            onCurrentPasswordChange={setCurrentPasswordInput}
+            onNewPasswordChange={setNewPasswordInput}
+            onConfirmPasswordChange={setConfirmPasswordInput}
+            onSubmit={handleSubmitPasswordChange}
+            onCancel={() => {
+              setActivePasswordSheet(null);
+              resetChangePasswordForm();
+            }}
+            error={passwordChangeError}
+            isPending={isChangingPassword || isSettingPassword}
+            theme={theme}
+          />
         </View>
       </BottomSheet>
     </SafeAreaView>
@@ -1416,9 +1434,7 @@ function PasswordChangeCard({
               .semibold as TextStyle["fontWeight"],
           }}
         >
-          {isChangePassword
-            ? "Change Password"
-            : "Set Email Password"}
+          {isChangePassword ? "Change Password" : "Set Email Password"}
         </Text>
         <Text
           style={{

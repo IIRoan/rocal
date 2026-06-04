@@ -43,8 +43,8 @@ import {
   selectionRowOpacity,
   selectionRowShift,
   selectionUnreadDotOpacity,
-  useSelectionProgress,
-} from "./mail-selection-anim";
+} from "./mail-selection-anim-utils";
+import { useSelectionProgress } from "./mail-selection-anim";
 
 interface MailMessageRowProps {
   message: JmapEmailMessage;
@@ -86,7 +86,8 @@ function MailMessageRowComponent({
   const radii = useMemo(() => mailRadii(theme), [theme]);
   const colors = useMemo(() => mailColors(theme), [theme]);
 
-  const read = threadCount > 1 ? threadUnreadCount === 0 : isMessageRead(message);
+  const read =
+    threadCount > 1 ? threadUnreadCount === 0 : isMessageRead(message);
   const flagged = isMessageFlagged(message);
   const showThreadBadge = threadCount > 1;
   const messageLabels = getAllMessageLabels(message, labels);
@@ -106,7 +107,10 @@ function MailMessageRowComponent({
   const selectedProgress = useSharedValue(selected ? 1 : 0);
 
   useEffect(() => {
-    selectedProgress.value = withSpring(selected ? 1 : 0, MAIL_SELECT_CHECK_SPRING);
+    selectedProgress.value = withSpring(
+      selected ? 1 : 0,
+      MAIL_SELECT_CHECK_SPRING,
+    );
   }, [selected, selectedProgress]);
 
   const rowShiftStyle = useAnimatedStyle(() => ({
@@ -122,23 +126,26 @@ function MailMessageRowComponent({
     opacity: selectionUnreadDotOpacity(selectionProgress.value),
   }));
 
-  const badgeStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      selectedProgress.value,
-      [0, 1],
-      [theme.colors.background, colors.selectIndicatorOn],
-    ),
-    borderColor: interpolateColor(
-      selectedProgress.value,
-      [0, 1],
-      [colors.selectIndicator, theme.colors.background],
-    ),
-    transform: [
-      {
-        scale: interpolate(selectedProgress.value, [0, 1], [1, 1.06]),
-      },
-    ],
-  }), [colors.selectIndicator, colors.selectIndicatorOn, theme.colors.background]);
+  const badgeStyle = useAnimatedStyle(
+    () => ({
+      backgroundColor: interpolateColor(
+        selectedProgress.value,
+        [0, 1],
+        [theme.colors.background, colors.selectIndicatorOn],
+      ),
+      borderColor: interpolateColor(
+        selectedProgress.value,
+        [0, 1],
+        [colors.selectIndicator, theme.colors.background],
+      ),
+      transform: [
+        {
+          scale: interpolate(selectedProgress.value, [0, 1], [1, 1.06]),
+        },
+      ],
+    }),
+    [colors.selectIndicator, colors.selectIndicatorOn, theme.colors.background],
+  );
 
   const checkStyle = useAnimatedStyle(() => ({
     opacity: selectedProgress.value,
@@ -164,7 +171,9 @@ function MailMessageRowComponent({
   return (
     <Pressable
       onPress={handleRowPress}
-      onLongPress={onLongPress || onToggleSelect ? handleRowLongPress : undefined}
+      onLongPress={
+        onLongPress || onToggleSelect ? handleRowLongPress : undefined
+      }
       delayLongPress={320}
       style={({ pressed }) => [
         styles.row,
@@ -178,133 +187,147 @@ function MailMessageRowComponent({
       accessibilityState={{ selected: selectionActive ? selected : undefined }}
     >
       <Animated.View style={[styles.rowInner, rowShiftStyle]}>
-      <View style={styles.avatarWrap}>
-        <View style={[styles.avatar, { borderRadius: radii.avatar }]}>
-          <Text style={styles.avatarText}>{getInitials(addresses)}</Text>
-        </View>
-        <Animated.View
-          style={[styles.checkBadgeWrap, badgeWrapStyle]}
-          pointerEvents="none"
-        >
+        <View style={styles.avatarWrap}>
+          <View style={[styles.avatar, { borderRadius: radii.avatar }]}>
+            <Text style={styles.avatarText}>{getInitials(addresses)}</Text>
+          </View>
           <Animated.View
-            style={[
-              styles.checkBadge,
-              { borderRadius: radii.selectBox },
-              badgeStyle,
-            ]}
+            style={[styles.checkBadgeWrap, badgeWrapStyle]}
+            pointerEvents="none"
           >
-            <Animated.View style={checkStyle}>
-              <Feather
-                name="check"
-                size={MAIL_ICON.rowMeta}
-                color={theme.colors.primaryForeground}
-              />
+            <Animated.View
+              style={[
+                styles.checkBadge,
+                { borderRadius: radii.selectBox },
+                badgeStyle,
+              ]}
+            >
+              <Animated.View style={checkStyle}>
+                <Feather
+                  name="check"
+                  size={MAIL_ICON.rowMeta}
+                  color={theme.colors.primaryForeground}
+                />
+              </Animated.View>
             </Animated.View>
           </Animated.View>
-        </Animated.View>
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.topLine}>
-          <Text
-            style={[styles.sender, read ? styles.readText : styles.unreadText]}
-            numberOfLines={1}
-          >
-            {name}
-          </Text>
-          <View style={styles.meta}>
-            {showThreadBadge ? (
-              <View
-                style={[
-                  styles.threadBadge,
-                  threadUnreadCount > 0 && styles.threadBadgeUnread,
-                ]}
-              >
-                <Feather
-                  name="message-square"
-                  size={MAIL_ICON.rowMeta}
-                  color={
-                    threadUnreadCount > 0
-                      ? theme.colors.primaryBase
-                      : theme.colors.mutedForeground
-                  }
-                />
-                <Text
-                  style={[
-                    styles.threadBadgeText,
-                    threadUnreadCount > 0 && styles.threadBadgeTextUnread,
-                  ]}
-                >
-                  {threadUnreadCount > 0 && threadUnreadCount < threadCount
-                    ? `${threadUnreadCount}/${threadCount}`
-                    : threadCount}
-                </Text>
-              </View>
-            ) : null}
-            {hasAttachments ? (
-              <Feather
-                name="paperclip"
-                size={MAIL_ICON.rowMeta}
-                color={theme.colors.mutedForeground}
-                accessibilityLabel="Has attachments"
-              />
-            ) : null}
-            <Text style={[styles.date, !read && styles.dateUnread]}>
-              {formatMessageDate(message.receivedAt)}
-            </Text>
-          </View>
         </View>
 
-        <View style={styles.subjectLine}>
+        <View style={styles.content}>
+          <View style={styles.topLine}>
+            <Text
+              style={[
+                styles.sender,
+                read ? styles.readText : styles.unreadText,
+              ]}
+              numberOfLines={1}
+            >
+              {name}
+            </Text>
+            <View style={styles.meta}>
+              {showThreadBadge ? (
+                <View
+                  style={[
+                    styles.threadBadge,
+                    threadUnreadCount > 0 && styles.threadBadgeUnread,
+                  ]}
+                >
+                  <Feather
+                    name="message-square"
+                    size={MAIL_ICON.rowMeta}
+                    color={
+                      threadUnreadCount > 0
+                        ? theme.colors.primaryBase
+                        : theme.colors.mutedForeground
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.threadBadgeText,
+                      threadUnreadCount > 0 && styles.threadBadgeTextUnread,
+                    ]}
+                  >
+                    {threadUnreadCount > 0 && threadUnreadCount < threadCount
+                      ? `${threadUnreadCount}/${threadCount}`
+                      : threadCount}
+                  </Text>
+                </View>
+              ) : null}
+              {hasAttachments ? (
+                <Feather
+                  name="paperclip"
+                  size={MAIL_ICON.rowMeta}
+                  color={theme.colors.mutedForeground}
+                  accessibilityLabel="Has attachments"
+                />
+              ) : null}
+              <Text style={[styles.date, !read && styles.dateUnread]}>
+                {formatMessageDate(message.receivedAt)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.subjectLine}>
+            <Text
+              style={[
+                styles.subject,
+                read ? styles.readText : styles.unreadText,
+              ]}
+              numberOfLines={1}
+            >
+              {subject}
+            </Text>
+            {flagged ? (
+              <FontAwesome
+                name="star"
+                size={MAIL_ICON.rowMeta}
+                color="#fbbf24"
+                style={styles.flagIcon}
+              />
+            ) : null}
+          </View>
+
           <Text
-            style={[styles.subject, read ? styles.readText : styles.unreadText]}
+            style={[
+              styles.preview,
+              read ? styles.previewRead : styles.previewUnread,
+            ]}
             numberOfLines={1}
           >
-            {subject}
+            {preview}
           </Text>
-          {flagged ? (
-            <FontAwesome
-              name="star"
-              size={MAIL_ICON.rowMeta}
-              color="#fbbf24"
-              style={styles.flagIcon}
-            />
+
+          {messageLabels.length > 0 ? (
+            <View style={styles.labelRow}>
+              {messageLabels.map((label) => (
+                <View
+                  key={label.id}
+                  style={[
+                    styles.labelChip,
+                    {
+                      borderColor: `${label.color}50`,
+                      backgroundColor: `${label.color}18`,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[styles.labelDot, { backgroundColor: label.color }]}
+                  />
+                  <Text
+                    style={[styles.labelText, { color: label.color }]}
+                    numberOfLines={1}
+                  >
+                    {label.name}
+                  </Text>
+                </View>
+              ))}
+            </View>
           ) : null}
         </View>
 
-        <Text
-          style={[styles.preview, read ? styles.previewRead : styles.previewUnread]}
-          numberOfLines={1}
-        >
-          {preview}
-        </Text>
-
-        {messageLabels.length > 0 ? (
-          <View style={styles.labelRow}>
-            {messageLabels.map((label) => (
-              <View
-                key={label.id}
-                style={[
-                  styles.labelChip,
-                  {
-                    borderColor: `${label.color}50`,
-                    backgroundColor: `${label.color}18`,
-                  },
-                ]}
-              >
-                <View style={[styles.labelDot, { backgroundColor: label.color }]} />
-                <Text style={[styles.labelText, { color: label.color }]} numberOfLines={1}>
-                  {label.name}
-                </Text>
-              </View>
-            ))}
-          </View>
+        {!read && !showThreadBadge ? (
+          <Animated.View style={[styles.unreadDot, unreadDotStyle]} />
         ) : null}
-      </View>
-
-      {!read && !showThreadBadge ? (
-        <Animated.View style={[styles.unreadDot, unreadDotStyle]} />
-      ) : null}
       </Animated.View>
     </Pressable>
   );
@@ -451,11 +474,13 @@ function createStyles(theme: ThemeTokens) {
     },
     dateUnread: {
       color: theme.colors.primaryBase,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
     },
     threadBadgeText: {
       fontSize: theme.typography.fontSize.xs.size,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.mutedForeground,
     },
     threadBadgeTextUnread: {
