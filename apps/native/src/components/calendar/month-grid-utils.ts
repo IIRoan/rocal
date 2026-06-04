@@ -84,6 +84,18 @@ export function groupEventsByDay(
   return map;
 }
 
+export function getMonthDayEvents(
+  eventsByDay: Map<string, DecoratedCalendarEvent[]>,
+  date: Date,
+  isCurrentMonth: boolean,
+): DecoratedCalendarEvent[] {
+  if (!isCurrentMonth) {
+    return [];
+  }
+
+  return eventsByDay.get(format(date, "yyyy-MM-dd")) ?? [];
+}
+
 /**
  * Resolve the dot color for an event. If the event's color matches a known
  * CalendarColor, use the theme's calendar palette bg. Otherwise use the raw

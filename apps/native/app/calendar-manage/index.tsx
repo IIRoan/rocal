@@ -9,7 +9,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen } from "../../src/components/layout";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -255,37 +255,42 @@ export default function CalendarManageScreen() {
         ? (error as { message: string }).message
         : "Failed to load calendars";
     return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>{errorMessage}</Text>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => back()}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Text style={styles.backButtonText}>Go back</Text>
-        </Pressable>
-      </SafeAreaView>
+      <AppScreen>
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+          <Pressable
+            style={styles.backButton}
+            onPress={() => back()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Text style={styles.backButtonText}>Go back</Text>
+          </Pressable>
+        </View>
+      </AppScreen>
     );
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StackScreenHeader
-        title="Calendar Management"
-        rightAction={
-          <Pressable
-            style={styles.headerAction}
-            onPress={handleCreate}
-            accessibilityRole="button"
-            accessibilityLabel="Create new calendar"
-          >
-            <Feather name="plus" size={18} color={theme.colors.primaryBase} />
-          </Pressable>
-        }
-      />
+    <AppScreen
+      header={
+        <StackScreenHeader
+          title="Calendar Management"
+          rightAction={
+            <Pressable
+              style={styles.headerAction}
+              onPress={handleCreate}
+              accessibilityRole="button"
+              accessibilityLabel="Create new calendar"
+            >
+              <Feather name="plus" size={18} color={theme.colors.primaryBase} />
+            </Pressable>
+          }
+        />
+      }
+    >
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -362,7 +367,7 @@ export default function CalendarManageScreen() {
           ))
         )}
       </ScrollView>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

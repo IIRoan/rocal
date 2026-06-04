@@ -12,7 +12,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppScreen } from "../../../src/components/layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -102,7 +102,10 @@ export default function SubscriptionEditScreen() {
       router.back();
     },
     onError: (error) => {
-      toast(getErrorMessage(error, "Failed to update read-only calendar"), "error");
+      toast(
+        getErrorMessage(error, "Failed to update read-only calendar"),
+        "error",
+      );
     },
   });
 
@@ -117,7 +120,10 @@ export default function SubscriptionEditScreen() {
       router.back();
     },
     onError: (error) => {
-      toast(getErrorMessage(error, "Failed to remove read-only calendar"), "error");
+      toast(
+        getErrorMessage(error, "Failed to remove read-only calendar"),
+        "error",
+      );
     },
   });
 
@@ -158,7 +164,10 @@ export default function SubscriptionEditScreen() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
     onError: (error) => {
-      toast(getErrorMessage(error, "Failed to update calendar visibility"), "error");
+      toast(
+        getErrorMessage(error, "Failed to update calendar visibility"),
+        "error",
+      );
     },
   });
 
@@ -238,18 +247,22 @@ export default function SubscriptionEditScreen() {
 
   if (!subscription) {
     return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>Read-only calendar not found.</Text>
-      </SafeAreaView>
+      <AppScreen>
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>Read-only calendar not found.</Text>
+        </View>
+      </AppScreen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StackScreenHeader
-        title={isHoliday ? "Holiday Calendar" : "External Feed"}
-      />
-
+    <AppScreen
+      header={
+        <StackScreenHeader
+          title={isHoliday ? "Holiday Calendar" : "External Feed"}
+        />
+      }
+    >
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -387,7 +400,7 @@ export default function SubscriptionEditScreen() {
           </Pressable>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

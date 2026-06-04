@@ -11,10 +11,8 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppScreen } from "../../../../src/components/layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -66,7 +64,9 @@ import {
   MailBottomActionDivider,
 } from "../../../../src/components/mail/MailBottomActionBar";
 import { mailBottomBarTotalHeight } from "../../../../src/components/mail/mail-bottom-action-bar-layout";
+import { MailReaderHeader } from "../../../../src/components/mail/MailReaderHeader";
 import { mailSpacing } from "../../../../src/components/mail/mail-ui";
+import { getMailboxIcon } from "../../../../src/lib/mail/mail-helpers";
 
 import {
   resolveAttachmentPreviewKind,
@@ -517,26 +517,21 @@ export default function MailMessageScreen() {
   ) : null;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.iconButton}
-          accessibilityRole="button"
-          accessibilityLabel="Back to messages"
-        >
-          <Feather
-            name="arrow-left"
-            size={18}
-            color={theme.colors.foreground}
-          />
-        </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {message?.subject?.trim() || "Message"}
-        </Text>
-        <View style={styles.iconButton} />
-      </View>
-
+    <AppScreen
+      header={
+        <MailReaderHeader
+          title={message?.subject?.trim() || "Message"}
+          mailboxName={currentMailbox?.name}
+          mailboxIcon={
+            currentMailbox
+              ? (getMailboxIcon(
+                  currentMailbox,
+                ) as keyof typeof Feather.glyphMap)
+              : "mail"
+          }
+        />
+      }
+    >
       {messageQuery.isLoading && !message ? (
         <CenteredLoader theme={theme} />
       ) : messageQuery.isError && !message ? (
@@ -874,7 +869,7 @@ export default function MailMessageScreen() {
           </View>
         ) : null}
       </BottomSheet>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
@@ -964,30 +959,11 @@ function MetaRow({
 
 function createStyles(theme: ThemeTokens) {
   const view = {
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
     messageBody: {
       flex: 1,
     },
     messageScroll: {
       flex: 1,
-    },
-    header: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["3"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
-    },
-    iconButton: {
-      width: 38,
-      height: 38,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
     },
     centered: {
       flex: 1,
@@ -1093,14 +1069,6 @@ function createStyles(theme: ThemeTokens) {
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    headerTitle: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
     subjectRow: {
       flexDirection: "row" as const,
       alignItems: "flex-start" as const,

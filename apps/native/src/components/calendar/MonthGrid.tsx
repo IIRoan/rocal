@@ -15,9 +15,11 @@ import {
   MAX_DOTS,
   getOrderedDayLabels,
   generateGridDates,
+  getMonthDayEvents,
   groupEventsByDay,
   resolveEventDotColor,
 } from "./month-grid-utils";
+import { useCurrentDateTime } from "./useCurrentDateTime";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -45,7 +47,7 @@ export function MonthGrid({
 }: MonthGridProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const today = useMemo(() => new Date(), []);
+  const today = useCurrentDateTime();
 
   const dayLabels = useMemo(
     () => getOrderedDayLabels(weekStartDay),
@@ -76,10 +78,17 @@ export function MonthGrid({
           {gridDates.slice(rowIndex * 7, rowIndex * 7 + 7).map((date) => {
             const dateKey = format(date, "yyyy-MM-dd");
             const isCurrentMonth = isSameMonth(date, currentDate);
-            const isToday = isSameDay(date, today);
+            const isToday = isCurrentMonth && isSameDay(date, today);
             const isSelected =
-              selectedDate != null && !isToday && isSameDay(date, selectedDate);
-            const dayEvents = eventsByDay.get(dateKey) ?? [];
+              isCurrentMonth &&
+              selectedDate != null &&
+              !isToday &&
+              isSameDay(date, selectedDate);
+            const dayEvents = getMonthDayEvents(
+              eventsByDay,
+              date,
+              isCurrentMonth,
+            );
             const extraCount = dayEvents.length - MAX_DOTS;
 
             return (
@@ -146,6 +155,7 @@ function createStyles(theme: ThemeTokens) {
   const view = {
     container: {
       backgroundColor: theme.colors.background,
+      paddingTop: theme.spacing["2"],
     },
     headerRow: {
       flexDirection: "row" as const,
