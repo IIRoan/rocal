@@ -12,6 +12,10 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { ScrollView } from "react-native-gesture-handler";
+import Animated, {
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from "react-native-reanimated";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   CalendarEvent,
@@ -36,6 +40,8 @@ import {
   type CacheSnapshot,
 } from "../../lib/optimistic-events";
 import { BottomSheet, type BottomSheetHandle } from "../BottomSheet";
+
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 import { CenteredLoader } from "../ui/loading";
 import {
   SheetActions,
@@ -181,9 +187,7 @@ export function EventSheet({
   >();
   const [scopeModalVisible, setScopeModalVisible] = useState(false);
   const [scopeAction, setScopeAction] = useState<"edit" | "delete">("edit");
-  const viewScrollAtTopRef = useRef(true);
-  const [canSwipeViewContentToDismiss, setCanSwipeViewContentToDismiss] =
-    useState(false);
+  const viewScrollAtTop = useSharedValue(false);
 
   const isCreate = mode?.type === "create";
   const isViewOrEdit = mode?.type === "view" || mode?.type === "edit";
@@ -210,19 +214,21 @@ export function EventSheet({
       setEditOccurrenceDate(mode.occurrenceDate);
     }
     setServerErrors([]);
-    viewScrollAtTopRef.current = true;
-    setCanSwipeViewContentToDismiss(mode?.type === "view");
-  }, [mode]);
+    viewScrollAtTop.value = mode?.type === "view";
+  }, [mode, viewScrollAtTop]);
 
   useEffect(() => {
-    if (viewMode !== "view") {
-      setCanSwipeViewContentToDismiss(false);
-      return;
-    }
+    viewScrollAtTop.value = viewMode === "view";
+  }, [viewMode, viewScrollAtTop]);
 
-    viewScrollAtTopRef.current = true;
-    setCanSwipeViewContentToDismiss(true);
-  }, [viewMode]);
+  const viewScrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      const atTop = event.contentOffset.y <= 0.5;
+      if (viewScrollAtTop.value !== atTop) {
+        viewScrollAtTop.value = atTop;
+      }
+    },
+  });
 
   const handleSheetDismissRequest = useCallback(() => {
     setServerErrors([]);
@@ -468,14 +474,14 @@ export function EventSheet({
         visible={visible}
         onDismiss={handleSheetDismissRequest}
         onCloseComplete={onCloseComplete}
-        swipeContentToDismiss={canSwipeViewContentToDismiss}
+        swipeContentToDismissAtTop={viewScrollAtTop}
       >
         {isLoading ? (
           <CenteredLoader theme={theme} message="Loading…" />
         ) : viewMode === "view" && event ? (
           <>
             {/* ── View mode body ─────────────────────────────────── */}
-            <ScrollView
+            <AnimatedScrollView
               style={styles.viewScroll}
               contentContainerStyle={[
                 styles.viewBody,
@@ -485,13 +491,7 @@ export function EventSheet({
               bounces={false}
               overScrollMode="never"
               scrollEventThrottle={16}
-              onScroll={(e) => {
-                const nextAtTop = e.nativeEvent.contentOffset.y <= 0.5;
-                if (viewScrollAtTopRef.current !== nextAtTop) {
-                  viewScrollAtTopRef.current = nextAtTop;
-                  setCanSwipeViewContentToDismiss(nextAtTop);
-                }
-              }}
+              onScroll={viewScrollHandler}
             >
               {/* Event title */}
               <Text style={styles.viewEventTitle} numberOfLines={2}>
@@ -559,7 +559,9 @@ export function EventSheet({
                 {event.participants && event.participants.length > 0 ? (
                   <>
                     <View style={styles.sectionDivider} />
-                    <View style={[styles.sectionRow, styles.participantSectionRow]}>
+                    <View
+                      style={[styles.sectionRow, styles.participantSectionRow]}
+                    >
                       <IconBox name="users" color={iconColor} bg={iconBg} />
                       <View style={styles.participantList}>
                         {event.participants.map((participant) => (
@@ -574,7 +576,9 @@ export function EventSheet({
                               />
                             ) : (
                               <View style={styles.participantAvatarFallback}>
-                                <Text style={styles.participantAvatarFallbackText}>
+                                <Text
+                                  style={styles.participantAvatarFallbackText}
+                                >
                                   {getParticipantInitials(participant)}
                                 </Text>
                               </View>
@@ -654,7 +658,7 @@ export function EventSheet({
                   ))}
                 </View>
               )}
-            </ScrollView>
+            </AnimatedScrollView>
             <SheetActions>
               <SheetSecondaryButton label="Close" onPress={dismissSheet} />
               {event.id ? (
@@ -854,11 +858,9 @@ function createStyles(theme: ThemeTokens) {
       alignItems: "center" as const,
       marginTop: 8,
     },
-
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-
     viewEventTitle: {
       fontSize: theme.typography.fontSize.xl.size,
       fontWeight: theme.typography.fontWeight

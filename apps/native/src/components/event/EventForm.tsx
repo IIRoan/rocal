@@ -27,6 +27,7 @@ import { Feather } from "@expo/vector-icons";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Extrapolation,
+  cancelAnimation,
   interpolate,
   runOnJS,
   useAnimatedStyle,
@@ -1127,10 +1128,33 @@ function PickerSheet({
   const { height } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
   const styles = useMemo(() => createModalStyles(theme), [theme]);
+  const closeSequenceRef = useRef(0);
+  const closeFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const translateY = useSharedValue(height);
   const overlayOpacity = useSharedValue(0);
 
-  const finishUnmount = useCallback(() => setMounted(false), []);
+  const clearCloseFallbackTimer = useCallback(() => {
+    if (closeFallbackTimerRef.current !== null) {
+      clearTimeout(closeFallbackTimerRef.current);
+      closeFallbackTimerRef.current = null;
+    }
+  }, []);
+
+  const finishUnmount = useCallback(() => {
+    clearCloseFallbackTimer();
+    setMounted(false);
+  }, [clearCloseFallbackTimer]);
+  const finishUnmountIfCurrent = useCallback(
+    (sequence: number) => {
+      if (sequence !== closeSequenceRef.current || visible) {
+        return;
+      }
+      finishUnmount();
+    },
+    [finishUnmount, visible],
+  );
   const requestClose = useCallback(() => {
     onClose();
   }, [onClose]);
@@ -1142,19 +1166,63 @@ function PickerSheet({
   }, [visible]);
 
   useEffect(() => {
-    translateY.value = visible
-      ? withSpring(0, PICKER_SPRING)
-      : withTiming(height, { duration: PICKER_CLOSE_DURATION }, (finished) => {
-          if (finished) runOnJS(finishUnmount)();
-        });
-    overlayOpacity.value = withTiming(visible ? 1 : 0, {
+    if (visible) {
+      clearCloseFallbackTimer();
+      closeSequenceRef.current += 1;
+      cancelAnimation(translateY);
+      cancelAnimation(overlayOpacity);
+      translateY.value = height;
+      overlayOpacity.value = 0;
+      translateY.value = withSpring(0, PICKER_SPRING);
+      overlayOpacity.value = withTiming(1, {
+        duration: PICKER_CLOSE_DURATION,
+      });
+      return;
+    }
+
+    const closeSequence = closeSequenceRef.current + 1;
+    closeSequenceRef.current = closeSequence;
+    clearCloseFallbackTimer();
+    cancelAnimation(translateY);
+    cancelAnimation(overlayOpacity);
+    translateY.value = withTiming(
+      height,
+      { duration: PICKER_CLOSE_DURATION },
+      (finished) => {
+        if (finished) {
+          runOnJS(finishUnmountIfCurrent)(closeSequence);
+        }
+      },
+    );
+    overlayOpacity.value = withTiming(0, {
       duration: PICKER_CLOSE_DURATION,
     });
-  }, [visible, height, translateY, overlayOpacity, finishUnmount]);
+    closeFallbackTimerRef.current = setTimeout(() => {
+      finishUnmountIfCurrent(closeSequence);
+    }, PICKER_CLOSE_DURATION + 120);
+  }, [
+    visible,
+    height,
+    translateY,
+    overlayOpacity,
+    clearCloseFallbackTimer,
+    finishUnmountIfCurrent,
+  ]);
+
+  useEffect(
+    () => () => {
+      clearCloseFallbackTimer();
+    },
+    [clearCloseFallbackTimer],
+  );
 
   const panGesture = Gesture.Pan()
     .activeOffsetY(8)
     .failOffsetX([-20, 20])
+    .onStart(() => {
+      "worklet";
+      cancelAnimation(translateY);
+    })
     .onUpdate((e) => {
       "worklet";
       if (e.translationY > 0) {

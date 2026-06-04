@@ -8,7 +8,8 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { MailSelectionBar } from "./MailSelectionBar";
 import { MailTopToolbar } from "./MailTopToolbar";
-import { headerChromeMotion, useSelectionProgress } from "./mail-selection-anim";
+import { headerChromeMotion } from "./mail-selection-anim-utils";
+import { useSelectionProgress } from "./mail-selection-anim";
 import { mailSpacing } from "./mail-ui";
 
 const AnimatedView = Animated.createAnimatedComponent(View);
@@ -38,10 +39,7 @@ export function MailListHeader({
     const motion = headerChromeMotion(progress.value, "outgoing");
     return {
       opacity: motion.opacity,
-      transform: [
-        { translateY: motion.translateY },
-        { scale: motion.scale },
-      ],
+      transform: [{ translateY: motion.translateY }, { scale: motion.scale }],
     };
   });
 
@@ -49,24 +47,26 @@ export function MailListHeader({
     const motion = headerChromeMotion(progress.value, "incoming");
     return {
       opacity: motion.opacity,
-      transform: [
-        { translateY: motion.translateY },
-        { scale: motion.scale },
-      ],
+      transform: [{ translateY: motion.translateY }, { scale: motion.scale }],
     };
   });
 
   const toolbarPointerProps = useAnimatedProps(() => ({
-    pointerEvents: progress.value < 0.35 ? ("auto" as const) : ("none" as const),
+    pointerEvents:
+      progress.value < 0.35 ? ("auto" as const) : ("none" as const),
   }));
 
   const selectionPointerProps = useAnimatedProps(() => ({
-    pointerEvents: progress.value > 0.65 ? ("auto" as const) : ("none" as const),
+    pointerEvents:
+      progress.value > 0.65 ? ("auto" as const) : ("none" as const),
   }));
 
   return (
     <View style={styles.shell}>
-      <AnimatedView style={[styles.layer, toolbarStyle]} animatedProps={toolbarPointerProps}>
+      <AnimatedView
+        style={[styles.layer, toolbarStyle]}
+        animatedProps={toolbarPointerProps}
+      >
         <MailTopToolbar onMenu={onMenu} onSearch={onSearch} />
       </AnimatedView>
       <AnimatedView
