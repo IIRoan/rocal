@@ -6,13 +6,8 @@
  * - InlineLoader   — horizontal row with a small spinner + optional label
  */
 import { useMemo } from "react";
-import {
-  ActivityIndicator,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
 // ─── LoadingScreen ────────────────────────────────────────────────────────────

@@ -9,7 +9,10 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { getErrorMessage } from "@workspace/calendar-core";
@@ -21,10 +24,8 @@ import { useMailSelection } from "../../../src/providers/MailSelectionProvider";
 import { useCommandPalette } from "../../../src/providers/CommandPaletteProvider";
 import { CenteredLoader } from "../../../src/components/ui/loading";
 import { MailMessageRow } from "../../../src/components/mail/MailMessageRow";
-import {
-  MAIL_COMPOSE_LIST_EXTRA,
-} from "../../../src/components/mail/MailComposeButton";
-import { mailBottomBarTotalHeight } from "../../../src/components/mail/MailBulkToolbar";
+import { MAIL_COMPOSE_LIST_EXTRA } from "../../../src/components/mail/MailComposeButton";
+import { mailBottomBarTotalHeight } from "../../../src/components/mail/mail-bottom-action-bar-layout";
 import { BottomSheet } from "../../../src/components/BottomSheet";
 import { MailBulkMoveSheet } from "../../../src/components/mail/MailBulkMoveSheet";
 import { MailBulkMoreSheet } from "../../../src/components/mail/MailBulkMoreSheet";
@@ -91,7 +92,9 @@ export default function MailScreen() {
   const messagesQuery = useMailboxMessages(runtime, selectedMailboxId);
   const companionMailboxId = useMemo(() => {
     const mailboxes = runtime?.mailboxes ?? [];
-    const selected = mailboxes.find((mailbox) => mailbox.id === selectedMailboxId);
+    const selected = mailboxes.find(
+      (mailbox) => mailbox.id === selectedMailboxId,
+    );
     const role = selected?.role?.toLowerCase();
     if (role === "inbox") {
       return getPrimaryMailboxId(mailboxes, "sent");
@@ -115,8 +118,8 @@ export default function MailScreen() {
 
   const allowedMailboxIds = useMemo(
     () =>
-      [selectedMailboxId, companionMailboxId].filter(
-        (id): id is string => Boolean(id),
+      [selectedMailboxId, companionMailboxId].filter((id): id is string =>
+        Boolean(id),
       ),
     [selectedMailboxId, companionMailboxId],
   );
@@ -170,7 +173,9 @@ export default function MailScreen() {
 
   const threadRows = useMemo(() => {
     const seen = new Set(mailboxMessages.map((message) => message.id));
-    const extras = conversationExtras.filter((message) => !seen.has(message.id));
+    const extras = conversationExtras.filter(
+      (message) => !seen.has(message.id),
+    );
     return buildMailConversations([...mailboxMessages, ...extras]);
   }, [mailboxMessages, conversationExtras]);
 
@@ -294,7 +299,10 @@ export default function MailScreen() {
         );
       },
       onError: (error) =>
-        toast(getErrorMessage(error, "Failed to mark messages as read."), "error"),
+        toast(
+          getErrorMessage(error, "Failed to mark messages as read."),
+          "error",
+        ),
     });
   }, [unreadSelectedIds, bulkMarkAsRead, clearSelection, toast]);
 
@@ -311,7 +319,10 @@ export default function MailScreen() {
         );
       },
       onError: (error) =>
-        toast(getErrorMessage(error, "Failed to mark messages as unread."), "error"),
+        toast(
+          getErrorMessage(error, "Failed to mark messages as unread."),
+          "error",
+        ),
     });
   }, [readSelectedIds, bulkMarkAsUnread, clearSelection, toast]);
 
@@ -331,7 +342,9 @@ export default function MailScreen() {
         toast(
           getErrorMessage(
             error,
-            isInTrash ? "Failed to delete messages." : "Failed to move messages to trash.",
+            isInTrash
+              ? "Failed to delete messages."
+              : "Failed to move messages to trash.",
           ),
           "error",
         ),
@@ -342,7 +355,8 @@ export default function MailScreen() {
     (targetMailboxId: string) => {
       if (bulkIds.length === 0) return;
       const targetName =
-        runtime?.mailboxes.find((m) => m.id === targetMailboxId)?.name ?? "mailbox";
+        runtime?.mailboxes.find((m) => m.id === targetMailboxId)?.name ??
+        "mailbox";
       bulkMoveToMailbox.mutate(
         { messageIds: bulkIds, targetMailboxId },
         {
@@ -425,10 +439,16 @@ export default function MailScreen() {
       try {
         await Promise.all(
           bulkIds.map((id) =>
-            setMessageLabel.mutateAsync({ messageId: id, labelId, assigned: true }),
+            setMessageLabel.mutateAsync({
+              messageId: id,
+              labelId,
+              assigned: true,
+            }),
           ),
         );
-        toast(`Applied "${label?.name ?? labelId}" to ${bulkIds.length} messages`);
+        toast(
+          `Applied "${label?.name ?? labelId}" to ${bulkIds.length} messages`,
+        );
         clearSelection();
       } catch (error) {
         toast(getErrorMessage(error, "Failed to apply label."), "error");
@@ -458,7 +478,8 @@ export default function MailScreen() {
   const renderItem = useCallback(
     ({ item }: { item: (typeof threadRows)[number] }) => {
       const unreadCount = item.messages.filter(
-        (entry) => primaryMessageIds.has(entry.id) && !entry.keywords?.["$seen"],
+        (entry) =>
+          primaryMessageIds.has(entry.id) && !entry.keywords?.["$seen"],
       ).length;
       const hasAttachments = item.messages.some((entry) =>
         messageHasVisibleAttachments(entry),
@@ -466,10 +487,13 @@ export default function MailScreen() {
       const rowSelectableIds = item.messageIds.filter((id) =>
         primaryMessageIds.has(id),
       );
-      const selectedCount = rowSelectableIds.filter((id) => selectedIds.has(id)).length;
+      const selectedCount = rowSelectableIds.filter((id) =>
+        selectedIds.has(id),
+      ).length;
       const isRowSelected =
         selectedCount > 0 ||
-        (rowSelectableIds.length === 0 && selectedIds.has(item.latestMessage.id));
+        (rowSelectableIds.length === 0 &&
+          selectedIds.has(item.latestMessage.id));
 
       return (
         <MailMessageRow
@@ -533,130 +557,128 @@ export default function MailScreen() {
           onSelectAll={handleSelectAll}
         />
 
-      {accountQuery.isLoading ? (
-        <CenteredLoader theme={theme} />
-      ) : accountQuery.isError ? (
-        <ErrorState
-          theme={theme}
-          message={getErrorMessage(accountQuery.error, "Failed to load mail")}
-          onRetry={() => accountQuery.refetch()}
-        />
-      ) : !provisioned ? (
-        <SetupState
-          theme={theme}
-          canCreateMailbox={configQuery.data?.signupEnabled ?? true}
-          isSettingUp={provisionMailbox.isPending}
-          errorMessage={
-            provisionMailbox.error
-              ? getErrorMessage(
-                  provisionMailbox.error,
-                  "Could not create your mailbox.",
-                )
-              : null
-          }
-          onSetup={() => provisionMailbox.mutate()}
-        />
-      ) : runtimeQuery.isLoading ? (
-        <CenteredLoader theme={theme} message="Connecting to your mailbox…" />
-      ) : runtimeQuery.isError ? (
-        <ErrorState
-          theme={theme}
-          message={getErrorMessage(
-            runtimeQuery.error,
-            "Failed to connect to your mailbox",
-          )}
-          onRetry={() => runtimeQuery.refetch()}
-        />
-      ) : (
-        <View style={styles.listArea}>
-          <FlatList
-            key={selectedMailboxId ?? "mailbox"}
-            style={styles.listFlex}
-            data={threadRows}
-            keyExtractor={(item) => item.id}
-            extraData={listExtraData}
-            renderItem={renderItem}
-            ItemSeparatorComponent={() => (
-              <View style={styles.separator} />
+        {accountQuery.isLoading ? (
+          <CenteredLoader theme={theme} />
+        ) : accountQuery.isError ? (
+          <ErrorState
+            theme={theme}
+            message={getErrorMessage(accountQuery.error, "Failed to load mail")}
+            onRetry={() => accountQuery.refetch()}
+          />
+        ) : !provisioned ? (
+          <SetupState
+            theme={theme}
+            canCreateMailbox={configQuery.data?.signupEnabled ?? true}
+            isSettingUp={provisionMailbox.isPending}
+            errorMessage={
+              provisionMailbox.error
+                ? getErrorMessage(
+                    provisionMailbox.error,
+                    "Could not create your mailbox.",
+                  )
+                : null
+            }
+            onSetup={() => provisionMailbox.mutate()}
+          />
+        ) : runtimeQuery.isLoading ? (
+          <CenteredLoader theme={theme} message="Connecting to your mailbox…" />
+        ) : runtimeQuery.isError ? (
+          <ErrorState
+            theme={theme}
+            message={getErrorMessage(
+              runtimeQuery.error,
+              "Failed to connect to your mailbox",
             )}
-            refreshing={messagesQuery.isFetching && !messagesQuery.isLoading}
-            onRefresh={() => {
-              void messagesQuery.refetch();
-              void companionMessagesQuery.refetch();
+            onRetry={() => runtimeQuery.refetch()}
+          />
+        ) : (
+          <View style={styles.listArea}>
+            <FlatList
+              key={selectedMailboxId ?? "mailbox"}
+              style={styles.listFlex}
+              data={threadRows}
+              keyExtractor={(item) => item.id}
+              extraData={listExtraData}
+              renderItem={renderItem}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+              refreshing={messagesQuery.isFetching && !messagesQuery.isLoading}
+              onRefresh={() => {
+                void messagesQuery.refetch();
+                void companionMessagesQuery.refetch();
+              }}
+              contentContainerStyle={
+                threadRows.length === 0 ? styles.emptyListContent : undefined
+              }
+              ListFooterComponent={listFooter}
+              ListEmptyComponent={
+                messagesQuery.isLoading ? (
+                  <CenteredLoader theme={theme} />
+                ) : (
+                  <View style={styles.centered}>
+                    <Feather
+                      name="inbox"
+                      size={MAIL_ICON.emptyState}
+                      color={theme.colors.mutedForeground}
+                    />
+                    <Text style={styles.mutedText}>No messages here</Text>
+                  </View>
+                )
+              }
+            />
+          </View>
+        )}
+
+        {showMailChrome ? (
+          <MailListBottomChrome
+            bottomInset={insets.bottom}
+            composeOnPress={() => router.push("/(tabs)/mail/compose" as never)}
+            bulk={{
+              isInTrash,
+              canMarkRead: unreadSelectedIds.length > 0,
+              canMarkUnread: readSelectedIds.length > 0,
+              busy: isActionBusy,
+              onMarkRead: handleBulkMarkRead,
+              onMarkUnread: handleBulkMarkUnread,
+              onTrash: handleBulkTrash,
+              onMore: () => setActiveSheetView("bulkMore"),
             }}
-            contentContainerStyle={
-              threadRows.length === 0 ? styles.emptyListContent : undefined
-            }
-            ListFooterComponent={listFooter}
-            ListEmptyComponent={
-              messagesQuery.isLoading ? (
-                <CenteredLoader theme={theme} />
-              ) : (
-                <View style={styles.centered}>
-                  <Feather
-                    name="inbox"
-                    size={MAIL_ICON.emptyState}
-                    color={theme.colors.mutedForeground}
-                  />
-                  <Text style={styles.mutedText}>No messages here</Text>
-                </View>
-              )
-            }
           />
-        </View>
-      )}
-
-      {showMailChrome ? (
-        <MailListBottomChrome
-          bottomInset={insets.bottom}
-          composeOnPress={() => router.push("/(tabs)/mail/compose" as never)}
-          bulk={{
-            isInTrash,
-            canMarkRead: unreadSelectedIds.length > 0,
-            canMarkUnread: readSelectedIds.length > 0,
-            busy: isActionBusy,
-            onMarkRead: handleBulkMarkRead,
-            onMarkUnread: handleBulkMarkUnread,
-            onTrash: handleBulkTrash,
-            onMore: () => setActiveSheetView("bulkMore"),
-          }}
-        />
-      ) : null}
-
-      <BottomSheet
-        visible={activeSheetView !== null}
-        onDismiss={() => setActiveSheetView(null)}
-        snapPoints={bulkSheetSnapPoints}
-      >
-        {activeSheetView === "bulkMore" ? (
-          <MailSheetPanel bottomInset={insets.bottom}>
-            <MailBulkMoreSheet
-              showStar={unflaggedSelectedIds.length > 0}
-              showUnstar={flaggedSelectedIds.length > 0}
-              showMove={bulkMoveTargets.length > 0}
-              onStar={() => void handleBulkStar()}
-              onUnstar={() => void handleBulkUnstar()}
-              onLabels={() => setActiveSheetView("bulkLabel")}
-              onMove={() => setActiveSheetView("bulkMove")}
-            />
-          </MailSheetPanel>
-        ) : activeSheetView === "bulkMove" ? (
-          <MailBulkMoveSheet
-            mailboxes={bulkMoveTargets}
-            bottomInset={sheetPadCompact}
-            disabled={isActionBusy || bulkIds.length === 0}
-            onSelectMailbox={handleBulkMove}
-          />
-        ) : activeSheetView === "bulkLabel" ? (
-          <MailSheetPanel bottomInset={insets.bottom}>
-            <MailBulkLabelsSheet
-              labels={labels}
-              onBack={() => setActiveSheetView("bulkMore")}
-              onApplyLabel={(labelId) => void handleBulkApplyLabel(labelId)}
-            />
-          </MailSheetPanel>
         ) : null}
-      </BottomSheet>
+
+        <BottomSheet
+          visible={activeSheetView !== null}
+          onDismiss={() => setActiveSheetView(null)}
+          snapPoints={bulkSheetSnapPoints}
+        >
+          {activeSheetView === "bulkMore" ? (
+            <MailSheetPanel bottomInset={insets.bottom}>
+              <MailBulkMoreSheet
+                showStar={unflaggedSelectedIds.length > 0}
+                showUnstar={flaggedSelectedIds.length > 0}
+                showMove={bulkMoveTargets.length > 0}
+                onStar={() => void handleBulkStar()}
+                onUnstar={() => void handleBulkUnstar()}
+                onLabels={() => setActiveSheetView("bulkLabel")}
+                onMove={() => setActiveSheetView("bulkMove")}
+              />
+            </MailSheetPanel>
+          ) : activeSheetView === "bulkMove" ? (
+            <MailBulkMoveSheet
+              mailboxes={bulkMoveTargets}
+              bottomInset={sheetPadCompact}
+              disabled={isActionBusy || bulkIds.length === 0}
+              onSelectMailbox={handleBulkMove}
+            />
+          ) : activeSheetView === "bulkLabel" ? (
+            <MailSheetPanel bottomInset={insets.bottom}>
+              <MailBulkLabelsSheet
+                labels={labels}
+                onBack={() => setActiveSheetView("bulkMore")}
+                onApplyLabel={(labelId) => void handleBulkApplyLabel(labelId)}
+              />
+            </MailSheetPanel>
+          ) : null}
+        </BottomSheet>
       </SafeAreaView>
     </MailSelectionAnimProvider>
   );
@@ -708,7 +730,11 @@ function SetupState({
   const styles = useMemo(() => createStyles(theme), [theme]);
   return (
     <View style={styles.centered}>
-      <Feather name="mail" size={MAIL_ICON.emptyState} color={theme.colors.primaryBase} />
+      <Feather
+        name="mail"
+        size={MAIL_ICON.emptyState}
+        color={theme.colors.primaryBase}
+      />
       <Text style={styles.setupTitle}>Set up your mailbox</Text>
       <Text style={styles.mutedText}>
         Create your encrypted mailbox on this device. Solace generates a random
@@ -804,7 +830,6 @@ function createStyles(theme: ThemeTokens) {
       borderWidth: 1,
       borderColor: theme.colors.border,
     },
-
   } satisfies Record<string, ViewStyle>;
 
   const text = {
@@ -838,7 +863,6 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
-
   } satisfies Record<string, TextStyle>;
 
   return { ...StyleSheet.create(view), ...StyleSheet.create(text) };

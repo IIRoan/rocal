@@ -19,18 +19,6 @@ import {
   mailTypography,
 } from "./mail-ui";
 
-/** Action row height (excludes safe-area padding). */
-export const MAIL_BOTTOM_BAR_HEIGHT = MAIL_LAYOUT.bottomBarHeight;
-
-/** Total dock height including top padding and bottom safe area. */
-export function mailBottomBarTotalHeight(bottomInset: number): number {
-  return (
-    MAIL_LAYOUT.bottomBarPaddingTop +
-    MAIL_LAYOUT.bottomBarHeight +
-    bottomInset
-  );
-}
-
 interface MailBottomActionBarProps {
   bottomInset: number;
   children: React.ReactNode;
@@ -40,7 +28,10 @@ interface MailBottomActionBarProps {
  * Fixed bottom dock for mail list bulk actions and message reader.
  * Always absolutely positioned so both screens share identical layout.
  */
-export function MailBottomActionBar({ bottomInset, children }: MailBottomActionBarProps) {
+export function MailBottomActionBar({
+  bottomInset,
+  children,
+}: MailBottomActionBarProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createBarStyles(theme), [theme]);
   const pad = mailSpacing(theme);
@@ -66,7 +57,9 @@ export function MailBottomActionDivider() {
   const { theme } = useTheme();
   const colors = mailColors(theme);
 
-  return <View style={[stylesStatic.divider, { backgroundColor: colors.border }]} />;
+  return (
+    <View style={[stylesStatic.divider, { backgroundColor: colors.border }]} />
+  );
 }
 
 export interface MailBottomActionProps {

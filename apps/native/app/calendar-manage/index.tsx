@@ -34,10 +34,7 @@ import {
   SectionHeader,
   EmptyCard,
 } from "../../src/components/ui/list-components";
-import {
-  LoadingScreen,
-  InlineLoader,
-} from "../../src/components/ui/loading";
+import { LoadingScreen, InlineLoader } from "../../src/components/ui/loading";
 
 type ReadOnlyCalendarEntry = {
   subscription: CalendarSubscription;
@@ -123,7 +120,10 @@ export default function CalendarManageScreen() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
     onError: (mutationError) => {
-      toast(getErrorMessage(mutationError, "Failed to update calendar visibility"), "error");
+      toast(
+        getErrorMessage(mutationError, "Failed to update calendar visibility"),
+        "error",
+      );
     },
     onSettled: (_data, _error, { id }) => {
       setTogglingIds((prev) => {
@@ -147,7 +147,10 @@ export default function CalendarManageScreen() {
       toast("Default calendar updated");
     },
     onError: (mutationError) => {
-      toast(getErrorMessage(mutationError, "Failed to update default calendar"), "error");
+      toast(
+        getErrorMessage(mutationError, "Failed to update default calendar"),
+        "error",
+      );
     },
     onSettled: () => {
       setPendingDefaultCalendarId(null);
@@ -269,7 +272,7 @@ export default function CalendarManageScreen() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <StackScreenHeader
         title="Calendar Management"
         rightAction={
@@ -287,31 +290,13 @@ export default function CalendarManageScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.heroCard}>
-          <Text style={styles.heroTitle}>
-            Manage every calendar in one place
-          </Text>
-          <Text style={styles.heroText}>
-            Owned calendars can be edited, shared, and set as default. Read-only
-            calendars stay synced from feeds and holiday catalogs.
-          </Text>
-          <View style={styles.heroActions}>
-            <Pressable style={styles.primaryButton} onPress={handleCreate}>
-              <Text style={styles.primaryButtonText}>New Calendar</Text>
-            </Pressable>
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={handleAddOrImport}
-            >
-              <Text style={styles.secondaryButtonText}>Add or Import</Text>
-            </Pressable>
-          </View>
-        </View>
-
         <SectionHeader
           title="Owned Calendars"
           count={sortedOwnedCalendars.length}
+          actionLabel="New"
+          onAction={handleCreate}
           theme={theme}
         />
         {sortedOwnedCalendars.length === 0 ? (
@@ -615,36 +600,6 @@ function createStyles(theme: ThemeTokens) {
       paddingBottom: theme.spacing["8"],
       gap: theme.spacing["3"],
     },
-    heroCard: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: theme.colors.card,
-      padding: theme.spacing["4"],
-      gap: theme.spacing["3"],
-    },
-    heroActions: {
-      flexDirection: "row" as const,
-      gap: theme.spacing["3"],
-    },
-    primaryButton: {
-      flex: 1,
-      minHeight: 44,
-      borderRadius: theme.borderRadius.md,
-      backgroundColor: theme.colors.primaryBase,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-    },
-    secondaryButton: {
-      flex: 1,
-      minHeight: 44,
-      borderRadius: theme.borderRadius.md,
-      backgroundColor: theme.colors.muted,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-    },
     rowCard: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
@@ -701,31 +656,6 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
-    },
-    heroTitle: {
-      fontSize: theme.typography.fontSize.lg.size,
-      lineHeight: theme.typography.fontSize.lg.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    heroText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    primaryButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.primaryForeground,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-    },
-    secondaryButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
     },
     rowTitle: {
       fontSize: theme.typography.fontSize.sm.size,

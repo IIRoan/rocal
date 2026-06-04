@@ -1,6 +1,7 @@
 import {
   CALENDAR_TAB_ROUTE,
   MAIL_TAB_ROUTE,
+  NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS,
   NATIVE_STACK_SCREEN_OPTIONS,
   isCalendarRouteSegments,
   isMailRouteSegments,
@@ -34,6 +35,13 @@ describe("navigation-routes", () => {
       headerShown: false,
       animation: "slide_from_right",
       animationDuration: 280,
+      gestureEnabled: true,
+    });
+  });
+
+  it("disables swipe-back on root tab and auth shells", () => {
+    expect(NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS).toEqual({
+      gestureEnabled: false,
     });
   });
 });

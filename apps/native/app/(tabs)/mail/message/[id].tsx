@@ -11,7 +11,10 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -61,16 +64,23 @@ import {
   MailBottomAction,
   MailBottomActionBar,
   MailBottomActionDivider,
-  mailBottomBarTotalHeight,
 } from "../../../../src/components/mail/MailBottomActionBar";
+import { mailBottomBarTotalHeight } from "../../../../src/components/mail/mail-bottom-action-bar-layout";
 import { mailSpacing } from "../../../../src/components/mail/mail-ui";
 
 import {
   resolveAttachmentPreviewKind,
   type MailAttachmentPreviewKind,
 } from "../../../../src/lib/mail/attachment-preview";
-import type { JmapAttachment, JmapEmailMessage, LabelDef } from "../../../../src/lib/mail/types";
-import { useLabels, getAllMessageLabels } from "../../../../src/lib/mail/use-labels";
+import type {
+  JmapAttachment,
+  JmapEmailMessage,
+  LabelDef,
+} from "../../../../src/lib/mail/types";
+import {
+  useLabels,
+  getAllMessageLabels,
+} from "../../../../src/lib/mail/use-labels";
 import { MailLabelsSheet } from "../../../../src/components/mail/MailLabelsSheet";
 import { sheetBottomPadding } from "../../../../src/components/sheet/sheet-padding";
 
@@ -137,10 +147,12 @@ export default function MailMessageScreen() {
     staleTime: Infinity,
     gcTime: 5 * 60 * 1000,
     queryFn: async () => {
-      if (!runtime || !message) throw new Error("Runtime or message not available");
+      if (!runtime || !message)
+        throw new Error("Runtime or message not available");
       const rawBodyText = bodies?.text ?? bodies?.html ?? null;
       if (encryption === "inline_pgp") {
-        if (!rawBodyText) throw new Error("No armored PGP body found in this message");
+        if (!rawBodyText)
+          throw new Error("No armored PGP body found in this message");
         return decryptMailMessage(runtime, messageId, rawBodyText);
       }
       if (encryption === "pgp_mime") {
@@ -172,19 +184,26 @@ export default function MailMessageScreen() {
     };
   }, [messageId]);
 
-  const htmlContent: string | null = decryptQuery.data?.html ?? (isEncrypted ? null : (bodies?.html ?? null));
-  const plainContent: string | null = decryptQuery.data?.plaintext ?? (isEncrypted ? null : (bodies?.text ?? null));
+  const htmlContent: string | null =
+    decryptQuery.data?.html ?? (isEncrypted ? null : (bodies?.html ?? null));
+  const plainContent: string | null =
+    decryptQuery.data?.plaintext ??
+    (isEncrypted ? null : (bodies?.text ?? null));
   const isHtmlEmail = Boolean(htmlContent);
-  const isDecrypting = isEncrypted && (decryptQuery.isLoading || decryptQuery.isFetching);
+  const isDecrypting =
+    isEncrypted && (decryptQuery.isLoading || decryptQuery.isFetching);
   const decryptError = isEncrypted ? decryptQuery.error : null;
   const rawHtmlSource = decryptQuery.data?.html ?? bodies?.html ?? null;
 
-  const [downloadingBlobId, setDownloadingBlobId] = useState<string | null>(null);
+  const [downloadingBlobId, setDownloadingBlobId] = useState<string | null>(
+    null,
+  );
   const [preview, setPreview] = useState<{
     attachment: JmapAttachment;
     kind: MailAttachmentPreviewKind;
   } | null>(null);
-  const [activeSheetView, setActiveSheetView] = useState<MessageSheetView>(null);
+  const [activeSheetView, setActiveSheetView] =
+    useState<MessageSheetView>(null);
 
   const displayAttachments = useMemo(
     () =>
@@ -205,7 +224,7 @@ export default function MailMessageScreen() {
   );
 
   const currentMailboxId = message
-    ? Object.keys(message.mailboxIds ?? {})[0] ?? null
+    ? (Object.keys(message.mailboxIds ?? {})[0] ?? null)
     : null;
   const currentMailbox = runtime?.mailboxes.find((mailbox) =>
     currentMailboxId ? mailbox.id === currentMailboxId : false,
@@ -217,14 +236,17 @@ export default function MailMessageScreen() {
   const inboxMailboxId =
     runtime?.mailboxes.find((mailbox) => mailbox.role === "inbox")?.id ?? null;
   const archiveMailboxId =
-    runtime?.mailboxes.find((mailbox) => mailbox.role === "archive")?.id ?? null;
+    runtime?.mailboxes.find((mailbox) => mailbox.role === "archive")?.id ??
+    null;
   const moveTargets = useMemo(() => {
     if (!runtime || !message) {
       return [];
     }
 
     const activeMailboxIds = new Set(Object.keys(message.mailboxIds ?? {}));
-    return runtime.mailboxes.filter((mailbox) => !activeMailboxIds.has(mailbox.id));
+    return runtime.mailboxes.filter(
+      (mailbox) => !activeMailboxIds.has(mailbox.id),
+    );
   }, [message, runtime]);
   const isActionBusy =
     markAsUnread.isPending ||
@@ -232,14 +254,20 @@ export default function MailMessageScreen() {
     moveToTrash.isPending ||
     deleteMessage.isPending ||
     moveToMailbox.isPending;
-  const cacheAttachment = async (attachment: JmapAttachment, cacheKey: string) =>
+  const cacheAttachment = async (
+    attachment: JmapAttachment,
+    cacheKey: string,
+  ) =>
     writeAttachmentToCache({
       attachment,
       cacheKey,
       runtime,
     });
 
-  const handleOpenAttachment = async (attachment: JmapAttachment, cacheKey: string) => {
+  const handleOpenAttachment = async (
+    attachment: JmapAttachment,
+    cacheKey: string,
+  ) => {
     const kind = resolveAttachmentPreviewKind({
       name: attachment.name,
       type: attachment.type,
@@ -297,15 +325,22 @@ export default function MailMessageScreen() {
     markAsUnread.mutate(message.id, {
       onSuccess: () => toast("Marked as unread"),
       onError: (error) =>
-        toast(getErrorMessage(error, "Failed to mark message as unread."), "error"),
+        toast(
+          getErrorMessage(error, "Failed to mark message as unread."),
+          "error",
+        ),
     });
   };
 
   const handleMoveToTrash = () => {
     if (!message) return;
     setActiveSheetView(null);
-    const mutation = currentMailboxRole === "trash" ? deleteMessage : moveToTrash;
-    const successMessage = currentMailboxRole === "trash" ? "Message deleted" : "Message moved to trash";
+    const mutation =
+      currentMailboxRole === "trash" ? deleteMessage : moveToTrash;
+    const successMessage =
+      currentMailboxRole === "trash"
+        ? "Message deleted"
+        : "Message moved to trash";
     mutation.mutate(message.id, {
       onSuccess: () => {
         toast(successMessage);
@@ -383,10 +418,21 @@ export default function MailMessageScreen() {
           {messageLabels.map((label) => (
             <View
               key={label.id}
-              style={[styles.labelChip, { borderColor: `${label.color}50`, backgroundColor: `${label.color}18` }]}
+              style={[
+                styles.labelChip,
+                {
+                  borderColor: `${label.color}50`,
+                  backgroundColor: `${label.color}18`,
+                },
+              ]}
             >
-              <View style={[styles.labelDot, { backgroundColor: label.color }]} />
-              <Text style={[styles.labelText, { color: label.color }]} numberOfLines={1}>
+              <View
+                style={[styles.labelDot, { backgroundColor: label.color }]}
+              />
+              <Text
+                style={[styles.labelText, { color: label.color }]}
+                numberOfLines={1}
+              >
                 {label.name}
               </Text>
             </View>
@@ -395,10 +441,22 @@ export default function MailMessageScreen() {
       ) : null}
 
       <View style={styles.metaBlock}>
-        <MetaRow theme={theme} label="From" value={formatAddressFull(message.from)} />
-        <MetaRow theme={theme} label="To" value={formatAddressFull(message.to)} />
+        <MetaRow
+          theme={theme}
+          label="From"
+          value={formatAddressFull(message.from)}
+        />
+        <MetaRow
+          theme={theme}
+          label="To"
+          value={formatAddressFull(message.to)}
+        />
         {message.cc?.length ? (
-          <MetaRow theme={theme} label="Cc" value={formatAddressFull(message.cc)} />
+          <MetaRow
+            theme={theme}
+            label="Cc"
+            value={formatAddressFull(message.cc)}
+          />
         ) : null}
         <MetaRow
           theme={theme}
@@ -427,9 +485,16 @@ export default function MailMessageScreen() {
                 ]}
               >
                 {isDownloading ? (
-                  <ActivityIndicator size={13} color={theme.colors.mutedForeground} />
+                  <ActivityIndicator
+                    size={13}
+                    color={theme.colors.mutedForeground}
+                  />
                 ) : (
-                  <Feather name="paperclip" size={13} color={theme.colors.mutedForeground} />
+                  <Feather
+                    name="paperclip"
+                    size={13}
+                    color={theme.colors.mutedForeground}
+                  />
                 )}
                 <Text style={styles.attachmentName} numberOfLines={1}>
                   {attachment.name ?? "attachment"}
@@ -460,7 +525,11 @@ export default function MailMessageScreen() {
           accessibilityRole="button"
           accessibilityLabel="Back to messages"
         >
-          <Feather name="arrow-left" size={18} color={theme.colors.foreground} />
+          <Feather
+            name="arrow-left"
+            size={18}
+            color={theme.colors.foreground}
+          />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {message?.subject?.trim() || "Message"}
@@ -472,7 +541,11 @@ export default function MailMessageScreen() {
         <CenteredLoader theme={theme} />
       ) : messageQuery.isError && !message ? (
         <View style={styles.centered}>
-          <Feather name="alert-triangle" size={36} color={theme.colors.destructive} />
+          <Feather
+            name="alert-triangle"
+            size={36}
+            color={theme.colors.destructive}
+          />
           <Text style={styles.mutedText}>
             {getErrorMessage(messageQuery.error, "Failed to load message")}
           </Text>
@@ -485,7 +558,10 @@ export default function MailMessageScreen() {
         <View style={styles.messageBody}>
           <ScrollView
             style={styles.messageScroll}
-            contentContainerStyle={[styles.body, { paddingBottom: scrollBottomPad }]}
+            contentContainerStyle={[
+              styles.body,
+              { paddingBottom: scrollBottomPad },
+            ]}
           >
             {messageHeader}
 
@@ -596,7 +672,8 @@ export default function MailMessageScreen() {
           loadCached={() =>
             cacheAttachment(
               preview.attachment,
-              preview.attachment.blobId ?? `preview-${preview.attachment.name ?? "attachment"}`,
+              preview.attachment.blobId ??
+                `preview-${preview.attachment.name ?? "attachment"}`,
             )
           }
           onClose={() => setPreview(null)}
@@ -604,14 +681,20 @@ export default function MailMessageScreen() {
             try {
               await shareCachedAttachment(cached);
             } catch (err) {
-              toast(getErrorMessage(err, "Could not share attachment."), "error");
+              toast(
+                getErrorMessage(err, "Could not share attachment."),
+                "error",
+              );
             }
           }}
           onOpen={async (cached) => {
             try {
               await openCachedAttachment(cached);
             } catch (err) {
-              toast(getErrorMessage(err, "Could not open attachment."), "error");
+              toast(
+                getErrorMessage(err, "Could not open attachment."),
+                "error",
+              );
             }
           }}
         />
@@ -620,34 +703,88 @@ export default function MailMessageScreen() {
       <BottomSheet
         visible={activeSheetView !== null}
         onDismiss={() => setActiveSheetView(null)}
-        snapPoints={activeSheetView === "html" ? [0.92] : activeSheetView === "label" ? [0.65] : [0.45]}
+        snapPoints={
+          activeSheetView === "html"
+            ? [0.92]
+            : activeSheetView === "label"
+              ? [0.65]
+              : [0.45]
+        }
       >
         {activeSheetView === "menu" ? (
           <MailSheetPanel bottomInset={insets.bottom}>
             <MailSheetList>
-              <SheetRow variant="mail" icon="corner-up-right" label="Forward" onPress={handleForward} />
-              <SheetRow variant="mail" icon="star" label={isFlagged ? "Unstar" : "Star"} onPress={handleToggleStar} showDivider />
+              <SheetRow
+                variant="mail"
+                icon="corner-up-right"
+                label="Forward"
+                onPress={handleForward}
+              />
+              <SheetRow
+                variant="mail"
+                icon="star"
+                label={isFlagged ? "Unstar" : "Star"}
+                onPress={handleToggleStar}
+                showDivider
+              />
               {isSeen ? (
-                <SheetRow variant="mail" icon="mail" label="Mark as unread" onPress={handleMarkUnread} showDivider />
+                <SheetRow
+                  variant="mail"
+                  icon="mail"
+                  label="Mark as unread"
+                  onPress={handleMarkUnread}
+                  showDivider
+                />
               ) : null}
-              <SheetRow variant="mail" icon="tag" label="Labels" accessory="chevron-right" onPress={() => setActiveSheetView("label")} showDivider />
+              <SheetRow
+                variant="mail"
+                icon="tag"
+                label="Labels"
+                accessory="chevron-right"
+                onPress={() => setActiveSheetView("label")}
+                showDivider
+              />
               {(currentMailboxRole === "trash" ||
                 currentMailboxRole === "junk") &&
               inboxMailboxId ? (
-                <SheetRow variant="mail" icon="inbox" label="Restore to inbox" onPress={handleRestoreToInbox} showDivider />
+                <SheetRow
+                  variant="mail"
+                  icon="inbox"
+                  label="Restore to inbox"
+                  onPress={handleRestoreToInbox}
+                  showDivider
+                />
               ) : null}
               {moveTargets.length > 0 ? (
-                <SheetRow variant="mail" icon="folder" label="Move to…" accessory="chevron-right" onPress={() => setActiveSheetView("move")} showDivider />
+                <SheetRow
+                  variant="mail"
+                  icon="folder"
+                  label="Move to…"
+                  accessory="chevron-right"
+                  onPress={() => setActiveSheetView("move")}
+                  showDivider
+                />
               ) : null}
               {rawHtmlSource ? (
-                <SheetRow variant="mail" icon="code" label="View HTML source" accessory="chevron-right" onPress={() => setActiveSheetView("html")} showDivider />
+                <SheetRow
+                  variant="mail"
+                  icon="code"
+                  label="View HTML source"
+                  accessory="chevron-right"
+                  onPress={() => setActiveSheetView("html")}
+                  showDivider
+                />
               ) : null}
             </MailSheetList>
             <MailSheetList>
               <SheetRow
                 variant="mail"
                 icon="trash-2"
-                label={currentMailboxRole === "trash" ? "Delete message" : "Move to trash"}
+                label={
+                  currentMailboxRole === "trash"
+                    ? "Delete message"
+                    : "Move to trash"
+                }
                 destructive
                 onPress={handleMoveToTrash}
                 disabled={isActionBusy}
@@ -656,7 +793,10 @@ export default function MailMessageScreen() {
           </MailSheetPanel>
         ) : activeSheetView === "move" ? (
           <MailSheetPanel bottomInset={insets.bottom}>
-            <SheetNavButton label="Actions" onPress={() => setActiveSheetView("menu")} />
+            <SheetNavButton
+              label="Actions"
+              onPress={() => setActiveSheetView("menu")}
+            />
             <MailSheetList>
               {moveTargets.map((mailbox, index) => (
                 <SheetRow
@@ -676,31 +816,46 @@ export default function MailMessageScreen() {
               labels={labels}
               messageKeywords={message?.keywords}
               onBack={() => setActiveSheetView("menu")}
-            onToggleLabel={(labelId, assigned) => {
-              if (!message) return;
-              setMessageLabel.mutate({ messageId: message.id, labelId, assigned });
-              setActiveSheetView(null);
-              const label = labels.find((l) => l.id === labelId);
-              toast(assigned ? `Added "${label?.name ?? labelId}"` : `Removed "${label?.name ?? labelId}"`);
-            }}
-            onCreateLabel={async (name, color) => {
-              const newLabel = await createLabel(name, color);
-              if (message) {
-                setMessageLabel.mutate({ messageId: message.id, labelId: newLabel.id, assigned: true });
-                toast(`Created "${newLabel.name}"`);
-              }
-              setActiveSheetView(null);
-            }}
-            onDeleteLabel={async (labelId) => {
-              const label = labels.find((l) => l.id === labelId);
-              await deleteLabel(labelId);
-              toast(`Deleted "${label?.name ?? labelId}"`);
-            }}
+              onToggleLabel={(labelId, assigned) => {
+                if (!message) return;
+                setMessageLabel.mutate({
+                  messageId: message.id,
+                  labelId,
+                  assigned,
+                });
+                setActiveSheetView(null);
+                const label = labels.find((l) => l.id === labelId);
+                toast(
+                  assigned
+                    ? `Added "${label?.name ?? labelId}"`
+                    : `Removed "${label?.name ?? labelId}"`,
+                );
+              }}
+              onCreateLabel={async (name, color) => {
+                const newLabel = await createLabel(name, color);
+                if (message) {
+                  setMessageLabel.mutate({
+                    messageId: message.id,
+                    labelId: newLabel.id,
+                    assigned: true,
+                  });
+                  toast(`Created "${newLabel.name}"`);
+                }
+                setActiveSheetView(null);
+              }}
+              onDeleteLabel={async (labelId) => {
+                const label = labels.find((l) => l.id === labelId);
+                await deleteLabel(labelId);
+                toast(`Deleted "${label?.name ?? labelId}"`);
+              }}
             />
           </MailSheetPanel>
         ) : activeSheetView === "html" ? (
           <View style={styles.sheetView}>
-            <SheetNavButton label="Actions" onPress={() => setActiveSheetView("menu")} />
+            <SheetNavButton
+              label="Actions"
+              onPress={() => setActiveSheetView("menu")}
+            />
             <ScrollView
               style={styles.sheetScroll}
               contentContainerStyle={{
@@ -736,7 +891,11 @@ function DecryptErrorCard({
 }) {
   return (
     <View style={styles.errorCard}>
-      <Feather name="alert-triangle" size={24} color={theme.colors.destructive} />
+      <Feather
+        name="alert-triangle"
+        size={24}
+        color={theme.colors.destructive}
+      />
       <Text style={styles.errorTitle}>Could not decrypt message</Text>
       <Text style={styles.mutedText}>{error}</Text>
       <Pressable onPress={onRetry} style={styles.retryButton}>
@@ -758,10 +917,15 @@ function SignatureBadge({
   if (state === "not_signed") return null;
 
   const icon =
-    state === "verified" ? "check-circle" : state === "failed" ? "x-circle" : "help-circle";
+    state === "verified"
+      ? "check-circle"
+      : state === "failed"
+        ? "x-circle"
+        : "help-circle";
   const color =
     state === "verified"
-      ? ((theme.colors as unknown as Record<string, string>)["success"] ?? theme.colors.primaryBase)
+      ? ((theme.colors as unknown as Record<string, string>)["success"] ??
+        theme.colors.primaryBase)
       : state === "failed"
         ? theme.colors.destructive
         : theme.colors.mutedForeground;

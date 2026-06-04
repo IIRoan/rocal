@@ -158,12 +158,14 @@ describe("E2eeProvider", () => {
 
   function E2eeProbe() {
     capturedE2ee = useE2ee();
-    return (
-      <div data-testid="e2ee-status">
-        {capturedE2ee.isReady ? "ready" : "not-ready"}:
-        {capturedE2ee.isEnabled ? "enabled" : "disabled"}
-      </div>
-    );
+    const statusLabel = capturedE2ee
+      ? [
+          capturedE2ee.isReady ? "ready" : "not-ready",
+          ":",
+          capturedE2ee.isEnabled ? "enabled" : "disabled",
+        ].join("")
+      : "";
+    return <div data-testid="e2ee-status">{statusLabel}</div>;
   }
 
   async function renderProvider() {
@@ -180,7 +182,9 @@ describe("E2eeProvider", () => {
       await Promise.resolve();
     });
     if (!capturedE2ee) {
-      throw new Error("renderProvider: E2eeProbe did not render — E2eeProvider may have thrown during initial render.");
+      throw new Error(
+        "renderProvider: E2eeProbe did not render — E2eeProvider may have thrown during initial render.",
+      );
     }
   }
 

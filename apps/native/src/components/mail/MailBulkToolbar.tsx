@@ -3,12 +3,7 @@ import {
   MailBottomAction,
   MailBottomActionBar,
   MailBottomActionDivider,
-  MAIL_BOTTOM_BAR_HEIGHT,
-  mailBottomBarTotalHeight,
 } from "./MailBottomActionBar";
-
-export const BULK_TOOLBAR_HEIGHT = MAIL_BOTTOM_BAR_HEIGHT;
-export { mailBottomBarTotalHeight };
 
 interface MailBulkToolbarProps {
   bottomInset: number;

@@ -8,10 +8,19 @@ export const SETTINGS_TIMEZONE_ROUTE = "/settings/timezone";
 export const CALENDAR_TAB_ROUTE = "/(tabs)/calendar";
 export const MAIL_TAB_ROUTE = "/(tabs)/mail";
 
+/** Native stack defaults — interactive swipe-back (iOS full-screen gesture). */
 export const NATIVE_STACK_SCREEN_OPTIONS = {
   headerShown: false,
   animation: "slide_from_right",
   animationDuration: 280,
+  gestureEnabled: true,
+  fullScreenGestureEnabled: true,
+  gestureDirection: "horizontal" as const,
+} as const;
+
+/** Root stack screens that should not pop via swipe (main tabs, auth gate). */
+export const NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS = {
+  gestureEnabled: false,
 } as const;
 
 type Segments = readonly string[];
