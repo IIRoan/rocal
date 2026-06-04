@@ -38,8 +38,11 @@
     "doctor": "npx react-doctor@latest"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.7",
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@babel/preset-env": "^7.29.7",
     "@babel/preset-react": "^7.28.5",
+    "@babel/preset-typescript": "^7.29.7",
     "babel-preset-jest": "^30.4.0",
     "bun-types": "^1.3.14",
     "minimatch": "10.1.1",
