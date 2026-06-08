@@ -1,13 +1,8 @@
 import type { EventReminderMailView } from "@workspace/calendar-core";
-import { Bell, Clock, ExternalLink, Loader2, MapPin } from "lucide-react";
+import { Clock, ExternalLink, Loader2, MapPin } from "lucide-react";
 import { Button } from "@workspace/ui/components/ui/button";
-import {
-  InvitationBanner,
-  InvitationBannerHeader,
-  InvitationBannerMeta,
-  InvitationBannerMetaItem,
-} from "@workspace/ui/components/ui/invitation-banner";
 import { cn } from "@workspace/ui/lib/utils";
+import { MailNotificationBanner } from "./mail-notification-banner";
 
 type EventReminderBannerProps = {
   eventId: string;
@@ -26,62 +21,55 @@ export function EventReminderBanner({
 }: EventReminderBannerProps) {
   const eventUrl = `/calendar?eventId=${encodeURIComponent(eventId)}`;
 
+  const title = loading ? (
+    <span className="flex items-center gap-2 text-muted-foreground">
+      <Loader2 className="size-4 shrink-0 animate-spin" />
+      Loading event details…
+    </span>
+  ) : error ? (
+    "Couldn't load event"
+  ) : (
+    (reminder?.title ?? "Event reminder")
+  );
+
+  const description = error ? (
+    <span className="text-destructive">{error}</span>
+  ) : loading ? (
+    "Fetching the latest event content from your calendar."
+  ) : reminder ? (
+    reminder.timeUntilEvent
+  ) : undefined;
+
+  const meta =
+    !loading && !error && reminder
+      ? [
+          {
+            icon: Clock,
+            children: `${reminder.eventDate} · ${reminder.eventTime}`,
+          },
+          ...(reminder.location
+            ? [{ icon: MapPin, children: reminder.location }]
+            : []),
+        ]
+      : undefined;
+
+  const actions =
+    !loading && !error ? (
+      <Button asChild variant="outline" size="xs" className="ml-auto gap-1.5">
+        <a href={eventUrl}>
+          Open in calendar
+          <ExternalLink className="size-3" />
+        </a>
+      </Button>
+    ) : undefined;
+
   return (
-    <InvitationBanner
-      className={cn(
-        "border-primary/15 bg-primary/[0.04]",
-        className,
-      )}
-    >
-      <InvitationBannerHeader
-        label={
-          <span className="inline-flex items-center gap-1.5 text-primary/80">
-            <Bell className="size-3 shrink-0" strokeWidth={2.25} />
-            Event reminder
-          </span>
-        }
-        title={
-          loading ? (
-            <span className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="size-4 shrink-0 animate-spin" />
-              Loading event details…
-            </span>
-          ) : error ? (
-            "Couldn't load event"
-          ) : (
-            reminder?.title ?? "Event reminder"
-          )
-        }
-        description={
-          error ? (
-            <span className="text-destructive">{error}</span>
-          ) : loading ? (
-            "Fetching the latest event content from your calendar."
-          ) : reminder ? (
-            reminder.timeUntilEvent
-          ) : null
-        }
-        action={
-          <Button asChild variant="secondary" size="xs" className="gap-1.5">
-            <a href={eventUrl}>
-              Open in calendar
-              <ExternalLink className="size-3" />
-            </a>
-          </Button>
-        }
-      />
-      {!loading && !error && reminder ? (
-        <InvitationBannerMeta>
-          <InvitationBannerMetaItem icon={Clock}>
-            {reminder.eventDate} · {reminder.eventTime}
-          </InvitationBannerMetaItem>
-          {reminder.location ? (
-            <InvitationBannerMetaItem icon={MapPin}>
-              {reminder.location}
-            </InvitationBannerMetaItem>
-          ) : null}
-        </InvitationBannerMeta>
-      ) : null}
-    </InvitationBanner>
+    <MailNotificationBanner
+      className={cn("shrink-0", className)}
+      title={title}
+      description={description}
+      meta={meta}
+      actions={actions}
+    />
   );
 }

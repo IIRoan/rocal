@@ -431,7 +431,8 @@ describe("MessageReader — linked calendar event", () => {
     expect(container.textContent).toContain("Work");
     expect(container.textContent).toContain("Open Event");
     expect(container.textContent).toContain("Solace");
-    expect(container.textContent).toContain("Event reminder");
+    expect(container.textContent).toContain("Open in calendar");
+    expect(container.textContent).toContain("15 minutes");
     expect(container.textContent).not.toContain("Linked calendar event");
     expect(container.textContent).not.toContain("Event ID: event-1");
     expect(

@@ -53,3 +53,5 @@ export function buildCalendarPath(
 ): string {
   return buildPathWithSearch(CALENDAR_HOME_PATH, searchParams);
 }
+
+export { buildMailUrl as buildMailPath } from "@/lib/mail/mail-url";
