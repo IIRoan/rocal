@@ -67,13 +67,6 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
 import { Button } from "@workspace/ui/components/ui/button";
-import {
-  InvitationBanner,
-  InvitationBannerHeader,
-  InvitationBannerMeta,
-  InvitationBannerMetaItem,
-  InvitationBannerActions,
-} from "@workspace/ui/components/ui/invitation-banner";
 import { Separator } from "@workspace/ui/components/ui/separator";
 import {
   Tooltip,
@@ -123,6 +116,7 @@ import {
   isSolaceEventReminderEmail,
 } from "@/lib/mail/calendar-event-link";
 import { EventReminderBanner } from "./event-reminder-banner";
+import { MailNotificationBanner } from "./mail-notification-banner";
 import { EventReminderMessageBody, EventReminderMessageBodyLoading } from "./event-reminder-message-body";
 import {
   buildEventReminderMailView,
@@ -766,6 +760,35 @@ export function MessageReader({
     [attachments, message, plaintext],
   );
   const mailCalendarInviteUid = mailCalendarInvite?.uid ?? null;
+  const mailCalendarInviteMeta = useMemo(() => {
+    if (!mailCalendarInvite) return undefined;
+
+    const items = [];
+    if (mailCalendarInvite.start) {
+      items.push({
+        icon: Clock,
+        children: mailCalendarInvite.start.toLocaleString(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+          hour12:
+            timeFormat === "12h"
+              ? true
+              : timeFormat === "24h"
+                ? false
+                : undefined,
+          timeZone: timezone ?? undefined,
+        }),
+      });
+    }
+    if (mailCalendarInvite.location) {
+      items.push({
+        icon: MapPin,
+        children: mailCalendarInvite.location,
+      });
+    }
+
+    return items.length > 0 ? items : undefined;
+  }, [mailCalendarInvite, timeFormat, timezone]);
   const [linkedCalendarEvent, setLinkedCalendarEvent] =
     useState<LinkedCalendarEventState | null>(null);
   const [calendarInviteEvent, setCalendarInviteEvent] =
@@ -2615,14 +2638,11 @@ export function MessageReader({
   const isPending = !invitationStatus || invitationStatus === "pending";
   const calendarInviteCard = shouldShowCalendarInviteCard &&
     mailCalendarInvite && (
-      <InvitationBanner
-        variant="invitation"
+      <MailNotificationBanner
         inactive={invitationRemovedFromCalendar}
-        className="mb-0 rounded-b-none"
-      >
-        <InvitationBannerHeader
-          title={mailCalendarInvite.title}
-          action={
+        title={mailCalendarInvite.title}
+        meta={mailCalendarInviteMeta}
+        headerAction={
             <div className="flex items-center gap-2">
               {currentCalendarInviteEvent?.loading ? (
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -2753,69 +2773,21 @@ export function MessageReader({
                   </Button>
                 )}
             </div>
-          }
-        />
-        <InvitationBannerMeta>
-          {mailCalendarInvite.start && (
-            <InvitationBannerMetaItem icon={Clock}>
-              {mailCalendarInvite.start.toLocaleString(undefined, {
-                dateStyle: "medium",
-                timeStyle: "short",
-                hour12:
-                  timeFormat === "12h"
-                    ? true
-                    : timeFormat === "24h"
-                      ? false
-                      : undefined,
-                timeZone: timezone ?? undefined,
-              })}
-            </InvitationBannerMetaItem>
-          )}
-          {mailCalendarInvite.location && (
-            <InvitationBannerMetaItem icon={MapPin}>
-              {mailCalendarInvite.location}
-            </InvitationBannerMetaItem>
-          )}
-        </InvitationBannerMeta>
-      </InvitationBanner>
+        }
+      />
     );
 
   const shouldShowCalendarCancellationCard =
     mailCalendarInvite?.method === "CANCEL";
   const calendarCancellationCard = shouldShowCalendarCancellationCard &&
     mailCalendarInvite && (
-      <InvitationBanner
+      <MailNotificationBanner
         variant="invitationCancelled"
-        className="mb-0 rounded-b-none"
-      >
-        <InvitationBannerHeader
-          title={mailCalendarInvite.title}
-          description="The organiser cancelled this event. Solace keeps it visible until you remove it yourself."
-        />
-        <InvitationBannerMeta>
-          {mailCalendarInvite.start && (
-            <InvitationBannerMetaItem icon={Clock}>
-              {mailCalendarInvite.start.toLocaleString(undefined, {
-                dateStyle: "medium",
-                timeStyle: "short",
-                hour12:
-                  timeFormat === "12h"
-                    ? true
-                    : timeFormat === "24h"
-                      ? false
-                      : undefined,
-                timeZone: timezone ?? undefined,
-              })}
-            </InvitationBannerMetaItem>
-          )}
-          {mailCalendarInvite.location && (
-            <InvitationBannerMetaItem icon={MapPin}>
-              {mailCalendarInvite.location}
-            </InvitationBannerMetaItem>
-          )}
-        </InvitationBannerMeta>
-        <InvitationBannerActions>
-          {currentCalendarInviteEvent?.loading ? (
+        title={mailCalendarInvite.title}
+        description="The organiser cancelled this event. Solace keeps it visible until you remove it yourself."
+        meta={mailCalendarInviteMeta}
+        actions={
+          currentCalendarInviteEvent?.loading ? (
             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />
               Checking calendar…
@@ -2849,9 +2821,9 @@ export function MessageReader({
             <span className="text-xs text-muted-foreground">
               This cancellation was already applied in your calendar.
             </span>
-          )}
-        </InvitationBannerActions>
-      </InvitationBanner>
+          )
+        }
+      />
     );
 
   const hasCardAboveBody =

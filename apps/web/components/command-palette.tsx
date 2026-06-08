@@ -51,6 +51,7 @@ import { Settings, Loader2, ArrowLeft } from "lucide-react";
 import { useNumberedShortcuts, useIsMobile, usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
 import type { JmapEmailMessage } from "@/lib/mail/types";
+import { buildMailUrlFromIds } from "@/lib/mail/mail-url";
 
 const log = createLogger("command-palette");
 
@@ -474,7 +475,11 @@ export function CommandPalette({
     (result: UnifiedSearchResult<JmapEmailMessage>) => {
       if (result.source === "mail") {
         onOpenChange(false);
-        window.location.href = `/mail?messageId=${encodeURIComponent(result.messageId)}`;
+        window.location.href = buildMailUrlFromIds(
+          result.mailboxIds?.[0],
+          result.messageId,
+          result.message.messageId,
+        );
         return;
       }
 
