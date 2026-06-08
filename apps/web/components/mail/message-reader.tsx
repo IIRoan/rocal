@@ -116,13 +116,22 @@ import { resolveAttachmentPreviewKind } from "@/lib/mail/attachment-preview";
 import { splitPlaintextQuote, splitHtmlQuote } from "@/lib/mail/quoted-text";
 import { formatAddressFull, formatMessageDate } from "./mail-helpers";
 import { PdfAttachmentThumbnail } from "./attachment-preview-dialog";
-import { extractLinkedCalendarEventId } from "@/lib/mail/calendar-event-link";
+import {
+  extractLinkedCalendarEventId,
+  extractReminderLeadMinutes,
+  getCalendarEventLinkSource,
+  isSolaceEventReminderEmail,
+} from "@/lib/mail/calendar-event-link";
+import { EventReminderBanner } from "./event-reminder-banner";
+import { EventReminderMessageBody, EventReminderMessageBodyLoading } from "./event-reminder-message-body";
+import {
+  buildEventReminderMailView,
+  ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
+  isDecryptedEventReminderContent,
+} from "@workspace/calendar-core";
 import { extractMailCalendarInvite } from "@/lib/mail/calendar-invite";
 import { calendarApiService } from "@/lib/calendar-api-service";
 
-// Matches ENCRYPTED_EVENT_PLACEHOLDER_TITLE in @workspace/e2ee — kept local to
-// avoid pulling in the crypto module (which uses TextEncoder) into test environments.
-const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
 const EMPTY_ARRAY: never[] = [];
 
 // ─── Security badge ───────────────────────────────────────────────────────────
@@ -729,9 +738,23 @@ export function MessageReader({
   const conversationListRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const prefersReducedMotion = usePrefersReducedMotion();
+  const calendarEventLinkSource = useMemo(
+    () => (message ? getCalendarEventLinkSource(message, plaintext) : null),
+    [message, plaintext],
+  );
   const linkedCalendarEventId = useMemo(
-    () => (message ? extractLinkedCalendarEventId(message) : null),
-    [message],
+    () =>
+      calendarEventLinkSource
+        ? extractLinkedCalendarEventId(message!, plaintext)
+        : null,
+    [calendarEventLinkSource, message, plaintext],
+  );
+  const isEventReminderEmail = useMemo(
+    () =>
+      calendarEventLinkSource
+        ? isSolaceEventReminderEmail(calendarEventLinkSource)
+        : false,
+    [calendarEventLinkSource],
   );
   const mailCalendarInvite = useMemo(
     () =>
@@ -836,6 +859,38 @@ export function MessageReader({
       cancelled = true;
     };
   }, [linkedCalendarEventId]);
+
+  const eventReminderView = useMemo(() => {
+    if (!linkedCalendarEvent?.event) {
+      return null;
+    }
+    if (!isDecryptedEventReminderContent(linkedCalendarEvent.event)) {
+      return null;
+    }
+
+    return buildEventReminderMailView({
+      event: linkedCalendarEvent.event,
+      minutesBefore: calendarEventLinkSource
+        ? extractReminderLeadMinutes(calendarEventLinkSource)
+        : null,
+      timezone: timezone ?? undefined,
+      timeFormat,
+    });
+  }, [calendarEventLinkSource, linkedCalendarEvent, timeFormat, timezone]);
+
+  const shouldReplaceBodyWithEventReminder = Boolean(
+    isEventReminderEmail &&
+      eventReminderView &&
+      linkedCalendarEvent &&
+      !linkedCalendarEvent.loading &&
+      !linkedCalendarEvent.error,
+  );
+  const isReminderEventLoading = Boolean(
+    isEventReminderEmail &&
+      linkedCalendarEvent &&
+      (linkedCalendarEvent.loading ||
+        (!shouldReplaceBodyWithEventReminder && !linkedCalendarEvent.error)),
+  );
 
   useEffect(() => {
     if (!mailCalendarInviteUid) {
@@ -2435,7 +2490,9 @@ export function MessageReader({
     </div>
   );
 
-  const linkedEventCard = linkedCalendarEvent && (
+  const linkedEventCard = linkedCalendarEvent &&
+    !isEventReminderEmail &&
+    !shouldReplaceBodyWithEventReminder && (
     <div
       className={cn(
         "mx-4 mb-0 rounded-lg rounded-b-none border border-primary/20 bg-primary/5 px-4 py-3",
@@ -2800,12 +2857,30 @@ export function MessageReader({
   const hasCardAboveBody =
     mailCalendarInvite?.method === "REQUEST" ||
     mailCalendarInvite?.method === "CANCEL" ||
-    Boolean(linkedCalendarEvent);
-  const bodyContent = renderAsHtml ? (
+    (Boolean(linkedCalendarEvent) &&
+      !isEventReminderEmail &&
+      !shouldReplaceBodyWithEventReminder);
+  const hasReminderBannerAbove =
+    isEventReminderEmail && Boolean(linkedCalendarEvent);
+  const bodyAttachedAbove = hasCardAboveBody || hasReminderBannerAbove;
+
+  const standardBodyContent = shouldReplaceBodyWithEventReminder &&
+  eventReminderView ? (
+    <EventReminderMessageBody
+      reminder={eventReminderView}
+      isDark={isDark}
+      attachedAbove={bodyAttachedAbove}
+    />
+  ) : isReminderEventLoading ? (
+    <EventReminderMessageBodyLoading
+      isDark={isDark}
+      attachedAbove={bodyAttachedAbove}
+    />
+  ) : renderAsHtml ? (
     <div
       className={cn(
         "flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col",
-        hasCardAboveBody && "rounded-t-none border-t-0",
+        bodyAttachedAbove && "rounded-t-none border-t-0",
       )}
     >
       {blockRemoteImages && (
@@ -2837,7 +2912,7 @@ export function MessageReader({
     <div
       className={cn(
         "flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col",
-        hasCardAboveBody && "rounded-t-none border-t-0",
+        bodyAttachedAbove && "rounded-t-none border-t-0",
       )}
     >
       <div className={cn(
@@ -2896,6 +2971,22 @@ export function MessageReader({
       )}
     </div>
   );
+
+  const bodyContent =
+    isEventReminderEmail && linkedCalendarEvent ? (
+      <div className="@container flex min-h-0 flex-1 flex-col">
+        <EventReminderBanner
+          eventId={linkedCalendarEvent.eventId}
+          loading={linkedCalendarEvent.loading}
+          error={linkedCalendarEvent.error}
+          reminder={eventReminderView}
+          className="mb-0 shrink-0 rounded-b-none"
+        />
+        <div className="flex min-h-0 flex-1 flex-col">{standardBodyContent}</div>
+      </div>
+    ) : (
+      standardBodyContent
+    );
 
   // ── Reply bar ────────────────────────────────────────────────────────────────
   const COMMON_EMOJI = [
@@ -3148,7 +3239,7 @@ export function MessageReader({
         {calendarCancellationCard}
         {linkedEventCard}
       </div>
-      {bodyContent}
+      <div className="flex min-h-0 flex-1 flex-col">{bodyContent}</div>
       {replyBar}
       {/* Raw HTML source dialog */}
       <Dialog open={showRawHtmlDialog} onOpenChange={setShowRawHtmlDialog}>

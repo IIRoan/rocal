@@ -165,6 +165,8 @@ const validEventBody = {
   start: "2026-05-01T10:00:00.000Z",
   end: "2026-05-01T11:00:00.000Z",
   calendarId: "cal-1",
+  encryptedContent: "ciphertext",
+  blindIndexTokens: ["idx-1"],
 };
 
 const ownedCalendar = {
@@ -431,14 +433,14 @@ describe("eventsRoutes – color validation", () => {
       expect(mockPrisma.calendarEvent.create).not.toHaveBeenCalled();
     });
 
-    it("keeps plaintext shadow fields when a reminder requires readable content", async () => {
+    it("stores encrypted events ciphertext-only even when reminders are enabled", async () => {
       mockPrisma.calendarEvent.create.mockResolvedValue({
         id: "event-reminder-1",
         ...validEventBody,
         color: null,
         encryptedContent: "ciphertext",
         blindIndexTokens: JSON.stringify(["idx-1"]),
-        encryptionState: "shadow_write",
+        encryptionState: "encrypted",
         encryptionKeyVersion: 1,
         reminder: 30,
         userId: "user-1",
@@ -453,8 +455,6 @@ describe("eventsRoutes – color validation", () => {
           body: JSON.stringify({
             ...validEventBody,
             reminder: 30,
-            encryptedContent: "ciphertext",
-            blindIndexTokens: ["idx-1"],
           }),
         }),
       );
@@ -463,32 +463,29 @@ describe("eventsRoutes – color validation", () => {
       expect(mockPrisma.calendarEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            title: "Test Event",
-            encryptionState: "shadow_write",
+            title: "",
+            encryptionState: "encrypted",
             reminder: 30,
           }),
         }),
       );
     });
 
-    it("rejects full mode event creation without encrypted content", async () => {
-      mockPrisma.userSettings.findUnique.mockResolvedValueOnce({
-        timezone: "UTC",
-        eventEncryptionMode: "full",
-        emailNotifications: true,
-      });
+    it("rejects owned-calendar event creation without encrypted content", async () => {
+      const { encryptedContent: _encryptedContent, blindIndexTokens: _blindIndexTokens, ...unencryptedBody } =
+        validEventBody;
 
       const response = await createApp().handle(
         new Request("http://localhost/events/", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(validEventBody),
+          body: JSON.stringify(unencryptedBody),
         }),
       );
 
       expect(response.status).toBe(500);
-      await expect(readText(response)).resolves.toBe(
-        "Full event encryption requires an active encryption session.",
+      await expect(readText(response)).resolves.toContain(
+        "Event encryption requires an active encryption session.",
       );
     });
 
@@ -538,7 +535,7 @@ describe("eventsRoutes – color validation", () => {
       userId: "user-1",
       isSynced: false,
       encryptedContent: "ciphertext",
-      encryptionState: "shadow_write",
+      encryptionState: "encrypted",
       reminder: null,
       recurrence: null,
       parentEventId: null,

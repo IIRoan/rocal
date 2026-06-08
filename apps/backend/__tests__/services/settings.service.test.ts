@@ -241,7 +241,6 @@ describe("SettingsService", () => {
       {
         userId: "user-1",
         calendarIds: ["calendar-1", "calendar-2"],
-        preserveReminderDependentShadows: false,
         now: expect.any(Date),
       },
     );

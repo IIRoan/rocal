@@ -28,13 +28,13 @@ function eventFixture(overrides: EventFixtureInput = {}) {
     id: "event-1",
     start: new Date("2026-12-01T12:30:00.000Z"),
     timezone: "UTC",
-    title: "Planning",
-    description: "Discuss roadmap",
-    location: "Room 7",
+    title: "",
+    description: null,
+    location: null,
     calendarId: "cal-1",
     reminder: 15,
     encryptedContent: "ciphertext",
-    encryptionState: "shadow_write" as const,
+    encryptionState: "encrypted" as const,
     isSynced: false,
     ...overrides,
   };
@@ -43,12 +43,6 @@ function eventFixture(overrides: EventFixtureInput = {}) {
 function createHarness(
   options: Partial<{
     event: ReturnType<typeof eventFixture>;
-    calendar: {
-      id: string;
-      icsShareEnabled: boolean;
-      forceFullEncryption: boolean;
-    };
-    settings: { eventEncryptionMode: "hybrid" | "full" } | null;
   }> = {},
 ) {
   const prisma = {
@@ -60,12 +54,6 @@ function createHarness(
       deleteMany: jest.fn<() => Promise<{ count: number }>>(),
       createMany: jest.fn<() => Promise<{ count: number }>>(),
     },
-    calendar: {
-      findFirst: jest.fn<() => Promise<any>>(),
-    },
-    userSettings: {
-      findUnique: jest.fn<() => Promise<any>>(),
-    },
     $executeRaw: jest.fn(async (): Promise<number> => 1),
   };
 
@@ -75,16 +63,6 @@ function createHarness(
   prisma.calendarEvent.update.mockResolvedValue({ id: "event-1" });
   prisma.eventNotification.deleteMany.mockResolvedValue({ count: 1 });
   prisma.eventNotification.createMany.mockResolvedValue({ count: 1 });
-  prisma.calendar.findFirst.mockResolvedValue(
-    options.calendar ?? {
-      id: "cal-1",
-      icsShareEnabled: false,
-      forceFullEncryption: false,
-    },
-  );
-  prisma.userSettings.findUnique.mockResolvedValue(
-    options.settings ?? { eventEncryptionMode: "hybrid" },
-  );
 
   return {
     prisma,
@@ -95,7 +73,7 @@ function createHarness(
 const mockBuildNotificationSchedule =
   NotificationCalculator.buildNotificationSchedule as jest.Mock;
 
-describe("NotificationService encryption transitions", () => {
+describe("NotificationService reminder field updates", () => {
   beforeEach(() => {
     mockBuildNotificationSchedule.mockReset();
     mockBuildNotificationSchedule.mockReturnValue({
@@ -105,7 +83,7 @@ describe("NotificationService encryption transitions", () => {
     });
   });
 
-  it("moves hybrid events into shadow_write when an email reminder is added", async () => {
+  it("stores the earliest enabled email reminder on the event row", async () => {
     const { prisma, service } = createHarness({
       event: eventFixture({ reminder: null }),
     });
@@ -122,15 +100,11 @@ describe("NotificationService encryption transitions", () => {
       where: { id: "event-1" },
       data: expect.objectContaining({
         reminder: 10,
-        encryptionState: "shadow_write",
-        title: "Planning",
-        description: "Discuss roadmap",
-        location: "Room 7",
       }),
     });
   });
 
-  it("uses the earliest remaining reminder when encrypted events keep multiple email reminders", async () => {
+  it("uses the earliest remaining reminder when multiple email reminders are enabled", async () => {
     const { prisma, service } = createHarness({
       event: eventFixture({ reminder: 15 }),
     });
@@ -152,10 +126,6 @@ describe("NotificationService encryption transitions", () => {
       where: { id: "event-1" },
       data: expect.objectContaining({
         reminder: 30,
-        encryptionState: "shadow_write",
-        title: "Planning",
-        description: "Discuss roadmap",
-        location: "Room 7",
       }),
     });
     expect(prisma.eventNotification.deleteMany).toHaveBeenCalledWith({
@@ -169,54 +139,9 @@ describe("NotificationService encryption transitions", () => {
     });
   });
 
-  it("keeps plaintext events plaintext when multiple reminders are updated", async () => {
-    const { prisma, service } = createHarness({
-      event: eventFixture({
-        encryptedContent: null,
-        encryptionState: "plaintext",
-        reminder: null,
-      }),
-    });
-
-    await service.setForEvent("user-1", "event-1", [
-      {
-        notificationType: "email",
-        minutesBefore: 15,
-        isEnabled: true,
-      },
-      {
-        notificationType: "email",
-        minutesBefore: 45,
-        isEnabled: true,
-      },
-    ]);
-
-    expect(prisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "event-1" },
-      data: expect.objectContaining({
-        reminder: 15,
-        encryptionState: "plaintext",
-        title: "Planning",
-        description: "Discuss roadmap",
-        location: "Room 7",
-      }),
-    });
-    expect(prisma.eventNotification.createMany).toHaveBeenCalledWith({
-      data: expect.arrayContaining([
-        expect.objectContaining({ minutesBefore: 15 }),
-        expect.objectContaining({ minutesBefore: 45 }),
-      ]),
-    });
-  });
-
-  it("keeps share-backed hybrid rows readable when only non-email notifications remain", async () => {
+  it("clears the reminder field when only non-email notifications remain", async () => {
     const { prisma, service } = createHarness({
       event: eventFixture({ reminder: 15 }),
-      calendar: {
-        id: "cal-1",
-        icsShareEnabled: true,
-        forceFullEncryption: false,
-      },
     });
 
     await service.setForEvent("user-1", "event-1", [
@@ -231,52 +156,16 @@ describe("NotificationService encryption transitions", () => {
       where: { id: "event-1" },
       data: expect.objectContaining({
         reminder: null,
-        encryptionState: "shadow_write",
-        title: "Planning",
-        description: "Discuss roadmap",
-        location: "Room 7",
       }),
     });
   });
 
-  it("rejects enabling email reminders on ciphertext-only hybrid events", async () => {
-    const { service } = createHarness({
-      event: eventFixture({
-        title: "",
-        description: null,
-        location: null,
-        reminder: null,
-        encryptionState: "encrypted",
-      }),
-    });
-
-    await expect(
-      service.setForEvent("user-1", "event-1", [
-        {
-          notificationType: "email",
-          minutesBefore: 15,
-          isEnabled: true,
-        },
-      ]),
-    ).rejects.toThrow(
-      "This event is stored as ciphertext only, so the server can't attach reminder details to it. Open the event in a signed-in client and save it again to switch it to hybrid encryption before enabling email reminders.",
-    );
-  });
-
-  it("keeps ciphertext-only storage when a calendar forces full encryption", async () => {
+  it("allows email reminders on ciphertext-only encrypted events", async () => {
     const { prisma, service } = createHarness({
       event: eventFixture({
-        title: "",
-        description: null,
-        location: null,
         reminder: null,
         encryptionState: "encrypted",
       }),
-      calendar: {
-        id: "cal-1",
-        icsShareEnabled: false,
-        forceFullEncryption: true,
-      },
     });
 
     await service.setForEvent("user-1", "event-1", [
@@ -291,15 +180,11 @@ describe("NotificationService encryption transitions", () => {
       where: { id: "event-1" },
       data: expect.objectContaining({
         reminder: 15,
-        encryptionState: "encrypted",
-        title: "",
-        description: null,
-        location: null,
       }),
     });
   });
 
-  it("re-encrypts hybrid events when the last reminder is removed", async () => {
+  it("clears the reminder field when all notifications are deleted", async () => {
     const { prisma, service } = createHarness({
       event: eventFixture({ reminder: 15 }),
     });
@@ -313,34 +198,6 @@ describe("NotificationService encryption transitions", () => {
       where: { id: "event-1" },
       data: expect.objectContaining({
         reminder: null,
-        encryptionState: "encrypted",
-        title: "",
-        description: null,
-        location: null,
-      }),
-    });
-  });
-
-  it("preserves shadow_write after reminder removal when sharing still needs plaintext", async () => {
-    const { prisma, service } = createHarness({
-      event: eventFixture({ reminder: 15 }),
-      calendar: {
-        id: "cal-1",
-        icsShareEnabled: true,
-        forceFullEncryption: false,
-      },
-    });
-
-    await service.deleteForEvent("user-1", "event-1");
-
-    expect(prisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "event-1" },
-      data: expect.objectContaining({
-        reminder: null,
-        encryptionState: "shadow_write",
-        title: "Planning",
-        description: "Discuss roadmap",
-        location: "Room 7",
       }),
     });
   });

@@ -48,7 +48,6 @@ export default function CalendarEditScreen() {
   const [color, setColor] = useState<EventColor>("blue");
   const [isVisible, setIsVisible] = useState(true);
   const [isDefault, setIsDefault] = useState(false);
-  const [forceFullEncryption, setForceFullEncryption] = useState(false);
   const [selectedMoveTargetId, setSelectedMoveTargetId] = useState("");
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [formReady, setFormReady] = useState(false);
@@ -82,7 +81,6 @@ export default function CalendarEditScreen() {
     setColor(calendar.color);
     setIsVisible(calendar.isVisible);
     setIsDefault(calendar.isDefault);
-    setForceFullEncryption(calendar.forceFullEncryption === true);
     setFormReady(true);
   }, [calendar, formReady]);
 
@@ -198,11 +196,9 @@ export default function CalendarEditScreen() {
       color,
       isVisible,
       isDefault,
-      forceFullEncryption,
     });
   }, [
     color,
-    forceFullEncryption,
     isDefault,
     isVisible,
     name,
@@ -348,38 +344,13 @@ export default function CalendarEditScreen() {
             )}
           </View>
 
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleCopy}>
-              <Text style={styles.toggleTitle}>Full Calendar Encryption</Text>
-              <Text style={styles.toggleText}>
-                Drop plaintext shadows for encrypted events in this calendar.
-              </Text>
-            </View>
-            <Switch
-              value={forceFullEncryption}
-              onValueChange={setForceFullEncryption}
-              trackColor={{
-                false: theme.colors.input,
-                true: theme.colors.primaryBase,
-              }}
-              thumbColor={theme.colors.background}
-            />
-          </View>
-
-          {forceFullEncryption ? (
-            <Text style={styles.helperText}>
-              Existing fully encrypted events may need to be reopened and saved
-              before ICS sharing can be enabled again.
-            </Text>
-          ) : null}
         </View>
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Sharing</Text>
           <Text style={styles.helperText}>
-            Share links publish an ICS feed for this owned calendar. If you
-            recently enabled full encryption, reopen and resave encrypted events
-            before sharing.
+            Share links publish an ICS feed for this owned calendar. Encrypted
+            events must be reopened and saved before sharing can be enabled.
           </Text>
 
           {shareBusy ? (

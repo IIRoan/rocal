@@ -173,12 +173,21 @@ const jmapBodyValueSchema = z.object({
   isTruncated: z.boolean().optional(),
 });
 
-const jmapBodyStructureSchema: z.ZodType<JmapBodyStructure> = z.lazy(() =>
+/** JMAP may send explicit null for absent optional fields. */
+function jmapOptional<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((value) => (value === null ? undefined : value), schema);
+}
+
+const jmapBodyStructureSchema: z.ZodType<
+  JmapBodyStructure,
+  z.ZodTypeDef,
+  unknown
+> = z.lazy(() =>
   z.object({
-    type: z.string().optional(),
-    blobId: z.string().optional(),
-    name: z.string().optional(),
-    subParts: z.array(jmapBodyStructureSchema).optional(),
+    type: jmapOptional(z.string().optional()),
+    blobId: jmapOptional(z.string().optional()),
+    name: jmapOptional(z.string().optional()),
+    subParts: jmapOptional(z.array(jmapBodyStructureSchema).optional()),
   }),
 );
 
@@ -199,8 +208,8 @@ const jmapEmailMessageSchema = z.object({
   subject: z.string().nullable().optional(),
   from: z.array(mailAddressSchema).optional(),
   to: z.array(mailAddressSchema).optional(),
-  cc: z.array(mailAddressSchema).optional(),
-  bcc: z.array(mailAddressSchema).optional(),
+  cc: jmapOptional(z.array(mailAddressSchema).optional()),
+  bcc: jmapOptional(z.array(mailAddressSchema).optional()),
   receivedAt: z.string().optional(),
   keywords: z.record(z.boolean()).optional(),
   bodyStructure: jmapBodyStructureSchema.optional(),

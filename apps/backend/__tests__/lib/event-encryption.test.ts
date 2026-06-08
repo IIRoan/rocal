@@ -13,12 +13,9 @@ type MockUpdateManyArgs = {
 };
 
 describe("event encryption policy", () => {
-  it("defaults to hybrid mode", () => {
-    expect(normalizeEventEncryptionMode(undefined)).toBe("hybrid");
-    expect(normalizeEventEncryptionMode("anything-else")).toBe("hybrid");
-  });
-
-  it("preserves explicit full mode", () => {
+  it("always normalizes to full mode", () => {
+    expect(normalizeEventEncryptionMode(undefined)).toBe("full");
+    expect(normalizeEventEncryptionMode("hybrid")).toBe("full");
     expect(normalizeEventEncryptionMode("full")).toBe("full");
   });
 
@@ -31,7 +28,6 @@ describe("event encryption policy", () => {
   it("keeps plaintext when no encrypted payload exists", () => {
     expect(
       resolveEventPersistencePolicy({
-        mode: "hybrid",
         hasEncryptedPayload: false,
         title: "Planning",
         description: "Discuss roadmap",
@@ -45,10 +41,9 @@ describe("event encryption policy", () => {
     });
   });
 
-  it("stores hybrid events as fully encrypted when no plaintext dependency exists", () => {
+  it("stores encrypted events as ciphertext only", () => {
     expect(
       resolveEventPersistencePolicy({
-        mode: "hybrid",
         hasEncryptedPayload: true,
         title: "Planning",
         description: "Discuss roadmap",
@@ -62,151 +57,19 @@ describe("event encryption policy", () => {
     });
   });
 
-  it("treats zero-minute reminders as no plaintext dependency", () => {
+  it("normalizes optional plaintext fields before encryption", () => {
     expect(
       resolveEventPersistencePolicy({
-        mode: "hybrid",
-        hasEncryptedPayload: true,
-        title: "Planning",
-        description: "Discuss roadmap",
-        location: "Room 7",
-        reminderMinutes: 0,
-      }),
-    ).toEqual({
-      encryptionState: "encrypted",
-      title: "",
-      description: null,
-      location: null,
-    });
-  });
-
-  it("keeps shadow-write plaintext when reminders require readable content", () => {
-    expect(
-      resolveEventPersistencePolicy({
-        mode: "hybrid",
-        hasEncryptedPayload: true,
-        title: "Planning",
-        description: "Discuss roadmap",
-        location: "Room 7",
-        reminderMinutes: 30,
-      }),
-    ).toEqual({
-      encryptionState: "shadow_write",
-      title: "Planning",
-      description: "Discuss roadmap",
-      location: "Room 7",
-    });
-  });
-
-  it("normalizes optional plaintext fields while preserving reminder-backed shadows", () => {
-    expect(
-      resolveEventPersistencePolicy({
-        mode: "hybrid",
         hasEncryptedPayload: true,
         title: "  Planning  ",
         description: "   ",
         location: "  Room 7  ",
-        reminderMinutes: 15,
-      }),
-    ).toEqual({
-      encryptionState: "shadow_write",
-      title: "Planning",
-      description: null,
-      location: "Room 7",
-    });
-  });
-
-  it("keeps shadow-write plaintext when calendar sharing requires readable content", () => {
-    expect(
-      resolveEventPersistencePolicy({
-        mode: "hybrid",
-        hasEncryptedPayload: true,
-        title: "Planning",
-        description: "Discuss roadmap",
-        location: "Room 7",
-        calendarShareEnabled: true,
-      }),
-    ).toEqual({
-      encryptionState: "shadow_write",
-      title: "Planning",
-      description: "Discuss roadmap",
-      location: "Room 7",
-    });
-  });
-
-  it("forces ciphertext-only storage in full mode", () => {
-    expect(
-      resolveEventPersistencePolicy({
-        mode: "full",
-        hasEncryptedPayload: true,
-        title: "Planning",
-        description: "Discuss roadmap",
-        location: "Room 7",
-        reminderMinutes: 30,
-        calendarShareEnabled: true,
       }),
     ).toEqual({
       encryptionState: "encrypted",
       title: "",
       description: null,
       location: null,
-    });
-  });
-
-  it("force-full calendar overrides hybrid mode and reminder shadows", () => {
-    expect(
-      resolveEventPersistencePolicy({
-        mode: "hybrid",
-        hasEncryptedPayload: true,
-        title: "Planning",
-        description: "Discuss roadmap",
-        location: "Room 7",
-        reminderMinutes: 30,
-        calendarShareEnabled: true,
-        calendarForceFullEncryption: true,
-      }),
-    ).toEqual({
-      encryptionState: "encrypted",
-      title: "",
-      description: null,
-      location: null,
-    });
-  });
-
-  it("force-full calendar still requires an encrypted payload before stripping plaintext", () => {
-    expect(
-      resolveEventPersistencePolicy({
-        mode: "hybrid",
-        hasEncryptedPayload: false,
-        title: "Planning",
-        description: "Discuss roadmap",
-        location: "Room 7",
-        calendarForceFullEncryption: true,
-      }),
-    ).toEqual({
-      encryptionState: "plaintext",
-      title: "Planning",
-      description: "Discuss roadmap",
-      location: "Room 7",
-    });
-  });
-
-  it("falsy force-full flag preserves hybrid shadow_write behavior", () => {
-    expect(
-      resolveEventPersistencePolicy({
-        mode: "hybrid",
-        hasEncryptedPayload: true,
-        title: "Planning",
-        description: "Discuss roadmap",
-        location: "Room 7",
-        reminderMinutes: 30,
-        calendarForceFullEncryption: false,
-      }),
-    ).toEqual({
-      encryptionState: "shadow_write",
-      title: "Planning",
-      description: "Discuss roadmap",
-      location: "Room 7",
     });
   });
 });
@@ -226,7 +89,7 @@ describe("backfillEncryptedEventsToCiphertextOnly", () => {
     expect(updateMany).not.toHaveBeenCalled();
   });
 
-  it("re-encrypts a single calendar while preserving reminder-backed shadows when requested", async () => {
+  it("re-encrypts a single calendar", async () => {
     const now = new Date("2026-04-24T10:00:00.000Z");
     const updateMany =
       jest.fn<(args: MockUpdateManyArgs) => Promise<{ count: number }>>();
@@ -239,7 +102,6 @@ describe("backfillEncryptedEventsToCiphertextOnly", () => {
         {
           userId: "user-1",
           calendarId: "cal-1",
-          preserveReminderDependentShadows: true,
           now,
         },
       ),
@@ -251,7 +113,6 @@ describe("backfillEncryptedEventsToCiphertextOnly", () => {
         calendarId: "cal-1",
         encryptedContent: { not: null },
         encryptionState: { not: "encrypted" },
-        OR: [{ reminder: null }, { reminder: 0 }],
       },
       data: {
         title: "",
@@ -305,6 +166,5 @@ describe("backfillEncryptedEventsToCiphertextOnly", () => {
         updatedAt: expect.any(Date),
       },
     });
-    expect(args.where).not.toHaveProperty("OR");
   });
 });

@@ -17,7 +17,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import { FontAwesome } from "@expo/vector-icons";
-import { getErrorMessage } from "@workspace/calendar-core";
+import {
+  buildEventReminderMailView,
+  getErrorMessage,
+  isDecryptedEventReminderContent,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../../src/providers/ThemeProvider";
 import { useToast } from "../../../../src/providers/ToastProvider";
@@ -54,6 +58,7 @@ import { CenteredLoader } from "../../../../src/components/ui/loading";
 import { AttachmentPreviewModal } from "../../../../src/components/mail/AttachmentPreviewModal";
 import { ConversationThreadStrip } from "../../../../src/components/mail/ConversationThreadStrip";
 import { useAuth } from "../../../../src/providers/AuthProvider";
+import { useE2ee } from "../../../../src/providers/E2eeProvider";
 import { BottomSheet } from "../../../../src/components/BottomSheet";
 import { SheetNavButton, SheetRow } from "../../../../src/components/sheet";
 import { MailSheetPanel } from "../../../../src/components/mail/MailSheetPanel";
@@ -83,6 +88,16 @@ import {
 } from "../../../../src/lib/mail/use-labels";
 import { MailLabelsSheet } from "../../../../src/components/mail/MailLabelsSheet";
 import { sheetBottomPadding } from "../../../../src/components/sheet/sheet-padding";
+import { calendarApiService } from "../../../../src/lib/api";
+import {
+  extractLinkedCalendarEventId,
+  extractReminderLeadMinutes,
+  getCalendarEventLinkSource,
+  isSolaceEventReminderEmail,
+} from "../../../../src/lib/mail/calendar-event-link";
+import { EventReminderBanner } from "../../../../src/components/mail/EventReminderBanner";
+import { EventReminderMessageBody } from "../../../../src/components/mail/EventReminderMessageBody";
+import { EventReminderMessageBodyLoading } from "../../../../src/components/mail/EventReminderMessageBodyLoading";
 
 type MessageSheetView = "menu" | "move" | "label" | "html" | null;
 
@@ -99,6 +114,7 @@ export default function MailMessageScreen() {
     theme.spacing["6"] + mailBottomBarTotalHeight(insets.bottom);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { isReady: isE2eeReady } = useE2ee();
   const { id } = useLocalSearchParams<{ id: string }>();
   const messageId = typeof id === "string" ? id : "";
 
@@ -110,7 +126,12 @@ export default function MailMessageScreen() {
   });
   const cached = useCachedMessage(messageId);
 
-  const messageQuery = useQuery<JmapEmailMessage | null>({
+  const {
+    data: messageData,
+    isLoading: isMessageLoading,
+    isError: isMessageError,
+    error: messageError,
+  } = useQuery<JmapEmailMessage | null>({
     queryKey: QUERY_KEYS.mailMessage(messageId),
     enabled: Boolean(messageId) && (Boolean(cached) || Boolean(runtime)),
     initialData: cached ?? undefined,
@@ -123,7 +144,7 @@ export default function MailMessageScreen() {
     },
   });
 
-  const message = messageQuery.data ?? null;
+  const message = messageData ?? null;
   const { conversationMessages, isLoading: isConversationLoading } =
     useConversationThread(runtime, message);
   const {
@@ -140,7 +161,14 @@ export default function MailMessageScreen() {
   const encryption = message ? classifyMessageEncryption(message) : "plain";
   const isEncrypted = encryption !== "plain";
 
-  const decryptQuery = useQuery<MailDecryptResult>({
+  const {
+    data: decryptResult,
+    isSuccess: isDecryptSuccess,
+    isLoading: isDecryptLoading,
+    isFetching: isDecryptFetching,
+    error: decryptQueryError,
+    refetch: refetchDecrypt,
+  } = useQuery<MailDecryptResult>({
     queryKey: QUERY_KEYS.mailDecrypted(messageId),
     enabled: isEncrypted && Boolean(runtime) && Boolean(message),
     retry: 1,
@@ -164,10 +192,10 @@ export default function MailMessageScreen() {
 
   // After decrypt unlocks the vault, refresh label names/colors from the vault backup.
   useEffect(() => {
-    if (decryptQuery.isSuccess) {
+    if (isDecryptSuccess) {
       refreshLabels();
     }
-  }, [decryptQuery.isSuccess, refreshLabels]);
+  }, [isDecryptSuccess, refreshLabels]);
 
   // Mark unread messages as read once per visit (not when the user marks unread mid-session).
   useEffect(() => {
@@ -185,15 +213,67 @@ export default function MailMessageScreen() {
   }, [messageId]);
 
   const htmlContent: string | null =
-    decryptQuery.data?.html ?? (isEncrypted ? null : (bodies?.html ?? null));
+    decryptResult?.html ?? (isEncrypted ? null : (bodies?.html ?? null));
   const plainContent: string | null =
-    decryptQuery.data?.plaintext ??
+    decryptResult?.plaintext ??
     (isEncrypted ? null : (bodies?.text ?? null));
+  const calendarEventLinkSource = useMemo(
+    () => (message ? getCalendarEventLinkSource(message, plainContent) : null),
+    [message, plainContent],
+  );
+  const linkedCalendarEventId = useMemo(
+    () => (message ? extractLinkedCalendarEventId(message, plainContent) : null),
+    [message, plainContent],
+  );
+  const isEventReminderEmail = useMemo(
+    () =>
+      calendarEventLinkSource
+        ? isSolaceEventReminderEmail(calendarEventLinkSource)
+        : false,
+    [calendarEventLinkSource],
+  );
+  const {
+    data: linkedEvent,
+    isLoading: isLinkedEventLoading,
+    isFetching: isLinkedEventFetching,
+    isError: isLinkedEventError,
+    isSuccess: isLinkedEventSuccess,
+    error: linkedEventError,
+  } = useQuery({
+    queryKey: QUERY_KEYS.eventDetail(linkedCalendarEventId ?? ""),
+    enabled: Boolean(linkedCalendarEventId) && isE2eeReady,
+    queryFn: () => calendarApiService.getEvent(linkedCalendarEventId!),
+  });
+  const { data: userSettings } = useQuery({
+    queryKey: QUERY_KEYS.settings(),
+    queryFn: () => calendarApiService.getUserSettings(),
+    staleTime: 5 * 60_000,
+  });
+  const eventReminderView = useMemo(() => {
+    if (!linkedEvent || !isDecryptedEventReminderContent(linkedEvent)) {
+      return null;
+    }
+
+    return buildEventReminderMailView({
+      event: linkedEvent,
+      minutesBefore: calendarEventLinkSource
+        ? extractReminderLeadMinutes(calendarEventLinkSource)
+        : null,
+      timezone: userSettings?.timezone,
+      timeFormat: userSettings?.timeFormat,
+    });
+  }, [calendarEventLinkSource, linkedEvent, userSettings]);
+  const isReminderEventLoading =
+    isEventReminderEmail &&
+    (!isE2eeReady || isLinkedEventLoading || isLinkedEventFetching);
+  const shouldReplaceBodyWithEventReminder = Boolean(
+    isEventReminderEmail && eventReminderView && isLinkedEventSuccess,
+  );
   const isHtmlEmail = Boolean(htmlContent);
   const isDecrypting =
-    isEncrypted && (decryptQuery.isLoading || decryptQuery.isFetching);
-  const decryptError = isEncrypted ? decryptQuery.error : null;
-  const rawHtmlSource = decryptQuery.data?.html ?? bodies?.html ?? null;
+    isEncrypted && (isDecryptLoading || isDecryptFetching);
+  const decryptError = isEncrypted ? decryptQueryError : null;
+  const rawHtmlSource = decryptResult?.html ?? bodies?.html ?? null;
 
   const [downloadingBlobId, setDownloadingBlobId] = useState<string | null>(
     null,
@@ -210,15 +290,15 @@ export default function MailMessageScreen() {
       resolveDisplayAttachments({
         encryption,
         isDecrypting,
-        decryptSucceeded: decryptQuery.isSuccess,
-        decryptedAttachments: decryptQuery.data?.attachments,
+        decryptSucceeded: isDecryptSuccess,
+        decryptedAttachments: decryptResult?.attachments,
         messageAttachments: message?.attachments,
       }),
     [
       encryption,
       isDecrypting,
-      decryptQuery.isSuccess,
-      decryptQuery.data?.attachments,
+      isDecryptSuccess,
+      decryptResult?.attachments,
       message?.attachments,
     ],
   );
@@ -532,9 +612,9 @@ export default function MailMessageScreen() {
         />
       }
     >
-      {messageQuery.isLoading && !message ? (
+      {isMessageLoading && !message ? (
         <CenteredLoader theme={theme} />
-      ) : messageQuery.isError && !message ? (
+      ) : isMessageError && !message ? (
         <View style={styles.centered}>
           <Feather
             name="alert-triangle"
@@ -542,7 +622,7 @@ export default function MailMessageScreen() {
             color={theme.colors.destructive}
           />
           <Text style={styles.mutedText}>
-            {getErrorMessage(messageQuery.error, "Failed to load message")}
+            {getErrorMessage(messageError, "Failed to load message")}
           </Text>
         </View>
       ) : !message ? (
@@ -579,6 +659,26 @@ export default function MailMessageScreen() {
               />
             )}
 
+            {isEventReminderEmail && linkedCalendarEventId ? (
+              <EventReminderBanner
+                loading={isReminderEventLoading}
+                error={
+                  isLinkedEventError
+                    ? getErrorMessage(
+                        linkedEventError,
+                        "Unable to load linked event details.",
+                      )
+                    : null
+                }
+                reminder={eventReminderView}
+                onOpenEvent={() =>
+                  router.push(
+                    `/event/${linkedCalendarEventId}` as never,
+                  )
+                }
+              />
+            ) : null}
+
             {isDecrypting ? (
               <CenteredLoader theme={theme} message="Decrypting message…" />
             ) : decryptError ? (
@@ -586,15 +686,33 @@ export default function MailMessageScreen() {
                 theme={theme}
                 styles={styles}
                 error={getErrorMessage(decryptError, "Decryption failed")}
-                onRetry={() => decryptQuery.refetch()}
+                onRetry={() => refetchDecrypt()}
               />
+            ) : shouldReplaceBodyWithEventReminder && eventReminderView ? (
+              <EventReminderMessageBody
+                reminder={eventReminderView}
+                attachedBelowBanner
+                onOpenEvent={() =>
+                  router.push(`/event/${eventReminderView.eventId}` as never)
+                }
+              />
+            ) : isReminderEventLoading ? (
+              <EventReminderMessageBodyLoading attachedBelowBanner />
+            ) : isEventReminderEmail &&
+              isLinkedEventSuccess &&
+              !eventReminderView ? (
+              <View style={styles.reminderBodyPlaceholder}>
+                <Text style={styles.mutedText}>
+                  Event details couldn&apos;t be decrypted on this device.
+                </Text>
+              </View>
             ) : isHtmlEmail ? (
               <>
-                {decryptQuery.data && (
+                {decryptResult && (
                   <SignatureBadge
                     theme={theme}
                     styles={styles}
-                    state={decryptQuery.data.signatureVerificationState}
+                    state={decryptResult.signatureVerificationState}
                   />
                 )}
                 <HtmlEmailView
@@ -606,11 +724,11 @@ export default function MailMessageScreen() {
               </>
             ) : plainContent ? (
               <>
-                {decryptQuery.data && (
+                {decryptResult && (
                   <SignatureBadge
                     theme={theme}
                     styles={styles}
-                    state={decryptQuery.data.signatureVerificationState}
+                    state={decryptResult.signatureVerificationState}
                   />
                 )}
                 <Text style={styles.bodyText}>{plainContent}</Text>
@@ -1066,6 +1184,19 @@ function createStyles(theme: ThemeTokens) {
       borderRadius: theme.borderRadius.lg,
       backgroundColor: theme.colors.muted + "28",
     },
+    reminderBodyPlaceholder: {
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      gap: theme.spacing["2"],
+      paddingHorizontal: theme.spacing["4"],
+      paddingVertical: theme.spacing["8"],
+      borderWidth: StyleSheet.hairlineWidth,
+      borderTopWidth: 0,
+      borderColor: theme.colors.primaryBase + "26",
+      borderBottomLeftRadius: theme.borderRadius.lg,
+      borderBottomRightRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.card,
+    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
@@ -1111,6 +1242,11 @@ function createStyles(theme: ThemeTokens) {
     },
     mutedText: {
       textAlign: "center" as const,
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.mutedForeground,
+    },
+    reminderBodyPlaceholderText: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.mutedForeground,

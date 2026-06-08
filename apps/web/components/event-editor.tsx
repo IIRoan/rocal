@@ -350,17 +350,9 @@ export function EventEditor({
   const previewBadgeItem = useMemo(
     () =>
       buildEventEditorEncryptionPreview({
-        enabledNotificationCount,
-        eventEncryptionMode: localSettings?.eventEncryptionMode,
         hasActiveEncryptionSession,
-        selectedCalendar,
       }),
-    [
-      enabledNotificationCount,
-      hasActiveEncryptionSession,
-      localSettings?.eventEncryptionMode,
-      selectedCalendar,
-    ],
+    [hasActiveEncryptionSession],
   );
   const badgeItem = selectedEvent?.id ? selectedEvent : previewBadgeItem;
   const dialogTitle = !selectedEvent?.id

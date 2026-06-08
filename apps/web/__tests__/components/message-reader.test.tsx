@@ -169,6 +169,7 @@ jest.mock("lucide-react", () => {
   );
   return {
     Archive: Icon,
+    Bell: Icon,
     ChevronDown: Icon,
     ChevronLeft: Icon,
     ChevronRight: Icon,
@@ -386,7 +387,7 @@ describe("MessageReader — email header", () => {
 });
 
 describe("MessageReader — linked calendar event", () => {
-  it("fetches and injects event details for Solace reminder mail", async () => {
+  it("replaces Solace reminder mail with decrypted event details", async () => {
     await act(async () => {
       root.render(
         <QueryClientProvider client={queryClient}>
@@ -395,28 +396,44 @@ describe("MessageReader — linked calendar event", () => {
             message={
               {
                 ...baseMessage,
-                subject: "Reminder: Planning sync",
+                subject: "Encrypted event in 15 minutes",
                 bodyValues: {
                   "1": {
-                    value:
-                      "Your event starts soon.\nEvent ID: event-1\nOpen it in Solace.",
+                    value: [
+                      "Encrypted event",
+                      "",
+                      "15 minutes",
+                      "When",
+                      "Friday, Jun 5 · 2:00 PM - 3:00 PM",
+                      "Event ID: event-1",
+                      "Open event: https://solace.onl/calendar?eventId=event-1",
+                    ].join("\n"),
                   },
                 },
               } as any
             }
-            plaintext={"Your event starts soon.\nEvent ID: event-1"}
+            plaintext={[
+              "Encrypted event",
+              "15 minutes",
+              "Event ID: event-1",
+              "Open event: https://solace.onl/calendar?eventId=event-1",
+            ].join("\n")}
           />
         </QueryClientProvider>,
       );
       await Promise.resolve();
+      await Promise.resolve();
     });
 
     expect(mockCalendarApiService.getEvent).toHaveBeenCalledWith("event-1");
-    expect(container.textContent).toContain("Linked calendar event");
     expect(container.textContent).toContain("Planning sync");
     expect(container.textContent).toContain("Room 42");
-    expect(container.textContent).toContain("Calendar: Work");
-    expect(container.textContent).toContain("Discuss launch details.");
+    expect(container.textContent).toContain("Work");
+    expect(container.textContent).toContain("Open Event");
+    expect(container.textContent).toContain("Solace");
+    expect(container.textContent).toContain("Event reminder");
+    expect(container.textContent).not.toContain("Linked calendar event");
+    expect(container.textContent).not.toContain("Event ID: event-1");
     expect(
       container.querySelector('a[href="/calendar?eventId=event-1"]'),
     ).not.toBeNull();

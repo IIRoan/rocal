@@ -348,6 +348,7 @@ describe("EventService Stalwart integration", () => {
       calendarId: "calendar-1",
       timezone: "UTC",
       location: "Room A",
+      encryptedContent: "ciphertext",
       participants: [{ email: "guest@example.com", role: "attendee" }],
     });
 
@@ -357,16 +358,11 @@ describe("EventService Stalwart integration", () => {
         "@type": "Event",
         calendarIds: { "remote-cal-1": true },
         title: "Planning",
-        description: "Discuss roadmap",
+        description: null,
         start: "2026-05-26T10:00:00",
         duration: "PT1H",
         timeZone: "Etc/UTC",
-        locations: {
-          primary: {
-            "@type": "Location",
-            name: "Room A",
-          },
-        },
+        locations: null,
         participants: expect.any(Object),
       }),
     });
@@ -428,6 +424,7 @@ describe("EventService Stalwart integration", () => {
         start: "2026-05-26T10:00:00.000Z",
         end: "2026-05-26T11:00:00.000Z",
         calendarId: "calendar-1",
+        encryptedContent: "ciphertext",
       }),
     ).rejects.toThrow("database unavailable");
 
@@ -441,7 +438,13 @@ describe("EventService Stalwart integration", () => {
   it("updates linked Stalwart events before saving local changes", async () => {
     const stalwartClient = createMockStalwartClient();
     const participantService = createParticipantService();
-    const existingEvent = eventFixture();
+    const existingEvent = eventFixture({
+      encryptedContent: "ciphertext",
+      encryptionState: "encrypted",
+      title: "",
+      description: null,
+      location: null,
+    });
     const prisma = {
       calendarEvent: {
         findFirst: jest.fn(async () => existingEvent),
@@ -490,6 +493,7 @@ describe("EventService Stalwart integration", () => {
       title: "Updated planning",
       start: "2026-05-26T12:00:00.000Z",
       end: "2026-05-26T13:00:00.000Z",
+      encryptedContent: "ciphertext-v2",
     });
 
     expect(stalwartClient.updateEvent).toHaveBeenCalledWith({
@@ -507,7 +511,8 @@ describe("EventService Stalwart integration", () => {
       expect.objectContaining({
         where: { id: "event-1", updatedAt },
         data: expect.objectContaining({
-          title: "Updated planning",
+          title: "",
+          encryptedContent: "ciphertext-v2",
           stalwartEventId: "remote-event-1",
           stalwartSyncedAt: expect.any(Date),
         }),

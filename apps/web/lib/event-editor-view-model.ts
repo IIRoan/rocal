@@ -1,43 +1,27 @@
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import type {
-  Calendar,
   CalendarEvent,
   EventNotification,
 } from "@workspace/ui/components/calendar";
 
-import type { EventEncryptionMode, RecurrenceRule } from "./types/calendar";
+import type { RecurrenceRule } from "./types/calendar";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 type EventEditorEncryptionPreviewInput = {
-  enabledNotificationCount: number;
-  eventEncryptionMode?: EventEncryptionMode | null;
   hasActiveEncryptionSession: boolean;
-  selectedCalendar?: Pick<Calendar, "forceFullEncryption"> | null;
 };
 
 export type EventEditorEncryptionPreview =
-  | { encryptionState: "plaintext" | "shadow_write" | "encrypted" }
-  | { forceFullEncryption: true };
+  | { encryptionState: "plaintext" }
+  | { encryptionState: "encrypted" };
 
 export function buildEventEditorEncryptionPreview(
   input: EventEditorEncryptionPreviewInput,
 ): EventEditorEncryptionPreview {
   if (!input.hasActiveEncryptionSession) {
     return { encryptionState: "plaintext" };
-  }
-
-  if (input.selectedCalendar?.forceFullEncryption) {
-    return { forceFullEncryption: true };
-  }
-
-  if (input.eventEncryptionMode === "full") {
-    return { encryptionState: "encrypted" };
-  }
-
-  if (input.enabledNotificationCount > 0) {
-    return { encryptionState: "shadow_write" };
   }
 
   return { encryptionState: "encrypted" };
