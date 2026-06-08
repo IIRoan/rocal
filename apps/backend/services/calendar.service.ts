@@ -160,9 +160,7 @@ export class CalendarService implements ICalendarService {
               encryptionState,
               encryptionKeyVersion,
             }),
-            ...(forceFullEncryption !== undefined
-              ? { forceFullEncryption }
-              : {}),
+            forceFullEncryption: forceFullEncryption ?? true,
             color,
             kind: "owned",
             isPublic: false,

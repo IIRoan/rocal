@@ -15,19 +15,14 @@ type EventReencryptionBackfillInput = {
   userId: string;
   calendarId?: string;
   calendarIds?: string[];
-  preserveReminderDependentShadows?: boolean;
   now?: Date;
 };
 
 type ResolveEventPersistencePolicyInput = {
-  mode?: string | null;
   hasEncryptedPayload: boolean;
   title: string;
   description?: string | null;
   location?: string | null;
-  reminderMinutes?: number | null;
-  calendarShareEnabled?: boolean;
-  calendarForceFullEncryption?: boolean;
 };
 
 function normalizeOptionalText(
@@ -40,7 +35,8 @@ function normalizeOptionalText(
 export function normalizeEventEncryptionMode(
   value?: string | null,
 ): EventEncryptionMode {
-  return value === "full" ? "full" : "hybrid";
+  void value;
+  return "full";
 }
 
 export function isEventFullyEncrypted(
@@ -49,16 +45,9 @@ export function isEventFullyEncrypted(
   return encryptionState === "encrypted";
 }
 
-function requiresPlaintextShadow(
-  input: ResolveEventPersistencePolicyInput,
-): boolean {
-  return !!input.calendarShareEnabled || (input.reminderMinutes ?? 0) > 0;
-}
-
 export function resolveEventPersistencePolicy(
   input: ResolveEventPersistencePolicyInput,
 ): ResolvedEventPersistencePolicy {
-  const mode = normalizeEventEncryptionMode(input.mode);
   const title = input.title.trim();
   const description = normalizeOptionalText(input.description);
   const location = normalizeOptionalText(input.location);
@@ -72,33 +61,11 @@ export function resolveEventPersistencePolicy(
     };
   }
 
-  const effectiveMode: EventEncryptionMode = input.calendarForceFullEncryption
-    ? "full"
-    : mode;
-
-  if (effectiveMode === "full") {
-    return {
-      encryptionState: "encrypted",
-      title: "",
-      description: null,
-      location: null,
-    };
-  }
-
-  if (!requiresPlaintextShadow(input)) {
-    return {
-      encryptionState: "encrypted",
-      title: "",
-      description: null,
-      location: null,
-    };
-  }
-
   return {
-    encryptionState: "shadow_write",
-    title,
-    description,
-    location,
+    encryptionState: "encrypted",
+    title: "",
+    description: null,
+    location: null,
   };
 }
 
@@ -110,7 +77,6 @@ export async function backfillEncryptedEventsToCiphertextOnly(
     userId,
     calendarId,
     calendarIds,
-    preserveReminderDependentShadows = false,
     now = new Date(),
   } = input;
 
@@ -136,25 +102,13 @@ export async function backfillEncryptedEventsToCiphertextOnly(
     calendarScope = { in: targetCalendarIds };
   }
 
-  const where: {
-    userId: string;
-    calendarId: string | { in: string[] };
-    encryptedContent: { not: null };
-    encryptionState: { not: "encrypted" };
-    OR?: Array<{ reminder: number | null }>;
-  } = {
-    userId,
-    calendarId: calendarScope,
-    encryptedContent: { not: null },
-    encryptionState: { not: "encrypted" },
-  };
-
-  if (preserveReminderDependentShadows) {
-    where.OR = [{ reminder: null }, { reminder: 0 }];
-  }
-
   const result = await prisma.calendarEvent.updateMany({
-    where,
+    where: {
+      userId,
+      calendarId: calendarScope,
+      encryptedContent: { not: null },
+      encryptionState: { not: "encrypted" },
+    },
     data: {
       title: "",
       description: null,

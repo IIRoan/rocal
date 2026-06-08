@@ -109,7 +109,6 @@ export const handleCalendarUpdate = async (
     setEditingCalendar: (calendar: any) => void;
   },
   goBack: () => void,
-  options: { forceFullEncryption?: boolean } = {},
 ) => {
   if (!editingCalendar) return;
 
@@ -128,19 +127,11 @@ export const handleCalendarUpdate = async (
 
   setters.setCalendarSaving(true);
   try {
-    const payload: {
-      name: string;
-      color: string;
-      isDefault: boolean;
-      forceFullEncryption?: boolean;
-    } = {
+    const payload = {
       name: calendarName.trim(),
       color: calendarColor,
       isDefault: calendarIsDefault,
     };
-    if (options.forceFullEncryption !== undefined) {
-      payload.forceFullEncryption = options.forceFullEncryption;
-    }
     await calendarData.updateCalendar(editingCalendar.id, payload);
 
     toast.success(`Calendar "${calendarName}" updated`);
