@@ -19,6 +19,7 @@ import { ValidationError, errorString} from "../lib/errors";
 import {
   assertCalendarWritable,
   findUserCalendarOrThrow,
+  isCalendarWritable,
 } from "../lib/calendar-access";
 import {
   validateEventDescriptionLength,
@@ -33,7 +34,6 @@ import { RecurrenceEngine } from "../lib/recurrence";
 import { NotificationCalculator } from "../lib/notification-calculator";
 import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
 import {
-  normalizeEventEncryptionMode,
   resolveEventPersistencePolicy,
 } from "../lib/event-encryption";
 import {
@@ -1255,35 +1255,24 @@ export class EventService implements IEventService {
         select: {
           timezone: true,
           emailNotifications: true,
-          eventEncryptionMode: true,
         },
       });
       const eventTimezone = timezone?.trim() || userSettings?.timezone || "UTC";
 
       const hasEncryptedPayload = this.hasEncryptedPayload(encryptedContent);
-      const encryptionMode = normalizeEventEncryptionMode(
-        userSettings?.eventEncryptionMode,
-      );
-      const calendarForceFullEncryption = calendar.forceFullEncryption === true;
-      const requiresFullEncryption =
-        encryptionMode === "full" || calendarForceFullEncryption;
 
-      if (requiresFullEncryption && !hasEncryptedPayload) {
+      if (isCalendarWritable(calendar) && !hasEncryptedPayload) {
         throw new ValidationError(
-          "Full event encryption requires an active encryption session.",
+          "Event encryption requires an active encryption session.",
           "encryptedContent",
         );
       }
 
       const persistencePolicy = resolveEventPersistencePolicy({
-        mode: encryptionMode,
         hasEncryptedPayload,
         title,
         description,
         location,
-        reminderMinutes: reminder ?? null,
-        calendarShareEnabled: calendar.icsShareEnabled,
-        calendarForceFullEncryption,
       });
 
       const stalwartAccountId = await this.getStalwartAccountId(userId);
@@ -1623,7 +1612,6 @@ export class EventService implements IEventService {
         select: {
           timezone: true,
           emailNotifications: true,
-          eventEncryptionMode: true,
         },
       });
       const eventTimezone =
@@ -1631,13 +1619,6 @@ export class EventService implements IEventService {
           ? input.timezone?.trim() || userSettings?.timezone || "UTC"
           : existingEvent.timezone;
 
-      const encryptionMode = normalizeEventEncryptionMode(
-        userSettings?.eventEncryptionMode,
-      );
-      const calendarForceFullEncryption =
-        finalCalendar.forceFullEncryption === true;
-      const requiresFullEncryption =
-        encryptionMode === "full" || calendarForceFullEncryption;
       const existingHasEncryptedPayload = this.hasEncryptedPayload(
         existingEvent.encryptedContent,
       );
@@ -1652,11 +1633,12 @@ export class EventService implements IEventService {
         input.title !== undefined ||
         input.description !== undefined ||
         input.location !== undefined;
+      const writableCalendar = isCalendarWritable(finalCalendar);
 
       if (
         sensitiveFieldsProvided &&
         input.encryptedContent === undefined &&
-        (existingHasEncryptedPayload || requiresFullEncryption)
+        (existingHasEncryptedPayload || writableCalendar)
       ) {
         throw new ValidationError(
           "Encrypted content payload is required when updating protected event fields.",
@@ -1664,9 +1646,9 @@ export class EventService implements IEventService {
         );
       }
 
-      if (requiresFullEncryption && !hasEncryptedPayload) {
+      if (writableCalendar && !hasEncryptedPayload && !existingEvent.isSynced) {
         throw new ValidationError(
-          "Full event encryption requires an active encryption session.",
+          "Event encryption requires an active encryption session.",
           "encryptedContent",
         );
       }
@@ -1686,26 +1668,11 @@ export class EventService implements IEventService {
           ? (reminderValue ?? null)
           : existingEvent.reminder;
       const persistencePolicy = resolveEventPersistencePolicy({
-        mode: encryptionMode,
         hasEncryptedPayload,
         title: nextTitle,
         description: nextDescription,
         location: nextLocation,
-        reminderMinutes: finalReminderValue,
-        calendarShareEnabled: finalCalendar.icsShareEnabled,
-        calendarForceFullEncryption,
       });
-
-      if (
-        persistencePolicy.encryptionState !== "encrypted" &&
-        existingEvent.encryptionState === "encrypted" &&
-        !sensitiveFieldsProvided
-      ) {
-        throw new ValidationError(
-          "This event is fully encrypted. Reopen and save it before enabling reminders or sharing.",
-          "encryptedContent",
-        );
-      }
 
       const updateData: Record<string, unknown> = {};
 

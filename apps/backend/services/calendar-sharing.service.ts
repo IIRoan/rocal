@@ -14,10 +14,7 @@ import { createLogger } from "@workspace/logger";
 import { toIcsBuildEvent } from "../lib/ics-export";
 
 const logger = createLogger("backend:calendar-sharing-service");
-import {
-  backfillEncryptedEventsToCiphertextOnly,
-  normalizeEventEncryptionMode,
-} from "../lib/event-encryption";
+import { backfillEncryptedEventsToCiphertextOnly } from "../lib/event-encryption";
 
 const SHARE_TOKEN_LENGTH = 40;
 const SHARE_TOKEN_ALPHABET =
@@ -102,17 +99,6 @@ export class CalendarSharingService implements ICalendarSharingService {
   ): Promise<CalendarShareLinkResponse> {
     const { userId, calendarId, baseUrl, regenerate = false } = input;
 
-    const userSettings = await this.prisma.userSettings.findUnique({
-      where: { userId },
-      select: { eventEncryptionMode: true },
-    });
-
-    if (userSettings?.eventEncryptionMode === "full") {
-      throw new ValidationError(
-        "Calendar sharing is unavailable while full event encryption is enabled.",
-      );
-    }
-
     const calendar = await this.prisma.calendar.findFirst({
       where: { id: calendarId, userId },
       select: {
@@ -171,20 +157,13 @@ export class CalendarSharingService implements ICalendarSharingService {
   ): Promise<DisableCalendarShareLinkResponse> {
     const { userId, calendarId } = input;
 
-    const [calendar, userSettings] = await Promise.all([
-      this.prisma.calendar.findFirst({
-        where: { id: calendarId, userId },
-        select: {
-          id: true,
-          forceFullEncryption: true,
-          isSyncOnly: true,
-        },
-      }),
-      this.prisma.userSettings.findUnique({
-        where: { userId },
-        select: { eventEncryptionMode: true },
-      }),
-    ]);
+    const calendar = await this.prisma.calendar.findFirst({
+      where: { id: calendarId, userId },
+      select: {
+        id: true,
+        isSyncOnly: true,
+      },
+    });
 
     if (!calendar) {
       throw new ValidationError("Calendar not found or access denied");
@@ -203,9 +182,6 @@ export class CalendarSharingService implements ICalendarSharingService {
     await backfillEncryptedEventsToCiphertextOnly(this.prisma, {
       userId,
       calendarId: calendar.id,
-      preserveReminderDependentShadows:
-        normalizeEventEncryptionMode(userSettings?.eventEncryptionMode) !==
-          "full" && calendar.forceFullEncryption !== true,
       now,
     });
 

@@ -57,36 +57,15 @@ describe("event-editor-view-model", () => {
   it("derives the correct encryption preview states", () => {
     expect(
       buildEventEditorEncryptionPreview({
-        enabledNotificationCount: 0,
-        eventEncryptionMode: "hybrid",
         hasActiveEncryptionSession: false,
       }),
     ).toEqual({ encryptionState: "plaintext" });
 
     expect(
       buildEventEditorEncryptionPreview({
-        enabledNotificationCount: 1,
-        eventEncryptionMode: "hybrid",
-        hasActiveEncryptionSession: true,
-      }),
-    ).toEqual({ encryptionState: "shadow_write" });
-
-    expect(
-      buildEventEditorEncryptionPreview({
-        enabledNotificationCount: 0,
-        eventEncryptionMode: "full",
         hasActiveEncryptionSession: true,
       }),
     ).toEqual({ encryptionState: "encrypted" });
-
-    expect(
-      buildEventEditorEncryptionPreview({
-        enabledNotificationCount: 0,
-        eventEncryptionMode: "hybrid",
-        hasActiveEncryptionSession: true,
-        selectedCalendar: { forceFullEncryption: true },
-      }),
-    ).toEqual({ forceFullEncryption: true });
   });
 
   it("formats dates, reminders, and enabled reminder lists consistently", () => {

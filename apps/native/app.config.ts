@@ -1,6 +1,6 @@
 import type { ExpoConfig } from "expo/config";
 
-const baseConfig: ExpoConfig = {
+const baseConfig = {
   name: "Solace",
   slug: "solace",
   version: "1.0.0",
@@ -37,7 +37,7 @@ const baseConfig: ExpoConfig = {
     },
   },
   owner: "iroan",
-};
+} as ExpoConfig;
 
 const expoOwner = process.env.EXPO_OWNER || baseConfig.owner;
 const expoProjectId =

@@ -153,7 +153,6 @@ export class SettingsService implements ISettingsService {
       await backfillEncryptedEventsToCiphertextOnly(tx, {
         userId,
         calendarIds: sharedCalendars.map((calendar) => calendar.id),
-        preserveReminderDependentShadows: false,
         now,
       });
 
