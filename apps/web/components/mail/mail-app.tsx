@@ -20,6 +20,7 @@ import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { useIsMobile } from "@workspace/ui/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { useMailApp } from "@/hooks/use-mail-app";
+import { useMailUrlSync } from "@/hooks/use-mail-url-sync";
 import { useSettings } from "@/hooks/use-settings";
 import { MobileAppSwitcher } from "@/components/mobile-app-switcher";
 import { MailSidebar } from "./mail-sidebar";
@@ -29,6 +30,7 @@ import { AttachmentPreviewDialog } from "./attachment-preview-dialog";
 import { MessageList } from "./message-list";
 import { MessageReader } from "./message-reader";
 import type { JmapEmailMessage } from "@/lib/mail/types";
+import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
 
 interface MobileMailHeaderProps {
   selectedMailboxName: string;
@@ -253,7 +255,6 @@ export function MailApp() {
     string | undefined
   >();
   const isMobile = useIsMobile();
-  const handledDeepLinkMessageIdRef = useRef<string | null>(null);
   const [mailListSearch, setMailListSearch] = useState("");
   const [debouncedMailListSearch, setDebouncedMailListSearch] = useState("");
 
@@ -268,7 +269,7 @@ export function MailApp() {
     data: serverSearchResults,
     isFetching: isSearching,
   } = useQuery<JmapEmailMessage[]>({
-    queryKey: ["mail-inline-search", mailboxId, debouncedMailListSearch],
+    queryKey: mailQueryKeys.inlineSearch(mailboxId, debouncedMailListSearch),
     queryFn: async () => {
       if (!activeMailbox || !mailboxId || !debouncedMailListSearch.trim()) return [];
       const { messages } = await activeMailbox.client.searchMailboxMessages(
@@ -312,16 +313,13 @@ export function MailApp() {
     setSelectedMessageId(null);
   };
 
-  useEffect(() => {
-    if (!activeMailbox || typeof window === "undefined") return;
-    const messageId = new URLSearchParams(window.location.search).get(
-      "messageId",
-    );
-    if (!messageId || handledDeepLinkMessageIdRef.current === messageId) return;
-
-    handledDeepLinkMessageIdRef.current = messageId;
-    void openMessageById(messageId);
-  }, [activeMailbox, openMessageById]);
+  useMailUrlSync({
+    activeMailbox,
+    selectedMessageId,
+    onSelectMailbox: refreshMailboxMessages,
+    onSelectMessageId: setSelectedMessageId,
+    openMessageById,
+  });
 
   // Clear inline search when switching mailboxes
   const prevMailboxIdRef = useRef<string | null | undefined>(null);

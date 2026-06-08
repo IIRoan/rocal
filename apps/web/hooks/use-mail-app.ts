@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { toast } from "sonner";
 import PostalMime, {
@@ -25,6 +26,12 @@ import {
   type JmapAttachmentInput,
 } from "@/lib/mail/jmap-client";
 import { getConversationForMessage } from "@/lib/mail/conversation-thread";
+import {
+  fetchMailMessageById,
+  findCachedMailMessage,
+  mergeMessageIntoMailboxCaches,
+  seedMailMessageCache,
+} from "@/lib/mail/mail-message-query";
 import {
   classifyMessageEncryption,
   extractMessageBodies,
@@ -558,6 +565,7 @@ function messagesLikelyMatch(
 export function useMailApp() {
   const { data: session, isPending: isSessionPending } = useSession();
   const router = useSmoothRouter();
+  const queryClient = useQueryClient();
 
   const [config, setConfig] = useState<MailDemoConfig | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -826,16 +834,32 @@ export function useMailApp() {
       return;
     }
 
-    setIsBusy(true);
-    try {
-      const [message] = await mb.client.getMessagesByIds(mb.session, [
-        messageId,
-      ]);
-      if (!message) {
-        toast.error("Could not find that message.");
-        return;
-      }
+    const cached =
+      findCachedMailMessage(queryClient, messageId) ??
+      mb.messages.find((message) => message.id === messageId);
+    if (cached) {
+      setActiveMailbox((current) =>
+        current
+          ? {
+              ...current,
+              messages: sortMessages(
+                mergeConversationSourceMessages(current.messages, [cached]),
+              ),
+            }
+          : current,
+      );
+      handleSelectMessageId(cached.id);
+      return;
+    }
 
+    try {
+      const message = await fetchMailMessageById(queryClient, {
+        client: mb.client,
+        session: mb.session,
+        messageId,
+      });
+
+      mergeMessageIntoMailboxCaches(queryClient, message);
       setActiveMailbox((current) =>
         current
           ? {
@@ -850,10 +874,8 @@ export function useMailApp() {
     } catch (error) {
       log.error("Failed to open message by id", error);
       toast.error(getErrorMessage(error, "Could not open that message."));
-    } finally {
-      setIsBusy(false);
     }
-  }, [handleSelectMessageId]);
+  }, [handleSelectMessageId, queryClient]);
 
   const handleSelectConversationMessageId = useCallback((messageId: string) => {
     setSelectedConversationMessageId(messageId);
@@ -1120,12 +1142,16 @@ export function useMailApp() {
             { limit: 20, position: 0 },
           );
         setTotalMessages(total);
+        seedMailMessageCache(queryClient, mailboxId, messages, total);
         setActiveMailbox((cur) =>
           cur ? { ...cur, selectedMailboxId: mailboxId, messages } : cur,
         );
-        setSelectedMessageId((curId) =>
-          curId && messages.some((m) => m.id === curId) ? curId : null,
-        );
+        setSelectedMessageId((curId) => {
+          if (!curId) return null;
+          if (messages.some((message) => message.id === curId)) return curId;
+          if (findCachedMailMessage(queryClient, curId)) return curId;
+          return null;
+        });
       } catch (error) {
         log.error("Failed to load mailbox messages", error);
         toast.error(
@@ -1135,7 +1161,7 @@ export function useMailApp() {
         setIsBusy(false);
       }
     },
-    [activeMailbox],
+    [activeMailbox, queryClient],
   );
 
   const loadMoreMessages = useCallback(async () => {
@@ -1150,10 +1176,11 @@ export function useMailApp() {
         { limit: 20, position },
       );
       if (more.length > 0) {
+        const mailboxId = activeMailbox.selectedMailboxId;
+        const nextMessages = sortMessages([...activeMailbox.messages, ...more]);
+        seedMailMessageCache(queryClient, mailboxId, nextMessages, totalMessages);
         setActiveMailbox((cur) =>
-          cur
-            ? { ...cur, messages: sortMessages([...cur.messages, ...more]) }
-            : cur,
+          cur ? { ...cur, messages: nextMessages } : cur,
         );
       }
     } catch (error) {
@@ -1161,7 +1188,7 @@ export function useMailApp() {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [activeMailbox, isLoadingMore, totalMessages]);
+  }, [activeMailbox, isLoadingMore, queryClient, totalMessages]);
 
   const handleSignIn = useCallback(
     async (passwordOverride?: string) => {
@@ -1313,6 +1340,14 @@ export function useMailApp() {
             })
           : { messages: [], total: 0 };
         setTotalMessages(initialTotal);
+        if (initialMailboxId) {
+          seedMailMessageCache(
+            queryClient,
+            initialMailboxId,
+            messages,
+            initialTotal,
+          );
+        }
         setActiveMailbox({
           client,
           session: jmapSession,
@@ -1351,6 +1386,7 @@ export function useMailApp() {
       loginPassword,
       mailboxEmail,
       mailboxStatus,
+      queryClient,
     ],
   );
 
