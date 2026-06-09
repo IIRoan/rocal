@@ -141,6 +141,8 @@ interface CompactMonthStripProps {
    * and drive height from the `expanded` prop with a short timing animation.
    */
   externalExpandControl?: boolean;
+  /** Fires when a programmatic or gesture expand/collapse animation settles. */
+  onExpandAnimationEnd?: (expanded: boolean) => void;
 }
 
 function getMonthRowTarget(
@@ -198,7 +200,6 @@ interface MonthPageProps {
   eventsByDay: Map<string, DecoratedCalendarEvent[]>;
   theme: ThemeTokens;
   styles: ReturnType<typeof createStyles>;
-  showExpandedRows: boolean;
   animatedContentHeight: SharedValue<number>;
   collapsedContentHeight: number;
   expandedContentHeight: number;
@@ -217,7 +218,6 @@ const MonthPage = React.memo(function MonthPage({
   eventsByDay,
   theme,
   styles,
-  showExpandedRows,
   animatedContentHeight,
   collapsedContentHeight,
   expandedContentHeight,
@@ -253,9 +253,8 @@ const MonthPage = React.memo(function MonthPage({
     return {
       transform: [
         {
-          translateY: showExpandedRows
-            ? collapsedGridTranslateY * (1 - revealProgress)
-            : 0,
+          translateY:
+            collapsedGridTranslateY * (1 - revealProgress),
         },
       ],
     };
@@ -264,7 +263,6 @@ const MonthPage = React.memo(function MonthPage({
     collapsedContentHeight,
     collapsedGridTranslateY,
     expandedContentHeight,
-    showExpandedRows,
   ]);
 
   const renderDatesRow = useCallback(
@@ -362,23 +360,16 @@ const MonthPage = React.memo(function MonthPage({
 
   return (
     <Animated.View style={[styles.monthPageContent, pageAnimatedStyle]}>
-      {showExpandedRows
-        ? Array.from(
-            { length: COMPACT_STRIP_EXPANDED_WEEK_ROWS },
-            (_, index) => {
-              const rowIndex = expandedWeekRowOffset + index;
-              return renderDatesRow(
-                gridDates.slice(rowIndex * 7, rowIndex * 7 + 7),
-                rowIndex,
-              );
-            },
-          )
-        : collapsedRowDates != null
-          ? renderDatesRow(collapsedRowDates, "collapsed-custom")
-          : renderDatesRow(
-              gridDates.slice(activeRowIndex * 7, activeRowIndex * 7 + 7),
-              activeRowIndex,
-            )}
+      {Array.from(
+        { length: COMPACT_STRIP_EXPANDED_WEEK_ROWS },
+        (_, index) => {
+          const rowIndex = expandedWeekRowOffset + index;
+          return renderDatesRow(
+            gridDates.slice(rowIndex * 7, rowIndex * 7 + 7),
+            rowIndex,
+          );
+        },
+      )}
     </Animated.View>
   );
 });
@@ -403,6 +394,7 @@ function CompactMonthStripComponent({
   showDayOfWeekHeader = true,
   embeddedInHeader = false,
   externalExpandControl = false,
+  onExpandAnimationEnd,
 }: CompactMonthStripProps) {
   const { theme } = useTheme();
   const styles = useMemo(
@@ -469,7 +461,6 @@ function CompactMonthStripComponent({
   const animatedContentHeight = useSharedValue(
     expanded ? expandedContentHeight : collapsedContentHeight,
   );
-  const [showExpandedRows, setShowExpandedRows] = useState(expanded);
   const expandAnimationSessionRef = useRef(0);
 
   useEffect(() => {
@@ -477,29 +468,38 @@ function CompactMonthStripComponent({
     const target = expanded ? expandedContentHeight : collapsedContentHeight;
     const session = ++expandAnimationSessionRef.current;
 
-    if (expanded) {
-      setShowExpandedRows(true);
-    }
-
     if (embeddedInHeader && expanded) {
       animatedContentHeight.value = target;
+      if (onExpandAnimationEnd != null) {
+        runOnJS(onExpandAnimationEnd)(true);
+      }
       return;
     }
 
     if (expanded) {
       if (externalExpandControl) {
-        animatedContentHeight.value = withTiming(target, {
-          duration: EXPAND_TIMING_MS,
-        });
+        animatedContentHeight.value = withTiming(
+          target,
+          { duration: EXPAND_TIMING_MS },
+          (finished) => {
+            if (finished && expandAnimationSessionRef.current === session && onExpandAnimationEnd != null) {
+              runOnJS(onExpandAnimationEnd)(true);
+            }
+          },
+        );
       } else {
-        animatedContentHeight.value = withSpring(target, HEIGHT_SPRING);
+        animatedContentHeight.value = withSpring(target, HEIGHT_SPRING, (finished) => {
+          if (finished && expandAnimationSessionRef.current === session && onExpandAnimationEnd != null) {
+            runOnJS(onExpandAnimationEnd)(true);
+          }
+        });
       }
       return;
     }
 
     const onCollapseFinished = (finished?: boolean) => {
-      if (finished && expandAnimationSessionRef.current === session) {
-        runOnJS(setShowExpandedRows)(false);
+      if (finished && expandAnimationSessionRef.current === session && onExpandAnimationEnd != null) {
+        runOnJS(onExpandAnimationEnd)(false);
       }
     };
 
@@ -523,6 +523,7 @@ function CompactMonthStripComponent({
     animatedContentHeight,
     embeddedInHeader,
     externalExpandControl,
+    onExpandAnimationEnd,
   ]);
 
   const contentAreaAnimatedStyle = useAnimatedStyle(() => ({
@@ -773,7 +774,6 @@ function CompactMonthStripComponent({
                       eventsByDay={page.eventsByDay}
                       theme={theme}
                       styles={styles}
-                      showExpandedRows={showExpandedRows}
                       animatedContentHeight={animatedContentHeight}
                       collapsedContentHeight={collapsedContentHeight}
                       expandedContentHeight={expandedContentHeight}
@@ -797,7 +797,6 @@ function CompactMonthStripComponent({
                 eventsByDay={pages[0].eventsByDay}
                 theme={theme}
                 styles={styles}
-                showExpandedRows={showExpandedRows}
                 animatedContentHeight={animatedContentHeight}
                 collapsedContentHeight={collapsedContentHeight}
                 expandedContentHeight={expandedContentHeight}
