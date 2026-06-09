@@ -319,6 +319,20 @@ export default function CalendarScreen() {
     setMonthStripExpanded((prev) => !prev);
   }, []);
 
+  const handleMonthStripAnimationEnd = useCallback((expanded: boolean) => {
+    if (expanded) {
+      setMonthGridVisible(false);
+    }
+  }, []);
+
+  const [monthGridVisible, setMonthGridVisible] = useState(true);
+
+  useEffect(() => {
+    if (!monthStripExpanded) {
+      setMonthGridVisible(true);
+    }
+  }, [monthStripExpanded]);
+
   const handleEventPress = useCallback(
     (event: DecoratedCalendarEvent) => {
       openEventSheet({ type: "view", eventId: event.id });
@@ -380,7 +394,7 @@ export default function CalendarScreen() {
               ? page.dates
               : undefined
         }
-        events={decoratedMonthEvents}
+        events={monthStripEvents}
         weekStartDay={settings?.weekStartDay ?? 0}
         expanded={false}
         onDayPress={handleDayPress}
@@ -392,7 +406,7 @@ export default function CalendarScreen() {
     ),
     [
       activeView,
-      decoratedMonthEvents,
+      monthStripEvents,
       handleDayPress,
       handleToggleMonthStrip,
       settings?.weekStartDay,
@@ -413,28 +427,26 @@ export default function CalendarScreen() {
       />
 
       {(monthStripExpanded || !isTimelineView) && (
-        <>
-          <CompactMonthStrip
-            currentDate={currentDate}
-            selectedDate={selectedDate}
-            events={monthStripEvents}
-            weekStartDay={settings?.weekStartDay ?? 0}
-            expanded={monthStripExpanded}
-            externalExpandControl={monthStripExpanded}
-            swipeEnabled
-            showHandle
-            onDayPress={handleDayPress}
-            onMonthChange={handleMonthChange}
-            onToggleExpand={handleToggleMonthStrip}
-          />
-          <View style={styles.separator} />
-        </>
+        <CompactMonthStrip
+          currentDate={currentDate}
+          selectedDate={selectedDate}
+          events={monthStripEvents}
+          weekStartDay={settings?.weekStartDay ?? 0}
+          expanded={monthStripExpanded}
+          externalExpandControl={monthStripExpanded}
+          swipeEnabled
+          showHandle
+          onDayPress={handleDayPress}
+          onMonthChange={handleMonthChange}
+          onToggleExpand={handleToggleMonthStrip}
+          onExpandAnimationEnd={handleMonthStripAnimationEnd}
+        />
       )}
 
       {loadingState.isAllInitialLoading ? (
         <SkeletonLoader view={activeView} />
       ) : activeView === "month" ? (
-        monthStripExpanded ? null : (
+        !monthStripExpanded || monthGridVisible ? (
           <MonthGrid
             currentDate={currentDate}
             selectedDate={selectedDate}
@@ -442,7 +454,7 @@ export default function CalendarScreen() {
             weekStartDay={settings?.weekStartDay ?? 0}
             onDayPress={handleDayPress}
           />
-        )
+        ) : null
       ) : activeView === "agenda" ? (
         <SwipeableCalendarView
           onSwipeLeft={() => handleDetailNavigate(1)}
@@ -514,10 +526,6 @@ function createStyles(theme: ThemeTokens) {
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
-    },
-    separator: {
-      height: 1,
-      backgroundColor: theme.colors.border,
     },
   } satisfies Record<string, ViewStyle>;
 
