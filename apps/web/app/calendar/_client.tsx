@@ -30,7 +30,14 @@ import { useDashboardUserActions } from "@/hooks/use-dashboard-user-actions";
 import { useSettings } from "@/hooks/use-settings";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { CALENDAR_HOME_PATH } from "@/lib/app-routes";
-import { useEffect, useRef, Suspense, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  Suspense,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
+import { useIsMobile } from "@workspace/ui/hooks";
 import { useCalendarUrlSync } from "@/hooks/use-calendar-url-sync";
 import { MobileAppSwitcher } from "@/components/mobile-app-switcher";
 
@@ -284,14 +291,23 @@ function MobileLayoutContent() {
 }
 
 export function CalendarPageContent() {
-  return (
-    <>
-      <div className="lg:hidden min-h-[100dvh] safe-area-inset-bottom">
-        <MobileLayoutContent />
-      </div>
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const isMobile = useIsMobile();
 
-      <CalendarWithData className="hidden h-full min-h-screen lg:flex lg:flex-1" />
-    </>
+  if (!mounted) {
+    return <DashboardSkeleton />;
+  }
+
+  return isMobile ? (
+    <div className="min-h-[100dvh] safe-area-inset-bottom">
+      <MobileLayoutContent />
+    </div>
+  ) : (
+    <CalendarWithData className="h-full min-h-screen flex flex-1" />
   );
 }
 

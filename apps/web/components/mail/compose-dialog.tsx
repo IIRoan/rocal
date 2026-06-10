@@ -2,7 +2,10 @@
 
 import { Send, ArrowLeft, Paperclip, X, Minus, Maximize2 } from "lucide-react";
 import { useRef, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
+import {
+  useMailCompose,
+  useMailComposeChrome,
+} from "./mail-compose-context";
 import {
   Dialog,
   DialogContent,
@@ -19,23 +22,10 @@ import { Button } from "@workspace/ui/components/ui/button";
 import { useIsMobile } from "@workspace/ui/hooks";
 
 export interface ComposeDialogProps {
-  open: boolean;
   fromEmail: string;
   onClose: () => void;
   onSend: () => Promise<void>;
   onExpand?: () => void;
-  composeTo: string;
-  composeCc: string;
-  composeBcc: string;
-  composeSubject: string;
-  composeBody: string;
-  composeAttachments: File[];
-  setComposeTo: (v: string) => void;
-  setComposeCc: (v: string) => void;
-  setComposeBcc: (v: string) => void;
-  setComposeSubject: (v: string) => void;
-  setComposeBody: (v: string) => void;
-  setComposeAttachments: Dispatch<SetStateAction<File[]>>;
   isBusy: boolean;
 }
 
@@ -50,23 +40,25 @@ export function ComposeForm({
   onClose,
   onSend,
   onExpand,
-  composeTo,
-  composeCc,
-  composeBcc,
-  composeSubject,
-  composeBody,
-  composeAttachments,
-  setComposeTo,
-  setComposeCc,
-  setComposeBcc,
-  setComposeSubject,
-  setComposeBody,
-  setComposeAttachments,
   isBusy,
   onKeyDown,
-}: Omit<ComposeDialogProps, "open"> & {
+}: ComposeDialogProps & {
   onKeyDown?: (e: React.KeyboardEvent) => void;
 }) {
+  const {
+    composeTo,
+    setComposeTo,
+    composeCc,
+    setComposeCc,
+    composeBcc,
+    setComposeBcc,
+    composeSubject,
+    setComposeSubject,
+    composeBody,
+    setComposeBody,
+    composeAttachments,
+    setComposeAttachments,
+  } = useMailCompose();
   const [showCc, setShowCc] = useState(!!composeCc);
   const [showBcc, setShowBcc] = useState(!!composeBcc);
   const [toTouched, setToTouched] = useState(false);
@@ -367,26 +359,16 @@ export function ComposeForm({
 }
 
 export function ComposeDialog({
-  open,
   fromEmail,
   onClose,
   onSend,
   onExpand,
-  composeTo,
-  composeCc,
-  composeBcc,
-  composeSubject,
-  composeBody,
-  composeAttachments,
-  setComposeTo,
-  setComposeCc,
-  setComposeBcc,
-  setComposeSubject,
-  setComposeBody,
-  setComposeAttachments,
   isBusy,
 }: ComposeDialogProps) {
+  const { isComposeOpen } = useMailComposeChrome();
+  const { composeTo, composeSubject } = useMailCompose();
   const isMobile = useIsMobile();
+  const open = isComposeOpen;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -402,18 +384,6 @@ export function ComposeDialog({
     onClose,
     onSend,
     onExpand,
-    composeTo,
-    composeCc,
-    composeBcc,
-    composeSubject,
-    composeBody,
-    composeAttachments,
-    setComposeTo,
-    setComposeCc,
-    setComposeBcc,
-    setComposeSubject,
-    setComposeBody,
-    setComposeAttachments,
     isBusy,
   };
 

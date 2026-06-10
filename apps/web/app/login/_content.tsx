@@ -154,14 +154,14 @@ function PasswordRequirements({ password }: { password: string }) {
       {requirements.map((req) => (
         <li key={req.label} className="flex items-center gap-2">
           {req.met ? (
-            <Check className="size-3.5 shrink-0 text-emerald-500" />
+            <Check className="size-3.5 shrink-0 text-success" />
           ) : (
             <X className="size-3.5 shrink-0 text-muted-foreground/50" />
           )}
           <span
             className={`text-xs ${
               req.met
-                ? "text-emerald-600 dark:text-emerald-400"
+                ? "text-success"
                 : "text-muted-foreground"
             }`}
           >
@@ -892,7 +892,7 @@ export function LoginForm() {
                         emailAvailability === null
                           ? "border-input"
                           : emailAvailability.available
-                            ? "border-emerald-500 ring-1 ring-emerald-500/30"
+                            ? "border-success ring-1 ring-success/30"
                             : "border-destructive ring-1 ring-destructive/30"
                       }`}
                     >
@@ -923,7 +923,7 @@ export function LoginForm() {
                       <p
                         className={`text-xs ${
                           emailAvailability.available
-                            ? "text-emerald-600 dark:text-emerald-400"
+                            ? "text-success"
                             : "text-destructive"
                         }`}
                       >
@@ -971,7 +971,7 @@ export function LoginForm() {
                           inviteValidation === null
                             ? ""
                             : inviteValidation.valid
-                              ? "border-emerald-500 ring-1 ring-emerald-500/30"
+                              ? "border-success ring-1 ring-success/30"
                               : "border-destructive ring-1 ring-destructive/30"
                         }`}
                       />
@@ -985,7 +985,7 @@ export function LoginForm() {
                       <p
                         className={`text-xs ${
                           inviteValidation.valid
-                            ? "text-emerald-600 dark:text-emerald-400"
+                            ? "text-success"
                             : "text-destructive"
                         }`}
                       >

@@ -16,17 +16,17 @@ Each executor: read the plan fully before starting, honor its STOP conditions, a
 | [003](003-notification-set-transaction.md) | Wrap notification writes in Prisma transactions | P1 | S | — | DONE |
 | [004](004-remove-dead-enhanced-notification.md) | Delete unused enhanced-notification-service | P2 | S | — | DONE |
 | [005](005-decouple-stalwart-sync-from-list.md) | Stop blocking GET /events on Stalwart sync | P1 | M | — | DONE |
-| [006](006-targeted-event-cache-invalidation.md) | Scope event mutation invalidation to affected months | P1 | M | — | TODO |
-| [007](007-single-calendar-tree-and-context-memo.md) | Mount one calendar tree per viewport; memoize data context | P1 | M | — | TODO |
-| [008](008-month-view-event-bucketing.md) | Memoize month-view per-day event buckets | P1 | M | — | TODO |
-| [009](009-bundle-and-asset-diet.md) | Cut initial bundle/asset weight (gsap, pdfjs, images) | P1 | M | — | TODO |
-| [010](010-mail-list-render-cost.md) | Reduce mail list render cost (Set hoist, row memo, windowing) | P2 | M | — | TODO |
-| [011](011-remove-getevents-retry-hack.md) | Replace getEvents refetch-on-bad-dates with date coercion | P2 | S | — | TODO |
-| [012](012-parallelize-mail-startup.md) | Parallelize and cache mail startup fetches | P2 | M | — | TODO |
-| [013](013-vault-kdf-off-main-thread.md) | Run mail vault argon2id KDF in the crypto worker | P2 | M | — | TODO |
-| [014](014-split-use-mail-app-hook.md) | Split use-mail-app god-hook (compose state first) | P3 | L | 012 | TODO |
-| [015](015-semantic-status-colors.md) | Replace raw Tailwind status colors with semantic tokens | P3 | S | — | TODO |
-| [016](016-calendar-manager-focus-visible.md) | Restore visible keyboard focus in calendar-manager rows | P3 | S | — | TODO |
+| [006](006-targeted-event-cache-invalidation.md) | Scope event mutation invalidation to affected months | P1 | M | — | DONE |
+| [007](007-single-calendar-tree-and-context-memo.md) | Mount one calendar tree per viewport; memoize data context | P1 | M | — | DONE |
+| [008](008-month-view-event-bucketing.md) | Memoize month-view per-day event buckets | P1 | M | — | DONE |
+| [009](009-bundle-and-asset-diet.md) | Cut initial bundle/asset weight (gsap, pdfjs, images) | P1 | M | — | DONE |
+| [010](010-mail-list-render-cost.md) | Reduce mail list render cost (Set hoist, row memo, windowing) | P2 | M | — | DONE |
+| [011](011-remove-getevents-retry-hack.md) | Replace getEvents refetch-on-bad-dates with date coercion | P2 | S | — | DONE |
+| [012](012-parallelize-mail-startup.md) | Parallelize and cache mail startup fetches | P2 | M | — | DONE |
+| [013](013-vault-kdf-off-main-thread.md) | Run mail vault argon2id KDF in the crypto worker | P2 | M | — | DONE |
+| [014](014-split-use-mail-app-hook.md) | Split use-mail-app god-hook (compose state first) | P3 | L | 012 | DONE |
+| [015](015-semantic-status-colors.md) | Replace raw Tailwind status colors with semantic tokens | P3 | S | — | DONE |
+| [016](016-calendar-manager-focus-visible.md) | Restore visible keyboard focus in calendar-manager rows | P3 | S | — | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` | `REJECTED`
 

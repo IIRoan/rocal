@@ -1,5 +1,10 @@
-import { useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { createLogger } from "@workspace/logger";
 import { calendarApiService } from "../lib/calendar-api-service";
 import {
@@ -18,10 +23,55 @@ import {
 import { EventNotification } from "@workspace/ui/components/calendar";
 import {
   useCalendarEventsLoader,
+  getMonthQueryKey,
+  monthKey,
   type DateRange,
 } from "./use-calendar-events-loader";
 
 const log = createLogger("calendar-data");
+
+function hasRecurrence(
+  event: { recurrence?: string | null } | null | undefined,
+): boolean {
+  return Boolean(event?.recurrence);
+}
+
+function findEventInCache(
+  queryClient: QueryClient,
+  id: string,
+): CalendarEvent | null {
+  const entries = queryClient.getQueriesData<CalendarEvent[]>({
+    queryKey: ["events"],
+  });
+  for (const [, events] of entries) {
+    if (!events) continue;
+    const match = events.find((event) => event.id === id);
+    if (match) return match;
+  }
+  return null;
+}
+
+export function invalidateEventRanges(
+  queryClient: QueryClient,
+  start?: Date | string | null,
+  end?: Date | string | null,
+) {
+  if (!start) {
+    queryClient.invalidateQueries({ queryKey: ["events"] });
+    return;
+  }
+  const startDate = new Date(start);
+  const endDate = end ? new Date(end) : startDate;
+  const months = new Set<string>();
+  const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+  while (cursor <= endDate) {
+    months.add(monthKey(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  for (const month of months) {
+    queryClient.invalidateQueries({ queryKey: getMonthQueryKey(month) });
+  }
+}
 
 interface UseCalendarDataOptions {
   cacheTimeout?: number;
@@ -136,23 +186,56 @@ export function useCalendarData(
   const createEventMutation = useMutation({
     mutationFn: (event: CreateEventRequest) =>
       calendarApiService.createEvent(event),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["events"] });
+    onSuccess: (_data, variables) => {
+      if (hasRecurrence(variables)) {
+        queryClient.invalidateQueries({ queryKey: ["events"] });
+        return;
+      }
+      invalidateEventRanges(queryClient, variables.start, variables.end);
     },
   });
 
   const updateEventMutation = useMutation({
     mutationFn: ({ id, event }: { id: string; event: UpdateEventRequest }) =>
       calendarApiService.updateEvent(id, event),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["events"] });
+    onSuccess: (_data, { id, event }) => {
+      if (hasRecurrence(event)) {
+        queryClient.invalidateQueries({ queryKey: ["events"] });
+        return;
+      }
+      const cached = findEventInCache(queryClient, id);
+      if (hasRecurrence(cached)) {
+        queryClient.invalidateQueries({ queryKey: ["events"] });
+        return;
+      }
+      if (!cached && (!event.start || !event.end)) {
+        queryClient.invalidateQueries({ queryKey: ["events"] });
+        return;
+      }
+      if (cached) {
+        invalidateEventRanges(queryClient, cached.start, cached.end);
+      }
+      if (event.start && event.end) {
+        invalidateEventRanges(queryClient, event.start, event.end);
+      } else if (event.start || event.end) {
+        queryClient.invalidateQueries({ queryKey: ["events"] });
+      }
     },
   });
 
   const deleteEventMutation = useMutation({
     mutationFn: (id: string) => calendarApiService.deleteEvent(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["events"] });
+    onSuccess: (_data, id) => {
+      const cached = findEventInCache(queryClient, id);
+      if (!cached) {
+        queryClient.invalidateQueries({ queryKey: ["events"] });
+        return;
+      }
+      if (hasRecurrence(cached)) {
+        queryClient.invalidateQueries({ queryKey: ["events"] });
+        return;
+      }
+      invalidateEventRanges(queryClient, cached.start, cached.end);
     },
   });
 
@@ -294,67 +377,154 @@ export function useCalendarData(
     [],
   );
 
-  return {
-    // Data
-    events,
-    calendars: calendarsQuery.data || [],
-    categories: categoriesQuery.data || [],
+  const createEvent = useCallback(
+    (event: CreateEventRequest) => createEventMutation.mutateAsync(event),
+    [createEventMutation],
+  );
 
-    // Loading states
-    loading:
-      eventsLoading || calendarsQuery.isLoading || categoriesQuery.isLoading,
-    eventsLoading,
-    calendarsLoading: calendarsQuery.isLoading,
-    categoriesLoading: categoriesQuery.isLoading,
+  const updateEvent = useCallback(
+    (id: string, event: UpdateEventRequest) =>
+      updateEventMutation.mutateAsync({ id, event }),
+    [updateEventMutation],
+  );
 
-    // Error states
-    error: (eventsError ||
-      calendarsQuery.error ||
-      categoriesQuery.error) as unknown as ApiError | null,
-    eventsError,
-    calendarsError: calendarsQuery.error as unknown as ApiError | null,
-    categoriesError: categoriesQuery.error as unknown as ApiError | null,
-
-    // Actions
-    refetch,
-    refetchEvents,
-    refetchCalendars,
-    refetchCategories,
-
-    // CRUD operations
-    createEvent: (event) => createEventMutation.mutateAsync(event),
-    updateEvent: (id, event) => updateEventMutation.mutateAsync({ id, event }),
-    deleteEvent: async (id) => {
+  const deleteEvent = useCallback(
+    async (id: string) => {
       await deleteEventMutation.mutateAsync(id);
     },
-    createCalendar: (calendar) => createCalendarMutation.mutateAsync(calendar),
-    updateCalendar: (id, calendar) =>
+    [deleteEventMutation],
+  );
+
+  const createCalendar = useCallback(
+    (calendar: CreateCalendarRequest) =>
+      createCalendarMutation.mutateAsync(calendar),
+    [createCalendarMutation],
+  );
+
+  const updateCalendar = useCallback(
+    (id: string, calendar: UpdateCalendarRequest) =>
       updateCalendarMutation.mutateAsync({ id, calendar }),
-    deleteCalendar: async (id, action = "delete_events", targetCalendarId) => {
+    [updateCalendarMutation],
+  );
+
+  const deleteCalendar = useCallback(
+    async (
+      id: string,
+      action = "delete_events",
+      targetCalendarId?: string,
+    ) => {
       await deleteCalendarMutation.mutateAsync({
         id,
         action,
         targetCalendarId,
       });
     },
-    createCategory: (category) => createCategoryMutation.mutateAsync(category),
-    updateCategory: (id, category) =>
+    [deleteCalendarMutation],
+  );
+
+  const createCategory = useCallback(
+    (category: CreateCategoryRequest) =>
+      createCategoryMutation.mutateAsync(category),
+    [createCategoryMutation],
+  );
+
+  const updateCategory = useCallback(
+    (id: string, category: UpdateCategoryRequest) =>
       updateCategoryMutation.mutateAsync({ id, category }),
-    deleteCategory: async (id) => {
+    [updateCategoryMutation],
+  );
+
+  const deleteCategory = useCallback(
+    async (id: string) => {
       await deleteCategoryMutation.mutateAsync(id);
     },
+    [deleteCategoryMutation],
+  );
 
-    // Utility
-    setDateRange,
-    setMonth,
-    clearCache,
+  return useMemo(
+    () => ({
+      // Data
+      events,
+      calendars: calendarsQuery.data || [],
+      categories: categoriesQuery.data || [],
 
-    // Mini calendar support
-    prefetchRange,
-    getCachedEventsForRange,
+      // Loading states
+      loading:
+        eventsLoading ||
+        calendarsQuery.isLoading ||
+        categoriesQuery.isLoading,
+      eventsLoading,
+      calendarsLoading: calendarsQuery.isLoading,
+      categoriesLoading: categoriesQuery.isLoading,
 
-    // Notification handlers
-    loadNotifications,
-    updateNotifications,
-  };
+      // Error states
+      error: (eventsError ||
+        calendarsQuery.error ||
+        categoriesQuery.error) as unknown as ApiError | null,
+      eventsError,
+      calendarsError: calendarsQuery.error as unknown as ApiError | null,
+      categoriesError: categoriesQuery.error as unknown as ApiError | null,
+
+      // Actions
+      refetch,
+      refetchEvents,
+      refetchCalendars,
+      refetchCategories,
+
+      // CRUD operations
+      createEvent,
+      updateEvent,
+      deleteEvent,
+      createCalendar,
+      updateCalendar,
+      deleteCalendar,
+      createCategory,
+      updateCategory,
+      deleteCategory,
+
+      // Utility
+      setDateRange,
+      setMonth,
+      clearCache,
+
+      // Mini calendar support
+      prefetchRange,
+      getCachedEventsForRange,
+
+      // Notification handlers
+      loadNotifications,
+      updateNotifications,
+    }),
+    [
+      events,
+      calendarsQuery.data,
+      calendarsQuery.isLoading,
+      calendarsQuery.error,
+      categoriesQuery.data,
+      categoriesQuery.isLoading,
+      categoriesQuery.error,
+      eventsLoading,
+      eventsError,
+      refetch,
+      refetchEvents,
+      refetchCalendars,
+      refetchCategories,
+      createEvent,
+      updateEvent,
+      deleteEvent,
+      createCalendar,
+      updateCalendar,
+      deleteCalendar,
+      createCategory,
+      updateCategory,
+      deleteCategory,
+      setDateRange,
+      setMonth,
+      clearCache,
+      prefetchRange,
+      getCachedEventsForRange,
+      loadNotifications,
+      updateNotifications,
+    ],
+  );
 }

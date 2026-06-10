@@ -193,4 +193,11 @@ export class MailCryptoWorkerClient {
     }
     return this.call<{ cleared: boolean }>("CLEAR_ACTIVE_VAULT");
   }
+
+  deriveVaultKey(input: {
+    password: string;
+    kdfParams: import("./types").MailVaultKdfParams;
+  }): Promise<{ keyB64: string }> {
+    return this.call<{ keyB64: string }>("DERIVE_VAULT_KEY", input);
+  }
 }

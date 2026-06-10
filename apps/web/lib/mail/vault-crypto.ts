@@ -1,4 +1,3 @@
-import { argon2id } from "hash-wasm";
 import type {
   EncryptedMailVaultRecord,
   MailVaultKdfParams,
@@ -63,19 +62,23 @@ async function deriveVaultKey(
   passphrase: string,
   params: MailVaultKdfParams,
 ): Promise<CryptoKey> {
-  const derived = await argon2id({
-    password: passphrase,
-    salt: base64ToBytes(params.saltB64),
-    iterations: params.iterations,
-    parallelism: params.parallelism,
-    memorySize: params.memoryKiB,
-    hashLength: 32,
-    outputType: "binary",
-  });
+  let keyBytes: Uint8Array;
+
+  if (typeof Worker !== "undefined") {
+    const { mailCryptoWorkerClient } = await import("./worker-client");
+    const { keyB64 } = await mailCryptoWorkerClient.deriveVaultKey({
+      password: passphrase,
+      kdfParams: params,
+    });
+    keyBytes = base64ToBytes(keyB64);
+  } else {
+    const { deriveVaultKeyBytes } = await import("./vault-kdf");
+    keyBytes = await deriveVaultKeyBytes(passphrase, params);
+  }
 
   return getCryptoRef().subtle.importKey(
     "raw",
-    toBufferSource(derived),
+    toBufferSource(keyBytes),
     { name: "AES-GCM" },
     false,
     ["encrypt", "decrypt"],
