@@ -792,7 +792,7 @@ export function MailCommandPalette({
     if (currentView === "appearance") {
       const themeOptions = [
         { value: "light", icon: Sun, label: "Light", color: "text-amber-500" },
-        { value: "dark", icon: Moon, label: "Dark", color: "text-slate-400" },
+        { value: "dark", icon: Moon, label: "Dark", color: "text-muted-foreground" },
         {
           value: "system",
           icon: Monitor,

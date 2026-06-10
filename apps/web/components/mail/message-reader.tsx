@@ -544,7 +544,7 @@ function CopyEmailButton({ value }: { value: string }) {
       className={cn(
         "inline-flex items-center justify-center size-4 rounded transition-all shrink-0",
         copied
-          ? "text-green-500"
+          ? "text-success"
           : "text-muted-foreground/30 hover:text-muted-foreground/70",
       )}
     >

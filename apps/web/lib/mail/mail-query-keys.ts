@@ -1,5 +1,8 @@
 export const mailQueryKeys = {
   all: ["mail"] as const,
+  config: () => [...mailQueryKeys.all, "config"] as const,
+  accountStatus: (userId: string) =>
+    [...mailQueryKeys.all, "account-status", userId] as const,
   messages: () => [...mailQueryKeys.all, "messages"] as const,
   mailboxMessages: (mailboxId: string | null) =>
     [...mailQueryKeys.messages(), mailboxId] as const,

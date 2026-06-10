@@ -47,7 +47,7 @@ export function AppearanceSettings({
               value: "dark",
               icon: Moon,
               label: "Dark Theme",
-              color: "text-slate-400",
+              color: "text-muted-foreground",
             },
             {
               value: "system",

@@ -540,17 +540,4 @@ export function createMailRoutes(
     );
 }
 
-let cachedMailRoutes: ReturnType<typeof createMailRoutes> | undefined;
-
-export const mailRoutes: ReturnType<typeof createMailRoutes> = new Proxy(
-  {} as ReturnType<typeof createMailRoutes>,
-  {
-    get(_target, prop, receiver) {
-      cachedMailRoutes ??= createMailRoutes();
-      const value = Reflect.get(cachedMailRoutes, prop, receiver);
-      return typeof value === "function"
-        ? value.bind(cachedMailRoutes)
-        : value;
-    },
-  },
-);
+export const mailRoutes = createMailRoutes();

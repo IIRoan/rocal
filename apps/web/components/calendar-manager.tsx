@@ -235,7 +235,7 @@ export function CalendarManager({
                 });
                 goForward("calendar-create");
               }}
-              className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+              className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus-visible:bg-accent/50 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 transition-colors"
             >
               <Plus className="size-4 text-muted-foreground shrink-0" />
               <span className="text-sm">Create New Calendar</span>
@@ -245,7 +245,7 @@ export function CalendarManager({
             <button
               type="button"
               onClick={() => onGoToSubscriptions()}
-              className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+              className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus-visible:bg-accent/50 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 transition-colors"
             >
               <Globe className="size-4 text-muted-foreground shrink-0" />
               <span className="text-sm">Public & External Feeds</span>
@@ -278,7 +278,7 @@ export function CalendarManager({
                       void loadShareLink(calendar.id);
                       goForward("calendar-edit");
                     }}
-                    className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0 rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                    className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0 rounded-md text-left hover:bg-accent/30 focus-visible:bg-accent/50 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 transition-colors"
                   >
                     <div
                       className="size-3.5 rounded-sm shrink-0"
@@ -342,7 +342,7 @@ export function CalendarManager({
                       <button
                         type="button"
                         onClick={() => onGoToSubscriptions(calendar.id)}
-                        className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0 rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                        className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0 rounded-md text-left hover:bg-accent/30 focus-visible:bg-accent/50 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 transition-colors"
                       >
                         <div
                           className="size-3.5 rounded-sm shrink-0"
@@ -408,7 +408,7 @@ export function CalendarManager({
                       <button
                         type="button"
                         onClick={() => onGoToSubscriptions(calendar.id)}
-                        className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0 rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                        className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0 rounded-md text-left hover:bg-accent/30 focus-visible:bg-accent/50 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 transition-colors"
                       >
                         <div
                           className="size-3.5 rounded-sm shrink-0"
@@ -704,7 +704,7 @@ export function CalendarManager({
                   void handleToggleShareLink(!shareLinkInfo?.enabled);
                 }}
                 disabled={shareLinkLoading}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:bg-accent/50 focus:outline-none disabled:opacity-60"
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus-visible:bg-accent/50 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60"
               >
                 <Link2 className="size-4 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
