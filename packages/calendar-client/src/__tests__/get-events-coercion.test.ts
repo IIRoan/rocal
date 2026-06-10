@@ -72,4 +72,28 @@ describe("CalendarApiService.getEvents", () => {
       service.getEvents(new Date("2026-03-01"), new Date("2026-03-31")),
     ).rejects.toMatchObject({ statusCode: 502 });
   });
+
+  it("throws when an event entry is null", async () => {
+    getMock.mockResolvedValueOnce({
+      events: [null],
+      calendars: [],
+      categories: [],
+    });
+
+    await expect(
+      service.getEvents(new Date("2026-03-01"), new Date("2026-03-31")),
+    ).rejects.toMatchObject({ statusCode: 502 });
+  });
+
+  it("throws when event dates are null", async () => {
+    getMock.mockResolvedValueOnce({
+      events: [{ id: "evt-1", title: "Test", start: null, end: null }],
+      calendars: [],
+      categories: [],
+    });
+
+    await expect(
+      service.getEvents(new Date("2026-03-01"), new Date("2026-03-31")),
+    ).rejects.toMatchObject({ statusCode: 502 });
+  });
 });

@@ -182,9 +182,28 @@ export class CalendarApiService {
       }
 
       const events = response.events.map((event) => {
+        if (!event) {
+          throw {
+            error: "Incomplete Data",
+            message:
+              "Event data appears incomplete. Please try again in a moment.",
+            statusCode: 502,
+            details: { reason: "validation_failed" },
+          };
+        }
+
         const start =
-          event.start instanceof Date ? event.start : new Date(event.start);
-        const end = event.end instanceof Date ? event.end : new Date(event.end);
+          event.start instanceof Date
+            ? event.start
+            : event.start != null
+              ? new Date(event.start)
+              : new Date(NaN);
+        const end =
+          event.end instanceof Date
+            ? event.end
+            : event.end != null
+              ? new Date(event.end)
+              : new Date(NaN);
         if (
           Number.isNaN(start.getTime()) ||
           Number.isNaN(end.getTime())
