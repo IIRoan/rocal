@@ -4,7 +4,10 @@ import { BETTER_AUTH_BASE_PATH } from "../lib/auth-constants";
 import { createLogger } from "@workspace/logger";
 import { prisma } from "../lib/prisma";
 import { env } from "../lib/env";
-import { auth } from "../lib/auth";
+import { requireAuth } from "../lib/auth-guard";
+import type { AuthenticatedUser } from "../lib/auth-utils";
+import { authenticatedRouteDetail } from "../lib/openapi";
+import { resolveRouteUser } from "../lib/request-user";
 import { MailService } from "../services/mail.service";
 import { createStalwartAdminClient } from "../lib/stalwart-admin";
 import {
@@ -335,6 +338,7 @@ export function createMailRoutes(
   const jmapFetch = options.jmapFetch ?? fetch;
   const jmapUpstreamBaseUrl =
     options.jmapUpstreamBaseUrl ?? env.stalwartBaseUrl;
+  const authDetail = authenticatedRouteDetail("Mail");
 
   return new Elysia({
     prefix: "/mail",
@@ -348,94 +352,6 @@ export function createMailRoutes(
           "Returns the public mailbox domain and Stalwart discovery base used by the mail demo.",
       },
     })
-    .get(
-      "/oauth/access-token",
-      async ({ request, set }) => {
-        const session = await auth.api.getSession({ headers: request.headers });
-        const userId = session?.session?.userId;
-        const email = session?.user?.email?.trim();
-        if (!userId || !email) {
-          set.status = 401;
-          return {
-            error: "Unauthorized",
-            message: "A valid session is required to obtain a mail token.",
-            statusCode: 401,
-          };
-        }
-
-        try {
-          return await mailService.issueAccessTokenForUser({
-            userId,
-            email,
-          });
-        } catch (err) {
-          const message =
-            errorMessage(err, "Could not issue mail token.");
-          set.status = 400;
-          return {
-            error: "mail_token_error",
-            message,
-            statusCode: 400,
-          };
-        }
-      },
-      {
-        detail: {
-          tags: ["Mail"],
-          summary: "Exchange session for a mail OAuth access token",
-          description:
-            "Performs a server-side OAuth authorization code flow using the caller's session cookie and returns a JWT access token accepted by the mail server.",
-        },
-      },
-    )
-    .get(
-      "/vault-key-material",
-      async ({ request, set }) => {
-        const session = await auth.api.getSession({ headers: request.headers });
-        if (!session?.session?.userId) {
-          set.status = 401;
-          return {
-            error: "Unauthorized",
-            message: "A valid session is required to obtain vault key material.",
-            statusCode: 401,
-          };
-        }
-        try {
-          const keyMaterial = await deriveVaultKeyMaterial(session.session.userId);
-          // Pre-compute the argon2id output for native clients (Hermes cannot run
-          // argon2id efficiently). Returns null if no vault backup exists yet.
-          let derivedKeyB64: string | null = null;
-          try {
-            derivedKeyB64 = await deriveVaultKeyForNative(session.session.userId, keyMaterial);
-          } catch (derivedErr) {
-            logger.error(
-              "[vault-key-material] deriveVaultKeyForNative failed for userId=%s: %s",
-              session.session.userId,
-              derivedErr instanceof Error ? derivedErr.message : String(derivedErr),
-            );
-          }
-          logger.debug(
-            "[vault-key-material] responding hasDerivedKey=%s for userId=%s",
-            derivedKeyB64 ? "yes" : "no",
-            session.session.userId,
-          );
-          return { keyMaterial, derivedKeyB64, version: "v1" };
-        } catch (err) {
-          const message =
-            errorMessage(err, "Could not derive vault key material.");
-          set.status = 500;
-          return { error: "vault_key_error", message, statusCode: 500 };
-        }
-      },
-      {
-        detail: {
-          tags: ["Mail"],
-          summary: "Get server-derived vault key material",
-          description:
-            "Returns an HMAC-SHA256 derived key material unique to the authenticated user. Used client-side to derive the vault encryption key without a user-typed password.",
-        },
-      },
-    )
     .get(
       "/keys/:email",
       async ({ params }) => mailService.getDirectoryKey(params.email),
@@ -519,7 +435,122 @@ export function createMailRoutes(
             "Forwards nested JMAP download, upload, and event-source requests to Stalwart through the backend proxy.",
         },
       },
+    )
+    .use(
+      requireAuth.guard(authenticatedRouteDetail("Mail"), (app) =>
+        app.get(
+          "/oauth/access-token",
+      async ({
+        authenticatedUser,
+        request,
+        set,
+      }: {
+        authenticatedUser?: AuthenticatedUser;
+        request: Request;
+        set: { status?: number | string };
+      }) => {
+        const user = await resolveRouteUser(authenticatedUser, request);
+        const userId = user.id;
+        const email = user.email?.trim();
+        if (!email) {
+          set.status = 401;
+          return {
+            error: "Unauthorized",
+            message: "A valid session is required to obtain a mail token.",
+            statusCode: 401,
+          };
+        }
+
+        try {
+          return await mailService.issueAccessTokenForUser({
+            userId,
+            email,
+          });
+        } catch (err) {
+          const message = errorMessage(err, "Could not issue mail token.");
+          set.status = 400;
+          return {
+            error: "mail_token_error",
+            message,
+            statusCode: 400,
+          };
+        }
+      },
+      {
+        detail: {
+          ...authDetail.detail,
+          summary: "Exchange session for a mail OAuth access token",
+          description:
+            "Performs a server-side OAuth authorization code flow using the caller's session cookie and returns a JWT access token accepted by the mail server.",
+        },
+      },
+    )
+    .get(
+      "/vault-key-material",
+      async ({
+        authenticatedUser,
+        request,
+        set,
+      }: {
+        authenticatedUser?: AuthenticatedUser;
+        request: Request;
+        set: { status?: number | string };
+      }) => {
+        const user = await resolveRouteUser(authenticatedUser, request);
+        const userId = user.id;
+        try {
+          const keyMaterial = await deriveVaultKeyMaterial(userId);
+          let derivedKeyB64: string | null = null;
+          try {
+            derivedKeyB64 = await deriveVaultKeyForNative(userId, keyMaterial);
+          } catch (derivedErr) {
+            logger.error(
+              "[vault-key-material] deriveVaultKeyForNative failed for userId=%s: %s",
+              userId,
+              derivedErr instanceof Error
+                ? derivedErr.message
+                : String(derivedErr),
+            );
+          }
+          logger.debug(
+            "[vault-key-material] responding hasDerivedKey=%s for userId=%s",
+            derivedKeyB64 ? "yes" : "no",
+            userId,
+          );
+          return { keyMaterial, derivedKeyB64, version: "v1" };
+        } catch (err) {
+          const message = errorMessage(
+            err,
+            "Could not derive vault key material.",
+          );
+          set.status = 500;
+          return { error: "vault_key_error", message, statusCode: 500 };
+        }
+      },
+      {
+        detail: {
+          ...authDetail.detail,
+          summary: "Get server-derived vault key material",
+          description:
+            "Returns an HMAC-SHA256 derived key material unique to the authenticated user. Used client-side to derive the vault encryption key without a user-typed password.",
+        },
+      },
+      ),
+    ),
     );
 }
 
-export const mailRoutes = createMailRoutes();
+let cachedMailRoutes: ReturnType<typeof createMailRoutes> | undefined;
+
+export const mailRoutes: ReturnType<typeof createMailRoutes> = new Proxy(
+  {} as ReturnType<typeof createMailRoutes>,
+  {
+    get(_target, prop, receiver) {
+      cachedMailRoutes ??= createMailRoutes();
+      const value = Reflect.get(cachedMailRoutes, prop, receiver);
+      return typeof value === "function"
+        ? value.bind(cachedMailRoutes)
+        : value;
+    },
+  },
+);

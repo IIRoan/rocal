@@ -5,6 +5,19 @@ jest.mock("../../lib/auth", () => ({
   auth: { api: { getSession: jest.fn() } },
 }));
 
+jest.mock("../../lib/prisma", () => ({
+  prisma: {},
+}));
+
+jest.mock("../../lib/passkey-step-up", () => ({
+  hasVerifiedPasskeyStepUp: jest.fn(() => false),
+  getPasskeyStepUpStatus: jest.fn(async () => ({
+    hasPasskeys: false,
+    isPasskeyStepUpVerified: false,
+    requiresPasskeyStepUp: false,
+  })),
+}));
+
 const mockMailOAuthConfig = {
   issuer: "https://api.solace.test/api/auth",
   discoveryUrl:
@@ -379,6 +392,7 @@ describe("mailRoutes", () => {
         userId: "user-1",
       },
       user: {
+        id: "user-1",
         email: "alice@solace.onl",
       },
     } as never);
@@ -409,6 +423,7 @@ describe("mailRoutes", () => {
         userId: "user-1",
       },
       user: {
+        id: "user-1",
         email: "alice@solace.onl",
       },
     } as never);
