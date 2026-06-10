@@ -38,9 +38,9 @@ const STATUS_LABELS: Record<InviteRecord["status"], string> = {
 };
 
 const STATUS_COLORS: Record<InviteRecord["status"], string> = {
-  pending: "text-amber-500 dark:text-amber-400",
-  claimed: "text-blue-500 dark:text-blue-400",
-  accepted: "text-emerald-500 dark:text-emerald-400",
+  pending: "text-warning",
+  claimed: "text-info",
+  accepted: "text-success",
   revoked: "text-muted-foreground line-through",
 };
 
@@ -106,7 +106,7 @@ function InviteRow({
               title="Copy invite token"
             >
               {copied ? (
-                <Check className="size-3.5 text-emerald-500" />
+                <Check className="size-3.5 text-success" />
               ) : (
                 <Copy className="size-3.5 text-muted-foreground" />
               )}
@@ -248,7 +248,7 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
             <div
               className={`mb-3 rounded-lg px-3 py-2 text-xs ${
                 message.kind === "success"
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                  ? "bg-success/10 text-success border border-success/20"
                   : "bg-destructive/10 text-destructive border border-destructive/20"
               }`}
             >

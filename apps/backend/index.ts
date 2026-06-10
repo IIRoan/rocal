@@ -162,10 +162,7 @@ export const createAPI = (prefix = "") => {
   );
   const localAuthBasePath = getLocalAuthBasePath(prefix);
 
-  // Initialize Calendar sync service
   const calendarSyncService = CalendarSyncService.getInstance();
-  calendarSyncService.start();
-  defaultMailRealtimeService.start();
 
   app
     .onBeforeHandle(async ({ request, set }) => {
@@ -231,6 +228,9 @@ export const createAPI = (prefix = "") => {
         },
       }),
     );
+
+  calendarSyncService.start();
+  defaultMailRealtimeService.start();
 
   return app
     .use(

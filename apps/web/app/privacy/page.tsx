@@ -154,7 +154,7 @@ export default function PrivacyPage() {
                         </td>
                         <td className="px-3 py-2">
                           {noReminder === "yes" ? (
-                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                            <span className="text-success font-medium">
                               Encrypted
                             </span>
                           ) : (
@@ -165,7 +165,7 @@ export default function PrivacyPage() {
                         </td>
                         <td className="px-3 py-2">
                           {withReminder === "yes" ? (
-                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                            <span className="text-success font-medium">
                               Encrypted
                             </span>
                           ) : (
@@ -287,7 +287,7 @@ export default function PrivacyPage() {
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           {status === "yes" && (
-                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                            <span className="text-success font-medium">
                               Yes
                             </span>
                           )}

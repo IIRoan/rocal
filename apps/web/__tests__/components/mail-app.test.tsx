@@ -296,46 +296,30 @@ jest.mock("../../components/mail/attachment-preview-dialog", () => ({
   AttachmentPreviewDialog: () => null,
 }));
 
-jest.mock("../../components/mail/compose-dialog", () => ({
-  ComposeForm: ({
-    composeTo,
-    composeSubject,
-    composeBody,
-    setComposeTo,
-    setComposeSubject,
-    setComposeBody,
+jest.mock("../../components/mail/compose-dialog", () => {
+  const React = require("react");
+  const {
+    useMailCompose,
+    useMailComposeChrome,
+  } = require("../../components/mail/mail-compose-context");
+
+  function ComposeFields({
     onSend,
-  }: any) => (
-    <div>
-      <input
-        placeholder="Recipient"
-        value={composeTo}
-        onChange={(e: any) => setComposeTo(e.target.value)}
-      />
-      <input
-        placeholder="Subject"
-        value={composeSubject}
-        onChange={(e: any) => setComposeSubject(e.target.value)}
-      />
-      <textarea
-        value={composeBody}
-        onChange={(e: any) => setComposeBody(e.target.value)}
-      />
-      <button onClick={() => void onSend()}>Send message</button>
-    </div>
-  ),
-  ComposeDialog: ({
-    open,
     onExpand,
-    composeTo,
-    composeSubject,
-    composeBody,
-    setComposeTo,
-    setComposeSubject,
-    setComposeBody,
-    onSend,
-  }: any) =>
-    open ? (
+  }: {
+    onSend: () => Promise<void>;
+    onExpand?: () => void;
+  }) {
+    const {
+      composeTo,
+      composeSubject,
+      composeBody,
+      setComposeTo,
+      setComposeSubject,
+      setComposeBody,
+    } = useMailCompose();
+
+    return (
       <div>
         <input
           placeholder="Recipient"
@@ -356,8 +340,19 @@ jest.mock("../../components/mail/compose-dialog", () => ({
         ) : null}
         <button onClick={() => void onSend()}>Send message</button>
       </div>
-    ) : null,
-}));
+    );
+  }
+
+  return {
+    ComposeForm: ({ onSend }: any) => <ComposeFields onSend={onSend} />,
+    ComposeDialog: ({ onSend, onExpand }: any) => {
+      const { isComposeOpen } = useMailComposeChrome();
+      return isComposeOpen ? (
+        <ComposeFields onSend={onSend} onExpand={onExpand} />
+      ) : null;
+    },
+  };
+});
 
 jest.mock("../../hooks/use-smooth-router", () => ({
   useSmoothRouter: () => ({
