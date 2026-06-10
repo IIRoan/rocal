@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@workspace/logger", () => ({
   createLogger: () => ({
@@ -9,43 +9,42 @@ jest.mock("@workspace/logger", () => ({
   }),
 }));
 
+jest.mock("../../lib/event-encryption", () => ({
+  backfillEncryptedEventsToCiphertextOnly: jest.fn(async () => 2),
+}));
+
+import { backfillEncryptedEventsToCiphertextOnly } from "../../lib/event-encryption";
 import { CalendarSharingService } from "../../services/calendar-sharing.service";
 
+const mockBackfillEncryptedEventsToCiphertextOnly =
+  backfillEncryptedEventsToCiphertextOnly as jest.MockedFunction<
+    typeof backfillEncryptedEventsToCiphertextOnly
+  >;
+
 describe("CalendarSharingService.disableShareLink", () => {
-  it("re-encrypts share-only hybrid events after disabling sharing", async () => {
+  beforeEach(() => {
+    mockBackfillEncryptedEventsToCiphertextOnly.mockClear();
+  });
+
+  it("disables sharing and re-encrypts shadow-write events", async () => {
     const findFirst = jest.fn<
       () => Promise<{
         id: string;
-        forceFullEncryption: boolean;
         isSyncOnly: boolean;
       } | null>
     >();
     const update = jest.fn<() => Promise<{ id: string }>>();
-    const updateMany = jest.fn<() => Promise<{ count: number }>>();
-    const findUnique =
-      jest.fn<
-        () => Promise<{ eventEncryptionMode: "hybrid" | "full" } | null>
-      >();
 
     findFirst.mockResolvedValueOnce({
       id: "cal-1",
-      forceFullEncryption: false,
       isSyncOnly: false,
     });
     update.mockResolvedValue({ id: "cal-1" });
-    updateMany.mockResolvedValue({ count: 2 });
-    findUnique.mockResolvedValue({ eventEncryptionMode: "hybrid" });
 
     const prisma = {
       calendar: {
         findFirst,
         update,
-      },
-      calendarEvent: {
-        updateMany,
-      },
-      userSettings: {
-        findUnique,
       },
     };
 
@@ -67,208 +66,46 @@ describe("CalendarSharingService.disableShareLink", () => {
         updatedAt: expect.any(Date),
       },
     });
-    expect(prisma.calendarEvent.updateMany).toHaveBeenCalledWith({
-      where: {
+    expect(mockBackfillEncryptedEventsToCiphertextOnly).toHaveBeenCalledWith(
+      prisma,
+      {
         userId: "user-1",
         calendarId: "cal-1",
-        encryptedContent: { not: null },
-        encryptionState: { not: "encrypted" },
-        OR: [{ reminder: null }, { reminder: 0 }],
+        now: expect.any(Date),
       },
-      data: {
-        title: "",
-        description: null,
-        location: null,
-        encryptionState: "encrypted",
-        updatedAt: expect.any(Date),
-      },
-    });
+    );
   });
 
-  it("re-encrypts all encrypted payload rows when full encryption is active", async () => {
+  it("rejects disabling sharing for synced calendars", async () => {
     const findFirst = jest.fn<
       () => Promise<{
         id: string;
-        forceFullEncryption: boolean;
         isSyncOnly: boolean;
       } | null>
     >();
-    const update = jest.fn<() => Promise<{ id: string }>>();
-    const updateMany = jest.fn<() => Promise<{ count: number }>>();
-    const findUnique =
-      jest.fn<
-        () => Promise<{ eventEncryptionMode: "hybrid" | "full" } | null>
-      >();
 
     findFirst.mockResolvedValueOnce({
       id: "cal-1",
-      forceFullEncryption: false,
-      isSyncOnly: false,
+      isSyncOnly: true,
     });
-    update.mockResolvedValue({ id: "cal-1" });
-    updateMany.mockResolvedValue({ count: 3 });
-    findUnique.mockResolvedValue({ eventEncryptionMode: "full" });
 
     const prisma = {
       calendar: {
         findFirst,
-        update,
-      },
-      calendarEvent: {
-        updateMany,
-      },
-      userSettings: {
-        findUnique,
+        update: jest.fn(),
       },
     };
 
     const service = new CalendarSharingService(prisma as never);
 
-    await service.disableShareLink({
-      userId: "user-1",
-      calendarId: "cal-1",
-      baseUrl: "https://example.com",
-    });
-
-    expect(prisma.calendarEvent.updateMany).toHaveBeenCalledWith({
-      where: {
+    await expect(
+      service.disableShareLink({
         userId: "user-1",
         calendarId: "cal-1",
-        encryptedContent: { not: null },
-        encryptionState: { not: "encrypted" },
-      },
-      data: {
-        title: "",
-        description: null,
-        location: null,
-        encryptionState: "encrypted",
-        updatedAt: expect.any(Date),
-      },
-    });
-  });
+        baseUrl: "https://example.com",
+      }),
+    ).rejects.toThrow("Cannot modify sharing for a synced calendar.");
 
-  it("treats missing user settings as hybrid and preserves reminder-backed shadows", async () => {
-    const findFirst = jest.fn<
-      () => Promise<{
-        id: string;
-        forceFullEncryption: boolean;
-        isSyncOnly: boolean;
-      } | null>
-    >();
-    const update = jest.fn<() => Promise<{ id: string }>>();
-    const updateMany = jest.fn<() => Promise<{ count: number }>>();
-    const findUnique =
-      jest.fn<
-        () => Promise<{ eventEncryptionMode: "hybrid" | "full" } | null>
-      >();
-
-    findFirst.mockResolvedValueOnce({
-      id: "cal-1",
-      forceFullEncryption: false,
-      isSyncOnly: false,
-    });
-    update.mockResolvedValue({ id: "cal-1" });
-    updateMany.mockResolvedValue({ count: 1 });
-    findUnique.mockResolvedValue(null);
-
-    const prisma = {
-      calendar: {
-        findFirst,
-        update,
-      },
-      calendarEvent: {
-        updateMany,
-      },
-      userSettings: {
-        findUnique,
-      },
-    };
-
-    const service = new CalendarSharingService(prisma as never);
-
-    await service.disableShareLink({
-      userId: "user-1",
-      calendarId: "cal-1",
-      baseUrl: "https://example.com",
-    });
-
-    expect(prisma.calendarEvent.updateMany).toHaveBeenCalledWith({
-      where: {
-        userId: "user-1",
-        calendarId: "cal-1",
-        encryptedContent: { not: null },
-        encryptionState: { not: "encrypted" },
-        OR: [{ reminder: null }, { reminder: 0 }],
-      },
-      data: {
-        title: "",
-        description: null,
-        location: null,
-        encryptionState: "encrypted",
-        updatedAt: expect.any(Date),
-      },
-    });
-  });
-
-  it("re-encrypts all encrypted payload rows when the calendar forces full encryption", async () => {
-    const findFirst = jest.fn<
-      () => Promise<{
-        id: string;
-        forceFullEncryption: boolean;
-        isSyncOnly: boolean;
-      } | null>
-    >();
-    const update = jest.fn<() => Promise<{ id: string }>>();
-    const updateMany = jest.fn<() => Promise<{ count: number }>>();
-    const findUnique =
-      jest.fn<
-        () => Promise<{ eventEncryptionMode: "hybrid" | "full" } | null>
-      >();
-
-    findFirst.mockResolvedValueOnce({
-      id: "cal-1",
-      forceFullEncryption: true,
-      isSyncOnly: false,
-    });
-    update.mockResolvedValue({ id: "cal-1" });
-    updateMany.mockResolvedValue({ count: 4 });
-    findUnique.mockResolvedValue({ eventEncryptionMode: "hybrid" });
-
-    const prisma = {
-      calendar: {
-        findFirst,
-        update,
-      },
-      calendarEvent: {
-        updateMany,
-      },
-      userSettings: {
-        findUnique,
-      },
-    };
-
-    const service = new CalendarSharingService(prisma as never);
-
-    await service.disableShareLink({
-      userId: "user-1",
-      calendarId: "cal-1",
-      baseUrl: "https://example.com",
-    });
-
-    expect(prisma.calendarEvent.updateMany).toHaveBeenCalledWith({
-      where: {
-        userId: "user-1",
-        calendarId: "cal-1",
-        encryptedContent: { not: null },
-        encryptionState: { not: "encrypted" },
-      },
-      data: {
-        title: "",
-        description: null,
-        location: null,
-        encryptionState: "encrypted",
-        updatedAt: expect.any(Date),
-      },
-    });
+    expect(mockBackfillEncryptedEventsToCiphertextOnly).not.toHaveBeenCalled();
   });
 });
