@@ -229,6 +229,9 @@ export const createAPI = (prefix = "") => {
       }),
     );
 
+  calendarSyncService.start();
+  defaultMailRealtimeService.start();
+
   return app
     .use(
       cors({
@@ -439,11 +442,6 @@ export const createAPI = (prefix = "") => {
     .use(accountPublicRoutes)
     .use(accountRoutes)
     .use(inviteRoutes);
-
-  calendarSyncService.start();
-  defaultMailRealtimeService.start();
-
-  return app;
 };
 
 // Start the server when this file is run directly
