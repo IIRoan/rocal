@@ -26,6 +26,10 @@ import { MobileAppSwitcher } from "@/components/mobile-app-switcher";
 import { MailSidebar } from "./mail-sidebar";
 import { MailCommandPalette } from "./mail-command-palette";
 import { ComposeDialog, ComposeForm } from "./compose-dialog";
+import {
+  MailComposeProvider,
+  useMailComposeChrome,
+} from "./mail-compose-context";
 import { AttachmentPreviewDialog } from "./attachment-preview-dialog";
 import { MessageList } from "./message-list";
 import { MessageReader } from "./message-reader";
@@ -165,6 +169,16 @@ function MobileMailHeader({
 }
 
 export function MailApp() {
+  return (
+    <MailComposeProvider>
+      <MailAppContent />
+    </MailComposeProvider>
+  );
+}
+
+function MailAppContent() {
+  const { isComposeOpen, setIsComposeOpen, isFullCompose, setIsFullCompose } =
+    useMailComposeChrome();
   const {
     session,
     isSessionPending,
@@ -186,22 +200,6 @@ export function MailApp() {
     attachmentPreview,
     selectedMessageSignatureVerificationState,
     selectedMessageDecryptError,
-    composeTo,
-    setComposeTo,
-    composeCc,
-    setComposeCc,
-    composeBcc,
-    setComposeBcc,
-    composeAttachments,
-    setComposeAttachments,
-    composeSubject,
-    setComposeSubject,
-    composeBody,
-    setComposeBody,
-    isComposeOpen,
-    setIsComposeOpen,
-    isFullCompose,
-    setIsFullCompose,
     isPaletteOpen,
     setIsPaletteOpen,
     blockRemoteImages,
@@ -617,18 +615,6 @@ export function MailApp() {
                         await handleSendMessage();
                         setIsFullCompose(false);
                       }}
-                      composeTo={composeTo}
-                      composeCc={composeCc}
-                      composeBcc={composeBcc}
-                      composeSubject={composeSubject}
-                      composeBody={composeBody}
-                      composeAttachments={composeAttachments}
-                      setComposeTo={setComposeTo}
-                      setComposeCc={setComposeCc}
-                      setComposeBcc={setComposeBcc}
-                      setComposeSubject={setComposeSubject}
-                      setComposeBody={setComposeBody}
-                      setComposeAttachments={setComposeAttachments}
                       isBusy={isBusy}
                     />
                   </div>
@@ -670,7 +656,6 @@ export function MailApp() {
       />
 
       <ComposeDialog
-        open={isComposeOpen}
         fromEmail={activeMailbox?.email ?? accountEmail}
         onClose={() => setIsComposeOpen(false)}
         onSend={handleSendMessage}
@@ -678,18 +663,6 @@ export function MailApp() {
           setIsComposeOpen(false);
           setIsFullCompose(true);
         }}
-        composeTo={composeTo}
-        composeCc={composeCc}
-        composeBcc={composeBcc}
-        composeSubject={composeSubject}
-        composeBody={composeBody}
-        composeAttachments={composeAttachments}
-        setComposeTo={setComposeTo}
-        setComposeCc={setComposeCc}
-        setComposeBcc={setComposeBcc}
-        setComposeSubject={setComposeSubject}
-        setComposeBody={setComposeBody}
-        setComposeAttachments={setComposeAttachments}
         isBusy={isBusy}
       />
 
