@@ -1,7 +1,9 @@
 import * as openpgp from "openpgp";
+import { deriveVaultKeyB64 } from "../lib/mail/vault-kdf";
 import type {
   MailDecryptResult,
   MailSignatureVerificationState,
+  MailVaultKdfParams,
 } from "../lib/mail/types";
 
 let activePrivateKey: openpgp.PrivateKey | null = null;
@@ -144,6 +146,14 @@ function clearActiveVault() {
   return { cleared: true };
 }
 
+async function handleDeriveVaultKey(payload: {
+  password: string;
+  kdfParams: MailVaultKdfParams;
+}) {
+  const keyB64 = await deriveVaultKeyB64(payload.password, payload.kdfParams);
+  return { keyB64 };
+}
+
 self.onmessage = async (event: MessageEvent) => {
   const { requestId, type, payload } = event.data as {
     requestId: number;
@@ -172,6 +182,9 @@ self.onmessage = async (event: MessageEvent) => {
         break;
       case "CLEAR_ACTIVE_VAULT":
         result = clearActiveVault();
+        break;
+      case "DERIVE_VAULT_KEY":
+        result = await handleDeriveVaultKey(payload);
         break;
       default:
         throw new Error(`Unknown mail crypto worker command: ${type}`);

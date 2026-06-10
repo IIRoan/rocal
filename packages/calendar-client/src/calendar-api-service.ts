@@ -166,26 +166,23 @@ export class CalendarApiService {
       const startISO = start.toISOString();
       const endISO = end.toISOString();
 
-      const doFetch = async (): Promise<EventsResponse> =>
-        await this.client.get<EventsResponse>(
-          `/api/events?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`,
-          { signal },
-        );
+      const response = await this.client.get<EventsResponse>(
+        `/api/events?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`,
+        { signal },
+      );
 
-      let response = await doFetch();
+      if (!response || !Array.isArray(response.events)) {
+        throw {
+          error: "Incomplete Data",
+          message:
+            "Event data appears incomplete. Please try again in a moment.",
+          statusCode: 502,
+          details: { reason: "validation_failed" },
+        };
+      }
 
-      const isComplete = (res: EventsResponse) => {
-        if (!res || !Array.isArray(res.events)) return false;
-        const datesOk = res.events.every(
-          (e) => e && e.start instanceof Date && e.end instanceof Date,
-        );
-        return datesOk;
-      };
-
-      if (!isComplete(response)) {
-        await new Promise((r) => setTimeout(r, 150));
-        response = await doFetch();
-        if (!isComplete(response)) {
+      const events = response.events.map((event) => {
+        if (!event) {
           throw {
             error: "Incomplete Data",
             message:
@@ -194,11 +191,37 @@ export class CalendarApiService {
             details: { reason: "validation_failed" },
           };
         }
-      }
+
+        const start =
+          event.start instanceof Date
+            ? event.start
+            : event.start != null
+              ? new Date(event.start)
+              : new Date(NaN);
+        const end =
+          event.end instanceof Date
+            ? event.end
+            : event.end != null
+              ? new Date(event.end)
+              : new Date(NaN);
+        if (
+          Number.isNaN(start.getTime()) ||
+          Number.isNaN(end.getTime())
+        ) {
+          throw {
+            error: "Incomplete Data",
+            message:
+              "Event data appears incomplete. Please try again in a moment.",
+            statusCode: 502,
+            details: { reason: "validation_failed" },
+          };
+        }
+        return { ...event, start, end };
+      });
 
       return {
         ...response,
-        events: await this.hydrateEncryptedEvents(response.events),
+        events: await this.hydrateEncryptedEvents(events),
         calendars: response.calendars.map((calendar) =>
           this.normalizeCalendarForUi(calendar),
         ),

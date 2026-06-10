@@ -119,6 +119,31 @@ export function MonthView({
     setIsMounted(true);
   });
 
+  type DayBuckets = {
+    dayEvents: CalendarEvent[];
+    spanningEvents: CalendarEvent[];
+    allEvents: CalendarEvent[];
+    sortedAllDay: CalendarEvent[];
+  };
+
+  const bucketsByDay = useMemo(() => {
+    const map = new Map<string, DayBuckets>();
+    for (const week of weeks) {
+      for (const day of week) {
+        if (!day) continue;
+        const dayEvents = getEventsForDay(events, day);
+        const spanningEvents = getSpanningEventsForDay(events, day);
+        map.set(day.toISOString(), {
+          dayEvents,
+          spanningEvents,
+          allEvents: getAllEventsForDay(events, day),
+          sortedAllDay: sortEvents([...spanningEvents, ...dayEvents]),
+        });
+      }
+    }
+    return map;
+  }, [events, weeks]);
+
   return (
     <div data-slot="month-view" className="contents animate-fade-in">
       <div
@@ -154,12 +179,13 @@ export function MonthView({
             {week.map((day, dayIndex) => {
               if (!day) return null; // Skip if day is undefined
 
-              const dayEvents = getEventsForDay(events, day);
-              const spanningEvents = getSpanningEventsForDay(events, day);
+              const buckets = bucketsByDay.get(day.toISOString());
+              if (!buckets) return null;
+              const { dayEvents, spanningEvents, allEvents, sortedAllDay } =
+                buckets;
               const isCurrentMonth = isSameMonth(day, currentDate);
               const cellId = `month-cell-${day.toISOString()}`;
               const allDayEvents = [...spanningEvents, ...dayEvents];
-              const allEvents = getAllEventsForDay(events, day);
 
               const isReferenceCell = weekIndex === 0 && dayIndex === 0;
               const visibleCount = isMounted
@@ -207,7 +233,7 @@ export function MonthView({
                           : "min-h-[calc((var(--event-height)+var(--event-gap))*2)] sm:min-h-[calc((var(--event-height)+var(--event-gap))*3)] lg:min-h-[calc((var(--event-height)+var(--event-gap))*4)]"
                       }`}
                     >
-                      {sortEvents(allDayEvents).map((event, index) => {
+                      {sortedAllDay.map((event, index) => {
                         const eventStart = new Date(event.start);
                         const eventEnd = new Date(event.end);
                         const isFirstDay = isSameDay(day, eventStart);

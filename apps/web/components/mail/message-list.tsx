@@ -181,6 +181,11 @@ export function MessageList({
     return buildMailConversations([...messages, ...extras]);
   }, [messages, relatedMessages]);
 
+  const primaryIds = useMemo(
+    () => new Set(messages.map((m) => m.id)),
+    [messages],
+  );
+
   if (messages.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
@@ -307,7 +312,6 @@ export function MessageList({
             const isChecked = selectedCount === row.messageIds.length;
             // Only count unread from primary mailbox messages (not sent/related extras)
             // so own sent replies don't inflate the unread counter.
-            const primaryIds = new Set(messages.map((m) => m.id));
             const primaryMessages = row.messages.filter((entry) =>
               primaryIds.has(entry.id),
             );
@@ -342,7 +346,7 @@ export function MessageList({
                       }
                     }}
                     className={cn(
-                      "group/row relative w-full text-left transition-colors cursor-pointer",
+                      "group/row relative w-full text-left transition-colors cursor-pointer [content-visibility:auto] [contain-intrinsic-size:auto_72px]",
                       isMobile ? "py-2 pl-3 pr-2.5" : "py-2.5 pl-[13px] pr-3",
                       "data-[state=open]:bg-muted/60",
                       isChecked

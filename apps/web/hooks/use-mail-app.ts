@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { toast } from "sonner";
 import PostalMime, {
@@ -32,6 +32,8 @@ import {
   mergeMessageIntoMailboxCaches,
   seedMailMessageCache,
 } from "@/lib/mail/mail-message-query";
+import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
+import { getMailComposeBridge } from "@/components/mail/mail-compose-context";
 import {
   classifyMessageEncryption,
   extractMessageBodies,
@@ -567,15 +569,10 @@ export function useMailApp() {
   const router = useSmoothRouter();
   const queryClient = useQueryClient();
 
-  const [config, setConfig] = useState<MailDemoConfig | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [totalMessages, setTotalMessages] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [mailboxStatus, setMailboxStatus] = useState<MailAccountStatus | null>(
-    null,
-  );
-  const [isMailboxStatusLoading, setIsMailboxStatusLoading] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
   const [activeMailbox, setActiveMailbox] = useState<ActiveMailboxState | null>(
     null,
@@ -614,16 +611,6 @@ export function useMailApp() {
   const attachmentHoverPreviewUrlsRef = useRef<Set<string>>(new Set());
   const activeMailboxRef = useRef<ActiveMailboxState | null>(null);
   const hasAttemptedAutoOpenRef = useRef(false);
-  const [composeTo, setComposeTo] = useState("");
-  const [composeCc, setComposeCc] = useState("");
-  const [composeBcc, setComposeBcc] = useState("");
-  const [composeSubject, setComposeSubject] = useState("");
-  const [composeBody, setComposeBody] = useState("");
-  const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
-  const [composeReplyContext, setComposeReplyContext] =
-    useState<MailReplyContext | null>(null);
-  const [isComposeOpen, setIsComposeOpen] = useState(false);
-  const [isFullCompose, setIsFullCompose] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   // Initialised synchronously from sessionStorage; updated async once the
   // encrypted cookie is decrypted (cross-tab / post-refresh case).
@@ -663,6 +650,27 @@ export function useMailApp() {
   const accountEmail = session?.user?.email?.trim().toLowerCase() ?? "";
   const accountDisplayName = session?.user?.name?.trim() ?? "";
   const accountUserId = session?.user?.id?.trim() ?? "";
+
+  const { data: config = null, error: configError } = useQuery({
+    queryKey: mailQueryKeys.config(),
+    queryFn: () => mailDemoApiService.getConfig(),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const accountStatusEnabled = Boolean(accountEmail && accountUserId);
+  const {
+    data: mailboxStatus = null,
+    isLoading: isMailboxStatusLoadingQuery,
+    error: mailboxStatusError,
+  } = useQuery({
+    queryKey: mailQueryKeys.accountStatus(accountUserId || "anon"),
+    queryFn: () => mailDemoApiService.getAccountStatus(),
+    enabled: accountStatusEnabled,
+    staleTime: 60 * 1000,
+  });
+  const isMailboxStatusLoading =
+    isMailboxStatusLoadingQuery && accountStatusEnabled;
+
   const mailboxEmail = mailboxStatus?.email ?? accountEmail;
 
   useEffect(() => {
@@ -703,66 +711,29 @@ export function useMailApp() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Load config
   useEffect(() => {
-    let cancelled = false;
-    void mailDemoApiService
-      .getConfig()
-      .then((nextConfig) => {
-        if (!cancelled) setConfig(nextConfig);
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          log.error("Failed to load mail config", error);
-          toast.error("Could not load the mail configuration.");
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Load mailbox status
-  useEffect(() => {
-    let cancelled = false;
-    if (!accountEmail || !accountUserId) {
-      queueMicrotask(() => {
-        if (cancelled) return;
-        setMailboxStatus(null);
-        setActiveMailbox(null);
-        setIsMailboxStatusLoading(false);
-      });
-      return () => {
-        cancelled = true;
-      };
+    if (configError) {
+      log.error("Failed to load mail config", configError);
+      toast.error("Could not load the mail configuration.");
     }
-    queueMicrotask(() => {
-      if (!cancelled) {
-        setIsMailboxStatusLoading(true);
-      }
-    });
-    void mailDemoApiService
-      .getAccountStatus()
-      .then((status) => {
-        if (cancelled) return;
-        setMailboxStatus(status);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        log.error("Failed to load mailbox status", error);
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Could not load mailbox status.",
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setIsMailboxStatusLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accountEmail, accountUserId]);
+  }, [configError]);
+
+  useEffect(() => {
+    if (mailboxStatusError) {
+      log.error("Failed to load mailbox status", mailboxStatusError);
+      toast.error(
+        mailboxStatusError instanceof Error
+          ? mailboxStatusError.message
+          : "Could not load mailbox status.",
+      );
+    }
+  }, [mailboxStatusError]);
+
+  useEffect(() => {
+    if (!accountStatusEnabled) {
+      queueMicrotask(() => setActiveMailbox(null));
+    }
+  }, [accountStatusEnabled]);
 
   useEffect(() => {
     hasAttemptedAutoOpenRef.current = false;
@@ -1227,11 +1198,14 @@ export function useMailApp() {
             kdfOverrides: vaultKey ? KEY_MATERIAL_KDF : undefined,
           }).then((provisioned) => {
             email = provisioned.email.trim().toLowerCase();
-            setMailboxStatus({
-              email: provisioned.email,
-              displayName: provisioned.displayName,
-              provisioned: true,
-            });
+            queryClient.setQueryData(
+              mailQueryKeys.accountStatus(accountUserId),
+              {
+                email: provisioned.email,
+                displayName: provisioned.displayName,
+                provisioned: true,
+              },
+            );
           });
           // After bootstrap, fetch JMAP + vault backup in parallel
           const [session, remoteBackup, localBackup] = await Promise.all([
@@ -1418,6 +1392,20 @@ export function useMailApp() {
 
   const handleSendMessage = useCallback(async () => {
     if (!activeMailbox) return;
+    const draft = getMailComposeBridge()?.getDraft();
+    if (!draft) {
+      toast.error("Compose is not available.");
+      return;
+    }
+    const {
+      to: composeTo,
+      cc: composeCc,
+      bcc: composeBcc,
+      subject: composeSubject,
+      body: composeBody,
+      attachments: composeAttachments,
+      replyContext: composeReplyContext,
+    } = draft;
     if (!composeTo.trim()) {
       toast.error("Enter a recipient email address.");
       return;
@@ -1511,14 +1499,7 @@ export function useMailApp() {
           }),
         );
       }
-      setComposeTo("");
-      setComposeCc("");
-      setComposeBcc("");
-      setComposeSubject("");
-      setComposeBody("");
-      setComposeAttachments([]);
-      setComposeReplyContext(null);
-      setIsComposeOpen(false);
+      getMailComposeBridge()?.resetDraft();
       toast(encrypted ? "Encrypted message sent." : "Message sent.");
       // Only reload the conversation thread for replies; let realtime sync
       // update the inbox list so the sent draft never briefly flashes there.
@@ -1536,13 +1517,6 @@ export function useMailApp() {
   }, [
     appendConversationMessage,
     activeMailbox,
-    composeTo,
-    composeCc,
-    composeBcc,
-    composeSubject,
-    composeBody,
-    composeAttachments,
-    composeReplyContext,
     config,
     loadConversationThread,
   ]);
@@ -1586,33 +1560,18 @@ export function useMailApp() {
 
   const handleReply = useCallback(() => {
     if (!selectedMessage) return;
-    const sender = selectedMessage.from?.[0]?.email ?? "";
-    const subject = selectedMessage.subject ?? "";
-    const { text } = extractMessageBodies(selectedMessage);
-    const body = selectedMessagePlaintext ?? text ?? "";
-    const date = selectedMessage.receivedAt
-      ? new Date(selectedMessage.receivedAt).toLocaleString()
-      : "";
-    setComposeTo(sender);
-    setComposeSubject(subject.startsWith("Re: ") ? subject : `Re: ${subject}`);
-    setComposeBody(`\n\n---\nOn ${date}, ${sender} wrote:\n${body}`);
-    setComposeReplyContext(buildReplyContext(selectedMessage));
-    setIsComposeOpen(true);
+    getMailComposeBridge()?.seedReply(
+      selectedMessage,
+      selectedMessagePlaintext,
+    );
   }, [selectedMessage, selectedMessagePlaintext]);
 
   const handleForward = useCallback(() => {
     if (!selectedMessage) return;
-    const sender = selectedMessage.from?.[0]?.email ?? "";
-    const subject = selectedMessage.subject ?? "";
-    const { text } = extractMessageBodies(selectedMessage);
-    const body = selectedMessagePlaintext ?? text ?? "";
-    setComposeTo("");
-    setComposeSubject(
-      subject.startsWith("Fwd: ") ? subject : `Fwd: ${subject}`,
+    getMailComposeBridge()?.seedForward(
+      selectedMessage,
+      selectedMessagePlaintext,
     );
-    setComposeBody(`\n\n---\nForwarded message from ${sender}:\n${body}`);
-    setComposeReplyContext(null);
-    setIsComposeOpen(true);
   }, [selectedMessage, selectedMessagePlaintext]);
 
   const handleQuickReply = useCallback(
@@ -2519,22 +2478,6 @@ export function useMailApp() {
     attachmentPreview,
     selectedMessageSignatureVerificationState,
     selectedMessageDecryptError,
-    composeTo,
-    setComposeTo,
-    composeCc,
-    setComposeCc,
-    composeBcc,
-    setComposeBcc,
-    composeAttachments,
-    setComposeAttachments,
-    composeSubject,
-    setComposeSubject,
-    composeBody,
-    setComposeBody,
-    isComposeOpen,
-    setIsComposeOpen,
-    isFullCompose,
-    setIsFullCompose,
     isPaletteOpen,
     setIsPaletteOpen,
     blockRemoteImages,

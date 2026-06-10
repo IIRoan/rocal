@@ -1,9 +1,6 @@
 import { Toaster } from "@workspace/ui/components/ui";
-import {
-  GsapAnimationProvider,
-  ThemeProvider,
-  LoadingProvider,
-} from "@workspace/ui/providers";
+import { ThemeProvider, LoadingProvider } from "@workspace/ui/providers";
+import { GsapAnimationProviderLazy } from "@/components/gsap-provider-lazy";
 import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { solaceDisplay, solaceSans } from "@workspace/ui/lib/fonts";
 import { SettingsProvider } from "@/components/settings-provider";
@@ -64,7 +61,7 @@ export default function RootLayout({
       <body
         className={`${solaceSans.variable} ${solaceDisplay.variable} bg-background font-sans antialiased`}
       >
-        <GsapAnimationProvider />
+        <GsapAnimationProviderLazy />
         <RouteTransitionProvider>
           <MobileRuntimeBridge>
             <LoggerBootstrap />

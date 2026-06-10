@@ -11,7 +11,6 @@ import {
 } from "@workspace/ui/components/ui/dialog";
 
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
-import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
 
 type MailAttachmentPreview =
   | {
@@ -38,19 +37,21 @@ type AttachmentPreviewDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-let pdfWorkerConfigured = false;
 const PDF_DOCUMENT_OPTIONS = {
   isEvalSupported: false,
   enableXfa: false,
 };
 
-function ensurePdfWorker() {
-  if (pdfWorkerConfigured || typeof window === "undefined") {
-    return;
-  }
+let pdfjsModulePromise: Promise<typeof import("pdfjs-dist")> | null = null;
 
-  GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-  pdfWorkerConfigured = true;
+function loadPdfjs() {
+  if (!pdfjsModulePromise) {
+    pdfjsModulePromise = import("pdfjs-dist").then((mod) => {
+      mod.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+      return mod;
+    });
+  }
+  return pdfjsModulePromise;
 }
 
 function PdfPageCanvas({
@@ -143,7 +144,6 @@ export function PdfAttachmentThumbnail({ url }: { url: string }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    ensurePdfWorker();
     const canvas = canvasRef.current;
     if (!canvas) {
       return;
@@ -151,60 +151,72 @@ export function PdfAttachmentThumbnail({ url }: { url: string }) {
 
     let cancelled = false;
     let renderTask: RenderTask | null = null;
-    const loadingTask = getDocument({
-      url,
-      ...PDF_DOCUMENT_OPTIONS,
-    });
+    let loadingTask: {
+      destroy: () => void;
+      promise: Promise<PDFDocumentProxy>;
+    } | null = null;
 
-    void loadingTask.promise
-      .then(async (document) => {
-        if (cancelled) {
-          void document.destroy();
-          return;
-        }
+    void (async () => {
+      const { getDocument } = await loadPdfjs();
+      if (cancelled) {
+        return;
+      }
 
-        const page = await document.getPage(1);
-        const viewport = page.getViewport({ scale: 0.28 });
-        const pixelRatio = window.devicePixelRatio || 1;
-        const context = canvas.getContext("2d");
-        if (!context) {
-          throw new Error("Could not render the PDF thumbnail.");
-        }
-
-        canvas.width = Math.ceil(viewport.width * pixelRatio);
-        canvas.height = Math.ceil(viewport.height * pixelRatio);
-        canvas.style.width = `${viewport.width}px`;
-        canvas.style.height = `${viewport.height}px`;
-        context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-
-        renderTask = page.render({
-          canvas,
-          canvasContext: context,
-          viewport,
-        });
-        await renderTask.promise;
-        await document.destroy();
-      })
-      .catch((thumbnailError) => {
-        if (cancelled) {
-          return;
-        }
-        setError(
-          thumbnailError instanceof Error
-            ? thumbnailError.message
-            : "Could not render this PDF preview.",
-        );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
+      loadingTask = getDocument({
+        url,
+        ...PDF_DOCUMENT_OPTIONS,
       });
+
+      void loadingTask
+        .promise.then(async (document) => {
+          if (cancelled) {
+            void document.destroy();
+            return;
+          }
+
+          const page = await document.getPage(1);
+          const viewport = page.getViewport({ scale: 0.28 });
+          const pixelRatio = window.devicePixelRatio || 1;
+          const context = canvas.getContext("2d");
+          if (!context) {
+            throw new Error("Could not render the PDF thumbnail.");
+          }
+
+          canvas.width = Math.ceil(viewport.width * pixelRatio);
+          canvas.height = Math.ceil(viewport.height * pixelRatio);
+          canvas.style.width = `${viewport.width}px`;
+          canvas.style.height = `${viewport.height}px`;
+          context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+
+          renderTask = page.render({
+            canvas,
+            canvasContext: context,
+            viewport,
+          });
+          await renderTask.promise;
+          await document.destroy();
+        })
+        .catch((thumbnailError) => {
+          if (cancelled) {
+            return;
+          }
+          setError(
+            thumbnailError instanceof Error
+              ? thumbnailError.message
+              : "Could not render this PDF preview.",
+          );
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsLoading(false);
+          }
+        });
+    })();
 
     return () => {
       cancelled = true;
       renderTask?.cancel();
-      void loadingTask.destroy();
+      loadingTask?.destroy();
     };
   }, [url]);
 
@@ -239,14 +251,22 @@ function PdfAttachmentPreview({ preview }: { preview: Extract<MailAttachmentPrev
   const [pdfError, setPdfError] = useState<string | null>(null);
 
   useEffect(() => {
-    ensurePdfWorker();
     let cancelled = false;
-    const loadingTask = getDocument({
-      url: preview.url,
-      ...PDF_DOCUMENT_OPTIONS,
-    });
+    let loadingTask: { destroy: () => void; promise: Promise<PDFDocumentProxy> } | null =
+      null;
 
-    void loadingTask.promise
+    void (async () => {
+      const { getDocument } = await loadPdfjs();
+      if (cancelled) {
+        return;
+      }
+
+      loadingTask = getDocument({
+        url: preview.url,
+        ...PDF_DOCUMENT_OPTIONS,
+      });
+
+      void loadingTask.promise
       .then((document) => {
         if (cancelled) {
           void document.destroy();
@@ -270,10 +290,11 @@ function PdfAttachmentPreview({ preview }: { preview: Extract<MailAttachmentPrev
           setIsLoadingDocument(false);
         }
       });
+    })();
 
     return () => {
       cancelled = true;
-      void loadingTask.destroy();
+      loadingTask?.destroy();
     };
   }, [preview.url]);
 
