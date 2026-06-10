@@ -43,6 +43,10 @@ function getInviteUnavailableReason(invite: {
     return "This invite has already been used.";
   }
 
+  if (invite.status === "claimed") {
+    return "This invite has already been claimed.";
+  }
+
   if (isInviteExpired(invite)) {
     return "This invite has expired.";
   }
@@ -256,14 +260,21 @@ export class InviteService implements IInviteService {
       };
     }
 
-    await this.prisma.invite.update({
-      where: { id: invite.id },
+    const result = await this.prisma.invite.updateMany({
+      where: { id: invite.id, status: "pending" },
       data: {
         status: "claimed",
         claimedForEmail: chosenEmail,
         claimedAt: new Date(),
       },
     });
+
+    if (result.count === 0) {
+      return {
+        success: false,
+        reason: "This invite is no longer available.",
+      };
+    }
 
     logger.info("Invite claimed", { inviteId: invite.id, chosenEmail });
 
