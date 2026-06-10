@@ -486,7 +486,7 @@ export function SubscriptionManagement({
         return (
           <Badge
             variant="secondary"
-            className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-[10px] px-1.5 py-0"
+            className="bg-success/15 text-success text-[10px] px-1.5 py-0"
           >
             Synced
           </Badge>
