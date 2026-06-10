@@ -12,7 +12,7 @@ module.exports = {
   },
   // Allow babel-jest to transform ESM-only packages inside node_modules
   transformIgnorePatterns: [
-    "/node_modules/(?!@noble/(?:hashes|curves|ciphers)/)",
+    "/node_modules/(?!(@noble/|.*/@noble/)(?:hashes|curves|ciphers)/)",
   ],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   moduleNameMapper: {

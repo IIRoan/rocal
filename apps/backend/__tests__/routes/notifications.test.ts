@@ -438,10 +438,10 @@ describe("notificationsRoutes", () => {
     });
     expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
       where: { id: "event-1" },
-      data: expect.objectContaining({
+      data: {
         reminder: 10,
-        encryptionState: "shadow_write",
-      }),
+        updatedAt: expect.any(Date),
+      },
     });
     expect(mockPrisma.eventNotification.createMany).toHaveBeenCalledTimes(1);
     expect(mockPrisma.eventNotification.createMany).toHaveBeenCalledWith({
@@ -533,11 +533,10 @@ describe("notificationsRoutes", () => {
     expect(deleteResponse.status).toBe(200);
     expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
       where: { id: "event-1" },
-      data: expect.objectContaining({
+      data: {
         reminder: null,
-        encryptionState: "encrypted",
-        title: "",
-      }),
+        updatedAt: expect.any(Date),
+      },
     });
     await expect(deleteResponse.json()).resolves.toEqual({
       success: true,
@@ -563,7 +562,8 @@ describe("notificationsRoutes", () => {
     });
   });
 
-  it("rejects hybrid reminder updates for fully encrypted events without plaintext", async () => {
+  it("updates the reminder field on fully encrypted events", async () => {
+    jest.useFakeTimers().setSystemTime(new Date("2024-02-01T12:00:00.000Z"));
     mockPrisma.calendarEvent.findFirst.mockResolvedValue(
       eventFixture({
         title: "",
@@ -572,6 +572,11 @@ describe("notificationsRoutes", () => {
         encryptionState: "encrypted",
       }),
     );
+    mockBuildNotificationSchedule.mockReturnValue({
+      notificationTime: new Date("2024-02-01T12:15:00.000Z"),
+      notificationDateLocal: "2024-02-01T12:15:00",
+      notificationTimezone: "UTC",
+    });
 
     const response = await createApp().handle(
       new Request("http://localhost/notifications/event/event-encrypted", {
@@ -589,10 +594,14 @@ describe("notificationsRoutes", () => {
       }),
     );
 
-    expect(response.status).toBe(500);
-    await expect(response.text()).resolves.toBe(
-      "This event is stored as ciphertext only, so the server can't attach reminder details to it. Open the event in a signed-in client and save it again to switch it to hybrid encryption before enabling email reminders.",
-    );
+    expect(response.status).toBe(200);
+    expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
+      where: { id: "event-1" },
+      data: {
+        reminder: 15,
+        updatedAt: expect.any(Date),
+      },
+    });
   });
 
   it("allows reminders on encrypted events when the calendar forces full encryption", async () => {
@@ -630,13 +639,10 @@ describe("notificationsRoutes", () => {
     expect(response.status).toBe(200);
     expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
       where: { id: "event-1" },
-      data: expect.objectContaining({
+      data: {
         reminder: 15,
-        encryptionState: "encrypted",
-        title: "",
-        description: null,
-        location: null,
-      }),
+        updatedAt: expect.any(Date),
+      },
     });
   });
 
