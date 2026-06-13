@@ -2,6 +2,18 @@
 builder = "RAILPACK"
 rootDirectory = "."
 buildCommand = "bun install && bun run build:backend"
+# Monorepo watch paths (repo-root relative). Deploy when backend code or its
+# workspace dependencies change; skip unrelated apps (web, native, notifications).
+watchPatterns = [
+  "apps/backend/**",
+  "packages/calendar-core/**",
+  "packages/calendar-ics/**",
+  "packages/logger/**",
+  "packages/runtime/**",
+  "packages/typescript-config/**",
+  "bun.lock",
+  "package.json",
+]
 
 [deploy]
 restartPolicyType = "ON_FAILURE"
