@@ -1,4 +1,4 @@
-import type { PrismaClient } from "../generated/prisma/index.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/index.js";
 import type {
   INotificationService,
   NotificationConfigInput,
@@ -17,10 +17,11 @@ export class NotificationService implements INotificationService {
   constructor(private readonly prisma: PrismaClient) {}
 
   private async reconcileEventReminderField(
+    tx: PrismaClient | Prisma.TransactionClient,
     eventId: string,
     reminderMinutes: number | null,
   ): Promise<void> {
-    await this.prisma.calendarEvent.update({
+    await tx.calendarEvent.update({
       where: { id: eventId },
       data: {
         reminder: reminderMinutes,
@@ -185,10 +186,6 @@ export class NotificationService implements INotificationService {
           )
         : null;
 
-    await this.reconcileEventReminderField(event.id, reminderMinutes);
-
-    await this.prisma.eventNotification.deleteMany({ where: { eventId } });
-
     const createdNotifications: Array<{
       id: string;
       notificationType: string;
@@ -221,27 +218,8 @@ export class NotificationService implements INotificationService {
     const createdAt = now;
     const eventIsInPast = event.start <= now;
 
-    if (eventIsInPast) {
-      return {
-        success: true,
-        message: "Event is in the past; notifications skipped",
-        data: {
-          eventId,
-          created: 0,
-          skipped: notifications.length,
-          details: {
-            createdNotifications: [],
-            skippedConfigurations: notifications.map((n) => ({
-              notificationType: n.notificationType,
-              minutesBefore: n.minutesBefore,
-              reason: "event_in_past",
-            })),
-          },
-        },
-      };
-    }
-
-    for (const config of notifications) {
+    if (!eventIsInPast) {
+      for (const config of notifications) {
       if (!config.isEnabled) {
         skippedConfigurations.push({
           notificationType: config.notificationType,
@@ -288,12 +266,37 @@ export class NotificationService implements INotificationService {
         notificationTimezone: schedule.notificationTimezone,
         isEnabled: true,
       });
+      }
     }
 
-    if (notificationsToCreate.length > 0) {
-      await this.prisma.eventNotification.createMany({
-        data: notificationsToCreate,
-      });
+    await this.prisma.$transaction(async (tx) => {
+      await this.reconcileEventReminderField(tx, event.id, reminderMinutes);
+      await tx.eventNotification.deleteMany({ where: { eventId } });
+      if (notificationsToCreate.length > 0) {
+        await tx.eventNotification.createMany({
+          data: notificationsToCreate,
+        });
+      }
+    });
+
+    if (eventIsInPast) {
+      return {
+        success: true,
+        message: "Event is in the past; notifications skipped",
+        data: {
+          eventId,
+          created: 0,
+          skipped: notifications.length,
+          details: {
+            createdNotifications: [],
+            skippedConfigurations: notifications.map((n) => ({
+              notificationType: n.notificationType,
+              minutesBefore: n.minutesBefore,
+              reason: "event_in_past",
+            })),
+          },
+        },
+      };
     }
 
     return {
@@ -333,11 +336,13 @@ export class NotificationService implements INotificationService {
       };
     }
 
-    const deleteResult = await this.prisma.eventNotification.deleteMany({
-      where: { eventId },
+    const deleteResult = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.eventNotification.deleteMany({
+        where: { eventId },
+      });
+      await this.reconcileEventReminderField(tx, event.id, null);
+      return result;
     });
-
-    await this.reconcileEventReminderField(event.id, null);
 
     return {
       success: true,

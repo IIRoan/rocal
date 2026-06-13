@@ -55,6 +55,9 @@ function createHarness(
       createMany: jest.fn<() => Promise<{ count: number }>>(),
     },
     $executeRaw: jest.fn(async (): Promise<number> => 1),
+    $transaction: jest.fn(async (callback: (tx: typeof prisma) => Promise<unknown>) =>
+      callback(prisma),
+    ),
   };
 
   prisma.calendarEvent.findFirst.mockResolvedValue(
@@ -102,6 +105,7 @@ describe("NotificationService reminder field updates", () => {
         reminder: 10,
       }),
     });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it("uses the earliest remaining reminder when multiple email reminders are enabled", async () => {
@@ -137,6 +141,7 @@ describe("NotificationService reminder field updates", () => {
         expect.objectContaining({ minutesBefore: 60 }),
       ]),
     });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it("clears the reminder field when only non-email notifications remain", async () => {
@@ -200,5 +205,30 @@ describe("NotificationService reminder field updates", () => {
         reminder: null,
       }),
     });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("wraps setForEvent writes in a prisma transaction", async () => {
+    const { prisma, service } = createHarness();
+
+    await service.setForEvent("user-1", "event-1", [
+      {
+        notificationType: "email",
+        minutesBefore: 15,
+        isEnabled: true,
+      },
+    ]);
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it("wraps deleteForEvent writes in a prisma transaction", async () => {
+    const { prisma, service } = createHarness();
+
+    await service.deleteForEvent("user-1", "event-1");
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
   });
 });
