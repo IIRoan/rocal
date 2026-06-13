@@ -23,6 +23,11 @@ jest.mock("../../lib/prisma", () => ({
     },
     $queryRaw: jest.fn(async (): Promise<any> => []),
     $executeRaw: jest.fn(async (): Promise<any> => 1),
+    $transaction: jest.fn(async (callback: (tx: any) => Promise<any>) =>
+      callback(
+        (jest.requireMock("../../lib/prisma") as { prisma: any }).prisma,
+      ),
+    ),
   },
 }));
 
@@ -92,6 +97,9 @@ const mockPrisma = prisma as unknown as {
   };
   $queryRaw: jest.Mock<() => Promise<any>>;
   $executeRaw: jest.Mock<() => Promise<any>>;
+  $transaction: jest.Mock<
+    (callback: (tx: unknown) => Promise<unknown>) => Promise<unknown>
+  >;
 };
 const mockBuildNotificationSchedule =
   NotificationCalculator.buildNotificationSchedule as jest.Mock;
