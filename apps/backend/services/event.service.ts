@@ -70,6 +70,7 @@ const INITIALIZED_USER_CACHE_LIMIT = 5000;
 
 export class EventService implements IEventService {
   private readonly initializedUsers = new Set<string>();
+  private stalwartListSyncInFlight = new Map<string, Promise<void>>();
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -172,6 +173,25 @@ export class EventService implements IEventService {
     });
 
     return remote.id;
+  }
+
+  private scheduleStalwartEventsSync(input: {
+    userId: string;
+    accountId: string;
+    startDate: Date;
+    endDate: Date;
+  }): void {
+    if (this.stalwartListSyncInFlight.has(input.userId)) {
+      return;
+    }
+
+    const syncPromise = this.syncStalwartEvents(input)
+      .catch(logger.error)
+      .finally(() => {
+        this.stalwartListSyncInFlight.delete(input.userId);
+      });
+
+    this.stalwartListSyncInFlight.set(input.userId, syncPromise);
   }
 
   private async syncStalwartEvents(input: {
@@ -713,7 +733,7 @@ export class EventService implements IEventService {
 
     const stalwartAccountId = await this.getStalwartAccountId(userId);
     if (stalwartAccountId) {
-      await this.syncStalwartEvents({
+      this.scheduleStalwartEventsSync({
         userId,
         accountId: stalwartAccountId,
         startDate,
