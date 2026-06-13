@@ -289,6 +289,66 @@ describe("EventService.list", () => {
       }),
     ]);
   });
+
+  it("does not await Stalwart sync before listing events", async () => {
+    let releaseSync!: () => void;
+    const syncBlocked = new Promise<void>((resolve) => {
+      releaseSync = resolve;
+    });
+
+    const stalwartClient = createMockStalwartClient();
+    stalwartClient.queryEventIds.mockImplementation(
+      async () => {
+        await syncBlocked;
+        return [];
+      },
+    );
+
+    const findMany = jest
+      .fn()
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never);
+
+    const prisma = {
+      userSettings: {
+        findUnique: jest.fn(async () => ({ timezone: "UTC" })),
+      },
+      mailDirectoryEntry: {
+        findUnique: jest.fn(async () => ({ stalwartAccountId: "acct-1" })),
+      },
+      calendarEvent: {
+        findMany,
+      },
+      eventCategory: {
+        findMany: jest.fn(async () => []),
+      },
+      calendar: {
+        findMany: jest.fn(async () => [calendarFixture()]),
+      },
+    };
+
+    const service = new EventService(prisma as never, undefined, stalwartClient);
+
+    const listPromise = service.list({
+      userId: "user-1",
+      start: "2026-05-26T00:00:00.000Z",
+      end: "2026-05-27T00:00:00.000Z",
+    });
+
+    const winner = await Promise.race([
+      listPromise.then(() => "list-done" as const),
+      syncBlocked.then(() => "sync-done" as const),
+    ]);
+
+    expect(winner).toBe("list-done");
+    expect(findMany).toHaveBeenCalled();
+    expect(stalwartClient.queryEventIds).toHaveBeenCalled();
+
+    releaseSync();
+    await listPromise;
+    await new Promise((resolve) => setImmediate(resolve));
+  });
 });
 
 describe("EventService Stalwart integration", () => {
