@@ -50,6 +50,7 @@ import { useLabels } from "../../../src/lib/mail/use-labels";
 import {
   getMailboxIcon,
   getPrimaryMailboxId,
+  isDraftMessage,
 } from "../../../src/lib/mail/mail-helpers";
 import { layoutListSeparator } from "../../../src/lib/app-layout";
 import { buildMailConversations } from "../../../src/lib/mail/conversation-thread";
@@ -112,11 +113,18 @@ export default function MailScreen() {
       ? companionMailboxId
       : null,
   );
-  const mailboxMessages = messagesQuery.data?.messages ?? [];
+  const mailboxMessages = useMemo(
+    () => messagesQuery.data?.pages.flatMap((page) => page.messages) ?? [],
+    [messagesQuery.data?.pages],
+  );
+  const totalMailboxMessages =
+    messagesQuery.data?.pages[0]?.total ?? mailboxMessages.length;
   const companionMessages = useMemo(() => {
     if (!companionMailboxId) return [];
-    return companionMessagesQuery.data?.messages ?? [];
-  }, [companionMailboxId, companionMessagesQuery.data?.messages]);
+    return (
+      companionMessagesQuery.data?.pages.flatMap((page) => page.messages) ?? []
+    );
+  }, [companionMailboxId, companionMessagesQuery.data?.pages]);
 
   const allowedMailboxIds = useMemo(
     () =>
@@ -228,9 +236,16 @@ export default function MailScreen() {
 
   const handleOpenMessage = useCallback(
     (message: JmapEmailMessage) => {
+      const mailboxes = runtime?.mailboxes ?? [];
+      if (isDraftMessage(message, selectedMailboxId, mailboxes)) {
+        router.push(
+          `/(tabs)/mail/compose?mode=draft&messageId=${message.id}` as never,
+        );
+        return;
+      }
       router.push(`/(tabs)/mail/message/${message.id}` as never);
     },
-    [router],
+    [router, runtime?.mailboxes, selectedMailboxId],
   );
 
   const toggleThreadSelection = useCallback((messageIds: string[]) => {
@@ -530,14 +545,29 @@ export default function MailScreen() {
   );
 
   const listFooter = useMemo(
-    () =>
-      showMailChrome ? (
-        <MailListAnimatedFooter
-          composePadding={composeListPadding}
-          bulkPadding={bulkListPadding}
-        />
-      ) : null,
-    [showMailChrome, composeListPadding, bulkListPadding],
+    () => (
+      <>
+        {messagesQuery.isFetchingNextPage ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color={theme.colors.primaryBase} />
+          </View>
+        ) : null}
+        {showMailChrome ? (
+          <MailListAnimatedFooter
+            composePadding={composeListPadding}
+            bulkPadding={bulkListPadding}
+          />
+        ) : null}
+      </>
+    ),
+    [
+      showMailChrome,
+      composeListPadding,
+      bulkListPadding,
+      messagesQuery.isFetchingNextPage,
+      styles.centered,
+      theme.colors.primaryBase,
+    ],
   );
 
   const handleSelectAll = useCallback(() => {
@@ -613,11 +643,24 @@ export default function MailScreen() {
               extraData={listExtraData}
               renderItem={renderItem}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
-              refreshing={messagesQuery.isFetching && !messagesQuery.isLoading}
+              refreshing={
+                messagesQuery.isFetching &&
+                !messagesQuery.isLoading &&
+                !messagesQuery.isFetchingNextPage
+              }
               onRefresh={() => {
                 void messagesQuery.refetch();
                 void companionMessagesQuery.refetch();
               }}
+              onEndReached={() => {
+                if (
+                  messagesQuery.hasNextPage &&
+                  !messagesQuery.isFetchingNextPage
+                ) {
+                  void messagesQuery.fetchNextPage();
+                }
+              }}
+              onEndReachedThreshold={0.4}
               contentContainerStyle={
                 threadRows.length === 0 ? styles.emptyListContent : undefined
               }

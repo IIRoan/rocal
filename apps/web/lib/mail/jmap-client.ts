@@ -18,6 +18,7 @@ type JmapClientBearerAuthInput = {
   baseUrl: string;
   accessToken?: string;
   getAccessToken?: (() => Promise<string> | string) | undefined;
+  onUnauthorized?: () => void | Promise<void>;
   fetcher?: Fetcher;
 };
 
@@ -113,19 +114,80 @@ const EMAIL_GET_PROPERTIES = [
   "attachments",
 ] as const;
 
+function buildMessageBodyStructure(input: {
+  attachments?: JmapAttachmentInput[];
+  htmlBody?: string;
+}): Record<string, unknown> {
+  const textPart = { type: "text/plain", partId: "text" };
+  const contentPart: Record<string, unknown> = input.htmlBody
+    ? {
+        type: "multipart/alternative",
+        subParts: [textPart, { type: "text/html", partId: "html" }],
+      }
+    : textPart;
+
+  const hasAttachments = (input.attachments?.length ?? 0) > 0;
+  if (!hasAttachments) {
+    return contentPart;
+  }
+
+  return {
+    type: "multipart/mixed",
+    subParts: [
+      contentPart,
+      ...(input.attachments ?? []).map((attachment) => ({
+        type: attachment.type,
+        blobId: attachment.blobId,
+        name: attachment.name,
+        size: attachment.size,
+        disposition: "attachment",
+      })),
+    ],
+  };
+}
+
+function buildMessageBodyValues(input: {
+  textBody: string;
+  htmlBody?: string;
+}): Record<string, { value: string }> {
+  if (input.htmlBody) {
+    return {
+      text: { value: input.textBody },
+      html: { value: input.htmlBody },
+    };
+  }
+  return { text: { value: input.textBody } };
+}
+
+function buildFromHeader(
+  fromEmail: string,
+  fromName?: string | null,
+): Array<{ email: string; name?: string }> {
+  const trimmedName = fromName?.trim();
+  return [
+    {
+      email: fromEmail,
+      ...(trimmedName ? { name: trimmedName } : {}),
+    },
+  ];
+}
+
 export function buildSendMessageMethodCalls(input: {
   draftsMailboxId: string;
   sentMailboxId?: string | null;
   fromEmail: string;
+  fromName?: string | null;
   to: string[];
   cc?: string[];
   bcc?: string[];
   subject: string;
   textBody: string;
+  htmlBody?: string;
   identityId: string;
   attachments?: JmapAttachmentInput[];
   inReplyTo?: string[];
   references?: string[];
+  previousDraftId?: string;
 }): JmapMethodCall[] {
   const submissionParams: Record<string, unknown> = {
     create: {
@@ -146,68 +208,95 @@ export function buildSendMessageMethodCalls(input: {
     };
   }
 
-  const hasAttachments = (input.attachments?.length ?? 0) > 0;
+  const emailSetArgs: Record<string, unknown> = {
+    create: {
+      draft1: {
+        mailboxIds: {
+          [input.draftsMailboxId]: true,
+        },
+        ...(input.inReplyTo?.length ? { inReplyTo: input.inReplyTo } : {}),
+        ...(input.references?.length ? { references: input.references } : {}),
+        from: buildFromHeader(input.fromEmail, input.fromName),
+        to: input.to.map((email) => ({ email })),
+        ...(input.cc?.length
+          ? { cc: input.cc.map((email) => ({ email })) }
+          : {}),
+        ...(input.bcc?.length
+          ? { bcc: input.bcc.map((email) => ({ email })) }
+          : {}),
+        subject: input.subject,
+        bodyStructure: buildMessageBodyStructure(input),
+        bodyValues: buildMessageBodyValues(input),
+      },
+    },
+  };
 
-  const bodyStructure: Record<string, unknown> = hasAttachments
-    ? {
-        type: "multipart/mixed",
-        subParts: [
-          { type: "text/plain", partId: "text" },
-          ...(input.attachments ?? []).map((a) => ({
-            type: a.type,
-            blobId: a.blobId,
-            name: a.name,
-            size: a.size,
-            disposition: "attachment",
-          })),
-        ],
-      }
-    : { type: "text/plain", partId: "text" };
+  if (input.previousDraftId) {
+    emailSetArgs.destroy = [input.previousDraftId];
+  }
 
   return [
-    [
-      "Email/set",
-      {
-        create: {
-          draft1: {
-            mailboxIds: {
-              [input.draftsMailboxId]: true,
-            },
-            ...(input.inReplyTo?.length ? { inReplyTo: input.inReplyTo } : {}),
-            ...(input.references?.length
-              ? { references: input.references }
-              : {}),
-            from: [{ email: input.fromEmail }],
-            to: input.to.map((email) => ({ email })),
-            ...(input.cc?.length ? { cc: input.cc.map((email) => ({ email })) } : {}),
-            ...(input.bcc?.length ? { bcc: input.bcc.map((email) => ({ email })) } : {}),
-            subject: input.subject,
-            bodyStructure,
-            bodyValues: {
-              text: {
-                value: input.textBody,
-              },
-            },
-          },
-        },
-      },
-      "c1",
-    ],
+    ["Email/set", emailSetArgs, "c1"],
     ["EmailSubmission/set", submissionParams, "c2"],
   ];
+}
+
+export function buildDraftMethodCalls(input: {
+  draftsMailboxId: string;
+  fromEmail: string;
+  fromName?: string | null;
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  textBody: string;
+  htmlBody?: string;
+  attachments?: JmapAttachmentInput[];
+  previousDraftId?: string;
+}): JmapMethodCall[] {
+  const emailSetArgs: Record<string, unknown> = {
+    create: {
+      draft1: {
+        mailboxIds: {
+          [input.draftsMailboxId]: true,
+        },
+        keywords: { $draft: true },
+        from: buildFromHeader(input.fromEmail, input.fromName),
+        to: input.to.map((email) => ({ email })),
+        ...(input.cc?.length
+          ? { cc: input.cc.map((email) => ({ email })) }
+          : {}),
+        ...(input.bcc?.length
+          ? { bcc: input.bcc.map((email) => ({ email })) }
+          : {}),
+        subject: input.subject,
+        bodyStructure: buildMessageBodyStructure(input),
+        bodyValues: buildMessageBodyValues(input),
+      },
+    },
+  };
+
+  if (input.previousDraftId) {
+    emailSetArgs.destroy = [input.previousDraftId];
+  }
+
+  return [["Email/set", emailSetArgs, "c1"]];
 }
 
 export class StalwartJmapClient {
   private readonly baseUrl: string;
   private readonly accessTokenProvider?: () => Promise<string> | string;
+  private readonly onUnauthorized?: () => void | Promise<void>;
   private readonly fetcher: Fetcher;
 
   constructor({
     baseUrl,
     fetcher = defaultFetcher,
+    onUnauthorized,
     ...auth
   }: JmapClientBearerAuthInput) {
     this.baseUrl = normalizeBaseUrl(baseUrl);
+    this.onUnauthorized = onUnauthorized;
 
     const accessTokenProvider =
       auth.getAccessToken ||
@@ -233,6 +322,12 @@ export class StalwartJmapClient {
   }
 
   async discoverSession(): Promise<JmapSession> {
+    return this.discoverSessionWithRetry(true);
+  }
+
+  private async discoverSessionWithRetry(
+    allowRetry: boolean,
+  ): Promise<JmapSession> {
     const authorization = await this.getAuthorizationHeader();
     const response = await this.fetcher(`${this.baseUrl}/.well-known/jmap`, {
       method: "GET",
@@ -241,6 +336,11 @@ export class StalwartJmapClient {
       },
       redirect: "follow",
     });
+
+    if (response.status === 401 && allowRetry) {
+      await this.onUnauthorized?.();
+      return this.discoverSessionWithRetry(false);
+    }
 
     if (!response.ok) {
       let detail = "";
@@ -320,7 +420,7 @@ export class StalwartJmapClient {
           "Identity/get",
           {
             accountId,
-            properties: ["id", "email", "name"],
+            properties: ["id", "email", "name", "textSignature", "htmlSignature"],
           },
           "c1",
         ],
@@ -640,17 +740,25 @@ export class StalwartJmapClient {
       draftsMailboxId: string;
       sentMailboxId: string | null;
       fromEmail: string;
+      fromName?: string | null;
       to: string[];
       cc?: string[];
       bcc?: string[];
       subject: string;
       textBody: string;
+      htmlBody?: string;
       identityId: string;
       attachments?: JmapAttachmentInput[];
       inReplyTo?: string[];
       references?: string[];
+      previousDraftId?: string;
     },
   ): Promise<{ emailId: string; threadId: string | null }> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const calls = buildSendMessageMethodCalls(input).map(
+      ([method, params, id]) =>
+        [method, { ...params, accountId }, id] as JmapMethodCall,
+    );
     const envelope = await this.call(
       session,
       [
@@ -658,7 +766,7 @@ export class StalwartJmapClient {
         "urn:ietf:params:jmap:mail",
         "urn:ietf:params:jmap:submission",
       ],
-      buildSendMessageMethodCalls(input),
+      calls,
     );
     const setResult = this.getMethodResult<{
       created?: Record<string, { id?: string; threadId?: string } | null>;
@@ -668,6 +776,50 @@ export class StalwartJmapClient {
       emailId: created?.id ?? "",
       threadId: created?.threadId ?? null,
     };
+  }
+
+  async saveDraft(
+    session: JmapSession,
+    input: {
+      draftsMailboxId: string;
+      fromEmail: string;
+      fromName?: string | null;
+      to: string[];
+      cc?: string[];
+      bcc?: string[];
+      subject: string;
+      textBody: string;
+      htmlBody?: string;
+      attachments?: JmapAttachmentInput[];
+      previousDraftId?: string;
+    },
+  ): Promise<string> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const calls = buildDraftMethodCalls(input).map(([method, params, id]) => [
+      method,
+      { ...params, accountId },
+      id,
+    ]) as JmapMethodCall[];
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      calls,
+    );
+    const setResult = this.getMethodResult<{
+      created?: Record<string, { id?: string } | null>;
+      notCreated?: Record<string, { description?: string }>;
+    }>(envelope, "Email/set");
+    const notCreated = setResult.notCreated
+      ? Object.values(setResult.notCreated)[0]
+      : null;
+    if (notCreated) {
+      throw new Error(notCreated.description ?? "Failed to save draft.");
+    }
+    const created = setResult.created?.draft1;
+    if (!created?.id) {
+      throw new Error("Failed to save draft.");
+    }
+    return created.id;
   }
 
   async moveToTrash(
@@ -1001,6 +1153,7 @@ export class StalwartJmapClient {
     session: JmapSession,
     using: string[],
     methodCalls: JmapMethodCall[],
+    allowRetry = true,
   ): Promise<JmapEnvelope> {
     const authorization = await this.getAuthorizationHeader();
     const response = await this.fetcher(session.apiUrl, {
@@ -1015,7 +1168,17 @@ export class StalwartJmapClient {
       }),
     });
 
+    if (response.status === 401 && allowRetry) {
+      await this.onUnauthorized?.();
+      return this.call(session, using, methodCalls, false);
+    }
+
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error(
+          "Mail sign-in expired or was rejected by the mail server.",
+        );
+      }
       throw new Error(`JMAP request failed with status ${response.status}.`);
     }
 

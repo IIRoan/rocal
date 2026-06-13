@@ -498,6 +498,99 @@ describe("StalwartAdminClient", () => {
     ]);
   });
 
+  it("reuses and updates an existing public key when Stalwart rejects create", async () => {
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [
+          [
+            "x:PublicKey/set",
+            {
+              notCreated: {
+                pk1: {
+                  type: "primaryKeyViolation",
+                  properties: ["emailAddresses"],
+                },
+              },
+            },
+            "c1",
+          ],
+        ],
+      }),
+    );
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [
+          ["x:PublicKey/query", { ids: ["pk-existing"] }, "c1"],
+        ],
+      }),
+    );
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [
+          [
+            "x:PublicKey/get",
+            {
+              list: [
+                {
+                  id: "pk-existing",
+                  emailAddresses: {
+                    "alice@solace.onl": true,
+                  },
+                },
+              ],
+            },
+            "c1",
+          ],
+        ],
+      }),
+    );
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [
+          [
+            "x:PublicKey/set",
+            {
+              updated: {
+                "pk-existing": null,
+              },
+            },
+            "c1",
+          ],
+        ],
+      }),
+    );
+
+    const result = await client.registerPublicKey({
+      accountId: "acct-1",
+      email: "alice@solace.onl",
+      publicKeyArmored:
+        "-----BEGIN PGP PUBLIC KEY BLOCK-----\nupdated\n-----END PGP PUBLIC KEY BLOCK-----",
+      description: "Primary OpenPGP key",
+    });
+
+    expect(result).toEqual({ publicKeyId: "pk-existing" });
+
+    const updateBody = JSON.parse(
+      String(fetcher.mock.calls[3]?.[1]?.body ?? "{}"),
+    );
+    expect(updateBody.methodCalls[0]).toEqual([
+      "x:PublicKey/set",
+      {
+        accountId: "acct-1",
+        update: {
+          "pk-existing": {
+            description: "Primary OpenPGP key",
+            key: "-----BEGIN PGP PUBLIC KEY BLOCK-----\nupdated\n-----END PGP PUBLIC KEY BLOCK-----",
+            emailAddresses: {
+              "alice@solace.onl": true,
+            },
+          },
+        },
+      },
+      "c1",
+    ]);
+  });
+
   it("enables AES-256 encryption at rest with safe defaults", async () => {
     fetcher.mockResolvedValueOnce(
       jsonResponse({
@@ -527,6 +620,33 @@ describe("StalwartAdminClient", () => {
             },
           },
         },
+      },
+      "c1",
+    ]);
+  });
+
+  it("destroys a Stalwart account through the admin JMAP API", async () => {
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [
+          [
+            "x:Account/set",
+            {
+              destroyed: ["acct-1"],
+            },
+            "c1",
+          ],
+        ],
+      }),
+    );
+
+    await client.deleteAccount("acct-1");
+
+    const body = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body ?? "{}"));
+    expect(body.methodCalls[0]).toEqual([
+      "x:Account/set",
+      {
+        destroy: ["acct-1"],
       },
       "c1",
     ]);

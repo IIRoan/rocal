@@ -42,6 +42,7 @@ function createMockPrisma() {
           kdfParallelism: 2,
         },
       })),
+      delete: jest.fn(async () => ({ id: "entry-1" })),
     },
     mailJmapSyncState: {
       deleteMany: jest.fn(async () => ({ count: 0 })),
@@ -72,6 +73,7 @@ function createMockAdminClient() {
       expires_in: 1800,
       expires_at: 1779149999,
     })),
+    deleteAccount: jest.fn(async () => undefined),
   };
 }
 
@@ -792,5 +794,63 @@ describe("MailService", () => {
     await expect(
       service.getVaultBackup("missing@solace.onl"),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("deletes the linked Stalwart account and directory entry for a user", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValueOnce({
+      id: "entry-1",
+      email: "alice@solace.onl",
+      stalwartAccountId: "acct-1",
+    });
+
+    await service.deleteMailboxForUser({ userId: "user-1" });
+
+    expect(mockAdminClient.deleteAccount).toHaveBeenCalledWith("acct-1");
+    expect(mockPrisma.mailDirectoryEntry.delete).toHaveBeenCalledWith({
+      where: { id: "entry-1" },
+    });
+  });
+
+  it("no-ops mailbox deletion when the user has no linked mailbox", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValueOnce(null);
+
+    await service.deleteMailboxForUser({ userId: "user-1" });
+
+    expect(mockAdminClient.deleteAccount).not.toHaveBeenCalled();
+    expect(mockPrisma.mailDirectoryEntry.delete).not.toHaveBeenCalled();
+  });
+
+  it("cleans up orphaned Stalwart accounts when directory persistence fails", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mockPrisma.mailDirectoryEntry.create.mockRejectedValueOnce(
+      new Error("database unavailable"),
+    );
+
+    await expect(
+      service.bootstrapForUser({
+        userId: "user-1",
+        email: "alice@solace.onl",
+        displayName: "Alice Example",
+        publicKeyArmored: "public-key-armored",
+        fingerprint: "ABCD1234EF567890",
+        algorithm: "openpgp",
+        createdAt: "2026-05-06T21:00:00.000Z",
+        vaultVersion: 1,
+        encryptedVaultB64: "vault-b64",
+        kdf: "argon2id",
+        kdfParams: {
+          saltB64: "salt-b64",
+          memoryKiB: 65536,
+          iterations: 3,
+          parallelism: 4,
+        },
+      }),
+    ).rejects.toThrow("Mailbox directory persistence failed");
+
+    expect(mockAdminClient.deleteAccount).toHaveBeenCalledWith("acct-1");
   });
 });

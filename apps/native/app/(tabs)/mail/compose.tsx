@@ -24,6 +24,7 @@ import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useToast } from "../../../src/providers/ToastProvider";
+import { BottomSheet } from "../../../src/components/BottomSheet";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import {
   useCachedMessage,
@@ -34,7 +35,15 @@ import {
 } from "../../../src/lib/mail/use-mail";
 import { validateComposeInput } from "../../../src/lib/mail/mail-helpers";
 import { extractMessageBodies } from "../../../src/lib/mail/message-security";
-import type { JmapEmailMessage } from "../../../src/lib/mail/types";
+import {
+  appendPlainTextSignature,
+  getPlainTextSignature,
+} from "../../../src/lib/mail/signature-utils";
+import {
+  useComposeDraftAutosave,
+  type DraftSaveStatus,
+} from "../../../src/hooks/use-compose-draft-autosave";
+import type { JmapEmailMessage, JmapIdentity, MailAddress } from "../../../src/lib/mail/types";
 
 export default function ComposeScreen() {
   const { theme } = useTheme();
@@ -53,8 +62,6 @@ export default function ComposeScreen() {
   const sendMessage = useSendMessage(runtime);
   const cachedMessage = useCachedMessage(params.messageId ?? "");
 
-  const composeContext = resolveComposeContext(runtime);
-
   const [to, setTo] = useState("");
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [cc, setCc] = useState("");
@@ -64,6 +71,39 @@ export default function ComposeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [hasInitializedFromParams, setHasInitializedFromParams] =
     useState(false);
+  const [selectedIdentityId, setSelectedIdentityId] = useState<string | null>(
+    null,
+  );
+  const [identityPickerOpen, setIdentityPickerOpen] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftSaveStatus, setDraftSaveStatus] =
+    useState<DraftSaveStatus>("idle");
+
+  const composeContext = resolveComposeContext(
+    runtime,
+    selectedIdentityId ?? undefined,
+  );
+  const identities = runtime?.identities ?? [];
+
+  useEffect(() => {
+    if (!selectedIdentityId && identities[0]?.id) {
+      setSelectedIdentityId(identities[0].id);
+    }
+  }, [identities, selectedIdentityId]);
+
+  const { saveDraft } = useComposeDraftAutosave({
+    runtime,
+    enabled: Boolean(composeContext),
+    to,
+    cc,
+    bcc,
+    subject,
+    body,
+    identityId: selectedIdentityId,
+    draftId,
+    setDraftId,
+    setDraftSaveStatus,
+  });
 
   const sourceMessageQuery = useQuery<JmapEmailMessage | null>({
     queryKey: QUERY_KEYS.mailMessage(params.messageId ?? ""),
@@ -79,7 +119,15 @@ export default function ComposeScreen() {
   });
   const sourceMessage = sourceMessageQuery.data ?? cachedMessage ?? null;
 
-  const handleSend = useCallback(() => {
+  const selectedIdentity = useMemo(
+    () =>
+      identities.find((entry) => entry.id === selectedIdentityId) ??
+      identities[0] ??
+      null,
+    [identities, selectedIdentityId],
+  );
+
+  const handleSend = useCallback(async () => {
     setError(null);
     const validation = validateComposeInput({ to, cc, bcc, subject });
     const firstError =
@@ -91,13 +139,18 @@ export default function ComposeScreen() {
       return;
     }
 
+    const bodyWithSignature = appendPlainTextSignature(body, selectedIdentity);
+    const savedDraftId = await saveDraft();
+
     sendMessage.mutate(
       {
         to: validation.to,
         cc: validation.cc,
         bcc: validation.bcc,
         subject: subject.trim(),
-        textBody: body,
+        textBody: bodyWithSignature,
+        identityId: selectedIdentityId,
+        previousDraftId: savedDraftId ?? draftId,
       },
       {
         onSuccess: () => {
@@ -108,7 +161,53 @@ export default function ComposeScreen() {
           setError(getErrorMessage(err, "Failed to send message")),
       },
     );
-  }, [to, cc, bcc, subject, body, sendMessage, router]);
+  }, [
+    to,
+    cc,
+    bcc,
+    subject,
+    body,
+    selectedIdentity,
+    selectedIdentityId,
+    draftId,
+    saveDraft,
+    sendMessage,
+    router,
+    toast,
+  ]);
+
+  const handleInsertSignature = useCallback(() => {
+    const signature = getPlainTextSignature(selectedIdentity);
+    if (!signature) return;
+    setBody((current) => appendPlainTextSignature(current, selectedIdentity));
+  }, [selectedIdentity]);
+
+  const handleClose = useCallback(async () => {
+    await saveDraft();
+    setTo("");
+    setCc("");
+    setBcc("");
+    setSubject("");
+    setBody("");
+    setError(null);
+    setDraftId(null);
+    setDraftSaveStatus("idle");
+    setShowCcBcc(false);
+    setHasInitializedFromParams(false);
+    router.back();
+  }, [router, saveDraft]);
+
+  const handleClear = useCallback(() => {
+    setTo("");
+    setCc("");
+    setBcc("");
+    setSubject("");
+    setBody("");
+    setError(null);
+    setDraftId(null);
+    setDraftSaveStatus("idle");
+    setShowCcBcc(false);
+  }, []);
 
   const canSend = Boolean(composeContext) && !sendMessage.isPending;
 
@@ -124,6 +223,17 @@ export default function ComposeScreen() {
     } else if (params.mode === "forward") {
       setSubject(prefixSubject(sourceMessage.subject, "Fwd:"));
       setBody(buildForwardBody(sourceMessage));
+    } else if (params.mode === "draft") {
+      setTo(formatAddressList(sourceMessage.to));
+      setCc(formatAddressList(sourceMessage.cc));
+      setBcc(formatAddressList(sourceMessage.bcc));
+      setSubject(sourceMessage.subject ?? "");
+      const bodies = extractMessageBodies(sourceMessage);
+      setBody(bodies.text?.trim() || stripHtmlToText(bodies.html));
+      setDraftId(sourceMessage.id);
+      if (sourceMessage.cc?.length || sourceMessage.bcc?.length) {
+        setShowCcBcc(true);
+      }
     }
 
     setHasInitializedFromParams(true);
@@ -134,29 +244,40 @@ export default function ComposeScreen() {
       header={
         <NavigationHeader
           variant="compose"
-          title="New message"
+          title={draftId ? "Draft" : "New message"}
+          onBack={() => void handleClose()}
           trailing={
-            <Pressable
-              onPress={handleSend}
-              disabled={!canSend}
-              style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
-              accessibilityRole="button"
-              accessibilityLabel="Send message"
-            >
-              {sendMessage.isPending ? (
-                <ActivityIndicator
-                  size="small"
-                  color={theme.colors.primaryForeground}
-                />
-              ) : (
-                <Feather
-                  name="send"
-                  size={16}
-                  color={theme.colors.primaryForeground}
-                />
-              )}
-              <Text style={styles.sendButtonText}>Send</Text>
-            </Pressable>
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={handleClear}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Clear compose"
+              >
+                <Text style={styles.clearButton}>Clear</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleSend}
+                disabled={!canSend}
+                style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
+                accessibilityRole="button"
+                accessibilityLabel="Send message"
+              >
+                {sendMessage.isPending ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.colors.primaryForeground}
+                  />
+                ) : (
+                  <Feather
+                    name="send"
+                    size={16}
+                    color={theme.colors.primaryForeground}
+                  />
+                )}
+                <Text style={styles.sendButtonText}>Send</Text>
+              </Pressable>
+            </View>
           }
         />
       }
@@ -170,12 +291,30 @@ export default function ComposeScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {composeContext ? (
-            <View style={styles.fromRow}>
+            <Pressable
+              style={styles.fromRow}
+              onPress={
+                identities.length > 1
+                  ? () => setIdentityPickerOpen(true)
+                  : undefined
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Choose sending identity"
+            >
               <Text style={styles.fromLabel}>From</Text>
               <Text style={styles.fromValue} numberOfLines={1}>
-                {composeContext.fromEmail}
+                {composeContext.fromName
+                  ? `${composeContext.fromName} <${composeContext.fromEmail}>`
+                  : composeContext.fromEmail}
               </Text>
-            </View>
+              {identities.length > 1 ? (
+                <Feather
+                  name="chevron-down"
+                  size={16}
+                  color={theme.colors.mutedForeground}
+                />
+              ) : null}
+            </Pressable>
           ) : runtimeQuery.isLoading ? (
             <View style={styles.fromRow}>
               <ActivityIndicator
@@ -241,6 +380,26 @@ export default function ComposeScreen() {
             placeholder="Subject"
           />
 
+          <View style={styles.composeToolbar}>
+            {getPlainTextSignature(selectedIdentity) ? (
+              <Pressable
+                onPress={handleInsertSignature}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Insert signature"
+              >
+                <Text style={styles.ccToggle}>Insert signature</Text>
+              </Pressable>
+            ) : null}
+            {draftSaveStatus === "saving" ? (
+              <Text style={styles.draftStatus}>Saving draft…</Text>
+            ) : draftSaveStatus === "saved" ? (
+              <Text style={styles.draftStatus}>Draft saved</Text>
+            ) : draftSaveStatus === "error" ? (
+              <Text style={styles.draftStatusError}>Draft save failed</Text>
+            ) : null}
+          </View>
+
           <TextInput
             style={styles.bodyInput}
             value={body}
@@ -255,6 +414,28 @@ export default function ComposeScreen() {
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <BottomSheet
+        visible={identityPickerOpen}
+        onDismiss={() => setIdentityPickerOpen(false)}
+        snapPoints={[0.45]}
+      >
+        <View style={styles.identitySheetHeader}>
+          <Text style={styles.identitySheetTitle}>Send from</Text>
+        </View>
+        {identities.map((identity) => (
+          <IdentityPickerRow
+            key={identity.id}
+            identity={identity}
+            selected={identity.id === selectedIdentityId}
+            theme={theme}
+            onSelect={() => {
+              setSelectedIdentityId(identity.id);
+              setIdentityPickerOpen(false);
+            }}
+          />
+        ))}
+      </BottomSheet>
     </AppScreen>
   );
 }
@@ -267,6 +448,13 @@ function prefixSubject(
   return normalized.toLowerCase().startsWith(prefix.toLowerCase())
     ? normalized
     : `${prefix} ${normalized}`;
+}
+
+function formatAddressList(addresses: MailAddress[] | undefined): string {
+  return (addresses ?? [])
+    .map((entry) => entry.email?.trim())
+    .filter((value): value is string => Boolean(value))
+    .join(", ");
 }
 
 function getReplyRecipients(message: JmapEmailMessage): string {
@@ -335,6 +523,38 @@ function stripHtmlToText(html: string | null | undefined): string {
     .trim();
 }
 
+function IdentityPickerRow({
+  identity,
+  selected,
+  theme,
+  onSelect,
+}: {
+  identity: JmapIdentity;
+  selected: boolean;
+  theme: ThemeTokens;
+  onSelect: () => void;
+}) {
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const label = identity.name?.trim()
+    ? `${identity.name} <${identity.email}>`
+    : identity.email;
+  return (
+    <Pressable
+      onPress={onSelect}
+      style={[styles.identityRow, selected && styles.identityRowSelected]}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+    >
+      <Text style={styles.identityLabel} numberOfLines={2}>
+        {label}
+      </Text>
+      {selected ? (
+        <Feather name="check" size={16} color={theme.colors.primaryBase} />
+      ) : null}
+    </Pressable>
+  );
+}
+
 function Field({
   theme,
   label,
@@ -379,6 +599,11 @@ function createStyles(theme: ThemeTokens) {
     flex: {
       flex: 1,
     },
+    headerActions: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["2"],
+    },
     sendButton: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
@@ -405,9 +630,36 @@ function createStyles(theme: ThemeTokens) {
       ...layoutFormFieldBorder(theme),
       paddingVertical: theme.spacing["2"],
     },
+    composeToolbar: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      marginTop: theme.spacing["2"],
+      minHeight: 24,
+    },
+    identityRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      paddingVertical: theme.spacing["3"],
+      paddingHorizontal: theme.spacing["4"],
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.colors.border,
+    },
+    identityRowSelected: {
+      backgroundColor: theme.colors.muted,
+    },
+    identitySheetHeader: {
+      paddingHorizontal: theme.spacing["4"],
+      paddingBottom: theme.spacing["2"],
+    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
+    clearButton: {
+      fontSize: theme.typography.fontSize.sm.size,
+      color: theme.colors.mutedForeground,
+    },
     sendButtonText: {
       fontSize: theme.typography.fontSize.sm.size,
       fontWeight: theme.typography.fontWeight
@@ -439,6 +691,24 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.xs.size,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.primaryBase,
+    },
+    draftStatus: {
+      fontSize: theme.typography.fontSize.xs.size,
+      color: theme.colors.mutedForeground,
+    },
+    draftStatusError: {
+      fontSize: theme.typography.fontSize.xs.size,
+      color: theme.colors.destructive,
+    },
+    identityLabel: {
+      flex: 1,
+      fontSize: theme.typography.fontSize.sm.size,
+      color: theme.colors.foreground,
+    },
+    identitySheetTitle: {
+      fontSize: theme.typography.fontSize.base.size,
+      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
     },
     noticeText: {
       fontSize: theme.typography.fontSize.sm.size,

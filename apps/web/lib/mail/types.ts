@@ -58,6 +58,8 @@ export type JmapIdentity = {
   id: string;
   email: string;
   name?: string | null;
+  textSignature?: string | null;
+  htmlSignature?: string | null;
 };
 
 export type JmapBodyPartRef = {

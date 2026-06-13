@@ -70,6 +70,27 @@ export function isMessageFlagged(message: JmapEmailMessage): boolean {
   return message.keywords?.["$flagged"] === true;
 }
 
+export function isDraftMessage(
+  message: JmapEmailMessage,
+  selectedMailboxId: string | null,
+  mailboxes: JmapMailbox[],
+): boolean {
+  if (message.keywords?.["$draft"] === true) {
+    return true;
+  }
+
+  const draftsMailboxId = getPrimaryMailboxId(mailboxes, "drafts");
+  if (!draftsMailboxId) {
+    return false;
+  }
+
+  if (selectedMailboxId === draftsMailboxId) {
+    return true;
+  }
+
+  return Boolean(message.mailboxIds?.[draftsMailboxId]);
+}
+
 export function sortMessagesByDate(
   messages: JmapEmailMessage[],
 ): JmapEmailMessage[] {

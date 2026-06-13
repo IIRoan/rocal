@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import {
   useMutation,
   useQuery,
+  useInfiniteQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import { useAuth } from "../../providers/AuthProvider";
@@ -13,6 +14,14 @@ import { getMailAccountStatus, getMailConfig } from "./mail-api";
 import { bootstrapMailboxForAccount } from "./account-bootstrap";
 import { buildMailRuntime, type MailRuntime } from "./mail-runtime";
 import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
+import { MAILBOX_MESSAGES_PAGE_SIZE } from "./mail-pagination";
+import {
+  flattenMailboxMessagesCache,
+  patchMailboxMessagesCache,
+  patchSingleMailboxMessageCache,
+  removeMessagesFromMailboxCache,
+  type MailboxMessagesCacheData,
+} from "./mail-message-cache";
 import type { JmapEmailMessage, LabelDef } from "./types";
 
 const RUNTIME_STALE_MS = 5 * 60_000;
@@ -83,16 +92,28 @@ export function useMailboxMessages(
   runtime: MailRuntime | undefined,
   mailboxId: string | null,
 ) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: QUERY_KEYS.mailMessages(mailboxId),
     enabled: Boolean(runtime && mailboxId),
-    queryFn: async () => {
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
       const { messages, total } = await runtime!.client.getMailboxMessages(
         runtime!.session,
         mailboxId!,
-        { limit: MESSAGES_LIMIT },
+        { limit: MESSAGES_LIMIT, position: pageParam },
       );
-      return { messages: sortMessagesByDate(messages), total };
+      return {
+        messages: sortMessagesByDate(messages),
+        total,
+        position: pageParam,
+      };
+    },
+    getNextPageParam: (lastPage) => {
+      const nextPosition = lastPage.position + lastPage.messages.length;
+      if (lastPage.total > 0) {
+        return nextPosition < lastPage.total ? nextPosition : undefined;
+      }
+      return lastPage.messages.length >= MESSAGES_LIMIT ? nextPosition : undefined;
     },
   });
 }
@@ -102,12 +123,13 @@ export function useCachedMessage(
   messageId: string,
 ): JmapEmailMessage | undefined {
   const queryClient = useQueryClient();
-  const lists = queryClient.getQueriesData<{
-    messages: JmapEmailMessage[];
-    total: number;
-  }>({ queryKey: ["mail", "messages"] });
+  const lists = queryClient.getQueriesData<MailboxMessagesCacheData>({
+    queryKey: ["mail", "messages"],
+  });
   for (const [, data] of lists) {
-    const found = data?.messages.find((message) => message.id === messageId);
+    const found = flattenMailboxMessagesCache(data).find(
+      (message) => message.id === messageId,
+    );
     if (found) return found;
   }
   return undefined;
@@ -118,12 +140,13 @@ function findCachedMessage(
   queryClient: ReturnType<typeof useQueryClient>,
   messageId: string,
 ): JmapEmailMessage | undefined {
-  const lists = queryClient.getQueriesData<{
-    messages: JmapEmailMessage[];
-    total: number;
-  }>({ queryKey: ["mail", "messages"] });
+  const lists = queryClient.getQueriesData<MailboxMessagesCacheData>({
+    queryKey: ["mail", "messages"],
+  });
   for (const [, data] of lists) {
-    const found = data?.messages?.find((m) => m.id === messageId);
+    const found = flattenMailboxMessagesCache(data).find(
+      (message) => message.id === messageId,
+    );
     if (found) return found;
   }
   return undefined;
@@ -136,20 +159,14 @@ function patchManyMessagesInCache(
   patch: (msg: JmapEmailMessage) => Partial<JmapEmailMessage>,
 ) {
   const idSet = new Set(messageIds);
-  const lists = queryClient.getQueriesData<{
-    messages: JmapEmailMessage[];
-    total: number;
-  }>({ queryKey: ["mail", "messages"] });
+  const lists = queryClient.getQueriesData<MailboxMessagesCacheData>({
+    queryKey: ["mail", "messages"],
+  });
   for (const [key, data] of lists) {
-    if (!data?.messages) continue;
-    let changed = false;
-    const updated = data.messages.map((msg) => {
-      if (!idSet.has(msg.id)) return msg;
-      changed = true;
-      return { ...msg, ...patch(msg) };
-    });
-    if (changed) {
-      queryClient.setQueryData(key, { ...data, messages: updated });
+    if (!data) continue;
+    const updated = patchMailboxMessagesCache(data, idSet, patch);
+    if (updated) {
+      queryClient.setQueryData(key, updated);
     }
   }
   for (const messageId of messageIds) {
@@ -163,17 +180,15 @@ function patchMessageInCache(
   messageId: string,
   patch: (msg: JmapEmailMessage) => Partial<JmapEmailMessage>,
 ) {
-  const lists = queryClient.getQueriesData<{
-    messages: JmapEmailMessage[];
-    total: number;
-  }>({ queryKey: ["mail", "messages"] });
+  const lists = queryClient.getQueriesData<MailboxMessagesCacheData>({
+    queryKey: ["mail", "messages"],
+  });
   for (const [key, data] of lists) {
-    if (!data?.messages) continue;
-    const idx = data.messages.findIndex((m) => m.id === messageId);
-    if (idx === -1) continue;
-    const updated = [...data.messages];
-    updated[idx] = { ...updated[idx], ...patch(updated[idx]) };
-    queryClient.setQueryData(key, { ...data, messages: updated });
+    if (!data) continue;
+    const updated = patchSingleMailboxMessageCache(data, messageId, patch);
+    if (updated) {
+      queryClient.setQueryData(key, updated);
+    }
   }
 }
 
@@ -398,20 +413,29 @@ export interface ComposeMessageInput {
   bcc?: string[];
   subject: string;
   textBody: string;
+  htmlBody?: string;
+  identityId?: string | null;
+  previousDraftId?: string | null;
 }
 
 /**
  * Resolves the identity + drafts/sent mailboxes needed to send mail, or `null`
  * when the runtime is not ready or has no usable sending identity.
  */
-export function resolveComposeContext(runtime: MailRuntime | undefined): {
+export function resolveComposeContext(
+  runtime: MailRuntime | undefined,
+  identityId?: string | null,
+): {
   identityId: string;
   fromEmail: string;
+  fromName: string | null;
   draftsMailboxId: string;
   sentMailboxId: string | null;
 } | null {
   if (!runtime) return null;
-  const identity = runtime.identities[0];
+  const identity =
+    runtime.identities.find((entry) => entry.id === identityId) ??
+    runtime.identities[0];
   if (!identity?.email) return null;
 
   const draftsMailboxId =
@@ -423,6 +447,7 @@ export function resolveComposeContext(runtime: MailRuntime | undefined): {
   return {
     identityId: identity.id,
     fromEmail: identity.email,
+    fromName: identity.name ?? null,
     draftsMailboxId,
     sentMailboxId: getPrimaryMailboxId(runtime.mailboxes, "sent"),
   };
@@ -433,20 +458,43 @@ export function useSendMessage(runtime: MailRuntime | undefined) {
 
   return useMutation({
     mutationFn: async (input: ComposeMessageInput) => {
-      const context = resolveComposeContext(runtime);
+      const context = resolveComposeContext(runtime, input.identityId);
       if (!runtime || !context) {
         throw new Error("Your mailbox is not ready to send messages yet.");
       }
       return runtime.client.sendMessage(runtime.session, {
-        ...context,
+        draftsMailboxId: context.draftsMailboxId,
+        sentMailboxId: context.sentMailboxId,
+        fromEmail: context.fromEmail,
+        fromName: context.fromName,
         to: input.to,
         cc: input.cc,
         bcc: input.bcc,
         subject: input.subject,
         textBody: input.textBody,
+        htmlBody: input.htmlBody,
+        identityId: context.identityId,
+        previousDraftId: input.previousDraftId ?? undefined,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      const draftId = variables.previousDraftId?.trim();
+      if (draftId) {
+        const lists = queryClient.getQueriesData<MailboxMessagesCacheData>({
+          queryKey: ["mail", "messages"],
+        });
+        for (const [key, data] of lists) {
+          if (!data) continue;
+          const updated = removeMessagesFromMailboxCache(
+            data,
+            new Set([draftId]),
+          );
+          if (updated) {
+            queryClient.setQueryData(key, updated);
+          }
+        }
+        queryClient.removeQueries({ queryKey: QUERY_KEYS.mailMessage(draftId) });
+      }
       queryClient.invalidateQueries({ queryKey: ["mail", "messages"] });
     },
   });
