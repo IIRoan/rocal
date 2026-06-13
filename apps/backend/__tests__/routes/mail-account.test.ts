@@ -84,6 +84,7 @@ const mockMailService = {
       parallelism: 2,
     },
   })),
+  deleteMailboxForUser: jest.fn(async () => undefined),
 };
 
 import { errorHandler } from "../../lib/errors";

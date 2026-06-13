@@ -65,6 +65,10 @@ export type UpsertMailVaultBackupForUserInput = {
   kdfParams: MailVaultKdfParams;
 };
 
+export type DeleteMailboxForUserInput = {
+  userId: string;
+};
+
 export interface IMailService {
   getConfig(): MailDemoConfig;
   issueAccessTokenForUser(
@@ -85,4 +89,5 @@ export interface IMailService {
   upsertVaultBackupForUser(
     input: UpsertMailVaultBackupForUserInput,
   ): Promise<MailVaultBackupResult>;
+  deleteMailboxForUser(input: DeleteMailboxForUserInput): Promise<void>;
 }

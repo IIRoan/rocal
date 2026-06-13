@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   RotateCcw,
   ArrowLeft,
@@ -28,6 +28,8 @@ import { MailCommandPalette } from "./mail-command-palette";
 import { ComposeDialog, ComposeForm } from "./compose-dialog";
 import {
   MailComposeProvider,
+  flushComposeDraftSave,
+  getMailComposeBridge,
   useMailComposeChrome,
 } from "./mail-compose-context";
 import { AttachmentPreviewDialog } from "./attachment-preview-dialog";
@@ -35,6 +37,10 @@ import { MessageList } from "./message-list";
 import { MessageReader } from "./message-reader";
 import type { JmapEmailMessage } from "@/lib/mail/types";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
+import { useComposeDraftAutosave } from "@/hooks/use-compose-draft-autosave";
+import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
+import { isDraftMessage } from "@/lib/mail/draft-utils";
+import { classifyMessageEncryption } from "@/lib/mail/message-security";
 
 interface MobileMailHeaderProps {
   selectedMailboxName: string;
@@ -168,20 +174,60 @@ function MobileMailHeader({
   );
 }
 
+function MailComposeAutosave({
+  activeMailbox,
+  accountEmail,
+}: {
+  activeMailbox: {
+    client: import("@/lib/mail/jmap-client").StalwartJmapClient;
+    session: import("@/lib/mail/types").JmapSession;
+    mailboxes: import("@/lib/mail/types").JmapMailbox[];
+    identities: import("@/lib/mail/types").JmapIdentity[];
+    email: string;
+  } | null;
+  accountEmail: string;
+}) {
+  useComposeDraftAutosave({
+    client: activeMailbox?.client ?? null,
+    session: activeMailbox?.session ?? null,
+    mailboxes: activeMailbox?.mailboxes ?? [],
+    identities: activeMailbox?.identities ?? [],
+    fallbackFromEmail: activeMailbox?.email ?? accountEmail,
+    enabled: Boolean(activeMailbox),
+  });
+  return null;
+}
+
 export function MailApp() {
+  const mail = useMailApp();
+
+  if (mail.isSessionPending || !mail.session?.user) {
+    return (
+      <PageLoadingOverlay
+        isLoading={true}
+        messageContext="PAGE_LOAD"
+        enableCycling
+        priority
+      />
+    );
+  }
+
   return (
-    <MailComposeProvider>
-      <MailAppContent />
+    <MailComposeProvider identities={mail.activeMailbox?.identities ?? []}>
+      <MailComposeAutosave
+        activeMailbox={mail.activeMailbox}
+        accountEmail={mail.accountEmail}
+      />
+      <MailAppContent mail={mail} />
     </MailComposeProvider>
   );
 }
 
-function MailAppContent() {
-  const { isComposeOpen, setIsComposeOpen, isFullCompose, setIsFullCompose } =
+function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
+  const { isComposeOpen, setIsComposeOpen, isFullCompose, setIsFullCompose, dismissCompose } =
     useMailComposeChrome();
   const {
     session,
-    isSessionPending,
     config,
     isBusy,
     mailboxStatus,
@@ -244,8 +290,12 @@ function MailAppContent() {
     handleSignOut,
     user,
     accountEmail,
-    conversationSourceMessages,
-  } = useMailApp();
+  } = mail;
+
+  useRefreshGesture({
+    enabled: Boolean(activeMailbox && session?.user),
+    onRefresh: () => void handleManualRefresh(),
+  });
 
   const { settings } = useSettings();
   const timeFormat = settings?.timeFormat ?? "24h";
@@ -255,6 +305,7 @@ function MailAppContent() {
   const isMobile = useIsMobile();
   const [mailListSearch, setMailListSearch] = useState("");
   const [debouncedMailListSearch, setDebouncedMailListSearch] = useState("");
+  const openedDraftIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedMailListSearch(mailListSearch), 300);
@@ -262,6 +313,58 @@ function MailAppContent() {
   }, [mailListSearch]);
 
   const mailboxId = activeMailbox?.selectedMailboxId ?? null;
+
+  useEffect(() => {
+    if (!selectedMessage || !activeMailbox) {
+      openedDraftIdRef.current = null;
+      return;
+    }
+
+    const mailboxes = activeMailbox.mailboxes ?? [];
+    if (!isDraftMessage(selectedMessage, mailboxId, mailboxes)) {
+      openedDraftIdRef.current = null;
+      return;
+    }
+
+    if (openedDraftIdRef.current === selectedMessage.id) {
+      return;
+    }
+
+    const bridge = getMailComposeBridge();
+    if (!bridge) {
+      return;
+    }
+
+    const encryption = classifyMessageEncryption(selectedMessage);
+    const needsDecrypt =
+      encryption === "inline_pgp" || encryption === "pgp_mime";
+
+    if (
+      needsDecrypt &&
+      !selectedMessagePlaintext &&
+      !selectedMessageDecryptError
+    ) {
+      return;
+    }
+
+    bridge.seedDraft(
+      selectedMessage,
+      needsDecrypt
+        ? {
+            plaintext: selectedMessagePlaintext,
+            html: selectedMessageDecryptedHtml,
+          }
+        : undefined,
+    );
+    openedDraftIdRef.current = selectedMessage.id;
+  }, [
+    selectedMessage,
+    mailboxId,
+    activeMailbox,
+    selectedMessagePlaintext,
+    selectedMessageDecryptedHtml,
+    selectedMessageDecryptError,
+  ]);
 
   const {
     data: serverSearchResults,
@@ -287,30 +390,85 @@ function MailAppContent() {
     ? (serverSearchResults ?? [])
     : (activeMailbox?.messages ?? []);
 
-  const handleSelectMessage = (id: string | null) => {
-    setSelectedMessageId(id);
-  };
+  const messages = activeMailbox?.messages ?? [];
+
+  const selectedIsDraft = Boolean(
+    selectedMessage &&
+      activeMailbox &&
+      isDraftMessage(selectedMessage, mailboxId, activeMailbox.mailboxes),
+  );
+
+  const handleDismissCompose = useCallback(async () => {
+    await flushComposeDraftSave();
+    dismissCompose();
+    openedDraftIdRef.current = null;
+    setSelectedMessageId(null);
+  }, [dismissCompose, setSelectedMessageId]);
+
+  const handleSelectMessage = useCallback(
+    (id: string | null) => {
+      if (!id) {
+        openedDraftIdRef.current = null;
+        setSelectedMessageId(null);
+        return;
+      }
+
+      const message =
+        filteredListMessages.find((entry) => entry.id === id) ??
+        messages.find((entry) => entry.id === id);
+
+      if (
+        message &&
+        activeMailbox &&
+        isDraftMessage(message, mailboxId, activeMailbox.mailboxes)
+      ) {
+        if (openedDraftIdRef.current === id && isFullCompose) {
+          return;
+        }
+        openedDraftIdRef.current = null;
+        setSelectedMessageId(id);
+        return;
+      }
+
+      openedDraftIdRef.current = null;
+      setSelectedMessageId(id);
+    },
+    [
+      activeMailbox,
+      filteredListMessages,
+      isFullCompose,
+      mailboxId,
+      messages,
+      setSelectedMessageId,
+    ],
+  );
 
   const handleBack = () => {
+    if (isFullCompose) {
+      void handleDismissCompose();
+      return;
+    }
     setSelectedMessageId(null);
   };
-
-  // Derive navigation state from current message list
-  const messages = activeMailbox?.messages ?? [];
   const selectedIndex = messages.findIndex((m) => m.id === selectedMessageId);
   const hasPrev = selectedIndex > 0;
   const hasNext = selectedIndex >= 0 && selectedIndex < messages.length - 1;
 
   const handleNavigatePrev = () => {
-    if (hasPrev) setSelectedMessageId(messages[selectedIndex - 1].id);
+    if (hasPrev) handleSelectMessage(messages[selectedIndex - 1].id);
   };
   const handleNavigateNext = () => {
-    if (hasNext) setSelectedMessageId(messages[selectedIndex + 1].id);
+    if (hasNext) handleSelectMessage(messages[selectedIndex + 1].id);
   };
   const handleCloseMessage = () => {
+    if (selectedIsDraft) {
+      void handleDismissCompose();
+      return;
+    }
     setSelectedMessageId(null);
   };
 
+  // Derive navigation state from current message list
   useMailUrlSync({
     activeMailbox,
     selectedMessageId,
@@ -337,17 +495,6 @@ function MailAppContent() {
     ? () => void handleMoveMessage(archiveMailbox.id)
     : undefined;
 
-  if (isSessionPending || !session?.user) {
-    return (
-      <PageLoadingOverlay
-        isLoading={true}
-        messageContext="PAGE_LOAD"
-        enableCycling
-        priority
-      />
-    );
-  }
-
   const isOverlayLoading = isMailboxStatusLoading || (isBusy && !activeMailbox);
 
   const selectedMailbox =
@@ -355,12 +502,14 @@ function MailAppContent() {
       (m) => m.id === activeMailbox.selectedMailboxId,
     ) ?? null;
 
-  // On mobile: show reader pane when a message is selected
-  const showReaderOnMobile = isMobile && Boolean(selectedMessageId);
+  // On mobile: show reader/compose pane for real messages or the full composer
+  const showMobileDetailPane =
+    isMobile &&
+    (isFullCompose || (Boolean(selectedMessageId) && !selectedIsDraft));
 
   return (
     <>
-      <SidebarProvider>
+      <SidebarProvider className="h-svh max-h-svh min-h-0 overflow-hidden">
         <MailSidebar
           user={user ?? { name: "User", email: "" }}
           activeMailbox={activeMailbox}
@@ -378,16 +527,16 @@ function MailAppContent() {
           }
           isBusy={isBusy}
         />
-        <SidebarInset>
+        <SidebarInset className="min-h-0 overflow-hidden">
           {activeMailbox ? (
-            <div className="flex h-full flex-col overflow-hidden bg-background">
-              {isMobile && !showReaderOnMobile && !isFullCompose && (
+            <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+              {isMobile && !showMobileDetailPane && (
                 <MobileMailHeader
                   selectedMailboxName={selectedMailbox?.name ?? "Inbox"}
                   mailboxMessageCount={activeMailbox.messages.length}
                   selectedMessageSubject={selectedMessage?.subject ?? null}
                   mailboxEmail={activeMailbox.email ?? accountEmail}
-                  showReaderOnMobile={showReaderOnMobile}
+                  showReaderOnMobile={showMobileDetailPane}
                   isFullCompose={isFullCompose}
                   isBusy={isBusy}
                   isRefreshing={isRefreshing}
@@ -402,10 +551,10 @@ function MailAppContent() {
                 <div
                   className={
                     isMobile
-                      ? showReaderOnMobile || isFullCompose
+                      ? showMobileDetailPane
                         ? "hidden"
-                        : "flex flex-col w-full min-h-0"
-                      : "w-72 shrink-0 border-r border-border/40 flex flex-col min-h-0"
+                        : "flex h-full min-h-0 flex-1 flex-col overflow-hidden"
+                      : "flex h-full min-h-0 w-72 shrink-0 flex-col overflow-hidden border-r border-border/40"
                   }
                 >
                   {/* Desktop-only header inside list column */}
@@ -478,10 +627,11 @@ function MailAppContent() {
                       </div>
                     </div>
                   )}
-                  <MessageList
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <MessageList
                     key={activeMailbox.selectedMailboxId ?? "mailbox-list"}
                     messages={filteredListMessages}
-                    relatedMessages={debouncedMailListSearch ? [] : conversationSourceMessages}
+                    relatedMessages={[]}
                     selectedMessageId={selectedMessageId}
                     onSelect={handleSelectMessage}
                     mailboxes={activeMailbox.mailboxes}
@@ -508,19 +658,21 @@ function MailAppContent() {
                     hasMore={debouncedMailListSearch ? false : hasMoreMessages}
                     isLoadingMore={isLoadingMore}
                   />
+                  </div>
                 </div>
 
                 {/* Message reader / inline composer — full screen on mobile when open */}
                 <div
                   className={
                     isMobile
-                      ? showReaderOnMobile || isFullCompose
+                      ? showMobileDetailPane
                         ? "flex flex-col w-full min-h-0 overflow-hidden relative"
                         : "hidden"
-                      : "flex-1 min-w-0 overflow-hidden relative"
+                      : "flex h-full min-h-0 min-w-0 flex-1 overflow-hidden relative"
                   }
                 >
-                  {/* Message reader — hidden (but mounted) when full compose is active */}
+                  {/* Message reader — never shown for drafts */}
+                  {selectedMessage && !selectedIsDraft ? (
                   <div
                     className="absolute inset-0 flex flex-col transition-all duration-200 ease-in-out"
                     style={{
@@ -598,6 +750,15 @@ function MailAppContent() {
                       accountEmail={activeMailbox?.email ?? accountEmail}
                     />
                   </div>
+                  ) : !isFullCompose ? (
+                    <div className="absolute inset-0 flex items-center justify-center p-8">
+                      <p className="text-sm text-muted-foreground">
+                        {selectedIsDraft
+                          ? "Opening draft…"
+                          : "Select a message to read"}
+                      </p>
+                    </div>
+                  ) : null}
 
                   {/* Full inline composer — slides in from right */}
                   <div
@@ -609,8 +770,9 @@ function MailAppContent() {
                     }}
                   >
                     <ComposeForm
-                      fromEmail={activeMailbox.email ?? accountEmail}
-                      onClose={() => setIsFullCompose(false)}
+                      identities={activeMailbox.identities}
+                      fallbackFromEmail={activeMailbox.email ?? accountEmail}
+                      onClose={() => void handleDismissCompose()}
                       onSend={async () => {
                         await handleSendMessage();
                         setIsFullCompose(false);
@@ -656,8 +818,9 @@ function MailAppContent() {
       />
 
       <ComposeDialog
-        fromEmail={activeMailbox?.email ?? accountEmail}
-        onClose={() => setIsComposeOpen(false)}
+        identities={activeMailbox?.identities ?? []}
+        fallbackFromEmail={activeMailbox?.email ?? accountEmail}
+        onClose={() => void handleDismissCompose()}
         onSend={handleSendMessage}
         onExpand={() => {
           setIsComposeOpen(false);

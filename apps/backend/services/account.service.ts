@@ -8,6 +8,7 @@ import type {
   DeleteAccountResult,
   IAccountService,
 } from "../contracts/account.contract";
+import type { IMailService } from "../contracts/mail.contract";
 import { NotFoundError } from "../lib/errors";
 import { normalizeDesiredSolaceEmailInput } from "../lib/solace-email";
 
@@ -19,6 +20,7 @@ export class AccountService implements IAccountService {
     private readonly config: AccountSignupConfig = {
       defaultEmailDomain: "solace.onl",
     },
+    private readonly mailService?: Pick<IMailService, "deleteMailboxForUser">,
   ) {}
 
   getSignupConfig(): AccountSignupConfig {
@@ -91,6 +93,10 @@ export class AccountService implements IAccountService {
 
     if (!existingUser) {
       throw new NotFoundError("User account not found");
+    }
+
+    if (this.mailService) {
+      await this.mailService.deleteMailboxForUser({ userId: input.userId });
     }
 
     await this.prisma.$transaction(async (tx) => {

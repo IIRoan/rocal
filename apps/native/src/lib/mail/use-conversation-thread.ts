@@ -2,6 +2,10 @@ import { useMemo } from "react";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "../query-keys";
 import {
+  flattenMailboxMessagesCache,
+  type MailboxMessagesCacheData,
+} from "./mail-message-cache";
+import {
   getConversationForMessage,
   mergeConversationSourceMessages,
 } from "./conversation-thread";
@@ -13,14 +17,13 @@ const MAX_PREFETCH_THREADS = 20;
 function getAllCachedMailboxMessages(
   queryClient: ReturnType<typeof useQueryClient>,
 ): JmapEmailMessage[] {
-  const lists = queryClient.getQueriesData<{
-    messages: JmapEmailMessage[];
-    total: number;
-  }>({ queryKey: ["mail", "messages"] });
+  const lists = queryClient.getQueriesData<MailboxMessagesCacheData>({
+    queryKey: ["mail", "messages"],
+  });
 
   const byId = new Map<string, JmapEmailMessage>();
   for (const [, data] of lists) {
-    for (const message of data?.messages ?? []) {
+    for (const message of flattenMailboxMessagesCache(data)) {
       byId.set(message.id, message);
     }
   }

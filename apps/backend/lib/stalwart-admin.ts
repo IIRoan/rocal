@@ -61,6 +61,7 @@ export interface StalwartAdminClientLike {
     accountId: string;
     secret: string;
   }): Promise<void>;
+  deleteAccount(accountId: string): Promise<void>;
   ensureOAuthClient(input: {
     clientId: string;
     redirectUri: string;
@@ -344,6 +345,43 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     });
   }
 
+  async deleteAccount(accountId: string): Promise<void> {
+    const normalizedAccountId = accountId.trim();
+    if (!normalizedAccountId) {
+      throw new Error("Stalwart account deletion requires a non-empty account id.");
+    }
+
+    const envelope = await this.postJmap([
+      [
+        "x:Account/set",
+        {
+          destroy: [normalizedAccountId],
+        },
+        "c1",
+      ],
+    ]);
+
+    const result = this.getMethodResult<{
+      destroyed?: string[];
+      notDestroyed?: Record<string, StalwartSetError>;
+    }>(envelope, "x:Account/set");
+    const destroyError = result.notDestroyed?.[normalizedAccountId];
+
+    if (destroyError) {
+      throw new Error(
+        destroyError.description || "Stalwart account deletion failed.",
+      );
+    }
+
+    if (!(result.destroyed ?? []).includes(normalizedAccountId)) {
+      throw new Error("Stalwart account deletion was not acknowledged.");
+    }
+
+    logger.info("Deleted Stalwart account", {
+      accountId: normalizedAccountId,
+    });
+  }
+
   private async updateAccountPasswordCredential(input: {
     accountId: string;
     existingCredentials?: Record<string, StalwartCredentialRecord>;
@@ -593,6 +631,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     publicKeyArmored: string;
     description?: string | null;
   }): Promise<{ publicKeyId: string }> {
+    const normalizedEmail = input.email.trim().toLowerCase();
     const envelope = await this.postJmap([
       [
         "x:PublicKey/set",
@@ -601,6 +640,148 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
           create: {
             pk1: {
               description: input.description ?? null,
+              key: input.publicKeyArmored,
+              emailAddresses: {
+                [normalizedEmail]: true,
+              },
+            },
+          },
+        },
+        "c1",
+      ],
+    ]);
+
+    const result = this.getMethodResult<{
+      created?: Record<string, { id?: string }>;
+      notCreated?: Record<string, StalwartSetError>;
+    }>(envelope, "x:PublicKey/set");
+    const created = result.created?.pk1;
+
+    if (created?.id) {
+      return {
+        publicKeyId: created.id,
+      };
+    }
+
+    const recoveredPublicKeyId = await this.recoverExistingPublicKeyId({
+      accountId: input.accountId,
+      email: normalizedEmail,
+      publicKeyArmored: input.publicKeyArmored,
+      description: input.description ?? null,
+      createError: result.notCreated?.pk1,
+    });
+
+    if (recoveredPublicKeyId) {
+      return {
+        publicKeyId: recoveredPublicKeyId,
+      };
+    }
+
+    const reason = result.notCreated?.pk1?.description || "Unknown error";
+    throw new Error(`Stalwart public-key registration failed: ${reason}`);
+  }
+
+  private publicKeyMatchesEmail(
+    publicKey: {
+      emailAddresses?: Record<string, boolean> | string[];
+    },
+    email: string,
+  ): boolean {
+    const emailAddresses = publicKey.emailAddresses;
+    if (!emailAddresses) {
+      return false;
+    }
+
+    if (Array.isArray(emailAddresses)) {
+      return emailAddresses.some(
+        (address) => address.trim().toLowerCase() === email,
+      );
+    }
+
+    return emailAddresses[email] === true;
+  }
+
+  private async listPublicKeysForAccount(accountId: string): Promise<
+    Array<{
+      id: string;
+      emailAddresses?: Record<string, boolean> | string[];
+    }>
+  > {
+    const queryEnvelope = await this.postJmap([
+      [
+        "x:PublicKey/query",
+        {
+          filter: {
+            accountId,
+          },
+        },
+        "c1",
+      ],
+    ]);
+    const queryResult = this.getMethodResult<{ ids?: string[] }>(
+      queryEnvelope,
+      "x:PublicKey/query",
+    );
+    const ids = Array.isArray(queryResult.ids) ? queryResult.ids : [];
+
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const getEnvelope = await this.postJmap([
+      [
+        "x:PublicKey/get",
+        {
+          ids,
+        },
+        "c1",
+      ],
+    ]);
+    const getResult = this.getMethodResult<{
+      list?: Array<{
+        id: string;
+        emailAddresses?: Record<string, boolean> | string[];
+      }>;
+    }>(getEnvelope, "x:PublicKey/get");
+
+    return getResult.list ?? [];
+  }
+
+  private async recoverExistingPublicKeyId(input: {
+    accountId: string;
+    email: string;
+    publicKeyArmored: string;
+    description: string | null;
+    createError?: StalwartSetError;
+  }): Promise<string | null> {
+    const existingKeys = await this.listPublicKeysForAccount(input.accountId);
+    const matchingKey = existingKeys.find((publicKey) =>
+      this.publicKeyMatchesEmail(publicKey, input.email),
+    );
+
+    if (!matchingKey?.id) {
+      return null;
+    }
+
+    logger.warn(
+      "Stalwart registerPublicKey reported an existing remote key; attempting recovery",
+      {
+        accountId: input.accountId,
+        email: input.email,
+        existingPublicKeyId: matchingKey.id,
+        errorType: input.createError?.type ?? null,
+        properties: input.createError?.properties ?? null,
+      },
+    );
+
+    const envelope = await this.postJmap([
+      [
+        "x:PublicKey/set",
+        {
+          accountId: input.accountId,
+          update: {
+            [matchingKey.id]: {
+              description: input.description,
               key: input.publicKeyArmored,
               emailAddresses: {
                 [input.email]: true,
@@ -613,19 +794,25 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     ]);
 
     const result = this.getMethodResult<{
-      created?: Record<string, { id?: string }>;
-      notCreated?: Record<string, { description?: string }>;
+      updated?: Record<string, null>;
+      notUpdated?: Record<string, StalwartSetError>;
     }>(envelope, "x:PublicKey/set");
-    const created = result.created?.pk1;
+    const updateError = result.notUpdated?.[matchingKey.id];
 
-    if (!created?.id) {
-      const reason = result.notCreated?.pk1?.description || "Unknown error";
-      throw new Error(`Stalwart public-key registration failed: ${reason}`);
+    if (updateError) {
+      throw new Error(
+        updateError.description ||
+          "Stalwart public-key update failed during recovery.",
+      );
     }
 
-    return {
-      publicKeyId: created.id,
-    };
+    if (!(matchingKey.id in (result.updated ?? {}))) {
+      throw new Error(
+        "Stalwart public-key update was not acknowledged during recovery.",
+      );
+    }
+
+    return matchingKey.id;
   }
 
   async enableEncryptionAtRest(input: {
