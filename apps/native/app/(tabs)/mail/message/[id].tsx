@@ -36,6 +36,7 @@ import {
 import {
   formatAddressFull,
   formatMessageDate,
+  isDraftMessage,
 } from "../../../../src/lib/mail/mail-helpers";
 import {
   classifyMessageEncryption,
@@ -145,6 +146,16 @@ export default function MailMessageScreen() {
   });
 
   const message = messageData ?? null;
+
+  useEffect(() => {
+    if (!message || !runtime) return;
+    if (isDraftMessage(message, null, runtime.mailboxes)) {
+      router.replace(
+        `/(tabs)/mail/compose?mode=draft&messageId=${message.id}` as never,
+      );
+    }
+  }, [message, router, runtime]);
+
   const { conversationMessages, isLoading: isConversationLoading } =
     useConversationThread(runtime, message);
   const {

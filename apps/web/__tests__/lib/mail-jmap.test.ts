@@ -7,6 +7,7 @@ import {
   getPrimaryMailAccountId,
   normalizeJmapSession,
 } from "../../lib/mail/jmap-client";
+import type { JmapSession } from "../../lib/mail/types";
 
 describe("mail JMAP helpers", () => {
   it("builds a bearer auth header from an access token", () => {
@@ -490,6 +491,59 @@ describe("StalwartJmapClient", () => {
     await expect(client.discoverSession()).rejects.toThrow(
       "Mail sign-in expired or was rejected by the mail server.",
     );
+  });
+
+  it("retries JMAP calls once after clearing stale auth", async () => {
+    let calls = 0;
+    const onUnauthorized = jest.fn<() => void>();
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "stale-access-token",
+      onUnauthorized,
+      fetcher: async () => {
+        calls += 1;
+        if (calls === 1) {
+          return new Response(JSON.stringify({ message: "Token expired" }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(
+          JSON.stringify({
+            methodResponses: [
+              [
+                "Mailbox/get",
+                {
+                  list: [
+                    {
+                      id: "inbox-1",
+                      name: "Inbox",
+                      role: "inbox",
+                    },
+                  ],
+                },
+                "c1",
+              ],
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      },
+    });
+
+    const session: JmapSession = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/",
+      accounts: { acc1: { name: "alice@solace.onl" } },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "acc1" },
+    };
+    const mailboxes = await client.getMailboxes(session);
+
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(calls).toBe(2);
+    expect(mailboxes[0]?.id).toBe("inbox-1");
   });
 
   it("includes upstream details when discovery cannot reach the mail server", async () => {

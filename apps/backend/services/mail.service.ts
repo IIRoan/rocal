@@ -14,6 +14,7 @@ import type {
   IMailService,
   MailAccountStatusResult,
   MailBootstrapForUserInput,
+  DeleteMailboxForUserInput,
   MailDemoConfig,
   MailDirectoryKeyResult,
   MailOAuthConfig,
@@ -564,8 +565,82 @@ export class MailService implements IMailService {
     });
   }
 
+  private async deleteOrphanedStalwartAccountIfNeeded(
+    accountId: string,
+  ): Promise<void> {
+    if (!accountId) {
+      return;
+    }
+
+    const existingEntry = await this.prisma.mailDirectoryEntry.findUnique({
+      where: { stalwartAccountId: accountId },
+      select: { id: true },
+    });
+
+    if (existingEntry) {
+      return;
+    }
+
+    try {
+      await this.adminClient.deleteAccount(accountId);
+      logger.warn(
+        "Deleted orphaned Stalwart account after failed mailbox provisioning",
+        {
+          stalwartAccountId: accountId,
+        },
+      );
+    } catch (error) {
+      logger.error(
+        "Failed to delete orphaned Stalwart account after failed mailbox provisioning",
+        {
+          stalwartAccountId: accountId,
+          error,
+        },
+      );
+    }
+  }
+
+  async deleteMailboxForUser(input: DeleteMailboxForUserInput): Promise<void> {
+    const mailbox = await this.prisma.mailDirectoryEntry.findUnique({
+      where: { userId: input.userId },
+      select: {
+        id: true,
+        email: true,
+        stalwartAccountId: true,
+      },
+    });
+
+    if (!mailbox) {
+      return;
+    }
+
+    try {
+      await this.adminClient.deleteAccount(mailbox.stalwartAccountId);
+    } catch (error) {
+      logger.error(
+        "Failed to delete linked Stalwart account during Solace account deletion",
+        {
+          userId: input.userId,
+          email: mailbox.email,
+          stalwartAccountId: mailbox.stalwartAccountId,
+          error,
+        },
+      );
+    }
+
+    await this.prisma.mailDirectoryEntry.delete({
+      where: { id: mailbox.id },
+    });
+
+    logger.info("Deleted linked mailbox for Solace account", {
+      userId: input.userId,
+      email: mailbox.email,
+      stalwartAccountId: mailbox.stalwartAccountId,
+    });
+  }
+
   private async createMailbox(input: {
-    userId?: string | null;
+    userId: string;
     email: string;
     localPart: string;
     domain: string;
@@ -632,6 +707,7 @@ export class MailService implements IMailService {
         allowSpamTraining: false,
       });
     } catch (error) {
+      await this.deleteOrphanedStalwartAccountIfNeeded(accountId);
       normalizeMailProvisioningError(error);
     }
 
@@ -750,6 +826,7 @@ export class MailService implements IMailService {
         }
       });
     } catch (error) {
+      await this.deleteOrphanedStalwartAccountIfNeeded(accountId);
       logger.error("Failed to persist provisioned mailbox state", {
         email: input.email,
         userId: input.userId ?? null,

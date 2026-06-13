@@ -39,13 +39,23 @@ function createMockPrisma() {
 
 describe("AccountService", () => {
   let mockPrisma: ReturnType<typeof createMockPrisma>;
+  let mockMailService: {
+    deleteMailboxForUser: jest.Mock<() => Promise<void>>;
+  };
   let service: AccountService;
 
   beforeEach(() => {
     mockPrisma = createMockPrisma();
-    service = new AccountService(mockPrisma.prisma as never, {
-      defaultEmailDomain: "solace.onl",
-    });
+    mockMailService = {
+      deleteMailboxForUser: jest.fn<() => Promise<void>>(async () => undefined),
+    };
+    service = new AccountService(
+      mockPrisma.prisma as never,
+      {
+        defaultEmailDomain: "solace.onl",
+      },
+      mockMailService,
+    );
   });
 
   it("returns the configured signup domain", () => {
@@ -125,6 +135,9 @@ describe("AccountService", () => {
   it("deletes non-cascading user references before removing the user", async () => {
     const result = await service.deleteAccount({ userId: "user-1" });
 
+    expect(mockMailService.deleteMailboxForUser).toHaveBeenCalledWith({
+      userId: "user-1",
+    });
     expect(mockPrisma.prisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: "user-1" },
       select: { id: true },

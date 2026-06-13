@@ -1,6 +1,16 @@
 "use client";
 
-import { Send, ArrowLeft, Paperclip, X, Minus, Maximize2 } from "lucide-react";
+import {
+  Send,
+  ArrowLeft,
+  Paperclip,
+  X,
+  Minus,
+  Maximize2,
+  Loader2,
+  Check,
+  AlertCircle,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import {
   useMailCompose,
@@ -20,9 +30,16 @@ import {
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Button } from "@workspace/ui/components/ui/button";
 import { useIsMobile } from "@workspace/ui/hooks";
+import type { JmapIdentity } from "@/lib/mail/types";
+import { RichTextEditor } from "./rich-text-editor";
+import {
+  appendHtmlSignature,
+  appendPlainTextSignature,
+} from "@/lib/mail/signature-utils";
 
 export interface ComposeDialogProps {
-  fromEmail: string;
+  identities: JmapIdentity[];
+  fallbackFromEmail: string;
   onClose: () => void;
   onSend: () => Promise<void>;
   onExpand?: () => void;
@@ -35,8 +52,39 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function DraftSaveIndicator({
+  status,
+}: {
+  status: "idle" | "saving" | "saved" | "error";
+}) {
+  if (status === "idle") return null;
+  if (status === "saving") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+        <Loader2 className="size-3 animate-spin" />
+        Saving draft…
+      </span>
+    );
+  }
+  if (status === "saved") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+        <Check className="size-3 text-emerald-600" />
+        Draft saved
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] text-destructive">
+      <AlertCircle className="size-3" />
+      Draft save failed
+    </span>
+  );
+}
+
 export function ComposeForm({
-  fromEmail,
+  identities,
+  fallbackFromEmail,
   onClose,
   onSend,
   onExpand,
@@ -54,16 +102,31 @@ export function ComposeForm({
     setComposeBcc,
     composeSubject,
     setComposeSubject,
-    composeBody,
-    setComposeBody,
+    composeHtmlBody,
+    setComposeHtmlBody,
     composeAttachments,
     setComposeAttachments,
+    selectedIdentityId,
+    setSelectedIdentityId,
+    draftSaveStatus,
+    composeDraftId,
+    clearCompose,
   } = useMailCompose();
   const [showCc, setShowCc] = useState(!!composeCc);
   const [showBcc, setShowBcc] = useState(!!composeBcc);
   const [toTouched, setToTouched] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
+
+  const selectedIdentity =
+    identities.find((identity) => identity.id === selectedIdentityId) ??
+    identities[0] ??
+    null;
+  const fromLabel = selectedIdentity
+    ? selectedIdentity.name
+      ? `${selectedIdentity.name} <${selectedIdentity.email}>`
+      : selectedIdentity.email
+    : fallbackFromEmail;
 
   const isValidEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -88,9 +151,21 @@ export function ComposeForm({
     );
   };
 
+  const applySignaturePreview = () => {
+    if (!selectedIdentity) return;
+    const withHtml = appendHtmlSignature(composeHtmlBody, selectedIdentity);
+    if (withHtml !== composeHtmlBody) {
+      setComposeHtmlBody(withHtml);
+      return;
+    }
+    const plain = appendPlainTextSignature("", selectedIdentity);
+    if (plain) {
+      setComposeHtmlBody(`<p>${plain.replace(/\n/g, "<br>")}</p>`);
+    }
+  };
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* Header */}
       <div
         className={`flex items-center border-b border-border/50 shrink-0 ${
           isMobile ? "h-11 gap-1.5 px-2.5" : "h-12 gap-2 px-3"
@@ -103,7 +178,19 @@ export function ComposeForm({
         >
           <ArrowLeft className="size-4 text-muted-foreground" />
         </button>
-        <span className="text-sm font-medium flex-1">New mail</span>
+        <span className="text-sm font-medium flex-1">
+          {composeDraftId ? "Draft" : "New mail"}
+        </span>
+        <DraftSaveIndicator status={draftSaveStatus} />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={isMobile ? "h-7 px-2 text-xs text-muted-foreground" : "h-7 px-2.5 text-xs text-muted-foreground"}
+          onClick={clearCompose}
+        >
+          Clear
+        </Button>
         {onExpand && (
           <button
             type="button"
@@ -125,7 +212,6 @@ export function ComposeForm({
         </Button>
       </div>
 
-      {/* From (read-only) */}
       <div
         className={`flex items-center border-b border-border/50 shrink-0 ${
           isMobile ? "h-9 gap-2 px-3" : "h-10 gap-3 px-4"
@@ -138,12 +224,38 @@ export function ComposeForm({
         >
           From
         </span>
-        <span className="flex-1 text-sm text-muted-foreground truncate">
-          {fromEmail}
-        </span>
+        {identities.length > 1 ? (
+          <select
+            value={selectedIdentityId ?? ""}
+            onChange={(event) => setSelectedIdentityId(event.target.value || null)}
+            disabled={isBusy}
+            className="flex-1 min-w-0 bg-transparent text-sm text-foreground border-0 outline-none focus:ring-0"
+          >
+            {identities.map((identity) => (
+              <option key={identity.id} value={identity.id}>
+                {identity.name
+                  ? `${identity.name} <${identity.email}>`
+                  : identity.email}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="flex-1 text-sm text-muted-foreground truncate">
+            {fromLabel}
+          </span>
+        )}
+        {selectedIdentity &&
+          (selectedIdentity.textSignature || selectedIdentity.htmlSignature) && (
+            <button
+              type="button"
+              onClick={applySignaturePreview}
+              className="shrink-0 text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Insert signature
+            </button>
+          )}
       </div>
 
-      {/* To */}
       <div
         className={`flex items-center border-b shrink-0 transition-colors ${
           isMobile ? "h-9 gap-2 px-3" : "h-10 gap-3 px-4"
@@ -188,7 +300,6 @@ export function ComposeForm({
         </div>
       </div>
 
-      {/* CC (conditional) */}
       {showCc && (
         <div
           className={`flex items-center border-b border-border/50 shrink-0 ${
@@ -213,7 +324,10 @@ export function ComposeForm({
           />
           <button
             type="button"
-            onClick={() => { setShowCc(false); setComposeCc(""); }}
+            onClick={() => {
+              setShowCc(false);
+              setComposeCc("");
+            }}
             className="shrink-0 p-0.5 rounded hover:bg-muted/50 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
           >
             <Minus className="size-3" />
@@ -221,7 +335,6 @@ export function ComposeForm({
         </div>
       )}
 
-      {/* BCC (conditional) */}
       {showBcc && (
         <div
           className={`flex items-center border-b border-border/50 shrink-0 ${
@@ -246,7 +359,10 @@ export function ComposeForm({
           />
           <button
             type="button"
-            onClick={() => { setShowBcc(false); setComposeBcc(""); }}
+            onClick={() => {
+              setShowBcc(false);
+              setComposeBcc("");
+            }}
             className="shrink-0 p-0.5 rounded hover:bg-muted/50 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
           >
             <Minus className="size-3" />
@@ -254,7 +370,6 @@ export function ComposeForm({
         </div>
       )}
 
-      {/* Subject */}
       <div
         className={`flex items-center border-b border-border/50 shrink-0 ${
           isMobile ? "h-9 gap-2 px-3" : "h-10 gap-3 px-4"
@@ -277,26 +392,21 @@ export function ComposeForm({
         />
       </div>
 
-      {/* Body */}
       <div
-        className={`flex-1 overflow-y-auto ${
-          isMobile ? "px-3 pb-1.5 pt-2" : "px-4 pb-2 pt-3"
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${
+          isMobile ? "px-1 pb-1.5 pt-1" : "px-2 pb-2 pt-2"
         }`}
         role="presentation"
         onKeyDown={onKeyDown}
       >
-        <textarea
-          value={composeBody}
-          onChange={(e) => setComposeBody(e.target.value)}
-          placeholder="Write your message…"
+        <RichTextEditor
+          content={composeHtmlBody}
+          onChange={setComposeHtmlBody}
           disabled={isBusy}
-          className={`size-full bg-transparent border-0 text-sm resize-none placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 ring-0 ${
-            isMobile ? "min-h-24 leading-normal" : "min-h-32 leading-relaxed"
-          }`}
+          className="min-h-0 flex-1"
         />
       </div>
 
-      {/* Attachment chips */}
       {composeAttachments.length > 0 && (
         <div
           className={`flex flex-wrap gap-1.5 border-t border-border/50 shrink-0 ${
@@ -325,7 +435,6 @@ export function ComposeForm({
         </div>
       )}
 
-      {/* Footer toolbar */}
       <div
         className={`flex items-center justify-between border-t border-border/50 shrink-0 ${
           isMobile ? "px-3 py-1.5" : "px-4 py-2"
@@ -350,7 +459,9 @@ export function ComposeForm({
           </button>
         </div>
         <span className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground/40">
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">⌘↵</kbd>
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+            ⌘↵
+          </kbd>
           to send
         </span>
       </div>
@@ -359,7 +470,8 @@ export function ComposeForm({
 }
 
 export function ComposeDialog({
-  fromEmail,
+  identities,
+  fallbackFromEmail,
   onClose,
   onSend,
   onExpand,
@@ -380,7 +492,8 @@ export function ComposeDialog({
   };
 
   const formProps = {
-    fromEmail,
+    identities,
+    fallbackFromEmail,
     onClose,
     onSend,
     onExpand,
@@ -410,7 +523,7 @@ export function ComposeDialog({
         variant="spotlight"
         showClose={false}
         aria-describedby={undefined}
-        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl flex flex-col min-h-[360px] max-h-[min(620px,calc(83dvh-2rem))]"
+        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl flex flex-col min-h-[360px] max-h-[min(720px,calc(90dvh-2rem))]"
         onKeyDown={handleKeyDown}
       >
         <VisuallyHidden>

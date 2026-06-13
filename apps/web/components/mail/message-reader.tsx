@@ -1296,7 +1296,7 @@ export function MessageReader({
 
   if (!message) {
     return (
-      <div className="flex flex-1 items-center justify-center p-8">
+      <div className="flex h-full min-h-0 items-center justify-center p-8">
         <p className="text-sm text-muted-foreground">
           Select a message to read
         </p>

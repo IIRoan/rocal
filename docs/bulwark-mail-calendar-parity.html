@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Solace vs Bulwark — Mail &amp; Calendar Parity</title>
+  <style>
+    :root {
+      --bg: #faf8f5;
+      --surface: #fff;
+      --border: #e8e2d9;
+      --text: #1c1917;
+      --muted: #78716c;
+      --primary: #b45309;
+      --yes: #166534;
+      --yes-bg: #dcfce7;
+      --partial: #a16207;
+      --partial-bg: #fef9c3;
+      --no: #b91c1c;
+      --no-bg: #fee2e2;
+      --unique: #1d4ed8;
+      --unique-bg: #dbeafe;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 {
+      margin: 0 0 0.25rem;
+      font-size: 1.35rem;
+      font-weight: 600;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      max-width: 72ch;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    nav a {
+      font-size: 0.8rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    nav a:hover { border-color: var(--primary); color: var(--primary); }
+
+    main { padding: 1.5rem 2rem 3rem; max-width: 1400px; }
+
+    section { margin-bottom: 2.5rem; }
+
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin: 0 0 0.35rem;
+      color: var(--primary);
+    }
+
+    h2 + .section-note {
+      margin: 0 0 1rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin: 1.5rem 0 0.5rem;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.8rem;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .badge-yes { background: var(--yes-bg); color: var(--yes); }
+    .badge-partial { background: var(--partial-bg); color: var(--partial); }
+    .badge-no { background: var(--no-bg); color: var(--no); }
+    .badge-unique { background: var(--unique-bg); color: var(--unique); }
+    .badge-na { background: #f5f5f4; color: var(--muted); }
+
+    .priority {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      margin-left: 0.35rem;
+    }
+    .p-high { background: #fecaca; color: #991b1b; }
+    .p-med { background: #fed7aa; color: #9a3412; }
+    .p-low { background: #e7e5e4; color: #57534e; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    thead { background: #f5f0e8; }
+
+    th, td {
+      padding: 0.55rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th { font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fdfcfb; }
+
+    td.feature { font-weight: 500; min-width: 200px; }
+    td.notes { color: var(--muted); font-size: 0.8rem; max-width: 320px; }
+
+    .callout {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--primary);
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.9rem;
+    }
+
+    .callout strong { color: var(--primary); }
+
+    .phase-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 0.75rem;
+    }
+
+    .phase-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      font-size: 0.85rem;
+    }
+
+    .phase-card h4 {
+      margin: 0 0 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .phase-card ul {
+      margin: 0;
+      padding-left: 1.1rem;
+      color: var(--muted);
+    }
+
+    .phase-card li { margin-bottom: 0.25rem; }
+    .phase-card li.done {
+      text-decoration: line-through;
+      color: var(--muted);
+    }
+
+    .shipped-callout {
+      background: var(--unique-bg);
+      border: 1px solid #93c5fd;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+    }
+
+    .shipped-callout h3 {
+      margin: 0 0 0.5rem;
+      font-size: 0.95rem;
+      color: var(--unique);
+    }
+
+    .shipped-callout ul {
+      margin: 0;
+      padding-left: 1.1rem;
+      color: var(--text);
+    }
+
+    .shipped-callout li { margin-bottom: 0.2rem; }
+
+    @media (max-width: 900px) {
+      header, main { padding-left: 1rem; padding-right: 1rem; }
+      table { font-size: 0.8rem; }
+      .notes { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Solace vs Bulwark Webmail — Mail &amp; Calendar Only</h1>
+    <p>
+      Feature parity reference derived from <code>webmail/FEATURES.md</code> (Bulwark / Stalwart JMAP client).
+      Excludes Files, Contacts app, Sieve admin, Plugins, Marketplace, Setup wizard, and other suite infrastructure.
+      Solace calendar uses its own backend (not Stalwart JMAP Calendar).
+      <strong>Last updated:</strong> 13 Jun 2026 — reflects P1 mail list + compose work on web and native.
+    </p>
+    <nav>
+      <a href="#legend">Legend</a>
+      <a href="#mail-core">Mail — Core</a>
+      <a href="#mail-list">Mail — List &amp; scrolling</a>
+      <a href="#mail-compose">Mail — Compose</a>
+      <a href="#mail-search">Mail — Search</a>
+      <a href="#mail-security">Mail — Security</a>
+      <a href="#mail-ui">Mail — UI &amp; interaction</a>
+      <a href="#mail-calendar-bridge">Mail ↔ Calendar bridge</a>
+      <a href="#cal-views">Calendar — Views</a>
+      <a href="#cal-editing">Calendar — Editing</a>
+      <a href="#cal-recurrence">Calendar — Recurrence</a>
+      <a href="#cal-invites">Calendar — Invitations</a>
+      <a href="#cal-subscriptions">Calendar — Subscriptions</a>
+      <a href="#cal-tasks">Calendar — Tasks</a>
+      <a href="#cal-ui">Calendar — UI &amp; sync</a>
+      <a href="#solace-unique">Solace advantages</a>
+      <a href="#roadmap">Suggested roadmap</a>
+    </nav>
+  </header>
+
+  <main>
+    <div id="legend" class="legend">
+      <span><span class="badge badge-yes">Yes</span> Implemented</span>
+      <span><span class="badge badge-partial">Partial</span> Basic / incomplete</span>
+      <span><span class="badge badge-no">Gap</span> Not implemented</span>
+      <span><span class="badge badge-unique">Solace+</span> Solace ahead of Bulwark</span>
+      <span><span class="badge badge-na">N/A</span> Different product shape</span>
+      <span><span class="priority p-high">P1</span> High impact</span>
+      <span><span class="priority p-med">P2</span> Medium</span>
+      <span><span class="priority p-low">P3</span> Polish</span>
+    </div>
+
+    <div class="shipped-callout">
+      <h3>Recently shipped (Jun 2026)</h3>
+      <ul>
+        <li><strong>Web list:</strong> <code>@tanstack/react-virtual</code> scrolling, fixed 68px / 60px rows, 50-message pages, 150ms debounced load-more, merge-on-refresh, F5/Cmd+R JMAP refresh, scroll-to-selected</li>
+        <li><strong>Web compose:</strong> Tiptap rich text, HTML send, draft auto-save, identity picker, per-identity signatures</li>
+        <li><strong>Native list:</strong> infinite scroll (<code>onEndReached</code>), 30-message pages, companion-mailbox thread grouping with prefetch</li>
+        <li><strong>Native compose:</strong> draft auto-save, identity picker, plain-text signature insert</li>
+        <li><strong>Both:</strong> JMAP 401 retry + token clear on unauthorized</li>
+      </ul>
+    </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- MAIL -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <section id="mail-core">
+    <h2>Mail — Core reading &amp; actions</h2>
+    <p class="section-note">Read, move, flag, bulk ops, folders.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Read messages (HTML + plain)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Reply / reply-all / forward</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Quick reply in reader</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> Native message detail</td>
+        </tr>
+        <tr>
+          <td class="feature">Star / unstar</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Color labels / tags</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Reader + context menu; web list omits label chips (fixed row height)</td>
+        </tr>
+        <tr>
+          <td class="feature">Move / trash / archive</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Bulwark: archive by year/month modes</td>
+        </tr>
+        <tr>
+          <td class="feature">Archive by year / month</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Mark read / unread</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Configurable mark-as-read delay</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> 0s / Ns / never auto-mark</td>
+        </tr>
+        <tr>
+          <td class="feature">Spam / junk + restore</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Restore exists; no dedicated spam action in list hover</td>
+        </tr>
+        <tr>
+          <td class="feature">Bulk select + batch ops</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Empty trash / junk folder</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-med">P2</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Folder CRUD + subfolders</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Solace: CRUD + reorder; no icon picker / subfolder tree UX</td>
+        </tr>
+        <tr>
+          <td class="feature">Unified inbox (all accounts)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td class="notes">Single mailbox per user today</td>
+        </tr>
+        <tr>
+          <td class="feature">Multi-account switching</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td class="notes">Out of scope unless product adds it</td>
+        </tr>
+        <tr>
+          <td class="feature">Print from viewer</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Toast with undo on delete/archive</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-med">P2</span></td>
+        </tr>
+        <tr>
+          <td class="feature">URL / history sync (mailbox + message)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Native: route per message, no deep link parity with web</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="mail-list">
+    <h2>Mail — List, scrolling &amp; refresh</h2>
+    <p class="section-note">High-impact UX gaps Bulwark solves well.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Gmail-style thread grouping</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Web: mailbox-only grouping in list; full thread in reader on select. Native: inbox+sent prefetch</td>
+        </tr>
+        <tr>
+          <td class="feature">Toggle threading off</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Inline thread expand in list</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> Fetch full thread on expand</td>
+        </tr>
+        <tr>
+          <td class="feature">Conversation view in reader</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Native: single-message screen</td>
+        </tr>
+        <tr>
+          <td class="feature">Virtual scrolling (large mailboxes)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web: <code>@tanstack/react-virtual</code> with fixed 68px / 60px rows. Native: FlatList virtualized</td>
+        </tr>
+        <tr>
+          <td class="feature">Fixed list row height</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web: 68px desktop / 60px mobile. Bulwark density settings go further</td>
+        </tr>
+        <tr>
+          <td class="feature">Default mailbox page size</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Web: 50 per page. Native: 30 per page (infinite query)</td>
+        </tr>
+        <tr>
+          <td class="feature">Infinite scroll / load more</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Native: <code>onEndReached</code> + React Query infinite pages</td>
+        </tr>
+        <tr>
+          <td class="feature">Debounced load-more (avoid scroll bounce)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web: 150ms debounce + near-end trigger. Native: threshold-based only</td>
+        </tr>
+        <tr>
+          <td class="feature">Merge refresh (keep loaded pages)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web: <code>mergeRefreshedMailboxMessages</code> on manual refresh + F5/Cmd+R. Mailbox switch still reloads page 1</td>
+        </tr>
+        <tr>
+          <td class="feature">Scroll to selected message</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes">Web: <code>virtualizer.scrollToIndex</code></td>
+        </tr>
+        <tr>
+          <td class="feature">Manual refresh button</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Native: pull-to-refresh</td>
+        </tr>
+        <tr>
+          <td class="feature">F5 / Cmd+R / pull-to-refresh → JMAP refresh</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web: <code>useRefreshGesture</code> intercepts browser reload → JMAP merge refresh. Native: pull-to-refresh</td>
+        </tr>
+        <tr>
+          <td class="feature">Realtime push / sync</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web: SSE + incremental merge. Native: manual refetch</td>
+        </tr>
+        <tr>
+          <td class="feature">Prefetch mailboxes + first page on login</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> Parallelize bootstrap</td>
+        </tr>
+        <tr>
+          <td class="feature">List density settings</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span> extra-compact → comfortable</td>
+        </tr>
+        <tr>
+          <td class="feature">Snippet preview in list</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Subject + metadata; limited body preview</td>
+        </tr>
+        <tr>
+          <td class="feature">Sender avatars (favicon-based)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web has MailAvatar component</td>
+        </tr>
+        <tr>
+          <td class="feature">Hover actions on list rows</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> Desktop only</td>
+        </tr>
+        <tr>
+          <td class="feature">Drag-drop messages to folders/tags</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span> Solace has mailbox reorder DnD only</td>
+        </tr>
+        <tr>
+          <td class="feature">Right-click context menus</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Native: long-press sheets</td>
+        </tr>
+        <tr>
+          <td class="feature">Full keyboard navigation (j/k, r, e, …)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> Solace: ⌘K only today</td>
+        </tr>
+        <tr>
+          <td class="feature">Three mail layouts (split / focus / bottom pane)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td class="notes"><span class="priority p-low">P3</span> Fixed split + mobile stack</td>
+        </tr>
+        <tr>
+          <td class="feature">Resizable list / reader columns</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">New-mail notification sound + toast</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes">Web: realtime sync; no dedicated new-mail toast/sound UX</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="mail-compose">
+    <h2>Mail — Compose &amp; drafts</h2>
+    <p class="section-note">Rich compose landed on web (Jun 2026); native still plain-text.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Rich text composer (Tiptap)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes">Web: <code>rich-text-editor.tsx</code> (StarterKit, links, lists). Native: plain <code>TextInput</code></td>
+        </tr>
+        <tr>
+          <td class="feature">Inline images in compose</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-high">P1</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Tables in compose</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Draft auto-save</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes"><code>use-compose-draft-autosave</code> on both platforms; HTML + identity on web</td>
+        </tr>
+        <tr>
+          <td class="feature">Edit existing drafts</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-high">P1</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Proper In-Reply-To / References on reply</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web threading headers in send path</td>
+        </tr>
+        <tr>
+          <td class="feature">Editable quote island when replying</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Quote split exists; not layout-preserving HTML island</td>
+        </tr>
+        <tr>
+          <td class="feature">Attachment upload + preview in compose</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Native compose: limited attachment UX</td>
+        </tr>
+        <tr>
+          <td class="feature">Forgotten-attachment warning</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-med">P2</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Scheduled send</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> Needs Stalwart delayed send</td>
+        </tr>
+        <tr>
+          <td class="feature">Configurable send delay (undo send)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> 10 / 30 / 60s</td>
+        </tr>
+        <tr>
+          <td class="feature">Read receipts (MDN request + response policy)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Multiple sender identities + picker</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Compose identity <code>&lt;select&gt;</code> on web; native picker in compose sheet</td>
+        </tr>
+        <tr>
+          <td class="feature">Per-identity signatures</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web: HTML/plain append on send. Native: manual “Insert signature” (plain text)</td>
+        </tr>
+        <tr>
+          <td class="feature">Signature above / below quoted text</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web: <code>signature-utils</code> append helpers; no user-facing above/below toggle</td>
+        </tr>
+        <tr>
+          <td class="feature">Reply-To header support</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">From-header override / alias auto-fill</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Identity picker sets From; no alias auto-fill UX</td>
+        </tr>
+        <tr>
+          <td class="feature">Plain-text composer mode toggle</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td class="notes">Web defaults to rich HTML; no plain-mode toggle yet</td>
+        </tr>
+        <tr>
+          <td class="feature">Email templates with placeholders</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Recipient autocomplete (contacts)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Solace: calendar participants / manual entry; no address book</td>
+        </tr>
+        <tr>
+          <td class="feature">Sub-addressing tag suggestions</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="mail-search">
+    <h2>Mail — Search</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Inline mailbox search</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes">Native: command palette only</td>
+        </tr>
+        <tr>
+          <td class="feature">Full-text search with wildcards</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">JMAP text search; no wildcard UX</td>
+        </tr>
+        <tr>
+          <td class="feature">Advanced filter panel (from/to/subject/body/date/…)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-med">P2</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Search chips + clear filters</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-med">P2</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Cross-mailbox search</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Command palette unified search</td>
+        </tr>
+        <tr>
+          <td class="feature">Paginated search results / load more</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Fixed limit (~40) on inline search</td>
+        </tr>
+        <tr>
+          <td class="feature">Encrypted local search index (E2EE mail)</td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-unique">Solace+</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes">Unique Solace strength on web</td>
+        </tr>
+        <tr>
+          <td class="feature">Unified mail + calendar search</td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-unique">Solace+</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Native palette is calendar-scoped</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="mail-security">
+    <h2>Mail — Security, privacy &amp; attachments</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">PGP / E2EE mail</td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-unique">Solace+</span></td>
+          <td><span class="badge badge-unique">Solace+</span></td>
+          <td class="notes">Core differentiator</td>
+        </tr>
+        <tr>
+          <td class="feature">S/MIME sign / encrypt / decrypt</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes">Intentional — PGP instead</td>
+        </tr>
+        <tr>
+          <td class="feature">Block remote images by default</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Parity on web</td>
+        </tr>
+        <tr>
+          <td class="feature">Block tracking pixels</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Parity on web</td>
+        </tr>
+        <tr>
+          <td class="feature">JMAP OAuth token refresh on 401</td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes"><code>StalwartJmapClient</code> clears token + single retry via <code>onUnauthorized</code></td>
+        </tr>
+        <tr>
+          <td class="feature">Trusted senders list</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-med">P2</span></td>
+        </tr>
+        <tr>
+          <td class="feature">SPF / DKIM / DMARC indicators</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Newsletter unsubscribe (List-Unsubscribe)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">HTML sanitization (DOMPurify)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Intelligent dark-mode color transform for HTML mail</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web mail dark mode toggle</td>
+        </tr>
+        <tr>
+          <td class="feature">Attachment preview (image, PDF)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Inline PDF preview on mobile</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Native modal preview</td>
+        </tr>
+        <tr>
+          <td class="feature">`.eml` / message/rfc822 attachment rendering</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">TNEF / winmail.dat extraction</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">`.eml` file import (folder context menu)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Drag attachment out to filesystem</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td class="notes"><span class="priority p-low">P3</span> Desktop web</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="mail-ui">
+    <h2>Mail — UI &amp; interaction (mail-only)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Responsive desktop / tablet / mobile</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Solace also has dedicated native app</td>
+        </tr>
+        <tr>
+          <td class="feature">Dark / light themes</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Recipient popover (click sender)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Identity badge in list / viewer</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">PWA + web push for new mail</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> Optional for web</td>
+        </tr>
+        <tr>
+          <td class="feature">Guided onboarding tour</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Storage quota display</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="mail-calendar-bridge">
+    <h2>Mail ↔ Calendar bridge</h2>
+    <p class="section-note">Features where mail and calendar interact — relevant even with a custom Solace calendar backend.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Detect `.ics` in email → RSVP / import</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web reader has invite banner + import</td>
+        </tr>
+        <tr>
+          <td class="feature">iMIP on send (organizer invitations)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Solace calendar sends invites via own backend</td>
+        </tr>
+        <tr>
+          <td class="feature">Auto-import calendar changes from inbound mail</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web: realtime sync + calendarImport toast</td>
+        </tr>
+        <tr>
+          <td class="feature">Event reminder emails (linked to calendar event)</td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-unique">Solace+</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Solace-native notification emails with deep links</td>
+        </tr>
+        <tr>
+          <td class="feature">Birthday calendar from contacts</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes">Needs contacts source; out of scope unless you add contacts</td>
+        </tr>
+        <tr>
+          <td class="feature">Shared command palette (mail + calendar)</td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-unique">Solace+</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Single app shell</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- CALENDAR -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <section id="cal-views">
+    <h2>Calendar — Views &amp; navigation</h2>
+    <p class="section-note">Bulwark uses JMAP Calendar; Solace uses its own API — compare by user-facing capability.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Month view</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Week view</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Day view</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Agenda view</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">3-day view</td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes"><span class="badge badge-unique">Solace+</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Mini-calendar sidebar</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Solace: date picker in views; not persistent mini-cal</td>
+        </tr>
+        <tr>
+          <td class="feature">Week numbers</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Event hover preview in grid</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Solace: popover on click; Bulwark: configurable hover delay</td>
+        </tr>
+        <tr>
+          <td class="feature">Multiple calendars + colors</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Hide / show calendars</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="cal-editing">
+    <h2>Calendar — Creating &amp; editing events</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Click-drag to create event</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Native: tap to create; less drag-create</td>
+        </tr>
+        <tr>
+          <td class="feature">Drag to reschedule</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Native swipe/drag varies by view</td>
+        </tr>
+        <tr>
+          <td class="feature">Edge-resize duration (15-min snap)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Parity on web week/day</td>
+        </tr>
+        <tr>
+          <td class="feature">All-day events</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Location field</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Virtual location / video conference URL</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> Bulwark: first-class JMAP virtualLocations field</td>
+        </tr>
+        <tr>
+          <td class="feature">Event reminders / alerts</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Solace: email notifications service + in-app</td>
+        </tr>
+        <tr>
+          <td class="feature">Notification sound picker</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">E2EE encrypted events</td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-unique">Solace+</span></td>
+          <td><span class="badge badge-unique">Solace+</span></td>
+          <td class="notes">Core differentiator</td>
+        </tr>
+        <tr>
+          <td class="feature">Participants / attendees</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="cal-recurrence">
+    <h2>Calendar — Recurrence</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Recurring events (RRULE)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Scoped edit/delete (this / following / all)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Recurrence exceptions / detached instances</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="cal-invites">
+    <h2>Calendar — Invitations &amp; RSVP</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Send iMIP invitations on create/update</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Different transport; same UX goal</td>
+        </tr>
+        <tr>
+          <td class="feature">RSVP accept / tentative / decline</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Organizer vs attendee UI</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">RSVP trust assessment</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Import `.ics` from file with preview</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Solace: subscriptions + mail import; bulk ICS UI thinner</td>
+        </tr>
+        <tr>
+          <td class="feature">UID deduplication on import</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity on subscription sync</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="cal-subscriptions">
+    <h2>Calendar — Subscriptions &amp; external calendars</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">iCal / webcal subscriptions</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Edit subscription URL / settings</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Batch import multiple subscriptions</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">CalDAV shared calendars discovery</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes">Solace: ICS subscriptions, not CalDAV</td>
+        </tr>
+        <tr>
+          <td class="feature">Shared calendars with per-viewer colors</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Solace: calendar sharing via own backend / participants</td>
+        </tr>
+        <tr>
+          <td class="feature">National / holiday calendar presets</td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes"><span class="badge badge-unique">Solace+</span> Holiday subscription UI on web</td>
+        </tr>
+        <tr>
+          <td class="feature">ICS export</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">@workspace/calendar-ics package</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="cal-tasks">
+    <h2>Calendar — Tasks</h2>
+    <p class="section-note">Bulwark bundles JMAP Tasks in the calendar app. Solace does not have a tasks surface today.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Task list with due dates</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes">Only if you want task parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Priority + completion status</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes">—</td>
+        </tr>
+        <tr>
+          <td class="feature">Tasks in calendar sidebar</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes">—</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="cal-ui">
+    <h2>Calendar — UI, sync &amp; settings</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Bulwark</th>
+          <th>Solace Web</th>
+          <th>Solace Native</th>
+          <th>Gap / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Realtime calendar sync (push)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Solace: React Query refetch / polling patterns</td>
+        </tr>
+        <tr>
+          <td class="feature">Timezone picker + per-user timezone</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">First day of week setting</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">24h / 12h time format</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Calendar CRUD (create / rename / delete / color)</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Parity</td>
+        </tr>
+        <tr>
+          <td class="feature">Encrypted calendar search</td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-unique">Solace+</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">E2EE search corpus on web</td>
+        </tr>
+        <tr>
+          <td class="feature">Jitsi / video plugin on events</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-no">Gap</span></td>
+          <td class="notes">Plugin — excluded; use virtual location URL instead</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="solace-unique">
+    <h2>Solace advantages (keep &amp; extend)</h2>
+    <div class="callout">
+      <strong>Not trying to replicate Bulwark's suite.</strong> These are areas where Solace is already ahead for a privacy-focused calendar + mail product.
+    </div>
+    <table>
+      <thead>
+        <tr><th>Area</th><th>What Solace has</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="feature">E2EE mail (PGP)</td><td class="notes">Vault, worker crypto, signature verification in reader</td></tr>
+        <tr><td class="feature">E2EE calendar events</td><td class="notes">Encrypted titles/descriptions; participant key distribution</td></tr>
+        <tr><td class="feature">Encrypted search indexes</td><td class="notes">Device-local mail + calendar search without server plaintext</td></tr>
+        <tr><td class="feature">Unified app shell</td><td class="notes">Single sidebar, command palette, mail ↔ calendar navigation</td></tr>
+        <tr><td class="feature">Native mobile app</td><td class="notes">Dedicated Expo app — not responsive-web-only</td></tr>
+        <tr><td class="feature">Own calendar backend</td><td class="notes">Full control over invites, reminders, sharing — no Stalwart Calendar dependency</td></tr>
+        <tr><td class="feature">Event reminder emails</td><td class="notes">Notifications service + rich in-mail event cards</td></tr>
+        <tr><td class="feature">3-day calendar view</td><td class="notes">Extra view Bulwark doesn't list</td></tr>
+        <tr><td class="feature">Holiday calendar presets</td><td class="notes">National holiday subscription picker on web</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="roadmap">
+    <h2>Suggested roadmap (mail + calendar only)</h2>
+    <div class="phase-list">
+      <div class="phase-card">
+        <h4>P1 — Mail list feel ✓ shipped</h4>
+        <ul>
+          <li class="done">Virtual scrolling (web)</li>
+          <li class="done">Merge-on-refresh + scroll preservation</li>
+          <li class="done">Debounced load-more</li>
+          <li class="done">Native pagination (onEndReached)</li>
+          <li class="done">F5 / Cmd+R → JMAP refresh (web)</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h4>P1 — Compose ✓ shipped (web)</h4>
+        <ul>
+          <li class="done">Draft auto-save (web + native)</li>
+          <li class="done">Rich text + HTML send (web)</li>
+          <li class="done">Identity picker + signatures (web + native partial)</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h4>P2 — Mail depth</h4>
+        <ul>
+          <li>Web list thread prefetch (inbox+sent, rate-limit safe)</li>
+          <li>Label chips in list (compact) or density settings</li>
+          <li>Edit existing drafts from drafts folder</li>
+          <li>Native rich-text compose</li>
+          <li>Advanced search panel + chips</li>
+          <li>Thread expand in list</li>
+          <li>Undo toasts</li>
+          <li>Keyboard shortcuts (j/k, r, e, …)</li>
+          <li>Mark-as-read delay</li>
+          <li>Trusted senders</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h4>P2 — Calendar polish</h4>
+        <ul>
+          <li>Virtual location / video URL field</li>
+          <li>Mini-calendar sidebar (optional)</li>
+          <li>Event hover preview tuning</li>
+          <li>Native invite import parity with web</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h4>P3 — Optional</h4>
+        <ul>
+          <li>Scheduled send + undo-send delay</li>
+          <li>Mail layout options + density</li>
+          <li>Empty trash/junk</li>
+          <li>SPF/DKIM/DMARC badges</li>
+          <li>Tasks (only if product wants them)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <p style="margin-top:2rem;font-size:0.8rem;color:var(--muted);">
+    Generated for Solace monorepo · Source: <code>webmail/FEATURES.md</code> + codebase review ·
+    Last updated 13 Jun 2026 ·
+    Open this file in any browser: <code>docs/bulwark-mail-calendar-parity.html</code>
+  </p>
+  </main>
+</body>
+</html>

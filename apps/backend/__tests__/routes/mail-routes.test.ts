@@ -36,6 +36,7 @@ const mockMailService = {
   getVaultBackupForUser: jest.fn(),
   upsertVaultBackup: jest.fn(),
   upsertVaultBackupForUser: jest.fn(),
+  deleteMailboxForUser: jest.fn(),
 };
 
 import { auth } from "../../lib/auth";

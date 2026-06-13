@@ -1,5 +1,10 @@
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { StalwartJmapClient } from "../../lib/mail/jmap-client";
+import {
+  appendMailboxMessages,
+  hasMoreMailboxMessages,
+  MAILBOX_MESSAGES_PAGE_SIZE,
+} from "../../lib/mail/mail-pagination";
 import type { JmapSession } from "../../lib/mail/types";
 
 const mockSession: JmapSession = {
@@ -125,5 +130,29 @@ describe("StalwartJmapClient.getMailboxMessages pagination", () => {
       (fetchMock.mock.calls[0] as [string, RequestInit])[1]!.body as string,
     );
     expect(body.methodCalls[0][1].filter.inMailbox).toBe("specific-mailbox-id");
+  });
+});
+
+describe("mail pagination helpers", () => {
+  it("uses total count when the server reports one", () => {
+    expect(hasMoreMailboxMessages(50, 120)).toBe(true);
+    expect(hasMoreMailboxMessages(120, 120)).toBe(false);
+  });
+
+  it("falls back to full-page heuristics when total is unknown", () => {
+    expect(hasMoreMailboxMessages(50, 0)).toBe(true);
+    expect(hasMoreMailboxMessages(48, 0)).toBe(false);
+  });
+
+  it("deduplicates appended mailbox pages", () => {
+    const merged = appendMailboxMessages(
+      [{ id: "a" }, { id: "b" }],
+      [{ id: "b" }, { id: "c" }],
+    );
+    expect(merged.map((message) => message.id)).toEqual(["c"]);
+  });
+
+  it("exports the mailbox page size used by the web client", () => {
+    expect(MAILBOX_MESSAGES_PAGE_SIZE).toBe(50);
   });
 });

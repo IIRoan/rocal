@@ -6,17 +6,19 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
-import type { JmapEmailMessage } from "@/lib/mail/types";
+import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
+import { extractMessageBodies } from "@/lib/mail/message-security";
+import { htmlToPlainText } from "@/lib/mail/signature-utils";
 
 type MailReplyContext = {
   threadId: string | null;
   inReplyTo?: string[];
   references?: string[];
 };
-import { extractMessageBodies } from "@/lib/mail/message-security";
 
 function buildReplyContext(
   message: Pick<JmapEmailMessage, "threadId" | "messageId" | "references">,
@@ -39,23 +41,57 @@ export type ComposeDraft = {
   bcc: string;
   subject: string;
   body: string;
+  htmlBody: string;
   attachments: File[];
   replyContext: MailReplyContext | null;
+  identityId: string | null;
+  draftId: string | null;
 };
+
+export type DraftSaveStatus = "idle" | "saving" | "saved" | "error";
 
 export type MailComposeBridge = {
   getDraft: () => ComposeDraft;
   resetDraft: () => void;
+  clearCompose: () => void;
   seedReply: (message: JmapEmailMessage, plaintext: string | null) => void;
   seedForward: (message: JmapEmailMessage, plaintext: string | null) => void;
+  seedDraft: (
+    message: JmapEmailMessage,
+    overrides?: {
+      plaintext?: string | null;
+      html?: string | null;
+    },
+  ) => void;
+  markDirty: () => void;
+  getDraftIdRef: () => string | null;
+  setDraftId: (id: string | null) => void;
+  setDraftSaveStatus: (status: DraftSaveStatus) => void;
 };
 
 const composeBridgeRef: { current: MailComposeBridge | null } = {
   current: null,
 };
 
+const composeDraftSaveRef: {
+  current: (() => Promise<string | null>) | null;
+} = { current: null };
+
 export function getMailComposeBridge(): MailComposeBridge | null {
   return composeBridgeRef.current;
+}
+
+export function registerComposeDraftSaver(
+  saver: (() => Promise<string | null>) | null,
+) {
+  composeDraftSaveRef.current = saver;
+}
+
+export async function flushComposeDraftSave(): Promise<string | null> {
+  if (!composeDraftSaveRef.current) {
+    return null;
+  }
+  return composeDraftSaveRef.current();
 }
 
 type MailComposeFieldsContextValue = {
@@ -69,8 +105,16 @@ type MailComposeFieldsContextValue = {
   setComposeSubject: (value: string) => void;
   composeBody: string;
   setComposeBody: (value: string) => void;
+  composeHtmlBody: string;
+  setComposeHtmlBody: (value: string) => void;
   composeAttachments: File[];
   setComposeAttachments: React.Dispatch<React.SetStateAction<File[]>>;
+  selectedIdentityId: string | null;
+  setSelectedIdentityId: (id: string | null) => void;
+  draftSaveStatus: DraftSaveStatus;
+  setDraftSaveStatus: (status: DraftSaveStatus) => void;
+  composeDraftId: string | null;
+  clearCompose: () => void;
 };
 
 type MailComposeChromeContextValue = {
@@ -78,6 +122,7 @@ type MailComposeChromeContextValue = {
   setIsComposeOpen: (open: boolean) => void;
   isFullCompose: boolean;
   setIsFullCompose: (open: boolean) => void;
+  dismissCompose: () => void;
 };
 
 const MailComposeFieldsContext = createContext<
@@ -106,17 +151,54 @@ export function useMailComposeChrome() {
   return context;
 }
 
-export function MailComposeProvider({ children }: { children: ReactNode }) {
+function addressesToCsv(
+  addresses: Array<{ email?: string | null }> | undefined,
+): string {
+  return (addresses ?? [])
+    .map((entry) => entry.email?.trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+export function MailComposeProvider({
+  children,
+  identities = [],
+}: {
+  children: ReactNode;
+  identities?: JmapIdentity[];
+}) {
   const [composeTo, setComposeTo] = useState("");
   const [composeCc, setComposeCc] = useState("");
   const [composeBcc, setComposeBcc] = useState("");
   const [composeSubject, setComposeSubject] = useState("");
   const [composeBody, setComposeBody] = useState("");
+  const [composeHtmlBody, setComposeHtmlBody] = useState("");
   const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
   const [composeReplyContext, setComposeReplyContext] =
     useState<MailReplyContext | null>(null);
+  const [selectedIdentityId, setSelectedIdentityId] = useState<string | null>(
+    null,
+  );
+  const resolvedIdentityId =
+    selectedIdentityId &&
+    identities.some((entry) => entry.id === selectedIdentityId)
+      ? selectedIdentityId
+      : (identities[0]?.id ?? null);
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftSaveStatus, setDraftSaveStatus] =
+    useState<DraftSaveStatus>("idle");
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isFullCompose, setIsFullCompose] = useState(false);
+  const draftIdRef = useRef<string | null>(null);
+  const isDirtyRef = useRef(false);
+
+  useEffect(() => {
+    draftIdRef.current = draftId;
+  }, [draftId]);
+
+  const markDirty = useCallback(() => {
+    isDirtyRef.current = true;
+  }, []);
 
   const draft = useMemo(
     () => ({
@@ -125,8 +207,11 @@ export function MailComposeProvider({ children }: { children: ReactNode }) {
       bcc: composeBcc,
       subject: composeSubject,
       body: composeBody,
+      htmlBody: composeHtmlBody,
       attachments: composeAttachments,
       replyContext: composeReplyContext,
+      identityId: resolvedIdentityId,
+      draftId,
     }),
     [
       composeTo,
@@ -134,8 +219,11 @@ export function MailComposeProvider({ children }: { children: ReactNode }) {
       composeBcc,
       composeSubject,
       composeBody,
+      composeHtmlBody,
       composeAttachments,
       composeReplyContext,
+      resolvedIdentityId,
+      draftId,
     ],
   );
 
@@ -145,18 +233,47 @@ export function MailComposeProvider({ children }: { children: ReactNode }) {
     setComposeBcc("");
     setComposeSubject("");
     setComposeBody("");
+    setComposeHtmlBody("");
     setComposeAttachments([]);
     setComposeReplyContext(null);
+    setDraftId(null);
+    draftIdRef.current = null;
+    isDirtyRef.current = false;
+    setDraftSaveStatus("idle");
     setIsComposeOpen(false);
     setIsFullCompose(false);
-  }, []);
+    setSelectedIdentityId(identities[0]?.id ?? null);
+  }, [identities]);
+
+  const clearCompose = useCallback(() => {
+    setComposeTo("");
+    setComposeCc("");
+    setComposeBcc("");
+    setComposeSubject("");
+    setComposeBody("");
+    setComposeHtmlBody("");
+    setComposeAttachments([]);
+    setComposeReplyContext(null);
+    setDraftId(null);
+    draftIdRef.current = null;
+    isDirtyRef.current = false;
+    setDraftSaveStatus("idle");
+    setSelectedIdentityId(identities[0]?.id ?? null);
+  }, [identities]);
+
+  const dismissCompose = useCallback(() => {
+    clearCompose();
+    setIsComposeOpen(false);
+    setIsFullCompose(false);
+  }, [clearCompose]);
 
   const seedReply = useCallback(
     (message: JmapEmailMessage, plaintext: string | null) => {
       const sender = message.from?.[0]?.email ?? "";
       const subject = message.subject ?? "";
-      const { text } = extractMessageBodies(message);
+      const { text, html } = extractMessageBodies(message);
       const body = plaintext ?? text ?? "";
+      const htmlBody = html ?? `<p>${body.replace(/\n/g, "<br>")}</p>`;
       const date = message.receivedAt
         ? new Date(message.receivedAt).toLocaleString()
         : "";
@@ -164,9 +281,15 @@ export function MailComposeProvider({ children }: { children: ReactNode }) {
       setComposeCc("");
       setComposeBcc("");
       setComposeSubject(subject.startsWith("Re: ") ? subject : `Re: ${subject}`);
-      setComposeBody(`\n\n---\nOn ${date}, ${sender} wrote:\n${body}`);
+      const quotedPlain = `\n\n---\nOn ${date}, ${sender} wrote:\n${body}`;
+      const quotedHtml = `<p></p><hr><p>On ${date}, ${sender} wrote:</p><blockquote>${htmlBody}</blockquote>`;
+      setComposeBody(quotedPlain);
+      setComposeHtmlBody(quotedHtml);
       setComposeAttachments([]);
       setComposeReplyContext(buildReplyContext(message));
+      setDraftId(null);
+      draftIdRef.current = null;
+      isDirtyRef.current = true;
       setIsComposeOpen(true);
     },
     [],
@@ -176,8 +299,9 @@ export function MailComposeProvider({ children }: { children: ReactNode }) {
     (message: JmapEmailMessage, plaintext: string | null) => {
       const sender = message.from?.[0]?.email ?? "";
       const subject = message.subject ?? "";
-      const { text } = extractMessageBodies(message);
+      const { text, html } = extractMessageBodies(message);
       const body = plaintext ?? text ?? "";
+      const htmlBody = html ?? `<p>${body.replace(/\n/g, "<br>")}</p>`;
       setComposeTo("");
       setComposeCc("");
       setComposeBcc("");
@@ -185,9 +309,47 @@ export function MailComposeProvider({ children }: { children: ReactNode }) {
         subject.startsWith("Fwd: ") ? subject : `Fwd: ${subject}`,
       );
       setComposeBody(`\n\n---\nForwarded message from ${sender}:\n${body}`);
+      setComposeHtmlBody(
+        `<p></p><hr><p>Forwarded message from ${sender}:</p>${htmlBody}`,
+      );
       setComposeAttachments([]);
       setComposeReplyContext(null);
+      setDraftId(null);
+      draftIdRef.current = null;
+      isDirtyRef.current = true;
       setIsComposeOpen(true);
+    },
+    [],
+  );
+
+  const seedDraft = useCallback(
+    (
+      message: JmapEmailMessage,
+      overrides?: {
+        plaintext?: string | null;
+        html?: string | null;
+      },
+    ) => {
+      const { text, html } = extractMessageBodies(message);
+      const bodyText = overrides?.plaintext ?? text ?? "";
+      const htmlBody =
+        overrides?.html ??
+        html ??
+        (bodyText ? `<p>${bodyText.replace(/\n/g, "<br>")}</p>` : "");
+      setComposeTo(addressesToCsv(message.to));
+      setComposeCc(addressesToCsv(message.cc));
+      setComposeBcc(addressesToCsv(message.bcc));
+      setComposeSubject(message.subject ?? "");
+      setComposeBody(bodyText);
+      setComposeHtmlBody(htmlBody);
+      setComposeAttachments([]);
+      setComposeReplyContext(buildReplyContext(message));
+      setDraftId(message.id);
+      draftIdRef.current = message.id;
+      isDirtyRef.current = false;
+      setDraftSaveStatus("idle");
+      setIsComposeOpen(false);
+      setIsFullCompose(true);
     },
     [],
   );
@@ -196,28 +358,76 @@ export function MailComposeProvider({ children }: { children: ReactNode }) {
     composeBridgeRef.current = {
       getDraft: () => draft,
       resetDraft,
+      clearCompose,
       seedReply,
       seedForward,
+      seedDraft,
+      markDirty,
+      getDraftIdRef: () => draftIdRef.current,
+      setDraftId: (id) => {
+        draftIdRef.current = id;
+        setDraftId(id);
+      },
+      setDraftSaveStatus,
     };
     return () => {
       composeBridgeRef.current = null;
     };
-  }, [draft, resetDraft, seedReply, seedForward]);
+  }, [
+    draft,
+    resetDraft,
+    clearCompose,
+    seedReply,
+    seedForward,
+    seedDraft,
+    markDirty,
+    setDraftSaveStatus,
+  ]);
 
   const fieldsValue = useMemo(
     () => ({
       composeTo,
-      setComposeTo,
+      setComposeTo: (value: string) => {
+        markDirty();
+        setComposeTo(value);
+      },
       composeCc,
-      setComposeCc,
+      setComposeCc: (value: string) => {
+        markDirty();
+        setComposeCc(value);
+      },
       composeBcc,
-      setComposeBcc,
+      setComposeBcc: (value: string) => {
+        markDirty();
+        setComposeBcc(value);
+      },
       composeSubject,
-      setComposeSubject,
+      setComposeSubject: (value: string) => {
+        markDirty();
+        setComposeSubject(value);
+      },
       composeBody,
-      setComposeBody,
+      setComposeBody: (value: string) => {
+        markDirty();
+        setComposeBody(value);
+      },
+      composeHtmlBody,
+      setComposeHtmlBody: (value: string) => {
+        markDirty();
+        setComposeHtmlBody(value);
+        setComposeBody(htmlToPlainText(value));
+      },
       composeAttachments,
       setComposeAttachments,
+      selectedIdentityId: resolvedIdentityId,
+      setSelectedIdentityId: (id: string | null) => {
+        markDirty();
+        setSelectedIdentityId(id);
+      },
+      draftSaveStatus,
+      setDraftSaveStatus,
+      composeDraftId: draftId,
+      clearCompose,
     }),
     [
       composeTo,
@@ -225,7 +435,13 @@ export function MailComposeProvider({ children }: { children: ReactNode }) {
       composeBcc,
       composeSubject,
       composeBody,
+      composeHtmlBody,
       composeAttachments,
+      resolvedIdentityId,
+      draftSaveStatus,
+      draftId,
+      markDirty,
+      clearCompose,
     ],
   );
 
@@ -235,8 +451,9 @@ export function MailComposeProvider({ children }: { children: ReactNode }) {
       setIsComposeOpen,
       isFullCompose,
       setIsFullCompose,
+      dismissCompose,
     }),
-    [isComposeOpen, isFullCompose],
+    [isComposeOpen, isFullCompose, dismissCompose],
   );
 
   return (

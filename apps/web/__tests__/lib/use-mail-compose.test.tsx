@@ -7,6 +7,7 @@ import {
   MailComposeProvider,
   getMailComposeBridge,
   useMailCompose,
+  useMailComposeChrome,
 } from "@/components/mail/mail-compose-context";
 
 function ComposeProbe({
@@ -90,5 +91,88 @@ describe("useMailCompose", () => {
 
     expect(getMailComposeBridge()?.getDraft().to).toBe("");
     expect(getMailComposeBridge()?.getDraft().body).toBe("");
+  });
+
+  it("clearCompose wipes fields without closing chrome", async () => {
+    let latest: ReturnType<typeof useMailCompose> | null = null;
+    let chrome: ReturnType<typeof useMailComposeChrome> | null = null;
+
+    function ChromeProbe() {
+      chrome = useMailComposeChrome();
+      return null;
+    }
+
+    await act(async () => {
+      root.render(
+        <MailComposeProvider>
+          <ChromeProbe />
+          <ComposeProbe onReady={(value) => { latest = value; }} />
+        </MailComposeProvider>,
+      );
+    });
+
+    await act(async () => {
+      latest!.setComposeTo("alice@solace.onl");
+      latest!.setComposeBody("Draft body");
+      chrome!.setIsComposeOpen(true);
+      chrome!.setIsFullCompose(true);
+    });
+
+    await act(async () => {
+      latest!.clearCompose();
+    });
+
+    expect(getMailComposeBridge()?.getDraft().to).toBe("");
+    expect(getMailComposeBridge()?.getDraft().body).toBe("");
+    expect(chrome?.isComposeOpen).toBe(true);
+    expect(chrome?.isFullCompose).toBe(true);
+  });
+
+  it("seedDraft opens full compose with message fields", async () => {
+    await act(async () => {
+      root.render(
+        <MailComposeProvider>
+          <ComposeProbe onReady={() => {}} />
+        </MailComposeProvider>,
+      );
+    });
+
+    const message = {
+      id: "draft-1",
+      subject: "Saved draft",
+      to: [{ email: "bob@solace.onl" }],
+      cc: [],
+      bcc: [],
+      keywords: { $draft: true },
+    } as const;
+
+    let chrome: ReturnType<typeof useMailComposeChrome> | null = null;
+
+    function ChromeProbe() {
+      chrome = useMailComposeChrome();
+      return null;
+    }
+
+    await act(async () => {
+      root.render(
+        <MailComposeProvider>
+          <ChromeProbe />
+        </MailComposeProvider>,
+      );
+    });
+
+    await act(async () => {
+      getMailComposeBridge()?.seedDraft(message as never);
+    });
+
+    const draft = getMailComposeBridge()?.getDraft();
+    expect(draft).toEqual(
+      expect.objectContaining({
+        to: "bob@solace.onl",
+        subject: "Saved draft",
+      }),
+    );
+    expect(chrome?.isFullCompose).toBe(true);
+    expect(chrome?.isComposeOpen).toBe(false);
   });
 });

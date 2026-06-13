@@ -4,9 +4,17 @@ import type { AuthenticatedUser } from "../lib/auth-utils";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { resolveRouteUser } from "../lib/request-user";
 import { prisma } from "../lib/prisma";
+import { env } from "../lib/env";
 import { AccountService } from "../services/account.service";
+import { defaultMailService } from "./mail";
 
-const accountService = new AccountService(prisma);
+const accountService = new AccountService(
+  prisma,
+  {
+    defaultEmailDomain: env.stalwartDefaultDomain,
+  },
+  defaultMailService,
+);
 
 export const accountRoutes = new Elysia({
   prefix: "/account",
@@ -30,7 +38,7 @@ export const accountRoutes = new Elysia({
         detail: {
           summary: "Delete the authenticated account",
           description:
-            "Deletes the authenticated user account and all related calendar/auth data.",
+            "Deletes the authenticated user account, linked Stalwart mailbox, and all related calendar/auth data.",
         },
       },
     ),

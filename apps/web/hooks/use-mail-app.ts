@@ -33,7 +33,19 @@ import {
   seedMailMessageCache,
 } from "@/lib/mail/mail-message-query";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
-import { getMailComposeBridge } from "@/components/mail/mail-compose-context";
+import { getMailComposeBridge, flushComposeDraftSave } from "@/components/mail/mail-compose-context";
+import {
+  appendHtmlSignature,
+  appendPlainTextSignature,
+  hasMeaningfulHtmlBody,
+  htmlToPlainText,
+} from "@/lib/mail/signature-utils";
+import { mergeRefreshedMailboxMessages } from "@/lib/mail/mail-list-merge";
+import {
+  appendMailboxMessages,
+  hasMoreMailboxMessages,
+  MAILBOX_MESSAGES_PAGE_SIZE,
+} from "@/lib/mail/mail-pagination";
 import {
   classifyMessageEncryption,
   extractMessageBodies,
@@ -1110,7 +1122,7 @@ export function useMailApp() {
           await activeMailbox.client.getMailboxMessages(
             activeMailbox.session,
             mailboxId,
-            { limit: 20, position: 0 },
+            { limit: MAILBOX_MESSAGES_PAGE_SIZE, position: 0 },
           );
         setTotalMessages(total);
         seedMailMessageCache(queryClient, mailboxId, messages, total);
@@ -1138,22 +1150,41 @@ export function useMailApp() {
   const loadMoreMessages = useCallback(async () => {
     if (!activeMailbox?.selectedMailboxId || isLoadingMore) return;
     const position = activeMailbox.messages.length;
-    if (position >= totalMessages) return;
+    if (!hasMoreMailboxMessages(position, totalMessages)) return;
     setIsLoadingMore(true);
     try {
-      const { messages: more } = await activeMailbox.client.getMailboxMessages(
+      const { messages: more, total } = await activeMailbox.client.getMailboxMessages(
         activeMailbox.session,
         activeMailbox.selectedMailboxId,
-        { limit: 20, position },
+        { limit: MAILBOX_MESSAGES_PAGE_SIZE, position },
       );
-      if (more.length > 0) {
-        const mailboxId = activeMailbox.selectedMailboxId;
-        const nextMessages = sortMessages([...activeMailbox.messages, ...more]);
-        seedMailMessageCache(queryClient, mailboxId, nextMessages, totalMessages);
-        setActiveMailbox((cur) =>
-          cur ? { ...cur, messages: nextMessages } : cur,
-        );
+      if (total > 0) {
+        setTotalMessages(total);
       }
+      const uniqueMore = appendMailboxMessages(activeMailbox.messages, more);
+      if (uniqueMore.length === 0) {
+        setTotalMessages(activeMailbox.messages.length);
+        return;
+      }
+      const mailboxId = activeMailbox.selectedMailboxId;
+      const nextMessages = sortMessages([
+        ...activeMailbox.messages,
+        ...uniqueMore,
+      ]);
+      if (total > 0) {
+        setTotalMessages(total);
+      } else if (uniqueMore.length < MAILBOX_MESSAGES_PAGE_SIZE) {
+        setTotalMessages(nextMessages.length);
+      }
+      seedMailMessageCache(
+        queryClient,
+        mailboxId,
+        nextMessages,
+        total > 0 ? total : nextMessages.length,
+      );
+      setActiveMailbox((cur) =>
+        cur ? { ...cur, messages: nextMessages } : cur,
+      );
     } catch (error) {
       log.error("Failed to load more messages", error);
     } finally {
@@ -1172,6 +1203,9 @@ export function useMailApp() {
         const client = new StalwartJmapClient({
           baseUrl: config.discoveryBaseUrl,
           getAccessToken: () => tokenManager.getAccessToken(),
+          onUnauthorized: () => {
+            tokenManager.clear();
+          },
         });
 
         let vaultKey: string | null = null;
@@ -1310,7 +1344,7 @@ export function useMailApp() {
         const initialMailboxId = getPrimaryMailboxId(mailboxes, "inbox");
         const { messages, total: initialTotal } = initialMailboxId
           ? await client.getMailboxMessages(jmapSession, initialMailboxId, {
-              limit: 20,
+              limit: MAILBOX_MESSAGES_PAGE_SIZE,
             })
           : { messages: [], total: 0 };
         setTotalMessages(initialTotal);
@@ -1403,8 +1437,11 @@ export function useMailApp() {
       bcc: composeBcc,
       subject: composeSubject,
       body: composeBody,
+      htmlBody: composeHtmlBody,
       attachments: composeAttachments,
       replyContext: composeReplyContext,
+      identityId: composeIdentityId,
+      draftId: composeDraftId,
     } = draft;
     if (!composeTo.trim()) {
       toast.error("Enter a recipient email address.");
@@ -1438,21 +1475,36 @@ export function useMailApp() {
         activeMailbox.mailboxes,
         "sent",
       );
-      const identityId = activeMailbox.identities[0]?.id;
+      const identity =
+        activeMailbox.identities.find(
+          (entry) => entry.id === composeIdentityId,
+        ) ?? activeMailbox.identities[0];
+      const identityId = identity?.id;
       if (!draftsMailboxId || !identityId) {
         throw new Error(
           "This mailbox is missing a draft mailbox or sending identity.",
         );
       }
+      const fromEmail = identity.email;
+      const fromName = identity.name ?? null;
+      const bodyWithSignature = appendPlainTextSignature(
+        composeBody,
+        identity,
+      );
+      const htmlWithSignature = hasMeaningfulHtmlBody(composeHtmlBody)
+        ? appendHtmlSignature(composeHtmlBody, identity)
+        : undefined;
       const internalDomain =
         config?.defaultDomain.trim().toLowerCase() ??
         getEmailDomain(activeMailbox.email);
       const { textBody, encrypted } = await resolveOutgoingMessageBody({
         activeMailbox,
         recipients,
-        plaintext: composeBody,
+        plaintext: bodyWithSignature,
         internalDomain,
       });
+      const htmlBody =
+        !encrypted && htmlWithSignature ? htmlWithSignature : undefined;
 
       // Upload any file attachments before sending
       let uploadedAttachments:
@@ -1466,21 +1518,31 @@ export function useMailApp() {
         );
       }
 
+      const flushedDraftId = await flushComposeDraftSave();
+      const previousDraftId =
+        flushedDraftId ??
+        getMailComposeBridge()?.getDraft().draftId ??
+        composeDraftId ??
+        undefined;
+
       const sendResult = await activeMailbox.client.sendMessage(
         activeMailbox.session,
         {
           draftsMailboxId,
           sentMailboxId,
-          fromEmail: activeMailbox.email,
+          fromEmail,
+          fromName,
           to: recipients,
           cc: ccRecipients,
           bcc: bccRecipients,
           subject: composeSubject.trim(),
           textBody,
+          htmlBody,
           identityId,
           attachments: uploadedAttachments,
           inReplyTo: composeReplyContext?.inReplyTo,
           references: composeReplyContext?.references,
+          previousDraftId,
         },
       );
       const effectiveThreadId =
@@ -1497,6 +1559,19 @@ export function useMailApp() {
             inReplyTo: composeReplyContext.inReplyTo,
             references: composeReplyContext.references,
           }),
+        );
+      }
+      if (previousDraftId) {
+        setActiveMailbox((cur) => {
+          if (!cur) return cur;
+          const remaining = cur.messages.filter(
+            (message) => message.id !== previousDraftId,
+          );
+          if (remaining.length === cur.messages.length) return cur;
+          return { ...cur, messages: remaining };
+        });
+        setSelectedMessageId((cur) =>
+          cur === previousDraftId ? null : cur,
         );
       }
       getMailComposeBridge()?.resetDraft();
@@ -2268,22 +2343,45 @@ export function useMailApp() {
   );
 
   const handleManualRefresh = useCallback(async () => {
-    if (!activeMailbox || isRefreshing) return;
-    const accountId = getPrimaryMailAccountId(activeMailbox.session);
-    if (!accountId) return;
+    if (!activeMailbox?.selectedMailboxId || isRefreshing) return;
+    const mailboxId = activeMailbox.selectedMailboxId;
     setIsRefreshing(true);
     try {
-      const result = await mailDemoApiService.syncAccount(accountId);
-      handleRealtimeSync(result);
+      const previousTotal = totalMessages;
+      const { messages: refreshed, total } =
+        await activeMailbox.client.getMailboxMessages(
+          activeMailbox.session,
+          mailboxId,
+          { limit: MAILBOX_MESSAGES_PAGE_SIZE, position: 0 },
+        );
+      setTotalMessages(total);
+      const merged = mergeRefreshedMailboxMessages(
+        activeMailbox.messages,
+        refreshed,
+        previousTotal,
+        total,
+      );
+      seedMailMessageCache(queryClient, mailboxId, merged, total);
+      setActiveMailbox((cur) => (cur ? { ...cur, messages: merged } : cur));
+
+      const accountId = getPrimaryMailAccountId(activeMailbox.session);
+      if (accountId) {
+        const result = await mailDemoApiService.syncAccount(accountId);
+        handleRealtimeSync(result);
+      }
     } catch (error) {
       log.error("Manual refresh failed", error);
-      toast.error(
-        getErrorMessage(error, "Could not refresh mail."),
-      );
+      toast.error(getErrorMessage(error, "Could not refresh mail."));
     } finally {
       setIsRefreshing(false);
     }
-  }, [activeMailbox, isRefreshing, handleRealtimeSync]);
+  }, [
+    activeMailbox,
+    handleRealtimeSync,
+    isRefreshing,
+    queryClient,
+    totalMessages,
+  ]);
 
   const realtimeAccountId = activeMailbox
     ? getPrimaryMailAccountId(activeMailbox.session)
@@ -2489,7 +2587,10 @@ export function useMailApp() {
     refreshMailboxMessages,
     loadMoreMessages,
     hasMoreMessages: activeMailbox
-      ? activeMailbox.messages.length < totalMessages
+      ? hasMoreMailboxMessages(
+          activeMailbox.messages.length,
+          totalMessages,
+        )
       : false,
     isLoadingMore,
     handleManualRefresh,

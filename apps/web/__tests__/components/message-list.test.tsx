@@ -17,6 +17,28 @@ import type { JmapEmailMessage } from "@/lib/mail/types";
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
+jest.mock("@tanstack/react-virtual", () => ({
+  useVirtualizer: ({
+    count,
+    getItemKey,
+  }: {
+    count: number;
+    getItemKey?: (index: number) => string;
+  }) => ({
+    getVirtualItems: () =>
+      Array.from({ length: count }, (_, index) => ({
+        index,
+        start: index * 68,
+        size: 68,
+        key: getItemKey?.(index) ?? String(index),
+      })),
+    getTotalSize: () => count * 68,
+    scrollToIndex: jest.fn(),
+    measure: jest.fn(),
+    measureElement: jest.fn(),
+  }),
+}));
+
 jest.mock("@gsap/react", () => ({
   useGSAP: jest.fn(),
 }));
@@ -111,6 +133,14 @@ describe("MessageList", () => {
   let root: Root | null = null;
 
   beforeEach(() => {
+    class MockResizeObserver {
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    }
+    globalThis.ResizeObserver =
+      MockResizeObserver as typeof ResizeObserver;
+
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: jest.fn().mockImplementation((query: string) => ({

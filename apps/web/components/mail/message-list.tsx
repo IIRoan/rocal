@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import {
@@ -66,7 +67,8 @@ interface MessageListProps {
   isLoadingMore?: boolean;
 }
 
-type MessageThreadRow = ReturnType<typeof buildMailConversations>[number];
+const ROW_HEIGHT_MOBILE = 60;
+const ROW_HEIGHT_DESKTOP = 68;
 
 function formatThreadSenders(messages: JmapEmailMessage[]): string {
   const uniqueSenders = Array.from(
@@ -108,8 +110,10 @@ export function MessageList({
   const [bulkActionsOpen, setBulkActionsOpen] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const loadMoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const rowHeight = isMobile ? ROW_HEIGHT_MOBILE : ROW_HEIGHT_DESKTOP;
 
   const moveTargets = (mailboxes ?? []).filter(
     (m) =>
@@ -159,23 +163,7 @@ export function MessageList({
     }
   }, [hasBulkSelection, isBarVisible]);
 
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    const container = scrollRef.current;
-    if (!sentinel || !container || !hasMore || !onLoadMore) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && !isLoadingMore) onLoadMore();
-      },
-      { root: container, rootMargin: "100px" },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, onLoadMore, isLoadingMore]);
-
   const threadRows = useMemo(() => {
-    // Merge primary messages with related cross-mailbox messages (e.g. Sent)
-    // so thread grouping reflects the full conversation, not just the current mailbox.
     const seenIds = new Set(messages.map((m) => m.id));
     const extras = relatedMessages.filter((m) => !seenIds.has(m.id));
     return buildMailConversations([...messages, ...extras]);
@@ -185,6 +173,91 @@ export function MessageList({
     () => new Set(messages.map((m) => m.id)),
     [messages],
   );
+
+  const virtualizer = useVirtualizer({
+    count: threadRows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => rowHeight,
+    overscan: 6,
+    getItemKey: (index) => threadRows[index]?.id ?? String(index),
+  });
+
+  const handleLoadMore = useCallback(() => {
+    if (!hasMore || isLoadingMore || !onLoadMore) return;
+    onLoadMore();
+  }, [hasMore, isLoadingMore, onLoadMore]);
+
+  const scheduleLoadMore = useCallback(() => {
+    if (!hasMore || isLoadingMore || !onLoadMore) return;
+    if (loadMoreTimerRef.current) clearTimeout(loadMoreTimerRef.current);
+    loadMoreTimerRef.current = setTimeout(() => {
+      loadMoreTimerRef.current = null;
+      handleLoadMore();
+    }, 150);
+  }, [handleLoadMore, hasMore, isLoadingMore, onLoadMore]);
+
+  const checkScrollForLoadMore = useCallback(() => {
+    const element = scrollRef.current;
+    if (!element || !hasMore || isLoadingMore || !onLoadMore) return;
+
+    const remaining =
+      element.scrollHeight - element.scrollTop - element.clientHeight;
+    if (remaining <= rowHeight * 5) {
+      scheduleLoadMore();
+    }
+  }, [rowHeight, hasMore, isLoadingMore, onLoadMore, scheduleLoadMore]);
+
+  const virtualItems = virtualizer.getVirtualItems();
+  const lastVirtualItemIndex = virtualItems[virtualItems.length - 1]?.index;
+
+  useEffect(() => {
+    if (lastVirtualItemIndex === undefined) return;
+    if (lastVirtualItemIndex >= threadRows.length - 5) {
+      scheduleLoadMore();
+    }
+  }, [lastVirtualItemIndex, threadRows.length, scheduleLoadMore]);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+
+    element.addEventListener("scroll", checkScrollForLoadMore, {
+      passive: true,
+    });
+    checkScrollForLoadMore();
+
+    const resizeObserver = new ResizeObserver(() => {
+      checkScrollForLoadMore();
+    });
+    resizeObserver.observe(element);
+
+    return () => {
+      element.removeEventListener("scroll", checkScrollForLoadMore);
+      resizeObserver.disconnect();
+      if (loadMoreTimerRef.current) {
+        clearTimeout(loadMoreTimerRef.current);
+        loadMoreTimerRef.current = null;
+      }
+    };
+  }, [
+    checkScrollForLoadMore,
+    messages.length,
+    threadRows.length,
+    virtualizer,
+  ]);
+
+  useEffect(() => {
+    if (!selectedMessageId) return;
+    const index = threadRows.findIndex(
+      (row) =>
+        row.latestMessage.id === selectedMessageId ||
+        row.messageIds.includes(selectedMessageId),
+    );
+    if (index >= 0) {
+      virtualizer.scrollToIndex(index, { align: "auto" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMessageId]);
 
   if (messages.length === 0) {
     return (
@@ -197,7 +270,8 @@ export function MessageList({
   return (
     <div
       ref={scrollRef}
-      className="flex h-full flex-col overflow-y-auto pb-6 safe-area-inset-bottom"
+      data-mail-list-scroll
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-6 safe-area-inset-bottom"
     >
       {isBarVisible && (
         <div
@@ -302,9 +376,14 @@ export function MessageList({
         </div>
       )}
 
-      <div className="flex flex-col divide-y divide-border/40">
-        {threadRows.map((row) => {
-            const message = row.latestMessage;
+      <div
+        className="relative w-full"
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
+      >
+        {virtualItems.map((virtualRow) => {
+          const row = threadRows[virtualRow.index];
+          if (!row) return null;
+          const message = row.latestMessage;
             const isSelected = row.messageIds.includes(selectedMessageId ?? "");
             const selectedCount = row.messageIds.filter((id) =>
               selectedIds.has(id),
@@ -322,9 +401,6 @@ export function MessageList({
             const isFlagged = row.messages.some(
               (entry) => entry.keywords?.["$flagged"] === true,
             );
-            const messageLabels = labels.filter(
-              (l) => message.keywords?.[`label:${l.id}`] === true,
-            );
             const hasAttachments = row.messages.some(
               (entry) => (entry.attachments?.length ?? 0) > 0,
             );
@@ -336,6 +412,15 @@ export function MessageList({
               <ContextMenu key={row.id}>
                 <ContextMenuTrigger asChild>
                   <div
+                    data-index={virtualRow.index}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      height: `${rowHeight}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
                     role="button"
                     tabIndex={0}
                     onClick={() => onSelect(message.id)}
@@ -346,8 +431,8 @@ export function MessageList({
                       }
                     }}
                     className={cn(
-                      "group/row relative w-full text-left transition-colors cursor-pointer [content-visibility:auto] [contain-intrinsic-size:auto_72px]",
-                      isMobile ? "py-2 pl-3 pr-2.5" : "py-2.5 pl-[13px] pr-3",
+                      "group/row relative w-full text-left transition-colors cursor-pointer border-b border-border/40 [content-visibility:auto]",
+                      isMobile ? "py-2 pl-3 pr-2.5" : "py-2 pl-[13px] pr-3",
                       "data-[state=open]:bg-muted/60",
                       isChecked
                         ? "bg-primary/5 dark:bg-primary/10"
@@ -518,34 +603,6 @@ export function MessageList({
                         >
                           {message.subject || "(No subject)"}
                         </p>
-
-                        {/* Labels */}
-                        {messageLabels.length > 0 && (
-                            <div
-                              className={cn(
-                                "mt-1 flex flex-wrap items-center gap-1",
-                                isMobile ? "mt-0.5" : "",
-                              )}
-                            >
-                            {messageLabels.map((label) => (
-                              <span
-                                key={label.id}
-                                className="inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-medium leading-none border"
-                                style={{
-                                  backgroundColor: `${label.color}18`,
-                                  color: label.color,
-                                  borderColor: `${label.color}40`,
-                                }}
-                              >
-                                <span
-                                  className="size-1.5 rounded-full shrink-0"
-                                  style={{ backgroundColor: label.color }}
-                                />
-                                {label.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -631,17 +688,9 @@ export function MessageList({
             );
           })}
       </div>
-      {hasMore && (
-        <div
-          ref={sentinelRef}
-          className="flex items-center justify-center py-4"
-        >
-          {isLoadingMore && (
-            <AppLoadingState
-              variant="inline"
-              text="Loading your workspace..."
-            />
-          )}
+      {hasMore && isLoadingMore && (
+        <div className="flex items-center justify-center py-4">
+          <AppLoadingState variant="inline" text="Loading more messages…" />
         </div>
       )}
     </div>

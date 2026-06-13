@@ -1044,7 +1044,7 @@ describe("MailApp", () => {
       expect.objectContaining({
         apiUrl: "http://192.168.2.213:8080/jmap/",
       }),
-      {
+      expect.objectContaining({
         draftsMailboxId: "drafts-1",
         sentMailboxId: "sent-1",
         fromEmail: "alice@solace.onl",
@@ -1052,7 +1052,7 @@ describe("MailApp", () => {
         subject: "Hello",
         textBody: "Plaintext body",
         identityId: "identity-1",
-      },
+      }),
     );
   });
 
@@ -1198,7 +1198,7 @@ describe("MailApp", () => {
       expect.objectContaining({
         apiUrl: "http://192.168.2.213:8080/jmap/",
       }),
-      {
+      expect.objectContaining({
         draftsMailboxId: "drafts-1",
         sentMailboxId: "sent-1",
         fromEmail: "alice@solace.onl",
@@ -1207,7 +1207,7 @@ describe("MailApp", () => {
         textBody:
           "-----BEGIN PGP MESSAGE-----\nVersion: OpenPGP\n\nciphertext\n-----END PGP MESSAGE-----",
         identityId: "identity-1",
-      },
+      }),
     );
   });
 
