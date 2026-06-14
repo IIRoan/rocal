@@ -1,5 +1,11 @@
 import * as openpgp from "openpgp";
 import { deriveVaultKeyB64 } from "../lib/mail/vault-kdf";
+import {
+  containsArmoredPgpMessage,
+  MAX_PGP_DECRYPT_LAYERS,
+  mergeSignatureVerificationState,
+  resolveLayerSignatureVerificationState,
+} from "../lib/mail/pgp-layers";
 import type {
   MailDecryptResult,
   MailSignatureVerificationState,
@@ -80,40 +86,54 @@ async function handleDecryptMessage(payload: {
     throw new Error("Mail vault is not loaded on this device.");
   }
 
-  const message = await openpgp.readMessage({
-    armoredMessage: payload.armoredMessage,
-  });
   const verificationKeys = payload.senderPublicKeyArmored
     ? await openpgp.readKey({ armoredKey: payload.senderPublicKeyArmored })
     : undefined;
-  const decrypted = await openpgp.decrypt({
-    message,
-    decryptionKeys: activePrivateKey,
-    verificationKeys,
-  });
 
+  let armoredMessage = payload.armoredMessage.trim();
+  let plaintext = "";
   let signatureVerificationState: MailSignatureVerificationState = "not_signed";
 
-  if (Array.isArray(decrypted.signatures) && decrypted.signatures.length > 0) {
-    if (!verificationKeys) {
-      signatureVerificationState = "unverified";
-    } else {
-      try {
-        await Promise.all(
-          decrypted.signatures.map((signature) => signature.verified),
-        );
-        signatureVerificationState = "verified";
-      } catch {
-        signatureVerificationState = "failed";
-      }
+  for (let layer = 0; layer < MAX_PGP_DECRYPT_LAYERS; layer++) {
+    if (!containsArmoredPgpMessage(armoredMessage)) {
+      plaintext = armoredMessage;
+      break;
     }
+
+    const message = await openpgp.readMessage({ armoredMessage });
+    const decrypted = await openpgp.decrypt({
+      message,
+      decryptionKeys: activePrivateKey,
+      verificationKeys,
+    });
+
+    plaintext =
+      typeof decrypted.data === "string"
+        ? decrypted.data
+        : new TextDecoder().decode(decrypted.data as Uint8Array);
+
+    const layerSignatureState = await resolveLayerSignatureVerificationState({
+      signatures: decrypted.signatures,
+      hasVerificationKey: Boolean(verificationKeys),
+    });
+    signatureVerificationState = mergeSignatureVerificationState(
+      signatureVerificationState,
+      layerSignatureState,
+    );
+
+    if (!containsArmoredPgpMessage(plaintext)) {
+      break;
+    }
+
+    armoredMessage = plaintext.trim();
+  }
+
+  if (!plaintext) {
+    throw new Error("PGP decryption did not return any plaintext.");
   }
 
   return {
-    plaintext:
-      typeof decrypted.data === "string"
-        ? decrypted.data
-        : new TextDecoder().decode(decrypted.data as Uint8Array),
+    plaintext,
     hasVerifiedSignature: signatureVerificationState === "verified",
     signatureVerificationState,
   } satisfies MailDecryptResult;

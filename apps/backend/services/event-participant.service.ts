@@ -18,8 +18,10 @@ import {
   type EventParticipantRecord,
   EVENT_PARTICIPANT_USER_SELECT,
 } from "../lib/event-participants";
-import { buildEventInvitationEmail, sendAuthEmail } from "../lib/auth-email";
+import { buildEventInvitationEmail } from "../lib/auth-email";
 import { authEmailFrom, resend } from "../lib/email-client";
+import { sendEventInvitationEmail } from "../lib/event-invitation-delivery";
+import { createStalwartAdminClient } from "../lib/stalwart-admin";
 import { env } from "../lib/env";
 import { errorString } from "../lib/errors";
 
@@ -116,8 +118,21 @@ export class EventParticipantService {
         name: true,
       },
     });
+    const directoryEntries = await client.mailDirectoryEntry.findMany({
+      where: { email: { in: emails } },
+      select: {
+        email: true,
+        userId: true,
+      },
+    });
     const userByEmail = new Map(
       users.map((user) => [normalizeParticipantEmail(user.email), user]),
+    );
+    const directoryByEmail = new Map(
+      directoryEntries.map((entry) => [
+        normalizeParticipantEmail(entry.email),
+        entry,
+      ]),
     );
     const participantByEmail = new Map(
       resolvedInputs.map((participant) => [participant.email, participant]),
@@ -126,13 +141,14 @@ export class EventParticipantService {
     return emails.map((email) => {
       const participant = participantByEmail.get(email)!;
       const matchedUser = userByEmail.get(email);
+      const matchedDirectory = directoryByEmail.get(email);
       const role = participant.role === "organizer" ? "organizer" : "attendee";
 
       return {
         email,
         displayName:
           participant.displayName?.trim() || matchedUser?.name?.trim() || email,
-        userId: matchedUser?.id ?? null,
+        userId: matchedUser?.id ?? matchedDirectory?.userId ?? null,
         role,
         status:
           role === "organizer"
@@ -281,7 +297,8 @@ export class EventParticipantService {
     const client = this.getClient(input.tx);
     const owner = await this.resolveOwner(client, input.ownerUserId);
     const newInvitees = resolvedParticipants.filter(
-      (p) => p.role !== "organizer" && !existingByEmail.has(p.email),
+      (participant) =>
+        participant.role !== "organizer" && !existingByEmail.has(participant.email),
     );
 
     if (!owner || newInvitees.length === 0) {
@@ -305,40 +322,56 @@ export class EventParticipantService {
       },
     });
 
+    const adminClient =
+      env.stalwartAdminToken.trim().length > 0
+        ? createStalwartAdminClient()
+        : null;
+
     return async () => {
       for (const invitee of newInvitees) {
         try {
-          await sendAuthEmail({
-            client: resend,
-            from: authEmailFrom,
+          const invitationMessage = {
+            ...buildEventInvitationEmail({
+              attendeeName: invitee.displayName,
+              inviterName: owner.name,
+              eventTitle: input.invitationEvent!.title,
+              eventDescription: input.invitationEvent!.description,
+              eventLocation: input.invitationEvent!.location,
+              start: input.invitationEvent!.start,
+              end: input.invitationEvent!.end,
+              allDay: !!input.invitationEvent!.allDay,
+              openUrl: new URL(
+                `/calendar?eventId=${encodeURIComponent(input.eventId)}`,
+                env.frontendUrl.replace(/\/+$/, "") + "/",
+              ).toString(),
+            }),
+            attachments: [
+              {
+                filename: "invite.ics",
+                content: icsContent,
+                contentType: "text/calendar; method=REQUEST; charset=utf-8",
+              },
+            ],
+          };
+
+          await sendEventInvitationEmail({
             to: invitee.email,
-            label: "event invitation",
-            message: {
-              ...buildEventInvitationEmail({
-                attendeeName: invitee.displayName,
-                inviterName: owner.name,
-                eventTitle: input.invitationEvent!.title,
-                eventDescription: input.invitationEvent!.description,
-                eventLocation: input.invitationEvent!.location,
-                start: input.invitationEvent!.start,
-                end: input.invitationEvent!.end,
-                allDay: !!input.invitationEvent!.allDay,
-                openUrl: new URL(
-                  `/calendar?eventId=${encodeURIComponent(input.eventId)}`,
-                  env.frontendUrl.replace(/\/+$/, "") + "/",
-                ).toString(),
-              }),
-              attachments: [
-                {
-                  filename: "invite.ics",
-                  content: icsContent,
-                  contentType: "text/calendar; method=REQUEST; charset=utf-8",
-                },
-              ],
-            },
+            from: authEmailFrom,
+            message: invitationMessage,
             logger,
+            resendClient: resend,
+            adminClient,
+            adminToken: env.stalwartAdminToken,
+            resolveInternalMailbox: async (email) => {
+              const entry = await client.mailDirectoryEntry.findUnique({
+                where: { email },
+                select: { stalwartAccountId: true },
+              });
+              return entry
+                ? { stalwartAccountId: entry.stalwartAccountId }
+                : null;
+            },
             isProduction: env.isProduction,
-            mode: "best-effort",
             developmentFallbackContext: {
               eventId: input.eventId,
               inviteeEmail: invitee.email,

@@ -181,3 +181,43 @@ export function extractPgpMimeCiphertextBlobId(
   // PGP/MIME: subParts[0] = version notice, subParts[1] = ciphertext blob
   return bodyStructure.subParts?.[1]?.blobId ?? null;
 }
+
+function collectBodyStructureBlobIds(
+  bodyStructure: JmapBodyStructure | undefined,
+): string[] {
+  if (!bodyStructure) {
+    return [];
+  }
+
+  const blobIds: string[] = [];
+  const visit = (part: JmapBodyStructure | undefined) => {
+    if (!part) {
+      return;
+    }
+    if (part.blobId) {
+      blobIds.push(part.blobId);
+    }
+    for (const subPart of part.subParts ?? []) {
+      visit(subPart);
+    }
+  };
+
+  visit(bodyStructure);
+  return blobIds;
+}
+
+/**
+ * Returns the first blob id that should contain armored ciphertext when JMAP
+ * body values are omitted for encrypted-at-rest messages.
+ */
+export function extractEncryptedBodyBlobId(
+  message: Pick<JmapEmailMessage, "bodyStructure" | "bodyValues" | "textBody">,
+): string | null {
+  const { text } = extractMessageBodies(message as JmapEmailMessage);
+  if (text?.trim()) {
+    return null;
+  }
+
+  const blobIds = collectBodyStructureBlobIds(message.bodyStructure);
+  return blobIds[0] ?? null;
+}

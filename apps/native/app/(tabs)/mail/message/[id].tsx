@@ -252,7 +252,8 @@ export default function MailMessageScreen() {
     error: linkedEventError,
   } = useQuery({
     queryKey: QUERY_KEYS.eventDetail(linkedCalendarEventId ?? ""),
-    enabled: Boolean(linkedCalendarEventId) && isE2eeReady,
+    enabled:
+      Boolean(linkedCalendarEventId) && isEventReminderEmail && isE2eeReady,
     queryFn: () => calendarApiService.getEvent(linkedCalendarEventId!),
   });
   const { data: userSettings } = useQuery({
