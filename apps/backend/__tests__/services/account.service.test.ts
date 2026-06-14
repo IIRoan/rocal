@@ -170,4 +170,16 @@ describe("AccountService", () => {
 
     expect(mockPrisma.prisma.$transaction).not.toHaveBeenCalled();
   });
+
+  it("does not delete the Solace user when linked mailbox removal fails", async () => {
+    mockMailService.deleteMailboxForUser.mockRejectedValueOnce(
+      new Error("Could not delete the linked Stalwart mailbox."),
+    );
+
+    await expect(
+      service.deleteAccount({ userId: "user-1" }),
+    ).rejects.toThrow("Could not delete the linked Stalwart mailbox.");
+
+    expect(mockPrisma.prisma.$transaction).not.toHaveBeenCalled();
+  });
 });

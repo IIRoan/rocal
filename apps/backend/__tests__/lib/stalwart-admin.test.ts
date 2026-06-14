@@ -95,6 +95,11 @@ describe("StalwartAdminClient", () => {
   it("creates an account using the authenticated admin account id", async () => {
     fetcher.mockResolvedValueOnce(
       jsonResponse({
+        methodResponses: [["x:Account/query", { ids: [] }, "c1"]],
+      }),
+    );
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
         methodResponses: [
           [
             "x:Account/set",
@@ -154,10 +159,24 @@ describe("StalwartAdminClient", () => {
       description: "Alice Example",
     });
 
-    expect(account).toEqual({ accountId: "acct-1" });
+    expect(account).toEqual({ accountId: "acct-1", created: true });
+
+    const queryBody = JSON.parse(
+      String(fetcher.mock.calls[0]?.[1]?.body ?? "{}"),
+    );
+    expect(queryBody.methodCalls[0]).toEqual([
+      "x:Account/query",
+      {
+        filter: {
+          name: "alice",
+          domainId: "domain-1",
+        },
+      },
+      "c1",
+    ]);
 
     const createBody = JSON.parse(
-      String(fetcher.mock.calls[0]?.[1]?.body ?? "{}"),
+      String(fetcher.mock.calls[1]?.[1]?.body ?? "{}"),
     );
     expect(createBody.methodCalls[0]).toEqual([
       "x:Account/set",
@@ -188,7 +207,7 @@ describe("StalwartAdminClient", () => {
     ]);
 
     const getBody = JSON.parse(
-      String(fetcher.mock.calls[1]?.[1]?.body ?? "{}"),
+      String(fetcher.mock.calls[2]?.[1]?.body ?? "{}"),
     );
     expect(getBody.methodCalls[0]).toEqual([
       "x:Account/get",
@@ -199,20 +218,18 @@ describe("StalwartAdminClient", () => {
     ]);
 
     const passwordBody = JSON.parse(
-      String(fetcher.mock.calls[2]?.[1]?.body ?? "{}"),
+      String(fetcher.mock.calls[3]?.[1]?.body ?? "{}"),
     );
     expect(passwordBody.methodCalls[0]).toEqual([
       "x:Account/set",
       {
         update: {
           "acct-1": {
-            credentials: {
-              password: {
-                "@type": "Password",
-                allowedIps: {},
-                expiresAt: null,
-                secret: "StrongPassw0rd!",
-              },
+            "credentials/0": {
+              "@type": "Password",
+              allowedIps: {},
+              expiresAt: null,
+              secret: "StrongPassw0rd!",
             },
           },
         },
@@ -222,6 +239,11 @@ describe("StalwartAdminClient", () => {
   });
 
   it("rejects mismatched createAccount responses from Stalwart", async () => {
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [["x:Account/query", { ids: [] }, "c1"]],
+      }),
+    );
     fetcher.mockResolvedValueOnce(
       jsonResponse({
         methodResponses: [
@@ -273,6 +295,11 @@ describe("StalwartAdminClient", () => {
   });
 
   it("reuses an existing remote account when Stalwart reports an email primary key violation", async () => {
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [["x:Account/query", { ids: [] }, "c1"]],
+      }),
+    );
     fetcher.mockResolvedValueOnce(
       jsonResponse({
         methodResponses: [
@@ -338,7 +365,65 @@ describe("StalwartAdminClient", () => {
       description: "Alice Example",
     });
 
-    expect(account).toEqual({ accountId: "acct-existing" });
+    expect(account).toEqual({
+      accountId: "acct-existing",
+      created: false,
+    });
+  });
+
+  it("reuses an existing remote account discovered through Account/query", async () => {
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [["x:Account/query", { ids: ["acct-existing"] }, "c1"]],
+      }),
+    );
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [
+          [
+            "x:Account/get",
+            {
+              list: [
+                {
+                  id: "acct-existing",
+                  name: "alice",
+                  domainId: "domain-1",
+                  emailAddress: "alice@solace.onl",
+                },
+              ],
+            },
+            "c1",
+          ],
+        ],
+      }),
+    );
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [
+          [
+            "x:Account/set",
+            {
+              updated: {
+                "acct-existing": null,
+              },
+            },
+            "c1",
+          ],
+        ],
+      }),
+    );
+
+    const account = await client.createAccount({
+      localPart: "alice",
+      secret: "StrongPassw0rd!",
+      domainId: "domain-1",
+      description: "Alice Example",
+    });
+
+    expect(account).toEqual({
+      accountId: "acct-existing",
+      created: false,
+    });
   });
 
   it("updates the inline password credential without dropping other credentials", async () => {
@@ -355,7 +440,7 @@ describe("StalwartAdminClient", () => {
                   domainId: "domain-1",
                   emailAddress: "alice@solace.onl",
                   credentials: {
-                    password: {
+                    "0": {
                       "@type": "Password",
                       allowedIps: {},
                       expiresAt: null,
@@ -402,18 +487,11 @@ describe("StalwartAdminClient", () => {
       {
         update: {
           "acct-1": {
-            credentials: {
-              password: {
-                "@type": "Password",
-                allowedIps: {},
-                expiresAt: null,
-                secret: "NewStrongPassw0rd!",
-              },
-              api1: {
-                "@type": "ApiKey",
-                description: "existing-api-key",
-                secret: "****",
-              },
+            "credentials/0": {
+              "@type": "Password",
+              allowedIps: {},
+              expiresAt: null,
+              secret: "NewStrongPassw0rd!",
             },
           },
         },
@@ -595,6 +673,28 @@ describe("StalwartAdminClient", () => {
     fetcher.mockResolvedValueOnce(
       jsonResponse({
         methodResponses: [
+          [
+            "x:Account/get",
+            {
+              list: [
+                {
+                  id: "acct-1",
+                  name: "alice",
+                  domainId: "domain-1",
+                  encryptionAtRest: {
+                    "@type": "Disabled",
+                  },
+                },
+              ],
+            },
+            "c1",
+          ],
+        ],
+      }),
+    );
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [
           ["x:AccountSettings/set", { updated: { singleton: null } }, "c1"],
         ],
       }),
@@ -605,7 +705,7 @@ describe("StalwartAdminClient", () => {
       publicKeyId: "pk-1",
     });
 
-    const body = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body ?? "{}"));
+    const body = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body ?? "{}"));
     expect(body.methodCalls[0]).toEqual([
       "x:AccountSettings/set",
       {
@@ -650,5 +750,37 @@ describe("StalwartAdminClient", () => {
       },
       "c1",
     ]);
+  });
+
+  it("treats destroy as successful when the account is already absent", async () => {
+    fetcher
+      .mockResolvedValueOnce(
+        jsonResponse({
+          methodResponses: [
+            [
+              "x:Account/set",
+              {
+                accountId: "admin-1",
+              },
+              "c1",
+            ],
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          methodResponses: [
+            [
+              "x:Account/get",
+              {
+                list: [],
+              },
+              "c1",
+            ],
+          ],
+        }),
+      );
+
+    await expect(client.deleteAccount("acct-1")).resolves.toBeUndefined();
   });
 });
