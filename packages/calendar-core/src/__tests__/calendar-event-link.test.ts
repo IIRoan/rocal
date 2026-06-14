@@ -3,6 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   extractLinkedCalendarEventId,
   extractReminderLeadMinutes,
+  isSolaceEventInvitationEmail,
   isSolaceEventReminderEmail,
 } from "../calendar-event-link";
 
@@ -31,5 +32,18 @@ describe("calendar-event-link", () => {
 
     expect(isSolaceEventReminderEmail(source)).toBe(true);
     expect(extractReminderLeadMinutes(source)).toBe(15);
+  });
+
+  it("does not classify Solace invitation emails as reminders", () => {
+    const source = {
+      subject: "Bob invited you to Planning sync",
+      bodies: [
+        "Bob invited you to Planning sync on Solace.",
+        "Open event: https://solace.onl/calendar?eventId=organizer-event-1",
+      ],
+    };
+
+    expect(isSolaceEventInvitationEmail(source)).toBe(true);
+    expect(isSolaceEventReminderEmail(source)).toBe(false);
   });
 });

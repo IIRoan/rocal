@@ -122,7 +122,10 @@ import {
   ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
   isDecryptedEventReminderContent,
 } from "@workspace/calendar-core";
-import { extractMailCalendarInvite } from "@/lib/mail/calendar-invite";
+import {
+  extractMailCalendarInvite,
+  hasCalendarInvitationMetadata,
+} from "@/lib/mail/calendar-invite";
 import { calendarApiService } from "@/lib/calendar-api-service";
 
 const EMPTY_ARRAY: never[] = [];
@@ -742,12 +745,9 @@ export function MessageReader({
         : null,
     [calendarEventLinkSource, message, plaintext],
   );
-  const isEventReminderEmail = useMemo(
-    () =>
-      calendarEventLinkSource
-        ? isSolaceEventReminderEmail(calendarEventLinkSource)
-        : false,
-    [calendarEventLinkSource],
+  const hasCalendarInvitationHint = useMemo(
+    () => (message ? hasCalendarInvitationMetadata(message) : false),
+    [message],
   );
   const mailCalendarInvite = useMemo(
     () =>
@@ -758,6 +758,24 @@ export function MessageReader({
       }),
     [attachments, message, plaintext],
   );
+  const isEventReminderEmail = useMemo(() => {
+    if (hasCalendarInvitationHint) {
+      return false;
+    }
+    if (
+      mailCalendarInvite?.method === "REQUEST" ||
+      mailCalendarInvite?.method === "CANCEL"
+    ) {
+      return false;
+    }
+    return calendarEventLinkSource
+      ? isSolaceEventReminderEmail(calendarEventLinkSource)
+      : false;
+  }, [
+    calendarEventLinkSource,
+    hasCalendarInvitationHint,
+    mailCalendarInvite?.method,
+  ]);
   const mailCalendarInviteUid = mailCalendarInvite?.uid ?? null;
   const mailCalendarInviteMeta = useMemo(() => {
     if (!mailCalendarInvite) return undefined;
