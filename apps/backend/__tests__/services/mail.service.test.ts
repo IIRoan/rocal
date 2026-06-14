@@ -12,6 +12,7 @@ import { MailService } from "../../services/mail.service";
 import {
   ConflictError,
   NotFoundError,
+  UpstreamServiceError,
   ValidationError,
 } from "../../lib/errors";
 import { getOpenPgpPublicKeyFingerprint } from "../../lib/mail-key-utils";
@@ -63,6 +64,7 @@ function createMockAdminClient() {
     })),
     createAccount: jest.fn(async () => ({
       accountId: "acct-1",
+      created: true,
     })),
     registerPublicKey: jest.fn(async () => ({ publicKeyId: "pk-1" })),
     enableEncryptionAtRest: jest.fn(async () => undefined),
@@ -74,6 +76,7 @@ function createMockAdminClient() {
       expires_at: 1779149999,
     })),
     deleteAccount: jest.fn(async () => undefined),
+    resolveAccountIdByMailbox: jest.fn(async () => null),
   };
 }
 
@@ -626,15 +629,21 @@ describe("MailService", () => {
   });
 
   it("rejects bootstrapping when the authenticated user already has a linked mailbox", async () => {
-    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValueOnce({
-      id: "entry-1",
-      email: "alice@solace.onl",
-      displayName: "Alice Example",
-      stalwartAccountId: "acct-1",
-      stalwartPublicKeyId: "pk-1",
-      publicKeyFingerprint: "ABCD1234EF567890",
-      userId: "user-1",
-    });
+    mockPrisma.mailDirectoryEntry.findUnique
+      .mockResolvedValueOnce({
+        id: "entry-1",
+        email: "alice@solace.onl",
+        displayName: "Alice Example",
+        stalwartAccountId: "acct-1",
+        stalwartPublicKeyId: "pk-1",
+        publicKeyFingerprint: "ABCD1234EF567890",
+        userId: "user-1",
+      })
+      .mockResolvedValueOnce({
+        vaultBackup: {
+          id: "vault-1",
+        },
+      });
 
     await expect(
       service.bootstrapForUser({
@@ -800,15 +809,40 @@ describe("MailService", () => {
     mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValueOnce({
       id: "entry-1",
       email: "alice@solace.onl",
+      localPart: "alice",
       stalwartAccountId: "acct-1",
+      stalwartDomainId: "domain-1",
     });
 
     await service.deleteMailboxForUser({ userId: "user-1" });
 
     expect(mockAdminClient.deleteAccount).toHaveBeenCalledWith("acct-1");
+    expect(mockAdminClient.resolveAccountIdByMailbox).toHaveBeenCalledWith({
+      localPart: "alice",
+      domainId: "domain-1",
+    });
     expect(mockPrisma.mailDirectoryEntry.delete).toHaveBeenCalledWith({
       where: { id: "entry-1" },
     });
+  });
+
+  it("fails mailbox deletion when Stalwart account removal fails", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValueOnce({
+      id: "entry-1",
+      email: "alice@solace.onl",
+      localPart: "alice",
+      stalwartAccountId: "acct-1",
+      stalwartDomainId: "domain-1",
+    });
+    mockAdminClient.deleteAccount.mockRejectedValueOnce(
+      new Error("Stalwart account deletion failed."),
+    );
+
+    await expect(
+      service.deleteMailboxForUser({ userId: "user-1" }),
+    ).rejects.toBeInstanceOf(UpstreamServiceError);
+
+    expect(mockPrisma.mailDirectoryEntry.delete).not.toHaveBeenCalled();
   });
 
   it("no-ops mailbox deletion when the user has no linked mailbox", async () => {
@@ -852,5 +886,90 @@ describe("MailService", () => {
     ).rejects.toThrow("Mailbox directory persistence failed");
 
     expect(mockAdminClient.deleteAccount).toHaveBeenCalledWith("acct-1");
+  });
+
+  it("does not delete adopted Stalwart accounts when persistence fails", async () => {
+    mockAdminClient.createAccount.mockResolvedValueOnce({
+      accountId: "acct-1",
+      created: false,
+    });
+    mockPrisma.mailDirectoryEntry.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mockPrisma.mailDirectoryEntry.create.mockRejectedValueOnce(
+      new Error("database unavailable"),
+    );
+
+    await expect(
+      service.bootstrapForUser({
+        userId: "user-1",
+        email: "alice@solace.onl",
+        displayName: "Alice Example",
+        publicKeyArmored: "public-key-armored",
+        fingerprint: "ABCD1234EF567890",
+        algorithm: "openpgp",
+        createdAt: "2026-05-06T21:00:00.000Z",
+        vaultVersion: 1,
+        encryptedVaultB64: "vault-b64",
+        kdf: "argon2id",
+        kdfParams: {
+          saltB64: "salt-b64",
+          memoryKiB: 65536,
+          iterations: 3,
+          parallelism: 4,
+        },
+      }),
+    ).rejects.toThrow("Mailbox directory persistence failed");
+
+    expect(mockAdminClient.deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it("repairs an incomplete linked mailbox instead of rejecting bootstrap", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique
+      .mockResolvedValueOnce({
+        id: "entry-1",
+        email: "alice@solace.onl",
+        displayName: "Alice Example",
+        stalwartAccountId: "acct-1",
+        stalwartPublicKeyId: "pk-1",
+        publicKeyFingerprint: "ABCD1234EF567890",
+        userId: "user-1",
+      })
+      .mockResolvedValueOnce({
+        vaultBackup: null,
+      });
+
+    const result = await service.bootstrapForUser({
+      userId: "user-1",
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      publicKeyArmored: "public-key-armored",
+      fingerprint: "ABCD1234EF567890",
+      algorithm: "openpgp",
+      createdAt: "2026-05-06T21:00:00.000Z",
+      vaultVersion: 1,
+      encryptedVaultB64: "vault-b64",
+      kdf: "argon2id",
+      kdfParams: {
+        saltB64: "salt-b64",
+        memoryKiB: 65536,
+        iterations: 3,
+        parallelism: 4,
+      },
+    });
+
+    expect(mockAdminClient.createAccount).not.toHaveBeenCalled();
+    expect(mockPrisma.mailDirectoryEntry.create).not.toHaveBeenCalled();
+    expect(mockPrisma.mailDirectoryEntry.update).toHaveBeenCalled();
+    expect(result).toEqual({
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      stalwartAccountId: "acct-1",
+      stalwartPublicKeyId: "pk-1",
+      fingerprint: "ABCD1234EF567890",
+      encryptionAtRestEnabled: true,
+    });
   });
 });

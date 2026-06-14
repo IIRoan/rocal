@@ -19,6 +19,8 @@ export type StalwartDomainRecord = {
 
 export type StalwartAccountRecord = {
   accountId: string;
+  /** False when an existing remote mailbox was adopted instead of created. */
+  created?: boolean;
 };
 
 type StalwartCredentialRecord = Record<string, unknown> & {
@@ -62,6 +64,10 @@ export interface StalwartAdminClientLike {
     secret: string;
   }): Promise<void>;
   deleteAccount(accountId: string): Promise<void>;
+  resolveAccountIdByMailbox(input: {
+    localPart: string;
+    domainId: string;
+  }): Promise<string | null>;
   ensureOAuthClient(input: {
     clientId: string;
     redirectUri: string;
@@ -154,6 +160,31 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     domainId: string;
     description?: string | null;
   }): Promise<StalwartAccountRecord> {
+    const requestedLocalPart = input.localPart.trim().toLowerCase();
+    const existingAccount = await this.findAccountByMailbox({
+      localPart: requestedLocalPart,
+      domainId: input.domainId,
+    });
+
+    if (existingAccount) {
+      logger.info("Reusing existing Stalwart account for mailbox provisioning", {
+        requestedLocalPart,
+        requestedDomainId: input.domainId,
+        existingAccountId: existingAccount.id,
+      });
+
+      await this.updateAccountPasswordCredential({
+        accountId: existingAccount.id,
+        existingCredentials: existingAccount.credentials,
+        secret: input.secret,
+      });
+
+      return {
+        accountId: existingAccount.id,
+        created: false,
+      };
+    }
+
     const envelope = await this.postJmap([
       [
         "x:Account/set",
@@ -215,7 +246,6 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     }
 
     const verifiedAccount = await this.getAccount(accountId);
-    const requestedLocalPart = input.localPart.trim().toLowerCase();
     const verifiedLocalPart = verifiedAccount.name.trim().toLowerCase();
 
     if (verifiedLocalPart !== requestedLocalPart) {
@@ -257,7 +287,59 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
 
     return {
       accountId,
+      created: Boolean(created?.id),
     };
+  }
+
+  private async findAccountByMailbox(input: {
+    localPart: string;
+    domainId: string;
+  }): Promise<{
+    id: string;
+    name: string;
+    domainId: string;
+    emailAddress?: string;
+    credentials?: Record<string, StalwartCredentialRecord>;
+    encryptionAtRest?: Record<string, unknown>;
+  } | null> {
+    const normalizedLocalPart = input.localPart.trim().toLowerCase();
+    const queryEnvelope = await this.postJmap([
+      [
+        "x:Account/query",
+        {
+          filter: {
+            name: normalizedLocalPart,
+            domainId: input.domainId,
+          },
+        },
+        "c1",
+      ],
+    ]);
+    const queryResult = this.getMethodResult<{ ids?: string[] }>(
+      queryEnvelope,
+      "x:Account/query",
+    );
+    const ids = Array.isArray(queryResult.ids) ? queryResult.ids : [];
+
+    if (ids.length === 0) {
+      return null;
+    }
+
+    const accountId = ids[0];
+    if (!accountId) {
+      return null;
+    }
+
+    const account = await this.getAccount(accountId);
+    if (account.name.trim().toLowerCase() !== normalizedLocalPart) {
+      return null;
+    }
+
+    if (account.domainId !== input.domainId) {
+      return null;
+    }
+
+    return account;
   }
 
   private async recoverExistingAccountId(
@@ -296,13 +378,14 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     return objectId;
   }
 
-  private async getAccount(accountId: string): Promise<{
+  private async getAccountIfExists(accountId: string): Promise<{
     id: string;
     name: string;
     domainId: string;
     emailAddress?: string;
     credentials?: Record<string, StalwartCredentialRecord>;
-  }> {
+    encryptionAtRest?: Record<string, unknown>;
+  } | null> {
     const envelope = await this.postJmap([
       [
         "x:Account/get",
@@ -314,16 +397,28 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     ]);
 
     const result = this.getMethodResult<{
-        list?: Array<{
-          id: string;
-          name: string;
-          domainId: string;
-          emailAddress?: string;
-          credentials?: Record<string, StalwartCredentialRecord>;
-        }>;
-      }>(envelope, "x:Account/get");
+      list?: Array<{
+        id: string;
+        name: string;
+        domainId: string;
+        emailAddress?: string;
+        credentials?: Record<string, StalwartCredentialRecord>;
+        encryptionAtRest?: Record<string, unknown>;
+      }>;
+    }>(envelope, "x:Account/get");
 
-    const account = result.list?.[0];
+    return result.list?.[0] ?? null;
+  }
+
+  private async getAccount(accountId: string): Promise<{
+    id: string;
+    name: string;
+    domainId: string;
+    emailAddress?: string;
+    credentials?: Record<string, StalwartCredentialRecord>;
+    encryptionAtRest?: Record<string, unknown>;
+  }> {
+    const account = await this.getAccountIfExists(accountId);
     if (!account) {
       throw new Error(
         `Stalwart account lookup failed after account creation for id '${accountId}'.`,
@@ -343,6 +438,14 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
       existingCredentials: account.credentials,
       secret: input.secret,
     });
+  }
+
+  async resolveAccountIdByMailbox(input: {
+    localPart: string;
+    domainId: string;
+  }): Promise<string | null> {
+    const account = await this.findAccountByMailbox(input);
+    return account?.id ?? null;
   }
 
   async deleteAccount(accountId: string): Promise<void> {
@@ -373,13 +476,22 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
       );
     }
 
-    if (!(result.destroyed ?? []).includes(normalizedAccountId)) {
-      throw new Error("Stalwart account deletion was not acknowledged.");
+    if ((result.destroyed ?? []).includes(normalizedAccountId)) {
+      logger.info("Deleted Stalwart account", {
+        accountId: normalizedAccountId,
+      });
+      return;
     }
 
-    logger.info("Deleted Stalwart account", {
-      accountId: normalizedAccountId,
-    });
+    const stillExists = await this.getAccountIfExists(normalizedAccountId);
+    if (!stillExists) {
+      logger.info("Stalwart account already absent before deletion", {
+        accountId: normalizedAccountId,
+      });
+      return;
+    }
+
+    throw new Error("Stalwart account deletion was not acknowledged.");
   }
 
   private async updateAccountPasswordCredential(input: {
@@ -391,29 +503,10 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     const passwordEntry = existingCredentials.find(
       ([, credential]) => credential?.["@type"] === "Password",
     );
-    const nextCredentials = Object.fromEntries(
-      existingCredentials.filter(
-        ([, credential]) => credential?.["@type"] !== "Password",
-      ).map(([credentialId, credential]) => [
-        credentialId,
-        toWritableCredential(credential),
-      ]),
-    ) as Record<string, StalwartCredentialRecord>;
-    const passwordCredentialId = passwordEntry?.[0] ?? "password";
+    const passwordCredentialKey = passwordEntry?.[0] ?? "0";
     const passwordCredential = toWritableCredential(
       (passwordEntry?.[1] ?? {}) as StalwartCredentialRecord,
     );
-    nextCredentials[passwordCredentialId] = {
-      ...passwordCredential,
-      "@type": "Password",
-      secret: input.secret,
-      expiresAt: null,
-      allowedIps:
-        typeof passwordCredential.allowedIps === "object" &&
-        passwordCredential.allowedIps !== null
-          ? passwordCredential.allowedIps
-          : {},
-    };
 
     const envelope = await this.postJmap([
       [
@@ -421,7 +514,17 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
         {
           update: {
             [input.accountId]: {
-              credentials: nextCredentials,
+              [`credentials/${passwordCredentialKey}`]: {
+                ...passwordCredential,
+                "@type": "Password",
+                secret: input.secret,
+                expiresAt: null,
+                allowedIps:
+                  typeof passwordCredential.allowedIps === "object" &&
+                  passwordCredential.allowedIps !== null
+                    ? passwordCredential.allowedIps
+                    : {},
+              },
             },
           },
         },
@@ -755,9 +858,24 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     createError?: StalwartSetError;
   }): Promise<string | null> {
     const existingKeys = await this.listPublicKeysForAccount(input.accountId);
-    const matchingKey = existingKeys.find((publicKey) =>
+    let matchingKey = existingKeys.find((publicKey) =>
       this.publicKeyMatchesEmail(publicKey, input.email),
     );
+
+    if (!matchingKey?.id && existingKeys.length > 0) {
+      const fallbackKey = existingKeys[0];
+      if (fallbackKey?.id) {
+        matchingKey = fallbackKey;
+        logger.warn(
+          "Adopting the first Stalwart public key for mailbox recovery",
+          {
+            accountId: input.accountId,
+            email: input.email,
+            existingPublicKeyId: fallbackKey.id,
+          },
+        );
+      }
+    }
 
     if (!matchingKey?.id) {
       return null;
@@ -821,7 +939,25 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     encryptOnAppend?: boolean;
     allowSpamTraining?: boolean;
   }): Promise<void> {
-    await this.postJmap([
+    const account = await this.getAccount(input.accountId);
+    const encryptionAtRest = account.encryptionAtRest;
+    const encryptionType =
+      typeof encryptionAtRest?.["@type"] === "string"
+        ? encryptionAtRest["@type"]
+        : null;
+    const configuredPublicKeyId =
+      typeof encryptionAtRest?.publicKey === "string"
+        ? encryptionAtRest.publicKey
+        : null;
+
+    if (
+      encryptionType === "Aes256" &&
+      configuredPublicKeyId === input.publicKeyId
+    ) {
+      return;
+    }
+
+    const envelope = await this.postJmap([
       [
         "x:AccountSettings/set",
         {
@@ -840,6 +976,24 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
         "c1",
       ],
     ]);
+
+    const result = this.getMethodResult<{
+      updated?: Record<string, null>;
+      notUpdated?: Record<string, StalwartSetError>;
+    }>(envelope, "x:AccountSettings/set");
+    const updateError = result.notUpdated?.singleton;
+
+    if (updateError) {
+      throw new Error(
+        updateError.description || "Stalwart encryption-at-rest update failed.",
+      );
+    }
+
+    if (!(result.updated && "singleton" in result.updated)) {
+      throw new Error(
+        "Stalwart encryption-at-rest update was not acknowledged.",
+      );
+    }
   }
 
   async getSession(): Promise<StalwartJmapEnvelope> {
