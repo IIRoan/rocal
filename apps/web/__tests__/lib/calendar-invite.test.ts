@@ -1,5 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
-import { extractMailCalendarInvite } from "@/lib/mail/calendar-invite";
+import {
+  extractMailCalendarInvite,
+  hasCalendarInvitationMetadata,
+  listCalendarAttachmentCandidates,
+} from "@/lib/mail/calendar-invite";
 
 describe("mail calendar invite parsing", () => {
   it("extracts RSVP invite metadata from text/calendar body values", () => {
@@ -144,5 +148,28 @@ describe("mail calendar invite parsing", () => {
       icsContent:
         "BEGIN:VCALENDAR\r\nMETHOD:REPLY\r\nBEGIN:VEVENT\r\nUID:x\r\nSUMMARY:Accepted\r\nEND:VEVENT\r\nEND:VCALENDAR",
     });
+  });
+
+  it("detects calendar invite metadata from blob-only attachments", () => {
+    const message = {
+      id: "mail-4",
+      subject: "Bob invited you to Planning sync",
+      attachments: [
+        {
+          blobId: "blob-ics-1",
+          name: "invite.ics",
+          type: "text/calendar; method=REQUEST",
+        },
+      ],
+    };
+
+    expect(hasCalendarInvitationMetadata(message)).toBe(true);
+    expect(listCalendarAttachmentCandidates(message)).toEqual([
+      {
+        blobId: "blob-ics-1",
+        name: "invite.ics",
+        type: "text/calendar; method=REQUEST",
+      },
+    ]);
   });
 });

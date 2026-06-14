@@ -600,6 +600,7 @@ describe("MessageReader — linked calendar event", () => {
     expect(container.textContent).not.toContain("Linked calendar event");
     expect(container.textContent).not.toContain("Unable to load linked event details");
     expect(container.textContent).toContain("Planning sync");
+    expect(container.textContent).toContain("Accept");
   });
 
   it("auto-processes CANCEL invites for already accepted events", async () => {

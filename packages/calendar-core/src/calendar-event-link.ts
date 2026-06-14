@@ -3,6 +3,7 @@ const EVENT_ID_LINE_REGEX =
 const EVENT_QUERY_REGEX = /[?&]eventId=([^&#\s<>"']+)/i;
 const SOLACE_REMINDER_SUBJECT_REGEX =
   /\b(?:encrypted event|event reminder)\b/i;
+const SOLACE_INVITATION_SUBJECT_REGEX = /\binvited you to\b/i;
 const REMINDER_LEAD_TIME_REGEX =
   /\b(\d+)\s+minutes?\b/i;
 
@@ -49,9 +50,19 @@ export function extractLinkedCalendarEventId(
   return null;
 }
 
+export function isSolaceEventInvitationEmail(
+  source: CalendarEventLinkSource,
+): boolean {
+  return SOLACE_INVITATION_SUBJECT_REGEX.test(source.subject ?? "");
+}
+
 export function isSolaceEventReminderEmail(
   source: CalendarEventLinkSource,
 ): boolean {
+  if (isSolaceEventInvitationEmail(source)) {
+    return false;
+  }
+
   if (!extractLinkedCalendarEventId(source)) {
     return false;
   }
