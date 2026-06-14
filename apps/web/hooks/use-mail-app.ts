@@ -52,6 +52,7 @@ import {
   extractMessageBodies,
   extractPgpMimeCiphertextBlobId,
 } from "@/lib/mail/message-security";
+import { listCalendarAttachmentCandidates } from "@/lib/mail/calendar-invite";
 import {
   resolveAttachmentPreviewKind,
   type MailAttachmentPreviewKind,
@@ -1088,6 +1089,70 @@ export function useMailApp() {
     // exclude activeMailbox and use activeMailboxRef.current inside the effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMessage?.id, config]);
+
+  useEffect(() => {
+    const mailbox = activeMailboxRef.current;
+    if (!selectedMessage || !mailbox) {
+      return;
+    }
+
+    const encState = classifyMessageEncryption(selectedMessage);
+    if (encState !== "plain") {
+      return;
+    }
+
+    const candidates = listCalendarAttachmentCandidates(selectedMessage);
+    if (candidates.length === 0) {
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setSelectedMessageDecryptedAttachments(null);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setSelectedMessageDecryptedAttachments([]);
+      }
+    });
+
+    void (async () => {
+      try {
+        const loaded = await Promise.all(
+          candidates.map(async (candidate) => {
+            const content = await mailbox.client.getBlobAsText(
+              mailbox.session,
+              candidate.blobId,
+            );
+            return {
+              blobId: candidate.blobId,
+              name: candidate.name ?? "invite.ics",
+              type: candidate.type ?? "text/calendar",
+              content,
+            } satisfies MailAttachment;
+          }),
+        );
+        if (!cancelled) {
+          setSelectedMessageDecryptedAttachments(loaded);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          log.warn("Failed to load calendar invite attachment", error);
+          setSelectedMessageDecryptedAttachments(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMessage?.id]);
 
   // Auto-mark read when a message is opened
   useEffect(() => {

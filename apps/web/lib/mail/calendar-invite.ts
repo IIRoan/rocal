@@ -90,6 +90,83 @@ function hasIcsFilename(value?: string | null): boolean {
   return normalized.endsWith(".ics") || normalized.endsWith(".ical");
 }
 
+export function isCalendarAttachmentMeta(
+  type?: string | null,
+  name?: string | null,
+): boolean {
+  return (
+    normalizeContentType(type) === "text/calendar" || hasIcsFilename(name)
+  );
+}
+
+function walkBodyStructureForCalendarBlobs(
+  part: JmapEmailMessage["bodyStructure"],
+  seen: Set<string>,
+  candidates: Array<{ blobId: string; name?: string; type?: string }>,
+): void {
+  if (!part) {
+    return;
+  }
+
+  const blobId = part.blobId?.trim();
+  if (
+    blobId &&
+    !seen.has(blobId) &&
+    isCalendarAttachmentMeta(part.type, part.name)
+  ) {
+    seen.add(blobId);
+    candidates.push({
+      blobId,
+      name: part.name ?? undefined,
+      type: part.type ?? undefined,
+    });
+  }
+
+  for (const subPart of part.subParts ?? []) {
+    walkBodyStructureForCalendarBlobs(subPart, seen, candidates);
+  }
+}
+
+export function listCalendarAttachmentCandidates(
+  message: Pick<JmapEmailMessage, "attachments" | "bodyStructure">,
+): Array<{ blobId: string; name?: string; type?: string }> {
+  const seen = new Set<string>();
+  const candidates: Array<{ blobId: string; name?: string; type?: string }> =
+    [];
+
+  for (const attachment of message.attachments ?? []) {
+    const blobId = attachment.blobId?.trim();
+    if (!blobId || seen.has(blobId)) {
+      continue;
+    }
+    if (isCalendarAttachmentMeta(attachment.type, attachment.name)) {
+      seen.add(blobId);
+      candidates.push({
+        blobId,
+        name: attachment.name ?? undefined,
+        type: attachment.type ?? undefined,
+      });
+    }
+  }
+
+  walkBodyStructureForCalendarBlobs(message.bodyStructure, seen, candidates);
+  return candidates;
+}
+
+export function hasCalendarInvitationMetadata(
+  message: Pick<JmapEmailMessage, "attachments" | "bodyStructure" | "subject">,
+): boolean {
+  if (listCalendarAttachmentCandidates(message).length > 0) {
+    return true;
+  }
+
+  const subject = message.subject?.trim() ?? "";
+  return (
+    /\binvited you to\b/i.test(subject) ||
+    /\b(?:invitation|invite):\b/i.test(subject)
+  );
+}
+
 function attachmentContentToString(
   content: MailAttachment["content"],
 ): string | null {
