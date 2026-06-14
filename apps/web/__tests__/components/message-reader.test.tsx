@@ -513,9 +513,93 @@ describe("MessageReader — linked calendar event", () => {
       mockCalendarApiService.getInvitationByExternalId,
     ).toHaveBeenCalledWith("google-event-1@example.com");
     expect(container.textContent).toContain("testinvite6");
+    expect(mockCalendarApiService.getEvent).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("Linked calendar event");
+    expect(container.textContent).not.toContain("Unable to load linked event details");
     expect(
       container.querySelector('a[href="/calendar?eventId=event-1"]'),
     ).not.toBeNull();
+  });
+
+  it("does not fetch organizer event links for Solace ICS invitations", async () => {
+    const icsContent = [
+      "BEGIN:VCALENDAR",
+      "METHOD:REQUEST",
+      "BEGIN:VEVENT",
+      "UID:event-uid@solace-calendar.local",
+      "DTSTART:20260527T150000Z",
+      "DTEND:20260527T160000Z",
+      "SUMMARY:Planning sync",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    mockCalendarApiService.getInvitationByExternalId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "invite-copy-1",
+        title: "Planning sync",
+        description: null,
+        start: new Date("2026-05-27T15:00:00Z"),
+        end: new Date("2026-05-27T16:00:00Z"),
+        allDay: false,
+        location: null,
+        calendarId: "cal-1",
+        calendar: { id: "cal-1", name: "Work" },
+        userId: "user-1",
+        participants: [
+          {
+            userId: "user-1",
+            email: "roan@solace.onl",
+            role: "attendee",
+            status: "pending",
+          },
+        ],
+        createdAt: new Date("2026-05-01T00:00:00Z"),
+        updatedAt: new Date("2026-05-01T00:00:00Z"),
+      } as any);
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <MessageReader
+            {...defaultProps}
+            message={
+              {
+                ...baseMessage,
+                subject: "Bob invited you to Planning sync",
+                bodyValues: {
+                  "1": {
+                    value: [
+                      "Bob invited you to Planning sync on Solace.",
+                      "Open event: https://solace.onl/calendar?eventId=organizer-event-1",
+                    ].join("\n"),
+                  },
+                },
+              } as any
+            }
+            plaintext={[
+              "Bob invited you to Planning sync on Solace.",
+              "Open event: https://solace.onl/calendar?eventId=organizer-event-1",
+            ].join("\n")}
+            attachments={[
+              {
+                name: "invite.ics",
+                type: "text/calendar; method=REQUEST",
+                content: icsContent,
+              },
+            ]}
+          />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockCalendarApiService.getEvent).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("Linked calendar event");
+    expect(container.textContent).not.toContain("Unable to load linked event details");
+    expect(container.textContent).toContain("Planning sync");
   });
 
   it("auto-processes CANCEL invites for already accepted events", async () => {

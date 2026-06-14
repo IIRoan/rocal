@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 
 import {
   classifyMessageEncryption,
+  extractEncryptedBodyBlobId,
   resolveMessageSecurityLabel,
   resolveSecurityLabels,
 } from "../../lib/mail/message-security";
@@ -42,6 +43,33 @@ describe("mail message security helpers", () => {
         textBody: [{ partId: "text" }],
       }),
     ).toBe("plain");
+  });
+
+  it("falls back to encrypted body blobs when inline values are omitted", () => {
+    expect(
+      extractEncryptedBodyBlobId({
+        textBody: [{ partId: "text" }],
+        bodyValues: {},
+        bodyStructure: {
+          type: "text/plain",
+          blobId: "blob-text",
+        } as never,
+      }),
+    ).toBe("blob-text");
+
+    expect(
+      extractEncryptedBodyBlobId({
+        textBody: [{ partId: "text" }],
+        bodyValues: {
+          text: {
+            value: "-----BEGIN PGP MESSAGE-----\nabc",
+          },
+        },
+        bodyStructure: {
+          type: "text/plain",
+        } as never,
+      }),
+    ).toBeNull();
   });
 
   it("resolves encrypted-at-rest and verified signature labels", () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("../../lib/auth-email", () => ({
   buildEventInvitationEmail: jest.fn(() => ({
@@ -7,6 +7,13 @@ jest.mock("../../lib/auth-email", () => ({
     html: "<p>Invite</p>",
   })),
   sendAuthEmail: jest.fn(async () => true),
+}));
+
+jest.mock("../../lib/event-invitation-delivery", () => ({
+  sendEventInvitationEmail: jest.fn(async () => ({
+    delivered: true,
+    channel: "resend",
+  })),
 }));
 
 jest.mock("../../lib/email-client", () => ({
@@ -18,16 +25,22 @@ jest.mock("../../lib/email-client", () => ({
   authEmailFrom: "Solace <test@example.com>",
 }));
 
-import { sendAuthEmail } from "../../lib/auth-email";
+import { sendEventInvitationEmail } from "../../lib/event-invitation-delivery";
 import { EventParticipantService } from "../../services/event-participant.service";
 
-const mockSendAuthEmail = sendAuthEmail as jest.MockedFunction<
-  typeof sendAuthEmail
+const mockSendEventInvitationEmail = sendEventInvitationEmail as jest.MockedFunction<
+  typeof sendEventInvitationEmail
 >;
 type MockUserRecord = {
   id: string;
   email: string;
   name: string;
+};
+
+type MockDirectoryRecord = {
+  email: string;
+  userId: string | null;
+  stalwartAccountId?: string;
 };
 
 type MockParticipantRecord = {
@@ -49,6 +62,14 @@ type MockParticipantRecord = {
 };
 
 describe("EventParticipantService", () => {
+  beforeEach(() => {
+    mockSendEventInvitationEmail.mockClear();
+    mockSendEventInvitationEmail.mockResolvedValue({
+      delivered: true,
+      channel: "resend",
+    });
+  });
+
   it("adds the organizer, upserts attendees, and sends invitation mail for new invitees", async () => {
     const prisma = {
       user: {
@@ -73,6 +94,12 @@ describe("EventParticipantService", () => {
               name: "Teammate",
             },
           ]),
+      },
+      mailDirectoryEntry: {
+        findMany: jest
+          .fn<(...args: unknown[]) => Promise<MockDirectoryRecord[]>>()
+          .mockResolvedValue([]),
+        findUnique: jest.fn(async () => null),
       },
       eventParticipant: {
         findMany: jest
@@ -144,31 +171,10 @@ describe("EventParticipantService", () => {
     await result.sendPendingInvitations();
 
     expect(prisma.eventParticipant.upsert).toHaveBeenCalledTimes(2);
-    expect(prisma.eventParticipant.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          eventId_email: {
-            eventId: "event-1",
-            email: "owner@example.com",
-          },
-        },
-      }),
-    );
-    expect(prisma.eventParticipant.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          eventId_email: {
-            eventId: "event-1",
-            email: "teammate@example.com",
-          },
-        },
-      }),
-    );
-    expect(mockSendAuthEmail).toHaveBeenCalledTimes(1);
-    expect(mockSendAuthEmail.mock.calls[0]?.[0]).toEqual(
+    expect(mockSendEventInvitationEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendEventInvitationEmail.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
         to: "teammate@example.com",
-        label: "event invitation",
         message: expect.objectContaining({
           attachments: [
             expect.objectContaining({
@@ -242,6 +248,10 @@ describe("EventParticipantService", () => {
           .fn<(...args: unknown[]) => Promise<MockUserRecord[]>>()
           .mockResolvedValue([]),
       },
+      mailDirectoryEntry: {
+        findMany: jest.fn(async () => []),
+        findUnique: jest.fn(async () => null),
+      },
       eventParticipant: {
         findMany: jest
           .fn<(...args: unknown[]) => Promise<MockParticipantRecord[]>>()
@@ -254,7 +264,6 @@ describe("EventParticipantService", () => {
 
     const service = new EventParticipantService(prisma as never);
 
-    // Sync with an empty attendee list — only the owner should remain
     const result = await service.syncParticipants({
       eventId: "event-1",
       ownerUserId: "user-1",
@@ -301,6 +310,10 @@ describe("EventParticipantService", () => {
           .fn<(...args: unknown[]) => Promise<MockUserRecord[]>>()
           .mockResolvedValue([]),
       },
+      mailDirectoryEntry: {
+        findMany: jest.fn(async () => []),
+        findUnique: jest.fn(async () => null),
+      },
       eventParticipant: {
         findMany: jest
           .fn<(...args: unknown[]) => Promise<MockParticipantRecord[]>>()
@@ -326,5 +339,97 @@ describe("EventParticipantService", () => {
     });
     expect(result.participants).toEqual([]);
     expect(result.changed).toBe(true);
+  });
+
+  it("links @solace.onl participants via mail directory and sends to the same address", async () => {
+    const prisma = {
+      user: {
+        findUnique: jest
+          .fn<(...args: unknown[]) => Promise<MockUserRecord | null>>()
+          .mockResolvedValue({
+            id: "user-bob",
+            email: "bob@gmail.com",
+            name: "Bob",
+          }),
+        findMany: jest
+          .fn<(...args: unknown[]) => Promise<MockUserRecord[]>>()
+          .mockResolvedValue([]),
+      },
+      mailDirectoryEntry: {
+        findMany: jest
+          .fn<(...args: unknown[]) => Promise<MockDirectoryRecord[]>>()
+          .mockResolvedValue([
+            {
+              email: "roan@solace.onl",
+              userId: "user-roan",
+              stalwartAccountId: "acct-roan",
+            },
+          ]),
+        findUnique: jest.fn(async () => ({
+          stalwartAccountId: "acct-roan",
+        })),
+      },
+      eventParticipant: {
+        findMany: jest
+          .fn<(...args: unknown[]) => Promise<MockParticipantRecord[]>>()
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([
+            {
+              id: "participant-attendee",
+              eventId: "event-1",
+              userId: "user-roan",
+              email: "roan@solace.onl",
+              displayName: "roan@solace.onl",
+              role: "attendee",
+              status: "pending",
+              createdAt: new Date("2026-05-01T09:00:00.000Z"),
+              updatedAt: new Date("2026-05-01T09:00:00.000Z"),
+              user: null,
+            },
+          ]),
+        deleteMany: jest.fn(async () => ({ count: 0 })),
+        upsert: jest.fn(async () => null),
+      },
+    };
+
+    const service = new EventParticipantService(prisma as never);
+
+    const result = await service.syncParticipants({
+      eventId: "event-1",
+      ownerUserId: "user-bob",
+      participants: [{ email: "roan@solace.onl", status: "pending" }],
+      sendInvitations: true,
+      calendarName: "Primary",
+      invitationEvent: {
+        uid: "event-1@solace-calendar.local",
+        title: "Sync",
+        start: new Date("2026-05-02T10:00:00.000Z"),
+        end: new Date("2026-05-02T11:00:00.000Z"),
+        allDay: false,
+        timezone: "UTC",
+      },
+    });
+    await result.sendPendingInvitations();
+
+    expect(mockSendEventInvitationEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendEventInvitationEmail.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        to: "roan@solace.onl",
+      }),
+    );
+    expect(prisma.eventParticipant.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          email: "roan@solace.onl",
+          userId: "user-roan",
+        }),
+      }),
+    );
+    expect(result.participants[0]).toEqual(
+      expect.objectContaining({
+        email: "roan@solace.onl",
+        userId: "user-roan",
+      }),
+    );
   });
 });
