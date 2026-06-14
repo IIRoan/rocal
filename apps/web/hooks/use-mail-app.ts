@@ -48,6 +48,7 @@ import {
 } from "@/lib/mail/mail-pagination";
 import {
   classifyMessageEncryption,
+  extractEncryptedBodyBlobId,
   extractMessageBodies,
   extractPgpMimeCiphertextBlobId,
 } from "@/lib/mail/message-security";
@@ -991,13 +992,21 @@ export function useMailApp() {
         let armoredMessage: string;
         if (encState === "inline_pgp") {
           const { text } = extractMessageBodies(selectedMessage);
-          if (!text) {
-            setSelectedMessageDecryptError(
-              "No armored PGP body found in this message.",
+          if (text) {
+            armoredMessage = text;
+          } else {
+            const blobId = extractEncryptedBodyBlobId(selectedMessage);
+            if (!blobId) {
+              setSelectedMessageDecryptError(
+                "No armored PGP body found in this message.",
+              );
+              return;
+            }
+            armoredMessage = await mailbox.client.getBlobAsText(
+              mailbox.session,
+              blobId,
             );
-            return;
           }
-          armoredMessage = text;
         } else {
           // pgp_mime: download the ciphertext blob
           const blobId = extractPgpMimeCiphertextBlobId(

@@ -414,6 +414,7 @@ describe("EventService Stalwart integration", () => {
 
     expect(stalwartClient.createEvent).toHaveBeenCalledWith({
       accountId: "acct-1",
+      sendSchedulingMessages: false,
       event: expect.objectContaining({
         "@type": "Event",
         calendarIds: { "remote-cal-1": true },
@@ -559,6 +560,7 @@ describe("EventService Stalwart integration", () => {
     expect(stalwartClient.updateEvent).toHaveBeenCalledWith({
       accountId: "acct-1",
       eventId: "remote-event-1",
+      sendSchedulingMessages: false,
       patch: expect.objectContaining({
         calendarIds: { "remote-cal-1": true },
         uid: "event-uid@solace-calendar.local",

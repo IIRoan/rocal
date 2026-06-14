@@ -35,6 +35,12 @@ import {
   saveCachedPrivateKey,
 } from "./mail-password-cache";
 import { extractPgpMimeCiphertextBlobId } from "./message-security";
+import {
+  containsArmoredPgpMessage,
+  MAX_PGP_DECRYPT_LAYERS,
+  mergeSignatureVerificationState,
+  resolveLayerSignatureVerificationState,
+} from "./pgp-layers";
 import { parseMimeBody } from "./mail-mime-parser";
 import type {
   JmapAttachment,
@@ -690,16 +696,6 @@ async function decryptArmoredMessage(
     throw err;
   }
 
-  let message: openpgp.Message<string>;
-  try {
-    message = await openpgp.readMessage({ armoredMessage });
-  } catch (err) {
-    throw new Error(
-      `[mail-crypto] id=${messageId}: Failed to parse PGP message: ` +
-        (err instanceof Error ? err.message : String(err)),
-    );
-  }
-
   let verificationKeys: openpgp.Key | undefined;
   if (senderPublicKeyArmored) {
     try {
@@ -713,38 +709,66 @@ async function decryptArmoredMessage(
     }
   }
 
-  let decrypted: openpgp.DecryptMessageResult;
-  try {
-    decrypted = await openpgp.decrypt({
-      message,
-      decryptionKeys: unlockedVault.privateKey,
-      verificationKeys,
+  let currentArmored = armoredMessage.trim();
+  let plaintext = "";
+  let signatureVerificationState: MailSignatureVerificationState = "not_signed";
+
+  for (let layer = 0; layer < MAX_PGP_DECRYPT_LAYERS; layer++) {
+    if (!containsArmoredPgpMessage(currentArmored)) {
+      plaintext = currentArmored;
+      break;
+    }
+
+    let message: openpgp.Message<string>;
+    try {
+      message = await openpgp.readMessage({ armoredMessage: currentArmored });
+    } catch (err) {
+      throw new Error(
+        `[mail-crypto] id=${messageId}: Failed to parse PGP message: ` +
+          (err instanceof Error ? err.message : String(err)),
+      );
+    }
+
+    let decrypted: openpgp.DecryptMessageResult;
+    try {
+      decrypted = await openpgp.decrypt({
+        message,
+        decryptionKeys: unlockedVault.privateKey,
+        verificationKeys,
+      });
+    } catch (err) {
+      throw new Error(
+        `[mail-crypto] id=${messageId}: PGP decryption failed: ` +
+          (err instanceof Error ? err.message : String(err)),
+      );
+    }
+
+    plaintext =
+      typeof decrypted.data === "string"
+        ? decrypted.data
+        : new TextDecoder().decode(decrypted.data as Uint8Array);
+
+    const layerSignatureState = await resolveLayerSignatureVerificationState({
+      signatures: decrypted.signatures,
+      hasVerificationKey: Boolean(verificationKeys),
     });
-  } catch (err) {
+    signatureVerificationState = mergeSignatureVerificationState(
+      signatureVerificationState,
+      layerSignatureState,
+    );
+
+    if (!containsArmoredPgpMessage(plaintext)) {
+      break;
+    }
+
+    currentArmored = plaintext.trim();
+  }
+
+  if (!plaintext) {
     throw new Error(
-      `[mail-crypto] id=${messageId}: PGP decryption failed: ` +
-        (err instanceof Error ? err.message : String(err)),
+      `[mail-crypto] id=${messageId}: PGP decryption did not return any plaintext.`,
     );
   }
-
-  let signatureVerificationState: MailSignatureVerificationState = "not_signed";
-  if (Array.isArray(decrypted.signatures) && decrypted.signatures.length > 0) {
-    if (!verificationKeys) {
-      signatureVerificationState = "unverified";
-    } else {
-      try {
-        await Promise.all(decrypted.signatures.map((sig) => sig.verified));
-        signatureVerificationState = "verified";
-      } catch {
-        signatureVerificationState = "failed";
-      }
-    }
-  }
-
-  const plaintext =
-    typeof decrypted.data === "string"
-      ? decrypted.data
-      : new TextDecoder().decode(decrypted.data as Uint8Array);
 
   return {
     plaintext,

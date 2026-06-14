@@ -1308,6 +1308,7 @@ export class EventService implements IEventService {
       if (this.stalwartClient && stalwartAccountId && stalwartCalendarId) {
         const remoteEvent = await this.stalwartClient.createEvent({
           accountId: stalwartAccountId,
+          sendSchedulingMessages: false,
           event: buildStalwartEventPayload({
             calendarId: stalwartCalendarId,
             uid: stalwartUid,
@@ -1807,11 +1808,13 @@ export class EventService implements IEventService {
           await this.stalwartClient.updateEvent({
             accountId: stalwartAccountId,
             eventId: stalwartEventId,
+            sendSchedulingMessages: false,
             patch: remotePayload,
           });
         } else {
           const remoteEvent = await this.stalwartClient.createEvent({
             accountId: stalwartAccountId,
+            sendSchedulingMessages: false,
             event: remotePayload,
           });
           stalwartEventId = remoteEvent.id;

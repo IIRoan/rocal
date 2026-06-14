@@ -40,7 +40,6 @@ import {
   Inbox,
   EyeOff,
   MessageSquare,
-  CalendarDays,
   CalendarCheck,
   Clock,
   MapPin,
@@ -822,7 +821,7 @@ export function MessageReader({
   }, [message?.id]);
 
   useEffect(() => {
-    if (!linkedCalendarEventId) {
+    if (!isEventReminderEmail || !linkedCalendarEventId) {
       let cancelled = false;
       queueMicrotask(() => {
         if (!cancelled) {
@@ -881,7 +880,7 @@ export function MessageReader({
     return () => {
       cancelled = true;
     };
-  }, [linkedCalendarEventId]);
+  }, [isEventReminderEmail, linkedCalendarEventId]);
 
   const eventReminderView = useMemo(() => {
     if (!linkedCalendarEvent?.event) {
@@ -2513,120 +2512,6 @@ export function MessageReader({
     </div>
   );
 
-  const linkedEventCard = linkedCalendarEvent &&
-    !isEventReminderEmail &&
-    !shouldReplaceBodyWithEventReminder && (
-    <div
-      className={cn(
-        "mx-4 mb-0 rounded-lg rounded-b-none border border-primary/20 bg-primary/5 px-4 py-3",
-        (mailCalendarInvite?.method === "REQUEST" ||
-          mailCalendarInvite?.method === "CANCEL") &&
-          "rounded-t-none border-t-0",
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <CalendarDays className="size-4" strokeWidth={2.25} />
-        </div>
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-primary/70">
-                Linked calendar event
-              </div>
-              <div className="text-base font-semibold text-foreground">
-                {linkedCalendarEvent.loading ? (
-                  "Loading event details..."
-                ) : linkedCalendarEvent.event?.encryptionState ===
-                    "encrypted" &&
-                  linkedCalendarEvent.event?.title ===
-                    ENCRYPTED_EVENT_PLACEHOLDER_TITLE ? (
-                  <span className="flex items-center gap-1.5 text-muted-foreground">
-                    <Lock className="size-3.5 shrink-0" />
-                    Encrypted – open in calendar to view
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5">
-                    {linkedCalendarEvent.event?.encryptionState ===
-                      "encrypted" && (
-                      <Lock
-                        className="size-3.5 shrink-0 text-primary/60"
-                        strokeWidth={2.25}
-                      />
-                    )}
-                    {linkedCalendarEvent.event?.title || "Untitled event"}
-                  </span>
-                )}
-              </div>
-            </div>
-            <Button asChild variant="secondary" size="xs" className="gap-1.5">
-              <a
-                href={`/calendar?eventId=${encodeURIComponent(linkedCalendarEvent.eventId)}`}
-              >
-                Open in calendar
-                <ExternalLink className="size-3" />
-              </a>
-            </Button>
-          </div>
-          {linkedCalendarEvent.loading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Fetching the latest event content from your calendar.
-            </div>
-          ) : linkedCalendarEvent.error ? (
-            <div className="text-sm text-destructive">
-              {linkedCalendarEvent.error}
-            </div>
-          ) : linkedCalendarEvent.event ? (
-            <div className="space-y-1.5 text-sm text-foreground/80">
-              <div className="flex items-center gap-2">
-                <Clock className="size-3.5 text-muted-foreground" />
-                <span>
-                  {(() => {
-                    const event = linkedCalendarEvent.event;
-                    const dateOptions: Intl.DateTimeFormatOptions = event.allDay
-                      ? {
-                          dateStyle: "full",
-                          timeZone: timezone ?? undefined,
-                        }
-                      : {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                          hour12:
-                            timeFormat === "12h"
-                              ? true
-                              : timeFormat === "24h"
-                                ? false
-                                : undefined,
-                          timeZone: timezone ?? undefined,
-                        };
-                    return `${new Date(event.start).toLocaleString(undefined, dateOptions)} - ${new Date(event.end).toLocaleString(undefined, dateOptions)}`;
-                  })()}
-                </span>
-              </div>
-              {linkedCalendarEvent.event.location && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="size-3.5 text-muted-foreground" />
-                  <span>{linkedCalendarEvent.event.location}</span>
-                </div>
-              )}
-              {linkedCalendarEvent.event.calendar?.name && (
-                <div className="text-xs text-muted-foreground">
-                  Calendar: {linkedCalendarEvent.event.calendar.name}
-                </div>
-              )}
-              {linkedCalendarEvent.event.description && (
-                <div className="rounded-md border border-border/50 bg-background/60 px-3 py-2 text-sm leading-relaxed text-foreground/80">
-                  {linkedCalendarEvent.event.description}
-                </div>
-              )}
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-
   const invitationStatus =
     currentCalendarInviteEvent?.event?.participants?.find(
       (participant) =>
@@ -2828,10 +2713,7 @@ export function MessageReader({
 
   const hasCardAboveBody =
     mailCalendarInvite?.method === "REQUEST" ||
-    mailCalendarInvite?.method === "CANCEL" ||
-    (Boolean(linkedCalendarEvent) &&
-      !isEventReminderEmail &&
-      !shouldReplaceBodyWithEventReminder);
+    mailCalendarInvite?.method === "CANCEL";
   const hasReminderBannerAbove =
     isEventReminderEmail && Boolean(linkedCalendarEvent);
   const bodyAttachedAbove = hasCardAboveBody || hasReminderBannerAbove;
@@ -3209,7 +3091,6 @@ export function MessageReader({
         {conversationStrip}
         {calendarInviteCard}
         {calendarCancellationCard}
-        {linkedEventCard}
       </div>
       <div className="flex min-h-0 flex-1 flex-col">{bodyContent}</div>
       {replyBar}

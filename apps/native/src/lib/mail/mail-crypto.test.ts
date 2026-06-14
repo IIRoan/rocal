@@ -548,6 +548,42 @@ describe("mail-crypto", () => {
       expect(result.signatureVerificationState).toBe("failed");
     });
 
+    it("verifies signatures on intermediate PGP layers before peeling further", async () => {
+      const nestedInner = [
+        "-----BEGIN PGP MESSAGE-----",
+        "inner-ciphertext",
+        "-----END PGP MESSAGE-----",
+      ].join("\n");
+      const senderKey = {};
+
+      mockReadMessage
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({});
+      mockReadKey.mockResolvedValueOnce(senderKey);
+      mockDecrypt
+        .mockResolvedValueOnce({
+          data: nestedInner,
+          signatures: [{ verified: Promise.resolve(true) }],
+        })
+        .mockResolvedValueOnce({
+          data: "Final plaintext",
+          signatures: [],
+        });
+
+      const runtime = buildRuntime();
+      const result = await decryptMailMessage(
+        runtime,
+        "msg-nested-sig",
+        "-----BEGIN PGP MESSAGE-----",
+        "-----BEGIN PGP PUBLIC KEY BLOCK-----",
+      );
+
+      expect(mockDecrypt).toHaveBeenCalledTimes(2);
+      expect(result.plaintext).toBe("Final plaintext");
+      expect(result.signatureVerificationState).toBe("verified");
+      expect(result.hasVerifiedSignature).toBe(true);
+    });
+
     it("handles Uint8Array data from openpgp.decrypt", async () => {
       const encoder = new TextEncoder();
       mockReadMessage.mockResolvedValueOnce({});
