@@ -567,8 +567,13 @@ export class MailService implements IMailService {
 
   private async deleteOrphanedStalwartAccountIfNeeded(
     accountId: string,
+    options?: { onlyIfCreated?: boolean; wasCreated?: boolean },
   ): Promise<void> {
     if (!accountId) {
+      return;
+    }
+
+    if (options?.onlyIfCreated && !options.wasCreated) {
       return;
     }
 
@@ -600,13 +605,56 @@ export class MailService implements IMailService {
     }
   }
 
+  private async purgeLinkedStalwartMailbox(input: {
+    stalwartAccountId: string;
+    localPart: string;
+    stalwartDomainId: string;
+    email: string;
+  }): Promise<void> {
+    const attemptedIds = new Set<string>();
+
+    const destroyAccount = async (accountId: string) => {
+      const normalizedAccountId = accountId.trim();
+      if (!normalizedAccountId || attemptedIds.has(normalizedAccountId)) {
+        return;
+      }
+
+      attemptedIds.add(normalizedAccountId);
+      await this.adminClient.deleteAccount(normalizedAccountId);
+    };
+
+    try {
+      await destroyAccount(input.stalwartAccountId);
+
+      const remoteAccountId = await this.adminClient.resolveAccountIdByMailbox({
+        localPart: input.localPart,
+        domainId: input.stalwartDomainId,
+      });
+
+      if (remoteAccountId) {
+        await destroyAccount(remoteAccountId);
+      }
+    } catch (error) {
+      logger.error("Failed to delete linked Stalwart account during Solace account deletion", {
+        email: input.email,
+        stalwartAccountId: input.stalwartAccountId,
+        error,
+      });
+      throw new UpstreamServiceError(
+        "Could not delete the linked Stalwart mailbox. Try again in a moment.",
+      );
+    }
+  }
+
   async deleteMailboxForUser(input: DeleteMailboxForUserInput): Promise<void> {
     const mailbox = await this.prisma.mailDirectoryEntry.findUnique({
       where: { userId: input.userId },
       select: {
         id: true,
         email: true,
+        localPart: true,
         stalwartAccountId: true,
+        stalwartDomainId: true,
       },
     });
 
@@ -614,19 +662,12 @@ export class MailService implements IMailService {
       return;
     }
 
-    try {
-      await this.adminClient.deleteAccount(mailbox.stalwartAccountId);
-    } catch (error) {
-      logger.error(
-        "Failed to delete linked Stalwart account during Solace account deletion",
-        {
-          userId: input.userId,
-          email: mailbox.email,
-          stalwartAccountId: mailbox.stalwartAccountId,
-          error,
-        },
-      );
-    }
+    await this.purgeLinkedStalwartMailbox({
+      stalwartAccountId: mailbox.stalwartAccountId,
+      localPart: mailbox.localPart,
+      stalwartDomainId: mailbox.stalwartDomainId,
+      email: mailbox.email,
+    });
 
     await this.prisma.mailDirectoryEntry.delete({
       where: { id: mailbox.id },
@@ -679,6 +720,7 @@ export class MailService implements IMailService {
     let domainId = "";
     let accountId = "";
     let publicKeyId = "";
+    let stalwartAccountCreated = false;
 
     try {
       const domain = await this.adminClient.resolveDomainByName(input.domain);
@@ -691,6 +733,7 @@ export class MailService implements IMailService {
         description: input.provisioning.displayName,
       });
       accountId = account.accountId;
+      stalwartAccountCreated = account.created === true;
 
       const registeredKey = await this.adminClient.registerPublicKey({
         accountId,
@@ -707,7 +750,17 @@ export class MailService implements IMailService {
         allowSpamTraining: false,
       });
     } catch (error) {
-      await this.deleteOrphanedStalwartAccountIfNeeded(accountId);
+      logger.error("Mailbox Stalwart provisioning failed", {
+        email: input.email,
+        userId: input.userId,
+        stalwartAccountId: accountId || null,
+        stalwartAccountCreated,
+        error: errorString(error),
+      });
+      await this.deleteOrphanedStalwartAccountIfNeeded(accountId, {
+        onlyIfCreated: true,
+        wasCreated: stalwartAccountCreated,
+      });
       normalizeMailProvisioningError(error);
     }
 
@@ -826,7 +879,10 @@ export class MailService implements IMailService {
         }
       });
     } catch (error) {
-      await this.deleteOrphanedStalwartAccountIfNeeded(accountId);
+      await this.deleteOrphanedStalwartAccountIfNeeded(accountId, {
+        onlyIfCreated: true,
+        wasCreated: stalwartAccountCreated,
+      });
       logger.error("Failed to persist provisioned mailbox state", {
         email: input.email,
         userId: input.userId ?? null,
@@ -866,6 +922,149 @@ export class MailService implements IMailService {
     };
   }
 
+  private async mailboxHasVaultBackup(mailboxId: string): Promise<boolean> {
+    const entry = await this.prisma.mailDirectoryEntry.findUnique({
+      where: { id: mailboxId },
+      select: {
+        vaultBackup: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    return Boolean(entry?.vaultBackup);
+  }
+
+  private async repairMailboxForUser(input: {
+    userId: string;
+    mailbox: LinkedMailboxRecord;
+    email: string;
+    localPart: string;
+    domain: string;
+    provisioning: NormalizedProvisioningInput;
+  }): Promise<MailSignupResult> {
+    let derivedFingerprint: string;
+    try {
+      derivedFingerprint = normalizeFingerprint(
+        await getOpenPgpPublicKeyFingerprint(
+          input.provisioning.publicKeyArmored,
+        ),
+      );
+    } catch {
+      throw new ValidationError(
+        "The submitted public key could not be parsed as OpenPGP.",
+        "publicKeyArmored",
+      );
+    }
+
+    if (derivedFingerprint !== input.provisioning.fingerprint) {
+      throw new ValidationError(
+        "The submitted public-key fingerprint does not match the uploaded key.",
+        "fingerprint",
+      );
+    }
+
+    let domainId = "";
+    let accountId = input.mailbox.stalwartAccountId;
+    let publicKeyId = "";
+    let stalwartAccountCreated = false;
+
+    try {
+      const domain = await this.adminClient.resolveDomainByName(input.domain);
+      domainId = domain.id;
+
+      if (!accountId) {
+        const account = await this.adminClient.createAccount({
+          localPart: input.localPart,
+          secret: generateMailboxCredentialSecret(),
+          domainId,
+          description: input.provisioning.displayName,
+        });
+        accountId = account.accountId;
+        stalwartAccountCreated = account.created === true;
+      }
+
+      const registeredKey = await this.adminClient.registerPublicKey({
+        accountId,
+        email: input.email,
+        publicKeyArmored: input.provisioning.publicKeyArmored,
+        description: `${input.provisioning.displayName || input.email} primary OpenPGP key`,
+      });
+      publicKeyId = registeredKey.publicKeyId;
+
+      await this.adminClient.enableEncryptionAtRest({
+        accountId,
+        publicKeyId,
+        encryptOnAppend: false,
+        allowSpamTraining: false,
+      });
+    } catch (error) {
+      logger.error("Mailbox Stalwart repair failed", {
+        email: input.email,
+        userId: input.userId,
+        directoryEntryId: input.mailbox.id,
+        stalwartAccountId: accountId || null,
+        stalwartAccountCreated,
+        error: errorString(error),
+      });
+      await this.deleteOrphanedStalwartAccountIfNeeded(accountId, {
+        onlyIfCreated: true,
+        wasCreated: stalwartAccountCreated,
+      });
+      normalizeMailProvisioningError(error);
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await this.reconcileProvisionedMailboxRecord(
+          tx,
+          {
+            userId: input.userId,
+            email: input.email,
+            localPart: input.localPart,
+            domain: input.domain,
+            provisioning: input.provisioning,
+          },
+          {
+            stalwartAccountId: accountId,
+            stalwartDomainId: domainId,
+            stalwartPublicKeyId: publicKeyId,
+            derivedFingerprint,
+          },
+          {
+            id: input.mailbox.id,
+            email: input.mailbox.email,
+            userId: input.mailbox.userId,
+          },
+        );
+      });
+    } catch (error) {
+      await this.deleteOrphanedStalwartAccountIfNeeded(accountId, {
+        onlyIfCreated: true,
+        wasCreated: stalwartAccountCreated,
+      });
+      logger.error("Failed to persist repaired mailbox state", {
+        email: input.email,
+        userId: input.userId,
+        directoryEntryId: input.mailbox.id,
+        stalwartAccountId: accountId,
+        error,
+      });
+      normalizeMailPersistenceError(error);
+    }
+
+    return {
+      email: input.email,
+      displayName: input.provisioning.displayName,
+      stalwartAccountId: accountId,
+      stalwartPublicKeyId: publicKeyId,
+      fingerprint: derivedFingerprint,
+      encryptionAtRestEnabled: true,
+    };
+  }
+
   async bootstrapForUser(
     input: MailBootstrapForUserInput,
   ): Promise<MailSignupResult> {
@@ -876,10 +1075,22 @@ export class MailService implements IMailService {
     });
 
     if (existingMailbox) {
-      throw new ValidationError(
-        "A mailbox has already been provisioned for this account.",
-        "email",
-      );
+      const hasVault = await this.mailboxHasVaultBackup(existingMailbox.id);
+      if (hasVault) {
+        throw new ValidationError(
+          "A mailbox has already been provisioned for this account.",
+          "email",
+        );
+      }
+
+      return this.repairMailboxForUser({
+        userId: input.userId,
+        mailbox: existingMailbox,
+        email: mailboxEmail.email,
+        localPart: mailboxEmail.localPart,
+        domain: mailboxEmail.domain,
+        provisioning: normalizeProvisioningInput(input),
+      });
     }
 
     return this.createMailbox({
