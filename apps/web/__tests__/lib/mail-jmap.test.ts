@@ -130,6 +130,7 @@ describe("mail JMAP helpers", () => {
           create: {
             draft1: {
               mailboxIds: { "drafts-1": true },
+              keywords: { $seen: true, $draft: true },
               from: [{ email: "alice@solace.onl" }],
               to: [{ email: "bob@example.com" }, { email: "cara@example.com" }],
               subject: "Hello",
@@ -154,6 +155,12 @@ describe("mail JMAP helpers", () => {
             s1: {
               emailId: "#draft1",
               identityId: "identity-1",
+              envelope: {
+                rcptTo: [
+                  { email: "bob@example.com" },
+                  { email: "cara@example.com" },
+                ],
+              },
             },
           },
         },
@@ -182,6 +189,9 @@ describe("mail JMAP helpers", () => {
             s1: {
               emailId: "#draft1",
               identityId: "identity-1",
+              envelope: {
+                rcptTo: [{ email: "bob@example.com" }],
+              },
             },
           },
           onSuccessUpdateEmail: {

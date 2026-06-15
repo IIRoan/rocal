@@ -31,6 +31,9 @@ import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Button } from "@workspace/ui/components/ui/button";
 import { useIsMobile } from "@workspace/ui/hooks";
 import type { JmapIdentity } from "@/lib/mail/types";
+import {
+  validateComposeRecipients,
+} from "@workspace/calendar-core";
 import { RichTextEditor } from "./rich-text-editor";
 import {
   appendHtmlSignature,
@@ -128,14 +131,24 @@ export function ComposeForm({
       : selectedIdentity.email
     : fallbackFromEmail;
 
-  const isValidEmail = (email: string) =>
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
-  const toEmails = composeTo
-    .split(/[,;]/)
-    .flatMap((e) => (e.trim() ? [e.trim()] : []));
-  const toValid = toEmails.length > 0 && toEmails.every(isValidEmail);
-  const showToError = toTouched && composeTo.trim().length > 0 && !toValid;
+  const recipientValidation = validateComposeRecipients({
+    to: composeTo,
+    cc: composeCc,
+    bcc: composeBcc,
+    subject: composeSubject,
+  });
+  const toValid =
+    recipientValidation.to.length > 0 && !recipientValidation.errors.recipients;
+  const showToError =
+    toTouched &&
+    composeTo.trim().length > 0 &&
+    Boolean(
+      recipientValidation.errors.to ?? recipientValidation.errors.recipients,
+    );
+  const canSend =
+    toValid &&
+    composeSubject.trim().length > 0 &&
+    !recipientValidation.errors.subject;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -205,7 +218,7 @@ export function ComposeForm({
           size="sm"
           className={isMobile ? "h-7 px-2.5 text-xs" : "h-7 text-xs"}
           onClick={() => void onSend()}
-          disabled={isBusy || !toValid || !composeSubject.trim()}
+          disabled={isBusy || !canSend}
         >
           <Send size={12} />
           {isBusy ? "Sending…" : "Send"}
@@ -478,13 +491,24 @@ export function ComposeDialog({
   isBusy,
 }: ComposeDialogProps) {
   const { isComposeOpen } = useMailComposeChrome();
-  const { composeTo, composeSubject } = useMailCompose();
+  const { composeTo, composeCc, composeBcc, composeSubject } = useMailCompose();
   const isMobile = useIsMobile();
   const open = isComposeOpen;
+  const canSendFromShortcut = validateComposeRecipients({
+    to: composeTo,
+    cc: composeCc,
+    bcc: composeBcc,
+    subject: composeSubject,
+  });
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-      if (!isBusy && composeTo.trim() && composeSubject.trim()) {
+      if (
+        !isBusy &&
+        !canSendFromShortcut.errors.to &&
+        !canSendFromShortcut.errors.recipients &&
+        !canSendFromShortcut.errors.subject
+      ) {
         e.preventDefault();
         void onSend();
       }
