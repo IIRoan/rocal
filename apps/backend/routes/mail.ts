@@ -313,13 +313,22 @@ async function proxyJmapRequest(input: {
       upstreamBody = null;
     }
 
-    logger.warn("JMAP proxy upstream responded with an error", {
+    const logPayload = {
       upstreamUrl,
       method,
       status: response.status,
       token: summarizeBearerToken(authorization),
       upstreamError: summarizeUpstreamErrorBody(upstreamBody),
-    });
+      ...(response.status >= 500 && upstreamBody
+        ? { upstreamBody }
+        : {}),
+    };
+
+    if (response.status >= 500) {
+      logger.error("JMAP proxy upstream responded with a server error", logPayload);
+    } else {
+      logger.warn("JMAP proxy upstream responded with an error", logPayload);
+    }
   }
 
   return new Response(response.body, {

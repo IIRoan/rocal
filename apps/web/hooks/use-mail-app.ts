@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getErrorMessage } from "@workspace/calendar-core";
+import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, validateComposeRecipients } from "@workspace/calendar-core";
 import { toast } from "sonner";
 import PostalMime, {
   type Attachment as ParsedMailAttachment,
@@ -180,10 +180,6 @@ function sortMessages(messages: JmapEmailMessage[]): JmapEmailMessage[] {
   });
 }
 
-function normalizeEmailAddress(value: string): string {
-  return value.trim().toLowerCase();
-}
-
 function getAttachmentSize(content: MailAttachment["content"]): number | null {
   if (content == null) return null;
   if (typeof content === "string") {
@@ -332,16 +328,6 @@ async function buildTextAttachmentPreview(
     text,
     type,
   };
-}
-
-function getEmailDomain(value: string): string | null {
-  const normalized = normalizeEmailAddress(value);
-  const atIndex = normalized.lastIndexOf("@");
-  if (atIndex <= 0 || atIndex === normalized.length - 1) {
-    return null;
-  }
-
-  return normalized.slice(atIndex + 1);
 }
 
 async function resolveOutgoingMessageBody(input: {
@@ -1525,21 +1511,36 @@ export function useMailApp() {
       toast.error("Enter a subject line.");
       return;
     }
+
+    const recipientValidation = validateComposeRecipients({
+      to: composeTo,
+      cc: composeCc,
+      bcc: composeBcc,
+      subject: composeSubject,
+    });
+    const recipientError =
+      recipientValidation.errors.to ??
+      recipientValidation.errors.recipients ??
+      recipientValidation.errors.subject;
+    if (recipientError) {
+      toast.error(recipientError);
+      return;
+    }
+
     setIsBusy(true);
     try {
-      const parseAddressList = (raw: string): string[] =>
-        raw.split(/[,;]+/).flatMap((s) => {
-          const normalized = normalizeEmailAddress(s);
-          return normalized ? [normalized] : [];
-        });
-
-      const recipients = parseAddressList(composeTo);
-      const ccRecipients = composeCc.trim()
-        ? parseAddressList(composeCc)
+      const recipients = parsedAddressesToEmails(recipientValidation.to);
+      const ccRecipients = recipientValidation.cc.length
+        ? parsedAddressesToEmails(recipientValidation.cc)
         : undefined;
-      const bccRecipients = composeBcc.trim()
-        ? parseAddressList(composeBcc)
+      const bccRecipients = recipientValidation.bcc.length
+        ? parsedAddressesToEmails(recipientValidation.bcc)
         : undefined;
+      const allRecipients = [
+        ...recipients,
+        ...(ccRecipients ?? []),
+        ...(bccRecipients ?? []),
+      ];
 
       const draftsMailboxId = getPrimaryMailboxId(
         activeMailbox.mailboxes,
@@ -1573,7 +1574,7 @@ export function useMailApp() {
         getEmailDomain(activeMailbox.email);
       const { textBody, encrypted } = await resolveOutgoingMessageBody({
         activeMailbox,
-        recipients,
+        recipients: allRecipients,
         plaintext: bodyWithSignature,
         internalDomain,
       });
