@@ -90,6 +90,7 @@ import { toast } from "sonner";
 import { SenderAvatar } from "./mail-avatar";
 import type {
   JmapEmailMessage,
+  JmapIdentity,
   JmapMailbox,
   LabelDef,
   MailAttachment,
@@ -109,6 +110,11 @@ import { splitPlaintextQuote, splitHtmlQuote } from "@/lib/mail/quoted-text";
 import { formatAddressFull, formatMessageDate } from "./mail-helpers";
 import { PdfAttachmentThumbnail } from "./attachment-preview-dialog";
 import {
+  RecipientPopover,
+  RecipientPopoverList,
+} from "./recipient-popover";
+import { MailIdentityBadge } from "./mail-identity-badge";
+import {
   extractLinkedCalendarEventId,
   extractReminderLeadMinutes,
   getCalendarEventLinkSource,
@@ -120,6 +126,7 @@ import { EventReminderMessageBody, EventReminderMessageBodyLoading } from "./eve
 import {
   buildEventReminderMailView,
   ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
+  enrichSelfMailRecipient,
   isDecryptedEventReminderContent,
 } from "@workspace/calendar-core";
 import {
@@ -528,37 +535,6 @@ function ConversationMessageMenu({
   );
 }
 
-// ─── Copy email button ────────────────────────────────────────────────────────
-
-function CopyEmailButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = () => {
-    void navigator.clipboard.writeText(value).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  };
-  return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      aria-label={copied ? "Copied!" : `Copy ${value}`}
-      className={cn(
-        "inline-flex items-center justify-center size-4 rounded transition-all shrink-0",
-        copied
-          ? "text-success"
-          : "text-muted-foreground/30 hover:text-muted-foreground/70",
-      )}
-    >
-      {copied ? (
-        <Check className="size-3" strokeWidth={2.5} />
-      ) : (
-        <Copy className="size-3" strokeWidth={2} />
-      )}
-    </button>
-  );
-}
-
 // ─── Message reader ───────────────────────────────────────────────────────────
 
 export interface MessageReaderProps {
@@ -633,6 +609,8 @@ export interface MessageReaderProps {
   onConversationMessageMove?: (id: string, mailboxId: string) => void;
   /** The signed-in user's email address, used to identify own messages */
   accountEmail?: string;
+  accountName?: string | null;
+  identities?: JmapIdentity[];
 }
 
 type LinkedCalendarEventState = {
@@ -689,6 +667,8 @@ export function MessageReader({
   onConversationMessageMarkUnread,
   onConversationMessageMove,
   accountEmail,
+  accountName,
+  identities = EMPTY_ARRAY,
 }: MessageReaderProps) {
   const queryClient = useQueryClient();
   const isDark = mailDarkMode;
@@ -1339,6 +1319,11 @@ export function MessageReader({
   const renderAsHtml = isHtmlEmail && (htmlHasQuote || !plaintextQuote);
 
   const senderEmail = message.from?.[0]?.email ?? "";
+  const senderName = message.from?.[0]?.name ?? undefined;
+  const enrichedSender = enrichSelfMailRecipient(
+    { email: senderEmail, name: senderName },
+    { email: accountEmail, name: accountName },
+  );
 
   const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
   const otherMailboxes = mailboxes.filter(
@@ -1347,7 +1332,6 @@ export function MessageReader({
       !MOVE_EXCLUDED_ROLES.has(m.role?.toLowerCase() ?? ""),
   );
 
-  const senderName = message.from?.[0]?.name ?? undefined;
   const orderedConversationMessages = conversationMessages.length
     ? conversationMessages
     : [message];
@@ -1888,38 +1872,36 @@ export function MessageReader({
       <div className={cn("flex items-start", isMobile ? "gap-2" : "gap-2.5")}>
         <SenderAvatar
           email={senderEmail}
-          name={senderName}
+          name={enrichedSender.name ?? undefined}
           className={isMobile ? "size-7 text-[10px]" : undefined}
         />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex items-center justify-between gap-2">
-            <div
-              className={cn(
-                "min-w-0 group/sender",
-                isMobile
-                  ? "flex items-center gap-1"
-                  : "flex items-center gap-1.5",
-              )}
-            >
-              {senderName && (
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+              {senderEmail ? (
+                <>
+                  <RecipientPopover
+                    name={enrichedSender.name}
+                    email={enrichedSender.email}
+                    showInlineAddress={Boolean(enrichedSender.name?.trim())}
+                    className={cn(
+                      "truncate font-medium",
+                      isMobile ? "text-xs" : "text-[13px]",
+                    )}
+                  />
+                  <MailIdentityBadge
+                    message={message}
+                    identities={identities}
+                  />
+                </>
+              ) : (
                 <span
                   className={cn(
                     "truncate font-medium",
                     isMobile ? "text-xs" : "text-[13px]",
                   )}
                 >
-                  {senderName}
-                </span>
-              )}
-              <span
-                className={cn(
-                  "truncate text-muted-foreground",
-                  isMobile ? "text-[11px]" : "text-xs",
-                )}
-              >{`<${senderEmail}>`}</span>
-              {!isMobile && (
-                <span className="opacity-0 transition-opacity group-hover/sender:opacity-100">
-                  <CopyEmailButton value={senderEmail} />
+                  Unknown sender
                 </span>
               )}
             </div>
@@ -1947,45 +1929,37 @@ export function MessageReader({
           {(message.to?.length ?? 0) > 0 && (
             <div
               className={cn(
-                "min-w-0 group/to text-muted-foreground",
+                "min-w-0 text-muted-foreground",
                 isMobile
                   ? "flex items-center gap-1 text-[11px]"
                   : "flex items-center gap-1 text-xs",
               )}
             >
               <span>To:</span>
-              <span className="truncate text-foreground/80">
-                {message.to!.map((a) => a.name || a.email).join(", ")}
-              </span>
-              {!isMobile && (
-                <span className="opacity-0 transition-opacity group-hover/to:opacity-100">
-                  <CopyEmailButton
-                    value={message.to!.map((a) => a.email).join(", ")}
-                  />
-                </span>
-              )}
+              <RecipientPopoverList
+                recipients={message.to!}
+                currentUserEmail={accountEmail}
+                currentUserName={accountName}
+                className="min-w-0 text-foreground/80"
+              />
             </div>
           )}
           {(message.cc?.length ?? 0) > 0 && (
             <div
               className={cn(
-                "min-w-0 group/cc text-muted-foreground",
+                "min-w-0 text-muted-foreground",
                 isMobile
                   ? "flex items-center gap-1 text-[11px]"
                   : "flex items-center gap-1 text-xs",
               )}
             >
               <span>CC:</span>
-              <span className="truncate text-foreground/80">
-                {message.cc!.map((a) => a.name || a.email).join(", ")}
-              </span>
-              {!isMobile && (
-                <span className="opacity-0 transition-opacity group-hover/cc:opacity-100">
-                  <CopyEmailButton
-                    value={message.cc!.map((a) => a.email).join(", ")}
-                  />
-                </span>
-              )}
+              <RecipientPopoverList
+                recipients={message.cc!}
+                currentUserEmail={accountEmail}
+                currentUserName={accountName}
+                className="min-w-0 text-foreground/80"
+              />
             </div>
           )}
         </div>

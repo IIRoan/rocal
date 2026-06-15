@@ -29,7 +29,7 @@ import {
 } from "../../lib/mail/mail-helpers";
 import { extractMessageBodies } from "../../lib/mail/message-security";
 import { getAllMessageLabels } from "../../lib/mail/use-labels";
-import type { JmapEmailMessage, LabelDef } from "../../lib/mail/types";
+import type { JmapEmailMessage, JmapIdentity, LabelDef } from "../../lib/mail/types";
 import {
   MAIL_ICON,
   MAIL_LAYOUT,
@@ -45,6 +45,7 @@ import {
   selectionUnreadDotOpacity,
 } from "./mail-selection-anim-utils";
 import { useSelectionProgress } from "./mail-selection-anim";
+import { MailIdentityBadge } from "./MailIdentityBadge";
 
 interface MailMessageRowProps {
   message: JmapEmailMessage;
@@ -54,6 +55,7 @@ interface MailMessageRowProps {
   hasAttachments?: boolean;
   showRecipient?: boolean;
   labels?: LabelDef[];
+  identities?: JmapIdentity[];
   selectionActive?: boolean;
   selected?: boolean;
   onPress: (message: JmapEmailMessage) => void;
@@ -75,6 +77,7 @@ function MailMessageRowComponent({
   hasAttachments = false,
   showRecipient = false,
   labels = [],
+  identities = [],
   selectionActive = false,
   selected = false,
   onPress,
@@ -215,15 +218,22 @@ function MailMessageRowComponent({
 
         <View style={styles.content}>
           <View style={styles.topLine}>
-            <Text
-              style={[
-                styles.sender,
-                read ? styles.readText : styles.unreadText,
-              ]}
-              numberOfLines={1}
-            >
-              {name}
-            </Text>
+            <View style={styles.senderLine}>
+              <Text
+                style={[
+                  styles.sender,
+                  read ? styles.readText : styles.unreadText,
+                ]}
+                numberOfLines={1}
+              >
+                {name}
+              </Text>
+              <MailIdentityBadge
+                message={message}
+                identities={identities}
+                compact
+              />
+            </View>
             <View style={styles.meta}>
               {showThreadBadge ? (
                 <View
@@ -398,6 +408,13 @@ function createStyles(theme: ThemeTokens) {
       justifyContent: "space-between" as const,
       gap: pad.chipGap,
     },
+    senderLine: {
+      flex: 1,
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: pad.tight,
+      minWidth: 0,
+    },
     meta: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
@@ -461,7 +478,7 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.secondaryForeground,
     },
     sender: {
-      flex: 1,
+      flexShrink: 1,
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
