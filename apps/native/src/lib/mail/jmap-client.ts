@@ -61,19 +61,22 @@ function assertSuccessfulJmapResponses(
   context: string,
 ): void {
   for (const [methodName, result] of envelope.methodResponses ?? []) {
-    if (methodName.endsWith("/error")) {
+    if (methodName === "error" || methodName.endsWith("/error")) {
       const error = result as JmapMethodError;
-      throw new Error(formatJmapMethodError(methodName, error));
+      throw new Error(formatJmapMethodError(methodName === "error" ? context : methodName, error));
     }
 
-    const notCreated = result.notCreated as
-      | Record<string, JmapMethodError>
-      | undefined;
-    if (notCreated && Object.keys(notCreated).length > 0) {
-      const firstError = Object.values(notCreated)[0];
-      if (firstError) {
-        throw new Error(formatJmapMethodError(methodName, firstError));
-      }
+    const failedPatch = (patch?: Record<string, JmapMethodError>) => {
+      if (!patch || Object.keys(patch).length === 0) return null;
+      return Object.values(patch)[0] ?? null;
+    };
+
+    const patchError =
+      failedPatch(result.notCreated as Record<string, JmapMethodError> | undefined) ??
+      failedPatch(result.notDestroyed as Record<string, JmapMethodError> | undefined) ??
+      failedPatch(result.notUpdated as Record<string, JmapMethodError> | undefined);
+    if (patchError) {
+      throw new Error(formatJmapMethodError(methodName, patchError));
     }
   }
 
@@ -253,8 +256,17 @@ export function buildSendMessageMethodCalls(input: {
   const bccAddresses = input.bcc?.length
     ? toJmapAddressList(input.bcc)
     : undefined;
-  const envelopeRecipients = [...toAddresses, ...(ccAddresses ?? []), ...(bccAddresses ?? [])]
-    .map((address) => ({ email: address.email }));
+  const seenEnvelopeRecipients = new Set<string>();
+  const envelopeRecipients: Array<{ email: string }> = [];
+  for (const address of [
+    ...toAddresses,
+    ...(ccAddresses ?? []),
+    ...(bccAddresses ?? []),
+  ]) {
+    if (seenEnvelopeRecipients.has(address.email)) continue;
+    seenEnvelopeRecipients.add(address.email);
+    envelopeRecipients.push({ email: address.email });
+  }
 
   const submissionParams: Record<string, unknown> = {
     create: {
@@ -262,6 +274,7 @@ export function buildSendMessageMethodCalls(input: {
         emailId: "#draft1",
         identityId: input.identityId,
         envelope: {
+          mailFrom: { email: input.fromEmail.trim() },
           rcptTo: envelopeRecipients,
         },
       },

@@ -51,6 +51,8 @@ export default function ComposeScreen() {
   const params = useLocalSearchParams<{
     mode?: string;
     messageId?: string;
+    to?: string;
+    toName?: string;
   }>();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { toast } = useToast();
@@ -212,7 +214,26 @@ export default function ComposeScreen() {
   const canSend = Boolean(composeContext) && !sendMessage.isPending;
 
   useEffect(() => {
-    if (hasInitializedFromParams || !sourceMessage) {
+    if (hasInitializedFromParams) {
+      return;
+    }
+
+    const toParam = Array.isArray(params.to) ? params.to[0] : params.to;
+    if (toParam) {
+      const toName = Array.isArray(params.toName)
+        ? params.toName[0]
+        : params.toName;
+      const trimmedName = toName?.trim();
+      setTo(
+        trimmedName && trimmedName.toLowerCase() !== toParam.toLowerCase()
+          ? `${trimmedName} <${toParam}>`
+          : toParam,
+      );
+      setHasInitializedFromParams(true);
+      return;
+    }
+
+    if (!sourceMessage) {
       return;
     }
 
@@ -237,7 +258,13 @@ export default function ComposeScreen() {
     }
 
     setHasInitializedFromParams(true);
-  }, [hasInitializedFromParams, params.mode, sourceMessage]);
+  }, [
+    hasInitializedFromParams,
+    params.mode,
+    params.to,
+    params.toName,
+    sourceMessage,
+  ]);
 
   return (
     <AppScreen

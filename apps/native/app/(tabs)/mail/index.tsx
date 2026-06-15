@@ -521,6 +521,7 @@ export default function MailScreen() {
           hasAttachments={hasAttachments}
           showRecipient={showRecipient}
           labels={labels}
+          identities={runtime?.identities ?? []}
           selectionActive={selectionActive}
           selected={isRowSelected}
           onPress={handleOpenMessage}
@@ -538,6 +539,7 @@ export default function MailScreen() {
       showRecipient,
       labels,
       primaryMessageIds,
+      runtime?.identities,
       selectedIds,
       selectionActive,
       threadRows,

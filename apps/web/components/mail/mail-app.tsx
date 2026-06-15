@@ -290,6 +290,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     handleSignOut,
     user,
     accountEmail,
+    accountDisplayName,
   } = mail;
 
   useRefreshGesture({
@@ -652,6 +653,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                     onBulkMarkAsRead={(ids) => void handleBulkMarkAsRead(ids)}
                     onToggleFlagged={(id) => void handleToggleFlagged(id)}
                     labels={labels}
+                    identities={activeMailbox.identities}
                     timeFormat={timeFormat}
                     timezone={settings?.timezone}
                     onLoadMore={debouncedMailListSearch ? undefined : () => void loadMoreMessages()}
@@ -748,6 +750,8 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                         void handleMoveMessage(mailboxId, id)
                       }
                       accountEmail={activeMailbox?.email ?? accountEmail}
+                      accountName={accountDisplayName}
+                      identities={activeMailbox.identities}
                     />
                   </div>
                   ) : !isFullCompose ? (

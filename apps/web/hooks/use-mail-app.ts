@@ -355,9 +355,10 @@ async function resolveOutgoingMessageBody(input: {
   }
 
   if (internalRecipients.length !== input.recipients.length) {
-    throw new Error(
-      "Messages can only be end-to-end encrypted when every recipient is an internal Solace mailbox.",
-    );
+    return {
+      textBody: input.plaintext,
+      encrypted: false,
+    };
   }
 
   const senderEmail = normalizeEmailAddress(input.activeMailbox.email);

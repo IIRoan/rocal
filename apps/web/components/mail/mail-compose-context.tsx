@@ -56,6 +56,10 @@ export type MailComposeBridge = {
   clearCompose: () => void;
   seedReply: (message: JmapEmailMessage, plaintext: string | null) => void;
   seedForward: (message: JmapEmailMessage, plaintext: string | null) => void;
+  seedNewMessage: (recipient: {
+    email: string;
+    name?: string | null;
+  }) => void;
   seedDraft: (
     message: JmapEmailMessage,
     overrides?: {
@@ -322,6 +326,33 @@ export function MailComposeProvider({
     [],
   );
 
+  const seedNewMessage = useCallback(
+    (recipient: { email: string; name?: string | null }) => {
+      const email = recipient.email.trim();
+      const name = recipient.name?.trim();
+      const to =
+        name && name.toLowerCase() !== email.toLowerCase()
+          ? `${name} <${email}>`
+          : email;
+
+      setComposeTo(to);
+      setComposeCc("");
+      setComposeBcc("");
+      setComposeSubject("");
+      setComposeBody("");
+      setComposeHtmlBody("");
+      setComposeAttachments([]);
+      setComposeReplyContext(null);
+      setDraftId(null);
+      draftIdRef.current = null;
+      isDirtyRef.current = true;
+      setDraftSaveStatus("idle");
+      setIsComposeOpen(true);
+      setIsFullCompose(false);
+    },
+    [],
+  );
+
   const seedDraft = useCallback(
     (
       message: JmapEmailMessage,
@@ -361,6 +392,7 @@ export function MailComposeProvider({
       clearCompose,
       seedReply,
       seedForward,
+      seedNewMessage,
       seedDraft,
       markDirty,
       getDraftIdRef: () => draftIdRef.current,
@@ -379,6 +411,7 @@ export function MailComposeProvider({
     clearCompose,
     seedReply,
     seedForward,
+    seedNewMessage,
     seedDraft,
     markDirty,
     setDraftSaveStatus,

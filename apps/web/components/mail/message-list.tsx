@@ -35,9 +35,10 @@ import {
 import { AppLoadingState } from "@workspace/ui/components/ui";
 import { useIsMobile } from "@workspace/ui/hooks";
 import { cn } from "@workspace/ui/lib/utils";
-import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
+import type { JmapEmailMessage, JmapIdentity, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import { formatAddress, formatMessageDate } from "./mail-helpers";
 import { SenderAvatar } from "./mail-avatar";
+import { MailIdentityBadge } from "./mail-identity-badge";
 import { buildMailConversations } from "@/lib/mail/conversation-thread";
 
 const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
@@ -60,6 +61,7 @@ interface MessageListProps {
   onBulkMarkAsRead?: (ids: string[]) => void;
   onToggleFlagged?: (id: string) => void;
   labels?: LabelDef[];
+  identities?: JmapIdentity[];
   timeFormat?: "12h" | "24h";
   timezone?: string;
   onLoadMore?: () => void;
@@ -99,6 +101,7 @@ export function MessageList({
   onBulkMarkAsRead,
   onToggleFlagged,
   labels = [],
+  identities = [],
   timeFormat,
   timezone,
   onLoadMore,
@@ -497,17 +500,24 @@ export function MessageList({
                             isMobile ? "mb-0" : "",
                           )}
                         >
-                          <span
-                            className={cn(
-                              "truncate",
-                              isMobile ? "text-[12.5px]" : "text-[13px]",
-                              isRead
-                                ? "font-medium text-foreground/70 dark:text-foreground/85"
-                                : "font-semibold text-foreground",
-                            )}
-                          >
-                            {senderLabel}
-                          </span>
+                          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                            <span
+                              className={cn(
+                                "truncate",
+                                isMobile ? "text-[12.5px]" : "text-[13px]",
+                                isRead
+                                  ? "font-medium text-foreground/70 dark:text-foreground/85"
+                                  : "font-semibold text-foreground",
+                              )}
+                            >
+                              {senderLabel}
+                            </span>
+                            <MailIdentityBadge
+                              message={message}
+                              identities={identities}
+                              compact
+                            />
+                          </div>
                           <div className="flex items-center gap-1 shrink-0">
                             {/* Thread count or unread dot */}
                             {row.messages.length > 1 ? (
