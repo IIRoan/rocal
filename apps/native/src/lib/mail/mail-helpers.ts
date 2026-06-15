@@ -1,4 +1,9 @@
 import type { JmapEmailMessage, JmapMailbox, MailAddress } from "./types";
+import {
+  isValidEmailAddress,
+  parseAddressList,
+  validateComposeRecipients,
+} from "@workspace/calendar-core";
 
 const MAILBOX_ROLE_ORDER: Record<string, number> = {
   inbox: 0,
@@ -147,33 +152,26 @@ export function getInitials(address: MailAddress[] | undefined): string {
   return (parts[0]!.charAt(0) + parts[1]!.charAt(0)).toUpperCase();
 }
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export { isValidEmailAddress };
 
-export function isLikelyEmail(value: string): boolean {
-  return EMAIL_PATTERN.test(value.trim());
-}
+/** @deprecated Use isValidEmailAddress */
+export const isLikelyEmail = isValidEmailAddress;
 
-/** Splits a free-text recipient field (commas, semicolons, whitespace). */
+/** Returns bare email addresses parsed from a recipient field. */
 export function parseEmailList(value: string): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const token of value.split(/[,;\s]+/)) {
-    const trimmed = token.trim();
-    if (!trimmed) continue;
-    const lower = trimmed.toLowerCase();
-    if (seen.has(lower)) continue;
-    seen.add(lower);
-    result.push(trimmed);
-  }
-  return result;
+  return parseAddressList(value).map((address) => address.email);
 }
 
-export interface ComposeValidationResult {
+export type ComposeValidationResult = {
   to: string[];
   cc: string[];
   bcc: string[];
-  errors: { to?: string; subject?: string; recipients?: string };
-}
+  errors: {
+    to?: string;
+    subject?: string;
+    recipients?: string;
+  };
+};
 
 /** Validates and normalises native compose form input. */
 export function validateComposeInput(input: {
@@ -182,21 +180,17 @@ export function validateComposeInput(input: {
   bcc?: string;
   subject: string;
 }): ComposeValidationResult {
-  const to = parseEmailList(input.to);
-  const cc = parseEmailList(input.cc ?? "");
-  const bcc = parseEmailList(input.bcc ?? "");
-  const errors: ComposeValidationResult["errors"] = {};
+  const validation = validateComposeRecipients({
+    to: input.to,
+    cc: input.cc,
+    bcc: input.bcc,
+    subject: input.subject,
+  });
 
-  if (to.length === 0) {
-    errors.to = "Add at least one recipient.";
-  }
-
-  const invalid = [...to, ...cc, ...bcc].filter(
-    (address) => !isLikelyEmail(address),
-  );
-  if (invalid.length > 0) {
-    errors.recipients = `Invalid email address: ${invalid[0]}`;
-  }
-
-  return { to, cc, bcc, errors };
+  return {
+    to: validation.to.map((address) => address.email),
+    cc: validation.cc.map((address) => address.email),
+    bcc: validation.bcc.map((address) => address.email),
+    errors: validation.errors,
+  };
 }

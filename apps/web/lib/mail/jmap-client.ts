@@ -5,6 +5,10 @@ import type {
   JmapMailbox,
   JmapSession,
 } from "./types";
+import {
+  parseRecipientString,
+  type ParsedMailAddress,
+} from "@workspace/calendar-core";
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -13,6 +17,62 @@ type JmapMethodCall = [string, Record<string, unknown>, string];
 type JmapEnvelope = {
   methodResponses?: Array<[string, Record<string, unknown>, string]>;
 };
+
+type JmapMethodError = {
+  type?: string;
+  description?: string;
+  properties?: string[];
+};
+
+function getSubmissionAccountId(
+  session: JmapSession,
+  mailAccountId: string,
+): string {
+  return (
+    session.primaryAccounts["urn:ietf:params:jmap:submission"] ?? mailAccountId
+  );
+}
+
+function toJmapAddressList(addresses: string[]): ParsedMailAddress[] {
+  return addresses.map((address) => parseRecipientString(address));
+}
+
+function formatJmapMethodError(
+  methodName: string,
+  error: JmapMethodError,
+): string {
+  const propsHint = error.properties?.length
+    ? ` (properties: ${error.properties.join(", ")})`
+    : "";
+  const typeHint = error.type ? ` [${error.type}]` : "";
+  return `${error.description || error.type || `Failed during ${methodName}`}${typeHint}${propsHint}`;
+}
+
+function assertSuccessfulJmapResponses(
+  envelope: JmapEnvelope,
+  context: string,
+): void {
+  for (const [methodName, result] of envelope.methodResponses ?? []) {
+    if (methodName.endsWith("/error")) {
+      const error = result as JmapMethodError;
+      throw new Error(formatJmapMethodError(methodName, error));
+    }
+
+    const notCreated = result.notCreated as
+      | Record<string, JmapMethodError>
+      | undefined;
+    if (notCreated && Object.keys(notCreated).length > 0) {
+      const firstError = Object.values(notCreated)[0];
+      if (firstError) {
+        throw new Error(formatJmapMethodError(methodName, firstError));
+      }
+    }
+  }
+
+  if (!envelope.methodResponses?.length) {
+    throw new Error(`${context}: JMAP response did not include method results.`);
+  }
+}
 
 type JmapClientBearerAuthInput = {
   baseUrl: string;
@@ -189,11 +249,22 @@ export function buildSendMessageMethodCalls(input: {
   references?: string[];
   previousDraftId?: string;
 }): JmapMethodCall[] {
+  const toAddresses = toJmapAddressList(input.to);
+  const ccAddresses = input.cc?.length ? toJmapAddressList(input.cc) : undefined;
+  const bccAddresses = input.bcc?.length
+    ? toJmapAddressList(input.bcc)
+    : undefined;
+  const envelopeRecipients = [...toAddresses, ...(ccAddresses ?? []), ...(bccAddresses ?? [])]
+    .map((address) => ({ email: address.email }));
+
   const submissionParams: Record<string, unknown> = {
     create: {
       s1: {
         emailId: "#draft1",
         identityId: input.identityId,
+        envelope: {
+          rcptTo: envelopeRecipients,
+        },
       },
     },
   };
@@ -214,16 +285,13 @@ export function buildSendMessageMethodCalls(input: {
         mailboxIds: {
           [input.draftsMailboxId]: true,
         },
+        keywords: { $seen: true, $draft: true },
         ...(input.inReplyTo?.length ? { inReplyTo: input.inReplyTo } : {}),
         ...(input.references?.length ? { references: input.references } : {}),
         from: buildFromHeader(input.fromEmail, input.fromName),
-        to: input.to.map((email) => ({ email })),
-        ...(input.cc?.length
-          ? { cc: input.cc.map((email) => ({ email })) }
-          : {}),
-        ...(input.bcc?.length
-          ? { bcc: input.bcc.map((email) => ({ email })) }
-          : {}),
+        to: toAddresses,
+        ...(ccAddresses?.length ? { cc: ccAddresses } : {}),
+        ...(bccAddresses?.length ? { bcc: bccAddresses } : {}),
         subject: input.subject,
         bodyStructure: buildMessageBodyStructure(input),
         bodyValues: buildMessageBodyValues(input),
@@ -254,6 +322,12 @@ export function buildDraftMethodCalls(input: {
   attachments?: JmapAttachmentInput[];
   previousDraftId?: string;
 }): JmapMethodCall[] {
+  const toAddresses = toJmapAddressList(input.to);
+  const ccAddresses = input.cc?.length ? toJmapAddressList(input.cc) : undefined;
+  const bccAddresses = input.bcc?.length
+    ? toJmapAddressList(input.bcc)
+    : undefined;
+
   const emailSetArgs: Record<string, unknown> = {
     create: {
       draft1: {
@@ -262,13 +336,9 @@ export function buildDraftMethodCalls(input: {
         },
         keywords: { $draft: true },
         from: buildFromHeader(input.fromEmail, input.fromName),
-        to: input.to.map((email) => ({ email })),
-        ...(input.cc?.length
-          ? { cc: input.cc.map((email) => ({ email })) }
-          : {}),
-        ...(input.bcc?.length
-          ? { bcc: input.bcc.map((email) => ({ email })) }
-          : {}),
+        to: toAddresses,
+        ...(ccAddresses?.length ? { cc: ccAddresses } : {}),
+        ...(bccAddresses?.length ? { bcc: bccAddresses } : {}),
         subject: input.subject,
         bodyStructure: buildMessageBodyStructure(input),
         bodyValues: buildMessageBodyValues(input),
@@ -754,10 +824,21 @@ export class StalwartJmapClient {
       previousDraftId?: string;
     },
   ): Promise<{ emailId: string; threadId: string | null }> {
-    const accountId = this.requirePrimaryAccountId(session);
+    const mailAccountId = this.requirePrimaryAccountId(session);
+    const submissionAccountId = getSubmissionAccountId(session, mailAccountId);
     const calls = buildSendMessageMethodCalls(input).map(
       ([method, params, id]) =>
-        [method, { ...params, accountId }, id] as JmapMethodCall,
+        [
+          method,
+          {
+            ...params,
+            accountId:
+              method === "EmailSubmission/set"
+                ? submissionAccountId
+                : mailAccountId,
+          },
+          id,
+        ] as JmapMethodCall,
     );
     const envelope = await this.call(
       session,
@@ -768,13 +849,17 @@ export class StalwartJmapClient {
       ],
       calls,
     );
+    assertSuccessfulJmapResponses(envelope, "Send message");
     const setResult = this.getMethodResult<{
       created?: Record<string, { id?: string; threadId?: string } | null>;
     }>(envelope, "Email/set");
     const created = setResult.created?.draft1;
+    if (!created?.id) {
+      throw new Error("Send message succeeded but no email id was returned.");
+    }
     return {
-      emailId: created?.id ?? "",
-      threadId: created?.threadId ?? null,
+      emailId: created.id,
+      threadId: created.threadId ?? null,
     };
   }
 
@@ -1174,12 +1259,25 @@ export class StalwartJmapClient {
     }
 
     if (!response.ok) {
+      let responseBody = "";
+      try {
+        responseBody = await response.text();
+      } catch {
+        responseBody = "";
+      }
+
       if (response.status === 401) {
         throw new Error(
           "Mail sign-in expired or was rejected by the mail server.",
         );
       }
-      throw new Error(`JMAP request failed with status ${response.status}.`);
+
+      const detail = responseBody
+        ? ` — ${responseBody.slice(0, 500)}`
+        : "";
+      throw new Error(
+        `JMAP request failed with status ${response.status}${detail}.`,
+      );
     }
 
     return (await response.json()) as JmapEnvelope;

@@ -94,7 +94,17 @@ async function uploadMimeBlob(input: {
   });
 
   if (!response.ok) {
-    throw new Error(`Stalwart blob upload failed with status ${response.status}.`);
+    let responseBody = "";
+    try {
+      responseBody = await response.text();
+    } catch {
+      responseBody = "";
+    }
+    throw new Error(
+      `Stalwart blob upload failed with status ${response.status}${
+        responseBody ? `: ${responseBody.slice(0, 500)}` : "."
+      }`,
+    );
   }
 
   const payload = (await response.json()) as { blobId?: string };

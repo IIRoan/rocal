@@ -198,6 +198,10 @@ describe("isLikelyEmail", () => {
     expect(isLikelyEmail("  user.name+tag@sub.example.co  ")).toBe(true);
   });
 
+  it("accepts display-name addresses", () => {
+    expect(isLikelyEmail("User Two <user2@solace.onl>")).toBe(true);
+  });
+
   it("rejects malformed addresses", () => {
     expect(isLikelyEmail("user")).toBe(false);
     expect(isLikelyEmail("user@host")).toBe(false);
@@ -207,18 +211,23 @@ describe("isLikelyEmail", () => {
 });
 
 describe("parseEmailList", () => {
-  it("splits on commas, semicolons, and whitespace", () => {
-    expect(parseEmailList("a@x.com, b@x.com; c@x.com d@x.com")).toEqual([
+  it("splits on commas and semicolons", () => {
+    expect(parseEmailList("a@x.com, b@x.com; c@x.com")).toEqual([
       "a@x.com",
       "b@x.com",
       "c@x.com",
-      "d@x.com",
+    ]);
+  });
+
+  it("parses display-name recipients", () => {
+    expect(parseEmailList("User Two <user2@solace.onl>")).toEqual([
+      "user2@solace.onl",
     ]);
   });
 
   it("trims and de-duplicates case-insensitively", () => {
     expect(parseEmailList("  A@x.com , a@X.com ,b@x.com")).toEqual([
-      "A@x.com",
+      "a@x.com",
       "b@x.com",
     ]);
   });

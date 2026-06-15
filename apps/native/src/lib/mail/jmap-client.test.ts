@@ -102,6 +102,22 @@ describe("buildSendMessageMethodCalls", () => {
     expect(draft.bodyValues.text.value).toBe("Hello");
   });
 
+  it("parses display-name recipients and sets an explicit submission envelope", () => {
+    const calls = buildSendMessageMethodCalls({
+      ...base,
+      to: ["User Two <user2@solace.onl>"],
+    });
+    const draft = (calls[0][1].create as Record<string, any>).draft1;
+    const submission = (calls[1][1].create as Record<string, any>).s1;
+
+    expect(draft.to).toEqual([
+      { name: "User Two", email: "user2@solace.onl" },
+    ]);
+    expect(submission.envelope.rcptTo).toEqual([
+      { email: "user2@solace.onl" },
+    ]);
+  });
+
   it("moves the message out of drafts into sent on success", () => {
     const calls = buildSendMessageMethodCalls({
       ...base,
