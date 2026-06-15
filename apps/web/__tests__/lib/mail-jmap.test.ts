@@ -156,6 +156,7 @@ describe("mail JMAP helpers", () => {
               emailId: "#draft1",
               identityId: "identity-1",
               envelope: {
+                mailFrom: { email: "alice@solace.onl" },
                 rcptTo: [
                   { email: "bob@example.com" },
                   { email: "cara@example.com" },
@@ -190,6 +191,7 @@ describe("mail JMAP helpers", () => {
               emailId: "#draft1",
               identityId: "identity-1",
               envelope: {
+                mailFrom: { email: "alice@solace.onl" },
                 rcptTo: [{ email: "bob@example.com" }],
               },
             },

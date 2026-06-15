@@ -113,9 +113,10 @@ describe("buildSendMessageMethodCalls", () => {
     expect(draft.to).toEqual([
       { name: "User Two", email: "user2@solace.onl" },
     ]);
-    expect(submission.envelope.rcptTo).toEqual([
-      { email: "user2@solace.onl" },
-    ]);
+    expect(submission.envelope).toEqual({
+      mailFrom: { email: "me@example.com" },
+      rcptTo: [{ email: "user2@solace.onl" }],
+    });
   });
 
   it("moves the message out of drafts into sent on success", () => {

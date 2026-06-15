@@ -19,6 +19,7 @@ import { Feather } from "@expo/vector-icons";
 import { FontAwesome } from "@expo/vector-icons";
 import {
   buildEventReminderMailView,
+  enrichSelfMailRecipient,
   getErrorMessage,
   isDecryptedEventReminderContent,
 } from "@workspace/calendar-core";
@@ -34,7 +35,6 @@ import {
   useMailRuntime,
 } from "../../../../src/lib/mail/use-mail";
 import {
-  formatAddressFull,
   formatMessageDate,
   isDraftMessage,
 } from "../../../../src/lib/mail/mail-helpers";
@@ -71,6 +71,11 @@ import {
 } from "../../../../src/components/mail/MailBottomActionBar";
 import { mailBottomBarTotalHeight } from "../../../../src/components/mail/mail-bottom-action-bar-layout";
 import { MailReaderHeader } from "../../../../src/components/mail/MailReaderHeader";
+import { MailIdentityBadge } from "../../../../src/components/mail/MailIdentityBadge";
+import {
+  RecipientLink,
+  RecipientLinkList,
+} from "../../../../src/components/mail/RecipientSheet";
 import { mailSpacing } from "../../../../src/components/mail/mail-ui";
 import { getMailboxIcon } from "../../../../src/lib/mail/mail-helpers";
 
@@ -483,6 +488,18 @@ export default function MailMessageScreen() {
     handleMoveToMailbox(inboxMailboxId);
   };
 
+  const accountEmail =
+    user?.email?.trim().toLowerCase() ??
+    runtime?.session.username?.trim().toLowerCase() ??
+    undefined;
+  const accountName = user?.name?.trim() || undefined;
+  const enrichedFrom = message?.from?.[0]
+    ? enrichSelfMailRecipient(message.from[0], {
+        email: accountEmail,
+        name: accountName,
+      })
+    : null;
+
   const messageHeader = message ? (
     <>
       <View style={styles.subjectRow}>
@@ -533,22 +550,51 @@ export default function MailMessageScreen() {
       ) : null}
 
       <View style={styles.metaBlock}>
-        <MetaRow
-          theme={theme}
-          label="From"
-          value={formatAddressFull(message.from)}
-        />
-        <MetaRow
-          theme={theme}
-          label="To"
-          value={formatAddressFull(message.to)}
-        />
+        {message.from?.[0] ? (
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>From</Text>
+            <View style={styles.metaValueRow}>
+              <RecipientLink
+                recipient={enrichedFrom ?? message.from[0]}
+                currentUserEmail={accountEmail}
+                currentUserName={accountName}
+                textStyle={styles.metaLink}
+                showInlineAddress
+              />
+              <MailIdentityBadge
+                message={message}
+                identities={runtime?.identities ?? []}
+              />
+            </View>
+          </View>
+        ) : (
+          <MetaRow theme={theme} label="From" value="Unknown sender" />
+        )}
+        {message.to?.length ? (
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>To</Text>
+            <View style={styles.metaValueWrap}>
+              <RecipientLinkList
+                recipients={message.to}
+                currentUserEmail={accountEmail}
+                currentUserName={accountName}
+                textStyle={styles.metaLink}
+              />
+            </View>
+          </View>
+        ) : null}
         {message.cc?.length ? (
-          <MetaRow
-            theme={theme}
-            label="Cc"
-            value={formatAddressFull(message.cc)}
-          />
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>Cc</Text>
+            <View style={styles.metaValueWrap}>
+              <RecipientLinkList
+                recipients={message.cc}
+                currentUserEmail={accountEmail}
+                currentUserName={accountName}
+                textStyle={styles.metaLink}
+              />
+            </View>
+          </View>
         ) : null}
         <MetaRow
           theme={theme}
@@ -1132,6 +1178,16 @@ function createStyles(theme: ThemeTokens) {
       flexDirection: "row" as const,
       gap: theme.spacing["2"],
     },
+    metaValueRow: {
+      flex: 1,
+      flexDirection: "row" as const,
+      flexWrap: "wrap" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["1.5"],
+    },
+    metaValueWrap: {
+      flex: 1,
+    },
     attachmentBlock: {
       flexDirection: "row" as const,
       flexWrap: "wrap" as const,
@@ -1236,6 +1292,12 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.foreground,
+    },
+    metaLink: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.primaryBase,
+      textDecorationLine: "underline" as const,
     },
     attachmentName: {
       flexShrink: 1,
