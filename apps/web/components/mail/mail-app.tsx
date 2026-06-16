@@ -246,6 +246,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     attachmentPreview,
     selectedMessageSignatureVerificationState,
     selectedMessageDecryptError,
+    selectedMessageIsDecrypting,
     isPaletteOpen,
     setIsPaletteOpen,
     blockRemoteImages,
@@ -697,6 +698,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                         selectedMessageSignatureVerificationState
                       }
                       decryptError={selectedMessageDecryptError}
+                      isDecrypting={selectedMessageIsDecrypting}
                       accountEncryptedAtRest={
                         activeMailbox.accountEncryptedAtRest
                       }
