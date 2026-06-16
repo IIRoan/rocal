@@ -412,8 +412,7 @@ export const eventsRoutes = new Elysia({
             user.id,
             query.externalId,
             {
-              syncRemote:
-                query.syncRemote !== false && query.syncRemote !== "false",
+              syncRemote: query.syncRemote !== false,
             },
           );
           return { event };

@@ -10,6 +10,7 @@ export type StalwartJmapEnvelope = {
   primaryAccounts?: Record<string, string>;
   accounts?: Record<string, unknown>;
   eventSourceUrl?: string;
+  uploadUrl?: string;
 };
 
 export type StalwartDomainRecord = {

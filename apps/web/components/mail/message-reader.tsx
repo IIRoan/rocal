@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback, useReducer } from "react";
 import {
   buildEmailHtmlDocument,
   emailHasOwnDarkMode,
   getErrorMessage,
   processEmailHtml,
 } from "@workspace/calendar-core";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import Image from "next/image";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import {
@@ -130,13 +131,77 @@ import {
   enrichSelfMailRecipient,
   isDecryptedEventReminderContent,
 } from "@workspace/calendar-core";
-import {
-  extractMailCalendarInvite,
-  hasCalendarInvitationMetadata,
-} from "@/lib/mail/calendar-invite";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { useMailCalendarInvitation } from "@/hooks/use-mail-calendar-invitation";
+import {
+  initialMessageReaderUiState,
+  messageReaderUiReducer,
+} from "./message-reader-ui-state";
 
 const EMPTY_ARRAY: never[] = [];
+
+const COMMON_EMOJI = [
+  "😀",
+  "😂",
+  "😍",
+  "😭",
+  "😊",
+  "😅",
+  "😎",
+  "🤔",
+  "😤",
+  "🥺",
+  "😏",
+  "😴",
+  "🤗",
+  "😬",
+  "🥳",
+  "🤩",
+  "😇",
+  "😆",
+  "🙄",
+  "😡",
+  "👍",
+  "👎",
+  "👏",
+  "🙌",
+  "🤝",
+  "✌️",
+  "👋",
+  "🤞",
+  "💪",
+  "🖐️",
+  "❤️",
+  "💔",
+  "💯",
+  "🔥",
+  "✨",
+  "🎉",
+  "🎊",
+  "💡",
+  "⭐",
+  "🌟",
+  "😻",
+  "🐶",
+  "🐱",
+  "🌸",
+  "🌈",
+  "☀️",
+  "🌙",
+  "⚡",
+  "🌊",
+  "🍕",
+  "🎵",
+  "📷",
+  "💬",
+  "📩",
+  "🔔",
+  "📅",
+  "📎",
+  "🔗",
+  "💻",
+  "📱",
+] as const;
 
 // ─── Security badge ───────────────────────────────────────────────────────────
 
@@ -622,8 +687,6 @@ type LinkedCalendarEventState = {
   error: string | null;
 };
 
-type InvitationResponseStatus = "accepted" | "declined" | "tentative";
-
 export function MessageReader({
   message,
   selectedMessageId,
@@ -673,7 +736,6 @@ export function MessageReader({
   accountName,
   identities = EMPTY_ARRAY,
 }: MessageReaderProps) {
-  const queryClient = useQueryClient();
   const isDark = mailDarkMode;
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#6366f1");
@@ -683,32 +745,22 @@ export function MessageReader({
   const [morePopoverOpen, setMorePopoverOpen] = useState(false);
   const [moveToExpanded, setMoveToExpanded] = useState(false);
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
-  const [replyText, setReplyText] = useState("");
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const [isSendingReply, setIsSendingReply] = useState(false);
-  const [isReplyExpanded, setIsReplyExpanded] = useState(false);
-  const [attachmentHoverPreviews, setAttachmentHoverPreviews] = useState<
-    Record<
-      string,
-      | {
-          kind: "image" | "pdf";
-          url: string;
-          type: string;
-        }
-      | {
-          kind: "text";
-          text: string;
-          type: string;
-        }
-      | null
-    >
-  >({});
-  const [loadingAttachmentPreviewKey, setLoadingAttachmentPreviewKey] =
-    useState<string | null>(null);
-  const [showQuote, setShowQuote] = useState(false);
+  const [messageUi, dispatchMessageUi] = useReducer(
+    messageReaderUiReducer,
+    initialMessageReaderUiState,
+  );
+  const {
+    replyText,
+    attachedFiles,
+    emojiPickerOpen,
+    isSendingReply,
+    isReplyExpanded,
+    attachmentHoverPreviews,
+    loadingAttachmentPreviewKey,
+    showQuote,
+    isConversationCollapsed,
+  } = messageUi;
   const [showOwnMessages, setShowOwnMessages] = useState(false);
-  const [isConversationCollapsed, setIsConversationCollapsed] = useState(true);
   const [showRawHtmlDialog, setShowRawHtmlDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -728,19 +780,22 @@ export function MessageReader({
         : null,
     [calendarEventLinkSource, message, plaintext],
   );
-  const hasCalendarInvitationHint = useMemo(
-    () => (message ? hasCalendarInvitationMetadata(message) : false),
-    [message],
-  );
-  const mailCalendarInvite = useMemo(
-    () =>
-      extractMailCalendarInvite({
-        message,
-        plaintext,
-        attachments,
-      }),
-    [attachments, message, plaintext],
-  );
+  const calendarInvitation = useMailCalendarInvitation({
+    message,
+    plaintext,
+    attachments,
+  });
+  const {
+    hasCalendarInvitationHint,
+    mailCalendarInvite,
+    currentCalendarInviteEvent,
+    inviteDeclined,
+    inviteCancelled,
+    inviteResponsePending,
+    cancelProcessPending,
+    handleInvitationResponse,
+    handleCancelRemove,
+  } = calendarInvitation;
   const isEventReminderEmail = useMemo(() => {
     if (hasCalendarInvitationHint) {
       return false;
@@ -759,7 +814,53 @@ export function MessageReader({
     hasCalendarInvitationHint,
     mailCalendarInvite?.method,
   ]);
-  const mailCalendarInviteUid = mailCalendarInvite?.uid ?? null;
+  const {
+    data: linkedEventData,
+    isLoading: isLinkedEventLoading,
+    isError: isLinkedEventError,
+    error: linkedEventQueryError,
+  } = useQuery({
+    queryKey: ["events", "detail", linkedCalendarEventId],
+    enabled: Boolean(isEventReminderEmail && linkedCalendarEventId),
+    queryFn: () => calendarApiService.getEvent(linkedCalendarEventId!),
+  });
+  const linkedCalendarEvent = useMemo((): LinkedCalendarEventState | null => {
+    if (!isEventReminderEmail || !linkedCalendarEventId) {
+      return null;
+    }
+    if (isLinkedEventLoading) {
+      return {
+        eventId: linkedCalendarEventId,
+        event: null,
+        loading: true,
+        error: null,
+      };
+    }
+    if (isLinkedEventError) {
+      return {
+        eventId: linkedCalendarEventId,
+        event: null,
+        loading: false,
+        error: getErrorMessage(
+          linkedEventQueryError,
+          "Unable to load linked event details.",
+        ),
+      };
+    }
+    return {
+      eventId: linkedCalendarEventId,
+      event: linkedEventData ?? null,
+      loading: false,
+      error: null,
+    };
+  }, [
+    isEventReminderEmail,
+    linkedCalendarEventId,
+    isLinkedEventLoading,
+    isLinkedEventError,
+    linkedEventQueryError,
+    linkedEventData,
+  ]);
   const mailCalendarInviteMeta = useMemo(() => {
     if (!mailCalendarInvite) return undefined;
 
@@ -789,99 +890,10 @@ export function MessageReader({
 
     return items.length > 0 ? items : undefined;
   }, [mailCalendarInvite, timeFormat, timezone]);
-  const [linkedCalendarEvent, setLinkedCalendarEvent] =
-    useState<LinkedCalendarEventState | null>(null);
-  const [calendarInviteEvent, setCalendarInviteEvent] =
-    useState<LinkedCalendarEventState | null>(null);
-  const [inviteResponsePending, setInviteResponsePending] =
-    useState<InvitationResponseStatus | null>(null);
-  const [inviteDeclined, setInviteDeclined] = useState(false);
-  const [inviteCancelled, setInviteCancelled] = useState(false);
-  const [cancelProcessPending, setCancelProcessPending] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setReplyText("");
-      setAttachedFiles([]);
-      setEmojiPickerOpen(false);
-      setIsSendingReply(false);
-      setIsReplyExpanded(false);
-      setAttachmentHoverPreviews({});
-      setLoadingAttachmentPreviewKey(null);
-      setShowQuote(false);
-      setIsConversationCollapsed(true);
-      setInviteDeclined(false);
-      setInviteCancelled(false);
-      setCancelProcessPending(false);
-    });
-    return () => {
-      cancelled = true;
-    };
+    dispatchMessageUi({ type: "reset" });
   }, [message?.id]);
-
-  useEffect(() => {
-    if (!isEventReminderEmail || !linkedCalendarEventId) {
-      let cancelled = false;
-      queueMicrotask(() => {
-        if (!cancelled) {
-          setLinkedCalendarEvent(null);
-        }
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) {
-        setLinkedCalendarEvent({
-          eventId: linkedCalendarEventId,
-          event: null,
-          loading: true,
-          error: null,
-        });
-      }
-    });
-
-    if (cancelled) {
-      return;
-    }
-
-    void calendarApiService
-      .getEvent(linkedCalendarEventId)
-      .then((event) => {
-        if (cancelled) {
-          return;
-        }
-        setLinkedCalendarEvent({
-          eventId: linkedCalendarEventId,
-          event,
-          loading: false,
-          error: null,
-        });
-      })
-      .catch((error) => {
-        if (cancelled) {
-          return;
-        }
-        setLinkedCalendarEvent({
-          eventId: linkedCalendarEventId,
-          event: null,
-          loading: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Unable to load linked event details.",
-        });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isEventReminderEmail, linkedCalendarEventId]);
 
   const eventReminderView = useMemo(() => {
     if (!linkedCalendarEvent?.event) {
@@ -915,283 +927,6 @@ export function MessageReader({
         (!shouldReplaceBodyWithEventReminder && !linkedCalendarEvent.error)),
   );
 
-  useEffect(() => {
-    if (!mailCalendarInviteUid) {
-      return;
-    }
-
-    let cancelled = false;
-
-    void (async () => {
-      try {
-        const existing = await calendarApiService.getInvitationByExternalId(
-          mailCalendarInviteUid,
-          { syncRemote: false },
-        );
-        if (cancelled) return;
-
-        if (mailCalendarInvite?.method === "CANCEL") {
-          const importSummary = mailCalendarInvite.icsContent
-            ? await calendarApiService.importInvitationIcs(
-                mailCalendarInvite.icsContent,
-              )
-            : null;
-          if (cancelled) return;
-
-          void queryClient.invalidateQueries({ queryKey: ["events"] });
-
-          const event = existing
-            ? await calendarApiService.getInvitationByExternalId(
-                mailCalendarInviteUid,
-                { syncRemote: false },
-              )
-            : null;
-          if (cancelled) return;
-
-          setInviteCancelled(false);
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event,
-            loading: false,
-            error:
-              !event && importSummary && importSummary.errors.length > 0
-                ? (importSummary.errors[0] ??
-                  "Unable to process cancellation details.")
-                : null,
-          });
-          return;
-        }
-
-        if (existing) {
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event: existing,
-            loading: false,
-            error: null,
-          });
-          return;
-        }
-
-        const importSummary = mailCalendarInvite?.icsContent
-          ? await calendarApiService.importInvitationIcs(
-              mailCalendarInvite.icsContent,
-            )
-          : null;
-        if (cancelled) return;
-
-        if (importSummary && importSummary.errors.length > 0) {
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event: null,
-            loading: false,
-            error:
-              importSummary.errors[0] ??
-              "Unable to add this invitation to your calendar.",
-          });
-          return;
-        }
-
-        const event = await calendarApiService.getInvitationByExternalId(
-          mailCalendarInviteUid,
-          { syncRemote: false },
-        );
-        if (cancelled) return;
-
-        void queryClient.invalidateQueries({ queryKey: ["events"] });
-
-        setCalendarInviteEvent({
-          eventId: mailCalendarInviteUid,
-          event,
-          loading: false,
-          error: event
-            ? null
-            : "Invitation was staged but could not be loaded.",
-        });
-      } catch (error) {
-        if (cancelled) return;
-        setCalendarInviteEvent({
-          eventId: mailCalendarInviteUid,
-          event: null,
-          loading: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Unable to load invitation details.",
-        });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // Only re-run when the invite identity changes, not on every
-    // mailCalendarInvite object reference change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    mailCalendarInvite?.icsContent,
-    mailCalendarInvite?.method,
-    mailCalendarInviteUid,
-  ]);
-
-  const currentCalendarInviteEvent = useMemo(() => {
-    if (!mailCalendarInviteUid) return null;
-    if (calendarInviteEvent?.eventId === mailCalendarInviteUid) {
-      return calendarInviteEvent;
-    }
-    return {
-      eventId: mailCalendarInviteUid,
-      event: null,
-      loading: true,
-      error: null,
-    };
-  }, [calendarInviteEvent, mailCalendarInviteUid]);
-  const calendarInviteResponseEventId =
-    currentCalendarInviteEvent?.event?.id ?? null;
-  const calendarInviteHasRemoteSync = Boolean(
-    currentCalendarInviteEvent?.event?.stalwartEventId,
-  );
-  const calendarCancellationEventId =
-    currentCalendarInviteEvent?.event?.id ?? null;
-
-  const handleInvitationResponse = useCallback(
-    async (status: InvitationResponseStatus) => {
-      if (!mailCalendarInviteUid) return;
-
-      setInviteResponsePending(status);
-      try {
-        const shouldRespondViaIcs =
-          !calendarInviteResponseEventId || !calendarInviteHasRemoteSync;
-
-        if (shouldRespondViaIcs) {
-          if (!mailCalendarInvite?.icsContent) {
-            throw new Error("Invitation details are unavailable.");
-          }
-
-          if (status === "declined") {
-            await calendarApiService.declineInvitationIcs(
-              mailCalendarInvite.icsContent,
-            );
-            if (calendarInviteResponseEventId) {
-              await calendarApiService.deleteEvent(calendarInviteResponseEventId);
-            }
-            setInviteDeclined(true);
-            setCalendarInviteEvent({
-              eventId: mailCalendarInviteUid,
-              event: null,
-              loading: false,
-              error: null,
-            });
-            void queryClient.invalidateQueries({ queryKey: ["events"] });
-            toast.success("Invitation declined.");
-            return;
-          }
-
-          const importSummary = await calendarApiService.importInvitationIcs(
-            mailCalendarInvite.icsContent,
-            { status },
-          );
-          if (importSummary.errors.length > 0) {
-            throw new Error(
-              importSummary.errors[0] ??
-                "Unable to add this invitation to your calendar.",
-            );
-          }
-
-          const event = await calendarApiService.getInvitationByExternalId(
-            mailCalendarInviteUid,
-            { syncRemote: false },
-          );
-          if (!event) {
-            throw new Error("Invitation was accepted but could not be loaded.");
-          }
-
-          void queryClient.invalidateQueries({ queryKey: ["events"] });
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event,
-            loading: false,
-            error: null,
-          });
-          toast.success(
-            status === "accepted"
-              ? "Invitation accepted."
-              : "Marked as tentative.",
-          );
-          return;
-        }
-
-        const result = await calendarApiService.respondToInvitation(
-          calendarInviteResponseEventId,
-          status,
-        );
-        // Sync the calendar grid in all cases
-        void queryClient.invalidateQueries({ queryKey: ["events"] });
-        if ("deleted" in result && result.deleted) {
-          // Event was declined and deleted — update local state to reflect this
-          setInviteDeclined(true);
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event: null,
-            loading: false,
-            error: null,
-          });
-          toast.success("Invitation declined and removed from your calendar.");
-        } else {
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event: result as CalendarEvent,
-            loading: false,
-            error: null,
-          });
-          toast.success(
-            status === "accepted"
-              ? "Invitation accepted."
-              : "Marked as tentative.",
-          );
-        }
-      } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Failed to update invitation response.",
-        );
-      } finally {
-        setInviteResponsePending(null);
-      }
-    },
-    [
-      calendarInviteHasRemoteSync,
-      calendarInviteResponseEventId,
-      mailCalendarInvite?.icsContent,
-      mailCalendarInviteUid,
-      queryClient,
-    ],
-  );
-
-  const handleCancelRemove = useCallback(async () => {
-    if (!calendarCancellationEventId || !mailCalendarInviteUid) return;
-
-    setCancelProcessPending(true);
-    try {
-      await calendarApiService.deleteEvent(calendarCancellationEventId);
-      void queryClient.invalidateQueries({ queryKey: ["events"] });
-      setInviteCancelled(true);
-      setCalendarInviteEvent({
-        eventId: mailCalendarInviteUid,
-        event: null,
-        loading: false,
-        error: null,
-      });
-      toast.success("Cancelled event removed from your calendar.");
-    } catch (error) {
-      toast.error(
-        getErrorMessage(error, "Failed to remove event."),
-      );
-    } finally {
-      setCancelProcessPending(false);
-    }
-  }, [calendarCancellationEventId, mailCalendarInviteUid, queryClient]);
-
   const displayAttachments = useMemo<MailAttachment[]>(
     () => attachments ?? message?.attachments ?? [],
     [attachments, message?.attachments],
@@ -1203,52 +938,38 @@ export function MessageReader({
         return;
       }
 
-      setLoadingAttachmentPreviewKey(previewKey);
+      dispatchMessageUi({
+        type: "patch",
+        patch: { loadingAttachmentPreviewKey: previewKey },
+      });
       void onLoadAttachmentPreview(attachment)
         .then((preview) => {
-          setAttachmentHoverPreviews((current) => ({
-            ...current,
-            [previewKey]: preview,
-          }));
+          dispatchMessageUi({
+            type: "updateAttachmentHoverPreviews",
+            updater: (current) => ({
+              ...current,
+              [previewKey]: preview,
+            }),
+          });
         })
         .catch(() => {
-          setAttachmentHoverPreviews((current) => ({
-            ...current,
-            [previewKey]: null,
-          }));
+          dispatchMessageUi({
+            type: "updateAttachmentHoverPreviews",
+            updater: (current) => ({
+              ...current,
+              [previewKey]: null,
+            }),
+          });
         })
         .finally(() => {
-          setLoadingAttachmentPreviewKey((current) =>
-            current === previewKey ? null : current,
-          );
+          dispatchMessageUi({
+            type: "clearLoadingAttachmentPreviewKeyIf",
+            previewKey,
+          });
         });
     },
     [attachmentHoverPreviews, onLoadAttachmentPreview],
   );
-
-  useEffect(() => {
-    if (!onLoadAttachmentPreview) {
-      return;
-    }
-
-    displayAttachments.forEach((attachment, idx) => {
-      const previewKind = resolveAttachmentPreviewKind(attachment);
-      if (!previewKind) {
-        return;
-      }
-      const name = attachment.name?.trim() || "Attachment";
-      const mimeType = attachment.type ?? "";
-      const previewKey = `${attachment.blobId ?? idx}:${name}:${mimeType}`;
-      if (!(previewKey in attachmentHoverPreviews)) {
-        handleLoadAttachmentHoverPreview(attachment, previewKey);
-      }
-    });
-  }, [
-    attachmentHoverPreviews,
-    displayAttachments,
-    handleLoadAttachmentHoverPreview,
-    onLoadAttachmentPreview,
-  ]);
 
   const handleSendReply = useCallback(async () => {
     if (onSendReply) {
@@ -1256,24 +977,28 @@ export function MessageReader({
         toast.error("Enter a reply message.");
         return;
       }
-      setIsSendingReply(true);
+      dispatchMessageUi({ type: "patch", patch: { isSendingReply: true } });
       try {
         await onSendReply(replyText, attachedFiles);
-        setReplyText("");
-        setAttachedFiles([]);
+        dispatchMessageUi({
+          type: "patch",
+          patch: { replyText: "", attachedFiles: [] },
+        });
       } finally {
-        setIsSendingReply(false);
+        dispatchMessageUi({ type: "patch", patch: { isSendingReply: false } });
       }
     } else {
       onReply();
-      setReplyText("");
+      dispatchMessageUi({ type: "patch", patch: { replyText: "" } });
     }
   }, [replyText, attachedFiles, onSendReply, onReply]);
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files ?? []);
-      if (files.length) setAttachedFiles((prev) => [...prev, ...files]);
+      if (files.length) {
+        dispatchMessageUi({ type: "appendAttachedFiles", files });
+      }
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
     [],
@@ -2156,10 +1881,12 @@ export function MessageReader({
                             </div>
                           ) : hoverPreview?.kind === "image" ? (
                             <div className="space-y-2 p-2">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
+                              <Image
                                 src={hoverPreview.url}
                                 alt={name}
+                                width={352}
+                                height={176}
+                                unoptimized
                                 className="max-h-44 w-full rounded-md border border-border/60 object-contain"
                               />
                             </div>
@@ -2439,7 +2166,12 @@ export function MessageReader({
       >
         <button
           type="button"
-          onClick={() => setIsConversationCollapsed((v) => !v)}
+          onClick={() =>
+            dispatchMessageUi({
+              type: "patch",
+              patch: { isConversationCollapsed: !isConversationCollapsed },
+            })
+          }
           className="flex items-center gap-1.5 flex-1 min-w-0 text-left cursor-pointer rounded hover:bg-accent/60 -mx-1 px-1 py-0.5 transition-colors group/thread-header"
         >
           <ChevronDown
@@ -2822,7 +2554,12 @@ export function MessageReader({
         <div className="shrink-0 border-t border-border/40 px-3 py-1.5 bg-muted/20">
           <button
             type="button"
-            onClick={() => setShowQuote((v) => !v)}
+            onClick={() =>
+              dispatchMessageUi({
+                type: "patch",
+                patch: { showQuote: !showQuote },
+              })
+            }
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors font-medium flex items-center gap-1"
           >
             <span className="tracking-widest leading-none">···</span>
@@ -2884,7 +2621,12 @@ export function MessageReader({
         <div className="shrink-0 border-t border-border/40 px-3 py-1.5 bg-muted/20">
           <button
             type="button"
-            onClick={() => setShowQuote((v) => !v)}
+            onClick={() =>
+              dispatchMessageUi({
+                type: "patch",
+                patch: { showQuote: !showQuote },
+              })
+            }
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors font-medium flex items-center gap-1"
           >
             <span className="tracking-widest leading-none">···</span>
@@ -2912,69 +2654,6 @@ export function MessageReader({
     );
 
   // ── Reply bar ────────────────────────────────────────────────────────────────
-  const COMMON_EMOJI = [
-    "😀",
-    "😂",
-    "😍",
-    "😭",
-    "😊",
-    "😅",
-    "😎",
-    "🤔",
-    "😤",
-    "🥺",
-    "😏",
-    "😴",
-    "🤗",
-    "😬",
-    "🥳",
-    "🤩",
-    "😇",
-    "😆",
-    "🙄",
-    "😡",
-    "👍",
-    "👎",
-    "👏",
-    "🙌",
-    "🤝",
-    "✌️",
-    "👋",
-    "🤞",
-    "💪",
-    "🖐️",
-    "❤️",
-    "💔",
-    "💯",
-    "🔥",
-    "✨",
-    "🎉",
-    "🎊",
-    "💡",
-    "⭐",
-    "🌟",
-    "😻",
-    "🐶",
-    "🐱",
-    "🌸",
-    "🌈",
-    "☀️",
-    "🌙",
-    "⚡",
-    "🌊",
-    "🍕",
-    "🎵",
-    "📷",
-    "💬",
-    "📩",
-    "🔔",
-    "📅",
-    "📎",
-    "🔗",
-    "💻",
-    "📱",
-  ];
-
   const replyBar = (
     <div className="shrink-0 px-3 pb-2">
       {/* Hidden file input */}
@@ -2992,7 +2671,9 @@ export function MessageReader({
       {!isReplyExpanded && (
         <button
           type="button"
-          onClick={() => setIsReplyExpanded(true)}
+          onClick={() =>
+            dispatchMessageUi({ type: "patch", patch: { isReplyExpanded: true } })
+          }
           className="w-full flex items-center gap-2 rounded-lg border border-input bg-muted/30 px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:border-ring/50 transition-colors text-left"
           aria-label={`Reply to ${senderName || senderEmail}`}
         >
@@ -3017,7 +2698,10 @@ export function MessageReader({
           // Collapse only if focus truly left this container
           if (!e.currentTarget.contains(e.relatedTarget as Node)) {
             if (!replyText && attachedFiles.length === 0) {
-              setIsReplyExpanded(false);
+              dispatchMessageUi({
+                type: "patch",
+                patch: { isReplyExpanded: false },
+              });
             }
           }
         }}
@@ -3038,10 +2722,15 @@ export function MessageReader({
             ref={textareaRef}
             value={replyText}
             onChange={(e) => {
-              setReplyText(e.target.value);
+              dispatchMessageUi({
+                type: "patch",
+                patch: { replyText: e.target.value },
+              });
               autoResizeTextarea();
             }}
-            onFocus={() => setIsReplyExpanded(true)}
+            onFocus={() =>
+              dispatchMessageUi({ type: "patch", patch: { isReplyExpanded: true } })
+            }
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 e.preventDefault();
@@ -3068,9 +2757,14 @@ export function MessageReader({
                   <button
                     type="button"
                     onClick={() =>
-                      setAttachedFiles((prev) =>
-                        prev.filter((attachment) => attachment !== file),
-                      )
+                      dispatchMessageUi({
+                        type: "patch",
+                        patch: {
+                          attachedFiles: attachedFiles.filter(
+                            (attachment) => attachment !== file,
+                          ),
+                        },
+                      })
                     }
                     className="ml-0.5 rounded-sm hover:text-foreground transition-colors"
                     aria-label={`Remove ${file.name}`}
@@ -3083,7 +2777,12 @@ export function MessageReader({
           )}
           {/* Footer toolbar */}
           <div className="flex items-center gap-0.5 px-2 pb-1.5 pt-0.5 border-t border-border/40">
-            <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+            <Popover
+              open={emojiPickerOpen}
+              onOpenChange={(open) =>
+                dispatchMessageUi({ type: "patch", patch: { emojiPickerOpen: open } })
+              }
+            >
               <PopoverTrigger asChild>
                 <Button
                   variant="ghost"
@@ -3099,7 +2798,12 @@ export function MessageReader({
                 side="top"
                 align="start"
                 className="w-64 p-2"
-                onInteractOutside={() => setEmojiPickerOpen(false)}
+                onInteractOutside={() =>
+                  dispatchMessageUi({
+                    type: "patch",
+                    patch: { emojiPickerOpen: false },
+                  })
+                }
               >
                 <div className="grid grid-cols-10 gap-0.5">
                   {COMMON_EMOJI.map((emoji) => (
@@ -3108,8 +2812,11 @@ export function MessageReader({
                       type="button"
                       className="flex items-center justify-center rounded p-0.5 text-base hover:bg-accent transition-colors"
                       onClick={() => {
-                        setReplyText((prev) => prev + emoji);
-                        setEmojiPickerOpen(false);
+                        dispatchMessageUi({ type: "appendReplyText", value: emoji });
+                        dispatchMessageUi({
+                          type: "patch",
+                          patch: { emojiPickerOpen: false },
+                        });
                         textareaRef.current?.focus();
                       }}
                     >
