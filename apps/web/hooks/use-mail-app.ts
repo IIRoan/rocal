@@ -626,6 +626,8 @@ export function useMailApp() {
   ] = useState<MailSignatureVerificationState>("not_signed");
   const [selectedMessageDecryptError, setSelectedMessageDecryptError] =
     useState<string | null>(null);
+  const [selectedMessageIsDecrypting, setSelectedMessageIsDecrypting] =
+    useState(false);
   const [selectedMessageDecryptedHtml, setSelectedMessageDecryptedHtml] =
     useState<string | null>(null);
   const [
@@ -977,6 +979,7 @@ export function useMailApp() {
         setSelectedMessageDecryptedAttachments(null);
         setSelectedMessageSignatureVerificationState("not_signed");
         setSelectedMessageDecryptError(null);
+        setSelectedMessageIsDecrypting(false);
       });
       return () => {
         cancelled = true;
@@ -992,6 +995,7 @@ export function useMailApp() {
         setSelectedMessageDecryptedAttachments(null);
         setSelectedMessageSignatureVerificationState("not_signed");
         setSelectedMessageDecryptError(null);
+        setSelectedMessageIsDecrypting(false);
       });
       return () => {
         cancelled = true;
@@ -1000,6 +1004,8 @@ export function useMailApp() {
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
+      setSelectedMessageIsDecrypting(true);
+      setSelectedMessageDecryptError(null);
       setSelectedMessageDecryptedAttachments(
         encState === "pgp_mime" ? [] : null,
       );
@@ -1022,6 +1028,7 @@ export function useMailApp() {
             setSelectedMessageDecryptError(
               "Could not locate PGP/MIME ciphertext blob.",
             );
+            setSelectedMessageIsDecrypting(false);
             return;
           }
           armoredMessage = await mailbox.client.getBlobAsText(
@@ -1072,6 +1079,7 @@ export function useMailApp() {
           resolveSignatureVerificationState(decrypted),
         );
         setSelectedMessageDecryptError(null);
+        setSelectedMessageIsDecrypting(false);
       } catch (error) {
         if (cancelled) return;
         log.warn("Failed to decrypt message", error);
@@ -1084,6 +1092,7 @@ export function useMailApp() {
         setSelectedMessageDecryptError(
           "Could not decrypt this message on this device.",
         );
+        setSelectedMessageIsDecrypting(false);
       }
     })();
     return () => {
@@ -2515,6 +2524,7 @@ export function useMailApp() {
     setSelectedMessageDecryptedHtml(null);
     setSelectedMessageSignatureVerificationState("not_signed");
     setSelectedMessageDecryptError(null);
+    setSelectedMessageIsDecrypting(false);
   }, []);
 
   const handleSignOut = useCallback(async () => {
@@ -2686,6 +2696,7 @@ export function useMailApp() {
     attachmentPreview,
     selectedMessageSignatureVerificationState,
     selectedMessageDecryptError,
+    selectedMessageIsDecrypting,
     isPaletteOpen,
     setIsPaletteOpen,
     blockRemoteImages,

@@ -263,6 +263,7 @@ const defaultProps: MessageReaderProps = {
   decryptedHtml: null,
   signatureVerificationState: "not_signed",
   decryptError: null,
+  isDecrypting: false,
   accountEncryptedAtRest: false,
   isBusy: false,
   blockRemoteImages: false,
