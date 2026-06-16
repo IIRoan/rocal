@@ -149,6 +149,11 @@ export interface CalendarEvent {
   externalId?: string | null;
   subscriptionId?: string | null;
   syncedAt?: Date | null;
+  stalwartAccountId?: string | null;
+  stalwartCalendarId?: string | null;
+  stalwartEventId?: string | null;
+  stalwartUid?: string | null;
+  stalwartSyncedAt?: Date | null;
   participants?: EventParticipant[];
 }
 

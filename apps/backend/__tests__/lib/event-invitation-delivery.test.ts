@@ -15,6 +15,7 @@ import {
   deliverToInternalMailbox,
 } from "../../lib/internal-mailbox-delivery";
 import { sendEventInvitationEmail } from "../../lib/event-invitation-delivery";
+import type { AuthEmailClient } from "../../lib/auth-email";
 
 const mockSendAuthEmail = sendAuthEmail as jest.MockedFunction<
   typeof sendAuthEmail
@@ -31,6 +32,17 @@ const logger = {
   warn: jest.fn(),
   error: jest.fn(),
 };
+
+function createMockResendClient(): AuthEmailClient {
+  return {
+    emails: {
+      send: jest.fn(async () => ({
+        data: { id: "email-1" },
+        error: null,
+      })),
+    },
+  };
+}
 
 describe("sendEventInvitationEmail", () => {
   beforeEach(() => {
@@ -97,7 +109,7 @@ describe("sendEventInvitationEmail", () => {
         html: "<p>Invite</p>",
       },
       logger,
-      resendClient: { emails: { send: jest.fn() } },
+      resendClient: createMockResendClient(),
       adminClient: null,
       adminToken: "",
       resolveInternalMailbox: async () => null,
@@ -128,7 +140,7 @@ describe("sendEventInvitationEmail", () => {
         html: "<p>Invite</p>",
       },
       logger,
-      resendClient: { emails: { send: jest.fn() } },
+      resendClient: createMockResendClient(),
       adminClient: { getSession: jest.fn(), callJmap: jest.fn() } as never,
       adminToken: "admin-token",
       resolveInternalMailbox: async () => ({
