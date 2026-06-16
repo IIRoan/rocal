@@ -47,6 +47,12 @@ const mockMailService = {
     expires_in: 1800,
     expires_at: 1779149999,
   })),
+  getAccessTokenForUser: jest.fn(async () => ({
+    access_token: "stalwart-access-token",
+    expires_in: 1800,
+    expires_at: 1779149999,
+  })),
+  invalidateAccessTokenForUser: jest.fn(),
   getMailboxStatusForUser: jest.fn(async () => ({
     email: "alice@solace.onl",
     displayName: "Alice Example",
@@ -406,7 +412,7 @@ describe("mailRoutes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockMailService.issueAccessTokenForUser).toHaveBeenCalledWith({
+    expect(mockMailService.getAccessTokenForUser).toHaveBeenCalledWith({
       userId: "user-1",
       email: "alice@solace.onl",
     });
@@ -428,7 +434,7 @@ describe("mailRoutes", () => {
         email: "alice@solace.onl",
       },
     } as never);
-    mockMailService.issueAccessTokenForUser.mockRejectedValueOnce(
+    mockMailService.getAccessTokenForUser.mockRejectedValueOnce(
       new Error("Stalwart mailbox login was rejected."),
     );
 

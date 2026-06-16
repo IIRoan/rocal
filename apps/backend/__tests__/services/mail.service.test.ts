@@ -168,6 +168,83 @@ describe("MailService", () => {
     });
   });
 
+  it("does not reset the Stalwart bridge password on subsequent token mints", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValue({
+      id: "entry-1",
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      stalwartAccountId: "acct-1",
+      stalwartPublicKeyId: "pk-1",
+      publicKeyFingerprint: "ABCD1234EF567890",
+      userId: "user-1",
+    });
+
+    await service.issueAccessTokenForUser({
+      userId: "user-1",
+      email: "alice@solace.onl",
+    });
+    await service.issueAccessTokenForUser({
+      userId: "user-1",
+      email: "alice@solace.onl",
+    });
+
+    expect(mockAdminClient.setAccountPassword).toHaveBeenCalledTimes(1);
+    expect(mockAdminClient.issueOAuthAccessToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns a cached mail access token without reissuing", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValue({
+      id: "entry-1",
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      stalwartAccountId: "acct-1",
+      stalwartPublicKeyId: "pk-1",
+      publicKeyFingerprint: "ABCD1234EF567890",
+      userId: "user-1",
+    });
+    mockAdminClient.issueOAuthAccessToken.mockResolvedValue({
+      access_token: "stalwart-access-token",
+      expires_in: 3600,
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+    });
+
+    const first = await service.getAccessTokenForUser({
+      userId: "user-1",
+      email: "alice@solace.onl",
+    });
+    const second = await service.getAccessTokenForUser({
+      userId: "user-1",
+      email: "alice@solace.onl",
+    });
+
+    expect(first).toEqual(second);
+    expect(mockAdminClient.issueOAuthAccessToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("reissues a mail access token after cache invalidation", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValue({
+      id: "entry-1",
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      stalwartAccountId: "acct-1",
+      stalwartPublicKeyId: "pk-1",
+      publicKeyFingerprint: "ABCD1234EF567890",
+      userId: "user-1",
+    });
+
+    await service.getAccessTokenForUser({
+      userId: "user-1",
+      email: "alice@solace.onl",
+    });
+    service.invalidateAccessTokenForUser("user-1");
+    await service.getAccessTokenForUser({
+      userId: "user-1",
+      email: "alice@solace.onl",
+    });
+
+    expect(mockAdminClient.issueOAuthAccessToken).toHaveBeenCalledTimes(2);
+  });
+
   it("returns an unprovisioned mailbox status for a new authenticated account", async () => {
     const result = await service.getMailboxStatusForUser({
       userId: "user-1",

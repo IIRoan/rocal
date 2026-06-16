@@ -403,7 +403,7 @@ export const eventsRoutes = new Elysia({
           authenticatedUser,
           request,
         }: {
-          query: { externalId: string };
+          query: { externalId: string; syncRemote?: boolean };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
         }) => {
@@ -411,6 +411,10 @@ export const eventsRoutes = new Elysia({
           const event = await eventService.getInvitationByExternalId(
             user.id,
             query.externalId,
+            {
+              syncRemote:
+                query.syncRemote !== false && query.syncRemote !== "false",
+            },
           );
           return { event };
         },
@@ -421,6 +425,12 @@ export const eventsRoutes = new Elysia({
               maxLength: 512,
               description: "External iCalendar UID from a mailed invitation",
             }),
+            syncRemote: t.Optional(
+              t.Boolean({
+                description:
+                  "When false, only checks Solace for an already-imported invitation without syncing Stalwart first.",
+              }),
+            ),
           }),
           detail: {
             summary: "Find a mailed calendar invitation by external UID",
@@ -435,7 +445,11 @@ export const eventsRoutes = new Elysia({
           authenticatedUser,
           request,
         }: {
-          body: { icsContent: string };
+          body: {
+            icsContent: string;
+            status?: "accepted" | "tentative";
+            calendarId?: string;
+          };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
         }) => {
@@ -444,18 +458,67 @@ export const eventsRoutes = new Elysia({
             userId: user.id,
             icsContent: body.icsContent,
             sourceId: "Decrypted mail invitation",
+            attendeeStatus: body.status,
+            calendarId: body.calendarId,
           });
         },
         {
           body: strictObject({
             icsContent: t.String({
               minLength: 1,
+              maxLength: 1_048_576,
+              description:
+                "Raw ICS content extracted from a decrypted mailed invitation.",
+            }),
+            status: t.Optional(
+              t.Union([t.Literal("accepted"), t.Literal("tentative")], {
+                description:
+                  "Attendee response to apply when importing the invitation onto the user's calendar.",
+              }),
+            ),
+            calendarId: t.Optional(
+              t.String({
+                minLength: 1,
+                maxLength: 64,
+                description:
+                  "Optional owned calendar to import into. Defaults to the user's default calendar.",
+              }),
+            ),
+          }),
+          detail: {
+            summary: "Import a decrypted mailed calendar invitation",
+          },
+        },
+      )
+
+      .post(
+        "/invitations/decline-ics",
+        async ({
+          body,
+          authenticatedUser,
+          request,
+        }: {
+          body: { icsContent: string };
+          authenticatedUser?: AuthenticatedUser;
+          request: Request;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          return mailCalendarIngestionService.declineIcsInvitation({
+            userId: user.id,
+            icsContent: body.icsContent,
+          });
+        },
+        {
+          body: strictObject({
+            icsContent: t.String({
+              minLength: 1,
+              maxLength: 1_048_576,
               description:
                 "Raw ICS content extracted from a decrypted mailed invitation.",
             }),
           }),
           detail: {
-            summary: "Import a decrypted mailed calendar invitation",
+            summary: "Decline a mailed calendar invitation without importing it",
           },
         },
       )

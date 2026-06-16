@@ -30,6 +30,7 @@ import {
 } from "../lib/event-constraints";
 import { MS_PER_DAY, MS_PER_MINUTE } from "../lib/time-constants";
 import { ensureUserCalendars } from "../lib/user-setup";
+import { resolveAcceptedInvitationTargetCalendar } from "../lib/mail-invitation-calendar";
 import { RecurrenceEngine } from "../lib/recurrence";
 import { NotificationCalculator } from "../lib/notification-calculator";
 import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
@@ -966,14 +967,16 @@ export class EventService implements IEventService {
   async getInvitationByExternalId(
     userId: string,
     externalId: string,
+    options: { syncRemote?: boolean } = {},
   ): Promise<unknown | null> {
     const normalizedExternalId = externalId.trim();
     if (!normalizedExternalId) {
       throw new ValidationError("External event id is required", "externalId");
     }
 
+    const syncRemote = options.syncRemote ?? true;
     const stalwartAccountId = await this.getStalwartAccountId(userId);
-    if (stalwartAccountId) {
+    if (syncRemote && stalwartAccountId) {
       await this.syncStalwartEventByUid({
         userId,
         accountId: stalwartAccountId,
@@ -1040,6 +1043,16 @@ export class EventService implements IEventService {
       );
     }
 
+    const targetCalendar =
+      input.status === "declined"
+        ? null
+        : await resolveAcceptedInvitationTargetCalendar(
+            this.prisma,
+            input.userId,
+          );
+    const shouldMoveToTargetCalendar =
+      targetCalendar != null && event.calendarId !== targetCalendar.id;
+
     const nextParticipants = event.participants.map((participant) => ({
       email: participant.email,
       displayName: participant.displayName ?? undefined,
@@ -1050,17 +1063,33 @@ export class EventService implements IEventService {
           : (participant.status as EventParticipantStatus),
     }));
 
+    if (shouldMoveToTargetCalendar && targetCalendar) {
+      await this.prisma.calendarEvent.update({
+        where: { id: event.id },
+        data: {
+          calendarId: targetCalendar.id,
+          stalwartAccountId:
+            targetCalendar.stalwartAccountId ?? event.stalwartAccountId,
+          stalwartCalendarId:
+            targetCalendar.stalwartCalendarId ?? event.stalwartCalendarId,
+        },
+      });
+    }
+
+    const stalwartCalendarId =
+      targetCalendar?.stalwartCalendarId ?? event.stalwartCalendarId;
+
     if (
       this.stalwartClient &&
       event.stalwartAccountId &&
-      event.stalwartCalendarId &&
+      stalwartCalendarId &&
       event.stalwartEventId
     ) {
       await this.stalwartClient.updateEvent({
         accountId: event.stalwartAccountId,
         eventId: event.stalwartEventId,
         patch: buildStalwartEventPayload({
-          calendarId: event.stalwartCalendarId,
+          calendarId: stalwartCalendarId,
           uid:
             event.stalwartUid ||
             event.externalId ||

@@ -9,6 +9,9 @@ import {
   parseRecipientString,
   type ParsedMailAddress,
 } from "@workspace/calendar-core";
+import { createLogger } from "@workspace/logger";
+
+const log = createLogger("mail-jmap");
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -90,7 +93,49 @@ function normalizeBaseUrl(baseUrl: string): string {
 }
 
 function defaultFetcher(input: string, init?: RequestInit): Promise<Response> {
-  return globalThis.fetch(input, init);
+  return globalThis.fetch(input, {
+    ...init,
+    credentials: init?.credentials ?? "include",
+  });
+}
+
+async function readHttpErrorDetail(response: Response): Promise<string> {
+  try {
+    const text = await response.clone().text();
+    if (!text) {
+      return "";
+    }
+
+    try {
+      const parsed = JSON.parse(text) as Record<string, unknown>;
+      const parts = [
+        typeof parsed.message === "string" ? parsed.message : null,
+        typeof parsed.title === "string" ? parsed.title : null,
+        typeof parsed.detail === "string" ? parsed.detail : null,
+        typeof parsed.error === "string" ? parsed.error : null,
+      ].filter((part): part is string => Boolean(part));
+
+      if (parts.length > 0) {
+        return parts.join(" — ");
+      }
+    } catch {
+      // Fall through to raw body snippet.
+    }
+
+    return text.slice(0, 500);
+  } catch {
+    return "";
+  }
+}
+
+function formatHttpStatusError(
+  label: string,
+  status: number,
+  detail: string,
+): string {
+  return detail
+    ? `${label} failed with status ${status}: ${detail}`
+    : `${label} failed with status ${status}.`;
 }
 
 function base64Encode(value: string): string {
@@ -839,6 +884,7 @@ export class StalwartJmapClient {
     session: JmapSession,
     blob: Blob,
     contentType: string,
+    allowRetry = true,
   ): Promise<{ blobId: string; size: number; type: string }> {
     const accountId = this.requirePrimaryAccountId(session);
     if (!session.uploadUrl) {
@@ -857,8 +903,28 @@ export class StalwartJmapClient {
       },
       body: blob,
     });
+
+    if (response.status === 401 && allowRetry) {
+      log.warn("Blob upload rejected with 401; clearing auth and retrying once", {
+        url,
+        contentType,
+        blobSize: blob.size,
+      });
+      await this.onUnauthorized?.();
+      return this.uploadBlob(session, blob, contentType, false);
+    }
+
     if (!response.ok) {
-      throw new Error(`Blob upload failed with status ${response.status}.`);
+      const detail = await readHttpErrorDetail(response);
+      log.error("Blob upload failed", {
+        status: response.status,
+        url,
+        contentType,
+        blobSize: blob.size,
+        detail,
+        retriedAfterUnauthorized: !allowRetry,
+      });
+      throw new Error(formatHttpStatusError("Blob upload", response.status, detail));
     }
     const json = (await response.json()) as {
       blobId: string;
@@ -1267,12 +1333,11 @@ export class StalwartJmapClient {
       .replace("{blobId}", encodeURIComponent(blobId))
       .replace("{name}", "encrypted.asc")
       .replace("{type}", encodeURIComponent("application/octet-stream"));
-    const authorization = await this.getAuthorizationHeader();
-    const response = await this.fetcher(url, {
-      headers: { Authorization: authorization },
-    });
+    const response = await this.authorizedBlobFetch(url);
+
     if (!response.ok) {
-      throw new Error(`Blob download failed with status ${response.status}.`);
+      const detail = await readHttpErrorDetail(response);
+      throw new Error(formatHttpStatusError("Blob download", response.status, detail));
     }
     return response.text();
   }
@@ -1292,14 +1357,33 @@ export class StalwartJmapClient {
       .replace("{blobId}", encodeURIComponent(blobId))
       .replace("{name}", encodeURIComponent(name))
       .replace("{type}", encodeURIComponent(type));
+    const response = await this.authorizedBlobFetch(url);
+
+    if (!response.ok) {
+      const detail = await readHttpErrorDetail(response);
+      throw new Error(formatHttpStatusError("Blob download", response.status, detail));
+    }
+    return response.blob();
+  }
+
+  private async authorizedBlobFetch(
+    url: string,
+    allowRetry = true,
+  ): Promise<Response> {
     const authorization = await this.getAuthorizationHeader();
     const response = await this.fetcher(url, {
       headers: { Authorization: authorization },
     });
-    if (!response.ok) {
-      throw new Error(`Blob download failed with status ${response.status}.`);
+
+    if (response.status === 401 && allowRetry) {
+      log.warn("Blob download rejected with 401; clearing auth and retrying once", {
+        url,
+      });
+      await this.onUnauthorized?.();
+      return this.authorizedBlobFetch(url, false);
     }
-    return response.blob();
+
+    return response;
   }
 
   private requirePrimaryAccountId(session: JmapSession): string {
@@ -1332,17 +1416,23 @@ export class StalwartJmapClient {
     });
 
     if (response.status === 401 && allowRetry) {
+      log.warn("JMAP request rejected with 401; clearing auth and retrying once", {
+        apiUrl: session.apiUrl,
+        methods: methodCalls.map(([method]) => method),
+      });
       await this.onUnauthorized?.();
       return this.call(session, using, methodCalls, false);
     }
 
     if (!response.ok) {
-      let responseBody = "";
-      try {
-        responseBody = await response.text();
-      } catch {
-        responseBody = "";
-      }
+      const detail = await readHttpErrorDetail(response);
+      log.error("JMAP request failed", {
+        status: response.status,
+        apiUrl: session.apiUrl,
+        methods: methodCalls.map(([method]) => method),
+        detail,
+        retriedAfterUnauthorized: !allowRetry,
+      });
 
       if (response.status === 401) {
         throw new Error(
@@ -1350,11 +1440,8 @@ export class StalwartJmapClient {
         );
       }
 
-      const detail = responseBody
-        ? ` — ${responseBody.slice(0, 500)}`
-        : "";
       throw new Error(
-        `JMAP request failed with status ${response.status}${detail}.`,
+        formatHttpStatusError("JMAP request", response.status, detail),
       );
     }
 

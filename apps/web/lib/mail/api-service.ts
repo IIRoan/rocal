@@ -13,6 +13,7 @@ class MailApiError extends Error {
   constructor(
     message: string,
     public readonly statusCode: number,
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     Object.setPrototypeOf(this, new.target.prototype);
@@ -20,18 +21,40 @@ class MailApiError extends Error {
   }
 }
 
+function parseApiErrorMessage(payload: unknown, status: number): string {
+  if (payload && typeof payload === "object") {
+    const record = payload as Record<string, unknown>;
+    if (typeof record.message === "string" && record.message.trim()) {
+      return record.message;
+    }
+    if (typeof record.title === "string" && record.title.trim()) {
+      const detail =
+        typeof record.detail === "string" && record.detail.trim()
+          ? `: ${record.detail}`
+          : "";
+      return `${record.title}${detail}`;
+    }
+    if (typeof record.error === "string" && record.error.trim()) {
+      return record.error;
+    }
+  }
+
+  return `Mail API request failed with status ${status}.`;
+}
+
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const message =
-      payload &&
-      typeof payload === "object" &&
-      "message" in payload &&
-      typeof payload.message === "string"
-        ? payload.message
-        : `Mail API request failed with status ${response.status}.`;
-    throw new MailApiError(message, response.status);
+    const details =
+      payload && typeof payload === "object"
+        ? (payload as Record<string, unknown>)
+        : undefined;
+    throw new MailApiError(
+      parseApiErrorMessage(payload, response.status),
+      response.status,
+      details,
+    );
   }
 
   return payload as T;

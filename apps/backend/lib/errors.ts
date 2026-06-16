@@ -140,13 +140,21 @@ function getValidationDetails(error: unknown) {
 
 // Error handling middleware
 export const errorHandler = new Elysia({ name: "error-handler" }).onError(
-  ({ code, error, set }) => {
+  ({ code, error, set, request }) => {
     const timestamp = new Date().toISOString();
+    const requestMeta = request
+      ? {
+          method: request.method,
+          url: request.url,
+        }
+      : undefined;
 
     // Log error for debugging (in production, use proper logging)
     logger.error(`[${timestamp}] Error:`, {
       code,
+      ...requestMeta,
       message: error instanceof Error ? error.message : String(error),
+      errorName: error instanceof Error ? error.name : undefined,
       stack: error instanceof Error ? error.stack : undefined,
     });
 
