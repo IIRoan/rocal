@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, validateComposeRecipients } from "@workspace/calendar-core";
+import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, validateComposeRecipients, buildOutgoingMimeMessage, type OutgoingMimeAttachment } from "@workspace/calendar-core";
 import { toast } from "sonner";
 import PostalMime, {
   type Attachment as ParsedMailAttachment,
@@ -39,6 +39,7 @@ import {
   appendPlainTextSignature,
   hasMeaningfulHtmlBody,
   htmlToPlainText,
+  resolveComposePlainBody,
 } from "@/lib/mail/signature-utils";
 import { mergeRefreshedMailboxMessages } from "@/lib/mail/mail-list-merge";
 import {
@@ -48,9 +49,9 @@ import {
 } from "@/lib/mail/mail-pagination";
 import {
   classifyMessageEncryption,
-  extractEncryptedBodyBlobId,
   extractMessageBodies,
   extractPgpMimeCiphertextBlobId,
+  resolveInlinePgpArmoredCiphertext,
 } from "@/lib/mail/message-security";
 import { listCalendarAttachmentCandidates } from "@/lib/mail/calendar-invite";
 import {
@@ -335,7 +336,12 @@ async function resolveOutgoingMessageBody(input: {
   recipients: string[];
   plaintext: string;
   internalDomain: string | null;
-}): Promise<{ textBody: string; encrypted: boolean }> {
+  mimeAttachments?: OutgoingMimeAttachment[];
+}): Promise<{
+  textBody: string;
+  encrypted: boolean;
+  pgpMimeCiphertext?: { blobId: string; size: number };
+}> {
   if (!input.internalDomain) {
     return {
       textBody: input.plaintext,
@@ -378,10 +384,33 @@ async function resolveOutgoingMessageBody(input: {
     recipientPublicKeysArmored.add(recipientKey.publicKeyArmored);
   }
 
+  const encryptPayload =
+    (input.mimeAttachments?.length ?? 0) > 0
+      ? buildOutgoingMimeMessage({
+          text: input.plaintext,
+          attachments: input.mimeAttachments,
+        })
+      : input.plaintext;
+
   const { armoredMessage } = await mailCryptoWorkerClient.encryptForRecipients({
-    plaintext: input.plaintext,
+    plaintext: encryptPayload,
     recipientPublicKeysArmored: [...recipientPublicKeysArmored],
   });
+
+  if ((input.mimeAttachments?.length ?? 0) > 0) {
+    const uploaded = await input.activeMailbox.client.uploadTextBlob(
+      input.activeMailbox.session,
+      armoredMessage,
+    );
+    return {
+      textBody: "",
+      encrypted: true,
+      pgpMimeCiphertext: {
+        blobId: uploaded.blobId,
+        size: uploaded.size,
+      },
+    };
+  }
 
   return {
     textBody: armoredMessage,
@@ -979,22 +1008,11 @@ export function useMailApp() {
       try {
         let armoredMessage: string;
         if (encState === "inline_pgp") {
-          const { text } = extractMessageBodies(selectedMessage);
-          if (text) {
-            armoredMessage = text;
-          } else {
-            const blobId = extractEncryptedBodyBlobId(selectedMessage);
-            if (!blobId) {
-              setSelectedMessageDecryptError(
-                "No armored PGP body found in this message.",
-              );
-              return;
-            }
-            armoredMessage = await mailbox.client.getBlobAsText(
-              mailbox.session,
-              blobId,
-            );
-          }
+          armoredMessage = await resolveInlinePgpArmoredCiphertext({
+            message: selectedMessage,
+            fetchBlob: (blobId) =>
+              mailbox.client.getBlobAsText(mailbox.session, blobId),
+          });
         } else {
           // pgp_mime: download the ciphertext blob
           const blobId = extractPgpMimeCiphertextBlobId(
@@ -1563,8 +1581,12 @@ export function useMailApp() {
       }
       const fromEmail = identity.email;
       const fromName = identity.name ?? null;
+      const composePlainBody = resolveComposePlainBody({
+        body: composeBody,
+        htmlBody: composeHtmlBody,
+      });
       const bodyWithSignature = appendPlainTextSignature(
-        composeBody,
+        composePlainBody,
         identity,
       );
       const htmlWithSignature = hasMeaningfulHtmlBody(composeHtmlBody)
@@ -1573,20 +1595,31 @@ export function useMailApp() {
       const internalDomain =
         config?.defaultDomain.trim().toLowerCase() ??
         getEmailDomain(activeMailbox.email);
-      const { textBody, encrypted } = await resolveOutgoingMessageBody({
-        activeMailbox,
-        recipients: allRecipients,
-        plaintext: bodyWithSignature,
-        internalDomain,
-      });
+      const mimeAttachments =
+        composeAttachments.length > 0
+          ? await Promise.all(
+              composeAttachments.map(async (file) => ({
+                filename: file.name,
+                contentType: file.type || "application/octet-stream",
+                content: new Uint8Array(await file.arrayBuffer()),
+              })),
+            )
+          : undefined;
+      const { textBody, encrypted, pgpMimeCiphertext } =
+        await resolveOutgoingMessageBody({
+          activeMailbox,
+          recipients: allRecipients,
+          plaintext: bodyWithSignature,
+          internalDomain,
+          mimeAttachments,
+        });
       const htmlBody =
         !encrypted && htmlWithSignature ? htmlWithSignature : undefined;
 
-      // Upload any file attachments before sending
       let uploadedAttachments:
         | import("@/lib/mail/jmap-client").JmapAttachmentInput[]
         | undefined;
-      if (composeAttachments.length > 0) {
+      if (!pgpMimeCiphertext && composeAttachments.length > 0) {
         uploadedAttachments = await Promise.all(
           composeAttachments.map((file) =>
             activeMailbox.client.uploadFile(activeMailbox.session, file),
@@ -1616,6 +1649,7 @@ export function useMailApp() {
           htmlBody,
           identityId,
           attachments: uploadedAttachments,
+          pgpMimeCiphertext,
           inReplyTo: composeReplyContext?.inReplyTo,
           references: composeReplyContext?.references,
           previousDraftId,

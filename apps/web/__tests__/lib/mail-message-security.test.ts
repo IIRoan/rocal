@@ -3,6 +3,8 @@ import { describe, expect, it } from "@jest/globals";
 import {
   classifyMessageEncryption,
   extractEncryptedBodyBlobId,
+  extractMessageBodies,
+  resolveInlinePgpArmoredCiphertext,
   resolveMessageSecurityLabel,
   resolveSecurityLabels,
 } from "../../lib/mail/message-security";
@@ -43,6 +45,50 @@ describe("mail message security helpers", () => {
         textBody: [{ partId: "text" }],
       }),
     ).toBe("plain");
+  });
+
+  it("ignores stale html previews when the text body is inline PGP", () => {
+    expect(
+      extractMessageBodies({
+        bodyValues: {
+          text: {
+            value:
+              "-----BEGIN PGP MESSAGE-----\nciphertext\n-----END PGP MESSAGE-----",
+          },
+          html: { value: "<p>visible preview</p>" },
+        },
+        textBody: [{ partId: "text" }],
+        htmlBody: [{ partId: "html" }],
+      } as never),
+    ).toEqual({
+      text: "-----BEGIN PGP MESSAGE-----\nciphertext\n-----END PGP MESSAGE-----",
+      html: null,
+    });
+  });
+
+  it("prefers complete inline ciphertext and falls back to blobs", async () => {
+    const complete =
+      "-----BEGIN PGP MESSAGE-----\nabc\n-----END PGP MESSAGE-----";
+    await expect(
+      resolveInlinePgpArmoredCiphertext({
+        message: {
+          bodyValues: { text: { value: complete } },
+          textBody: [{ partId: "text" }],
+        },
+        fetchBlob: async () => "blob-ciphertext",
+      }),
+    ).resolves.toBe(complete);
+
+    await expect(
+      resolveInlinePgpArmoredCiphertext({
+        message: {
+          bodyValues: { text: { value: "-----BEGIN PGP MESSAGE-----\nabc" } },
+          textBody: [{ partId: "text" }],
+          bodyStructure: { type: "text/plain", blobId: "blob-text" },
+        },
+        fetchBlob: async () => complete,
+      }),
+    ).resolves.toBe(complete);
   });
 
   it("falls back to encrypted body blobs when inline values are omitted", () => {

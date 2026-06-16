@@ -108,3 +108,18 @@ export function hasMeaningfulHtmlBody(html: string): boolean {
     ),
   );
 }
+
+/** Plaintext source of truth for compose/send, preferring rich-text HTML when present. */
+export function resolveComposePlainBody(input: {
+  body: string;
+  htmlBody: string;
+}): string {
+  const trimmedHtml = input.htmlBody.trim();
+  if (trimmedHtml) {
+    const fromHtml = htmlToPlainText(trimmedHtml).trim();
+    if (fromHtml) {
+      return fromHtml;
+    }
+  }
+  return input.body.trim();
+}

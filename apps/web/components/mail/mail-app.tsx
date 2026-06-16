@@ -342,8 +342,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
 
     if (
       needsDecrypt &&
-      !selectedMessagePlaintext &&
-      !selectedMessageDecryptError
+      !selectedMessagePlaintext
     ) {
       return;
     }

@@ -177,10 +177,36 @@ const EMAIL_GET_PROPERTIES = [
   "attachments",
 ] as const;
 
+export type JmapPgpMimeCiphertext = {
+  blobId: string;
+  size: number;
+};
+
+function buildPgpMimeBodyStructure(
+  ciphertext: JmapPgpMimeCiphertext,
+): Record<string, unknown> {
+  return {
+    type: "multipart/encrypted",
+    subParts: [
+      { type: "application/pgp-encrypted", partId: "pgp-version" },
+      {
+        type: "application/octet-stream",
+        blobId: ciphertext.blobId,
+        size: ciphertext.size,
+      },
+    ],
+  };
+}
+
 function buildMessageBodyStructure(input: {
   attachments?: JmapAttachmentInput[];
   htmlBody?: string;
+  pgpMimeCiphertext?: JmapPgpMimeCiphertext;
 }): Record<string, unknown> {
+  if (input.pgpMimeCiphertext) {
+    return buildPgpMimeBodyStructure(input.pgpMimeCiphertext);
+  }
+
   const textPart = { type: "text/plain", partId: "text" };
   const contentPart: Record<string, unknown> = input.htmlBody
     ? {
@@ -209,17 +235,28 @@ function buildMessageBodyStructure(input: {
   };
 }
 
+function normalizeJmapBodyValue(value: string): string {
+  return value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, "\r\n");
+}
+
 function buildMessageBodyValues(input: {
   textBody: string;
   htmlBody?: string;
+  pgpMimeCiphertext?: JmapPgpMimeCiphertext;
 }): Record<string, { value: string }> {
-  if (input.htmlBody) {
+  if (input.pgpMimeCiphertext) {
     return {
-      text: { value: input.textBody },
-      html: { value: input.htmlBody },
+      "pgp-version": { value: "Version: 1\r\n" },
     };
   }
-  return { text: { value: input.textBody } };
+
+  if (input.htmlBody) {
+    return {
+      text: { value: normalizeJmapBodyValue(input.textBody) },
+      html: { value: normalizeJmapBodyValue(input.htmlBody) },
+    };
+  }
+  return { text: { value: normalizeJmapBodyValue(input.textBody) } };
 }
 
 function buildFromHeader(
@@ -248,6 +285,7 @@ export function buildSendMessageMethodCalls(input: {
   htmlBody?: string;
   identityId: string;
   attachments?: JmapAttachmentInput[];
+  pgpMimeCiphertext?: JmapPgpMimeCiphertext;
   inReplyTo?: string[];
   references?: string[];
   previousDraftId?: string;
@@ -784,6 +822,24 @@ export class StalwartJmapClient {
   }
 
   async uploadFile(session: JmapSession, file: File): Promise<JmapAttachmentInput> {
+    const uploaded = await this.uploadBlob(
+      session,
+      file,
+      file.type || "application/octet-stream",
+    );
+    return {
+      blobId: uploaded.blobId,
+      name: file.name,
+      type: uploaded.type,
+      size: uploaded.size,
+    };
+  }
+
+  async uploadBlob(
+    session: JmapSession,
+    blob: Blob,
+    contentType: string,
+  ): Promise<{ blobId: string; size: number; type: string }> {
     const accountId = this.requirePrimaryAccountId(session);
     if (!session.uploadUrl) {
       throw new Error("No upload URL in JMAP session.");
@@ -797,9 +853,9 @@ export class StalwartJmapClient {
       method: "POST",
       headers: {
         Authorization: authorization,
-        "Content-Type": file.type || "application/octet-stream",
+        "Content-Type": contentType,
       },
-      body: file,
+      body: blob,
     });
     if (!response.ok) {
       throw new Error(`Blob upload failed with status ${response.status}.`);
@@ -811,10 +867,18 @@ export class StalwartJmapClient {
     };
     return {
       blobId: json.blobId,
-      name: file.name,
-      type: json.type || file.type || "application/octet-stream",
-      size: json.size ?? file.size,
+      size: json.size ?? blob.size,
+      type: json.type || contentType,
     };
+  }
+
+  async uploadTextBlob(
+    session: JmapSession,
+    text: string,
+    contentType = "application/octet-stream",
+  ): Promise<{ blobId: string; size: number; type: string }> {
+    const blob = new Blob([text], { type: contentType });
+    return this.uploadBlob(session, blob, contentType);
   }
 
   async sendMessage(
@@ -832,6 +896,7 @@ export class StalwartJmapClient {
       htmlBody?: string;
       identityId: string;
       attachments?: JmapAttachmentInput[];
+      pgpMimeCiphertext?: JmapPgpMimeCiphertext;
       inReplyTo?: string[];
       references?: string[];
       previousDraftId?: string;

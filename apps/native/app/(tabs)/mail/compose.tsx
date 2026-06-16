@@ -34,7 +34,16 @@ import {
   useSendMessage,
 } from "../../../src/lib/mail/use-mail";
 import { validateComposeInput } from "../../../src/lib/mail/mail-helpers";
-import { extractMessageBodies } from "../../../src/lib/mail/message-security";
+import {
+  classifyMessageEncryption,
+  extractMessageBodies,
+  resolveInlinePgpArmoredCiphertext,
+} from "../../../src/lib/mail/message-security";
+import {
+  decryptMailMessage,
+  decryptPgpMimeMessage,
+} from "../../../src/lib/mail/mail-crypto";
+import { resolveOutgoingMessageBody } from "../../../src/lib/mail/outgoing-message-crypto";
 import {
   appendPlainTextSignature,
   getPlainTextSignature,
@@ -80,6 +89,7 @@ export default function ComposeScreen() {
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draftSaveStatus, setDraftSaveStatus] =
     useState<DraftSaveStatus>("idle");
+  const [isDraftDecrypting, setIsDraftDecrypting] = useState(false);
 
   const composeContext = resolveComposeContext(
     runtime,
@@ -142,27 +152,44 @@ export default function ComposeScreen() {
     }
 
     const bodyWithSignature = appendPlainTextSignature(body, selectedIdentity);
-    const savedDraftId = await saveDraft();
+    const allRecipients = [
+      ...validation.to,
+      ...validation.cc,
+      ...validation.bcc,
+    ];
 
-    sendMessage.mutate(
-      {
-        to: validation.to,
-        cc: validation.cc,
-        bcc: validation.bcc,
-        subject: subject.trim(),
-        textBody: bodyWithSignature,
-        identityId: selectedIdentityId,
-        previousDraftId: savedDraftId ?? draftId,
-      },
-      {
-        onSuccess: () => {
-          toast("Message sent");
-          router.back();
+    try {
+      const { textBody, encrypted } = runtime
+        ? await resolveOutgoingMessageBody({
+            runtime,
+            recipients: allRecipients,
+            plaintext: bodyWithSignature,
+          })
+        : { textBody: bodyWithSignature, encrypted: false };
+      const savedDraftId = await saveDraft();
+
+      sendMessage.mutate(
+        {
+          to: validation.to,
+          cc: validation.cc,
+          bcc: validation.bcc,
+          subject: subject.trim(),
+          textBody,
+          identityId: selectedIdentityId,
+          previousDraftId: savedDraftId ?? draftId,
         },
-        onError: (err) =>
-          setError(getErrorMessage(err, "Failed to send message")),
-      },
-    );
+        {
+          onSuccess: () => {
+            toast(encrypted ? "Encrypted message sent" : "Message sent");
+            router.back();
+          },
+          onError: (err) =>
+            setError(getErrorMessage(err, "Failed to send message")),
+        },
+      );
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to send message"));
+    }
   }, [
     to,
     cc,
@@ -172,6 +199,7 @@ export default function ComposeScreen() {
     selectedIdentity,
     selectedIdentityId,
     draftId,
+    runtime,
     saveDraft,
     sendMessage,
     router,
@@ -211,7 +239,8 @@ export default function ComposeScreen() {
     setShowCcBcc(false);
   }, []);
 
-  const canSend = Boolean(composeContext) && !sendMessage.isPending;
+  const canSend =
+    Boolean(composeContext) && !sendMessage.isPending && !isDraftDecrypting;
 
   useEffect(() => {
     if (hasInitializedFromParams) {
@@ -249,12 +278,67 @@ export default function ComposeScreen() {
       setCc(formatAddressList(sourceMessage.cc));
       setBcc(formatAddressList(sourceMessage.bcc));
       setSubject(sourceMessage.subject ?? "");
-      const bodies = extractMessageBodies(sourceMessage);
-      setBody(bodies.text?.trim() || stripHtmlToText(bodies.html));
       setDraftId(sourceMessage.id);
       if (sourceMessage.cc?.length || sourceMessage.bcc?.length) {
         setShowCcBcc(true);
       }
+
+      const encryption = classifyMessageEncryption(sourceMessage);
+      if (encryption === "inline_pgp" || encryption === "pgp_mime") {
+        if (!runtime) {
+          return;
+        }
+
+        let cancelled = false;
+        setIsDraftDecrypting(true);
+        void (async () => {
+          try {
+            let plaintext = "";
+            if (encryption === "inline_pgp") {
+              const armoredMessage = await resolveInlinePgpArmoredCiphertext({
+                message: sourceMessage,
+                fetchBlob: (blobId) =>
+                  runtime.client.getBlobAsText(runtime.session, blobId),
+              });
+              const decrypted = await decryptMailMessage(
+                runtime,
+                sourceMessage.id,
+                armoredMessage,
+              );
+              plaintext = decrypted.plaintext;
+            } else {
+              const decrypted = await decryptPgpMimeMessage(
+                runtime,
+                sourceMessage.id,
+                sourceMessage.bodyStructure,
+              );
+              plaintext = decrypted.plaintext;
+            }
+            if (!cancelled) {
+              setBody(plaintext);
+            }
+          } catch (err) {
+            if (!cancelled) {
+              setError(
+                getErrorMessage(err, "Could not decrypt this draft."),
+              );
+              setBody("");
+            }
+          } finally {
+            if (!cancelled) {
+              setIsDraftDecrypting(false);
+              setHasInitializedFromParams(true);
+            }
+          }
+        })();
+
+        return () => {
+          cancelled = true;
+        };
+      }
+
+      const bodies = extractMessageBodies(sourceMessage);
+      setBody(bodies.text?.trim() || stripHtmlToText(bodies.html));
     }
 
     setHasInitializedFromParams(true);
@@ -263,6 +347,7 @@ export default function ComposeScreen() {
     params.mode,
     params.to,
     params.toName,
+    runtime,
     sourceMessage,
   ]);
 

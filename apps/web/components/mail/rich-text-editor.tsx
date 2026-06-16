@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -65,6 +65,8 @@ export function RichTextEditor({
   className,
   disabled = false,
 }: RichTextEditorProps) {
+  const lastEmittedHtmlRef = useRef(content);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -82,7 +84,20 @@ export function RichTextEditor({
     editable: !disabled,
     immediatelyRender: false,
     onUpdate: ({ editor: currentEditor }) => {
-      onChange(currentEditor.getHTML());
+      const html = currentEditor.getHTML();
+      if (html === lastEmittedHtmlRef.current) {
+        return;
+      }
+      lastEmittedHtmlRef.current = html;
+      onChange(html);
+    },
+    onBlur: ({ editor: currentEditor }) => {
+      const html = currentEditor.getHTML();
+      if (html === lastEmittedHtmlRef.current) {
+        return;
+      }
+      lastEmittedHtmlRef.current = html;
+      onChange(html);
     },
   });
 
@@ -92,10 +107,18 @@ export function RichTextEditor({
   }, [disabled, editor]);
 
   useEffect(() => {
+    lastEmittedHtmlRef.current = content;
+  }, [content]);
+
+  useEffect(() => {
     if (!editor) return;
+    if (content === lastEmittedHtmlRef.current) {
+      return;
+    }
     const current = editor.getHTML();
     if (content !== current) {
       editor.commands.setContent(content, { emitUpdate: false });
+      lastEmittedHtmlRef.current = content;
     }
   }, [content, editor]);
 

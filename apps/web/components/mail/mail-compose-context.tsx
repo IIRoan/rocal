@@ -362,17 +362,19 @@ export function MailComposeProvider({
       },
     ) => {
       const { text, html } = extractMessageBodies(message);
-      const bodyText = overrides?.plaintext ?? text ?? "";
+      const bodyText =
+        overrides?.plaintext != null ? overrides.plaintext : (text ?? "");
       const htmlBody =
-        overrides?.html ??
-        html ??
-        (bodyText ? `<p>${bodyText.replace(/\n/g, "<br>")}</p>` : "");
+        overrides?.html != null
+          ? overrides.html
+          : (html ??
+            (bodyText ? `<p>${bodyText.replace(/\n/g, "<br>")}</p>` : ""));
       setComposeTo(addressesToCsv(message.to));
       setComposeCc(addressesToCsv(message.cc));
       setComposeBcc(addressesToCsv(message.bcc));
       setComposeSubject(message.subject ?? "");
-      setComposeBody(bodyText);
       setComposeHtmlBody(htmlBody);
+      setComposeBody(bodyText);
       setComposeAttachments([]);
       setComposeReplyContext(buildReplyContext(message));
       setDraftId(message.id);

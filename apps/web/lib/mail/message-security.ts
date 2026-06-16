@@ -1,3 +1,7 @@
+import {
+  containsArmoredPgpMessage,
+  isCompleteArmoredPgpMessage,
+} from "./pgp-layers";
 import type {
   JmapBodyStructure,
   JmapBodyValue,
@@ -35,6 +39,10 @@ export function extractMessageBodies(message: JmapEmailMessage): {
   const html = getBodyValue(message.bodyValues, htmlPartId);
 
   if (text || html) {
+    // Inline PGP lives in the text part; ignore any stale HTML preview from drafts.
+    if (containsArmoredPgpMessage(text)) {
+      return { text, html: null };
+    }
     return {
       text,
       html,
@@ -172,6 +180,69 @@ export function resolveMessageSecurityLabel(input: {
   }
 
   return "Not encrypted";
+}
+
+function collectTextPlainBlobIds(
+  bodyStructure: JmapBodyStructure | undefined,
+): string[] {
+  if (!bodyStructure) {
+    return [];
+  }
+
+  const blobIds: string[] = [];
+  const visit = (part: JmapBodyStructure | undefined) => {
+    if (!part) {
+      return;
+    }
+    if (part.type?.toLowerCase() === "text/plain" && part.blobId) {
+      blobIds.push(part.blobId);
+    }
+    for (const subPart of part.subParts ?? []) {
+      visit(subPart);
+    }
+  };
+
+  visit(bodyStructure);
+  return blobIds;
+}
+
+export function extractTextBodyBlobId(
+  bodyStructure: JmapBodyStructure | undefined,
+): string | null {
+  return collectTextPlainBlobIds(bodyStructure)[0] ?? null;
+}
+
+/**
+ * Resolves inline PGP ciphertext, preferring a complete armored body value and
+ * falling back to the text/plain blob when bodyValues were truncated.
+ */
+export async function resolveInlinePgpArmoredCiphertext(input: {
+  message: Pick<
+    JmapEmailMessage,
+    "bodyStructure" | "bodyValues" | "textBody" | "htmlBody"
+  >;
+  fetchBlob: (blobId: string) => Promise<string>;
+}): Promise<string> {
+  const { text } = extractMessageBodies(input.message as JmapEmailMessage);
+  if (isCompleteArmoredPgpMessage(text)) {
+    return text!.trim();
+  }
+
+  const blobId =
+    extractTextBodyBlobId(input.message.bodyStructure) ??
+    extractEncryptedBodyBlobId(input.message);
+  if (blobId) {
+    const armored = (await input.fetchBlob(blobId)).trim();
+    if (armored) {
+      return armored;
+    }
+  }
+
+  if (text?.trim()) {
+    return text.trim();
+  }
+
+  throw new Error("No armored PGP body found in this message.");
 }
 
 export function extractPgpMimeCiphertextBlobId(

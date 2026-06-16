@@ -580,6 +580,33 @@ export async function decryptMailMessage(
 }
 
 /**
+ * Encrypts a plaintext body for one or more recipient public keys.
+ * The sender's own public key is always included by callers so sent mail
+ * remains readable on this device.
+ */
+export async function encryptForRecipients(input: {
+  plaintext: string;
+  recipientPublicKeysArmored: string[];
+}): Promise<{ armoredMessage: string }> {
+  if (!cachedVault) {
+    throw new Error("Mail vault is not loaded on this device.");
+  }
+
+  const encryptionKeys = await Promise.all(
+    input.recipientPublicKeysArmored.map((armoredKey) =>
+      openpgp.readKey({ armoredKey }),
+    ),
+  );
+  const armoredMessage = await openpgp.encrypt({
+    message: await openpgp.createMessage({ text: input.plaintext }),
+    encryptionKeys,
+    signingKeys: cachedVault.privateKey,
+  });
+
+  return { armoredMessage };
+}
+
+/**
  * Decrypts a PGP/MIME message (RFC 3156).
  *
  * PGP/MIME structure:

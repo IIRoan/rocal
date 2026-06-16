@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 
 import {
   containsArmoredPgpMessage,
+  isCompleteArmoredPgpMessage,
   isNestedArmoredPgpMessage,
   mergeSignatureVerificationState,
   PGP_MESSAGE_BEGIN,
@@ -14,6 +15,17 @@ describe("mail pgp layer helpers", () => {
     expect(containsArmoredPgpMessage("plain text")).toBe(false);
     expect(
       containsArmoredPgpMessage(`${PGP_MESSAGE_BEGIN}\nabc\n${PGP_MESSAGE_END}`),
+    ).toBe(true);
+  });
+
+  it("detects complete armored envelopes", () => {
+    expect(isCompleteArmoredPgpMessage(`${PGP_MESSAGE_BEGIN}\nabc`)).toBe(
+      false,
+    );
+    expect(
+      isCompleteArmoredPgpMessage(
+        `${PGP_MESSAGE_BEGIN}\nabc\n${PGP_MESSAGE_END}`,
+      ),
     ).toBe(true);
   });
 

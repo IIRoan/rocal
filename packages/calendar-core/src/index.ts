@@ -5,6 +5,7 @@ export * from "./mail-sub-addressing";
 export * from "./mail-identity-badge";
 export * from "./mail-recipient";
 export * from "./mail-html";
+export * from "./outgoing-mime";
 export * from "./search-types";
 export * from "./color-utils";
 export * from "./date-utils";
