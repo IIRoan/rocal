@@ -13,6 +13,17 @@ export function containsArmoredPgpMessage(value: string | null | undefined): boo
   return typeof value === "string" && value.includes(PGP_MESSAGE_BEGIN);
 }
 
+/** True when an armored block includes both BEGIN and END markers. */
+export function isCompleteArmoredPgpMessage(
+  value: string | null | undefined,
+): boolean {
+  return (
+    containsArmoredPgpMessage(value) &&
+    typeof value === "string" &&
+    value.includes(PGP_MESSAGE_END)
+  );
+}
+
 /** True when ciphertext appears to contain multiple armored PGP envelopes. */
 export function isNestedArmoredPgpMessage(value: string): boolean {
   if (!containsArmoredPgpMessage(value)) {
