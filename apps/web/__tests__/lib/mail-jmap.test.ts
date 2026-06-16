@@ -170,6 +170,51 @@ describe("mail JMAP helpers", () => {
     ]);
   });
 
+  it("builds multipart/encrypted body structure for PGP/MIME ciphertext", () => {
+    expect(
+      buildSendMessageMethodCalls({
+        draftsMailboxId: "drafts-1",
+        fromEmail: "alice@solace.onl",
+        to: ["bob@solace.onl"],
+        subject: "Encrypted attachment",
+        textBody: "",
+        identityId: "identity-1",
+        pgpMimeCiphertext: { blobId: "blob-abc", size: 4096 },
+      }),
+    ).toEqual([
+      [
+        "Email/set",
+        {
+          create: {
+            draft1: {
+              mailboxIds: { "drafts-1": true },
+              keywords: { $seen: true, $draft: true },
+              from: [{ email: "alice@solace.onl" }],
+              to: [{ email: "bob@solace.onl" }],
+              subject: "Encrypted attachment",
+              bodyStructure: {
+                type: "multipart/encrypted",
+                subParts: [
+                  { type: "application/pgp-encrypted", partId: "pgp-version" },
+                  {
+                    type: "application/octet-stream",
+                    blobId: "blob-abc",
+                    size: 4096,
+                  },
+                ],
+              },
+              bodyValues: {
+                "pgp-version": { value: "Version: 1\r\n" },
+              },
+            },
+          },
+        },
+        "c1",
+      ],
+      expect.any(Array),
+    ]);
+  });
+
   it("moves the sent message into the sent mailbox when one is provided", () => {
     expect(
       buildSendMessageMethodCalls({

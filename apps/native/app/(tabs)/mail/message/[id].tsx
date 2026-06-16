@@ -42,6 +42,7 @@ import {
   classifyMessageEncryption,
   extractMessageBodies,
   resolveDisplayAttachments,
+  resolveInlinePgpArmoredCiphertext,
 } from "../../../../src/lib/mail/message-security";
 import {
   openCachedAttachment,
@@ -193,11 +194,13 @@ export default function MailMessageScreen() {
     queryFn: async () => {
       if (!runtime || !message)
         throw new Error("Runtime or message not available");
-      const rawBodyText = bodies?.text ?? bodies?.html ?? null;
       if (encryption === "inline_pgp") {
-        if (!rawBodyText)
-          throw new Error("No armored PGP body found in this message");
-        return decryptMailMessage(runtime, messageId, rawBodyText);
+        const armoredMessage = await resolveInlinePgpArmoredCiphertext({
+          message,
+          fetchBlob: (blobId) =>
+            runtime.client.getBlobAsText(runtime.session, blobId),
+        });
+        return decryptMailMessage(runtime, messageId, armoredMessage);
       }
       if (encryption === "pgp_mime") {
         return decryptPgpMimeMessage(runtime, messageId, message.bodyStructure);

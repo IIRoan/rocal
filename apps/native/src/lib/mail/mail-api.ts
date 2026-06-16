@@ -115,6 +115,21 @@ export async function getVaultKeyMaterial(
   );
 }
 
+export type MailDirectoryKey = {
+  email: string;
+  publicKeyArmored: string;
+  fingerprint: string;
+  algorithm: string;
+};
+
+export async function getRecipientKey(email: string): Promise<MailDirectoryKey> {
+  const response = await mailFetch(
+    `${backendBaseUrl}/api/mail/keys/${encodeURIComponent(email)}`,
+    { method: "GET" },
+  );
+  return parseJson<MailDirectoryKey>(response);
+}
+
 type MailTokenResponse = {
   access_token?: string;
   expires_in?: number;
