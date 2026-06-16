@@ -33,6 +33,7 @@ import { normalizeEmail, normalizeEmailOrThrow } from "../lib/email-utils";
 
 const LOCAL_PART_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/;
 const MIN_VAULT_MEMORY_KIB = 8192;
+const MAIL_TOKEN_EXPIRY_SKEW_MS = 60_000;
 const logger = createLogger("backend:mail-service");
 
 const linkedMailboxSelect = {
@@ -323,6 +324,16 @@ function normalizeMailPersistenceError(error: unknown): never {
 }
 
 export class MailService implements IMailService {
+  private readonly accessTokenCache = new Map<
+    string,
+    { token: MailAccessTokenResult; expiresAtMs: number }
+  >();
+  private readonly accessTokenInflight = new Map<
+    string,
+    Promise<MailAccessTokenResult>
+  >();
+  private readonly bridgePasswordConfiguredAccountIds = new Set<string>();
+
   constructor(
     private readonly prisma: PrismaClient,
     private readonly adminClient: StalwartAdminClientLike,
@@ -373,7 +384,7 @@ export class MailService implements IMailService {
       redirectUri: this.config.stalwartOauthRedirectUri,
       description: "Solace mail backend bridge",
     });
-    await this.adminClient.setAccountPassword({
+    await this.ensureBridgeAccountPassword({
       accountId: mailbox.stalwartAccountId,
       secret: bridgeSecret,
     });
@@ -394,6 +405,66 @@ export class MailService implements IMailService {
       expires_at:
         token.expires_at ?? Math.floor(Date.now() / 1000) + expiresIn,
     };
+  }
+
+  async getAccessTokenForUser(
+    input: MailAccessTokenForUserInput,
+  ): Promise<MailAccessTokenResult> {
+    const cacheKey = input.userId;
+    const cached = this.accessTokenCache.get(cacheKey);
+    if (
+      cached &&
+      Date.now() + MAIL_TOKEN_EXPIRY_SKEW_MS < cached.expiresAtMs
+    ) {
+      return cached.token;
+    }
+
+    const inflight = this.accessTokenInflight.get(cacheKey);
+    if (inflight) {
+      return inflight;
+    }
+
+    const promise = this.issueAccessTokenForUser(input)
+      .then((token) => {
+        this.accessTokenCache.set(cacheKey, {
+          token,
+          expiresAtMs: token.expires_at * 1000,
+        });
+        logger.debug("Cached mail access token for user", {
+          userId: input.userId,
+          expiresAt: token.expires_at,
+        });
+        return token;
+      })
+      .finally(() => {
+        this.accessTokenInflight.delete(cacheKey);
+      });
+
+    this.accessTokenInflight.set(cacheKey, promise);
+    return promise;
+  }
+
+  invalidateAccessTokenForUser(userId: string): void {
+    this.accessTokenCache.delete(userId);
+    this.accessTokenInflight.delete(userId);
+  }
+
+  private async ensureBridgeAccountPassword(input: {
+    accountId: string;
+    secret: string;
+  }): Promise<void> {
+    if (this.bridgePasswordConfiguredAccountIds.has(input.accountId)) {
+      return;
+    }
+
+    await this.adminClient.setAccountPassword({
+      accountId: input.accountId,
+      secret: input.secret,
+    });
+    this.bridgePasswordConfiguredAccountIds.add(input.accountId);
+    logger.debug("Configured Stalwart bridge password for account", {
+      accountId: input.accountId,
+    });
   }
 
   private async reconcileProvisionedMailboxRecord(

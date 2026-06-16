@@ -27,7 +27,9 @@ export function partitionCalendarsByKind(
       continue;
     }
 
-    subscribedCalendars.push(calendar);
+    if (calendar.kind === "subscribed") {
+      subscribedCalendars.push(calendar);
+    }
   }
 
   return {

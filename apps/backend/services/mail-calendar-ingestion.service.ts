@@ -1,5 +1,5 @@
 import { createLogger } from "@workspace/logger";
-import type { Calendar, PrismaClient } from "../generated/prisma/index.js";
+import type { PrismaClient } from "../generated/prisma/index.js";
 import {
   areParsedEventParticipantsDifferent,
   isEventModified,
@@ -10,6 +10,10 @@ import { EventParticipantService } from "./event-participant.service";
 import type { StalwartCalendarClientLike } from "../lib/stalwart-calendar";
 import { buildStalwartEventPayload } from "../lib/stalwart-calendar-mapping";
 import { errorString, errorMessage } from "../lib/errors";
+import {
+  resolveAcceptedInvitationTargetCalendar,
+  type InvitationTargetCalendar,
+} from "../lib/mail-invitation-calendar";
 
 const logger = createLogger("backend:mail-calendar-ingestion");
 
@@ -51,19 +55,9 @@ type MailCalendarBodyStructure = {
   subParts?: MailCalendarBodyStructure[];
 };
 
-type ImportTargetCalendar = Pick<
-  Calendar,
-  | "id"
-  | "name"
-  | "color"
-  | "kind"
-  | "isVisible"
-  | "isDefault"
-  | "isSyncOnly"
-  | "forceFullEncryption"
-  | "stalwartAccountId"
-  | "stalwartCalendarId"
->;
+type ImportTargetCalendar = InvitationTargetCalendar;
+
+type MailInvitationAttendeeStatus = "accepted" | "tentative";
 
 type IcsPayloadSource = {
   sourceId: string;
@@ -192,6 +186,8 @@ export class MailCalendarIngestionService {
     userId: string;
     icsContent: string;
     sourceId?: string;
+    attendeeStatus?: MailInvitationAttendeeStatus;
+    calendarId?: string;
   }): Promise<MailCalendarImportSummary> {
     return this.ingestPayloadSources({
       userId: input.userId,
@@ -202,7 +198,92 @@ export class MailCalendarIngestionService {
           icsContent: input.icsContent,
         },
       ],
+      attendeeStatus: input.attendeeStatus,
+      calendarId: input.calendarId,
+      sendSchedulingMessages: Boolean(input.attendeeStatus),
     });
+  }
+
+  async declineIcsInvitation(input: {
+    userId: string;
+    icsContent: string;
+  }): Promise<{ declined: true }> {
+    if (Buffer.byteLength(input.icsContent, "utf8") > MAX_ICS_CONTENT_BYTES) {
+      throw new Error("ICS content exceeds the 1 MB size limit.");
+    }
+
+    const timezone = await this.getUserTimezone(input.userId);
+    const parseResult = parseICSFile(input.icsContent, timezone);
+    const parsedEvent = parseResult.events[0];
+
+    if (!parsedEvent) {
+      return { declined: true };
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: input.userId },
+      select: { email: true },
+    });
+    const userEmail = user?.email?.trim().toLowerCase() ?? null;
+    if (!userEmail || !this.stalwartClient) {
+      return { declined: true };
+    }
+
+    const stalwartAccountId = await this.getStalwartAccountId(input.userId);
+    const targetCalendar = await resolveAcceptedInvitationTargetCalendar(
+      this.prisma,
+      input.userId,
+    );
+
+    if (
+      !stalwartAccountId ||
+      !targetCalendar?.stalwartCalendarId
+    ) {
+      return { declined: true };
+    }
+
+    const participants = (parsedEvent.participants ?? []).map((participant) => ({
+      ...participant,
+      status:
+        participant.email.trim().toLowerCase() === userEmail
+          ? "declined"
+          : participant.status,
+    }));
+
+    const remoteEvent = await this.stalwartClient.createEvent({
+      accountId: stalwartAccountId,
+      event: buildStalwartEventPayload({
+        calendarId: targetCalendar.stalwartCalendarId,
+        uid: parsedEvent.uid,
+        title: parsedEvent.title,
+        description: parsedEvent.description ?? null,
+        start: parsedEvent.start,
+        end: parsedEvent.end,
+        allDay: parsedEvent.allDay,
+        timezone: parsedEvent.timezone || "UTC",
+        location: parsedEvent.location ?? null,
+        recurrence: recurrenceToJson(parsedEvent),
+        reminder: null,
+        participants,
+      }),
+      sendSchedulingMessages: true,
+    });
+
+    try {
+      await this.stalwartClient.deleteEvent({
+        accountId: stalwartAccountId,
+        eventId: remoteEvent.id,
+        sendSchedulingMessages: false,
+      });
+    } catch (error) {
+      logger.warn("Failed to clean up temporary decline event in Stalwart", {
+        userId: input.userId,
+        remoteEventId: remoteEvent.id,
+        error: errorString(error),
+      });
+    }
+
+    return { declined: true };
   }
 
   private async getUserTimezone(userId: string): Promise<string> {
@@ -214,96 +295,30 @@ export class MailCalendarIngestionService {
     return userSettings?.timezone || "UTC";
   }
 
-  private async resolveImportCalendar(
-    userId: string,
-  ): Promise<ImportTargetCalendar | null> {
-    const userSettings = await this.prisma.userSettings.findUnique({
-      where: { userId },
-      select: { defaultCalendarId: true },
+  private async applyAttendeeStatusForUser(input: {
+    userId: string;
+    eventId: string;
+    status: MailInvitationAttendeeStatus;
+  }): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: input.userId },
+      select: { email: true },
     });
-
-    const writableCalendarWhere = {
-      userId,
-      kind: "owned",
-      isSyncOnly: false,
-      forceFullEncryption: false,
-    } as const;
-
-    if (userSettings?.defaultCalendarId) {
-      const defaultCalendar = await this.prisma.calendar.findFirst({
-        where: {
-          ...writableCalendarWhere,
-          id: userSettings.defaultCalendarId,
-        },
-        select: {
-          id: true,
-          name: true,
-          color: true,
-          kind: true,
-          isVisible: true,
-          isDefault: true,
-          isSyncOnly: true,
-          forceFullEncryption: true,
-          stalwartAccountId: true,
-          stalwartCalendarId: true,
-        },
-      });
-
-      if (defaultCalendar) {
-        return defaultCalendar;
-      }
+    const userEmail = user?.email?.trim().toLowerCase();
+    if (!userEmail) {
+      return;
     }
 
-    const existingCalendar = await this.prisma.calendar.findFirst({
-      where: writableCalendarWhere,
-      orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
-      select: {
-        id: true,
-        name: true,
-        color: true,
-        kind: true,
-        isVisible: true,
-        isDefault: true,
-        isSyncOnly: true,
-        forceFullEncryption: true,
-        stalwartAccountId: true,
-        stalwartCalendarId: true,
+    await this.prisma.eventParticipant.updateMany({
+      where: {
+        eventId: input.eventId,
+        email: {
+          equals: userEmail,
+          mode: "insensitive",
+        },
       },
-    });
-
-    if (existingCalendar) {
-      return existingCalendar;
-    }
-
-    const calendarCount = await this.prisma.calendar.count({
-      where: { userId },
-    });
-
-    if (calendarCount > 0) {
-      return null;
-    }
-
-    return this.prisma.calendar.create({
       data: {
-        name: "Personal",
-        color: "#10b981",
-        kind: "owned",
-        isPublic: false,
-        isVisible: true,
-        isDefault: true,
-        userId,
-      },
-      select: {
-        id: true,
-        name: true,
-        color: true,
-        kind: true,
-        isVisible: true,
-        isDefault: true,
-        isSyncOnly: true,
-        forceFullEncryption: true,
-        stalwartAccountId: true,
-        stalwartCalendarId: true,
+        status: input.status,
       },
     });
   }
@@ -319,6 +334,27 @@ export class MailCalendarIngestionService {
     });
 
     return mailbox?.stalwartAccountId ?? null;
+  }
+
+  private patchParsedEventAttendeeStatus(
+    parsedEvent: ParsedIcsEvent,
+    userEmail: string | null,
+    status?: MailInvitationAttendeeStatus,
+  ): ParsedIcsEvent {
+    if (!status || !userEmail) {
+      return parsedEvent;
+    }
+
+    return {
+      ...parsedEvent,
+      participants: (parsedEvent.participants ?? []).map((participant) => ({
+        ...participant,
+        status:
+          participant.email.trim().toLowerCase() === userEmail
+            ? status
+            : participant.status,
+      })),
+    };
   }
 
   private buildRemoteEventPayload(
@@ -371,6 +407,10 @@ export class MailCalendarIngestionService {
     stalwartAccountId: string | null,
     stalwartCalendarId: string | null,
     parsedEvents: ParsedIcsEvent[],
+    options: {
+      attendeeStatus?: MailInvitationAttendeeStatus;
+      sendSchedulingMessages?: boolean;
+    } = {},
   ): Promise<{ created: number; updated: number }> {
     const existingEvents = await this.prisma.calendarEvent.findMany({
       where: {
@@ -386,18 +426,41 @@ export class MailCalendarIngestionService {
       existingEvents.map((event) => [event.externalId, event]),
     );
     const pendingInvitationDispatchers: Array<() => Promise<void>> = [];
+    const sendSchedulingMessages = options.sendSchedulingMessages ?? false;
+    const userEmail = options.attendeeStatus
+      ? (
+          await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { email: true },
+          })
+        )?.email
+          ?.trim()
+          .toLowerCase() ?? null
+      : null;
 
     let created = 0;
     let updated = 0;
 
     for (const parsedEvent of parsedEvents) {
+      const syncedParsedEvent = this.patchParsedEventAttendeeStatus(
+        parsedEvent,
+        userEmail,
+        options.attendeeStatus,
+      );
       const existingEvent = existingByExternalId.get(parsedEvent.uid);
       let remoteEventId = existingEvent?.stalwartEventId ?? null;
+      const shouldMoveToTargetCalendar =
+        Boolean(existingEvent) && existingEvent!.calendarId !== calendar.id;
 
-      if (this.stalwartClient && stalwartAccountId && stalwartCalendarId) {
+      if (
+        this.stalwartClient &&
+        stalwartAccountId &&
+        stalwartCalendarId &&
+        (sendSchedulingMessages || remoteEventId)
+      ) {
         const remotePayload = this.buildRemoteEventPayload(
           stalwartCalendarId,
-          parsedEvent,
+          syncedParsedEvent,
         );
 
         if (remoteEventId) {
@@ -405,13 +468,13 @@ export class MailCalendarIngestionService {
             accountId: existingEvent?.stalwartAccountId ?? stalwartAccountId,
             eventId: remoteEventId,
             patch: remotePayload,
-            sendSchedulingMessages: false,
+            sendSchedulingMessages,
           });
         } else {
           const remoteEvent = await this.stalwartClient.createEvent({
             accountId: stalwartAccountId,
             event: remotePayload,
-            sendSchedulingMessages: false,
+            sendSchedulingMessages,
           });
           remoteEventId = remoteEvent.id;
         }
@@ -459,9 +522,18 @@ export class MailCalendarIngestionService {
             participants: parsedEvent.participants ?? [],
             tx: this.prisma,
           });
-        pendingInvitationDispatchers.push(
-          createdParticipants.sendPendingInvitations,
-        );
+        if (!sendSchedulingMessages) {
+          pendingInvitationDispatchers.push(
+            createdParticipants.sendPendingInvitations,
+          );
+        }
+        if (options.attendeeStatus) {
+          await this.applyAttendeeStatusForUser({
+            userId,
+            eventId: createdEvent.id,
+            status: options.attendeeStatus,
+          });
+        }
         created++;
         continue;
       }
@@ -477,12 +549,15 @@ export class MailCalendarIngestionService {
       );
 
       const eventChanged = isEventModified(existingEvent, parsedEvent);
+      const shouldUpdateEvent =
+        eventChanged || shouldMoveToTargetCalendar || Boolean(options.attendeeStatus);
 
-      if (eventChanged) {
+      if (shouldUpdateEvent) {
         await this.prisma.calendarEvent.update({
           where: { id: existingEvent.id },
           data: {
-            ...toEventUpdateData(parsedEvent),
+            ...(eventChanged ? toEventUpdateData(parsedEvent) : {}),
+            calendarId: calendar.id,
             stalwartAccountId,
             stalwartCalendarId,
             stalwartEventId: remoteEventId,
@@ -511,12 +586,22 @@ export class MailCalendarIngestionService {
             participants: parsedEvent.participants ?? [],
             tx: this.prisma,
           });
-        pendingInvitationDispatchers.push(
-          updatedParticipants.sendPendingInvitations,
-        );
-        if (!eventChanged) {
+        if (!sendSchedulingMessages) {
+          pendingInvitationDispatchers.push(
+            updatedParticipants.sendPendingInvitations,
+          );
+        }
+        if (!shouldUpdateEvent) {
           updated++;
         }
+      }
+
+      if (options.attendeeStatus) {
+        await this.applyAttendeeStatusForUser({
+          userId,
+          eventId: existingEvent.id,
+          status: options.attendeeStatus,
+        });
       }
     }
 
@@ -531,6 +616,9 @@ export class MailCalendarIngestionService {
     userId: string;
     messagesScanned: number;
     payloadSources: IcsPayloadSource[];
+    attendeeStatus?: MailInvitationAttendeeStatus;
+    calendarId?: string;
+    sendSchedulingMessages?: boolean;
   }): Promise<MailCalendarImportSummary> {
     const summary = createEmptyMailCalendarImportSummary();
     summary.messagesScanned = input.messagesScanned;
@@ -542,7 +630,11 @@ export class MailCalendarIngestionService {
 
     const [timezone, targetCalendar] = await Promise.all([
       this.getUserTimezone(input.userId),
-      this.resolveImportCalendar(input.userId),
+      resolveAcceptedInvitationTargetCalendar(
+        this.prisma,
+        input.userId,
+        input.calendarId,
+      ),
     ]);
 
     if (!targetCalendar) {
@@ -604,6 +696,10 @@ export class MailCalendarIngestionService {
           stalwartAccountId,
           stalwartCalendarId,
           parseResult.events,
+          {
+            attendeeStatus: input.attendeeStatus,
+            sendSchedulingMessages: input.sendSchedulingMessages,
+          },
         );
         summary.eventsCreated += result.created;
         summary.eventsUpdated += result.updated;

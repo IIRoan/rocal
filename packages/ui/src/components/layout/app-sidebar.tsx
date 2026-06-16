@@ -76,8 +76,7 @@ export function AppSidebar({
     (calendar) => calendar.kind === "public_holiday",
   );
   const subscribedCalendars = calendars.filter(
-    (calendar) =>
-      calendar.kind !== "owned" && calendar.kind !== "public_holiday",
+    (calendar) => calendar.kind === "subscribed",
   );
 
   if (isMobile) {
@@ -398,8 +397,7 @@ function AppSidebarDesktop({
     (calendar) => calendar.kind === "public_holiday",
   );
   const subscribedCalendars = calendars.filter(
-    (calendar) =>
-      calendar.kind !== "owned" && calendar.kind !== "public_holiday",
+    (calendar) => calendar.kind === "subscribed",
   );
 
   return (

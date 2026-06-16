@@ -27,6 +27,7 @@ export async function ensureUserCalendars(userId: string) {
             isPublic: false,
             isVisible: true,
             isDefault: true,
+            forceFullEncryption: false,
             userId,
           },
           {
@@ -36,6 +37,7 @@ export async function ensureUserCalendars(userId: string) {
             isPublic: false,
             isVisible: true,
             isDefault: false,
+            forceFullEncryption: false,
             userId,
           },
           {
@@ -45,6 +47,7 @@ export async function ensureUserCalendars(userId: string) {
             isPublic: false,
             isVisible: true,
             isDefault: false,
+            forceFullEncryption: false,
             userId,
           },
         ],

@@ -603,6 +603,55 @@ describe("StalwartJmapClient", () => {
     expect(mailboxes[0]?.id).toBe("inbox-1");
   });
 
+  it("retries blob uploads once after clearing stale auth", async () => {
+    let calls = 0;
+    const onUnauthorized = jest.fn<() => void>();
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "stale-access-token",
+      onUnauthorized,
+      fetcher: async (url) => {
+        calls += 1;
+        if (calls === 1) {
+          return new Response(
+            JSON.stringify({ title: "Unauthorized", status: 401 }),
+            {
+              status: 401,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            blobId: "blob-1",
+            size: 4,
+            type: "text/plain",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      },
+    });
+
+    const session: JmapSession = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/",
+      uploadUrl: "http://localhost:4001/api/mail/jmap/jmap/upload/{accountId}/",
+      accounts: { acc1: { name: "alice@solace.onl" } },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "acc1" },
+    };
+    const uploaded = await client.uploadBlob(
+      session,
+      new Blob(["test"], { type: "text/plain" }),
+      "text/plain",
+    );
+
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(calls).toBe(2);
+    expect(uploaded.blobId).toBe("blob-1");
+  });
+
   it("includes upstream details when discovery cannot reach the mail server", async () => {
     const client = new StalwartJmapClient({
       baseUrl: "http://localhost:4001/api/mail/jmap",

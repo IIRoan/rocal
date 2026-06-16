@@ -51,6 +51,7 @@ describe("ensureUserCalendars", () => {
           isPublic: false,
           isVisible: true,
           isDefault: true,
+          forceFullEncryption: false,
           userId: "user-1",
         },
         {
@@ -60,6 +61,7 @@ describe("ensureUserCalendars", () => {
           isPublic: false,
           isVisible: true,
           isDefault: false,
+          forceFullEncryption: false,
           userId: "user-1",
         },
         {
@@ -69,6 +71,7 @@ describe("ensureUserCalendars", () => {
           isPublic: false,
           isVisible: true,
           isDefault: false,
+          forceFullEncryption: false,
           userId: "user-1",
         },
       ],

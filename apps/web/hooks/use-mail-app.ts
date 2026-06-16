@@ -1291,8 +1291,15 @@ export function useMailApp() {
         const client = new StalwartJmapClient({
           baseUrl: config.discoveryBaseUrl,
           getAccessToken: () => tokenManager.getAccessToken(),
-          onUnauthorized: () => {
+          onUnauthorized: async () => {
             tokenManager.clear();
+            try {
+              await tokenManager.getAccessToken();
+            } catch (error) {
+              log.warn("Could not refresh mail token after unauthorized response", {
+                error,
+              });
+            }
           },
         });
 
@@ -1701,7 +1708,22 @@ export function useMailApp() {
         void loadConversationThread(effectiveThreadId);
       }
     } catch (error) {
-      log.error("Failed to send mail", error);
+      log.error("Failed to send mail", {
+        error,
+        statusCode:
+          error &&
+          typeof error === "object" &&
+          "statusCode" in error &&
+          typeof (error as { statusCode?: unknown }).statusCode === "number"
+            ? (error as { statusCode: number }).statusCode
+            : undefined,
+        to: composeTo,
+        cc: composeCc,
+        bcc: composeBcc,
+        attachmentCount: composeAttachments.length,
+        hasHtmlBody: hasMeaningfulHtmlBody(composeHtmlBody),
+        isReply: Boolean(composeReplyContext),
+      });
       toast.error(
         getErrorMessage(error, "Could not send the message."),
       );
@@ -1856,7 +1878,19 @@ export function useMailApp() {
         }
         toast(encrypted ? "Encrypted reply sent." : "Reply sent.");
       } catch (error) {
-        log.error("Failed to send quick reply", error);
+        log.error("Failed to send quick reply", {
+          error,
+          statusCode:
+            error &&
+            typeof error === "object" &&
+            "statusCode" in error &&
+            typeof (error as { statusCode?: unknown }).statusCode === "number"
+              ? (error as { statusCode: number }).statusCode
+              : undefined,
+          attachmentCount: files.length,
+          replyLength: replyText.length,
+          recipient: sender,
+        });
         toast.error(
           getErrorMessage(error, "Could not send reply."),
         );

@@ -926,6 +926,7 @@ export function MessageReader({
       try {
         const existing = await calendarApiService.getInvitationByExternalId(
           mailCalendarInviteUid,
+          { syncRemote: false },
         );
         if (cancelled) return;
 
@@ -942,6 +943,7 @@ export function MessageReader({
           const event = existing
             ? await calendarApiService.getInvitationByExternalId(
                 mailCalendarInviteUid,
+                { syncRemote: false },
               )
             : null;
           if (cancelled) return;
@@ -970,18 +972,6 @@ export function MessageReader({
           return;
         }
 
-        // For CANCEL: event is not in calendar — nothing to import.
-        if (mailCalendarInvite?.method === "CANCEL") {
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event: null,
-            loading: false,
-            error: null,
-          });
-          return;
-        }
-
-        // Event not found yet — import from ICS then fetch.
         const importSummary = mailCalendarInvite?.icsContent
           ? await calendarApiService.importInvitationIcs(
               mailCalendarInvite.icsContent,
@@ -989,20 +979,33 @@ export function MessageReader({
           : null;
         if (cancelled) return;
 
+        if (importSummary && importSummary.errors.length > 0) {
+          setCalendarInviteEvent({
+            eventId: mailCalendarInviteUid,
+            event: null,
+            loading: false,
+            error:
+              importSummary.errors[0] ??
+              "Unable to add this invitation to your calendar.",
+          });
+          return;
+        }
+
         const event = await calendarApiService.getInvitationByExternalId(
           mailCalendarInviteUid,
+          { syncRemote: false },
         );
         if (cancelled) return;
+
+        void queryClient.invalidateQueries({ queryKey: ["events"] });
 
         setCalendarInviteEvent({
           eventId: mailCalendarInviteUid,
           event,
           loading: false,
-          error:
-            !event && importSummary && importSummary.errors.length > 0
-              ? (importSummary.errors[0] ??
-                "Unable to import invitation details.")
-              : null,
+          error: event
+            ? null
+            : "Invitation was staged but could not be loaded.",
         });
       } catch (error) {
         if (cancelled) return;
@@ -1044,15 +1047,79 @@ export function MessageReader({
   }, [calendarInviteEvent, mailCalendarInviteUid]);
   const calendarInviteResponseEventId =
     currentCalendarInviteEvent?.event?.id ?? null;
+  const calendarInviteHasRemoteSync = Boolean(
+    currentCalendarInviteEvent?.event?.stalwartEventId,
+  );
   const calendarCancellationEventId =
     currentCalendarInviteEvent?.event?.id ?? null;
 
   const handleInvitationResponse = useCallback(
     async (status: InvitationResponseStatus) => {
-      if (!calendarInviteResponseEventId || !mailCalendarInviteUid) return;
+      if (!mailCalendarInviteUid) return;
 
       setInviteResponsePending(status);
       try {
+        const shouldRespondViaIcs =
+          !calendarInviteResponseEventId || !calendarInviteHasRemoteSync;
+
+        if (shouldRespondViaIcs) {
+          if (!mailCalendarInvite?.icsContent) {
+            throw new Error("Invitation details are unavailable.");
+          }
+
+          if (status === "declined") {
+            await calendarApiService.declineInvitationIcs(
+              mailCalendarInvite.icsContent,
+            );
+            if (calendarInviteResponseEventId) {
+              await calendarApiService.deleteEvent(calendarInviteResponseEventId);
+            }
+            setInviteDeclined(true);
+            setCalendarInviteEvent({
+              eventId: mailCalendarInviteUid,
+              event: null,
+              loading: false,
+              error: null,
+            });
+            void queryClient.invalidateQueries({ queryKey: ["events"] });
+            toast.success("Invitation declined.");
+            return;
+          }
+
+          const importSummary = await calendarApiService.importInvitationIcs(
+            mailCalendarInvite.icsContent,
+            { status },
+          );
+          if (importSummary.errors.length > 0) {
+            throw new Error(
+              importSummary.errors[0] ??
+                "Unable to add this invitation to your calendar.",
+            );
+          }
+
+          const event = await calendarApiService.getInvitationByExternalId(
+            mailCalendarInviteUid,
+            { syncRemote: false },
+          );
+          if (!event) {
+            throw new Error("Invitation was accepted but could not be loaded.");
+          }
+
+          void queryClient.invalidateQueries({ queryKey: ["events"] });
+          setCalendarInviteEvent({
+            eventId: mailCalendarInviteUid,
+            event,
+            loading: false,
+            error: null,
+          });
+          toast.success(
+            status === "accepted"
+              ? "Invitation accepted."
+              : "Marked as tentative.",
+          );
+          return;
+        }
+
         const result = await calendarApiService.respondToInvitation(
           calendarInviteResponseEventId,
           status,
@@ -1092,7 +1159,13 @@ export function MessageReader({
         setInviteResponsePending(null);
       }
     },
-    [calendarInviteResponseEventId, mailCalendarInviteUid, queryClient],
+    [
+      calendarInviteHasRemoteSync,
+      calendarInviteResponseEventId,
+      mailCalendarInvite?.icsContent,
+      mailCalendarInviteUid,
+      queryClient,
+    ],
   );
 
   const handleCancelRemove = useCallback(async () => {
@@ -2536,10 +2609,6 @@ export function MessageReader({
               ) : inviteDeclined ? (
                 <span className="text-xs text-muted-foreground">
                   Declined, removed
-                </span>
-              ) : !currentCalendarInviteEvent?.event ? (
-                <span className="text-xs text-muted-foreground">
-                  Processing…
                 </span>
               ) : isPending ? (
                 <>

@@ -6,6 +6,8 @@ import { prisma } from "../lib/prisma";
 import { env } from "../lib/env";
 import { requireAuth } from "../lib/auth-guard";
 import type { AuthenticatedUser } from "../lib/auth-utils";
+import { hasUserId } from "../lib/auth-utils";
+import { auth } from "../lib/auth";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { resolveRouteUser } from "../lib/request-user";
 import { MailService } from "../services/mail.service";
@@ -113,6 +115,67 @@ async function deriveVaultKeyForNative(
 }
 
 const publicJmapProxyBaseUrl = `${normalizeBaseUrl(env.backendUrl)}/api/mail/jmap`;
+const UPSTREAM_LOG_BODY_LIMIT = 2048;
+
+function truncateLogBody(body: string): string {
+  return body.length <= UPSTREAM_LOG_BODY_LIMIT
+    ? body
+    : `${body.slice(0, UPSTREAM_LOG_BODY_LIMIT)}…`;
+}
+
+function classifyJmapProxyOperation(upstreamPath: string): string {
+  if (upstreamPath.includes("/upload/")) return "blob-upload";
+  if (upstreamPath.includes("/download/")) return "blob-download";
+  if (upstreamPath === "/.well-known/jmap") return "discovery";
+  if (upstreamPath.startsWith("/jmap/")) return "jmap-api";
+  return "other";
+}
+
+function summarizeJmapRequestBody(
+  requestBody: ArrayBuffer | undefined,
+): Record<string, unknown> {
+  if (!requestBody || requestBody.byteLength === 0) {
+    return { bodyPresent: false };
+  }
+
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(requestBody).toString("utf8"),
+    ) as {
+      methodCalls?: unknown[];
+      using?: string[];
+    };
+    const methodCalls = (parsed.methodCalls ?? [])
+      .map((call) => (Array.isArray(call) ? call[0] : null))
+      .filter((method): method is string => typeof method === "string");
+
+    return {
+      bodyPresent: true,
+      bodyLength: requestBody.byteLength,
+      using: parsed.using,
+      methodCalls,
+    };
+  } catch {
+    return {
+      bodyPresent: true,
+      bodyLength: requestBody.byteLength,
+      bodyFormat: "non-json",
+    };
+  }
+}
+
+function requestIncludesSendIntent(
+  requestSummary: Record<string, unknown>,
+): boolean {
+  const methodCalls = requestSummary.methodCalls;
+  if (!Array.isArray(methodCalls)) {
+    return false;
+  }
+
+  return methodCalls.some(
+    (method) => method === "Email/set" || method === "EmailSubmission/set",
+  );
+}
 
 function summarizeBearerToken(
   authorization: string | null,
@@ -147,6 +210,8 @@ function summarizeBearerToken(
 
   const header = decodePart(parts[0]!);
   const payload = decodePart(parts[1]!);
+  const exp = typeof payload?.exp === "number" ? payload.exp : null;
+  const nowSec = Math.floor(Date.now() / 1000);
 
   return {
     tokenType: "jwt",
@@ -155,7 +220,9 @@ function summarizeBearerToken(
     iss: payload?.iss,
     aud: payload?.aud,
     azp: payload?.azp,
-    exp: payload?.exp,
+    sub: payload?.sub,
+    exp,
+    secondsUntilExpiry: exp != null ? exp - nowSec : undefined,
   };
 }
 
@@ -172,6 +239,8 @@ function summarizeUpstreamErrorBody(
       bodyPresent: true,
       bodyLength: body.length,
       error: parsed.error,
+      message: parsed.message,
+      detail: parsed.detail,
       type: parsed.type,
       title: parsed.title,
       status: parsed.status,
@@ -220,13 +289,64 @@ export const defaultMailService = new MailService(
   },
 );
 
+async function resolveSessionUserForProxy(
+  request: Request,
+): Promise<AuthenticatedUser | null> {
+  try {
+    const session = await auth.api.getSession({
+      headers: request.headers as Headers,
+    });
+
+    if (hasUserId(session?.user) && typeof session.user.id === "string") {
+      const email = session.user.email?.trim();
+      if (email) {
+        return session.user;
+      }
+    }
+  } catch (err) {
+    logger.debug("JMAP proxy session lookup failed", {
+      message: errorMessage(err, "Unknown error"),
+    });
+  }
+
+  return null;
+}
+
 async function proxyJmapRequest(input: {
   request: Request;
   upstreamPath: string;
   upstreamBaseUrl: string;
+  mailService: IMailService;
   fetcher?: JmapProxyFetcher;
+  retryWithFreshToken?: boolean;
 }): Promise<Response> {
-  const authorization = input.request.headers.get("authorization");
+  let authorization = input.request.headers.get("authorization");
+  let authSource: "session" | "client-bearer" | "missing" = authorization
+    ? "client-bearer"
+    : "missing";
+
+  try {
+    const user = await resolveSessionUserForProxy(input.request);
+    if (user) {
+      const email = user.email?.trim();
+      if (email) {
+        if (input.retryWithFreshToken) {
+          input.mailService.invalidateAccessTokenForUser(user.id);
+        }
+        const token = await input.mailService.getAccessTokenForUser({
+          userId: user.id,
+          email,
+        });
+        authorization = `Bearer ${token.access_token}`;
+        authSource = "session";
+      }
+    }
+  } catch (err) {
+    logger.debug("JMAP proxy could not resolve session user for upstream auth", {
+      message: errorMessage(err, "Unknown error"),
+      hadClientBearer: Boolean(input.request.headers.get("authorization")),
+    });
+  }
 
   if (!authorization) {
     return Response.json(
@@ -306,6 +426,29 @@ async function proxyJmapRequest(input: {
   }
 
   if (!response.ok) {
+    const operation = classifyJmapProxyOperation(input.upstreamPath);
+    const requestSummary = summarizeJmapRequestBody(requestBody);
+
+    if (
+      response.status === 401 &&
+      authSource === "session" &&
+      !input.retryWithFreshToken
+    ) {
+      logger.debug(
+        "JMAP proxy refreshing session token after upstream 401",
+        {
+          operation,
+          upstreamUrl,
+          method,
+          methodCalls: requestSummary.methodCalls,
+        },
+      );
+      return proxyJmapRequest({
+        ...input,
+        retryWithFreshToken: true,
+      });
+    }
+
     let upstreamBody: string | null = null;
     try {
       upstreamBody = await response.clone().text();
@@ -314,18 +457,25 @@ async function proxyJmapRequest(input: {
     }
 
     const logPayload = {
+      operation,
+      authSource,
+      retriedWithFreshToken: Boolean(input.retryWithFreshToken),
+      proxyPath: requestUrl.pathname,
       upstreamUrl,
       method,
       status: response.status,
       token: summarizeBearerToken(authorization),
+      request: requestSummary,
       upstreamError: summarizeUpstreamErrorBody(upstreamBody),
-      ...(response.status >= 500 && upstreamBody
-        ? { upstreamBody }
-        : {}),
+      ...(upstreamBody ? { upstreamBody: truncateLogBody(upstreamBody) } : {}),
     };
 
-    if (response.status >= 500) {
-      logger.error("JMAP proxy upstream responded with a server error", logPayload);
+    const isSendFailure =
+      response.status === 401 &&
+      (operation === "blob-upload" || requestIncludesSendIntent(requestSummary));
+
+    if (response.status >= 500 || isSendFailure) {
+      logger.error("JMAP proxy upstream responded with an error", logPayload);
     } else {
       logger.warn("JMAP proxy upstream responded with an error", logPayload);
     }
@@ -363,7 +513,18 @@ export function createMailRoutes(
     })
     .get(
       "/keys/:email",
-      async ({ params }) => mailService.getDirectoryKey(params.email),
+      async ({ params }) => {
+        try {
+          return await mailService.getDirectoryKey(params.email);
+        } catch (err) {
+          logger.error("Failed to look up internal recipient key", {
+            email: params.email,
+            message: errorMessage(err, "Unknown error"),
+            errorName: err instanceof Error ? err.name : undefined,
+          });
+          throw err;
+        }
+      },
       {
         detail: {
           tags: ["Mail"],
@@ -381,6 +542,7 @@ export function createMailRoutes(
           upstreamPath: "/.well-known/jmap",
           upstreamBaseUrl: jmapUpstreamBaseUrl,
           fetcher: jmapFetch,
+          mailService,
         }),
       {
         detail: {
@@ -399,6 +561,7 @@ export function createMailRoutes(
           upstreamPath: "/jmap/",
           upstreamBaseUrl: jmapUpstreamBaseUrl,
           fetcher: jmapFetch,
+          mailService,
         }),
       {
         detail: {
@@ -417,6 +580,7 @@ export function createMailRoutes(
           upstreamPath: "/jmap/",
           upstreamBaseUrl: jmapUpstreamBaseUrl,
           fetcher: jmapFetch,
+          mailService,
         }),
       {
         detail: {
@@ -435,6 +599,7 @@ export function createMailRoutes(
           upstreamPath: `/jmap/${params["*"]}`,
           upstreamBaseUrl: jmapUpstreamBaseUrl,
           fetcher: jmapFetch,
+          mailService,
         }),
       {
         detail: {
@@ -471,12 +636,19 @@ export function createMailRoutes(
         }
 
         try {
-          return await mailService.issueAccessTokenForUser({
+          return await mailService.getAccessTokenForUser({
             userId,
             email,
           });
         } catch (err) {
           const message = errorMessage(err, "Could not issue mail token.");
+          logger.error("Failed to issue mail access token", {
+            userId,
+            email,
+            message,
+            errorName: err instanceof Error ? err.name : undefined,
+            stack: err instanceof Error ? err.stack : undefined,
+          });
           set.status = 400;
           return {
             error: "mail_token_error",

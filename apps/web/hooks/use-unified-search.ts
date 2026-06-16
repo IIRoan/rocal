@@ -72,8 +72,13 @@ async function loadSharedMailSearchMessages(): Promise<JmapEmailMessage[]> {
   const client = new StalwartJmapClient({
     baseUrl: config.discoveryBaseUrl,
     getAccessToken: () => tokenManager.getAccessToken(),
-    onUnauthorized: () => {
+    onUnauthorized: async () => {
       tokenManager.clear();
+      try {
+        await tokenManager.getAccessToken();
+      } catch {
+        // Search can fall back without mail results.
+      }
     },
   });
   const session = await client.discoverSession();

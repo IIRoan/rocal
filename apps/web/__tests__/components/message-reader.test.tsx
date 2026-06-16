@@ -234,6 +234,7 @@ jest.mock("../../lib/calendar-api-service", () => ({
     getEvent: jest.fn(),
     getInvitationByExternalId: jest.fn(),
     importInvitationIcs: jest.fn(),
+    declineInvitationIcs: jest.fn(),
     respondToInvitation: jest.fn(),
     deleteEvent: jest.fn(),
   },
@@ -441,7 +442,7 @@ describe("MessageReader — linked calendar event", () => {
     ).not.toBeNull();
   });
 
-  it("extracts and imports decrypted ICS attachments for invitation mail", async () => {
+  it("shows decrypted ICS invitation details without importing before acceptance", async () => {
     const icsContent = [
       "BEGIN:VCALENDAR",
       "METHOD:REQUEST",
@@ -455,30 +456,24 @@ describe("MessageReader — linked calendar event", () => {
       "END:VCALENDAR",
     ].join("\r\n");
 
-    mockCalendarApiService.getInvitationByExternalId
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: "event-1",
-        title: "testinvite6",
-        description: null,
-        start: new Date("2026-05-27T15:00:00Z"),
-        end: new Date("2026-05-27T16:00:00Z"),
-        allDay: false,
-        location: "google event",
-        calendarId: "cal-1",
-        calendar: { id: "cal-1", name: "Work" },
-        userId: "user-1",
-        participants: [
-          {
-            userId: "user-1",
-            email: "bob@example.com",
-            role: "attendee",
-            status: "pending",
-          },
-        ],
-        createdAt: new Date("2026-05-01T00:00:00Z"),
-        updatedAt: new Date("2026-05-01T00:00:00Z"),
-      } as any);
+    mockCalendarApiService.getInvitationByExternalId.mockResolvedValueOnce(null);
+    const pendingGoogleEvent = {
+      id: "event-1",
+      title: "testinvite6",
+      calendarId: "cal-1",
+      userId: "user-1",
+      participants: [
+        {
+          userId: "user-1",
+          email: "bob@example.com",
+          role: "attendee",
+          status: "pending",
+        },
+      ],
+    } as any;
+    mockCalendarApiService.getInvitationByExternalId.mockResolvedValueOnce(
+      pendingGoogleEvent,
+    );
 
     await act(async () => {
       root.render(
@@ -512,14 +507,14 @@ describe("MessageReader — linked calendar event", () => {
     );
     expect(
       mockCalendarApiService.getInvitationByExternalId,
-    ).toHaveBeenCalledWith("google-event-1@example.com");
+    ).toHaveBeenCalledWith("google-event-1@example.com", {
+      syncRemote: false,
+    });
     expect(container.textContent).toContain("testinvite6");
+    expect(container.textContent).toContain("Accept");
     expect(mockCalendarApiService.getEvent).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("Linked calendar event");
     expect(container.textContent).not.toContain("Unable to load linked event details");
-    expect(
-      container.querySelector('a[href="/calendar?eventId=event-1"]'),
-    ).not.toBeNull();
   });
 
   it("does not fetch organizer event links for Solace ICS invitations", async () => {
@@ -535,30 +530,24 @@ describe("MessageReader — linked calendar event", () => {
       "END:VCALENDAR",
     ].join("\r\n");
 
-    mockCalendarApiService.getInvitationByExternalId
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: "invite-copy-1",
-        title: "Planning sync",
-        description: null,
-        start: new Date("2026-05-27T15:00:00Z"),
-        end: new Date("2026-05-27T16:00:00Z"),
-        allDay: false,
-        location: null,
-        calendarId: "cal-1",
-        calendar: { id: "cal-1", name: "Work" },
-        userId: "user-1",
-        participants: [
-          {
-            userId: "user-1",
-            email: "roan@solace.onl",
-            role: "attendee",
-            status: "pending",
-          },
-        ],
-        createdAt: new Date("2026-05-01T00:00:00Z"),
-        updatedAt: new Date("2026-05-01T00:00:00Z"),
-      } as any);
+    mockCalendarApiService.getInvitationByExternalId.mockResolvedValueOnce(null);
+    const pendingSolaceEvent = {
+      id: "event-1",
+      title: "Planning sync",
+      calendarId: "cal-1",
+      userId: "user-1",
+      participants: [
+        {
+          userId: "user-1",
+          email: "bob@example.com",
+          role: "attendee",
+          status: "pending",
+        },
+      ],
+    } as any;
+    mockCalendarApiService.getInvitationByExternalId.mockResolvedValueOnce(
+      pendingSolaceEvent,
+    );
 
     await act(async () => {
       root.render(
@@ -598,10 +587,210 @@ describe("MessageReader — linked calendar event", () => {
     });
 
     expect(mockCalendarApiService.getEvent).not.toHaveBeenCalled();
+    expect(mockCalendarApiService.importInvitationIcs).toHaveBeenCalledWith(
+      icsContent,
+    );
     expect(container.textContent).not.toContain("Linked calendar event");
     expect(container.textContent).not.toContain("Unable to load linked event details");
     expect(container.textContent).toContain("Planning sync");
     expect(container.textContent).toContain("Accept");
+  });
+
+  it("responds to a staged invitation when accepting from mail", async () => {
+    const icsContent = [
+      "BEGIN:VCALENDAR",
+      "METHOD:REQUEST",
+      "BEGIN:VEVENT",
+      "UID:google-event-1@example.com",
+      "DTSTART:20260527T150000Z",
+      "DTEND:20260527T160000Z",
+      "SUMMARY:testinvite6",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const pendingEvent = {
+      id: "event-1",
+      title: "testinvite6",
+      calendarId: "cal-1",
+      userId: "user-1",
+      participants: [
+        {
+          userId: "user-1",
+          email: "bob@example.com",
+          role: "attendee",
+          status: "pending",
+        },
+      ],
+    } as any;
+    const acceptedEvent = {
+      ...pendingEvent,
+      participants: [
+        {
+          userId: "user-1",
+          email: "bob@example.com",
+          role: "attendee",
+          status: "accepted",
+        },
+      ],
+    } as any;
+
+    mockCalendarApiService.getInvitationByExternalId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(pendingEvent);
+    mockCalendarApiService.importInvitationIcs.mockResolvedValueOnce({
+      messagesScanned: 1,
+      icsPartsFound: 1,
+      eventsCreated: 0,
+      eventsUpdated: 1,
+      eventsDeleted: 0,
+      errors: [],
+    });
+    mockCalendarApiService.getInvitationByExternalId.mockResolvedValueOnce(
+      acceptedEvent,
+    );
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <MessageReader
+            {...defaultProps}
+            message={
+              {
+                ...baseMessage,
+                subject: "google event",
+                bodyValues: {},
+              } as any
+            }
+            plaintext={"Invitation from Google Calendar"}
+            attachments={[
+              {
+                name: "invite.ics",
+                type: "text/calendar; method=REQUEST",
+                content: icsContent,
+              },
+            ]}
+          />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const acceptButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent?.includes("Accept"));
+    expect(acceptButton).toBeTruthy();
+
+    await act(async () => {
+      acceptButton?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockCalendarApiService.importInvitationIcs).toHaveBeenCalledWith(
+      icsContent,
+    );
+    expect(mockCalendarApiService.importInvitationIcs).toHaveBeenCalledWith(
+      icsContent,
+      { status: "accepted" },
+    );
+    expect(mockCalendarApiService.respondToInvitation).not.toHaveBeenCalled();
+  });
+
+  it("responds to a synced invitation via RSVP when Stalwart is linked", async () => {
+    const icsContent = [
+      "BEGIN:VCALENDAR",
+      "METHOD:REQUEST",
+      "BEGIN:VEVENT",
+      "UID:google-event-1@example.com",
+      "DTSTART:20260527T150000Z",
+      "DTEND:20260527T160000Z",
+      "SUMMARY:testinvite6",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const syncedEvent = {
+      id: "event-1",
+      title: "testinvite6",
+      calendarId: "cal-1",
+      userId: "user-1",
+      stalwartEventId: "remote-event-1",
+      participants: [
+        {
+          userId: "user-1",
+          email: "bob@example.com",
+          role: "attendee",
+          status: "pending",
+        },
+      ],
+    } as any;
+    const acceptedEvent = {
+      ...syncedEvent,
+      participants: [
+        {
+          userId: "user-1",
+          email: "bob@example.com",
+          role: "attendee",
+          status: "accepted",
+        },
+      ],
+    } as any;
+
+    mockCalendarApiService.getInvitationByExternalId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(syncedEvent);
+    mockCalendarApiService.respondToInvitation.mockResolvedValueOnce(
+      acceptedEvent,
+    );
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <MessageReader
+            {...defaultProps}
+            message={
+              {
+                ...baseMessage,
+                subject: "google event",
+                bodyValues: {},
+              } as any
+            }
+            plaintext={"Invitation from Google Calendar"}
+            attachments={[
+              {
+                name: "invite.ics",
+                type: "text/calendar; method=REQUEST",
+                content: icsContent,
+              },
+            ]}
+          />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const acceptButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent?.includes("Accept"));
+    expect(acceptButton).toBeTruthy();
+
+    await act(async () => {
+      acceptButton?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockCalendarApiService.respondToInvitation).toHaveBeenCalledWith(
+      "event-1",
+      "accepted",
+    );
+    expect(mockCalendarApiService.importInvitationIcs).not.toHaveBeenCalledWith(
+      icsContent,
+      { status: "accepted" },
+    );
   });
 
   it("auto-processes CANCEL invites for already accepted events", async () => {
@@ -706,10 +895,14 @@ describe("MessageReader — linked calendar event", () => {
     );
     expect(
       mockCalendarApiService.getInvitationByExternalId,
-    ).toHaveBeenNthCalledWith(1, "google-event-1@example.com");
+    ).toHaveBeenNthCalledWith(1, "google-event-1@example.com", {
+      syncRemote: false,
+    });
     expect(
       mockCalendarApiService.getInvitationByExternalId,
-    ).toHaveBeenNthCalledWith(2, "google-event-1@example.com");
+    ).toHaveBeenNthCalledWith(2, "google-event-1@example.com", {
+      syncRemote: false,
+    });
     expect(container.textContent).toContain("The organiser cancelled this event");
     expect(container.textContent).toContain("Remove from calendar");
   });

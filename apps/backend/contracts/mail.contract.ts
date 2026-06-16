@@ -74,6 +74,10 @@ export interface IMailService {
   issueAccessTokenForUser(
     input: MailAccessTokenForUserInput,
   ): Promise<MailAccessTokenResult>;
+  getAccessTokenForUser(
+    input: MailAccessTokenForUserInput,
+  ): Promise<MailAccessTokenResult>;
+  invalidateAccessTokenForUser(userId: string): void;
   getMailboxStatusForUser(
     input: GetMailAccountStatusInput,
   ): Promise<MailAccountStatusResult>;

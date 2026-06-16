@@ -247,10 +247,17 @@ export class CalendarApiService {
 
   async getInvitationByExternalId(
     externalId: string,
+    options: { syncRemote?: boolean } = {},
   ): Promise<CalendarEvent | null> {
     try {
+      const searchParams = new URLSearchParams({
+        externalId,
+      });
+      if (options.syncRemote === false) {
+        searchParams.set("syncRemote", "false");
+      }
       const response = await this.client.get<{ event: CalendarEvent | null }>(
-        `/api/events/invitations/by-external-id?externalId=${encodeURIComponent(externalId)}`,
+        `/api/events/invitations/by-external-id?${searchParams.toString()}`,
       );
       return response.event
         ? await this.hydrateEncryptedEvent(response.event)
@@ -262,14 +269,35 @@ export class CalendarApiService {
 
   async importInvitationIcs(
     icsContent: string,
+    options: {
+      status?: "accepted" | "tentative";
+      calendarId?: string;
+    } = {},
   ): Promise<InvitationImportSummary> {
     try {
       return await this.client.post<InvitationImportSummary>(
         "/api/events/invitations/import-ics",
-        { icsContent },
+        {
+          icsContent,
+          ...(options.status ? { status: options.status } : {}),
+          ...(options.calendarId ? { calendarId: options.calendarId } : {}),
+        },
       );
     } catch (error) {
       throw this.transformError(error, "Failed to import calendar invitation");
+    }
+  }
+
+  async declineInvitationIcs(
+    icsContent: string,
+  ): Promise<{ declined: true }> {
+    try {
+      return await this.client.post<{ declined: true }>(
+        "/api/events/invitations/decline-ics",
+        { icsContent },
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to decline calendar invitation");
     }
   }
 

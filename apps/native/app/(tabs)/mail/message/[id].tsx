@@ -103,9 +103,11 @@ import {
   isSolaceEventReminderEmail,
 } from "../../../../src/lib/mail/calendar-event-link";
 import { EventReminderBanner } from "../../../../src/components/mail/EventReminderBanner";
+import { CalendarInviteBanner } from "../../../../src/components/mail/CalendarInviteBanner";
 import { EventReminderMessageBody } from "../../../../src/components/mail/EventReminderMessageBody";
 import { EventReminderMessageBodyLoading } from "../../../../src/components/mail/EventReminderMessageBodyLoading";
 import { MessageDecryptingSkeleton } from "../../../../src/components/mail/MessageDecryptingLoader";
+import { useMailCalendarInvitation } from "../../../../src/hooks/use-mail-calendar-invitation";
 
 type MessageSheetView = "menu" | "move" | "label" | "html" | null;
 
@@ -245,13 +247,61 @@ export default function MailMessageScreen() {
     () => (message ? extractLinkedCalendarEventId(message, plainContent) : null),
     [message, plainContent],
   );
-  const isEventReminderEmail = useMemo(
+  const isHtmlEmail = Boolean(htmlContent);
+  const isDecrypting =
+    isEncrypted && (isDecryptLoading || isDecryptFetching);
+  const decryptError = isEncrypted ? decryptQueryError : null;
+  const rawHtmlSource = decryptResult?.html ?? bodies?.html ?? null;
+
+  const displayAttachments = useMemo(
     () =>
-      calendarEventLinkSource
-        ? isSolaceEventReminderEmail(calendarEventLinkSource)
-        : false,
-    [calendarEventLinkSource],
+      resolveDisplayAttachments({
+        encryption,
+        isDecrypting,
+        decryptSucceeded: isDecryptSuccess,
+        decryptedAttachments: decryptResult?.attachments,
+        messageAttachments: message?.attachments,
+      }),
+    [
+      encryption,
+      isDecrypting,
+      isDecryptSuccess,
+      decryptResult?.attachments,
+      message?.attachments,
+    ],
   );
+
+  const calendarInvitation = useMailCalendarInvitation({
+    message,
+    plaintext: plainContent,
+    attachments: displayAttachments,
+    runtime,
+    userId: user?.id,
+    enabled: Boolean(message) && !isDecrypting,
+  });
+
+  const isEventReminderEmail = useMemo(
+    () => {
+      if (calendarInvitation.hasCalendarInvitationHint) {
+        return false;
+      }
+      if (
+        calendarInvitation.mailCalendarInvite?.method === "REQUEST" ||
+        calendarInvitation.mailCalendarInvite?.method === "CANCEL"
+      ) {
+        return false;
+      }
+      return calendarEventLinkSource
+        ? isSolaceEventReminderEmail(calendarEventLinkSource)
+        : false;
+    },
+    [
+      calendarEventLinkSource,
+      calendarInvitation.hasCalendarInvitationHint,
+      calendarInvitation.mailCalendarInvite?.method,
+    ],
+  );
+
   const {
     data: linkedEvent,
     isLoading: isLinkedEventLoading,
@@ -290,11 +340,23 @@ export default function MailMessageScreen() {
   const shouldReplaceBodyWithEventReminder = Boolean(
     isEventReminderEmail && eventReminderView && isLinkedEventSuccess,
   );
-  const isHtmlEmail = Boolean(htmlContent);
-  const isDecrypting =
-    isEncrypted && (isDecryptLoading || isDecryptFetching);
-  const decryptError = isEncrypted ? decryptQueryError : null;
-  const rawHtmlSource = decryptResult?.html ?? bodies?.html ?? null;
+
+  const formattedInviteStart = useMemo(() => {
+    const start = calendarInvitation.mailCalendarInvite?.start;
+    if (!start) return null;
+
+    return start.toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+      hour12:
+        userSettings?.timeFormat === "12h"
+          ? true
+          : userSettings?.timeFormat === "24h"
+            ? false
+            : undefined,
+      timeZone: userSettings?.timezone ?? undefined,
+    });
+  }, [calendarInvitation.mailCalendarInvite?.start, userSettings]);
 
   const [downloadingBlobId, setDownloadingBlobId] = useState<string | null>(
     null,
@@ -305,24 +367,6 @@ export default function MailMessageScreen() {
   } | null>(null);
   const [activeSheetView, setActiveSheetView] =
     useState<MessageSheetView>(null);
-
-  const displayAttachments = useMemo(
-    () =>
-      resolveDisplayAttachments({
-        encryption,
-        isDecrypting,
-        decryptSucceeded: isDecryptSuccess,
-        decryptedAttachments: decryptResult?.attachments,
-        messageAttachments: message?.attachments,
-      }),
-    [
-      encryption,
-      isDecrypting,
-      isDecryptSuccess,
-      decryptResult?.attachments,
-      message?.attachments,
-    ],
-  );
 
   const currentMailboxId = message
     ? (Object.keys(message.mailboxIds ?? {})[0] ?? null)
@@ -474,6 +518,18 @@ export default function MailMessageScreen() {
           toast(getErrorMessage(error, "Failed to move the message."), "error"),
       },
     );
+  };
+
+  const respondToCalendarInvite = (
+    status: "accepted" | "declined" | "tentative",
+  ) => {
+    void calendarInvitation.handleInvitationResponse(status).then((result) => {
+      if (result.ok) {
+        toast(result.message, "success");
+        return;
+      }
+      toast(result.error, "error");
+    });
   };
 
   const handleArchive = () => {
@@ -737,6 +793,29 @@ export default function MailMessageScreen() {
                   router.push(
                     `/event/${linkedCalendarEventId}` as never,
                   )
+                }
+              />
+            ) : null}
+
+            {calendarInvitation.mailCalendarInvite?.method === "REQUEST" ? (
+              <CalendarInviteBanner
+                invite={calendarInvitation.mailCalendarInvite}
+                loading={calendarInvitation.currentCalendarInviteEvent?.loading}
+                error={calendarInvitation.currentCalendarInviteEvent?.error}
+                inviteDeclined={calendarInvitation.inviteDeclined}
+                invitationStatus={calendarInvitation.invitationStatus}
+                inviteResponsePending={calendarInvitation.inviteResponsePending}
+                formattedStart={formattedInviteStart}
+                onAccept={() => respondToCalendarInvite("accepted")}
+                onMaybe={() => respondToCalendarInvite("tentative")}
+                onDecline={() => respondToCalendarInvite("declined")}
+                onOpenEvent={
+                  calendarInvitation.currentCalendarInviteEvent?.event
+                    ? () =>
+                        router.push(
+                          `/event/${calendarInvitation.currentCalendarInviteEvent!.event!.id}` as never,
+                        )
+                    : undefined
                 }
               />
             ) : null}

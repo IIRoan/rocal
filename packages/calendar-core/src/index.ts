@@ -18,3 +18,4 @@ export * from "./auth-accounts";
 export { RecurrenceEngine } from "@workspace/calendar-ics/recurrence";
 export * from "./calendar-event-link";
 export * from "./event-reminder-mail";
+export * from "./mail-calendar-invite";
