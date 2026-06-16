@@ -111,6 +111,14 @@ export function clearVaultCache(): void {
   vaultLoadingPromise = null;
 }
 
+async function streamToString(stream: unknown): Promise<string> {
+  if (typeof stream === "string") {
+    return stream;
+  }
+
+  return new Response(stream as BodyInit).text();
+}
+
 // ---------------------------------------------------------------------------
 // Backend API helpers (native auth headers via mailFetch)
 // ---------------------------------------------------------------------------
@@ -597,11 +605,14 @@ export async function encryptForRecipients(input: {
       openpgp.readKey({ armoredKey }),
     ),
   );
-  const armoredMessage = await openpgp.encrypt({
+  const encrypted = await openpgp.encrypt({
     message: await openpgp.createMessage({ text: input.plaintext }),
     encryptionKeys,
     signingKeys: cachedVault.privateKey,
+    format: "armored",
   });
+  const armoredMessage =
+    typeof encrypted === "string" ? encrypted : await streamToString(encrypted);
 
   return { armoredMessage };
 }

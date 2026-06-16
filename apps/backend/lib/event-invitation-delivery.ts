@@ -1,6 +1,9 @@
-import type { AuthEmailLogger, AuthEmailMessage } from "./auth-email";
-import { sendAuthEmail } from "./auth-email";
-import type { AuthEmailClient } from "./auth-email";
+import {
+  sendAuthEmail,
+  type AuthEmailClient,
+  type AuthEmailLogger,
+  type AuthEmailMessage,
+} from "./auth-email";
 import { buildMimeMessage, deliverToInternalMailbox } from "./internal-mailbox-delivery";
 import { normalizeParticipantEmail } from "./event-participants";
 import type { StalwartJmapAdminClientLike } from "./stalwart-admin";

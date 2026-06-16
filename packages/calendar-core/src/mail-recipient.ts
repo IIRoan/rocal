@@ -17,7 +17,12 @@ export function isCurrentUserMailAddress(
 
   const [accountLocal, accountDomain] = account.split("@");
   const [recipientLocal, recipientDomain] = normalized.split("@");
-  if (!accountLocal || !accountDomain || recipientDomain !== accountDomain) {
+  if (
+    !accountLocal ||
+    !accountDomain ||
+    !recipientLocal ||
+    recipientDomain !== accountDomain
+  ) {
     return false;
   }
 

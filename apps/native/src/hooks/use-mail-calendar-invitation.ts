@@ -30,9 +30,7 @@ type UseMailCalendarInvitationInput = {
 };
 
 function eventHasRemoteSync(event: CalendarEvent | null | undefined): boolean {
-  return Boolean(
-    (event as { stalwartEventId?: string | null } | null)?.stalwartEventId,
-  );
+  return Boolean(event?.stalwartEventId);
 }
 
 export function useMailCalendarInvitation({

@@ -5,8 +5,7 @@ import { createLogger } from "@workspace/logger";
 import { prisma } from "../lib/prisma";
 import { env } from "../lib/env";
 import { requireAuth } from "../lib/auth-guard";
-import type { AuthenticatedUser } from "../lib/auth-utils";
-import { hasUserId } from "../lib/auth-utils";
+import { hasUserId, type AuthenticatedUser } from "../lib/auth-utils";
 import { auth } from "../lib/auth";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { resolveRouteUser } from "../lib/request-user";
@@ -222,7 +221,7 @@ function summarizeBearerToken(
     azp: payload?.azp,
     sub: payload?.sub,
     exp,
-    secondsUntilExpiry: exp != null ? exp - nowSec : undefined,
+    secondsUntilExpiry: exp !== null ? exp - nowSec : undefined,
   };
 }
 

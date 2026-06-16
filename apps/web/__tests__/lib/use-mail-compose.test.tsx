@@ -22,6 +22,18 @@ function ComposeProbe({
   return null;
 }
 
+function ChromeProbe({
+  onReady,
+}: {
+  onReady: (value: ReturnType<typeof useMailComposeChrome>) => void;
+}) {
+  const chrome = useMailComposeChrome();
+  React.useEffect(() => {
+    onReady(chrome);
+  }, [chrome, onReady]);
+  return null;
+}
+
 describe("useMailCompose", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -97,15 +109,10 @@ describe("useMailCompose", () => {
     let latest: ReturnType<typeof useMailCompose> | null = null;
     let chrome: ReturnType<typeof useMailComposeChrome> | null = null;
 
-    function ChromeProbe() {
-      chrome = useMailComposeChrome();
-      return null;
-    }
-
     await act(async () => {
       root.render(
         <MailComposeProvider>
-          <ChromeProbe />
+          <ChromeProbe onReady={(value) => { chrome = value; }} />
           <ComposeProbe onReady={(value) => { latest = value; }} />
         </MailComposeProvider>,
       );
@@ -148,15 +155,10 @@ describe("useMailCompose", () => {
 
     let chrome: ReturnType<typeof useMailComposeChrome> | null = null;
 
-    function ChromeProbe() {
-      chrome = useMailComposeChrome();
-      return null;
-    }
-
     await act(async () => {
       root.render(
         <MailComposeProvider>
-          <ChromeProbe />
+          <ChromeProbe onReady={(value) => { chrome = value; }} />
         </MailComposeProvider>,
       );
     });

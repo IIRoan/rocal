@@ -423,7 +423,16 @@ describe("MessageReader — linked calendar event", () => {
           />
         </QueryClientProvider>,
       );
-      await Promise.resolve();
+    });
+
+    await act(async () => {
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const state = queryClient.getQueryState(["events", "detail", "event-1"]);
+        if (state?.status === "success") {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
       await Promise.resolve();
     });
 

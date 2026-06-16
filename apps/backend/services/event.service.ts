@@ -1051,7 +1051,7 @@ export class EventService implements IEventService {
             input.userId,
           );
     const shouldMoveToTargetCalendar =
-      targetCalendar != null && event.calendarId !== targetCalendar.id;
+      targetCalendar !== null && event.calendarId !== targetCalendar.id;
 
     const nextParticipants = event.participants.map((participant) => ({
       email: participant.email,
