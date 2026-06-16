@@ -123,6 +123,7 @@ import {
 import { EventReminderBanner } from "./event-reminder-banner";
 import { MailNotificationBanner } from "./mail-notification-banner";
 import { EventReminderMessageBody, EventReminderMessageBodyLoading } from "./event-reminder-message-body";
+import { MessageDecryptingSkeleton } from "./message-decrypting-loader";
 import {
   buildEventReminderMailView,
   ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
@@ -548,6 +549,7 @@ export interface MessageReaderProps {
   attachments?: MailAttachment[];
   signatureVerificationState: MailSignatureVerificationState;
   decryptError: string | null;
+  isDecrypting?: boolean;
   accountEncryptedAtRest: boolean;
   isBusy: boolean;
   blockRemoteImages: boolean;
@@ -633,6 +635,7 @@ export function MessageReader({
   attachments,
   signatureVerificationState,
   decryptError,
+  isDecrypting = false,
   accountEncryptedAtRest,
   isBusy,
   blockRemoteImages,
@@ -2710,7 +2713,12 @@ export function MessageReader({
     isEventReminderEmail && Boolean(linkedCalendarEvent);
   const bodyAttachedAbove = hasCardAboveBody || hasReminderBannerAbove;
 
-  const standardBodyContent = shouldReplaceBodyWithEventReminder &&
+  const standardBodyContent = isDecrypting ? (
+    <MessageDecryptingSkeleton
+      isDark={isDark}
+      attachedAbove={bodyAttachedAbove}
+    />
+  ) : shouldReplaceBodyWithEventReminder &&
   eventReminderView ? (
     <EventReminderMessageBody
       reminder={eventReminderView}

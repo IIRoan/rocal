@@ -105,6 +105,7 @@ import {
 import { EventReminderBanner } from "../../../../src/components/mail/EventReminderBanner";
 import { EventReminderMessageBody } from "../../../../src/components/mail/EventReminderMessageBody";
 import { EventReminderMessageBodyLoading } from "../../../../src/components/mail/EventReminderMessageBodyLoading";
+import { MessageDecryptingSkeleton } from "../../../../src/components/mail/MessageDecryptingLoader";
 
 type MessageSheetView = "menu" | "move" | "label" | "html" | null;
 
@@ -741,7 +742,10 @@ export default function MailMessageScreen() {
             ) : null}
 
             {isDecrypting ? (
-              <CenteredLoader theme={theme} message="Decrypting message…" />
+              <MessageDecryptingSkeleton
+                attachedBelowBanner
+                isDark={isDark}
+              />
             ) : decryptError ? (
               <DecryptErrorCard
                 theme={theme}
