@@ -29,6 +29,12 @@ const mockMailService = {
     expires_in: 1800,
     expires_at: 1779149999,
   })),
+  getAccessTokenForUser: jest.fn(async () => ({
+    access_token: "stalwart-access-token",
+    expires_in: 1800,
+    expires_at: 1779149999,
+  })),
+  invalidateAccessTokenForUser: jest.fn(),
   getDirectoryKey: jest.fn(),
   getMailboxStatusForUser: jest.fn(),
   bootstrapForUser: jest.fn(),

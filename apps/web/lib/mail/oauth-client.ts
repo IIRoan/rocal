@@ -1,4 +1,7 @@
 import type { MailOAuthConfig } from "./types";
+import { createLogger } from "@workspace/logger";
+
+const log = createLogger("mail-oauth");
 
 const MAIL_OAUTH_CALLBACK_MESSAGE_SOURCE = "solace-mail-oauth-callback";
 const MAIL_OAUTH_REQUEST_TIMEOUT_MS = 10000;
@@ -328,6 +331,13 @@ export function createMailOAuthTokenManager(config: MailOAuthConfig) {
   const mintFreshToken = async () => {
     if (config.mailTokenEndpoint) {
       tokens = await fetchMailTokenFromServer(config.mailTokenEndpoint);
+      log.info("Minted mail access token via server exchange", {
+        expiresAtMs: tokens.expiresAtMs,
+        secondsUntilExpiry:
+          tokens.expiresAtMs != null
+            ? Math.round((tokens.expiresAtMs - Date.now()) / 1000)
+            : null,
+      });
       return tokens.accessToken;
     }
 
@@ -337,12 +347,20 @@ export function createMailOAuthTokenManager(config: MailOAuthConfig) {
       code,
       codeVerifier,
     });
+    log.info("Minted mail access token via silent OAuth", {
+      expiresAtMs: tokens.expiresAtMs,
+      secondsUntilExpiry:
+        tokens.expiresAtMs != null
+          ? Math.round((tokens.expiresAtMs - Date.now()) / 1000)
+          : null,
+    });
     return tokens.accessToken;
   };
 
   const refreshOrMintToken = async () => {
     if (tokens?.refreshToken) {
       try {
+        log.info("Refreshing mail access token from refresh token");
         const refreshed = await refreshAuthorizationToken({
           config,
           refreshToken: tokens.refreshToken,
@@ -354,12 +372,26 @@ export function createMailOAuthTokenManager(config: MailOAuthConfig) {
           expiresAtMs: refreshed.expiresAtMs,
         };
 
+        log.info("Refreshed mail access token", {
+          expiresAtMs: tokens.expiresAtMs,
+          secondsUntilExpiry:
+            tokens.expiresAtMs != null
+              ? Math.round((tokens.expiresAtMs - Date.now()) / 1000)
+              : null,
+        });
+
         return tokens.accessToken;
-      } catch {
+      } catch (error) {
+        log.warn("Mail access token refresh failed; minting a new token", {
+          message: error instanceof Error ? error.message : String(error),
+        });
         tokens = null;
       }
     }
 
+    log.info("Minting fresh mail access token", {
+      viaServerExchange: Boolean(config.mailTokenEndpoint),
+    });
     return mintFreshToken();
   };
 
@@ -370,18 +402,28 @@ export function createMailOAuthTokenManager(config: MailOAuthConfig) {
       }
 
       if (inflight) {
+        log.debug("Waiting for in-flight mail access token request");
         return inflight;
       }
 
       inflight = refreshOrMintToken();
 
       try {
-        return await inflight;
+        const accessToken = await inflight;
+        log.debug("Resolved mail access token", {
+          expiresAtMs: tokens?.expiresAtMs ?? null,
+          secondsUntilExpiry:
+            tokens?.expiresAtMs != null
+              ? Math.round((tokens.expiresAtMs - Date.now()) / 1000)
+              : null,
+        });
+        return accessToken;
       } finally {
         inflight = null;
       }
     },
     clear() {
+      log.warn("Cleared cached mail access token");
       tokens = null;
       inflight = null;
     },

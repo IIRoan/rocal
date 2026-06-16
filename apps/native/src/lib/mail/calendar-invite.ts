@@ -6,7 +6,7 @@ import {
   parseMailCalendarInviteFromIcs,
   type MailCalendarInvite,
 } from "@workspace/calendar-core";
-import type { JmapEmailMessage, MailAttachment } from "./types";
+import type { JmapAttachment, JmapEmailMessage } from "./types";
 
 export type { MailCalendarInvite };
 export {
@@ -16,17 +16,8 @@ export {
   looksLikeCalendarPayload,
 };
 
-function normalizeContentType(value?: string | null): string {
-  return value?.split(";")[0]?.trim().toLowerCase() ?? "";
-}
-
-function hasIcsFilename(value?: string | null): boolean {
-  const normalized = value?.trim().toLowerCase() ?? "";
-  return normalized.endsWith(".ics") || normalized.endsWith(".ical");
-}
-
 function attachmentContentToString(
-  content: MailAttachment["content"],
+  content: JmapAttachment["content"],
 ): string | null {
   if (typeof content === "string") {
     return content;
@@ -45,7 +36,7 @@ function attachmentContentToString(
 function collectCalendarPayloads(input: {
   message?: JmapEmailMessage | null;
   plaintext?: string | null;
-  attachments?: MailAttachment[] | null;
+  attachments?: JmapAttachment[] | null;
 }): string[] {
   const payloads = new Set<string>();
 
@@ -67,10 +58,10 @@ function collectCalendarPayloads(input: {
       continue;
     }
 
-    const isCalendarAttachment =
-      normalizeContentType(attachment.type) === "text/calendar" ||
-      hasIcsFilename(attachment.name);
-    if (isCalendarAttachment || looksLikeCalendarPayload(content)) {
+    if (
+      isCalendarAttachmentMeta(attachment.type, attachment.name) ||
+      looksLikeCalendarPayload(content)
+    ) {
       payloads.add(content);
     }
   }
@@ -81,7 +72,7 @@ function collectCalendarPayloads(input: {
 export function extractMailCalendarInvite(input: {
   message?: JmapEmailMessage | null;
   plaintext?: string | null;
-  attachments?: MailAttachment[] | null;
+  attachments?: JmapAttachment[] | null;
 }): MailCalendarInvite | null {
   const icsContent = collectCalendarPayloads(input).find((value) =>
     looksLikeCalendarPayload(value),
