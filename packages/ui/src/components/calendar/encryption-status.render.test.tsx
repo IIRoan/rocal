@@ -24,6 +24,7 @@ jest.mock("lucide-react", () => {
 
   return {
     Lock: makeIcon("lock"),
+    LockOpen: makeIcon("lock-open"),
     ShieldAlert: makeIcon("shield-alert"),
     ShieldCheck: makeIcon("shield-check"),
   };
@@ -94,6 +95,7 @@ describe("EncryptionStatusBadge", () => {
     const popover = container.querySelector("[data-testid='popover']");
 
     expect(button).not.toBeNull();
+    expect(button?.querySelector("[data-icon='lock-open']")).not.toBeNull();
     expect(popover?.textContent).toContain(
       "Stored as plaintext on the server.",
     );
@@ -168,6 +170,6 @@ describe("EncryptionStatusBadge", () => {
     expect(popover?.textContent).toContain(
       "Encrypted ciphertext copy stored alongside",
     );
-    expect(popover?.querySelector("[data-icon='lock']")).not.toBeNull();
+    expect(popover?.querySelector("[data-icon='lock-open']")).not.toBeNull();
   });
 });

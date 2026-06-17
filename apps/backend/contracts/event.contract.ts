@@ -43,6 +43,14 @@ export type EventCreateInput = {
   participants?: EventParticipantInput[];
 };
 
+export type EventSealEncryptionInput = {
+  userId: string;
+  eventId: string;
+  encryptedContent: string;
+  blindIndexTokens?: string[];
+  encryptionKeyVersion?: number;
+};
+
 export type EventUpdateInput = {
   userId: string;
   eventId: string;
@@ -107,6 +115,7 @@ export interface IEventService {
   getById(userId: string, eventId: string): Promise<unknown>;
   create(input: EventCreateInput): Promise<unknown>;
   update(input: EventUpdateInput): Promise<unknown>;
+  sealEncryption(input: EventSealEncryptionInput): Promise<unknown>;
   delete(userId: string, eventId: string): Promise<EventDeleteResult>;
   bulkAction(input: EventBulkInput): Promise<EventBulkResult>;
   exportIcs(userId: string, eventId: string): Promise<EventIcsExportResult>;

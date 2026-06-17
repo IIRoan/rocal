@@ -15,6 +15,9 @@ import {
   resolveInvitationStagingCalendar,
   type InvitationTargetCalendar,
 } from "../lib/mail-invitation-calendar";
+import { resolveEventPersistencePolicy } from "../lib/event-encryption";
+import type { InvitationImportEncryptionPayload } from "@workspace/calendar-core";
+import { indexInvitationImportEncryption } from "@workspace/calendar-core";
 
 const logger = createLogger("backend:mail-calendar-ingestion");
 
@@ -156,6 +159,93 @@ function toEventUpdateData(parsedEvent: ParsedIcsEvent) {
   };
 }
 
+function hasEncryptedPayload(value?: string | null): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+type InvitationLocalEventFields = Omit<
+  ReturnType<typeof toEventUpdateData>,
+  "title" | "description" | "location"
+> & {
+  title?: string;
+  description?: string | null;
+  location?: string | null;
+  encryptedContent?: string;
+  blindIndexTokens?: string;
+  encryptionState?: string;
+  encryptionKeyVersion?: number;
+};
+
+function buildInvitationLocalEventData(
+  parsedEvent: ParsedIcsEvent,
+  encryptionPayload?: InvitationImportEncryptionPayload,
+  existingEncryptionState?: string | null,
+): InvitationLocalEventFields {
+  const schedulingData = toEventUpdateData(parsedEvent);
+
+  if (existingEncryptionState === "encrypted") {
+    const {
+      title: _title,
+      description: _description,
+      location: _location,
+      ...schedulingOnly
+    } = schedulingData;
+    return schedulingOnly;
+  }
+
+  if (!encryptionPayload || !hasEncryptedPayload(encryptionPayload.encryptedContent)) {
+    return schedulingData;
+  }
+
+  const persistencePolicy = resolveEventPersistencePolicy({
+    hasEncryptedPayload: true,
+    title: parsedEvent.title,
+    description: parsedEvent.description,
+    location: parsedEvent.location,
+  });
+
+  return {
+    ...schedulingData,
+    title: persistencePolicy.title,
+    description: persistencePolicy.description,
+    location: persistencePolicy.location,
+    encryptedContent: encryptionPayload.encryptedContent,
+    ...(encryptionPayload.blindIndexTokens !== undefined
+      ? { blindIndexTokens: JSON.stringify(encryptionPayload.blindIndexTokens) }
+      : {}),
+    encryptionState: persistencePolicy.encryptionState,
+    encryptionKeyVersion: encryptionPayload.encryptionKeyVersion ?? 1,
+  };
+}
+
+function extractEncryptionOnlyFields(data: InvitationLocalEventFields) {
+  const fields: Partial<InvitationLocalEventFields> = {};
+
+  if (data.title !== undefined) {
+    fields.title = data.title;
+  }
+  if (data.description !== undefined) {
+    fields.description = data.description;
+  }
+  if (data.location !== undefined) {
+    fields.location = data.location;
+  }
+  if (data.encryptedContent !== undefined) {
+    fields.encryptedContent = data.encryptedContent;
+  }
+  if (data.blindIndexTokens !== undefined) {
+    fields.blindIndexTokens = data.blindIndexTokens;
+  }
+  if (data.encryptionState !== undefined) {
+    fields.encryptionState = data.encryptionState;
+  }
+  if (data.encryptionKeyVersion !== undefined) {
+    fields.encryptionKeyVersion = data.encryptionKeyVersion;
+  }
+
+  return fields;
+}
+
 export class MailCalendarIngestionService {
   constructor(
     private readonly prisma: PrismaClient,
@@ -189,6 +279,7 @@ export class MailCalendarIngestionService {
     sourceId?: string;
     attendeeStatus?: MailInvitationAttendeeStatus;
     calendarId?: string;
+    encryption?: InvitationImportEncryptionPayload[];
   }): Promise<MailCalendarImportSummary> {
     return this.ingestPayloadSources({
       userId: input.userId,
@@ -202,6 +293,7 @@ export class MailCalendarIngestionService {
       attendeeStatus: input.attendeeStatus,
       calendarId: input.calendarId,
       sendSchedulingMessages: Boolean(input.attendeeStatus),
+      encryptionByExternalId: indexInvitationImportEncryption(input.encryption),
     });
   }
 
@@ -226,7 +318,10 @@ export class MailCalendarIngestionService {
       select: { email: true },
     });
     const userEmail = user?.email?.trim().toLowerCase() ?? null;
-    if (!userEmail || !this.stalwartClient) {
+    if (!userEmail) {
+      if (parsedEvent) {
+        await this.recordDeclinedInvitationTombstone(input.userId, parsedEvent);
+      }
       return { declined: true };
     }
 
@@ -236,10 +331,8 @@ export class MailCalendarIngestionService {
       input.userId,
     );
 
-    if (
-      !stalwartAccountId ||
-      !targetCalendar?.stalwartCalendarId
-    ) {
+    if (!stalwartAccountId || !targetCalendar?.stalwartCalendarId || !this.stalwartClient) {
+      await this.recordDeclinedInvitationTombstone(input.userId, parsedEvent);
       return { declined: true };
     }
 
@@ -284,7 +377,93 @@ export class MailCalendarIngestionService {
       });
     }
 
+    await this.recordDeclinedInvitationTombstone(input.userId, parsedEvent);
     return { declined: true };
+  }
+
+  private isUserDeclinedOnEvent(
+    userId: string,
+    event: {
+      participants?: Array<{
+        userId?: string | null;
+        role?: string | null;
+        status?: string | null;
+      }> | null;
+    },
+  ): boolean {
+    const participant = event.participants?.find(
+      (entry) => entry.userId === userId && entry.role !== "organizer",
+    );
+    return participant?.status === "declined";
+  }
+
+  private async recordDeclinedInvitationTombstone(
+    userId: string,
+    parsedEvent: ParsedIcsEvent,
+  ): Promise<void> {
+    const stagingCalendar = await resolveInvitationStagingCalendar(
+      this.prisma,
+      userId,
+    );
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+    const userEmail = user?.email?.trim().toLowerCase() ?? null;
+    const declinedParticipants = (parsedEvent.participants ?? []).map(
+      (participant) => ({
+        ...participant,
+        status:
+          userEmail &&
+          participant.email.trim().toLowerCase() === userEmail
+            ? ("declined" as const)
+            : participant.status,
+      }),
+    );
+    const localEventData = buildInvitationLocalEventData(parsedEvent);
+
+    const existingEvent = await this.prisma.calendarEvent.findFirst({
+      where: {
+        userId,
+        externalId: parsedEvent.uid,
+        subscriptionId: null,
+      },
+      include: { participants: true },
+    });
+
+    if (existingEvent) {
+      await this.prisma.calendarEvent.update({
+        where: { id: existingEvent.id },
+        data: {
+          calendarId: stagingCalendar.id,
+          stalwartEventId: null,
+          stalwartSyncedAt: null,
+        },
+      });
+      await this.eventParticipantService.syncParticipants({
+        eventId: existingEvent.id,
+        participants: declinedParticipants,
+        tx: this.prisma,
+      });
+      return;
+    }
+
+    const createdEvent = await this.prisma.calendarEvent.create({
+      data: {
+        ...localEventData,
+        title: localEventData.title ?? parsedEvent.title,
+        externalId: parsedEvent.uid,
+        isSynced: false,
+        userId,
+        calendarId: stagingCalendar.id,
+      },
+    });
+
+    await this.eventParticipantService.syncParticipants({
+      eventId: createdEvent.id,
+      participants: declinedParticipants,
+      tx: this.prisma,
+    });
   }
 
   private async getUserTimezone(userId: string): Promise<string> {
@@ -411,6 +590,7 @@ export class MailCalendarIngestionService {
     options: {
       attendeeStatus?: MailInvitationAttendeeStatus;
       sendSchedulingMessages?: boolean;
+      encryptionByExternalId?: Map<string, InvitationImportEncryptionPayload>;
     } = {},
   ): Promise<{ created: number; updated: number }> {
     const existingEvents = await this.prisma.calendarEvent.findMany({
@@ -449,6 +629,13 @@ export class MailCalendarIngestionService {
         options.attendeeStatus,
       );
       const existingEvent = existingByExternalId.get(parsedEvent.uid);
+      if (
+        existingEvent &&
+        this.isUserDeclinedOnEvent(userId, existingEvent) &&
+        !options.attendeeStatus
+      ) {
+        continue;
+      }
       let remoteEventId = existingEvent?.stalwartEventId ?? null;
       const shouldMoveToTargetCalendar =
         Boolean(existingEvent) && existingEvent!.calendarId !== calendar.id;
@@ -482,11 +669,19 @@ export class MailCalendarIngestionService {
       }
 
       if (!existingEvent) {
+        const encryptionPayload = options.encryptionByExternalId?.get(
+          parsedEvent.uid,
+        );
+        const localEventData = buildInvitationLocalEventData(
+          parsedEvent,
+          encryptionPayload,
+        );
         let createdEvent;
         try {
           createdEvent = await this.prisma.calendarEvent.create({
             data: {
-              ...toEventUpdateData(parsedEvent),
+              ...localEventData,
+              title: localEventData.title ?? parsedEvent.title,
               externalId: parsedEvent.uid,
               isSynced: false,
               userId,
@@ -549,15 +744,34 @@ export class MailCalendarIngestionService {
         parsedEvent.participants,
       );
 
+      const encryptionPayload = options.encryptionByExternalId?.get(
+        parsedEvent.uid,
+      );
+      const localEventData = buildInvitationLocalEventData(
+        parsedEvent,
+        encryptionPayload,
+        existingEvent.encryptionState,
+      );
+      const shouldApplyEncryption =
+        Boolean(encryptionPayload) &&
+        existingEvent.encryptionState !== "encrypted";
+
       const eventChanged = isEventModified(existingEvent, parsedEvent);
       const shouldUpdateEvent =
-        eventChanged || shouldMoveToTargetCalendar || Boolean(options.attendeeStatus);
+        eventChanged ||
+        shouldMoveToTargetCalendar ||
+        Boolean(options.attendeeStatus) ||
+        shouldApplyEncryption;
 
       if (shouldUpdateEvent) {
         await this.prisma.calendarEvent.update({
           where: { id: existingEvent.id },
           data: {
-            ...(eventChanged ? toEventUpdateData(parsedEvent) : {}),
+            ...(eventChanged
+              ? localEventData
+              : shouldApplyEncryption
+                ? extractEncryptionOnlyFields(localEventData)
+                : {}),
             calendarId: calendar.id,
             stalwartAccountId,
             stalwartCalendarId,
@@ -620,6 +834,7 @@ export class MailCalendarIngestionService {
     attendeeStatus?: MailInvitationAttendeeStatus;
     calendarId?: string;
     sendSchedulingMessages?: boolean;
+    encryptionByExternalId?: Map<string, InvitationImportEncryptionPayload>;
   }): Promise<MailCalendarImportSummary> {
     const summary = createEmptyMailCalendarImportSummary();
     summary.messagesScanned = input.messagesScanned;
@@ -702,6 +917,7 @@ export class MailCalendarIngestionService {
           {
             attendeeStatus: input.attendeeStatus,
             sendSchedulingMessages: input.sendSchedulingMessages,
+            encryptionByExternalId: input.encryptionByExternalId,
           },
         );
         summary.eventsCreated += result.created;

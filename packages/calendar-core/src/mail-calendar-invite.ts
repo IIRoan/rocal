@@ -2,6 +2,7 @@ export type MailCalendarInvite = {
   uid: string;
   method: "REQUEST" | "CANCEL" | "REPLY" | string;
   title: string;
+  description?: string;
   location?: string;
   start?: Date;
   end?: Date;
@@ -207,6 +208,7 @@ export function parseMailCalendarInviteFromIcs(
       readProperty(eventLines, "SUMMARY") ||
       fallbackTitle?.trim() ||
       "Invitation",
+    description: readProperty(eventLines, "DESCRIPTION") ?? undefined,
     location: readProperty(eventLines, "LOCATION") ?? undefined,
     start: parseIcsDate(readProperty(eventLines, "DTSTART")),
     end: parseIcsDate(readProperty(eventLines, "DTEND")),

@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
+  canCurrentUserDeleteEvent,
   canCurrentUserEditEvent,
   getCurrentUserInvitationStatus,
-  isCancelledCalendarEvent,
+  invitationByExternalIdQueryKey,
 } from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { EncryptionStatusBadge } from "@workspace/ui/components/calendar";
@@ -67,6 +69,7 @@ export function EventEditor({
   showBackButton = false,
 }: EventEditorProps) {
   const calendarData = useSharedCalendarData();
+  const queryClient = useQueryClient();
   const { calendars } = calendarData;
   const handleClose = useCallback(() => {
     onOpenChange(false);
@@ -254,6 +257,11 @@ export function EventEditor({
         );
         void calendarData.refetchEvents();
         if ("deleted" in result && result.deleted) {
+          if (selectedEvent.externalId) {
+            void queryClient.invalidateQueries({
+              queryKey: invitationByExternalIdQueryKey(selectedEvent.externalId),
+            });
+          }
           // Event was declined and removed from calendar — close the modal
           onEventSaved?.();
           handleClose();
@@ -274,7 +282,7 @@ export function EventEditor({
         setInviteResponsePending(null);
       }
     },
-    [calendarData, handleClose, loadEventData, onEventSaved, selectedEvent],
+    [calendarData, handleClose, loadEventData, onEventSaved, queryClient, selectedEvent],
   );
   const handleToggleLocation = useCallback(() => {
     setShowLocation((current) => !current);
@@ -296,20 +304,16 @@ export function EventEditor({
     () => (selectedEvent ? canCurrentUserEditEvent(selectedEvent) : true),
     [selectedEvent],
   );
-  const isCancelledSelectedEvent = useMemo(
-    () => (selectedEvent ? isCancelledCalendarEvent(selectedEvent) : false),
-    [selectedEvent],
-  );
   const canDeleteSelectedEvent = useMemo(() => {
-    if (!selectedEvent?.id || selectedEvent.isSynced) {
+    if (!selectedEvent?.id) {
       return false;
     }
 
-    return canEditSelectedEvent || isCancelledSelectedEvent;
-  }, [canEditSelectedEvent, isCancelledSelectedEvent, selectedEvent]);
+    return canCurrentUserDeleteEvent(selectedEvent);
+  }, [selectedEvent]);
   const handleEventDelete = useCallback(() => {
     if (selectedEvent && !canDeleteSelectedEvent) {
-      toast.error("Imported invitation events are read-only for attendees.");
+      toast.error("Synced calendar events cannot be deleted.");
       return;
     }
     void deleteEvent(calendarData);
