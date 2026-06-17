@@ -267,13 +267,13 @@ describe("Subscription validation", () => {
     });
   });
 
-  it("rejects non-ICS subscription URLs", () => {
+  it("rejects non-calendar subscription URLs", () => {
     const errors = validateCreateSubscriptionInput({
       name: "Company Holidays",
       url: "https://example.com/calendar.json",
       color: "blue",
     });
-    expect(errors.url).toBe("URL should point to an .ics calendar file");
+    expect(errors.url).toBe("URL should point to a calendar feed");
   });
 
   it("accepts valid external subscription input", () => {
@@ -295,11 +295,11 @@ describe("Subscription validation", () => {
 });
 
 describe("Subscription helpers", () => {
-  it("normalizes subscription URLs by removing query, hash, and trailing slash", () => {
+  it("normalizes subscription URLs by removing hash and trailing slash", () => {
     const result = normalizeSubscriptionUrl(
       "https://example.com/feed/calendar.ics/?token=abc#top",
     );
-    expect(result).toBe("https://example.com/feed/calendar.ics");
+    expect(result).toBe("https://example.com/feed/calendar.ics?token=abc");
   });
 
   it("identifies holiday subscriptions by calendar kind", () => {

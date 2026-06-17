@@ -82,13 +82,22 @@ describe("subscription-utils", () => {
       expect(errors.url).toBeDefined();
     });
 
-    it("requires the URL to point to an .ics file", () => {
+    it("requires the URL to point to a calendar feed", () => {
       const errors = validateCreateSubscriptionInput({
         name: "Cal",
         url: "https://example.com/calendar",
         color: "blue",
       });
-      expect(errors.url).toContain(".ics");
+      expect(errors.url).toContain("calendar feed");
+    });
+
+    it("accepts tokenized PHP calendar endpoints", () => {
+      const errors = validateCreateSubscriptionInput({
+        name: "School",
+        url: "https://wdka.asimut.net/api/ical.php?token=WoiiytWf6gsXPMww",
+        color: "blue",
+      });
+      expect(errors).toEqual({});
     });
 
     it("rejects malformed URLs", () => {
@@ -125,10 +134,10 @@ describe("subscription-utils", () => {
   });
 
   describe("normalizeSubscriptionUrl", () => {
-    it("strips query and hash and trailing slashes", () => {
+    it("strips hash and trailing slashes while preserving query params", () => {
       expect(
         normalizeSubscriptionUrl("https://example.com/cal/?x=1#frag"),
-      ).toBe("https://example.com/cal");
+      ).toBe("https://example.com/cal?x=1");
     });
 
     it("returns trimmed original for invalid urls", () => {

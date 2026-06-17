@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,7 +21,7 @@ import {
   getErrorMessage,
 } from "@workspace/calendar-core";
 import type { CreateSubscriptionRequest } from "@workspace/calendar-core";
-import { NATIONAL_HOLIDAY_CALENDARS } from "@workspace/calendar-ics";
+import { NATIONAL_HOLIDAY_CALENDARS, SUBSCRIPTION_FEED_URL_HELP_TEXT } from "@workspace/calendar-ics";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { StackScreenHeader } from "../../src/components/StackScreenHeader";
 import { ColorPicker } from "../../src/components/event/ColorPicker";
@@ -121,7 +122,7 @@ export default function SubscriptionCreateScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
 
-      if (variables.url === feedUrl.trim()) {
+      if (variables.url === normalizeSubscriptionUrl(feedUrl)) {
         setFeedName("");
         setFeedUrl("");
         setFeedColor("indigo");
@@ -178,7 +179,7 @@ export default function SubscriptionCreateScreen() {
 
     createSubscriptionMutation.mutate({
       name: feedName.trim(),
-      url: feedUrl.trim(),
+      url: normalizeSubscriptionUrl(feedUrl),
       color: feedColor.trim(),
     });
   }, [createSubscriptionMutation, feedColor, feedName, feedUrl]);
@@ -286,7 +287,14 @@ export default function SubscriptionCreateScreen() {
             <Text style={styles.errorText}>{feedErrors.name}</Text>
           ) : null}
 
-          <FieldLabel text="Feed URL" theme={theme} />
+          <FieldLabel
+            text="Feed URL"
+            theme={theme}
+            onInfoPress={() =>
+              Alert.alert("Feed URL", SUBSCRIPTION_FEED_URL_HELP_TEXT)
+            }
+            infoAccessibilityLabel="About calendar feed URLs"
+          />
           <TextInput
             style={styles.input}
             value={feedUrl}
@@ -502,9 +510,37 @@ export default function SubscriptionCreateScreen() {
   );
 }
 
-function FieldLabel({ text, theme }: { text: string; theme: ThemeTokens }) {
+function FieldLabel({
+  text,
+  theme,
+  onInfoPress,
+  infoAccessibilityLabel,
+}: {
+  text: string;
+  theme: ThemeTokens;
+  onInfoPress?: () => void;
+  infoAccessibilityLabel?: string;
+}) {
   const styles = useMemo(() => createStyles(theme), [theme]);
-  return <Text style={styles.fieldLabel}>{text}</Text>;
+
+  if (!onInfoPress) {
+    return <Text style={styles.fieldLabel}>{text}</Text>;
+  }
+
+  return (
+    <View style={styles.fieldLabelRow}>
+      <Text style={styles.fieldLabel}>{text}</Text>
+      <Pressable
+        style={styles.fieldInfoButton}
+        onPress={onInfoPress}
+        accessibilityRole="button"
+        accessibilityLabel={infoAccessibilityLabel}
+        hitSlop={8}
+      >
+        <Feather name="info" size={14} color={theme.colors.mutedForeground} />
+      </Pressable>
+    </View>
+  );
 }
 
 function createStyles(theme: ThemeTokens) {
@@ -639,6 +675,18 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.mutedForeground,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       marginTop: theme.spacing["1"],
+    },
+    fieldLabelRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["1"],
+    },
+    fieldInfoButton: {
+      width: 28,
+      height: 28,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      borderRadius: theme.borderRadius.md,
     },
     errorText: {
       fontSize: theme.typography.fontSize.xs.size,
