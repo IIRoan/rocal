@@ -39,6 +39,39 @@ describe("getEncryptionStatusMeta", () => {
     );
   });
 
+  it("labels unsealed imported invitations as unencrypted on Solace", () => {
+    expect(
+      getEncryptionStatusMeta({
+        externalId: "google-event@example.com",
+        isSynced: false,
+        subscriptionId: null,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        state: "plaintext",
+        label: "Unencrypted on Solace",
+        originWarning: expect.stringContaining("Unencrypted at origin"),
+      }),
+    );
+  });
+
+  it("explains encrypted imported invitations separately from local events", () => {
+    expect(
+      getEncryptionStatusMeta({
+        encryptionState: "encrypted",
+        externalId: "google-event@example.com",
+        isSynced: false,
+        subscriptionId: null,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        label: "End-to-end encrypted",
+        description: expect.stringContaining("Encrypted on Solace"),
+        originWarning: expect.stringContaining("Unencrypted at origin"),
+      }),
+    );
+  });
+
   it("keeps fully encrypted items labeled as encrypted", () => {
     expect(getEncryptionStatusMeta({ encryptionState: "encrypted" })).toEqual(
       expect.objectContaining({

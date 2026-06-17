@@ -43,6 +43,13 @@ export function partitionCalendarsByKind(
 }
 
 /**
+ * Calendars shown in navigation sidebars (excludes the hidden mail-invitation staging calendar).
+ */
+export function listSidebarCalendars(calendars: Calendar[]): Calendar[] {
+  return calendars.filter((calendar) => !isMailInvitationStagingCalendar(calendar));
+}
+
+/**
  * Extracts a human-readable error message from an unknown error value.
  * Falls back to the provided default message.
  */

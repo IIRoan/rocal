@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useTheme } from "../../providers/ThemeProvider";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import { canCurrentUserDeleteEvent } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { resolveEventBlockColor } from "./timeline-utils";
 import {
@@ -117,6 +118,7 @@ export function AgendaList({
               eventId={item.id}
               eventTitle={item.title}
               onDelete={onEventDelete}
+              enabled={canCurrentUserDeleteEvent(item)}
             >
               {rowContent}
             </SwipeableEventRow>

@@ -111,6 +111,56 @@ describe("EventEditorFooter", () => {
     expect(buttonTexts.some((text) => text.includes("Accept"))).toBe(true);
     expect(buttonTexts.some((text) => text.includes("Maybe"))).toBe(true);
     expect(buttonTexts.some((text) => text.includes("Decline"))).toBe(true);
+    expect(buttonTexts.some((text) => text.includes("Delete"))).toBe(false);
+  });
+
+  it("shows delete for accepted attendee invitations but not pending ghosts", async () => {
+    await act(async () => {
+      root.render(
+        <EventEditorFooter
+          canEditEvent={false}
+          eventForm={
+            {
+              eventCalendarId: "calendar-1",
+              eventSaving: false,
+              eventTitle: "Accepted invite",
+              selectedEvent: {
+                id: "event-1",
+                isSynced: false,
+                externalId: "uid-123@google.com",
+                userId: "user-1",
+                participants: [
+                  {
+                    userId: "user-1",
+                    role: "attendee",
+                    status: "accepted",
+                  },
+                ],
+              },
+              setEventViewMode: jest.fn(),
+              setShowRecurringDeleteModal: jest.fn(),
+            } as any
+          }
+          handleEventDelete={() => {}}
+          handleEventDownloadIcs={() => {}}
+          handleEventSave={() => {}}
+          invitationResponsePending={null}
+          invitationStatus="accepted"
+          isViewMode={true}
+          onBack={() => {}}
+          onClose={() => {}}
+          onInvitationResponse={() => {}}
+        />,
+      );
+
+      await Promise.resolve();
+    });
+
+    const buttonTexts = Array.from(container.querySelectorAll("button")).map(
+      (button) => button.textContent ?? "",
+    );
+
+    expect(buttonTexts.some((text) => text.includes("Delete"))).toBe(true);
   });
 
   it("shows remove action instead of RSVP controls for cancelled attendee invite events", async () => {

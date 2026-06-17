@@ -448,6 +448,12 @@ export const eventsRoutes = new Elysia({
             icsContent: string;
             status?: "accepted" | "tentative";
             calendarId?: string;
+            encryption?: Array<{
+              externalId: string;
+              encryptedContent: string;
+              blindIndexTokens?: string[];
+              encryptionKeyVersion?: number;
+            }>;
           };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
@@ -459,6 +465,7 @@ export const eventsRoutes = new Elysia({
             sourceId: "Decrypted mail invitation",
             attendeeStatus: body.status,
             calendarId: body.calendarId,
+            encryption: body.encryption,
           });
         },
         {
@@ -482,6 +489,30 @@ export const eventsRoutes = new Elysia({
                 description:
                   "Optional owned calendar to import into. Defaults to the user's default calendar.",
               }),
+            ),
+            encryption: t.Optional(
+              t.Array(
+                strictObject({
+                  externalId: t.String({
+                    minLength: 1,
+                    maxLength: 512,
+                    description: "ICS UID for the invitation being encrypted.",
+                  }),
+                  encryptedContent: t.String({
+                    minLength: 1,
+                    description:
+                      "Client-encrypted payload for title, description, and location.",
+                  }),
+                  blindIndexTokens: t.Optional(
+                    t.Array(t.String({ minLength: 1 })),
+                  ),
+                  encryptionKeyVersion: t.Optional(t.Number({ minimum: 1 })),
+                }),
+                {
+                  description:
+                    "Optional client-encrypted payloads to store on Solace during import.",
+                },
+              ),
             ),
           }),
           detail: {
@@ -560,6 +591,62 @@ export const eventsRoutes = new Elysia({
           }),
           detail: {
             summary: "Respond to a mailed calendar invitation",
+          },
+        },
+      )
+
+      .post(
+        "/:id/seal-encryption",
+        async ({
+          params,
+          body,
+          authenticatedUser,
+          request,
+        }: {
+          params: { id: string };
+          body: {
+            encryptedContent: string;
+            blindIndexTokens?: string[];
+            encryptionKeyVersion?: number;
+          };
+          authenticatedUser?: AuthenticatedUser;
+          request: Request;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          return eventService.sealEncryption({
+            userId: user.id,
+            eventId: params.id,
+            encryptedContent: body.encryptedContent,
+            blindIndexTokens: body.blindIndexTokens,
+            encryptionKeyVersion: body.encryptionKeyVersion,
+          });
+        },
+        {
+          params: strictObject({
+            id: t.String({ description: "Event ID" }),
+          }),
+          body: strictObject({
+            encryptedContent: t.String({
+              minLength: 1,
+              description:
+                "Client-encrypted event payload for title, description, and location.",
+            }),
+            blindIndexTokens: t.Optional(
+              t.Array(t.String({ minLength: 1 }), {
+                description: "Blind-index tokens for encrypted search.",
+              }),
+            ),
+            encryptionKeyVersion: t.Optional(
+              t.Number({
+                minimum: 1,
+                description: "Encryption key version used for the payload.",
+              }),
+            ),
+          }),
+          detail: {
+            summary: "Seal imported invitation encryption on Solace",
+            description:
+              "Stores ciphertext for an imported invitation without changing scheduling metadata or Stalwart copies.",
           },
         },
       )

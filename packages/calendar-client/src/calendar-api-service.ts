@@ -3,6 +3,9 @@ import { NoopE2eeProvider, type E2eeProvider } from "./e2ee-provider";
 import {
   validateEventData as coreValidateEventData,
   validateCategoryData as coreValidateCategoryData,
+  shouldSealImportedInvitationEncryption,
+  parseMailCalendarInviteFromIcs,
+  type InvitationImportEncryptionPayload,
 } from "@workspace/calendar-core";
 import type {
   CalendarEvent,
@@ -275,17 +278,52 @@ export class CalendarApiService {
     } = {},
   ): Promise<InvitationImportSummary> {
     try {
+      const encryption = await this.buildInvitationImportEncryption(icsContent);
+
       return await this.client.post<InvitationImportSummary>(
         "/api/events/invitations/import-ics",
         {
           icsContent,
           ...(options.status ? { status: options.status } : {}),
           ...(options.calendarId ? { calendarId: options.calendarId } : {}),
+          ...(encryption ? { encryption } : {}),
         },
       );
     } catch (error) {
       throw this.transformError(error, "Failed to import calendar invitation");
     }
+  }
+
+  private async buildInvitationImportEncryption(
+    icsContent: string,
+  ): Promise<InvitationImportEncryptionPayload[] | undefined> {
+    const parsed = parseMailCalendarInviteFromIcs(icsContent);
+    if (!parsed) {
+      return undefined;
+    }
+
+    const shadow = await this.e2ee.attachEventEncryptionShadow({
+      title: parsed.title,
+      description: parsed.description,
+      location: parsed.location,
+    } as UpdateEventRequest);
+
+    if (!shadow.encryptedContent) {
+      return undefined;
+    }
+
+    return [
+      {
+        externalId: parsed.uid,
+        encryptedContent: shadow.encryptedContent,
+        ...(shadow.blindIndexTokens
+          ? { blindIndexTokens: shadow.blindIndexTokens }
+          : {}),
+        ...(shadow.encryptionKeyVersion
+          ? { encryptionKeyVersion: shadow.encryptionKeyVersion }
+          : {}),
+      },
+    ];
   }
 
   async declineInvitationIcs(
@@ -298,6 +336,64 @@ export class CalendarApiService {
       );
     } catch (error) {
       throw this.transformError(error, "Failed to decline calendar invitation");
+    }
+  }
+
+  async sealEventEncryption(
+    event: Pick<
+      CalendarEvent,
+      | "id"
+      | "title"
+      | "description"
+      | "location"
+      | "externalId"
+      | "isSynced"
+      | "subscriptionId"
+      | "encryptionState"
+      | "encryptedContent"
+    >,
+  ): Promise<CalendarEvent | null> {
+    if (!shouldSealImportedInvitationEncryption(event)) {
+      return null;
+    }
+
+    const shadow = await this.e2ee.attachEventEncryptionShadow({
+      title: event.title,
+      description: event.description ?? undefined,
+      location: event.location ?? undefined,
+    } as UpdateEventRequest);
+
+    if (!shadow.encryptedContent) {
+      return null;
+    }
+
+    try {
+      const response = await this.client.post<CalendarEvent>(
+        `/api/events/${event.id}/seal-encryption`,
+        {
+          encryptedContent: shadow.encryptedContent,
+          ...(shadow.blindIndexTokens
+            ? { blindIndexTokens: shadow.blindIndexTokens }
+            : {}),
+          ...(shadow.encryptionKeyVersion
+            ? { encryptionKeyVersion: shadow.encryptionKeyVersion }
+            : {}),
+        },
+      );
+      return await this.hydrateEncryptedEvent(response);
+    } catch (error) {
+      throw this.transformError(error, "Failed to seal event encryption");
+    }
+  }
+
+  async sealImportedInvitationIfNeeded(
+    event: CalendarEvent,
+  ): Promise<CalendarEvent> {
+    try {
+      const sealed = await this.sealEventEncryption(event);
+      return sealed ?? event;
+    } catch {
+      return event;
     }
   }
 

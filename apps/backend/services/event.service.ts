@@ -30,7 +30,10 @@ import {
 } from "../lib/event-constraints";
 import { MS_PER_DAY, MS_PER_MINUTE } from "../lib/time-constants";
 import { ensureUserCalendars } from "../lib/user-setup";
-import { resolveAcceptedInvitationTargetCalendar } from "../lib/mail-invitation-calendar";
+import {
+  resolveAcceptedInvitationTargetCalendar,
+  resolveInvitationStagingCalendar,
+} from "../lib/mail-invitation-calendar";
 import { RecurrenceEngine } from "../lib/recurrence";
 import { NotificationCalculator } from "../lib/notification-calculator";
 import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
@@ -416,6 +419,36 @@ export class EventService implements IEventService {
   ): boolean {
     const participant = participants?.find((entry) => entry.userId === userId);
     return participant?.role === "attendee";
+  }
+
+  private isAttendeeImportedInvitationForUser(
+    userId: string,
+    event: {
+      externalId?: string | null;
+      participants?:
+        | Array<{
+            userId?: string | null;
+            role?: string | null;
+          }>
+        | null;
+    },
+  ): boolean {
+    return (
+      Boolean(event.externalId?.trim()) &&
+      this.isAttendeeCopyForUser(userId, event.participants)
+    );
+  }
+
+  private async purgeInvitationEventRecord(eventId: string): Promise<void> {
+    await this.prisma.eventNotification.deleteMany({
+      where: { eventId },
+    });
+    await this.prisma.notificationLog.deleteMany({
+      where: { eventId },
+    });
+    await this.prisma.calendarEvent.delete({
+      where: { id: eventId },
+    });
   }
 
   private async attachParticipantsToSearchEvents(
@@ -1003,6 +1036,74 @@ export class EventService implements IEventService {
     };
   }
 
+  async sealEncryption(input: {
+    userId: string;
+    eventId: string;
+    encryptedContent: string;
+    blindIndexTokens?: string[];
+    encryptionKeyVersion?: number;
+  }): Promise<unknown> {
+    if (!this.hasEncryptedPayload(input.encryptedContent)) {
+      throw new ValidationError(
+        "Encrypted content payload is required.",
+        "encryptedContent",
+      );
+    }
+
+    const existingEvent = await this.prisma.calendarEvent.findFirst({
+      where: {
+        id: input.eventId,
+        userId: input.userId,
+      },
+      include: EVENT_WITH_RELATIONS_INCLUDE,
+    });
+
+    if (!existingEvent) {
+      throw new ValidationError("Event not found or access denied");
+    }
+
+    if (existingEvent.isSynced) {
+      throw new ValidationError(
+        "Cannot seal encryption for synced subscription events.",
+      );
+    }
+
+    if (existingEvent.encryptionState === "encrypted") {
+      return {
+        ...existingEvent,
+        participants: mapAndSortParticipants(existingEvent),
+      };
+    }
+
+    const persistencePolicy = resolveEventPersistencePolicy({
+      hasEncryptedPayload: true,
+      title: existingEvent.title,
+      description: existingEvent.description,
+      location: existingEvent.location,
+    });
+
+    const updatedEvent = await this.prisma.calendarEvent.update({
+      where: { id: existingEvent.id },
+      data: {
+        title: persistencePolicy.title,
+        description: persistencePolicy.description,
+        location: persistencePolicy.location,
+        encryptedContent: input.encryptedContent,
+        ...(input.blindIndexTokens !== undefined
+          ? { blindIndexTokens: JSON.stringify(input.blindIndexTokens) }
+          : {}),
+        encryptionState: persistencePolicy.encryptionState,
+        encryptionKeyVersion: input.encryptionKeyVersion ?? 1,
+      },
+      include: EVENT_WITH_RELATIONS_INCLUDE,
+    });
+
+    return {
+      ...updatedEvent,
+      participants: mapAndSortParticipants(updatedEvent),
+    };
+  }
+
   async respondToInvitation(input: {
     userId: string;
     eventId: string;
@@ -1172,7 +1273,7 @@ export class EventService implements IEventService {
       });
     }
 
-    // When declining, delete the event from the local DB and return a deleted marker
+    // When declining, keep a hidden tombstone so mailed invites are not re-staged.
     if (input.status === "declined") {
       await this.prisma.eventNotification.deleteMany({
         where: { eventId: input.eventId },
@@ -1180,9 +1281,26 @@ export class EventService implements IEventService {
       await this.prisma.notificationLog.deleteMany({
         where: { eventId: input.eventId },
       });
-      await this.prisma.calendarEvent.delete({
-        where: { id: input.eventId },
+
+      const stagingCalendar = await resolveInvitationStagingCalendar(
+        this.prisma,
+        input.userId,
+      );
+
+      await this.prisma.eventParticipant.update({
+        where: { id: attendee.id },
+        data: { status: "declined" },
       });
+
+      await this.prisma.calendarEvent.update({
+        where: { id: input.eventId },
+        data: {
+          calendarId: stagingCalendar.id,
+          stalwartEventId: null,
+          stalwartSyncedAt: null,
+        },
+      });
+
       return { deleted: true as const };
     }
 
@@ -2105,13 +2223,24 @@ export class EventService implements IEventService {
         );
       }
 
-      if (
-        this.isAttendeeCopyForUser(userId, existingEvent.participants) &&
-        !existingEvent.isCancelled
-      ) {
-        throw new ValidationError(
-          "Imported invitation events are read-only for attendees.",
-        );
+      const isCancelledAttendeeInvitation =
+        this.isAttendeeImportedInvitationForUser(userId, existingEvent) &&
+        existingEvent.isCancelled;
+
+      if (this.isAttendeeImportedInvitationForUser(userId, existingEvent)) {
+        if (!existingEvent.isCancelled) {
+          await this.respondToInvitation({
+            userId,
+            eventId: id,
+            status: "declined",
+          });
+          await this.purgeInvitationEventRecord(id);
+          return {
+            success: true,
+            message: "Invitation declined and removed from your calendar",
+            deletedEventId: id,
+          };
+        }
       }
 
       if (
@@ -2142,7 +2271,9 @@ export class EventService implements IEventService {
 
       return {
         success: true,
-        message: "Event deleted successfully",
+        message: isCancelledAttendeeInvitation
+          ? "Cancelled event removed from your calendar"
+          : "Event deleted successfully",
         deletedEventId: id,
       };
     } catch (error) {
@@ -2199,7 +2330,7 @@ export class EventService implements IEventService {
           this.isAttendeeCopyForUser(userId, event.participants) &&
           !event.isCancelled,
       );
-      if (attendeeEvents.length > 0) {
+      if (attendeeEvents.length > 0 && action !== "delete") {
         throw new ValidationError(
           `Imported invitation events are read-only for attendees: ${attendeeEvents.map((event) => event.title).join(", ")}`,
         );
@@ -2288,7 +2419,33 @@ export class EventService implements IEventService {
         }
 
         case "delete": {
-          for (const event of events) {
+          const attendeeInvitationEvents = events.filter((event) =>
+            this.isAttendeeImportedInvitationForUser(userId, event),
+          );
+          const activeAttendeeInvitationEvents = attendeeInvitationEvents.filter(
+            (event) => !event.isCancelled,
+          );
+          const cancelledAttendeeInvitationEvents =
+            attendeeInvitationEvents.filter((event) => event.isCancelled);
+          const regularEvents = events.filter(
+            (event) =>
+              !this.isAttendeeImportedInvitationForUser(userId, event),
+          );
+
+          for (const event of activeAttendeeInvitationEvents) {
+            await this.respondToInvitation({
+              userId,
+              eventId: event.id,
+              status: "declined",
+            });
+          }
+
+          const eventsToDeleteLocally = [
+            ...regularEvents,
+            ...cancelledAttendeeInvitationEvents,
+          ];
+
+          for (const event of eventsToDeleteLocally) {
             if (
               this.stalwartClient &&
               event.stalwartAccountId &&
@@ -2301,29 +2458,37 @@ export class EventService implements IEventService {
             }
           }
 
-          const deletedNotifications =
-            await this.prisma.eventNotification.deleteMany({
-              where: { eventId: { in: eventIds } },
-            });
-          logger.ok(
-            `Deleted ${deletedNotifications.count} notifications for ${eventIds.length} events`,
+          const localDeleteEventIds = eventsToDeleteLocally.map(
+            (event) => event.id,
           );
+          let deletedCount = activeAttendeeInvitationEvents.length;
 
-          await this.prisma.notificationLog.deleteMany({
-            where: { eventId: { in: eventIds } },
-          });
+          if (localDeleteEventIds.length > 0) {
+            const deletedNotifications =
+              await this.prisma.eventNotification.deleteMany({
+                where: { eventId: { in: localDeleteEventIds } },
+              });
+            logger.ok(
+              `Deleted ${deletedNotifications.count} notifications for ${localDeleteEventIds.length} events`,
+            );
 
-          result = await this.prisma.calendarEvent.deleteMany({
-            where: {
-              id: { in: eventIds },
-              userId,
-            },
-          });
+            await this.prisma.notificationLog.deleteMany({
+              where: { eventId: { in: localDeleteEventIds } },
+            });
+
+            const deleteResult = await this.prisma.calendarEvent.deleteMany({
+              where: {
+                id: { in: localDeleteEventIds },
+                userId,
+              },
+            });
+            deletedCount += deleteResult.count;
+          }
 
           return {
             success: true,
-            message: `Successfully deleted ${result.count} events`,
-            eventsProcessed: result.count,
+            message: `Successfully deleted ${deletedCount} events`,
+            eventsProcessed: deletedCount,
             action: "delete",
           };
         }

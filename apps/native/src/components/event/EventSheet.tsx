@@ -23,7 +23,10 @@ import type {
   RecurrenceDeleteScope,
   RecurrenceEditScope,
 } from "@workspace/calendar-core";
-import { getErrorMessage } from "@workspace/calendar-core";
+import {
+  canCurrentUserDeleteEvent,
+  getErrorMessage,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -464,6 +467,7 @@ export function EventSheet({
     if (!event || !calendars) return null;
     return calendars.find((c) => c.id === event.calendarId) ?? null;
   }, [event, calendars]);
+  const canDeleteEvent = event ? canCurrentUserDeleteEvent(event) : false;
 
   // ─── Render ────────────────────────────────────────────────────────────
 
@@ -631,7 +635,7 @@ export function EventSheet({
               ) : null}
 
               {/* Delete */}
-              {event.id ? (
+              {event.id && canDeleteEvent ? (
                 <Pressable
                   style={styles.deleteRow}
                   onPress={handleDeletePress}

@@ -4,6 +4,7 @@ import {
   MAIL_INVITATION_STAGING_CALENDAR_NAME,
 } from "../mail-invitation-staging";
 import { partitionCalendarsByKind } from "../calendar-helpers";
+import { listSidebarCalendars } from "../calendar-helpers";
 import { transformCalendarEvents, createCalendarMap } from "../view-model";
 import type { Calendar, CalendarEvent } from "../types";
 
@@ -84,6 +85,17 @@ describe("mail invitation staging helpers", () => {
       publicCalendars: [],
       subscribedCalendars: [],
     });
+  });
+
+  it("hides the invitations staging calendar from sidebar calendar lists", () => {
+    const owned = calendarFixture({ id: "owned-1" });
+    const staging = calendarFixture({
+      id: "invitations-cal-1",
+      name: MAIL_INVITATION_STAGING_CALENDAR_NAME,
+      isVisible: false,
+    });
+
+    expect(listSidebarCalendars([owned, staging])).toEqual([owned]);
   });
 
   it("still shows pending invitation ghost events from hidden calendars", () => {

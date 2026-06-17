@@ -1,4 +1,7 @@
-import { isCancelledCalendarEvent } from "@workspace/calendar-core";
+import {
+  canCurrentUserDeleteEvent,
+  isCancelledCalendarEvent,
+} from "@workspace/calendar-core";
 import { Button } from "@workspace/ui/components/ui/button";
 import {
   DropdownMenu,
@@ -35,8 +38,7 @@ export function EventEditorFooter({
     : false;
   const canDeleteEvent =
     Boolean(eventForm.selectedEvent?.id) &&
-    !eventForm.selectedEvent.isSynced &&
-    (canEditEvent || isCancelledEvent);
+    canCurrentUserDeleteEvent(eventForm.selectedEvent);
   const deleteLabel =
     !canEditEvent && isCancelledEvent ? "Remove from calendar" : "Delete";
 

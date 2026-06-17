@@ -1,4 +1,6 @@
-import { Lock, ShieldAlert, ShieldCheck } from "lucide-react";
+import { LockOpen, ShieldAlert, ShieldCheck } from "lucide-react";
+
+import { isImportedExternalInvitationEvent } from "@workspace/calendar-core";
 
 import type { EncryptionState } from "./types";
 
@@ -6,6 +8,9 @@ export interface EncryptableCalendarItem {
   encryptionState?: EncryptionState | null;
   encryptedContent?: string | null;
   encryptedName?: string | null;
+  externalId?: string | null;
+  isSynced?: boolean | null;
+  subscriptionId?: string | null;
   /**
    * When set on a Calendar, every event in that calendar is forced to
    * full ciphertext storage regardless of the user's global encryption
@@ -26,7 +31,8 @@ export interface EncryptionStatusMeta {
   label: string;
   shortLabel: string;
   description: string;
-  Icon: typeof Lock;
+  originWarning?: string;
+  Icon: typeof LockOpen;
   iconClassName: string;
   protectedFields: string[];
   visibleFields: string[];
@@ -54,9 +60,15 @@ export function resolveEncryptionState(
   return "plaintext";
 }
 
+function isExternalInvitationItem(item: EncryptableCalendarItem): boolean {
+  return isImportedExternalInvitationEvent(item);
+}
+
 export function getEncryptionStatusMeta(
   item: EncryptableCalendarItem,
 ): EncryptionStatusMeta {
+  const externalInvitation = isExternalInvitationItem(item);
+
   switch (resolveEncryptionState(item)) {
     case "force_full":
       return {
@@ -75,8 +87,12 @@ export function getEncryptionStatusMeta(
         state: "encrypted",
         label: "End-to-end encrypted",
         shortLabel: "Encrypted",
-        description:
-          "Stored as ciphertext only. The server can't read this item's contents.",
+        description: externalInvitation
+          ? "Encrypted on Solace. Your copy is stored as ciphertext only."
+          : "Stored as ciphertext only. The server can't read this item's contents.",
+        originWarning: externalInvitation
+          ? "Unencrypted at origin. External calendars such as Google Calendar send invitation details in plaintext."
+          : undefined,
         Icon: ShieldCheck,
         iconClassName: "text-foreground/70",
         protectedFields: ["Title", "Description", "Location"],
@@ -103,10 +119,17 @@ export function getEncryptionStatusMeta(
     default:
       return {
         state: "plaintext",
-        label: "Not encrypted",
+        label: externalInvitation
+          ? "Unencrypted on Solace"
+          : "Not encrypted",
         shortLabel: "Plaintext",
-        description: "Stored as plaintext on the server.",
-        Icon: Lock,
+        description: externalInvitation
+          ? "This invitation is encrypted on Solace only after import. Unlock encryption on this device and reopen the invitation to seal your copy."
+          : "Stored as plaintext on the server.",
+        originWarning: externalInvitation
+          ? "Unencrypted at origin. External calendars such as Google Calendar send invitation details in plaintext."
+          : undefined,
+        Icon: LockOpen,
         iconClassName: "text-muted-foreground/40",
         protectedFields: [],
         visibleFields: [

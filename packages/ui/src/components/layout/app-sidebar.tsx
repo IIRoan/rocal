@@ -3,6 +3,10 @@
 import * as React from "react";
 import { GearSixIcon } from "@phosphor-icons/react";
 import { Check, Plus, Search, Settings2 } from "lucide-react";
+import {
+  listSidebarCalendars,
+  partitionCalendarsByKind,
+} from "@workspace/calendar-core";
 import { useCalendarContext } from "../calendar/calendar-context";
 import {
   type CalendarEvent,
@@ -69,15 +73,9 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { calendars, isCalendarVisible, toggleCalendarVisibility } =
     useCalendarContext();
-  const ownedCalendars = calendars.filter(
-    (calendar) => calendar.kind === "owned",
-  );
-  const publicCalendars = calendars.filter(
-    (calendar) => calendar.kind === "public_holiday",
-  );
-  const subscribedCalendars = calendars.filter(
-    (calendar) => calendar.kind === "subscribed",
-  );
+  const { ownedCalendars, publicCalendars, subscribedCalendars } =
+    partitionCalendarsByKind(calendars);
+  const sidebarCalendars = listSidebarCalendars(calendars);
 
   if (isMobile) {
     const initials =
@@ -104,6 +102,7 @@ export function AppSidebar({
             {onOpenSearch && (
               <SheetClose asChild>
                 <button
+                  type="button"
                   onClick={onOpenSearch}
                   aria-label="Search"
                   className="size-9 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors active:scale-90"
@@ -114,7 +113,7 @@ export function AppSidebar({
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="outline-none active:scale-90 transition-transform">
+                <button type="button" className="outline-none active:scale-90 transition-transform">
                   <Avatar className="size-8 rounded-full">
                     <AvatarImage src={user?.avatar} alt={user?.name} />
                     <AvatarFallback className="bg-primary/10 text-primary font-semibold text-xs">
@@ -191,6 +190,7 @@ export function AppSidebar({
               </span>
               <SheetClose asChild>
                 <button
+                  type="button"
                   onClick={onOpenCalendarManagement}
                   className="text-muted-foreground/50 hover:text-foreground transition-colors"
                   aria-label="Manage calendars"
@@ -390,15 +390,9 @@ function AppSidebarDesktop({
 }) {
   const { calendars, isCalendarVisible, toggleCalendarVisibility } =
     useCalendarContext();
-  const ownedCalendars = calendars.filter(
-    (calendar) => calendar.kind === "owned",
-  );
-  const publicCalendars = calendars.filter(
-    (calendar) => calendar.kind === "public_holiday",
-  );
-  const subscribedCalendars = calendars.filter(
-    (calendar) => calendar.kind === "subscribed",
-  );
+  const { ownedCalendars, publicCalendars, subscribedCalendars } =
+    partitionCalendarsByKind(calendars);
+  const sidebarCalendars = listSidebarCalendars(calendars);
 
   return (
     <SidebarShell
@@ -436,7 +430,7 @@ function AppSidebarDesktop({
           >
             {isCollapsed ? (
             <SidebarGroupContent className="flex flex-col items-center gap-1">
-              {calendars.map((calendar) => {
+              {sidebarCalendars.map((calendar) => {
                 const isVisible = isCalendarVisible(calendar.id);
                 return (
                   <SidebarMenuItem
@@ -468,6 +462,7 @@ function AppSidebarDesktop({
                   Calendars
                 </span>
                 <button
+                  type="button"
                   onClick={onOpenCalendarManagement}
                   aria-label="Manage calendars"
                   className="text-muted-foreground/40 hover:text-foreground transition-colors"
