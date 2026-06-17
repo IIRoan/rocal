@@ -20,7 +20,7 @@ import {
   layoutFormFieldBorder,
 } from "../../../src/lib/app-layout";
 import { useQuery } from "@tanstack/react-query";
-import { getErrorMessage } from "@workspace/calendar-core";
+import { getErrorMessage, resolveReplyRecipients } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useToast } from "../../../src/providers/ToastProvider";
@@ -267,7 +267,12 @@ export default function ComposeScreen() {
     }
 
     if (params.mode === "reply") {
-      setTo(getReplyRecipients(sourceMessage));
+      setTo(
+        getReplyRecipients(
+          sourceMessage,
+          composeContext?.fromEmail ?? runtime?.session.username ?? null,
+        ),
+      );
       setSubject(prefixSubject(sourceMessage.subject, "Re:"));
       setBody(buildReplyBody(sourceMessage));
     } else if (params.mode === "forward") {
@@ -343,6 +348,7 @@ export default function ComposeScreen() {
 
     setHasInitializedFromParams(true);
   }, [
+    composeContext?.fromEmail,
     hasInitializedFromParams,
     params.mode,
     params.to,
@@ -569,11 +575,16 @@ function formatAddressList(addresses: MailAddress[] | undefined): string {
     .join(", ");
 }
 
-function getReplyRecipients(message: JmapEmailMessage): string {
-  return (message.from ?? [])
-    .map((entry) => entry.email?.trim())
-    .filter((value): value is string => Boolean(value))
-    .join(", ");
+function getReplyRecipients(
+  message: JmapEmailMessage,
+  currentUserEmail?: string | null,
+): string {
+  return resolveReplyRecipients({
+    from: message.from,
+    to: message.to,
+    cc: message.cc,
+    currentUserEmail,
+  }).join(", ");
 }
 
 function buildReplyBody(message: JmapEmailMessage): string {

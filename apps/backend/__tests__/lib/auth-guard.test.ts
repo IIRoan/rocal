@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { Elysia } from "elysia";
 
 jest.mock("../../lib/auth", () => ({
   auth: {
@@ -26,7 +27,6 @@ import {
   getPasskeyStepUpStatus,
   hasVerifiedPasskeyStepUp,
 } from "../../lib/passkey-step-up";
-import { UnauthorizedError } from "../../lib/errors";
 import { requireAuth } from "../../lib/auth-guard";
 
 const mockGetSession = auth.api.getSession as unknown as jest.Mock<
@@ -38,124 +38,79 @@ const mockHasVerifiedPasskeyStepUp =
   >;
 const mockGetPasskeyStepUpStatus =
   getPasskeyStepUpStatus as jest.MockedFunction<typeof getPasskeyStepUpStatus>;
-const deriveHook = requireAuth.event.transform![0]!.fn as (
-  ctx: any,
-) => Promise<any>;
-const beforeHandleHook = requireAuth.event.beforeHandle![0]!.fn as (
-  ctx: any,
-) => void;
-const passkeyBeforeHandleHook = requireAuth.event.beforeHandle![1]!.fn as (
-  ctx: any,
-) => Promise<void>;
+
+const authApp = new Elysia()
+  .use(requireAuth)
+  .get("/protected", ({ routeUser }) => ({ id: routeUser.id }));
 
 describe("requireAuth", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("returns the existing authenticatedUser from context", async () => {
-    await expect(
-      deriveHook({
-        authenticatedUser: { id: "user-1", email: "user@example.com" },
-        request: new Request("http://localhost"),
-      }),
-    ).resolves.toEqual({
-      authenticatedUser: { id: "user-1", email: "user@example.com" },
-    });
+  it("returns 401 when no session is available", async () => {
+    mockGetSession.mockResolvedValue(null);
 
-    expect(mockGetSession).not.toHaveBeenCalled();
+    const response = await authApp.handle(
+      new Request("http://localhost/protected"),
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Unauthorized",
+      statusCode: 401,
+    });
   });
 
-  it("falls back to auth.api.getSession when user is missing", async () => {
+  it("resolves routeUser from better-auth session", async () => {
     mockGetSession.mockResolvedValue({
       user: { id: "user-2", email: "fallback@example.com" },
       session: { id: "session-2" },
     });
 
-    await expect(
-      deriveHook({
-        request: new Request("http://localhost"),
-      }),
-    ).resolves.toEqual({
-      authenticatedUser: { id: "user-2", email: "fallback@example.com" },
-    });
-  });
-
-  it("returns null auth data when fallback session lookup fails or is missing", async () => {
-    mockGetSession.mockResolvedValueOnce(null);
-
-    await expect(
-      deriveHook({
-        request: new Request("http://localhost"),
-      }),
-    ).resolves.toEqual({
-      authenticatedUser: null,
-    });
-
-    mockGetSession.mockRejectedValueOnce(new Error("session failed"));
-
-    await expect(
-      deriveHook({
-        request: new Request("http://localhost"),
-      }),
-    ).resolves.toEqual({
-      authenticatedUser: null,
-    });
-  });
-
-  it("throws UnauthorizedError when beforeHandle receives no valid user", () => {
-    expect(() => beforeHandleHook({ authenticatedUser: null })).toThrow(
-      UnauthorizedError,
+    const response = await authApp.handle(
+      new Request("http://localhost/protected"),
     );
-    expect(() => beforeHandleHook({ authenticatedUser: {} })).toThrow(
-      "Unauthorized access",
-    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ id: "user-2" });
   });
 
-  it("allows requests with a valid user id", () => {
-    expect(() =>
-      beforeHandleHook({ authenticatedUser: { id: "user-1" } }),
-    ).not.toThrow();
-  });
-
-  it("skips passkey database checks when the verification cookie is already present", async () => {
-    mockHasVerifiedPasskeyStepUp.mockReturnValueOnce(true);
-
-    await expect(
-      passkeyBeforeHandleHook({
-        request: new Request("http://localhost"),
-        authenticatedUser: { id: "user-1" },
-      }),
-    ).resolves.toBeUndefined();
-
-    expect(mockGetPasskeyStepUpStatus).not.toHaveBeenCalled();
-  });
-
-  it("blocks access when passkey step-up is still required", async () => {
+  it("returns 403 when passkey step-up is required", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "user-1", email: "user@example.com" },
+      session: { id: "session-1" },
+    });
     mockGetPasskeyStepUpStatus.mockResolvedValueOnce({
       hasPasskeys: true,
       isPasskeyStepUpVerified: false,
       requiresPasskeyStepUp: true,
     });
 
-    await expect(
-      passkeyBeforeHandleHook({
-        request: new Request("http://localhost"),
-        authenticatedUser: { id: "user-1" },
-      }),
-    ).rejects.toThrow("Passkey verification required.");
+    const response = await authApp.handle(
+      new Request("http://localhost/protected"),
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Forbidden",
+      message: "Passkey verification required.",
+      statusCode: 403,
+    });
   });
 
-  it("normalizes a legacy user context into authenticatedUser", async () => {
-    const user = { id: "user-1", email: "user@example.com" };
-
-    await expect(
-      deriveHook({
-        user,
-        request: new Request("http://localhost"),
-      }),
-    ).resolves.toEqual({
-      authenticatedUser: user,
+  it("skips passkey database checks when the verification cookie is present", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "user-1", email: "user@example.com" },
+      session: { id: "session-1" },
     });
+    mockHasVerifiedPasskeyStepUp.mockReturnValueOnce(true);
+
+    const response = await authApp.handle(
+      new Request("http://localhost/protected"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockGetPasskeyStepUpStatus).not.toHaveBeenCalled();
   });
 });

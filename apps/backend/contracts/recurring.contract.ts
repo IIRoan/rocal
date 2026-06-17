@@ -1,31 +1,68 @@
+import { z } from "zod";
+import {
+  recurrenceRuleSchema,
+  recurrenceScopeSchema,
+  optionalCalendarColorSchema,
+} from "@workspace/calendar-core";
 import type { RecurrenceRule } from "../lib/recurrence";
+import { strictZodObject } from "../lib/validation";
+import { resourceIdParamsSchema } from "./_schemas";
+import { resourceIdSchema, userIdField } from "./_zod";
 
-export type RecurringRuleInput =
-  | string
-  | {
-      frequency: RecurrenceRule["frequency"];
-      interval: number;
-      count?: number;
-      until?: string;
-      timezone?: string;
-      byWeekDay?: number[];
-      byMonthDay?: number[];
-      byMonth?: number[];
-    };
+export const validateRecurrenceBodySchema = strictZodObject({
+  rule: recurrenceRuleSchema,
+});
 
-export type RecurringUpdates = {
-  title?: string;
-  description?: string;
-  start?: string;
-  end?: string;
-  allDay?: boolean;
-  location?: string;
-  color?: string;
-  reminder?: number;
-  recurrence?: string;
-  calendarId?: string;
-  categoryId?: string;
-};
+export const previewRecurrenceBodySchema = strictZodObject({
+  eventStart: z.string(),
+  eventEnd: z.string(),
+  recurrenceRule: recurrenceRuleSchema,
+  previewDays: z.number().int().min(7).max(365).optional(),
+});
+
+export const editRecurringEventBodySchema = strictZodObject({
+  editScope: recurrenceScopeSchema,
+  occurrenceDate: z.string().optional(),
+  updates: strictZodObject({
+    title: z.string().optional(),
+    description: z.string().optional(),
+    start: z.string().optional(),
+    end: z.string().optional(),
+    allDay: z.boolean().optional(),
+    location: z.string().optional(),
+    color: optionalCalendarColorSchema,
+    reminder: z.number().optional(),
+    recurrence: z.string().optional(),
+    calendarId: z.string().optional(),
+    categoryId: z.string().optional(),
+  }),
+});
+
+export const deleteRecurringEventQuerySchema = strictZodObject({
+  deleteScope: recurrenceScopeSchema,
+  occurrenceDate: z.string().optional(),
+});
+
+export const recurringEventIdParamsSchema = resourceIdParamsSchema;
+
+export type RecurringRuleInput = z.infer<typeof recurrenceRuleSchema>;
+
+export const recurrencePreviewInputSchema = previewRecurrenceBodySchema;
+
+export const recurringEditInputSchema = editRecurringEventBodySchema.extend({
+  ...userIdField,
+  eventId: resourceIdSchema,
+});
+
+export const recurringDeleteInputSchema =
+  deleteRecurringEventQuerySchema.extend({
+    ...userIdField,
+    eventId: resourceIdSchema,
+  });
+
+export type RecurringUpdates = z.infer<
+  typeof editRecurringEventBodySchema
+>["updates"];
 
 export type RecurrenceValidateResult = {
   valid: boolean;
@@ -34,33 +71,17 @@ export type RecurrenceValidateResult = {
   rule?: RecurrenceRule;
 };
 
-export type RecurrencePreviewInput = {
-  eventStart: string;
-  eventEnd: string;
-  recurrenceRule: RecurringRuleInput;
-  previewDays?: number;
-};
-
+export type RecurrencePreviewInput = z.infer<
+  typeof recurrencePreviewInputSchema
+>;
 export type RecurrencePreviewResult = {
   instances: Array<{ date: string; isOriginal: boolean }>;
   description: string;
   totalInstances: number;
 };
 
-export type RecurringEditInput = {
-  userId: string;
-  eventId: string;
-  editScope: "this_only" | "this_and_future" | "all";
-  occurrenceDate?: string;
-  updates: RecurringUpdates;
-};
-
-export type RecurringDeleteInput = {
-  userId: string;
-  eventId: string;
-  deleteScope: "this_only" | "this_and_future" | "all";
-  occurrenceDate?: string;
-};
+export type RecurringEditInput = z.infer<typeof recurringEditInputSchema>;
+export type RecurringDeleteInput = z.infer<typeof recurringDeleteInputSchema>;
 
 export type RecurringDeleteResult = {
   success: boolean;

@@ -16,8 +16,10 @@ import {
   type InvitationTargetCalendar,
 } from "../lib/mail-invitation-calendar";
 import { resolveEventPersistencePolicy } from "../lib/event-encryption";
-import type { InvitationImportEncryptionPayload } from "@workspace/calendar-core";
-import { indexInvitationImportEncryption } from "@workspace/calendar-core";
+import {
+  indexInvitationImportEncryption,
+  type InvitationImportEncryptionPayload,
+} from "@workspace/calendar-core";
 
 const logger = createLogger("backend:mail-calendar-ingestion");
 
@@ -184,13 +186,9 @@ function buildInvitationLocalEventData(
   const schedulingData = toEventUpdateData(parsedEvent);
 
   if (existingEncryptionState === "encrypted") {
-    const {
-      title: _title,
-      description: _description,
-      location: _location,
-      ...schedulingOnly
-    } = schedulingData;
-    return schedulingOnly;
+    const { start, end, allDay, recurrence, timezone, isCancelled, syncedAt } =
+      schedulingData;
+    return { start, end, allDay, recurrence, timezone, isCancelled, syncedAt };
   }
 
   if (!encryptionPayload || !hasEncryptedPayload(encryptionPayload.encryptedContent)) {

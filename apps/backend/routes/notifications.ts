@@ -1,22 +1,18 @@
-import { Elysia, t } from "elysia";
+import { Elysia } from "elysia";
 import {
   ValidationError,
-  UnauthorizedError,
   NotFoundError,
 } from "../lib/errors";
 import { requireAuth } from "../lib/auth-guard";
-import type { AuthenticatedUser } from "../lib/auth-utils";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import { resolveRouteUser } from "../lib/request-user";
-import { strictObject } from "../lib/validation";
 import { prisma } from "../lib/prisma";
 import { NotificationService } from "../services/notification.service";
 import { createLogger } from "@workspace/logger";
+import { RouteModel, routeModels } from "../contracts";
 
 const logger = createLogger("backend:notifications");
 const notificationService = new NotificationService(prisma);
 
-// Rate limiting configuration
 const RATE_LIMITS = {
   GET_NOTIFICATIONS: { requests: 100, windowMs: 60000 },
   UPDATE_NOTIFICATIONS: { requests: 20, windowMs: 60000 },
@@ -26,23 +22,22 @@ const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_CLEANUP_INTERVAL_MS = 60_000;
 let lastRateLimitCleanup = 0;
 
-type RateLimitContext = {
-  request: Request;
-  set: {
-    status?: number | string;
-    headers: Record<string, string | number | undefined>;
-  };
-  user?: { id: string } | null;
-};
-
 function rateLimit(limit: { requests: number; windowMs: number }) {
-  return ({ request, set, user }: RateLimitContext) => {
-    if (!user) {
-      set.status = 401;
-      throw new UnauthorizedError("Authentication required");
-    }
-
-    const key = `${user.id}:${request.url}`;
+  return ({
+    request,
+    set,
+    routeUser,
+    status,
+  }: {
+    request: Request;
+    set: {
+      status?: number | string;
+      headers: Record<string, string | number | undefined>;
+    };
+    routeUser: { id: string };
+    status: (code: number, body?: unknown) => unknown;
+  }): unknown => {
+    const key = `${routeUser.id}:${request.url}`;
     const now = Date.now();
     const windowStart = now - limit.windowMs;
 
@@ -60,16 +55,19 @@ function rateLimit(limit: { requests: number; windowMs: number }) {
     }
 
     if (current.count >= limit.requests) {
-      set.status = 429;
       set.headers["Retry-After"] = Math.ceil(
         (current.resetTime - now) / 1000,
       ).toString();
-      throw new ValidationError(
-        `Rate limit exceeded. Try again in ${Math.ceil((current.resetTime - now) / 1000)} seconds.`,
-      );
+      return status(429, {
+        error: "Validation Error",
+        message: `Rate limit exceeded. Try again in ${Math.ceil((current.resetTime - now) / 1000)} seconds.`,
+        statusCode: 429,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     current.count++;
+    return;
   };
 }
 
@@ -77,41 +75,31 @@ export const notificationsRoutes = new Elysia({
   prefix: "/notifications",
   normalize: false,
 })
+  .use(routeModels)
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Notifications"), (app) =>
     app
       .get(
         "/event/:eventId",
-        async ({
-          params,
-          request,
-          set,
-          authenticatedUser,
-        }: {
-          params: { eventId: string };
-          request: Request;
-          set: {
-            status?: number | string;
-            headers: Record<string, string | number | undefined>;
-          };
-          authenticatedUser?: AuthenticatedUser;
-        }) => {
+        async ({ params, request, set, routeUser, status }) => {
           try {
-            const user = await resolveRouteUser(authenticatedUser, request);
-            rateLimit(RATE_LIMITS.GET_NOTIFICATIONS)({
+            const limited = rateLimit(RATE_LIMITS.GET_NOTIFICATIONS)({
               request,
               set,
-              user,
+              routeUser,
+              status,
             });
+            if (limited) {
+              return limited;
+            }
 
             return await notificationService.getForEvent(
-              user.id,
+              routeUser.id,
               params.eventId,
             );
           } catch (error) {
             if (
               error instanceof ValidationError ||
-              error instanceof UnauthorizedError ||
               error instanceof NotFoundError
             ) {
               throw error;
@@ -121,12 +109,7 @@ export const notificationsRoutes = new Elysia({
           }
         },
         {
-          params: strictObject({
-            eventId: t.String({
-              description: "Event ID to get notifications for",
-              minLength: 1,
-            }),
-          }),
+          params: RouteModel.notifications.eventIdParams,
           detail: {
             summary: "Get notifications for an event",
             description:
@@ -137,45 +120,26 @@ export const notificationsRoutes = new Elysia({
 
       .put(
         "/event/:eventId",
-        async ({
-          params,
-          body,
-          request,
-          set,
-          authenticatedUser,
-        }: {
-          params: { eventId: string };
-          body: {
-            notifications: Array<{
-              notificationType: "browser" | "email";
-              minutesBefore: number;
-              isEnabled: boolean;
-            }>;
-          };
-          request: Request;
-          set: {
-            status?: number | string;
-            headers: Record<string, string | number | undefined>;
-          };
-          authenticatedUser?: AuthenticatedUser;
-        }) => {
+        async ({ params, body, request, set, routeUser, status }) => {
           try {
-            const user = await resolveRouteUser(authenticatedUser, request);
-            rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({
+            const limited = rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({
               request,
               set,
-              user,
+              routeUser,
+              status,
             });
+            if (limited) {
+              return limited;
+            }
 
             return await notificationService.setForEvent(
-              user.id,
+              routeUser.id,
               params.eventId,
               body.notifications,
             );
           } catch (error) {
             if (
               error instanceof ValidationError ||
-              error instanceof UnauthorizedError ||
               error instanceof NotFoundError
             ) {
               throw error;
@@ -185,34 +149,8 @@ export const notificationsRoutes = new Elysia({
           }
         },
         {
-          params: strictObject({
-            eventId: t.String({
-              description: "Event ID to update notifications for",
-              minLength: 1,
-            }),
-          }),
-          body: strictObject({
-            notifications: t.Array(
-              strictObject({
-                notificationType: t.Union(
-                  [t.Literal("browser"), t.Literal("email")],
-                  { description: "Type of notification" },
-                ),
-                minutesBefore: t.Integer({
-                  description: "Minutes before event to send notification",
-                  minimum: 0,
-                  maximum: 43200,
-                }),
-                isEnabled: t.Boolean({
-                  description: "Whether this notification is enabled",
-                }),
-              }),
-              {
-                description: "Array of notification settings",
-                maxItems: 20,
-              },
-            ),
-          }),
+          params: RouteModel.notifications.eventIdParams,
+          body: RouteModel.notifications.updateBody,
           detail: {
             summary: "Update notifications for an event",
             description:
@@ -223,36 +161,25 @@ export const notificationsRoutes = new Elysia({
 
       .delete(
         "/event/:eventId",
-        async ({
-          params,
-          request,
-          set,
-          authenticatedUser,
-        }: {
-          params: { eventId: string };
-          request: Request;
-          set: {
-            status?: number | string;
-            headers: Record<string, string | number | undefined>;
-          };
-          authenticatedUser?: AuthenticatedUser;
-        }) => {
+        async ({ params, request, set, routeUser, status }) => {
           try {
-            const user = await resolveRouteUser(authenticatedUser, request);
-            rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({
+            const limited = rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({
               request,
               set,
-              user,
+              routeUser,
+              status,
             });
+            if (limited) {
+              return limited;
+            }
 
             return await notificationService.deleteForEvent(
-              user.id,
+              routeUser.id,
               params.eventId,
             );
           } catch (error) {
             if (
               error instanceof ValidationError ||
-              error instanceof UnauthorizedError ||
               error instanceof NotFoundError
             ) {
               throw error;
@@ -262,12 +189,7 @@ export const notificationsRoutes = new Elysia({
           }
         },
         {
-          params: strictObject({
-            eventId: t.String({
-              description: "Event ID to delete notifications for",
-              minLength: 1,
-            }),
-          }),
+          params: RouteModel.notifications.eventIdParams,
           detail: {
             summary: "Delete all notifications for an event",
             description:

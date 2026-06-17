@@ -46,6 +46,7 @@ import {
 } from "../sheet";
 import {
   PARTICIPANTS_INVITE_HELP_TEXT,
+  isMailInvitationStagingCalendar,
   type Calendar,
   type CreateEventRequest,
   type EventParticipantInput,
@@ -196,7 +197,12 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     const endDate = useMemo(() => new Date(end), [end]);
     const selectedCalendar = calendars.find((c) => c.id === calendarId);
     const selectableCalendars = useMemo(
-      () => calendars.filter((c) => !(c as any).isSyncOnly),
+      () =>
+        calendars.filter(
+          (calendar) =>
+            !calendar.isSyncOnly &&
+            !isMailInvitationStagingCalendar(calendar),
+        ),
       [calendars],
     );
 

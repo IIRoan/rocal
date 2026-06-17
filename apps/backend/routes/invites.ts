@@ -1,7 +1,6 @@
-import { Elysia, t } from "elysia";
+import { Elysia } from "elysia";
 import { createLogger } from "@workspace/logger";
 import { requireAuth } from "../lib/auth-guard";
-import type { AuthenticatedUser } from "../lib/auth-utils";
 import {
   type ApiErrorResponse,
   ConflictError,
@@ -10,22 +9,13 @@ import {
   ValidationError,
 } from "../lib/errors";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import { resolveRouteUser } from "../lib/request-user";
 import { env } from "../lib/env";
 import { resend, authEmailFrom } from "../lib/email-client";
 import { buildInviteEmail, sendAuthEmail } from "../lib/auth-email";
-import { strictObject } from "../lib/validation";
 import { inviteService } from "../lib/invite-service";
+import { RouteModel, routeModels } from "../contracts";
 
 const logger = createLogger("backend:invite-routes");
-
-const createInviteBody = strictObject({
-  email: t.String({ minLength: 1, maxLength: 320 }),
-});
-
-const revokeInviteParams = strictObject({
-  id: t.String({ minLength: 1 }),
-});
 
 type RouteSet = {
   status?: number | string;
@@ -75,26 +65,16 @@ export const inviteRoutes = new Elysia({
   prefix: "/invites",
   normalize: false,
 })
+  .use(routeModels)
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Invites"), (app) =>
     app
       .post(
         "/",
-        async ({
-          authenticatedUser,
-          request,
-          body,
-          set,
-        }: {
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-          body: { email: string };
-          set: RouteSet;
-        }) => {
+        async ({ routeUser, body, set }) => {
           try {
-            const user = await resolveRouteUser(authenticatedUser, request);
             const invite = await inviteService.createInvite({
-              invitedById: user.id,
+              invitedById: routeUser.id,
               email: body.email,
             });
 
@@ -104,7 +84,7 @@ export const inviteRoutes = new Elysia({
             ).toString();
 
             const inviterName =
-              (user.name as string | null | undefined)?.trim() || "Someone";
+              (routeUser.name as string | null | undefined)?.trim() || "Someone";
 
             await sendAuthEmail({
               client: resend,
@@ -134,7 +114,7 @@ export const inviteRoutes = new Elysia({
           }
         },
         {
-          body: createInviteBody,
+          body: RouteModel.invite.createBody,
           detail: {
             summary: "Create an invite",
             description: "Send an invite to an external email address.",
@@ -143,18 +123,9 @@ export const inviteRoutes = new Elysia({
       )
       .get(
         "/",
-        async ({
-          authenticatedUser,
-          request,
-          set,
-        }: {
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-          set: RouteSet;
-        }) => {
+        async ({ routeUser, set }) => {
           try {
-            const user = await resolveRouteUser(authenticatedUser, request);
-            return await inviteService.listInvites({ invitedById: user.id });
+            return await inviteService.listInvites({ invitedById: routeUser.id });
           } catch (error) {
             const handled = handleInviteRouteError(error, set);
             if (handled) {
@@ -174,22 +145,11 @@ export const inviteRoutes = new Elysia({
       )
       .delete(
         "/:id",
-        async ({
-          authenticatedUser,
-          request,
-          params,
-          set,
-        }: {
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-          params: { id: string };
-          set: RouteSet;
-        }) => {
+        async ({ routeUser, params, set }) => {
           try {
-            const user = await resolveRouteUser(authenticatedUser, request);
             return await inviteService.revokeInvite({
               id: params.id,
-              invitedById: user.id,
+              invitedById: routeUser.id,
             });
           } catch (error) {
             const handled = handleInviteRouteError(error, set);
@@ -202,7 +162,7 @@ export const inviteRoutes = new Elysia({
           }
         },
         {
-          params: revokeInviteParams,
+          params: RouteModel.invite.revokeParams,
           detail: {
             summary: "Revoke an invite",
             description: "Revoke a pending invite.",

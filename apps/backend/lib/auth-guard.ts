@@ -1,6 +1,6 @@
-import { Elysia } from "elysia";
+import { Elysia, status } from "elysia";
 import { auth } from "./auth";
-import { ForbiddenError, UnauthorizedError } from "./errors";
+import { forbiddenBody, unauthorizedBody } from "./api-error-response";
 import { hasUserId, type AuthenticatedUser } from "./auth-utils";
 import { prisma } from "./prisma";
 import {
@@ -8,81 +8,64 @@ import {
   hasVerifiedPasskeyStepUp,
 } from "./passkey-step-up";
 
-type AuthGuardContext = {
-  request: Request;
+type AuthParentContext = {
   authenticatedUser?: AuthenticatedUser | null;
   user?: AuthenticatedUser | null;
+  request: Request;
 };
 
-type AuthGuardBeforeHandleContext = {
-  authenticatedUser?: AuthenticatedUser | null;
-};
+async function resolveAuthenticatedUser(
+  ctx: AuthParentContext,
+): Promise<AuthenticatedUser | null> {
+  if (
+    hasUserId(ctx.authenticatedUser) &&
+    typeof ctx.authenticatedUser.id === "string"
+  ) {
+    return ctx.authenticatedUser;
+  }
 
-// Auth guard plugin - expose a normalized authenticatedUser for routes.
-export const requireAuth = new Elysia({ name: "require-auth" })
-  .derive(async (ctx: AuthGuardContext) => {
-    if (
-      hasUserId(ctx.authenticatedUser) &&
-      typeof ctx.authenticatedUser.id === "string"
-    ) {
-      return {
-        authenticatedUser: ctx.authenticatedUser,
-      };
-    }
+  if (hasUserId(ctx.user) && typeof ctx.user.id === "string") {
+    return ctx.user;
+  }
 
-    if (hasUserId(ctx.user) && typeof ctx.user.id === "string") {
-      return {
-        authenticatedUser: ctx.user,
-      };
-    }
-
-    try {
-      const authData = await auth.api.getSession({
-        headers: ctx.request.headers as Headers,
-      });
-
-      if (hasUserId(authData?.user) && typeof authData.user.id === "string") {
-        return {
-          authenticatedUser: authData.user,
-        };
-      }
-    } catch {
-      // Swallow auth provider errors and normalize them into UnauthorizedError.
-    }
-
-    return {
-      authenticatedUser: null,
-    };
-  })
-  .onBeforeHandle(({ authenticatedUser }: AuthGuardBeforeHandleContext) => {
-    if (
-      !authenticatedUser ||
-      typeof authenticatedUser !== "object" ||
-      !authenticatedUser.id
-    ) {
-      throw new UnauthorizedError();
-    }
-  })
-  .onBeforeHandle(async ({ request, authenticatedUser }: AuthGuardContext) => {
-    if (
-      !authenticatedUser ||
-      typeof authenticatedUser !== "object" ||
-      !authenticatedUser.id
-    ) {
-      return;
-    }
-
-    if (hasVerifiedPasskeyStepUp(request)) {
-      return;
-    }
-
-    const stepUpStatus = await getPasskeyStepUpStatus({
-      prisma,
-      request,
-      userId: authenticatedUser.id,
+  try {
+    const authData = await auth.api.getSession({
+      headers: ctx.request.headers as Headers,
     });
 
-    if (stepUpStatus.requiresPasskeyStepUp) {
-      throw new ForbiddenError("Passkey verification required.");
+    if (hasUserId(authData?.user) && typeof authData.user.id === "string") {
+      return authData.user;
     }
-  });
+  } catch {
+    // Normalize auth provider failures into a 401 below.
+  }
+
+  return null;
+}
+
+// Auth guard plugin — resolves `routeUser` for authenticated routes.
+export const requireAuth = new Elysia({ name: "require-auth" }).derive(
+  { as: "scoped" },
+  async (ctx) => {
+    const parent = ctx as typeof ctx & AuthParentContext;
+    const routeUser = await resolveAuthenticatedUser(parent);
+
+    if (!routeUser?.id) {
+      return status(401, unauthorizedBody());
+    }
+
+    if (!hasVerifiedPasskeyStepUp(parent.request)) {
+      const stepUpStatus = await getPasskeyStepUpStatus({
+        prisma,
+        request: parent.request,
+        userId: routeUser.id,
+      });
+
+      if (stepUpStatus.requiresPasskeyStepUp) {
+        return status(403, forbiddenBody("Passkey verification required."));
+      }
+    }
+
+    return { routeUser };
+  },
+);

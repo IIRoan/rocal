@@ -451,6 +451,7 @@ describe("mailRoutes", () => {
       error: "mail_token_error",
       message: "Stalwart mailbox login was rejected.",
       statusCode: 400,
+      timestamp: expect.any(String),
     });
   });
 

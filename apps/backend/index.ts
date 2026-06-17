@@ -1,4 +1,5 @@
 import { Elysia } from "elysia";
+import { unauthorizedBody } from "./lib/api-error-response";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
 import {
@@ -33,7 +34,7 @@ import {
   defaultMailRealtimeService,
   realtimeMailRoutes,
 } from "./routes/realtime-mail";
-import { errorHandler, UnauthorizedError } from "./lib/errors";
+import { errorHandler } from "./lib/errors";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
 import {
   API_DOCS_SPEC_PATH,
@@ -49,6 +50,7 @@ import {
 } from "./lib/openapi";
 import { corsOriginPolicy } from "./lib/origin-policy";
 import { patchOauthMetadataResponse } from "./lib/oauth-metadata";
+import { routeModels } from "./contracts";
 
 installGlobalConsoleLogger("backend");
 
@@ -233,6 +235,7 @@ export const createAPI = (prefix = "") => {
   defaultMailRealtimeService.start();
 
   return app
+    .use(routeModels)
     .use(
       cors({
         origin: (request) =>
@@ -390,13 +393,13 @@ export const createAPI = (prefix = "") => {
     )
     .get(
       "/user",
-      async ({ request }) => {
+      async ({ request, status }) => {
         const session = await auth.api.getSession({
           headers: request.headers as Headers,
         });
 
         if (!session) {
-          throw new UnauthorizedError();
+          return status(401, unauthorizedBody());
         }
 
         return session.user;

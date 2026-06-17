@@ -10,6 +10,7 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import { resolveReplyRecipients } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { extractMessageBodies } from "@/lib/mail/message-security";
 import { htmlToPlainText } from "@/lib/mail/signature-utils";
@@ -274,6 +275,16 @@ export function MailComposeProvider({
   const seedReply = useCallback(
     (message: JmapEmailMessage, plaintext: string | null) => {
       const sender = message.from?.[0]?.email ?? "";
+      const currentIdentityEmail =
+        identities.find((entry) => entry.id === resolvedIdentityId)?.email ??
+        identities[0]?.email ??
+        null;
+      const replyRecipients = resolveReplyRecipients({
+        from: message.from,
+        to: message.to,
+        cc: message.cc,
+        currentUserEmail: currentIdentityEmail,
+      });
       const subject = message.subject ?? "";
       const { text, html } = extractMessageBodies(message);
       const body = plaintext ?? text ?? "";
@@ -281,7 +292,7 @@ export function MailComposeProvider({
       const date = message.receivedAt
         ? new Date(message.receivedAt).toLocaleString()
         : "";
-      setComposeTo(sender);
+      setComposeTo(replyRecipients.join(", "));
       setComposeCc("");
       setComposeBcc("");
       setComposeSubject(subject.startsWith("Re: ") ? subject : `Re: ${subject}`);
@@ -296,7 +307,7 @@ export function MailComposeProvider({
       isDirtyRef.current = true;
       setIsComposeOpen(true);
     },
-    [],
+    [identities, resolvedIdentityId],
   );
 
   const seedForward = useCallback(

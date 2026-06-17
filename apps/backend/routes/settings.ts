@@ -1,11 +1,9 @@
-import { Elysia, t } from "elysia";
+import { Elysia } from "elysia";
 import { requireAuth } from "../lib/auth-guard";
-import type { AuthenticatedUser } from "../lib/auth-utils";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import { resolveRouteUser } from "../lib/request-user";
-import { strictObject } from "../lib/validation";
 import { prisma } from "../lib/prisma";
 import { SettingsService } from "../services/settings.service";
+import { RouteModel, routeModels } from "../contracts";
 
 const settingsService = new SettingsService(prisma);
 
@@ -13,20 +11,14 @@ export const settingsRoutes = new Elysia({
   prefix: "/settings",
   normalize: false,
 })
+  .use(routeModels)
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Settings"), (app) =>
     app
       .get(
         "/",
-        async ({
-          authenticatedUser,
-          request,
-        }: {
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
-          return settingsService.get(user.id);
+        async ({ routeUser }) => {
+          return settingsService.get(routeUser.id);
         },
         {
           detail: {
@@ -39,80 +31,14 @@ export const settingsRoutes = new Elysia({
 
       .put(
         "/",
-        async ({
-          body,
-          authenticatedUser,
-          request,
-        }: {
-          body: {
-            theme?: "light" | "dark" | "system";
-            defaultView?: "month" | "week" | "day" | "agenda";
-            weekStartDay?: number;
-            timezone?: string;
-            timeFormat?: "12h" | "24h";
-            workingHoursStart?: number;
-            workingHoursEnd?: number;
-            workingDays?: string;
-            emailNotifications?: boolean;
-            browserNotifications?: boolean;
-            reminderSound?: boolean;
-            eventEncryptionMode?: "hybrid" | "full";
-            defaultEventDuration?: number;
-            defaultCalendarId?: string | null;
-            compactView?: boolean;
-            showWeekNumbers?: boolean;
-            showDeclinedEvents?: boolean;
-          };
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
+        async ({ body, routeUser }) => {
           return settingsService.update({
-            userId: user.id,
+            userId: routeUser.id,
             ...body,
           });
         },
         {
-          body: strictObject({
-            theme: t.Optional(
-              t.Union([
-                t.Literal("light"),
-                t.Literal("dark"),
-                t.Literal("system"),
-              ]),
-            ),
-            defaultView: t.Optional(
-              t.Union([
-                t.Literal("month"),
-                t.Literal("week"),
-                t.Literal("day"),
-                t.Literal("agenda"),
-              ]),
-            ),
-            weekStartDay: t.Optional(t.Number({ minimum: 0, maximum: 6 })),
-            timezone: t.Optional(t.String()),
-            timeFormat: t.Optional(
-              t.Union([t.Literal("12h"), t.Literal("24h")]),
-            ),
-            workingHoursStart: t.Optional(
-              t.Number({ minimum: 0, maximum: 1440 }),
-            ),
-            workingHoursEnd: t.Optional(
-              t.Number({ minimum: 0, maximum: 1440 }),
-            ),
-            workingDays: t.Optional(t.String()),
-            emailNotifications: t.Optional(t.Boolean()),
-            browserNotifications: t.Optional(t.Boolean()),
-            reminderSound: t.Optional(t.Boolean()),
-            eventEncryptionMode: t.Optional(
-              t.Union([t.Literal("hybrid"), t.Literal("full")]),
-            ),
-            defaultEventDuration: t.Optional(t.Number({ minimum: 1 })),
-            defaultCalendarId: t.Optional(t.Union([t.String(), t.Null()])),
-            compactView: t.Optional(t.Boolean()),
-            showWeekNumbers: t.Optional(t.Boolean()),
-            showDeclinedEvents: t.Optional(t.Boolean()),
-          }),
+          body: RouteModel.settings.updateBody,
           detail: {
             summary: "Update user settings",
             description:
@@ -123,15 +49,8 @@ export const settingsRoutes = new Elysia({
 
       .delete(
         "/",
-        async ({
-          authenticatedUser,
-          request,
-        }: {
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
-          return settingsService.reset(user.id);
+        async ({ routeUser }) => {
+          return settingsService.reset(routeUser.id);
         },
         {
           detail: {

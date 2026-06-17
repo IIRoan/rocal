@@ -1,78 +1,9 @@
-import { Elysia, t } from "elysia";
-import type { AuthenticatedUser } from "../lib/auth-utils";
+import { Elysia } from "elysia";
 import type { IMailService } from "../contracts/mail.contract";
 import { requireAuth } from "../lib/auth-guard";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import { resolveRouteUser } from "../lib/request-user";
-import { strictObject } from "../lib/validation";
+import { RouteModel, routeModels } from "../contracts";
 import { defaultMailService } from "./mail";
-
-const kdfParamsSchema = strictObject({
-  saltB64: t.String({
-    minLength: 1,
-    maxLength: 512,
-  }),
-  memoryKiB: t.Number({
-    minimum: 8192,
-    maximum: 1048576,
-  }),
-  iterations: t.Number({
-    minimum: 1,
-    maximum: 16,
-  }),
-  parallelism: t.Number({
-    minimum: 1,
-    maximum: 32,
-  }),
-});
-
-const bootstrapBodySchema = strictObject({
-  publicKeyArmored: t.String({
-    minLength: 1,
-    maxLength: 131072,
-  }),
-  fingerprint: t.String({
-    minLength: 16,
-    maxLength: 128,
-  }),
-  algorithm: t.String({
-    minLength: 1,
-    maxLength: 32,
-  }),
-  createdAt: t.String({
-    minLength: 1,
-    maxLength: 64,
-  }),
-  vaultVersion: t.Number({
-    minimum: 1,
-    maximum: 10,
-  }),
-  encryptedVaultB64: t.String({
-    minLength: 1,
-    maxLength: 500000,
-  }),
-  kdf: t.String({
-    minLength: 1,
-    maxLength: 32,
-  }),
-  kdfParams: kdfParamsSchema,
-});
-
-const vaultBackupBodySchema = strictObject({
-  vaultVersion: t.Number({
-    minimum: 1,
-    maximum: 10,
-  }),
-  encryptedVaultB64: t.String({
-    minLength: 1,
-    maxLength: 500000,
-  }),
-  kdf: t.String({
-    minLength: 1,
-    maxLength: 32,
-  }),
-  kdfParams: kdfParamsSchema,
-});
 
 export function createMailAccountRoutes(
   mailService: IMailService = defaultMailService,
@@ -81,24 +12,17 @@ export function createMailAccountRoutes(
     prefix: "/mail/account",
     normalize: false,
   })
+    .use(routeModels)
     .use(requireAuth)
     .guard(authenticatedRouteDetail("Mail"), (app) =>
       app
         .get(
           "/",
-          async ({
-            authenticatedUser,
-            request,
-          }: {
-            authenticatedUser?: AuthenticatedUser;
-            request: Request;
-          }) => {
-            const user = await resolveRouteUser(authenticatedUser, request);
-
+          async ({ routeUser }) => {
             return mailService.getMailboxStatusForUser({
-              userId: user.id,
-              email: user.email ?? "",
-              displayName: user.name ?? null,
+              userId: routeUser.id,
+              email: routeUser.email ?? "",
+              displayName: routeUser.name ?? null,
             });
           },
           {
@@ -111,26 +35,16 @@ export function createMailAccountRoutes(
         )
         .post(
           "/bootstrap",
-          async ({
-            authenticatedUser,
-            body,
-            request,
-          }: {
-            authenticatedUser?: AuthenticatedUser;
-            body: typeof bootstrapBodySchema.static;
-            request: Request;
-          }) => {
-            const user = await resolveRouteUser(authenticatedUser, request);
-
+          async ({ routeUser, body }) => {
             return mailService.bootstrapForUser({
-              userId: user.id,
-              email: user.email ?? "",
-              displayName: user.name ?? null,
+              userId: routeUser.id,
+              email: routeUser.email ?? "",
+              displayName: routeUser.name ?? null,
               ...body,
             });
           },
           {
-            body: bootstrapBodySchema,
+            body: RouteModel.mail.bootstrapBody,
             detail: {
               summary:
                 "Provision a mailbox for the authenticated Solace account",
@@ -141,18 +55,10 @@ export function createMailAccountRoutes(
         )
         .get(
           "/vault-backup",
-          async ({
-            authenticatedUser,
-            request,
-          }: {
-            authenticatedUser?: AuthenticatedUser;
-            request: Request;
-          }) => {
-            const user = await resolveRouteUser(authenticatedUser, request);
-
+          async ({ routeUser }) => {
             return mailService.getVaultBackupForUser({
-              userId: user.id,
-              email: user.email ?? "",
+              userId: routeUser.id,
+              email: routeUser.email ?? "",
             });
           },
           {
@@ -165,25 +71,15 @@ export function createMailAccountRoutes(
         )
         .put(
           "/vault-backup",
-          async ({
-            authenticatedUser,
-            body,
-            request,
-          }: {
-            authenticatedUser?: AuthenticatedUser;
-            body: typeof vaultBackupBodySchema.static;
-            request: Request;
-          }) => {
-            const user = await resolveRouteUser(authenticatedUser, request);
-
+          async ({ routeUser, body }) => {
             return mailService.upsertVaultBackupForUser({
-              userId: user.id,
-              email: user.email ?? "",
+              userId: routeUser.id,
+              email: routeUser.email ?? "",
               ...body,
             });
           },
           {
-            body: vaultBackupBodySchema,
+            body: RouteModel.mail.vaultBackupBody,
             detail: {
               summary: "Update the authenticated user's encrypted vault backup",
               description:
