@@ -16,6 +16,7 @@ import type {
 import {
   parseRecipientString,
   type ParsedMailAddress,
+  parseSendMessageResults,
 } from "@workspace/calendar-core";
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
@@ -767,7 +768,11 @@ export class StalwartJmapClient {
       references?: string[];
       previousDraftId?: string;
     },
-  ): Promise<{ emailId: string; threadId: string | null }> {
+  ): Promise<{
+    emailId: string;
+    threadId: string | null;
+    submissionId: string;
+  }> {
     const mailAccountId = this.requirePrimaryAccountId(session);
     const submissionAccountId = getSubmissionAccountId(session, mailAccountId);
     const calls = buildSendMessageMethodCalls(input).map(
@@ -794,17 +799,10 @@ export class StalwartJmapClient {
       calls,
     );
     assertSuccessfulJmapResponses(envelope, "Send message");
-    const setResult = this.getMethodResult<{
-      created?: Record<string, { id?: string; threadId?: string } | null>;
-    }>(envelope, "Email/set");
-    const created = setResult.created?.draft1;
-    if (!created?.id) {
-      throw new Error("Send message succeeded but no email id was returned.");
-    }
-    return {
-      emailId: created.id,
-      threadId: created.threadId ?? null,
-    };
+    return parseSendMessageResults({
+      emailSet: this.getMethodResult(envelope, "Email/set"),
+      emailSubmissionSet: this.getMethodResult(envelope, "EmailSubmission/set"),
+    });
   }
 
   async saveDraft(

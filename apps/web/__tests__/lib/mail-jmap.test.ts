@@ -289,6 +289,63 @@ describe("mail JMAP helpers", () => {
       expect.any(Array),
     ]);
   });
+
+  it("builds multipart/mixed body structure for html and attachments", () => {
+    expect(
+      buildSendMessageMethodCalls({
+        draftsMailboxId: "drafts-1",
+        fromEmail: "alice@solace.onl",
+        to: ["bob@example.com"],
+        subject: "Files",
+        textBody: "See attached",
+        htmlBody: "<p>See attached</p>",
+        identityId: "identity-1",
+        attachments: [
+          {
+            blobId: "blob-1",
+            name: "note.txt",
+            type: "text/plain",
+            size: 12,
+          },
+        ],
+      }),
+    ).toEqual([
+      [
+        "Email/set",
+        {
+          create: {
+            draft1: expect.objectContaining({
+              bodyStructure: {
+                type: "multipart/mixed",
+                subParts: [
+                  {
+                    type: "multipart/alternative",
+                    subParts: [
+                      { type: "text/plain", partId: "text" },
+                      { type: "text/html", partId: "html" },
+                    ],
+                  },
+                  {
+                    type: "text/plain",
+                    blobId: "blob-1",
+                    name: "note.txt",
+                    size: 12,
+                    disposition: "attachment",
+                  },
+                ],
+              },
+              bodyValues: {
+                text: { value: "See attached" },
+                html: { value: "<p>See attached</p>" },
+              },
+            }),
+          },
+        },
+        "c1",
+      ],
+      expect.any(Array),
+    ]);
+  });
 });
 
 describe("StalwartJmapClient", () => {
@@ -650,6 +707,88 @@ describe("StalwartJmapClient", () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
     expect(calls).toBe(2);
     expect(uploaded.blobId).toBe("blob-1");
+  });
+
+  it("rejects blob uploads that do not return a blob id", async () => {
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher: async () =>
+        new Response(
+          JSON.stringify({
+            size: 4,
+            type: "text/plain",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+    });
+
+    const session: JmapSession = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/",
+      uploadUrl: "http://localhost:4001/api/mail/jmap/jmap/upload/{accountId}/",
+      accounts: { acc1: { name: "alice@solace.onl" } },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "acc1" },
+    };
+
+    await expect(
+      client.uploadBlob(
+        session,
+        new Blob(["test"], { type: "text/plain" }),
+        "text/plain",
+      ),
+    ).rejects.toThrow("Blob upload did not return a blob id");
+  });
+
+  it("requires EmailSubmission/set to create a submission when sending", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            methodResponses: [
+              [
+                "Email/set",
+                {
+                  created: {
+                    draft1: { id: "email-1", threadId: "thread-1" },
+                  },
+                },
+                "c1",
+              ],
+              ["EmailSubmission/set", { created: {} }, "c2"],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+
+    await expect(
+      client.sendMessage(
+        {
+          apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+          accounts: { account: {} },
+          primaryAccounts: { "urn:ietf:params:jmap:mail": "account" },
+        },
+        {
+          draftsMailboxId: "drafts-1",
+          sentMailboxId: "sent-1",
+          fromEmail: "alice@solace.onl",
+          to: ["bob@example.com"],
+          subject: "Hello",
+          textBody: "Hello",
+          identityId: "identity-1",
+        },
+      ),
+    ).rejects.toThrow("not submitted for delivery");
   });
 
   it("includes upstream details when discovery cannot reach the mail server", async () => {
