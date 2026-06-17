@@ -15,6 +15,11 @@ export {
   findNationalHolidayCalendarByUrl,
   NATIONAL_HOLIDAY_CALENDARS,
 } from "./national-holiday-calendars";
+export {
+  isLikelyIcsFeedUrl,
+  normalizeSubscriptionFeedUrl,
+  SUBSCRIPTION_FEED_URL_HELP_TEXT,
+} from "./subscription-url";
 export type {
   CalendarKind,
   NationalHolidayCalendarCatalogEntry,

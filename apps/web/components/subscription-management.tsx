@@ -18,6 +18,8 @@ import type {
 import {
   NATIONAL_HOLIDAY_CALENDARS,
   findNationalHolidayCalendarByUrl,
+  isLikelyIcsFeedUrl,
+  normalizeSubscriptionFeedUrl,
 } from "@workspace/calendar-ics";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
@@ -38,6 +40,7 @@ import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { PRESET_COLORS } from "./command-palette/navigation-config";
 import type { PaletteView } from "./command-palette/constants";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
+import { SubscriptionFeedUrlInfo } from "./subscription-feed-url-info";
 import {
   Plus,
   Trash2,
@@ -69,8 +72,8 @@ const customSubscriptionSchema = z.object({
     .trim()
     .min(1, "Calendar URL is required")
     .url("Please enter a valid URL")
-    .refine((value) => value.toLowerCase().includes(".ics"), {
-      message: "URL should point to an .ics calendar file",
+    .refine((value) => isLikelyIcsFeedUrl(value), {
+      message: "URL should point to a calendar feed",
     }),
   color: z.string().trim().refine(isValidColor, "Please select a valid color"),
 });
@@ -304,17 +307,7 @@ export function SubscriptionManagement({
     syncMutation.isPending ||
     updateMutation.isPending;
 
-  const normalizeSubscriptionUrl = (value: string) => {
-    try {
-      const parsed = new URL(value);
-      parsed.hash = "";
-      parsed.search = "";
-      parsed.pathname = parsed.pathname.replace(/\/+$/, "");
-      return parsed.toString();
-    } catch {
-      return value.trim();
-    }
-  };
+  const normalizeSubscriptionUrl = normalizeSubscriptionFeedUrl;
 
   const subscribedUrls = useMemo(
     () =>
@@ -409,7 +402,7 @@ export function SubscriptionManagement({
     if (!parsed) return;
     createMutation.mutate({
       name: parsed.name,
-      url: parsed.url,
+      url: normalizeSubscriptionUrl(parsed.url),
       color: parsed.color,
     });
   };
@@ -741,12 +734,15 @@ export function SubscriptionManagement({
             </div>
 
             <div className="space-y-1.5">
-              <Label
-                htmlFor="subscription-url"
-                className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
-              >
-                URL (.ics)
-              </Label>
+              <div className="flex items-center gap-1.5">
+                <Label
+                  htmlFor="subscription-url"
+                  className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                >
+                  URL (.ics)
+                </Label>
+                <SubscriptionFeedUrlInfo />
+              </div>
               <Input
                 id="subscription-url"
                 value={newSubscription.url}

@@ -3,6 +3,10 @@ import type {
   EventColor,
 } from "@workspace/calendar-core";
 import {
+  isLikelyIcsFeedUrl,
+  normalizeSubscriptionFeedUrl,
+} from "@workspace/calendar-ics";
+import {
   isNamedCalendarColor as isNamedCalendarColorValue,
   isValidCalendarColorValue,
 } from "./calendar-color-utils";
@@ -40,17 +44,8 @@ export function validateCreateSubscriptionInput(input: {
 
   if (!url) {
     errors.url = "Calendar URL is required";
-  } else {
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        errors.url = "Please enter a valid URL";
-      } else if (!url.toLowerCase().includes(".ics")) {
-        errors.url = "URL should point to an .ics calendar file";
-      }
-    } catch {
-      errors.url = "Please enter a valid URL";
-    }
+  } else if (!isLikelyIcsFeedUrl(url)) {
+    errors.url = "URL should point to a calendar feed";
   }
 
   if (!isValidCalendarColorValue(color)) {
@@ -82,15 +77,7 @@ export function validateEditableSubscriptionInput(input: {
 }
 
 export function normalizeSubscriptionUrl(value: string): string {
-  try {
-    const parsed = new URL(value);
-    parsed.hash = "";
-    parsed.search = "";
-    parsed.pathname = parsed.pathname.replace(/\/+$/, "");
-    return parsed.toString();
-  } catch {
-    return value.trim();
-  }
+  return normalizeSubscriptionFeedUrl(value);
 }
 
 export function formatLastSync(lastSyncAt?: string | Date | null): string {
