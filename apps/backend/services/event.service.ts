@@ -1078,47 +1078,91 @@ export class EventService implements IEventService {
 
     const stalwartCalendarId =
       targetCalendar?.stalwartCalendarId ?? event.stalwartCalendarId;
+    const stalwartAccountId =
+      targetCalendar?.stalwartAccountId ??
+      event.stalwartAccountId ??
+      (await this.getStalwartAccountId(input.userId));
+    const eventUid =
+      event.stalwartUid ||
+      event.externalId ||
+      `${event.id}@solace-calendar.local`;
+    const remotePayload = buildStalwartEventPayload({
+      calendarId: stalwartCalendarId ?? "",
+      uid: eventUid,
+      title: event.title,
+      description: event.description,
+      start: event.start,
+      end: event.end,
+      allDay: event.allDay,
+      timezone: event.timezone || "UTC",
+      location: event.location,
+      recurrence: event.recurrence,
+      reminder: event.reminder,
+      participants: nextParticipants,
+    });
 
     if (
       this.stalwartClient &&
-      event.stalwartAccountId &&
+      stalwartAccountId &&
       stalwartCalendarId &&
       event.stalwartEventId
     ) {
       await this.stalwartClient.updateEvent({
-        accountId: event.stalwartAccountId,
+        accountId: stalwartAccountId,
         eventId: event.stalwartEventId,
-        patch: buildStalwartEventPayload({
-          calendarId: stalwartCalendarId,
-          uid:
-            event.stalwartUid ||
-            event.externalId ||
-            `${event.id}@solace-calendar.local`,
-          title: event.title,
-          description: event.description,
-          start: event.start,
-          end: event.end,
-          allDay: event.allDay,
-          timezone: event.timezone || "UTC",
-          location: event.location,
-          recurrence: event.recurrence,
-          reminder: event.reminder,
-          participants: nextParticipants,
-        }),
+        patch: remotePayload,
         sendSchedulingMessages: true,
       });
 
       if (input.status === "declined") {
         // Remove the event from the Stalwart calendar after sending the DECLINED iTIP reply
         await this.stalwartClient.deleteEvent({
-          accountId: event.stalwartAccountId,
+          accountId: stalwartAccountId,
           eventId: event.stalwartEventId,
         });
       } else {
         await this.syncStalwartEventsByIds({
           userId: input.userId,
-          accountId: event.stalwartAccountId,
+          accountId: stalwartAccountId,
           eventIds: [event.stalwartEventId],
+        });
+      }
+    } else if (this.stalwartClient && stalwartAccountId && stalwartCalendarId) {
+      const remoteEvent = await this.stalwartClient.createEvent({
+        accountId: stalwartAccountId,
+        event: remotePayload,
+        sendSchedulingMessages: true,
+      });
+
+      if (input.status === "declined") {
+        try {
+          await this.stalwartClient.deleteEvent({
+            accountId: stalwartAccountId,
+            eventId: remoteEvent.id,
+            sendSchedulingMessages: false,
+          });
+        } catch (error) {
+          logger.warn("Failed to clean up temporary decline event in Stalwart", {
+            userId: input.userId,
+            remoteEventId: remoteEvent.id,
+            error: errorString(error),
+          });
+        }
+      } else {
+        await this.prisma.calendarEvent.update({
+          where: { id: event.id },
+          data: {
+            stalwartAccountId,
+            stalwartCalendarId,
+            stalwartEventId: remoteEvent.id,
+            stalwartUid: eventUid,
+            stalwartSyncedAt: new Date(),
+          },
+        });
+        await this.syncStalwartEventsByIds({
+          userId: input.userId,
+          accountId: stalwartAccountId,
+          eventIds: [remoteEvent.id],
         });
       }
     } else {

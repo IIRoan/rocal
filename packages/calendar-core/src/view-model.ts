@@ -1,4 +1,5 @@
 import type { Calendar, CalendarEvent } from "./types";
+import { isAwaitingUserInvitationResponse } from "./types";
 
 // ─── Decorated Event Type ────────────────────────────────────────────────────
 
@@ -88,7 +89,11 @@ export function transformCalendarEvents(
   visibleCalendarIds: Set<string>,
 ): DecoratedCalendarEvent[] {
   return events
-    .filter((event) => visibleCalendarIds.has(event.calendarId))
+    .filter(
+      (event) =>
+        visibleCalendarIds.has(event.calendarId) ||
+        isAwaitingUserInvitationResponse(event),
+    )
     .map((event) => decorateCalendarEvent(event, calendarMap));
 }
 

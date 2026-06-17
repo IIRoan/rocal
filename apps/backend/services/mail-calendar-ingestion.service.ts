@@ -12,6 +12,7 @@ import { buildStalwartEventPayload } from "../lib/stalwart-calendar-mapping";
 import { errorString, errorMessage } from "../lib/errors";
 import {
   resolveAcceptedInvitationTargetCalendar,
+  resolveInvitationStagingCalendar,
   type InvitationTargetCalendar,
 } from "../lib/mail-invitation-calendar";
 
@@ -630,11 +631,13 @@ export class MailCalendarIngestionService {
 
     const [timezone, targetCalendar] = await Promise.all([
       this.getUserTimezone(input.userId),
-      resolveAcceptedInvitationTargetCalendar(
-        this.prisma,
-        input.userId,
-        input.calendarId,
-      ),
+      input.attendeeStatus
+        ? resolveAcceptedInvitationTargetCalendar(
+            this.prisma,
+            input.userId,
+            input.calendarId,
+          )
+        : resolveInvitationStagingCalendar(this.prisma, input.userId),
     ]);
 
     if (!targetCalendar) {

@@ -1,4 +1,5 @@
 import type { Calendar, PrismaClient } from "../generated/prisma/index.js";
+import { MAIL_INVITATION_STAGING_CALENDAR_NAME } from "@workspace/calendar-core";
 
 export type InvitationTargetCalendar = Pick<
   Calendar,
@@ -102,6 +103,39 @@ export async function resolveAcceptedInvitationTargetCalendar(
       isPublic: false,
       isVisible: true,
       isDefault: true,
+      forceFullEncryption: false,
+      userId,
+    },
+    select: invitationTargetCalendarSelect,
+  });
+}
+
+export async function resolveInvitationStagingCalendar(
+  prisma: PrismaClient,
+  userId: string,
+): Promise<InvitationTargetCalendar> {
+  const existingCalendar = await prisma.calendar.findFirst({
+    where: {
+      userId,
+      name: MAIL_INVITATION_STAGING_CALENDAR_NAME,
+      kind: "owned",
+      isSyncOnly: false,
+    },
+    select: invitationTargetCalendarSelect,
+  });
+
+  if (existingCalendar) {
+    return existingCalendar;
+  }
+
+  return prisma.calendar.create({
+    data: {
+      name: MAIL_INVITATION_STAGING_CALENDAR_NAME,
+      color: "#78716c",
+      kind: "owned",
+      isPublic: false,
+      isVisible: false,
+      isDefault: false,
       forceFullEncryption: false,
       userId,
     },
