@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, validateComposeRecipients, buildOutgoingMimeMessage, prepareOutgoingAttachments, validateUploadedAttachmentSet, type OutgoingMimeAttachment } from "@workspace/calendar-core";
+import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, resolveReplyRecipients, validateComposeRecipients, buildOutgoingMimeMessage, prepareOutgoingAttachments, validateUploadedAttachmentSet, type OutgoingMimeAttachment } from "@workspace/calendar-core";
 import { toast } from "sonner";
 import PostalMime, {
   type Attachment as ParsedMailAttachment,
@@ -543,6 +543,29 @@ function mergeConversationSourceMessages(
   }
 
   return sortMessagesByReceivedAt([...byId.values()]);
+}
+
+function resolveConversationReplyRecipients(input: {
+  messages: JmapEmailMessage[];
+  currentUserEmail: string;
+}): string[] {
+  const currentUser = normalizeEmailAddress(input.currentUserEmail);
+  const seen = new Set<string>();
+  const recipients: string[] = [];
+
+  for (const message of input.messages) {
+    const addresses = [...(message.from ?? []), ...(message.to ?? []), ...(message.cc ?? [])];
+    for (const entry of addresses) {
+      const email = entry.email?.trim();
+      if (!email) continue;
+      const normalized = normalizeEmailAddress(email);
+      if (normalized === currentUser || seen.has(normalized)) continue;
+      seen.add(normalized);
+      recipients.push(normalized);
+    }
+  }
+
+  return recipients;
 }
 
 function messagesLikelyMatch(
@@ -1814,7 +1837,21 @@ export function useMailApp() {
         : "";
       setIsBusy(true);
       try {
-        const recipients = [normalizeEmailAddress(sender)];
+        let recipients = resolveReplyRecipients({
+          from: selectedMessage.from,
+          to: selectedMessage.to,
+          cc: selectedMessage.cc,
+          currentUserEmail: activeMailbox.email,
+        });
+        if (recipients.length === 0) {
+          recipients = resolveConversationReplyRecipients({
+            messages: selectedConversationMessages,
+            currentUserEmail: activeMailbox.email,
+          });
+        }
+        if (recipients.length === 0 && sender.trim()) {
+          recipients = [normalizeEmailAddress(sender)];
+        }
         const draftsMailboxId = getPrimaryMailboxId(
           activeMailbox.mailboxes,
           "drafts",
@@ -1926,6 +1963,7 @@ export function useMailApp() {
     [
       appendConversationMessage,
       selectedMessage,
+      selectedConversationMessages,
       selectedMessagePlaintext,
       activeMailbox,
       config,

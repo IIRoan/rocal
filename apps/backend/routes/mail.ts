@@ -5,10 +5,13 @@ import { createLogger } from "@workspace/logger";
 import { prisma } from "../lib/prisma";
 import { env } from "../lib/env";
 import { requireAuth } from "../lib/auth-guard";
+import {
+  createApiErrorBody,
+  unauthorizedBody,
+} from "../lib/api-error-response";
 import { hasUserId, type AuthenticatedUser } from "../lib/auth-utils";
 import { auth } from "../lib/auth";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import { resolveRouteUser } from "../lib/request-user";
 import { MailService } from "../services/mail.service";
 import { createStalwartAdminClient } from "../lib/stalwart-admin";
 import {
@@ -613,25 +616,16 @@ export function createMailRoutes(
       requireAuth.guard(authenticatedRouteDetail("Mail"), (app) =>
         app.get(
           "/oauth/access-token",
-      async ({
-        authenticatedUser,
-        request,
-        set,
-      }: {
-        authenticatedUser?: AuthenticatedUser;
-        request: Request;
-        set: { status?: number | string };
-      }) => {
-        const user = await resolveRouteUser(authenticatedUser, request);
-        const userId = user.id;
-        const email = user.email?.trim();
+      async ({ routeUser, status }) => {
+        const userId = routeUser.id;
+        const email = routeUser.email?.trim();
         if (!email) {
-          set.status = 401;
-          return {
-            error: "Unauthorized",
-            message: "A valid session is required to obtain a mail token.",
-            statusCode: 401,
-          };
+          return status(
+            401,
+            unauthorizedBody(
+              "A valid session is required to obtain a mail token.",
+            ),
+          );
         }
 
         try {
@@ -648,12 +642,10 @@ export function createMailRoutes(
             errorName: err instanceof Error ? err.name : undefined,
             stack: err instanceof Error ? err.stack : undefined,
           });
-          set.status = 400;
-          return {
-            error: "mail_token_error",
-            message,
-            statusCode: 400,
-          };
+          return status(
+            400,
+            createApiErrorBody(400, "mail_token_error", message),
+          );
         }
       },
       {
@@ -667,17 +659,8 @@ export function createMailRoutes(
     )
     .get(
       "/vault-key-material",
-      async ({
-        authenticatedUser,
-        request,
-        set,
-      }: {
-        authenticatedUser?: AuthenticatedUser;
-        request: Request;
-        set: { status?: number | string };
-      }) => {
-        const user = await resolveRouteUser(authenticatedUser, request);
-        const userId = user.id;
+      async ({ routeUser, status }) => {
+        const userId = routeUser.id;
         try {
           const keyMaterial = await deriveVaultKeyMaterial(userId);
           let derivedKeyB64: string | null = null;
@@ -703,8 +686,10 @@ export function createMailRoutes(
             err,
             "Could not derive vault key material.",
           );
-          set.status = 500;
-          return { error: "vault_key_error", message, statusCode: 500 };
+          return status(
+            500,
+            createApiErrorBody(500, "vault_key_error", message),
+          );
         }
       },
       {
