@@ -8,6 +8,10 @@ import type {
 import {
   parseRecipientString,
   type ParsedMailAddress,
+  parseJmapBlobUploadResponse,
+  parseSendMessageResults,
+  validateUploadedBlob,
+  type PreparedOutgoingAttachment,
 } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 
@@ -926,16 +930,58 @@ export class StalwartJmapClient {
       });
       throw new Error(formatHttpStatusError("Blob upload", response.status, detail));
     }
-    const json = (await response.json()) as {
-      blobId: string;
-      size: number;
-      type: string;
-    };
+    const json = await response.json();
+    const validated = parseJmapBlobUploadResponse(
+      json,
+      blob.size,
+      "Blob upload",
+    );
     return {
-      blobId: json.blobId,
-      size: json.size ?? blob.size,
-      type: json.type || contentType,
+      blobId: validated.blobId,
+      size: validated.size,
+      type: validated.type || contentType,
     };
+  }
+
+  async uploadPreparedAttachment(
+    session: JmapSession,
+    attachment: PreparedOutgoingAttachment,
+  ): Promise<JmapAttachmentInput> {
+    const blob = new Blob([attachment.content.slice()], {
+      type: attachment.contentType,
+    });
+    const uploaded = await this.uploadBlob(
+      session,
+      blob,
+      attachment.contentType,
+    );
+    const validated = validateUploadedBlob({
+      blobId: uploaded.blobId,
+      size: uploaded.size,
+      expectedSize: attachment.size,
+      label: attachment.filename,
+    });
+    return {
+      blobId: validated.blobId,
+      name: attachment.filename,
+      type: uploaded.type,
+      size: validated.size,
+    };
+  }
+
+  async uploadPreparedAttachments(
+    session: JmapSession,
+    attachments: PreparedOutgoingAttachment[],
+  ): Promise<JmapAttachmentInput[]> {
+    if (attachments.length === 0) {
+      return [];
+    }
+
+    return Promise.all(
+      attachments.map((attachment) =>
+        this.uploadPreparedAttachment(session, attachment),
+      ),
+    );
   }
 
   async uploadTextBlob(
@@ -967,7 +1013,11 @@ export class StalwartJmapClient {
       references?: string[];
       previousDraftId?: string;
     },
-  ): Promise<{ emailId: string; threadId: string | null }> {
+  ): Promise<{
+    emailId: string;
+    threadId: string | null;
+    submissionId: string;
+  }> {
     const mailAccountId = this.requirePrimaryAccountId(session);
     const submissionAccountId = getSubmissionAccountId(session, mailAccountId);
     const calls = buildSendMessageMethodCalls(input).map(
@@ -994,17 +1044,10 @@ export class StalwartJmapClient {
       calls,
     );
     assertSuccessfulJmapResponses(envelope, "Send message");
-    const setResult = this.getMethodResult<{
-      created?: Record<string, { id?: string; threadId?: string } | null>;
-    }>(envelope, "Email/set");
-    const created = setResult.created?.draft1;
-    if (!created?.id) {
-      throw new Error("Send message succeeded but no email id was returned.");
-    }
-    return {
-      emailId: created.id,
-      threadId: created.threadId ?? null,
-    };
+    return parseSendMessageResults({
+      emailSet: this.getMethodResult(envelope, "Email/set"),
+      emailSubmissionSet: this.getMethodResult(envelope, "EmailSubmission/set"),
+    });
   }
 
   async saveDraft(

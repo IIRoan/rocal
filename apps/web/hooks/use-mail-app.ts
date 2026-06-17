@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, validateComposeRecipients, buildOutgoingMimeMessage, type OutgoingMimeAttachment } from "@workspace/calendar-core";
+import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, validateComposeRecipients, buildOutgoingMimeMessage, prepareOutgoingAttachments, validateUploadedAttachmentSet, type OutgoingMimeAttachment } from "@workspace/calendar-core";
 import { toast } from "sonner";
 import PostalMime, {
   type Attachment as ParsedMailAttachment,
@@ -1611,15 +1611,16 @@ export function useMailApp() {
       const internalDomain =
         config?.defaultDomain.trim().toLowerCase() ??
         getEmailDomain(activeMailbox.email);
+      const preparedAttachments = await prepareOutgoingAttachments(
+        composeAttachments,
+      );
       const mimeAttachments =
-        composeAttachments.length > 0
-          ? await Promise.all(
-              composeAttachments.map(async (file) => ({
-                filename: file.name,
-                contentType: file.type || "application/octet-stream",
-                content: new Uint8Array(await file.arrayBuffer()),
-              })),
-            )
+        preparedAttachments.length > 0
+          ? preparedAttachments.map(({ filename, contentType, content }) => ({
+              filename,
+              contentType,
+              content,
+            }))
           : undefined;
       const { textBody, encrypted, pgpMimeCiphertext } =
         await resolveOutgoingMessageBody({
@@ -1635,11 +1636,18 @@ export function useMailApp() {
       let uploadedAttachments:
         | import("@/lib/mail/jmap-client").JmapAttachmentInput[]
         | undefined;
-      if (!pgpMimeCiphertext && composeAttachments.length > 0) {
-        uploadedAttachments = await Promise.all(
-          composeAttachments.map((file) =>
-            activeMailbox.client.uploadFile(activeMailbox.session, file),
-          ),
+      if (!pgpMimeCiphertext && preparedAttachments.length > 0) {
+        uploadedAttachments =
+          await activeMailbox.client.uploadPreparedAttachments(
+            activeMailbox.session,
+            preparedAttachments,
+          );
+        validateUploadedAttachmentSet(
+          preparedAttachments.map((attachment) => ({
+            filename: attachment.filename,
+            size: attachment.size,
+          })),
+          uploadedAttachments,
         );
       }
 
@@ -1825,22 +1833,38 @@ export function useMailApp() {
         const quotedBody = date
           ? `\n\n---\nOn ${date}, ${sender} wrote:\n${body}`
           : "";
-        const { textBody, encrypted } = await resolveOutgoingMessageBody({
-          activeMailbox,
-          recipients,
-          plaintext: `${replyText}${quotedBody}`,
-          internalDomain,
-        });
-
-        // Upload any attached files and collect JMAP attachment inputs
-        const attachments =
-          files.length > 0
-            ? await Promise.all(
-                files.map((f) =>
-                  activeMailbox.client.uploadFile(activeMailbox.session, f),
-                ),
-              )
+        const preparedAttachments = await prepareOutgoingAttachments(files);
+        const mimeAttachments =
+          preparedAttachments.length > 0
+            ? preparedAttachments.map(({ filename, contentType, content }) => ({
+                filename,
+                contentType,
+                content,
+              }))
             : undefined;
+        const { textBody, encrypted, pgpMimeCiphertext } =
+          await resolveOutgoingMessageBody({
+            activeMailbox,
+            recipients,
+            plaintext: `${replyText}${quotedBody}`,
+            internalDomain,
+            mimeAttachments,
+          });
+
+        let attachments: JmapAttachmentInput[] | undefined;
+        if (!pgpMimeCiphertext && preparedAttachments.length > 0) {
+          attachments = await activeMailbox.client.uploadPreparedAttachments(
+            activeMailbox.session,
+            preparedAttachments,
+          );
+          validateUploadedAttachmentSet(
+            preparedAttachments.map((attachment) => ({
+              filename: attachment.filename,
+              size: attachment.size,
+            })),
+            attachments,
+          );
+        }
 
         const replyContext = buildReplyContext(selectedMessage);
         const sendResult = await activeMailbox.client.sendMessage(
@@ -1854,6 +1878,7 @@ export function useMailApp() {
             textBody,
             identityId,
             attachments,
+            pgpMimeCiphertext,
             inReplyTo: replyContext.inReplyTo,
             references: replyContext.references,
           },
