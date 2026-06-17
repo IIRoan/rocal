@@ -1,5 +1,9 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { resolveAcceptedInvitationTargetCalendar } from "../../lib/mail-invitation-calendar";
+import { MAIL_INVITATION_STAGING_CALENDAR_NAME } from "@workspace/calendar-core";
+import {
+  resolveAcceptedInvitationTargetCalendar,
+  resolveInvitationStagingCalendar,
+} from "../../lib/mail-invitation-calendar";
 
 function createPrismaMock() {
   return {
@@ -72,5 +76,40 @@ describe("resolveAcceptedInvitationTargetCalendar", () => {
     );
 
     expect(calendar?.id).toBe("calendar-work");
+  });
+});
+
+describe("resolveInvitationStagingCalendar", () => {
+  it("creates a hidden invitations calendar when one does not exist", async () => {
+    const prisma = createPrismaMock();
+    prisma.calendar.findFirst.mockResolvedValueOnce(null as never);
+    prisma.calendar.create.mockResolvedValueOnce({
+      id: "invitations-cal-1",
+      name: MAIL_INVITATION_STAGING_CALENDAR_NAME,
+      color: "#78716c",
+      kind: "owned",
+      isVisible: false,
+      isDefault: false,
+      isSyncOnly: false,
+      forceFullEncryption: false,
+      stalwartAccountId: null,
+      stalwartCalendarId: null,
+    } as never);
+
+    const calendar = await resolveInvitationStagingCalendar(
+      prisma as never,
+      "user-1",
+    );
+
+    expect(prisma.calendar.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: MAIL_INVITATION_STAGING_CALENDAR_NAME,
+          isVisible: false,
+        }),
+      }),
+    );
+    expect(calendar?.name).toBe(MAIL_INVITATION_STAGING_CALENDAR_NAME);
+    expect(calendar?.isVisible).toBe(false);
   });
 });
