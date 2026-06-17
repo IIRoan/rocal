@@ -33,8 +33,22 @@ function createOwnedCalendarMock(
   };
 }
 
+function createInvitationStagingCalendarMock(
+  overrides: Partial<NonNullable<CalendarMockResult>> = {},
+): NonNullable<CalendarMockResult> {
+  return createOwnedCalendarMock({
+    id: "invitations-cal-1",
+    name: "Invitations",
+    color: "#78716c",
+    isVisible: false,
+    isDefault: false,
+    ...overrides,
+  });
+}
+
 function createPrismaMock() {
   const ownedCalendar = createOwnedCalendarMock();
+  const stagingCalendar = createInvitationStagingCalendarMock();
 
   return {
     userSettings: {
@@ -48,9 +62,20 @@ function createPrismaMock() {
       ),
     },
     calendar: {
-      findFirst: jest.fn<() => Promise<CalendarMockResult>>(async () => ownedCalendar),
+      findFirst: jest.fn(async (args?: { where?: { id?: string; name?: string } }) => {
+        const where = args?.where;
+        if (where?.name === "Invitations") {
+          return stagingCalendar;
+        }
+        if (!where?.id || where.id === "calendar-1") {
+          return ownedCalendar;
+        }
+        return null;
+      }),
       count: jest.fn(async () => 1),
-      create: jest.fn(async () => ownedCalendar),
+      create: jest.fn(async (input: { data?: { name?: string } }) =>
+        input.data?.name === "Invitations" ? stagingCalendar : ownedCalendar,
+      ),
       update: jest.fn(),
     },
     user: {
@@ -216,7 +241,11 @@ describe("MailCalendarIngestionService", () => {
       eventsDeleted: 0,
       errors: [],
     });
-    expect(prisma.calendarEvent.create).toHaveBeenCalled();
+    expect(prisma.calendarEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        calendarId: "invitations-cal-1",
+      }),
+    });
   });
 
   it("still processes CANCEL messages during background mail sync", async () => {

@@ -1,4 +1,5 @@
 import type { Calendar } from "./types";
+import { isMailInvitationStagingCalendar } from "./mail-invitation-staging";
 
 export type PartitionedCalendars = {
   ownedCalendars: Calendar[];
@@ -18,7 +19,9 @@ export function partitionCalendarsByKind(
 
   for (const calendar of calendars) {
     if (calendar.kind === "owned") {
-      ownedCalendars.push(calendar);
+      if (!isMailInvitationStagingCalendar(calendar)) {
+        ownedCalendars.push(calendar);
+      }
       continue;
     }
 
