@@ -1,5 +1,8 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { isCancelledCalendarEvent } from "@workspace/calendar-core";
+import {
+  isCancelledCalendarEvent,
+  isMailInvitationStagingCalendar,
+} from "@workspace/calendar-core";
 import {
   NotificationManager,
   formatEventDescription,
@@ -194,7 +197,11 @@ export function EventEditorBody({
     [calendars, eventForm.eventCalendarId],
   );
   const selectableCalendars = useMemo(
-    () => calendars.filter((calendar) => !calendar.isSyncOnly),
+    () =>
+      calendars.filter(
+        (calendar) =>
+          !calendar.isSyncOnly && !isMailInvitationStagingCalendar(calendar),
+      ),
     [calendars],
   );
   const reminderMinutes = useMemo(

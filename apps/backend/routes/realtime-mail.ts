@@ -1,11 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { createLogger } from "@workspace/logger";
 import { Elysia } from "elysia";
-import type { AuthenticatedUser } from "../lib/auth-utils";
 import { requireAuth } from "../lib/auth-guard";
 import { env } from "../lib/env";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import { resolveRouteUser } from "../lib/request-user";
 import {
   MailRealtimeService,
   resolveChangedTypes,
@@ -60,16 +58,9 @@ export function createRealtimeMailRoutes(
     .guard(authenticatedRouteDetail("Mail"), (app) =>
       app.get(
         "/mail",
-        async ({
-          authenticatedUser,
-          request,
-        }: {
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
+        async ({ routeUser, request }) => {
           const accountIds =
-            await mailSyncService.listAuthorizedAccountIdsForUser(user.id);
+            await mailSyncService.listAuthorizedAccountIdsForUser(routeUser.id);
           const stream = new TransformStream<Uint8Array, Uint8Array>();
           const writer = stream.writable.getWriter();
           const subscriberId = randomUUID();
@@ -102,7 +93,7 @@ export function createRealtimeMailRoutes(
             void writer.close().catch(() => undefined);
             logger.info("Mail SSE client disconnected", {
               subscriberId,
-              userId: user.id,
+              userId: routeUser.id,
             });
           };
 
@@ -133,13 +124,13 @@ export function createRealtimeMailRoutes(
                   try {
                     const { hasChanges, changedTypes } =
                       await mailSyncService.detectChanges({
-                        userId: user.id,
+                        userId: routeUser.id,
                         accountId,
                       });
 
                     if (!hasChanges || closed) continue;
                     const sync = await mailSyncService.syncForUser({
-                      userId: user.id,
+                      userId: routeUser.id,
                       accountId,
                     });
                     const resolvedChangedTypes = resolveChangedTypes(
@@ -148,7 +139,7 @@ export function createRealtimeMailRoutes(
                     );
 
                     logger.info("Mail poll detected changes", {
-                      userId: user.id,
+                      userId: routeUser.id,
                       accountId,
                       changedTypes: resolvedChangedTypes,
                     });
@@ -165,7 +156,7 @@ export function createRealtimeMailRoutes(
                     );
                   } catch (error) {
                     logger.warn("Mail poll check failed", {
-                      userId: user.id,
+                      userId: routeUser.id,
                       accountId,
                       error:
                         errorString(error),
@@ -180,7 +171,7 @@ export function createRealtimeMailRoutes(
 
           logger.info("Mail SSE client connected", {
             subscriberId,
-            userId: user.id,
+            userId: routeUser.id,
             accountIds,
           });
 
