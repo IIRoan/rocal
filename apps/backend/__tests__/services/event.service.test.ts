@@ -615,6 +615,67 @@ describe("EventService Stalwart integration", () => {
     );
   });
 
+  it("seals imported invitation encryption without touching Stalwart", async () => {
+    const prisma = {
+      calendarEvent: {
+        findFirst: jest.fn(async () =>
+          eventFixture({
+            title: "Google sync",
+            description: "From invite",
+            location: "Meet",
+            encryptionState: "plaintext",
+            encryptedContent: null,
+            participants: [
+              {
+                id: "participant-self",
+                eventId: "event-1",
+                userId: "user-1",
+                email: "testingprod15@solace.onl",
+                displayName: "Test User",
+                role: "attendee",
+                status: "accepted",
+              },
+            ],
+          }),
+        ),
+        update: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+          ...eventFixture({
+            ...data,
+            encryptionState: "encrypted",
+          }),
+          participants: [],
+        })),
+      },
+    };
+    const service = new EventService(prisma as never);
+
+    const result = await service.sealEncryption({
+      userId: "user-1",
+      eventId: "event-1",
+      encryptedContent: "ciphertext-v1",
+      blindIndexTokens: ["token-1"],
+      encryptionKeyVersion: 1,
+    });
+
+    expect(prisma.calendarEvent.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "event-1" },
+        data: expect.objectContaining({
+          title: "",
+          description: null,
+          location: null,
+          encryptedContent: "ciphertext-v1",
+          encryptionState: "encrypted",
+        }),
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        encryptionState: "encrypted",
+      }),
+    );
+  });
+
   it("prevents attendees from editing imported invitation copies", async () => {
     const prisma = {
       calendarEvent: {
@@ -1000,6 +1061,20 @@ describe("EventService Stalwart integration", () => {
       mailDirectoryEntry: {
         findUnique: jest.fn(async () => null),
       },
+      calendar: {
+        findFirst: jest.fn(async () => ({
+          id: "staging-calendar-1",
+          name: "Invitations",
+          color: "#78716c",
+          kind: "owned",
+          isVisible: false,
+          isDefault: false,
+          isSyncOnly: false,
+          forceFullEncryption: false,
+          stalwartAccountId: null,
+          stalwartCalendarId: null,
+        })),
+      },
       calendarEvent: {
         findFirst: jest.fn(async () =>
           eventFixture({
@@ -1009,6 +1084,7 @@ describe("EventService Stalwart integration", () => {
             participants: [organizerParticipant, selfParticipant],
           }),
         ),
+        update: jest.fn(async () => undefined),
         delete: jest.fn(async () => undefined),
       },
       eventParticipant: {
@@ -1037,9 +1113,16 @@ describe("EventService Stalwart integration", () => {
     });
     expect(stalwartClient.updateEvent).not.toHaveBeenCalled();
     expect(stalwartClient.deleteEvent).not.toHaveBeenCalled();
-    expect(prisma.calendarEvent.delete).toHaveBeenCalledWith({
-      where: { id: "event-1" },
-    });
+    expect(prisma.calendarEvent.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "event-1" },
+        data: expect.objectContaining({
+          calendarId: "staging-calendar-1",
+          stalwartEventId: null,
+        }),
+      }),
+    );
+    expect(prisma.calendarEvent.delete).not.toHaveBeenCalled();
   });
 
   it("ignores remote-only Stalwart invitation calendars during lookup", async () => {
@@ -1096,26 +1179,71 @@ describe("EventService Stalwart integration", () => {
     expect(prisma.calendar.update).not.toHaveBeenCalled();
   });
 
-  it("allows attendees to delete cancelled invitation copies", async () => {
+  it("allows attendees to delete imported invitation copies", async () => {
+    const stalwartClient = createMockStalwartClient();
+    const organizerParticipant = {
+      id: "participant-organizer",
+      eventId: "event-1",
+      userId: null,
+      email: "organizer@example.com",
+      displayName: "Organizer",
+      role: "organizer",
+      status: "accepted",
+      user: null,
+    };
+    const selfParticipant = {
+      id: "participant-self",
+      eventId: "event-1",
+      userId: "user-1",
+      email: "testingprod15@solace.onl",
+      displayName: "Test User",
+      role: "attendee",
+      status: "accepted",
+      user: {
+        id: "user-1",
+        name: "Test User",
+        email: "testingprod15@solace.onl",
+        image: null,
+      },
+    };
     const prisma = {
+      user: {
+        findUnique: jest.fn(async () => ({
+          email: "testingprod15@solace.onl",
+        })),
+      },
+      mailDirectoryEntry: {
+        findUnique: jest.fn(async () => null),
+      },
+      calendar: {
+        findFirst: jest.fn(async () => ({
+          id: "staging-calendar-1",
+          name: "Invitations",
+          color: "#78716c",
+          kind: "owned",
+          isVisible: false,
+          isDefault: false,
+          isSyncOnly: false,
+          forceFullEncryption: false,
+          stalwartAccountId: null,
+          stalwartCalendarId: null,
+        })),
+      },
       calendarEvent: {
         findFirst: jest.fn(async () =>
           eventFixture({
-            isCancelled: true,
-            participants: [
-              {
-                id: "participant-self",
-                eventId: "event-1",
-                userId: "user-1",
-                email: "testingprod15@solace.onl",
-                displayName: "Test User",
-                role: "attendee",
-                status: "accepted",
-              },
-            ],
+            isCancelled: false,
+            stalwartEventId: null,
+            stalwartAccountId: null,
+            stalwartCalendarId: null,
+            participants: [organizerParticipant, selfParticipant],
           }),
         ),
+        update: jest.fn(async () => undefined),
         delete: jest.fn(async () => undefined),
+      },
+      eventParticipant: {
+        update: jest.fn(async () => undefined),
       },
       eventNotification: {
         deleteMany: jest.fn(async () => ({ count: 0 })),
@@ -1123,18 +1251,96 @@ describe("EventService Stalwart integration", () => {
       notificationLog: {
         deleteMany: jest.fn(async () => ({ count: 0 })),
       },
-      $transaction: jest.fn(async (ops: Promise<unknown>[]) =>
-        Promise.all(ops),
-      ),
     };
-    const service = new EventService(prisma as never);
+    const service = new EventService(prisma as never, undefined, stalwartClient);
 
     await expect(service.delete("user-1", "event-1")).resolves.toEqual(
       expect.objectContaining({
         success: true,
+        message: "Invitation declined and removed from your calendar",
         deletedEventId: "event-1",
       }),
     );
+    expect(prisma.eventParticipant.update).toHaveBeenCalledWith({
+      where: { id: "participant-self" },
+      data: { status: "declined" },
+    });
+    expect(prisma.calendarEvent.delete).toHaveBeenCalledWith({
+      where: { id: "event-1" },
+    });
+  });
+
+  it("allows attendees to delete cancelled invitation copies", async () => {
+    const stalwartClient = createMockStalwartClient();
+    const organizerParticipant = {
+      id: "participant-organizer",
+      eventId: "event-1",
+      userId: null,
+      email: "organizer@example.com",
+      displayName: "Organizer",
+      role: "organizer",
+      status: "accepted",
+      user: null,
+    };
+    const selfParticipant = {
+      id: "participant-self",
+      eventId: "event-1",
+      userId: "user-1",
+      email: "testingprod15@solace.onl",
+      displayName: "Test User",
+      role: "attendee",
+      status: "accepted",
+      user: {
+        id: "user-1",
+        name: "Test User",
+        email: "testingprod15@solace.onl",
+        image: null,
+      },
+    };
+    const prisma = {
+      user: {
+        findUnique: jest.fn(async () => ({
+          email: "testingprod15@solace.onl",
+        })),
+      },
+      mailDirectoryEntry: {
+        findUnique: jest.fn(async () => null),
+      },
+      calendarEvent: {
+        findFirst: jest.fn(async () =>
+          eventFixture({
+            isCancelled: true,
+            stalwartEventId: null,
+            stalwartAccountId: null,
+            stalwartCalendarId: null,
+            participants: [organizerParticipant, selfParticipant],
+          }),
+        ),
+        delete: jest.fn(async () => undefined),
+      },
+      eventParticipant: {
+        update: jest.fn(async () => undefined),
+      },
+      eventNotification: {
+        deleteMany: jest.fn(async () => ({ count: 0 })),
+      },
+      notificationLog: {
+        deleteMany: jest.fn(async () => ({ count: 0 })),
+      },
+      $transaction: jest.fn(async (operations: Promise<unknown>[]) =>
+        Promise.all(operations),
+      ),
+    };
+    const service = new EventService(prisma as never, undefined, stalwartClient);
+
+    await expect(service.delete("user-1", "event-1")).resolves.toEqual(
+      expect.objectContaining({
+        success: true,
+        message: "Cancelled event removed from your calendar",
+        deletedEventId: "event-1",
+      }),
+    );
+    expect(prisma.eventParticipant.update).not.toHaveBeenCalled();
     expect(prisma.calendarEvent.delete).toHaveBeenCalledWith({
       where: { id: "event-1" },
     });

@@ -200,6 +200,7 @@ export default function CalendarScreen() {
     mutationFn: (eventId: string) => calendarApiService.deleteEvent(eventId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: ["invitations"] });
     },
   });
 

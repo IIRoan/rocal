@@ -21,6 +21,7 @@ import {
   EventNotification as ApiEventNotification,
 } from "../lib/types/calendar";
 import { EventNotification } from "@workspace/ui/components/calendar";
+import { invitationByExternalIdQueryKey } from "@workspace/calendar-core";
 import {
   useCalendarEventsLoader,
   getMonthQueryKey,
@@ -227,6 +228,11 @@ export function useCalendarData(
     mutationFn: (id: string) => calendarApiService.deleteEvent(id),
     onSuccess: (_data, id) => {
       const cached = findEventInCache(queryClient, id);
+      if (cached?.externalId) {
+        void queryClient.invalidateQueries({
+          queryKey: invitationByExternalIdQueryKey(cached.externalId),
+        });
+      }
       if (!cached) {
         queryClient.invalidateQueries({ queryKey: ["events"] });
         return;

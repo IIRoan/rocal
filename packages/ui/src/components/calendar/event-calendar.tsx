@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState, useDeferredValue } from "react";
 import { createLogger } from "@workspace/logger";
+import {
+  canCurrentUserDeleteEvent,
+  canCurrentUserEditEvent,
+} from "@workspace/calendar-core";
 import { useCalendarContext } from "./calendar-context";
 import {
   addDays,
@@ -1291,25 +1295,33 @@ export function EventCalendar({
                   <Eye className="size-4" />
                   View
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() =>
-                    onEventEdit?.(contextTarget.event, {
-                      mode: "modal",
-                      eventViewMode: "edit",
-                    })
-                  }
-                >
-                  <Pencil className="size-4" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  variant="destructive"
-                  onClick={() => handleEventDelete(contextTarget.event.id)}
-                >
-                  <Trash2 className="size-4" />
-                  Delete
-                </DropdownMenuItem>
+                {canCurrentUserEditEvent(contextTarget.event) ? (
+                  <DropdownMenuItem
+                    onClick={() =>
+                      onEventEdit?.(contextTarget.event, {
+                        mode: "modal",
+                        eventViewMode: "edit",
+                      })
+                    }
+                  >
+                    <Pencil className="size-4" />
+                    Edit
+                  </DropdownMenuItem>
+                ) : null}
+                {canCurrentUserDeleteEvent(contextTarget.event) ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() =>
+                        handleEventDelete(contextTarget.event.id)
+                      }
+                    >
+                      <Trash2 className="size-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
               </>
             )
           ) : (

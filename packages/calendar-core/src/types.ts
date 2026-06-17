@@ -194,6 +194,12 @@ export function isAwaitingUserInvitationResponse(
   return status === "pending" || status === "tentative";
 }
 
+export function isUserDeclinedInvitationEvent(
+  event: Pick<CalendarEvent, "userId" | "participants">,
+): boolean {
+  return getCurrentUserInvitationStatus(event) === "declined";
+}
+
 export function canCurrentUserEditEvent(
   event: Pick<CalendarEvent, "userId" | "participants">,
 ): boolean {
@@ -206,6 +212,40 @@ export function canCurrentUserEditEvent(
   }
 
   return participant.role === "organizer";
+}
+
+export function canCurrentUserDeleteEvent(
+  event: Pick<
+    CalendarEvent,
+    "isSynced" | "isCancelled" | "externalId" | "participants" | "userId"
+  >,
+): boolean {
+  if (event.isSynced === true) {
+    return false;
+  }
+
+  if (isAttendeeImportedInvitationEvent(event)) {
+    if (isCancelledCalendarEvent(event)) {
+      return true;
+    }
+
+    return getCurrentUserInvitationStatus(event) === "accepted";
+  }
+
+  return true;
+}
+
+export function invitationByExternalIdQueryKey(externalId: string) {
+  return ["invitations", "by-external-id", externalId] as const;
+}
+
+export function isAttendeeImportedInvitationEvent(
+  event: Pick<CalendarEvent, "externalId" | "participants" | "userId">,
+): boolean {
+  return (
+    Boolean(event.externalId?.trim()) &&
+    !canCurrentUserEditEvent(event)
+  );
 }
 
 export function isCancelledCalendarEvent(

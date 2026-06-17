@@ -1,4 +1,4 @@
-import { Lock, ShieldCheck } from "lucide-react";
+import { LockOpen, ShieldCheck } from "lucide-react";
 
 import { cn } from "../../lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -134,6 +134,13 @@ export function EncryptionStatusBadge({
             </div>
           </div>
         </div>
+        {meta.originWarning ? (
+          <div className="px-3 py-2 border-b border-border/50 bg-amber-500/5">
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              {meta.originWarning}
+            </p>
+          </div>
+        ) : null}
         <div className="px-3 py-2.5 space-y-2.5">
           {meta.protectedFields.length > 0 && (
             <div>
@@ -168,7 +175,7 @@ export function EncryptionStatusBadge({
                     key={`plain-${field}`}
                     className="text-xs flex items-center gap-1.5 text-muted-foreground"
                   >
-                    <Lock
+                    <LockOpen
                       className="size-3 opacity-40 shrink-0"
                       strokeWidth={2.25}
                       aria-hidden

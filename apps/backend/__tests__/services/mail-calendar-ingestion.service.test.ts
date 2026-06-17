@@ -86,6 +86,7 @@ function createPrismaMock() {
       findUnique: jest.fn<() => Promise<{ stalwartAccountId: string } | null>>(
         async () => null,
       ),
+      findMany: jest.fn(async () => []),
     },
     eventParticipant: {
       findMany: jest.fn(async () => []),
@@ -95,7 +96,13 @@ function createPrismaMock() {
     },
     calendarEvent: {
       findMany: jest.fn<() => Promise<CalendarEvent[]>>(async () => []),
-      create: jest.fn(async (input: unknown) => input),
+      findFirst: jest.fn(async () => null),
+      create: jest.fn(async (input: unknown) => ({
+        ...(typeof input === "object" && input && "data" in input
+          ? (input as { data: Record<string, unknown> }).data
+          : {}),
+        id: "event-1",
+      })),
       update: jest.fn(async (input: unknown) => input),
       updateMany: jest.fn(async () => ({ count: 0 })),
       deleteMany: jest.fn(async () => ({ count: 0 })),
@@ -188,6 +195,41 @@ function createExistingEvent(
 }
 
 describe("MailCalendarIngestionService", () => {
+  it("stores client-encrypted invitation payloads during import", async () => {
+    const prisma = createPrismaMock();
+    const service = new MailCalendarIngestionService(prisma as never);
+
+    const summary = await service.ingestIcsContent({
+      userId: "user-1",
+      icsContent: buildIcs({
+        title: "Google planning sync",
+        description: "Agenda",
+        location: "Meet",
+      }),
+      attendeeStatus: "accepted",
+      encryption: [
+        {
+          externalId: "invite-1@example.com",
+          encryptedContent: "ciphertext-v1",
+          blindIndexTokens: ["token-1"],
+          encryptionKeyVersion: 1,
+        },
+      ],
+    });
+
+    expect(summary.eventsCreated).toBe(1);
+    expect(prisma.calendarEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        title: "",
+        description: null,
+        location: null,
+        encryptedContent: "ciphertext-v1",
+        encryptionState: "encrypted",
+        externalId: "invite-1@example.com",
+      }),
+    });
+  });
+
   it("imports accepted invitations onto the user's default calendar", async () => {
     const prisma = createPrismaMock();
     const service = new MailCalendarIngestionService(prisma as never);
@@ -371,7 +413,7 @@ describe("MailCalendarIngestionService", () => {
     });
   });
 
-  it("declines mailed invitations without creating a local event", async () => {
+  it("declines mailed invitations and records a hidden declined tombstone", async () => {
     const prisma = createPrismaMock();
     const stalwartClient = createMockStalwartClient();
     prisma.mailDirectoryEntry.findUnique.mockResolvedValue({
@@ -398,7 +440,7 @@ describe("MailCalendarIngestionService", () => {
       }),
     ).resolves.toEqual({ declined: true });
 
-    expect(prisma.calendarEvent.create).not.toHaveBeenCalled();
+    expect(prisma.calendarEvent.create).toHaveBeenCalled();
     expect(stalwartClient.createEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         sendSchedulingMessages: true,
