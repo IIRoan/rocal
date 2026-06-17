@@ -375,7 +375,7 @@ export const WeekView = React.memo(function WeekView({
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="h-full w-full px-[1px] sm:px-1">
+                  <div className="h-full w-full px-[1px]">
                     {positionedEvent.event && (
                       <DraggableEvent
                         event={positionedEvent.event}
