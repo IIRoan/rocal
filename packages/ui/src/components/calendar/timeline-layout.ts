@@ -67,26 +67,116 @@ function sortTimelineEvents(
   });
 }
 
+function calculateEqualColumns(columnCount: number, columnIndex: number) {
+  const width = 1 / columnCount;
+  return {
+    width,
+    left: columnIndex * width,
+  };
+}
+
+function buildOverlapClusters(
+  events: CalendarEvent[],
+  day: Date,
+): Map<CalendarEvent, CalendarEvent[]> {
+  const parent = new Map<CalendarEvent, CalendarEvent>();
+
+  function find(event: CalendarEvent): CalendarEvent {
+    let root = event;
+    while (parent.get(root) !== root) {
+      root = parent.get(root)!;
+    }
+    return root;
+  }
+
+  function union(a: CalendarEvent, b: CalendarEvent) {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) {
+      parent.set(rootB, rootA);
+    }
+  }
+
+  for (const event of events) {
+    parent.set(event, event);
+  }
+
+  for (let i = 0; i < events.length; i++) {
+    for (let j = i + 1; j < events.length; j++) {
+      const left = events[i]!;
+      const right = events[j]!;
+
+      if (
+        areIntervalsOverlapping(
+          getAdjustedEventInterval(left, day),
+          getAdjustedEventInterval(right, day),
+        )
+      ) {
+        union(left, right);
+      }
+    }
+  }
+
+  const clustersByRoot = new Map<CalendarEvent, CalendarEvent[]>();
+  for (const event of events) {
+    const root = find(event);
+    const cluster = clustersByRoot.get(root) ?? [];
+    cluster.push(event);
+    clustersByRoot.set(root, cluster);
+  }
+
+  const eventCluster = new Map<CalendarEvent, CalendarEvent[]>();
+  for (const event of events) {
+    eventCluster.set(event, clustersByRoot.get(find(event)) ?? [event]);
+  }
+
+  return eventCluster;
+}
+
+function getClusterColumnCount(
+  cluster: CalendarEvent[],
+  eventColumnMapping: Map<CalendarEvent, number>,
+) {
+  let maxColumnIndex = 0;
+
+  for (const event of cluster) {
+    maxColumnIndex = Math.max(
+      maxColumnIndex,
+      eventColumnMapping.get(event) ?? 0,
+    );
+  }
+
+  return maxColumnIndex + 1;
+}
+
 function calculateWidth(
   strategy: TimelineWidthStrategy,
-  overlappingColumns: number,
+  columnCount: number,
   columnIndex: number,
 ) {
-  if (strategy === "desktop-cascade") {
-    if (overlappingColumns === 1) {
-      return { width: 1, left: 0 };
+  if (columnCount === 1) {
+    if (strategy === "mobile-cascade") {
+      return { width: 0.95, left: 0.02 };
     }
 
-    if (overlappingColumns <= 3) {
+    return { width: 1, left: 0 };
+  }
+
+  if (strategy === "no-overflow" || strategy === "simple-no-overflow") {
+    return calculateEqualColumns(columnCount, columnIndex);
+  }
+
+  if (strategy === "desktop-cascade") {
+    if (columnCount <= 3) {
       return {
-        width: (1 / overlappingColumns) * 0.95,
-        left: columnIndex * (1 / overlappingColumns) + columnIndex * 0.01,
+        width: (1 / columnCount) * 0.95,
+        left: columnIndex * (1 / columnCount) + columnIndex * 0.01,
       };
     }
 
     const baseWidth = 0.75;
-    const widthDecrement = Math.min(0.1, 0.5 / overlappingColumns);
-    const offsetIncrement = Math.min(0.15, 0.8 / overlappingColumns);
+    const widthDecrement = Math.min(0.1, 0.5 / columnCount);
+    const offsetIncrement = Math.min(0.15, 0.8 / columnCount);
 
     return {
       width: baseWidth - columnIndex * widthDecrement,
@@ -95,18 +185,14 @@ function calculateWidth(
   }
 
   if (strategy === "mobile-cascade") {
-    if (overlappingColumns === 1) {
-      return { width: 0.95, left: 0.02 };
-    }
-
-    if (overlappingColumns === 2) {
+    if (columnCount === 2) {
       return {
         width: columnIndex === 0 ? 0.92 : 0.78,
         left: columnIndex === 0 ? 0.02 : 0.18,
       };
     }
 
-    if (overlappingColumns === 3) {
+    if (columnCount === 3) {
       const widths = [0.88, 0.74, 0.6];
       const positions = [0.02, 0.12, 0.28];
 
@@ -122,49 +208,10 @@ function calculateWidth(
     };
   }
 
-  if (strategy === "no-overflow") {
-    if (overlappingColumns === 1) {
-      return { width: 1, left: 0 };
-    }
-
-    if (overlappingColumns === 2) {
-      return { width: 0.495, left: columnIndex === 0 ? 0 : 0.505 };
-    }
-
-    if (overlappingColumns === 3) {
-      return {
-        width: 0.33,
-        left: columnIndex === 0 ? 0 : columnIndex === 1 ? 0.34 : 0.67,
-      };
-    }
-
-    if (overlappingColumns === 4) {
-      return {
-        width: 0.2475,
-        left:
-          columnIndex === 0
-            ? 0
-            : columnIndex === 1
-              ? 0.255
-              : columnIndex === 2
-                ? 0.51
-                : 0.765,
-      };
-    }
-  }
-
-  if (strategy === "simple-no-overflow" && overlappingColumns === 1) {
-    return { width: 1, left: 0 };
-  }
-
-  if (strategy === "simple-no-overflow" && overlappingColumns === 2) {
-    return { width: 0.495, left: columnIndex === 0 ? 0 : 0.505 };
-  }
-
   const gap = 0.005;
-  const totalGap = (overlappingColumns - 1) * gap;
+  const totalGap = (columnCount - 1) * gap;
   const availableWidth = 1 - totalGap;
-  const width = availableWidth / overlappingColumns;
+  const width = availableWidth / columnCount;
 
   return {
     width,
@@ -220,6 +267,17 @@ export function layoutTimelineEvents(
     eventColumnMapping.set(event, columnIndex);
   });
 
+  const eventClusters = buildOverlapClusters(sortedEvents, day);
+  const clusterColumnCounts = new Map<CalendarEvent, number>();
+
+  for (const event of sortedEvents) {
+    const cluster = eventClusters.get(event) ?? [event];
+    clusterColumnCounts.set(
+      event,
+      getClusterColumnCount(cluster, eventColumnMapping),
+    );
+  }
+
   return sortedEvents.map((event) => {
     const adjustedInterval = getAdjustedEventInterval(event, day);
     const dayStart = startOfDay(day);
@@ -228,16 +286,10 @@ export function layoutTimelineEvents(
     const top = (start - startHour) * cellHeight;
     const height = Math.max((end - start) * cellHeight, minHeight);
     const columnIndex = eventColumnMapping.get(event) ?? 0;
-    const overlappingColumns =
-      sortedEvents.filter((otherEvent) => {
-        if (otherEvent === event || otherEvent.id === event.id) return false;
-
-        const otherInterval = getAdjustedEventInterval(otherEvent, day);
-        return areIntervalsOverlapping(adjustedInterval, otherInterval);
-      }).length + 1;
+    const columnCount = clusterColumnCounts.get(event) ?? 1;
     const { width, left } = calculateWidth(
       widthStrategy,
-      overlappingColumns,
+      columnCount,
       columnIndex,
     );
 
