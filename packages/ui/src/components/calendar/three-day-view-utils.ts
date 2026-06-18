@@ -85,6 +85,7 @@ export function groupThreeDayAllDayEventsByDay(
       allDayEvents.filter((event) =>
         eventOverlapsRange(event, day, day, "day", resolvedTimezone),
       ),
+      resolvedTimezone,
     ),
   );
 }
