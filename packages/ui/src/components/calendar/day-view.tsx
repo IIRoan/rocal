@@ -4,7 +4,6 @@ import React, { useMemo } from "react";
 import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
   eventOverlapsZonedCalendarDay,
-  isSameCalendarDayInTimezone,
   resolveTimezone,
   utcToPickerDate,
   wallClockToUtc,
@@ -20,7 +19,7 @@ import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EncryptionStatusBadge } from "./encryption-status";
 import { EventItem } from "./event-item";
-import { isMultiDayEvent } from "./utils";
+import { getEventSegmentForCalendarDay, isAllDayRowEvent } from "./utils";
 import { WeekCellsHeight, StartHour, EndHour } from "./constants";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
@@ -85,19 +84,13 @@ export function DayView({
 
   // Filter all-day events
   const allDayEvents = useMemo(() => {
-    return dayEvents.filter((event) => {
-      // Include explicitly marked all-day events or multi-day events
-      return event.allDay || isMultiDayEvent(event, resolvedTimezone);
-    });
+    return dayEvents.filter((event) => isAllDayRowEvent(event));
   }, [dayEvents, resolvedTimezone]);
 
   // Get only single-day time-based events
   const timeEvents = useMemo(() => {
-    return dayEvents.filter((event) => {
-      // Exclude all-day events and multi-day events
-      return !event.allDay && !isMultiDayEvent(event, resolvedTimezone);
-    });
-  }, [dayEvents, resolvedTimezone]);
+    return dayEvents.filter((event) => !event.allDay);
+  }, [dayEvents]);
 
   // Process events to calculate positions
   const positionedEvents = useMemo(() => {
@@ -137,15 +130,8 @@ export function DayView({
             </div>
             <div className="border-border/70 relative border-r p-1 last:border-r-0">
               {allDayEvents.map((event) => {
-                const eventStart = new Date(event.start);
-                const eventEnd = new Date(event.end);
-                const isFirstDay = isSameCalendarDayInTimezone(
-                  eventStart,
-                  calendarDay,
-                  resolvedTimezone,
-                );
-                const isLastDay = isSameCalendarDayInTimezone(
-                  eventEnd,
+                const { isFirstDay, isLastDay } = getEventSegmentForCalendarDay(
+                  event,
                   calendarDay,
                   resolvedTimezone,
                 );

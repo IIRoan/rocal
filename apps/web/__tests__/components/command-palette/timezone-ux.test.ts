@@ -79,29 +79,42 @@ describe("command palette timezone UX", () => {
 });
 
 describe("event editor timezone display", () => {
-  it("labels same-day events using the configured timezone", () => {
+  it("labels same-day picker dates without shifting by timezone", () => {
     expect(
-      getEventDateDisplay(
-        new Date("2026-06-16T07:00:00.000Z"),
-        new Date("2026-06-16T08:00:00.000Z"),
-        { timezone: "Europe/Amsterdam" },
-      ),
+      getEventDateDisplay(new Date(2026, 5, 16), new Date(2026, 5, 16), {
+        timezone: "Europe/Amsterdam",
+      }),
     ).toEqual({
       isSameDay: true,
       label: "Tuesday, June 16, 2026",
+      startLabel: "Tue, Jun 16",
+      endLabel: "Tue, Jun 16",
     });
   });
 
-  it("splits cross-midnight ranges into separate start and end labels", () => {
+  it("does not shift a Saturday picker date to Friday when timezone is UTC", () => {
     expect(
-      getEventDateDisplay(
-        new Date("2026-06-16T22:00:00.000Z"),
-        new Date("2026-06-17T23:00:00.000Z"),
-        { timezone: "Europe/Amsterdam" },
-      ),
+      getEventDateDisplay(new Date(2026, 5, 13), new Date(2026, 5, 13), {
+        allDay: true,
+        timezone: "UTC",
+      }),
+    ).toEqual({
+      isSameDay: true,
+      label: "Saturday, June 13, 2026",
+      startLabel: "Sat, Jun 13",
+      endLabel: "Sat, Jun 13",
+    });
+  });
+
+  it("splits cross-day picker ranges into separate start and end labels", () => {
+    expect(
+      getEventDateDisplay(new Date(2026, 5, 17), new Date(2026, 5, 18), {
+        timezone: "Europe/Amsterdam",
+      }),
     ).toEqual({
       endLabel: "Thu, Jun 18, 2026",
       isSameDay: false,
+      label: "Wednesday, June 17, 2026",
       startLabel: "Wed, Jun 17",
     });
   });

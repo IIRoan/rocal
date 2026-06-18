@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { formatInUserTimezone, resolveTimezone } from "@workspace/calendar-core";
+import { getPickerDateRangeDisplay } from "@workspace/calendar-core";
 import type {
   CalendarEvent,
   EventNotification,
@@ -49,27 +49,9 @@ export function formatReminderMinutes(minutes: number): string {
 export function getEventDateDisplay(
   startDate: Date,
   endDate: Date,
-  options?: { allDay?: boolean; timezone?: string },
+  _options?: { allDay?: boolean; timezone?: string },
 ) {
-  const timezone = resolveTimezone(options?.timezone);
-  const fmt = (date: Date, pattern: string) =>
-    formatInUserTimezone(date, timezone, pattern);
-
-  const startLabel = fmt(startDate, "EEEE, MMMM d, yyyy");
-  const endLabel = fmt(endDate, "EEEE, MMMM d, yyyy");
-
-  if (startLabel === endLabel) {
-    return {
-      isSameDay: true,
-      label: startLabel,
-    };
-  }
-
-  return {
-    endLabel: fmt(endDate, "EEE, MMM d, yyyy"),
-    isSameDay: false,
-    startLabel: fmt(startDate, "EEE, MMM d"),
-  };
+  return getPickerDateRangeDisplay(startDate, endDate);
 }
 
 export function getEnabledEmailReminderMinutes(

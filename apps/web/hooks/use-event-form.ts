@@ -11,9 +11,9 @@ import type {
   EventParticipantInput,
 } from "@workspace/calendar-core";
 import {
+  getEventPickerDateRange,
   pickerDateAndTimeToUtc,
   pickerDateToAllDayUtcRange,
-  utcToPickerDate,
 } from "@workspace/calendar-core";
 import { RecurrenceEngine } from "@workspace/calendar-core";
 import type { RecurrenceRule } from "@/lib/types/calendar";
@@ -306,8 +306,12 @@ export function useEventForm({
       setEventViewMode(isNewEvent ? "edit" : "view");
       setEventTitle(event.title || "");
       setEventDescription(event.description || "");
-      setEventStartDate(utcToPickerDate(new Date(event.start), localSettings.timezone));
-      setEventEndDate(utcToPickerDate(new Date(event.end), localSettings.timezone));
+      const { startDate, endDate } = getEventPickerDateRange(
+        event,
+        localSettings.timezone,
+      );
+      setEventStartDate(startDate);
+      setEventEndDate(endDate);
       setEventStartTime(
         formatTimeForInput(new Date(event.start), localSettings.timezone),
       );

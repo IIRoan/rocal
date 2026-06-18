@@ -2,7 +2,6 @@
 
 import React, { useMemo, useEffect, useRef, useState } from "react";
 import {
-  eventOverlapsZonedCalendarDay,
   formatInUserTimezone,
   getWeekCalendarDays,
   getZonedDateParts,
@@ -23,7 +22,7 @@ import {
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventDots } from "./event-dots";
-import { isMultiDayEvent } from "./utils";
+import { getTimedTimelineEventsForDay } from "./utils";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
 import { cn } from "../../lib/utils";
@@ -80,19 +79,12 @@ export function MobileWeekView({
 
   const processedDayEvents = useMemo(() => {
     return days.map((day) => {
-      const dayEvents = events.filter((event) => {
-        if (event.allDay || isMultiDayEvent(event, resolvedTimezone)) return false;
-
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end);
-
-        return eventOverlapsZonedCalendarDay(
-          eventStart,
-          eventEnd,
-          day,
-          resolvedTimezone,
-        );
-      });
+      const dayEvents = getTimedTimelineEventsForDay(
+        events,
+        day,
+        resolvedTimezone,
+        { excludeMultiDay: true },
+      );
 
       dayEvents.sort((a, b) => {
         const aStart = new Date(a.start);
