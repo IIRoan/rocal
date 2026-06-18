@@ -1,4 +1,5 @@
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import { resolveTimezone, wallClockToUtc } from "@workspace/calendar-core";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -93,13 +94,18 @@ export function xOffsetToColumnIndex(
 export function computeRescheduledTimes(
   event: DecoratedCalendarEvent,
   dropTarget: DropTarget,
+  timezone?: string,
 ): { newStart: Date; newEnd: Date } {
   const originalStart = new Date(event.start);
   const originalEnd = new Date(event.end);
   const durationMs = getEventDurationMs(originalStart, originalEnd);
 
-  const newStart = new Date(dropTarget.date);
-  newStart.setHours(dropTarget.hour, dropTarget.minute, 0, 0);
+  const newStart = wallClockToUtc(
+    dropTarget.date,
+    dropTarget.hour,
+    dropTarget.minute,
+    resolveTimezone(timezone ?? event.timezone),
+  );
 
   const newEnd = new Date(newStart.getTime() + durationMs);
 

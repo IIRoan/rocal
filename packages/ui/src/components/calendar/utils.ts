@@ -6,6 +6,12 @@ import {
   isBefore,
   isAfter,
 } from "date-fns";
+import {
+  eventOverlapsZonedCalendarDay,
+  getZonedDateParts,
+  getZonedDayUtcBounds,
+  isSameCalendarDayInTimezone,
+} from "@workspace/calendar-core";
 
 import type { CalendarEvent } from "./types";
 export {
@@ -38,7 +44,21 @@ export function getBorderRadiusClasses(
 /**
  * Check if an event is a multi-day event
  */
-export function isMultiDayEvent(event: CalendarEvent): boolean {
+export function isMultiDayEvent(
+  event: CalendarEvent,
+  timezone?: string,
+): boolean {
+  if (timezone) {
+    return (
+      event.allDay ||
+      !isSameCalendarDayInTimezone(
+        new Date(event.start),
+        new Date(event.end),
+        timezone,
+      )
+    );
+  }
+
   const eventStart = startOfDay(new Date(event.start));
   const eventEnd = startOfDay(new Date(event.end));
   return event.allDay || !isSameDay(eventStart, eventEnd);
@@ -52,6 +72,7 @@ export function isMultiDayEvent(event: CalendarEvent): boolean {
 export function getEventInterval(
   event: CalendarEvent,
   granularity: "day" | "time" = "day",
+  timezone?: string,
 ): { start: Date; end: Date } {
   const rawStart = new Date(event.start);
   const rawEnd = new Date(event.end);
@@ -61,6 +82,18 @@ export function getEventInterval(
     const start = rawStart <= rawEnd ? rawStart : rawEnd;
     const end = rawEnd >= rawStart ? rawEnd : rawStart;
     return { start, end };
+  }
+
+  if (timezone) {
+    const toCalendarDay = (date: Date) => {
+      const { year, month, day } = getZonedDateParts(date, timezone);
+      return new Date(year, month - 1, day);
+    };
+
+    return {
+      start: getZonedDayUtcBounds(toCalendarDay(rawStart), timezone).start,
+      end: getZonedDayUtcBounds(toCalendarDay(rawEnd), timezone).end,
+    };
   }
 
   // Day-level comparisons: inclusive of the final day
@@ -78,10 +111,26 @@ export function eventOverlapsRange(
   rangeStart: Date,
   rangeEnd: Date,
   granularity: "day" | "time" = "day",
+  timezone?: string,
 ): boolean {
-  const { start, end } = getEventInterval(event, granularity);
-  const rStart = granularity === "day" ? startOfDay(rangeStart) : rangeStart;
-  const rEnd = granularity === "day" ? endOfDay(rangeEnd) : rangeEnd;
+  const { start, end } = getEventInterval(event, granularity, timezone);
+  const bounds =
+    granularity === "day" && timezone
+      ? {
+          start: getZonedDayUtcBounds(rangeStart, timezone).start,
+          end: getZonedDayUtcBounds(rangeEnd, timezone).end,
+        }
+      : null;
+  const rStart = bounds
+    ? bounds.start
+    : granularity === "day"
+      ? startOfDay(rangeStart)
+      : rangeStart;
+  const rEnd = bounds
+    ? bounds.end
+    : granularity === "day"
+      ? endOfDay(rangeEnd)
+      : rangeEnd;
 
   return start <= rEnd && end >= rStart;
 }
@@ -92,10 +141,14 @@ export function eventOverlapsRange(
 export function getEventsForDay(
   events: CalendarEvent[],
   day: Date,
+  timezone?: string,
 ): CalendarEvent[] {
   return events
     .filter((event) => {
       const eventStart = new Date(event.start);
+      if (timezone) {
+        return isSameCalendarDayInTimezone(eventStart, day, timezone);
+      }
       return isSameDay(day, eventStart);
     })
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
@@ -104,10 +157,13 @@ export function getEventsForDay(
 /**
  * Sort events with multi-day events first, then by start time
  */
-export function sortEvents(events: CalendarEvent[]): CalendarEvent[] {
+export function sortEvents(
+  events: CalendarEvent[],
+  timezone?: string,
+): CalendarEvent[] {
   return [...events].sort((a, b) => {
-    const aIsMultiDay = isMultiDayEvent(a);
-    const bIsMultiDay = isMultiDayEvent(b);
+    const aIsMultiDay = isMultiDayEvent(a, timezone);
+    const bIsMultiDay = isMultiDayEvent(b, timezone);
 
     if (aIsMultiDay && !bIsMultiDay) return -1;
     if (!aIsMultiDay && bIsMultiDay) return 1;
@@ -122,15 +178,23 @@ export function sortEvents(events: CalendarEvent[]): CalendarEvent[] {
 export function getSpanningEventsForDay(
   events: CalendarEvent[],
   day: Date,
+  timezone?: string,
 ): CalendarEvent[] {
-  const dayStart = startOfDay(day);
-  const dayEnd = endOfDay(day);
+  const { start: dayStart, end: dayEnd } = timezone
+    ? getZonedDayUtcBounds(day, timezone)
+    : { start: startOfDay(day), end: endOfDay(day) };
 
   return events.filter((event) => {
-    if (!isMultiDayEvent(event)) return false;
-    const { start, end } = getEventInterval(event, "day");
+    if (!isMultiDayEvent(event, timezone)) return false;
+    const { start, end } = getEventInterval(event, "day", timezone);
     // Only include if it's not the start day but overlaps the day range
-    return !isSameDay(dayStart, start) && start <= dayEnd && end >= dayStart;
+    return (
+      !(timezone
+        ? isSameCalendarDayInTimezone(start, day, timezone)
+        : isSameDay(dayStart, start)) &&
+      start <= dayEnd &&
+      end >= dayStart
+    );
   });
 }
 
@@ -140,7 +204,19 @@ export function getSpanningEventsForDay(
 export function getAllEventsForDay(
   events: CalendarEvent[],
   day: Date,
+  timezone?: string,
 ): CalendarEvent[] {
+  if (timezone) {
+    return events.filter((event) =>
+      eventOverlapsZonedCalendarDay(
+        new Date(event.start),
+        new Date(event.end),
+        day,
+        timezone,
+      ),
+    );
+  }
+
   const dayStart = startOfDay(day);
   const dayEnd = endOfDay(day);
 
@@ -155,7 +231,23 @@ export function getAllEventsForDay(
 export function getAgendaEventsForDay(
   events: CalendarEvent[],
   day: Date,
+  timezone?: string,
 ): CalendarEvent[] {
+  if (timezone) {
+    return events
+      .filter((event) =>
+        eventOverlapsZonedCalendarDay(
+          new Date(event.start),
+          new Date(event.end),
+          day,
+          timezone,
+        ),
+      )
+      .sort(
+        (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+      );
+  }
+
   return events
     .filter((event) => {
       const eventStart = new Date(event.start);

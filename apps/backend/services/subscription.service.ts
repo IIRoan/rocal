@@ -14,6 +14,7 @@ import {
   type ImportIcsResponse,
   findNationalHolidayCalendarByUrl,
 } from "@workspace/calendar-ics";
+import { resolveTimezone } from "@workspace/calendar-core";
 import {
   areParsedEventParticipantsDifferent,
   parseICSFile,
@@ -55,7 +56,7 @@ export class SubscriptionService implements ISubscriptionService {
       });
     }
 
-    return userSettings.timezone || "UTC";
+    return resolveTimezone(userSettings.timezone);
   }
 
   private validateExternalCalendarUrl(url: string): URL {
@@ -641,7 +642,7 @@ export class SubscriptionService implements ISubscriptionService {
                 recurrence: parsedEvent.recurrence
                   ? JSON.stringify(parsedEvent.recurrence)
                   : null,
-                timezone: parsedEvent.timezone || "UTC",
+                timezone: resolveTimezone(parsedEvent.timezone),
                 syncedAt: new Date(),
               },
             });

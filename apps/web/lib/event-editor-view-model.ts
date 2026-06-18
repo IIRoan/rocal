@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { formatInTimeZone } from "date-fns-tz";
+import { formatInUserTimezone, resolveTimezone } from "@workspace/calendar-core";
 import type {
   CalendarEvent,
   EventNotification,
@@ -51,10 +51,9 @@ export function getEventDateDisplay(
   endDate: Date,
   options?: { allDay?: boolean; timezone?: string },
 ) {
+  const timezone = resolveTimezone(options?.timezone);
   const fmt = (date: Date, pattern: string) =>
-    options?.allDay
-      ? formatInTimeZone(date, options.timezone || "UTC", pattern)
-      : format(date, pattern);
+    formatInUserTimezone(date, timezone, pattern);
 
   const startLabel = fmt(startDate, "EEEE, MMMM d, yyyy");
   const endLabel = fmt(endDate, "EEEE, MMMM d, yyyy");

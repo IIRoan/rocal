@@ -4,6 +4,7 @@ import {
   eventEncryptionModeSchema,
   themeSchema,
   timeFormatSchema,
+  timezoneSchema,
 } from "@workspace/calendar-core";
 import type { UserSettings as PrismaUserSettings } from "../generated/prisma/index.js";
 import { strictZodObject } from "../lib/validation";
@@ -13,7 +14,7 @@ export const updateSettingsBodySchema = strictZodObject({
   theme: themeSchema.optional(),
   defaultView: defaultViewSchema.optional(),
   weekStartDay: z.number().int().min(0).max(6).optional(),
-  timezone: z.string().optional(),
+  timezone: timezoneSchema.optional(),
   timeFormat: timeFormatSchema.optional(),
   workingHoursStart: z.number().int().min(0).max(1440).optional(),
   workingHoursEnd: z.number().int().min(0).max(1440).optional(),

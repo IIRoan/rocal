@@ -1,11 +1,10 @@
-import {
+﻿import {
   groupEventsIntoSections,
   formatAgendaDate,
   formatEventTime,
 } from "./agenda-utils";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 
-// ─── Test helpers ────────────────────────────────────────────────────────────
 
 function makeEvent(
   id: string,
@@ -26,7 +25,6 @@ function makeEvent(
   } as DecoratedCalendarEvent;
 }
 
-// ─── formatAgendaDate ────────────────────────────────────────────────────────
 
 describe("formatAgendaDate", () => {
   it('returns "Today" for today\'s date', () => {
@@ -40,19 +38,18 @@ describe("formatAgendaDate", () => {
   });
 
   it("returns a formatted date string for other dates", () => {
-    // Use a fixed date that is neither today nor tomorrow
-    const date = new Date(2025, 0, 15); // Wednesday, Jan 15, 2025
+
+    const date = new Date(2025, 0, 15);
     const result = formatAgendaDate(date);
     expect(result).toBe("Wednesday, Jan 15");
   });
 
   it("includes the full day name for non-today/tomorrow dates", () => {
-    const date = new Date(2025, 5, 20); // Friday, Jun 20, 2025
+    const date = new Date(2025, 5, 20);
     expect(formatAgendaDate(date)).toBe("Friday, Jun 20");
   });
 });
 
-// ─── formatEventTime ─────────────────────────────────────────────────────────
 
 describe("formatEventTime", () => {
   it('returns "All day" for all-day events', () => {
@@ -112,7 +109,6 @@ describe("formatEventTime", () => {
   });
 });
 
-// ─── groupEventsIntoSections ─────────────────────────────────────────────────
 
 describe("groupEventsIntoSections", () => {
   it("returns an empty array for no events", () => {
@@ -195,3 +191,66 @@ describe("groupEventsIntoSections", () => {
     expect(sections[0].title).toBe("Today");
   });
 });
+
+describe("timezone-aware agenda UX", () => {
+  const timezone = "Europe/Amsterdam";
+
+  it("formats event times for display in the configured timezone", () => {
+    const event = makeEvent(
+      "zoned",
+      new Date("2026-06-16T07:30:00.000Z"),
+      new Date("2026-06-16T08:30:00.000Z"),
+    );
+
+    expect(formatEventTime(event, "24h", timezone)).toBe("09:30 – 10:30");
+    expect(formatEventTime(event, "12h", timezone)).toBe("9:30 AM – 10:30 AM");
+  });
+
+  it("uses the event timezone when no viewer timezone is passed", () => {
+    const event = makeEvent(
+      "event-tz",
+      new Date("2026-06-16T13:30:00.000Z"),
+      new Date("2026-06-16T14:30:00.000Z"),
+      { timezone: "America/New_York" },
+    );
+
+    expect(formatEventTime(event, "24h")).toBe("09:30 – 10:30");
+  });
+
+  it("groups late-night UTC events into the next zoned agenda section", () => {
+    const events = [
+      makeEvent(
+        "late",
+        new Date("2026-06-16T22:30:00.000Z"),
+        new Date("2026-06-16T23:30:00.000Z"),
+      ),
+      makeEvent(
+        "daytime",
+        new Date("2026-06-16T10:00:00.000Z"),
+        new Date("2026-06-16T11:00:00.000Z"),
+      ),
+    ];
+
+    const sections = groupEventsIntoSections(events, timezone);
+
+    expect(sections).toHaveLength(2);
+    expect(sections[0]?.data[0]?.id).toBe("daytime");
+    expect(sections[1]?.data[0]?.id).toBe("late");
+    expect(sections[1]?.title).toBe("Wednesday, Jun 17");
+  });
+
+  it("labels today and tomorrow using the configured timezone", () => {
+    const today = new Date();
+    const { year, month, day } = {
+      year: today.getFullYear(),
+      month: today.getMonth() + 1,
+      day: today.getDate(),
+    };
+    const tomorrow = new Date(year, month - 1, day + 1);
+
+    expect(formatAgendaDate(today, timezone)).toBe("Today");
+    expect(formatAgendaDate(tomorrow, timezone)).toBe("Tomorrow");
+  });
+});
+
+

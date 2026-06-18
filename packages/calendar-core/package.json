@@ -11,6 +11,7 @@
   "dependencies": {
     "@workspace/calendar-ics": "workspace:*",
     "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {

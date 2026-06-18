@@ -115,8 +115,8 @@ describe("settingsRoutes", () => {
       }),
     );
 
-    expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toBe(
+    expect(response.status).toBe(422);
+    await expect(readText(response)).resolves.toContain(
       "Invalid timezone identifier",
     );
   });

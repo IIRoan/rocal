@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+﻿import { describe, expect, it } from "@jest/globals";
 import { z } from "zod";
 import { strictZodObject } from "../../lib/validation";
 

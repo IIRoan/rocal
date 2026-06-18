@@ -5,6 +5,14 @@ import { createLogger } from "@workspace/logger";
 import {
   canCurrentUserDeleteEvent,
   canCurrentUserEditEvent,
+  formatCalendarDayKey,
+  formatCalendarMonthKey,
+  formatCalendarWeekKey,
+  formatInUserTimezone,
+  getZonedDayUtcBounds,
+  resolveTimezone,
+  wallClockFromCalendarDayKey,
+  wallClockToUtc,
 } from "@workspace/calendar-core";
 import { useCalendarContext } from "./calendar-context";
 import {
@@ -20,7 +28,6 @@ import {
   startOfMonth,
   endOfMonth,
   eachDayOfInterval,
-  isToday,
 } from "date-fns";
 import {
   AlignJustify,
@@ -227,6 +234,7 @@ export function EventCalendar({
 
   // Use context view, falling back to initialView on first render if context hasn't been set
   const view = currentView;
+  const resolvedTimezone = resolveTimezone(timezone);
 
   // Defer event layout so grid structure can paint at the new date first
   const deferredEvents = useDeferredValue(events);
@@ -334,10 +342,7 @@ export function EventCalendar({
         weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
       });
     } else if (v === "day") {
-      start = new Date(date);
-      start.setHours(0, 0, 0, 0);
-      end = new Date(date);
-      end.setHours(23, 59, 59, 999);
+      ({ start, end } = getZonedDayUtcBounds(date, resolvedTimezone));
     } else if (v === "agenda") {
       start = new Date(date);
       end = addDays(date, AgendaDaysToShow - 1);
@@ -351,7 +356,7 @@ export function EventCalendar({
   // Calculate date range based on current view and date
   const dateRange = useMemo(
     () => computeDateRange(currentDate, view),
-    [currentDate, view],
+    [currentDate, view, resolvedTimezone],
   );
 
   // Calculate days for week view (needed for day headers)
@@ -477,9 +482,7 @@ export function EventCalendar({
       // day / 3day
       const base = addDays(currentDate, offset);
       start = new Date(base);
-      start.setHours(0, 0, 0, 0);
-      end = new Date(base);
-      end.setHours(23, 59, 59, 999);
+      ({ start, end } = getZonedDayUtcBounds(base, resolvedTimezone));
     }
     onPrefetchRange({ start, end });
   };
@@ -489,10 +492,13 @@ export function EventCalendar({
     navigateTo(new Date());
   };
 
-  const calendarViewKey = `${view}-${format(
-    currentDate,
-    view === "day" ? "yyyy-MM-dd" : view === "week" ? "yyyy-ww" : "yyyy-MM",
-  )}`;
+  const calendarViewKey = `${view}-${
+    view === "day"
+      ? formatCalendarDayKey(currentDate)
+      : view === "week"
+        ? formatCalendarWeekKey(currentDate, weekStartDay, resolvedTimezone)
+        : formatCalendarMonthKey(currentDate)
+  }`;
   const canAnimateCalendar = !loading && !error;
 
   useGSAP(
@@ -591,20 +597,32 @@ export function EventCalendar({
       "[data-calendar-cell='true']",
     );
     if (cellElement?.dataset.cellDate) {
-      const startTime = new Date(cellElement.dataset.cellDate);
+      const resolvedTimezone = resolveTimezone(timezone);
       const timeValue = Number(cellElement.dataset.cellTime);
+      let startTime: Date | null = null;
 
       if (!Number.isNaN(timeValue)) {
         const hours = Math.floor(timeValue);
         const minutes = Math.round((timeValue - hours) * 60);
-        startTime.setHours(hours, minutes, 0, 0);
+        startTime = wallClockFromCalendarDayKey(
+          cellElement.dataset.cellDate,
+          hours,
+          minutes,
+          resolvedTimezone,
+        );
       } else {
-        startTime.setHours(DefaultStartHour, 0, 0, 0);
+        startTime = wallClockFromCalendarDayKey(
+          cellElement.dataset.cellDate,
+          DefaultStartHour,
+          0,
+          resolvedTimezone,
+        );
       }
 
-      // Show a preview event at the right-clicked position
-      startTime.setSeconds(0);
-      startTime.setMilliseconds(0);
+      if (!startTime) {
+        return;
+      }
+
       const previewEvent: CalendarEvent = {
         id: "__context_preview__" as any,
         title: "",
@@ -615,6 +633,7 @@ export function EventCalendar({
         userId: "",
         createdAt: new Date(),
         updatedAt: new Date(),
+        timezone: resolvedTimezone,
         isPreview: true,
       };
       onSetPreview?.(previewEvent);
@@ -654,6 +673,7 @@ export function EventCalendar({
       userId: "",
       createdAt: new Date(),
       updatedAt: new Date(),
+      timezone: resolvedTimezone,
     };
     // Open as popover near the click position (for timeline cell clicks)
     const anchorPos = lastClickPositionRef.current;
@@ -679,6 +699,7 @@ export function EventCalendar({
       userId: "",
       createdAt: new Date(),
       updatedAt: new Date(),
+      timezone: resolvedTimezone,
     };
     // Always open as modal for button-triggered creation
     onEventEdit?.(newEvent, { mode: "modal" });
@@ -708,7 +729,11 @@ export function EventCalendar({
 
         // Show success toast notification when an event is updated
         toast.success(`Event "${event.title}" updated`, {
-          description: format(new Date(event.start), "MMM d, yyyy 'at' h:mm a"),
+          description: formatInUserTimezone(
+            new Date(event.start),
+            resolvedTimezone,
+            "MMM d, yyyy 'at' h:mm a",
+          ),
           position: "bottom-left",
         });
       } else {
@@ -717,7 +742,11 @@ export function EventCalendar({
 
         // Show success toast notification when an event is created
         toast.success(`Event "${event.title}" created`, {
-          description: format(new Date(event.start), "MMM d, yyyy 'at' h:mm a"),
+          description: formatInUserTimezone(
+            new Date(event.start),
+            resolvedTimezone,
+            "MMM d, yyyy 'at' h:mm a",
+          ),
           position: "bottom-left",
         });
       }
@@ -783,7 +812,11 @@ export function EventCalendar({
       // Show success toast notification when an event is deleted
       if (deletedEvent) {
         toast.success(`Event "${deletedEvent.title}" deleted`, {
-          description: format(new Date(deletedEvent.start), "MMM d, yyyy"),
+          description: formatInUserTimezone(
+            new Date(deletedEvent.start),
+            resolvedTimezone,
+            "MMM d, yyyy",
+          ),
           position: "bottom-left",
         });
       }
@@ -847,8 +880,9 @@ export function EventCalendar({
 
       // Show success toast notification when an event is updated via drag and drop
       toast.success(`Event "${updatedEvent.title}" moved`, {
-        description: format(
+        description: formatInUserTimezone(
           new Date(updatedEvent.start),
+          resolvedTimezone,
           "MMM d, yyyy 'at' h:mm a",
         ),
         position: "bottom-left",
@@ -1332,9 +1366,14 @@ export function EventCalendar({
                   return;
                 }
 
-                const startTime = new Date(currentDate);
-                startTime.setHours(DefaultStartHour, 0, 0, 0);
-                handleEventCreate(startTime);
+                handleEventCreate(
+                  wallClockToUtc(
+                    currentDate,
+                    DefaultStartHour,
+                    0,
+                    resolvedTimezone,
+                  ),
+                );
               }}
             >
               <Plus className="size-4" />

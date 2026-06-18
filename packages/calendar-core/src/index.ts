@@ -12,6 +12,7 @@ export * from "./mail-jmap-validation";
 export * from "./search-types";
 export * from "./color-utils";
 export * from "./date-utils";
+export * from "./timezone";
 export * from "./event-utils";
 export * from "./view-model";
 export * from "./validation";

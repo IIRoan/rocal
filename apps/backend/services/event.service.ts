@@ -3,6 +3,7 @@ import type {
   EventParticipantInput,
   EventParticipantStatus,
 } from "@workspace/calendar-core";
+import { resolveTimezone } from "@workspace/calendar-core";
 import type {
   IEventService,
   EventSearchCorpusInput,
@@ -101,7 +102,7 @@ export class EventService implements IEventService {
       select: { timezone: true },
     });
 
-    return userSettings?.timezone || "UTC";
+    return resolveTimezone(userSettings?.timezone);
   }
 
   private async getStalwartAccountId(userId: string): Promise<string | null> {
@@ -1195,7 +1196,7 @@ export class EventService implements IEventService {
       start: event.start,
       end: event.end,
       allDay: event.allDay,
-      timezone: event.timezone || "UTC",
+      timezone: resolveTimezone(event.timezone),
       location: event.location,
       recurrence: event.recurrence,
       reminder: event.reminder,
@@ -1468,7 +1469,7 @@ export class EventService implements IEventService {
           emailNotifications: true,
         },
       });
-      const eventTimezone = timezone?.trim() || userSettings?.timezone || "UTC";
+      const eventTimezone = resolveTimezone(timezone ?? userSettings?.timezone);
 
       const hasEncryptedPayload = this.hasEncryptedPayload(encryptedContent);
 
@@ -1828,7 +1829,7 @@ export class EventService implements IEventService {
       });
       const eventTimezone =
         input.timezone !== undefined
-          ? input.timezone?.trim() || userSettings?.timezone || "UTC"
+          ? resolveTimezone(input.timezone ?? userSettings?.timezone)
           : existingEvent.timezone;
 
       const existingHasEncryptedPayload = this.hasEncryptedPayload(
@@ -2698,7 +2699,7 @@ export class EventService implements IEventService {
     const icsContent = buildIcsEventFile({
       calendar: {
         name: event.calendar.name,
-        timezone: event.timezone || "UTC",
+        timezone: resolveTimezone(event.timezone),
       },
       event: exportedEvent,
     });
