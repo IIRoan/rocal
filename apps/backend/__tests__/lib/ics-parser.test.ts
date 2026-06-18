@@ -141,7 +141,7 @@ describe("ics-parser", () => {
     });
   });
 
-  it("uses UTC and omits sync metadata when no subscription is provided", () => {
+  it("uses the default timezone and omits sync metadata when no subscription is provided", () => {
     expect(
       convertParsedEventToCalendarEvent(
         {
@@ -163,7 +163,7 @@ describe("ics-parser", () => {
       allDay: true,
       location: undefined,
       recurrence: undefined,
-      timezone: "UTC",
+      timezone: "Europe/Amsterdam",
       isSynced: false,
       externalId: "uid-2",
       subscriptionId: undefined,
@@ -193,6 +193,23 @@ describe("ics-parser", () => {
         location: "HQ",
         recurrence: { frequency: "weekly", interval: 1 },
         timezone: "UTC",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not treat omitted parsed timezone as a modification", () => {
+    const existingEvent = createCalendarEvent({
+      timezone: "UTC",
+    });
+
+    expect(
+      isEventModified(existingEvent, {
+        uid: "uid-1",
+        sourceUid: "uid-1",
+        title: "Imported event",
+        start: new Date("2024-02-01T10:00:00.000Z"),
+        end: new Date("2024-02-01T11:00:00.000Z"),
+        allDay: false,
       }),
     ).toBe(false);
   });

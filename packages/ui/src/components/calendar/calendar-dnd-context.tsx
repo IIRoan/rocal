@@ -23,6 +23,11 @@ import {
 } from "@dnd-kit/core";
 import { addMinutes, differenceInMinutes } from "date-fns";
 import { createLogger } from "@workspace/logger";
+import {
+  getZonedDateParts,
+  resolveTimezone,
+  wallClockToUtc,
+} from "@workspace/calendar-core";
 
 import { EventItem } from "./event-item";
 import { CalendarEvent, type CalendarView } from "./types";
@@ -75,6 +80,7 @@ export function CalendarDndProvider({
   onEventUpdate,
   timezone,
 }: CalendarDndProviderProps) {
+  const resolvedTimezone = resolveTimezone(timezone);
   const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [activeView, setActiveView] = useState<CalendarView | null>(null);
@@ -175,8 +181,6 @@ export function CalendarDndProvider({
 
       // Update time for week/day views
       if (time !== undefined && activeView !== "month") {
-        const newTime = new Date(date);
-
         // Calculate hours and minutes with exact precision
         const hours = Math.floor(time);
         const fractionalHour = time - hours;
@@ -184,37 +188,42 @@ export function CalendarDndProvider({
         // Use exact minutes instead of rounding to 15-minute intervals
         const minutes = Math.round(fractionalHour * 60);
 
-        newTime.setHours(hours, minutes, 0, 0);
+        const newTime = wallClockToUtc(date, hours, minutes, resolvedTimezone);
+        const newParts = getZonedDateParts(newTime, resolvedTimezone);
+        const currentParts = currentTime
+          ? getZonedDateParts(currentTime, resolvedTimezone)
+          : null;
 
         // Only update if time has changed
         if (
-          !currentTime ||
-          newTime.getHours() !== currentTime.getHours() ||
-          newTime.getMinutes() !== currentTime.getMinutes() ||
-          newTime.getDate() !== currentTime.getDate() ||
-          newTime.getMonth() !== currentTime.getMonth() ||
-          newTime.getFullYear() !== currentTime.getFullYear()
+          !currentParts ||
+          newParts.hours !== currentParts.hours ||
+          newParts.minutes !== currentParts.minutes ||
+          newParts.day !== currentParts.day ||
+          newParts.month !== currentParts.month ||
+          newParts.year !== currentParts.year
         ) {
           setCurrentTime(newTime);
         }
       } else if (activeView === "month") {
         // For month view, just update the date but preserve time
-        const newTime = new Date(date);
-        if (currentTime) {
-          newTime.setHours(
-            currentTime.getHours(),
-            currentTime.getMinutes(),
-            currentTime.getSeconds(),
-            currentTime.getMilliseconds(),
-          );
-        }
+        const currentParts = currentTime
+          ? getZonedDateParts(currentTime, resolvedTimezone)
+          : null;
+        const newTime = wallClockToUtc(
+          date,
+          currentParts?.hours ?? 0,
+          currentParts?.minutes ?? 0,
+          resolvedTimezone,
+        );
+        const newParts = getZonedDateParts(newTime, resolvedTimezone);
 
         // Only update if date has changed
         if (
-          !currentTime ||
-          newTime.getDate() !== currentTime.getDate() ||
-          newTime.getMonth() !== currentTime.getMonth() ||
-          newTime.getFullYear() !== currentTime.getFullYear()
+          !currentParts ||
+          newParts.day !== currentParts.day ||
+          newParts.month !== currentParts.month ||
+          newParts.year !== currentParts.year
         ) {
           setCurrentTime(newTime);
         }
@@ -261,7 +270,7 @@ export function CalendarDndProvider({
       const time = overData.time;
 
       // Calculate new start time
-      const newStart = new Date(date);
+      let newStart: Date;
 
       // If time is provided (for week/day views), set the hours and minutes
       if (time !== undefined) {
@@ -271,14 +280,15 @@ export function CalendarDndProvider({
         // Use exact minutes instead of rounding to 15-minute intervals
         const minutes = Math.round(fractionalHour * 60);
 
-        newStart.setHours(hours, minutes, 0, 0);
+        newStart = wallClockToUtc(date, hours, minutes, resolvedTimezone);
       } else {
         // For month view, preserve the original time from currentTime
-        newStart.setHours(
-          currentTime.getHours(),
-          currentTime.getMinutes(),
-          currentTime.getSeconds(),
-          currentTime.getMilliseconds(),
+        const currentParts = getZonedDateParts(currentTime, resolvedTimezone);
+        newStart = wallClockToUtc(
+          date,
+          currentParts.hours,
+          currentParts.minutes,
+          resolvedTimezone,
         );
       }
 
@@ -289,12 +299,14 @@ export function CalendarDndProvider({
       const newEnd = addMinutes(newStart, durationMinutes);
 
       // Only update if the start time has actually changed
+      const originalParts = getZonedDateParts(originalStart, resolvedTimezone);
+      const newParts = getZonedDateParts(newStart, resolvedTimezone);
       const hasStartTimeChanged =
-        originalStart.getFullYear() !== newStart.getFullYear() ||
-        originalStart.getMonth() !== newStart.getMonth() ||
-        originalStart.getDate() !== newStart.getDate() ||
-        originalStart.getHours() !== newStart.getHours() ||
-        originalStart.getMinutes() !== newStart.getMinutes();
+        originalParts.year !== newParts.year ||
+        originalParts.month !== newParts.month ||
+        originalParts.day !== newParts.day ||
+        originalParts.hours !== newParts.hours ||
+        originalParts.minutes !== newParts.minutes;
 
       if (hasStartTimeChanged) {
         // Update the event only if the time has changed

@@ -171,6 +171,14 @@ Keep edits factual and concise: architecture bullets, directory trees, shared-pa
 
 When mutating mail data already in the React Query cache (star, read state, labels), **use optimistic `onMutate` + `setQueryData`** on the specific list key. Do **not** blanket-invalidate `["mail"]` — that refetches everything, shows spinners, and loses scroll position. Invalidate narrowly on destructive actions (delete, move) where items leave the list. Roll back via refetch/`invalidateMessages()` on failure.
 
+### Calendar timezone handling (native + web)
+
+Calendar UI must use the user's configured timezone as the source of truth for wall-clock dates and times. Do not derive event picker values, calendar day membership, previews, drag/drop targets, date-range fetch bounds, or user-facing event timestamps from the device/browser local timezone. If no user timezone is configured, use `resolveTimezone()` from `@workspace/calendar-core`; the canonical fallback is `Europe/Amsterdam`.
+
+Use shared helpers from `@workspace/calendar-core` for timezone work: validate IANA timezone identifiers with `timezoneSchema`, normalize fallbacks with `resolveTimezone`, convert picker date + `HH:mm` values to UTC with `pickerDateAndTimeToUtc`/`wallClockToUtc`, convert stored UTC instants back to picker dates with `utcToPickerDate`, compute day/week membership with the zoned calendar-day helpers, and format event times with timezone-aware formatters. Avoid `Date#setHours`, `startOfDay`, `isSameDay`, `isToday`, or `date-fns/format` on event times when the result is meant to reflect the user's configured timezone.
+
+Timezone-sensitive API payloads must make timezone explicit in the contract. Event create/update and settings update bodies must use the shared Zod `timezoneSchema` from `@workspace/calendar-core`; do not accept raw `z.string()` for timezone fields. Clients should submit event `start`/`end` as UTC ISO 8601 strings and include the user's resolved timezone when the endpoint persists or interprets wall-clock intent.
+
 ---
 
 ## Agent Commands (Allowed vs Forbidden)

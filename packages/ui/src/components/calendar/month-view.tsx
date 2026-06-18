@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { isCancelledCalendarEvent } from "@workspace/calendar-core";
+import {
+  isCancelledCalendarEvent,
+  isSameCalendarDayInTimezone,
+  isTodayInTimezone,
+  resolveTimezone,
+  wallClockToUtc,
+} from "@workspace/calendar-core";
 import { cn } from "../../lib/utils";
 import { useDidMount } from "rooks";
 import {
@@ -11,9 +17,7 @@ import {
   endOfWeek,
   format,
   getWeek,
-  isSameDay,
   isSameMonth,
-  isToday,
   startOfMonth,
   startOfWeek,
 } from "date-fns";
@@ -64,6 +68,7 @@ export function MonthView({
   onEventDelete,
   onEventView,
 }: MonthViewProps) {
+  const resolvedTimezone = resolveTimezone(timezone);
   const days = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(monthStart);
@@ -131,18 +136,25 @@ export function MonthView({
     for (const week of weeks) {
       for (const day of week) {
         if (!day) continue;
-        const dayEvents = getEventsForDay(events, day);
-        const spanningEvents = getSpanningEventsForDay(events, day);
+        const dayEvents = getEventsForDay(events, day, resolvedTimezone);
+        const spanningEvents = getSpanningEventsForDay(
+          events,
+          day,
+          resolvedTimezone,
+        );
         map.set(day.toISOString(), {
           dayEvents,
           spanningEvents,
-          allEvents: getAllEventsForDay(events, day),
-          sortedAllDay: sortEvents([...spanningEvents, ...dayEvents]),
+          allEvents: getAllEventsForDay(events, day, resolvedTimezone),
+          sortedAllDay: sortEvents(
+            [...spanningEvents, ...dayEvents],
+            resolvedTimezone,
+          ),
         });
       }
     }
     return map;
-  }, [events, weeks]);
+  }, [events, resolvedTimezone, weeks]);
 
   return (
     <div data-slot="month-view" className="contents animate-fade-in">
@@ -210,16 +222,21 @@ export function MonthView({
                         ? "bg-[var(--calendar-weekend)]"
                         : ""
                   }`}
-                  data-today={isToday(day) || undefined}
+                  data-today={isTodayInTimezone(day, resolvedTimezone) || undefined}
                   data-outside-cell={!isCurrentMonth || undefined}
                 >
                   <DroppableCell
                     id={cellId}
                     date={day}
                     onClick={() => {
-                      const startTime = new Date(day);
-                      startTime.setHours(DefaultStartHour, 0, 0);
-                      onEventCreate(startTime);
+                      onEventCreate(
+                        wallClockToUtc(
+                          day,
+                          DefaultStartHour,
+                          0,
+                          resolvedTimezone,
+                        ),
+                      );
                     }}
                   >
                     <div className="group-data-today:bg-[var(--calendar-accent-bg)] group-data-today:text-[var(--calendar-accent)] group-data-today:font-semibold mt-1 inline-flex size-6 items-center justify-center rounded-full text-sm transition-all duration-200 hover:scale-110 hover:bg-accent/10 group-data-today:animate-pulse">
@@ -236,8 +253,16 @@ export function MonthView({
                       {sortedAllDay.map((event, index) => {
                         const eventStart = new Date(event.start);
                         const eventEnd = new Date(event.end);
-                        const isFirstDay = isSameDay(day, eventStart);
-                        const isLastDay = isSameDay(day, eventEnd);
+                        const isFirstDay = isSameCalendarDayInTimezone(
+                          eventStart,
+                          day,
+                          resolvedTimezone,
+                        );
+                        const isLastDay = isSameCalendarDayInTimezone(
+                          eventEnd,
+                          day,
+                          resolvedTimezone,
+                        );
 
                         const isHidden =
                           isMounted && visibleCount && index >= visibleCount;
@@ -336,11 +361,21 @@ export function MonthView({
                                 {format(day, "EEE d")}
                               </div>
                               <div className="space-y-1">
-                                {sortEvents(allEvents).map((event) => {
+                                {sortEvents(allEvents, resolvedTimezone).map((event) => {
                                   const eventStart = new Date(event.start);
                                   const eventEnd = new Date(event.end);
-                                  const isFirstDay = isSameDay(day, eventStart);
-                                  const isLastDay = isSameDay(day, eventEnd);
+                                  const isFirstDay =
+                                    isSameCalendarDayInTimezone(
+                                      eventStart,
+                                      day,
+                                      resolvedTimezone,
+                                    );
+                                  const isLastDay =
+                                    isSameCalendarDayInTimezone(
+                                      eventEnd,
+                                      day,
+                                      resolvedTimezone,
+                                    );
 
                                   return (
                                     <EventItem

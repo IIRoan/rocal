@@ -5,7 +5,6 @@ import {
   addDays,
   eachDayOfInterval,
   endOfDay,
-  format,
   startOfDay,
   startOfMonth,
   startOfWeek,
@@ -55,7 +54,7 @@ export function useMiniCalendarMonthData({
     return { start, end, days };
   }, [calendarMonth]);
 
-  const monthKey = format(calendarMonth, "yyyy-MM");
+  const monthKey = getCalendarMonthKey(calendarMonth);
 
   // Track which grid range we last fetched
   const lastFetchedKeyRef = useRef<string | null>(null);

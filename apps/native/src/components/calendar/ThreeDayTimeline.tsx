@@ -11,6 +11,7 @@ interface ThreeDayTimelineProps {
   events: DecoratedCalendarEvent[];
   /** Time format: "12h" or "24h" */
   timeFormat?: "12h" | "24h";
+  timezone?: string;
   /** Callback when an event block is tapped */
   onEventPress?: (event: DecoratedCalendarEvent) => void;
   /** Callback when an empty time slot is tapped */
@@ -31,6 +32,7 @@ export function ThreeDayTimeline({
   currentDate,
   events,
   timeFormat = "12h",
+  timezone,
   onEventPress,
   onTimeSlotPress,
   onSwipeCommit,
@@ -44,6 +46,7 @@ export function ThreeDayTimeline({
       events={events}
       view="3day"
       timeFormat={timeFormat}
+      timezone={timezone}
       swipeEnabled={swipeEnabled}
       onSwipeCommit={onSwipeCommit}
       onNavigate={onNavigate}

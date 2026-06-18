@@ -7,6 +7,8 @@ import {
   canCurrentUserEditEvent,
   getCurrentUserInvitationStatus,
   invitationByExternalIdQueryKey,
+  pickerDateAndTimeToUtc,
+  pickerDateToAllDayUtcRange,
 } from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { EncryptionStatusBadge } from "@workspace/ui/components/calendar";
@@ -169,13 +171,24 @@ export function EventEditor({
       return;
     }
 
-    const [startHours, startMinutes] = eventStartTime.split(":").map(Number);
-    const [endHours, endMinutes] = eventEndTime.split(":").map(Number);
-    const start = new Date(eventStartDate);
-    const end = new Date(eventEndDate);
-
-    start.setHours(startHours || 0, startMinutes || 0, 0, 0);
-    end.setHours(endHours || 0, endMinutes || 0, 0, 0);
+    const { start, end } = eventAllDay
+      ? pickerDateToAllDayUtcRange(
+          eventStartDate,
+          eventEndDate,
+          localSettings.timezone,
+        )
+      : {
+          start: pickerDateAndTimeToUtc(
+            eventStartDate,
+            eventStartTime,
+            localSettings.timezone,
+          ),
+          end: pickerDateAndTimeToUtc(
+            eventEndDate,
+            eventEndTime,
+            localSettings.timezone,
+          ),
+        };
 
     const payload = {
       allDay: eventAllDay,
@@ -201,6 +214,7 @@ export function EventEditor({
       calendarId: payload.calendarId,
       location: payload.location || undefined,
       description: payload.description || undefined,
+      timezone: localSettings.timezone,
     });
   }, [
     editorMode,
@@ -213,6 +227,7 @@ export function EventEditor({
     eventStartDate,
     eventStartTime,
     eventTitle,
+    localSettings.timezone,
     open,
     updatePreviewEvent,
   ]);

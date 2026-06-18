@@ -1,7 +1,15 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { isCancelledCalendarEvent } from "@workspace/calendar-core";
+import {
+  eventOverlapsZonedCalendarDay,
+  formatInUserTimezone,
+  getZonedDayUtcBounds,
+  isCancelledCalendarEvent,
+  isTodayInTimezone,
+  resolveTimezone,
+  wallClockToUtc,
+} from "@workspace/calendar-core";
 import {
   addDays,
   addHours,
@@ -9,8 +17,6 @@ import {
   eachHourOfInterval,
   format,
   getHours,
-  isSameDay,
-  isToday,
   startOfDay,
   subDays,
 } from "date-fns";
@@ -51,6 +57,7 @@ export function MobileThreeDayView({
 }: MobileThreeDayViewProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerEvents, setDrawerEvents] = useState<CalendarEvent[]>([]);
+  const resolvedTimezone = resolveTimezone(timezone);
 
   // Show yesterday, today, tomorrow centered on currentDate
   const days = useMemo(
@@ -73,17 +80,16 @@ export function MobileThreeDayView({
   const processedDayEvents = useMemo(() => {
     return days.map((day) => {
       const dayEvents = events.filter((event) => {
-        if (event.allDay || isMultiDayEvent(event)) return false;
+        if (event.allDay || isMultiDayEvent(event, resolvedTimezone)) return false;
 
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
-        const dayStart = startOfDay(day);
-        const dayEnd = addHours(dayStart, 24);
 
-        return (
-          isSameDay(day, eventStart) ||
-          isSameDay(day, eventEnd) ||
-          (eventStart < dayEnd && eventEnd > dayStart)
+        return eventOverlapsZonedCalendarDay(
+          eventStart,
+          eventEnd,
+          day,
+          resolvedTimezone,
         );
       });
 
@@ -94,23 +100,24 @@ export function MobileThreeDayView({
       return layoutTimelineEvents(dayEvents, day, {
         cellHeight: CELL_HEIGHT,
         widthStrategy: "simple-no-overflow",
+        timezone: resolvedTimezone,
       });
     });
-  }, [days, events]);
+  }, [days, events, resolvedTimezone]);
 
   const allDayEvents = useMemo(() => {
     const firstDay = days[0];
     const lastDay = days[2];
     if (!firstDay || !lastDay) return [];
-    const rangeStart = startOfDay(firstDay);
-    const rangeEnd = addHours(startOfDay(lastDay), 24);
+    const rangeStart = getZonedDayUtcBounds(firstDay, resolvedTimezone).start;
+    const rangeEnd = getZonedDayUtcBounds(lastDay, resolvedTimezone).end;
     return events.filter(
       (event) =>
-        (event.allDay || isMultiDayEvent(event)) &&
+        (event.allDay || isMultiDayEvent(event, resolvedTimezone)) &&
         new Date(event.start) < rangeEnd &&
         new Date(event.end) > rangeStart,
     );
-  }, [days, events]);
+  }, [days, events, resolvedTimezone]);
 
   const handleEventClick = (
     event: CalendarEvent,
@@ -167,13 +174,18 @@ export function MobileThreeDayView({
 
           {/* Day columns headers */}
           {days.map((day, dayIndex) => {
-            const isSelected = isSameDay(day, currentDate);
-            const today = isToday(day);
+            const isSelected =
+              day.getFullYear() === currentDate.getFullYear() &&
+              day.getMonth() === currentDate.getMonth() &&
+              day.getDate() === currentDate.getDate();
+            const today = isTodayInTimezone(day, resolvedTimezone);
             const dayAllDay = allDayEvents.filter((event) => {
               const eStart = new Date(event.start);
               const eEnd = new Date(event.end);
-              const dStart = startOfDay(day);
-              const dEnd = addHours(dStart, 24);
+              const { start: dStart, end: dEnd } = getZonedDayUtcBounds(
+                day,
+                resolvedTimezone,
+              );
               return eStart < dEnd && eEnd > dStart;
             });
 
@@ -253,7 +265,7 @@ export function MobileThreeDayView({
               key={day.toString()}
               className={cn(
                 "flex-1 min-w-0 relative border-r border-border/50 last:border-r-0",
-                isToday(day) && "bg-primary/5",
+                isTodayInTimezone(day, resolvedTimezone) && "bg-primary/5",
               )}
             >
               {/* Positioned events */}
@@ -289,7 +301,7 @@ export function MobileThreeDayView({
               ))}
 
               {/* Current time indicator */}
-              {currentTimeVisible && isToday(day) && (
+              {currentTimeVisible && isTodayInTimezone(day, resolvedTimezone) && (
                 <CurrentTimeIndicator position={currentTimePosition} />
               )}
 
@@ -319,10 +331,14 @@ export function MobileThreeDayView({
                           )}
                           style={{ height: CELL_HEIGHT / 4 }}
                           onClick={() => {
-                            const startTime = new Date(day);
-                            startTime.setHours(hourValue);
-                            startTime.setMinutes(quarter * 15);
-                            onEventCreate(startTime);
+                            onEventCreate(
+                              wallClockToUtc(
+                                day,
+                                hourValue,
+                                quarter * 15,
+                                resolvedTimezone,
+                              ),
+                            );
                           }}
                         />
                       );
@@ -349,7 +365,11 @@ export function MobileThreeDayView({
                 <span className="text-base font-semibold">Select Event</span>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {drawerEvents[0] &&
-                    format(new Date(drawerEvents[0].start), "EEEE, MMMM d")}
+                    formatInUserTimezone(
+                      new Date(drawerEvents[0].start),
+                      resolvedTimezone,
+                      "EEEE, MMMM d",
+                    )}
                 </p>
               </div>
             }
