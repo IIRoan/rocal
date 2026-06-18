@@ -212,14 +212,8 @@ export function EventEditorBody({
     () =>
       getEventDateDisplay(eventForm.eventStartDate, eventForm.eventEndDate, {
         allDay: eventForm.eventAllDay,
-        timezone: eventForm.selectedEvent?.timezone || "UTC",
       }),
-    [
-      eventForm.eventEndDate,
-      eventForm.eventStartDate,
-      eventForm.eventAllDay,
-      eventForm.selectedEvent?.timezone,
-    ],
+    [eventForm.eventEndDate, eventForm.eventStartDate, eventForm.eventAllDay],
   );
   const recurrenceSummary = useMemo(
     () =>

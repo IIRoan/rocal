@@ -1,4 +1,5 @@
 import {
+  addDays,
   isSameDay,
   startOfDay,
   endOfDay,
@@ -7,10 +8,14 @@ import {
   isAfter,
 } from "date-fns";
 import {
-  eventOverlapsZonedCalendarDay,
-  getZonedDateParts,
+  eventOverlapsCalendarDay,
+  getInclusiveCalendarDayRange,
+  getTimedTimelineEventsForDay,
   getZonedDayUtcBounds,
   isSameCalendarDayInTimezone,
+  isSamePickerDay,
+  resolveTimezone,
+  spansMultipleCalendarDays,
 } from "@workspace/calendar-core";
 
 import type { CalendarEvent } from "./types";
@@ -42,6 +47,34 @@ export function getBorderRadiusClasses(
 }
 
 /**
+ * Events rendered in the all-day header row of timeline views.
+ */
+export function isAllDayRowEvent(event: CalendarEvent): boolean {
+  return event.allDay === true;
+}
+
+/**
+ * Border segment flags for a multi-day or all-day event on a specific calendar day.
+ */
+export function getEventSegmentForCalendarDay(
+  event: CalendarEvent,
+  calendarDay: Date,
+  timezone: string,
+): { isFirstDay: boolean; isLastDay: boolean } {
+  const { firstDay, lastDay } = getInclusiveCalendarDayRange(
+    new Date(event.start),
+    new Date(event.end),
+    timezone,
+    { allDay: event.allDay },
+  );
+
+  return {
+    isFirstDay: isSamePickerDay(calendarDay, firstDay),
+    isLastDay: isSamePickerDay(calendarDay, lastDay),
+  };
+}
+
+/**
  * Check if an event is a multi-day event
  */
 export function isMultiDayEvent(
@@ -49,19 +82,24 @@ export function isMultiDayEvent(
   timezone?: string,
 ): boolean {
   if (timezone) {
-    return (
-      event.allDay ||
-      !isSameCalendarDayInTimezone(
-        new Date(event.start),
-        new Date(event.end),
-        timezone,
-      )
+    return spansMultipleCalendarDays(
+      new Date(event.start),
+      new Date(event.end),
+      timezone,
+      { allDay: event.allDay },
     );
   }
 
-  const eventStart = startOfDay(new Date(event.start));
-  const eventEnd = startOfDay(new Date(event.end));
-  return event.allDay || !isSameDay(eventStart, eventEnd);
+  const rawStart = new Date(event.start);
+  const rawEnd = new Date(event.end);
+  const eventStart = startOfDay(rawStart);
+  let eventEnd = startOfDay(rawEnd);
+
+  if (event.allDay && eventEnd > eventStart) {
+    eventEnd = addDays(eventEnd, -1);
+  }
+
+  return !isSameDay(eventStart, eventEnd);
 }
 
 /**
@@ -85,14 +123,20 @@ export function getEventInterval(
   }
 
   if (timezone) {
-    const toCalendarDay = (date: Date) => {
-      const { year, month, day } = getZonedDateParts(date, timezone);
-      return new Date(year, month - 1, day);
-    };
+    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
+      rawStart,
+      rawEnd,
+      timezone,
+      { allDay: event.allDay },
+    );
+
+    if (!event.allDay && isSamePickerDay(firstDay, lastDay)) {
+      return { start: rawStart, end: rawEnd };
+    }
 
     return {
-      start: getZonedDayUtcBounds(toCalendarDay(rawStart), timezone).start,
-      end: getZonedDayUtcBounds(toCalendarDay(rawEnd), timezone).end,
+      start: getZonedDayUtcBounds(firstDay, timezone).start,
+      end: getZonedDayUtcBounds(lastDay, timezone).end,
     };
   }
 
@@ -132,8 +176,21 @@ export function eventOverlapsRange(
       ? endOfDay(rangeEnd)
       : rangeEnd;
 
-  return start <= rEnd && end >= rStart;
+  return start < rEnd && end > rStart;
 }
+
+/**
+ * Check if an event overlaps a calendar picker day in the user's timezone.
+ */
+export function calendarDayOverlapsEvent(
+  event: CalendarEvent,
+  calendarDay: Date,
+  timezone: string,
+): boolean {
+  return eventOverlapsCalendarDay(event, calendarDay, timezone);
+}
+
+export { getTimedTimelineEventsForDay };
 
 /**
  * Filter events for a specific day
@@ -186,14 +243,28 @@ export function getSpanningEventsForDay(
 
   return events.filter((event) => {
     if (!isMultiDayEvent(event, timezone)) return false;
-    const { start, end } = getEventInterval(event, "day", timezone);
-    // Only include if it's not the start day but overlaps the day range
+    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
+      new Date(event.start),
+      new Date(event.end),
+      timezone ?? resolveTimezone(),
+      { allDay: event.allDay },
+    );
+    const { start: dayStart, end: dayEnd } = timezone
+      ? getZonedDayUtcBounds(day, timezone)
+      : { start: startOfDay(day), end: endOfDay(day) };
+    const intervalStart = timezone
+      ? getZonedDayUtcBounds(firstDay, timezone).start
+      : startOfDay(firstDay);
+    const intervalEnd = timezone
+      ? getZonedDayUtcBounds(lastDay, timezone).end
+      : endOfDay(lastDay);
+
     return (
       !(timezone
-        ? isSameCalendarDayInTimezone(start, day, timezone)
-        : isSameDay(dayStart, start)) &&
-      start <= dayEnd &&
-      end >= dayStart
+        ? isSamePickerDay(day, firstDay)
+        : isSameDay(day, firstDay)) &&
+      intervalStart < dayEnd &&
+      intervalEnd > dayStart
     );
   });
 }
@@ -208,12 +279,7 @@ export function getAllEventsForDay(
 ): CalendarEvent[] {
   if (timezone) {
     return events.filter((event) =>
-      eventOverlapsZonedCalendarDay(
-        new Date(event.start),
-        new Date(event.end),
-        day,
-        timezone,
-      ),
+      calendarDayOverlapsEvent(event, day, timezone),
     );
   }
 
@@ -235,14 +301,7 @@ export function getAgendaEventsForDay(
 ): CalendarEvent[] {
   if (timezone) {
     return events
-      .filter((event) =>
-        eventOverlapsZonedCalendarDay(
-          new Date(event.start),
-          new Date(event.end),
-          day,
-          timezone,
-        ),
-      )
+      .filter((event) => calendarDayOverlapsEvent(event, day, timezone))
       .sort(
         (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
       );

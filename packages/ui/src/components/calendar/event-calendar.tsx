@@ -5,11 +5,11 @@ import { createLogger } from "@workspace/logger";
 import {
   canCurrentUserDeleteEvent,
   canCurrentUserEditEvent,
-  formatCalendarDayKey,
-  formatCalendarMonthKey,
-  formatCalendarWeekKey,
   formatInUserTimezone,
-  getZonedDayUtcBounds,
+  getCalendarViewAnimationKey,
+  getPrefetchCalendarDateRange,
+  getTimezoneAwareCalendarDateRange,
+  navigateCalendarDate,
   resolveTimezone,
   wallClockFromCalendarDayKey,
   wallClockToUtc,
@@ -17,16 +17,10 @@ import {
 import { useCalendarContext } from "./calendar-context";
 import {
   addDays,
-  addMonths,
-  addWeeks,
   endOfWeek,
   format,
   isSameMonth,
   startOfWeek,
-  subMonths,
-  subWeeks,
-  startOfMonth,
-  endOfMonth,
   eachDayOfInterval,
 } from "date-fns";
 import {
@@ -322,36 +316,13 @@ export function EventCalendar({
   ]);
 
   // Compute the date range for a given date and view
-  const computeDateRange = (date: Date, v: string) => {
-    let start: Date;
-    let end: Date;
-    if (v === "month") {
-      const monthStart = startOfMonth(date);
-      const monthEnd = endOfMonth(date);
-      start = startOfWeek(monthStart, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-      end = endOfWeek(monthEnd, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-    } else if (v === "week") {
-      start = startOfWeek(date, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-      end = endOfWeek(date, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-    } else if (v === "day") {
-      ({ start, end } = getZonedDayUtcBounds(date, resolvedTimezone));
-    } else if (v === "agenda") {
-      start = new Date(date);
-      end = addDays(date, AgendaDaysToShow - 1);
-    } else {
-      start = startOfMonth(date);
-      end = endOfMonth(date);
-    }
-    return { start, end };
-  };
+  const computeDateRange = (date: Date, v: typeof view) =>
+    getTimezoneAwareCalendarDateRange({
+      baseDate: date,
+      view: v,
+      weekStartDay,
+      timezone: resolvedTimezone,
+    });
 
   // Calculate date range based on current view and date
   const dateRange = useMemo(
@@ -429,62 +400,36 @@ export function EventCalendar({
 
   const handlePrevious = () => {
     navDirectionRef.current = -1;
-    let newDate;
-    if (view === "month") {
-      newDate = subMonths(currentDate, 1);
-    } else if (view === "week") {
-      newDate = subWeeks(currentDate, 1);
-    } else if (view === "day") {
-      newDate = addDays(currentDate, -1);
-    } else if (view === "agenda") {
-      newDate = addDays(currentDate, -AgendaDaysToShow);
-    }
+    const newDate =
+      view === "agenda"
+        ? addDays(currentDate, -AgendaDaysToShow)
+        : navigateCalendarDate(currentDate, view, -1);
 
-    if (newDate) navigateTo(newDate);
+    navigateTo(newDate);
   };
 
   const handleNext = () => {
     navDirectionRef.current = 1;
-    let newDate;
-    if (view === "month") {
-      newDate = addMonths(currentDate, 1);
-    } else if (view === "week") {
-      newDate = addWeeks(currentDate, 1);
-    } else if (view === "day") {
-      newDate = addDays(currentDate, 1);
-    } else if (view === "agenda") {
-      newDate = addDays(currentDate, AgendaDaysToShow);
-    }
+    const newDate =
+      view === "agenda"
+        ? addDays(currentDate, AgendaDaysToShow)
+        : navigateCalendarDate(currentDate, view, 1);
 
-    if (newDate) navigateTo(newDate);
+    navigateTo(newDate);
   };
 
   const prefetchAdjacentRange = (direction: "prev" | "next") => {
     if (!onPrefetchRange) return;
-    const offset = direction === "next" ? 1 : -1;
-    let start: Date;
-    let end: Date;
-    if (view === "month" || view === "agenda") {
-      const base =
-        direction === "next"
-          ? addMonths(currentDate, offset)
-          : addMonths(currentDate, offset);
-      start = startOfMonth(base);
-      end = endOfMonth(base);
-    } else if (view === "week") {
-      start = startOfWeek(addWeeks(currentDate, offset), {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-      end = endOfWeek(start, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-    } else {
-      // day / 3day
-      const base = addDays(currentDate, offset);
-      start = new Date(base);
-      ({ start, end } = getZonedDayUtcBounds(base, resolvedTimezone));
-    }
-    onPrefetchRange({ start, end });
+
+    onPrefetchRange(
+      getPrefetchCalendarDateRange({
+        currentDate,
+        view,
+        direction: direction === "next" ? 1 : -1,
+        weekStartDay,
+        timezone: resolvedTimezone,
+      }),
+    );
   };
 
   const handleToday = () => {
@@ -492,13 +437,12 @@ export function EventCalendar({
     navigateTo(new Date());
   };
 
-  const calendarViewKey = `${view}-${
-    view === "day"
-      ? formatCalendarDayKey(currentDate)
-      : view === "week"
-        ? formatCalendarWeekKey(currentDate, weekStartDay, resolvedTimezone)
-        : formatCalendarMonthKey(currentDate)
-  }`;
+  const calendarViewKey = getCalendarViewAnimationKey(
+    view,
+    currentDate,
+    weekStartDay,
+    resolvedTimezone,
+  );
   const canAnimateCalendar = !loading && !error;
 
   useGSAP(
@@ -972,6 +916,30 @@ export function EventCalendar({
           </span>
         </>
       );
+    } else if (view === "3day") {
+      const start = addDays(currentDate, -1);
+      const end = addDays(currentDate, 1);
+      if (isSameMonth(start, end)) {
+        return (
+          <>
+            <span className="font-bold">
+              {format(start, "MMM d")} – {format(end, "d")}
+            </span>
+            <span className="text-muted-foreground">
+              {" "}
+              {format(end, "yyyy")}
+            </span>
+          </>
+        );
+      }
+      return (
+        <>
+          <span className="font-bold">{format(start, "MMM d")}</span>
+          <span className="text-muted-foreground"> – </span>
+          <span className="font-bold">{format(end, "MMM d")}</span>
+          <span className="text-muted-foreground"> {format(end, "yyyy")}</span>
+        </>
+      );
     } else if (view === "agenda") {
       const start = currentDate;
       const end = addDays(currentDate, AgendaDaysToShow - 1);
@@ -1245,16 +1213,21 @@ export function EventCalendar({
                 />
               )}
               {view === "3day" && (
-                <ThreeDayView
-                  currentDate={currentDate}
-                  events={deferredEvents}
-                  onEventSelect={handleEventSelect}
-                  onEventCreate={handleEventCreate}
-                  timeFormat={timeFormat}
-                  weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
-                  workingDays={workingDays}
-                  timezone={timezone}
-                />
+                <div className="absolute inset-0 min-h-0">
+                  <ThreeDayView
+                    currentDate={currentDate}
+                    events={deferredEvents}
+                    onEventSelect={handleEventSelect}
+                    onEventCreate={handleEventCreate}
+                    timeFormat={timeFormat}
+                    weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
+                    workingDays={workingDays}
+                    timezone={timezone}
+                    onEventEdit={onEventEdit}
+                    onEventDelete={(event) => handleEventDelete(event.id)}
+                    onEventView={onEventEdit}
+                  />
+                </div>
               )}
               {view === "agenda" && (
                 <AgendaView

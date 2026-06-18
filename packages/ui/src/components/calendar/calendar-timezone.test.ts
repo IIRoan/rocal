@@ -9,6 +9,7 @@ import {
   isMultiDayEvent,
   sortEvents,
 } from "./utils";
+import { getInclusiveCalendarDayRange } from "@workspace/calendar-core";
 
 function createEvent(
   overrides: Partial<CalendarEvent> = {},
@@ -23,6 +24,22 @@ function createEvent(
     ...overrides,
   };
 }
+
+describe("inclusive calendar day range", () => {
+  const timezone = "Europe/Amsterdam";
+
+  it("treats exclusive all-day end instants as the previous inclusive day", () => {
+    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
+      new Date("2026-06-19T22:00:00.000Z"),
+      new Date("2026-06-20T22:00:00.000Z"),
+      timezone,
+      { allDay: true },
+    );
+
+    expect(firstDay).toEqual(new Date(2026, 5, 20));
+    expect(lastDay).toEqual(new Date(2026, 5, 20));
+  });
+});
 
 describe("calendar timezone helpers", () => {
   const timezone = "Europe/Amsterdam";
@@ -87,7 +104,7 @@ describe("calendar timezone helpers", () => {
     );
   });
 
-  it("treats explicit all-day events as multi-day when they span picker days", () => {
+  it("treats explicit multi-day all-day events as multi-day", () => {
     const event = createEvent({
       start: "2026-06-15T22:00:00.000Z",
       end: "2026-06-17T22:00:00.000Z",
@@ -95,6 +112,16 @@ describe("calendar timezone helpers", () => {
     });
 
     expect(isMultiDayEvent(event, timezone)).toBe(true);
+  });
+
+  it("keeps a single-day all-day event as single-day", () => {
+    const event = createEvent({
+      start: "2026-06-19T22:00:00.000Z",
+      end: "2026-06-20T22:00:00.000Z",
+      allDay: true,
+    });
+
+    expect(isMultiDayEvent(event, timezone)).toBe(false);
   });
 
   it("lists spanning events that continue from a previous zoned day", () => {

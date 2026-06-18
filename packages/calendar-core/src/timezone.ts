@@ -2,6 +2,7 @@ import {
   addDays,
   eachDayOfInterval,
   endOfWeek,
+  startOfDay,
   startOfWeek,
 } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
@@ -144,6 +145,91 @@ export function pickerDateToAllDayUtcRange(
   return { start, end };
 }
 
+export function isStartOfZonedDay(instant: Date, timezone: string): boolean {
+  const parts = getZonedDateParts(instant, timezone);
+  return parts.hours === 0 && parts.minutes === 0 && parts.seconds === 0;
+}
+
+export function isSamePickerDay(left: Date, right: Date): boolean {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+function isUtcMidnight(instant: Date): boolean {
+  return (
+    instant.getUTCHours() === 0 &&
+    instant.getUTCMinutes() === 0 &&
+    instant.getUTCSeconds() === 0 &&
+    instant.getUTCMilliseconds() === 0
+  );
+}
+
+/**
+ * Returns the inclusive first/last calendar picker days covered by an event.
+ * All-day events may end at exclusive midnight, inclusive 23:59:59, or UTC date
+ * boundaries depending on how they were persisted.
+ */
+export function getInclusiveCalendarDayRange(
+  start: Date,
+  end: Date,
+  timezone: string,
+  options?: { allDay?: boolean },
+): { firstDay: Date; lastDay: Date } {
+  const resolvedTimezone = resolveTimezone(timezone);
+  const rawStart = new Date(start);
+  const rawEnd = new Date(end);
+  const firstDay = utcToPickerDate(rawStart, resolvedTimezone);
+
+  if (options?.allDay) {
+    if (rawEnd <= rawStart) {
+      return { firstDay, lastDay: firstDay };
+    }
+
+    const endPickerDay = utcToPickerDate(rawEnd, resolvedTimezone);
+
+    if (isSamePickerDay(firstDay, endPickerDay)) {
+      return { firstDay, lastDay: firstDay };
+    }
+
+    if (isStartOfZonedDay(rawEnd, resolvedTimezone) || isUtcMidnight(rawEnd)) {
+      return { firstDay, lastDay: addDays(endPickerDay, -1) };
+    }
+
+    return { firstDay, lastDay: endPickerDay };
+  }
+
+  let lastInstant = rawEnd;
+  if (
+    rawEnd > rawStart &&
+    isStartOfZonedDay(rawEnd, resolvedTimezone) &&
+    !isSameCalendarDayInTimezone(rawStart, rawEnd, resolvedTimezone)
+  ) {
+    lastInstant = new Date(rawEnd.getTime() - 1);
+  }
+
+  const lastDay = utcToPickerDate(lastInstant, resolvedTimezone);
+  return { firstDay, lastDay };
+}
+
+export function spansMultipleCalendarDays(
+  start: Date,
+  end: Date,
+  timezone: string,
+  options?: { allDay?: boolean },
+): boolean {
+  const { firstDay, lastDay } = getInclusiveCalendarDayRange(
+    start,
+    end,
+    timezone,
+    options,
+  );
+
+  return !isSamePickerDay(firstDay, lastDay);
+}
+
 export function isSameCalendarDayInTimezone(
   instant: Date,
   calendarDay: Date,
@@ -197,7 +283,22 @@ export function eventOverlapsZonedCalendarDay(
   eventEnd: Date,
   calendarDay: Date,
   timezone: string,
+  options?: { allDay?: boolean },
 ): boolean {
+  if (options?.allDay) {
+    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
+      eventStart,
+      eventEnd,
+      timezone,
+      { allDay: true },
+    );
+    const dayTime = startOfDay(calendarDay).getTime();
+    const firstTime = startOfDay(firstDay).getTime();
+    const lastTime = startOfDay(lastDay).getTime();
+
+    return dayTime >= firstTime && dayTime <= lastTime;
+  }
+
   const { start: dayStart, end: dayEnd } = getZonedDayUtcBounds(
     calendarDay,
     timezone,

@@ -11,6 +11,7 @@ import {
   formatInstantCalendarDayKey,
   formatInstantCalendarMonthKey,
   formatWallClockTime,
+  getInclusiveCalendarDayRange,
   getWeekCalendarDays,
   getZonedDateParts,
   getZonedDayUtcBounds,
@@ -383,6 +384,125 @@ describe("timezone UX round-trips", () => {
         new Date(2026, 5, 19),
         timezone,
       ),
+    ).toBe(false);
+  });
+});
+
+describe("getInclusiveCalendarDayRange", () => {
+  const timezone = "Europe/Amsterdam";
+  const friday = new Date(2026, 5, 19);
+  const saturday = new Date(2026, 5, 20);
+
+  it("treats a single-day all-day event as one inclusive picker day", () => {
+    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
+      new Date("2026-06-19T22:00:00.000Z"),
+      new Date("2026-06-20T22:00:00.000Z"),
+      timezone,
+      { allDay: true },
+    );
+
+    expect(firstDay).toEqual(new Date(2026, 5, 20));
+    expect(lastDay).toEqual(new Date(2026, 5, 20));
+  });
+
+  it("covers Friday through Monday for a multi-day all-day event", () => {
+    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
+      new Date("2026-06-19T22:00:00.000Z"),
+      new Date("2026-06-22T22:00:00.000Z"),
+      timezone,
+      { allDay: true },
+    );
+
+    expect(firstDay).toEqual(new Date(2026, 5, 20));
+    expect(lastDay).toEqual(new Date(2026, 5, 22));
+  });
+
+  it("keeps a Friday-only all-day event on Friday when stored at UTC midnight boundaries", () => {
+    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
+      new Date("2026-06-19T00:00:00.000Z"),
+      new Date("2026-06-20T00:00:00.000Z"),
+      timezone,
+      { allDay: true },
+    );
+
+    expect(firstDay).toEqual(friday);
+    expect(lastDay).toEqual(friday);
+  });
+
+  it("keeps a Friday-only all-day event on Friday with zoned exclusive midnight end", () => {
+    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
+      new Date("2026-06-18T22:00:00.000Z"),
+      new Date("2026-06-19T22:00:00.000Z"),
+      timezone,
+      { allDay: true },
+    );
+
+    expect(firstDay).toEqual(friday);
+    expect(lastDay).toEqual(friday);
+  });
+
+  it("keeps a Friday-only all-day event on Friday with inclusive 23:59:59 end", () => {
+    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
+      new Date("2026-06-18T22:00:00.000Z"),
+      new Date("2026-06-19T21:59:59.000Z"),
+      timezone,
+      { allDay: true },
+    );
+
+    expect(firstDay).toEqual(friday);
+    expect(lastDay).toEqual(friday);
+  });
+
+  it("covers inclusive picker end days from pickerDateToAllDayUtcRange", () => {
+    const range = pickerDateToAllDayUtcRange(
+      new Date(2026, 5, 16),
+      new Date(2026, 5, 18),
+      timezone,
+    );
+    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
+      range.start,
+      range.end,
+      timezone,
+      { allDay: true },
+    );
+
+    expect(firstDay).toEqual(new Date(2026, 5, 16));
+    expect(lastDay).toEqual(new Date(2026, 5, 18));
+  });
+});
+
+describe("eventOverlapsZonedCalendarDay all-day semantics", () => {
+  const timezone = "Europe/Amsterdam";
+  const friday = new Date(2026, 5, 19);
+  const saturday = new Date(2026, 5, 20);
+
+  it("includes a Friday all-day event on Friday only when stored at UTC midnight", () => {
+    const start = new Date("2026-06-19T00:00:00.000Z");
+    const end = new Date("2026-06-20T00:00:00.000Z");
+
+    expect(
+      eventOverlapsZonedCalendarDay(start, end, friday, timezone, {
+        allDay: true,
+      }),
+    ).toBe(true);
+    expect(
+      eventOverlapsZonedCalendarDay(start, end, saturday, timezone, {
+        allDay: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("excludes a Friday all-day event from Saturday with raw timed overlap", () => {
+    const start = new Date("2026-06-19T00:00:00.000Z");
+    const end = new Date("2026-06-20T00:00:00.000Z");
+
+    expect(
+      eventOverlapsZonedCalendarDay(start, end, saturday, timezone),
+    ).toBe(true);
+    expect(
+      eventOverlapsZonedCalendarDay(start, end, saturday, timezone, {
+        allDay: true,
+      }),
     ).toBe(false);
   });
 });

@@ -1,11 +1,11 @@
 import { createLogger } from "@workspace/logger";
-import type {
-  EventParticipant,
-  EventParticipantInput,
-  EventParticipantRole,
-  EventParticipantStatus,
+import {
+  resolveTimezone,
+  type EventParticipant,
+  type EventParticipantInput,
+  type EventParticipantRole,
+  type EventParticipantStatus,
 } from "@workspace/calendar-core";
-import { resolveTimezone } from "@workspace/calendar-core";
 import {
   buildIcsEventFile,
   type IcsBuildEventInput,
