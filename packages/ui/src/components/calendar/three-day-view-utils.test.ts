@@ -147,6 +147,31 @@ describe("three-day all-day event helpers", () => {
     ]);
   });
 
+  it("sorts multi-day all-day events before single-day events within each column", () => {
+    const events = [
+      createEvent({
+        id: "single",
+        allDay: true,
+        start: "2026-06-19T22:00:00.000Z",
+        end: "2026-06-20T22:00:00.000Z",
+      }),
+      createEvent({
+        id: "multi",
+        allDay: true,
+        start: "2026-06-19T22:00:00.000Z",
+        end: "2026-06-22T22:00:00.000Z",
+      }),
+    ];
+
+    const grouped = groupThreeDayAllDayEventsByDay(
+      events,
+      new Date(2026, 5, 20),
+      timezone,
+    );
+
+    expect(grouped[1]!.map((event) => event.id)).toEqual(["multi", "single"]);
+  });
+
   it("does not place a Friday all-day event in the Saturday column", () => {
     const events = [
       createEvent({
