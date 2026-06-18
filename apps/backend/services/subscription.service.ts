@@ -260,7 +260,9 @@ export class SubscriptionService implements ISubscriptionService {
       testParseResult = parseICSFile(icsContent, userTimezone);
 
       if (testParseResult.errors.length > 0) {
-        logger.warn("ICS parsing warnings:", testParseResult.errors);
+        logger.warn("ICS parsing warnings", {
+          warningCount: testParseResult.errors.length,
+        });
       }
     } catch (error) {
       throw new ValidationError(

@@ -12,6 +12,9 @@ import { authenticatedRouteDetail } from "../lib/openapi";
 import { env } from "../lib/env";
 import { resend, authEmailFrom } from "../lib/email-client";
 import { buildInviteEmail, sendAuthEmail } from "../lib/auth-email";
+import { emailDeliveryWarning } from "../lib/email-delivery";
+import { errorLogDetails } from "../lib/log-sanitization";
+import { resolveRequestId } from "../lib/request-context";
 import { inviteService } from "../lib/invite-service";
 import { RouteModel, routeModels } from "../contracts";
 
@@ -25,11 +28,13 @@ function buildInviteErrorResponse(
   statusCode: 400 | 403 | 404 | 409,
   error: string,
   message: string,
+  requestId: string,
 ): ApiErrorResponse {
   return {
     error,
     message,
     statusCode,
+    requestId,
     timestamp: new Date().toISOString(),
   };
 }
@@ -37,25 +42,28 @@ function buildInviteErrorResponse(
 function handleInviteRouteError(
   error: unknown,
   set: RouteSet,
+  request: Request,
 ): ApiErrorResponse | null {
+  const requestId = resolveRequestId(request);
+
   if (error instanceof ValidationError) {
     set.status = 400;
-    return buildInviteErrorResponse(400, "Validation Error", error.message);
+    return buildInviteErrorResponse(400, "Validation Error", error.message, requestId);
   }
 
   if (error instanceof ConflictError) {
     set.status = 409;
-    return buildInviteErrorResponse(409, "Conflict", error.message);
+    return buildInviteErrorResponse(409, "Conflict", error.message, requestId);
   }
 
   if (error instanceof ForbiddenError) {
     set.status = 403;
-    return buildInviteErrorResponse(403, "Forbidden", error.message);
+    return buildInviteErrorResponse(403, "Forbidden", error.message, requestId);
   }
 
   if (error instanceof NotFoundError) {
     set.status = 404;
-    return buildInviteErrorResponse(404, "Not Found", error.message);
+    return buildInviteErrorResponse(404, "Not Found", error.message, requestId);
   }
 
   return null;
@@ -71,7 +79,7 @@ export const inviteRoutes = new Elysia({
     app
       .post(
         "/",
-        async ({ routeUser, body, set }) => {
+        async ({ routeUser, body, set, request }) => {
           try {
             const invite = await inviteService.createInvite({
               invitedById: routeUser.id,
@@ -86,7 +94,7 @@ export const inviteRoutes = new Elysia({
             const inviterName =
               (routeUser.name as string | null | undefined)?.trim() || "Someone";
 
-            await sendAuthEmail({
+            const delivery = await sendAuthEmail({
               client: resend,
               from: authEmailFrom,
               to: invite.email,
@@ -102,14 +110,21 @@ export const inviteRoutes = new Elysia({
               developmentFallbackContext: { signupUrl, token: invite.token },
             });
 
-            return invite;
+            const warnings = delivery.delivered
+              ? []
+              : [emailDeliveryWarning("invite", invite.email)];
+
+            return {
+              ...invite,
+              ...(warnings.length > 0 ? { warnings } : {}),
+            };
           } catch (error) {
-            const handled = handleInviteRouteError(error, set);
+            const handled = handleInviteRouteError(error, set, request);
             if (handled) {
               return handled;
             }
 
-            logger.error("Failed to create invite", error);
+            logger.error("Failed to create invite", errorLogDetails(error));
             throw error;
           }
         },
@@ -123,16 +138,16 @@ export const inviteRoutes = new Elysia({
       )
       .get(
         "/",
-        async ({ routeUser, set }) => {
+        async ({ routeUser, set, request }) => {
           try {
             return await inviteService.listInvites({ invitedById: routeUser.id });
           } catch (error) {
-            const handled = handleInviteRouteError(error, set);
+            const handled = handleInviteRouteError(error, set, request);
             if (handled) {
               return handled;
             }
 
-            logger.error("Failed to list invites", error);
+            logger.error("Failed to list invites", errorLogDetails(error));
             throw error;
           }
         },
@@ -145,19 +160,19 @@ export const inviteRoutes = new Elysia({
       )
       .delete(
         "/:id",
-        async ({ routeUser, params, set }) => {
+        async ({ routeUser, params, set, request }) => {
           try {
             return await inviteService.revokeInvite({
               id: params.id,
               invitedById: routeUser.id,
             });
           } catch (error) {
-            const handled = handleInviteRouteError(error, set);
+            const handled = handleInviteRouteError(error, set, request);
             if (handled) {
               return handled;
             }
 
-            logger.error("Failed to revoke invite", error);
+            logger.error("Failed to revoke invite", errorLogDetails(error));
             throw error;
           }
         },

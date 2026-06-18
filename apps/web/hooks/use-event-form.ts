@@ -12,6 +12,7 @@ import type {
 } from "@workspace/calendar-core";
 import {
   getEventPickerDateRange,
+  getOperationWarningMessages,
   pickerDateAndTimeToUtc,
   pickerDateToAllDayUtcRange,
 } from "@workspace/calendar-core";
@@ -630,6 +631,11 @@ export function useEventForm({
           });
           savedEventId = persistedEvent?.id ?? selectedEvent.id;
           toast.success(`Event "${eventTitle}" updated`);
+          for (const warningMessage of getOperationWarningMessages(
+            persistedEvent,
+          )) {
+            toast.warning(warningMessage);
+          }
         } else {
           const newEvent = await calendarData.createEvent({
             title: eventData.title,
@@ -647,6 +653,9 @@ export function useEventForm({
           persistedEvent = newEvent;
           savedEventId = newEvent.id;
           toast.success(`Event "${eventTitle}" created`);
+          for (const warningMessage of getOperationWarningMessages(newEvent)) {
+            toast.warning(warningMessage);
+          }
         }
 
         // Save notifications (non-blocking, sanitized)

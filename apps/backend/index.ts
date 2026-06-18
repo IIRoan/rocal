@@ -34,7 +34,9 @@ import {
   defaultMailRealtimeService,
   realtimeMailRoutes,
 } from "./routes/realtime-mail";
-import { errorHandler } from "./lib/errors";
+import { handleApiError } from "./lib/errors";
+import { errorLogDetails } from "./lib/log-sanitization";
+import { requestContext } from "./lib/request-context";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
 import {
   API_DOCS_SPEC_PATH,
@@ -101,7 +103,7 @@ async function buildApiDocumentation() {
       paths: authDocumentation.paths,
     };
   } catch (error) {
-    logger.warn("Failed to generate Better Auth OpenAPI schema", { error });
+    logger.warn("Failed to generate Better Auth OpenAPI schema", errorLogDetails(error));
 
     return {
       info: {
@@ -143,7 +145,7 @@ const betterAuth = new Elysia({ name: "better-auth" })
         session: session?.session,
       };
     } catch (error) {
-      logger.error("Auth Middleware Error:", error);
+      logger.error("Auth middleware error", errorLogDetails(error));
       return {
         user: null,
         session: null,
@@ -352,7 +354,8 @@ export const createAPI = (prefix = "") => {
         },
       },
     )
-    .use(errorHandler)
+    .use(requestContext)
+    .onError(handleApiError)
     .use(betterAuth)
     .get("/", () => ({ message: "API is running" }), {
       detail: {

@@ -96,7 +96,7 @@ function createParticipantService() {
   return {
     syncParticipants: jest.fn(async () => ({
       participants: [],
-      sendPendingInvitations: jest.fn(async () => undefined),
+      sendPendingInvitations: jest.fn(async () => []),
     })),
   };
 }

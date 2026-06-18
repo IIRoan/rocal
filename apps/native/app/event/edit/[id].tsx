@@ -18,6 +18,7 @@ import { resolveTimezone } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useToast } from "../../../src/providers/ToastProvider";
+import { toastOperationWarnings } from "../../../src/lib/operation-warnings";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { EventForm } from "../../../src/components/event/EventForm";
@@ -105,12 +106,13 @@ export default function EventEditScreen() {
       }
       return calendarApiService.updateEvent(id!, data);
     },
-    onSuccess: () => {
+    onSuccess: (savedEvent) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.eventDetail(id!),
       });
       toast("Event updated");
+      toastOperationWarnings(toast, savedEvent);
       router.back();
     },
     onError: (err: unknown) => {

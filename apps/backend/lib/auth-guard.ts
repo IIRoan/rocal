@@ -1,12 +1,16 @@
 import { Elysia, status } from "elysia";
+import { createLogger } from "@workspace/logger";
 import { auth } from "./auth";
 import { forbiddenBody, unauthorizedBody } from "./api-error-response";
 import { hasUserId, type AuthenticatedUser } from "./auth-utils";
+import { errorLogDetails } from "./log-sanitization";
 import { prisma } from "./prisma";
 import {
   getPasskeyStepUpStatus,
   hasVerifiedPasskeyStepUp,
 } from "./passkey-step-up";
+
+const logger = createLogger("backend:auth-guard");
 
 type AuthParentContext = {
   authenticatedUser?: AuthenticatedUser | null;
@@ -36,8 +40,8 @@ async function resolveAuthenticatedUser(
     if (hasUserId(authData?.user) && typeof authData.user.id === "string") {
       return authData.user;
     }
-  } catch {
-    // Normalize auth provider failures into a 401 below.
+  } catch (error) {
+    logger.debug("Session resolution failed", errorLogDetails(error));
   }
 
   return null;

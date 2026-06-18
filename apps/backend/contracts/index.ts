@@ -113,6 +113,7 @@ export * from "./category.contract";
 export * from "./e2ee.contract";
 export * from "./event.contract";
 export * from "./invite.contract";
+export * from "./logging.contract";
 export * from "./mail.contract";
 export * from "./notification.contract";
 export * from "./recurring.contract";
