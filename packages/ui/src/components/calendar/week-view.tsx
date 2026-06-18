@@ -3,15 +3,21 @@
 import React, { useLayoutEffect, useMemo, useRef } from "react";
 import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
+  eventOverlapsZonedCalendarDay,
+  getWeekCalendarDays,
+  isTodayInTimezone,
+  resolveTimezone,
+  utcToPickerDate,
+  wallClockToUtc,
+} from "@workspace/calendar-core";
+import {
   addHours,
-  eachDayOfInterval,
   eachHourOfInterval,
   endOfWeek,
   format,
   getHours,
   isBefore,
   isSameDay,
-  isToday,
   startOfDay,
   startOfWeek,
   isWithinInterval,
@@ -69,15 +75,11 @@ export const WeekView = React.memo(function WeekView({
   onEventView,
 }: WeekViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const days = useMemo(() => {
-    const weekStart = startOfWeek(currentDate, {
-      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-    });
-    const weekEnd = endOfWeek(currentDate, {
-      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-    });
-    return eachDayOfInterval({ start: weekStart, end: weekEnd });
-  }, [currentDate, weekStartDay]);
+  const resolvedTimezone = resolveTimezone(timezone);
+  const days = useMemo(
+    () => getWeekCalendarDays(currentDate, weekStartDay, resolvedTimezone),
+    [currentDate, weekStartDay, resolvedTimezone],
+  );
 
   const weekStart = useMemo(
     () =>
@@ -125,20 +127,16 @@ export const WeekView = React.memo(function WeekView({
     const result = days.map((day) => {
       // Get events for this day that are not all-day events or multi-day events
       const dayEvents = events.filter((event) => {
-        // Skip all-day events and multi-day events
         if (event.allDay || isMultiDayEvent(event)) return false;
 
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
 
-        // Check if event is on this day
-        // Use proper date comparison for spanning events
-        const dayStart = startOfDay(day);
-        const dayEnd = addHours(dayStart, 24);
-        return (
-          isSameDay(day, eventStart) ||
-          isSameDay(day, eventEnd) ||
-          (eventStart < dayEnd && eventEnd > dayStart)
+        return eventOverlapsZonedCalendarDay(
+          eventStart,
+          eventEnd,
+          day,
+          resolvedTimezone,
         );
       });
 
@@ -153,6 +151,7 @@ export const WeekView = React.memo(function WeekView({
         cellHeight: WeekCellsHeight,
         startHour: StartHour,
         widthStrategy: "no-overflow",
+        timezone: resolvedTimezone,
       }).map((positionedEvent) => ({
         ...positionedEvent,
         dayIndex: 0,
@@ -160,7 +159,7 @@ export const WeekView = React.memo(function WeekView({
     });
 
     return result;
-  }, [days, events]);
+  }, [days, events, resolvedTimezone]);
 
   const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -213,7 +212,7 @@ export const WeekView = React.memo(function WeekView({
               <span
                 className={cn(
                   "text-[11px] font-medium uppercase tracking-wider",
-                  isToday(day)
+                  isTodayInTimezone(day, resolvedTimezone)
                     ? "rounded-md bg-primary px-2 py-1 font-medium text-primary-foreground"
                     : "",
                 )}
@@ -239,7 +238,7 @@ export const WeekView = React.memo(function WeekView({
               <span
                 className={cn(
                   "text-[10px] font-medium uppercase",
-                  isToday(day)
+                  isTodayInTimezone(day, resolvedTimezone)
                     ? "rounded-md bg-primary px-1.5 py-0.5 font-medium text-primary-foreground"
                     : "",
                 )}
@@ -356,9 +355,13 @@ export const WeekView = React.memo(function WeekView({
           <div
             key={dayIndex}
             className={`border-border/70 relative border-r last:border-r-0 grid auto-cols-fr ${
-              isToday(day) ? "bg-[var(--calendar-accent-bg)]/20" : ""
+              isTodayInTimezone(day, resolvedTimezone)
+                ? "bg-[var(--calendar-accent-bg)]/20"
+                : ""
             }`}
-            data-today={isToday(day) || undefined}
+            data-today={
+              isTodayInTimezone(day, resolvedTimezone) || undefined
+            }
           >
             {/* Positioned events */}
             {(processedDayEvents[dayIndex] ?? []).map(
@@ -398,7 +401,7 @@ export const WeekView = React.memo(function WeekView({
             )}
 
             {/* Current time indicator - only show for today's column */}
-            {currentTimeVisible && isToday(day) && (
+            {currentTimeVisible && isTodayInTimezone(day, resolvedTimezone) && (
               <CurrentTimeIndicator
                 position={currentTimePosition}
                 variant="calendar-accent"
@@ -431,10 +434,14 @@ export const WeekView = React.memo(function WeekView({
                             "top-[calc(var(--week-cells-height)/4*3)]",
                         )}
                         onClick={() => {
-                          const startTime = new Date(day);
-                          startTime.setHours(hourValue);
-                          startTime.setMinutes(quarter * 15);
-                          onEventCreate(startTime);
+                          onEventCreate(
+                            wallClockToUtc(
+                              day,
+                              hourValue,
+                              quarter * 15,
+                              resolvedTimezone,
+                            ),
+                          );
                         }}
                       />
                     );

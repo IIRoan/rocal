@@ -18,6 +18,7 @@ import {
 import { resolveEventPersistencePolicy } from "../lib/event-encryption";
 import {
   indexInvitationImportEncryption,
+  resolveTimezone,
   type InvitationImportEncryptionPayload,
 } from "@workspace/calendar-core";
 
@@ -155,7 +156,7 @@ function toEventUpdateData(parsedEvent: ParsedIcsEvent) {
     allDay: parsedEvent.allDay,
     location: parsedEvent.location ?? null,
     recurrence: recurrenceToJson(parsedEvent),
-    timezone: parsedEvent.timezone || "UTC",
+    timezone: resolveTimezone(parsedEvent.timezone),
     isCancelled: false,
     syncedAt: new Date(),
   };
@@ -352,7 +353,7 @@ export class MailCalendarIngestionService {
         start: parsedEvent.start,
         end: parsedEvent.end,
         allDay: parsedEvent.allDay,
-        timezone: parsedEvent.timezone || "UTC",
+        timezone: resolveTimezone(parsedEvent.timezone),
         location: parsedEvent.location ?? null,
         recurrence: recurrenceToJson(parsedEvent),
         reminder: null,
@@ -470,7 +471,7 @@ export class MailCalendarIngestionService {
       select: { timezone: true },
     });
 
-    return userSettings?.timezone || "UTC";
+    return resolveTimezone(userSettings?.timezone);
   }
 
   private async applyAttendeeStatusForUser(input: {
@@ -547,7 +548,7 @@ export class MailCalendarIngestionService {
       start: parsedEvent.start,
       end: parsedEvent.end,
       allDay: parsedEvent.allDay,
-      timezone: parsedEvent.timezone || "UTC",
+      timezone: resolveTimezone(parsedEvent.timezone),
       location: parsedEvent.location ?? null,
       recurrence: recurrenceToJson(parsedEvent),
       reminder: null,

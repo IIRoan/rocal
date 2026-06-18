@@ -5,6 +5,10 @@ import {
   isSameDay,
   startOfDay,
 } from "date-fns";
+import {
+  getZonedDayUtcBounds,
+  isSameCalendarDayInTimezone,
+} from "@workspace/calendar-core";
 
 import { CalendarEvent } from "./types";
 
@@ -20,6 +24,7 @@ interface TimelineLayoutOptions {
   minHeight?: number;
   sortByDurationOnTie?: boolean;
   widthStrategy: TimelineWidthStrategy;
+  timezone?: string;
 }
 
 export interface PositionedTimelineEvent {
@@ -37,10 +42,28 @@ interface TimelineColumnEvent {
   end: Date;
 }
 
-function getAdjustedEventInterval(event: CalendarEvent, day: Date) {
-  const dayStart = startOfDay(day);
+function getAdjustedEventInterval(
+  event: CalendarEvent,
+  day: Date,
+  timezone?: string,
+) {
   const eventStart = new Date(event.start);
   const eventEnd = new Date(event.end);
+
+  if (timezone) {
+    const { start: dayStart, end: dayEnd } = getZonedDayUtcBounds(day, timezone);
+
+    return {
+      start: isSameCalendarDayInTimezone(eventStart, day, timezone)
+        ? eventStart
+        : dayStart,
+      end: isSameCalendarDayInTimezone(eventEnd, day, timezone)
+        ? eventEnd
+        : dayEnd,
+    };
+  }
+
+  const dayStart = startOfDay(day);
 
   return {
     start: isSameDay(day, eventStart) ? eventStart : dayStart,
@@ -78,6 +101,7 @@ function calculateEqualColumns(columnCount: number, columnIndex: number) {
 function buildOverlapClusters(
   events: CalendarEvent[],
   day: Date,
+  timezone?: string,
 ): Map<CalendarEvent, CalendarEvent[]> {
   const parent = new Map<CalendarEvent, CalendarEvent>();
 
@@ -108,8 +132,8 @@ function buildOverlapClusters(
 
       if (
         areIntervalsOverlapping(
-          getAdjustedEventInterval(left, day),
-          getAdjustedEventInterval(right, day),
+          getAdjustedEventInterval(left, day, timezone),
+          getAdjustedEventInterval(right, day, timezone),
         )
       ) {
         union(left, right);
@@ -228,6 +252,7 @@ export function layoutTimelineEvents(
     minHeight = 22,
     sortByDurationOnTie = false,
     widthStrategy,
+    timezone,
   }: TimelineLayoutOptions,
 ): PositionedTimelineEvent[] {
   const sortedEvents = sortTimelineEvents(events, sortByDurationOnTie);
@@ -235,7 +260,7 @@ export function layoutTimelineEvents(
   const eventColumnMapping = new Map<CalendarEvent, number>();
 
   sortedEvents.forEach((event) => {
-    const adjustedInterval = getAdjustedEventInterval(event, day);
+    const adjustedInterval = getAdjustedEventInterval(event, day, timezone);
     let columnIndex = 0;
     let placed = false;
 
@@ -267,7 +292,7 @@ export function layoutTimelineEvents(
     eventColumnMapping.set(event, columnIndex);
   });
 
-  const eventClusters = buildOverlapClusters(sortedEvents, day);
+  const eventClusters = buildOverlapClusters(sortedEvents, day, timezone);
   const clusterColumnCounts = new Map<CalendarEvent, number>();
 
   for (const event of sortedEvents) {
@@ -279,8 +304,10 @@ export function layoutTimelineEvents(
   }
 
   return sortedEvents.map((event) => {
-    const adjustedInterval = getAdjustedEventInterval(event, day);
-    const dayStart = startOfDay(day);
+    const adjustedInterval = getAdjustedEventInterval(event, day, timezone);
+    const dayStart = timezone
+      ? getZonedDayUtcBounds(day, timezone).start
+      : startOfDay(day);
     const start = differenceInMinutes(adjustedInterval.start, dayStart) / 60;
     const end = differenceInMinutes(adjustedInterval.end, dayStart) / 60;
     const top = (start - startHour) * cellHeight;

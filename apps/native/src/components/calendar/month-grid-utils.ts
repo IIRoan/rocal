@@ -6,6 +6,11 @@ import {
   isSameMonth,
 } from "date-fns";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import {
+  formatCalendarDayKey,
+  formatInstantCalendarDayKey,
+  resolveTimezone,
+} from "@workspace/calendar-core";
 import type { CalendarColor, ThemeTokens } from "@workspace/design-tokens";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -108,10 +113,14 @@ export function getCompactStripWeekRowOffset(
  */
 export function groupEventsByDay(
   events: DecoratedCalendarEvent[],
+  timezone?: string,
 ): Map<string, DecoratedCalendarEvent[]> {
+  const resolvedTimezone = timezone ? resolveTimezone(timezone) : null;
   const map = new Map<string, DecoratedCalendarEvent[]>();
   for (const event of events) {
-    const key = format(new Date(event.start), "yyyy-MM-dd");
+    const key = resolvedTimezone
+      ? formatInstantCalendarDayKey(new Date(event.start), resolvedTimezone)
+      : formatCalendarDayKey(new Date(event.start));
     const list = map.get(key);
     if (list) {
       list.push(event);
@@ -131,7 +140,7 @@ export function getMonthDayEvents(
     return [];
   }
 
-  return eventsByDay.get(format(date, "yyyy-MM-dd")) ?? [];
+  return eventsByDay.get(formatCalendarDayKey(date)) ?? [];
 }
 
 /**

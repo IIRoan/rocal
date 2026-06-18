@@ -7,9 +7,14 @@ import {
   type ViewStyle,
   type TextStyle,
 } from "react-native";
-import { isSameMonth, isSameDay, format } from "date-fns";
+import { isSameMonth, format } from "date-fns";
 import { useTheme } from "../../providers/ThemeProvider";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import {
+  formatCalendarDayKey,
+  isTodayInTimezone,
+  resolveTimezone,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import {
   MAX_DOTS,
@@ -19,7 +24,6 @@ import {
   groupEventsByDay,
   resolveEventDotColor,
 } from "./month-grid-utils";
-import { useCurrentDateTime } from "./useCurrentDateTime";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -32,6 +36,7 @@ interface MonthGridProps {
   events: DecoratedCalendarEvent[];
   /** Week start day: 0 = Sunday, 1 = Monday */
   weekStartDay: number;
+  timezone?: string;
   /** Callback when a day cell is tapped */
   onDayPress?: (date: Date) => void;
 }
@@ -43,11 +48,12 @@ export function MonthGrid({
   selectedDate,
   events,
   weekStartDay,
+  timezone,
   onDayPress,
 }: MonthGridProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const today = useCurrentDateTime();
+  const resolvedTimezone = resolveTimezone(timezone);
 
   const dayLabels = useMemo(
     () => getOrderedDayLabels(weekStartDay),
@@ -59,7 +65,10 @@ export function MonthGrid({
     [currentDate, weekStartDay],
   );
 
-  const eventsByDay = useMemo(() => groupEventsByDay(events), [events]);
+  const eventsByDay = useMemo(
+    () => groupEventsByDay(events, resolvedTimezone),
+    [events, resolvedTimezone],
+  );
 
   return (
     <View style={styles.container}>
@@ -76,14 +85,15 @@ export function MonthGrid({
       {Array.from({ length: 6 }, (_, rowIndex) => (
         <View key={rowIndex} style={styles.row}>
           {gridDates.slice(rowIndex * 7, rowIndex * 7 + 7).map((date) => {
-            const dateKey = format(date, "yyyy-MM-dd");
+            const dateKey = formatCalendarDayKey(date);
             const isCurrentMonth = isSameMonth(date, currentDate);
-            const isToday = isCurrentMonth && isSameDay(date, today);
+            const isToday =
+              isCurrentMonth && isTodayInTimezone(date, resolvedTimezone);
             const isSelected =
               isCurrentMonth &&
               selectedDate != null &&
               !isToday &&
-              isSameDay(date, selectedDate);
+              formatCalendarDayKey(date) === formatCalendarDayKey(selectedDate);
             const dayEvents = getMonthDayEvents(
               eventsByDay,
               date,

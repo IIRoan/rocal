@@ -27,6 +27,7 @@ interface AgendaListProps {
   events: DecoratedCalendarEvent[];
   /** Time format: "12h" or "24h" */
   timeFormat?: "12h" | "24h";
+  timezone?: string;
   /** Whether data is currently being refreshed */
   refreshing?: boolean;
   /** Callback when pull-to-refresh is triggered */
@@ -42,6 +43,7 @@ interface AgendaListProps {
 export function AgendaList({
   events,
   timeFormat = "12h",
+  timezone,
   refreshing = false,
   onRefresh,
   onEventPress,
@@ -50,7 +52,10 @@ export function AgendaList({
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const sections = useMemo(() => groupEventsIntoSections(events), [events]);
+  const sections = useMemo(
+    () => groupEventsIntoSections(events, timezone),
+    [events, timezone],
+  );
 
   if (events.length === 0) {
     return (
@@ -79,7 +84,7 @@ export function AgendaList({
       renderItem={({ item }) => {
         const colors = resolveEventBlockColor(item.color, theme);
         const calendarName = item.calendar?.name;
-        const timeLabel = formatEventTime(item, timeFormat);
+        const timeLabel = formatEventTime(item, timeFormat, timezone);
 
         const accessibilityParts = [item.title, timeLabel];
         if (calendarName) accessibilityParts.push(calendarName);

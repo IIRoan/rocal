@@ -37,13 +37,25 @@ export const recurrenceFrequencySchema = z.enum([
   "yearly",
 ]);
 
+export const timezoneSchema = z.string().refine(
+  (timezone) => {
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: timezone });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  { message: "Invalid timezone identifier" },
+);
+
 export const recurrenceRuleObjectSchema = z
   .object({
     frequency: recurrenceFrequencySchema,
     interval: z.number().int().min(1).max(999),
     count: z.number().int().min(1).optional(),
     until: z.string().optional(),
-    timezone: z.string().optional(),
+    timezone: timezoneSchema.optional(),
     byWeekDay: z.array(z.number().int().min(0).max(6)).optional(),
     byMonthDay: z.array(z.number().int().min(1).max(31)).optional(),
     byMonth: z.array(z.number().int().min(1).max(12)).optional(),

@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { format, isSameDay } from "date-fns";
+import { format } from "date-fns";
 import { XIcon } from "lucide-react";
+import {
+  isSameCalendarDayInTimezone,
+  resolveTimezone,
+} from "@workspace/calendar-core";
 
 import { EventItem } from "./event-item";
 import { CalendarEvent } from "./types";
@@ -25,6 +29,7 @@ export function EventsPopup({
   timezone,
 }: EventsPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
+  const resolvedTimezone = resolveTimezone(timezone);
 
   // Handle click outside to close popup
   useEffect(() => {
@@ -113,8 +118,16 @@ export function EventsPopup({
           events.map((event) => {
             const eventStart = new Date(event.start);
             const eventEnd = new Date(event.end);
-            const isFirstDay = isSameDay(date, eventStart);
-            const isLastDay = isSameDay(date, eventEnd);
+            const isFirstDay = isSameCalendarDayInTimezone(
+              eventStart,
+              date,
+              resolvedTimezone,
+            );
+            const isLastDay = isSameCalendarDayInTimezone(
+              eventEnd,
+              date,
+              resolvedTimezone,
+            );
 
             return (
               <div

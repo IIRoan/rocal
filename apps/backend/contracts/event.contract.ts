@@ -5,6 +5,7 @@ import {
   invitationImportStatusSchema,
   optionalCalendarColorSchema,
   rsvpStatusSchema,
+  timezoneSchema,
 } from "@workspace/calendar-core";
 import { strictZodObject } from "../lib/validation";
 import {
@@ -53,7 +54,7 @@ const eventWritableFieldsSchema = {
   color: optionalCalendarColorSchema,
   calendarId: z.string(),
   categoryId: z.string().optional(),
-  timezone: z.string().optional(),
+  timezone: timezoneSchema.optional(),
   reminder: reminderFieldSchema.optional(),
   recurrence: z.string().optional(),
   ...eventContentEncryptionFieldsSchema.shape,
@@ -67,7 +68,7 @@ export const updateEventBodySchema = strictZodObject({
   description: z.string().max(1000).optional(),
   start: z.string().optional(),
   end: z.string().optional(),
-  timezone: z.string().optional(),
+  timezone: timezoneSchema.optional(),
   allDay: z.boolean().optional(),
   location: z.string().max(255).optional(),
   color: optionalCalendarColorSchema,

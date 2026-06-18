@@ -14,6 +14,7 @@ import type {
   CreateEventRequest,
   RecurrenceEditScope,
 } from "@workspace/calendar-core";
+import { resolveTimezone } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useToast } from "../../../src/providers/ToastProvider";
@@ -21,7 +22,7 @@ import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { EventForm } from "../../../src/components/event/EventForm";
 import { LoadingScreen } from "../../../src/components/ui/loading";
-import { toLocalISOString } from "../../../src/components/event/event-form-utils";
+import { toTimezonePickerISOString } from "../../../src/components/event/event-form-utils";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -31,13 +32,15 @@ import { toLocalISOString } from "../../../src/components/event/event-form-utils
  */
 function eventToInitialValues(
   event: CalendarEvent,
+  timezone?: string,
 ): Partial<CreateEventRequest> {
+  const resolvedTimezone = resolveTimezone(timezone ?? event.timezone);
   return {
     title: event.title,
     description: event.description ?? undefined,
-    start: toLocalISOString(new Date(event.start)),
-    end: toLocalISOString(new Date(event.end)),
-    timezone: event.timezone ?? undefined,
+    start: toTimezonePickerISOString(new Date(event.start), resolvedTimezone),
+    end: toTimezonePickerISOString(new Date(event.end), resolvedTimezone),
+    timezone: resolvedTimezone,
     allDay: event.allDay ?? false,
     location: event.location ?? undefined,
     color: event.color ?? undefined,
@@ -82,6 +85,11 @@ export default function EventEditScreen() {
     queryKey: QUERY_KEYS.calendars(),
     queryFn: () => calendarApiService.getCalendars(),
   });
+  const { data: settings } = useQuery({
+    queryKey: QUERY_KEYS.settings(),
+    queryFn: () => calendarApiService.getUserSettings(),
+  });
+  const resolvedTimezone = resolveTimezone(settings?.timezone);
 
   // ─── Update mutation ───────────────────────────────────────────────────────
 
@@ -132,8 +140,8 @@ export default function EventEditScreen() {
 
   const initialValues = useMemo(() => {
     if (!event) return undefined;
-    return eventToInitialValues(event);
-  }, [event]);
+    return eventToInitialValues(event, resolvedTimezone);
+  }, [event, resolvedTimezone]);
 
   // ─── Loading state ─────────────────────────────────────────────────────────
 

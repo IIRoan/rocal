@@ -2,6 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createLogger } from "@workspace/logger";
+import {
+  formatInUserTimezone,
+  getZonedDateParts,
+  getZonedDayUtcBounds,
+  isTodayInTimezone,
+  resolveTimezone,
+  wallClockToUtc,
+} from "@workspace/calendar-core";
 import { useCalendarContext } from "./calendar-context";
 import {
   addDays,
@@ -188,6 +196,7 @@ export function MobileEventCalendar({
     useCalendarContext();
   const currentDate = currentDateOverride || contextCurrentDate;
   const isMobile = useIsMobile();
+  const resolvedTimezone = resolveTimezone(timezone);
 
   // Initialize view from sessionStorage or fallback to smart default
   const [view, setViewState] = useState<CalendarView>(() => {
@@ -308,15 +317,10 @@ export function MobileEventCalendar({
         weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
       });
     } else if (v === "day") {
-      start = new Date(date);
-      start.setHours(0, 0, 0, 0);
-      end = new Date(date);
-      end.setHours(23, 59, 59, 999);
+      ({ start, end } = getZonedDayUtcBounds(date, resolvedTimezone));
     } else if (v === "3day") {
-      start = addDays(date, -1);
-      start.setHours(0, 0, 0, 0);
-      end = addDays(date, 1);
-      end.setHours(23, 59, 59, 999);
+      start = getZonedDayUtcBounds(addDays(date, -1), resolvedTimezone).start;
+      end = getZonedDayUtcBounds(addDays(date, 1), resolvedTimezone).end;
     } else if (v === "agenda") {
       start = new Date(date);
       end = addDays(date, AgendaDaysToShow - 1);
@@ -330,7 +334,7 @@ export function MobileEventCalendar({
   // Calculate date range based on current view and date
   const dateRange = useMemo(
     () => computeDateRange(currentDate, view),
-    [currentDate, view],
+    [currentDate, resolvedTimezone, view],
   );
 
   // Notify parent of date range changes (fallback for view changes, external date changes, etc.)
@@ -441,13 +445,21 @@ export function MobileEventCalendar({
       if (event.id) {
         savedEvent = await updateEvent(event.id, eventData);
         toast.success(`Event "${event.title}" updated`, {
-          description: format(new Date(event.start), "MMM d, yyyy 'at' h:mm a"),
+          description: formatInUserTimezone(
+            new Date(event.start),
+            resolvedTimezone,
+            "MMM d, yyyy 'at' h:mm a",
+          ),
           position: "bottom-left",
         });
       } else {
         savedEvent = await createEvent(eventData);
         toast.success(`Event "${event.title}" created`, {
-          description: format(new Date(event.start), "MMM d, yyyy 'at' h:mm a"),
+          description: formatInUserTimezone(
+            new Date(event.start),
+            resolvedTimezone,
+            "MMM d, yyyy 'at' h:mm a",
+          ),
           position: "bottom-left",
         });
       }
@@ -485,7 +497,11 @@ export function MobileEventCalendar({
 
       if (deletedEvent) {
         toast.success(`Event "${deletedEvent.title}" deleted`, {
-          description: format(new Date(deletedEvent.start), "MMM d, yyyy"),
+          description: formatInUserTimezone(
+            new Date(deletedEvent.start),
+            resolvedTimezone,
+            "MMM d, yyyy",
+          ),
           position: "bottom-left",
         });
       }
@@ -514,8 +530,9 @@ export function MobileEventCalendar({
       await updateEvent(updatedEvent.id, eventData);
 
       toast.success(`Event "${updatedEvent.title}" moved`, {
-        description: format(
+        description: formatInUserTimezone(
           new Date(updatedEvent.start),
+          resolvedTimezone,
           "MMM d, yyyy 'at' h:mm a",
         ),
         position: "bottom-left",
@@ -690,18 +707,27 @@ export function MobileEventCalendar({
                   variant="outline"
                   className="max-sm:h-8 max-sm:px-2.5!"
                   onClick={() => {
-                    const startTime = new Date(currentDate);
                     const now = new Date();
+                    let startTime: Date;
 
-                    if (startTime.toDateString() === now.toDateString()) {
-                      startTime.setHours(
-                        now.getHours(),
-                        now.getMinutes(),
-                        0,
-                        0,
+                    if (isTodayInTimezone(currentDate, resolvedTimezone)) {
+                      const { hours, minutes } = getZonedDateParts(
+                        now,
+                        resolvedTimezone,
+                      );
+                      startTime = wallClockToUtc(
+                        currentDate,
+                        hours,
+                        minutes,
+                        resolvedTimezone,
                       );
                     } else {
-                      startTime.setHours(9, 0, 0, 0);
+                      startTime = wallClockToUtc(
+                        currentDate,
+                        9,
+                        0,
+                        resolvedTimezone,
+                      );
                     }
 
                     handleEventCreate(startTime);

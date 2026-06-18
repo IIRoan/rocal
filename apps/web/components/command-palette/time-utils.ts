@@ -1,4 +1,11 @@
 import { format } from "date-fns";
+import {
+  formatWallClockTime,
+  pickerDateAndTimeToUtc,
+  pickerDateToAllDayUtcRange,
+  resolveTimezone,
+  utcToPickerDate,
+} from "@workspace/calendar-core";
 
 export interface TimeValidationResult {
   isValid: boolean;
@@ -6,7 +13,11 @@ export interface TimeValidationResult {
   error?: string;
 }
 
-export const formatTimeForInput = (date: Date) => {
+export const formatTimeForInput = (date: Date, timezone?: string) => {
+  if (timezone) {
+    return formatWallClockTime(date, resolveTimezone(timezone));
+  }
+
   const hours = date.getHours().toString().padStart(2, "0");
   const minutes = date.getMinutes();
   return `${hours}:${minutes.toString().padStart(2, "0")}`;

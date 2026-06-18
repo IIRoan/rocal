@@ -11,12 +11,13 @@ import { addMonths, subMonths } from "date-fns";
 import {
   buildPaddedCalendarMonthRanges,
   type DecoratedCalendarEvent,
-  getDefaultCalendarDateRange,
   getPaddedCalendarMonthRange,
   createCalendarMap,
   createVisibleCalendarIdSet,
   transformCalendarEvents,
   resolveCalendarLoadingState,
+  formatCalendarDayKey,
+  resolveTimezone,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
@@ -26,6 +27,7 @@ import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import {
   getSurroundingCalendarDateRange,
+  getTimezoneAwareCalendarDateRange,
   navigateCalendarDate,
 } from "../../../src/components/calendar/navigation-utils";
 import { getThreeDayStripDates } from "../../../src/components/calendar/timeline-utils";
@@ -61,6 +63,7 @@ export default function CalendarScreen() {
     queryKey: QUERY_KEYS.settings(),
     queryFn: () => calendarApiService.getUserSettings(),
   });
+  const resolvedTimezone = resolveTimezone(settings?.timezone);
 
   const { data: calendars, isLoading: calendarsLoading } = useQuery({
     queryKey: QUERY_KEYS.calendars(),
@@ -80,15 +83,17 @@ export default function CalendarScreen() {
         view: activeView,
         weekStartDay,
         pageRadius: 2,
+        timezone: resolvedTimezone,
       });
     }
 
-    return getDefaultCalendarDateRange({
+    return getTimezoneAwareCalendarDateRange({
       baseDate: selectedDate,
       view: activeView,
       weekStartDay,
+      timezone: resolvedTimezone,
     });
-  }, [selectedDate, activeView, settings?.weekStartDay]);
+  }, [selectedDate, activeView, settings?.weekStartDay, resolvedTimezone]);
 
   const monthEventsCenter = currentDate;
 
@@ -101,16 +106,21 @@ export default function CalendarScreen() {
     [monthEventsCenter],
   );
   const previousMonthRange = useMemo(
-    () => getPaddedCalendarMonthRange(previousMonth),
-    [previousMonth],
+    () => getPaddedCalendarMonthRange(previousMonth, undefined, resolvedTimezone),
+    [previousMonth, resolvedTimezone],
   );
   const currentMonthRange = useMemo(
-    () => getPaddedCalendarMonthRange(monthEventsCenter),
-    [monthEventsCenter],
+    () =>
+      getPaddedCalendarMonthRange(
+        monthEventsCenter,
+        undefined,
+        resolvedTimezone,
+      ),
+    [monthEventsCenter, resolvedTimezone],
   );
   const nextMonthRange = useMemo(
-    () => getPaddedCalendarMonthRange(nextMonth),
-    [nextMonth],
+    () => getPaddedCalendarMonthRange(nextMonth, undefined, resolvedTimezone),
+    [nextMonth, resolvedTimezone],
   );
 
   const {
@@ -132,6 +142,7 @@ export default function CalendarScreen() {
   useEffect(() => {
     for (const range of buildPaddedCalendarMonthRanges(monthEventsCenter, {
       adjacentMonthDepth: 2,
+      timezone: resolvedTimezone,
     })) {
       void queryClient.prefetchQuery({
         queryKey: QUERY_KEYS.events(
@@ -142,7 +153,7 @@ export default function CalendarScreen() {
         staleTime: 120_000,
       });
     }
-  }, [monthEventsCenter, queryClient]);
+  }, [monthEventsCenter, queryClient, resolvedTimezone]);
 
   const { data: previousMonthEventsData, isPending: isPreviousMonthPending } =
     useQuery({
@@ -345,7 +356,7 @@ export default function CalendarScreen() {
     (date: Date, hour: number) => {
       openEventSheet({
         type: "create",
-        date: date.toISOString(),
+        date: formatCalendarDayKey(date),
         hour: String(hour),
       });
     },
@@ -397,6 +408,7 @@ export default function CalendarScreen() {
         }
         events={monthStripEvents}
         weekStartDay={settings?.weekStartDay ?? 0}
+        timezone={resolvedTimezone}
         expanded={false}
         onDayPress={handleDayPress}
         onToggleExpand={handleToggleMonthStrip}
@@ -411,6 +423,7 @@ export default function CalendarScreen() {
       handleDayPress,
       handleToggleMonthStrip,
       settings?.weekStartDay,
+      resolvedTimezone,
     ],
   );
 
@@ -433,6 +446,7 @@ export default function CalendarScreen() {
           selectedDate={selectedDate}
           events={monthStripEvents}
           weekStartDay={settings?.weekStartDay ?? 0}
+          timezone={resolvedTimezone}
           expanded={monthStripExpanded}
           externalExpandControl={monthStripExpanded}
           swipeEnabled
@@ -453,6 +467,7 @@ export default function CalendarScreen() {
             selectedDate={selectedDate}
             events={decoratedDetailEvents}
             weekStartDay={settings?.weekStartDay ?? 0}
+            timezone={resolvedTimezone}
             onDayPress={handleDayPress}
           />
         ) : null
@@ -465,6 +480,7 @@ export default function CalendarScreen() {
             key={selectedDate.toISOString()}
             events={decoratedDetailEvents}
             timeFormat={settings?.timeFormat ?? "12h"}
+            timezone={resolvedTimezone}
             refreshing={detailEventsLoading}
             onRefresh={() => refetchDetailEvents()}
             onEventPress={handleEventPress}
@@ -479,6 +495,7 @@ export default function CalendarScreen() {
               events={decoratedDetailEvents}
               weekStartDay={settings?.weekStartDay ?? 0}
               timeFormat={settings?.timeFormat ?? "12h"}
+              timezone={resolvedTimezone}
               onSwipeCommit={handleDetailSwipeCommit}
               onNavigate={handleDetailNavigate}
               onEventPress={handleEventPress}
@@ -493,6 +510,7 @@ export default function CalendarScreen() {
               currentDate={selectedDate}
               events={decoratedDetailEvents}
               timeFormat={settings?.timeFormat ?? "12h"}
+              timezone={resolvedTimezone}
               onSwipeCommit={handleDetailSwipeCommit}
               onNavigate={handleDetailNavigate}
               onEventPress={handleEventPress}
@@ -507,6 +525,7 @@ export default function CalendarScreen() {
               currentDate={selectedDate}
               events={decoratedDetailEvents}
               timeFormat={settings?.timeFormat ?? "12h"}
+              timezone={resolvedTimezone}
               onSwipeCommit={handleDetailSwipeCommit}
               onNavigate={handleDetailNavigate}
               onEventPress={handleEventPress}

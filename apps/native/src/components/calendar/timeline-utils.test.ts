@@ -1,4 +1,4 @@
-import {
+﻿import {
   eventOverlapsDate,
   getWeekDates,
   getThreeDayDates,
@@ -18,7 +18,6 @@ import { getDay, isSameDay, addDays } from "date-fns";
 import { nativeLightTheme, nativeDarkTheme } from "@workspace/design-tokens";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 
-// ─── Test helpers ────────────────────────────────────────────────────────────
 
 function makeEvent(
   id: string,
@@ -39,7 +38,6 @@ function makeEvent(
   } as DecoratedCalendarEvent;
 }
 
-// ─── getWeekDates ────────────────────────────────────────────────────────────
 
 describe("getWeekDates", () => {
   it("returns exactly 7 dates", () => {
@@ -58,7 +56,7 @@ describe("getWeekDates", () => {
   });
 
   it("contains the given date", () => {
-    const target = new Date(2025, 5, 18); // Wednesday
+    const target = new Date(2025, 5, 18);
     const dates = getWeekDates(target, 1);
     expect(dates.some((d) => isSameDay(d, target))).toBe(true);
   });
@@ -78,7 +76,6 @@ describe("getWeekDates", () => {
   });
 });
 
-// ─── calculateEventPosition ─────────────────────────────────────────────────
 
 describe("calculateEventPosition", () => {
   it("positions an event at the top for midnight start", () => {
@@ -92,7 +89,7 @@ describe("calculateEventPosition", () => {
     expect(pos.height).toBe(HOUR_HEIGHT);
   });
 
-  it("positions a 9am–10am event correctly", () => {
+  it("positions a 9amâ€“10am event correctly", () => {
     const event = makeEvent(
       "2",
       new Date(2025, 0, 15, 9, 0),
@@ -129,7 +126,7 @@ describe("calculateEventPosition", () => {
     const event = makeEvent(
       "5",
       new Date(2025, 0, 15, 12, 0),
-      new Date(2025, 0, 15, 12, 1), // 1 minute
+      new Date(2025, 0, 15, 12, 1),
     );
     const pos = calculateEventPosition(event, HOUR_HEIGHT);
     expect(pos.height).toBeGreaterThanOrEqual(HOUR_HEIGHT / 4);
@@ -139,16 +136,14 @@ describe("calculateEventPosition", () => {
     const event = makeEvent(
       "6",
       new Date(2025, 0, 15, 23, 0),
-      new Date(2025, 0, 16, 1, 0), // next day 1am
+      new Date(2025, 0, 16, 1, 0),
     );
     const pos = calculateEventPosition(event, HOUR_HEIGHT);
     expect(pos.top).toBe(23 * HOUR_HEIGHT);
-    // Should extend to end of day (24h - 23h = 1h)
     expect(pos.height).toBe(HOUR_HEIGHT);
   });
 });
 
-// ─── formatHourLabel ─────────────────────────────────────────────────────────
 
 describe("formatHourLabel", () => {
   describe("24h format", () => {
@@ -196,7 +191,6 @@ describe("formatHourLabel", () => {
   });
 });
 
-// ─── resolveEventBlockColor ──────────────────────────────────────────────────
 
 describe("resolveEventBlockColor", () => {
   const theme = nativeLightTheme;
@@ -249,7 +243,6 @@ describe("resolveEventBlockColor", () => {
   });
 });
 
-// ─── groupEventsByDate ───────────────────────────────────────────────────────
 
 describe("groupEventsByDate", () => {
   it("returns an empty map for no events", () => {
@@ -277,7 +270,6 @@ describe("groupEventsByDate", () => {
   });
 });
 
-// ─── getEventsForDate ────────────────────────────────────────────────────────
 
 describe("getEventsForDate", () => {
   it("returns events for a date that has events", () => {
@@ -297,11 +289,10 @@ describe("getEventsForDate", () => {
   });
 });
 
-// ─── formatDayHeader ─────────────────────────────────────────────────────────
 
 describe("formatDayHeader", () => {
   it("formats a Wednesday as 'Wed 15'", () => {
-    // Jan 15, 2025 is a Wednesday
+
     expect(formatDayHeader(new Date(2025, 0, 15))).toBe("Wed 15");
   });
 
@@ -314,7 +305,6 @@ describe("formatDayHeader", () => {
   });
 });
 
-// ─── isToday ─────────────────────────────────────────────────────────────────
 
 describe("isToday", () => {
   it("returns true for today's date", () => {
@@ -331,7 +321,6 @@ describe("isToday", () => {
   });
 });
 
-// ─── getThreeDayDates ────────────────────────────────────────────────────────
 
 describe("getThreeDayDates", () => {
   it("returns exactly 3 dates", () => {
@@ -340,7 +329,7 @@ describe("getThreeDayDates", () => {
   });
 
   it("returns [day-1, day, day+1] centered on the given date", () => {
-    const center = new Date(2025, 0, 15); // Wednesday Jan 15
+    const center = new Date(2025, 0, 15);
     const dates = getThreeDayDates(center);
     expect(isSameDay(dates[0], new Date(2025, 0, 14))).toBe(true);
     expect(isSameDay(dates[1], center)).toBe(true);
@@ -348,7 +337,7 @@ describe("getThreeDayDates", () => {
   });
 
   it("handles month boundaries correctly", () => {
-    const center = new Date(2025, 1, 1); // Feb 1
+    const center = new Date(2025, 1, 1);
     const dates = getThreeDayDates(center);
     expect(isSameDay(dates[0], new Date(2025, 0, 31))).toBe(true);
     expect(isSameDay(dates[1], new Date(2025, 1, 1))).toBe(true);
@@ -356,7 +345,7 @@ describe("getThreeDayDates", () => {
   });
 
   it("handles year boundaries correctly", () => {
-    const center = new Date(2025, 0, 1); // Jan 1
+    const center = new Date(2025, 0, 1);
     const dates = getThreeDayDates(center);
     expect(isSameDay(dates[0], new Date(2024, 11, 31))).toBe(true);
     expect(isSameDay(dates[1], new Date(2025, 0, 1))).toBe(true);
@@ -375,7 +364,7 @@ describe("getThreeDayDates", () => {
 
 describe("getThreeDayStripDates", () => {
   it("centers the visible 3-day range inside the 7-day strip", () => {
-    const dates = getThreeDayStripDates(new Date(2025, 0, 12)); // Sunday
+    const dates = getThreeDayStripDates(new Date(2025, 0, 12));
     expect(isSameDay(dates[0], new Date(2025, 0, 9))).toBe(true);
     expect(isSameDay(dates[2], new Date(2025, 0, 11))).toBe(true);
     expect(isSameDay(dates[3], new Date(2025, 0, 12))).toBe(true);
@@ -384,7 +373,7 @@ describe("getThreeDayStripDates", () => {
   });
 
   it("covers the centered 3-day range even across month boundaries", () => {
-    const dates = getThreeDayStripDates(new Date(2025, 1, 1)); // Feb 1
+    const dates = getThreeDayStripDates(new Date(2025, 1, 1));
     expect(isSameDay(dates[0], new Date(2025, 0, 29))).toBe(true);
     expect(isSameDay(dates[2], new Date(2025, 0, 31))).toBe(true);
     expect(isSameDay(dates[3], new Date(2025, 1, 1))).toBe(true);
@@ -485,3 +474,75 @@ describe("getAllDayEventsForDate", () => {
     ).toEqual(["all-day", "multi"]);
   });
 });
+
+describe("timezone-aware timeline UX", () => {
+  const timezone = "Europe/Amsterdam";
+
+  it("positions events using wall-clock minutes in the configured timezone", () => {
+    const event = makeEvent(
+      "zoned",
+      new Date("2026-06-16T07:30:00.000Z"),
+      new Date("2026-06-16T08:30:00.000Z"),
+    );
+    const pos = calculateEventPosition(event, HOUR_HEIGHT, timezone);
+
+    expect(pos.top).toBe(9.5 * HOUR_HEIGHT);
+    expect(pos.height).toBe(HOUR_HEIGHT);
+  });
+
+  it("groups overnight UTC starts under the zoned calendar day key", () => {
+    const events = [
+      makeEvent(
+        "late-night",
+        new Date("2026-06-16T22:30:00.000Z"),
+        new Date("2026-06-16T23:30:00.000Z"),
+      ),
+      makeEvent(
+        "afternoon",
+        new Date("2026-06-16T10:00:00.000Z"),
+        new Date("2026-06-16T11:00:00.000Z"),
+      ),
+    ];
+
+    const map = groupEventsByDate(events, timezone);
+
+    expect(map.get("2026-06-17")).toHaveLength(1);
+    expect(map.get("2026-06-16")).toHaveLength(1);
+  });
+
+  it("builds week columns from the configured timezone anchor", () => {
+    const dates = getWeekDates(
+      new Date("2026-06-17T01:00:00.000Z"),
+      1,
+      timezone,
+    );
+
+    expect(dates[0]?.getDate()).toBe(15);
+    expect(dates.some((date) => date.getDate() === 17)).toBe(true);
+  });
+
+  it("detects multi-day events from zoned start and end days", () => {
+    const event = makeEvent(
+      "overnight",
+      new Date("2026-06-16T21:00:00.000Z"),
+      new Date("2026-06-16T23:00:00.000Z"),
+    );
+
+    expect(isAllDayOrMultiDayEvent(event, timezone)).toBe(true);
+  });
+
+  it("matches spanning events on intermediate zoned days", () => {
+    const event = makeEvent(
+      "span",
+      new Date("2026-06-15T10:00:00.000Z"),
+      new Date("2026-06-18T10:00:00.000Z"),
+    );
+
+    expect(eventOverlapsDate(event, new Date(2026, 5, 17), timezone)).toBe(true);
+    expect(eventOverlapsDate(event, new Date(2026, 5, 14), timezone)).toBe(
+      false,
+    );
+  });
+});
+
+

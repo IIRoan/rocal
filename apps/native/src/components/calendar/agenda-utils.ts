@@ -1,5 +1,12 @@
 import { format, isToday, isTomorrow, startOfDay, compareAsc } from "date-fns";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import {
+  formatCalendarDayKey,
+  formatInUserTimezone,
+  getZonedDateParts,
+  isTodayInTimezone,
+  resolveTimezone,
+} from "@workspace/calendar-core";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -17,7 +24,20 @@ export interface AgendaSection {
  * - Returns "Tomorrow" if the date is tomorrow
  * - Otherwise returns a formatted string like "Wednesday, Jan 15"
  */
-export function formatAgendaDate(date: Date): string {
+export function formatAgendaDate(date: Date, timezone?: string): string {
+  if (timezone) {
+    const resolvedTimezone = resolveTimezone(timezone);
+    if (isTodayInTimezone(date, resolvedTimezone)) return "Today";
+    const todayParts = getZonedDateParts(new Date(), resolvedTimezone);
+    const tomorrow = new Date(
+      todayParts.year,
+      todayParts.month - 1,
+      todayParts.day + 1,
+    );
+    if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
+    return format(date, "EEEE, MMM d");
+  }
+
   if (isToday(date)) return "Today";
   if (isTomorrow(date)) return "Tomorrow";
   return format(date, "EEEE, MMM d");
@@ -33,17 +53,27 @@ export function formatAgendaDate(date: Date): string {
 export function formatEventTime(
   event: DecoratedCalendarEvent,
   timeFormat: "12h" | "24h" = "12h",
+  timezone?: string,
 ): string {
   if (event.allDay) return "All day";
 
   const start = new Date(event.start);
   const end = new Date(event.end);
+  const resolvedTimezone = resolveTimezone(timezone ?? event.timezone);
 
   if (timeFormat === "24h") {
-    return `${format(start, "HH:mm")} – ${format(end, "HH:mm")}`;
+    return `${formatInUserTimezone(
+      start,
+      resolvedTimezone,
+      "HH:mm",
+    )} – ${formatInUserTimezone(end, resolvedTimezone, "HH:mm")}`;
   }
 
-  return `${format(start, "h:mm a")} – ${format(end, "h:mm a")}`;
+  return `${formatInUserTimezone(
+    start,
+    resolvedTimezone,
+    "h:mm a",
+  )} – ${formatInUserTimezone(end, resolvedTimezone, "h:mm a")}`;
 }
 
 /**
@@ -55,6 +85,7 @@ export function formatEventTime(
  */
 export function groupEventsIntoSections(
   events: DecoratedCalendarEvent[],
+  timezone?: string,
 ): AgendaSection[] {
   if (events.length === 0) return [];
 
@@ -64,9 +95,19 @@ export function groupEventsIntoSections(
     { date: Date; events: DecoratedCalendarEvent[] }
   >();
 
+  const resolvedTimezone = timezone ? resolveTimezone(timezone) : null;
+
   for (const event of events) {
-    const day = startOfDay(new Date(event.start));
-    const key = format(day, "yyyy-MM-dd");
+    const day = resolvedTimezone
+      ? (() => {
+          const { year, month, day } = getZonedDateParts(
+            new Date(event.start),
+            resolvedTimezone,
+          );
+          return new Date(year, month - 1, day);
+        })()
+      : startOfDay(new Date(event.start));
+    const key = formatCalendarDayKey(day);
 
     const entry = map.get(key);
     if (entry) {
@@ -83,7 +124,7 @@ export function groupEventsIntoSections(
 
   // Sort events within each section by start time, all-day events first
   return sortedEntries.map(({ date, events: sectionEvents }) => ({
-    title: formatAgendaDate(date),
+    title: formatAgendaDate(date, resolvedTimezone ?? undefined),
     data: sectionEvents.sort((a, b) => {
       // All-day events come first
       if (a.allDay && !b.allDay) return -1;

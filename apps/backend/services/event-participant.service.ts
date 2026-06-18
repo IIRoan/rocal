@@ -5,6 +5,7 @@ import type {
   EventParticipantRole,
   EventParticipantStatus,
 } from "@workspace/calendar-core";
+import { resolveTimezone } from "@workspace/calendar-core";
 import {
   buildIcsEventFile,
   type IcsBuildEventInput,
@@ -308,7 +309,7 @@ export class EventParticipantService {
     const icsContent = buildIcsEventFile({
       calendar: {
         name: input.calendarName || "Solace",
-        timezone: input.invitationEvent.timezone || "UTC",
+        timezone: resolveTimezone(input.invitationEvent.timezone),
         method: "REQUEST",
       },
       event: {

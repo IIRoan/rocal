@@ -10,6 +10,11 @@ import type {
   EventParticipant,
   EventParticipantInput,
 } from "@workspace/calendar-core";
+import {
+  pickerDateAndTimeToUtc,
+  pickerDateToAllDayUtcRange,
+  utcToPickerDate,
+} from "@workspace/calendar-core";
 import { RecurrenceEngine } from "@workspace/calendar-core";
 import type { RecurrenceRule } from "@/lib/types/calendar";
 import type { EventNotification } from "@workspace/ui/components/calendar";
@@ -301,10 +306,14 @@ export function useEventForm({
       setEventViewMode(isNewEvent ? "edit" : "view");
       setEventTitle(event.title || "");
       setEventDescription(event.description || "");
-      setEventStartDate(new Date(event.start));
-      setEventEndDate(new Date(event.end));
-      setEventStartTime(formatTimeForInput(new Date(event.start)));
-      setEventEndTime(formatTimeForInput(new Date(event.end)));
+      setEventStartDate(utcToPickerDate(new Date(event.start), localSettings.timezone));
+      setEventEndDate(utcToPickerDate(new Date(event.end), localSettings.timezone));
+      setEventStartTime(
+        formatTimeForInput(new Date(event.start), localSettings.timezone),
+      );
+      setEventEndTime(
+        formatTimeForInput(new Date(event.end), localSettings.timezone),
+      );
       setEventAllDay(event.allDay || false);
       setEventLocation(event.location || "");
       setEventCalendarId(
@@ -390,7 +399,7 @@ export function useEventForm({
         setShowNotifications(false);
       }
     },
-    [queryClient, setEventNotifications],
+    [queryClient, setEventNotifications, localSettings.timezone],
   );
 
   // Reset form to initial state
@@ -496,6 +505,7 @@ export function useEventForm({
         eventAllDay,
         eventStartTime,
         eventEndTime,
+        localSettings.timezone,
       );
       if (validationError) {
         toast.error(validationError);
@@ -537,22 +547,23 @@ export function useEventForm({
         return;
       }
 
-      const start = new Date(eventStartDate);
-      const end = new Date(eventEndDate);
+      const timezone = localSettings.timezone;
+      let start: Date;
+      let end: Date;
 
       if (!eventAllDay) {
-        const [startHours = 0, startMinutes = 0] = eventStartTime
-          .split(":")
-          .map(Number);
-        const [endHours = 0, endMinutes = 0] = eventEndTime
-          .split(":")
-          .map(Number);
-
-        start.setHours(startHours, startMinutes, 0);
-        end.setHours(endHours, endMinutes, 0);
+        start = pickerDateAndTimeToUtc(
+          eventStartDate,
+          eventStartTime,
+          timezone,
+        );
+        end = pickerDateAndTimeToUtc(eventEndDate, eventEndTime, timezone);
       } else {
-        start.setHours(0, 0, 0, 0);
-        end.setHours(23, 59, 59, 999);
+        ({ start, end } = pickerDateToAllDayUtcRange(
+          eventStartDate,
+          eventEndDate,
+          timezone,
+        ));
       }
 
       const selectedCalendar = calendars.find(

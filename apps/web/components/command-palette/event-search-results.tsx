@@ -1,8 +1,11 @@
 "use client";
 
 import React from "react";
-import { format } from "date-fns";
 import { CalendarIcon, MapPin, Loader2, Search } from "lucide-react";
+import {
+  formatInUserTimezone,
+  resolveTimezone,
+} from "@workspace/calendar-core";
 import {
   EncryptionStatusBadge,
   type CalendarEvent,
@@ -67,10 +70,23 @@ export function EventSearchResults({
         const globalIndex = baseIndex + index;
         const isSelected = globalIndex === selectedIndex;
         const eventColor = event.color;
-        const dateStr = format(event.start, "MMM d, yyyy");
+        const resolvedTimezone = resolveTimezone(event.timezone);
+        const dateStr = formatInUserTimezone(
+          event.start,
+          resolvedTimezone,
+          "MMM d, yyyy",
+        );
         const timeStr = event.allDay
           ? "All day"
-          : `${format(event.start, "HH:mm")} - ${format(event.end, "HH:mm")}`;
+          : `${formatInUserTimezone(
+              event.start,
+              resolvedTimezone,
+              "HH:mm",
+            )} - ${formatInUserTimezone(
+              event.end,
+              resolvedTimezone,
+              "HH:mm",
+            )}`;
 
         return (
           <button

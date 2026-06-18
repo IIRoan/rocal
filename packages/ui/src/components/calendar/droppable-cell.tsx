@@ -1,6 +1,7 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
+import { formatCalendarDayKey } from "@workspace/calendar-core";
 
 import { cn } from "../../lib/utils";
 import { useCalendarDnd } from "./calendar-dnd-context";
@@ -54,7 +55,7 @@ export function DroppableCell({
       title={formattedTime ? `${formattedTime}` : undefined}
       data-dragging={isOver && activeEvent ? true : undefined}
       data-calendar-cell="true"
-      data-cell-date={date.toISOString()}
+      data-cell-date={formatCalendarDayKey(date)}
       data-cell-time={time ?? ""}
     >
       {children}

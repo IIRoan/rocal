@@ -6,6 +6,7 @@ import type {
   UpdateEventRequest,
 } from "./types";
 import { CALENDAR_COLORS, isValidCalendarColor } from "./color-utils";
+import { timezoneSchema } from "./route-schemas";
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 
@@ -100,6 +101,13 @@ export function validateEventData(
       errors.push(
         `Color must be one of: ${CALENDAR_COLORS.join(", ")} or a valid hex color`,
       );
+    }
+  }
+
+  if ("timezone" in event && event.timezone) {
+    const timezoneResult = timezoneSchema.safeParse(event.timezone);
+    if (!timezoneResult.success) {
+      errors.push("Invalid timezone identifier");
     }
   }
 

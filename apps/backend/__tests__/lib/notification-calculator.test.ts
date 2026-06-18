@@ -16,15 +16,15 @@ describe("NotificationCalculator", () => {
     });
   });
 
-  it("falls back to UTC when the timezone is blank", () => {
+  it("falls back to Amsterdam when the timezone is blank", () => {
     const schedule = NotificationCalculator.buildNotificationSchedule(
       new Date("2024-01-10T12:00:00.000Z"),
       15,
       "   ",
     );
 
-    expect(schedule.notificationTimezone).toBe("UTC");
-    expect(schedule.notificationDateLocal).toBe("2024-01-10T11:45:00");
+    expect(schedule.notificationTimezone).toBe("Europe/Amsterdam");
+    expect(schedule.notificationDateLocal).toBe("2024-01-10T12:45:00");
   });
 
   it("calculates the notification time and rounds to the minute", () => {
