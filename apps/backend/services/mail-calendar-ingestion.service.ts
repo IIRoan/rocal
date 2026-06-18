@@ -1,3 +1,9 @@
+import {
+  indexInvitationImportEncryption,
+  resolveTimezone,
+  type InvitationImportEncryptionPayload,
+  type OperationWarning,
+} from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import {
@@ -9,18 +15,14 @@ import {
 import { EventParticipantService } from "./event-participant.service";
 import type { StalwartCalendarClientLike } from "../lib/stalwart-calendar";
 import { buildStalwartEventPayload } from "../lib/stalwart-calendar-mapping";
-import { errorString, errorMessage } from "../lib/errors";
+import { errorMessage } from "../lib/errors";
+import { errorLogDetails } from "../lib/log-sanitization";
 import {
   resolveAcceptedInvitationTargetCalendar,
   resolveInvitationStagingCalendar,
   type InvitationTargetCalendar,
 } from "../lib/mail-invitation-calendar";
 import { resolveEventPersistencePolicy } from "../lib/event-encryption";
-import {
-  indexInvitationImportEncryption,
-  resolveTimezone,
-  type InvitationImportEncryptionPayload,
-} from "@workspace/calendar-core";
 
 const logger = createLogger("backend:mail-calendar-ingestion");
 
@@ -372,7 +374,7 @@ export class MailCalendarIngestionService {
       logger.warn("Failed to clean up temporary decline event in Stalwart", {
         userId: input.userId,
         remoteEventId: remoteEvent.id,
-        error: errorString(error),
+        ...errorLogDetails(error),
       });
     }
 
@@ -605,7 +607,7 @@ export class MailCalendarIngestionService {
     const existingByExternalId = new Map(
       existingEvents.map((event) => [event.externalId, event]),
     );
-    const pendingInvitationDispatchers: Array<() => Promise<void>> = [];
+    const pendingInvitationDispatchers: Array<() => Promise<OperationWarning[]>> = [];
     const sendSchedulingMessages = options.sendSchedulingMessages ?? false;
     const userEmail = options.attendeeStatus
       ? (
@@ -703,8 +705,8 @@ export class MailCalendarIngestionService {
             } catch (cleanupError) {
               logger.error("Failed to clean up remote event after local DB create failure", {
                 remoteEventId,
-                originalError: errorString(error),
-                cleanupError: errorString(cleanupError),
+                ...errorLogDetails(error),
+                cleanupError: errorLogDetails(cleanupError),
               });
             }
           }

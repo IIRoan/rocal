@@ -93,13 +93,16 @@ describe("auth-email", () => {
           url: "https://solace.test/reset?token=abc",
         },
       }),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({
+      delivered: false,
+      reason: expect.stringContaining("development"),
+    });
 
     expect(logger.warn).toHaveBeenCalledWith(
-      "password reset email provider is not configured on the backend. Logging the email details instead.",
+      expect.stringContaining("development fallback context omitted"),
       expect.objectContaining({
-        email: "roan@example.com",
-        url: "https://solace.test/reset?token=abc",
+        recipientRef: expect.any(String),
+        label: "password reset",
       }),
     );
   });
@@ -156,12 +159,18 @@ describe("auth-email", () => {
         isProduction: true,
         mode: "best-effort",
       }),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({
+      delivered: false,
+      channel: "resend",
+      reason: "Failed to send password update notification email. Try again later or contact support.",
+    });
 
     expect(logger.error).toHaveBeenCalledWith(
       "Failed to send password update notification email",
       expect.objectContaining({
-        email: "roan@example.com",
+        recipientRef: expect.any(String),
+        label: "password update notification",
+        message: "temporarily unavailable",
       }),
     );
   });

@@ -6,6 +6,7 @@ import {
   optionalCalendarColorSchema,
   rsvpStatusSchema,
   timezoneSchema,
+  type WithOperationWarnings,
 } from "@workspace/calendar-core";
 import { strictZodObject } from "../lib/validation";
 import {
@@ -171,6 +172,9 @@ export type EventIcsExportResult = {
   filename: string;
 };
 
+/** Event payload returned after create or update; may include non-fatal warnings. */
+export type EventMutationResult = WithOperationWarnings<Record<string, unknown>>;
+
 export interface IEventService {
   search(
     input: EventSearchInput,
@@ -191,8 +195,8 @@ export interface IEventService {
     externalId: string,
     options?: { syncRemote?: boolean },
   ): Promise<unknown | null>;
-  create(input: EventCreateInput): Promise<unknown>;
-  update(input: EventUpdateInput): Promise<unknown>;
+  create(input: EventCreateInput): Promise<EventMutationResult>;
+  update(input: EventUpdateInput): Promise<EventMutationResult>;
   respondToInvitation(input: {
     userId: string;
     eventId: string;

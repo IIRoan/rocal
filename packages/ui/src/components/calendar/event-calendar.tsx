@@ -7,6 +7,7 @@ import {
   canCurrentUserEditEvent,
   formatInUserTimezone,
   getCalendarViewAnimationKey,
+  getOperationWarningMessages,
   getPrefetchCalendarDateRange,
   getTimezoneAwareCalendarDateRange,
   navigateCalendarDate,
@@ -40,6 +41,23 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { toast } from "sonner";
 
 const log = createLogger("event-calendar");
+
+function toastEventSaved(
+  savedEvent: unknown,
+  message: string,
+  description: string,
+) {
+  toast.success(message, {
+    description,
+    position: "bottom-left",
+  });
+
+  for (const warningMessage of getOperationWarningMessages(savedEvent)) {
+    toast.warning(warningMessage, {
+      position: "bottom-left",
+    });
+  }
+}
 
 import {
   AgendaDaysToShow,
@@ -671,28 +689,28 @@ export function EventCalendar({
         // Update existing event
         savedEvent = await updateEvent(event.id, eventData);
 
-        // Show success toast notification when an event is updated
-        toast.success(`Event "${event.title}" updated`, {
-          description: formatInUserTimezone(
+        toastEventSaved(
+          savedEvent,
+          `Event "${event.title}" updated`,
+          formatInUserTimezone(
             new Date(event.start),
             resolvedTimezone,
             "MMM d, yyyy 'at' h:mm a",
           ),
-          position: "bottom-left",
-        });
+        );
       } else {
         // Create new event
         savedEvent = await createEvent(eventData);
 
-        // Show success toast notification when an event is created
-        toast.success(`Event "${event.title}" created`, {
-          description: formatInUserTimezone(
+        toastEventSaved(
+          savedEvent,
+          `Event "${event.title}" created`,
+          formatInUserTimezone(
             new Date(event.start),
             resolvedTimezone,
             "MMM d, yyyy 'at' h:mm a",
           ),
-          position: "bottom-left",
-        });
+        );
       }
 
       // No longer needed as we use command palette

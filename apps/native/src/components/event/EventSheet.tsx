@@ -34,6 +34,7 @@ import { useTheme } from "../../providers/ThemeProvider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../providers/AuthProvider";
 import { useToast } from "../../providers/ToastProvider";
+import { toastOperationWarnings } from "../../lib/operation-warnings";
 import { calendarApiService } from "../../lib/api";
 import { QUERY_KEYS } from "../../lib/query-keys";
 import {
@@ -291,9 +292,10 @@ export function EventSheet({
       dismissSheet();
       return { tempId };
     },
-    onSuccess: () => {
+    onSuccess: (savedEvent) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       toast("Event created");
+      toastOperationWarnings(toast, savedEvent);
     },
     onError: (err: unknown) => {
       rollbackFromSnapshot(queryClient, createSnapshotRef.current);
@@ -312,7 +314,7 @@ export function EventSheet({
       }
       return calendarApiService.updateEvent(eventId!, data);
     },
-    onSuccess: () => {
+    onSuccess: (savedEvent) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       if (eventId) {
         queryClient.invalidateQueries({
@@ -321,6 +323,7 @@ export function EventSheet({
       }
       setServerErrors([]);
       toast("Event updated");
+      toastOperationWarnings(toast, savedEvent);
       dismissSheet();
     },
     onError: (err: unknown) => {

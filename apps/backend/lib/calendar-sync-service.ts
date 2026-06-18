@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { syncCalendarSubscription } from "../routes/subscriptions";
+import { errorLogDetails } from "./log-sanitization";
 import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:calendar-sync");
@@ -29,7 +30,7 @@ export class CalendarSyncService {
     // Run initial sync after a short delay
     this.initialSyncTimeoutId = setTimeout(() => {
       this.syncAllActiveSubscriptions().catch((error) => {
-        logger.error("Initial sync failed:", error);
+        logger.error("Initial sync failed", errorLogDetails(error));
       });
     }, 5000);
     this.initialSyncTimeoutId.unref?.();
@@ -48,7 +49,7 @@ export class CalendarSyncService {
           this.isSyncing = true;
           await this.syncAllActiveSubscriptions();
         } catch (error) {
-          logger.error("Scheduled sync failed:", error);
+          logger.error("Scheduled sync failed", errorLogDetails(error));
         } finally {
           this.isSyncing = false;
         }
@@ -132,10 +133,10 @@ export class CalendarSyncService {
             await syncCalendarSubscription(subscription);
             results.success++;
           } catch (error) {
-            logger.error(
-              `Failed to sync subscription ${subscription.id} (${subscription.name}):`,
-              error,
-            );
+            logger.error("Failed to sync subscription", {
+              subscriptionId: subscription.id,
+              ...errorLogDetails(error),
+            });
             results.errors++;
           }
         });
@@ -151,7 +152,7 @@ export class CalendarSyncService {
       // Clean up old sync logs (keep last 50 per subscription)
       await this.cleanupOldSyncLogs();
     } catch (error) {
-      logger.error("Error during scheduled sync:", error);
+      logger.error("Error during scheduled sync", errorLogDetails(error));
     }
   }
 
@@ -200,7 +201,7 @@ export class CalendarSyncService {
         }
       }
     } catch (error) {
-      logger.error("Error cleaning up sync logs:", error);
+      logger.error("Error cleaning up sync logs", errorLogDetails(error));
     }
   }
 

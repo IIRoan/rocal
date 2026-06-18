@@ -15,6 +15,7 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { useToast } from "../../src/providers/ToastProvider";
+import { toastOperationWarnings } from "../../src/lib/operation-warnings";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
 import {
@@ -84,10 +85,11 @@ export default function EventCreateScreen() {
       router.back();
       return { tempId };
     },
-    onSuccess: () => {
+    onSuccess: (savedEvent) => {
       // Replace optimistic data with real server data
       queryClient.invalidateQueries({ queryKey: ["events"] });
       toast("Event created");
+      toastOperationWarnings(toast, savedEvent);
     },
     onError: (err: unknown) => {
       // Roll back the optimistic event
