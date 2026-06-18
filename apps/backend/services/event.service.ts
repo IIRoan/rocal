@@ -1,9 +1,9 @@
 import type { PrismaClient } from "../generated/prisma/index.js";
-import type {
-  EventParticipantInput,
-  EventParticipantStatus,
+import {
+  resolveTimezone,
+  type EventParticipantInput,
+  type EventParticipantStatus,
 } from "@workspace/calendar-core";
-import { resolveTimezone } from "@workspace/calendar-core";
 import type {
   IEventService,
   EventSearchCorpusInput,

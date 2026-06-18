@@ -4,25 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 import { createLogger } from "@workspace/logger";
 import {
   formatInUserTimezone,
+  getTimezoneAwareCalendarDateRange,
   getZonedDateParts,
-  getZonedDayUtcBounds,
   isTodayInTimezone,
+  navigateCalendarDate,
   resolveTimezone,
   wallClockToUtc,
 } from "@workspace/calendar-core";
 import { useCalendarContext } from "./calendar-context";
 import {
   addDays,
-  addMonths,
-  addWeeks,
   endOfWeek,
   format,
   isSameMonth,
   startOfWeek,
-  subMonths,
-  subWeeks,
-  startOfMonth,
-  endOfMonth,
 } from "date-fns";
 import {
   ChevronDownIcon,
@@ -303,33 +298,13 @@ export function MobileEventCalendar({
   }, [initialView, view]);
 
   // Compute the date range for a given date and view
-  const computeDateRange = (date: Date, v: string) => {
-    let start: Date;
-    let end: Date;
-    if (v === "month") {
-      start = startOfMonth(date);
-      end = endOfMonth(date);
-    } else if (v === "week") {
-      start = startOfWeek(date, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-      end = endOfWeek(date, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-    } else if (v === "day") {
-      ({ start, end } = getZonedDayUtcBounds(date, resolvedTimezone));
-    } else if (v === "3day") {
-      start = getZonedDayUtcBounds(addDays(date, -1), resolvedTimezone).start;
-      end = getZonedDayUtcBounds(addDays(date, 1), resolvedTimezone).end;
-    } else if (v === "agenda") {
-      start = new Date(date);
-      end = addDays(date, AgendaDaysToShow - 1);
-    } else {
-      start = startOfMonth(date);
-      end = endOfMonth(date);
-    }
-    return { start, end };
-  };
+  const computeDateRange = (date: Date, v: CalendarView) =>
+    getTimezoneAwareCalendarDateRange({
+      baseDate: date,
+      view: v,
+      weekStartDay,
+      timezone: resolvedTimezone,
+    });
 
   // Calculate date range based on current view and date
   const dateRange = useMemo(
@@ -355,43 +330,21 @@ export function MobileEventCalendar({
 
   // Navigation handlers
   const handlePrevious = () => {
-    let newDate: Date;
+    const newDate =
+      view === "agenda"
+        ? addDays(currentDate, -AgendaDaysToShow)
+        : navigateCalendarDate(currentDate, view, -1);
 
-    if (view === "month") {
-      newDate = subMonths(currentDate, 1);
-    } else if (view === "week") {
-      newDate = subWeeks(currentDate, 1);
-    } else if (view === "day") {
-      newDate = addDays(currentDate, -1);
-    } else if (view === "3day") {
-      newDate = addDays(currentDate, -3);
-    } else if (view === "agenda") {
-      newDate = addDays(currentDate, -AgendaDaysToShow);
-    } else {
-      newDate = subMonths(currentDate, 1);
-    }
-
-    if (newDate) navigateTo(newDate);
+    navigateTo(newDate);
   };
 
   const handleNext = () => {
-    let newDate: Date;
+    const newDate =
+      view === "agenda"
+        ? addDays(currentDate, AgendaDaysToShow)
+        : navigateCalendarDate(currentDate, view, 1);
 
-    if (view === "month") {
-      newDate = addMonths(currentDate, 1);
-    } else if (view === "week") {
-      newDate = addWeeks(currentDate, 1);
-    } else if (view === "day") {
-      newDate = addDays(currentDate, 1);
-    } else if (view === "3day") {
-      newDate = addDays(currentDate, 3);
-    } else if (view === "agenda") {
-      newDate = addDays(currentDate, AgendaDaysToShow);
-    } else {
-      newDate = addMonths(currentDate, 1);
-    }
-
-    if (newDate) navigateTo(newDate);
+    navigateTo(newDate);
   };
 
   const handleToday = () => {
