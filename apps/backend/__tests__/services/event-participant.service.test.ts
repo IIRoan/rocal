@@ -6,7 +6,7 @@ jest.mock("../../lib/auth-email", () => ({
     text: "Invite text",
     html: "<p>Invite</p>",
   })),
-  sendAuthEmail: jest.fn(async () => true),
+  sendAuthEmail: jest.fn(async () => ({ delivered: true, channel: "resend" })),
 }));
 
 jest.mock("../../lib/event-invitation-delivery", () => ({

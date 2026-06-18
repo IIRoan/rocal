@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("../../lib/auth-email", () => ({
-  sendAuthEmail: jest.fn(async () => true),
+  sendAuthEmail: jest.fn(async () => ({ delivered: true, channel: "resend" })),
 }));
 
 jest.mock("../../lib/internal-mailbox-delivery", () => ({

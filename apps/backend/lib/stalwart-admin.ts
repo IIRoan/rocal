@@ -1,5 +1,6 @@
 import { env } from "./env";
 import { createLogger } from "@workspace/logger";
+import { logRef } from "./log-sanitization";
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -871,7 +872,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
           "Adopting the first Stalwart public key for mailbox recovery",
           {
             accountId: input.accountId,
-            email: input.email,
+            recipientRef: logRef(input.email),
             existingPublicKeyId: fallbackKey.id,
           },
         );
@@ -886,7 +887,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
       "Stalwart registerPublicKey reported an existing remote key; attempting recovery",
       {
         accountId: input.accountId,
-        email: input.email,
+        recipientRef: logRef(input.email),
         existingPublicKeyId: matchingKey.id,
         errorType: input.createError?.type ?? null,
         properties: input.createError?.properties ?? null,

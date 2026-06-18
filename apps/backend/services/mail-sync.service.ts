@@ -1,6 +1,7 @@
 import { createLogger } from "@workspace/logger";
 import type { PrismaClient } from "../generated/prisma/index.js";
-import { ForbiddenError, ValidationError, errorString} from "../lib/errors";
+import { ForbiddenError, ValidationError } from "../lib/errors";
+import { errorLogDetails } from "../lib/log-sanitization";
 import type {
   StalwartJmapAdminClientLike,
   StalwartJmapEnvelope,
@@ -274,13 +275,25 @@ export class MailSyncService {
 
     const [emailChanged, mailboxChanged] = await Promise.all([
       this.quickChangesCheck("Email", accountId, syncState.emailState).catch(
-        () => false,
+        (error) => {
+          logger.debug("JMAP Email/changes check failed", {
+            accountId,
+            ...errorLogDetails(error),
+          });
+          return false;
+        },
       ),
       this.quickChangesCheck(
         "Mailbox",
         accountId,
         syncState.mailboxState,
-      ).catch(() => false),
+      ).catch((error) => {
+        logger.debug("JMAP Mailbox/changes check failed", {
+          accountId,
+          ...errorLogDetails(error),
+        });
+        return false;
+      }),
     ]);
 
     const changedTypes = [
@@ -378,7 +391,7 @@ export class MailSyncService {
         logger.warn("Receipt-time mail sync failed", {
           accountId: entry.stalwartAccountId,
           userId: entry.userId,
-          error: errorString(error),
+          ...errorLogDetails(error),
         });
       }
     }
@@ -492,7 +505,7 @@ export class MailSyncService {
         error instanceof Error
           ? error.message
           : "Unknown calendar import error";
-      logger.error("Mail calendar import failed", error);
+      logger.error("Mail calendar import failed", errorLogDetails(error));
       return {
         ...createEmptyMailCalendarImportSummary(),
         messagesScanned: input.records.length,

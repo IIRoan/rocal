@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createLogger } from "@workspace/logger";
 import {
   formatInUserTimezone,
+  getOperationWarningMessages,
   getTimezoneAwareCalendarDateRange,
   getZonedDateParts,
   isTodayInTimezone,
@@ -29,6 +30,23 @@ import {
 import { toast } from "sonner";
 
 const log = createLogger("mobile-calendar");
+
+function toastEventSaved(
+  savedEvent: unknown,
+  message: string,
+  description: string,
+) {
+  toast.success(message, {
+    description,
+    position: "bottom-left",
+  });
+
+  for (const warningMessage of getOperationWarningMessages(savedEvent)) {
+    toast.warning(warningMessage, {
+      position: "bottom-left",
+    });
+  }
+}
 import { useIsMobile } from "../../hooks/use-mobile";
 
 import {
@@ -397,24 +415,26 @@ export function MobileEventCalendar({
       let savedEvent: any;
       if (event.id) {
         savedEvent = await updateEvent(event.id, eventData);
-        toast.success(`Event "${event.title}" updated`, {
-          description: formatInUserTimezone(
+        toastEventSaved(
+          savedEvent,
+          `Event "${event.title}" updated`,
+          formatInUserTimezone(
             new Date(event.start),
             resolvedTimezone,
             "MMM d, yyyy 'at' h:mm a",
           ),
-          position: "bottom-left",
-        });
+        );
       } else {
         savedEvent = await createEvent(eventData);
-        toast.success(`Event "${event.title}" created`, {
-          description: formatInUserTimezone(
+        toastEventSaved(
+          savedEvent,
+          `Event "${event.title}" created`,
+          formatInUserTimezone(
             new Date(event.start),
             resolvedTimezone,
             "MMM d, yyyy 'at' h:mm a",
           ),
-          position: "bottom-left",
-        });
+        );
       }
 
       return savedEvent || event;

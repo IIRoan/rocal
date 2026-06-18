@@ -10,7 +10,7 @@ import {
 } from "../services/mail-realtime.service";
 import type { MailSyncService } from "../services/mail-sync.service";
 import { defaultMailSyncService } from "./mail-sync";
-import { errorString } from "../lib/errors";
+import { errorLogDetails } from "../lib/log-sanitization";
 
 const logger = createLogger("backend:mail-sse");
 const encoder = new TextEncoder();
@@ -158,8 +158,7 @@ export function createRealtimeMailRoutes(
                     logger.warn("Mail poll check failed", {
                       userId: routeUser.id,
                       accountId,
-                      error:
-                        errorString(error),
+                      ...errorLogDetails(error),
                     });
                   }
                 }

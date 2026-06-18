@@ -2,6 +2,7 @@ import { z } from "zod";
 import { strictZodObject } from "../lib/validation";
 import { resourceIdParamsSchema } from "./_schemas";
 import { resourceIdSchema } from "./_zod";
+import type { WithOperationWarnings } from "@workspace/calendar-core";
 
 export const createInviteBodySchema = strictZodObject({
   email: z.string().min(1).max(320),
@@ -52,7 +53,7 @@ export type InviteRecord = {
 };
 
 export type CreateInviteInput = z.infer<typeof createInviteInputSchema>;
-export type CreateInviteResult = InviteRecord;
+export type CreateInviteResult = WithOperationWarnings<InviteRecord>;
 export type ListInvitesInput = z.infer<typeof listInvitesInputSchema>;
 export type ListInvitesResult = {
   invites: InviteRecord[];

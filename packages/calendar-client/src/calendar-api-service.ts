@@ -16,6 +16,7 @@ import type {
   CategoriesResponse,
   CreateEventRequest,
   UpdateEventRequest,
+  WithOperationWarnings,
   CreateCalendarRequest,
   UpdateCalendarRequest,
   CreateCategoryRequest,
@@ -474,10 +475,12 @@ export class CalendarApiService {
     }
   }
 
-  async createEvent(event: CreateEventRequest): Promise<CalendarEvent> {
+  async createEvent(
+    event: CreateEventRequest,
+  ): Promise<WithOperationWarnings<CalendarEvent>> {
     try {
       const payload = await this.e2ee.attachEventEncryptionShadow(event);
-      const response = await this.client.post<CalendarEvent>(
+      const response = await this.client.post<WithOperationWarnings<CalendarEvent>>(
         "/api/events",
         payload,
       );
@@ -490,10 +493,10 @@ export class CalendarApiService {
   async updateEvent(
     id: string,
     event: UpdateEventRequest,
-  ): Promise<CalendarEvent> {
+  ): Promise<WithOperationWarnings<CalendarEvent>> {
     try {
       const payload = await this.e2ee.attachEventEncryptionShadow(event);
-      const response = await this.client.put<CalendarEvent>(
+      const response = await this.client.put<WithOperationWarnings<CalendarEvent>>(
         `/api/events/${id}`,
         payload,
       );

@@ -3,12 +3,18 @@ import {
   type AuthEmailClient,
   type AuthEmailLogger,
   type AuthEmailMessage,
+  type EmailDeliveryResult,
 } from "./auth-email";
 import { buildMimeMessage, deliverToInternalMailbox } from "./internal-mailbox-delivery";
 import { normalizeParticipantEmail } from "./event-participants";
 import type { StalwartJmapAdminClientLike } from "./stalwart-admin";
+import { errorLogDetails, logRef } from "./log-sanitization";
 
 export type EventInvitationDeliveryChannel = "mailbox" | "resend";
+
+export type EventInvitationDeliveryResult = EmailDeliveryResult & {
+  channel: EventInvitationDeliveryChannel;
+};
 
 export async function sendEventInvitationEmail(input: {
   to: string;
@@ -23,10 +29,7 @@ export async function sendEventInvitationEmail(input: {
   ) => Promise<{ stalwartAccountId: string } | null>;
   isProduction: boolean;
   developmentFallbackContext?: Record<string, unknown>;
-}): Promise<{
-  delivered: boolean;
-  channel: EventInvitationDeliveryChannel;
-}> {
+}): Promise<EventInvitationDeliveryResult> {
   const email = normalizeParticipantEmail(input.to);
   const internalMailbox = await input.resolveInternalMailbox(email);
 
@@ -53,20 +56,20 @@ export async function sendEventInvitationEmail(input: {
       });
 
       input.logger.info("Sent event invitation email", {
-        email,
+        recipientRef: logRef(email),
         channel: "mailbox",
         emailId: result.emailId,
       });
       return { delivered: true, channel: "mailbox" };
     } catch (error) {
       input.logger.warn("Mailbox invitation delivery failed; falling back to Resend", {
-        email,
-        error,
+        recipientRef: logRef(email),
+        ...errorLogDetails(error),
       });
     }
   }
 
-  const delivered = await sendAuthEmail({
+  const delivery = await sendAuthEmail({
     client: input.resendClient,
     from: input.from,
     to: email,
@@ -79,7 +82,7 @@ export async function sendEventInvitationEmail(input: {
   });
 
   return {
-    delivered,
+    ...delivery,
     channel: "resend",
   };
 }

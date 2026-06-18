@@ -19,6 +19,7 @@ import {
   getStalwartMailBridgeClientId,
 } from "../lib/mail-bridge-auth";
 import { errorMessage } from "../lib/errors";
+import { logRef, redactPII, sanitizeRequestUrl, errorLogDetails } from "../lib/log-sanitization";
 
 type JmapProxyFetcher = (
   input: string,
@@ -117,13 +118,6 @@ async function deriveVaultKeyForNative(
 }
 
 const publicJmapProxyBaseUrl = `${normalizeBaseUrl(env.backendUrl)}/api/mail/jmap`;
-const UPSTREAM_LOG_BODY_LIMIT = 2048;
-
-function truncateLogBody(body: string): string {
-  return body.length <= UPSTREAM_LOG_BODY_LIMIT
-    ? body
-    : `${body.slice(0, UPSTREAM_LOG_BODY_LIMIT)}…`;
-}
 
 function classifyJmapProxyOperation(upstreamPath: string): string {
   if (upstreamPath.includes("/upload/")) return "blob-upload";
@@ -222,7 +216,10 @@ function summarizeBearerToken(
     iss: payload?.iss,
     aud: payload?.aud,
     azp: payload?.azp,
-    sub: payload?.sub,
+    sub:
+      typeof payload?.sub === "string" && payload.sub.includes("@")
+        ? logRef(payload.sub)
+        : payload?.sub,
     exp,
     secondsUntilExpiry: exp !== null ? exp - nowSec : undefined,
   };
@@ -241,10 +238,19 @@ function summarizeUpstreamErrorBody(
       bodyPresent: true,
       bodyLength: body.length,
       error: parsed.error,
-      message: parsed.message,
-      detail: parsed.detail,
+      message:
+        typeof parsed.message === "string"
+          ? redactPII(parsed.message)
+          : parsed.message,
+      detail:
+        typeof parsed.detail === "string"
+          ? redactPII(parsed.detail)
+          : parsed.detail,
       type: parsed.type,
-      title: parsed.title,
+      title:
+        typeof parsed.title === "string"
+          ? redactPII(parsed.title)
+          : parsed.title,
       status: parsed.status,
     };
   } catch {
@@ -307,7 +313,7 @@ async function resolveSessionUserForProxy(
     }
   } catch (err) {
     logger.debug("JMAP proxy session lookup failed", {
-      message: errorMessage(err, "Unknown error"),
+      message: redactPII(errorMessage(err, "Unknown error")),
     });
   }
 
@@ -345,7 +351,7 @@ async function proxyJmapRequest(input: {
     }
   } catch (err) {
     logger.debug("JMAP proxy could not resolve session user for upstream auth", {
-      message: errorMessage(err, "Unknown error"),
+      message: redactPII(errorMessage(err, "Unknown error")),
       hadClientBearer: Boolean(input.request.headers.get("authorization")),
     });
   }
@@ -399,10 +405,10 @@ async function proxyJmapRequest(input: {
     const message =
       errorMessage(err, "Unknown network error");
     logger.error("JMAP proxy upstream request failed", {
-      upstreamUrl,
+      upstreamUrl: sanitizeRequestUrl(upstreamUrl),
       method,
       token: summarizeBearerToken(authorization),
-      message,
+      message: redactPII(message),
     });
     return Response.json(
       {
@@ -440,7 +446,7 @@ async function proxyJmapRequest(input: {
         "JMAP proxy refreshing session token after upstream 401",
         {
           operation,
-          upstreamUrl,
+          upstreamUrl: sanitizeRequestUrl(upstreamUrl),
           method,
           methodCalls: requestSummary.methodCalls,
         },
@@ -463,13 +469,12 @@ async function proxyJmapRequest(input: {
       authSource,
       retriedWithFreshToken: Boolean(input.retryWithFreshToken),
       proxyPath: requestUrl.pathname,
-      upstreamUrl,
+      upstreamUrl: sanitizeRequestUrl(upstreamUrl),
       method,
       status: response.status,
       token: summarizeBearerToken(authorization),
       request: requestSummary,
       upstreamError: summarizeUpstreamErrorBody(upstreamBody),
-      ...(upstreamBody ? { upstreamBody: truncateLogBody(upstreamBody) } : {}),
     };
 
     const isSendFailure =
@@ -520,9 +525,8 @@ export function createMailRoutes(
           return await mailService.getDirectoryKey(params.email);
         } catch (err) {
           logger.error("Failed to look up internal recipient key", {
-            email: params.email,
-            message: errorMessage(err, "Unknown error"),
-            errorName: err instanceof Error ? err.name : undefined,
+            recipientRef: logRef(params.email),
+            ...errorLogDetails(err),
           });
           throw err;
         }
@@ -637,10 +641,8 @@ export function createMailRoutes(
           const message = errorMessage(err, "Could not issue mail token.");
           logger.error("Failed to issue mail access token", {
             userId,
-            email,
-            message,
-            errorName: err instanceof Error ? err.name : undefined,
-            stack: err instanceof Error ? err.stack : undefined,
+            recipientRef: logRef(email),
+            ...errorLogDetails(err),
           });
           return status(
             400,
@@ -667,13 +669,10 @@ export function createMailRoutes(
           try {
             derivedKeyB64 = await deriveVaultKeyForNative(userId, keyMaterial);
           } catch (derivedErr) {
-            logger.error(
-              "[vault-key-material] deriveVaultKeyForNative failed for userId=%s: %s",
+            logger.error("[vault-key-material] deriveVaultKeyForNative failed", {
               userId,
-              derivedErr instanceof Error
-                ? derivedErr.message
-                : String(derivedErr),
-            );
+              ...errorLogDetails(derivedErr),
+            });
           }
           logger.debug(
             "[vault-key-material] responding hasDerivedKey=%s for userId=%s",

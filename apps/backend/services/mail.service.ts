@@ -5,6 +5,11 @@ import {
   NotFoundError,
   UpstreamServiceError,
   ValidationError, errorString} from "../lib/errors";
+import {
+  errorLogDetails,
+  logRef,
+  sanitizeLogContext,
+} from "../lib/log-sanitization";
 import { getOpenPgpPublicKeyFingerprint } from "../lib/mail-key-utils";
 import type {
   GetMailAccountStatusInput,
@@ -492,13 +497,13 @@ export class MailService implements IMailService {
     if (isOwnedByDifferentUser) {
       logger.warn(
         "Provisioned Stalwart account is already linked to another Solace account",
-        {
+        sanitizeLogContext({
           email: input.email,
           userId: input.userId ?? null,
           existingUserId: existingEntry.userId,
           stalwartAccountId: details.stalwartAccountId,
           directoryEntryId: existingEntry.id,
-        },
+        }),
       );
       throw new ValidationError(
         "That mailbox is already linked to another Solace account.",
@@ -509,7 +514,7 @@ export class MailService implements IMailService {
     if (requiresEmailRepair) {
       logger.warn(
         "Repairing stale mail directory entry for a provisioned Stalwart account",
-        {
+        sanitizeLogContext({
           requestedEmail: input.email,
           existingEmail: existingEntry.email,
           userId: input.userId ?? null,
@@ -517,7 +522,7 @@ export class MailService implements IMailService {
           stalwartAccountId: details.stalwartAccountId,
           directoryEntryId: existingEntry.id,
           resetMailSyncState: true,
-        },
+        }),
       );
 
       await tx.mailJmapSyncState.deleteMany({
@@ -530,13 +535,13 @@ export class MailService implements IMailService {
     if (!requiresEmailRepair) {
       logger.warn(
         "Reusing existing mail directory entry for provisioned Stalwart account",
-        {
+        sanitizeLogContext({
           email: input.email,
           userId: input.userId ?? null,
           existingUserId: existingEntry.userId,
           stalwartAccountId: details.stalwartAccountId,
           directoryEntryId: existingEntry.id,
-        },
+        }),
       );
     }
 
@@ -670,7 +675,7 @@ export class MailService implements IMailService {
         "Failed to delete orphaned Stalwart account after failed mailbox provisioning",
         {
           stalwartAccountId: accountId,
-          error,
+          ...errorLogDetails(error),
         },
       );
     }
@@ -707,9 +712,9 @@ export class MailService implements IMailService {
       }
     } catch (error) {
       logger.error("Failed to delete linked Stalwart account during Solace account deletion", {
-        email: input.email,
+        recipientRef: logRef(input.email),
         stalwartAccountId: input.stalwartAccountId,
-        error,
+        ...errorLogDetails(error),
       });
       throw new UpstreamServiceError(
         "Could not delete the linked Stalwart mailbox. Try again in a moment.",
@@ -746,7 +751,7 @@ export class MailService implements IMailService {
 
     logger.info("Deleted linked mailbox for Solace account", {
       userId: input.userId,
-      email: mailbox.email,
+      recipientRef: logRef(mailbox.email),
       stalwartAccountId: mailbox.stalwartAccountId,
     });
   }
@@ -822,11 +827,11 @@ export class MailService implements IMailService {
       });
     } catch (error) {
       logger.error("Mailbox Stalwart provisioning failed", {
-        email: input.email,
+        recipientRef: logRef(input.email),
         userId: input.userId,
         stalwartAccountId: accountId || null,
         stalwartAccountCreated,
-        error: errorString(error),
+        ...errorLogDetails(error),
       });
       await this.deleteOrphanedStalwartAccountIfNeeded(accountId, {
         onlyIfCreated: true,
@@ -924,12 +929,12 @@ export class MailService implements IMailService {
             if (concurrentEntry) {
               logger.warn(
                 "Detected concurrent mail directory entry creation during mailbox provisioning",
-                {
+                sanitizeLogContext({
                   email: input.email,
                   userId: input.userId ?? null,
                   stalwartAccountId: accountId,
                   directoryEntryId: concurrentEntry.id,
-                },
+                }),
               );
               await this.reconcileProvisionedMailboxRecord(
                 tx,
@@ -955,13 +960,13 @@ export class MailService implements IMailService {
         wasCreated: stalwartAccountCreated,
       });
       logger.error("Failed to persist provisioned mailbox state", {
-        email: input.email,
+        recipientRef: logRef(input.email),
         userId: input.userId ?? null,
         stalwartAccountId: accountId,
         stalwartDomainId: domainId,
         stalwartPublicKeyId: publicKeyId,
         derivedFingerprint,
-        error,
+        ...errorLogDetails(error),
       });
       normalizeMailPersistenceError(error);
     }
@@ -1073,12 +1078,12 @@ export class MailService implements IMailService {
       });
     } catch (error) {
       logger.error("Mailbox Stalwart repair failed", {
-        email: input.email,
+        recipientRef: logRef(input.email),
         userId: input.userId,
         directoryEntryId: input.mailbox.id,
         stalwartAccountId: accountId || null,
         stalwartAccountCreated,
-        error: errorString(error),
+        ...errorLogDetails(error),
       });
       await this.deleteOrphanedStalwartAccountIfNeeded(accountId, {
         onlyIfCreated: true,
@@ -1117,11 +1122,11 @@ export class MailService implements IMailService {
         wasCreated: stalwartAccountCreated,
       });
       logger.error("Failed to persist repaired mailbox state", {
-        email: input.email,
+        recipientRef: logRef(input.email),
         userId: input.userId,
         directoryEntryId: input.mailbox.id,
         stalwartAccountId: accountId,
-        error,
+        ...errorLogDetails(error),
       });
       normalizeMailPersistenceError(error);
     }
