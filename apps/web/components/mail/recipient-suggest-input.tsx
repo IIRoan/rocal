@@ -4,14 +4,11 @@ import {
   useCallback,
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type KeyboardEvent,
 } from "react";
-import { createPortal } from "react-dom";
 import {
   formatRecentContactForField,
   insertRecipientSuggestion,
@@ -19,13 +16,14 @@ import {
   type RecentContactEntry,
 } from "@workspace/calendar-core";
 import { Input } from "@workspace/ui/components/ui/input";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+} from "@workspace/ui/components/ui/popover";
 import { cn } from "@workspace/ui/lib/utils";
 import { useRecentContacts } from "@/hooks/use-recent-contacts";
 import { SenderAvatar } from "./mail-avatar";
-
-const SUGGESTION_LIST_MAX_HEIGHT = 240;
-const SUGGESTION_LIST_GAP = 4;
-const SUGGESTION_LIST_Z_INDEX = 200;
 
 function getActiveRecipientToken(value: string): string {
   const separatorIndex = Math.max(value.lastIndexOf(","), value.lastIndexOf(";"));
@@ -34,33 +32,8 @@ function getActiveRecipientToken(value: string): string {
     : value.trim();
 }
 
-function getSuggestionListStyle(anchor: HTMLElement): CSSProperties {
-  const rect = anchor.getBoundingClientRect();
-  const spaceBelow = window.innerHeight - rect.bottom - SUGGESTION_LIST_GAP;
-  const spaceAbove = rect.top - SUGGESTION_LIST_GAP;
-  const placeAbove =
-    spaceBelow < SUGGESTION_LIST_MAX_HEIGHT / 2 && spaceAbove > spaceBelow;
-  const maxHeight = Math.min(
-    SUGGESTION_LIST_MAX_HEIGHT,
-    Math.max(120, placeAbove ? spaceAbove : spaceBelow),
-  );
-
-  return {
-    position: "fixed",
-    left: rect.left,
-    width: rect.width,
-    top: placeAbove
-      ? rect.top - maxHeight - SUGGESTION_LIST_GAP
-      : rect.bottom + SUGGESTION_LIST_GAP,
-    maxHeight,
-    zIndex: SUGGESTION_LIST_Z_INDEX,
-  };
-}
-
 type RecipientSuggestionsListProps = {
   listboxId: string;
-  anchorRef: React.RefObject<HTMLElement | null>;
-  open: boolean;
   suggestions: RecentContactEntry[];
   highlightedIndex: number;
   onSelect: (entry: RecentContactEntry) => void;
@@ -68,48 +41,12 @@ type RecipientSuggestionsListProps = {
 
 function RecipientSuggestionsList({
   listboxId,
-  anchorRef,
-  open,
   suggestions,
   highlightedIndex,
   onSelect,
 }: RecipientSuggestionsListProps) {
-  const [style, setStyle] = useState<CSSProperties | null>(null);
-
-  useLayoutEffect(() => {
-    if (!open || !anchorRef.current) {
-      setStyle(null);
-      return;
-    }
-
-    const updatePosition = () => {
-      if (!anchorRef.current) {
-        return;
-      }
-      setStyle(getSuggestionListStyle(anchorRef.current));
-    };
-
-    updatePosition();
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-
-    return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [anchorRef, open, suggestions.length]);
-
-  if (!open || !style || typeof document === "undefined") {
-    return null;
-  }
-
-  return createPortal(
-    <div
-      id={listboxId}
-      role="listbox"
-      style={style}
-      className="overflow-y-auto overscroll-contain rounded-md border border-border/60 bg-popover text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 duration-100"
-    >
+  return (
+    <div id={listboxId} role="listbox" className="max-h-60 overflow-y-auto overscroll-contain">
       {suggestions.map((entry, index) => {
         const label = entry.displayName?.trim() || entry.email;
         return (
@@ -118,8 +55,10 @@ function RecipientSuggestionsList({
             type="button"
             role="option"
             aria-selected={index === highlightedIndex}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => onSelect(entry)}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              onSelect(entry);
+            }}
             className={cn(
               "flex w-full items-center gap-2 px-2.5 py-2 text-left text-sm transition-colors",
               index === highlightedIndex ? "bg-muted/60" : "hover:bg-muted/40",
@@ -141,8 +80,7 @@ function RecipientSuggestionsList({
           </button>
         );
       })}
-    </div>,
-    document.body,
+    </div>
   );
 }
 
@@ -176,6 +114,7 @@ export function RecipientSuggestInput({
 }: RecipientSuggestInputProps) {
   const listboxId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
+  const selectingRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
@@ -197,34 +136,16 @@ export function RecipientSuggestInput({
     setHighlightedIndex(0);
   }, [activeToken, suggestions.length]);
 
-  useEffect(() => {
-    if (!showSuggestions) {
-      return;
-    }
-
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (containerRef.current?.contains(target)) {
-        return;
-      }
-      if (
-        target instanceof Element &&
-        document.getElementById(listboxId)?.contains(target)
-      ) {
-        return;
-      }
-      setOpen(false);
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [listboxId, showSuggestions]);
-
   const selectSuggestion = useCallback(
     (entry: RecentContactEntry) => {
+      selectingRef.current = true;
+
       if (onSelectSuggestion) {
         onSelectSuggestion(entry);
         setOpen(false);
+        queueMicrotask(() => {
+          selectingRef.current = false;
+        });
         return;
       }
 
@@ -238,6 +159,9 @@ export function RecipientSuggestInput({
 
       onChange(nextValue);
       setOpen(false);
+      queueMicrotask(() => {
+        selectingRef.current = false;
+      });
     },
     [mode, onChange, onSelectSuggestion, value],
   );
@@ -294,7 +218,11 @@ export function RecipientSuggestInput({
     },
     onFocus: () => setOpen(true),
     onBlur: () => {
-      window.setTimeout(() => setOpen(false), 120);
+      window.setTimeout(() => {
+        if (!selectingRef.current) {
+          setOpen(false);
+        }
+      }, 0);
       onBlur?.();
     },
     onKeyDown: handleKeyDown,
@@ -308,28 +236,54 @@ export function RecipientSuggestInput({
   };
 
   return (
-    <div ref={containerRef} className={cn("relative flex-1 min-w-0", className)}>
-      {appearance === "field" ? (
-        <Input {...sharedInputProps} className={inputClassName} />
-      ) : (
-        <input
-          type="text"
-          {...sharedInputProps}
-          className={cn(
-            "w-full h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40",
-            inputClassName,
+    <Popover
+      open={showSuggestions}
+      modal={false}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          setOpen(false);
+        }
+      }}
+    >
+      <PopoverAnchor asChild>
+        <div
+          ref={containerRef}
+          className={cn("relative flex-1 min-w-0", className)}
+        >
+          {appearance === "field" ? (
+            <Input {...sharedInputProps} className={inputClassName} />
+          ) : (
+            <input
+              type="text"
+              {...sharedInputProps}
+              className={cn(
+                "w-full h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40",
+                inputClassName,
+              )}
+            />
           )}
-        />
-      )}
+        </div>
+      </PopoverAnchor>
 
-      <RecipientSuggestionsList
-        listboxId={listboxId}
-        anchorRef={containerRef}
-        open={showSuggestions}
-        suggestions={suggestions}
-        highlightedIndex={highlightedIndex}
-        onSelect={selectSuggestion}
-      />
-    </div>
+      <PopoverContent
+        className="w-[var(--radix-popover-anchor-width)] p-0"
+        align="start"
+        sideOffset={4}
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onCloseAutoFocus={(event) => event.preventDefault()}
+        onInteractOutside={(event) => {
+          if (containerRef.current?.contains(event.target as Node)) {
+            event.preventDefault();
+          }
+        }}
+      >
+        <RecipientSuggestionsList
+          listboxId={listboxId}
+          suggestions={suggestions}
+          highlightedIndex={highlightedIndex}
+          onSelect={selectSuggestion}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
