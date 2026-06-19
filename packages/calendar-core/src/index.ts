@@ -9,6 +9,8 @@ export * from "./mail-html";
 export * from "./outgoing-mime";
 export * from "./mail-outgoing-attachments";
 export * from "./mail-jmap-validation";
+export * from "./mail-server-limits";
+export * from "./mail-server-policy";
 export * from "./search-types";
 export * from "./color-utils";
 export * from "./date-utils";

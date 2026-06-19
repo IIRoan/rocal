@@ -12,7 +12,12 @@ import { useAuth } from "../../providers/AuthProvider";
 import { QUERY_KEYS } from "../query-keys";
 import { getMailAccountStatus, getMailConfig } from "./mail-api";
 import { bootstrapMailboxForAccount } from "./account-bootstrap";
-import { buildMailRuntime, type MailRuntime } from "./mail-runtime";
+import {
+  buildMailRuntime,
+  refreshMailRuntimePolicy,
+  type MailRuntime,
+} from "./mail-runtime";
+import { resolveMailboxMessagesPageSize } from "@workspace/calendar-core";
 import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
 import { MAILBOX_MESSAGES_PAGE_SIZE } from "./mail-pagination";
 import {
@@ -25,7 +30,6 @@ import {
 import type { JmapEmailMessage, LabelDef } from "./types";
 
 const RUNTIME_STALE_MS = 5 * 60_000;
-const MESSAGES_LIMIT = 30;
 
 export function useMailAccount() {
   const { isAuthenticated } = useAuth();
@@ -92,6 +96,13 @@ export function useMailboxMessages(
   runtime: MailRuntime | undefined,
   mailboxId: string | null,
 ) {
+  const pageSize = runtime?.mailServerPolicy
+    ? resolveMailboxMessagesPageSize(
+        runtime.mailServerPolicy,
+        MAILBOX_MESSAGES_PAGE_SIZE,
+      )
+    : MAILBOX_MESSAGES_PAGE_SIZE;
+
   return useInfiniteQuery({
     queryKey: QUERY_KEYS.mailMessages(mailboxId),
     enabled: Boolean(runtime && mailboxId),
@@ -100,7 +111,7 @@ export function useMailboxMessages(
       const { messages, total } = await runtime!.client.getMailboxMessages(
         runtime!.session,
         mailboxId!,
-        { limit: MESSAGES_LIMIT, position: pageParam },
+        { limit: pageSize, position: pageParam },
       );
       return {
         messages: sortMessagesByDate(messages),
@@ -113,7 +124,7 @@ export function useMailboxMessages(
       if (lastPage.total > 0) {
         return nextPosition < lastPage.total ? nextPosition : undefined;
       }
-      return lastPage.messages.length >= MESSAGES_LIMIT ? nextPosition : undefined;
+      return lastPage.messages.length >= pageSize ? nextPosition : undefined;
     },
   });
 }
@@ -458,11 +469,17 @@ export function useSendMessage(runtime: MailRuntime | undefined) {
 
   return useMutation({
     mutationFn: async (input: ComposeMessageInput) => {
-      const context = resolveComposeContext(runtime, input.identityId);
-      if (!runtime || !context) {
+      if (!runtime) {
         throw new Error("Your mailbox is not ready to send messages yet.");
       }
-      return runtime.client.sendMessage(runtime.session, {
+      const refreshedRuntime = await refreshMailRuntimePolicy(runtime);
+      queryClient.setQueryData(QUERY_KEYS.mailRuntime(), refreshedRuntime);
+
+      const context = resolveComposeContext(refreshedRuntime, input.identityId);
+      if (!context) {
+        throw new Error("Your mailbox is not ready to send messages yet.");
+      }
+      return refreshedRuntime.client.sendMessage(refreshedRuntime.session, {
         draftsMailboxId: context.draftsMailboxId,
         sentMailboxId: context.sentMailboxId,
         fromEmail: context.fromEmail,

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, resolveReplyRecipients, validateComposeRecipients, buildOutgoingMimeMessage, prepareOutgoingAttachments, validateUploadedAttachmentSet, type OutgoingMimeAttachment } from "@workspace/calendar-core";
+import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, capIdentitiesForPicker, resolveMailServerPolicy, resolveReplyRecipients, validateComposeRecipients, buildOutgoingMimeMessage, prepareOutgoingAttachments, validateUploadedAttachmentSet, validateMailboxCreate, validateMailboxName, resolveMailboxMessagesPageSize, type MailServerPolicy, type OutgoingMimeAttachment } from "@workspace/calendar-core";
 import { toast } from "sonner";
 import PostalMime, {
   type Attachment as ParsedMailAttachment,
@@ -111,11 +111,13 @@ export type ActiveMailboxState = {
   session: JmapSession;
   mailboxes: JmapMailbox[];
   identities: JmapIdentity[];
+  pickerIdentities: JmapIdentity[];
   messages: JmapEmailMessage[];
   unlockedVault: UserKeyVault;
   accountEncryptedAtRest: boolean;
   email: string;
   selectedMailboxId: string | null;
+  mailServerPolicy: MailServerPolicy;
 };
 
 type MailAttachmentPreviewState = {
@@ -1229,11 +1231,15 @@ export function useMailApp() {
       if (!activeMailbox) return;
       setIsBusy(true);
       try {
+        const pageSize = resolveMailboxMessagesPageSize(
+          activeMailbox.mailServerPolicy,
+          MAILBOX_MESSAGES_PAGE_SIZE,
+        );
         const { messages, total } =
           await activeMailbox.client.getMailboxMessages(
             activeMailbox.session,
             mailboxId,
-            { limit: MAILBOX_MESSAGES_PAGE_SIZE, position: 0 },
+            { limit: pageSize, position: 0 },
           );
         setTotalMessages(total);
         seedMailMessageCache(queryClient, mailboxId, messages, total);
@@ -1261,13 +1267,17 @@ export function useMailApp() {
   const loadMoreMessages = useCallback(async () => {
     if (!activeMailbox?.selectedMailboxId || isLoadingMore) return;
     const position = activeMailbox.messages.length;
-    if (!hasMoreMailboxMessages(position, totalMessages)) return;
+    const pageSize = resolveMailboxMessagesPageSize(
+      activeMailbox.mailServerPolicy,
+      MAILBOX_MESSAGES_PAGE_SIZE,
+    );
+    if (!hasMoreMailboxMessages(position, totalMessages, pageSize)) return;
     setIsLoadingMore(true);
     try {
       const { messages: more, total } = await activeMailbox.client.getMailboxMessages(
         activeMailbox.session,
         activeMailbox.selectedMailboxId,
-        { limit: MAILBOX_MESSAGES_PAGE_SIZE, position },
+        { limit: pageSize, position },
       );
       if (total > 0) {
         setTotalMessages(total);
@@ -1284,7 +1294,7 @@ export function useMailApp() {
       ]);
       if (total > 0) {
         setTotalMessages(total);
-      } else if (uniqueMore.length < MAILBOX_MESSAGES_PAGE_SIZE) {
+      } else if (uniqueMore.length < pageSize) {
         setTotalMessages(nextMessages.length);
       }
       seedMailMessageCache(
@@ -1435,7 +1445,8 @@ export function useMailApp() {
         }
 
         // Worker load (CPU) + JMAP metadata (network) in parallel
-        const [, [accountSettings, mailboxes, identities]] = await Promise.all([
+        const [, [accountSettings, stalwartPolicy, mailboxes, identities]] =
+          await Promise.all([
           mailCryptoWorkerClient.loadVault({
             privateKeyArmored: unlockedVault.encryptedPrivateKeyArmored,
             privateKeyPassphrase: effectivePassphrase,
@@ -1443,6 +1454,7 @@ export function useMailApp() {
           }),
           Promise.all([
             client.getAccountSettings(jmapSession),
+            client.getStalwartPolicySingletons(jmapSession),
             client.getMailboxes(jmapSession),
             client.getIdentities(jmapSession),
           ]),
@@ -1459,10 +1471,22 @@ export function useMailApp() {
           });
         }
 
+        const mailServerPolicy = resolveMailServerPolicy({
+          session: jmapSession,
+          emailSettings: stalwartPolicy.emailSettings,
+          jmapSettings: stalwartPolicy.jmapSettings,
+          configPolicy: config?.serverLimits ?? null,
+        });
+        client.setMailServerPolicy(mailServerPolicy, config?.serverLimits ?? null);
+        const mailboxPageSize = resolveMailboxMessagesPageSize(
+          mailServerPolicy,
+          MAILBOX_MESSAGES_PAGE_SIZE,
+        );
+
         const initialMailboxId = getPrimaryMailboxId(mailboxes, "inbox");
         const { messages, total: initialTotal } = initialMailboxId
           ? await client.getMailboxMessages(jmapSession, initialMailboxId, {
-              limit: MAILBOX_MESSAGES_PAGE_SIZE,
+              limit: mailboxPageSize,
             })
           : { messages: [], total: 0 };
         setTotalMessages(initialTotal);
@@ -1479,6 +1503,7 @@ export function useMailApp() {
           session: jmapSession,
           mailboxes,
           identities,
+          pickerIdentities: capIdentitiesForPicker(identities, mailServerPolicy),
           messages,
           unlockedVault,
           accountEncryptedAtRest:
@@ -1489,6 +1514,7 @@ export function useMailApp() {
             )?.["@type"] === "Aes256",
           email,
           selectedMailboxId: initialMailboxId,
+          mailServerPolicy,
         });
         setSelectedMessageId(null);
         setLoginPassword(effectivePassphrase);
@@ -1542,6 +1568,38 @@ export function useMailApp() {
     handleSignIn,
   ]);
 
+  const refreshActiveMailboxPolicy = useCallback(
+    async (
+      mailbox: ActiveMailboxState,
+      options?: { force?: boolean },
+    ): Promise<ActiveMailboxState> => {
+      const mailServerPolicy =
+        (await mailbox.client.syncMailServerPolicy(mailbox.session, options)) ??
+        mailbox.mailServerPolicy;
+      const pickerIdentities = capIdentitiesForPicker(
+        mailbox.identities,
+        mailServerPolicy,
+      );
+
+      setActiveMailbox((current) =>
+        current && current.session === mailbox.session
+          ? {
+              ...current,
+              mailServerPolicy,
+              pickerIdentities,
+            }
+          : current,
+      );
+
+      return {
+        ...mailbox,
+        mailServerPolicy,
+        pickerIdentities,
+      };
+    },
+    [],
+  );
+
   const handleSendMessage = useCallback(async () => {
     if (!activeMailbox) return;
     const draft = getMailComposeBridge()?.getDraft();
@@ -1587,6 +1645,9 @@ export function useMailApp() {
 
     setIsBusy(true);
     try {
+      const mailbox = await refreshActiveMailboxPolicy(activeMailbox, {
+        force: true,
+      });
       const recipients = parsedAddressesToEmails(recipientValidation.to);
       const ccRecipients = recipientValidation.cc.length
         ? parsedAddressesToEmails(recipientValidation.cc)
@@ -1601,17 +1662,17 @@ export function useMailApp() {
       ];
 
       const draftsMailboxId = getPrimaryMailboxId(
-        activeMailbox.mailboxes,
+        mailbox.mailboxes,
         "drafts",
       );
       const sentMailboxId = getPrimaryMailboxId(
-        activeMailbox.mailboxes,
+        mailbox.mailboxes,
         "sent",
       );
       const identity =
-        activeMailbox.identities.find(
+        mailbox.identities.find(
           (entry) => entry.id === composeIdentityId,
-        ) ?? activeMailbox.identities[0];
+        ) ?? mailbox.identities[0];
       const identityId = identity?.id;
       if (!draftsMailboxId || !identityId) {
         throw new Error(
@@ -1633,9 +1694,10 @@ export function useMailApp() {
         : undefined;
       const internalDomain =
         config?.defaultDomain.trim().toLowerCase() ??
-        getEmailDomain(activeMailbox.email);
+        getEmailDomain(mailbox.email);
       const preparedAttachments = await prepareOutgoingAttachments(
         composeAttachments,
+        { maxBytes: mailbox.mailServerPolicy.limits.maxOutgoingAttachmentBytes },
       );
       const mimeAttachments =
         preparedAttachments.length > 0
@@ -1647,7 +1709,7 @@ export function useMailApp() {
           : undefined;
       const { textBody, encrypted, pgpMimeCiphertext } =
         await resolveOutgoingMessageBody({
-          activeMailbox,
+          activeMailbox: mailbox,
           recipients: allRecipients,
           plaintext: bodyWithSignature,
           internalDomain,
@@ -1661,8 +1723,8 @@ export function useMailApp() {
         | undefined;
       if (!pgpMimeCiphertext && preparedAttachments.length > 0) {
         uploadedAttachments =
-          await activeMailbox.client.uploadPreparedAttachments(
-            activeMailbox.session,
+          await mailbox.client.uploadPreparedAttachments(
+            mailbox.session,
             preparedAttachments,
           );
         validateUploadedAttachmentSet(
@@ -1681,8 +1743,8 @@ export function useMailApp() {
         composeDraftId ??
         undefined;
 
-      const sendResult = await activeMailbox.client.sendMessage(
-        activeMailbox.session,
+      const sendResult = await mailbox.client.sendMessage(
+        mailbox.session,
         {
           draftsMailboxId,
           sentMailboxId,
@@ -1707,7 +1769,7 @@ export function useMailApp() {
       if (composeReplyContext) {
         appendConversationMessage(
           createOptimisticReplyMessage({
-            fromEmail: activeMailbox.email,
+            fromEmail: mailbox.email,
             to: recipients,
             subject: composeSubject.trim(),
             textBody: composeBody,
@@ -1766,6 +1828,7 @@ export function useMailApp() {
     activeMailbox,
     config,
     loadConversationThread,
+    refreshActiveMailboxPolicy,
   ]);
 
   const handleDeleteMessage = useCallback(
@@ -1837,40 +1900,45 @@ export function useMailApp() {
         : "";
       setIsBusy(true);
       try {
+        const mailbox = await refreshActiveMailboxPolicy(activeMailbox, {
+          force: true,
+        });
         let recipients = resolveReplyRecipients({
           from: selectedMessage.from,
           to: selectedMessage.to,
           cc: selectedMessage.cc,
-          currentUserEmail: activeMailbox.email,
+          currentUserEmail: mailbox.email,
         });
         if (recipients.length === 0) {
           recipients = resolveConversationReplyRecipients({
             messages: selectedConversationMessages,
-            currentUserEmail: activeMailbox.email,
+            currentUserEmail: mailbox.email,
           });
         }
         if (recipients.length === 0 && sender.trim()) {
           recipients = [normalizeEmailAddress(sender)];
         }
         const draftsMailboxId = getPrimaryMailboxId(
-          activeMailbox.mailboxes,
+          mailbox.mailboxes,
           "drafts",
         );
         const sentMailboxId = getPrimaryMailboxId(
-          activeMailbox.mailboxes,
+          mailbox.mailboxes,
           "sent",
         );
-        const identityId = activeMailbox.identities[0]?.id;
+        const identityId = mailbox.identities[0]?.id;
         if (!draftsMailboxId || !identityId) {
           throw new Error("Missing draft mailbox or sending identity.");
         }
         const internalDomain =
           config?.defaultDomain.trim().toLowerCase() ??
-          getEmailDomain(activeMailbox.email);
+          getEmailDomain(mailbox.email);
         const quotedBody = date
           ? `\n\n---\nOn ${date}, ${sender} wrote:\n${body}`
           : "";
-        const preparedAttachments = await prepareOutgoingAttachments(files);
+        const preparedAttachments = await prepareOutgoingAttachments(files, {
+          maxBytes: mailbox.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
+        });
         const mimeAttachments =
           preparedAttachments.length > 0
             ? preparedAttachments.map(({ filename, contentType, content }) => ({
@@ -1881,7 +1949,7 @@ export function useMailApp() {
             : undefined;
         const { textBody, encrypted, pgpMimeCiphertext } =
           await resolveOutgoingMessageBody({
-            activeMailbox,
+            activeMailbox: mailbox,
             recipients,
             plaintext: `${replyText}${quotedBody}`,
             internalDomain,
@@ -1890,8 +1958,8 @@ export function useMailApp() {
 
         let attachments: JmapAttachmentInput[] | undefined;
         if (!pgpMimeCiphertext && preparedAttachments.length > 0) {
-          attachments = await activeMailbox.client.uploadPreparedAttachments(
-            activeMailbox.session,
+          attachments = await mailbox.client.uploadPreparedAttachments(
+            mailbox.session,
             preparedAttachments,
           );
           validateUploadedAttachmentSet(
@@ -1904,12 +1972,12 @@ export function useMailApp() {
         }
 
         const replyContext = buildReplyContext(selectedMessage);
-        const sendResult = await activeMailbox.client.sendMessage(
-          activeMailbox.session,
+        const sendResult = await mailbox.client.sendMessage(
+          mailbox.session,
           {
             draftsMailboxId,
             sentMailboxId,
-            fromEmail: activeMailbox.email,
+            fromEmail: mailbox.email,
             to: recipients,
             subject: subject.startsWith("Re: ") ? subject : `Re: ${subject}`,
             textBody,
@@ -1924,7 +1992,7 @@ export function useMailApp() {
           sendResult?.threadId ?? replyContext.threadId ?? null;
         appendConversationMessage(
           createOptimisticReplyMessage({
-            fromEmail: activeMailbox.email,
+            fromEmail: mailbox.email,
             to: recipients,
             subject: subject.startsWith("Re: ") ? subject : `Re: ${subject}`,
             textBody: `${replyText}${quotedBody}`,
@@ -1968,6 +2036,7 @@ export function useMailApp() {
       activeMailbox,
       config,
       loadConversationThread,
+      refreshActiveMailboxPolicy,
     ],
   );
 
@@ -2193,6 +2262,14 @@ export function useMailApp() {
       if (!mailbox || PROTECTED_ROLES.has(mailbox.role?.toLowerCase() ?? ""))
         return;
       const trimmed = name.trim();
+      const validationError = validateMailboxName(
+        trimmed,
+        activeMailbox.mailServerPolicy,
+      );
+      if (validationError) {
+        toast.error(validationError);
+        return;
+      }
       setActiveMailbox((cur) =>
         cur
           ? {
@@ -2234,10 +2311,24 @@ export function useMailApp() {
   const handleCreateMailbox = useCallback(
     async (name: string) => {
       if (!activeMailbox || !name.trim()) return;
+      const mailbox = await refreshActiveMailboxPolicy(activeMailbox, {
+        force: true,
+      });
+      const validationError = validateMailboxCreate(
+        {
+          name: name.trim(),
+          existingMailboxCount: mailbox.mailboxes.length,
+        },
+        mailbox.mailServerPolicy,
+      );
+      if (validationError) {
+        toast.error(validationError);
+        return;
+      }
       setIsBusy(true);
       try {
-        const created = await activeMailbox.client.createMailbox(
-          activeMailbox.session,
+        const created = await mailbox.client.createMailbox(
+          mailbox.session,
           name.trim(),
         );
         setActiveMailbox((cur) =>
@@ -2255,7 +2346,7 @@ export function useMailApp() {
         setIsBusy(false);
       }
     },
-    [activeMailbox],
+    [activeMailbox, refreshActiveMailboxPolicy],
   );
 
   const handleDeleteMailbox = useCallback(
@@ -2560,27 +2651,39 @@ export function useMailApp() {
 
   const handleManualRefresh = useCallback(async () => {
     if (!activeMailbox?.selectedMailboxId || isRefreshing) return;
-    const mailboxId = activeMailbox.selectedMailboxId;
+    const mailbox = await refreshActiveMailboxPolicy(activeMailbox, {
+      force: true,
+    });
+    const mailboxId = mailbox.selectedMailboxId;
+    if (!mailboxId) {
+      return;
+    }
     setIsRefreshing(true);
     try {
       const previousTotal = totalMessages;
+      const pageSize = resolveMailboxMessagesPageSize(
+        mailbox.mailServerPolicy,
+        MAILBOX_MESSAGES_PAGE_SIZE,
+      );
       const { messages: refreshed, total } =
-        await activeMailbox.client.getMailboxMessages(
-          activeMailbox.session,
+        await mailbox.client.getMailboxMessages(
+          mailbox.session,
           mailboxId,
-          { limit: MAILBOX_MESSAGES_PAGE_SIZE, position: 0 },
+          { limit: pageSize, position: 0 },
         );
       setTotalMessages(total);
       const merged = mergeRefreshedMailboxMessages(
-        activeMailbox.messages,
+        mailbox.messages,
         refreshed,
         previousTotal,
         total,
       );
       seedMailMessageCache(queryClient, mailboxId, merged, total);
-      setActiveMailbox((cur) => (cur ? { ...cur, messages: merged } : cur));
+      setActiveMailbox((cur) =>
+        cur ? { ...cur, messages: merged, selectedMailboxId: mailboxId } : cur,
+      );
 
-      const accountId = getPrimaryMailAccountId(activeMailbox.session);
+      const accountId = getPrimaryMailAccountId(mailbox.session);
       if (accountId) {
         const result = await mailDemoApiService.syncAccount(accountId);
         handleRealtimeSync(result);
@@ -2596,6 +2699,7 @@ export function useMailApp() {
     handleRealtimeSync,
     isRefreshing,
     queryClient,
+    refreshActiveMailboxPolicy,
     totalMessages,
   ]);
 
@@ -2764,6 +2868,13 @@ export function useMailApp() {
     [activeMailbox, saveLabelsToVault],
   );
 
+  const composeMailPolicy = useMemo(
+    () =>
+      activeMailbox?.mailServerPolicy ??
+      resolveMailServerPolicy({ configPolicy: config?.serverLimits ?? null }),
+    [activeMailbox?.mailServerPolicy, config?.serverLimits],
+  );
+
   const user = session?.user
     ? {
         name: session.user.name ?? "User",
@@ -2780,6 +2891,7 @@ export function useMailApp() {
     mailboxStatus,
     isMailboxStatusLoading,
     activeMailbox,
+    composeMailPolicy,
     selectedMessage,
     selectedMessageId,
     setSelectedMessageId: handleSelectMessageId,
@@ -2808,6 +2920,10 @@ export function useMailApp() {
       ? hasMoreMailboxMessages(
           activeMailbox.messages.length,
           totalMessages,
+          resolveMailboxMessagesPageSize(
+            activeMailbox.mailServerPolicy,
+            MAILBOX_MESSAGES_PAGE_SIZE,
+          ),
         )
       : false,
     isLoadingMore,

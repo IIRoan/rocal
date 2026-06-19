@@ -34,7 +34,7 @@ const mockMailOAuthConfig = {
 };
 
 const mockMailService = {
-  getConfig: jest.fn(() => ({
+  getConfig: jest.fn(async () => ({
     defaultDomain: "solace.onl",
     discoveryBaseUrl: "http://localhost:8080",
     signupEnabled: true,

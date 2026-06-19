@@ -29,7 +29,11 @@ import type {
   UpsertMailVaultBackupInput,
   UpsertMailVaultBackupForUserInput,
 } from "../contracts/mail.contract";
-import type { StalwartAdminClientLike } from "../lib/stalwart-admin";
+import type {
+  StalwartAdminClientLike,
+  StalwartJmapAdminClientLike,
+} from "../lib/stalwart-admin";
+import { fetchStalwartMailServerLimits } from "../lib/stalwart-mail-limits";
 import {
   createMailBridgePkcePair,
   deriveMailBridgeSecret,
@@ -39,6 +43,7 @@ import { normalizeEmail, normalizeEmailOrThrow } from "../lib/email-utils";
 const LOCAL_PART_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/;
 const MIN_VAULT_MEMORY_KIB = 8192;
 const MAIL_TOKEN_EXPIRY_SKEW_MS = 60_000;
+const SERVER_LIMITS_CACHE_TTL_MS = 60_000;
 const logger = createLogger("backend:mail-service");
 
 const linkedMailboxSelect = {
@@ -328,6 +333,10 @@ function normalizeMailPersistenceError(error: unknown): never {
   );
 }
 
+function hasValue<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
+}
+
 export class MailService implements IMailService {
   private readonly accessTokenCache = new Map<
     string,
@@ -338,6 +347,13 @@ export class MailService implements IMailService {
     Promise<MailAccessTokenResult>
   >();
   private readonly bridgePasswordConfiguredAccountIds = new Set<string>();
+
+  private serverLimitsCache: {
+    expiresAt: number;
+    value: MailDemoConfig["serverLimits"];
+  } | null = null;
+  private serverLimitsInflight: Promise<MailDemoConfig["serverLimits"]> | null =
+    null;
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -352,7 +368,11 @@ export class MailService implements IMailService {
     },
   ) {}
 
-  getConfig(): MailDemoConfig {
+  getConfig(): Promise<MailDemoConfig> {
+    return this.getConfigWithServerLimits();
+  }
+
+  private getBaseConfig(): MailDemoConfig {
     return {
       defaultDomain: this.config.defaultDomain,
       discoveryBaseUrl: this.config.discoveryBaseUrl,
@@ -360,6 +380,84 @@ export class MailService implements IMailService {
       oauth: this.config.oauth,
       vaultKeyMaterialEndpoint: this.config.vaultKeyMaterialEndpoint,
     };
+  }
+
+  async getConfigWithServerLimits(): Promise<MailDemoConfig> {
+    const serverLimits = await this.loadServerLimits();
+    return {
+      ...this.getBaseConfig(),
+      serverLimits,
+    };
+  }
+
+  private loadServerLimits(): Promise<MailDemoConfig["serverLimits"]> {
+    const now = Date.now();
+    if (
+      this.serverLimitsCache &&
+      this.serverLimitsCache.expiresAt > now
+    ) {
+      return Promise.resolve(this.serverLimitsCache.value);
+    }
+
+    if (this.serverLimitsInflight) {
+      return this.serverLimitsInflight;
+    }
+
+    const inflight = this.fetchServerLimits()
+      .then(({ value, cacheable }) => {
+        if (cacheable) {
+          this.serverLimitsCache = {
+            expiresAt: Date.now() + SERVER_LIMITS_CACHE_TTL_MS,
+            value,
+          };
+        } else {
+          this.serverLimitsCache = null;
+        }
+
+        return value;
+      })
+      .finally(() => {
+        if (this.serverLimitsInflight === inflight) {
+          this.serverLimitsInflight = null;
+        }
+      });
+
+    this.serverLimitsInflight = inflight;
+    return inflight;
+  }
+
+  private async fetchServerLimits(): Promise<{
+    value: MailDemoConfig["serverLimits"];
+    cacheable: boolean;
+  }> {
+    if (!isJmapAdminClient(this.adminClient)) {
+      return { value: null, cacheable: true };
+    }
+
+    try {
+      const limits = await fetchStalwartMailServerLimits(this.adminClient);
+      const hasValues =
+        hasValue(limits.maxBlobUploadBytes) ||
+        hasValue(limits.maxAttachmentSizeBytes) ||
+        hasValue(limits.maxMessageSizeBytes) ||
+        hasValue(limits.maxMailboxDepth) ||
+        hasValue(limits.maxMailboxNameLength) ||
+        hasValue(limits.maxMailboxes) ||
+        hasValue(limits.maxIdentities) ||
+        hasValue(limits.defaultFolders) ||
+        hasValue(limits.getMaxResults) ||
+        hasValue(limits.queryMaxResults) ||
+        hasValue(limits.maxMethodCalls) ||
+        hasValue(limits.maxConcurrentUploads) ||
+        hasValue(limits.maxRequestSizeBytes) ||
+        hasValue(limits.uploadTtlMs);
+      return { value: hasValues ? limits : null, cacheable: true };
+    } catch (error) {
+      logger.warn("Failed to load Stalwart mail server limits", {
+        ...errorLogDetails(error),
+      });
+      return { value: null, cacheable: false };
+    }
   }
 
   async issueAccessTokenForUser(
@@ -1398,4 +1496,10 @@ export class MailService implements IMailService {
       kdfParams: input.kdfParams,
     });
   }
+}
+
+function isJmapAdminClient(
+  client: StalwartAdminClientLike,
+): client is StalwartJmapAdminClientLike {
+  return typeof (client as StalwartJmapAdminClientLike).callJmap === "function";
 }
