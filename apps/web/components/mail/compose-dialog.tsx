@@ -33,12 +33,14 @@ import { useIsMobile } from "@workspace/ui/hooks";
 import type { JmapIdentity } from "@/lib/mail/types";
 import {
   validateComposeRecipients,
+  pickOutgoingAttachmentFiles,
 } from "@workspace/calendar-core";
 import { RichTextEditor } from "./rich-text-editor";
 import {
   appendHtmlSignature,
   appendPlainTextSignature,
 } from "@/lib/mail/signature-utils";
+import { toast } from "sonner";
 
 export interface ComposeDialogProps {
   identities: JmapIdentity[];
@@ -109,6 +111,7 @@ export function ComposeForm({
     setComposeHtmlBody,
     composeAttachments,
     setComposeAttachments,
+    mailServerLimits,
     selectedIdentityId,
     setSelectedIdentityId,
     draftSaveStatus,
@@ -151,9 +154,15 @@ export function ComposeForm({
     !recipientValidation.errors.subject;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (files.length > 0) {
-      setComposeAttachments((prev) => [...prev, ...files]);
+    const accepted = pickOutgoingAttachmentFiles(
+      Array.from(e.target.files ?? []),
+      {
+        maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
+        onReject: (error) => toast.error(error),
+      },
+    );
+    if (accepted.length > 0) {
+      setComposeAttachments((prev) => [...prev, ...accepted]);
     }
     e.target.value = "";
   };

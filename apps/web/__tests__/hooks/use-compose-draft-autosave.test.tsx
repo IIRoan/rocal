@@ -15,6 +15,7 @@ import {
   useMailCompose,
   useMailComposeChrome,
 } from "@/components/mail/mail-compose-context";
+import { resolveMailServerLimits } from "@workspace/calendar-core";
 import { useComposeDraftAutosave } from "@/hooks/use-compose-draft-autosave";
 import type { JmapSession } from "@/lib/mail/types";
 
@@ -82,6 +83,7 @@ describe("useComposeDraftAutosave", () => {
           identities={[
             { id: "identity-1", email: "alice@solace.onl", name: "Alice" },
           ]}
+          mailServerLimits={resolveMailServerLimits({})}
         >
           <ComposeOpenGate>
             <AutosaveProbe onReady={(value) => { latest = value; }} />

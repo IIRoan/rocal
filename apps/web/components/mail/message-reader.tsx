@@ -107,6 +107,7 @@ import {
   cleanInviteMailText,
 } from "@/lib/mail/invite-boilerplate";
 import { resolveAttachmentPreviewKind } from "@/lib/mail/attachment-preview";
+import { pickOutgoingAttachmentFiles, resolveMailServerLimits, type MailServerLimits } from "@workspace/calendar-core";
 import { splitPlaintextQuote, splitHtmlQuote } from "@/lib/mail/quoted-text";
 import { formatAddressFull, formatMessageDate } from "./mail-helpers";
 import { PdfAttachmentThumbnail } from "./attachment-preview-dialog";
@@ -678,6 +679,7 @@ export interface MessageReaderProps {
   accountEmail?: string;
   accountName?: string | null;
   identities?: JmapIdentity[];
+  mailServerLimits?: MailServerLimits;
 }
 
 type LinkedCalendarEventState = {
@@ -735,6 +737,7 @@ export function MessageReader({
   accountEmail,
   accountName,
   identities = EMPTY_ARRAY,
+  mailServerLimits = resolveMailServerLimits({}),
 }: MessageReaderProps) {
   const isDark = mailDarkMode;
   const [newLabelName, setNewLabelName] = useState("");
@@ -995,13 +998,19 @@ export function MessageReader({
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files ?? []);
-      if (files.length) {
-        dispatchMessageUi({ type: "appendAttachedFiles", files });
+      const accepted = pickOutgoingAttachmentFiles(
+        Array.from(e.target.files ?? []),
+        {
+          maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
+          onReject: (error) => toast.error(error),
+        },
+      );
+      if (accepted.length > 0) {
+        dispatchMessageUi({ type: "appendAttachedFiles", files: accepted });
       }
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
-    [],
+    [mailServerLimits],
   );
 
   // ── GSAP reply bar expand/collapse ──────────────────────────────────────────

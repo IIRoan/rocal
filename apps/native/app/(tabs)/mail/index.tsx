@@ -651,6 +651,7 @@ export default function MailScreen() {
                 !messagesQuery.isFetchingNextPage
               }
               onRefresh={() => {
+                void runtimeQuery.refetch();
                 void messagesQuery.refetch();
                 void companionMessagesQuery.refetch();
               }}

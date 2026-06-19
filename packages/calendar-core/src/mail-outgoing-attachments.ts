@@ -1,5 +1,68 @@
 import { z } from "zod";
+import {
+  DEFAULT_MAX_BLOB_UPLOAD_BYTES,
+  formatAttachmentByteLimit,
+} from "./mail-server-limits";
 import { nonEmptyTrimmedString, throwFirstZodIssue } from "./mail-zod-utils";
+
+export {
+  DEFAULT_MAX_BLOB_UPLOAD_BYTES,
+  DEFAULT_MAX_OUTGOING_ATTACHMENT_BYTES,
+  formatAttachmentByteLimit,
+  parseStalwartSizeBytes,
+  resolveMailServerLimits,
+  resolveMaxOutgoingAttachmentBytes,
+  type JmapSessionLimitsSource,
+  type JmapSessionAttachmentLimitsSource,
+  type MailServerLimits,
+  type MailServerLimitsSource,
+  type StalwartEmailSettingsSource,
+  type StalwartJmapSettingsSource,
+} from "./mail-server-limits";
+
+export {
+  DEFAULT_JMAP_GET_MAX_RESULTS,
+  DEFAULT_JMAP_MAX_CONCURRENT_UPLOADS,
+  DEFAULT_JMAP_MAX_METHOD_CALLS,
+  DEFAULT_JMAP_MAX_REQUEST_SIZE_BYTES,
+  DEFAULT_JMAP_QUERY_MAX_RESULTS,
+  DEFAULT_JMAP_UPLOAD_TTL_MS,
+  DEFAULT_MAX_IDENTITIES,
+  DEFAULT_MAX_MAILBOX_DEPTH,
+  DEFAULT_MAX_MAILBOX_NAME_LENGTH,
+  DEFAULT_MAX_MAILBOXES,
+  REQUIRED_DEFAULT_FOLDER_ROLES,
+  STALWART_EMAIL_POLICY_PROPERTIES,
+  STALWART_JMAP_POLICY_PROPERTIES,
+  canCreateMailbox,
+  capIdentitiesForPicker,
+  chunkArray,
+  getBuiltinDefaultFolders,
+  getMissingDefaultFolderRoles,
+  parseStalwartDefaultFolders,
+  parseStalwartDuration,
+  resolveMailServerPolicy,
+  resolveMailboxMessagesPageSize,
+  resolveMailboxNameDepth,
+  resolveMailboxSearchPageSize,
+  runTasksWithConcurrencyLimit,
+  validateIdentityLimit,
+  validateJmapRequestSize,
+  validateMailboxCreate,
+  validateMailboxName,
+  MailBlobUploadRegistry,
+  chunkJmapMethodCalls,
+  estimateOutgoingJmapMessageBytes,
+  isBlobUploadExpired,
+  jmapMethodCallsHaveDependencies,
+  validateOutgoingMessageSize,
+  type MailDefaultFolderConfig,
+  type MailServerPolicy,
+  type MailServerPolicyConfig,
+  type MailServerPolicySource,
+  type StalwartEmailPolicySource,
+  type StalwartJmapPolicySource,
+} from "./mail-server-policy";
 
 export const preparedOutgoingAttachmentSchema = z.object({
   filename: nonEmptyTrimmedString,
@@ -32,6 +95,57 @@ export type ReadableAttachmentFile = {
 };
 export type UploadedAttachmentRef = z.infer<typeof uploadedAttachmentRefSchema>;
 
+export function getOutgoingAttachmentSizeError(
+  filename: string,
+  sizeBytes: number,
+  maxBytes: number = DEFAULT_MAX_BLOB_UPLOAD_BYTES,
+): string | null {
+  if (sizeBytes <= maxBytes) {
+    return null;
+  }
+
+  const label = filename.trim() || "Attachment";
+  return `"${label}" exceeds the ${formatAttachmentByteLimit(maxBytes)} attachment limit.`;
+}
+
+export function partitionOutgoingAttachmentFiles<
+  T extends ReadableAttachmentFile,
+>(
+  files: T[],
+  maxBytes: number = DEFAULT_MAX_BLOB_UPLOAD_BYTES,
+): { accepted: T[]; rejected: Array<{ file: T; error: string }> } {
+  const accepted: T[] = [];
+  const rejected: Array<{ file: T; error: string }> = [];
+
+  for (const file of files) {
+    const error = getOutgoingAttachmentSizeError(file.name, file.size, maxBytes);
+    if (error) {
+      rejected.push({ file, error });
+      continue;
+    }
+    accepted.push(file);
+  }
+
+  return { accepted, rejected };
+}
+
+export function pickOutgoingAttachmentFiles<T extends ReadableAttachmentFile>(
+  files: T[],
+  options?: {
+    maxBytes?: number;
+    onReject?: (error: string) => void;
+  },
+): T[] {
+  const maxBytes = options?.maxBytes ?? DEFAULT_MAX_BLOB_UPLOAD_BYTES;
+  const { accepted, rejected } = partitionOutgoingAttachmentFiles(files, maxBytes);
+
+  for (const { error } of rejected) {
+    options?.onReject?.(error);
+  }
+
+  return accepted;
+}
+
 function parsePreparedAttachment(
   candidate: {
     filename: string;
@@ -58,10 +172,13 @@ function parsePreparedAttachment(
  */
 export async function prepareOutgoingAttachments(
   files: ReadableAttachmentFile[],
+  options?: { maxBytes?: number },
 ): Promise<PreparedOutgoingAttachment[]> {
   if (files.length === 0) {
     return [];
   }
+
+  const maxBytes = options?.maxBytes ?? DEFAULT_MAX_BLOB_UPLOAD_BYTES;
 
   return Promise.all(
     files.map(async (file) => {
@@ -70,6 +187,15 @@ export async function prepareOutgoingAttachments(
         throw new Error("Every attachment must have a filename.");
       }
       const filename = filenameResult.data;
+
+      const reportedSizeError = getOutgoingAttachmentSizeError(
+        filename,
+        file.size,
+        maxBytes,
+      );
+      if (reportedSizeError) {
+        throw new Error(reportedSizeError);
+      }
 
       const buffer = await file.arrayBuffer();
       if (buffer.byteLength === 0) {
@@ -80,6 +206,15 @@ export async function prepareOutgoingAttachments(
         throw new Error(
           `"${filename}" could not be read completely. Try re-attaching it.`,
         );
+      }
+
+      const actualSizeError = getOutgoingAttachmentSizeError(
+        filename,
+        buffer.byteLength,
+        maxBytes,
+      );
+      if (actualSizeError) {
+        throw new Error(actualSizeError);
       }
 
       return parsePreparedAttachment(

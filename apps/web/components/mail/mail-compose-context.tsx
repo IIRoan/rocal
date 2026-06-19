@@ -10,7 +10,7 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
-import { resolveReplyRecipients } from "@workspace/calendar-core";
+import { resolveReplyRecipients, type MailServerLimits } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { extractMessageBodies } from "@/lib/mail/message-security";
 import { htmlToPlainText } from "@/lib/mail/signature-utils";
@@ -114,6 +114,7 @@ type MailComposeFieldsContextValue = {
   setComposeHtmlBody: (value: string) => void;
   composeAttachments: File[];
   setComposeAttachments: React.Dispatch<React.SetStateAction<File[]>>;
+  mailServerLimits: MailServerLimits;
   selectedIdentityId: string | null;
   setSelectedIdentityId: (id: string | null) => void;
   draftSaveStatus: DraftSaveStatus;
@@ -168,9 +169,11 @@ function addressesToCsv(
 export function MailComposeProvider({
   children,
   identities = [],
+  mailServerLimits,
 }: {
   children: ReactNode;
   identities?: JmapIdentity[];
+  mailServerLimits: MailServerLimits;
 }) {
   const [composeTo, setComposeTo] = useState("");
   const [composeCc, setComposeCc] = useState("");
@@ -465,6 +468,7 @@ export function MailComposeProvider({
       },
       composeAttachments,
       setComposeAttachments,
+      mailServerLimits,
       selectedIdentityId: resolvedIdentityId,
       setSelectedIdentityId: (id: string | null) => {
         markDirty();
@@ -483,6 +487,7 @@ export function MailComposeProvider({
       composeBody,
       composeHtmlBody,
       composeAttachments,
+      mailServerLimits,
       resolvedIdentityId,
       draftSaveStatus,
       draftId,

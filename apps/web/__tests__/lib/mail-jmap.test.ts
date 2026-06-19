@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
+import { resolveMailServerPolicy } from "@workspace/calendar-core";
 
 import {
   StalwartJmapClient,
@@ -658,6 +659,216 @@ describe("StalwartJmapClient", () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
     expect(calls).toBe(2);
     expect(mailboxes[0]?.id).toBe("inbox-1");
+  });
+
+  it("loads Stalwart Email singleton limits when available", async () => {
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher: async () =>
+        new Response(
+          JSON.stringify({
+            methodResponses: [
+              [
+                "x:Email/get",
+                {
+                  list: [
+                    {
+                      maxAttachmentSize: 100_000_000,
+                      maxMessageSize: 150_000_000,
+                    },
+                  ],
+                },
+                "e1",
+              ],
+              ["x:Jmap/get", { list: [{ maxUploadSize: 100_000_000 }] }, "j1"],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    });
+
+    const session: JmapSession = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/",
+      accounts: { acc1: { name: "alice@solace.onl" } },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "acc1" },
+    };
+
+    await expect(client.getStalwartPolicySingletons(session)).resolves.toEqual({
+      emailSettings: {
+        maxAttachmentSize: 100_000_000,
+        maxMessageSize: 150_000_000,
+      },
+      jmapSettings: { maxUploadSize: 100_000_000 },
+    });
+  });
+
+  it("refreshes Stalwart policy before saving a draft", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () =>
+      new Response(
+        JSON.stringify({
+          methodResponses: [
+            [
+              "x:Email/get",
+              {
+                list: [{ maxMessageSize: 1_000 }],
+              },
+              "e1",
+            ],
+            ["x:Jmap/get", { list: [] }, "j1"],
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+
+    const session: JmapSession = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/",
+      accounts: { acc1: { name: "alice@solace.onl" } },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "acc1" },
+    };
+
+    await expect(
+      client.saveDraft(session, {
+        draftsMailboxId: "drafts",
+        fromEmail: "alice@solace.onl",
+        to: ["bob@solace.onl"],
+        subject: "Hello",
+        textBody: "x".repeat(5_000),
+      }),
+    ).rejects.toThrow(/exceeds the .* server limit/);
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects send when the outgoing message exceeds maxMessageSize", async () => {
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher: async () =>
+        new Response(JSON.stringify({ methodResponses: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    });
+    client.setMailServerPolicy(
+      resolveMailServerPolicy({
+        emailSettings: { maxMessageSize: 1_000 },
+      }),
+    );
+
+    const session: JmapSession = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/",
+      accounts: { acc1: { name: "alice@solace.onl" } },
+      primaryAccounts: {
+        "urn:ietf:params:jmap:mail": "acc1",
+        "urn:ietf:params:jmap:submission": "acc1",
+      },
+    };
+
+    await expect(
+      client.sendMessage(session, {
+        draftsMailboxId: "drafts",
+        sentMailboxId: "sent",
+        fromEmail: "alice@solace.onl",
+        to: ["bob@solace.onl"],
+        subject: "Hello",
+        textBody: "x".repeat(5_000),
+        identityId: "identity-1",
+      }),
+    ).rejects.toThrow(/exceeds the .* server limit/);
+  });
+
+  it("refreshes Stalwart policy before sending a message", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () =>
+      new Response(
+        JSON.stringify({
+          methodResponses: [
+            [
+              "x:Email/get",
+              {
+                list: [{ maxMessageSize: 1_000 }],
+              },
+              "e1",
+            ],
+            ["x:Jmap/get", { list: [] }, "j1"],
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+
+    const session: JmapSession = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/",
+      accounts: { acc1: { name: "alice@solace.onl" } },
+      primaryAccounts: {
+        "urn:ietf:params:jmap:mail": "acc1",
+        "urn:ietf:params:jmap:submission": "acc1",
+      },
+    };
+
+    await expect(
+      client.sendMessage(session, {
+        draftsMailboxId: "drafts",
+        sentMailboxId: "sent",
+        fromEmail: "alice@solace.onl",
+        to: ["bob@solace.onl"],
+        subject: "Hello",
+        textBody: "x".repeat(5_000),
+        identityId: "identity-1",
+      }),
+    ).rejects.toThrow(/exceeds the .* server limit/);
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not split dependent JMAP method calls when maxMethodCalls is low", async () => {
+    let requestCount = 0;
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher: async () => {
+        requestCount += 1;
+        return new Response(
+          JSON.stringify({
+            methodResponses: [
+              ["Email/query", { ids: ["m1"], total: 1 }, "q1"],
+              ["Email/get", { list: [] }, "g1"],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      },
+    });
+    client.setMailServerPolicy(
+      resolveMailServerPolicy({
+        jmapSettings: { maxMethodCalls: 1 },
+      }),
+    );
+
+    const session: JmapSession = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/",
+      accounts: { acc1: { name: "alice@solace.onl" } },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "acc1" },
+    };
+
+    await client.getMailboxMessages(session, "inbox-1", { limit: 5 });
+
+    expect(requestCount).toBe(1);
   });
 
   it("retries blob uploads once after clearing stale auth", async () => {

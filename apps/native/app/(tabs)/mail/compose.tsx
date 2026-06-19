@@ -95,7 +95,7 @@ export default function ComposeScreen() {
     runtime,
     selectedIdentityId ?? undefined,
   );
-  const identities = runtime?.identities ?? [];
+  const identities = runtime?.pickerIdentities ?? [];
 
   useEffect(() => {
     if (!selectedIdentityId && identities[0]?.id) {

@@ -9,6 +9,9 @@ import {
   useMailCompose,
   useMailComposeChrome,
 } from "@/components/mail/mail-compose-context";
+import { resolveMailServerLimits } from "@workspace/calendar-core";
+
+const fallbackMailServerLimits = resolveMailServerLimits({});
 
 function ComposeProbe({
   onReady,
@@ -56,7 +59,7 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider>
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
           <ComposeProbe onReady={(value) => { latest = value; }} />
         </MailComposeProvider>,
       );
@@ -86,7 +89,7 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider>
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
           <ComposeProbe onReady={(value) => { latest = value; }} />
         </MailComposeProvider>,
       );
@@ -111,7 +114,7 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider>
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
           <ChromeProbe onReady={(value) => { chrome = value; }} />
           <ComposeProbe onReady={(value) => { latest = value; }} />
         </MailComposeProvider>,
@@ -138,7 +141,7 @@ describe("useMailCompose", () => {
   it("seedDraft opens full compose with message fields", async () => {
     await act(async () => {
       root.render(
-        <MailComposeProvider>
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
           <ComposeProbe onReady={() => {}} />
         </MailComposeProvider>,
       );
@@ -157,7 +160,7 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider>
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
           <ChromeProbe onReady={(value) => { chrome = value; }} />
         </MailComposeProvider>,
       );

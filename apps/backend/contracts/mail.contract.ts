@@ -108,7 +108,7 @@ export type DeleteMailboxForUserInput = z.infer<
 >;
 
 export interface IMailService {
-  getConfig(): MailDemoConfig;
+  getConfig(): Promise<MailDemoConfig>;
   issueAccessTokenForUser(
     input: MailAccessTokenForUserInput,
   ): Promise<MailAccessTokenResult>;

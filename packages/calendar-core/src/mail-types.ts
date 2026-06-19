@@ -29,12 +29,17 @@ export type MailVaultKdfParams = {
   audiences: string[];
 };
 
+export type { MailServerPolicyConfig } from "./mail-server-policy";
+
+export type MailServerLimitsConfig = import("./mail-server-policy").MailServerPolicyConfig;
+
 export type MailDemoConfig = {
   defaultDomain: string;
   discoveryBaseUrl: string;
   signupEnabled: boolean;
   oauth: MailOAuthConfig;
   vaultKeyMaterialEndpoint: string;
+  serverLimits?: MailServerLimitsConfig | null;
 };
 
 export type MailAccountStatus = {
