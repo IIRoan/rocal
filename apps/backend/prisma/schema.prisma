@@ -42,6 +42,7 @@ model User {
   oauthConsents  OauthConsent[]
   encryptionDevices UserEncryptionDevice[]
   encryptionPassword UserEncryptionPassword?
+  recentContacts UserRecentContacts?
 
   passkeys Passkey[]
   sentInvites Invite[] @relation("InviteSender")
@@ -271,6 +272,18 @@ model UserSettings {
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   @@map("user_settings")
+}
+
+model UserRecentContacts {
+  id                   String   @id @default(cuid())
+  userId               String   @unique @map("user_id")
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  encryptedContent     String   @map("encrypted_content")
+  encryptionKeyVersion Int      @default(1) @map("encryption_key_version")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("user_recent_contacts")
 }
 
 model CalendarSharing {

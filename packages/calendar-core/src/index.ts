@@ -30,3 +30,4 @@ export * from "./mail-calendar-invite";
 export * from "./mail-invitation-staging";
 export * from "./invitation-encryption";
 export * from "./operation-warnings";
+export * from "./recent-contacts";

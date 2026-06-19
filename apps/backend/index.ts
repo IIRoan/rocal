@@ -20,6 +20,7 @@ import { eventsRoutes } from "./routes/events";
 import { categoriesRoutes } from "./routes/categories";
 import { calendarsRoutes } from "./routes/calendars";
 import { settingsRoutes } from "./routes/settings";
+import { recentContactsRoutes } from "./routes/recent-contacts";
 import { notificationsRoutes } from "./routes/notifications";
 import { recurringRoutes } from "./routes/recurring";
 import { subscriptionsRoute } from "./routes/subscriptions";
@@ -438,6 +439,7 @@ export const createAPI = (prefix = "") => {
     .use(categoriesRoutes)
     .use(calendarsRoutes)
     .use(settingsRoutes)
+    .use(recentContactsRoutes)
     .use(notificationsRoutes)
     .use(recurringRoutes)
     .use(subscriptionsRoute)

@@ -31,6 +31,9 @@ import { validateEventForm } from "@/components/command-palette/event-utils";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "@/lib/auth-client";
+import { isCurrentUserMailAddress } from "@workspace/calendar-core";
+import { useRecentContacts } from "./use-recent-contacts";
 
 const log = createLogger("event-form");
 
@@ -205,6 +208,8 @@ export function useEventForm({
   onClose,
 }: UseEventFormProps): UseEventFormReturn {
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const { recordUsage } = useRecentContacts();
   // Use ref to store calendars to avoid infinite loops
   const calendarsRef = useRef(calendars);
   useEffect(() => {
@@ -733,6 +738,22 @@ export function useEventForm({
           setSelectedEvent(nextEvent);
         }
 
+        if (eventData.participants.length > 0) {
+          const accountEmail = session?.user?.email ?? null;
+          const entries = eventData.participants
+            .filter(
+              (participant) =>
+                !isCurrentUserMailAddress(participant.email, accountEmail),
+            )
+            .map((participant) => ({
+              email: participant.email,
+              displayName: participant.displayName,
+            }));
+          if (entries.length > 0) {
+            recordUsage(entries, "calendar");
+          }
+        }
+
         onEventSaved?.();
 
         setTimeout(() => {
@@ -803,6 +824,8 @@ export function useEventForm({
       validateRecurrenceMutation,
       updateNotificationsMutation,
       localSettings.timezone,
+      session?.user?.email,
+      recordUsage,
     ],
   );
 

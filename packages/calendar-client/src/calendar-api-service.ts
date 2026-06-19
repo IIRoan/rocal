@@ -25,6 +25,8 @@ import type {
   ApiError,
   UserSettings,
   UpdateSettingsRequest,
+  RecentContactsRecord,
+  PutRecentContactsRequest,
   RecurrenceValidation,
   RecurrencePreview,
   RecurrencePatterns,
@@ -664,6 +666,31 @@ export class CalendarApiService {
       }>("/api/settings");
     } catch (error) {
       throw this.transformError(error, "Failed to reset user settings");
+    }
+  }
+
+  // ─── Recent contacts ─────────────────────────────────────────────────────────
+
+  async getRecentContacts(): Promise<RecentContactsRecord | null> {
+    try {
+      return await this.client.get<RecentContactsRecord | null>(
+        "/api/recent-contacts",
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to fetch recent contacts");
+    }
+  }
+
+  async putRecentContacts(
+    request: PutRecentContactsRequest,
+  ): Promise<RecentContactsRecord> {
+    try {
+      return await this.client.put<RecentContactsRecord>(
+        "/api/recent-contacts",
+        request,
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to save recent contacts");
     }
   }
 

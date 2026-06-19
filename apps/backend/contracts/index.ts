@@ -51,6 +51,7 @@ import {
   validateRecurrenceBodySchema,
 } from "./recurring.contract";
 import { updateSettingsBodySchema } from "./settings.contract";
+import { putRecentContactsBodySchema } from "./recent-contacts.contract";
 import {
   createSubscriptionBodySchema,
   deleteSubscriptionQuerySchema,
@@ -94,6 +95,7 @@ export const routeModels = new Elysia({ name: "route-models" }).model({
   "notifications.eventIdParams": eventIdParamsSchema,
   "notifications.updateBody": updateEventNotificationsBodySchema,
   "settings.updateBody": updateSettingsBodySchema,
+  "recentContacts.putBody": putRecentContactsBodySchema,
   "recurring.validateBody": validateRecurrenceBodySchema,
   "recurring.previewBody": previewRecurrenceBodySchema,
   "recurring.editBody": editRecurringEventBodySchema,
@@ -119,4 +121,5 @@ export * from "./notification.contract";
 export * from "./recurring.contract";
 export * from "./route-model-names";
 export * from "./settings.contract";
+export * from "./recent-contacts.contract";
 export * from "./subscription.contract";

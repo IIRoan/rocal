@@ -49,6 +49,9 @@ export interface E2eeContextValue {
   bootstrap: (userId: string, apiBaseUrl: string) => Promise<void>;
   resetEncryptionPassword: (password: string) => Promise<boolean>;
   clearSession: () => void;
+  runWithAccountKey: <T>(
+    fn: (accountKey: CryptoKey, e2ee: E2eeModule) => Promise<T>,
+  ) => Promise<T | null>;
 }
 
 const E2eeContext = createContext<E2eeContextValue | null>(null);
@@ -651,6 +654,21 @@ export function E2eeProvider({
     };
   }, [getModule]);
 
+  const runWithAccountKey = useCallback(
+    async <T,>(
+      fn: (accountKey: CryptoKey, e2ee: E2eeModule) => Promise<T>,
+    ): Promise<T | null> => {
+      const session = sessionRef.current;
+      const e2ee = await getModule();
+      if (!session || !e2ee) {
+        return null;
+      }
+
+      return fn(session.accountKey, e2ee);
+    },
+    [getModule],
+  );
+
   const value = useMemo<E2eeContextValue>(
     () => ({
       isReady,
@@ -659,6 +677,7 @@ export function E2eeProvider({
       bootstrap,
       resetEncryptionPassword,
       clearSession,
+      runWithAccountKey,
     }),
     [
       bootstrap,
@@ -667,6 +686,7 @@ export function E2eeProvider({
       isReady,
       provider,
       resetEncryptionPassword,
+      runWithAccountKey,
     ],
   );
 

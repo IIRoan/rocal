@@ -48,6 +48,9 @@ function createMockPrisma() {
     mailJmapSyncState: {
       deleteMany: jest.fn(async () => ({ count: 0 })),
     },
+    user: {
+      findFirst: jest.fn<() => Promise<any | null>>(async () => null),
+    },
     $transaction: jest.fn(async (callback: (tx: any) => Promise<any>) =>
       callback(mockPrisma),
     ),
@@ -77,6 +80,7 @@ function createMockAdminClient() {
     })),
     deleteAccount: jest.fn(async () => undefined),
     resolveAccountIdByMailbox: jest.fn(async () => null),
+    resolveMailboxPublicKey: jest.fn(async () => null),
     callJmap: jest.fn<() => Promise<{ methodResponses: unknown[] }>>(
       async () => ({ methodResponses: [] }),
     ),
@@ -906,6 +910,34 @@ describe("MailService", () => {
       email: "bob@solace.onl",
       publicKeyArmored: "recipient-public-key",
       fingerprint: "FACECAFE12345678",
+      source: "internal",
+      trust: "verified",
+    });
+  });
+
+  it("falls back to Stalwart when the directory entry is missing locally", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValue(null);
+    mockPrisma.user.findFirst.mockResolvedValue(null);
+    mockAdminClient.resolveMailboxPublicKey.mockResolvedValue({
+      email: "nomnomnomnom@solace.onl",
+      publicKeyArmored: "recipient-public-key",
+      publicKeyId: "pk-remote",
+      stalwartAccountId: "acct-remote",
+      stalwartDomainId: "domain-1",
+    });
+
+    const result = await service.getDirectoryKey("nomnomnomnom@solace.onl");
+
+    expect(mockAdminClient.resolveMailboxPublicKey).toHaveBeenCalledWith({
+      email: "nomnomnomnom@solace.onl",
+    });
+    expect(getOpenPgpPublicKeyFingerprint).toHaveBeenCalledWith(
+      "recipient-public-key",
+    );
+    expect(result).toEqual({
+      email: "nomnomnomnom@solace.onl",
+      publicKeyArmored: "recipient-public-key",
+      fingerprint: "ABCD1234EF567890",
       source: "internal",
       trust: "verified",
     });

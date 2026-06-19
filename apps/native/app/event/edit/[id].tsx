@@ -17,6 +17,9 @@ import type {
 import { resolveTimezone } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
+import { useAuth } from "../../../src/providers/AuthProvider";
+import { useRecentContacts } from "../../../src/hooks/use-recent-contacts";
+import { extractRecentContactEntries } from "../../../src/lib/record-recent-contacts";
 import { useToast } from "../../../src/providers/ToastProvider";
 import { toastOperationWarnings } from "../../../src/lib/operation-warnings";
 import { calendarApiService } from "../../../src/lib/api";
@@ -59,6 +62,8 @@ export default function EventEditScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { recordUsage } = useRecentContacts();
 
   // ─── Route params ──────────────────────────────────────────────────────────
 
@@ -106,11 +111,18 @@ export default function EventEditScreen() {
       }
       return calendarApiService.updateEvent(id!, data);
     },
-    onSuccess: (savedEvent) => {
+    onSuccess: (savedEvent, variables) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.eventDetail(id!),
       });
+      const entries = extractRecentContactEntries(
+        variables.participants,
+        user?.email,
+      );
+      if (entries.length > 0) {
+        recordUsage(entries, "calendar");
+      }
       toast("Event updated");
       toastOperationWarnings(toast, savedEvent);
       router.back();
