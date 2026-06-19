@@ -33,6 +33,8 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../providers/AuthProvider";
+import { useRecentContacts } from "../../hooks/use-recent-contacts";
+import { extractRecentContactEntries } from "../../lib/record-recent-contacts";
 import { useToast } from "../../providers/ToastProvider";
 import { toastOperationWarnings } from "../../lib/operation-warnings";
 import { calendarApiService } from "../../lib/api";
@@ -182,6 +184,7 @@ export function EventSheet({
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { recordUsage } = useRecentContacts();
   const { toast } = useToast();
   const bottomSheetRef = useRef<BottomSheetHandle>(null);
   const createSnapshotRef = useRef<CacheSnapshot>([]);
@@ -292,8 +295,15 @@ export function EventSheet({
       dismissSheet();
       return { tempId };
     },
-    onSuccess: (savedEvent) => {
+    onSuccess: (savedEvent, variables) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      const entries = extractRecentContactEntries(
+        variables.participants,
+        user?.email,
+      );
+      if (entries.length > 0) {
+        recordUsage(entries, "calendar");
+      }
       toast("Event created");
       toastOperationWarnings(toast, savedEvent);
     },
@@ -314,12 +324,19 @@ export function EventSheet({
       }
       return calendarApiService.updateEvent(eventId!, data);
     },
-    onSuccess: (savedEvent) => {
+    onSuccess: (savedEvent, variables) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       if (eventId) {
         queryClient.invalidateQueries({
           queryKey: QUERY_KEYS.eventDetail(eventId),
         });
+      }
+      const entries = extractRecentContactEntries(
+        variables.participants,
+        user?.email,
+      );
+      if (entries.length > 0) {
+        recordUsage(entries, "calendar");
       }
       setServerErrors([]);
       toast("Event updated");

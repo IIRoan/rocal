@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, capIdentitiesForPicker, resolveMailServerPolicy, resolveReplyRecipients, validateComposeRecipients, buildOutgoingMimeMessage, prepareOutgoingAttachments, validateUploadedAttachmentSet, validateMailboxCreate, validateMailboxName, resolveMailboxMessagesPageSize, type MailServerPolicy, type OutgoingMimeAttachment } from "@workspace/calendar-core";
+import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, capIdentitiesForPicker, resolveMailServerPolicy, resolveReplyRecipients, validateComposeRecipients, buildOutgoingMimeMessage, prepareOutgoingAttachments, validateUploadedAttachmentSet, validateMailboxCreate, validateMailboxName, resolveMailboxMessagesPageSize, isCurrentUserMailAddress, type MailServerPolicy, type OutgoingMimeAttachment } from "@workspace/calendar-core";
 import { toast } from "sonner";
 import PostalMime, {
   type Attachment as ParsedMailAttachment,
@@ -12,6 +12,7 @@ import { useSession, signOut } from "@/lib/auth-client";
 import { completeAuthNavigation } from "@/lib/auth-navigation";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { useMailRealtime } from "@/hooks/use-mail-realtime";
+import { useRecentContacts } from "@/hooks/use-recent-contacts";
 import { peekCachedAuthPassword } from "@/lib/e2ee-password-cache";
 import {
   clearEncPasswordCookie,
@@ -623,6 +624,7 @@ export function useMailApp() {
   const { data: session, isPending: isSessionPending } = useSession();
   const router = useSmoothRouter();
   const queryClient = useQueryClient();
+  const { recordUsage } = useRecentContacts();
 
   const [isBusy, setIsBusy] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -1794,6 +1796,22 @@ export function useMailApp() {
         );
       }
       getMailComposeBridge()?.resetDraft();
+      const recentEntries = [
+        ...recipientValidation.to,
+        ...recipientValidation.cc,
+        ...recipientValidation.bcc,
+      ]
+        .filter(
+          (address) =>
+            !isCurrentUserMailAddress(address.email, mailbox.email),
+        )
+        .map((address) => ({
+          email: address.email,
+          displayName: address.name,
+        }));
+      if (recentEntries.length > 0) {
+        recordUsage(recentEntries, "mail");
+      }
       toast(encrypted ? "Encrypted message sent." : "Message sent.");
       // Only reload the conversation thread for replies; let realtime sync
       // update the inbox list so the sent draft never briefly flashes there.
@@ -1829,6 +1847,7 @@ export function useMailApp() {
     config,
     loadConversationThread,
     refreshActiveMailboxPolicy,
+    recordUsage,
   ]);
 
   const handleDeleteMessage = useCallback(

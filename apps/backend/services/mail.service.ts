@@ -1278,29 +1278,110 @@ export class MailService implements IMailService {
 
   async getDirectoryKey(email: string): Promise<MailDirectoryKeyResult> {
     const normalizedEmail = normalizeEmail(email);
+    const directorySelect = {
+      email: true,
+      publicKeyArmored: true,
+      publicKeyFingerprint: true,
+      source: true,
+      trust: true,
+    } as const;
+
     const entry = await this.prisma.mailDirectoryEntry.findUnique({
       where: { email: normalizedEmail },
-      select: {
-        email: true,
-        publicKeyArmored: true,
-        publicKeyFingerprint: true,
-        source: true,
-        trust: true,
-      },
+      select: directorySelect,
     });
 
-    if (!entry) {
-      throw new NotFoundError(
-        "No internal public key was found for that email.",
-      );
+    if (entry) {
+      return this.toDirectoryKeyResult(entry);
     }
 
+    const user = await this.prisma.user.findFirst({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    });
+    if (user) {
+      const linkedEntry = await this.prisma.mailDirectoryEntry.findUnique({
+        where: { userId: user.id },
+        select: directorySelect,
+      });
+      if (linkedEntry) {
+        return this.toDirectoryKeyResult(linkedEntry);
+      }
+    }
+
+    const remoteKey = await this.resolveRemoteDirectoryKey(normalizedEmail);
+    if (remoteKey) {
+      return remoteKey;
+    }
+
+    throw new NotFoundError(
+      "No internal public key was found for that email.",
+    );
+  }
+
+  private toDirectoryKeyResult(entry: {
+    email: string;
+    publicKeyArmored: string;
+    publicKeyFingerprint: string;
+    source: string;
+    trust: string;
+  }): MailDirectoryKeyResult {
     return {
       email: entry.email,
       publicKeyArmored: entry.publicKeyArmored,
       fingerprint: entry.publicKeyFingerprint,
       source: entry.source,
       trust: entry.trust,
+    };
+  }
+
+  private async resolveRemoteDirectoryKey(
+    normalizedEmail: string,
+  ): Promise<MailDirectoryKeyResult | null> {
+    const configuredDomain = this.config.defaultDomain.trim().toLowerCase();
+    const separatorIndex = normalizedEmail.lastIndexOf("@");
+    if (separatorIndex <= 0) {
+      return null;
+    }
+
+    const domain = normalizedEmail.slice(separatorIndex + 1);
+    if (domain !== configuredDomain) {
+      return null;
+    }
+
+    let remote: Awaited<
+      ReturnType<StalwartAdminClientLike["resolveMailboxPublicKey"]>
+    >;
+    try {
+      remote = await this.adminClient.resolveMailboxPublicKey({
+        email: normalizedEmail,
+      });
+    } catch (error) {
+      logger.warn("Failed to resolve mailbox public key from Stalwart", {
+        recipientRef: logRef(normalizedEmail),
+        ...errorLogDetails(error),
+      });
+      return null;
+    }
+
+    if (!remote) {
+      return null;
+    }
+
+    logger.info(
+      "Resolved mailbox public key from Stalwart after missing directory entry",
+      {
+        recipientRef: logRef(normalizedEmail),
+        stalwartAccountId: remote.stalwartAccountId,
+      },
+    );
+
+    return {
+      email: normalizedEmail,
+      publicKeyArmored: remote.publicKeyArmored,
+      fingerprint: await getOpenPgpPublicKeyFingerprint(remote.publicKeyArmored),
+      source: "internal",
+      trust: "verified",
     };
   }
 

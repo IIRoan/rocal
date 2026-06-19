@@ -51,8 +51,10 @@ import {
   type Calendar,
   type CreateEventRequest,
   type EventParticipantInput,
+  type RecentContactEntry,
 } from "@workspace/calendar-core";
 import { RecurrencePicker } from "./RecurrencePicker";
+import { RecipientSuggestInput } from "../mail/RecipientSuggestInput";
 import {
   REMINDER_OPTIONS,
   roundToNextHour,
@@ -409,6 +411,49 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
         },
       ]);
     }, [participantDraft, participants]);
+
+    const addParticipantFromSuggestion = useCallback(
+      (entry: RecentContactEntry) => {
+        const email = entry.email.trim().replace(/^mailto:/i, "").toLowerCase();
+
+        if (!email) {
+          return;
+        }
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          setFieldErrors((current) => ({
+            ...current,
+            participants: "Participant must use a valid email address",
+          }));
+          return;
+        }
+
+        if (participants.some((participant) => participant.email === email)) {
+          setFieldErrors((current) => ({
+            ...current,
+            participants: "That participant is already invited",
+          }));
+          return;
+        }
+
+        setParticipantDraft("");
+        setFieldErrors((current) => {
+          const next = { ...current };
+          delete next.participants;
+          return next;
+        });
+        setParticipants((current) => [
+          ...current,
+          {
+            email,
+            displayName: entry.displayName?.trim() || undefined,
+            role: "attendee",
+            status: "pending",
+          },
+        ]);
+      },
+      [participants],
+    );
 
     const removeParticipant = useCallback((email: string) => {
       setParticipants((current) =>
@@ -862,22 +907,19 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                         </Pressable>
                       </View>
                       <View style={styles.participantComposer}>
-                        <TextInput
+                        <RecipientSuggestInput
+                          mode="calendar"
+                          value={participantDraft}
+                          onChangeText={setParticipantDraft}
+                          onSelectSuggestion={addParticipantFromSuggestion}
+                          placeholder="Add attendee by email"
+                          onSubmitEditing={addParticipant}
                           style={[
                             styles.expandableInput,
                             styles.participantInput,
-                            fieldErrors.participants ? styles.inputError : null,
+                            ...(fieldErrors.participants ? [styles.inputError] : []),
                           ]}
-                          value={participantDraft}
-                          onChangeText={setParticipantDraft}
-                          placeholder="Add attendee by email"
-                          placeholderTextColor={theme.colors.mutedForeground}
-                          keyboardType="email-address"
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          returnKeyType="done"
-                          onSubmitEditing={addParticipant}
-                          accessibilityLabel="Add attendee by email"
+                          hasError={Boolean(fieldErrors.participants)}
                         />
                         <Pressable
                           style={styles.participantAddButton}
