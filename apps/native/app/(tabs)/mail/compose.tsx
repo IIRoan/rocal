@@ -20,7 +20,7 @@ import {
   layoutFormFieldBorder,
 } from "../../../src/lib/app-layout";
 import { useQuery } from "@tanstack/react-query";
-import { getErrorMessage, resolveReplyRecipients } from "@workspace/calendar-core";
+import { getErrorMessage, resolveReplyRecipients, validateComposeRecipients } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useToast } from "../../../src/providers/ToastProvider";
@@ -53,6 +53,9 @@ import {
   type DraftSaveStatus,
 } from "../../../src/hooks/use-compose-draft-autosave";
 import type { JmapEmailMessage, JmapIdentity, MailAddress } from "../../../src/lib/mail/types";
+import { RecipientSuggestInput } from "../../../src/components/mail/RecipientSuggestInput";
+import { useRecentContacts } from "../../../src/hooks/use-recent-contacts";
+import { extractRecentContactEntries } from "../../../src/lib/record-recent-contacts";
 
 export default function ComposeScreen() {
   const { theme } = useTheme();
@@ -71,6 +74,7 @@ export default function ComposeScreen() {
   const runtimeQuery = useMailRuntime(provisioned);
   const runtime = runtimeQuery.data;
   const sendMessage = useSendMessage(runtime);
+  const { recordUsage } = useRecentContacts();
   const cachedMessage = useCachedMessage(params.messageId ?? "");
 
   const [to, setTo] = useState("");
@@ -180,6 +184,32 @@ export default function ComposeScreen() {
         },
         {
           onSuccess: () => {
+            const recipientValidation = validateComposeRecipients({
+              to,
+              cc,
+              bcc,
+              subject,
+            });
+            const entries = extractRecentContactEntries(
+              [
+                ...recipientValidation.to.map((address) => ({
+                  email: address.email,
+                  displayName: address.name ?? null,
+                })),
+                ...recipientValidation.cc.map((address) => ({
+                  email: address.email,
+                  displayName: address.name ?? null,
+                })),
+                ...recipientValidation.bcc.map((address) => ({
+                  email: address.email,
+                  displayName: address.name ?? null,
+                })),
+              ],
+              composeContext?.fromEmail,
+            );
+            if (entries.length > 0) {
+              recordUsage(entries, "mail");
+            }
             toast(encrypted ? "Encrypted message sent" : "Message sent");
             router.back();
           },
@@ -202,6 +232,8 @@ export default function ComposeScreen() {
     runtime,
     saveDraft,
     sendMessage,
+    composeContext,
+    recordUsage,
     router,
     toast,
   ]);
@@ -348,7 +380,7 @@ export default function ComposeScreen() {
 
     setHasInitializedFromParams(true);
   }, [
-    composeContext?.fromEmail,
+              composeContext?.fromEmail,
     hasInitializedFromParams,
     params.mode,
     params.to,
@@ -447,13 +479,12 @@ export default function ComposeScreen() {
             </Text>
           )}
 
-          <Field
+          <SuggestField
             theme={theme}
             label="To"
             value={to}
             onChangeText={setTo}
             placeholder="name@example.com"
-            keyboardType="email-address"
             autoFocus
             trailing={
               <Pressable
@@ -471,21 +502,19 @@ export default function ComposeScreen() {
 
           {showCcBcc ? (
             <>
-              <Field
+              <SuggestField
                 theme={theme}
                 label="Cc"
                 value={cc}
                 onChangeText={setCc}
                 placeholder="name@example.com"
-                keyboardType="email-address"
               />
-              <Field
+              <SuggestField
                 theme={theme}
                 label="Bcc"
                 value={bcc}
                 onChangeText={setBcc}
                 placeholder="name@example.com"
-                keyboardType="email-address"
               />
             </>
           ) : null}
@@ -675,6 +704,39 @@ function IdentityPickerRow({
         <Feather name="check" size={16} color={theme.colors.primaryBase} />
       ) : null}
     </Pressable>
+  );
+}
+
+function SuggestField({
+  theme,
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  autoFocus,
+  trailing,
+}: {
+  theme: ThemeTokens;
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder: string;
+  autoFocus?: boolean;
+  trailing?: React.ReactNode;
+}) {
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  return (
+    <View style={styles.fieldRow}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <RecipientSuggestInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        style={styles.fieldInput}
+      />
+      {trailing}
+    </View>
   );
 }
 

@@ -380,6 +380,17 @@ export interface UpdateSettingsRequest extends Partial<
   userId?: string;
 }
 
+export interface RecentContactsRecord {
+  encryptedContent: string;
+  encryptionKeyVersion: number;
+  updatedAt: string;
+}
+
+export interface PutRecentContactsRequest {
+  encryptedContent: string;
+  encryptionKeyVersion?: number;
+}
+
 // ─── Recurring Events Types ──────────────────────────────────────────────────
 
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";

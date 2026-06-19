@@ -14,6 +14,8 @@ import { resolveTimezone, wallClockToUtc } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { useAuth } from "../../src/providers/AuthProvider";
+import { useRecentContacts } from "../../src/hooks/use-recent-contacts";
+import { extractRecentContactEntries } from "../../src/lib/record-recent-contacts";
 import { useToast } from "../../src/providers/ToastProvider";
 import { toastOperationWarnings } from "../../src/lib/operation-warnings";
 import { calendarApiService } from "../../src/lib/api";
@@ -37,6 +39,7 @@ export default function EventCreateScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { recordUsage } = useRecentContacts();
   const { toast } = useToast();
 
   // ─── Query params (optional pre-fill from tapping a time slot) ───────────
@@ -85,9 +88,16 @@ export default function EventCreateScreen() {
       router.back();
       return { tempId };
     },
-    onSuccess: (savedEvent) => {
+    onSuccess: (savedEvent, variables) => {
       // Replace optimistic data with real server data
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      const entries = extractRecentContactEntries(
+        variables.participants,
+        user?.email,
+      );
+      if (entries.length > 0) {
+        recordUsage(entries, "calendar");
+      }
       toast("Event created");
       toastOperationWarnings(toast, savedEvent);
     },

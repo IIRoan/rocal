@@ -52,6 +52,9 @@ export const RouteModel = {
   settings: {
     updateBody: "settings.updateBody",
   },
+  recentContacts: {
+    putBody: "recentContacts.putBody",
+  },
   recurring: {
     validateBody: "recurring.validateBody",
     previewBody: "recurring.previewBody",

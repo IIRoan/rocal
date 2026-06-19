@@ -36,6 +36,7 @@ import {
   pickOutgoingAttachmentFiles,
 } from "@workspace/calendar-core";
 import { RichTextEditor } from "./rich-text-editor";
+import { RecipientSuggestInput } from "./recipient-suggest-input";
 import {
   appendHtmlSignature,
   appendPlainTextSignature,
@@ -290,15 +291,12 @@ export function ComposeForm({
         >
           To
         </span>
-        <input
-          type="text"
+        <RecipientSuggestInput
           value={composeTo}
-          onChange={(e) => setComposeTo(e.target.value)}
+          onChange={setComposeTo}
           onBlur={() => setToTouched(true)}
           placeholder="recipient@example.com"
           disabled={isBusy}
-          autoComplete="off"
-          className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40"
         />
         <div className="flex items-center gap-1 shrink-0">
           {!showCc && (
@@ -335,14 +333,11 @@ export function ComposeForm({
           >
             CC
           </span>
-          <input
-            type="text"
+          <RecipientSuggestInput
             value={composeCc}
-            onChange={(e) => setComposeCc(e.target.value)}
+            onChange={setComposeCc}
             placeholder="cc@example.com"
             disabled={isBusy}
-            autoComplete="off"
-            className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40"
           />
           <button
             type="button"
@@ -370,14 +365,11 @@ export function ComposeForm({
           >
             BCC
           </span>
-          <input
-            type="text"
+          <RecipientSuggestInput
             value={composeBcc}
-            onChange={(e) => setComposeBcc(e.target.value)}
+            onChange={setComposeBcc}
             placeholder="bcc@example.com"
             disabled={isBusy}
-            autoComplete="off"
-            className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40"
           />
           <button
             type="button"
