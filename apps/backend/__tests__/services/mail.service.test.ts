@@ -77,6 +77,9 @@ function createMockAdminClient() {
     })),
     deleteAccount: jest.fn(async () => undefined),
     resolveAccountIdByMailbox: jest.fn(async () => null),
+    callJmap: jest.fn<() => Promise<{ methodResponses: unknown[] }>>(
+      async () => ({ methodResponses: [] }),
+    ),
   };
 }
 
@@ -115,15 +118,116 @@ describe("MailService", () => {
     });
   });
 
-  it("returns public configuration for the mail demo", () => {
-    expect(service.getConfig()).toEqual({
+  it("returns public configuration for the mail demo", async () => {
+    mockAdminClient.callJmap.mockImplementation(async () => ({
+      methodResponses: [
+        [
+          "x:Email/get",
+          {
+            list: [
+              {
+                maxAttachmentSize: 100_000_000,
+                maxMessageSize: 150_000_000,
+              },
+            ],
+          },
+          "e1",
+        ],
+        [
+          "x:Jmap/get",
+          {
+            list: [{ maxUploadSize: 100_000_000 }],
+          },
+          "j1",
+        ],
+      ],
+    }));
+
+    await expect(service.getConfig()).resolves.toEqual({
       defaultDomain: "solace.onl",
       discoveryBaseUrl: "http://192.168.2.213:8080",
       signupEnabled: true,
       oauth: mockMailOAuthConfig,
       vaultKeyMaterialEndpoint:
         "https://api.solace.test/api/mail/vault-key-material",
+      serverLimits: {
+        maxBlobUploadBytes: 100_000_000,
+        maxAttachmentSizeBytes: 100_000_000,
+        maxMessageSizeBytes: 150_000_000,
+      },
     });
+  });
+
+  it("caches successful Stalwart config fetches between getConfig calls", async () => {
+    mockAdminClient.callJmap.mockImplementation(async () => ({
+      methodResponses: [
+        [
+          "x:Email/get",
+          {
+            list: [
+              {
+                maxAttachmentSize: 100_000_000,
+                maxMessageSize: 150_000_000,
+              },
+            ],
+          },
+          "e1",
+        ],
+        [
+          "x:Jmap/get",
+          {
+            list: [{ maxUploadSize: 100_000_000 }],
+          },
+          "j1",
+        ],
+      ],
+    }));
+
+    const first = await service.getConfig();
+    const second = await service.getConfig();
+
+    expect(first).toEqual(second);
+    expect(mockAdminClient.callJmap).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not cache a failed Stalwart config fetch", async () => {
+    mockAdminClient.callJmap
+      .mockRejectedValueOnce(new Error("Stalwart temporarily unavailable"))
+      .mockResolvedValueOnce({
+        methodResponses: [
+          [
+            "x:Email/get",
+            {
+              list: [
+                {
+                  maxAttachmentSize: 100_000_000,
+                  maxMessageSize: 150_000_000,
+                },
+              ],
+            },
+            "e1",
+          ],
+          [
+            "x:Jmap/get",
+            {
+              list: [{ maxUploadSize: 100_000_000 }],
+            },
+            "j1",
+          ],
+        ],
+      });
+
+    await expect(service.getConfig()).resolves.toMatchObject({
+      serverLimits: null,
+    });
+    await expect(service.getConfig()).resolves.toMatchObject({
+      serverLimits: {
+        maxBlobUploadBytes: 100_000_000,
+        maxAttachmentSizeBytes: 100_000_000,
+        maxMessageSizeBytes: 150_000_000,
+      },
+    });
+    expect(mockAdminClient.callJmap).toHaveBeenCalledTimes(2);
   });
 
   it("issues a Stalwart-local access token for a provisioned mailbox", async () => {
