@@ -85,7 +85,7 @@ function SyncedEventInfoBadge() {
         <button
           type="button"
           aria-label="Synced from external calendar"
-          className="inline-flex items-center justify-center size-5 rounded-md text-foreground/60 hover:text-foreground hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 transition-colors"
+          className="tap-target inline-flex items-center justify-center size-5 rounded-md text-foreground/60 hover:text-foreground hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 transition-colors"
           onClick={stopEventPropagation}
         >
           <RefreshCw className="size-3" strokeWidth={2.25} aria-hidden />
