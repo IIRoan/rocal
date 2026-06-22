@@ -53,7 +53,7 @@
   }
 
   /* Extend hit area to 40×40px for visually small controls */
-  .tap-target {
+  .tap-target:not(.absolute):not(.fixed):not(.sticky) {
     position: relative;
   }
 
