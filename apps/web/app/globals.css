@@ -51,6 +51,21 @@
     visibility: hidden;
     pointer-events: none;
   }
+
+  /* Extend hit area to 40×40px for visually small controls */
+  .tap-target {
+    position: relative;
+  }
+
+  .tap-target::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 40px;
+    height: 40px;
+    transform: translate(-50%, -50%);
+  }
 }
 
 /* Dark mode via class on root element */
@@ -149,6 +164,16 @@
   --shadow-xl:
     0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+
+  /* Layered shadow rings for elevated surfaces (light mode) */
+  --shadow-border:
+    0px 0px 0px 1px rgba(0, 0, 0, 0.06),
+    0px 1px 2px -1px rgba(0, 0, 0, 0.06),
+    0px 2px 4px 0px rgba(0, 0, 0, 0.04);
+  --shadow-border-hover:
+    0px 0px 0px 1px rgba(0, 0, 0, 0.08),
+    0px 1px 2px -1px rgba(0, 0, 0, 0.08),
+    0px 2px 4px 0px rgba(0, 0, 0, 0.06);
 
   --tracking-normal: 0em;
 
@@ -269,6 +294,9 @@
   --shadow-xl:
     0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+
+  --shadow-border: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-border-hover: 0 0 0 1px rgba(255, 255, 255, 0.13);
 
   /* Calendar */
   --calendar-accent: var(--primary);
@@ -535,6 +563,25 @@
     font-family: var(--font-display);
     letter-spacing: -0.01em;
     font-weight: 600;
+    text-wrap: balance;
+  }
+
+  p,
+  li,
+  figcaption,
+  blockquote {
+    text-wrap: pretty;
+  }
+
+  [data-slot="avatar-image"],
+  img.rounded-full {
+    outline: 1px solid rgba(0, 0, 0, 0.1);
+    outline-offset: -1px;
+  }
+
+  .dark [data-slot="avatar-image"],
+  .dark img.rounded-full {
+    outline-color: rgba(255, 255, 255, 0.1);
   }
 
   html,
@@ -575,7 +622,13 @@
       color 0.15s ease,
       background-color 0.15s ease,
       border-color 0.15s ease,
-      box-shadow 0.15s ease;
+      box-shadow 0.15s ease,
+      transform 0.15s ease-out,
+      opacity 0.15s ease;
+  }
+
+  button:not(:disabled):not([data-no-press-scale]):active {
+    scale: 0.96;
   }
 
   /* Focus visibility for a11y */
@@ -637,7 +690,13 @@
 
   /* Smooth transitions for interactive elements */
   .transition-smooth {
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition:
+      color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+      background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+      border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .transition-bounce {

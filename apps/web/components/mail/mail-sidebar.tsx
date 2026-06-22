@@ -148,7 +148,8 @@ function SortableMailboxItem({
     >
       <button
         type="button"
-        className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-8 flex items-center justify-center opacity-0 group-hover/item:opacity-100 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground/70 transition-all z-10"
+        className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-8 flex items-center justify-center opacity-0 group-hover/item:opacity-100 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground/70 transition-[opacity,color] z-10"
+        data-no-press-scale
         aria-label="Drag to reorder"
         {...attributes}
         {...listeners}
@@ -176,7 +177,7 @@ function SortableMailboxItem({
           onClick={onHideClick}
           disabled={isBusy}
           aria-label={`Hide ${mailbox.name}`}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 size-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-all disabled:opacity-30"
+          className="tap-target absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 size-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-[opacity,color,background-color] disabled:opacity-30"
         >
           <EyeOff size={11} strokeWidth={2.5} />
         </button>
@@ -414,7 +415,7 @@ export function MailSidebar({
                                   type="button"
                                   onClick={() => toggleHide(mailbox.id)}
                                   aria-label={`Show ${mailbox.name}`}
-                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/hidden:opacity-100 size-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-all"
+                                  className="tap-target absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/hidden:opacity-100 size-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-[opacity,color,background-color]"
                                 >
                                   <Eye size={11} strokeWidth={2.5} />
                                 </button>

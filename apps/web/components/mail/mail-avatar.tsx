@@ -99,7 +99,7 @@ function SenderAvatarContent({
           loading="lazy"
           referrerPolicy="no-referrer"
           className={cn(
-            "absolute inset-0 size-full object-cover",
+            "absolute inset-0 size-full object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10",
             loadedSrc === currentSrc ? "block" : "hidden",
           )}
           onLoad={() => setLoadedSrc(currentSrc)}

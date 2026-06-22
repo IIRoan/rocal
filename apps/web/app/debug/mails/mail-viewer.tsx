@@ -94,7 +94,7 @@ export function MailViewer({ previews }: { previews: EmailPreview[] }) {
         {/* Email render */}
         <div className="flex-1 overflow-auto bg-muted/30 p-8">
           <div
-            className={`mx-auto transition-all duration-300 ${
+            className={`mx-auto transition-[max-width] duration-300 ${
               width === "mobile" ? "max-w-[375px]" : "max-w-[680px]"
             }`}
           >
