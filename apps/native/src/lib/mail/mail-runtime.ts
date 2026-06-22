@@ -1,6 +1,8 @@
 import {
   capIdentitiesForPicker,
+  resolveEncryptionInternalDomain,
   resolveMailServerPolicy,
+  shouldEncryptOutgoingMail,
   type MailServerPolicy,
 } from "@workspace/calendar-core";
 import {
@@ -78,6 +80,8 @@ export async function buildMailRuntime(): Promise<MailRuntime> {
       client.getMailboxes(session),
       client.getIdentities(session).catch(() => [] as JmapIdentity[]),
     ]);
+
+  await client.ensureEncryptOnAppendDisabled(session).catch(() => undefined);
 
   const encryptedAtRest =
     (accountSettings.encryptionAtRest as { "@type"?: string } | undefined)?.[

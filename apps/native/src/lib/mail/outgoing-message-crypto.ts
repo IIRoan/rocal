@@ -2,6 +2,8 @@ import {
   buildOutgoingMimeMessage,
   getEmailDomain,
   normalizeEmailAddress,
+  resolveEncryptionInternalDomain,
+  shouldEncryptOutgoingMail,
   type OutgoingMimeAttachment,
 } from "@workspace/calendar-core";
 import { getRecipientKey } from "./mail-api";
@@ -24,22 +26,16 @@ export async function resolveOutgoingMessageBody(input: {
   encrypted: boolean;
   pgpMimeCiphertext?: { blobId: string; size: number };
 }> {
-  const internalDomain =
-    input.runtime.config.defaultDomain.trim().toLowerCase() || null;
-  if (!internalDomain) {
+  const internalDomain = resolveEncryptionInternalDomain(
+    input.runtime.config.defaultDomain,
+  );
+  if (!shouldEncryptOutgoingMail(input.recipients, internalDomain)) {
     return { textBody: input.plaintext, encrypted: false };
   }
 
   const internalRecipients = input.recipients.filter(
     (recipient) => getEmailDomain(recipient) === internalDomain,
   );
-
-  if (
-    internalRecipients.length === 0 ||
-    internalRecipients.length !== input.recipients.length
-  ) {
-    return { textBody: input.plaintext, encrypted: false };
-  }
 
   const unlockedVault = await ensureVaultLoaded(input.runtime);
   const senderEmail = normalizeEmailAddress(

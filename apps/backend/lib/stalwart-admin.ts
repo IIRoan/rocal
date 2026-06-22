@@ -1083,10 +1083,18 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
       typeof encryptionAtRest?.publicKey === "string"
         ? encryptionAtRest.publicKey
         : null;
+    const currentEncryptOnAppend =
+      encryptionAtRest?.encryptOnAppend === true;
+    const desiredEncryptOnAppend = input.encryptOnAppend ?? false;
+    const currentAllowSpamTraining =
+      encryptionAtRest?.allowSpamTraining === true;
+    const desiredAllowSpamTraining = input.allowSpamTraining ?? false;
 
     if (
       encryptionType === "Aes256" &&
-      configuredPublicKeyId === input.publicKeyId
+      configuredPublicKeyId === input.publicKeyId &&
+      currentEncryptOnAppend === desiredEncryptOnAppend &&
+      currentAllowSpamTraining === desiredAllowSpamTraining
     ) {
       return;
     }

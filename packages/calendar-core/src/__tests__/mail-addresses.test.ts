@@ -4,7 +4,9 @@ import {
   normalizeEmailAddress,
   parseAddressList,
   parseRecipientString,
+  resolveEncryptionInternalDomain,
   resolveReplyRecipients,
+  shouldEncryptOutgoingMail,
   validateComposeRecipients,
 } from "../mail-addresses";
 
@@ -67,6 +69,24 @@ describe("mail address parsing", () => {
         currentUserEmail: "me@solace.onl",
       }),
     ).toEqual(["alice@solace.onl"]);
+  });
+
+  it("encrypts only when every recipient is on the configured domain", () => {
+    const domain = resolveEncryptionInternalDomain("solace.onl");
+    expect(
+      shouldEncryptOutgoingMail(["alice@solace.onl"], domain),
+    ).toBe(true);
+    expect(
+      shouldEncryptOutgoingMail(["friend@gmail.com"], domain),
+    ).toBe(false);
+    expect(
+      shouldEncryptOutgoingMail(
+        ["alice@solace.onl", "friend@gmail.com"],
+        domain,
+      ),
+    ).toBe(false);
+    expect(shouldEncryptOutgoingMail(["alice@solace.onl"], null)).toBe(false);
+    expect(shouldEncryptOutgoingMail([], domain)).toBe(false);
   });
 
   it("falls back to non-self recipients when replying to own last message", () => {
