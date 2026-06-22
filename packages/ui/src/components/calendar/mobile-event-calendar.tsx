@@ -2,19 +2,23 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createLogger } from "@workspace/logger";
+import {
+  formatInUserTimezone,
+  getOperationWarningMessages,
+  getTimezoneAwareCalendarDateRange,
+  getZonedDateParts,
+  isTodayInTimezone,
+  navigateCalendarDate,
+  resolveTimezone,
+  wallClockToUtc,
+} from "@workspace/calendar-core";
 import { useCalendarContext } from "./calendar-context";
 import {
   addDays,
-  addMonths,
-  addWeeks,
   endOfWeek,
   format,
   isSameMonth,
   startOfWeek,
-  subMonths,
-  subWeeks,
-  startOfMonth,
-  endOfMonth,
 } from "date-fns";
 import {
   ChevronDownIcon,
@@ -26,6 +30,23 @@ import {
 import { toast } from "sonner";
 
 const log = createLogger("mobile-calendar");
+
+function toastEventSaved(
+  savedEvent: unknown,
+  message: string,
+  description: string,
+) {
+  toast.success(message, {
+    description,
+    position: "bottom-left",
+  });
+
+  for (const warningMessage of getOperationWarningMessages(savedEvent)) {
+    toast.warning(warningMessage, {
+      position: "bottom-left",
+    });
+  }
+}
 import { useIsMobile } from "../../hooks/use-mobile";
 
 import {
@@ -188,6 +209,7 @@ export function MobileEventCalendar({
     useCalendarContext();
   const currentDate = currentDateOverride || contextCurrentDate;
   const isMobile = useIsMobile();
+  const resolvedTimezone = resolveTimezone(timezone);
 
   // Initialize view from sessionStorage or fallback to smart default
   const [view, setViewState] = useState<CalendarView>(() => {
@@ -294,43 +316,18 @@ export function MobileEventCalendar({
   }, [initialView, view]);
 
   // Compute the date range for a given date and view
-  const computeDateRange = (date: Date, v: string) => {
-    let start: Date;
-    let end: Date;
-    if (v === "month") {
-      start = startOfMonth(date);
-      end = endOfMonth(date);
-    } else if (v === "week") {
-      start = startOfWeek(date, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-      end = endOfWeek(date, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-    } else if (v === "day") {
-      start = new Date(date);
-      start.setHours(0, 0, 0, 0);
-      end = new Date(date);
-      end.setHours(23, 59, 59, 999);
-    } else if (v === "3day") {
-      start = addDays(date, -1);
-      start.setHours(0, 0, 0, 0);
-      end = addDays(date, 1);
-      end.setHours(23, 59, 59, 999);
-    } else if (v === "agenda") {
-      start = new Date(date);
-      end = addDays(date, AgendaDaysToShow - 1);
-    } else {
-      start = startOfMonth(date);
-      end = endOfMonth(date);
-    }
-    return { start, end };
-  };
+  const computeDateRange = (date: Date, v: CalendarView) =>
+    getTimezoneAwareCalendarDateRange({
+      baseDate: date,
+      view: v,
+      weekStartDay,
+      timezone: resolvedTimezone,
+    });
 
   // Calculate date range based on current view and date
   const dateRange = useMemo(
     () => computeDateRange(currentDate, view),
-    [currentDate, view],
+    [currentDate, resolvedTimezone, view],
   );
 
   // Notify parent of date range changes (fallback for view changes, external date changes, etc.)
@@ -351,43 +348,21 @@ export function MobileEventCalendar({
 
   // Navigation handlers
   const handlePrevious = () => {
-    let newDate: Date;
+    const newDate =
+      view === "agenda"
+        ? addDays(currentDate, -AgendaDaysToShow)
+        : navigateCalendarDate(currentDate, view, -1);
 
-    if (view === "month") {
-      newDate = subMonths(currentDate, 1);
-    } else if (view === "week") {
-      newDate = subWeeks(currentDate, 1);
-    } else if (view === "day") {
-      newDate = addDays(currentDate, -1);
-    } else if (view === "3day") {
-      newDate = addDays(currentDate, -3);
-    } else if (view === "agenda") {
-      newDate = addDays(currentDate, -AgendaDaysToShow);
-    } else {
-      newDate = subMonths(currentDate, 1);
-    }
-
-    if (newDate) navigateTo(newDate);
+    navigateTo(newDate);
   };
 
   const handleNext = () => {
-    let newDate: Date;
+    const newDate =
+      view === "agenda"
+        ? addDays(currentDate, AgendaDaysToShow)
+        : navigateCalendarDate(currentDate, view, 1);
 
-    if (view === "month") {
-      newDate = addMonths(currentDate, 1);
-    } else if (view === "week") {
-      newDate = addWeeks(currentDate, 1);
-    } else if (view === "day") {
-      newDate = addDays(currentDate, 1);
-    } else if (view === "3day") {
-      newDate = addDays(currentDate, 3);
-    } else if (view === "agenda") {
-      newDate = addDays(currentDate, AgendaDaysToShow);
-    } else {
-      newDate = addMonths(currentDate, 1);
-    }
-
-    if (newDate) navigateTo(newDate);
+    navigateTo(newDate);
   };
 
   const handleToday = () => {
@@ -440,16 +415,26 @@ export function MobileEventCalendar({
       let savedEvent: any;
       if (event.id) {
         savedEvent = await updateEvent(event.id, eventData);
-        toast.success(`Event "${event.title}" updated`, {
-          description: format(new Date(event.start), "MMM d, yyyy 'at' h:mm a"),
-          position: "bottom-left",
-        });
+        toastEventSaved(
+          savedEvent,
+          `Event "${event.title}" updated`,
+          formatInUserTimezone(
+            new Date(event.start),
+            resolvedTimezone,
+            "MMM d, yyyy 'at' h:mm a",
+          ),
+        );
       } else {
         savedEvent = await createEvent(eventData);
-        toast.success(`Event "${event.title}" created`, {
-          description: format(new Date(event.start), "MMM d, yyyy 'at' h:mm a"),
-          position: "bottom-left",
-        });
+        toastEventSaved(
+          savedEvent,
+          `Event "${event.title}" created`,
+          formatInUserTimezone(
+            new Date(event.start),
+            resolvedTimezone,
+            "MMM d, yyyy 'at' h:mm a",
+          ),
+        );
       }
 
       return savedEvent || event;
@@ -485,7 +470,11 @@ export function MobileEventCalendar({
 
       if (deletedEvent) {
         toast.success(`Event "${deletedEvent.title}" deleted`, {
-          description: format(new Date(deletedEvent.start), "MMM d, yyyy"),
+          description: formatInUserTimezone(
+            new Date(deletedEvent.start),
+            resolvedTimezone,
+            "MMM d, yyyy",
+          ),
           position: "bottom-left",
         });
       }
@@ -514,8 +503,9 @@ export function MobileEventCalendar({
       await updateEvent(updatedEvent.id, eventData);
 
       toast.success(`Event "${updatedEvent.title}" moved`, {
-        description: format(
+        description: formatInUserTimezone(
           new Date(updatedEvent.start),
+          resolvedTimezone,
           "MMM d, yyyy 'at' h:mm a",
         ),
         position: "bottom-left",
@@ -690,18 +680,27 @@ export function MobileEventCalendar({
                   variant="outline"
                   className="max-sm:h-8 max-sm:px-2.5!"
                   onClick={() => {
-                    const startTime = new Date(currentDate);
                     const now = new Date();
+                    let startTime: Date;
 
-                    if (startTime.toDateString() === now.toDateString()) {
-                      startTime.setHours(
-                        now.getHours(),
-                        now.getMinutes(),
-                        0,
-                        0,
+                    if (isTodayInTimezone(currentDate, resolvedTimezone)) {
+                      const { hours, minutes } = getZonedDateParts(
+                        now,
+                        resolvedTimezone,
+                      );
+                      startTime = wallClockToUtc(
+                        currentDate,
+                        hours,
+                        minutes,
+                        resolvedTimezone,
                       );
                     } else {
-                      startTime.setHours(9, 0, 0, 0);
+                      startTime = wallClockToUtc(
+                        currentDate,
+                        9,
+                        0,
+                        resolvedTimezone,
+                      );
                     }
 
                     handleEventCreate(startTime);

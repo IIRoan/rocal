@@ -11,6 +11,10 @@ export type AuthEmailMessage = {
 
 export type AuthEmailDeliveryMode = "required" | "best-effort";
 
+export type { EmailDeliveryResult } from "./email-delivery";
+import type { EmailDeliveryResult } from "./email-delivery";
+import { logRef, errorLogDetails, sanitizeLogContext } from "./log-sanitization";
+
 export interface AuthEmailClient {
   emails: {
     send(message: {
@@ -502,34 +506,41 @@ export async function sendAuthEmail({
   isProduction: boolean;
   mode?: AuthEmailDeliveryMode;
   developmentFallbackContext?: Record<string, unknown>;
-}): Promise<boolean> {
+}): Promise<EmailDeliveryResult> {
   const email = to.trim();
 
   if (!email) {
+    const reason = "The recipient email address is missing.";
     const errorMessage = `${label} email could not be delivered because the recipient email is missing.`;
 
     if (mode === "best-effort") {
       logger.error(errorMessage);
-      return false;
+      return { delivered: false, reason };
     }
 
     throw new Error(errorMessage);
   }
 
   if (!client) {
+    const reason = isProduction
+      ? "Email delivery is not configured on the server."
+      : "Email was not sent because no email provider is configured in development.";
     const errorMessage = `${label} email provider is not configured on the backend.`;
 
     if (!isProduction && developmentFallbackContext) {
-      logger.warn(`${errorMessage} Logging the email details instead.`, {
-        email,
-        ...developmentFallbackContext,
-      });
-      return false;
+      logger.warn(
+        `${errorMessage} Email was not sent; development fallback context omitted from logs.`,
+        sanitizeLogContext({
+          recipientRef: logRef(email),
+          label,
+        }),
+      );
+      return { delivered: false, reason };
     }
 
     if (mode === "best-effort") {
-      logger.error(errorMessage, { email });
-      return false;
+      logger.error(errorMessage, { recipientRef: logRef(email), label });
+      return { delivered: false, reason };
     }
 
     throw new Error(errorMessage);
@@ -550,14 +561,20 @@ export async function sendAuthEmail({
     }
 
     logger.info(`Sent ${label} email`, {
-      email,
+      recipientRef: logRef(email),
       resendId: result.data?.id ?? null,
     });
-    return true;
+    return { delivered: true, channel: "resend" };
   } catch (error) {
+    const reason = `Failed to send ${label} email. Try again later or contact support.`;
+
     if (mode === "best-effort") {
-      logger.error(`Failed to send ${label} email`, { email, error });
-      return false;
+      logger.error(`Failed to send ${label} email`, {
+        recipientRef: logRef(email),
+        label,
+        ...errorLogDetails(error),
+      });
+      return { delivered: false, channel: "resend", reason };
     }
 
     throw error instanceof Error

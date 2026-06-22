@@ -1,5 +1,7 @@
 import { HttpClient } from "./http-client";
 
+import type { WithOperationWarnings } from "@workspace/calendar-core";
+
 export type InviteStatus = "pending" | "claimed" | "accepted" | "revoked";
 
 export type InviteRecord = {
@@ -16,7 +18,7 @@ export type ListInvitesResponse = {
   invites: InviteRecord[];
 };
 
-export type CreateInviteResponse = InviteRecord;
+export type CreateInviteResponse = WithOperationWarnings<InviteRecord>;
 
 export type RevokeInviteResponse = {
   success: boolean;

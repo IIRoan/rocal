@@ -26,7 +26,9 @@ import {
 import { addMonths, format, isSameDay, isSameMonth, subMonths } from "date-fns";
 import {
   buildPaddedCalendarMonthRanges,
+  formatCalendarMonthKey,
   getPaddedCalendarMonthRange,
+  resolveTimezone,
   type DecoratedCalendarEvent,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -48,6 +50,7 @@ interface SidebarMiniCalendarProps {
   selectedDate?: Date;
   onDayPress?: (date: Date) => void;
   drawerCloseGesture?: unknown;
+  timezone?: string | null;
 }
 
 type MiniCalendarEventsResponse = Awaited<
@@ -93,11 +96,13 @@ export function SidebarMiniCalendar({
   weekStartDay = 1,
   selectedDate,
   onDayPress,
+  timezone,
 }: SidebarMiniCalendarProps) {
   const { theme } = useTheme();
   const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const today = useCurrentDateTime();
+  const resolvedTimezone = resolveTimezone(timezone);
   const fallbackSelectedDate = useMemo(() => new Date(), []);
   const effectiveSelectedDate = selectedDate ?? fallbackSelectedDate;
   const [calendarMonth, setCalendarMonth] = useState<Date>(
@@ -120,21 +125,22 @@ export function SidebarMiniCalendar({
   );
   const nextMonth = useMemo(() => addMonths(calendarMonth, 1), [calendarMonth]);
   const previousMonthRange = useMemo(
-    () => getPaddedCalendarMonthRange(previousMonth),
-    [previousMonth],
+    () => getPaddedCalendarMonthRange(previousMonth, undefined, resolvedTimezone),
+    [previousMonth, resolvedTimezone],
   );
   const currentMonthRange = useMemo(
-    () => getPaddedCalendarMonthRange(calendarMonth),
-    [calendarMonth],
+    () => getPaddedCalendarMonthRange(calendarMonth, undefined, resolvedTimezone),
+    [calendarMonth, resolvedTimezone],
   );
   const nextMonthRange = useMemo(
-    () => getPaddedCalendarMonthRange(nextMonth),
-    [nextMonth],
+    () => getPaddedCalendarMonthRange(nextMonth, undefined, resolvedTimezone),
+    [nextMonth, resolvedTimezone],
   );
 
   useEffect(() => {
     for (const range of buildPaddedCalendarMonthRanges(calendarMonth, {
       adjacentMonthDepth: 2,
+      timezone: resolvedTimezone,
     })) {
       void queryClient.prefetchQuery({
         queryKey: QUERY_KEYS.events(
@@ -145,7 +151,7 @@ export function SidebarMiniCalendar({
         staleTime: MINI_CALENDAR_STALE_TIME,
       });
     }
-  }, [calendarMonth, queryClient]);
+  }, [calendarMonth, queryClient, resolvedTimezone]);
 
   const { data: previousMonthData } = useQuery({
     queryKey: QUERY_KEYS.events(
@@ -194,7 +200,7 @@ export function SidebarMiniCalendar({
   const pages = useMemo(
     () => [
       {
-        key: `prev-${format(previousMonth, "yyyy-MM")}`,
+        key: `prev-${formatCalendarMonthKey(previousMonth)}`,
         monthDate: previousMonth,
         weeks: Array.from({ length: 6 }, (_, index) =>
           generateGridDates(previousMonth, weekStartDay).slice(
@@ -202,10 +208,13 @@ export function SidebarMiniCalendar({
             index * 7 + 7,
           ),
         ),
-        eventsByDay: groupEventsByDay(decorateEvents(previousMonthData)),
+        eventsByDay: groupEventsByDay(
+          decorateEvents(previousMonthData),
+          resolvedTimezone,
+        ),
       },
       {
-        key: `current-${format(calendarMonth, "yyyy-MM")}`,
+        key: `current-${formatCalendarMonthKey(calendarMonth)}`,
         monthDate: calendarMonth,
         weeks: Array.from({ length: 6 }, (_, index) =>
           generateGridDates(calendarMonth, weekStartDay).slice(
@@ -213,10 +222,13 @@ export function SidebarMiniCalendar({
             index * 7 + 7,
           ),
         ),
-        eventsByDay: groupEventsByDay(decorateEvents(currentMonthData)),
+        eventsByDay: groupEventsByDay(
+          decorateEvents(currentMonthData),
+          resolvedTimezone,
+        ),
       },
       {
-        key: `next-${format(nextMonth, "yyyy-MM")}`,
+        key: `next-${formatCalendarMonthKey(nextMonth)}`,
         monthDate: nextMonth,
         weeks: Array.from({ length: 6 }, (_, index) =>
           generateGridDates(nextMonth, weekStartDay).slice(
@@ -224,7 +236,10 @@ export function SidebarMiniCalendar({
             index * 7 + 7,
           ),
         ),
-        eventsByDay: groupEventsByDay(decorateEvents(nextMonthData)),
+        eventsByDay: groupEventsByDay(
+          decorateEvents(nextMonthData),
+          resolvedTimezone,
+        ),
       },
     ],
     [
@@ -234,6 +249,7 @@ export function SidebarMiniCalendar({
       nextMonthData,
       previousMonth,
       previousMonthData,
+      resolvedTimezone,
       weekStartDay,
     ],
   );
@@ -373,7 +389,7 @@ export function SidebarMiniCalendar({
       <View>
         {pageWeeks.map((week, weekIndex) => (
           <View
-            key={`${format(pageMonth, "yyyy-MM")}-week-${weekIndex}`}
+            key={`${formatCalendarMonthKey(pageMonth)}-week-${weekIndex}`}
             style={styles.weekRow}
           >
             {week.map((date) => {

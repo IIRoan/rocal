@@ -8,7 +8,7 @@ This repository is a monorepo for **Solace** — a calendar and mail application
 - **apps/native**: Expo React Native app (SDK 55, React Native 0.83, React 19). File-based routing via Expo Router. Styling is **`StyleSheet.create()` + `useTheme()`** from `@workspace/design-tokens` — **no NativeWind/Tailwind**. Uses `react-native-gesture-handler`, `react-native-reanimated`, and `expo-secure-store` for auth. Source in `apps/native/src/`; screens in `apps/native/app/`.
 - **apps/backend**: Elysia.js API on Bun, Prisma + PostgreSQL, Better Auth (passkeys). Service-layer architecture:
   - `routes/` — HTTP adapters (auth, TypeBox validation, rate limits). Delegate to services.
-  - `contracts/` — Service interfaces and DTOs (source of truth for signatures).
+  - `contracts/` — Service interfaces, DTOs, and cross-cutting policies (e.g. `logging.contract.ts` for log sanitization).
   - `services/` — Business logic, DB access, notifications. Constructor-injected `PrismaClient`.
   - `lib/` — Auth, errors, recurrence, ICS, notification calculator, etc.
 - **apps/notifications**: Go service for scheduled email notifications (Resend + HTML templates).
@@ -149,7 +149,8 @@ When unsure, **copy structure and classes from the closest existing feature** an
 ## Implementation Conventions
 
 - **Minimize scope** — smallest correct diff; match surrounding naming, imports, and abstraction level.
-- **Backend changes** — routes stay thin; logic in services; update `contracts/` and `@workspace/calendar-client` together.
+- **Backend changes** — routes stay thin; logic in services; update `contracts/` and `@workspace/calendar-client` together. Route validation schemas and service `I*Service` interfaces live in `apps/backend/contracts/` — ESLint enforces this (see below).
+- **Backend logging** — never log PII or user content. Policy lives in `apps/backend/contracts/logging.contract.ts`; apply it via `apps/backend/lib/log-sanitization.ts` (`logRef`, `errorLogDetails`, `sanitizeLogContext`, `redactPII`). Do not duplicate omit/hash key lists elsewhere.
 - **Comments** — only for non-obvious business logic.
 - **Tests** — add when they cover real behavior; skip trivial assertions.
 
@@ -167,9 +168,43 @@ Update it when you:
 
 Keep edits factual and concise: architecture bullets, directory trees, shared-packages table, and feature map. Do **not** document one-off scripts or temporary experiments.
 
+### Backend API contracts (types + validation)
+
+HTTP adapters and services share types through `apps/backend/contracts/`:
+
+- **Route schemas** — Zod schemas registered on `routeModels`; routes reference `RouteModel.*` for `body` / `query` / `params` (never inline Zod in `routes/`).
+- **Service interfaces** — `I*Service` + input/result types; service classes `implements` the matching contract.
+- **Client sync** — when API shapes change, update `contracts/` and `@workspace/calendar-client` together.
+
+**Lint enforcement** (`@workspace/eslint-config/api-contract` in `apps/backend/eslint.config.js`):
+
+- `use-route-model-schemas` — route `body`/`query`/`params` must use `RouteModel.*` from contracts.
+- `require-route-models-plugin` — route files using `RouteModel` must `.use(routeModels)` and import from `../contracts`.
+- `require-service-contract` — `*Service` classes must `implements I*Service` (internal helpers like `MailSyncService` are allowlisted).
+- `no-restricted-imports` — `zod` is banned in `routes/` and `services/` except `contracts/`, `lib/validation.ts`, and `mail-realtime.service.ts` (upstream SSE parsing).
+
+### Backend log sanitization (PII)
+
+Server logs must support debugging **without** storing PII, secrets, or user content (mail bodies, tokens, invite URLs, etc.).
+
+- **Policy (source of truth)**: `apps/backend/contracts/logging.contract.ts` (field keys in `logging.policy.mjs`, shared with ESLint) — `LOG_OMIT_FIELD_KEYS`, `LOG_HASH_FIELD_KEYS`, redaction placeholders, and `LOG_SANITIZATION_POLICY`.
+- **Implementation**: `apps/backend/lib/log-sanitization.ts` — always use `logRef`, `errorLogDetails`, `sanitizeLogContext`, `redactPII`, and `sanitizeRequestUrl` when logging errors or context that may contain user data.
+- **Lint enforcement**: `apps/backend/eslint.config.js` uses `@workspace/eslint-config/safe-logging` with keys from `logging.policy.mjs`. Rules: `no-raw-error-logging`, `no-sensitive-log-keys`, `no-error-string-in-logs`.
+- **New sensitive fields**: add keys to `logging.policy.mjs` first; do not invent parallel omit/hash lists in routes or services.
+- **Never log**: raw `Error` objects, stack traces, upstream/JMAP bodies, or Prisma query literals in shared environments.
+- **Correlation**: API errors include `requestId` / `x-request-id` for support — log the same id, not raw user identifiers.
+
 ### Mail cache mutations (native + web mail)
 
 When mutating mail data already in the React Query cache (star, read state, labels), **use optimistic `onMutate` + `setQueryData`** on the specific list key. Do **not** blanket-invalidate `["mail"]` — that refetches everything, shows spinners, and loses scroll position. Invalidate narrowly on destructive actions (delete, move) where items leave the list. Roll back via refetch/`invalidateMessages()` on failure.
+
+### Calendar timezone handling (native + web)
+
+Calendar UI must use the user's configured timezone as the source of truth for wall-clock dates and times. Do not derive event picker values, calendar day membership, previews, drag/drop targets, date-range fetch bounds, or user-facing event timestamps from the device/browser local timezone. If no user timezone is configured, use `resolveTimezone()` from `@workspace/calendar-core`; the canonical fallback is `Europe/Amsterdam`.
+
+Use shared helpers from `@workspace/calendar-core` for timezone work: validate IANA timezone identifiers with `timezoneSchema`, normalize fallbacks with `resolveTimezone`, convert picker date + `HH:mm` values to UTC with `pickerDateAndTimeToUtc`/`wallClockToUtc`, convert stored UTC instants back to picker dates with `utcToPickerDate`, compute day/week membership with the zoned calendar-day helpers, and format event times with timezone-aware formatters. Avoid `Date#setHours`, `startOfDay`, `isSameDay`, `isToday`, or `date-fns/format` on event times when the result is meant to reflect the user's configured timezone.
+
+Timezone-sensitive API payloads must make timezone explicit in the contract. Event create/update and settings update bodies must use the shared Zod `timezoneSchema` from `@workspace/calendar-core`; do not accept raw `z.string()` for timezone fields. Clients should submit event `start`/`end` as UTC ISO 8601 strings and include the user's resolved timezone when the endpoint persists or interprets wall-clock intent.
 
 ---
 

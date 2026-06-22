@@ -9,6 +9,7 @@ import {
   type DisableCalendarShareLinkResponse,
   buildIcsCalendar,
 } from "@workspace/calendar-ics";
+import { resolveTimezone } from "@workspace/calendar-core";
 import { NotFoundError, ValidationError } from "../lib/errors";
 import { createLogger } from "@workspace/logger";
 import { toIcsBuildEvent } from "../lib/ics-export";
@@ -228,7 +229,7 @@ export class CalendarSharingService implements ICalendarSharingService {
       calendar: {
         name: calendar.name,
         description: `Shared calendar from ${calendar.user.name || calendar.user.email}`,
-        timezone: timezoneSource?.timezone || "UTC",
+        timezone: resolveTimezone(timezoneSource?.timezone),
         sourceUrl,
       },
       events: calendar.events.map((event) => toIcsBuildEvent(event)),

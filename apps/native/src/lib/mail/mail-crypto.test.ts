@@ -159,6 +159,8 @@ const MOCK_DECRYPTED_KEY = {
   getFingerprint: () => MOCK_VAULT.publicKeyFingerprint.toLowerCase(),
 } as any;
 
+import { resolveMailServerPolicy } from "@workspace/calendar-core";
+
 const mockGetBlobAsText = jest.fn();
 
 function buildRuntime(overrides?: Partial<MailRuntime["config"]>): MailRuntime {
@@ -178,7 +180,9 @@ function buildRuntime(overrides?: Partial<MailRuntime["config"]>): MailRuntime {
     accountId: "account-1",
     mailboxes: [],
     identities: [],
+    pickerIdentities: [],
     encryptedAtRest: false,
+    mailServerPolicy: resolveMailServerPolicy({}),
   };
 }
 

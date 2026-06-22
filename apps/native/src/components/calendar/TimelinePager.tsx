@@ -19,7 +19,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { format, isSameDay } from "date-fns";
+import { format } from "date-fns";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Easing,
@@ -30,6 +30,13 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import {
+  formatCalendarDayKey,
+  formatInUserTimezone,
+  getZonedDateParts,
+  isTodayInTimezone,
+  resolveTimezone,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { getCalendarPageDate } from "./navigation-utils";
@@ -63,6 +70,7 @@ interface TimelinePagerProps {
   onNavigate?: (direction: 1 | -1) => void;
   onEventPress?: (event: DecoratedCalendarEvent) => void;
   onTimeSlotPress?: (date: Date, hour: number) => void;
+  timezone?: string;
   /** Renders one header per timeline page so it can slide with the grid. */
   renderHeaderPage?: (page: TimelinePage) => ReactNode;
 }
@@ -93,10 +101,11 @@ function getTimelinePageDates(
   baseDate: Date,
   view: TimelineView,
   weekStartDay: number,
+  timezone: string,
 ): Date[] {
   switch (view) {
     case "week":
-      return getWeekDates(baseDate, weekStartDay);
+      return getWeekDates(baseDate, weekStartDay, timezone);
     case "3day":
       return getThreeDayDates(baseDate);
     case "day":
@@ -116,6 +125,7 @@ export function TimelinePager({
   onNavigate,
   onEventPress,
   onTimeSlotPress,
+  timezone,
   renderHeaderPage,
 }: TimelinePagerProps) {
   const { theme } = useTheme();
@@ -134,10 +144,15 @@ export function TimelinePager({
   }, [currentDateKey, pageWidth, translateX, view, weekStartDay]);
 
   const today = useCurrentDateTime();
-  const nowMinutes = today.getHours() * 60 + today.getMinutes();
+  const resolvedTimezone = resolveTimezone(timezone);
+  const nowParts = getZonedDateParts(today, resolvedTimezone);
+  const nowMinutes = nowParts.hours * 60 + nowParts.minutes;
   const nowTop = (nowMinutes / 60) * HOUR_HEIGHT;
 
-  const eventsByDate = useMemo(() => groupEventsByDate(events), [events]);
+  const eventsByDate = useMemo(
+    () => groupEventsByDate(events, resolvedTimezone),
+    [events, resolvedTimezone],
+  );
   const hourLabels = useMemo(
     () =>
       Array.from({ length: TOTAL_HOURS }, (_, hour) =>
@@ -153,18 +168,25 @@ export function TimelinePager({
         return {
           offset,
           baseDate,
-          dates: getTimelinePageDates(baseDate, view, weekStartDay),
+          dates: getTimelinePageDates(
+            baseDate,
+            view,
+            weekStartDay,
+            resolvedTimezone,
+          ),
         };
       }),
-    [currentDate, view, weekStartDay],
+    [currentDate, resolvedTimezone, view, weekStartDay],
   );
 
   const allDayEventsByPage = useMemo(
     () =>
       pages.map((page) =>
-        page.dates.map((date) => getAllDayEventsForDate(date, events)),
+        page.dates.map((date) =>
+          getAllDayEventsForDate(date, events, resolvedTimezone),
+        ),
       ),
-    [events, pages],
+    [events, pages, resolvedTimezone],
   );
   const hasAllDayEvents = useMemo(
     () =>
@@ -270,15 +292,19 @@ export function TimelinePager({
 
   const renderDayColumn = useCallback(
     (date: Date) => {
-      const dayEvents = getEventsForDate(date, eventsByDate).filter(
-        (event) => !isAllDayOrMultiDayEvent(event),
+      const dayEvents = getEventsForDate(
+        date,
+        eventsByDate,
+        resolvedTimezone,
+      ).filter(
+        (event) => !isAllDayOrMultiDayEvent(event, resolvedTimezone),
       );
-      const isCurrentDay = isSameDay(date, today);
+      const isCurrentDay = isTodayInTimezone(date, resolvedTimezone);
       const dayLabel =
         view === "day" ? format(date, "EEEE, MMM d") : formatDayHeader(date);
 
       return (
-        <View key={format(date, "yyyy-MM-dd")} style={styles.dayColumn}>
+        <View key={formatCalendarDayKey(date)} style={styles.dayColumn}>
           {Array.from({ length: TOTAL_HOURS }, (_, hour) => (
             <Pressable
               key={hour}
@@ -292,7 +318,11 @@ export function TimelinePager({
           ))}
 
           {dayEvents.map((event) => {
-            const position = calculateEventPosition(event, HOUR_HEIGHT);
+            const position = calculateEventPosition(
+              event,
+              HOUR_HEIGHT,
+              resolvedTimezone,
+            );
             const colors = resolveEventBlockColor(event.color, theme);
 
             return (
@@ -326,10 +356,11 @@ export function TimelinePager({
                     style={[styles.eventTime, { color: colors.fg }]}
                     numberOfLines={1}
                   >
-                    {formatHourLabel(
-                      new Date(event.start).getHours(),
-                      timeFormat,
-                    )}
+                    {formatInUserTimezone(
+                      new Date(event.start),
+                      resolvedTimezone,
+                      timeFormat === "24h" ? "HH:mm" : "haaa",
+                    ).toLowerCase()}
                   </Text>
                 )}
               </Pressable>
@@ -360,7 +391,7 @@ export function TimelinePager({
       styles,
       theme,
       timeFormat,
-      today,
+      resolvedTimezone,
       view,
     ],
   );
@@ -368,7 +399,7 @@ export function TimelinePager({
   const renderAllDayPage = useCallback(
     (page: TimelinePage, pageIndex: number) => (
       <View
-        key={`all-day-${page.offset}-${format(page.baseDate, "yyyy-MM-dd")}`}
+        key={`all-day-${page.offset}-${formatCalendarDayKey(page.baseDate)}`}
         style={[styles.allDayPage, { width: pageWidth }]}
       >
         {page.dates.map((date, dateIndex) => {
@@ -376,7 +407,7 @@ export function TimelinePager({
 
           return (
             <View
-              key={`all-day-column-${format(date, "yyyy-MM-dd")}`}
+              key={`all-day-column-${formatCalendarDayKey(date)}`}
               style={styles.allDayColumn}
             >
               <View
@@ -394,7 +425,7 @@ export function TimelinePager({
 
                   return (
                     <Pressable
-                      key={`${event.id}-${format(date, "yyyy-MM-dd")}`}
+                      key={`${event.id}-${formatCalendarDayKey(date)}`}
                       style={[
                         styles.allDayPill,
                         isWeekView ? styles.allDayPillWeek : null,
@@ -458,7 +489,7 @@ export function TimelinePager({
                 >
                   {pages.map((page) => (
                     <View
-                      key={`hdr-${page.offset}-${format(page.baseDate, "yyyy-MM-dd")}`}
+                      key={`hdr-${page.offset}-${formatCalendarDayKey(page.baseDate)}`}
                       style={[styles.headerPage, { width: pageWidth }]}
                     >
                       {renderHeaderPage(page)}
@@ -516,7 +547,7 @@ export function TimelinePager({
                 >
                   {pages.map((page) => (
                     <View
-                      key={`${page.offset}-${format(page.baseDate, "yyyy-MM-dd")}`}
+                      key={`${page.offset}-${formatCalendarDayKey(page.baseDate)}`}
                       style={[styles.page, { width: pageWidth }]}
                     >
                       {page.dates.map(renderDayColumn)}

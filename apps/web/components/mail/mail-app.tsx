@@ -184,6 +184,7 @@ function MailComposeAutosave({
     mailboxes: import("@/lib/mail/types").JmapMailbox[];
     identities: import("@/lib/mail/types").JmapIdentity[];
     email: string;
+    mailServerPolicy: import("@workspace/calendar-core").MailServerPolicy;
   } | null;
   accountEmail: string;
 }) {
@@ -193,6 +194,7 @@ function MailComposeAutosave({
     mailboxes: activeMailbox?.mailboxes ?? [],
     identities: activeMailbox?.identities ?? [],
     fallbackFromEmail: activeMailbox?.email ?? accountEmail,
+    mailServerPolicy: activeMailbox?.mailServerPolicy ?? null,
     enabled: Boolean(activeMailbox),
   });
   return null;
@@ -213,7 +215,10 @@ export function MailApp() {
   }
 
   return (
-    <MailComposeProvider identities={mail.activeMailbox?.identities ?? []}>
+    <MailComposeProvider
+      identities={mail.activeMailbox?.pickerIdentities ?? []}
+      mailServerLimits={mail.composeMailPolicy.limits}
+    >
       <MailComposeAutosave
         activeMailbox={mail.activeMailbox}
         accountEmail={mail.accountEmail}
@@ -653,7 +658,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                     onBulkMarkAsRead={(ids) => void handleBulkMarkAsRead(ids)}
                     onToggleFlagged={(id) => void handleToggleFlagged(id)}
                     labels={labels}
-                    identities={activeMailbox.identities}
+                    identities={activeMailbox.pickerIdentities}
                     timeFormat={timeFormat}
                     timezone={settings?.timezone}
                     onLoadMore={debouncedMailListSearch ? undefined : () => void loadMoreMessages()}
@@ -752,7 +757,8 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                       }
                       accountEmail={activeMailbox?.email ?? accountEmail}
                       accountName={accountDisplayName}
-                      identities={activeMailbox.identities}
+                      identities={activeMailbox.pickerIdentities}
+                      mailServerLimits={mail.composeMailPolicy.limits}
                     />
                   </div>
                   ) : !isFullCompose ? (
@@ -775,7 +781,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                     }}
                   >
                     <ComposeForm
-                      identities={activeMailbox.identities}
+                      identities={activeMailbox.pickerIdentities}
                       fallbackFromEmail={activeMailbox.email ?? accountEmail}
                       onClose={() => void handleDismissCompose()}
                       onSend={async () => {
@@ -823,7 +829,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
       />
 
       <ComposeDialog
-        identities={activeMailbox?.identities ?? []}
+        identities={activeMailbox?.pickerIdentities ?? []}
         fallbackFromEmail={activeMailbox?.email ?? accountEmail}
         onClose={() => void handleDismissCompose()}
         onSend={handleSendMessage}

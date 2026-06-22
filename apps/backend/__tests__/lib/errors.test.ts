@@ -18,18 +18,27 @@ import {
   ForbiddenError,
   NotFoundError,
   NotificationError,
+  RateLimitError,
   UnauthorizedError,
   ValidationError,
-  errorHandler,
+  handleApiError,
   errorMessage,
   errorString,
 } from "../../lib/errors";
 
-const onErrorHook = errorHandler.event.error![0]!.fn as (ctx: any) => unknown;
-
-function invokeOnError(code: string, error: Error) {
-  const set: { status?: number } = {};
-  const result = onErrorHook({ code, error, set });
+function invokeOnError(code: string, error: Error, request?: Request) {
+  const set: {
+    status?: number;
+    headers: Record<string, string | number | undefined>;
+  } = {
+    headers: {},
+  };
+  const result = handleApiError({
+    code,
+    error,
+    set,
+    request: request ?? new Request("http://localhost/api/test"),
+  });
   return { set, result };
 }
 
@@ -50,17 +59,18 @@ describe("errors", () => {
 
   it("maps built-in Elysia error codes", () => {
     expect(invokeOnError("VALIDATION", new Error("Invalid body"))).toEqual({
-      set: { status: 400 },
+      set: expect.objectContaining({ status: 400 }),
       result: expect.objectContaining({
         error: "Validation Error",
         message: "Invalid body",
         statusCode: 400,
+        requestId: expect.any(String),
         timestamp: expect.any(String),
       }),
     });
 
     expect(invokeOnError("NOT_FOUND", new Error("Missing route"))).toEqual({
-      set: { status: 404 },
+      set: expect.objectContaining({ status: 404 }),
       result: expect.objectContaining({
         error: "Not Found",
         message: "Missing route",
@@ -70,7 +80,7 @@ describe("errors", () => {
     });
 
     expect(invokeOnError("PARSE", new Error("Bad JSON"))).toEqual({
-      set: { status: 400 },
+      set: expect.objectContaining({ status: 400 }),
       result: expect.objectContaining({
         error: "Parse Error",
         message: "Invalid request format",
@@ -97,7 +107,7 @@ describe("errors", () => {
     });
 
     expect(invokeOnError("VALIDATION", validationError)).toEqual({
-      set: { status: 400 },
+      set: expect.objectContaining({ status: 400 }),
       result: expect.objectContaining({
         error: "Validation Error",
         message: "Invalid body",
@@ -128,7 +138,7 @@ describe("errors", () => {
     });
 
     expect(invokeOnError("VALIDATION", validationError)).toEqual({
-      set: { status: 400 },
+      set: expect.objectContaining({ status: 400 }),
       result: expect.objectContaining({
         error: "Validation Error",
         message: "Invalid body",
@@ -142,7 +152,7 @@ describe("errors", () => {
     expect(
       invokeOnError("UNKNOWN", new ValidationError("Bad input", "name")),
     ).toEqual({
-      set: { status: 400 },
+      set: expect.objectContaining({ status: 400 }),
       result: expect.objectContaining({
         error: "Validation Error",
         message: "Bad input",
@@ -154,7 +164,7 @@ describe("errors", () => {
     expect(
       invokeOnError("UNKNOWN", new NotFoundError("Missing thing")),
     ).toEqual({
-      set: { status: 404 },
+      set: expect.objectContaining({ status: 404 }),
       result: expect.objectContaining({
         error: "Not Found",
         message: "Missing thing",
@@ -163,7 +173,7 @@ describe("errors", () => {
     });
 
     expect(invokeOnError("UNKNOWN", new UnauthorizedError())).toEqual({
-      set: { status: 401 },
+      set: expect.objectContaining({ status: 401 }),
       result: expect.objectContaining({
         error: "Unauthorized",
         message: "Unauthorized access",
@@ -172,7 +182,7 @@ describe("errors", () => {
     });
 
     expect(invokeOnError("UNKNOWN", new ForbiddenError())).toEqual({
-      set: { status: 403 },
+      set: expect.objectContaining({ status: 403 }),
       result: expect.objectContaining({
         error: "Forbidden",
         message: "Access forbidden",
@@ -188,12 +198,11 @@ describe("errors", () => {
         new DatabaseError("Write failed", new Error("duplicate key")),
       ),
     ).toEqual({
-      set: { status: 500 },
+      set: expect.objectContaining({ status: 500 }),
       result: expect.objectContaining({
         error: "Database Error",
         message: "Write failed",
         statusCode: 500,
-        details: { originalError: "duplicate key" },
       }),
     });
 
@@ -203,12 +212,11 @@ describe("errors", () => {
         new NotificationError("Send failed", new Error("smtp offline")),
       ),
     ).toEqual({
-      set: { status: 500 },
+      set: expect.objectContaining({ status: 500 }),
       result: expect.objectContaining({
         error: "Notification Error",
         message: "Send failed",
         statusCode: 500,
-        details: { originalError: "smtp offline" },
       }),
     });
   });
@@ -217,7 +225,7 @@ describe("errors", () => {
     expect(
       invokeOnError("UNKNOWN", new Error("Unique constraint failed")),
     ).toEqual({
-      set: { status: 409 },
+      set: expect.objectContaining({ status: 409 }),
       result: expect.objectContaining({
         error: "Conflict",
         message: "Resource already exists",
@@ -228,7 +236,7 @@ describe("errors", () => {
     expect(
       invokeOnError("UNKNOWN", new Error("Record to update not found")),
     ).toEqual({
-      set: { status: 404 },
+      set: expect.objectContaining({ status: 404 }),
       result: expect.objectContaining({
         error: "Not Found",
         message: "Resource not found",
@@ -237,13 +245,31 @@ describe("errors", () => {
     });
   });
 
-  it("falls back to a generic internal server error", () => {
+  it("maps rate limit errors with Retry-After", () => {
+    expect(
+      invokeOnError("UNKNOWN", new RateLimitError("Slow down", 30)),
+    ).toEqual({
+      set: expect.objectContaining({
+        status: 429,
+        headers: expect.objectContaining({ "Retry-After": "30" }),
+      }),
+      result: expect.objectContaining({
+        error: "Too Many Requests",
+        message: "Slow down",
+        statusCode: 429,
+        requestId: expect.any(String),
+      }),
+    });
+  });
+
+  it("falls back to a generic internal server error with request id", () => {
     expect(invokeOnError("UNKNOWN", new Error("boom"))).toEqual({
-      set: { status: 500 },
+      set: expect.objectContaining({ status: 500 }),
       result: expect.objectContaining({
         error: "Internal Server Error",
-        message: "An unexpected error occurred",
+        message: expect.stringContaining("request id"),
         statusCode: 500,
+        requestId: expect.any(String),
       }),
     });
   });

@@ -16,35 +16,25 @@ jest.mock("../../lib/prisma", () => ({
   },
 }));
 
-jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(
-    async (): Promise<any> => ({
-      id: "user-1",
-    }),
-  ),
-}));
-
 jest.mock("../../lib/auth", () => ({
   auth: { api: { getSession: jest.fn() } },
 }));
 
 jest.mock("../../lib/auth-guard", () => {
-  const { Elysia: LocalElysia } =
-    jest.requireActual<typeof import("elysia")>("elysia");
+  const { createMockRequireAuth } =
+    jest.requireActual<typeof import("../helpers/mock-require-auth")>(
+      "../helpers/mock-require-auth",
+    );
   return {
-    requireAuth: new LocalElysia({ name: "require-auth-test" }),
+    requireAuth: createMockRequireAuth(),
   };
 });
 
 import { errorHandler } from "../../lib/errors";
-import { ensureAuthenticatedUser } from "../../lib/auth-utils";
 import { prisma } from "../../lib/prisma";
 import { categoriesRoutes } from "../../routes/categories";
+import { expectValidationError } from "../helpers/validation-assertions";
 
-const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<
-    typeof ensureAuthenticatedUser
-  >;
 const mockPrisma = prisma as unknown as {
   eventCategory: {
     findMany: jest.Mock<() => Promise<any>>;
@@ -73,9 +63,7 @@ async function readText(response: Response) {
 }
 
 describe("categoriesRoutes", () => {
-  it("lists active categories and exposes usageCount", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.eventCategory.findMany.mockResolvedValue([
+  it("lists active categories and exposes usageCount", async () => {    mockPrisma.eventCategory.findMany.mockResolvedValue([
       {
         id: "category-1",
         name: "Work",
@@ -115,9 +103,7 @@ describe("categoriesRoutes", () => {
       name: "Work",
       color: "#123456",
       userId: "user-1",
-    };
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.eventCategory.findFirst.mockResolvedValue(null);
+    };    mockPrisma.eventCategory.findFirst.mockResolvedValue(null);
     mockPrisma.eventCategory.create.mockResolvedValue(created);
 
     const response = await createApp().handle(
@@ -141,9 +127,7 @@ describe("categoriesRoutes", () => {
     await expect(readJson(response)).resolves.toEqual(created);
   });
 
-  it("rejects unexpected category fields", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.eventCategory.findFirst.mockResolvedValue(null);
+  it("rejects unexpected category fields", async () => {    mockPrisma.eventCategory.findFirst.mockResolvedValue(null);
 
     const response = await createApp().handle(
       new Request("http://localhost/categories/", {
@@ -158,15 +142,11 @@ describe("categoriesRoutes", () => {
     );
 
     expect(response.status).toBe(422);
-    await expect(readText(response)).resolves.toContain(
-      "Property 'unexpected' should not be provided",
-    );
+    await expectValidationError(response, "unexpected");
     expect(mockPrisma.eventCategory.create).not.toHaveBeenCalled();
   });
 
-  it("rejects unsupported encryptionState values", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.eventCategory.findFirst.mockResolvedValue(null);
+  it("rejects unsupported encryptionState values", async () => {    mockPrisma.eventCategory.findFirst.mockResolvedValue(null);
 
     const response = await createApp().handle(
       new Request("http://localhost/categories/", {
@@ -181,14 +161,11 @@ describe("categoriesRoutes", () => {
     );
 
     expect(response.status).toBe(422);
-    await expect(readText(response)).resolves.toContain("Expected union value");
+    await expectValidationError(response, "invalid_state");
     expect(mockPrisma.eventCategory.create).not.toHaveBeenCalled();
   });
 
-  it("rejects invalid category colors", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-
-    const response = await createApp().handle(
+  it("rejects invalid category colors", async () => {    const response = await createApp().handle(
       new Request("http://localhost/categories/", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -199,17 +176,12 @@ describe("categoriesRoutes", () => {
       }),
     );
 
-    expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toContain(
-      "Color must be one of:",
-    );
+    expect(response.status).toBe(422);
+    await expectValidationError(response, "Color must be one of:");
     expect(mockPrisma.eventCategory.create).not.toHaveBeenCalled();
   });
 
-  it("rejects missing required category fields", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-
-    const response = await createApp().handle(
+  it("rejects missing required category fields", async () => {    const response = await createApp().handle(
       new Request("http://localhost/categories/", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -220,15 +192,11 @@ describe("categoriesRoutes", () => {
       }),
     );
 
-    expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toContain(
-      "Category name is required and cannot be empty",
-    );
+    expect(response.status).toBe(422);
+    await expectValidationError(response, "String must contain at least 1 character");
   });
 
-  it("rejects duplicate category names on create", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.eventCategory.findFirst.mockResolvedValue({
+  it("rejects duplicate category names on create", async () => {    mockPrisma.eventCategory.findFirst.mockResolvedValue({
       id: "category-1",
       name: "Work",
       color: "blue",
@@ -263,10 +231,7 @@ describe("categoriesRoutes", () => {
       ...existingCategory,
       name: "Focus",
       color: "emerald",
-    };
-
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.eventCategory.findFirst
+    };    mockPrisma.eventCategory.findFirst
       .mockResolvedValueOnce(existingCategory)
       .mockResolvedValueOnce(null);
     mockPrisma.eventCategory.update.mockResolvedValue(updatedCategory);
@@ -292,9 +257,7 @@ describe("categoriesRoutes", () => {
     await expect(readJson(response)).resolves.toEqual(updatedCategory);
   });
 
-  it("rejects missing or inaccessible categories during update", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.eventCategory.findFirst.mockResolvedValue(null);
+  it("rejects missing or inaccessible categories during update", async () => {    mockPrisma.eventCategory.findFirst.mockResolvedValue(null);
 
     const response = await createApp().handle(
       new Request("http://localhost/categories/category-missing", {
@@ -318,9 +281,7 @@ describe("categoriesRoutes", () => {
       name: "Work",
       color: "blue",
       userId: "user-1",
-    };
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.eventCategory.findFirst
+    };    mockPrisma.eventCategory.findFirst
       .mockResolvedValueOnce(existingCategory)
       .mockResolvedValueOnce(existingCategory)
       .mockResolvedValueOnce(existingCategory);
@@ -335,10 +296,8 @@ describe("categoriesRoutes", () => {
       }),
     );
 
-    expect(invalidColorResponse.status).toBe(500);
-    await expect(readText(invalidColorResponse)).resolves.toContain(
-      "Color must be one of:",
-    );
+    expect(invalidColorResponse.status).toBe(422);
+    await expectValidationError(invalidColorResponse, "Color must be one of:");
 
     const duplicateNameResponse = await createApp().handle(
       new Request("http://localhost/categories/category-1", {
@@ -356,9 +315,7 @@ describe("categoriesRoutes", () => {
     );
   });
 
-  it("deletes a category after detaching orphaned events", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.eventCategory.findFirst.mockResolvedValue({
+  it("deletes a category after detaching orphaned events", async () => {    mockPrisma.eventCategory.findFirst.mockResolvedValue({
       id: "category-1",
       userId: "user-1",
     });
@@ -389,9 +346,7 @@ describe("categoriesRoutes", () => {
     });
   });
 
-  it("rejects delete requests for categories the user does not own", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.eventCategory.findFirst.mockResolvedValueOnce(null);
+  it("rejects delete requests for categories the user does not own", async () => {    mockPrisma.eventCategory.findFirst.mockResolvedValue(null);
 
     const response = await createApp().handle(
       new Request("http://localhost/categories/category-missing", {

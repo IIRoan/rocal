@@ -27,24 +27,44 @@ function makeEvent(overrides: Record<string, unknown> = {}): CalendarEvent {
 describe("formatEventDate", () => {
   it("formats a regular event date", () => {
     const event = makeEvent({
-      start: new Date(2025, 0, 15, 9, 0).toISOString(),
+      start: "2025-01-15T09:00:00.000Z",
+      end: "2025-01-15T10:00:00.000Z",
+      timezone: "UTC",
     });
-    expect(formatEventDate(event)).toBe("Wednesday, January 15, 2025");
+    expect(formatEventDate(event, "UTC")).toBe("Wednesday, January 15, 2025");
   });
 
-  it("formats an all-day event date", () => {
+  it("formats an all-day event date from inclusive calendar days", () => {
     const event = makeEvent({
       allDay: true,
-      start: new Date(2025, 5, 1).toISOString(),
+      start: "2026-06-12T22:00:00.000Z",
+      end: "2026-06-13T21:59:59.000Z",
+      timezone: "Europe/Amsterdam",
     });
-    expect(formatEventDate(event)).toBe("Sunday, June 1, 2025");
+    expect(formatEventDate(event, "Europe/Amsterdam")).toBe(
+      "Saturday, June 13, 2026",
+    );
+  });
+
+  it("does not show the day before for UTC-midnight all-day storage", () => {
+    const event = makeEvent({
+      allDay: true,
+      start: "2026-06-13T00:00:00.000Z",
+      end: "2026-06-14T00:00:00.000Z",
+      timezone: "Europe/Amsterdam",
+    });
+    expect(formatEventDate(event, "Europe/Amsterdam")).toBe(
+      "Saturday, June 13, 2026",
+    );
   });
 
   it("formats a date at end of year", () => {
     const event = makeEvent({
-      start: new Date(2025, 11, 31, 18, 0).toISOString(),
+      start: "2025-12-31T18:00:00.000Z",
+      end: "2025-12-31T19:00:00.000Z",
+      timezone: "UTC",
     });
-    expect(formatEventDate(event)).toBe("Wednesday, December 31, 2025");
+    expect(formatEventDate(event, "UTC")).toBe("Wednesday, December 31, 2025");
   });
 });
 
@@ -58,34 +78,38 @@ describe("formatEventTime", () => {
 
   it("formats a morning event time range", () => {
     const event = makeEvent({
-      start: new Date(2025, 0, 15, 9, 0).toISOString(),
-      end: new Date(2025, 0, 15, 10, 0).toISOString(),
+      start: "2025-01-15T09:00:00.000Z",
+      end: "2025-01-15T10:00:00.000Z",
+      timezone: "UTC",
     });
-    expect(formatEventTime(event)).toBe("9:00 AM – 10:00 AM");
+    expect(formatEventTime(event, "UTC")).toBe("9:00 AM – 10:00 AM");
   });
 
   it("formats a PM event time range", () => {
     const event = makeEvent({
-      start: new Date(2025, 0, 15, 14, 30).toISOString(),
-      end: new Date(2025, 0, 15, 16, 0).toISOString(),
+      start: "2025-01-15T14:30:00.000Z",
+      end: "2025-01-15T16:00:00.000Z",
+      timezone: "UTC",
     });
-    expect(formatEventTime(event)).toBe("2:30 PM – 4:00 PM");
+    expect(formatEventTime(event, "UTC")).toBe("2:30 PM – 4:00 PM");
   });
 
   it("formats noon correctly", () => {
     const event = makeEvent({
-      start: new Date(2025, 0, 15, 12, 0).toISOString(),
-      end: new Date(2025, 0, 15, 13, 0).toISOString(),
+      start: "2025-01-15T12:00:00.000Z",
+      end: "2025-01-15T13:00:00.000Z",
+      timezone: "UTC",
     });
-    expect(formatEventTime(event)).toBe("12:00 PM – 1:00 PM");
+    expect(formatEventTime(event, "UTC")).toBe("12:00 PM – 1:00 PM");
   });
 
   it("formats midnight correctly", () => {
     const event = makeEvent({
-      start: new Date(2025, 0, 15, 0, 0).toISOString(),
-      end: new Date(2025, 0, 15, 1, 0).toISOString(),
+      start: "2025-01-15T00:00:00.000Z",
+      end: "2025-01-15T01:00:00.000Z",
+      timezone: "UTC",
     });
-    expect(formatEventTime(event)).toBe("12:00 AM – 1:00 AM");
+    expect(formatEventTime(event, "UTC")).toBe("12:00 AM – 1:00 AM");
   });
 });
 

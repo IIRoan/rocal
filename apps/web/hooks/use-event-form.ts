@@ -10,6 +10,12 @@ import type {
   EventParticipant,
   EventParticipantInput,
 } from "@workspace/calendar-core";
+import {
+  getEventPickerDateRange,
+  getOperationWarningMessages,
+  pickerDateAndTimeToUtc,
+  pickerDateToAllDayUtcRange,
+} from "@workspace/calendar-core";
 import { RecurrenceEngine } from "@workspace/calendar-core";
 import type { RecurrenceRule } from "@/lib/types/calendar";
 import type { EventNotification } from "@workspace/ui/components/calendar";
@@ -25,6 +31,9 @@ import { validateEventForm } from "@/components/command-palette/event-utils";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "@/lib/auth-client";
+import { isCurrentUserMailAddress } from "@workspace/calendar-core";
+import { useRecentContacts } from "./use-recent-contacts";
 
 const log = createLogger("event-form");
 
@@ -199,6 +208,8 @@ export function useEventForm({
   onClose,
 }: UseEventFormProps): UseEventFormReturn {
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const { recordUsage } = useRecentContacts();
   // Use ref to store calendars to avoid infinite loops
   const calendarsRef = useRef(calendars);
   useEffect(() => {
@@ -301,10 +312,18 @@ export function useEventForm({
       setEventViewMode(isNewEvent ? "edit" : "view");
       setEventTitle(event.title || "");
       setEventDescription(event.description || "");
-      setEventStartDate(new Date(event.start));
-      setEventEndDate(new Date(event.end));
-      setEventStartTime(formatTimeForInput(new Date(event.start)));
-      setEventEndTime(formatTimeForInput(new Date(event.end)));
+      const { startDate, endDate } = getEventPickerDateRange(
+        event,
+        localSettings.timezone,
+      );
+      setEventStartDate(startDate);
+      setEventEndDate(endDate);
+      setEventStartTime(
+        formatTimeForInput(new Date(event.start), localSettings.timezone),
+      );
+      setEventEndTime(
+        formatTimeForInput(new Date(event.end), localSettings.timezone),
+      );
       setEventAllDay(event.allDay || false);
       setEventLocation(event.location || "");
       setEventCalendarId(
@@ -390,7 +409,7 @@ export function useEventForm({
         setShowNotifications(false);
       }
     },
-    [queryClient, setEventNotifications],
+    [queryClient, setEventNotifications, localSettings.timezone],
   );
 
   // Reset form to initial state
@@ -496,6 +515,7 @@ export function useEventForm({
         eventAllDay,
         eventStartTime,
         eventEndTime,
+        localSettings.timezone,
       );
       if (validationError) {
         toast.error(validationError);
@@ -537,22 +557,23 @@ export function useEventForm({
         return;
       }
 
-      const start = new Date(eventStartDate);
-      const end = new Date(eventEndDate);
+      const timezone = localSettings.timezone;
+      let start: Date;
+      let end: Date;
 
       if (!eventAllDay) {
-        const [startHours = 0, startMinutes = 0] = eventStartTime
-          .split(":")
-          .map(Number);
-        const [endHours = 0, endMinutes = 0] = eventEndTime
-          .split(":")
-          .map(Number);
-
-        start.setHours(startHours, startMinutes, 0);
-        end.setHours(endHours, endMinutes, 0);
+        start = pickerDateAndTimeToUtc(
+          eventStartDate,
+          eventStartTime,
+          timezone,
+        );
+        end = pickerDateAndTimeToUtc(eventEndDate, eventEndTime, timezone);
       } else {
-        start.setHours(0, 0, 0, 0);
-        end.setHours(23, 59, 59, 999);
+        ({ start, end } = pickerDateToAllDayUtcRange(
+          eventStartDate,
+          eventEndDate,
+          timezone,
+        ));
       }
 
       const selectedCalendar = calendars.find(
@@ -615,6 +636,11 @@ export function useEventForm({
           });
           savedEventId = persistedEvent?.id ?? selectedEvent.id;
           toast.success(`Event "${eventTitle}" updated`);
+          for (const warningMessage of getOperationWarningMessages(
+            persistedEvent,
+          )) {
+            toast.warning(warningMessage);
+          }
         } else {
           const newEvent = await calendarData.createEvent({
             title: eventData.title,
@@ -632,6 +658,9 @@ export function useEventForm({
           persistedEvent = newEvent;
           savedEventId = newEvent.id;
           toast.success(`Event "${eventTitle}" created`);
+          for (const warningMessage of getOperationWarningMessages(newEvent)) {
+            toast.warning(warningMessage);
+          }
         }
 
         // Save notifications (non-blocking, sanitized)
@@ -709,6 +738,22 @@ export function useEventForm({
           setSelectedEvent(nextEvent);
         }
 
+        if (eventData.participants.length > 0) {
+          const accountEmail = session?.user?.email ?? null;
+          const entries = eventData.participants
+            .filter(
+              (participant) =>
+                !isCurrentUserMailAddress(participant.email, accountEmail),
+            )
+            .map((participant) => ({
+              email: participant.email,
+              displayName: participant.displayName,
+            }));
+          if (entries.length > 0) {
+            recordUsage(entries, "calendar");
+          }
+        }
+
         onEventSaved?.();
 
         setTimeout(() => {
@@ -779,6 +824,8 @@ export function useEventForm({
       validateRecurrenceMutation,
       updateNotificationsMutation,
       localSettings.timezone,
+      session?.user?.email,
+      recordUsage,
     ],
   );
 

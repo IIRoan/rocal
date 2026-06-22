@@ -3,19 +3,23 @@
 import React, { useMemo } from "react";
 import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
+  eventOverlapsZonedCalendarDay,
+  resolveTimezone,
+  utcToPickerDate,
+  wallClockToUtc,
+} from "@workspace/calendar-core";
+import {
   addHours,
   eachHourOfInterval,
   format,
   getHours,
-  isSameDay,
-  startOfDay,
 } from "date-fns";
 
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EncryptionStatusBadge } from "./encryption-status";
 import { EventItem } from "./event-item";
-import { isMultiDayEvent, eventOverlapsRange } from "./utils";
+import { getEventSegmentForCalendarDay, isAllDayRowEvent } from "./utils";
 import { WeekCellsHeight, StartHour, EndHour } from "./constants";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
@@ -50,6 +54,12 @@ export function DayView({
   onEventDelete,
   onEventView,
 }: DayViewProps) {
+  const resolvedTimezone = resolveTimezone(timezone);
+  const calendarDay = useMemo(
+    () => utcToPickerDate(currentDate, resolvedTimezone),
+    [currentDate, resolvedTimezone],
+  );
+
   const hours = useMemo(() => {
     return eachHourOfInterval({
       start: addHours(new Date(2000, 0, 1), StartHour),
@@ -58,40 +68,40 @@ export function DayView({
   }, []);
 
   const dayEvents = useMemo(() => {
-    const dayStart = startOfDay(currentDate);
-    const dayEnd = addHours(dayStart, 24);
     return events
-      .filter((event) => eventOverlapsRange(event, dayStart, dayEnd, "time"))
+      .filter((event) =>
+        eventOverlapsZonedCalendarDay(
+          new Date(event.start),
+          new Date(event.end),
+          calendarDay,
+          resolvedTimezone,
+        ),
+      )
       .sort(
         (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
       );
-  }, [currentDate, events]);
+  }, [calendarDay, events, resolvedTimezone]);
 
   // Filter all-day events
   const allDayEvents = useMemo(() => {
-    return dayEvents.filter((event) => {
-      // Include explicitly marked all-day events or multi-day events
-      return event.allDay || isMultiDayEvent(event);
-    });
-  }, [dayEvents]);
+    return dayEvents.filter((event) => isAllDayRowEvent(event));
+  }, [dayEvents, resolvedTimezone]);
 
   // Get only single-day time-based events
   const timeEvents = useMemo(() => {
-    return dayEvents.filter((event) => {
-      // Exclude all-day events and multi-day events
-      return !event.allDay && !isMultiDayEvent(event);
-    });
+    return dayEvents.filter((event) => !event.allDay);
   }, [dayEvents]);
 
   // Process events to calculate positions
   const positionedEvents = useMemo(() => {
-    return layoutTimelineEvents(timeEvents, currentDate, {
+    return layoutTimelineEvents(timeEvents, calendarDay, {
       cellHeight: WeekCellsHeight,
       startHour: StartHour,
       sortByDurationOnTie: true,
       widthStrategy: "desktop-cascade",
+      timezone: resolvedTimezone,
     });
-  }, [currentDate, timeEvents]);
+  }, [calendarDay, resolvedTimezone, timeEvents]);
 
   const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -120,10 +130,11 @@ export function DayView({
             </div>
             <div className="border-border/70 relative border-r p-1 last:border-r-0">
               {allDayEvents.map((event) => {
-                const eventStart = new Date(event.start);
-                const eventEnd = new Date(event.end);
-                const isFirstDay = isSameDay(currentDate, eventStart);
-                const isLastDay = isSameDay(currentDate, eventEnd);
+                const { isFirstDay, isLastDay } = getEventSegmentForCalendarDay(
+                  event,
+                  calendarDay,
+                  resolvedTimezone,
+                );
 
                 return (
                   <EventItem
@@ -229,7 +240,7 @@ export function DayView({
                     <DroppableCell
                       key={quarter}
                       id={`day-cell-h${hourIndex}-q${quarter}`}
-                      date={currentDate}
+                      date={calendarDay}
                       time={quarterHourTime}
                       className={cn(
                         "absolute h-[calc(var(--week-cells-height)/4)] w-full",
@@ -242,10 +253,14 @@ export function DayView({
                           "top-[calc(var(--week-cells-height)/4*3)]",
                       )}
                       onClick={() => {
-                        const startTime = new Date(currentDate);
-                        startTime.setHours(hourValue);
-                        startTime.setMinutes(quarter * 15);
-                        onEventCreate(startTime);
+                        onEventCreate(
+                          wallClockToUtc(
+                            calendarDay,
+                            hourValue,
+                            quarter * 15,
+                            resolvedTimezone,
+                          ),
+                        );
                       }}
                     />
                   );

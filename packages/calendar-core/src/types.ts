@@ -78,14 +78,21 @@ export type EventColor =
   | "teal"
   | string;
 
-export type EncryptionState = "plaintext" | "shadow_write" | "encrypted";
-export type EventEncryptionMode = "hybrid" | "full";
-export type EventParticipantRole = "organizer" | "attendee";
-export type EventParticipantStatus =
-  | "pending"
-  | "accepted"
-  | "declined"
-  | "tentative";
+import type {
+  EncryptionState,
+  EventEncryptionMode,
+  EventParticipantInput,
+  EventParticipantRole,
+  EventParticipantStatus,
+} from "./route-schemas";
+
+export type {
+  EncryptionState,
+  EventEncryptionMode,
+  EventParticipantRole,
+  EventParticipantStatus,
+  EventParticipantInput,
+} from "./route-schemas";
 
 export interface NameEncryptionShadowRequest {
   encryptedName?: string;
@@ -168,13 +175,6 @@ export interface EventParticipant {
   status: EventParticipantStatus;
   createdAt?: Date;
   updatedAt?: Date;
-}
-
-export interface EventParticipantInput {
-  email: string;
-  displayName?: string;
-  role?: EventParticipantRole;
-  status?: EventParticipantStatus;
 }
 
 export function getCurrentUserInvitationStatus(
@@ -378,6 +378,17 @@ export interface UpdateSettingsRequest extends Partial<
   Omit<UserSettings, "id" | "userId" | "createdAt" | "updatedAt">
 > {
   userId?: string;
+}
+
+export interface RecentContactsRecord {
+  encryptedContent: string;
+  encryptionKeyVersion: number;
+  updatedAt: string;
+}
+
+export interface PutRecentContactsRequest {
+  encryptedContent: string;
+  encryptionKeyVersion?: number;
 }
 
 // ─── Recurring Events Types ──────────────────────────────────────────────────

@@ -6,14 +6,20 @@ import {
   eachHourOfInterval,
   format,
   getHours,
-  getMinutes,
-  isSameDay,
   startOfDay,
 } from "date-fns";
+import {
+  eventOverlapsZonedCalendarDay,
+  getZonedDateParts,
+  isSameCalendarDayInTimezone,
+  isTodayInTimezone,
+  resolveTimezone,
+  utcToPickerDate,
+  wallClockToUtc,
+} from "@workspace/calendar-core";
 
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
-import { eventOverlapsRange } from "./utils";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
 import { cn } from "../../lib/utils";
@@ -66,40 +72,57 @@ export function MobileDayView({
 }: MobileDayViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasScrolledRef = useRef(false);
+  const resolvedTimezone = resolveTimezone(timezone);
+  const calendarDay = useMemo(
+    () => utcToPickerDate(currentDate, resolvedTimezone),
+    [currentDate, resolvedTimezone],
+  );
 
   const hours = useMemo(() => {
-    const dayStart = startOfDay(currentDate);
+    const dayStart = startOfDay(calendarDay);
     return eachHourOfInterval({
       start: addHours(dayStart, MobileStartHour),
       end: addHours(dayStart, MobileEndHour),
     });
-  }, [currentDate]);
+  }, [calendarDay]);
 
   // Get time-based events (excluding all-day/multi-day events which are shown in sticky header)
   const timeEvents = useMemo(() => {
-    const dayStart = startOfDay(currentDate);
-    const dayEnd = addHours(dayStart, 24);
     return events
       .filter((event) => {
         // Exclude all-day and multi-day events
         if (event.allDay) return false;
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
-        if (!isSameDay(eventStart, eventEnd)) return false;
-        return eventOverlapsRange(event, dayStart, dayEnd, "time");
+        if (
+          !isSameCalendarDayInTimezone(
+            eventStart,
+            eventEnd,
+            resolvedTimezone,
+          )
+        ) {
+          return false;
+        }
+        return eventOverlapsZonedCalendarDay(
+          eventStart,
+          eventEnd,
+          calendarDay,
+          resolvedTimezone,
+        );
       })
       .sort(
         (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
       );
-  }, [currentDate, events]);
+  }, [calendarDay, events, resolvedTimezone]);
 
   const positionedEvents = useMemo(() => {
-    return layoutTimelineEvents(timeEvents, currentDate, {
+    return layoutTimelineEvents(timeEvents, calendarDay, {
       cellHeight: MobileCellHeight,
       sortByDurationOnTie: true,
       widthStrategy: "mobile-cascade",
+      timezone: resolvedTimezone,
     });
-  }, [currentDate, timeEvents]);
+  }, [calendarDay, resolvedTimezone, timeEvents]);
 
   const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -114,14 +137,13 @@ export function MobileDayView({
   useEffect(() => {
     if (scrollContainerRef.current && !hasScrolledRef.current) {
       const now = new Date();
-      const currentHour = getHours(now);
-      const currentMinute = getMinutes(now);
+      const nowParts = getZonedDateParts(now, resolvedTimezone);
 
       let targetHour: number;
 
-      if (isSameDay(currentDate, now)) {
+      if (isTodayInTimezone(calendarDay, resolvedTimezone)) {
         // If it's today, scroll to current time
-        targetHour = currentHour + currentMinute / 60;
+        targetHour = nowParts.hours + nowParts.minutes / 60;
       } else {
         // Otherwise scroll to 9 AM
         targetHour = 9;
@@ -134,7 +156,7 @@ export function MobileDayView({
       });
       hasScrolledRef.current = true;
     }
-  }, [currentDate]);
+  }, [calendarDay, resolvedTimezone]);
 
   // Reset scroll flag when date changes
   useEffect(() => {
@@ -213,7 +235,7 @@ export function MobileDayView({
                     <DroppableCell
                       key={`${hour.toString()}-${quarter}`}
                       id={`mobile-day-cell-${currentDate.toISOString()}-${quarterHourTime}`}
-                      date={currentDate}
+                      date={calendarDay}
                       time={quarterHourTime}
                       className={cn(
                         "absolute w-full h-[15px]",
@@ -223,10 +245,14 @@ export function MobileDayView({
                         quarter === 3 && "top-3/4",
                       )}
                       onClick={() => {
-                        const startTime = new Date(currentDate);
-                        startTime.setHours(hourValue);
-                        startTime.setMinutes(quarter * 15);
-                        onEventCreate(startTime);
+                        onEventCreate(
+                          wallClockToUtc(
+                            calendarDay,
+                            hourValue,
+                            quarter * 15,
+                            resolvedTimezone,
+                          ),
+                        );
                       }}
                     />
                   );

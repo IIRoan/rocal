@@ -46,18 +46,23 @@ import {
 } from "../sheet";
 import {
   PARTICIPANTS_INVITE_HELP_TEXT,
+  isMailInvitationStagingCalendar,
+  resolveTimezone,
   type Calendar,
   type CreateEventRequest,
   type EventParticipantInput,
+  type RecentContactEntry,
 } from "@workspace/calendar-core";
 import { RecurrencePicker } from "./RecurrencePicker";
+import { RecipientSuggestInput } from "../mail/RecipientSuggestInput";
 import {
   REMINDER_OPTIONS,
   roundToNextHour,
-  toLocalISOString,
-  startOfDay,
-  endOfDay,
   buildEventRequest,
+  pickerISOStringToUtc,
+  setPickerDatePart,
+  setPickerTimePart,
+  toTimezonePickerISOString,
   validateForm,
 } from "./event-form-utils";
 
@@ -94,6 +99,7 @@ function formatTime12(date: Date): string {
 
 interface EventFormProps {
   initialValues?: Partial<CreateEventRequest>;
+  timezone?: string;
   calendars: Calendar[];
   serverErrors?: string[];
   isSubmitting?: boolean;
@@ -112,6 +118,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
   function EventForm(
     {
       initialValues,
+      timezone,
       calendars,
       serverErrors,
       isSubmitting = false,
@@ -122,6 +129,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     ref,
   ) {
     const { theme } = useTheme();
+    const resolvedTimezone = resolveTimezone(initialValues?.timezone ?? timezone);
     const insets = useSafeAreaInsets();
     const styles = useMemo(() => createStyles(theme), [theme]);
     const scrollRef = useRef<ScrollView>(null);
@@ -143,10 +151,11 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     const [title, setTitle] = useState(initialValues?.title ?? "");
     const [allDay, setAllDay] = useState(initialValues?.allDay ?? false);
     const [start, setStart] = useState(
-      initialValues?.start ?? toLocalISOString(defaultStart),
+      initialValues?.start ??
+        toTimezonePickerISOString(defaultStart, resolvedTimezone),
     );
     const [end, setEnd] = useState(
-      initialValues?.end ?? toLocalISOString(defaultEnd),
+      initialValues?.end ?? toTimezonePickerISOString(defaultEnd, resolvedTimezone),
     );
     const [calendarId, setCalendarId] = useState(
       initialValues?.calendarId ?? defaultCalendarId,
@@ -192,11 +201,22 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
 
     // ── Derived values ───────────────────────────────────────────────────────
 
-    const startDate = useMemo(() => new Date(start), [start]);
-    const endDate = useMemo(() => new Date(end), [end]);
+    const startDate = useMemo(
+      () => pickerISOStringToUtc(start, resolvedTimezone),
+      [resolvedTimezone, start],
+    );
+    const endDate = useMemo(
+      () => pickerISOStringToUtc(end, resolvedTimezone),
+      [end, resolvedTimezone],
+    );
     const selectedCalendar = calendars.find((c) => c.id === calendarId);
     const selectableCalendars = useMemo(
-      () => calendars.filter((c) => !(c as any).isSyncOnly),
+      () =>
+        calendars.filter(
+          (calendar) =>
+            !calendar.isSyncOnly &&
+            !isMailInvitationStagingCalendar(calendar),
+        ),
       [calendars],
     );
 
@@ -231,44 +251,49 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
         setAllDay(value);
         if (value) {
           const sd = start ? new Date(start) : defaultStart;
-          setStart(toLocalISOString(startOfDay(sd)));
-          setEnd(toLocalISOString(endOfDay(sd)));
+          setStart(
+            setPickerTimePart(
+              setPickerDatePart(start, sd),
+              new Date(2000, 0, 1, 0, 0),
+            ),
+          );
+          setEnd(
+            setPickerTimePart(
+              setPickerDatePart(end, sd),
+              new Date(2000, 0, 1, 23, 59),
+            ),
+          );
         }
       },
-      [start, defaultStart],
+      [defaultStart, end, start],
     );
 
     const handleStartDateSelect = useCallback(
       (date: Date) => {
-        const current = new Date(start);
-        date.setHours(current.getHours(), current.getMinutes(), 0, 0);
-        setStart(toLocalISOString(date));
-        if (date > new Date(end)) {
-          const newEnd = new Date(date);
-          const currentEnd = new Date(end);
-          newEnd.setHours(currentEnd.getHours(), currentEnd.getMinutes(), 0, 0);
-          setEnd(toLocalISOString(newEnd));
+        const nextStart = setPickerDatePart(start, date, resolvedTimezone);
+        setStart(nextStart);
+        if (
+          pickerISOStringToUtc(nextStart, resolvedTimezone) >
+          pickerISOStringToUtc(end, resolvedTimezone)
+        ) {
+          setEnd(setPickerDatePart(end, date, resolvedTimezone));
         }
         setShowStartDatePicker(false);
       },
-      [start, end],
+      [end, resolvedTimezone, start],
     );
 
     const handleEndDateSelect = useCallback(
       (date: Date) => {
-        const current = new Date(end);
-        date.setHours(current.getHours(), current.getMinutes(), 0, 0);
-        setEnd(toLocalISOString(date));
+        setEnd(setPickerDatePart(end, date, resolvedTimezone));
         setShowEndDatePicker(false);
       },
-      [end],
+      [end, resolvedTimezone],
     );
 
     const handleStartTimeSelect = useCallback(
       (time: Date) => {
-        const current = new Date(start);
-        current.setHours(time.getHours(), time.getMinutes(), 0, 0);
-        setStart(toLocalISOString(current));
+        setStart(setPickerTimePart(start, time));
         setShowStartTimePicker(false);
       },
       [start],
@@ -276,9 +301,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
 
     const handleEndTimeSelect = useCallback(
       (time: Date) => {
-        const current = new Date(end);
-        current.setHours(time.getHours(), time.getMinutes(), 0, 0);
-        setEnd(toLocalISOString(current));
+        setEnd(setPickerTimePart(end, time));
         setShowEndTimePicker(false);
       },
       [end],
@@ -298,6 +321,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
         categoryId: undefined,
         recurrence,
         reminder,
+        timezone: resolvedTimezone,
         participants: participants.map((participant) => ({
           email: participant.email.trim().toLowerCase(),
           displayName: participant.displayName?.trim() || undefined,
@@ -332,6 +356,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       color,
       recurrence,
       reminder,
+      resolvedTimezone,
       onSubmit,
     ]);
 
@@ -386,6 +411,49 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
         },
       ]);
     }, [participantDraft, participants]);
+
+    const addParticipantFromSuggestion = useCallback(
+      (entry: RecentContactEntry) => {
+        const email = entry.email.trim().replace(/^mailto:/i, "").toLowerCase();
+
+        if (!email) {
+          return;
+        }
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          setFieldErrors((current) => ({
+            ...current,
+            participants: "Participant must use a valid email address",
+          }));
+          return;
+        }
+
+        if (participants.some((participant) => participant.email === email)) {
+          setFieldErrors((current) => ({
+            ...current,
+            participants: "That participant is already invited",
+          }));
+          return;
+        }
+
+        setParticipantDraft("");
+        setFieldErrors((current) => {
+          const next = { ...current };
+          delete next.participants;
+          return next;
+        });
+        setParticipants((current) => [
+          ...current,
+          {
+            email,
+            displayName: entry.displayName?.trim() || undefined,
+            role: "attendee",
+            status: "pending",
+          },
+        ]);
+      },
+      [participants],
+    );
 
     const removeParticipant = useCallback((email: string) => {
       setParticipants((current) =>
@@ -839,22 +907,19 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                         </Pressable>
                       </View>
                       <View style={styles.participantComposer}>
-                        <TextInput
+                        <RecipientSuggestInput
+                          mode="calendar"
+                          value={participantDraft}
+                          onChangeText={setParticipantDraft}
+                          onSelectSuggestion={addParticipantFromSuggestion}
+                          placeholder="Add attendee by email"
+                          onSubmitEditing={addParticipant}
                           style={[
                             styles.expandableInput,
                             styles.participantInput,
-                            fieldErrors.participants ? styles.inputError : null,
+                            ...(fieldErrors.participants ? [styles.inputError] : []),
                           ]}
-                          value={participantDraft}
-                          onChangeText={setParticipantDraft}
-                          placeholder="Add attendee by email"
-                          placeholderTextColor={theme.colors.mutedForeground}
-                          keyboardType="email-address"
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          returnKeyType="done"
-                          onSubmitEditing={addParticipant}
-                          accessibilityLabel="Add attendee by email"
+                          hasError={Boolean(fieldErrors.participants)}
                         />
                         <Pressable
                           style={styles.participantAddButton}

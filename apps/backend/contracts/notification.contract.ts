@@ -1,8 +1,23 @@
-export type NotificationConfigInput = {
-  notificationType: "email" | "browser";
-  minutesBefore: number;
-  isEnabled: boolean;
-};
+import { z } from "zod";
+import { notificationTypeSchema } from "@workspace/calendar-core";
+import { strictZodObject } from "../lib/validation";
+import { eventIdParamsSchema } from "./_schemas";
+
+export const eventNotificationSettingSchema = strictZodObject({
+  notificationType: notificationTypeSchema,
+  minutesBefore: z.number().int().min(0).max(43200),
+  isEnabled: z.boolean(),
+});
+
+export const updateEventNotificationsBodySchema = strictZodObject({
+  notifications: z.array(eventNotificationSettingSchema).max(20),
+});
+
+export { eventIdParamsSchema };
+
+export type NotificationConfigInput = z.infer<
+  typeof eventNotificationSettingSchema
+>;
 
 export type NotificationRow = {
   id: string;

@@ -108,3 +108,47 @@ export function getEmailDomain(value: string): string | null {
 
   return normalized.slice(atIndex + 1);
 }
+
+type ReplyAddress = {
+  email?: string | null;
+};
+
+/**
+ * Resolve recipients for a "Reply" action.
+ *
+ * - Prefer original sender(s), excluding the current user.
+ * - If the selected message was sent by the current user, fall back to `to` + `cc`
+ *   (excluding the current user) so replies continue the conversation.
+ */
+export function resolveReplyRecipients(input: {
+  from?: ReplyAddress[];
+  to?: ReplyAddress[];
+  cc?: ReplyAddress[];
+  currentUserEmail?: string | null;
+}): string[] {
+  const currentUserEmail = input.currentUserEmail
+    ? normalizeEmailAddress(input.currentUserEmail)
+    : null;
+
+  const collectUnique = (entries: ReplyAddress[] | undefined): string[] => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const entry of entries ?? []) {
+      const email = entry.email?.trim();
+      if (!email) continue;
+      const normalized = normalizeEmailAddress(email);
+      if (currentUserEmail && normalized === currentUserEmail) continue;
+      if (seen.has(normalized)) continue;
+      seen.add(normalized);
+      list.push(normalized);
+    }
+    return list;
+  };
+
+  const senderRecipients = collectUnique(input.from);
+  if (senderRecipients.length > 0) {
+    return senderRecipients;
+  }
+
+  return collectUnique([...(input.to ?? []), ...(input.cc ?? [])]);
+}
