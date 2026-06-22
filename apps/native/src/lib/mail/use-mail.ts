@@ -17,7 +17,11 @@ import {
   refreshMailRuntimePolicy,
   type MailRuntime,
 } from "./mail-runtime";
-import { resolveMailboxMessagesPageSize } from "@workspace/calendar-core";
+import {
+  resolveEncryptionInternalDomain,
+  resolveMailboxMessagesPageSize,
+  shouldEncryptOutgoingMail,
+} from "@workspace/calendar-core";
 import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
 import { MAILBOX_MESSAGES_PAGE_SIZE } from "./mail-pagination";
 import {
@@ -479,6 +483,21 @@ export function useSendMessage(runtime: MailRuntime | undefined) {
       if (!context) {
         throw new Error("Your mailbox is not ready to send messages yet.");
       }
+
+      const allRecipients = [
+        ...input.to,
+        ...(input.cc ?? []),
+        ...(input.bcc ?? []),
+      ];
+      const internalDomain = resolveEncryptionInternalDomain(
+        refreshedRuntime.config.defaultDomain,
+      );
+      if (!shouldEncryptOutgoingMail(allRecipients, internalDomain)) {
+        await refreshedRuntime.client.ensureEncryptOnAppendDisabled(
+          refreshedRuntime.session,
+        );
+      }
+
       return refreshedRuntime.client.sendMessage(refreshedRuntime.session, {
         draftsMailboxId: context.draftsMailboxId,
         sentMailboxId: context.sentMailboxId,
