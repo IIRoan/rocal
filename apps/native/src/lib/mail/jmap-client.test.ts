@@ -4,6 +4,7 @@ import {
   buildSendMessageMethodCalls,
   getPrimaryMailAccountId,
   normalizeJmapSession,
+  StalwartJmapClient,
 } from "./jmap-client";
 
 describe("buildBearerAuthHeader", () => {
@@ -178,5 +179,105 @@ describe("buildSendMessageMethodCalls", () => {
         disposition: "attachment",
       },
     ]);
+  });
+});
+
+describe("ensureEncryptOnAppendDisabled", () => {
+  const session: JmapSession = {
+    apiUrl: "http://localhost:4001/api/mail/jmap/",
+    accounts: { acc1: { name: "alice@solace.onl" } },
+    primaryAccounts: { "urn:ietf:params:jmap:mail": "acc1" },
+  };
+
+  it("is a no-op when encryptOnAppend is already disabled", async () => {
+    const fetcher = jest.fn(async () =>
+      new Response(
+        JSON.stringify({
+          methodResponses: [
+            [
+              "x:AccountSettings/get",
+              {
+                list: [
+                  {
+                    encryptionAtRest: {
+                      "@type": "Aes256",
+                      publicKey: "pk-1",
+                      encryptOnAppend: false,
+                    },
+                  },
+                ],
+              },
+              "c1",
+            ],
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      getAccessToken: async () => "mail-access-token",
+      fetcher,
+    });
+
+    await client.ensureEncryptOnAppendDisabled(session);
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws when Stalwart refuses to disable encryptOnAppend", async () => {
+    const fetcher = jest
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            methodResponses: [
+              [
+                "x:AccountSettings/get",
+                {
+                  list: [
+                    {
+                      encryptionAtRest: {
+                        "@type": "Aes256",
+                        publicKey: "pk-1",
+                        encryptOnAppend: true,
+                      },
+                    },
+                  ],
+                },
+                "c1",
+              ],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            methodResponses: [
+              [
+                "x:AccountSettings/set",
+                {
+                  notUpdated: {
+                    singleton: { description: "Permission denied" },
+                  },
+                },
+                "c1",
+              ],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      getAccessToken: async () => "mail-access-token",
+      fetcher,
+    });
+
+    await expect(client.ensureEncryptOnAppendDisabled(session)).rejects.toThrow(
+      "Permission denied",
+    );
   });
 });

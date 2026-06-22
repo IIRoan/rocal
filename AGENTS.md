@@ -11,6 +11,7 @@ This repository is a monorepo for **Solace** — a calendar and mail application
   - `contracts/` — Service interfaces, DTOs, and cross-cutting policies (e.g. `logging.contract.ts` for log sanitization).
   - `services/` — Business logic, DB access, notifications. Constructor-injected `PrismaClient`.
   - `lib/` — Auth, errors, recurrence, ICS, notification calculator, etc.
+- **Mail server**: Stalwart, accessed **only via JMAP** (clients through `StalwartJmapClient` + backend JMAP proxy; provisioning via Stalwart admin JMAP).
 - **apps/notifications**: Go service for scheduled email notifications (Resend + HTML templates).
 
 ### Shared Packages
@@ -164,7 +165,7 @@ Update it when you:
 - Add, remove, or rename a **workspace package** under `packages/`
 - Change **primary routes**, navigation surfaces, or where a major feature lives
 - Move or split a feature across directories in a way future agents would need to know
-- Change cross-cutting conventions documented here (auth, E2EE, cache mutation rules, design system)
+- Change cross-cutting conventions documented here (auth, E2EE, cache mutation rules, design system, **mail/JMAP protocol**)
 
 Keep edits factual and concise: architecture bullets, directory trees, shared-packages table, and feature map. Do **not** document one-off scripts or temporary experiments.
 
@@ -197,6 +198,33 @@ Server logs must support debugging **without** storing PII, secrets, or user con
 ### Mail cache mutations (native + web mail)
 
 When mutating mail data already in the React Query cache (star, read state, labels), **use optimistic `onMutate` + `setQueryData`** on the specific list key. Do **not** blanket-invalidate `["mail"]` — that refetches everything, shows spinners, and loses scroll position. Invalidate narrowly on destructive actions (delete, move) where items leave the list. Roll back via refetch/`invalidateMessages()` on failure.
+
+### Mail protocol: JMAP only (Required)
+
+Solace mail is **JMAP end-to-end**. Agents must use **JMAP as the only protocol** for mailbox operations — never introduce or wire up parallel mail stacks.
+
+**Use JMAP for all mailbox work:**
+
+- **Web and native clients** — `StalwartJmapClient` (`apps/web/lib/mail/jmap-client.ts`, `apps/native/src/lib/mail/jmap-client.ts`): session discovery, `Email/*`, `Mailbox/*`, `Thread/*`, `Identity/*`, `EmailSubmission/set`, blob upload/download, and Stalwart JMAP extensions (`x:AccountSettings/*`, `x:Email/*`, `x:Jmap/*`).
+- **Backend user mail** — JMAP proxy and OAuth bridge in `apps/backend/routes/mail.ts`; sync/realtime via JMAP `*/changes` in `mail-sync.service.ts` and `mail-realtime.service.ts`.
+- **Backend provisioning and admin** — Stalwart registry/admin **via JMAP** in `apps/backend/lib/stalwart-admin.ts` (not a separate mail REST API).
+- **Server-delivered mail to a Solace inbox** — JMAP blob upload + `Email/import` in `apps/backend/lib/internal-mailbox-delivery.ts`.
+
+**Forbidden — do not add or use:**
+
+- **IMAP, POP3, or SMTP client code** in apps or shared packages (no `node-imap`, `nodemailer` transport to the mailbox server, direct SMTP submission from web/native, etc.).
+- **Alternate mail HTTP APIs** or proprietary sync layers alongside JMAP.
+- **New mail clients** that bypass `StalwartJmapClient` / the backend JMAP proxy.
+- **Legacy or reference trees** (e.g. `webmail/`) as patterns for new Solace mail work — extend the JMAP clients above instead.
+
+**Outbound delivery:** clients submit with `Email/set` + `EmailSubmission/set` over JMAP. Stalwart relays to external recipients over SMTP on the server side — apps do **not** speak SMTP.
+
+**Not user-mailbox JMAP (allowed, separate concern):**
+
+- `apps/notifications` — scheduled calendar reminders via Resend.
+- Auth/system email helpers — transactional only; not mailbox read/write.
+
+When implementing mail features, search for existing JMAP method builders (`buildSendMessageMethodCalls`, `buildDraftMethodCalls`, etc.) and extend them rather than inventing a new transport.
 
 ### Calendar timezone handling (native + web)
 
