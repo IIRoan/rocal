@@ -82,11 +82,14 @@ export function useMailCalendarInvitation({
     enabled: Boolean(enabled && mailCalendarInviteUid),
   });
 
-  useEffect(() => {
+  const messageId = message?.id;
+  const [inviteMessageId, setInviteMessageId] = useState(messageId);
+  if (messageId !== inviteMessageId) {
+    setInviteMessageId(messageId);
     setInviteDeclined(false);
     setInviteCancelled(false);
     setCancelProcessPending(false);
-  }, [message?.id]);
+  }
 
   useEffect(() => {
     if (!enabled || !mailCalendarInviteUid || isInvitationFetching) {

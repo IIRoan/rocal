@@ -1,9 +1,11 @@
 import { createLogger } from "@workspace/logger";
-import type {
-  EventParticipant,
-  EventParticipantInput,
-  EventParticipantRole,
-  EventParticipantStatus,
+import {
+  resolveTimezone,
+  type EventParticipant,
+  type EventParticipantInput,
+  type EventParticipantRole,
+  type EventParticipantStatus,
+  type OperationWarning,
 } from "@workspace/calendar-core";
 import {
   buildIcsEventFile,
@@ -23,7 +25,8 @@ import { authEmailFrom, resend } from "../lib/email-client";
 import { sendEventInvitationEmail } from "../lib/event-invitation-delivery";
 import { createStalwartAdminClient } from "../lib/stalwart-admin";
 import { env } from "../lib/env";
-import { errorString } from "../lib/errors";
+import { emailDeliveryWarning } from "../lib/email-delivery";
+import { errorLogDetails, logRef } from "../lib/log-sanitization";
 
 const logger = createLogger("backend:event-participants");
 
@@ -55,7 +58,7 @@ type SyncEventParticipantsResult = {
    * Dispatching emails inside an uncommitted transaction risks sending
    * invitations for events that never persisted.
    */
-  sendPendingInvitations: () => Promise<void>;
+  sendPendingInvitations: () => Promise<OperationWarning[]>;
 };
 
 export class EventParticipantService {
@@ -285,13 +288,13 @@ export class EventParticipantService {
     input: SyncEventParticipantsInput,
     resolvedParticipants: ResolvedParticipant[],
     existingByEmail: Map<string, unknown>,
-  ): Promise<() => Promise<void>> {
+  ): Promise<() => Promise<OperationWarning[]>> {
     if (
       !input.sendInvitations ||
       !input.invitationEvent ||
       resolvedParticipants.length === 0
     ) {
-      return async () => {};
+      return async () => [];
     }
 
     const client = this.getClient(input.tx);
@@ -302,13 +305,13 @@ export class EventParticipantService {
     );
 
     if (!owner || newInvitees.length === 0) {
-      return async () => {};
+      return async () => [];
     }
 
     const icsContent = buildIcsEventFile({
       calendar: {
         name: input.calendarName || "Solace",
-        timezone: input.invitationEvent.timezone || "UTC",
+        timezone: resolveTimezone(input.invitationEvent.timezone),
         method: "REQUEST",
       },
       event: {
@@ -328,6 +331,8 @@ export class EventParticipantService {
         : null;
 
     return async () => {
+      const warnings: OperationWarning[] = [];
+
       for (const invitee of newInvitees) {
         try {
           const invitationMessage = {
@@ -354,7 +359,7 @@ export class EventParticipantService {
             ],
           };
 
-          await sendEventInvitationEmail({
+          const delivery = await sendEventInvitationEmail({
             to: invitee.email,
             from: authEmailFrom,
             message: invitationMessage,
@@ -377,14 +382,25 @@ export class EventParticipantService {
               inviteeEmail: invitee.email,
             },
           });
+
+          if (!delivery.delivered) {
+            warnings.push(
+              emailDeliveryWarning("event invitation", invitee.email),
+            );
+          }
         } catch (error) {
           logger.warn("Failed to send event invitation", {
             eventId: input.eventId,
-            inviteeEmail: invitee.email,
-            error: errorString(error),
+            recipientRef: logRef(invitee.email),
+            ...errorLogDetails(error),
           });
+          warnings.push(
+            emailDeliveryWarning("event invitation", invitee.email),
+          );
         }
       }
+
+      return warnings;
     };
   }
 }

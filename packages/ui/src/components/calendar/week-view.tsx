@@ -3,19 +3,19 @@
 import React, { useLayoutEffect, useMemo, useRef } from "react";
 import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
+  getWeekCalendarDays,
+  isTodayInTimezone,
+  resolveTimezone,
+  utcToPickerDate,
+  wallClockToUtc,
+} from "@workspace/calendar-core";
+import {
   addHours,
-  eachDayOfInterval,
   eachHourOfInterval,
   endOfWeek,
   format,
   getHours,
-  isBefore,
-  isSameDay,
-  isToday,
-  startOfDay,
   startOfWeek,
-  isWithinInterval,
-  endOfDay,
 } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 
@@ -23,11 +23,11 @@ import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
 import {
-  isMultiDayEvent,
   sortEvents,
-  getAllEventsForDay,
   eventOverlapsRange,
-  getEventInterval,
+  isAllDayRowEvent,
+  getEventSegmentForCalendarDay,
+  getTimedTimelineEventsForDay,
 } from "./utils";
 import { WeekCellsHeight } from "./constants";
 import { CalendarEvent } from "./types";
@@ -69,15 +69,11 @@ export const WeekView = React.memo(function WeekView({
   onEventView,
 }: WeekViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const days = useMemo(() => {
-    const weekStart = startOfWeek(currentDate, {
-      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-    });
-    const weekEnd = endOfWeek(currentDate, {
-      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-    });
-    return eachDayOfInterval({ start: weekStart, end: weekEnd });
-  }, [currentDate, weekStartDay]);
+  const resolvedTimezone = resolveTimezone(timezone);
+  const days = useMemo(
+    () => getWeekCalendarDays(currentDate, weekStartDay, resolvedTimezone),
+    [currentDate, weekStartDay, resolvedTimezone],
+  );
 
   const weekStart = useMemo(
     () =>
@@ -101,46 +97,36 @@ export const WeekView = React.memo(function WeekView({
     });
   }, []);
 
-  // Get all-day events and multi-day events for the week
+  // Get all-day events for the week
   const allDayEvents = useMemo(() => {
     return events
-      .filter((event) => event.allDay || isMultiDayEvent(event))
-      .filter((event) => eventOverlapsRange(event, weekStart, weekEnd, "day"));
-  }, [events, weekStart, weekEnd]);
+      .filter((event) => isAllDayRowEvent(event))
+      .filter((event) =>
+        eventOverlapsRange(event, weekStart, weekEnd, "day", resolvedTimezone),
+      );
+  }, [events, resolvedTimezone, weekStart, weekEnd]);
 
   const allDayEventsByDay = useMemo(
     () =>
       days.map((day) =>
         sortEvents(
           allDayEvents.filter((event) =>
-            eventOverlapsRange(event, day, day, "day"),
+            eventOverlapsRange(event, day, day, "day", resolvedTimezone),
           ),
+          resolvedTimezone,
         ),
       ),
-    [allDayEvents, days],
+    [allDayEvents, days, resolvedTimezone],
   );
 
   // Process events for each day to calculate positions
   const processedDayEvents = useMemo(() => {
     const result = days.map((day) => {
-      // Get events for this day that are not all-day events or multi-day events
-      const dayEvents = events.filter((event) => {
-        // Skip all-day events and multi-day events
-        if (event.allDay || isMultiDayEvent(event)) return false;
-
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end);
-
-        // Check if event is on this day
-        // Use proper date comparison for spanning events
-        const dayStart = startOfDay(day);
-        const dayEnd = addHours(dayStart, 24);
-        return (
-          isSameDay(day, eventStart) ||
-          isSameDay(day, eventEnd) ||
-          (eventStart < dayEnd && eventEnd > dayStart)
-        );
-      });
+      const dayEvents = getTimedTimelineEventsForDay(
+        events,
+        day,
+        resolvedTimezone,
+      );
 
       // Sort events by start time
       dayEvents.sort((a, b) => {
@@ -153,6 +139,7 @@ export const WeekView = React.memo(function WeekView({
         cellHeight: WeekCellsHeight,
         startHour: StartHour,
         widthStrategy: "no-overflow",
+        timezone: resolvedTimezone,
       }).map((positionedEvent) => ({
         ...positionedEvent,
         dayIndex: 0,
@@ -160,7 +147,7 @@ export const WeekView = React.memo(function WeekView({
     });
 
     return result;
-  }, [days, events]);
+  }, [days, events, resolvedTimezone]);
 
   const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -213,7 +200,7 @@ export const WeekView = React.memo(function WeekView({
               <span
                 className={cn(
                   "text-[11px] font-medium uppercase tracking-wider",
-                  isToday(day)
+                  isTodayInTimezone(day, resolvedTimezone)
                     ? "rounded-md bg-primary px-2 py-1 font-medium text-primary-foreground"
                     : "",
                 )}
@@ -239,7 +226,7 @@ export const WeekView = React.memo(function WeekView({
               <span
                 className={cn(
                   "text-[10px] font-medium uppercase",
-                  isToday(day)
+                  isTodayInTimezone(day, resolvedTimezone)
                     ? "rounded-md bg-primary px-1.5 py-0.5 font-medium text-primary-foreground"
                     : "",
                 )}
@@ -274,22 +261,12 @@ export const WeekView = React.memo(function WeekView({
                 )}
               >
                 {dayEvents.map((event) => {
-                  const { start: eStartDay, end: eEndDay } = getEventInterval(
+                  const { isFirstDay, isLastDay } = getEventSegmentForCalendarDay(
                     event,
-                    "day",
+                    day,
+                    resolvedTimezone,
                   );
-                  const weekStartDay = startOfDay(weekStart);
-                  const weekEndDay = endOfDay(weekEnd);
-                  const visibleStart = isBefore(eStartDay, weekStartDay)
-                    ? weekStartDay
-                    : eStartDay;
-                  const visibleEnd = isBefore(weekEndDay, eEndDay)
-                    ? weekEndDay
-                    : eEndDay;
-
-                  const isFirstSegmentDay = isSameDay(day, visibleStart);
-                  const isLastSegmentDay = isSameDay(day, visibleEnd);
-                  const shouldShowTitle = isFirstSegmentDay;
+                  const shouldShowTitle = isFirstDay;
 
                   return (
                     <div key={`allday-${event.id}`} className="w-full">
@@ -297,8 +274,8 @@ export const WeekView = React.memo(function WeekView({
                         onClick={(e) => handleEventClick(event, e)}
                         event={event}
                         view="month"
-                        isFirstDay={isFirstSegmentDay}
-                        isLastDay={isLastSegmentDay}
+                        isFirstDay={isFirstDay}
+                        isLastDay={isLastDay}
                         className="text-[10px] min-h-[20px] h-[22px] items-center"
                         timezone={timezone}
                         onEdit={onEventEdit}
@@ -356,9 +333,13 @@ export const WeekView = React.memo(function WeekView({
           <div
             key={dayIndex}
             className={`border-border/70 relative border-r last:border-r-0 grid auto-cols-fr ${
-              isToday(day) ? "bg-[var(--calendar-accent-bg)]/20" : ""
+              isTodayInTimezone(day, resolvedTimezone)
+                ? "bg-[var(--calendar-accent-bg)]/20"
+                : ""
             }`}
-            data-today={isToday(day) || undefined}
+            data-today={
+              isTodayInTimezone(day, resolvedTimezone) || undefined
+            }
           >
             {/* Positioned events */}
             {(processedDayEvents[dayIndex] ?? []).map(
@@ -375,7 +356,7 @@ export const WeekView = React.memo(function WeekView({
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="h-full w-full px-[1px] sm:px-1">
+                  <div className="h-full w-full px-[1px]">
                     {positionedEvent.event && (
                       <DraggableEvent
                         event={positionedEvent.event}
@@ -398,7 +379,7 @@ export const WeekView = React.memo(function WeekView({
             )}
 
             {/* Current time indicator - only show for today's column */}
-            {currentTimeVisible && isToday(day) && (
+            {currentTimeVisible && isTodayInTimezone(day, resolvedTimezone) && (
               <CurrentTimeIndicator
                 position={currentTimePosition}
                 variant="calendar-accent"
@@ -431,10 +412,14 @@ export const WeekView = React.memo(function WeekView({
                             "top-[calc(var(--week-cells-height)/4*3)]",
                         )}
                         onClick={() => {
-                          const startTime = new Date(day);
-                          startTime.setHours(hourValue);
-                          startTime.setMinutes(quarter * 15);
-                          onEventCreate(startTime);
+                          onEventCreate(
+                            wallClockToUtc(
+                              day,
+                              hourValue,
+                              quarter * 15,
+                              resolvedTimezone,
+                            ),
+                          );
                         }}
                       />
                     );

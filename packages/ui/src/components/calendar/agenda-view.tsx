@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import { CalendarBlankIcon } from "@phosphor-icons/react";
-import { addDays, format, isToday } from "date-fns";
+import { addDays, format } from "date-fns";
+import { isTodayInTimezone, resolveTimezone } from "@workspace/calendar-core";
 
 import { AgendaDaysToShow } from "./constants";
 import { CalendarEvent } from "./types";
@@ -33,6 +34,7 @@ export function AgendaView({
   onEventDelete,
   onEventView,
 }: AgendaViewProps) {
+  const resolvedTimezone = resolveTimezone(timezone);
   // Show events for the next days based on constant
   const days = useMemo(() => {
     return Array.from({ length: AgendaDaysToShow }, (_, i) =>
@@ -47,7 +49,7 @@ export function AgendaView({
 
   // Check if there are any days with events
   const hasEvents = days.some(
-    (day) => getAgendaEventsForDay(events, day).length > 0,
+    (day) => getAgendaEventsForDay(events, day, resolvedTimezone).length > 0,
   );
 
   return (
@@ -65,11 +67,15 @@ export function AgendaView({
       ) : (
         <div className="px-3 sm:px-6 py-4 space-y-6">
           {days.map((day) => {
-            const dayEvents = getAgendaEventsForDay(events, day);
+            const dayEvents = getAgendaEventsForDay(
+              events,
+              day,
+              resolvedTimezone,
+            );
 
             if (dayEvents.length === 0) return null;
 
-            const today = isToday(day);
+            const today = isTodayInTimezone(day, resolvedTimezone);
 
             return (
               <section key={day.toString()} className="flex flex-col gap-1.5">

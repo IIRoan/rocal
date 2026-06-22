@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
-import { format, parse, startOfDay } from "date-fns";
+import {
+  formatCalendarDayKey,
+  parseCalendarDayKey,
+} from "@workspace/calendar-core";
 import {
   useCalendarContext,
   CALENDAR_VIEWS,
@@ -11,19 +14,10 @@ import type { CalendarView } from "@workspace/ui/components/calendar";
 
 const DATE_PARAM = "date";
 const VIEW_PARAM = "view";
-const DATE_FORMAT = "yyyy-MM-dd";
 
 function parseDateParam(value: string | null): Date | null {
   if (!value) return null;
-  try {
-    const parsed = parse(value, DATE_FORMAT, new Date());
-    if (!isNaN(parsed.getTime())) {
-      return startOfDay(parsed);
-    }
-  } catch {
-    // ignore
-  }
-  return null;
+  return parseCalendarDayKey(value);
 }
 
 function parseViewParam(value: string | null): CalendarView | null {
@@ -35,7 +29,7 @@ function parseViewParam(value: string | null): CalendarView | null {
 }
 
 function formatDateParam(date: Date): string {
-  return format(date, DATE_FORMAT);
+  return formatCalendarDayKey(date);
 }
 
 export function useCalendarUrlSync() {

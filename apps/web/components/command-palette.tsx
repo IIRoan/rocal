@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { format } from "date-fns";
 import { createLogger } from "@workspace/logger";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UnifiedSearchResult } from "@workspace/calendar-core";
+import { formatCalendarDayKey } from "@workspace/calendar-core";
 import { useSettings } from "@/hooks/use-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useCalendarContext } from "@workspace/ui/components/calendar";
@@ -487,7 +487,7 @@ export function CommandPalette({
       setCurrentDate(eventStart);
       setCalendarView("week");
 
-      const dateParam = format(eventStart, "yyyy-MM-dd");
+      const dateParam = formatCalendarDayKey(eventStart);
       const params = new URLSearchParams(window.location.search);
       params.set("date", dateParam);
       params.set("view", "week");

@@ -6,6 +6,7 @@
  */
 
 import { errorMessage } from "./errors";
+import { resolveTimezone } from "@workspace/calendar-core";
 
 export interface NotificationConfig {
   notificationType: "email" | "browser";
@@ -35,7 +36,7 @@ export class NotificationCalculator {
       eventStart,
       minutesBefore,
     );
-    const notificationTimezone = timezone?.trim() || "UTC";
+    const notificationTimezone = resolveTimezone(timezone);
 
     return {
       notificationTime,
@@ -163,7 +164,7 @@ export class NotificationCalculator {
     }
 
     const formatter = new Intl.DateTimeFormat("sv-SE", {
-      timeZone: timezone || "UTC",
+      timeZone: resolveTimezone(timezone),
       year: "numeric",
       month: "2-digit",
       day: "2-digit",

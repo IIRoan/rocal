@@ -1,3 +1,9 @@
+import {
+  indexInvitationImportEncryption,
+  resolveTimezone,
+  type InvitationImportEncryptionPayload,
+  type OperationWarning,
+} from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import {
@@ -9,15 +15,14 @@ import {
 import { EventParticipantService } from "./event-participant.service";
 import type { StalwartCalendarClientLike } from "../lib/stalwart-calendar";
 import { buildStalwartEventPayload } from "../lib/stalwart-calendar-mapping";
-import { errorString, errorMessage } from "../lib/errors";
+import { errorMessage } from "../lib/errors";
+import { errorLogDetails } from "../lib/log-sanitization";
 import {
   resolveAcceptedInvitationTargetCalendar,
   resolveInvitationStagingCalendar,
   type InvitationTargetCalendar,
 } from "../lib/mail-invitation-calendar";
 import { resolveEventPersistencePolicy } from "../lib/event-encryption";
-import type { InvitationImportEncryptionPayload } from "@workspace/calendar-core";
-import { indexInvitationImportEncryption } from "@workspace/calendar-core";
 
 const logger = createLogger("backend:mail-calendar-ingestion");
 
@@ -153,7 +158,7 @@ function toEventUpdateData(parsedEvent: ParsedIcsEvent) {
     allDay: parsedEvent.allDay,
     location: parsedEvent.location ?? null,
     recurrence: recurrenceToJson(parsedEvent),
-    timezone: parsedEvent.timezone || "UTC",
+    timezone: resolveTimezone(parsedEvent.timezone),
     isCancelled: false,
     syncedAt: new Date(),
   };
@@ -184,13 +189,9 @@ function buildInvitationLocalEventData(
   const schedulingData = toEventUpdateData(parsedEvent);
 
   if (existingEncryptionState === "encrypted") {
-    const {
-      title: _title,
-      description: _description,
-      location: _location,
-      ...schedulingOnly
-    } = schedulingData;
-    return schedulingOnly;
+    const { start, end, allDay, recurrence, timezone, isCancelled, syncedAt } =
+      schedulingData;
+    return { start, end, allDay, recurrence, timezone, isCancelled, syncedAt };
   }
 
   if (!encryptionPayload || !hasEncryptedPayload(encryptionPayload.encryptedContent)) {
@@ -354,7 +355,7 @@ export class MailCalendarIngestionService {
         start: parsedEvent.start,
         end: parsedEvent.end,
         allDay: parsedEvent.allDay,
-        timezone: parsedEvent.timezone || "UTC",
+        timezone: resolveTimezone(parsedEvent.timezone),
         location: parsedEvent.location ?? null,
         recurrence: recurrenceToJson(parsedEvent),
         reminder: null,
@@ -373,7 +374,7 @@ export class MailCalendarIngestionService {
       logger.warn("Failed to clean up temporary decline event in Stalwart", {
         userId: input.userId,
         remoteEventId: remoteEvent.id,
-        error: errorString(error),
+        ...errorLogDetails(error),
       });
     }
 
@@ -472,7 +473,7 @@ export class MailCalendarIngestionService {
       select: { timezone: true },
     });
 
-    return userSettings?.timezone || "UTC";
+    return resolveTimezone(userSettings?.timezone);
   }
 
   private async applyAttendeeStatusForUser(input: {
@@ -549,7 +550,7 @@ export class MailCalendarIngestionService {
       start: parsedEvent.start,
       end: parsedEvent.end,
       allDay: parsedEvent.allDay,
-      timezone: parsedEvent.timezone || "UTC",
+      timezone: resolveTimezone(parsedEvent.timezone),
       location: parsedEvent.location ?? null,
       recurrence: recurrenceToJson(parsedEvent),
       reminder: null,
@@ -606,7 +607,7 @@ export class MailCalendarIngestionService {
     const existingByExternalId = new Map(
       existingEvents.map((event) => [event.externalId, event]),
     );
-    const pendingInvitationDispatchers: Array<() => Promise<void>> = [];
+    const pendingInvitationDispatchers: Array<() => Promise<OperationWarning[]>> = [];
     const sendSchedulingMessages = options.sendSchedulingMessages ?? false;
     const userEmail = options.attendeeStatus
       ? (
@@ -704,8 +705,8 @@ export class MailCalendarIngestionService {
             } catch (cleanupError) {
               logger.error("Failed to clean up remote event after local DB create failure", {
                 remoteEventId,
-                originalError: errorString(error),
-                cleanupError: errorString(cleanupError),
+                ...errorLogDetails(error),
+                cleanupError: errorLogDetails(cleanupError),
               });
             }
           }

@@ -25,35 +25,24 @@ jest.mock("../../lib/prisma", () => ({
   },
 }));
 
-jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(
-    async (): Promise<any> => ({
-      id: "user-1",
-    }),
-  ),
-}));
-
 jest.mock("../../lib/auth", () => ({
   auth: { api: { getSession: jest.fn() } },
 }));
 
 jest.mock("../../lib/auth-guard", () => {
-  const { Elysia: LocalElysia } =
-    jest.requireActual<typeof import("elysia")>("elysia");
+  const { createMockRequireAuth } =
+    jest.requireActual<typeof import("../helpers/mock-require-auth")>(
+      "../helpers/mock-require-auth",
+    );
   return {
-    requireAuth: new LocalElysia({ name: "require-auth-test" }),
+    requireAuth: createMockRequireAuth(),
   };
 });
 
 import { errorHandler } from "../../lib/errors";
-import { ensureAuthenticatedUser } from "../../lib/auth-utils";
 import { prisma } from "../../lib/prisma";
 import { settingsRoutes } from "../../routes/settings";
 
-const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<
-    typeof ensureAuthenticatedUser
-  >;
 const mockPrisma = prisma as unknown as {
   userSettings: {
     findUnique: jest.Mock<() => Promise<any>>;
@@ -90,9 +79,7 @@ describe("settingsRoutes", () => {
       id: "settings-1",
       userId: "user-1",
       timezone: "UTC",
-    };
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.userSettings.findUnique.mockResolvedValue(settings);
+    };    mockPrisma.userSettings.findUnique.mockResolvedValue(settings);
 
     const response = await createApp().handle(
       new Request("http://localhost/settings/"),
@@ -107,9 +94,7 @@ describe("settingsRoutes", () => {
       id: "settings-1",
       userId: "user-1",
       timezone: "UTC",
-    };
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.userSettings.findUnique.mockResolvedValue(null);
+    };    mockPrisma.userSettings.findUnique.mockResolvedValue(null);
     mockPrisma.userSettings.create.mockResolvedValue(settings);
 
     const response = await createApp().handle(
@@ -122,10 +107,7 @@ describe("settingsRoutes", () => {
     await expect(readJson(response)).resolves.toEqual(settings);
   });
 
-  it("rejects invalid timezones during update", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-
-    const response = await createApp().handle(
+  it("rejects invalid timezones during update", async () => {    const response = await createApp().handle(
       new Request("http://localhost/settings/", {
         method: "PUT",
         headers: { "content-type": "application/json" },
@@ -133,16 +115,13 @@ describe("settingsRoutes", () => {
       }),
     );
 
-    expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toBe(
+    expect(response.status).toBe(422);
+    await expect(readText(response)).resolves.toContain(
       "Invalid timezone identifier",
     );
   });
 
-  it("rejects inverted working hours", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-
-    const response = await createApp().handle(
+  it("rejects inverted working hours", async () => {    const response = await createApp().handle(
       new Request("http://localhost/settings/", {
         method: "PUT",
         headers: { "content-type": "application/json" },
@@ -159,10 +138,7 @@ describe("settingsRoutes", () => {
     );
   });
 
-  it("rejects malformed working days JSON", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-
-    const response = await createApp().handle(
+  it("rejects malformed working days JSON", async () => {    const response = await createApp().handle(
       new Request("http://localhost/settings/", {
         method: "PUT",
         headers: { "content-type": "application/json" },
@@ -178,10 +154,7 @@ describe("settingsRoutes", () => {
     );
   });
 
-  it("rejects working days outside the allowed weekday range", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-
-    const response = await createApp().handle(
+  it("rejects working days outside the allowed weekday range", async () => {    const response = await createApp().handle(
       new Request("http://localhost/settings/", {
         method: "PUT",
         headers: { "content-type": "application/json" },
@@ -197,9 +170,7 @@ describe("settingsRoutes", () => {
     );
   });
 
-  it("rejects a default calendar that does not belong to the user", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.calendar.findFirst.mockResolvedValue(null);
+  it("rejects a default calendar that does not belong to the user", async () => {    mockPrisma.calendar.findFirst.mockResolvedValue(null);
 
     const response = await createApp().handle(
       new Request("http://localhost/settings/", {
@@ -217,9 +188,7 @@ describe("settingsRoutes", () => {
     );
   });
 
-  it("rejects a non-owned default calendar", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.calendar.findFirst.mockResolvedValue({
+  it("rejects a non-owned default calendar", async () => {    mockPrisma.calendar.findFirst.mockResolvedValue({
       id: "calendar-1",
       kind: "subscribed",
     });
@@ -246,9 +215,7 @@ describe("settingsRoutes", () => {
       userId: "user-1",
       timezone: "UTC",
       defaultCalendarId: "calendar-1",
-    };
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.calendar.findFirst.mockResolvedValue({
+    };    mockPrisma.calendar.findFirst.mockResolvedValue({
       id: "calendar-1",
       kind: "owned",
     });
@@ -290,9 +257,7 @@ describe("settingsRoutes", () => {
       userId: "user-1",
       timezone: "UTC",
       eventEncryptionMode: "full",
-    };
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.calendar.findMany.mockResolvedValue([
+    };    mockPrisma.calendar.findMany.mockResolvedValue([
       { id: "calendar-1" },
       { id: "calendar-2" },
     ]);
@@ -335,9 +300,7 @@ describe("settingsRoutes", () => {
     await expect(readJson(response)).resolves.toEqual(savedSettings);
   });
 
-  it("deletes a user's settings on reset", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.userSettings.deleteMany.mockResolvedValue({ count: 1 });
+  it("deletes a user's settings on reset", async () => {    mockPrisma.userSettings.deleteMany.mockResolvedValue({ count: 1 });
 
     const response = await createApp().handle(
       new Request("http://localhost/settings/", {

@@ -24,7 +24,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import type { Calendar } from "@workspace/calendar-core";
-import { getErrorMessage } from "@workspace/calendar-core";
+import { getErrorMessage, resolveTimezone } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
 import { useAuth } from "../providers/AuthProvider";
@@ -92,6 +92,13 @@ export function AppSidebar() {
     staleTime: Infinity,
     placeholderData: keepPreviousData,
   });
+
+  const { data: settings } = useQuery({
+    queryKey: QUERY_KEYS.settings(),
+    queryFn: () => calendarApiService.getUserSettings(),
+    enabled: isAuthenticated,
+  });
+  const resolvedTimezone = resolveTimezone(settings?.timezone);
 
   const calendarSections = useMemo(
     () => buildSidebarCalendarSections(calendars, theme),
@@ -431,6 +438,7 @@ export function AppSidebar() {
                   weekStartDay={1}
                   selectedDate={selectedDate}
                   onDayPress={handleSelectCalendarDate}
+                  timezone={resolvedTimezone}
                 />
               </View>
 

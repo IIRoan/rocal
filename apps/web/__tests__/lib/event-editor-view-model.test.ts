@@ -70,23 +70,20 @@ describe("event-editor-view-model", () => {
 
   it("formats dates, reminders, and enabled reminder lists consistently", () => {
     expect(
-      getEventDateDisplay(
-        new Date("2026-04-24T10:00:00.000Z"),
-        new Date("2026-04-24T12:00:00.000Z"),
-      ),
+      getEventDateDisplay(new Date(2026, 3, 24), new Date(2026, 3, 24)),
     ).toEqual({
       isSameDay: true,
       label: "Friday, April 24, 2026",
+      startLabel: "Fri, Apr 24",
+      endLabel: "Fri, Apr 24",
     });
 
     expect(
-      getEventDateDisplay(
-        new Date("2026-04-24T10:00:00.000Z"),
-        new Date("2026-04-25T12:00:00.000Z"),
-      ),
+      getEventDateDisplay(new Date(2026, 3, 24), new Date(2026, 3, 25)),
     ).toEqual({
       endLabel: "Sat, Apr 25, 2026",
       isSameDay: false,
+      label: "Friday, April 24, 2026",
       startLabel: "Fri, Apr 24",
     });
 

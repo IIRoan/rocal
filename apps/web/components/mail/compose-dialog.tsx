@@ -33,12 +33,15 @@ import { useIsMobile } from "@workspace/ui/hooks";
 import type { JmapIdentity } from "@/lib/mail/types";
 import {
   validateComposeRecipients,
+  pickOutgoingAttachmentFiles,
 } from "@workspace/calendar-core";
 import { RichTextEditor } from "./rich-text-editor";
+import { RecipientSuggestInput } from "./recipient-suggest-input";
 import {
   appendHtmlSignature,
   appendPlainTextSignature,
 } from "@/lib/mail/signature-utils";
+import { toast } from "sonner";
 
 export interface ComposeDialogProps {
   identities: JmapIdentity[];
@@ -109,6 +112,7 @@ export function ComposeForm({
     setComposeHtmlBody,
     composeAttachments,
     setComposeAttachments,
+    mailServerLimits,
     selectedIdentityId,
     setSelectedIdentityId,
     draftSaveStatus,
@@ -151,9 +155,15 @@ export function ComposeForm({
     !recipientValidation.errors.subject;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (files.length > 0) {
-      setComposeAttachments((prev) => [...prev, ...files]);
+    const accepted = pickOutgoingAttachmentFiles(
+      Array.from(e.target.files ?? []),
+      {
+        maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
+        onReject: (error) => toast.error(error),
+      },
+    );
+    if (accepted.length > 0) {
+      setComposeAttachments((prev) => [...prev, ...accepted]);
     }
     e.target.value = "";
   };
@@ -281,15 +291,12 @@ export function ComposeForm({
         >
           To
         </span>
-        <input
-          type="text"
+        <RecipientSuggestInput
           value={composeTo}
-          onChange={(e) => setComposeTo(e.target.value)}
+          onChange={setComposeTo}
           onBlur={() => setToTouched(true)}
           placeholder="recipient@example.com"
           disabled={isBusy}
-          autoComplete="off"
-          className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40"
         />
         <div className="flex items-center gap-1 shrink-0">
           {!showCc && (
@@ -326,14 +333,11 @@ export function ComposeForm({
           >
             CC
           </span>
-          <input
-            type="text"
+          <RecipientSuggestInput
             value={composeCc}
-            onChange={(e) => setComposeCc(e.target.value)}
+            onChange={setComposeCc}
             placeholder="cc@example.com"
             disabled={isBusy}
-            autoComplete="off"
-            className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40"
           />
           <button
             type="button"
@@ -361,14 +365,11 @@ export function ComposeForm({
           >
             BCC
           </span>
-          <input
-            type="text"
+          <RecipientSuggestInput
             value={composeBcc}
-            onChange={(e) => setComposeBcc(e.target.value)}
+            onChange={setComposeBcc}
             placeholder="bcc@example.com"
             disabled={isBusy}
-            autoComplete="off"
-            className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40"
           />
           <button
             type="button"

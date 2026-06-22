@@ -4,14 +4,13 @@ export const MAILBOX_MESSAGES_PAGE_SIZE = 50;
 export function hasMoreMailboxMessages(
   loadedCount: number,
   totalCount: number,
+  pageSize: number = MAILBOX_MESSAGES_PAGE_SIZE,
 ): boolean {
   if (totalCount > 0) {
     return loadedCount < totalCount;
   }
 
-  return (
-    loadedCount > 0 && loadedCount % MAILBOX_MESSAGES_PAGE_SIZE === 0
-  );
+  return loadedCount > 0 && loadedCount % pageSize === 0;
 }
 
 /** Append the next mailbox page without duplicate ids. */

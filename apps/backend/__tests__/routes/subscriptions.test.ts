@@ -53,36 +53,26 @@ jest.mock("../../lib/prisma", () => ({
   },
 }));
 
-jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(
-    async (): Promise<any> => ({
-      id: "user-1",
-    }),
-  ),
-}));
-
 jest.mock("../../lib/auth", () => ({
   auth: { api: { getSession: jest.fn() } },
 }));
 
 jest.mock("../../lib/auth-guard", () => {
-  const { Elysia: LocalElysia } =
-    jest.requireActual<typeof import("elysia")>("elysia");
+  const { createMockRequireAuth } =
+    jest.requireActual<typeof import("../helpers/mock-require-auth")>(
+      "../helpers/mock-require-auth",
+    );
   return {
-    requireAuth: new LocalElysia({ name: "require-auth-test" }),
+    requireAuth: createMockRequireAuth(),
   };
 });
 
 import { errorHandler } from "../../lib/errors";
-import { ensureAuthenticatedUser } from "../../lib/auth-utils";
 import { prisma } from "../../lib/prisma";
 import { subscriptionsRoute } from "../../routes/subscriptions";
 import { ALLOWED_CALENDAR_COLORS } from "../../lib/colors";
+import { expectValidationError } from "../helpers/validation-assertions";
 
-const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<
-    typeof ensureAuthenticatedUser
-  >;
 const mockPrisma = prisma as unknown as {
   calendarSubscription: {
     findMany: jest.Mock<() => Promise<any>>;
@@ -134,9 +124,7 @@ describe("subscriptionsRoute – color validation", () => {
     },
   };
 
-  beforeEach(() => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-  });
+  beforeEach(() => {  });
 
   describe("PUT /subscriptions/:id – update", () => {
     it.each(ALLOWED_CALENDAR_COLORS)(
@@ -253,9 +241,8 @@ describe("subscriptionsRoute – color validation", () => {
           }),
         );
 
-        expect(response.status).toBe(500);
-        const text = await readText(response);
-        expect(text).toContain("Color must be one of:");
+        expect(response.status).toBe(422);
+        await expectValidationError(response, "Color must be one of:");
         expect(mockTransaction).not.toHaveBeenCalled();
       },
     );

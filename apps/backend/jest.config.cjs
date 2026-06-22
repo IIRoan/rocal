@@ -27,12 +27,12 @@ module.exports = {
     },
   },
   transform: {
-    "^.+\\.(js|jsx|ts|tsx)$": [
+    "^.+\\.(js|jsx|ts|tsx|mjs)$": [
       "babel-jest",
       { configFile: require.resolve("../../babel.config.cts") },
     ],
   },
-  moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
+  moduleFileExtensions: ["ts", "tsx", "js", "jsx", "mjs", "json", "node"],
   moduleNameMapper: {
     "^@workspace/calendar-ics$":
       "<rootDir>/../../packages/calendar-ics/src/index.ts",

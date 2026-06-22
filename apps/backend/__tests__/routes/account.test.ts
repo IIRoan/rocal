@@ -24,37 +24,26 @@ jest.mock("../../lib/prisma", () => ({
   },
 }));
 
-jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(
-    async (): Promise<any> => ({
-      id: "user-1",
-    }),
-  ),
-}));
-
 jest.mock("../../lib/auth", () => ({
   auth: { api: { getSession: jest.fn() } },
 }));
 
 jest.mock("../../lib/auth-guard", () => {
-  const { Elysia: LocalElysia } =
-    jest.requireActual<typeof import("elysia")>("elysia");
+  const { createMockRequireAuth } =
+    jest.requireActual<typeof import("../helpers/mock-require-auth")>(
+      "../helpers/mock-require-auth",
+    );
   return {
-    requireAuth: new LocalElysia({ name: "require-auth-test" }),
+    requireAuth: createMockRequireAuth(),
   };
 });
 
-import { ensureAuthenticatedUser } from "../../lib/auth-utils";
 import { auth } from "../../lib/auth";
 import { errorHandler } from "../../lib/errors";
 import { prisma } from "../../lib/prisma";
 import { accountPublicRoutes } from "../../routes/account-public";
 import { accountRoutes } from "../../routes/account";
 
-const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<
-    typeof ensureAuthenticatedUser
-  >;
 const mockGetSession = jest.mocked(auth.api.getSession);
 const mockPrisma = prisma as unknown as {
   user: {
@@ -132,10 +121,7 @@ describe("accountRoutes", () => {
     });
   });
 
-  it("deletes the authenticated account", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-
-    const response = await createApp().handle(
+  it("deletes the authenticated account", async () => {    const response = await createApp().handle(
       new Request("http://localhost/account/", {
         method: "DELETE",
       }),

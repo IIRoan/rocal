@@ -1,27 +1,40 @@
+import { z } from "zod";
+import {
+  defaultViewSchema,
+  eventEncryptionModeSchema,
+  themeSchema,
+  timeFormatSchema,
+  timezoneSchema,
+} from "@workspace/calendar-core";
 import type { UserSettings as PrismaUserSettings } from "../generated/prisma/index.js";
+import { strictZodObject } from "../lib/validation";
+import { userIdField } from "./_zod";
+
+export const updateSettingsBodySchema = strictZodObject({
+  theme: themeSchema.optional(),
+  defaultView: defaultViewSchema.optional(),
+  weekStartDay: z.number().int().min(0).max(6).optional(),
+  timezone: timezoneSchema.optional(),
+  timeFormat: timeFormatSchema.optional(),
+  workingHoursStart: z.number().int().min(0).max(1440).optional(),
+  workingHoursEnd: z.number().int().min(0).max(1440).optional(),
+  workingDays: z.string().optional(),
+  emailNotifications: z.boolean().optional(),
+  browserNotifications: z.boolean().optional(),
+  reminderSound: z.boolean().optional(),
+  eventEncryptionMode: eventEncryptionModeSchema.optional(),
+  defaultEventDuration: z.number().int().min(1).optional(),
+  defaultCalendarId: z.union([z.string(), z.null()]).optional(),
+  compactView: z.boolean().optional(),
+  showWeekNumbers: z.boolean().optional(),
+  showDeclinedEvents: z.boolean().optional(),
+});
+
+export const settingsUpdateInputSchema =
+  updateSettingsBodySchema.extend(userIdField);
 
 export type PublicUserSettings = Omit<PrismaUserSettings, "defaultReminder">;
-
-export type SettingsUpdateInput = {
-  userId: string;
-  theme?: "light" | "dark" | "system";
-  defaultView?: "month" | "week" | "day" | "agenda";
-  weekStartDay?: number;
-  timezone?: string;
-  timeFormat?: "12h" | "24h";
-  workingHoursStart?: number;
-  workingHoursEnd?: number;
-  workingDays?: string;
-  emailNotifications?: boolean;
-  browserNotifications?: boolean;
-  reminderSound?: boolean;
-  eventEncryptionMode?: "hybrid" | "full";
-  defaultEventDuration?: number;
-  defaultCalendarId?: string | null;
-  compactView?: boolean;
-  showWeekNumbers?: boolean;
-  showDeclinedEvents?: boolean;
-};
+export type SettingsUpdateInput = z.infer<typeof settingsUpdateInputSchema>;
 
 export interface ISettingsService {
   get(userId: string): Promise<PublicUserSettings>;

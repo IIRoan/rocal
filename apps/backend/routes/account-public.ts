@@ -1,27 +1,21 @@
-import { Elysia, t } from "elysia";
+import { Elysia } from "elysia";
 import { auth } from "../lib/auth";
 import { env } from "../lib/env";
 import { getPasskeyStepUpStatus } from "../lib/passkey-step-up";
 import { prisma } from "../lib/prisma";
-import { strictObject } from "../lib/validation";
 import { AccountService } from "../services/account.service";
 import { inviteService } from "../lib/invite-service";
+import { RouteModel, routeModels } from "../contracts";
 
 const accountService = new AccountService(prisma, {
   defaultEmailDomain: env.stalwartDefaultDomain,
-});
-
-const emailAvailabilityQuerySchema = strictObject({
-  email: t.String({
-    minLength: 1,
-    maxLength: 320,
-  }),
 });
 
 export const accountPublicRoutes = new Elysia({
   prefix: "/account",
   normalize: false,
 })
+  .use(routeModels)
   .get("/signup-config", () => accountService.getSignupConfig(), {
     detail: {
       tags: ["Account"],
@@ -34,7 +28,7 @@ export const accountPublicRoutes = new Elysia({
     "/email-availability",
     async ({ query }) => accountService.checkEmailAvailability(query),
     {
-      query: emailAvailabilityQuerySchema,
+      query: RouteModel.account.emailAvailabilityQuery,
       detail: {
         tags: ["Account"],
         summary: "Check whether a Solace email address can be used for sign-up",
@@ -85,9 +79,7 @@ export const accountPublicRoutes = new Elysia({
     async ({ query }) =>
       inviteService.validateInviteToken({ token: query.token }),
     {
-      query: strictObject({
-        token: t.String({ minLength: 1, maxLength: 500 }),
-      }),
+      query: RouteModel.invite.tokenQuery,
       detail: {
         tags: ["Account"],
         summary: "Validate an invite token",
@@ -103,10 +95,7 @@ export const accountPublicRoutes = new Elysia({
         chosenEmail: body.chosenEmail,
       }),
     {
-      body: strictObject({
-        token: t.String({ minLength: 1, maxLength: 500 }),
-        chosenEmail: t.String({ minLength: 1, maxLength: 320 }),
-      }),
+      body: RouteModel.invite.claimBody,
       detail: {
         tags: ["Account"],
         summary: "Claim an invite token",

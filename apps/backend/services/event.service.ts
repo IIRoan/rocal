@@ -1,7 +1,9 @@
 import type { PrismaClient } from "../generated/prisma/index.js";
-import type {
-  EventParticipantInput,
-  EventParticipantStatus,
+import {
+  resolveTimezone,
+  type EventParticipantInput,
+  type EventParticipantStatus,
+  type OperationWarning,
 } from "@workspace/calendar-core";
 import type {
   IEventService,
@@ -14,8 +16,11 @@ import type {
   EventDeleteResult,
   EventBulkResult,
   EventIcsExportResult,
+  EventMutationResult,
 } from "../contracts/event.contract";
-import { ValidationError, errorString} from "../lib/errors";
+import { ValidationError } from "../lib/errors";
+import { reminderScheduleWarning } from "../lib/email-delivery";
+import { errorLogDetails } from "../lib/log-sanitization";
 import {
   assertCalendarWritable,
   findUserCalendarOrThrow,
@@ -101,7 +106,7 @@ export class EventService implements IEventService {
       select: { timezone: true },
     });
 
-    return userSettings?.timezone || "UTC";
+    return resolveTimezone(userSettings?.timezone);
   }
 
   private async getStalwartAccountId(userId: string): Promise<string | null> {
@@ -190,7 +195,9 @@ export class EventService implements IEventService {
     }
 
     const syncPromise = this.syncStalwartEvents(input)
-      .catch(logger.error)
+      .catch((error) => {
+        logger.error("Stalwart list sync failed", errorLogDetails(error));
+      })
       .finally(() => {
         this.stalwartListSyncInFlight.delete(input.userId);
       });
@@ -866,8 +873,8 @@ export class EventService implements IEventService {
         }
       } catch (error) {
         logger.error(
-          `Error generating instances for event ${recurringEvent.id}:`,
-          error,
+          `Error generating instances for event ${recurringEvent.id}`,
+          errorLogDetails(error),
         );
         if (
           recurringEvent.start >= startDate &&
@@ -992,7 +999,7 @@ export class EventService implements IEventService {
         participants: mapAndSortParticipants(event),
       };
     } catch (error) {
-      logger.error("Event fetch error:", error);
+      logger.error("Event fetch error", errorLogDetails(error));
       throw error;
     }
   }
@@ -1195,7 +1202,7 @@ export class EventService implements IEventService {
       start: event.start,
       end: event.end,
       allDay: event.allDay,
-      timezone: event.timezone || "UTC",
+      timezone: resolveTimezone(event.timezone),
       location: event.location,
       recurrence: event.recurrence,
       reminder: event.reminder,
@@ -1246,7 +1253,7 @@ export class EventService implements IEventService {
           logger.warn("Failed to clean up temporary decline event in Stalwart", {
             userId: input.userId,
             remoteEventId: remoteEvent.id,
-            error: errorString(error),
+            ...errorLogDetails(error),
           });
         }
       } else {
@@ -1322,7 +1329,7 @@ export class EventService implements IEventService {
     };
   }
 
-  async create(input: EventCreateInput): Promise<unknown> {
+  async create(input: EventCreateInput): Promise<EventMutationResult> {
     try {
       const {
         userId,
@@ -1410,7 +1417,7 @@ export class EventService implements IEventService {
             );
           }
         } catch (recurrenceError) {
-          logger.error("Recurrence validation error:", recurrenceError);
+          logger.error("Recurrence validation error", errorLogDetails(recurrenceError));
           throw new ValidationError(
             "Invalid recurrence rule format",
             "recurrence",
@@ -1468,7 +1475,7 @@ export class EventService implements IEventService {
           emailNotifications: true,
         },
       });
-      const eventTimezone = timezone?.trim() || userSettings?.timezone || "UTC";
+      const eventTimezone = resolveTimezone(timezone ?? userSettings?.timezone);
 
       const hasEncryptedPayload = this.hasEncryptedPayload(encryptedContent);
 
@@ -1569,8 +1576,8 @@ export class EventService implements IEventService {
           } catch (cleanupError) {
             logger.error("Failed to clean up remote event after local DB create failure", {
               stalwartEventId,
-              originalError: errorString(error),
-              cleanupError: errorString(cleanupError),
+              ...errorLogDetails(error),
+              cleanupError: errorLogDetails(cleanupError),
             });
           }
         }
@@ -1599,7 +1606,9 @@ export class EventService implements IEventService {
             updatedAt: event.updatedAt,
           }),
         });
-      await participantResult.sendPendingInvitations();
+      const invitationWarnings = await participantResult.sendPendingInvitations();
+
+      const warnings: OperationWarning[] = [...invitationWarnings];
 
       try {
         if (reminder && reminder > 0) {
@@ -1649,20 +1658,22 @@ export class EventService implements IEventService {
           }
         }
       } catch (notificationError) {
-        logger.error("Failed to create notifications:", notificationError);
+        logger.error("Failed to create notifications", errorLogDetails(notificationError));
+        warnings.push(reminderScheduleWarning("create"));
       }
 
       return {
         ...event,
         participants: participantResult.participants,
+        ...(warnings.length > 0 ? { warnings } : {}),
       };
     } catch (error) {
-      logger.error("Event creation error:", error);
+      logger.error("Event creation error", errorLogDetails(error));
       throw error;
     }
   }
 
-  async update(input: EventUpdateInput): Promise<unknown> {
+  async update(input: EventUpdateInput): Promise<EventMutationResult> {
     try {
       const { userId, eventId: requestedId } = input;
 
@@ -1828,7 +1839,7 @@ export class EventService implements IEventService {
       });
       const eventTimezone =
         input.timezone !== undefined
-          ? input.timezone?.trim() || userSettings?.timezone || "UTC"
+          ? resolveTimezone(input.timezone ?? userSettings?.timezone)
           : existingEvent.timezone;
 
       const existingHasEncryptedPayload = this.hasEncryptedPayload(
@@ -1934,7 +1945,7 @@ export class EventService implements IEventService {
               );
             }
           } catch (recurrenceError) {
-            logger.error("Recurrence validation error:", recurrenceError);
+            logger.error("Recurrence validation error", errorLogDetails(recurrenceError));
             throw new ValidationError(
               "Invalid recurrence rule format",
               "recurrence",
@@ -2038,6 +2049,8 @@ export class EventService implements IEventService {
         },
       });
 
+      let invitationWarnings: OperationWarning[] = [];
+
       if (input.participants !== undefined) {
         const participantResult =
           await this.eventParticipantService.syncParticipants({
@@ -2071,8 +2084,10 @@ export class EventService implements IEventService {
                 })
               : undefined,
           });
-        await participantResult.sendPendingInvitations();
+        invitationWarnings = await participantResult.sendPendingInvitations();
       }
+
+      const warnings: OperationWarning[] = [...invitationWarnings];
 
       // Update notifications if event time or reminder changed
       try {
@@ -2157,8 +2172,8 @@ export class EventService implements IEventService {
           logger.ok(`Updated notifications for event ${id}`);
         }
       } catch (notificationError) {
-        logger.error("Failed to update notifications:", notificationError);
-        // Notification failure shouldn't fail the event update
+        logger.error("Failed to update notifications", errorLogDetails(notificationError));
+        warnings.push(reminderScheduleWarning("update"));
       }
 
       const participantMap = await this.buildParticipantMap([updatedEvent.id]);
@@ -2166,9 +2181,10 @@ export class EventService implements IEventService {
       return {
         ...updatedEvent,
         participants: participantMap.get(updatedEvent.id) ?? [],
+        ...(warnings.length > 0 ? { warnings } : {}),
       };
     } catch (error: unknown) {
-      logger.error("Event update error:", error);
+      logger.error("Event update error", errorLogDetails(error));
 
       // Handle optimistic locking conflict
       if (
@@ -2277,7 +2293,7 @@ export class EventService implements IEventService {
         deletedEventId: id,
       };
     } catch (error) {
-      logger.error("Event deletion error:", error);
+      logger.error("Event deletion error", errorLogDetails(error));
       throw error;
     }
   }
@@ -2594,8 +2610,8 @@ export class EventService implements IEventService {
               }
             } catch (notificationError) {
               logger.error(
-                "Failed to create notifications for duplicated event:",
-                notificationError,
+                "Failed to create notifications for duplicated event",
+                errorLogDetails(notificationError),
               );
             }
 
@@ -2621,7 +2637,7 @@ export class EventService implements IEventService {
           );
       }
     } catch (error) {
-      logger.error("Bulk operation error:", error);
+      logger.error("Bulk operation error", errorLogDetails(error));
       throw error;
     }
   }
@@ -2698,7 +2714,7 @@ export class EventService implements IEventService {
     const icsContent = buildIcsEventFile({
       calendar: {
         name: event.calendar.name,
-        timezone: event.timezone || "UTC",
+        timezone: resolveTimezone(event.timezone),
       },
       event: exportedEvent,
     });

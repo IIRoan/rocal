@@ -1,11 +1,9 @@
-import { Elysia, t } from "elysia";
+import { Elysia } from "elysia";
 import { requireAuth } from "../lib/auth-guard";
-import type { AuthenticatedUser } from "../lib/auth-utils";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import { resolveRouteUser } from "../lib/request-user";
-import { strictObject } from "../lib/validation";
 import { prisma } from "../lib/prisma";
 import { SubscriptionService } from "../services/subscription.service";
+import { RouteModel, routeModels } from "../contracts";
 
 const subscriptionService = new SubscriptionService(prisma);
 
@@ -17,20 +15,14 @@ export async function syncCalendarSubscription(
 }
 
 export const subscriptionsRoute = new Elysia({ normalize: false })
+  .use(routeModels)
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Calendar Subscriptions"), (app) =>
     app
       .get(
         "/subscriptions",
-        async ({
-          authenticatedUser,
-          request,
-        }: {
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
-          return subscriptionService.list(user.id);
+        async ({ routeUser }) => {
+          return subscriptionService.list(routeUser.id);
         },
         {
           detail: {
@@ -43,42 +35,16 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
       .post(
         "/subscriptions",
-        async ({
-          body,
-          authenticatedUser,
-          request,
-        }: {
-          body: { name: string; url: string; color?: string };
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
+        async ({ body, routeUser }) => {
           return subscriptionService.create({
-            userId: user.id,
+            userId: routeUser.id,
             name: body.name,
             url: body.url,
             color: body.color,
           });
         },
         {
-          body: strictObject({
-            name: t.String({
-              description: "Display name for the synced calendar.",
-              examples: ["Team holidays", "Vendor schedule"],
-            }),
-            url: t.String({
-              format: "uri",
-              description: "Absolute URL to the remote ICS feed.",
-              examples: ["https://example.com/calendar.ics"],
-            }),
-            color: t.Optional(
-              t.String({
-                description:
-                  "Optional color applied to the generated sync-only calendar.",
-                examples: ["#7c3aed"],
-              }),
-            ),
-          }),
+          body: RouteModel.subscriptions.createBody,
           detail: {
             summary: "Subscribe to an external calendar",
             description:
@@ -89,25 +55,9 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
       .put(
         "/subscriptions/:id",
-        async ({
-          params,
-          body,
-          authenticatedUser,
-          request,
-        }: {
-          params: { id: string };
-          body: {
-            name?: string;
-            color?: string;
-            isActive?: boolean;
-            syncIntervalMinutes?: number;
-          };
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
+        async ({ params, body, routeUser }) => {
           return subscriptionService.update({
-            userId: user.id,
+            userId: routeUser.id,
             subscriptionId: params.id,
             name: body.name,
             color: body.color,
@@ -116,37 +66,8 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
           });
         },
         {
-          params: strictObject({
-            id: t.String({
-              description: "Subscription identifier.",
-            }),
-          }),
-          body: strictObject({
-            name: t.Optional(
-              t.String({
-                description: "Updated subscription display name.",
-              }),
-            ),
-            color: t.Optional(
-              t.String({
-                description: "Updated calendar color.",
-              }),
-            ),
-            isActive: t.Optional(
-              t.Boolean({
-                description:
-                  "Whether scheduled background sync should continue running for this subscription.",
-              }),
-            ),
-            syncIntervalMinutes: t.Optional(
-              t.Number({
-                minimum: 5,
-                maximum: 1440,
-                description:
-                  "Polling interval in minutes for automatic sync jobs.",
-              }),
-            ),
-          }),
+          params: RouteModel.subscriptions.idParams,
+          body: RouteModel.subscriptions.updateBody,
           detail: {
             summary: "Update calendar subscription",
             description:
@@ -157,35 +78,16 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
       .delete(
         "/subscriptions/:id",
-        async ({
-          params,
-          authenticatedUser,
-          request,
-        }: {
-          params: { id: string };
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
+        async ({ params, query, routeUser }) => {
           return subscriptionService.delete({
-            userId: user.id,
+            userId: routeUser.id,
             subscriptionId: params.id,
+            deleteEvents: query.deleteEvents ?? false,
           });
         },
         {
-          params: strictObject({
-            id: t.String({
-              description: "Subscription identifier.",
-            }),
-          }),
-          query: strictObject({
-            deleteEvents: t.Optional(
-              t.Boolean({
-                description:
-                  "When true, also remove events that were previously imported from the subscription.",
-              }),
-            ),
-          }),
+          params: RouteModel.subscriptions.idParams,
+          query: RouteModel.subscriptions.deleteQuery,
           detail: {
             summary: "Delete calendar subscription",
             description:
@@ -196,27 +98,14 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
       .post(
         "/subscriptions/:id/sync",
-        async ({
-          params,
-          authenticatedUser,
-          request,
-        }: {
-          params: { id: string };
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
+        async ({ params, routeUser }) => {
           return subscriptionService.sync({
-            userId: user.id,
+            userId: routeUser.id,
             subscriptionId: params.id,
           });
         },
         {
-          params: strictObject({
-            id: t.String({
-              description: "Subscription identifier.",
-            }),
-          }),
+          params: RouteModel.subscriptions.idParams,
           detail: {
             summary: "Manually trigger subscription sync",
             description:
@@ -227,40 +116,16 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
       .post(
         "/subscriptions/import-ics",
-        async ({
-          body,
-          authenticatedUser,
-          request,
-        }: {
-          body: { calendarId: string; icsContent: string; fileName?: string };
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
+        async ({ body, routeUser }) => {
           return subscriptionService.importIcs({
-            userId: user.id,
+            userId: routeUser.id,
             calendarId: body.calendarId,
             icsContent: body.icsContent,
             fileName: body.fileName,
           });
         },
         {
-          body: strictObject({
-            calendarId: t.String({
-              description:
-                "Destination calendar that should receive the imported events.",
-            }),
-            icsContent: t.String({
-              description: "Raw ICS file contents.",
-            }),
-            fileName: t.Optional(
-              t.String({
-                description:
-                  "Optional original filename used for diagnostics or import summaries.",
-                examples: ["conference-schedule.ics"],
-              }),
-            ),
-          }),
+          body: RouteModel.subscriptions.importIcsBody,
           detail: {
             summary: "Import ICS file manually",
             description:

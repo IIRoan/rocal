@@ -1,21 +1,13 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { Elysia } from "elysia";
 
-jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(
-    async (): Promise<any> => ({
-      id: "user-1",
-      email: "alice@solace.onl",
-      name: "Alice Example",
-    }),
-  ),
-}));
-
 jest.mock("../../lib/auth-guard", () => {
-  const { Elysia: LocalElysia } =
-    jest.requireActual<typeof import("elysia")>("elysia");
+  const { createMockRequireAuth } =
+    jest.requireActual<typeof import("../helpers/mock-require-auth")>(
+      "../helpers/mock-require-auth",
+    );
   return {
-    requireAuth: new LocalElysia({ name: "require-auth-mail-sync-test" }),
+    requireAuth: createMockRequireAuth(),
   };
 });
 

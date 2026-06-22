@@ -26,12 +26,17 @@ import type {
 import {
   canCurrentUserDeleteEvent,
   getErrorMessage,
+  resolveTimezone,
+  wallClockToUtc,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../providers/AuthProvider";
+import { useRecentContacts } from "../../hooks/use-recent-contacts";
+import { extractRecentContactEntries } from "../../lib/record-recent-contacts";
 import { useToast } from "../../providers/ToastProvider";
+import { toastOperationWarnings } from "../../lib/operation-warnings";
 import { calendarApiService } from "../../lib/api";
 import { QUERY_KEYS } from "../../lib/query-keys";
 import {
@@ -53,7 +58,7 @@ import {
 } from "../sheet";
 
 import { EventForm } from "./EventForm";
-import { toLocalISOString } from "./event-form-utils";
+import { toTimezonePickerISOString, parseCreateEventCalendarDay } from "./event-form-utils";
 import {
   formatEventDate,
   formatEventTime,
@@ -83,13 +88,15 @@ export interface EventSheetProps {
 
 function eventToInitialValues(
   event: CalendarEvent,
+  timezone?: string,
 ): Partial<CreateEventRequest> {
+  const resolvedTimezone = resolveTimezone(timezone ?? event.timezone);
   return {
     title: event.title,
     description: event.description ?? undefined,
-    start: toLocalISOString(new Date(event.start)),
-    end: toLocalISOString(new Date(event.end)),
-    timezone: event.timezone ?? undefined,
+    start: toTimezonePickerISOString(new Date(event.start), resolvedTimezone),
+    end: toTimezonePickerISOString(new Date(event.end), resolvedTimezone),
+    timezone: resolvedTimezone,
     allDay: event.allDay ?? false,
     location: event.location ?? undefined,
     color: event.color ?? undefined,
@@ -177,6 +184,7 @@ export function EventSheet({
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { recordUsage } = useRecentContacts();
   const { toast } = useToast();
   const bottomSheetRef = useRef<BottomSheetHandle>(null);
   const createSnapshotRef = useRef<CacheSnapshot>([]);
@@ -260,6 +268,12 @@ export function EventSheet({
     queryFn: () => calendarApiService.getCalendars(),
     enabled: visible,
   });
+  const { data: settings } = useQuery({
+    queryKey: QUERY_KEYS.settings(),
+    queryFn: () => calendarApiService.getUserSettings(),
+    enabled: visible,
+  });
+  const resolvedTimezone = resolveTimezone(settings?.timezone);
 
   // ─── Mutations ─────────────────────────────────────────────────────────
 
@@ -281,9 +295,17 @@ export function EventSheet({
       dismissSheet();
       return { tempId };
     },
-    onSuccess: () => {
+    onSuccess: (savedEvent, variables) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      const entries = extractRecentContactEntries(
+        variables.participants,
+        user?.email,
+      );
+      if (entries.length > 0) {
+        recordUsage(entries, "calendar");
+      }
       toast("Event created");
+      toastOperationWarnings(toast, savedEvent);
     },
     onError: (err: unknown) => {
       rollbackFromSnapshot(queryClient, createSnapshotRef.current);
@@ -302,15 +324,23 @@ export function EventSheet({
       }
       return calendarApiService.updateEvent(eventId!, data);
     },
-    onSuccess: () => {
+    onSuccess: (savedEvent, variables) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       if (eventId) {
         queryClient.invalidateQueries({
           queryKey: QUERY_KEYS.eventDetail(eventId),
         });
       }
+      const entries = extractRecentContactEntries(
+        variables.participants,
+        user?.email,
+      );
+      if (entries.length > 0) {
+        recordUsage(entries, "calendar");
+      }
       setServerErrors([]);
       toast("Event updated");
+      toastOperationWarnings(toast, savedEvent);
       dismissSheet();
     },
     onError: (err: unknown) => {
@@ -436,22 +466,47 @@ export function EventSheet({
   // ─── Initial values ───────────────────────────────────────────────────
 
   const initialValues = useMemo(() => {
-    if (isViewOrEdit && event) return eventToInitialValues(event);
+    if (isViewOrEdit && event) {
+      return eventToInitialValues(event, resolvedTimezone);
+    }
     if (isCreate && mode?.type === "create" && mode.date) {
-      const startDate = new Date(mode.date);
-      if (isNaN(startDate.getTime())) return undefined;
+      const calendarDay = parseCreateEventCalendarDay(
+        mode.date,
+        resolvedTimezone,
+      );
+      if (!calendarDay) return undefined;
       if (mode.hour !== undefined) {
         const h = parseInt(mode.hour, 10);
-        if (!isNaN(h)) startDate.setHours(h, 0, 0, 0);
+        if (!isNaN(h)) {
+          const zonedStart = wallClockToUtc(
+            calendarDay,
+            h,
+            0,
+            resolvedTimezone,
+          );
+          const endDate = new Date(zonedStart.getTime() + 60 * 60 * 1000);
+          return {
+            start: toTimezonePickerISOString(zonedStart, resolvedTimezone),
+            end: toTimezonePickerISOString(endDate, resolvedTimezone),
+            timezone: resolvedTimezone,
+          } satisfies Partial<CreateEventRequest>;
+        }
       }
-      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+      const zonedStart = wallClockToUtc(
+        calendarDay,
+        0,
+        0,
+        resolvedTimezone,
+      );
+      const endDate = new Date(zonedStart.getTime() + 60 * 60 * 1000);
       return {
-        start: toLocalISOString(startDate),
-        end: toLocalISOString(endDate),
+        start: toTimezonePickerISOString(zonedStart, resolvedTimezone),
+        end: toTimezonePickerISOString(endDate, resolvedTimezone),
+        timezone: resolvedTimezone,
       } satisfies Partial<CreateEventRequest>;
     }
     return undefined;
-  }, [isCreate, isViewOrEdit, mode, event]);
+  }, [event, isCreate, isViewOrEdit, mode, resolvedTimezone]);
 
   // ─── Derived ───────────────────────────────────────────────────────────
 
@@ -508,10 +563,10 @@ export function EventSheet({
                   <IconBox name="clock" color={iconColor} bg={iconBg} />
                   <View style={styles.viewRowContent}>
                     <Text style={styles.viewText}>
-                      {formatEventDate(event)}
+                      {formatEventDate(event, resolvedTimezone)}
                     </Text>
                     <Text style={styles.viewSubtext}>
-                      {formatEventTime(event)}
+                      {formatEventTime(event, resolvedTimezone)}
                     </Text>
                   </View>
                 </View>
@@ -687,6 +742,7 @@ export function EventSheet({
               onSubmit={handleSubmit}
               onCancel={handleCancel}
               initialValues={initialValues}
+              timezone={resolvedTimezone}
             />
           </View>
         )}
