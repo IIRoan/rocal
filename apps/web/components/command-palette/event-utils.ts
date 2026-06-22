@@ -1,4 +1,9 @@
 import { isBefore } from "date-fns";
+import {
+  pickerDateAndTimeToUtc,
+  pickerDateToAllDayUtcRange,
+  resolveTimezone,
+} from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import type { EventNotification } from "@workspace/ui/components/calendar";
 
@@ -47,24 +52,28 @@ export const validateEventForm = (
   eventAllDay: boolean,
   eventStartTime: string,
   eventEndTime: string,
+  timezone?: string,
 ) => {
   if (!eventTitle.trim()) return "Title is required";
   if (!eventCalendarId) return "Please select a calendar";
 
-  const start = new Date(eventStartDate);
-  const end = new Date(eventEndDate);
+  const resolvedTimezone = resolveTimezone(timezone);
+  let start: Date;
+  let end: Date;
 
   if (!eventAllDay) {
-    const [startHours = 0, startMinutes = 0] = eventStartTime
-      .split(":")
-      .map(Number);
-    const [endHours = 0, endMinutes = 0] = eventEndTime.split(":").map(Number);
-
-    start.setHours(startHours, startMinutes, 0);
-    end.setHours(endHours, endMinutes, 0);
+    start = pickerDateAndTimeToUtc(
+      eventStartDate,
+      eventStartTime,
+      resolvedTimezone,
+    );
+    end = pickerDateAndTimeToUtc(eventEndDate, eventEndTime, resolvedTimezone);
   } else {
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
+    ({ start, end } = pickerDateToAllDayUtcRange(
+      eventStartDate,
+      eventEndDate,
+      resolvedTimezone,
+    ));
   }
 
   if (isBefore(end, start)) {

@@ -1,26 +1,28 @@
 "use client";
 
 import React, { useMemo, useEffect, useRef, useState } from "react";
-import { isCancelledCalendarEvent } from "@workspace/calendar-core";
+import {
+  formatInUserTimezone,
+  getWeekCalendarDays,
+  getZonedDateParts,
+  isCancelledCalendarEvent,
+  isTodayInTimezone,
+  resolveTimezone,
+  wallClockToUtc,
+} from "@workspace/calendar-core";
 import {
   addHours,
   areIntervalsOverlapping,
-  eachDayOfInterval,
   eachHourOfInterval,
-  endOfWeek,
   format,
   getHours,
-  getMinutes,
-  isSameDay,
-  isToday,
   startOfDay,
-  startOfWeek,
 } from "date-fns";
 
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventDots } from "./event-dots";
-import { isMultiDayEvent } from "./utils";
+import { getTimedTimelineEventsForDay } from "./utils";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
 import { cn } from "../../lib/utils";
@@ -61,12 +63,11 @@ export function MobileWeekView({
   const hasScrolledRef = useRef(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerEvents, setDrawerEvents] = useState<CalendarEvent[]>([]);
+  const resolvedTimezone = resolveTimezone(timezone);
 
   const days = useMemo(() => {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: weekStartDay });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: weekStartDay });
-    return eachDayOfInterval({ start: weekStart, end: weekEnd });
-  }, [currentDate, weekStartDay]);
+    return getWeekCalendarDays(currentDate, weekStartDay, resolvedTimezone);
+  }, [currentDate, resolvedTimezone, weekStartDay]);
 
   const hours = useMemo(() => {
     const dayStart = startOfDay(currentDate);
@@ -78,20 +79,12 @@ export function MobileWeekView({
 
   const processedDayEvents = useMemo(() => {
     return days.map((day) => {
-      const dayEvents = events.filter((event) => {
-        if (event.allDay || isMultiDayEvent(event)) return false;
-
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end);
-
-        const dayStart = startOfDay(day);
-        const dayEnd = addHours(dayStart, 24);
-        return (
-          isSameDay(day, eventStart) ||
-          isSameDay(day, eventEnd) ||
-          (eventStart < dayEnd && eventEnd > dayStart)
-        );
-      });
+      const dayEvents = getTimedTimelineEventsForDay(
+        events,
+        day,
+        resolvedTimezone,
+        { excludeMultiDay: true },
+      );
 
       dayEvents.sort((a, b) => {
         const aStart = new Date(a.start);
@@ -102,12 +95,13 @@ export function MobileWeekView({
       return layoutTimelineEvents(dayEvents, day, {
         cellHeight: MobileCellHeight,
         widthStrategy: "no-overflow",
+        timezone: resolvedTimezone,
       }).map((positionedEvent) => ({
         ...positionedEvent,
         dayIndex: 0,
       }));
     });
-  }, [days, events]);
+  }, [days, events, resolvedTimezone]);
 
   const handleEventClick = (
     event: CalendarEvent,
@@ -159,13 +153,12 @@ export function MobileWeekView({
   useEffect(() => {
     if (scrollContainerRef.current && !hasScrolledRef.current) {
       const now = new Date();
-      const currentHour = getHours(now);
-      const currentMinute = getMinutes(now);
+      const nowParts = getZonedDateParts(now, resolvedTimezone);
 
       let targetHour: number;
 
-      if (isSameDay(currentDate, now)) {
-        targetHour = currentHour + currentMinute / 60;
+      if (isTodayInTimezone(currentDate, resolvedTimezone)) {
+        targetHour = nowParts.hours + nowParts.minutes / 60;
       } else {
         targetHour = 9;
       }
@@ -177,7 +170,7 @@ export function MobileWeekView({
       });
       hasScrolledRef.current = true;
     }
-  }, [currentDate]);
+  }, [currentDate, resolvedTimezone]);
 
   useEffect(() => {
     hasScrolledRef.current = false;
@@ -211,7 +204,7 @@ export function MobileWeekView({
               key={day.toString()}
               className={cn(
                 "flex-1 min-w-0 relative border-r border-border/50 last:border-r-0",
-                isToday(day) && "bg-primary/5",
+                isTodayInTimezone(day, resolvedTimezone) && "bg-primary/5",
               )}
             >
               {/* Positioned events */}
@@ -249,7 +242,7 @@ export function MobileWeekView({
               )}
 
               {/* Current time indicator */}
-              {currentTimeVisible && isToday(day) && (
+              {currentTimeVisible && isTodayInTimezone(day, resolvedTimezone) && (
                 <CurrentTimeIndicator position={currentTimePosition} />
               )}
 
@@ -279,10 +272,14 @@ export function MobileWeekView({
                           )}
                           style={{ height: MobileCellHeight / 4 }}
                           onClick={() => {
-                            const startTime = new Date(day);
-                            startTime.setHours(hourValue);
-                            startTime.setMinutes(quarter * 15);
-                            onEventCreate(startTime);
+                            onEventCreate(
+                              wallClockToUtc(
+                                day,
+                                hourValue,
+                                quarter * 15,
+                                resolvedTimezone,
+                              ),
+                            );
                           }}
                         />
                       );
@@ -309,7 +306,11 @@ export function MobileWeekView({
                     </span>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {drawerEvents[0] &&
-                        format(new Date(drawerEvents[0].start), "EEEE, MMMM d")}
+                        formatInUserTimezone(
+                          new Date(drawerEvents[0].start),
+                          resolvedTimezone,
+                          "EEEE, MMMM d",
+                        )}
                     </p>
                   </div>
                 }

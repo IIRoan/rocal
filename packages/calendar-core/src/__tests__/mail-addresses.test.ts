@@ -4,6 +4,7 @@ import {
   normalizeEmailAddress,
   parseAddressList,
   parseRecipientString,
+  resolveReplyRecipients,
   validateComposeRecipients,
 } from "../mail-addresses";
 
@@ -55,5 +56,27 @@ describe("mail address parsing", () => {
       { name: "Friend", email: "friend@example.com" },
     ]);
     expect(result.cc).toEqual([{ email: "cc@solace.onl" }]);
+  });
+
+  it("prefers sender for standard replies", () => {
+    expect(
+      resolveReplyRecipients({
+        from: [{ email: "alice@solace.onl" }],
+        to: [{ email: "me@solace.onl" }],
+        cc: [{ email: "other@solace.onl" }],
+        currentUserEmail: "me@solace.onl",
+      }),
+    ).toEqual(["alice@solace.onl"]);
+  });
+
+  it("falls back to non-self recipients when replying to own last message", () => {
+    expect(
+      resolveReplyRecipients({
+        from: [{ email: "me@solace.onl" }],
+        to: [{ email: "alice@solace.onl" }],
+        cc: [{ email: "bob@solace.onl" }],
+        currentUserEmail: "me@solace.onl",
+      }),
+    ).toEqual(["alice@solace.onl", "bob@solace.onl"]);
   });
 });

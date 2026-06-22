@@ -31,6 +31,13 @@ import Animated, {
 import { addMonths, format, isSameDay, isSameMonth } from "date-fns";
 import { useTheme } from "../../providers/ThemeProvider";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import {
+  formatCalendarDayKey,
+  formatCalendarMonthKey,
+  formatInstantCalendarMonthKey,
+  isTodayInTimezone,
+  resolveTimezone,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import {
   MAX_DOTS,
@@ -91,11 +98,18 @@ function monthStart(date: Date): Date {
 function monthEventsByDay(
   events: DecoratedCalendarEvent[],
   monthDate: Date,
+  timezone?: string,
 ): Map<string, DecoratedCalendarEvent[]> {
+  const resolvedTimezone = timezone ? resolveTimezone(timezone) : null;
   const filtered = events.filter((event) =>
-    isSameMonth(new Date(event.start), monthDate),
+    resolvedTimezone
+      ? formatInstantCalendarMonthKey(
+          new Date(event.start),
+          resolvedTimezone,
+        ) === formatCalendarMonthKey(monthDate)
+      : isSameMonth(new Date(event.start), monthDate),
   );
-  return groupEventsByDay(filtered);
+  return groupEventsByDay(filtered, resolvedTimezone ?? undefined);
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -113,6 +127,7 @@ interface CompactMonthStripProps {
   events: DecoratedCalendarEvent[];
   /** Week start day: 0 = Sunday, 1 = Monday */
   weekStartDay: number;
+  timezone?: string;
   /** Whether the full month grid is expanded */
   expanded: boolean;
   /** Callback when a day is tapped */
@@ -206,6 +221,7 @@ interface MonthPageProps {
   onDayPress: (date: Date) => void;
   showSelectedDateHighlight: boolean;
   weekStartDay: number;
+  timezone: string;
 }
 
 const MonthPage = React.memo(function MonthPage({
@@ -224,6 +240,7 @@ const MonthPage = React.memo(function MonthPage({
   onDayPress,
   showSelectedDateHighlight,
   weekStartDay,
+  timezone,
 }: MonthPageProps) {
   const expandedWeekRowOffset = useMemo(
     () => getCompactStripWeekRowOffset(monthDate, weekStartDay),
@@ -270,17 +287,18 @@ const MonthPage = React.memo(function MonthPage({
       return (
         <View key={key} style={styles.weekRow}>
           {rowDates.map((date) => {
-            const dateKey = format(date, "yyyy-MM-dd");
+            const dateKey = formatCalendarDayKey(date);
             const isCurrentMonth = isSameMonth(date, monthDate);
-            const isToday = isCurrentMonth && isSameDay(date, today);
+            const isToday = isCurrentMonth && isTodayInTimezone(date, timezone);
             const isSelected =
               isCurrentMonth &&
               selectedDate != null &&
-              isSameDay(date, selectedDate);
+              formatCalendarDayKey(date) === formatCalendarDayKey(selectedDate);
             const isHighlighted =
               isCurrentMonth &&
               (highlightedDates?.some((highlightedDate) =>
-                isSameDay(date, highlightedDate),
+                formatCalendarDayKey(date) ===
+                formatCalendarDayKey(highlightedDate),
               ) ??
                 false);
             const dayEvents = getMonthDayEvents(
@@ -355,6 +373,7 @@ const MonthPage = React.memo(function MonthPage({
       styles,
       theme,
       today,
+      timezone,
     ],
   );
 
@@ -383,6 +402,7 @@ function CompactMonthStripComponent({
   collapsedRowDates,
   events,
   weekStartDay,
+  timezone,
   expanded,
   onDayPress,
   onMonthChange,
@@ -403,6 +423,7 @@ function CompactMonthStripComponent({
   );
   const dayHeaderHeight = showDayOfWeekHeader ? HEADER_ROW_HEIGHT : 0;
   const today = useCurrentDateTime();
+  const resolvedTimezone = resolveTimezone(timezone);
 
   const dayLabels = useMemo(
     () => getOrderedDayLabels(weekStartDay),
@@ -410,7 +431,7 @@ function CompactMonthStripComponent({
   );
   const [pagedMonth, setPagedMonth] = useState(() => monthStart(currentDate));
   const carouselMonth = swipeEnabled ? pagedMonth : currentDate;
-  const parentMonthKey = format(currentDate, "yyyy-MM");
+  const parentMonthKey = formatCalendarMonthKey(currentDate);
   const skipParentMonthSyncRef = useRef(false);
   const pendingMonthCommitRef = useRef<1 | -1 | null>(null);
 
@@ -430,10 +451,10 @@ function CompactMonthStripComponent({
     if (!swipeEnabled) {
       return [
         {
-          key: format(currentDate, "yyyy-MM"),
+          key: formatCalendarMonthKey(currentDate),
           monthDate: currentDate,
           gridDates: generateGridDates(currentDate, weekStartDay),
-          eventsByDay: monthEventsByDay(events, currentDate),
+          eventsByDay: monthEventsByDay(events, currentDate, resolvedTimezone),
         },
       ];
     }
@@ -444,10 +465,17 @@ function CompactMonthStripComponent({
         key: String(offset),
         monthDate,
         gridDates: generateGridDates(monthDate, weekStartDay),
-        eventsByDay: monthEventsByDay(events, monthDate),
+        eventsByDay: monthEventsByDay(events, monthDate, resolvedTimezone),
       };
     });
-  }, [carouselMonth, currentDate, events, swipeEnabled, weekStartDay]);
+  }, [
+    carouselMonth,
+    currentDate,
+    events,
+    resolvedTimezone,
+    swipeEnabled,
+    weekStartDay,
+  ]);
 
   // ─── Animated height for expand/collapse ─────────────────────────────────
 
@@ -537,7 +565,7 @@ function CompactMonthStripComponent({
   const translateX = useSharedValue(-1);
 
   const carouselCenterKey = swipeEnabled
-    ? format(pagedMonth, "yyyy-MM")
+    ? formatCalendarMonthKey(pagedMonth)
     : parentMonthKey;
 
   useLayoutEffect(() => {
@@ -780,6 +808,7 @@ function CompactMonthStripComponent({
                       onDayPress={onDayPress}
                       showSelectedDateHighlight={showSelectedDateHighlight}
                       weekStartDay={weekStartDay}
+                      timezone={resolvedTimezone}
                     />
                   </View>
                 ))}
@@ -803,6 +832,7 @@ function CompactMonthStripComponent({
                 onDayPress={onDayPress}
                 showSelectedDateHighlight={showSelectedDateHighlight}
                 weekStartDay={weekStartDay}
+                timezone={resolvedTimezone}
               />
             </View>
           )}

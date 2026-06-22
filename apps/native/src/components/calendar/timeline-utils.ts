@@ -7,6 +7,17 @@ import {
   startOfDay,
 } from "date-fns";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import {
+  eventOverlapsZonedCalendarDay,
+  formatCalendarDayKey,
+  formatInstantCalendarDayKey,
+  getZonedDateParts,
+  getZonedDayUtcBounds,
+  getWeekCalendarDays,
+  isSameCalendarDayInTimezone,
+  isTodayInTimezone,
+  resolveTimezone,
+} from "@workspace/calendar-core";
 import type { CalendarColor, ThemeTokens } from "@workspace/design-tokens";
 import { KNOWN_CALENDAR_COLORS } from "./month-grid-utils";
 
@@ -36,7 +47,15 @@ export interface ResolvedEventColor {
  * Returns an array of 7 dates for the week containing `currentDate`,
  * starting from the configured `weekStartDay`.
  */
-export function getWeekDates(currentDate: Date, weekStartDay: number): Date[] {
+export function getWeekDates(
+  currentDate: Date,
+  weekStartDay: number,
+  timezone?: string,
+): Date[] {
+  if (timezone) {
+    return getWeekCalendarDays(currentDate, weekStartDay, resolveTimezone(timezone));
+  }
+
   const weekStartsOn = (((weekStartDay % 7) + 7) % 7) as Day;
   const weekStart = startOfWeek(currentDate, { weekStartsOn });
   const dates: Date[] = [];
@@ -53,12 +72,22 @@ export function getWeekDates(currentDate: Date, weekStartDay: number): Date[] {
 export function calculateEventPosition(
   event: DecoratedCalendarEvent,
   hourHeight: number,
+  timezone?: string,
 ): EventPosition {
   const start = new Date(event.start);
   const end = new Date(event.end);
+  const resolvedTimezone = timezone ? resolveTimezone(timezone) : null;
+  const startParts = resolvedTimezone
+    ? getZonedDateParts(start, resolvedTimezone)
+    : null;
+  const endParts = resolvedTimezone ? getZonedDateParts(end, resolvedTimezone) : null;
 
-  const startMinutes = start.getHours() * 60 + start.getMinutes();
-  const endMinutes = end.getHours() * 60 + end.getMinutes();
+  const startMinutes = startParts
+    ? startParts.hours * 60 + startParts.minutes
+    : start.getHours() * 60 + start.getMinutes();
+  const endMinutes = endParts
+    ? endParts.hours * 60 + endParts.minutes
+    : end.getHours() * 60 + end.getMinutes();
 
   // If end is midnight (0:00) or earlier than start (spans midnight),
   // clamp to end of day
@@ -115,10 +144,14 @@ export function resolveEventBlockColor(
  */
 export function groupEventsByDate(
   events: DecoratedCalendarEvent[],
+  timezone?: string,
 ): Map<string, DecoratedCalendarEvent[]> {
+  const resolvedTimezone = timezone ? resolveTimezone(timezone) : null;
   const map = new Map<string, DecoratedCalendarEvent[]>();
   for (const event of events) {
-    const key = format(new Date(event.start), "yyyy-MM-dd");
+    const key = resolvedTimezone
+      ? formatInstantCalendarDayKey(new Date(event.start), resolvedTimezone)
+      : formatCalendarDayKey(new Date(event.start));
     const list = map.get(key);
     if (list) {
       list.push(event);
@@ -135,8 +168,9 @@ export function groupEventsByDate(
 export function getEventsForDate(
   date: Date,
   eventsByDate: Map<string, DecoratedCalendarEvent[]>,
+  timezone?: string,
 ): DecoratedCalendarEvent[] {
-  const key = format(date, "yyyy-MM-dd");
+  const key = formatCalendarDayKey(date);
   return eventsByDate.get(key) ?? [];
 }
 
@@ -150,7 +184,11 @@ export function formatDayHeader(date: Date): string {
 /**
  * Check if a date is today.
  */
-export function isToday(date: Date): boolean {
+export function isToday(date: Date, timezone?: string): boolean {
+  if (timezone) {
+    return isTodayInTimezone(date, resolveTimezone(timezone));
+  }
+
   return isSameDay(date, new Date());
 }
 
@@ -173,17 +211,33 @@ export function getThreeDayStripDates(currentDate: Date): Date[] {
 
 export function isAllDayOrMultiDayEvent(
   event: DecoratedCalendarEvent,
+  timezone?: string,
 ): boolean {
   const eventStart = new Date(event.start);
   const eventEnd = new Date(event.end);
 
-  return Boolean(event.allDay) || !isSameDay(eventStart, eventEnd);
+  return (
+    Boolean(event.allDay) ||
+    (timezone
+      ? !isSameCalendarDayInTimezone(eventEnd, eventStart, resolveTimezone(timezone))
+      : !isSameDay(eventStart, eventEnd))
+  );
 }
 
 export function eventOverlapsDate(
   event: DecoratedCalendarEvent,
   date: Date,
+  timezone?: string,
 ): boolean {
+  if (timezone) {
+    return eventOverlapsZonedCalendarDay(
+      new Date(event.start),
+      new Date(event.end),
+      date,
+      resolveTimezone(timezone),
+    );
+  }
+
   const dayStart = startOfDay(date);
   const dayEnd = addHours(dayStart, 24);
   const eventStart = new Date(event.start);
@@ -195,10 +249,11 @@ export function eventOverlapsDate(
 export function getAllDayEventsForDate(
   date: Date,
   events: DecoratedCalendarEvent[],
+  timezone?: string,
 ): DecoratedCalendarEvent[] {
   return events
-    .filter((event) => isAllDayOrMultiDayEvent(event))
-    .filter((event) => eventOverlapsDate(event, date))
+    .filter((event) => isAllDayOrMultiDayEvent(event, timezone))
+    .filter((event) => eventOverlapsDate(event, date, timezone))
     .sort((left, right) => {
       const leftStart = new Date(left.start).getTime();
       const rightStart = new Date(right.start).getTime();

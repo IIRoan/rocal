@@ -13,6 +13,7 @@ interface WeekTimelineProps {
   weekStartDay: number;
   /** Time format: "12h" or "24h" */
   timeFormat?: "12h" | "24h";
+  timezone?: string;
   /** Callback when an event block is tapped */
   onEventPress?: (event: DecoratedCalendarEvent) => void;
   /** Callback when an empty time slot is tapped */
@@ -34,6 +35,7 @@ export function WeekTimeline({
   events,
   weekStartDay,
   timeFormat = "12h",
+  timezone,
   onEventPress,
   onTimeSlotPress,
   onSwipeCommit,
@@ -48,6 +50,7 @@ export function WeekTimeline({
       view="week"
       weekStartDay={weekStartDay}
       timeFormat={timeFormat}
+      timezone={timezone}
       swipeEnabled={swipeEnabled}
       onSwipeCommit={onSwipeCommit}
       onNavigate={onNavigate}

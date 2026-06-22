@@ -12,7 +12,7 @@ import {
   Users,
   RotateCcw,
 } from "lucide-react";
-import { getErrorMessage } from "@workspace/calendar-core";
+import { getErrorMessage, getInviteCreateFeedback } from "@workspace/calendar-core";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
@@ -27,6 +27,7 @@ interface InviteSettingsProps {
 
 type SectionMessage =
   | { kind: "success"; text: string }
+  | { kind: "warning"; text: string }
   | { kind: "error"; text: string }
   | null;
 
@@ -149,11 +150,12 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
   const createMutation = useMutation({
     mutationFn: (emailAddress: string) =>
       inviteApiService.createInvite(emailAddress),
-    onSuccess: (_data, emailAddress) => {
+    onSuccess: (data, emailAddress) => {
       setEmail("");
+      const feedback = getInviteCreateFeedback(emailAddress, data);
       setMessage({
-        kind: "success",
-        text: `Invite email sent to ${emailAddress}.`,
+        kind: feedback.tone === "warning" ? "warning" : "success",
+        text: feedback.text,
       });
       queryClient.invalidateQueries({ queryKey: ["invites"] });
     },
@@ -249,7 +251,9 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
               className={`mb-3 rounded-lg px-3 py-2 text-xs ${
                 message.kind === "success"
                   ? "bg-success/10 text-success border border-success/20"
-                  : "bg-destructive/10 text-destructive border border-destructive/20"
+                  : message.kind === "warning"
+                    ? "bg-warning/10 text-warning border border-warning/20"
+                    : "bg-destructive/10 text-destructive border border-destructive/20"
               }`}
             >
               {message.text}

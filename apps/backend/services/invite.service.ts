@@ -20,6 +20,7 @@ import {
   NotFoundError,
   ValidationError,
 } from "../lib/errors";
+import { logRef } from "../lib/log-sanitization";
 import { normalizeEmail } from "../lib/email-utils";
 
 const logger = createLogger("backend:invite-service");
@@ -276,7 +277,10 @@ export class InviteService implements IInviteService {
       };
     }
 
-    logger.info("Invite claimed", { inviteId: invite.id, chosenEmail });
+    logger.info("Invite claimed", {
+      inviteId: invite.id,
+      recipientRef: logRef(chosenEmail),
+    });
 
     return { success: true, inviteId: invite.id };
   }
@@ -309,7 +313,7 @@ export class InviteService implements IInviteService {
       });
       logger.info("Invite marked accepted", {
         inviteId: invite.id,
-        email: normalizedEmail,
+        recipientRef: logRef(normalizedEmail),
       });
     }
   }

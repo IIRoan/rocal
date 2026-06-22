@@ -1,7 +1,7 @@
 import { createLogger } from "@workspace/logger";
 import { z } from "zod";
 import type { MailSyncResult } from "./mail-sync.service";
-import { errorString } from "../lib/errors";
+import { errorLogDetails } from "../lib/log-sanitization";
 
 export type MailChangedEvent = {
   type: "mail.changed";
@@ -238,9 +238,7 @@ export class MailRealtimeService {
           }
         })
         .catch((error) => {
-          logger.warn("Receipt-time mail polling failed", {
-            error: errorString(error),
-          });
+          logger.warn("Receipt-time mail polling failed", errorLogDetails(error));
         })
         .finally(() => {
           this.receiptPollRunning = false;
@@ -269,9 +267,7 @@ export class MailRealtimeService {
         if (signal?.aborted || !this.started) {
           break;
         }
-        logger.error("Stalwart JMAP EventSource listener failed", {
-          error,
-        });
+        logger.error("Stalwart JMAP EventSource listener failed", errorLogDetails(error));
       }
 
       await new Promise<void>((resolve) => {

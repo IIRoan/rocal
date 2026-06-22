@@ -7,7 +7,9 @@
     "./base": "./base.js",
     "./next-js": "./next.js",
     "./react-doctor": "./react-doctor.js",
-    "./react-internal": "./react-internal.js"
+    "./react-internal": "./react-internal.js",
+    "./safe-logging": "./safe-logging.js",
+    "./api-contract": "./api-contract.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",

@@ -67,6 +67,11 @@ jest.mock("../../lib/prisma", () => ({
       upsert: jest.fn(async (): Promise<any> => null),
       deleteMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
     },
+    mailDirectoryEntry: {
+      findUnique: jest.fn(async (): Promise<any> => null),
+      findMany: jest.fn(async (): Promise<any> => []),
+    },
+    $executeRaw: jest.fn(async (): Promise<any> => 1),
   },
 }));
 
@@ -79,23 +84,17 @@ jest.mock("../../lib/email-client", () => ({
   authEmailFrom: "Solace <test@example.com>",
 }));
 
-jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(
-    async (): Promise<any> => ({
-      id: "user-1",
-    }),
-  ),
-}));
-
 jest.mock("../../lib/auth", () => ({
   auth: { api: { getSession: jest.fn() } },
 }));
 
 jest.mock("../../lib/auth-guard", () => {
-  const { Elysia: LocalElysia } =
-    jest.requireActual<typeof import("elysia")>("elysia");
+  const { createMockRequireAuth } =
+    jest.requireActual<typeof import("../helpers/mock-require-auth")>(
+      "../helpers/mock-require-auth",
+    );
   return {
-    requireAuth: new LocalElysia({ name: "require-auth-test" }),
+    requireAuth: createMockRequireAuth(),
   };
 });
 
@@ -109,15 +108,11 @@ jest.mock("../../lib/ics-export", () => ({
 }));
 
 import { errorHandler } from "../../lib/errors";
-import { ensureAuthenticatedUser } from "../../lib/auth-utils";
 import { prisma } from "../../lib/prisma";
 import { eventsRoutes } from "../../routes/events";
 import { ALLOWED_CALENDAR_COLORS } from "../../lib/colors";
+import { expectValidationError } from "../helpers/validation-assertions";
 
-const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<
-    typeof ensureAuthenticatedUser
-  >;
 const mockPrisma = prisma as unknown as {
   calendarEvent: {
     findMany: jest.Mock<() => Promise<any>>;
@@ -180,9 +175,7 @@ const ownedCalendar = {
 };
 
 describe("eventsRoutes – color validation", () => {
-  beforeEach(() => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.calendar.findFirst.mockResolvedValue(ownedCalendar);
+  beforeEach(() => {    mockPrisma.calendar.findFirst.mockResolvedValue(ownedCalendar);
   });
 
   describe("POST /events – create", () => {
@@ -243,8 +236,7 @@ describe("eventsRoutes – color validation", () => {
       );
     });
 
-    it("falls back to resolve the authenticated user from the request context", async () => {
-      mockEnsureAuthenticatedUser.mockClear();
+    it("authenticates requests through requireAuth", async () => {
       mockPrisma.calendarEvent.create.mockResolvedValue({
         id: "event-1",
         ...validEventBody,
@@ -263,10 +255,6 @@ describe("eventsRoutes – color validation", () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockEnsureAuthenticatedUser).toHaveBeenCalledWith(
-        undefined,
-        expect.any(Request),
-      );
     });
 
     it("accepts event without color (null)", async () => {
@@ -427,9 +415,7 @@ describe("eventsRoutes – color validation", () => {
       );
 
       expect(response.status).toBe(422);
-      await expect(readText(response)).resolves.toContain(
-        "Property 'encryptionState' should not be provided",
-      );
+      await expectValidationError(response, "encryptionState");
       expect(mockPrisma.calendarEvent.create).not.toHaveBeenCalled();
     });
 
@@ -616,15 +602,11 @@ describe("eventsRoutes – color validation", () => {
       );
 
       expect(response.status).toBe(422);
-      await expect(readText(response)).resolves.toContain(
-        "Property 'encryptionState' should not be provided",
-      );
+      await expectValidationError(response, "encryptionState");
       expect(mockPrisma.calendarEvent.update).not.toHaveBeenCalled();
     });
 
-    it("accepts valid hex color on update", async () => {
-      mockEnsureAuthenticatedUser.mockClear();
-      mockPrisma.calendarEvent.findFirst.mockResolvedValue(existingEvent);
+    it("accepts valid hex color on update", async () => {      mockPrisma.calendarEvent.findFirst.mockResolvedValue(existingEvent);
       mockPrisma.calendarEvent.update.mockResolvedValue({
         ...existingEvent,
         color: "#FF5733",
@@ -641,10 +623,6 @@ describe("eventsRoutes – color validation", () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockEnsureAuthenticatedUser).toHaveBeenCalledWith(
-        undefined,
-        expect.any(Request),
-      );
     });
 
     it("rejects invalid color on update", async () => {

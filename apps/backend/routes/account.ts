@@ -1,8 +1,6 @@
 import { Elysia } from "elysia";
 import { requireAuth } from "../lib/auth-guard";
-import type { AuthenticatedUser } from "../lib/auth-utils";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import { resolveRouteUser } from "../lib/request-user";
 import { prisma } from "../lib/prisma";
 import { env } from "../lib/env";
 import { AccountService } from "../services/account.service";
@@ -24,15 +22,8 @@ export const accountRoutes = new Elysia({
   .guard(authenticatedRouteDetail("Account"), (app) =>
     app.delete(
       "/",
-      async ({
-        authenticatedUser,
-        request,
-      }: {
-        authenticatedUser?: AuthenticatedUser;
-        request: Request;
-      }) => {
-        const user = await resolveRouteUser(authenticatedUser, request);
-        return accountService.deleteAccount({ userId: user.id });
+      async ({ routeUser }) => {
+        return accountService.deleteAccount({ userId: routeUser.id });
       },
       {
         detail: {

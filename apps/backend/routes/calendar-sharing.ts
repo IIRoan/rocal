@@ -1,12 +1,10 @@
-import { Elysia, t } from "elysia";
+import { Elysia } from "elysia";
 import { requireAuth } from "../lib/auth-guard";
-import type { AuthenticatedUser } from "../lib/auth-utils";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import { resolveRouteUser } from "../lib/request-user";
-import { strictObject } from "../lib/validation";
 import { prisma } from "../lib/prisma";
 import { CalendarSharingService } from "../services/calendar-sharing.service";
 import { toSafeIcsFilename } from "../lib/ics-export";
+import { RouteModel, routeModels } from "../contracts";
 
 const calendarSharingService = new CalendarSharingService(prisma);
 
@@ -24,17 +22,10 @@ export const calendarSharingRoutes = new Elysia({
   prefix: "/calendars",
   normalize: false,
 })
+  .use(routeModels)
   .get(
     "/shared/:token",
-    async ({
-      params,
-      set,
-      request,
-    }: {
-      params: { token: string };
-      set: { headers: Record<string, string | number | undefined> };
-      request: Request;
-    }) => {
+    async ({ params, set, request }) => {
       const baseUrl = resolveBackendBaseUrl(request);
       const sourceUrl = `${baseUrl}/api/calendars/shared/${encodeURIComponent(params.token)}`;
 
@@ -51,11 +42,7 @@ export const calendarSharingRoutes = new Elysia({
       return result.icsContent;
     },
     {
-      params: strictObject({
-        token: t.String({
-          description: "Share token embedded in the public ICS URL.",
-        }),
-      }),
+      params: RouteModel.calendar.shareTokenParams,
       detail: {
         tags: ["ICS Sharing"],
         summary: "Public shared calendar feed (.ics)",
@@ -69,29 +56,16 @@ export const calendarSharingRoutes = new Elysia({
     app
       .get(
         "/:id/share-link",
-        async ({
-          params,
-          request,
-          authenticatedUser,
-        }: {
-          params: { id: string };
-          request: Request;
-          authenticatedUser?: AuthenticatedUser;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
+        async ({ params, request, routeUser }) => {
           const baseUrl = resolveBackendBaseUrl(request);
           return calendarSharingService.getShareLink({
-            userId: user.id,
+            userId: routeUser.id,
             calendarId: params.id,
             baseUrl,
           });
         },
         {
-          params: strictObject({
-            id: t.String({
-              description: "Calendar identifier.",
-            }),
-          }),
+          params: RouteModel.calendar.idParams,
           detail: {
             summary: "Get calendar ICS share-link status",
             description:
@@ -101,42 +75,18 @@ export const calendarSharingRoutes = new Elysia({
       )
       .post(
         "/:id/share-link",
-        async ({
-          params,
-          body,
-          request,
-          authenticatedUser,
-        }: {
-          params: { id: string };
-          body: { regenerate?: boolean } | null;
-          request: Request;
-          authenticatedUser?: AuthenticatedUser;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
+        async ({ params, body, request, routeUser }) => {
           const baseUrl = resolveBackendBaseUrl(request);
           return calendarSharingService.createShareLink({
-            userId: user.id,
+            userId: routeUser.id,
             calendarId: params.id,
             baseUrl,
-            regenerate: body?.regenerate,
+            regenerate: body.regenerate,
           });
         },
         {
-          params: strictObject({
-            id: t.String({
-              description: "Calendar identifier.",
-            }),
-          }),
-          body: t.Optional(
-            strictObject({
-              regenerate: t.Optional(
-                t.Boolean({
-                  description:
-                    "When true, rotates the share token and invalidates any previously issued public URL.",
-                }),
-              ),
-            }),
-          ),
+          params: RouteModel.calendar.idParams,
+          body: RouteModel.calendar.shareLinkBody,
           detail: {
             summary: "Enable or regenerate calendar ICS share-link",
             description:
@@ -146,29 +96,16 @@ export const calendarSharingRoutes = new Elysia({
       )
       .delete(
         "/:id/share-link",
-        async ({
-          params,
-          request,
-          authenticatedUser,
-        }: {
-          params: { id: string };
-          request: Request;
-          authenticatedUser?: AuthenticatedUser;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
+        async ({ params, request, routeUser }) => {
           const baseUrl = resolveBackendBaseUrl(request);
           return calendarSharingService.disableShareLink({
-            userId: user.id,
+            userId: routeUser.id,
             calendarId: params.id,
             baseUrl,
           });
         },
         {
-          params: strictObject({
-            id: t.String({
-              description: "Calendar identifier.",
-            }),
-          }),
+          params: RouteModel.calendar.idParams,
           detail: {
             summary: "Disable calendar ICS share-link",
             description:

@@ -45,12 +45,17 @@ const formatTimeWithOptionalMinutesTZ = (
   timezone?: string,
 ) => {
   if (!timezone) return formatTimeWithOptionalMinutes(date, timeFormat);
+
+  const minutesInTimezone = Number.parseInt(
+    formatInTimeZone(date, timezone, "m"),
+    10,
+  );
   const token =
     timeFormat === "24h"
-      ? getMinutes(date) === 0
+      ? minutesInTimezone === 0
         ? "H"
         : "H:mm"
-      : getMinutes(date) === 0
+      : minutesInTimezone === 0
         ? "ha"
         : "h:mma";
   const str = formatInTimeZone(date, timezone, token);

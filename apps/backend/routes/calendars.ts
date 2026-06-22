@@ -1,144 +1,28 @@
-import { Elysia, t } from "elysia";
+import { Elysia } from "elysia";
 import { requireAuth } from "../lib/auth-guard";
-import type { AuthenticatedUser } from "../lib/auth-utils";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import {
-  rowEncryptionStateSchema,
-  type RowEncryptionState,
-} from "../lib/encryption-state";
-import { resolveRouteUser } from "../lib/request-user";
-import { strictObject } from "../lib/validation";
 import { prisma } from "../lib/prisma";
 import { CalendarService } from "../services/calendar.service";
 import { createStalwartCalendarClient } from "../lib/stalwart-calendar";
+import { RouteModel, routeModels } from "../contracts";
 
 const calendarService = new CalendarService(
   prisma,
   createStalwartCalendarClient(),
 );
 
-const createCalendarBodySchema = strictObject({
-  name: t.String({
-    minLength: 1,
-    maxLength: 100,
-    description: "Calendar name (required, 1-100 characters)",
-  }),
-  color: t.String({
-    description:
-      "Calendar color (blue, orange, violet, rose, emerald, or hex color like #FF0000)",
-  }),
-  isDefault: t.Optional(
-    t.Boolean({
-      description:
-        "Whether this should be the default calendar (default: false)",
-    }),
-  ),
-  encryptedName: t.Optional(
-    t.String({
-      description: "Client-encrypted shadow copy of the calendar name.",
-    }),
-  ),
-  blindIndexTokens: t.Optional(
-    t.Array(
-      t.String({
-        description: "Blind-index token hash for encrypted search rollout.",
-      }),
-    ),
-  ),
-  encryptionState: t.Optional(rowEncryptionStateSchema),
-  encryptionKeyVersion: t.Optional(
-    t.Number({
-      minimum: 1,
-      description: "Client-managed encryption key version.",
-    }),
-  ),
-  forceFullEncryption: t.Optional(
-    t.Boolean({
-      description:
-        "When true, all events in this calendar are stored as ciphertext only, regardless of the user's global encryption mode.",
-    }),
-  ),
-});
-
-const updateCalendarBodySchema = strictObject({
-  name: t.Optional(
-    t.String({
-      minLength: 1,
-      maxLength: 100,
-      description: "Calendar name (1-100 characters)",
-    }),
-  ),
-  color: t.Optional(
-    t.String({
-      description:
-        "Calendar color (blue, orange, violet, rose, emerald, or hex color like #FF0000)",
-    }),
-  ),
-  isVisible: t.Optional(
-    t.Boolean({ description: "Whether the calendar is visible" }),
-  ),
-  isDefault: t.Optional(
-    t.Boolean({ description: "Whether this should be the default calendar" }),
-  ),
-  encryptedName: t.Optional(
-    t.String({
-      description: "Client-encrypted shadow copy of the calendar name.",
-    }),
-  ),
-  blindIndexTokens: t.Optional(
-    t.Array(
-      t.String({
-        description: "Blind-index token hash for encrypted search rollout.",
-      }),
-    ),
-  ),
-  encryptionState: t.Optional(rowEncryptionStateSchema),
-  encryptionKeyVersion: t.Optional(
-    t.Number({
-      minimum: 1,
-      description: "Client-managed encryption key version.",
-    }),
-  ),
-  forceFullEncryption: t.Optional(
-    t.Boolean({
-      description:
-        "When true, all events in this calendar are stored as ciphertext only, regardless of the user's global encryption mode. Toggling this on backfills existing encrypted events to drop their plaintext shadows.",
-    }),
-  ),
-});
-
-const deleteCalendarQuerySchema = strictObject({
-  action: t.Optional(
-    t.Union([t.Literal("delete_events"), t.Literal("move_events")], {
-      description:
-        "What to do with events: delete_events (default), or move_events",
-    }),
-  ),
-  targetCalendarId: t.Optional(
-    t.String({
-      description: "Target calendar ID when using move_events action",
-    }),
-  ),
-});
-
 export const calendarsRoutes = new Elysia({
   prefix: "/calendars",
   normalize: false,
 })
+  .use(routeModels)
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Calendars"), (app) =>
     app
       .get(
         "/",
-        async ({
-          authenticatedUser,
-          request,
-        }: {
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
-          return calendarService.list(user.id);
+        async ({ routeUser }) => {
+          return calendarService.list(routeUser.id);
         },
         {
           detail: {
@@ -151,27 +35,9 @@ export const calendarsRoutes = new Elysia({
 
       .post(
         "/",
-        async ({
-          body,
-          authenticatedUser,
-          request,
-        }: {
-          body: {
-            name: string;
-            color: string;
-            isDefault?: boolean;
-            encryptedName?: string;
-            blindIndexTokens?: string[];
-            encryptionState?: RowEncryptionState;
-            encryptionKeyVersion?: number;
-            forceFullEncryption?: boolean;
-          };
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
+        async ({ body, routeUser }) => {
           return calendarService.create({
-            userId: user.id,
+            userId: routeUser.id,
             name: body.name,
             color: body.color,
             isDefault: body.isDefault,
@@ -183,7 +49,7 @@ export const calendarsRoutes = new Elysia({
           });
         },
         {
-          body: createCalendarBodySchema,
+          body: RouteModel.calendar.createBody,
           detail: {
             summary: "Create a new calendar",
             description: "Creates a new calendar for the authenticated user",
@@ -193,30 +59,9 @@ export const calendarsRoutes = new Elysia({
 
       .put(
         "/:id",
-        async ({
-          params,
-          body,
-          authenticatedUser,
-          request,
-        }: {
-          params: { id: string };
-          body: {
-            name?: string;
-            color?: string;
-            isVisible?: boolean;
-            isDefault?: boolean;
-            encryptedName?: string;
-            blindIndexTokens?: string[];
-            encryptionState?: RowEncryptionState;
-            encryptionKeyVersion?: number;
-            forceFullEncryption?: boolean;
-          };
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
+        async ({ params, body, routeUser }) => {
           return calendarService.update({
-            userId: user.id,
+            userId: routeUser.id,
             calendarId: params.id,
             name: body.name,
             color: body.color,
@@ -230,10 +75,8 @@ export const calendarsRoutes = new Elysia({
           });
         },
         {
-          params: strictObject({
-            id: t.String({ description: "Calendar ID" }),
-          }),
-          body: updateCalendarBodySchema,
+          params: RouteModel.calendar.idParams,
+          body: RouteModel.calendar.updateBody,
           detail: {
             summary: "Update an existing calendar",
             description:
@@ -244,33 +87,17 @@ export const calendarsRoutes = new Elysia({
 
       .delete(
         "/:id",
-        async ({
-          params,
-          query,
-          authenticatedUser,
-          request,
-        }: {
-          params: { id: string };
-          query: {
-            action?: "delete_events" | "move_events";
-            targetCalendarId?: string;
-          };
-          authenticatedUser?: AuthenticatedUser;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
+        async ({ params, query, routeUser }) => {
           return calendarService.delete({
-            userId: user.id,
+            userId: routeUser.id,
             calendarId: params.id,
             action: query.action,
             targetCalendarId: query.targetCalendarId,
           });
         },
         {
-          params: strictObject({
-            id: t.String({ description: "Calendar ID to delete" }),
-          }),
-          query: deleteCalendarQuerySchema,
+          params: RouteModel.calendar.idParams,
+          query: RouteModel.calendar.deleteQuery,
           detail: {
             summary: "Delete a calendar with event handling options",
             description: `Deletes a calendar with options for handling existing events:

@@ -10,10 +10,14 @@ import { AppScreen, NavigationHeader } from "../../src/components/layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { CreateEventRequest } from "@workspace/calendar-core";
+import { resolveTimezone, wallClockToUtc } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { useAuth } from "../../src/providers/AuthProvider";
+import { useRecentContacts } from "../../src/hooks/use-recent-contacts";
+import { extractRecentContactEntries } from "../../src/lib/record-recent-contacts";
 import { useToast } from "../../src/providers/ToastProvider";
+import { toastOperationWarnings } from "../../src/lib/operation-warnings";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
 import {
@@ -25,7 +29,7 @@ import {
 } from "../../src/lib/optimistic-events";
 import { EventForm } from "../../src/components/event/EventForm";
 import { LoadingScreen } from "../../src/components/ui/loading";
-import { toLocalISOString } from "../../src/components/event/event-form-utils";
+import { toTimezonePickerISOString, parseCreateEventCalendarDay } from "../../src/components/event/event-form-utils";
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -35,6 +39,7 @@ export default function EventCreateScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { recordUsage } = useRecentContacts();
   const { toast } = useToast();
 
   // ─── Query params (optional pre-fill from tapping a time slot) ───────────
@@ -57,6 +62,11 @@ export default function EventCreateScreen() {
     queryKey: QUERY_KEYS.calendars(),
     queryFn: () => calendarApiService.getCalendars(),
   });
+  const { data: settings, isLoading: settingsLoading } = useQuery({
+    queryKey: QUERY_KEYS.settings(),
+    queryFn: () => calendarApiService.getUserSettings(),
+  });
+  const resolvedTimezone = resolveTimezone(settings?.timezone);
 
   // ─── Create mutation (optimistic) ─────────────────────────────────────────
 
@@ -78,10 +88,18 @@ export default function EventCreateScreen() {
       router.back();
       return { tempId };
     },
-    onSuccess: () => {
+    onSuccess: (savedEvent, variables) => {
       // Replace optimistic data with real server data
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      const entries = extractRecentContactEntries(
+        variables.participants,
+        user?.email,
+      );
+      if (entries.length > 0) {
+        recordUsage(entries, "calendar");
+      }
       toast("Event created");
+      toastOperationWarnings(toast, savedEvent);
     },
     onError: (err: unknown) => {
       // Roll back the optimistic event
@@ -113,27 +131,35 @@ export default function EventCreateScreen() {
   const initialValues = useMemo(() => {
     if (!date) return undefined;
 
-    const startDate = new Date(date);
-    if (isNaN(startDate.getTime())) return undefined;
+    const calendarDay = parseCreateEventCalendarDay(date, resolvedTimezone);
+    if (!calendarDay) return undefined;
 
     if (hour !== undefined) {
       const h = parseInt(hour, 10);
       if (!isNaN(h)) {
-        startDate.setHours(h, 0, 0, 0);
+        const zonedStart = wallClockToUtc(calendarDay, h, 0, resolvedTimezone);
+        const zonedEnd = new Date(zonedStart.getTime() + 60 * 60 * 1000);
+        return {
+          start: toTimezonePickerISOString(zonedStart, resolvedTimezone),
+          end: toTimezonePickerISOString(zonedEnd, resolvedTimezone),
+          timezone: resolvedTimezone,
+        } satisfies Partial<CreateEventRequest>;
       }
     }
 
-    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+    const zonedStart = wallClockToUtc(calendarDay, 0, 0, resolvedTimezone);
+    const zonedEnd = new Date(zonedStart.getTime() + 60 * 60 * 1000);
 
     return {
-      start: toLocalISOString(startDate),
-      end: toLocalISOString(endDate),
+      start: toTimezonePickerISOString(zonedStart, resolvedTimezone),
+      end: toTimezonePickerISOString(zonedEnd, resolvedTimezone),
+      timezone: resolvedTimezone,
     } satisfies Partial<CreateEventRequest>;
-  }, [date, hour]);
+  }, [date, hour, resolvedTimezone]);
 
   // ─── Loading state ─────────────────────────────────────────────────────────
 
-  if (calendarsLoading) {
+  if (calendarsLoading || settingsLoading) {
     return <LoadingScreen theme={theme} message="Loading…" />;
   }
 
@@ -151,6 +177,7 @@ export default function EventCreateScreen() {
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         initialValues={initialValues}
+        timezone={resolvedTimezone}
       />
     </AppScreen>
   );

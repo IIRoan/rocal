@@ -5,6 +5,11 @@ import {
   NotFoundError,
   UpstreamServiceError,
   ValidationError, errorString} from "../lib/errors";
+import {
+  errorLogDetails,
+  logRef,
+  sanitizeLogContext,
+} from "../lib/log-sanitization";
 import { getOpenPgpPublicKeyFingerprint } from "../lib/mail-key-utils";
 import type {
   GetMailAccountStatusInput,
@@ -24,7 +29,11 @@ import type {
   UpsertMailVaultBackupInput,
   UpsertMailVaultBackupForUserInput,
 } from "../contracts/mail.contract";
-import type { StalwartAdminClientLike } from "../lib/stalwart-admin";
+import type {
+  StalwartAdminClientLike,
+  StalwartJmapAdminClientLike,
+} from "../lib/stalwart-admin";
+import { fetchStalwartMailServerLimits } from "../lib/stalwart-mail-limits";
 import {
   createMailBridgePkcePair,
   deriveMailBridgeSecret,
@@ -34,6 +43,7 @@ import { normalizeEmail, normalizeEmailOrThrow } from "../lib/email-utils";
 const LOCAL_PART_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/;
 const MIN_VAULT_MEMORY_KIB = 8192;
 const MAIL_TOKEN_EXPIRY_SKEW_MS = 60_000;
+const SERVER_LIMITS_CACHE_TTL_MS = 60_000;
 const logger = createLogger("backend:mail-service");
 
 const linkedMailboxSelect = {
@@ -323,6 +333,10 @@ function normalizeMailPersistenceError(error: unknown): never {
   );
 }
 
+function hasValue<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
+}
+
 export class MailService implements IMailService {
   private readonly accessTokenCache = new Map<
     string,
@@ -333,6 +347,13 @@ export class MailService implements IMailService {
     Promise<MailAccessTokenResult>
   >();
   private readonly bridgePasswordConfiguredAccountIds = new Set<string>();
+
+  private serverLimitsCache: {
+    expiresAt: number;
+    value: MailDemoConfig["serverLimits"];
+  } | null = null;
+  private serverLimitsInflight: Promise<MailDemoConfig["serverLimits"]> | null =
+    null;
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -347,7 +368,11 @@ export class MailService implements IMailService {
     },
   ) {}
 
-  getConfig(): MailDemoConfig {
+  getConfig(): Promise<MailDemoConfig> {
+    return this.getConfigWithServerLimits();
+  }
+
+  private getBaseConfig(): MailDemoConfig {
     return {
       defaultDomain: this.config.defaultDomain,
       discoveryBaseUrl: this.config.discoveryBaseUrl,
@@ -355,6 +380,84 @@ export class MailService implements IMailService {
       oauth: this.config.oauth,
       vaultKeyMaterialEndpoint: this.config.vaultKeyMaterialEndpoint,
     };
+  }
+
+  async getConfigWithServerLimits(): Promise<MailDemoConfig> {
+    const serverLimits = await this.loadServerLimits();
+    return {
+      ...this.getBaseConfig(),
+      serverLimits,
+    };
+  }
+
+  private loadServerLimits(): Promise<MailDemoConfig["serverLimits"]> {
+    const now = Date.now();
+    if (
+      this.serverLimitsCache &&
+      this.serverLimitsCache.expiresAt > now
+    ) {
+      return Promise.resolve(this.serverLimitsCache.value);
+    }
+
+    if (this.serverLimitsInflight) {
+      return this.serverLimitsInflight;
+    }
+
+    const inflight = this.fetchServerLimits()
+      .then(({ value, cacheable }) => {
+        if (cacheable) {
+          this.serverLimitsCache = {
+            expiresAt: Date.now() + SERVER_LIMITS_CACHE_TTL_MS,
+            value,
+          };
+        } else {
+          this.serverLimitsCache = null;
+        }
+
+        return value;
+      })
+      .finally(() => {
+        if (this.serverLimitsInflight === inflight) {
+          this.serverLimitsInflight = null;
+        }
+      });
+
+    this.serverLimitsInflight = inflight;
+    return inflight;
+  }
+
+  private async fetchServerLimits(): Promise<{
+    value: MailDemoConfig["serverLimits"];
+    cacheable: boolean;
+  }> {
+    if (!isJmapAdminClient(this.adminClient)) {
+      return { value: null, cacheable: true };
+    }
+
+    try {
+      const limits = await fetchStalwartMailServerLimits(this.adminClient);
+      const hasValues =
+        hasValue(limits.maxBlobUploadBytes) ||
+        hasValue(limits.maxAttachmentSizeBytes) ||
+        hasValue(limits.maxMessageSizeBytes) ||
+        hasValue(limits.maxMailboxDepth) ||
+        hasValue(limits.maxMailboxNameLength) ||
+        hasValue(limits.maxMailboxes) ||
+        hasValue(limits.maxIdentities) ||
+        hasValue(limits.defaultFolders) ||
+        hasValue(limits.getMaxResults) ||
+        hasValue(limits.queryMaxResults) ||
+        hasValue(limits.maxMethodCalls) ||
+        hasValue(limits.maxConcurrentUploads) ||
+        hasValue(limits.maxRequestSizeBytes) ||
+        hasValue(limits.uploadTtlMs);
+      return { value: hasValues ? limits : null, cacheable: true };
+    } catch (error) {
+      logger.warn("Failed to load Stalwart mail server limits", {
+        ...errorLogDetails(error),
+      });
+      return { value: null, cacheable: false };
+    }
   }
 
   async issueAccessTokenForUser(
@@ -492,13 +595,13 @@ export class MailService implements IMailService {
     if (isOwnedByDifferentUser) {
       logger.warn(
         "Provisioned Stalwart account is already linked to another Solace account",
-        {
+        sanitizeLogContext({
           email: input.email,
           userId: input.userId ?? null,
           existingUserId: existingEntry.userId,
           stalwartAccountId: details.stalwartAccountId,
           directoryEntryId: existingEntry.id,
-        },
+        }),
       );
       throw new ValidationError(
         "That mailbox is already linked to another Solace account.",
@@ -509,7 +612,7 @@ export class MailService implements IMailService {
     if (requiresEmailRepair) {
       logger.warn(
         "Repairing stale mail directory entry for a provisioned Stalwart account",
-        {
+        sanitizeLogContext({
           requestedEmail: input.email,
           existingEmail: existingEntry.email,
           userId: input.userId ?? null,
@@ -517,7 +620,7 @@ export class MailService implements IMailService {
           stalwartAccountId: details.stalwartAccountId,
           directoryEntryId: existingEntry.id,
           resetMailSyncState: true,
-        },
+        }),
       );
 
       await tx.mailJmapSyncState.deleteMany({
@@ -530,13 +633,13 @@ export class MailService implements IMailService {
     if (!requiresEmailRepair) {
       logger.warn(
         "Reusing existing mail directory entry for provisioned Stalwart account",
-        {
+        sanitizeLogContext({
           email: input.email,
           userId: input.userId ?? null,
           existingUserId: existingEntry.userId,
           stalwartAccountId: details.stalwartAccountId,
           directoryEntryId: existingEntry.id,
-        },
+        }),
       );
     }
 
@@ -670,7 +773,7 @@ export class MailService implements IMailService {
         "Failed to delete orphaned Stalwart account after failed mailbox provisioning",
         {
           stalwartAccountId: accountId,
-          error,
+          ...errorLogDetails(error),
         },
       );
     }
@@ -707,9 +810,9 @@ export class MailService implements IMailService {
       }
     } catch (error) {
       logger.error("Failed to delete linked Stalwart account during Solace account deletion", {
-        email: input.email,
+        recipientRef: logRef(input.email),
         stalwartAccountId: input.stalwartAccountId,
-        error,
+        ...errorLogDetails(error),
       });
       throw new UpstreamServiceError(
         "Could not delete the linked Stalwart mailbox. Try again in a moment.",
@@ -746,7 +849,7 @@ export class MailService implements IMailService {
 
     logger.info("Deleted linked mailbox for Solace account", {
       userId: input.userId,
-      email: mailbox.email,
+      recipientRef: logRef(mailbox.email),
       stalwartAccountId: mailbox.stalwartAccountId,
     });
   }
@@ -822,11 +925,11 @@ export class MailService implements IMailService {
       });
     } catch (error) {
       logger.error("Mailbox Stalwart provisioning failed", {
-        email: input.email,
+        recipientRef: logRef(input.email),
         userId: input.userId,
         stalwartAccountId: accountId || null,
         stalwartAccountCreated,
-        error: errorString(error),
+        ...errorLogDetails(error),
       });
       await this.deleteOrphanedStalwartAccountIfNeeded(accountId, {
         onlyIfCreated: true,
@@ -924,12 +1027,12 @@ export class MailService implements IMailService {
             if (concurrentEntry) {
               logger.warn(
                 "Detected concurrent mail directory entry creation during mailbox provisioning",
-                {
+                sanitizeLogContext({
                   email: input.email,
                   userId: input.userId ?? null,
                   stalwartAccountId: accountId,
                   directoryEntryId: concurrentEntry.id,
-                },
+                }),
               );
               await this.reconcileProvisionedMailboxRecord(
                 tx,
@@ -955,13 +1058,13 @@ export class MailService implements IMailService {
         wasCreated: stalwartAccountCreated,
       });
       logger.error("Failed to persist provisioned mailbox state", {
-        email: input.email,
+        recipientRef: logRef(input.email),
         userId: input.userId ?? null,
         stalwartAccountId: accountId,
         stalwartDomainId: domainId,
         stalwartPublicKeyId: publicKeyId,
         derivedFingerprint,
-        error,
+        ...errorLogDetails(error),
       });
       normalizeMailPersistenceError(error);
     }
@@ -1073,12 +1176,12 @@ export class MailService implements IMailService {
       });
     } catch (error) {
       logger.error("Mailbox Stalwart repair failed", {
-        email: input.email,
+        recipientRef: logRef(input.email),
         userId: input.userId,
         directoryEntryId: input.mailbox.id,
         stalwartAccountId: accountId || null,
         stalwartAccountCreated,
-        error: errorString(error),
+        ...errorLogDetails(error),
       });
       await this.deleteOrphanedStalwartAccountIfNeeded(accountId, {
         onlyIfCreated: true,
@@ -1117,11 +1220,11 @@ export class MailService implements IMailService {
         wasCreated: stalwartAccountCreated,
       });
       logger.error("Failed to persist repaired mailbox state", {
-        email: input.email,
+        recipientRef: logRef(input.email),
         userId: input.userId,
         directoryEntryId: input.mailbox.id,
         stalwartAccountId: accountId,
-        error,
+        ...errorLogDetails(error),
       });
       normalizeMailPersistenceError(error);
     }
@@ -1175,29 +1278,110 @@ export class MailService implements IMailService {
 
   async getDirectoryKey(email: string): Promise<MailDirectoryKeyResult> {
     const normalizedEmail = normalizeEmail(email);
+    const directorySelect = {
+      email: true,
+      publicKeyArmored: true,
+      publicKeyFingerprint: true,
+      source: true,
+      trust: true,
+    } as const;
+
     const entry = await this.prisma.mailDirectoryEntry.findUnique({
       where: { email: normalizedEmail },
-      select: {
-        email: true,
-        publicKeyArmored: true,
-        publicKeyFingerprint: true,
-        source: true,
-        trust: true,
-      },
+      select: directorySelect,
     });
 
-    if (!entry) {
-      throw new NotFoundError(
-        "No internal public key was found for that email.",
-      );
+    if (entry) {
+      return this.toDirectoryKeyResult(entry);
     }
 
+    const user = await this.prisma.user.findFirst({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    });
+    if (user) {
+      const linkedEntry = await this.prisma.mailDirectoryEntry.findUnique({
+        where: { userId: user.id },
+        select: directorySelect,
+      });
+      if (linkedEntry) {
+        return this.toDirectoryKeyResult(linkedEntry);
+      }
+    }
+
+    const remoteKey = await this.resolveRemoteDirectoryKey(normalizedEmail);
+    if (remoteKey) {
+      return remoteKey;
+    }
+
+    throw new NotFoundError(
+      "No internal public key was found for that email.",
+    );
+  }
+
+  private toDirectoryKeyResult(entry: {
+    email: string;
+    publicKeyArmored: string;
+    publicKeyFingerprint: string;
+    source: string;
+    trust: string;
+  }): MailDirectoryKeyResult {
     return {
       email: entry.email,
       publicKeyArmored: entry.publicKeyArmored,
       fingerprint: entry.publicKeyFingerprint,
       source: entry.source,
       trust: entry.trust,
+    };
+  }
+
+  private async resolveRemoteDirectoryKey(
+    normalizedEmail: string,
+  ): Promise<MailDirectoryKeyResult | null> {
+    const configuredDomain = this.config.defaultDomain.trim().toLowerCase();
+    const separatorIndex = normalizedEmail.lastIndexOf("@");
+    if (separatorIndex <= 0) {
+      return null;
+    }
+
+    const domain = normalizedEmail.slice(separatorIndex + 1);
+    if (domain !== configuredDomain) {
+      return null;
+    }
+
+    let remote: Awaited<
+      ReturnType<StalwartAdminClientLike["resolveMailboxPublicKey"]>
+    >;
+    try {
+      remote = await this.adminClient.resolveMailboxPublicKey({
+        email: normalizedEmail,
+      });
+    } catch (error) {
+      logger.warn("Failed to resolve mailbox public key from Stalwart", {
+        recipientRef: logRef(normalizedEmail),
+        ...errorLogDetails(error),
+      });
+      return null;
+    }
+
+    if (!remote) {
+      return null;
+    }
+
+    logger.info(
+      "Resolved mailbox public key from Stalwart after missing directory entry",
+      {
+        recipientRef: logRef(normalizedEmail),
+        stalwartAccountId: remote.stalwartAccountId,
+      },
+    );
+
+    return {
+      email: normalizedEmail,
+      publicKeyArmored: remote.publicKeyArmored,
+      fingerprint: await getOpenPgpPublicKeyFingerprint(remote.publicKeyArmored),
+      source: "internal",
+      trust: "verified",
     };
   }
 
@@ -1393,4 +1577,10 @@ export class MailService implements IMailService {
       kdfParams: input.kdfParams,
     });
   }
+}
+
+function isJmapAdminClient(
+  client: StalwartAdminClientLike,
+): client is StalwartJmapAdminClientLike {
+  return typeof (client as StalwartJmapAdminClientLike).callJmap === "function";
 }

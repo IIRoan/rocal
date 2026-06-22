@@ -1,5 +1,8 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { isCancelledCalendarEvent } from "@workspace/calendar-core";
+import {
+  isCancelledCalendarEvent,
+  isMailInvitationStagingCalendar,
+} from "@workspace/calendar-core";
 import {
   NotificationManager,
   formatEventDescription,
@@ -58,10 +61,11 @@ import {
   Users,
   X,
 } from "lucide-react";
-import type { EventParticipantInput } from "@workspace/calendar-core";
+import type { EventParticipantInput, RecentContactEntry } from "@workspace/calendar-core";
 import { normalizeParticipantEmail } from "@workspace/calendar-core";
 
 import { RecurringEventForm } from "../command-palette/recurring-event-form";
+import { RecipientSuggestInput } from "../mail/recipient-suggest-input";
 import { stopEventPropagation } from "@/lib/event-propagation";
 import {
   formatReminderMinutes,
@@ -194,7 +198,11 @@ export function EventEditorBody({
     [calendars, eventForm.eventCalendarId],
   );
   const selectableCalendars = useMemo(
-    () => calendars.filter((calendar) => !calendar.isSyncOnly),
+    () =>
+      calendars.filter(
+        (calendar) =>
+          !calendar.isSyncOnly && !isMailInvitationStagingCalendar(calendar),
+      ),
     [calendars],
   );
   const reminderMinutes = useMemo(
@@ -205,14 +213,8 @@ export function EventEditorBody({
     () =>
       getEventDateDisplay(eventForm.eventStartDate, eventForm.eventEndDate, {
         allDay: eventForm.eventAllDay,
-        timezone: eventForm.selectedEvent?.timezone || "UTC",
       }),
-    [
-      eventForm.eventEndDate,
-      eventForm.eventStartDate,
-      eventForm.eventAllDay,
-      eventForm.selectedEvent?.timezone,
-    ],
+    [eventForm.eventEndDate, eventForm.eventStartDate, eventForm.eventAllDay],
   );
   const recurrenceSummary = useMemo(
     () =>
@@ -291,6 +293,38 @@ export function EventEditorBody({
       },
     ]);
   }, [participantDraft, participantItems, eventForm]);
+
+  const addParticipantFromSuggestion = useCallback(
+    (entry: RecentContactEntry) => {
+      const email = normalizeParticipantEmail(entry.email);
+      if (!email) {
+        return;
+      }
+
+      if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) {
+        setParticipantError("Enter a valid email address.");
+        return;
+      }
+
+      if (participantItems.some((participant) => participant.email === email)) {
+        setParticipantError("That participant is already invited.");
+        return;
+      }
+
+      setParticipantError(null);
+      setParticipantDraft("");
+      eventForm.setEventParticipants([
+        ...participantItems,
+        {
+          email,
+          displayName: entry.displayName?.trim() || undefined,
+          role: "attendee",
+          status: "pending",
+        },
+      ]);
+    },
+    [participantItems, eventForm],
+  );
 
   const removeParticipant = useCallback(
     (email: string) => {
@@ -867,14 +901,17 @@ export function EventEditorBody({
                   </div>
 
                   <div className="flex gap-2">
-                    <Input
+                    <RecipientSuggestInput
+                      appearance="field"
+                      mode="calendar"
                       value={participantDraft}
-                      onChange={(event) => {
-                        setParticipantDraft(event.target.value);
+                      onChange={(value) => {
+                        setParticipantDraft(value);
                         if (participantError) {
                           setParticipantError(null);
                         }
                       }}
+                      onSelectSuggestion={addParticipantFromSuggestion}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") {
                           event.preventDefault();
@@ -882,7 +919,8 @@ export function EventEditorBody({
                         }
                       }}
                       placeholder="Add attendee by email"
-                      className={`${desktop ? "h-9 text-sm" : "h-10"}`}
+                      className="flex-1"
+                      inputClassName={desktop ? "h-9 text-sm" : "h-10"}
                     />
                     <Button
                       type="button"

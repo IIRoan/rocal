@@ -1,14 +1,12 @@
-import { Elysia, t } from "elysia";
-import type { AuthenticatedUser } from "../lib/auth-utils";
+import { Elysia } from "elysia";
 import { requireAuth } from "../lib/auth-guard";
 import { prisma } from "../lib/prisma";
 import { createStalwartAdminClient } from "../lib/stalwart-admin";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import { resolveRouteUser } from "../lib/request-user";
-import { strictObject } from "../lib/validation";
 import { MailSyncService } from "../services/mail-sync.service";
 import { createStalwartCalendarClient } from "../lib/stalwart-calendar";
 import { MailCalendarIngestionService } from "../services/mail-calendar-ingestion.service";
+import { RouteModel, routeModels } from "../contracts";
 
 export const defaultMailSyncService = new MailSyncService(
   prisma,
@@ -20,13 +18,6 @@ export const defaultMailSyncService = new MailSyncService(
   ),
 );
 
-const syncQuerySchema = strictObject({
-  accountId: t.String({
-    minLength: 1,
-    maxLength: 128,
-  }),
-});
-
 export function createMailSyncRoutes(
   mailSyncService: MailSyncService = defaultMailSyncService,
 ) {
@@ -34,28 +25,19 @@ export function createMailSyncRoutes(
     prefix: "/mail",
     normalize: false,
   })
+    .use(routeModels)
     .use(requireAuth)
     .guard(authenticatedRouteDetail("Mail"), (app) =>
       app.get(
         "/sync",
-        async ({
-          authenticatedUser,
-          query,
-          request,
-        }: {
-          authenticatedUser?: AuthenticatedUser;
-          query: typeof syncQuerySchema.static;
-          request: Request;
-        }) => {
-          const user = await resolveRouteUser(authenticatedUser, request);
-
+        async ({ routeUser, query }) => {
           return mailSyncService.syncForUser({
-            userId: user.id,
+            userId: routeUser.id,
             accountId: query.accountId,
           });
         },
         {
-          query: syncQuerySchema,
+          query: RouteModel.mail.syncQuery,
           detail: {
             summary: "Synchronize mail changes for an authorized account",
             description:

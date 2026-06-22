@@ -14,14 +14,19 @@ import type {
   CreateEventRequest,
   RecurrenceEditScope,
 } from "@workspace/calendar-core";
+import { resolveTimezone } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
+import { useAuth } from "../../../src/providers/AuthProvider";
+import { useRecentContacts } from "../../../src/hooks/use-recent-contacts";
+import { extractRecentContactEntries } from "../../../src/lib/record-recent-contacts";
 import { useToast } from "../../../src/providers/ToastProvider";
+import { toastOperationWarnings } from "../../../src/lib/operation-warnings";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { EventForm } from "../../../src/components/event/EventForm";
 import { LoadingScreen } from "../../../src/components/ui/loading";
-import { toLocalISOString } from "../../../src/components/event/event-form-utils";
+import { toTimezonePickerISOString } from "../../../src/components/event/event-form-utils";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -31,13 +36,15 @@ import { toLocalISOString } from "../../../src/components/event/event-form-utils
  */
 function eventToInitialValues(
   event: CalendarEvent,
+  timezone?: string,
 ): Partial<CreateEventRequest> {
+  const resolvedTimezone = resolveTimezone(timezone ?? event.timezone);
   return {
     title: event.title,
     description: event.description ?? undefined,
-    start: toLocalISOString(new Date(event.start)),
-    end: toLocalISOString(new Date(event.end)),
-    timezone: event.timezone ?? undefined,
+    start: toTimezonePickerISOString(new Date(event.start), resolvedTimezone),
+    end: toTimezonePickerISOString(new Date(event.end), resolvedTimezone),
+    timezone: resolvedTimezone,
     allDay: event.allDay ?? false,
     location: event.location ?? undefined,
     color: event.color ?? undefined,
@@ -55,6 +62,8 @@ export default function EventEditScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { recordUsage } = useRecentContacts();
 
   // ─── Route params ──────────────────────────────────────────────────────────
 
@@ -82,6 +91,11 @@ export default function EventEditScreen() {
     queryKey: QUERY_KEYS.calendars(),
     queryFn: () => calendarApiService.getCalendars(),
   });
+  const { data: settings } = useQuery({
+    queryKey: QUERY_KEYS.settings(),
+    queryFn: () => calendarApiService.getUserSettings(),
+  });
+  const resolvedTimezone = resolveTimezone(settings?.timezone);
 
   // ─── Update mutation ───────────────────────────────────────────────────────
 
@@ -97,12 +111,20 @@ export default function EventEditScreen() {
       }
       return calendarApiService.updateEvent(id!, data);
     },
-    onSuccess: () => {
+    onSuccess: (savedEvent, variables) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.eventDetail(id!),
       });
+      const entries = extractRecentContactEntries(
+        variables.participants,
+        user?.email,
+      );
+      if (entries.length > 0) {
+        recordUsage(entries, "calendar");
+      }
       toast("Event updated");
+      toastOperationWarnings(toast, savedEvent);
       router.back();
     },
     onError: (err: unknown) => {
@@ -132,8 +154,8 @@ export default function EventEditScreen() {
 
   const initialValues = useMemo(() => {
     if (!event) return undefined;
-    return eventToInitialValues(event);
-  }, [event]);
+    return eventToInitialValues(event, resolvedTimezone);
+  }, [event, resolvedTimezone]);
 
   // ─── Loading state ─────────────────────────────────────────────────────────
 

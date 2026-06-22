@@ -10,6 +10,12 @@ import {
   useMailCompose,
   useMailComposeChrome,
 } from "@/components/mail/mail-compose-context";
+import {
+  validateJmapRequestSize,
+  estimateOutgoingJmapMessageBytes,
+  validateOutgoingMessageSize,
+} from "@workspace/calendar-core";
+import type { MailServerPolicy } from "@workspace/calendar-core";
 import { hasMeaningfulHtmlBody, htmlToPlainText } from "@/lib/mail/signature-utils";
 
 const log = createLogger("compose-draft-autosave");
@@ -32,6 +38,7 @@ type ComposeDraftAutosaveInput = {
     name?: string | null;
   }>;
   fallbackFromEmail: string;
+  mailServerPolicy?: MailServerPolicy | null;
   enabled: boolean;
 };
 
@@ -97,6 +104,30 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     const draftsMailboxId = getPrimaryMailboxId(input.mailboxes, "drafts");
     if (!draftsMailboxId) return null;
 
+    if (input.mailServerPolicy) {
+      const estimatedBytes = estimateOutgoingJmapMessageBytes({
+        subject: draft.subject.trim() || "(No subject)",
+        textBody: plainBody,
+        htmlBody,
+      });
+      const messageSizeError = validateOutgoingMessageSize(
+        estimatedBytes,
+        input.mailServerPolicy.limits.maxMessageSizeBytes,
+      );
+      if (messageSizeError) {
+        bridge.setDraftSaveStatus("error");
+        return null;
+      }
+      const requestSizeError = validateJmapRequestSize(
+        estimatedBytes,
+        input.mailServerPolicy,
+      );
+      if (requestSizeError) {
+        bridge.setDraftSaveStatus("error");
+        return null;
+      }
+    }
+
     const identity =
       input.identities.find((entry) => entry.id === draft.identityId) ??
       input.identities[0];
@@ -139,6 +170,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     input.fallbackFromEmail,
     input.identities,
     input.mailboxes,
+    input.mailServerPolicy,
     input.session,
   ]);
 

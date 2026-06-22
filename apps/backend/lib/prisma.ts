@@ -1,4 +1,5 @@
 import { PrismaClient, type Prisma } from "../generated/prisma";
+import { errorLogDetails, redactPII } from "./log-sanitization";
 import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:prisma");
@@ -86,13 +87,13 @@ if (isDevelopment) {
       return;
     }
 
-    logger.error(e.message);
+    logger.error(redactPII(e.message));
   });
   prismaWithEvents.$on("warn", (e) => {
-    logger.warn(e.message);
+    logger.warn(redactPII(e.message));
   });
   prismaWithEvents.$on("info", (e) => {
-    logger.info(e.message);
+    logger.info(redactPII(e.message));
   });
 }
 
@@ -122,7 +123,7 @@ export async function checkDatabaseConnection(): Promise<boolean> {
     await prisma.$queryRaw`SELECT 1`;
     return true;
   } catch (error) {
-    logger.error("Database connection failed:", error);
+    logger.error("Database connection failed", errorLogDetails(error));
     return false;
   }
 }
@@ -150,7 +151,7 @@ export const db = {
     try {
       return await queryFn();
     } catch (error) {
-      logger.error("Database query failed:", error);
+      logger.error("Database query failed", errorLogDetails(error));
       return fallback || null;
     }
   },

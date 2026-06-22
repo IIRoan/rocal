@@ -1,26 +1,14 @@
 import { Elysia } from "elysia";
 import { createLogger } from "@workspace/logger";
+import { resolveRequestId } from "./request-context";
+import {
+  errorLogDetails,
+  sanitizeRequestUrl,
+} from "./log-sanitization";
 
 const logger = createLogger("backend:errors");
 
-/**
- * Extract a human-readable message from an unknown error value.
- * Returns `fallback` (default "Unknown error") when the value is not an Error.
- */
-export function errorMessage(error: unknown, fallback = "Unknown error"): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string" && error.length > 0) return error;
-  return fallback;
-}
-
-/**
- * Like {@link errorMessage} but uses `String(error)` as the fallback so any
- * non-Error value is still serialized. Use for diagnostic/log payloads where
- * preserving the original value matters.
- */
-export function errorString(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+export { errorMessage, errorString } from "./error-utils";
 
 // Custom error types
 export class ValidationError extends Error {
@@ -99,12 +87,25 @@ export class NotificationError extends Error {
   }
 }
 
+export class RateLimitError extends Error {
+  constructor(
+    message: string,
+    public retryAfterSeconds: number,
+  ) {
+    super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
+    this.name = "RateLimitError";
+  }
+}
+
 // Error response interface
 export interface ApiErrorResponse {
   error: string;
   message: string;
   statusCode: number;
   details?: Record<string, unknown>;
+  /** Correlates client-facing errors with server logs. */
+  requestId?: string;
   timestamp: string;
 }
 
@@ -138,143 +139,262 @@ function getValidationDetails(error: unknown) {
   return issues.length > 0 ? { issues } : undefined;
 }
 
-// Error handling middleware
-export const errorHandler = new Elysia({ name: "error-handler" }).onError(
-  ({ code, error, set, request }) => {
+function buildErrorResponse(
+  statusCode: number,
+  error: string,
+  message: string,
+  timestamp: string,
+  requestId: string,
+  details?: Record<string, unknown>,
+): ApiErrorResponse {
+  return {
+    error,
+    message,
+    statusCode,
+    details,
+    requestId,
+    timestamp,
+  };
+}
+
+function logRequestFailure(
+  statusCode: number,
+  context: Record<string, unknown>,
+) {
+  if (statusCode >= 500 || statusCode === 429) {
+    logger.error("Request failed", context);
+    return;
+  }
+
+  logger.warn("Request failed", context);
+}
+
+function finishErrorResponse(
+  statusCode: number,
+  response: ApiErrorResponse,
+  context: Record<string, unknown>,
+): ApiErrorResponse {
+  logRequestFailure(statusCode, context);
+  return response;
+}
+
+// Error handling middleware — must be registered with `.onError(handleApiError)` on the
+// root app *before* route definitions so thrown errors are formatted consistently.
+export function handleApiError({
+  code,
+  error,
+  set,
+  request,
+}: {
+  code: string | number;
+  error: unknown;
+  set: {
+    status?: number | string;
+    headers: Record<string, string | number | undefined>;
+  };
+  request: Request;
+}) {
     const timestamp = new Date().toISOString();
+    const requestId = resolveRequestId(request);
+    set.headers["x-request-id"] = requestId;
+
     const requestMeta = request
       ? {
           method: request.method,
-          url: request.url,
+          url: sanitizeRequestUrl(request.url),
         }
       : undefined;
 
-    // Log error for debugging (in production, use proper logging)
-    logger.error(`[${timestamp}] Error:`, {
+    const errorDetails = errorLogDetails(error);
+    const logContext = {
+      requestId,
       code,
       ...requestMeta,
-      message: error instanceof Error ? error.message : String(error),
-      errorName: error instanceof Error ? error.name : undefined,
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+      ...errorDetails,
+    };
 
     // Handle different error types
     switch (code) {
       case "VALIDATION":
         set.status = 400;
-        return {
-          error: "Validation Error",
-          message: error.message,
-          statusCode: 400,
-          details: getValidationDetails(error),
-          timestamp,
-        } as ApiErrorResponse;
+        return finishErrorResponse(
+          400,
+          buildErrorResponse(
+            400,
+            "Validation Error",
+            error instanceof Error ? error.message : String(error),
+            timestamp,
+            requestId,
+            getValidationDetails(error),
+          ),
+          logContext,
+        );
 
       case "NOT_FOUND":
         set.status = 404;
-        return {
-          error: "Not Found",
-          message: error.message || "Resource not found",
-          statusCode: 404,
-          timestamp,
-        } as ApiErrorResponse;
+        return finishErrorResponse(
+          404,
+          buildErrorResponse(
+            404,
+            "Not Found",
+            error instanceof Error ? error.message : "Resource not found",
+            timestamp,
+            requestId,
+          ),
+          logContext,
+        );
 
       case "PARSE":
         set.status = 400;
-        return {
-          error: "Parse Error",
-          message: "Invalid request format",
-          statusCode: 400,
-          timestamp,
-        } as ApiErrorResponse;
+        return finishErrorResponse(
+          400,
+          buildErrorResponse(
+            400,
+            "Parse Error",
+            "Invalid request format",
+            timestamp,
+            requestId,
+          ),
+          logContext,
+        );
 
       default:
         // Handle custom errors
         if (error instanceof ValidationError) {
           set.status = 400;
-          return {
-            error: "Validation Error",
-            message: error.message,
-            statusCode: 400,
-            details: error.field ? { field: error.field } : undefined,
-            timestamp,
-          } as ApiErrorResponse;
+          return finishErrorResponse(
+            400,
+            buildErrorResponse(
+              400,
+              "Validation Error",
+              error.message,
+              timestamp,
+              requestId,
+              error.field ? { field: error.field } : undefined,
+            ),
+            logContext,
+          );
         }
 
         if (error instanceof NotFoundError) {
           set.status = 404;
-          return {
-            error: "Not Found",
-            message: error.message,
-            statusCode: 404,
-            timestamp,
-          } as ApiErrorResponse;
+          return finishErrorResponse(
+            404,
+            buildErrorResponse(
+              404,
+              "Not Found",
+              error.message,
+              timestamp,
+              requestId,
+            ),
+            logContext,
+          );
         }
 
         if (error instanceof UnauthorizedError) {
           set.status = 401;
-          return {
-            error: "Unauthorized",
-            message: error.message,
-            statusCode: 401,
-            timestamp,
-          } as ApiErrorResponse;
+          return finishErrorResponse(
+            401,
+            buildErrorResponse(
+              401,
+              "Unauthorized",
+              error.message,
+              timestamp,
+              requestId,
+            ),
+            logContext,
+          );
         }
 
         if (error instanceof ForbiddenError) {
           set.status = 403;
-          return {
-            error: "Forbidden",
-            message: error.message,
-            statusCode: 403,
-            timestamp,
-          } as ApiErrorResponse;
+          return finishErrorResponse(
+            403,
+            buildErrorResponse(
+              403,
+              "Forbidden",
+              error.message,
+              timestamp,
+              requestId,
+            ),
+            logContext,
+          );
         }
 
         if (error instanceof ConflictError) {
           set.status = 409;
-          return {
-            error: "Conflict",
-            message: error.message,
-            statusCode: 409,
-            timestamp,
-          } as ApiErrorResponse;
+          return finishErrorResponse(
+            409,
+            buildErrorResponse(
+              409,
+              "Conflict",
+              error.message,
+              timestamp,
+              requestId,
+            ),
+            logContext,
+          );
+        }
+
+        if (error instanceof RateLimitError) {
+          set.status = 429;
+          set.headers["Retry-After"] = String(error.retryAfterSeconds);
+          return finishErrorResponse(
+            429,
+            buildErrorResponse(
+              429,
+              "Too Many Requests",
+              error.message,
+              timestamp,
+              requestId,
+            ),
+            logContext,
+          );
         }
 
         if (error instanceof UpstreamServiceError) {
           set.status = error.statusCode;
-          return {
-            error: "Upstream Service Error",
-            message: error.message,
-            statusCode: error.statusCode,
-            timestamp,
-          } as ApiErrorResponse;
+          return finishErrorResponse(
+            error.statusCode,
+            buildErrorResponse(
+              error.statusCode,
+              "Upstream Service Error",
+              error.message,
+              timestamp,
+              requestId,
+            ),
+            logContext,
+          );
         }
 
         if (error instanceof DatabaseError) {
           set.status = 500;
-          return {
-            error: "Database Error",
-            message: error.message,
-            statusCode: 500,
-            details: error.originalError
-              ? { originalError: error.originalError.message }
-              : undefined,
-            timestamp,
-          } as ApiErrorResponse;
+          return finishErrorResponse(
+            500,
+            buildErrorResponse(
+              500,
+              "Database Error",
+              error.message,
+              timestamp,
+              requestId,
+            ),
+            logContext,
+          );
         }
 
         if (error instanceof NotificationError) {
           set.status = 500;
-          return {
-            error: "Notification Error",
-            message: error.message,
-            statusCode: 500,
-            details: error.originalError
-              ? { originalError: error.originalError.message }
-              : undefined,
-            timestamp,
-          } as ApiErrorResponse;
+          return finishErrorResponse(
+            500,
+            buildErrorResponse(
+              500,
+              "Notification Error",
+              error.message,
+              timestamp,
+              requestId,
+            ),
+            logContext,
+          );
         }
 
         // Handle Prisma errors
@@ -283,12 +403,17 @@ export const errorHandler = new Elysia({ name: "error-handler" }).onError(
           error.message.includes("Unique constraint")
         ) {
           set.status = 409;
-          return {
-            error: "Conflict",
-            message: "Resource already exists",
-            statusCode: 409,
-            timestamp,
-          } as ApiErrorResponse;
+          return finishErrorResponse(
+            409,
+            buildErrorResponse(
+              409,
+              "Conflict",
+              "Resource already exists",
+              timestamp,
+              requestId,
+            ),
+            logContext,
+          );
         }
 
         if (
@@ -296,22 +421,36 @@ export const errorHandler = new Elysia({ name: "error-handler" }).onError(
           error.message.includes("Record to update not found")
         ) {
           set.status = 404;
-          return {
-            error: "Not Found",
-            message: "Resource not found",
-            statusCode: 404,
-            timestamp,
-          } as ApiErrorResponse;
+          return finishErrorResponse(
+            404,
+            buildErrorResponse(
+              404,
+              "Not Found",
+              "Resource not found",
+              timestamp,
+              requestId,
+            ),
+            logContext,
+          );
         }
 
-        // Generic server error
+        // Generic server error — include requestId so users can report issues.
         set.status = 500;
-        return {
-          error: "Internal Server Error",
-          message: "An unexpected error occurred",
-          statusCode: 500,
-          timestamp,
-        } as ApiErrorResponse;
+        return finishErrorResponse(
+          500,
+          buildErrorResponse(
+            500,
+            "Internal Server Error",
+            "An unexpected error occurred. If this keeps happening, contact support and include the request id.",
+            timestamp,
+            requestId,
+          ),
+          logContext,
+        );
     }
-  },
+}
+
+/** @deprecated Prefer `.onError(handleApiError)` on the root app instance. */
+export const errorHandler = new Elysia({ name: "error-handler" }).onError(
+  handleApiError,
 );

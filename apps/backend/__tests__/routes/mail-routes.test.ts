@@ -116,7 +116,7 @@ describe("mailRoutes passkey step-up", () => {
 
     expect(response.status).toBe(200);
     expect(mockGetPasskeyStepUpStatus).toHaveBeenCalled();
-    expect(mockMailService.issueAccessTokenForUser).toHaveBeenCalledWith({
+    expect(mockMailService.getAccessTokenForUser).toHaveBeenCalledWith({
       userId: "user-1",
       email: "alice@solace.onl",
     });

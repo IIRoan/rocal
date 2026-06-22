@@ -1,5 +1,6 @@
 import { env } from "./env";
 import { createLogger } from "@workspace/logger";
+import { logRef } from "./log-sanitization";
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -69,6 +70,15 @@ export interface StalwartAdminClientLike {
     localPart: string;
     domainId: string;
   }): Promise<string | null>;
+  resolveMailboxPublicKey(input: {
+    email: string;
+  }): Promise<{
+    email: string;
+    publicKeyArmored: string;
+    publicKeyId: string;
+    stalwartAccountId: string;
+    stalwartDomainId: string;
+  } | null>;
   ensureOAuthClient(input: {
     clientId: string;
     redirectUri: string;
@@ -343,6 +353,67 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     return account;
   }
 
+  private async findAccountByEmailAddress(input: {
+    email: string;
+    domainId: string;
+  }): Promise<{
+    id: string;
+    name: string;
+    domainId: string;
+    emailAddress?: string;
+    credentials?: Record<string, StalwartCredentialRecord>;
+    encryptionAtRest?: Record<string, unknown>;
+  } | null> {
+    const normalizedEmail = input.email.trim().toLowerCase();
+    const queryEnvelope = await this.postJmap([
+      [
+        "x:Account/query",
+        {
+          filter: {
+            domainId: input.domainId,
+          },
+        },
+        "c1",
+      ],
+    ]);
+    const queryResult = this.getMethodResult<{ ids?: string[] }>(
+      queryEnvelope,
+      "x:Account/query",
+    );
+    const ids = Array.isArray(queryResult.ids) ? queryResult.ids : [];
+
+    if (ids.length === 0) {
+      return null;
+    }
+
+    const getEnvelope = await this.postJmap([
+      [
+        "x:Account/get",
+        {
+          ids,
+        },
+        "c1",
+      ],
+    ]);
+    const getResult = this.getMethodResult<{
+      list?: Array<{
+        id: string;
+        name: string;
+        domainId: string;
+        emailAddress?: string;
+        credentials?: Record<string, StalwartCredentialRecord>;
+        encryptionAtRest?: Record<string, unknown>;
+      }>;
+    }>(getEnvelope, "x:Account/get");
+
+    return (
+      (getResult.list ?? []).find(
+        (account) =>
+          account.emailAddress?.trim().toLowerCase() === normalizedEmail,
+      ) ?? null
+    );
+  }
+
   private async recoverExistingAccountId(
     input: {
       localPart: string;
@@ -447,6 +518,66 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
   }): Promise<string | null> {
     const account = await this.findAccountByMailbox(input);
     return account?.id ?? null;
+  }
+
+  async resolveMailboxPublicKey(input: {
+    email: string;
+  }): Promise<{
+    email: string;
+    publicKeyArmored: string;
+    publicKeyId: string;
+    stalwartAccountId: string;
+    stalwartDomainId: string;
+  } | null> {
+    const normalizedEmail = input.email.trim().toLowerCase();
+    const atIndex = normalizedEmail.lastIndexOf("@");
+    if (atIndex <= 0 || atIndex === normalizedEmail.length - 1) {
+      return null;
+    }
+
+    const localPart = normalizedEmail.slice(0, atIndex);
+    const domainName = normalizedEmail.slice(atIndex + 1);
+
+    let domain: StalwartDomainRecord;
+    try {
+      domain = await this.resolveDomainByName(domainName);
+    } catch {
+      return null;
+    }
+
+    const accountByName = await this.findAccountByMailbox({
+      localPart,
+      domainId: domain.id,
+    });
+    const account =
+      accountByName ??
+      (await this.findAccountByEmailAddress({
+        email: normalizedEmail,
+        domainId: domain.id,
+      }));
+    const accountId = account?.id;
+    if (!accountId) {
+      return null;
+    }
+
+    const publicKeys = await this.listPublicKeysForAccount(accountId);
+    const matchingKey =
+      publicKeys.find((publicKey) =>
+        this.publicKeyMatchesEmail(publicKey, normalizedEmail),
+      ) ?? publicKeys[0];
+    const publicKeyArmored = matchingKey?.key?.trim();
+
+    if (!matchingKey?.id || !publicKeyArmored) {
+      return null;
+    }
+
+    return {
+      email: normalizedEmail,
+      publicKeyArmored,
+      publicKeyId: matchingKey.id,
+      stalwartAccountId: accountId,
+      stalwartDomainId: domain.id,
+    };
   }
 
   async deleteAccount(accountId: string): Promise<void> {
@@ -808,6 +939,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
   private async listPublicKeysForAccount(accountId: string): Promise<
     Array<{
       id: string;
+      key?: string;
       emailAddresses?: Record<string, boolean> | string[];
     }>
   > {
@@ -844,6 +976,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     const getResult = this.getMethodResult<{
       list?: Array<{
         id: string;
+        key?: string;
         emailAddresses?: Record<string, boolean> | string[];
       }>;
     }>(getEnvelope, "x:PublicKey/get");
@@ -871,7 +1004,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
           "Adopting the first Stalwart public key for mailbox recovery",
           {
             accountId: input.accountId,
-            email: input.email,
+            recipientRef: logRef(input.email),
             existingPublicKeyId: fallbackKey.id,
           },
         );
@@ -886,7 +1019,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
       "Stalwart registerPublicKey reported an existing remote key; attempting recovery",
       {
         accountId: input.accountId,
-        email: input.email,
+        recipientRef: logRef(input.email),
         existingPublicKeyId: matchingKey.id,
         errorType: input.createError?.type ?? null,
         properties: input.createError?.properties ?? null,

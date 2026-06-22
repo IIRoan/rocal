@@ -31,23 +31,17 @@ jest.mock("../../lib/prisma", () => ({
   },
 }));
 
-jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(
-    async (): Promise<any> => ({
-      id: "user-1",
-    }),
-  ),
-}));
-
 jest.mock("../../lib/auth", () => ({
   auth: { api: { getSession: jest.fn() } },
 }));
 
 jest.mock("../../lib/auth-guard", () => {
-  const { Elysia: LocalElysia } =
-    jest.requireActual<typeof import("elysia")>("elysia");
+  const { createMockRequireAuth } =
+    jest.requireActual<typeof import("../helpers/mock-require-auth")>(
+      "../helpers/mock-require-auth",
+    );
   return {
-    requireAuth: new LocalElysia({ name: "require-auth-test" }),
+    requireAuth: createMockRequireAuth(),
   };
 });
 
@@ -70,16 +64,12 @@ jest.mock("@workspace/logger", () => ({
   }),
 }));
 
-import { ensureAuthenticatedUser } from "../../lib/auth-utils";
 import { NotificationCalculator } from "../../lib/notification-calculator";
 import { prisma } from "../../lib/prisma";
-import { errorHandler } from "../../lib/errors";
+import { handleApiError } from "../../lib/errors";
 import { notificationsRoutes } from "../../routes/notifications";
+import { expectValidationError } from "../helpers/validation-assertions";
 
-const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<
-    typeof ensureAuthenticatedUser
-  >;
 const mockPrisma = prisma as unknown as {
   calendarEvent: {
     findFirst: jest.Mock<() => Promise<any>>;
@@ -106,7 +96,7 @@ const mockBuildNotificationSchedule =
 
 function createApp() {
   return new Elysia({ normalize: false })
-    .use(errorHandler)
+    .onError(handleApiError)
     .use(notificationsRoutes);
 }
 
@@ -142,9 +132,7 @@ function eventFixture(
 }
 
 describe("notificationsRoutes", () => {
-  beforeEach(() => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.calendar.findFirst.mockResolvedValue({
+  beforeEach(() => {    mockPrisma.calendar.findFirst.mockResolvedValue({
       id: "cal-1",
       icsShareEnabled: false,
     });
@@ -172,9 +160,7 @@ describe("notificationsRoutes", () => {
     expect(mockPrisma.calendarEvent.findFirst).not.toHaveBeenCalled();
   });
 
-  it("returns mapped notification rows for owned events", async () => {
-    mockEnsureAuthenticatedUser.mockClear();
-    mockPrisma.calendarEvent.findFirst.mockResolvedValue(eventFixture());
+  it("returns mapped notification rows for owned events", async () => {    mockPrisma.calendarEvent.findFirst.mockResolvedValue(eventFixture());
     mockPrisma.$queryRaw.mockResolvedValue([
       {
         id: "notification-1",
@@ -218,22 +204,21 @@ describe("notificationsRoutes", () => {
         count: 1,
       },
     });
-    expect(mockEnsureAuthenticatedUser).toHaveBeenCalledWith(
-      undefined,
-      expect.any(Request),
-    );
   });
 
-  it("surfaces not-found and wrapped database failures during reads", async () => {
+  it("surfaces not-found and database failures during reads", async () => {
     mockPrisma.calendarEvent.findFirst.mockResolvedValueOnce(null);
 
     const notFoundResponse = await createApp().handle(
       new Request("http://localhost/notifications/event/missing"),
     );
 
-    expect(notFoundResponse.status).toBe(500);
-    await expect(notFoundResponse.text()).resolves.toBe(
-      "Event not found or access denied",
+    expect(notFoundResponse.status).toBe(404);
+    await expect(notFoundResponse.json()).resolves.toEqual(
+      expect.objectContaining({
+        error: "Not Found",
+        message: "Event not found or access denied",
+      }),
     );
 
     mockPrisma.calendarEvent.findFirst.mockResolvedValueOnce(eventFixture());
@@ -244,8 +229,11 @@ describe("notificationsRoutes", () => {
     );
 
     expect(errorResponse.status).toBe(500);
-    await expect(errorResponse.text()).resolves.toBe(
-      "Failed to retrieve event notifications",
+    await expect(errorResponse.json()).resolves.toEqual(
+      expect.objectContaining({
+        error: "Internal Server Error",
+        requestId: expect.any(String),
+      }),
     );
   });
 
@@ -267,17 +255,6 @@ describe("notificationsRoutes", () => {
         count: 0,
       },
     });
-  });
-
-  it("returns an auth error when notification rate limiting receives no user", async () => {
-    mockEnsureAuthenticatedUser.mockResolvedValue(null as any);
-
-    const response = await createApp().handle(
-      new Request("http://localhost/notifications/event/event-no-user"),
-    );
-
-    expect(response.status).toBe(401);
-    await expect(response.text()).resolves.toBe("Authentication required");
   });
 
   it("skips updates when the event is already in the past", async () => {
@@ -350,9 +327,12 @@ describe("notificationsRoutes", () => {
       }),
     );
 
-    expect(response.status).toBe(500);
-    await expect(response.text()).resolves.toBe(
-      "Duplicate notification configurations are not allowed",
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        error: "Validation Error",
+        message: "Duplicate notification configurations are not allowed",
+      }),
     );
   });
 
@@ -374,10 +354,8 @@ describe("notificationsRoutes", () => {
       }),
     );
 
-    expect(response.status).toBe(422);
-    await expect(response.text()).resolves.toContain(
-      "Property 'notifications.0.unexpected' should not be provided",
-    );
+    expect(response.status).toBe(400);
+    await expectValidationError(response, "unexpected");
     expect(mockPrisma.calendarEvent.findFirst).not.toHaveBeenCalled();
   });
 
@@ -495,7 +473,7 @@ describe("notificationsRoutes", () => {
     );
   });
 
-  it("wraps unexpected update failures", async () => {
+  it("surfaces unexpected update failures", async () => {
     jest.useFakeTimers().setSystemTime(new Date("2024-02-01T12:00:00.000Z"));
     mockPrisma.calendarEvent.findFirst.mockResolvedValue(eventFixture());
     mockBuildNotificationSchedule.mockReturnValue({
@@ -523,9 +501,14 @@ describe("notificationsRoutes", () => {
       }),
     );
 
-    const responseBody = await response.text();
+    const responseBody = await response.json();
     expect(response.status).toBe(500);
-    expect(responseBody).toBe("Failed to update event notifications");
+    expect(responseBody).toEqual(
+      expect.objectContaining({
+        error: "Internal Server Error",
+        requestId: expect.any(String),
+      }),
+    );
   });
 
   it("deletes notifications for owned events and no-ops for recurring instances", async () => {
@@ -654,7 +637,7 @@ describe("notificationsRoutes", () => {
     });
   });
 
-  it("wraps unexpected delete failures", async () => {
+  it("surfaces unexpected delete failures", async () => {
     mockPrisma.calendarEvent.findFirst.mockResolvedValue(eventFixture());
     mockPrisma.eventNotification.deleteMany.mockRejectedValueOnce(
       new Error("delete failed"),
@@ -667,8 +650,12 @@ describe("notificationsRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    const body = await response.text();
-    expect(body).toBe("Failed to delete event notifications");
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        error: "Internal Server Error",
+        requestId: expect.any(String),
+      }),
+    );
   });
 
   it("enforces the update rate limit", async () => {
@@ -696,8 +683,11 @@ describe("notificationsRoutes", () => {
     );
 
     expect(limitedResponse.status).toBe(429);
-    await expect(limitedResponse.text()).resolves.toContain(
-      "Rate limit exceeded.",
+    await expect(limitedResponse.json()).resolves.toEqual(
+      expect.objectContaining({
+        error: "Too Many Requests",
+        message: expect.stringContaining("Rate limit exceeded"),
+      }),
     );
   });
 });

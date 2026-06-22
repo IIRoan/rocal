@@ -10,6 +10,7 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import { resolveReplyRecipients, type MailServerLimits } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { extractMessageBodies } from "@/lib/mail/message-security";
 import { htmlToPlainText } from "@/lib/mail/signature-utils";
@@ -113,6 +114,7 @@ type MailComposeFieldsContextValue = {
   setComposeHtmlBody: (value: string) => void;
   composeAttachments: File[];
   setComposeAttachments: React.Dispatch<React.SetStateAction<File[]>>;
+  mailServerLimits: MailServerLimits;
   selectedIdentityId: string | null;
   setSelectedIdentityId: (id: string | null) => void;
   draftSaveStatus: DraftSaveStatus;
@@ -167,9 +169,11 @@ function addressesToCsv(
 export function MailComposeProvider({
   children,
   identities = [],
+  mailServerLimits,
 }: {
   children: ReactNode;
   identities?: JmapIdentity[];
+  mailServerLimits: MailServerLimits;
 }) {
   const [composeTo, setComposeTo] = useState("");
   const [composeCc, setComposeCc] = useState("");
@@ -274,6 +278,16 @@ export function MailComposeProvider({
   const seedReply = useCallback(
     (message: JmapEmailMessage, plaintext: string | null) => {
       const sender = message.from?.[0]?.email ?? "";
+      const currentIdentityEmail =
+        identities.find((entry) => entry.id === resolvedIdentityId)?.email ??
+        identities[0]?.email ??
+        null;
+      const replyRecipients = resolveReplyRecipients({
+        from: message.from,
+        to: message.to,
+        cc: message.cc,
+        currentUserEmail: currentIdentityEmail,
+      });
       const subject = message.subject ?? "";
       const { text, html } = extractMessageBodies(message);
       const body = plaintext ?? text ?? "";
@@ -281,7 +295,7 @@ export function MailComposeProvider({
       const date = message.receivedAt
         ? new Date(message.receivedAt).toLocaleString()
         : "";
-      setComposeTo(sender);
+      setComposeTo(replyRecipients.join(", "));
       setComposeCc("");
       setComposeBcc("");
       setComposeSubject(subject.startsWith("Re: ") ? subject : `Re: ${subject}`);
@@ -296,7 +310,7 @@ export function MailComposeProvider({
       isDirtyRef.current = true;
       setIsComposeOpen(true);
     },
-    [],
+    [identities, resolvedIdentityId],
   );
 
   const seedForward = useCallback(
@@ -454,6 +468,7 @@ export function MailComposeProvider({
       },
       composeAttachments,
       setComposeAttachments,
+      mailServerLimits,
       selectedIdentityId: resolvedIdentityId,
       setSelectedIdentityId: (id: string | null) => {
         markDirty();
@@ -472,6 +487,7 @@ export function MailComposeProvider({
       composeBody,
       composeHtmlBody,
       composeAttachments,
+      mailServerLimits,
       resolvedIdentityId,
       draftSaveStatus,
       draftId,

@@ -34,7 +34,7 @@ const mockMailOAuthConfig = {
 };
 
 const mockMailService = {
-  getConfig: jest.fn(() => ({
+  getConfig: jest.fn(async () => ({
     defaultDomain: "solace.onl",
     discoveryBaseUrl: "http://localhost:8080",
     signupEnabled: true,
@@ -451,6 +451,7 @@ describe("mailRoutes", () => {
       error: "mail_token_error",
       message: "Stalwart mailbox login was rejected.",
       statusCode: 400,
+      timestamp: expect.any(String),
     });
   });
 

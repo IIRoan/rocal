@@ -23,35 +23,25 @@ jest.mock("../../lib/prisma", () => ({
   },
 }));
 
-jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(
-    async (): Promise<any> => ({
-      id: "user-1",
-    }),
-  ),
-}));
-
 jest.mock("../../lib/auth", () => ({
   auth: { api: { getSession: jest.fn() } },
 }));
 
 jest.mock("../../lib/auth-guard", () => {
-  const { Elysia: LocalElysia } =
-    jest.requireActual<typeof import("elysia")>("elysia");
+  const { createMockRequireAuth } =
+    jest.requireActual<typeof import("../helpers/mock-require-auth")>(
+      "../helpers/mock-require-auth",
+    );
   return {
-    requireAuth: new LocalElysia({ name: "require-auth-test" }),
+    requireAuth: createMockRequireAuth(),
   };
 });
 
 import { errorHandler } from "../../lib/errors";
-import { ensureAuthenticatedUser } from "../../lib/auth-utils";
 import { prisma } from "../../lib/prisma";
 import { e2eeRoutes } from "../../routes/e2ee";
+import { expectValidationError } from "../helpers/validation-assertions";
 
-const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<
-    typeof ensureAuthenticatedUser
-  >;
 const mockPrisma = prisma as unknown as {
   userEncryptionDevice: {
     findMany: jest.Mock<() => Promise<any>>;
@@ -85,9 +75,7 @@ async function readText(response: Response) {
 }
 
 describe("e2eeRoutes", () => {
-  beforeEach(() => {
-    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-  });
+  beforeEach(() => {  });
 
   it("returns bootstrap metadata for the authenticated user", async () => {
     mockPrisma.userEncryptionDevice.findMany.mockResolvedValue([
@@ -329,9 +317,7 @@ describe("e2eeRoutes", () => {
     );
 
     expect(response.status).toBe(422);
-    await expect(readText(response)).resolves.toContain(
-      "Property 'unexpected' should not be provided",
-    );
+    await expectValidationError(response, "unexpected");
     expect(mockPrisma.userEncryptionDevice.upsert).not.toHaveBeenCalled();
   });
 });

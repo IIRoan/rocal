@@ -14,6 +14,7 @@ import {
   type ImportIcsResponse,
   findNationalHolidayCalendarByUrl,
 } from "@workspace/calendar-ics";
+import { resolveTimezone } from "@workspace/calendar-core";
 import {
   areParsedEventParticipantsDifferent,
   parseICSFile,
@@ -55,7 +56,7 @@ export class SubscriptionService implements ISubscriptionService {
       });
     }
 
-    return userSettings.timezone || "UTC";
+    return resolveTimezone(userSettings.timezone);
   }
 
   private validateExternalCalendarUrl(url: string): URL {
@@ -259,7 +260,9 @@ export class SubscriptionService implements ISubscriptionService {
       testParseResult = parseICSFile(icsContent, userTimezone);
 
       if (testParseResult.errors.length > 0) {
-        logger.warn("ICS parsing warnings:", testParseResult.errors);
+        logger.warn("ICS parsing warnings", {
+          warningCount: testParseResult.errors.length,
+        });
       }
     } catch (error) {
       throw new ValidationError(
@@ -379,7 +382,7 @@ export class SubscriptionService implements ISubscriptionService {
   }
 
   async delete(input: SubscriptionDeleteInput) {
-    const { userId, subscriptionId } = input;
+    const { userId, subscriptionId, deleteEvents } = input;
 
     const subscription = await this.prisma.calendarSubscription.findFirst({
       where: { id: subscriptionId, userId },
@@ -389,17 +392,41 @@ export class SubscriptionService implements ISubscriptionService {
       throw new NotFoundError("Subscription not found");
     }
 
-    await this.prisma.calendarEvent.deleteMany({
-      where: { subscriptionId },
-    });
+    if (deleteEvents) {
+      await this.prisma.calendarEvent.deleteMany({
+        where: { subscriptionId },
+      });
 
-    await this.prisma.calendarSubscription.delete({
-      where: { id: subscriptionId },
-    });
+      await this.prisma.calendarSubscription.delete({
+        where: { id: subscriptionId },
+      });
 
-    await this.prisma.calendar.deleteMany({
-      where: { id: subscription.calendarId, userId, isSyncOnly: true },
-    });
+      await this.prisma.calendar.deleteMany({
+        where: { id: subscription.calendarId, userId, isSyncOnly: true },
+      });
+    } else {
+      await this.prisma.calendarEvent.updateMany({
+        where: { subscriptionId },
+        data: {
+          subscriptionId: null,
+          isSynced: false,
+          externalId: null,
+          syncedAt: null,
+        },
+      });
+
+      await this.prisma.calendar.updateMany({
+        where: { id: subscription.calendarId, userId, isSyncOnly: true },
+        data: {
+          isSyncOnly: false,
+          kind: "owned",
+        },
+      });
+
+      await this.prisma.calendarSubscription.delete({
+        where: { id: subscriptionId },
+      });
+    }
 
     return { success: true };
   }
@@ -617,7 +644,7 @@ export class SubscriptionService implements ISubscriptionService {
                 recurrence: parsedEvent.recurrence
                   ? JSON.stringify(parsedEvent.recurrence)
                   : null,
-                timezone: parsedEvent.timezone || "UTC",
+                timezone: resolveTimezone(parsedEvent.timezone),
                 syncedAt: new Date(),
               },
             });

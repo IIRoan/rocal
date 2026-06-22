@@ -1,4 +1,5 @@
 import type { CalendarEvent } from "./types";
+import { resolveTimezone } from "./timezone";
 
 export const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
 
@@ -130,7 +131,7 @@ function formatEventClockTime(
 export function buildEventReminderMailView(
   input: BuildEventReminderMailViewInput,
 ): EventReminderMailView {
-  const timezone = input.timezone?.trim() || "UTC";
+  const timezone = resolveTimezone(input.timezone);
   const start = new Date(input.event.start);
   const end = new Date(input.event.end);
   const minutesBefore = input.minutesBefore ?? null;

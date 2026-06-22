@@ -5,6 +5,7 @@ import {
   type ParsedIcsEvent,
 } from "@workspace/calendar-ics/parse-ics";
 import type { IcsParticipant } from "@workspace/calendar-ics";
+import { resolveTimezone } from "@workspace/calendar-core";
 import { normalizeParticipantEmail } from "./event-participants";
 
 export type { IcsParseResult, ParsedIcsEvent };
@@ -75,7 +76,7 @@ export function convertParsedEventToCalendarEvent(
     recurrence: parsedEvent.recurrence
       ? JSON.stringify(parsedEvent.recurrence)
       : undefined,
-    timezone: parsedEvent.timezone || "UTC",
+    timezone: resolveTimezone(parsedEvent.timezone),
     isSynced: !!subscriptionId,
     externalId: parsedEvent.uid,
     subscriptionId: subscriptionId,
@@ -105,7 +106,9 @@ export function isEventModified(
     existing.allDay !== parsed.allDay ||
     existing.location !== (parsed.location || null) ||
     existing.recurrence !== parsedRecurrence ||
-    existing.timezone !== (parsed.timezone || "UTC")
+    (parsed.timezone?.trim()
+      ? existing.timezone !== resolveTimezone(parsed.timezone)
+      : false)
   );
 }
 

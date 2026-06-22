@@ -1,4 +1,5 @@
 import { Elysia } from "elysia";
+import { unauthorizedBody } from "./lib/api-error-response";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
 import {
@@ -19,6 +20,7 @@ import { eventsRoutes } from "./routes/events";
 import { categoriesRoutes } from "./routes/categories";
 import { calendarsRoutes } from "./routes/calendars";
 import { settingsRoutes } from "./routes/settings";
+import { recentContactsRoutes } from "./routes/recent-contacts";
 import { notificationsRoutes } from "./routes/notifications";
 import { recurringRoutes } from "./routes/recurring";
 import { subscriptionsRoute } from "./routes/subscriptions";
@@ -33,7 +35,9 @@ import {
   defaultMailRealtimeService,
   realtimeMailRoutes,
 } from "./routes/realtime-mail";
-import { errorHandler, UnauthorizedError } from "./lib/errors";
+import { handleApiError } from "./lib/errors";
+import { errorLogDetails } from "./lib/log-sanitization";
+import { requestContext } from "./lib/request-context";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
 import {
   API_DOCS_SPEC_PATH,
@@ -49,6 +53,7 @@ import {
 } from "./lib/openapi";
 import { corsOriginPolicy } from "./lib/origin-policy";
 import { patchOauthMetadataResponse } from "./lib/oauth-metadata";
+import { routeModels } from "./contracts";
 
 installGlobalConsoleLogger("backend");
 
@@ -99,7 +104,7 @@ async function buildApiDocumentation() {
       paths: authDocumentation.paths,
     };
   } catch (error) {
-    logger.warn("Failed to generate Better Auth OpenAPI schema", { error });
+    logger.warn("Failed to generate Better Auth OpenAPI schema", errorLogDetails(error));
 
     return {
       info: {
@@ -141,7 +146,7 @@ const betterAuth = new Elysia({ name: "better-auth" })
         session: session?.session,
       };
     } catch (error) {
-      logger.error("Auth Middleware Error:", error);
+      logger.error("Auth middleware error", errorLogDetails(error));
       return {
         user: null,
         session: null,
@@ -233,6 +238,7 @@ export const createAPI = (prefix = "") => {
   defaultMailRealtimeService.start();
 
   return app
+    .use(routeModels)
     .use(
       cors({
         origin: (request) =>
@@ -349,7 +355,8 @@ export const createAPI = (prefix = "") => {
         },
       },
     )
-    .use(errorHandler)
+    .use(requestContext)
+    .onError(handleApiError)
     .use(betterAuth)
     .get("/", () => ({ message: "API is running" }), {
       detail: {
@@ -390,13 +397,13 @@ export const createAPI = (prefix = "") => {
     )
     .get(
       "/user",
-      async ({ request }) => {
+      async ({ request, status }) => {
         const session = await auth.api.getSession({
           headers: request.headers as Headers,
         });
 
         if (!session) {
-          throw new UnauthorizedError();
+          return status(401, unauthorizedBody());
         }
 
         return session.user;
@@ -432,6 +439,7 @@ export const createAPI = (prefix = "") => {
     .use(categoriesRoutes)
     .use(calendarsRoutes)
     .use(settingsRoutes)
+    .use(recentContactsRoutes)
     .use(notificationsRoutes)
     .use(recurringRoutes)
     .use(subscriptionsRoute)

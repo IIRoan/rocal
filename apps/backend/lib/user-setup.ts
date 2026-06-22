@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { errorLogDetails } from "./log-sanitization";
 import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:user-setup");
@@ -56,7 +57,7 @@ export async function ensureUserCalendars(userId: string) {
       logger.ok(`Created default calendars for user ${userId}`);
     }
   } catch (error) {
-    logger.error(`Failed to ensure calendars for user ${userId}:`, error);
+    logger.error(`Failed to ensure calendars for user ${userId}`, errorLogDetails(error));
     // Don't throw - this shouldn't break the app if calendar setup fails
   }
 }
