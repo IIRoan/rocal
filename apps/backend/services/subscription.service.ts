@@ -23,6 +23,7 @@ import {
 } from "../lib/ics-parser";
 import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
 import { ValidationError, NotFoundError , errorMessage} from "../lib/errors";
+import { prismaStringEquals } from "../lib/prisma-query";
 import { createLogger } from "@workspace/logger";
 import { EventParticipantService } from "./event-participant.service";
 
@@ -394,7 +395,7 @@ export class SubscriptionService implements ISubscriptionService {
 
     if (deleteEvents) {
       await this.prisma.calendarEvent.deleteMany({
-        where: { subscriptionId },
+        where: { subscriptionId: prismaStringEquals(subscriptionId, "subscriptionId") },
       });
 
       await this.prisma.calendarSubscription.delete({
@@ -406,7 +407,7 @@ export class SubscriptionService implements ISubscriptionService {
       });
     } else {
       await this.prisma.calendarEvent.updateMany({
-        where: { subscriptionId },
+        where: { subscriptionId: prismaStringEquals(subscriptionId, "subscriptionId") },
         data: {
           subscriptionId: null,
           isSynced: false,
