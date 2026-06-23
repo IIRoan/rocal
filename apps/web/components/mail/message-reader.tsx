@@ -40,6 +40,7 @@ import {
   Loader2,
   Inbox,
   EyeOff,
+  Image as ImageIcon,
   MessageSquare,
   CalendarCheck,
   Clock,
@@ -109,6 +110,13 @@ import {
 import { resolveAttachmentPreviewKind } from "@/lib/mail/attachment-preview";
 import { pickOutgoingAttachmentFiles, resolveMailServerLimits, type MailServerLimits } from "@workspace/calendar-core";
 import { splitPlaintextQuote, splitHtmlQuote } from "@/lib/mail/quoted-text";
+import {
+  addTrustedSender,
+  resolveMailContentIsDark,
+  shouldBlockRemoteImages,
+  htmlContainsRemoteResources,
+  useMailDisplaySettings,
+} from "@/lib/mail/mail-display-settings";
 import { formatAddressFull, formatMessageDate } from "./mail-helpers";
 import { PdfAttachmentThumbnail } from "./attachment-preview-dialog";
 import {
@@ -618,9 +626,6 @@ export interface MessageReaderProps {
   isDecrypting?: boolean;
   accountEncryptedAtRest: boolean;
   isBusy: boolean;
-  blockRemoteImages: boolean;
-  blockTrackingPixels: boolean;
-  mailDarkMode: boolean;
   mailboxes: JmapMailbox[];
   currentMailboxId: string | null;
   labels?: LabelDef[];
@@ -703,9 +708,6 @@ export function MessageReader({
   isDecrypting = false,
   accountEncryptedAtRest,
   isBusy,
-  blockRemoteImages,
-  blockTrackingPixels,
-  mailDarkMode,
   mailboxes,
   currentMailboxId,
   labels = EMPTY_ARRAY,
@@ -739,7 +741,21 @@ export function MessageReader({
   identities = EMPTY_ARRAY,
   mailServerLimits = resolveMailServerLimits({}),
 }: MessageReaderProps) {
-  const isDark = mailDarkMode;
+  const { settings: displaySettings } = useMailDisplaySettings();
+  const [allowExternalContent, setAllowExternalContent] = useState(false);
+  const externalContentSenderEmail = message?.from?.[0]?.email ?? null;
+  const blockRemoteImages = shouldBlockRemoteImages({
+    policy: displaySettings.externalContentPolicy,
+    allowExternalContent,
+    senderEmail: externalContentSenderEmail,
+    trustedSenders: displaySettings.trustedSenders,
+  });
+  const blockTrackingPixels = displaySettings.blockTrackingPixels;
+  const isDark = resolveMailContentIsDark(displaySettings);
+
+  useEffect(() => {
+    setAllowExternalContent(displaySettings.externalContentPolicy === "allow");
+  }, [message?.id, displaySettings.externalContentPolicy]);
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#6366f1");
   const [isSavingLabel, setIsSavingLabel] = useState(false);
@@ -930,14 +946,29 @@ export function MessageReader({
         (!shouldReplaceBodyWithEventReminder && !linkedCalendarEvent.error)),
   );
 
-  const displayAttachments = useMemo<MailAttachment[]>(
-    () => attachments ?? message?.attachments ?? [],
-    [attachments, message?.attachments],
-  );
+  const displayAttachments = useMemo<MailAttachment[]>(() => {
+    const all = attachments ?? message?.attachments ?? [];
+    if (!displaySettings.hideInlineImageAttachments) return all;
+    return all.filter(
+      (attachment) =>
+        !(
+          attachment.disposition === "inline" &&
+          Boolean(attachment.cid?.trim())
+        ),
+    );
+  }, [
+    attachments,
+    displaySettings.hideInlineImageAttachments,
+    message?.attachments,
+  ]);
 
   const handleLoadAttachmentHoverPreview = useCallback(
     (attachment: MailAttachment, previewKey: string) => {
-      if (!onLoadAttachmentPreview || previewKey in attachmentHoverPreviews) {
+      if (
+        !displaySettings.attachmentImagePreviewsEnabled ||
+        !onLoadAttachmentPreview ||
+        previewKey in attachmentHoverPreviews
+      ) {
         return;
       }
 
@@ -971,7 +1002,7 @@ export function MessageReader({
           });
         });
     },
-    [attachmentHoverPreviews, onLoadAttachmentPreview],
+    [attachmentHoverPreviews, displaySettings.attachmentImagePreviewsEnabled, onLoadAttachmentPreview],
   );
 
   const handleSendReply = useCallback(async () => {
@@ -1121,6 +1152,10 @@ export function MessageReader({
   const messageState = classifyMessageEncryption(message);
 
   const displayHtml = _displayHtml;
+  const hasRemoteContent = useMemo(
+    () => htmlContainsRemoteResources(displayHtml ?? ""),
+    [displayHtml],
+  );
   const displayText = _displayText;
   const isHtmlEmail = Boolean(displayHtml);
   // If the HTML body has no detected quote markers but the plaintext body does
@@ -2547,10 +2582,41 @@ export function MessageReader({
         bodyAttachedAbove && "rounded-t-none border-t-0",
       )}
     >
-      {blockRemoteImages && (
-        <div className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-border/30 text-[11px] text-muted-foreground bg-muted/30">
-          <Lock className="size-3 shrink-0" strokeWidth={2.25} />
-          Remote images are blocked
+      {blockRemoteImages &&
+        displaySettings.externalContentPolicy !== "allow" &&
+        hasRemoteContent && (
+        <div className="shrink-0 border-b border-border/30 bg-muted/30 px-4 py-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
+              <Lock className="mt-0.5 size-3 shrink-0" strokeWidth={2.25} />
+              <span>Remote images and other external content are blocked.</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {displaySettings.externalContentPolicy === "ask" && (
+                <button
+                  type="button"
+                  onClick={() => setAllowExternalContent(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <ImageIcon className="size-3.5" />
+                  Load images
+                </button>
+              )}
+              {externalContentSenderEmail && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    addTrustedSender(externalContentSenderEmail);
+                    setAllowExternalContent(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <ShieldCheck className="size-3.5" />
+                  Trust sender
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
       <HtmlEmailRenderer

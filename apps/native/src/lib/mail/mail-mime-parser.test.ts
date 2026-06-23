@@ -1,6 +1,21 @@
+import { buildOutgoingMimeMessage, looksLikeMimeMessage } from "@workspace/calendar-core";
 import { parseMimeBody } from "./mail-mime-parser";
 
 describe("parseMimeBody", () => {
+  it("parses encrypted compose MIME from buildOutgoingMimeMessage", () => {
+    const mime = buildOutgoingMimeMessage({
+      text: "Hello world",
+      html: "<p>Hello <strong>world</strong></p>",
+    });
+
+    expect(looksLikeMimeMessage(mime)).toBe(true);
+    expect(parseMimeBody(mime)).toEqual({
+      text: "Hello world",
+      html: "<p>Hello <strong>world</strong></p>",
+      attachments: [],
+    });
+  });
+
   it("extracts text and html from multipart/alternative", () => {
     const mime = [
       "Content-Type: multipart/alternative; boundary=alt",

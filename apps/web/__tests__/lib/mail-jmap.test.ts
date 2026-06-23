@@ -135,10 +135,7 @@ describe("mail JMAP helpers", () => {
               from: [{ email: "alice@solace.onl" }],
               to: [{ email: "bob@example.com" }, { email: "cara@example.com" }],
               subject: "Hello",
-              bodyStructure: {
-                type: "text/plain",
-                partId: "text",
-              },
+              textBody: [{ partId: "text", type: "text/plain" }],
               bodyValues: {
                 text: {
                   value: "Hello from Solace Mail",
@@ -291,7 +288,7 @@ describe("mail JMAP helpers", () => {
     ]);
   });
 
-  it("builds multipart/mixed body structure for html and attachments", () => {
+  it("builds html and top-level attachments for multipart messages", () => {
     expect(
       buildSendMessageMethodCalls({
         draftsMailboxId: "drafts-1",
@@ -316,29 +313,66 @@ describe("mail JMAP helpers", () => {
         {
           create: {
             draft1: expect.objectContaining({
-              bodyStructure: {
-                type: "multipart/mixed",
-                subParts: [
-                  {
-                    type: "multipart/alternative",
-                    subParts: [
-                      { type: "text/plain", partId: "text" },
-                      { type: "text/html", partId: "html" },
-                    ],
-                  },
-                  {
-                    type: "text/plain",
-                    blobId: "blob-1",
-                    name: "note.txt",
-                    size: 12,
-                    disposition: "attachment",
-                  },
-                ],
-              },
+              textBody: [{ partId: "text", type: "text/plain" }],
+              htmlBody: [{ partId: "html", type: "text/html" }],
               bodyValues: {
                 text: { value: "See attached" },
                 html: { value: "<p>See attached</p>" },
               },
+              attachments: [
+                {
+                  blobId: "blob-1",
+                  name: "note.txt",
+                  type: "text/plain",
+                  disposition: "attachment",
+                },
+              ],
+            }),
+          },
+        },
+        "c1",
+      ],
+      expect.any(Array),
+    ]);
+  });
+
+  it("includes inline attachments with cid at the top level", () => {
+    expect(
+      buildSendMessageMethodCalls({
+        draftsMailboxId: "drafts-1",
+        fromEmail: "alice@solace.onl",
+        to: ["bob@example.com"],
+        subject: "Inline image",
+        textBody: "",
+        htmlBody: '<p><img src="cid:img@solace"></p>',
+        identityId: "identity-1",
+        attachments: [
+          {
+            blobId: "blob-img",
+            name: "inline.png",
+            type: "image/png",
+            size: 42,
+            disposition: "inline",
+            cid: "img@solace",
+          },
+        ],
+      }),
+    ).toEqual([
+      [
+        "Email/set",
+        {
+          create: {
+            draft1: expect.objectContaining({
+              htmlBody: [{ partId: "html", type: "text/html" }],
+              attachments: [
+                {
+                  blobId: "blob-img",
+                  name: "inline.png",
+                  type: "image/png",
+                  disposition: "inline",
+                  cid: "img@solace",
+                },
+              ],
             }),
           },
         },

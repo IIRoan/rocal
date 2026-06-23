@@ -35,14 +35,26 @@ import {
 } from "@/lib/mail/mail-message-query";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
 import { getMailComposeBridge, flushComposeDraftSave } from "@/components/mail/mail-compose-context";
+import { parseDecryptedMailContent } from "@/lib/mail/decrypted-mail-content";
 import {
-  appendHtmlSignature,
-  appendPlainTextSignature,
-  hasMeaningfulHtmlBody,
-  htmlToPlainText,
-  resolveComposePlainBody,
+  hasComposeHtmlBody,
+  resolveOutgoingComposeBodies,
 } from "@/lib/mail/signature-utils";
 import { mergeRefreshedMailboxMessages } from "@/lib/mail/mail-list-merge";
+import {
+  rewriteCidImagesForEditor,
+  rewriteComposeInlineImages,
+  sanitizeQuotedEmailHtml,
+  plainTextToComposerBody,
+  htmlHasUnhydratedInlinePlaceholders,
+} from "@/lib/mail/compose-editor-utils";
+import {
+  getComposeInlineImages,
+  registerComposeInlineImage,
+  waitForQuotedInlineImageHydration,
+} from "@/lib/mail/compose-inline-images";
+import type { InlineImageUpload } from "@/components/mail/rich-text-editor";
+import { readMailComposeSettings } from "@/lib/mail/compose-settings";
 import {
   appendMailboxMessages,
   hasMoreMailboxMessages,
@@ -338,6 +350,7 @@ async function resolveOutgoingMessageBody(input: {
   activeMailbox: ActiveMailboxState;
   recipients: string[];
   plaintext: string;
+  html?: string;
   internalDomain: string | null;
   mimeAttachments?: OutgoingMimeAttachment[];
 }): Promise<{
@@ -374,13 +387,15 @@ async function resolveOutgoingMessageBody(input: {
     recipientPublicKeysArmored.add(recipientKey.publicKeyArmored);
   }
 
-  const encryptPayload =
-    (input.mimeAttachments?.length ?? 0) > 0
-      ? buildOutgoingMimeMessage({
-          text: input.plaintext,
-          attachments: input.mimeAttachments,
-        })
-      : input.plaintext;
+  const shouldUseMime =
+    Boolean(input.html?.trim()) || (input.mimeAttachments?.length ?? 0) > 0;
+  const encryptPayload = shouldUseMime
+    ? buildOutgoingMimeMessage({
+        text: input.plaintext,
+        html: input.html,
+        attachments: input.mimeAttachments,
+      })
+    : input.plaintext;
 
   const { armoredMessage } = await mailCryptoWorkerClient.encryptForRecipients({
     plaintext: encryptPayload,
@@ -391,6 +406,7 @@ async function resolveOutgoingMessageBody(input: {
     const uploaded = await input.activeMailbox.client.uploadTextBlob(
       input.activeMailbox.session,
       armoredMessage,
+      "text/plain",
     );
     return {
       textBody: "",
@@ -658,41 +674,9 @@ export function useMailApp() {
   const activeMailboxRef = useRef<ActiveMailboxState | null>(null);
   const hasAttemptedAutoOpenRef = useRef(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
-  // Initialised synchronously from sessionStorage; updated async once the
-  // encrypted cookie is decrypted (cross-tab / post-refresh case).
   const [cachedAuthPassword, setCachedAuthPassword] = useState<string | null>(
     () => (typeof window !== "undefined" ? peekCachedAuthPassword() : null),
   );
-  const [blockRemoteImages, setBlockRemoteImagesState] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("mail:blockRemoteImages") === "true";
-  });
-  const [blockTrackingPixels, setBlockTrackingPixelsState] = useState(() => {
-    if (typeof window === "undefined") return true;
-    const stored = localStorage.getItem("mail:blockTrackingPixels");
-    return stored === null ? true : stored === "true";
-  });
-  const [mailDarkMode, setMailDarkModeState] = useState(() => {
-    if (typeof window === "undefined") return true;
-    const stored = localStorage.getItem("mail:darkMode");
-    return stored === null ? true : stored === "true";
-  });
-
-  const setBlockRemoteImages = useCallback((val: boolean) => {
-    setBlockRemoteImagesState(val);
-    localStorage.setItem("mail:blockRemoteImages", String(val));
-  }, []);
-
-  const setBlockTrackingPixels = useCallback((val: boolean) => {
-    setBlockTrackingPixelsState(val);
-    localStorage.setItem("mail:blockTrackingPixels", String(val));
-  }, []);
-
-  const setMailDarkMode = useCallback((val: boolean) => {
-    setMailDarkModeState(val);
-    localStorage.setItem("mail:darkMode", String(val));
-  }, []);
-
   const accountEmail = session?.user?.email?.trim().toLowerCase() ?? "";
   const accountDisplayName = session?.user?.name?.trim() ?? "";
   const accountUserId = session?.user?.id?.trim() ?? "";
@@ -1071,12 +1055,26 @@ export function useMailApp() {
           senderPublicKeyArmored,
         });
         if (cancelled) return;
+        let parsed;
+        try {
+          parsed = await parseDecryptedMailContent(decrypted.plaintext);
+        } catch (parseError) {
+          log.warn("Failed to parse decrypted MIME", parseError);
+          setSelectedMessagePlaintext(decrypted.plaintext);
+          setSelectedMessageDecryptedHtml(null);
+          setSelectedMessageDecryptedAttachments(
+            encState === "pgp_mime" ? [] : null,
+          );
+          setSelectedMessageSignatureVerificationState(
+            resolveSignatureVerificationState(decrypted),
+          );
+          setSelectedMessageDecryptError(null);
+          setSelectedMessageIsDecrypting(false);
+          return;
+        }
+        setSelectedMessageDecryptedHtml(parsed.html ?? null);
+        setSelectedMessagePlaintext(parsed.text ?? decrypted.plaintext);
         if (encState === "pgp_mime") {
-          const parsed = await PostalMime.parse(decrypted.plaintext, {
-            attachmentEncoding: "arraybuffer",
-          });
-          setSelectedMessageDecryptedHtml(parsed.html ?? null);
-          setSelectedMessagePlaintext(parsed.text ?? decrypted.plaintext);
           setSelectedMessageDecryptedAttachments(
             parsed.attachments.flatMap((attachment) =>
               attachment.disposition === "attachment" && !attachment.related
@@ -1085,8 +1083,6 @@ export function useMailApp() {
             ),
           );
         } else {
-          setSelectedMessageDecryptedHtml(null);
-          setSelectedMessagePlaintext(decrypted.plaintext);
           setSelectedMessageDecryptedAttachments(null);
         }
         setSelectedMessageSignatureVerificationState(
@@ -1595,7 +1591,50 @@ export function useMailApp() {
     [],
   );
 
-  const handleSendMessage = useCallback(async () => {
+  const handleComposeImageUpload = useCallback(
+    async (file: File): Promise<InlineImageUpload | null> => {
+      if (!activeMailbox) return null;
+      try {
+        const contentType = file.type || "application/octet-stream";
+        const [uploaded, dataUrl, content] = await Promise.all([
+          activeMailbox.client.uploadBlob(
+            activeMailbox.session,
+            file,
+            contentType,
+          ),
+          new Promise<string | null>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (event) =>
+              resolve((event.target?.result as string) ?? null);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(file);
+          }),
+          file.arrayBuffer().then((buffer) => new Uint8Array(buffer)),
+        ]);
+        if (!dataUrl) {
+          throw new Error("Failed to read image preview");
+        }
+        const cid = `${crypto.randomUUID()}@solace`;
+        registerComposeInlineImage({
+          cid,
+          blobId: uploaded.blobId,
+          type: contentType,
+          name: file.name,
+          size: file.size,
+          dataUrl,
+          content,
+        });
+        return { src: dataUrl, cid };
+      } catch (error) {
+        log.error("Inline image upload failed", error);
+        toast.error(`Failed to upload ${file.name}`);
+        return null;
+      }
+    },
+    [activeMailbox],
+  );
+
+  const handleSendMessage = useCallback(async (options?: { skipAttachmentCheck?: boolean }) => {
     if (!activeMailbox) return;
     const draft = getMailComposeBridge()?.getDraft();
     if (!draft) {
@@ -1613,7 +1652,11 @@ export function useMailApp() {
       replyContext: composeReplyContext,
       identityId: composeIdentityId,
       draftId: composeDraftId,
+      composeMode,
+      signatureAlreadyEmbedded,
     } = draft;
+    const composeSettings = readMailComposeSettings();
+    const plainTextMode = composeSettings.plainTextMode;
     if (!composeTo.trim()) {
       toast.error("Enter a recipient email address.");
       return;
@@ -1676,63 +1719,136 @@ export function useMailApp() {
       }
       const fromEmail = identity.email;
       const fromName = identity.name ?? null;
-      const composePlainBody = resolveComposePlainBody({
-        body: composeBody,
-        htmlBody: composeHtmlBody,
-      });
-      const bodyWithSignature = appendPlainTextSignature(
-        composePlainBody,
-        identity,
-      );
-      const htmlWithSignature = hasMeaningfulHtmlBody(composeHtmlBody)
-        ? appendHtmlSignature(composeHtmlBody, identity)
-        : undefined;
+      if (!plainTextMode) {
+        await waitForQuotedInlineImageHydration();
+        if (htmlHasUnhydratedInlinePlaceholders(composeHtmlBody)) {
+          toast.error("Inline images are still loading. Try again in a moment.");
+          return;
+        }
+      }
+      const { textBody: bodyWithSignature, htmlBody: htmlWithSignature } =
+        plainTextMode
+          ? {
+              textBody: signatureAlreadyEmbedded
+                ? composeBody
+                : resolveOutgoingComposeBodies({
+                    body: composeBody,
+                    htmlBody: "",
+                    signature: identity,
+                  }).textBody,
+              htmlBody: undefined,
+            }
+          : resolveOutgoingComposeBodies({
+              body: composeBody,
+              htmlBody: composeHtmlBody,
+              signature: identity,
+              signatureAlreadyEmbedded,
+            });
       const internalDomain = resolveEncryptionInternalDomain(
         config?.defaultDomain,
+      );
+      const willEncrypt = shouldEncryptOutgoingMail(
+        allRecipients,
+        internalDomain,
       );
       const preparedAttachments = await prepareOutgoingAttachments(
         composeAttachments,
         { maxBytes: mailbox.mailServerPolicy.limits.maxOutgoingAttachmentBytes },
       );
+      const hasFileAttachments = preparedAttachments.length > 0;
+      const hasInlineComposeImages = getComposeInlineImages().length > 0;
+      const embedInlineImagesInEncryptedHtml =
+        willEncrypt && hasInlineComposeImages && !hasFileAttachments;
+
+      const rewritten =
+        !plainTextMode && htmlWithSignature
+          ? embedInlineImagesInEncryptedHtml
+            ? { html: htmlWithSignature, attachments: [] as const }
+            : rewriteComposeInlineImages(htmlWithSignature)
+          : { html: htmlWithSignature, attachments: [] as const };
+      const htmlForSend = plainTextMode ? undefined : (rewritten.html ?? htmlWithSignature);
+      const inlineJmapAttachments: JmapAttachmentInput[] =
+        embedInlineImagesInEncryptedHtml
+          ? []
+          : rewritten.attachments.map((attachment) => ({
+              blobId: attachment.blobId,
+              name: attachment.name,
+              type: attachment.type,
+              size: attachment.size,
+              disposition: "inline" as const,
+              cid: attachment.cid,
+            }));
+      const inlineMimeAttachments: OutgoingMimeAttachment[] =
+        embedInlineImagesInEncryptedHtml
+          ? []
+          : getComposeInlineImages()
+              .filter((image) =>
+                rewritten.attachments.some(
+                  (attachment) => attachment.cid === image.cid,
+                ),
+              )
+              .map((image) => ({
+                filename: image.name,
+                contentType: image.type,
+                content: image.content,
+                cid: image.cid,
+                disposition: "inline" as const,
+              }));
+      const fileMimeAttachments: OutgoingMimeAttachment[] =
+        preparedAttachments.map(({ filename, contentType, content }) => ({
+          filename,
+          contentType,
+          content,
+        }));
       const mimeAttachments =
-        preparedAttachments.length > 0
-          ? preparedAttachments.map(({ filename, contentType, content }) => ({
-              filename,
-              contentType,
-              content,
-            }))
+        inlineMimeAttachments.length > 0 || fileMimeAttachments.length > 0
+          ? [...inlineMimeAttachments, ...fileMimeAttachments]
           : undefined;
       const { textBody, encrypted, pgpMimeCiphertext } =
         await resolveOutgoingMessageBody({
           activeMailbox: mailbox,
           recipients: allRecipients,
           plaintext: bodyWithSignature,
+          html: htmlForSend,
           internalDomain,
-          mimeAttachments,
+          mimeAttachments:
+            plainTextMode && fileMimeAttachments.length > 0
+              ? fileMimeAttachments
+              : mimeAttachments,
         });
-      const htmlBody =
-        !encrypted && htmlWithSignature ? htmlWithSignature : undefined;
+      const htmlBody = encrypted || plainTextMode ? undefined : htmlForSend;
 
       if (!shouldEncryptOutgoingMail(allRecipients, internalDomain)) {
         await mailbox.client.ensureEncryptOnAppendDisabled(mailbox.session);
       }
 
-      let uploadedAttachments:
-        | import("@/lib/mail/jmap-client").JmapAttachmentInput[]
-        | undefined;
-      if (!pgpMimeCiphertext && preparedAttachments.length > 0) {
-        uploadedAttachments =
-          await mailbox.client.uploadPreparedAttachments(
-            mailbox.session,
-            preparedAttachments,
+      let uploadedAttachments: JmapAttachmentInput[] | undefined;
+      if (!pgpMimeCiphertext) {
+        const fileUploads =
+          preparedAttachments.length > 0
+            ? await mailbox.client.uploadPreparedAttachments(
+                mailbox.session,
+                preparedAttachments,
+              )
+            : [];
+        uploadedAttachments = [...inlineJmapAttachments, ...fileUploads];
+        if (uploadedAttachments.length > 0) {
+          validateUploadedAttachmentSet(
+            [
+              ...rewritten.attachments.map((attachment) => ({
+                filename: attachment.name,
+                size: attachment.size,
+              })),
+              ...preparedAttachments.map((attachment) => ({
+                filename: attachment.filename,
+                size: attachment.size,
+              })),
+            ],
+            uploadedAttachments,
           );
-        validateUploadedAttachmentSet(
-          preparedAttachments.map((attachment) => ({
-            filename: attachment.filename,
-            size: attachment.size,
-          })),
-          uploadedAttachments,
-        );
+        } else {
+          uploadedAttachments = undefined;
+        }
       }
 
       const flushedDraftId = await flushComposeDraftSave();
@@ -1771,7 +1887,7 @@ export function useMailApp() {
             fromEmail: mailbox.email,
             to: recipients,
             subject: composeSubject.trim(),
-            textBody: composeBody,
+            textBody: bodyWithSignature,
             sentMailboxId,
             threadId: effectiveThreadId,
             inReplyTo: composeReplyContext.inReplyTo,
@@ -1829,7 +1945,7 @@ export function useMailApp() {
         cc: composeCc,
         bcc: composeBcc,
         attachmentCount: composeAttachments.length,
-        hasHtmlBody: hasMeaningfulHtmlBody(composeHtmlBody),
+        hasHtmlBody: hasComposeHtmlBody(composeHtmlBody),
         isReply: Boolean(composeReplyContext),
       });
       toast.error(
@@ -2928,12 +3044,6 @@ export function useMailApp() {
     selectedMessageIsDecrypting,
     isPaletteOpen,
     setIsPaletteOpen,
-    blockRemoteImages,
-    setBlockRemoteImages,
-    blockTrackingPixels,
-    setBlockTrackingPixels,
-    mailDarkMode,
-    setMailDarkMode,
     refreshMailboxMessages,
     loadMoreMessages,
     hasMoreMessages: activeMailbox
@@ -2951,6 +3061,7 @@ export function useMailApp() {
     isRefreshing,
     handleSignIn,
     handleSendMessage,
+    handleComposeImageUpload,
     handleDeleteMessage,
     handleReply,
     handleForward,

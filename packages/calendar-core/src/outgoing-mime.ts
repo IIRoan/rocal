@@ -2,6 +2,8 @@ export type OutgoingMimeAttachment = {
   filename: string;
   contentType: string;
   content: Uint8Array;
+  cid?: string;
+  disposition?: "inline" | "attachment";
 };
 
 function encodeMimeFilename(value: string): string {
@@ -33,45 +35,102 @@ function wrapBase64(value: string): string {
   return lines.join("\r\n");
 }
 
-/**
- * Builds a MIME payload for PGP/MIME encryption. When attachments are present
- * the result is multipart/mixed with a text/plain body followed by each file.
- */
-export function buildOutgoingMimeMessage(input: {
-  text: string;
-  attachments?: OutgoingMimeAttachment[];
-}): string {
-  const normalizedText = input.text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  const attachments = input.attachments ?? [];
+function normalizeMimeText(value: string): string {
+  return value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
 
-  if (attachments.length === 0) {
+function toMimeLines(value: string): string {
+  return normalizeMimeText(value).replace(/\n/g, "\r\n");
+}
+
+function createMimeBoundary(prefix: string): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** True when decrypted PGP plaintext should be parsed as a MIME envelope. */
+export function looksLikeMimeMessage(content: string): boolean {
+  return /^Content-Type:\s*\S+/im.test(content.trimStart());
+}
+
+function buildAlternativeBodyParts(input: {
+  text: string;
+  html?: string;
+}): string[] {
+  const normalizedText = toMimeLines(input.text);
+  const trimmedHtml = input.html?.trim();
+
+  if (!trimmedHtml) {
     return [
       "Content-Type: text/plain; charset=utf-8",
       "Content-Transfer-Encoding: 7bit",
       "",
-      normalizedText.replace(/\n/g, "\r\n"),
-    ].join("\r\n");
+      normalizedText,
+    ];
   }
 
-  const boundary = `solace_mixed_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-  const lines = [
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+  const boundary = createMimeBoundary("solace_alt");
+  const normalizedHtml = toMimeLines(trimmedHtml);
+
+  return [
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
     "MIME-Version: 1.0",
     "",
     `--${boundary}`,
     "Content-Type: text/plain; charset=utf-8",
     "Content-Transfer-Encoding: 7bit",
     "",
-    normalizedText.replace(/\n/g, "\r\n"),
+    normalizedText,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/html; charset=utf-8",
+    "Content-Transfer-Encoding: 7bit",
+    "",
+    normalizedHtml,
+    "",
+    `--${boundary}--`,
+  ];
+}
+
+/**
+ * Builds a MIME payload for PGP encryption. Rich-text compose bodies are wrapped
+ * in multipart/alternative (text/plain + text/html). Attachments use
+ * multipart/mixed with the body part as the first subpart.
+ */
+export function buildOutgoingMimeMessage(input: {
+  text: string;
+  html?: string;
+  attachments?: OutgoingMimeAttachment[];
+}): string {
+  const attachments = input.attachments ?? [];
+  const bodyPart = buildAlternativeBodyParts(input);
+
+  if (attachments.length === 0) {
+    return bodyPart.join("\r\n");
+  }
+
+  const boundary = createMimeBoundary("solace_mixed");
+  const lines = [
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    "MIME-Version: 1.0",
+    "",
+    `--${boundary}`,
+    ...bodyPart,
     "",
   ];
 
   for (const attachment of attachments) {
     const filename = encodeMimeFilename(attachment.filename);
+    const disposition = attachment.disposition ?? "attachment";
+    const cid = attachment.cid?.trim();
     lines.push(
       `--${boundary}`,
       `Content-Type: ${attachment.contentType}; name="${filename}"`,
-      `Content-Disposition: attachment; filename="${filename}"`,
+      disposition === "inline" && cid
+        ? `Content-Disposition: inline; filename="${filename}"`
+        : `Content-Disposition: attachment; filename="${filename}"`,
+      ...(disposition === "inline" && cid
+        ? [`Content-ID: <${cid}>`]
+        : []),
       "Content-Transfer-Encoding: base64",
       "",
       wrapBase64(encodeBase64(attachment.content)),

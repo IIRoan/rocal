@@ -97,6 +97,29 @@ describe("resolveOutgoingMessageBody", () => {
     expect(encryptForRecipients).not.toHaveBeenCalled();
   });
 
+  it("encrypts rich text as multipart/alternative MIME for internal recipients", async () => {
+    const result = await resolveOutgoingMessageBody({
+      runtime: createRuntime(),
+      recipients: ["bob@solace.onl"],
+      plaintext: "Hello world",
+      html: "<p>Hello <strong>world</strong></p>",
+    });
+
+    expect(result.encrypted).toBe(true);
+    expect(result.textBody).toContain("BEGIN PGP MESSAGE");
+    expect(encryptForRecipients).toHaveBeenCalledWith({
+      plaintext: expect.stringContaining("multipart/alternative"),
+      recipientPublicKeysArmored: expect.arrayContaining([
+        "sender-public-key",
+        "recipient-public-key",
+      ]),
+    });
+    const encryptedPayload = (encryptForRecipients as jest.Mock).mock
+      .calls[0][0].plaintext as string;
+    expect(encryptedPayload).toContain("Content-Type: text/html; charset=utf-8");
+    expect(encryptedPayload).toContain("<p>Hello <strong>world</strong></p>");
+  });
+
   it("encrypts when every recipient is on the configured Solace domain", async () => {
     const result = await resolveOutgoingMessageBody({
       runtime: createRuntime(),

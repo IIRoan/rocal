@@ -13,7 +13,25 @@ import React, {
 import { resolveReplyRecipients, type MailServerLimits } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { extractMessageBodies } from "@/lib/mail/message-security";
-import { htmlToPlainText } from "@/lib/mail/signature-utils";
+import {
+  appendPlainTextSignature,
+  buildEmbeddedSignatureHtml,
+  getPlainTextSignature,
+  hasEmbeddedSignature,
+  htmlToPlainText,
+  resolveComposeSignatureIdentity,
+} from "@/lib/mail/signature-utils";
+import { buildQuotedHtmlBlock } from "@/components/mail/quoted-html";
+import {
+  rewriteCidImagesForEditor,
+  sanitizeQuotedEmailHtml,
+  type QuotedInlineAttachment,
+} from "@/lib/mail/compose-editor-utils";
+import { resetComposeInlineImages } from "@/lib/mail/compose-inline-images";
+import { readMailComposeSettings } from "@/lib/mail/compose-settings";
+import { resolveReplyFrom } from "@/lib/mail/reply-identity";
+
+export type ComposeMode = "new" | "reply" | "forward" | "draft";
 
 type MailReplyContext = {
   threadId: string | null;
@@ -47,6 +65,8 @@ export type ComposeDraft = {
   replyContext: MailReplyContext | null;
   identityId: string | null;
   draftId: string | null;
+  composeMode: ComposeMode;
+  signatureAlreadyEmbedded: boolean;
 };
 
 export type DraftSaveStatus = "idle" | "saving" | "saved" | "error";
@@ -55,6 +75,7 @@ export type MailComposeBridge = {
   getDraft: () => ComposeDraft;
   resetDraft: () => void;
   clearCompose: () => void;
+  openNewCompose: () => void;
   seedReply: (message: JmapEmailMessage, plaintext: string | null) => void;
   seedForward: (message: JmapEmailMessage, plaintext: string | null) => void;
   seedNewMessage: (recipient: {
@@ -121,6 +142,9 @@ type MailComposeFieldsContextValue = {
   setDraftSaveStatus: (status: DraftSaveStatus) => void;
   composeDraftId: string | null;
   clearCompose: () => void;
+  composeMode: ComposeMode;
+  quotedAttachments: QuotedInlineAttachment[];
+  openNewCompose: () => void;
 };
 
 type MailComposeChromeContextValue = {
@@ -166,6 +190,60 @@ function addressesToCsv(
     .join(", ");
 }
 
+function resolveSignatureIdentity(
+  identities: JmapIdentity[],
+  identityId: string | null,
+): JmapIdentity | null {
+  return resolveComposeSignatureIdentity(identities, identityId);
+}
+
+function mapQuotedAttachments(
+  message: JmapEmailMessage,
+): QuotedInlineAttachment[] {
+  return (message.attachments ?? []).map((attachment) => ({
+    blobId: attachment.blobId,
+    name: attachment.name,
+    type: attachment.type,
+    size: attachment.size,
+    disposition: attachment.disposition,
+    cid: attachment.cid,
+  }));
+}
+
+function buildNewComposeBodies(
+  identity: JmapIdentity | null,
+): { body: string; htmlBody: string; signatureAlreadyEmbedded: boolean } {
+  const settings = readMailComposeSettings();
+  const signatureIdentity = resolveSignatureIdentity(
+    identity ? [identity] : [],
+    identity?.id ?? null,
+  );
+  const hasSignature = Boolean(
+    signatureIdentity?.htmlSignature?.trim() ||
+      signatureIdentity?.textSignature?.trim(),
+  );
+
+  if (settings.plainTextMode) {
+    if (!hasSignature || !signatureIdentity) {
+      return { body: "", htmlBody: "", signatureAlreadyEmbedded: false };
+    }
+    const body = appendPlainTextSignature("", signatureIdentity, {
+      separator: settings.signatureSeparatorEnabled,
+    });
+    return { body, htmlBody: "", signatureAlreadyEmbedded: true };
+  }
+
+  const embedded = buildEmbeddedSignatureHtml(signatureIdentity, {
+    embed: hasSignature,
+    separator: settings.signatureSeparatorEnabled,
+  });
+  return {
+    body: "",
+    htmlBody: embedded ? `<p></p>${embedded}` : "",
+    signatureAlreadyEmbedded: hasSignature,
+  };
+}
+
 export function MailComposeProvider({
   children,
   identities = [],
@@ -182,6 +260,12 @@ export function MailComposeProvider({
   const [composeBody, setComposeBody] = useState("");
   const [composeHtmlBody, setComposeHtmlBody] = useState("");
   const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
+  const [composeMode, setComposeMode] = useState<ComposeMode>("new");
+  const [quotedAttachments, setQuotedAttachments] = useState<
+    QuotedInlineAttachment[]
+  >([]);
+  const [signatureAlreadyEmbedded, setSignatureAlreadyEmbedded] =
+    useState(false);
   const [composeReplyContext, setComposeReplyContext] =
     useState<MailReplyContext | null>(null);
   const [selectedIdentityId, setSelectedIdentityId] = useState<string | null>(
@@ -220,6 +304,8 @@ export function MailComposeProvider({
       replyContext: composeReplyContext,
       identityId: resolvedIdentityId,
       draftId,
+      composeMode,
+      signatureAlreadyEmbedded,
     }),
     [
       composeTo,
@@ -232,6 +318,8 @@ export function MailComposeProvider({
       composeReplyContext,
       resolvedIdentityId,
       draftId,
+      composeMode,
+      signatureAlreadyEmbedded,
     ],
   );
 
@@ -244,6 +332,9 @@ export function MailComposeProvider({
     setComposeHtmlBody("");
     setComposeAttachments([]);
     setComposeReplyContext(null);
+    setComposeMode("new");
+    setQuotedAttachments([]);
+    setSignatureAlreadyEmbedded(false);
     setDraftId(null);
     draftIdRef.current = null;
     isDirtyRef.current = false;
@@ -262,11 +353,15 @@ export function MailComposeProvider({
     setComposeHtmlBody("");
     setComposeAttachments([]);
     setComposeReplyContext(null);
+    setComposeMode("new");
+    setQuotedAttachments([]);
+    setSignatureAlreadyEmbedded(false);
     setDraftId(null);
     draftIdRef.current = null;
     isDirtyRef.current = false;
     setDraftSaveStatus("idle");
     setSelectedIdentityId(identities[0]?.id ?? null);
+    resetComposeInlineImages();
   }, [identities]);
 
   const dismissCompose = useCallback(() => {
@@ -275,13 +370,57 @@ export function MailComposeProvider({
     setIsFullCompose(false);
   }, [clearCompose]);
 
+  const openNewCompose = useCallback(() => {
+    const identity =
+      identities.find((entry) => entry.id === resolvedIdentityId) ??
+      identities[0] ??
+      null;
+    setComposeTo("");
+    setComposeCc("");
+    setComposeBcc("");
+    setComposeSubject("");
+    setComposeAttachments([]);
+    setComposeReplyContext(null);
+    setQuotedAttachments([]);
+    setComposeMode("new");
+    setDraftId(null);
+    draftIdRef.current = null;
+    isDirtyRef.current = false;
+    setDraftSaveStatus("idle");
+    resetComposeInlineImages();
+    const seeded = buildNewComposeBodies(identity);
+    setComposeBody(seeded.body);
+    setComposeHtmlBody(seeded.htmlBody);
+    setSignatureAlreadyEmbedded(seeded.signatureAlreadyEmbedded);
+    setIsComposeOpen(true);
+    setIsFullCompose(false);
+  }, [identities, resolvedIdentityId]);
+
   const seedReply = useCallback(
     (message: JmapEmailMessage, plaintext: string | null) => {
+      const settings = readMailComposeSettings();
       const sender = message.from?.[0]?.email ?? "";
-      const currentIdentityEmail =
-        identities.find((entry) => entry.id === resolvedIdentityId)?.email ??
-        identities[0]?.email ??
+      let replyIdentityId = resolvedIdentityId;
+      if (settings.autoSelectReplyIdentity) {
+        const resolved = resolveReplyFrom(identities, {
+          to: message.to,
+          cc: message.cc,
+          bcc: message.bcc,
+        });
+        if (resolved) {
+          replyIdentityId = resolved.identityId;
+          setSelectedIdentityId(resolved.identityId);
+        }
+      }
+      const currentIdentity =
+        identities.find((entry) => entry.id === replyIdentityId) ??
+        identities[0] ??
         null;
+      const signatureIdentity = resolveSignatureIdentity(
+        identities,
+        currentIdentity?.id ?? null,
+      );
+      const currentIdentityEmail = currentIdentity?.email ?? null;
       const replyRecipients = resolveReplyRecipients({
         from: message.from,
         to: message.to,
@@ -295,19 +434,49 @@ export function MailComposeProvider({
       const date = message.receivedAt
         ? new Date(message.receivedAt).toLocaleString()
         : "";
+      const from = message.from?.[0];
+      const fromLabel = from?.name || from?.email || sender;
+      const embedAboveQuote =
+        settings.signaturePosition === "above_quote" &&
+        Boolean(
+          signatureIdentity?.htmlSignature?.trim() ||
+            signatureIdentity?.textSignature?.trim(),
+        );
+      const signatureBlock = embedAboveQuote
+        ? buildEmbeddedSignatureHtml(signatureIdentity, {
+            embed: true,
+            separator: settings.signatureSeparatorEnabled,
+          })
+        : "";
+
       setComposeTo(replyRecipients.join(", "));
       setComposeCc("");
       setComposeBcc("");
       setComposeSubject(subject.startsWith("Re: ") ? subject : `Re: ${subject}`);
       const quotedPlain = `\n\n---\nOn ${date}, ${sender} wrote:\n${body}`;
-      const quotedHtml = `<p></p><hr><p>On ${date}, ${sender} wrote:</p><blockquote>${htmlBody}</blockquote>`;
-      setComposeBody(quotedPlain);
+      const sanitizedQuote = rewriteCidImagesForEditor(
+        sanitizeQuotedEmailHtml(htmlBody),
+      );
+      const quotedHtml = settings.plainTextMode
+        ? ""
+        : `<p></p>${signatureBlock}<div><p>On ${date}, ${fromLabel} wrote:</p></div>${buildQuotedHtmlBlock(sanitizedQuote)}`;
+      const plainBody = settings.plainTextMode
+        ? `${embedAboveQuote ? `${settings.signatureSeparatorEnabled ? "\n\n-- \n" : "\n\n"}${getPlainTextSignature(signatureIdentity)}` : ""}\n\nOn ${date}, ${fromLabel} wrote:\n${body
+            .split("\n")
+            .map((line) => `> ${line}`)
+            .join("\n")}`
+        : quotedPlain;
+      setComposeBody(plainBody);
       setComposeHtmlBody(quotedHtml);
       setComposeAttachments([]);
       setComposeReplyContext(buildReplyContext(message));
+      setComposeMode("reply");
+      setQuotedAttachments(mapQuotedAttachments(message));
+      setSignatureAlreadyEmbedded(embedAboveQuote);
       setDraftId(null);
       draftIdRef.current = null;
       isDirtyRef.current = true;
+      resetComposeInlineImages();
       setIsComposeOpen(true);
     },
     [identities, resolvedIdentityId],
@@ -315,29 +484,84 @@ export function MailComposeProvider({
 
   const seedForward = useCallback(
     (message: JmapEmailMessage, plaintext: string | null) => {
+      const settings = readMailComposeSettings();
       const sender = message.from?.[0]?.email ?? "";
+      let forwardIdentityId = resolvedIdentityId;
+      if (settings.autoSelectReplyIdentity) {
+        const resolved = resolveReplyFrom(identities, {
+          to: message.to,
+          cc: message.cc,
+          bcc: message.bcc,
+        });
+        if (resolved) {
+          forwardIdentityId = resolved.identityId;
+          setSelectedIdentityId(resolved.identityId);
+        }
+      }
       const subject = message.subject ?? "";
       const { text, html } = extractMessageBodies(message);
       const body = plaintext ?? text ?? "";
       const htmlBody = html ?? `<p>${body.replace(/\n/g, "<br>")}</p>`;
+      const currentIdentity =
+        identities.find((entry) => entry.id === forwardIdentityId) ??
+        identities[0] ??
+        null;
+      const signatureIdentity = resolveSignatureIdentity(
+        identities,
+        currentIdentity?.id ?? null,
+      );
+      const embedAboveQuote =
+        settings.signaturePosition === "above_quote" &&
+        Boolean(
+          signatureIdentity?.htmlSignature?.trim() ||
+            signatureIdentity?.textSignature?.trim(),
+        );
+      const signatureBlock = embedAboveQuote
+        ? buildEmbeddedSignatureHtml(signatureIdentity, {
+            embed: true,
+            separator: settings.signatureSeparatorEnabled,
+          })
+        : "";
       setComposeTo("");
       setComposeCc("");
       setComposeBcc("");
       setComposeSubject(
         subject.startsWith("Fwd: ") ? subject : `Fwd: ${subject}`,
       );
-      setComposeBody(`\n\n---\nForwarded message from ${sender}:\n${body}`);
+      const date = message.receivedAt
+        ? new Date(message.receivedAt).toLocaleString()
+        : "";
+      const from = message.from?.[0];
+      const fromFull =
+        from?.name && from.email && from.name !== from.email
+          ? `${from.name} <${from.email}>`
+          : (from?.email || from?.name || sender);
+      const sanitizedQuote = rewriteCidImagesForEditor(
+        sanitizeQuotedEmailHtml(htmlBody),
+      );
+      const forwardHeader = `<div>---------- Forwarded message ----------<br>From: ${fromFull}<br>Date: ${date}<br>Subject: ${subject}<br><br></div>`;
+      const plainForward = `---------- Forwarded message ----------\nFrom: ${fromFull}\nDate: ${date}\nSubject: ${subject}\n\n${body}`;
+      const plainBody = settings.plainTextMode
+        ? `${embedAboveQuote ? `${settings.signatureSeparatorEnabled ? "\n\n-- \n" : "\n\n"}${getPlainTextSignature(signatureIdentity)}` : ""}\n\n${plainForward}`
+        : `\n\n---\nForwarded message from ${sender}:\n${body}`;
+      setComposeBody(plainBody);
       setComposeHtmlBody(
-        `<p></p><hr><p>Forwarded message from ${sender}:</p>${htmlBody}`,
+        settings.plainTextMode
+          ? ""
+          : `<p></p>${signatureBlock}${forwardHeader}${buildQuotedHtmlBlock(sanitizedQuote)}`,
       );
       setComposeAttachments([]);
       setComposeReplyContext(null);
+      setComposeMode("forward");
+      setQuotedAttachments(mapQuotedAttachments(message));
+      setSignatureAlreadyEmbedded(embedAboveQuote);
       setDraftId(null);
       draftIdRef.current = null;
       isDirtyRef.current = true;
+      resetComposeInlineImages();
       setIsComposeOpen(true);
     },
-    [],
+    [identities, resolvedIdentityId],
   );
 
   const seedNewMessage = useCallback(
@@ -348,23 +572,32 @@ export function MailComposeProvider({
         name && name.toLowerCase() !== email.toLowerCase()
           ? `${name} <${email}>`
           : email;
+      const identity =
+        identities.find((entry) => entry.id === resolvedIdentityId) ??
+        identities[0] ??
+        null;
+      const seeded = buildNewComposeBodies(identity);
 
       setComposeTo(to);
       setComposeCc("");
       setComposeBcc("");
       setComposeSubject("");
-      setComposeBody("");
-      setComposeHtmlBody("");
+      setComposeBody(seeded.body);
+      setComposeHtmlBody(seeded.htmlBody);
       setComposeAttachments([]);
       setComposeReplyContext(null);
+      setComposeMode("new");
+      setQuotedAttachments([]);
+      setSignatureAlreadyEmbedded(seeded.signatureAlreadyEmbedded);
       setDraftId(null);
       draftIdRef.current = null;
       isDirtyRef.current = true;
       setDraftSaveStatus("idle");
+      resetComposeInlineImages();
       setIsComposeOpen(true);
       setIsFullCompose(false);
     },
-    [],
+    [identities, resolvedIdentityId],
   );
 
   const seedDraft = useCallback(
@@ -391,6 +624,9 @@ export function MailComposeProvider({
       setComposeBody(bodyText);
       setComposeAttachments([]);
       setComposeReplyContext(buildReplyContext(message));
+      setComposeMode("draft");
+      setQuotedAttachments(mapQuotedAttachments(message));
+      setSignatureAlreadyEmbedded(hasEmbeddedSignature(htmlBody));
       setDraftId(message.id);
       draftIdRef.current = message.id;
       isDirtyRef.current = false;
@@ -401,11 +637,15 @@ export function MailComposeProvider({
     [],
   );
 
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
   useEffect(() => {
     composeBridgeRef.current = {
-      getDraft: () => draft,
+      getDraft: () => draftRef.current,
       resetDraft,
       clearCompose,
+      openNewCompose,
       seedReply,
       seedForward,
       seedNewMessage,
@@ -422,15 +662,14 @@ export function MailComposeProvider({
       composeBridgeRef.current = null;
     };
   }, [
-    draft,
     resetDraft,
     clearCompose,
+    openNewCompose,
     seedReply,
     seedForward,
     seedNewMessage,
     seedDraft,
     markDirty,
-    setDraftSaveStatus,
   ]);
 
   const fieldsValue = useMemo(
@@ -478,6 +717,9 @@ export function MailComposeProvider({
       setDraftSaveStatus,
       composeDraftId: draftId,
       clearCompose,
+      composeMode,
+      quotedAttachments,
+      openNewCompose,
     }),
     [
       composeTo,
@@ -493,6 +735,9 @@ export function MailComposeProvider({
       draftId,
       markDirty,
       clearCompose,
+      composeMode,
+      quotedAttachments,
+      openNewCompose,
     ],
   );
 

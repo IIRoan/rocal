@@ -119,7 +119,7 @@ describe("splitPlaintextQuote", () => {
     expect(result.quote).not.toBeNull();
   });
 
-
+
   it("returns empty body unchanged", () => {
     const result = splitPlaintextQuote("");
     expect(result.body).toBe("");
@@ -183,5 +183,31 @@ describe("splitHtmlQuote", () => {
     const result = splitHtmlQuote(html);
     expect(result.hasQuote).toBe(true);
     expect(result.html).not.toContain("gmail_extra");
+  });
+
+  it("detects Solace reply quotes with hr and blockquote", () => {
+    const html =
+      '<p>Reply with <strong>formatting</strong></p><ul><li>one</li></ul><p></p><hr><p>On 6/23/2026, alice@example.com wrote:</p><blockquote><p>Original</p></blockquote>';
+    const result = splitHtmlQuote(html);
+    expect(result.hasQuote).toBe(true);
+    expect(result.html).toContain("<strong>formatting</strong>");
+    expect(result.html).toContain("<ul>");
+    expect(result.html).not.toContain("<hr>");
+    expect(result.html).not.toContain("alice@example.com wrote");
+  });
+
+  it("detects Solace forward quotes", () => {
+    const html =
+      '<p>See below</p><hr><p>Forwarded message from bob@example.com:</p><p>Original body</p>';
+    const result = splitHtmlQuote(html);
+    expect(result.hasQuote).toBe(true);
+    expect(result.html).toBe("<p>See below</p>");
+  });
+
+  it("preserves rich text lists in non-reply html", () => {
+    const html = "<p>Hello</p><ul><li>alpha</li><li>beta</li></ul>";
+    const result = splitHtmlQuote(html);
+    expect(result.hasQuote).toBe(false);
+    expect(result.html).toBe(html);
   });
 });
