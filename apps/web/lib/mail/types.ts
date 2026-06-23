@@ -64,6 +64,7 @@ export type JmapIdentity = {
 
 export type JmapBodyPartRef = {
   partId?: string;
+  type?: string;
 };
 
 export type JmapBodyValue = {
@@ -106,6 +107,9 @@ export type JmapEmailMessage = {
   bcc?: MailAddress[];
   receivedAt?: string;
   keywords?: Record<string, boolean>;
+  preview?: string | null;
+  hasAttachment?: boolean;
+  size?: number;
   bodyStructure?: JmapBodyStructure;
   bodyValues?: Record<string, JmapBodyValue>;
   textBody?: JmapBodyPartRef[];
@@ -218,6 +222,9 @@ const jmapEmailMessageSchema = z.object({
   bcc: jmapOptional(z.array(mailAddressSchema).optional()),
   receivedAt: z.string().optional(),
   keywords: z.record(z.boolean()).optional(),
+  preview: z.string().nullable().optional(),
+  hasAttachment: z.boolean().optional(),
+  size: z.number().optional(),
   bodyStructure: jmapBodyStructureSchema.optional(),
   bodyValues: z.record(jmapBodyValueSchema).optional(),
   textBody: z.array(jmapBodyPartRefSchema).optional(),

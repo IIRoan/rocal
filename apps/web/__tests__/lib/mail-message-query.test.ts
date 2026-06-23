@@ -97,7 +97,11 @@ describe("mail message query cache", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
-    const cached = message({ id: "message-4" });
+    const cached = message({
+      id: "message-4",
+      textBody: [{ partId: "text", type: "text/plain" }],
+      bodyValues: { text: { value: "Cached body" } },
+    });
     queryClient.setQueryData(mailQueryKeys.message("message-4"), cached);
 
     let fetchCount = 0;
@@ -114,5 +118,39 @@ describe("mail message query cache", () => {
 
     expect(result).toEqual(cached);
     expect(fetchCount).toBe(0);
+  });
+
+  it("refetches preview-only cached rows when a full body is required", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    seedMailMessageCache(
+      queryClient,
+      "mb-inbox",
+      [message({ id: "message-5", preview: "Snippet" })],
+      1,
+    );
+
+    const fetched = message({
+      id: "message-5",
+      textBody: [{ partId: "text", type: "text/plain" }],
+      bodyValues: { text: { value: "Full body" } },
+    });
+    let fetchCount = 0;
+
+    const result = await fetchMailMessageById(queryClient, {
+      client: {
+        getMessagesByIds: async () => {
+          fetchCount += 1;
+          return [fetched];
+        },
+      } as never,
+      session: {} as never,
+      messageId: "message-5",
+      requireBody: true,
+    });
+
+    expect(result.bodyValues?.text?.value).toBe("Full body");
+    expect(fetchCount).toBe(1);
   });
 });

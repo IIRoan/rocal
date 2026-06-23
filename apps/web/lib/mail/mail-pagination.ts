@@ -1,4 +1,4 @@
-export const MAILBOX_MESSAGES_PAGE_SIZE = 50;
+export const MAILBOX_MESSAGES_PAGE_SIZE = 25;
 
 /** Whether another JMAP page is likely available after the current list. */
 export function hasMoreMailboxMessages(
