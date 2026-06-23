@@ -5,8 +5,11 @@ import {
   appendHtmlSignature,
   appendPlainTextSignature,
   getPlainTextSignature,
-  hasMeaningfulHtmlBody,
+  hasComposeHtmlBody,
   htmlToPlainText,
+  resolveOutgoingComposeBodies,
+  stripTrailingPlainTextSignature,
+  swapEmbeddedSignatureInPlainText,
 } from "@/lib/mail/signature-utils";
 
 describe("signature-utils", () => {
@@ -31,6 +34,42 @@ describe("signature-utils", () => {
     expect(
       appendPlainTextSignature("Hello", { textSignature: "Alice" }),
     ).toBe("Hello\n\n-- \nAlice");
+  });
+
+  it("seeds an empty plain text compose body with a trailing signature", () => {
+    expect(appendPlainTextSignature("", { textSignature: "Alice" })).toBe(
+      "\n\n-- \nAlice",
+    );
+  });
+
+  it("strips trailing plain text signatures", () => {
+    const body = "Hello\n\n-- \nAlice";
+    expect(
+      stripTrailingPlainTextSignature(body, { textSignature: "Alice" }),
+    ).toBe("Hello");
+    expect(
+      stripTrailingPlainTextSignature("\n\n-- \nAlice", { textSignature: "Alice" }),
+    ).toBe("");
+  });
+
+  it("swaps embedded plain text signatures when identity changes", () => {
+    const alice = { textSignature: "Alice" };
+    const bob = { textSignature: "Bob" };
+    const body = "Hello\n\n-- \nAlice";
+    expect(swapEmbeddedSignatureInPlainText(body, alice, bob, { separator: true })).toBe(
+      "Hello\n\n-- \nBob",
+    );
+  });
+
+  it("does not swap plain text signatures when the old signature was removed", () => {
+    expect(
+      swapEmbeddedSignatureInPlainText(
+        "Hello",
+        { textSignature: "Alice" },
+        { textSignature: "Bob" },
+        { separator: true },
+      ),
+    ).toBeNull();
   });
 
   it("appends html signatures to html bodies", () => {
@@ -60,12 +99,68 @@ describe("signature-utils", () => {
     );
   });
 
-  it("detects meaningful html bodies", () => {
-    expect(hasMeaningfulHtmlBody("<p>Hello</p>")).toBe(false);
-    expect(hasMeaningfulHtmlBody("<p>Hello <strong>world</strong></p>")).toBe(
+  it("detects compose html bodies with any visible text", () => {
+    expect(hasComposeHtmlBody("<p>Hello</p>")).toBe(true);
+    expect(hasComposeHtmlBody("<p>Hello <strong>world</strong></p>")).toBe(
       true,
     );
-    expect(hasMeaningfulHtmlBody("")).toBe(false);
-    expect(hasMeaningfulHtmlBody("<p></p>")).toBe(false);
+    expect(hasComposeHtmlBody("<p><s>strike</s></p>")).toBe(true);
+    expect(hasComposeHtmlBody("")).toBe(false);
+    expect(hasComposeHtmlBody("<p></p>")).toBe(false);
+  });
+
+  it("resolves outgoing compose bodies with html and plain alternatives", () => {
+    expect(
+      resolveOutgoingComposeBodies({
+        body: "",
+        htmlBody: "<p>Hello <strong>world</strong></p>",
+      }),
+    ).toEqual({
+      textBody: "Hello world",
+      htmlBody: "<p>Hello <strong>world</strong></p>",
+    });
+  });
+
+  it("resolves outgoing compose bodies with signatures on both parts", () => {
+    const identity = {
+      textSignature: "Alice",
+      htmlSignature: "<p>Alice</p>",
+    };
+    expect(
+      resolveOutgoingComposeBodies({
+        body: "",
+        htmlBody: "<p>Hello</p>",
+        signature: identity,
+      }),
+    ).toEqual({
+      textBody: "Hello\n\n-- \nAlice",
+      htmlBody: "<p>Hello</p><br><br>-- <br><p>Alice</p>",
+    });
+  });
+
+  it("falls back to plain body when html is empty", () => {
+    expect(
+      resolveOutgoingComposeBodies({
+        body: "Plain only",
+        htmlBody: "",
+      }),
+    ).toEqual({
+      textBody: "Plain only",
+      htmlBody: undefined,
+    });
+  });
+
+  it("keeps html body for image-only compose content", () => {
+    const html =
+      '<p></p><img src="data:image/png;base64,abc" data-cid="img@solace">';
+    expect(
+      resolveOutgoingComposeBodies({
+        body: "",
+        htmlBody: html,
+      }),
+    ).toEqual({
+      textBody: "",
+      htmlBody: html,
+    });
   });
 });

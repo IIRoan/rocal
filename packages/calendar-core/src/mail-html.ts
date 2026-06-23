@@ -123,12 +123,15 @@ export function buildEmailHtmlDocument({
   const bg = isDark ? "#1a1a1a" : "#fff";
   const fg = isDark ? "#e0e0e0" : "#111";
   const linkColor = isDark ? "#8ab4f8" : "#2563eb";
+  const quoteBorder = isDark ? "#444" : "#d4d4d4";
+  const quoteColor = isDark ? "#9aa0a6" : "#666";
   const autoDarkStyles = isDark && !hasOwnDark ? `<style>${EMAIL_AUTO_DARK_CSS}</style>` : "";
   const viewport = mobileViewport
     ? `<meta name="viewport" content="width=device-width, initial-scale=1">`
     : "";
+  const richTextStyles = `ul,ol{margin:0 0 1em;padding-left:1.5em}ul{list-style-type:disc}ol{list-style-type:decimal}li{margin:0.25em 0}li>p{margin:0}blockquote{margin:0 0 1em;padding-left:12px;border-left:3px solid ${quoteBorder};color:${quoteColor}}a{color:${linkColor};text-decoration:underline}u{text-decoration:underline}s,strike,del{text-decoration:line-through}strong,b{font-weight:600}em,i{font-style:italic}`;
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8">${viewport}<meta name="color-scheme" content="${scheme}">${csp}<base target="_blank"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;color-scheme:${scheme}}body{background:${bg};font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;font-size:14px;line-height:1.6;padding:16px 20px;color:${fg};word-break:break-word;overflow-wrap:anywhere;overflow-x:hidden}img{max-width:100%;height:auto}a{color:${linkColor}}p{margin:0 0 1em}p:last-child{margin:0}</style>${autoDarkStyles}</head><body>${processedHtml}</body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">${viewport}<meta name="color-scheme" content="${scheme}">${csp}<base target="_blank"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;color-scheme:${scheme}}body{background:${bg};font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;font-size:14px;line-height:1.6;padding:16px 20px;color:${fg};word-break:break-word;overflow-wrap:anywhere;overflow-x:hidden}img{max-width:100%;height:auto}${richTextStyles}p{margin:0 0 1em}p:last-child{margin:0}</style>${autoDarkStyles}</head><body>${processedHtml}</body></html>`;
 }
 
 function extractBodyHtml(html: string): string {

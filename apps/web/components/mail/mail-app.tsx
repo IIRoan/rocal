@@ -31,6 +31,7 @@ import {
   flushComposeDraftSave,
   getMailComposeBridge,
   useMailComposeChrome,
+  useMailCompose,
 } from "./mail-compose-context";
 import { AttachmentPreviewDialog } from "./attachment-preview-dialog";
 import { MessageList } from "./message-list";
@@ -231,6 +232,7 @@ export function MailApp() {
 function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
   const { isComposeOpen, setIsComposeOpen, isFullCompose, setIsFullCompose, dismissCompose } =
     useMailComposeChrome();
+  const { openNewCompose } = useMailCompose();
   const {
     session,
     config,
@@ -254,12 +256,6 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     selectedMessageIsDecrypting,
     isPaletteOpen,
     setIsPaletteOpen,
-    blockRemoteImages,
-    setBlockRemoteImages,
-    blockTrackingPixels,
-    setBlockTrackingPixels,
-    mailDarkMode,
-    setMailDarkMode,
     refreshMailboxMessages,
     handleManualRefresh,
     isRefreshing,
@@ -268,6 +264,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     isLoadingMore,
     handleSignIn,
     handleSendMessage,
+    handleComposeImageUpload,
     handleDeleteMessage,
     handleReply,
     handleForward,
@@ -520,7 +517,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
           user={user ?? { name: "User", email: "" }}
           activeMailbox={activeMailbox}
           onSelectMailbox={(id) => void refreshMailboxMessages(id)}
-          onCompose={() => setIsComposeOpen(true)}
+          onCompose={() => openNewCompose()}
           onOpenPalette={() => setIsPaletteOpen(true)}
           onOpenSearch={() => setIsPaletteOpen(true)}
           onOpenMailboxes={() => {
@@ -548,7 +545,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                   isRefreshing={isRefreshing}
                   onBack={handleBack}
                   onRefresh={() => void handleManualRefresh()}
-                  onCompose={() => setIsComposeOpen(true)}
+                  onCompose={() => openNewCompose()}
                 />
               )}
 
@@ -708,9 +705,6 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                         activeMailbox.accountEncryptedAtRest
                       }
                       isBusy={isBusy}
-                      blockRemoteImages={blockRemoteImages}
-                      blockTrackingPixels={blockTrackingPixels}
-                      mailDarkMode={mailDarkMode}
                       mailboxes={activeMailbox.mailboxes}
                       currentMailboxId={activeMailbox.selectedMailboxId}
                       onReply={handleReply}
@@ -788,6 +782,15 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                         await handleSendMessage();
                         setIsFullCompose(false);
                       }}
+                      onImageUpload={handleComposeImageUpload}
+                      activeMailbox={
+                        activeMailbox
+                          ? {
+                              client: activeMailbox.client,
+                              session: activeMailbox.session,
+                            }
+                          : null
+                      }
                       isBusy={isBusy}
                     />
                   </div>
@@ -806,17 +809,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
           if (!v) setPaletteInitialView(undefined);
         }}
         initialView={paletteInitialView}
-        onCompose={() => setIsComposeOpen(true)}
-        blockRemoteImages={blockRemoteImages}
-        blockTrackingPixels={blockTrackingPixels}
-        onToggleBlockRemoteImages={() =>
-          setBlockRemoteImages(!blockRemoteImages)
-        }
-        onToggleBlockTrackingPixels={() =>
-          setBlockTrackingPixels(!blockTrackingPixels)
-        }
-        mailDarkMode={mailDarkMode}
-        onToggleMailDarkMode={() => setMailDarkMode(!mailDarkMode)}
+        onCompose={() => openNewCompose()}
         mailboxes={activeMailbox?.mailboxes ?? []}
         onCreateMailbox={(name) => handleCreateMailbox(name)}
         onDeleteMailbox={(id) => handleDeleteMailbox(id)}
@@ -833,6 +826,15 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
         fallbackFromEmail={activeMailbox?.email ?? accountEmail}
         onClose={() => void handleDismissCompose()}
         onSend={handleSendMessage}
+        onImageUpload={handleComposeImageUpload}
+        activeMailbox={
+          activeMailbox
+            ? {
+                client: activeMailbox.client,
+                session: activeMailbox.session,
+              }
+            : null
+        }
         onExpand={() => {
           setIsComposeOpen(false);
           setIsFullCompose(true);

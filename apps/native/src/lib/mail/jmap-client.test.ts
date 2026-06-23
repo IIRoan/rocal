@@ -99,7 +99,8 @@ describe("buildSendMessageMethodCalls", () => {
     expect(draft.from).toEqual([{ email: "me@example.com" }]);
     expect(draft.to).toEqual([{ email: "you@example.com" }]);
     expect(draft.subject).toBe("Hi");
-    expect(draft.bodyStructure).toEqual({ type: "text/plain", partId: "text" });
+    expect(draft.bodyStructure).toBeUndefined();
+    expect(draft.textBody).toEqual([{ partId: "text", type: "text/plain" }]);
     expect(draft.bodyValues.text.value).toBe("Hello");
   });
 
@@ -159,7 +160,7 @@ describe("buildSendMessageMethodCalls", () => {
     expect(draft.references).toEqual(["<root@example.com>"]);
   });
 
-  it("builds a multipart/mixed body when attachments are present", () => {
+  it("uses top-level attachments when present", () => {
     const draft = (
       buildSendMessageMethodCalls({
         ...base,
@@ -168,14 +169,12 @@ describe("buildSendMessageMethodCalls", () => {
         ],
       })[0][1].create as Record<string, any>
     ).draft1;
-    expect(draft.bodyStructure.type).toBe("multipart/mixed");
-    expect(draft.bodyStructure.subParts).toEqual([
-      { type: "text/plain", partId: "text" },
+    expect(draft.bodyStructure).toBeUndefined();
+    expect(draft.attachments).toEqual([
       {
-        type: "application/pdf",
         blobId: "blob-1",
         name: "a.pdf",
-        size: 10,
+        type: "application/pdf",
         disposition: "attachment",
       },
     ]);

@@ -48,6 +48,7 @@ import type {
   LabelDef,
   MailVaultKdfParams,
 } from "./types";
+import { looksLikeMimeMessage } from "@workspace/calendar-core";
 import type { MailRuntime } from "./mail-runtime";
 
 const log = createLogger("mail-crypto");
@@ -578,13 +579,29 @@ export async function decryptMailMessage(
 ): Promise<MailDecryptResult> {
   log.debug("[mail-crypto] decryptMailMessage: start id=%s armoredLength=%d", messageId, armoredMessage.length);
   const result = await decryptArmoredMessage(runtime, messageId, armoredMessage, senderPublicKeyArmored);
+  if (!looksLikeMimeMessage(result.plaintext)) {
+    log.debug(
+      "[mail-crypto] decryptMailMessage: SUCCESS id=%s plaintext=%db sigState=%s",
+      messageId,
+      result.plaintext.length,
+      result.signatureVerificationState,
+    );
+    return result;
+  }
+
+  const parsed = parseMimeBody(result.plaintext);
   log.debug(
-    "[mail-crypto] decryptMailMessage: SUCCESS id=%s plaintext=%db sigState=%s",
+    "[mail-crypto] decryptMailMessage: parsed inline MIME text=%s html=%s id=%s",
+    parsed.text ? "yes" : "no",
+    parsed.html ? "yes" : "no",
     messageId,
-    result.plaintext.length,
-    result.signatureVerificationState,
   );
-  return result;
+  return {
+    ...result,
+    plaintext: parsed.text?.trim() ?? result.plaintext,
+    html: parsed.html?.trim() ?? null,
+    attachments: parsed.attachments,
+  };
 }
 
 /**

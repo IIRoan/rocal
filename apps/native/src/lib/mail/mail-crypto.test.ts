@@ -11,6 +11,7 @@
  * candidate ordering, cache behaviour, error propagation, and logging.
  */
 
+import { buildOutgoingMimeMessage } from "@workspace/calendar-core";
 import {
   ensureVaultLoaded,
   decryptMailMessage,
@@ -495,6 +496,31 @@ describe("mail-crypto", () => {
       expect(result.plaintext).toBe("Decrypted content");
       expect(result.signatureVerificationState).toBe("not_signed");
       expect(result.hasVerifiedSignature).toBe(false);
+    });
+
+    it("extracts html from decrypted inline MIME payloads", async () => {
+      const mime = buildOutgoingMimeMessage({
+        text: "Hello world",
+        html: "<p>Hello <strong>world</strong></p>",
+      });
+      mockReadMessage.mockResolvedValueOnce({});
+      mockDecrypt.mockResolvedValueOnce({
+        data: mime,
+        signatures: [],
+      });
+      mockParseMimeBody.mockImplementationOnce(
+        jest.requireActual("./mail-mime-parser").parseMimeBody,
+      );
+
+      const runtime = buildRuntime();
+      const result = await decryptMailMessage(
+        runtime,
+        "msg-inline-html",
+        "-----BEGIN PGP MESSAGE-----",
+      );
+
+      expect(result.plaintext).toBe("Hello world");
+      expect(result.html).toBe("<p>Hello <strong>world</strong></p>");
     });
 
     it("reports unverified signature when no sender key is provided", async () => {

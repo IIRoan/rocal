@@ -72,8 +72,25 @@ export function splitHtmlQuote(html: string): {
   const hasGmailExtra = /class="[^"]*gmail_extra[^"]*"/i.test(html);
   const hasBlockquoteCite = /blockquote[^>]+type="cite"/i.test(html);
   const hasAppleMail = /class="[^"]*apple_content_edited[^"]*"/i.test(html);
+  const hasSolaceHrQuote = /<hr\b/i.test(html);
+  const hasSolaceBlockquote =
+    /<blockquote\b/i.test(html) &&
+    (/wrote:\s*<\/p>/i.test(html) ||
+      /Forwarded message from/i.test(html) ||
+      hasSolaceHrQuote);
+  const hasQuotedHtmlIsland = /data-quoted-html/i.test(html);
+  const hasForwardSeparator = /Forwarded message/i.test(html);
 
-  if (!hasGmailQuote && !hasGmailExtra && !hasBlockquoteCite && !hasAppleMail) {
+  if (
+    !hasGmailQuote &&
+    !hasGmailExtra &&
+    !hasBlockquoteCite &&
+    !hasAppleMail &&
+    !hasSolaceHrQuote &&
+    !hasSolaceBlockquote &&
+    !hasQuotedHtmlIsland &&
+    !hasForwardSeparator
+  ) {
     return { html, hasQuote: false };
   }
 
@@ -103,7 +120,42 @@ export function splitHtmlQuote(html: string): {
       });
     }
 
-    const stripped = doc.body.innerHTML;
+    const hr = doc.querySelector("hr");
+    if (hr) {
+      let node: ChildNode | null = hr;
+      while (node) {
+        const next = node.nextSibling;
+        node.remove();
+        hasQuote = true;
+        node = next;
+      }
+    }
+
+    if (!hasQuote) {
+      doc.querySelectorAll("blockquote").forEach((el) => {
+        const previous = el.previousElementSibling;
+        const previousText = previous?.textContent?.trim() ?? "";
+        if (
+          /wrote:\s*$/i.test(previousText) ||
+          /Forwarded message from/i.test(previousText)
+        ) {
+          previous?.remove();
+          el.remove();
+          hasQuote = true;
+        }
+      });
+    }
+
+    doc.querySelectorAll("div[data-quoted-html]").forEach((el) => {
+      const previous = el.previousElementSibling;
+      if (previous) {
+        previous.remove();
+      }
+      el.remove();
+      hasQuote = true;
+    });
+
+    const stripped = doc.body.innerHTML.trim();
     // If stripping leaves an empty body, return the original unstripped HTML
     if (
       hasQuote &&
