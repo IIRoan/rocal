@@ -17,6 +17,7 @@ export async function resolveOutgoingMessageBody(input: {
   runtime: MailRuntime;
   recipients: string[];
   plaintext: string;
+  html?: string;
   mimeAttachments?: OutgoingMimeAttachment[];
   uploadPgpMimeCiphertext?: (
     armoredMessage: string,
@@ -55,13 +56,15 @@ export async function resolveOutgoingMessageBody(input: {
     recipientPublicKeysArmored.add(recipientKey.publicKeyArmored);
   }
 
-  const encryptPayload =
-    (input.mimeAttachments?.length ?? 0) > 0
-      ? buildOutgoingMimeMessage({
-          text: input.plaintext,
-          attachments: input.mimeAttachments,
-        })
-      : input.plaintext;
+  const shouldUseMime =
+    Boolean(input.html?.trim()) || (input.mimeAttachments?.length ?? 0) > 0;
+  const encryptPayload = shouldUseMime
+    ? buildOutgoingMimeMessage({
+        text: input.plaintext,
+        html: input.html,
+        attachments: input.mimeAttachments,
+      })
+    : input.plaintext;
 
   const { armoredMessage } = await encryptForRecipients({
     plaintext: encryptPayload,

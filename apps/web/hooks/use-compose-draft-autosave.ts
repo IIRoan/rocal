@@ -16,7 +16,8 @@ import {
   validateOutgoingMessageSize,
 } from "@workspace/calendar-core";
 import type { MailServerPolicy } from "@workspace/calendar-core";
-import { hasMeaningfulHtmlBody, htmlToPlainText } from "@/lib/mail/signature-utils";
+import { resolveOutgoingComposeBodies } from "@/lib/mail/signature-utils";
+import { readMailComposeSettings } from "@/lib/mail/compose-settings";
 
 const log = createLogger("compose-draft-autosave");
 const AUTOSAVE_DEBOUNCE_MS = 2000;
@@ -72,16 +73,19 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     const toAddresses = parseList(draft.to);
     const ccAddresses = parseList(draft.cc);
     const bccAddresses = parseList(draft.bcc);
-    const plainBody = draft.body.trim() || htmlToPlainText(draft.htmlBody);
-    const htmlBody = hasMeaningfulHtmlBody(draft.htmlBody)
-      ? draft.htmlBody
-      : undefined;
+    const composeSettings = readMailComposeSettings();
+    const { textBody: plainBody, htmlBody } = resolveOutgoingComposeBodies({
+      body: draft.body,
+      htmlBody: draft.htmlBody,
+      signatureAlreadyEmbedded: draft.signatureAlreadyEmbedded,
+    });
+    const htmlForDraft = composeSettings.plainTextMode ? undefined : htmlBody;
 
     if (
       !toAddresses.length &&
       !draft.subject.trim() &&
       !plainBody &&
-      !htmlBody
+      !htmlForDraft
     ) {
       return bridge.getDraftIdRef();
     }
@@ -92,7 +96,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       bcc: bccAddresses,
       subject: draft.subject,
       body: plainBody,
-      htmlBody: htmlBody ?? "",
+      htmlBody: htmlForDraft ?? "",
       identityId: draft.identityId,
       draftId: bridge.getDraftIdRef(),
     });
@@ -108,7 +112,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       const estimatedBytes = estimateOutgoingJmapMessageBytes({
         subject: draft.subject.trim() || "(No subject)",
         textBody: plainBody,
-        htmlBody,
+        htmlBody: htmlForDraft,
       });
       const messageSizeError = validateOutgoingMessageSize(
         estimatedBytes,
@@ -146,7 +150,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
         bcc: bccAddresses.length ? bccAddresses : undefined,
         subject: draft.subject.trim() || "(No subject)",
         textBody: plainBody,
-        htmlBody,
+        htmlBody: htmlForDraft,
         previousDraftId: bridge.getDraftIdRef() ?? undefined,
       });
 

@@ -214,41 +214,48 @@ function buildPgpMimeBodyStructure(
   };
 }
 
-function buildMessageBodyStructure(input: {
-  attachments?: JmapAttachmentInput[];
+/** JMAP Email/set body fields — matches Bulwark/webmail sendEmail (convenience properties). */
+function buildEmailContentFields(input: {
+  textBody: string;
   htmlBody?: string;
+  attachments?: JmapAttachmentInput[];
   pgpMimeCiphertext?: JmapPgpMimeCiphertext;
 }): Record<string, unknown> {
   if (input.pgpMimeCiphertext) {
-    return buildPgpMimeBodyStructure(input.pgpMimeCiphertext);
+    return {
+      bodyStructure: buildPgpMimeBodyStructure(input.pgpMimeCiphertext),
+      bodyValues: buildMessageBodyValues(input),
+    };
   }
 
-  const textPart = { type: "text/plain", partId: "text" };
-  const contentPart: Record<string, unknown> = input.htmlBody
-    ? {
-        type: "multipart/alternative",
-        subParts: [textPart, { type: "text/html", partId: "html" }],
-      }
-    : textPart;
-
-  const hasAttachments = (input.attachments?.length ?? 0) > 0;
-  if (!hasAttachments) {
-    return contentPart;
-  }
-
-  return {
-    type: "multipart/mixed",
-    subParts: [
-      contentPart,
-      ...(input.attachments ?? []).map((attachment) => ({
-        type: attachment.type,
-        blobId: attachment.blobId,
-        name: attachment.name,
-        size: attachment.size,
-        disposition: "attachment",
-      })),
-    ],
+  const trimmedHtml = input.htmlBody?.trim();
+  const fields: Record<string, unknown> = {
+    bodyValues: trimmedHtml
+      ? {
+          text: { value: normalizeJmapBodyValue(input.textBody) },
+          html: { value: normalizeJmapBodyValue(trimmedHtml) },
+        }
+      : {
+          text: { value: normalizeJmapBodyValue(input.textBody) },
+        },
+    textBody: [{ partId: "text", type: "text/plain" }],
   };
+
+  if (trimmedHtml) {
+    fields.htmlBody = [{ partId: "html", type: "text/html" }];
+  }
+
+  if (input.attachments?.length) {
+    fields.attachments = input.attachments.map((attachment) => ({
+      blobId: attachment.blobId,
+      type: attachment.type,
+      name: attachment.name,
+      disposition: attachment.disposition ?? "attachment",
+      ...(attachment.cid ? { cid: attachment.cid } : {}),
+    }));
+  }
+
+  return fields;
 }
 
 function normalizeJmapBodyValue(value: string): string {
@@ -360,8 +367,7 @@ export function buildSendMessageMethodCalls(input: {
         ...(ccAddresses?.length ? { cc: ccAddresses } : {}),
         ...(bccAddresses?.length ? { bcc: bccAddresses } : {}),
         subject: input.subject,
-        bodyStructure: buildMessageBodyStructure(input),
-        bodyValues: buildMessageBodyValues(input),
+        ...buildEmailContentFields(input),
       },
     },
   };
@@ -407,8 +413,7 @@ export function buildDraftMethodCalls(input: {
         ...(ccAddresses?.length ? { cc: ccAddresses } : {}),
         ...(bccAddresses?.length ? { bcc: bccAddresses } : {}),
         subject: input.subject,
-        bodyStructure: buildMessageBodyStructure(input),
-        bodyValues: buildMessageBodyValues(input),
+        ...buildEmailContentFields(input),
       },
     },
   };

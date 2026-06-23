@@ -7,8 +7,8 @@ import {
   ChevronRight,
   ArrowLeft,
   SquarePen,
+  Eye,
   EyeOff,
-  ShieldOff,
   Sun,
   Moon,
   Monitor,
@@ -19,6 +19,7 @@ import {
   Plus,
   Trash2,
   Loader2,
+  AlignLeft,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { UnifiedSearchResult } from "@workspace/calendar-core";
@@ -49,6 +50,8 @@ import { NotificationSettings } from "../command-palette/notification-settings";
 import { TimeRegionSettings } from "../command-palette/time-region-settings";
 import { TransitionContainer } from "../command-palette/transition-container";
 import { SettingToggleRow } from "../command-palette/setting-toggle-row";
+import { ComposeSettingsPanel } from "./compose-settings-panel";
+import { MailDisplaySettingsPanel } from "./mail-display-settings-panel";
 import { InviteSettings } from "../command-palette/invite-settings";
 import { PasswordSection } from "../command-palette/password-section";
 import { PasskeySettings } from "@/components/passkey-settings";
@@ -74,7 +77,9 @@ type MailPaletteView =
   | "mailbox-create"
   | "mailbox-edit"
   | "invites"
-  | "labels";
+  | "labels"
+  | "composing"
+  | "mail-display";
 
 interface PaletteItem {
   id: string;
@@ -87,12 +92,6 @@ export interface MailCommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCompose: () => void;
-  blockRemoteImages: boolean;
-  blockTrackingPixels: boolean;
-  onToggleBlockRemoteImages: () => void;
-  onToggleBlockTrackingPixels: () => void;
-  mailDarkMode: boolean;
-  onToggleMailDarkMode: () => void;
   mailboxes?: JmapMailbox[];
   onCreateMailbox?: (name: string) => Promise<void>;
   onDeleteMailbox?: (id: string) => Promise<void>;
@@ -316,12 +315,6 @@ export function MailCommandPalette({
   open,
   onOpenChange,
   onCompose,
-  blockRemoteImages,
-  blockTrackingPixels,
-  onToggleBlockRemoteImages,
-  onToggleBlockTrackingPixels,
-  mailDarkMode,
-  onToggleMailDarkMode,
   mailboxes = [],
   onCreateMailbox,
   onDeleteMailbox,
@@ -580,6 +573,18 @@ export function MailCommandPalette({
         label: "Labels",
         icon: Tag,
         description: "Manage message labels",
+      },
+      {
+        id: "composing",
+        label: "Composing",
+        icon: AlignLeft,
+        description: "Plain text mode, signatures, attachment reminders",
+      },
+      {
+        id: "mail-display",
+        label: "Content & display",
+        icon: Eye,
+        description: "Remote images, dark mode, attachment previews",
       },
       ...getBaseSettingsNavigationItems({
         timezone: settings?.timezone,
@@ -847,13 +852,22 @@ export function MailCommandPalette({
                 Mail
               </span>
             </div>
-            <SettingToggleRow
-              icon={Moon}
-              label="Dark mode for emails"
-              description="Render HTML email content with dark backgrounds and light text"
-              checked={mailDarkMode}
-              onToggle={onToggleMailDarkMode}
-            />
+            <button
+              type="button"
+              onClick={() => goForward("mail-display")}
+              className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors group"
+            >
+              <div className="flex items-center justify-center size-6 shrink-0">
+                <Eye className="size-4 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm">Content &amp; display</div>
+                <div className="text-xs text-muted-foreground">
+                  Remote images, trusted senders, email dark mode
+                </div>
+              </div>
+              <ChevronRight className="size-4 text-muted-foreground/40 shrink-0" />
+            </button>
           </div>
         </div>
       );
@@ -939,20 +953,22 @@ export function MailCommandPalette({
                 Images &amp; Privacy
               </span>
             </div>
-            <SettingToggleRow
-              icon={EyeOff}
-              label="Block remote images"
-              description="Prevent external images from loading"
-              checked={blockRemoteImages}
-              onToggle={onToggleBlockRemoteImages}
-            />
-            <SettingToggleRow
-              icon={ShieldOff}
-              label="Block tracking pixels"
-              description="Remove 1×1 invisible tracker images"
-              checked={blockTrackingPixels}
-              onToggle={onToggleBlockTrackingPixels}
-            />
+            <button
+              type="button"
+              onClick={() => goForward("mail-display")}
+              className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors group"
+            >
+              <div className="flex items-center justify-center size-6 shrink-0">
+                <EyeOff className="size-4 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm">Content &amp; display</div>
+                <div className="text-xs text-muted-foreground">
+                  Remote images, tracking pixels, trusted senders
+                </div>
+              </div>
+              <ChevronRight className="size-4 text-muted-foreground/40 shrink-0" />
+            </button>
             <SettingToggleRow
               icon={Search}
               label="Private content indexing"
@@ -1115,6 +1131,14 @@ export function MailCommandPalette({
           onDeleteLabel={onDeleteLabel}
         />
       );
+    }
+
+    if (currentView === "composing") {
+      return <ComposeSettingsPanel goBack={goBack} />;
+    }
+
+    if (currentView === "mail-display") {
+      return <MailDisplaySettingsPanel goBack={goBack} />;
     }
 
     return null;

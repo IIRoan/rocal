@@ -85,6 +85,8 @@ export type MailAttachment = {
   name?: string | null;
   type?: string | null;
   size?: number | null;
+  disposition?: string | null;
+  cid?: string | null;
   content?: MailAttachmentContent | null;
 };
 
@@ -198,6 +200,8 @@ const jmapAttachmentSchema = z.object({
   name: z.string().nullable().optional(),
   type: z.string().nullable().optional(),
   size: z.number().nullable().optional(),
+  disposition: z.string().nullable().optional(),
+  cid: z.string().nullable().optional(),
 });
 
 const jmapEmailMessageSchema = z.object({
