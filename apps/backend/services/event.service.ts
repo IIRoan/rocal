@@ -19,6 +19,7 @@ import type {
   EventMutationResult,
 } from "../contracts/event.contract";
 import { ValidationError } from "../lib/errors";
+import { prismaStringEquals } from "../lib/prisma-query";
 import { reminderScheduleWarning } from "../lib/email-delivery";
 import { errorLogDetails } from "../lib/log-sanitization";
 import {
@@ -447,14 +448,15 @@ export class EventService implements IEventService {
   }
 
   private async purgeInvitationEventRecord(eventId: string): Promise<void> {
+    const eventIdFilter = prismaStringEquals(eventId, "eventId");
     await this.prisma.eventNotification.deleteMany({
-      where: { eventId },
+      where: { eventId: eventIdFilter },
     });
     await this.prisma.notificationLog.deleteMany({
-      where: { eventId },
+      where: { eventId: eventIdFilter },
     });
     await this.prisma.calendarEvent.delete({
-      where: { id: eventId },
+      where: { id: eventIdFilter },
     });
   }
 
