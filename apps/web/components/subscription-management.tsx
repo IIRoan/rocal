@@ -979,7 +979,7 @@ export function SubscriptionManagement({
                             color: undefined,
                           }));
                       }}
-                      className={`size-6 rounded-full border-2 transition-all ${
+                      className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
                         editingColor === preset.value
                           ? "border-foreground scale-110"
                           : "border-transparent hover:scale-105"

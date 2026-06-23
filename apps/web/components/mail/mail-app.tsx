@@ -681,7 +681,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                   {/* Message reader — never shown for drafts */}
                   {selectedMessage && !selectedIsDraft ? (
                   <div
-                    className="absolute inset-0 flex flex-col transition-all duration-200 ease-in-out"
+                    className="absolute inset-0 flex flex-col transition-[transform,opacity] duration-200 ease-in-out"
                     style={{
                       opacity: isFullCompose ? 0 : 1,
                       transform: isFullCompose ? "translateX(-16px)" : "translateX(0)",
@@ -773,7 +773,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
 
                   {/* Full inline composer — slides in from right */}
                   <div
-                    className="absolute inset-0 flex flex-col transition-all duration-200 ease-in-out"
+                    className="absolute inset-0 flex flex-col transition-[transform,opacity] duration-200 ease-in-out"
                     style={{
                       opacity: isFullCompose ? 1 : 0,
                       transform: isFullCompose ? "translateX(0)" : "translateX(16px)",

@@ -29,6 +29,7 @@ import {
   jmapMethodCallsHaveDependencies,
   validateOutgoingMessageSize,
   validateJmapRequestSize,
+  isStalwartEncryptOnAppendEnabled,
   type MailServerPolicy,
   type MailServerPolicyConfig,
 } from "@workspace/calendar-core";
@@ -602,6 +603,54 @@ export class StalwartJmapClient {
     }>(envelope, "x:AccountSettings/get");
 
     return result.list?.[0] ?? { encryptionAtRest: { "@type": "Disabled" } };
+  }
+
+  /**
+   * Stalwart encryptOnAppend re-encrypts JMAP submissions with the user's PGP
+   * key, which breaks external delivery. Solace handles internal encryption.
+   */
+  async ensureEncryptOnAppendDisabled(session: JmapSession): Promise<void> {
+    const settings = await this.getAccountSettings(session);
+    if (!isStalwartEncryptOnAppendEnabled(settings)) {
+      return;
+    }
+
+    const encryptionAtRest = settings.encryptionAtRest;
+    if (!encryptionAtRest || typeof encryptionAtRest !== "object") {
+      return;
+    }
+
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
+      [
+        [
+          "x:AccountSettings/set",
+          {
+            accountId,
+            update: {
+              singleton: {
+                encryptionAtRest: {
+                  ...(encryptionAtRest as Record<string, unknown>),
+                  encryptOnAppend: false,
+                },
+              },
+            },
+          },
+          "c1",
+        ],
+      ],
+    );
+    const result = this.getMethodResult<{
+      notUpdated?: Record<string, { description?: string }>;
+    }>(envelope, "x:AccountSettings/set");
+    const updateError = result.notUpdated?.singleton;
+    if (updateError) {
+      throw new Error(
+        updateError.description ?? "Failed to disable Stalwart encryptOnAppend.",
+      );
+    }
   }
 
   async getStalwartPolicySingletons(

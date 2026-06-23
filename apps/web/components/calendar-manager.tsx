@@ -523,7 +523,7 @@ export function CalendarManager({
                         }));
                       }
                     }}
-                    className={`size-6 rounded-full border-2 transition-all ${
+                    className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
                       calendarColor === preset.value
                         ? "border-foreground scale-110"
                         : "border-transparent hover:scale-105"
@@ -665,7 +665,7 @@ export function CalendarManager({
                           }));
                         }
                       }}
-                      className={`size-6 rounded-full border-2 transition-all ${
+                      className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
                         calendarColor === preset.value
                           ? "border-foreground scale-110"
                           : "border-transparent hover:scale-105"

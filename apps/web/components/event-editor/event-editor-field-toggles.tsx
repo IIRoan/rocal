@@ -30,7 +30,7 @@ function EventEditorFieldToggleButton({
     <button
       type="button"
       onClick={onClick}
-      className={`p-1.5 rounded transition-colors cursor-pointer ${
+      className={`tap-target p-1.5 rounded transition-[color,background-color,transform] cursor-pointer ${
         active
           ? "bg-primary/20 text-primary"
           : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
