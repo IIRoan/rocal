@@ -405,7 +405,9 @@ export function MessageList({
               (entry) => entry.keywords?.["$flagged"] === true,
             );
             const hasAttachments = row.messages.some(
-              (entry) => (entry.attachments?.length ?? 0) > 0,
+              (entry) =>
+                entry.hasAttachment === true ||
+                (entry.attachments?.length ?? 0) > 0,
             );
             const senderLabel =
               row.messages.length > 1

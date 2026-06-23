@@ -41,6 +41,7 @@ import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
 import { useComposeDraftAutosave } from "@/hooks/use-compose-draft-autosave";
 import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
 import { isDraftMessage } from "@/lib/mail/draft-utils";
+import { messageHasLoadedBody } from "@/lib/mail/mail-message-body";
 import { classifyMessageEncryption } from "@/lib/mail/message-security";
 
 interface MobileMailHeaderProps {
@@ -246,6 +247,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     openMessageById,
     selectedConversationMessages,
     isConversationLoading,
+    isMessageBodyLoading,
     setSelectedConversationMessageId,
     selectedMessagePlaintext,
     selectedMessageDecryptedHtml,
@@ -331,6 +333,10 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     }
 
     if (openedDraftIdRef.current === selectedMessage.id) {
+      return;
+    }
+
+    if (!messageHasLoadedBody(selectedMessage)) {
       return;
     }
 
@@ -690,6 +696,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                       selectedMessageId={selectedMessage?.id ?? null}
                       conversationMessages={selectedConversationMessages}
                       isConversationLoading={isConversationLoading}
+                      isMessageBodyLoading={isMessageBodyLoading}
                       onSelectConversationMessage={(id) =>
                         setSelectedConversationMessageId(id)
                       }

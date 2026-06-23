@@ -171,6 +171,7 @@ const mockJmapClient = {
   getAccountSettings: jest.fn<() => Promise<any>>(),
   getMailboxes: jest.fn<() => Promise<any>>(),
   getMailboxMessages: jest.fn<() => Promise<any>>(),
+  getMessagesByIds: jest.fn<() => Promise<any>>(),
   getThreadMessages: jest.fn<() => Promise<any>>(),
   getIdentities: jest.fn<() => Promise<any>>(),
   sendMessage: jest.fn<() => Promise<any>>(),
@@ -632,12 +633,24 @@ describe("MailApp", () => {
           subject: "Encrypted hello",
           from: [{ email: "bob@solace.onl", name: "Bob" }],
           receivedAt: "2026-05-06T21:10:00.000Z",
-          textBody: [{ partId: "text" }],
-          bodyValues: { text: { value: "Hello Alice" } },
+          preview: "Hello Alice",
         },
       ],
       total: 1,
     });
+    mockJmapClient.getMessagesByIds.mockImplementation(
+      async (...args: unknown[]) => {
+        const ids = args[1] as string[];
+        return ids.map((id) => ({
+          id,
+          subject: "Encrypted hello",
+          from: [{ email: "bob@solace.onl", name: "Bob" }],
+          receivedAt: "2026-05-06T21:10:00.000Z",
+          textBody: [{ partId: "text" }],
+          bodyValues: { text: { value: "Hello Alice" } },
+        }));
+      },
+    );
     mockJmapClient.getThreadMessages.mockResolvedValue([
       {
         id: "mail-1",
@@ -959,7 +972,7 @@ describe("MailApp", () => {
         apiUrl: "http://192.168.2.213:8080/jmap/",
       }),
       "junk-1",
-      expect.objectContaining({ limit: 20, position: 0 }),
+      expect.objectContaining({ limit: 25, position: 0 }),
     );
     expect(container.textContent).toContain("Junk hello");
   });
@@ -1034,7 +1047,7 @@ describe("MailApp", () => {
           apiUrl: "http://192.168.2.213:8080/jmap/",
         }),
         "inbox-1",
-        expect.objectContaining({ limit: 20 }),
+        expect.objectContaining({ limit: 25 }),
       );
     });
 

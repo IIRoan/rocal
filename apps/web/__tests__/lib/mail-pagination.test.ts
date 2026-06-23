@@ -54,7 +54,7 @@ describe("StalwartJmapClient.getMailboxMessages pagination", () => {
     });
   });
 
-  it("defaults to limit=20 and position=0", async () => {
+  it("defaults to limit=25 and position=0", async () => {
     fetchMock.mockResolvedValue(makeOkResponse(["m1"], 5, [makeMessage("m1")]));
 
     await client.getMailboxMessages(mockSession, "mailbox1");
@@ -63,7 +63,7 @@ describe("StalwartJmapClient.getMailboxMessages pagination", () => {
       (fetchMock.mock.calls[0] as [string, RequestInit])[1]!.body as string,
     );
     const queryParams = body.methodCalls[0][1];
-    expect(queryParams.limit).toBe(20);
+    expect(queryParams.limit).toBe(25);
     expect(queryParams.position).toBe(0);
   });
 
@@ -121,6 +121,23 @@ describe("StalwartJmapClient.getMailboxMessages pagination", () => {
     expect(body.methodCalls[1][0]).toBe("Email/get");
   });
 
+  it("requests preview-only Email/get properties for mailbox lists", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse([], 0, []));
+
+    await client.getMailboxMessages(mockSession, "mailbox1");
+
+    const body = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, RequestInit])[1]!.body as string,
+    );
+    const getParams = body.methodCalls[1][1];
+    expect(getParams.properties).toEqual(
+      expect.arrayContaining(["preview", "hasAttachment"]),
+    );
+    expect(getParams.properties).not.toContain("bodyStructure");
+    expect(getParams.fetchTextBodyValues).toBeUndefined();
+    expect(getParams.fetchHTMLBodyValues).toBeUndefined();
+  });
+
   it("filters by the provided mailboxId", async () => {
     fetchMock.mockResolvedValue(makeOkResponse([], 0, []));
 
@@ -133,15 +150,71 @@ describe("StalwartJmapClient.getMailboxMessages pagination", () => {
   });
 });
 
+describe("StalwartJmapClient.getMessagesByIds", () => {
+  let fetchMock: jest.MockedFunction<
+    (input: string, init?: RequestInit) => Promise<Response>
+  >;
+  let client: StalwartJmapClient;
+
+  beforeEach(() => {
+    fetchMock = jest.fn() as jest.MockedFunction<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >;
+    client = new StalwartJmapClient({
+      baseUrl: "https://mail.example.com",
+      accessToken: "mail-access-token",
+      fetcher: fetchMock as never,
+    });
+  });
+
+  it("fetches full bodies when includeBodies is true", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        methodResponses: [["Email/get", { list: [makeMessage("m1")] }, "c1"]],
+      }),
+    } as unknown as Response);
+
+    await client.getMessagesByIds(mockSession, ["m1"], { includeBodies: true });
+
+    const body = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, RequestInit])[1]!.body as string,
+    );
+    const getParams = body.methodCalls[0][1];
+    expect(getParams.properties).toContain("bodyStructure");
+    expect(getParams.fetchTextBodyValues).toBe(true);
+    expect(getParams.fetchHTMLBodyValues).toBe(true);
+  });
+
+  it("skips body fetch flags for preview-only reads", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        methodResponses: [["Email/get", { list: [makeMessage("m1")] }, "c1"]],
+      }),
+    } as unknown as Response);
+
+    await client.getMessagesByIds(mockSession, ["m1"], { includeBodies: false });
+
+    const body = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, RequestInit])[1]!.body as string,
+    );
+    const getParams = body.methodCalls[0][1];
+    expect(getParams.properties).toContain("preview");
+    expect(getParams.properties).not.toContain("bodyStructure");
+    expect(getParams.fetchTextBodyValues).toBeUndefined();
+  });
+});
+
 describe("mail pagination helpers", () => {
   it("uses total count when the server reports one", () => {
-    expect(hasMoreMailboxMessages(50, 120)).toBe(true);
+    expect(hasMoreMailboxMessages(25, 120)).toBe(true);
     expect(hasMoreMailboxMessages(120, 120)).toBe(false);
   });
 
   it("falls back to full-page heuristics when total is unknown", () => {
-    expect(hasMoreMailboxMessages(50, 0)).toBe(true);
-    expect(hasMoreMailboxMessages(48, 0)).toBe(false);
+    expect(hasMoreMailboxMessages(25, 0)).toBe(true);
+    expect(hasMoreMailboxMessages(23, 0)).toBe(false);
   });
 
   it("deduplicates appended mailbox pages", () => {
@@ -153,6 +226,6 @@ describe("mail pagination helpers", () => {
   });
 
   it("exports the mailbox page size used by the web client", () => {
-    expect(MAILBOX_MESSAGES_PAGE_SIZE).toBe(50);
+    expect(MAILBOX_MESSAGES_PAGE_SIZE).toBe(25);
   });
 });
