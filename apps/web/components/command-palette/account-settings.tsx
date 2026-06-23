@@ -180,7 +180,7 @@ function Avatar({
         height={sizePx}
         unoptimized
         onError={() => setImgError(true)}
-        className={`${sizeClass} shrink-0 rounded-full object-cover ring-1 ring-border/40`}
+        className={`${sizeClass} shrink-0 rounded-full object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10`}
       />
     );
   }
