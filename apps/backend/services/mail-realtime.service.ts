@@ -137,10 +137,31 @@ type MailRealtimeSyncProvider = {
       sync: MailSyncResult;
     }>
   >;
+  syncAccount?: (accountId: string) => Promise<
+    | {
+        accountId: string;
+        changedTypes: string[];
+        sync: MailSyncResult;
+      }
+    | null
+  >;
+};
+
+type PendingAccountChange = {
+  changedTypes: Set<string>;
+  receivedAt: string;
+  sync?: MailSyncResult;
 };
 
 export class MailRealtimeService {
   private readonly subscribers = new Map<string, MailRealtimeSubscriber>();
+  private readonly subscribersByAccountId = new Map<string, Set<string>>();
+  private readonly pendingByAccountId = new Map<string, PendingAccountChange>();
+  private readonly flushTimerByAccountId = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
+  private readonly syncInFlightByAccountId = new Map<string, Promise<void>>();
   private started = false;
   private receiptPollId: ReturnType<typeof setInterval> | null = null;
   private receiptPollRunning = false;
@@ -153,6 +174,7 @@ export class MailRealtimeService {
       fetcher?: typeof fetch;
       reconnectDelayMs?: number;
       receiptPollIntervalMs?: number;
+      notificationThrottleMs?: number;
       syncProvider?: MailRealtimeSyncProvider;
     },
   ) {}
@@ -182,6 +204,12 @@ export class MailRealtimeService {
       clearInterval(this.receiptPollId);
       this.receiptPollId = null;
     }
+    for (const timeoutId of this.flushTimerByAccountId.values()) {
+      clearTimeout(timeoutId);
+    }
+    this.flushTimerByAccountId.clear();
+    this.pendingByAccountId.clear();
+    this.syncInFlightByAccountId.clear();
     this.listenerAbortController?.abort();
     this.listenerAbortController = null;
   }
@@ -191,24 +219,176 @@ export class MailRealtimeService {
     accountIds: string[];
     onEvent: (event: MailChangedEvent) => void;
   }): () => void {
+    this.unsubscribe(input.subscriberId);
     this.subscribers.set(input.subscriberId, {
       accountIds: new Set(input.accountIds),
       onEvent: input.onEvent,
     });
+    for (const accountId of input.accountIds) {
+      const subscribers = this.subscribersByAccountId.get(accountId) ?? new Set();
+      subscribers.add(input.subscriberId);
+      this.subscribersByAccountId.set(accountId, subscribers);
+    }
 
     return () => {
-      this.subscribers.delete(input.subscriberId);
+      this.unsubscribe(input.subscriberId);
     };
   }
 
   publish(event: MailChangedEvent): void {
-    for (const subscriber of this.subscribers.values()) {
-      if (!subscriber.accountIds.has(event.accountId)) {
+    const subscriberIds = this.subscribersByAccountId.get(event.accountId);
+
+    if (!subscriberIds) {
+      return;
+    }
+
+    for (const subscriberId of subscriberIds) {
+      const subscriber = this.subscribers.get(subscriberId);
+      subscriber?.onEvent(event);
+    }
+  }
+
+  private unsubscribe(subscriberId: string): void {
+    const existing = this.subscribers.get(subscriberId);
+
+    if (!existing) {
+      return;
+    }
+
+    this.subscribers.delete(subscriberId);
+    for (const accountId of existing.accountIds) {
+      const subscribers = this.subscribersByAccountId.get(accountId);
+
+      if (!subscribers) {
         continue;
       }
 
-      subscriber.onEvent(event);
+      subscribers.delete(subscriberId);
+      if (subscribers.size === 0) {
+        this.subscribersByAccountId.delete(accountId);
+      }
     }
+  }
+
+  private hasSubscribers(accountId: string): boolean {
+    return (this.subscribersByAccountId.get(accountId)?.size ?? 0) > 0;
+  }
+
+  private enqueueEvent(event: MailChangedEvent): void {
+    const pending = this.pendingByAccountId.get(event.accountId) ?? {
+      changedTypes: new Set<string>(),
+      receivedAt: event.receivedAt,
+    };
+
+    for (const type of event.changedTypes) {
+      pending.changedTypes.add(type);
+    }
+
+    if (event.receivedAt > pending.receivedAt) {
+      pending.receivedAt = event.receivedAt;
+    }
+
+    if (event.sync) {
+      pending.sync = event.sync;
+    } else if (pending.sync) {
+      pending.sync = undefined;
+    }
+
+    this.pendingByAccountId.set(event.accountId, pending);
+    this.scheduleFlush(event.accountId);
+  }
+
+  private scheduleFlush(accountId: string): void {
+    if (
+      this.flushTimerByAccountId.has(accountId) ||
+      this.syncInFlightByAccountId.has(accountId)
+    ) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      this.flushTimerByAccountId.delete(accountId);
+      void this.flushAccount(accountId);
+    }, this.input.notificationThrottleMs ?? 750);
+
+    this.flushTimerByAccountId.set(accountId, timeoutId);
+  }
+
+  private async flushAccount(accountId: string): Promise<void> {
+    const pending = this.pendingByAccountId.get(accountId);
+
+    if (!pending || this.syncInFlightByAccountId.has(accountId)) {
+      return;
+    }
+
+    this.pendingByAccountId.delete(accountId);
+    const fallbackChangedTypes = [...pending.changedTypes];
+    const fallbackEvent: MailChangedEvent = {
+      type: "mail.changed",
+      accountId,
+      changedTypes: fallbackChangedTypes,
+      receivedAt: pending.receivedAt,
+    };
+
+    const flushPromise = (async () => {
+      try {
+        if (pending.sync) {
+          this.publish({
+            ...fallbackEvent,
+            changedTypes: resolveChangedTypes(
+              pending.sync.changedTypes,
+              fallbackChangedTypes,
+            ),
+            sync: pending.sync,
+          });
+          return;
+        }
+
+        if (!this.hasSubscribers(accountId)) {
+          return;
+        }
+
+        if (!this.input.syncProvider?.syncAccount) {
+          this.publish(fallbackEvent);
+          return;
+        }
+
+        const result = await this.input.syncProvider.syncAccount(accountId);
+
+        if (!result) {
+          return;
+        }
+
+        this.publish({
+          type: "mail.changed",
+          accountId,
+          changedTypes: resolveChangedTypes(
+            result.changedTypes,
+            fallbackChangedTypes,
+          ),
+          receivedAt: pending.receivedAt,
+          sync: result.sync,
+        });
+      } catch (error) {
+        logger.warn("Mail realtime flush failed", {
+          accountId,
+          ...errorLogDetails(error),
+        });
+
+        if (this.hasSubscribers(accountId)) {
+          this.publish(fallbackEvent);
+        }
+      } finally {
+        this.syncInFlightByAccountId.delete(accountId);
+
+        if (this.pendingByAccountId.has(accountId)) {
+          this.scheduleFlush(accountId);
+        }
+      }
+    })();
+
+    this.syncInFlightByAccountId.set(accountId, flushPromise);
+    await flushPromise;
   }
 
   private startReceiptPolling(): void {
@@ -228,10 +408,13 @@ export class MailRealtimeService {
         .then((results) => {
           const receivedAt = new Date().toISOString();
           for (const result of results) {
-            this.publish({
+            this.enqueueEvent({
               type: "mail.changed",
               accountId: result.accountId,
-              changedTypes: result.changedTypes,
+              changedTypes: resolveChangedTypes(
+                result.sync.changedTypes,
+                result.changedTypes,
+              ),
               receivedAt,
               sync: result.sync,
             });
@@ -324,7 +507,7 @@ export class MailRealtimeService {
           accountId: event.accountId,
           changedTypes: event.changedTypes,
         });
-        this.publish(event);
+        this.enqueueEvent(event);
       }
     }
   }
