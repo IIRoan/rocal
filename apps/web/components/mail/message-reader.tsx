@@ -108,6 +108,7 @@ import {
   cleanInviteMailText,
 } from "@/lib/mail/invite-boilerplate";
 import { resolveAttachmentPreviewKind } from "@/lib/mail/attachment-preview";
+import { messageHasLoadedBody } from "@/lib/mail/mail-message-body";
 import { pickOutgoingAttachmentFiles, resolveMailServerLimits, type MailServerLimits } from "@workspace/calendar-core";
 import { splitPlaintextQuote, splitHtmlQuote } from "@/lib/mail/quoted-text";
 import {
@@ -617,6 +618,7 @@ export interface MessageReaderProps {
   selectedMessageId?: string | null;
   conversationMessages?: JmapEmailMessage[];
   isConversationLoading?: boolean;
+  isMessageBodyLoading?: boolean;
   onSelectConversationMessage?: (id: string) => void;
   plaintext: string | null;
   decryptedHtml: string | null;
@@ -699,6 +701,7 @@ export function MessageReader({
   selectedMessageId,
   conversationMessages = EMPTY_ARRAY,
   isConversationLoading = false,
+  isMessageBodyLoading = false,
   onSelectConversationMessage,
   plaintext,
   decryptedHtml,
@@ -1124,6 +1127,10 @@ export function MessageReader({
     () => splitHtmlQuote(_displayHtml ?? ""),
     [_displayHtml],
   );
+  const hasRemoteContent = useMemo(
+    () => htmlContainsRemoteResources(_displayHtml ?? ""),
+    [_displayHtml],
+  );
 
   // Auto-scroll conversation list to bottom when messages load/change.
   // Must be above the early return to keep hook order consistent.
@@ -1142,6 +1149,14 @@ export function MessageReader({
     );
   }
 
+  if (isMessageBodyLoading && !messageHasLoadedBody(message)) {
+    return (
+      <div className="flex h-full min-h-0 items-center justify-center p-8">
+        <p className="text-sm text-muted-foreground">Loading message…</p>
+      </div>
+    );
+  }
+
   const PLAINTEXT_COLLAPSE_THRESHOLD = 1200;
 
   const isFlagged = message?.keywords?.["$flagged"] === true;
@@ -1152,10 +1167,6 @@ export function MessageReader({
   const messageState = classifyMessageEncryption(message);
 
   const displayHtml = _displayHtml;
-  const hasRemoteContent = useMemo(
-    () => htmlContainsRemoteResources(displayHtml ?? ""),
-    [displayHtml],
-  );
   const displayText = _displayText;
   const isHtmlEmail = Boolean(displayHtml);
   // If the HTML body has no detected quote markers but the plaintext body does
@@ -2263,7 +2274,8 @@ export function MessageReader({
               const { html: cleanedHtml } = splitHtmlQuote(threadBodies.html);
               rawPreview = cleanedHtml.replace(/<[^>]+>/g, " ");
             } else {
-              rawPreview = threadBodies.text ?? "";
+              rawPreview =
+                threadBodies.text ?? threadMessage.preview ?? "";
             }
             const { body: previewBody } = splitPlaintextQuote(rawPreview);
             const threadPreviewText = previewBody.replace(/\s+/g, " ").trim();

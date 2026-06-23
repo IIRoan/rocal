@@ -31,8 +31,13 @@ import {
   fetchMailMessageById,
   findCachedMailMessage,
   mergeMessageIntoMailboxCaches,
+  prefetchMailMessageBodies,
   seedMailMessageCache,
 } from "@/lib/mail/mail-message-query";
+import {
+  mergeMailMessage,
+  messageHasLoadedBody,
+} from "@/lib/mail/mail-message-body";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
 import { getMailComposeBridge, flushComposeDraftSave } from "@/components/mail/mail-compose-context";
 import { parseDecryptedMailContent } from "@/lib/mail/decrypted-mail-content";
@@ -518,7 +523,11 @@ function mergeMessagesForMailbox(
 
   for (const message of sync.records) {
     if (message.mailboxIds?.[mailboxId]) {
-      nextMessages.set(message.id, message);
+      const existing = nextMessages.get(message.id);
+      nextMessages.set(
+        message.id,
+        existing ? mergeMailMessage(existing, message) : message,
+      );
     } else {
       nextMessages.delete(message.id);
     }
@@ -647,6 +656,7 @@ export function useMailApp() {
   const [optimisticConversationMessages, setOptimisticConversationMessages] =
     useState<JmapEmailMessage[]>([]);
   const [isConversationLoading, setIsConversationLoading] = useState(false);
+  const [isMessageBodyLoading, setIsMessageBodyLoading] = useState(false);
   const [selectedMessagePlaintext, setSelectedMessagePlaintext] = useState<
     string | null
   >(null);
@@ -820,6 +830,9 @@ export function useMailApp() {
     ) ?? null;
   const selectedMessage =
     selectedConversationMessage ?? selectedMailboxMessage ?? null;
+  const selectedMessageBodyLoaded = selectedMessage
+    ? messageHasLoadedBody(selectedMessage)
+    : false;
 
   const handleSelectMessageId = useCallback((messageId: string | null) => {
     setSelectedMessageId(messageId);
@@ -966,6 +979,145 @@ export function useMailApp() {
     }
   }, [selectedMessageId, loadConversationThread, clearConversationThread]);
 
+  const applyLoadedMessage = useCallback(
+    (message: JmapEmailMessage) => {
+      mergeMessageIntoMailboxCaches(queryClient, message);
+      setActiveMailbox((current) =>
+        current
+          ? {
+              ...current,
+              messages: current.messages.map((entry) =>
+                entry.id === message.id
+                  ? mergeMailMessage(entry, message)
+                  : entry,
+              ),
+            }
+          : current,
+      );
+      setRelatedConversationMessages((current) =>
+        current.map((entry) =>
+          entry.id === message.id ? mergeMailMessage(entry, message) : entry,
+        ),
+      );
+    },
+    [queryClient],
+  );
+
+  useEffect(() => {
+    const mailbox = activeMailboxRef.current;
+    const bodyTargetMessageId =
+      selectedConversationMessageId ?? selectedMessageId;
+    if (!bodyTargetMessageId || !mailbox) {
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setIsMessageBodyLoading(false);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const cached =
+      selectedConversationMessages.find(
+        (message) => message.id === bodyTargetMessageId,
+      ) ??
+      mailbox.messages.find((message) => message.id === bodyTargetMessageId) ??
+      findCachedMailMessage(queryClient, bodyTargetMessageId);
+
+    if (cached && messageHasLoadedBody(cached)) {
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setIsMessageBodyLoading(false);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setIsMessageBodyLoading(true);
+      }
+    });
+
+    void (async () => {
+      try {
+        const message = await fetchMailMessageById(queryClient, {
+          client: mailbox.client,
+          session: mailbox.session,
+          messageId: bodyTargetMessageId,
+          requireBody: true,
+        });
+        if (cancelled) return;
+        applyLoadedMessage(message);
+      } catch (error) {
+        if (cancelled) return;
+        log.error("Failed to load message body", error);
+        toast.error(getErrorMessage(error, "Could not load message content."));
+      } finally {
+        if (!cancelled) {
+          setIsMessageBodyLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    applyLoadedMessage,
+    queryClient,
+    selectedConversationMessageId,
+    selectedConversationMessages,
+    selectedMessageId,
+  ]);
+
+  useEffect(() => {
+    const mailbox = activeMailboxRef.current;
+    if (!selectedMessageId || !mailbox) {
+      return;
+    }
+
+    const index = mailbox.messages.findIndex(
+      (message) => message.id === selectedMessageId,
+    );
+    if (index < 0) {
+      return;
+    }
+
+    const neighborIds = [mailbox.messages[index - 1], mailbox.messages[index + 1]]
+      .filter((message): message is JmapEmailMessage => Boolean(message))
+      .map((message) => message.id);
+
+    if (neighborIds.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    void prefetchMailMessageBodies(queryClient, {
+      client: mailbox.client,
+      session: mailbox.session,
+      messageIds: neighborIds,
+    }).then(() => {
+      if (cancelled) return;
+      for (const messageId of neighborIds) {
+        const loaded = findCachedMailMessage(queryClient, messageId);
+        if (loaded && messageHasLoadedBody(loaded)) {
+          applyLoadedMessage(loaded);
+        }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyLoadedMessage, queryClient, selectedMessageId]);
+
   useEffect(() => {
     const mailbox = activeMailboxRef.current;
     if (!selectedMessage || !mailbox) {
@@ -982,6 +1134,9 @@ export function useMailApp() {
       return () => {
         cancelled = true;
       };
+    }
+    if (!selectedMessageBodyLoaded) {
+      return;
     }
     const encState = classifyMessageEncryption(selectedMessage);
     if (encState !== "inline_pgp" && encState !== "pgp_mime") {
@@ -1112,11 +1267,11 @@ export function useMailApp() {
     // Keyword-only updates (flag/read) do not change encryption state, so we
     // exclude activeMailbox and use activeMailboxRef.current inside the effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMessage?.id, config]);
+  }, [selectedMessage?.id, selectedMessageBodyLoaded, config]);
 
   useEffect(() => {
     const mailbox = activeMailboxRef.current;
-    if (!selectedMessage || !mailbox) {
+    if (!selectedMessage || !mailbox || !selectedMessageBodyLoaded) {
       return;
     }
 
@@ -1176,7 +1331,7 @@ export function useMailApp() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMessage?.id]);
+  }, [selectedMessage?.id, selectedMessageBodyLoaded]);
 
   // Auto-mark read when a message is opened
   useEffect(() => {
@@ -3034,6 +3189,7 @@ export function useMailApp() {
     openMessageById,
     selectedConversationMessages,
     isConversationLoading,
+    isMessageBodyLoading,
     setSelectedConversationMessageId: handleSelectConversationMessageId,
     selectedMessagePlaintext,
     selectedMessageDecryptedHtml,

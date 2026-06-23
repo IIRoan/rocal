@@ -227,7 +227,21 @@ export type JmapAttachmentInput = {
   cid?: string;
 };
 
-const EMAIL_GET_PROPERTIES = [
+const EMAIL_LIST_GET_PROPERTIES = [
+  "id",
+  "threadId",
+  "mailboxIds",
+  "keywords",
+  "size",
+  "receivedAt",
+  "from",
+  "to",
+  "subject",
+  "preview",
+  "hasAttachment",
+] as const;
+
+const EMAIL_FULL_GET_PROPERTIES = [
   "id",
   "threadId",
   "messageId",
@@ -247,6 +261,11 @@ const EMAIL_GET_PROPERTIES = [
   "htmlBody",
   "attachments",
 ] as const;
+
+export type GetMessagesOptions = {
+  /** When false, only list-preview metadata is fetched (no MIME/blob work). Default true. */
+  includeBodies?: boolean;
+};
 
 export type JmapPgpMimeCiphertext = {
   blobId: string;
@@ -568,8 +587,8 @@ export class StalwartJmapClient {
 
   private getDefaultMailboxPageSize(): number {
     return this.mailServerPolicy
-      ? resolveMailboxMessagesPageSize(this.mailServerPolicy, 50)
-      : 20;
+      ? resolveMailboxMessagesPageSize(this.mailServerPolicy, 25)
+      : 25;
   }
 
   private getDefaultSearchPageSize(): number {
@@ -947,10 +966,7 @@ export class StalwartJmapClient {
               name: "Email/query",
               path: "/ids",
             },
-            properties: EMAIL_GET_PROPERTIES,
-            fetchTextBodyValues: true,
-            fetchHTMLBodyValues: true,
-            fetchAllBodyValues: true,
+            properties: [...EMAIL_LIST_GET_PROPERTIES],
           },
           "g1",
         ],
@@ -1002,10 +1018,7 @@ export class StalwartJmapClient {
               name: "Email/query",
               path: "/ids",
             },
-            properties: EMAIL_GET_PROPERTIES,
-            fetchTextBodyValues: true,
-            fetchHTMLBodyValues: true,
-            fetchAllBodyValues: true,
+            properties: [...EMAIL_LIST_GET_PROPERTIES],
           },
           "g1",
         ],
@@ -1076,7 +1089,9 @@ export class StalwartJmapClient {
       mailboxId,
       options,
     );
-    const messages = await this.getMessagesByIds(session, ids);
+    const messages = await this.getMessagesByIds(session, ids, {
+      includeBodies: true,
+    });
     return { messages, total, queryState };
   }
 
@@ -1119,11 +1134,13 @@ export class StalwartJmapClient {
   async getMessagesByIds(
     session: JmapSession,
     ids: string[],
+    options: GetMessagesOptions = {},
   ): Promise<JmapEmailMessage[]> {
     if (ids.length === 0) {
       return [];
     }
 
+    const includeBodies = options.includeBodies ?? true;
     const accountId = this.requirePrimaryAccountId(session);
     const chunkSize = this.getEmailGetChunkSize();
     const chunks = chunkArray(ids, chunkSize);
@@ -1139,10 +1156,17 @@ export class StalwartJmapClient {
             {
               accountId,
               ids: chunk,
-              properties: EMAIL_GET_PROPERTIES,
-              fetchTextBodyValues: true,
-              fetchHTMLBodyValues: true,
-              fetchAllBodyValues: true,
+              properties: [
+                ...(includeBodies
+                  ? EMAIL_FULL_GET_PROPERTIES
+                  : EMAIL_LIST_GET_PROPERTIES),
+              ],
+              ...(includeBodies
+                ? {
+                    fetchTextBodyValues: true,
+                    fetchHTMLBodyValues: true,
+                  }
+                : {}),
             },
             "c1",
           ],
@@ -1181,7 +1205,7 @@ export class StalwartJmapClient {
       list?: Array<{ id: string; emailIds?: string[] }>;
     }>(threadEnvelope, "Thread/get");
     const emailIds = threadResult.list?.[0]?.emailIds ?? [];
-    return this.getMessagesByIds(session, emailIds);
+    return this.getMessagesByIds(session, emailIds, { includeBodies: false });
   }
 
   async uploadFile(session: JmapSession, file: File): Promise<JmapAttachmentInput> {
