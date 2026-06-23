@@ -399,6 +399,46 @@ export class MailSyncService {
     return results;
   }
 
+  async syncAccount(accountId: string): Promise<MailReceiptSyncResult | null> {
+    const normalizedAccountId = accountId.trim();
+
+    if (!normalizedAccountId) {
+      return null;
+    }
+
+    const entry = await this.prisma.mailDirectoryEntry.findUnique({
+      where: {
+        stalwartAccountId: normalizedAccountId,
+      },
+      select: {
+        id: true,
+        userId: true,
+        stalwartAccountId: true,
+      },
+    });
+
+    if (!entry?.userId) {
+      return null;
+    }
+
+    this.cacheAuthorizedDirectoryEntry(entry.userId, {
+      id: entry.id,
+      stalwartAccountId: entry.stalwartAccountId,
+    });
+
+    const sync = await this.syncForUser({
+      userId: entry.userId,
+      accountId: entry.stalwartAccountId,
+    });
+
+    return {
+      accountId: entry.stalwartAccountId,
+      userId: entry.userId,
+      changedTypes: sync.changedTypes,
+      sync,
+    };
+  }
+
   async syncForUser(input: {
     userId: string;
     accountId: string;

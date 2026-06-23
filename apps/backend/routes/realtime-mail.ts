@@ -4,13 +4,9 @@ import { Elysia } from "elysia";
 import { requireAuth } from "../lib/auth-guard";
 import { env } from "../lib/env";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import {
-  MailRealtimeService,
-  resolveChangedTypes,
-} from "../services/mail-realtime.service";
+import { MailRealtimeService } from "../services/mail-realtime.service";
 import type { MailSyncService } from "../services/mail-sync.service";
 import { defaultMailSyncService } from "./mail-sync";
-import { errorLogDetails } from "../lib/log-sanitization";
 
 const logger = createLogger("backend:mail-sse");
 const encoder = new TextEncoder();
@@ -45,10 +41,12 @@ export function createRealtimeMailRoutes(
   input: {
     realtimeService?: MailRealtimeService;
     mailSyncService?: MailSyncService;
+    heartbeatIntervalMs?: number;
   } = {},
 ) {
   const realtimeService = input.realtimeService ?? defaultMailRealtimeService;
   const mailSyncService = input.mailSyncService ?? defaultMailSyncService;
+  const heartbeatIntervalMs = input.heartbeatIntervalMs ?? 15_000;
 
   return new Elysia({
     prefix: "/realtime",
@@ -66,8 +64,6 @@ export function createRealtimeMailRoutes(
           const subscriberId = randomUUID();
           let closed = false;
           let keepaliveId: ReturnType<typeof setInterval> | null = null;
-          let pollId: ReturnType<typeof setInterval> | null = null;
-          let pollInFlight = false;
 
           const unsubscribe = realtimeService.subscribe({
             subscriberId,
@@ -88,7 +84,6 @@ export function createRealtimeMailRoutes(
 
             closed = true;
             if (keepaliveId) clearInterval(keepaliveId);
-            if (pollId) clearInterval(pollId);
             unsubscribe();
             void writer.close().catch(() => undefined);
             logger.info("Mail SSE client disconnected", {
@@ -110,63 +105,7 @@ export function createRealtimeMailRoutes(
           scheduleWrite(writer, "retry: 5000\n: connected\n\n", close);
           keepaliveId = setInterval(() => {
             scheduleWrite(writer, ": keepalive\n\n", close);
-          }, 15000);
-
-          // Server-side polling: Stalwart's EventSource only delivers events for the
-          // account that authenticated (the admin account), not for regular user accounts.
-          // Polling JMAP /changes with the user's accountId is the reliable delivery path.
-          if (accountIds.length > 0) {
-            pollId = setInterval(() => {
-              if (closed || pollInFlight) return;
-              pollInFlight = true;
-              void (async () => {
-                for (const accountId of accountIds) {
-                  try {
-                    const { hasChanges, changedTypes } =
-                      await mailSyncService.detectChanges({
-                        userId: routeUser.id,
-                        accountId,
-                      });
-
-                    if (!hasChanges || closed) continue;
-                    const sync = await mailSyncService.syncForUser({
-                      userId: routeUser.id,
-                      accountId,
-                    });
-                    const resolvedChangedTypes = resolveChangedTypes(
-                      sync.changedTypes,
-                      changedTypes,
-                    );
-
-                    logger.info("Mail poll detected changes", {
-                      userId: routeUser.id,
-                      accountId,
-                      changedTypes: resolvedChangedTypes,
-                    });
-                    scheduleWrite(
-                      writer,
-                      `event: mail.changed\ndata: ${JSON.stringify({
-                        type: "mail.changed",
-                        accountId,
-                        changedTypes: resolvedChangedTypes,
-                        receivedAt: new Date().toISOString(),
-                        sync,
-                      })}\n\n`,
-                      close,
-                    );
-                  } catch (error) {
-                    logger.warn("Mail poll check failed", {
-                      userId: routeUser.id,
-                      accountId,
-                      ...errorLogDetails(error),
-                    });
-                  }
-                }
-              })().finally(() => {
-                pollInFlight = false;
-              });
-            }, 10_000);
-          }
+          }, heartbeatIntervalMs);
 
           logger.info("Mail SSE client connected", {
             subscriberId,
@@ -180,7 +119,7 @@ export function createRealtimeMailRoutes(
           detail: {
             summary: "Subscribe to realtime mail change signals",
             description:
-              "Streams lightweight mail.changed events for the authenticated user's authorized mail accounts without exposing mailbox content.",
+              "Streams mail.changed events for the authenticated user's authorized mail accounts without exposing mailbox content.",
           },
         },
       ),
