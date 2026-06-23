@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, capIdentitiesForPicker, resolveMailServerPolicy, resolveReplyRecipients, validateComposeRecipients, buildOutgoingMimeMessage, prepareOutgoingAttachments, validateUploadedAttachmentSet, validateMailboxCreate, validateMailboxName, resolveMailboxMessagesPageSize, isCurrentUserMailAddress, type MailServerPolicy, type OutgoingMimeAttachment } from "@workspace/calendar-core";
+import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, capIdentitiesForPicker, resolveMailServerPolicy, resolveReplyRecipients, validateComposeRecipients, buildOutgoingMimeMessage, prepareOutgoingAttachments, validateUploadedAttachmentSet, validateMailboxCreate, validateMailboxName, resolveMailboxMessagesPageSize, isCurrentUserMailAddress, resolveEncryptionInternalDomain, shouldEncryptOutgoingMail, type MailServerPolicy, type OutgoingMimeAttachment } from "@workspace/calendar-core";
 import { toast } from "sonner";
 import PostalMime, {
   type Attachment as ParsedMailAttachment,
@@ -345,7 +345,8 @@ async function resolveOutgoingMessageBody(input: {
   encrypted: boolean;
   pgpMimeCiphertext?: { blobId: string; size: number };
 }> {
-  if (!input.internalDomain) {
+  const internalDomain = resolveEncryptionInternalDomain(input.internalDomain);
+  if (!shouldEncryptOutgoingMail(input.recipients, internalDomain)) {
     return {
       textBody: input.plaintext,
       encrypted: false,
@@ -353,22 +354,8 @@ async function resolveOutgoingMessageBody(input: {
   }
 
   const internalRecipients = input.recipients.filter(
-    (recipient) => getEmailDomain(recipient) === input.internalDomain,
+    (recipient) => getEmailDomain(recipient) === internalDomain,
   );
-
-  if (internalRecipients.length === 0) {
-    return {
-      textBody: input.plaintext,
-      encrypted: false,
-    };
-  }
-
-  if (internalRecipients.length !== input.recipients.length) {
-    return {
-      textBody: input.plaintext,
-      encrypted: false,
-    };
-  }
 
   const senderEmail = normalizeEmailAddress(input.activeMailbox.email);
   const recipientPublicKeysArmored = new Set<string>([
@@ -1462,6 +1449,12 @@ export function useMailApp() {
           ]),
         ]);
 
+        await client
+          .ensureEncryptOnAppendDisabled(jmapSession)
+          .catch((error) => {
+            log.warn("Failed to disable Stalwart encryptOnAppend on sign-in", error);
+          });
+
         // Background migration if unlocked with old password
         if (vaultKey && effectivePassphrase !== vaultKey) {
           void migrateVaultToKeyMaterial({
@@ -1694,9 +1687,9 @@ export function useMailApp() {
       const htmlWithSignature = hasMeaningfulHtmlBody(composeHtmlBody)
         ? appendHtmlSignature(composeHtmlBody, identity)
         : undefined;
-      const internalDomain =
-        config?.defaultDomain.trim().toLowerCase() ??
-        getEmailDomain(mailbox.email);
+      const internalDomain = resolveEncryptionInternalDomain(
+        config?.defaultDomain,
+      );
       const preparedAttachments = await prepareOutgoingAttachments(
         composeAttachments,
         { maxBytes: mailbox.mailServerPolicy.limits.maxOutgoingAttachmentBytes },
@@ -1719,6 +1712,10 @@ export function useMailApp() {
         });
       const htmlBody =
         !encrypted && htmlWithSignature ? htmlWithSignature : undefined;
+
+      if (!shouldEncryptOutgoingMail(allRecipients, internalDomain)) {
+        await mailbox.client.ensureEncryptOnAppendDisabled(mailbox.session);
+      }
 
       let uploadedAttachments:
         | import("@/lib/mail/jmap-client").JmapAttachmentInput[]
@@ -1949,9 +1946,9 @@ export function useMailApp() {
         if (!draftsMailboxId || !identityId) {
           throw new Error("Missing draft mailbox or sending identity.");
         }
-        const internalDomain =
-          config?.defaultDomain.trim().toLowerCase() ??
-          getEmailDomain(mailbox.email);
+        const internalDomain = resolveEncryptionInternalDomain(
+          config?.defaultDomain,
+        );
         const quotedBody = date
           ? `\n\n---\nOn ${date}, ${sender} wrote:\n${body}`
           : "";
@@ -1974,6 +1971,10 @@ export function useMailApp() {
             internalDomain,
             mimeAttachments,
           });
+
+        if (!shouldEncryptOutgoingMail(recipients, internalDomain)) {
+          await mailbox.client.ensureEncryptOnAppendDisabled(mailbox.session);
+        }
 
         let attachments: JmapAttachmentInput[] | undefined;
         if (!pgpMimeCiphertext && preparedAttachments.length > 0) {

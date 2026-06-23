@@ -294,7 +294,7 @@ function LabelsView({
                   type="button"
                   onClick={() => void handleDelete(label.id)}
                   disabled={deletingId === label.id}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-all"
+                  className="opacity-0 group-hover:opacity-100 tap-target p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-[opacity,color,background-color]"
                   aria-label="Delete label"
                 >
                   {deletingId === label.id ? (

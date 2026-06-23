@@ -725,6 +725,66 @@ describe("StalwartAdminClient", () => {
     ]);
   });
 
+  it("disables encryptOnAppend when encryption is already enabled with encryptOnAppend true", async () => {
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [
+          [
+            "x:Account/get",
+            {
+              list: [
+                {
+                  id: "acct-1",
+                  name: "alice",
+                  domainId: "domain-1",
+                  encryptionAtRest: {
+                    "@type": "Aes256",
+                    publicKey: "pk-1",
+                    encryptOnAppend: true,
+                    allowSpamTraining: false,
+                  },
+                },
+              ],
+            },
+            "c1",
+          ],
+        ],
+      }),
+    );
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [
+          ["x:AccountSettings/set", { updated: { singleton: null } }, "c1"],
+        ],
+      }),
+    );
+
+    await client.enableEncryptionAtRest({
+      accountId: "acct-1",
+      publicKeyId: "pk-1",
+      encryptOnAppend: false,
+    });
+
+    const body = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body ?? "{}"));
+    expect(body.methodCalls[0]).toEqual([
+      "x:AccountSettings/set",
+      {
+        accountId: "acct-1",
+        update: {
+          singleton: {
+            encryptionAtRest: {
+              "@type": "Aes256",
+              publicKey: "pk-1",
+              encryptOnAppend: false,
+              allowSpamTraining: false,
+            },
+          },
+        },
+      },
+      "c1",
+    ]);
+  });
+
   it("destroys a Stalwart account through the admin JMAP API", async () => {
     fetcher.mockResolvedValueOnce(
       jsonResponse({

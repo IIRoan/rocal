@@ -109,6 +109,42 @@ export function getEmailDomain(value: string): string | null {
   return normalized.slice(atIndex + 1);
 }
 
+/** Configured Solace domain used for outbound encryption decisions. */
+export function resolveEncryptionInternalDomain(
+  defaultDomain: string | null | undefined,
+): string | null {
+  const configured = defaultDomain?.trim().toLowerCase();
+  return configured || null;
+}
+
+/** True only when every recipient is on the configured Solace domain. */
+export function shouldEncryptOutgoingMail(
+  recipients: string[],
+  internalDomain: string | null | undefined,
+): boolean {
+  const domain = internalDomain?.trim().toLowerCase();
+  if (!domain || recipients.length === 0) {
+    return false;
+  }
+
+  return recipients.every(
+    (recipient) => getEmailDomain(recipient) === domain,
+  );
+}
+
+export function isStalwartEncryptOnAppendEnabled(
+  accountSettings: Record<string, unknown> | null | undefined,
+): boolean {
+  const encryptionAtRest = accountSettings?.encryptionAtRest;
+  if (!encryptionAtRest || typeof encryptionAtRest !== "object") {
+    return false;
+  }
+
+  return (
+    (encryptionAtRest as { encryptOnAppend?: boolean }).encryptOnAppend === true
+  );
+}
+
 type ReplyAddress = {
   email?: string | null;
 };

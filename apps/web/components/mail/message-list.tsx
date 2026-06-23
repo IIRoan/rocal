@@ -301,7 +301,7 @@ export function MessageList({
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+                className="tap-target flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
                 aria-label="Bulk actions"
               >
                 <MoreHorizontal className="size-3.5" strokeWidth={2.25} />
