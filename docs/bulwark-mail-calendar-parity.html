@@ -246,8 +246,9 @@
     <p>
       Feature parity reference derived from <code>webmail/FEATURES.md</code> (Bulwark / Stalwart JMAP client).
       Excludes Files, Contacts app, Sieve admin, Plugins, Marketplace, Setup wizard, and other suite infrastructure.
-      Solace calendar uses its own backend (not Stalwart JMAP Calendar).
-      <strong>Last updated:</strong> 13 Jun 2026 — reflects P1 mail list + compose work on web and native.
+      <strong>Scope:</strong> web mail parity only — native is tracked separately and out of scope for this roadmap.
+      <strong>Architecture:</strong> Stalwart is <em>mail only</em> (JMAP). Calendar, contacts, and recent-contacts sync use the Solace backend — not Stalwart Calendar or JMAP Contacts.
+      <strong>Last updated:</strong> 24 Jun 2026 — web compose depth, recent contacts, display settings, draft editing, list performance, and new tests.
     </p>
     <nav>
       <a href="#legend">Legend</a>
@@ -267,6 +268,7 @@
       <a href="#cal-ui">Calendar — UI &amp; sync</a>
       <a href="#solace-unique">Solace advantages</a>
       <a href="#roadmap">Suggested roadmap</a>
+      <a href="#tests-improvements">Tests &amp; improvements</a>
     </nav>
   </header>
 
@@ -282,13 +284,24 @@
       <span><span class="priority p-low">P3</span> Polish</span>
     </div>
 
+    <div class="callout">
+      <strong>Web-first parity.</strong> Bulwark comparisons below prioritize <strong>Solace Web</strong> vs Bulwark.
+      The native column is informational only — native mail is a separate track and not part of the current Stalwart porting effort.
+      <strong>Stalwart boundary:</strong> mailbox read/write, identities, and JMAP mail operations only.
+      Calendar views, events, invitations, subscriptions, and encrypted recent contacts are served by <code>apps/backend</code> APIs.
+    </div>
+
     <div class="shipped-callout">
       <h3>Recently shipped (Jun 2026)</h3>
       <ul>
-        <li><strong>Web list:</strong> <code>@tanstack/react-virtual</code> scrolling, fixed 68px / 60px rows, 50-message pages, 150ms debounced load-more, merge-on-refresh, F5/Cmd+R JMAP refresh, scroll-to-selected</li>
-        <li><strong>Web compose:</strong> Tiptap rich text, HTML send, draft auto-save, identity picker, per-identity signatures</li>
-        <li><strong>Native list:</strong> infinite scroll (<code>onEndReached</code>), 30-message pages, companion-mailbox thread grouping with prefetch</li>
-        <li><strong>Native compose:</strong> draft auto-save, identity picker, plain-text signature insert</li>
+        <li><strong>Web list (early Jun):</strong> <code>@tanstack/react-virtual</code> scrolling, fixed 68px / 60px rows, 50-message pages, 150ms debounced load-more, merge-on-refresh, F5/Cmd+R JMAP refresh, scroll-to-selected</li>
+        <li><strong>Web + native UI (mid Jun):</strong> recipient popover / sheet (copy, compose-to), identity badge (sub-address tags), <code>MailIdentityBadge</code> in list + reader</li>
+        <li><strong>Recent contacts (19 Jun):</strong> E2EE recent-contacts payload, backend sync route, <code>RecipientSuggestInput</code> in mail compose + event participants (web + native)</li>
+        <li><strong>Web compose depth (24 Jun):</strong> inline images (paste / drag-drop, resizable), edit existing drafts (<code>seedDraft</code>), plain-text mode toggle, signature above/below quote, forgotten-attachment warning, improved quoted HTML island, reply-identity auto-select</li>
+        <li><strong>Web mail settings (24 Jun):</strong> display settings panel (external content ask/block/allow, light/dark/original appearance, trusted senders), compose settings panel</li>
+        <li><strong>Web performance (24 Jun):</strong> neighbor message-body prefetch, <code>mergeMailMessage</code> body cache, faster list → reader transitions</li>
+        <li><strong>Native compose:</strong> <em>deferred</em> — plain-text only today; not in current web-parity scope</li>
+        <li><strong>Backend:</strong> Zod mail validation, external-recipient send fixes, timezone schema enforcement on events, invitation + subscription-auth fixes</li>
         <li><strong>Both:</strong> JMAP 401 retry + token clear on unauthorized</li>
       </ul>
     </div>
@@ -342,9 +355,9 @@
         <tr>
           <td class="feature">Color labels / tags</td>
           <td><span class="badge badge-yes">Yes</span></td>
-          <td><span class="badge badge-partial">Partial</span></td>
           <td><span class="badge badge-yes">Yes</span></td>
-          <td class="notes">Reader + context menu; web list omits label chips (fixed row height)</td>
+          <td><span class="badge badge-na">Deferred</span></td>
+          <td class="notes">Web: colored chips in list + reader; assign via context menu and reader popover; vault-backed definitions</td>
         </tr>
         <tr>
           <td class="feature">Move / trash / archive</td>
@@ -377,9 +390,9 @@
         <tr>
           <td class="feature">Spam / junk + restore</td>
           <td><span class="badge badge-yes">Yes</span></td>
-          <td><span class="badge badge-partial">Partial</span></td>
-          <td><span class="badge badge-partial">Partial</span></td>
-          <td class="notes">Restore exists; no dedicated spam action in list hover</td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-na">Deferred</span></td>
+          <td class="notes">Web: report spam in list hover, context menu, reader toolbar; not spam in junk; bulk spam</td>
         </tr>
         <tr>
           <td class="feature">Bulk select + batch ops</td>
@@ -391,9 +404,9 @@
         <tr>
           <td class="feature">Empty trash / junk folder</td>
           <td><span class="badge badge-yes">Yes</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-med">P2</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-na">Deferred</span></td>
+          <td class="notes">Web: list header button + confirm dialog; JMAP batch destroy via <code>emptyMailbox</code></td>
         </tr>
         <tr>
           <td class="feature">Folder CRUD + subfolders</td>
@@ -558,7 +571,7 @@
           <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-partial">Partial</span></td>
           <td><span class="badge badge-partial">Partial</span></td>
-          <td class="notes"><span class="priority p-med">P2</span> Parallelize bootstrap</td>
+          <td class="notes">Web: neighbor body prefetch on select; bootstrap still sequential in places</td>
         </tr>
         <tr>
           <td class="feature">List density settings</td>
@@ -584,9 +597,9 @@
         <tr>
           <td class="feature">Hover actions on list rows</td>
           <td><span class="badge badge-yes">Yes</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
           <td><span class="badge badge-na">N/A</span></td>
-          <td class="notes"><span class="priority p-med">P2</span> Desktop only</td>
+          <td class="notes">Web: star + report-spam on row hover; no full move/archive hover strip yet</td>
         </tr>
         <tr>
           <td class="feature">Drag-drop messages to folders/tags</td>
@@ -636,7 +649,7 @@
 
   <section id="mail-compose">
     <h2>Mail — Compose &amp; drafts</h2>
-    <p class="section-note">Rich compose landed on web (Jun 2026); native still plain-text.</p>
+    <p class="section-note">Rich compose on web (Jun 2026); native still plain-text with draft resume.</p>
     <table>
       <thead>
         <tr>
@@ -658,9 +671,9 @@
         <tr>
           <td class="feature">Inline images in compose</td>
           <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-high">P1</span></td>
+          <td class="notes">Web: paste / drag-drop, JMAP blob upload, <code>ResizableImage</code> extension</td>
         </tr>
         <tr>
           <td class="feature">Tables in compose</td>
@@ -679,9 +692,9 @@
         <tr>
           <td class="feature">Edit existing drafts</td>
           <td><span class="badge badge-yes">Yes</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-high">P1</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Web: auto-opens full compose from drafts folder (<code>seedDraft</code>). Native: plain-text resume via compose route; no rich HTML round-trip</td>
         </tr>
         <tr>
           <td class="feature">Proper In-Reply-To / References on reply</td>
@@ -695,7 +708,7 @@
           <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-partial">Partial</span></td>
           <td><span class="badge badge-partial">Partial</span></td>
-          <td class="notes">Quote split exists; not layout-preserving HTML island</td>
+          <td class="notes">Web: <code>quoted-html.ts</code> + inline quoted images; not full layout-preserving island yet</td>
         </tr>
         <tr>
           <td class="feature">Attachment upload + preview in compose</td>
@@ -707,9 +720,9 @@
         <tr>
           <td class="feature">Forgotten-attachment warning</td>
           <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-med">P2</span></td>
+          <td class="notes">Web: keyword list in compose settings; confirm before send</td>
         </tr>
         <tr>
           <td class="feature">Scheduled send</td>
@@ -749,9 +762,9 @@
         <tr>
           <td class="feature">Signature above / below quoted text</td>
           <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-partial">Partial</span></td>
-          <td><span class="badge badge-partial">Partial</span></td>
-          <td class="notes">Web: <code>signature-utils</code> append helpers; no user-facing above/below toggle</td>
+          <td class="notes">Web: compose settings toggle. Native: manual insert only</td>
         </tr>
         <tr>
           <td class="feature">Reply-To header support</td>
@@ -765,14 +778,14 @@
           <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-partial">Partial</span></td>
           <td><span class="badge badge-partial">Partial</span></td>
-          <td class="notes">Identity picker sets From; no alias auto-fill UX</td>
+          <td class="notes">Identity picker + <code>reply-identity</code> auto-select on reply; no catch-all alias auto-fill</td>
         </tr>
         <tr>
           <td class="feature">Plain-text composer mode toggle</td>
           <td><span class="badge badge-yes">Yes</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-na">N/A</span></td>
-          <td class="notes">Web defaults to rich HTML; no plain-mode toggle yet</td>
+          <td class="notes">Web compose toolbar + settings panel. Native is plain-text only</td>
         </tr>
         <tr>
           <td class="feature">Email templates with placeholders</td>
@@ -786,14 +799,14 @@
           <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-partial">Partial</span></td>
           <td><span class="badge badge-partial">Partial</span></td>
-          <td class="notes">Solace: calendar participants / manual entry; no address book</td>
+          <td class="notes">E2EE recent contacts (mail + calendar usage); no full JMAP address book yet</td>
         </tr>
         <tr>
           <td class="feature">Sub-addressing tag suggestions</td>
           <td><span class="badge badge-yes">Yes</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-low">P3</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
+          <td class="notes">Identity badge shows <code>+tag</code> in list/reader; no compose suggestions yet</td>
         </tr>
       </tbody>
     </table>
@@ -904,7 +917,7 @@
           <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-partial">Partial</span></td>
-          <td class="notes">Parity on web</td>
+          <td class="notes">Web: ask / block / allow policy in display settings + per-sender trust</td>
         </tr>
         <tr>
           <td class="feature">Block tracking pixels</td>
@@ -923,9 +936,9 @@
         <tr>
           <td class="feature">Trusted senders list</td>
           <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-partial">Partial</span></td>
           <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-med">P2</span></td>
+          <td class="notes">Web: local list in display settings + “trust sender” in reader; not JMAP address book sync</td>
         </tr>
         <tr>
           <td class="feature">SPF / DKIM / DMARC indicators</td>
@@ -953,7 +966,7 @@
           <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-partial">Partial</span></td>
-          <td class="notes">Web mail dark mode toggle</td>
+          <td class="notes">Web: light / dark / original appearance in display settings</td>
         </tr>
         <tr>
           <td class="feature">Attachment preview (image, PDF)</td>
@@ -1031,16 +1044,16 @@
         <tr>
           <td class="feature">Recipient popover (click sender)</td>
           <td><span class="badge badge-yes">Yes</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-low">P3</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes">Web: <code>RecipientPopover</code>. Native: <code>RecipientSheet</code> (copy, compose-to)</td>
         </tr>
         <tr>
           <td class="feature">Identity badge in list / viewer</td>
           <td><span class="badge badge-yes">Yes</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-low">P3</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
+          <td class="notes"><code>MailIdentityBadge</code> — sub-address tags + matching identity name</td>
         </tr>
         <tr>
           <td class="feature">PWA + web push for new mail</td>
@@ -1133,7 +1146,7 @@
 
   <section id="cal-views">
     <h2>Calendar — Views &amp; navigation</h2>
-    <p class="section-note">Bulwark uses JMAP Calendar; Solace uses its own API — compare by user-facing capability.</p>
+    <p class="section-note">Bulwark uses Stalwart JMAP Calendar; Solace calendar is entirely <code>apps/backend</code> — compare by user-facing capability only.</p>
     <table>
       <thead>
         <tr>
@@ -1587,9 +1600,10 @@
         <tr><td class="feature">E2EE mail (PGP)</td><td class="notes">Vault, worker crypto, signature verification in reader</td></tr>
         <tr><td class="feature">E2EE calendar events</td><td class="notes">Encrypted titles/descriptions; participant key distribution</td></tr>
         <tr><td class="feature">Encrypted search indexes</td><td class="notes">Device-local mail + calendar search without server plaintext</td></tr>
+        <tr><td class="feature">E2EE recent contacts</td><td class="notes">Encrypted usage history via Solace backend (<code>/recent-contacts</code>) — not Stalwart</td></tr>
         <tr><td class="feature">Unified app shell</td><td class="notes">Single sidebar, command palette, mail ↔ calendar navigation</td></tr>
         <tr><td class="feature">Native mobile app</td><td class="notes">Dedicated Expo app — not responsive-web-only</td></tr>
-        <tr><td class="feature">Own calendar backend</td><td class="notes">Full control over invites, reminders, sharing — no Stalwart Calendar dependency</td></tr>
+        <tr><td class="feature">Own calendar backend</td><td class="notes">Full control over invites, reminders, sharing — Stalwart is mail-only in Solace</td></tr>
         <tr><td class="feature">Event reminder emails</td><td class="notes">Notifications service + rich in-mail event cards</td></tr>
         <tr><td class="feature">3-day calendar view</td><td class="notes">Extra view Bulwark doesn't list</td></tr>
         <tr><td class="feature">Holiday calendar presets</td><td class="notes">National holiday subscription picker on web</td></tr>
@@ -1611,35 +1625,44 @@
         </ul>
       </div>
       <div class="phase-card">
-        <h4>P1 — Compose ✓ shipped (web)</h4>
+        <h4>P1 — Compose depth ✓ shipped (web)</h4>
         <ul>
           <li class="done">Draft auto-save (web + native)</li>
           <li class="done">Rich text + HTML send (web)</li>
           <li class="done">Identity picker + signatures (web + native partial)</li>
+          <li class="done">Inline images in compose (web)</li>
+          <li class="done">Edit existing drafts (web + native plain)</li>
+          <li class="done">Forgotten-attachment warning (web)</li>
+          <li class="done">Plain-text mode + signature position toggles (web)</li>
+          <li class="done">Display + compose settings panels (web)</li>
         </ul>
       </div>
       <div class="phase-card">
-        <h4>P2 — Mail depth</h4>
+        <h4>P2 — Web mail depth</h4>
         <ul>
+          <li class="done">Recipient popover + identity badge</li>
+          <li class="done">Recent contacts autocomplete (E2EE + backend sync)</li>
+          <li class="done">Trusted senders (local display settings)</li>
+          <li class="done">Neighbor message-body prefetch</li>
           <li>Web list thread prefetch (inbox+sent, rate-limit safe)</li>
           <li>Label chips in list (compact) or density settings</li>
-          <li>Edit existing drafts from drafts folder</li>
-          <li>Native rich-text compose</li>
           <li>Advanced search panel + chips</li>
           <li>Thread expand in list</li>
           <li>Undo toasts</li>
           <li>Keyboard shortcuts (j/k, r, e, …)</li>
           <li>Mark-as-read delay</li>
-          <li>Trusted senders</li>
+          <li>Layout-preserving quote island</li>
+          <li>Sub-address tag suggestions in compose</li>
+          <li>Parallel mail bootstrap on login</li>
         </ul>
       </div>
       <div class="phase-card">
-        <h4>P2 — Calendar polish</h4>
+        <h4>P2 — Calendar polish (Solace backend)</h4>
         <ul>
           <li>Virtual location / video URL field</li>
           <li>Mini-calendar sidebar (optional)</li>
           <li>Event hover preview tuning</li>
-          <li>Native invite import parity with web</li>
+          <li>Backend contacts for participant autocomplete beyond recent-contacts</li>
         </ul>
       </div>
       <div class="phase-card">
@@ -1655,9 +1678,149 @@
     </div>
   </section>
 
+  <section id="tests-improvements">
+    <h2>Tests &amp; quality improvements (web)</h2>
+    <p class="section-note">Web mail test coverage added Jun 2026. Native tests are out of scope for this track.</p>
+
+    <h3>Added in this pass</h3>
+    <table>
+      <thead>
+        <tr><th>Area</th><th>Test file</th><th>Covers</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Compose settings</td>
+          <td class="notes"><code>compose-settings.test.ts</code></td>
+          <td class="notes"><code>shouldWarnAboutMissingAttachment</code>, persistence, keyword matching</td>
+        </tr>
+        <tr>
+          <td class="feature">E2EE recent contacts</td>
+          <td class="notes"><code>e2ee-recent-contacts.test.ts</code></td>
+          <td class="notes">Backend encrypt/decrypt round-trip, record usage, empty session</td>
+        </tr>
+        <tr>
+          <td class="feature">Quoted HTML island</td>
+          <td class="notes"><code>quoted-html.test.ts</code></td>
+          <td class="notes"><code>buildQuotedHtmlBlock</code> marker + verbatim table HTML</td>
+        </tr>
+        <tr>
+          <td class="feature">Inline image registry</td>
+          <td class="notes"><code>compose-inline-images.test.ts</code></td>
+          <td class="notes">Register/reset images, quoted hydration waiter</td>
+        </tr>
+        <tr>
+          <td class="feature">Recipient popover</td>
+          <td class="notes"><code>recipient-popover.test.tsx</code></td>
+          <td class="notes">Copy email, start new message to recipient</td>
+        </tr>
+        <tr>
+          <td class="feature">Recipient suggestions UI</td>
+          <td class="notes"><code>recipient-suggest-input.test.tsx</code></td>
+          <td class="notes">Suggestion list, click insert, keyboard Enter, comma-append</td>
+        </tr>
+        <tr>
+          <td class="feature">Compose context</td>
+          <td class="notes"><code>use-mail-compose.test.tsx</code> (expanded)</td>
+          <td class="notes"><code>seedDraft</code> draft id, <code>seedReply</code> mode + recipients</td>
+        </tr>
+        <tr>
+          <td class="feature">Display settings</td>
+          <td class="notes"><code>mail-display-settings.test.ts</code> (expanded)</td>
+          <td class="notes">Block policy, trusted-sender add/remove dedupe</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Web test gaps to fill next</h3>
+    <div class="phase-list">
+      <div class="phase-card">
+        <h4>P1 — Regression guards</h4>
+        <ul>
+          <li><strong>Draft round-trip:</strong> web <code>seedDraft</code> → autosave → send removes from drafts (extend <code>use-compose-draft-autosave.test.tsx</code>)</li>
+          <li><strong>Inline image send:</strong> blob upload → CID in HTML → outgoing MIME related parts (<code>compose-editor-utils</code> + <code>outgoing-mime</code>)</li>
+          <li><strong>External content policy:</strong> <code>message-reader</code> ask/block/allow + trusted sender bypass (component test)</li>
+          <li><strong>Recipient popover:</strong> copy + compose-to actions</li>
+          <li><strong>Trusted senders dialog:</strong> add/remove list entries</li>
+          <li><strong>Mail-app integration:</strong> drafts folder opens compose; neighbor prefetch avoids duplicate JMAP fetches</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h4>P2 — Component / hook coverage</h4>
+        <ul>
+          <li><code>use-compose-quoted-inline-images</code>: quoted reply preserves inline CID refs</li>
+          <li><code>compose-dialog</code>: attachment warning confirm / skip flow</li>
+          <li><code>trusted-senders-dialog</code> + add-from-reader flow</li>
+          <li><code>use-recent-contacts</code> hook: batch flush, refetch after send</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h4>P3 — Polish &amp; perf</h4>
+        <ul>
+          <li>Snapshot / a11y tests for compose toolbar + settings panels</li>
+          <li>Load-test virtual list with 10k+ merged pages (scroll + refresh merge)</li>
+          <li>Fuzz <code>quoted-html</code> against malformed reply HTML</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Web product improvements (non-test)</h3>
+    <table>
+      <thead>
+        <tr><th>Improvement</th><th>Why</th><th>Effort</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Keyboard shortcuts + help modal</td>
+          <td class="notes">Bulwark power-user muscle memory; web-only first</td>
+          <td class="notes"><span class="priority p-med">P2</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Undo toast on archive/delete</td>
+          <td class="notes">High perceived quality; needs optimistic move + timer</td>
+          <td class="notes"><span class="priority p-med">P2</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Mark-as-read delay setting</td>
+          <td class="notes">Common mail client expectation; store in display settings</td>
+          <td class="notes"><span class="priority p-med">P2</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Advanced search panel</td>
+          <td class="notes">JMAP filter builder (from/to/date/body) with chips</td>
+          <td class="notes"><span class="priority p-med">P2</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Backend contacts address book</td>
+          <td class="notes">Full autocomplete via Solace backend — not Stalwart JMAP Contacts</td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Parallel mail bootstrap on login</td>
+          <td class="notes">Mailboxes + page 1 + identities in one parallel batch</td>
+          <td class="notes"><span class="priority p-med">P2</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Tables in compose</td>
+          <td class="notes">Bulwark Tiptap table extension; low urgency</td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Scheduled send + undo-send delay</td>
+          <td class="notes">Needs Stalwart delayed send support</td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Newsletter List-Unsubscribe</td>
+          <td class="notes">One-click unsubscribe banner in reader</td>
+          <td class="notes"><span class="priority p-low">P3</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
   <p style="margin-top:2rem;font-size:0.8rem;color:var(--muted);">
     Generated for Solace monorepo · Source: <code>webmail/FEATURES.md</code> + codebase review ·
-    Last updated 13 Jun 2026 ·
+    Last updated 24 Jun 2026 ·
     Open this file in any browser: <code>docs/bulwark-mail-calendar-parity.html</code>
   </p>
   </main>

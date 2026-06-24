@@ -16,9 +16,6 @@ import {
   Shield,
   Inbox,
   Tag,
-  Plus,
-  Trash2,
-  Loader2,
   AlignLeft,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -56,6 +53,7 @@ import { InviteSettings } from "../command-palette/invite-settings";
 import { PasswordSection } from "../command-palette/password-section";
 import { PasskeySettings } from "@/components/passkey-settings";
 import { MailboxManager } from "./mailbox-manager";
+import { LabelPickerPanel } from "./label-picker-panel";
 import { getBaseSettingsNavigationItems } from "../command-palette/base-navigation";
 import { UnifiedSearchResults } from "../command-palette/unified-search-results";
 import { useUnifiedSearch } from "@/hooks/use-unified-search";
@@ -98,6 +96,10 @@ export interface MailCommandPaletteProps {
   onRenameMailbox?: (id: string, name: string) => Promise<void>;
   labels?: LabelDef[];
   onCreateLabel?: (name: string, color: string) => Promise<LabelDef | null>;
+  onUpdateLabel?: (
+    labelId: string,
+    updates: { name: string; color: string },
+  ) => Promise<void>;
   onDeleteLabel?: (id: string) => Promise<void>;
   initialView?: string;
   messages?: JmapEmailMessage[];
@@ -106,76 +108,26 @@ export interface MailCommandPaletteProps {
 
 const log = createLogger("mail-command-palette");
 
-const LABEL_COLORS: { value: string; hex: string }[] = [
-  { value: "blue", hex: "#3b82f6" },
-  { value: "red", hex: "#ef4444" },
-  { value: "green", hex: "#22c55e" },
-  { value: "yellow", hex: "#facc15" },
-  { value: "orange", hex: "#f97316" },
-  { value: "purple", hex: "#a855f7" },
-  { value: "pink", hex: "#ec4899" },
-  { value: "teal", hex: "#14b8a6" },
-];
+const EMPTY_MAILBOXES: JmapMailbox[] = [];
+const EMPTY_LABELS: LabelDef[] = [];
+const EMPTY_MESSAGES: JmapEmailMessage[] = [];
 
 function LabelsView({
   goBack,
   labels,
   onCreateLabel,
+  onUpdateLabel,
   onDeleteLabel,
 }: {
   goBack: () => void;
   labels: LabelDef[];
   onCreateLabel?: (name: string, color: string) => Promise<LabelDef | null>;
+  onUpdateLabel?: (
+    labelId: string,
+    updates: { name: string; color: string },
+  ) => Promise<void>;
   onDeleteLabel?: (id: string) => Promise<void>;
 }) {
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newColor, setNewColor] = useState("blue");
-  const [hexInput, setHexInput] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  const isValidHex = (v: string) =>
-    /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(v);
-
-  const colorPreview = isValidHex(newColor)
-    ? newColor
-    : (LABEL_COLORS.find((c) => c.value === newColor)?.hex ?? "#888");
-
-  const handleHexInput = (v: string) => {
-    setHexInput(v);
-    if (isValidHex(v)) setNewColor(v);
-  };
-
-  const handlePresetClick = (value: string) => {
-    setNewColor(value);
-    setHexInput("");
-  };
-
-  const handleCreate = async () => {
-    if (!newName.trim() || !onCreateLabel) return;
-    setSaving(true);
-    try {
-      await onCreateLabel(newName.trim(), newColor);
-      setNewName("");
-      setNewColor("blue");
-      setHexInput("");
-      setCreating(false);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!onDeleteLabel) return;
-    setDeletingId(id);
-    try {
-      await onDeleteLabel(id);
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
   return (
     <div
       className="flex flex-col"
@@ -186,126 +138,25 @@ function LabelsView({
           type="button"
           onClick={goBack}
           className="p-1 rounded hover:bg-muted/50 transition-colors"
+          aria-label="Back"
         >
           <ArrowLeft className="size-4 text-muted-foreground" />
         </button>
         <span className="text-sm font-medium flex-1">Labels</span>
-        {onCreateLabel ? (
-          <button
-            type="button"
-            onClick={() => setCreating((v) => !v)}
-            className="p-1 rounded hover:bg-muted/50 transition-colors"
-            aria-label="New label"
-          >
-            <Plus className="size-4 text-muted-foreground" />
-          </button>
-        ) : null}
       </div>
-      <div className="flex-1 overflow-y-auto p-2">
-        {creating ? (
-          <div className="mx-1 mb-2 rounded-lg border border-border/50 bg-muted/20 p-3 space-y-3">
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Label name"
-              disabled={saving}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleCreate();
-                if (e.key === "Escape") setCreating(false);
-              }}
-              className="flex h-9 w-full rounded-md bg-input px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
-            />
-            <div className="flex gap-1.5 flex-wrap items-center">
-              {LABEL_COLORS.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => handlePresetClick(c.value)}
-                  style={{ backgroundColor: c.hex }}
-                  className={`size-5 rounded-full transition-transform ${newColor === c.value ? "ring-2 ring-ring ring-offset-1 scale-110" : ""}`}
-                  aria-label={c.value}
-                />
-              ))}
-              <div className="flex items-center gap-1.5 ml-1">
-                <div
-                  className="size-5 rounded-full border border-border/50 shrink-0"
-                  style={{ backgroundColor: colorPreview }}
-                />
-                <input
-                  type="text"
-                  value={hexInput}
-                  onChange={(e) => handleHexInput(e.target.value)}
-                  placeholder="#000000"
-                  className="h-7 w-20 rounded-md bg-input px-2 text-xs font-mono text-foreground outline-none placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring/30"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => void handleCreate()}
-                disabled={saving || !newName.trim()}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-              >
-                {saving ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <Check className="size-3" />
-                )}
-                Create
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setCreating(false);
-                  setNewName("");
-                }}
-                className="inline-flex h-8 items-center rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent/40"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : null}
-        {labels.length === 0 && !creating ? (
-          <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No labels yet.
-          </div>
-        ) : null}
-        {labels.map((label) => {
-          const displayColor = /^#/.test(label.color)
-            ? label.color
-            : (LABEL_COLORS.find((c) => c.value === label.color)?.hex ??
-              "#888");
-          return (
-            <div
-              key={label.id}
-              className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/50 group"
-            >
-              <div
-                className="size-3 rounded-full shrink-0"
-                style={{ backgroundColor: displayColor }}
-              />
-              <span className="text-sm flex-1 truncate">{label.name}</span>
-              {onDeleteLabel ? (
-                <button
-                  type="button"
-                  onClick={() => void handleDelete(label.id)}
-                  disabled={deletingId === label.id}
-                  className="opacity-0 group-hover:opacity-100 tap-target p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-[opacity,color,background-color]"
-                  aria-label="Delete label"
-                >
-                  {deletingId === label.id ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Trash2 className="size-3.5" />
-                  )}
-                </button>
-              ) : null}
-            </div>
-          );
-        })}
+      <div className="flex-1 overflow-y-auto">
+        <LabelPickerPanel
+          labels={labels}
+          onCreateLabel={onCreateLabel}
+          onUpdateLabel={onUpdateLabel}
+          onDeleteLabel={
+            onDeleteLabel
+              ? (id) => {
+                  void onDeleteLabel(id);
+                }
+              : undefined
+          }
+        />
       </div>
     </div>
   );
@@ -315,15 +166,16 @@ export function MailCommandPalette({
   open,
   onOpenChange,
   onCompose,
-  mailboxes = [],
+  mailboxes = EMPTY_MAILBOXES,
   onCreateMailbox,
   onDeleteMailbox,
   onRenameMailbox,
-  labels = [],
+  labels = EMPTY_LABELS,
   onCreateLabel,
+  onUpdateLabel,
   onDeleteLabel,
   initialView,
-  messages = [],
+  messages = EMPTY_MESSAGES,
   onSelectMessage,
 }: MailCommandPaletteProps) {
   const [navHistory, setNavHistory] = useState<MailPaletteView[]>(["main"]);
@@ -378,7 +230,7 @@ export function MailCommandPalette({
   );
 
   const queryClient = useQueryClient();
-  const accountsQuery = useQuery({
+  const { data: accountsData, refetch: refetchAccounts } = useQuery({
     queryKey: ["auth", "accounts", sessionUserId],
     queryFn: async () => {
       if (typeof authClient.listAccounts !== "function") return [];
@@ -389,8 +241,8 @@ export function MailCommandPalette({
     staleTime: 5 * 60 * 1000,
   });
   const linkedAccounts = useMemo(
-    () => accountsQuery.data ?? [],
-    [accountsQuery.data],
+    () => accountsData ?? [],
+    [accountsData],
   );
   const { hasOAuthAccount, hasPasswordAccount } = useMemo(
     () => summarizeLinkedAuthAccounts(linkedAccounts),
@@ -500,7 +352,7 @@ export function MailCommandPalette({
           throw new Error(
             result.error.message || "Unable to set your password.",
           );
-        await accountsQuery?.refetch?.();
+        await refetchAccounts();
       } catch (error) {
         log.error("Failed to set password:", error);
         throw error;
@@ -508,7 +360,7 @@ export function MailCommandPalette({
         setSettingPassword(false);
       }
     },
-    [accountsQuery],
+    [refetchAccounts],
   );
 
   const handleResetEncryptionPassword = useCallback(
@@ -1128,6 +980,7 @@ export function MailCommandPalette({
           goBack={goBack}
           labels={labels}
           onCreateLabel={onCreateLabel}
+          onUpdateLabel={onUpdateLabel}
           onDeleteLabel={onDeleteLabel}
         />
       );

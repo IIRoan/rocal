@@ -26,7 +26,7 @@ import {
   FileText,
   Trash2,
   Archive,
-  AlertTriangle,
+  OctagonAlert,
   Mail,
   GripVertical,
   ChevronRight,
@@ -65,6 +65,25 @@ const ROLE_ORDER = [
   "spam",
   "trash",
 ];
+const HIDDEN_MAILBOX_IDS_STORAGE_KEY = "mail:hiddenMailboxIds:v1";
+const LEGACY_HIDDEN_MAILBOX_IDS_STORAGE_KEY = "mail:hiddenMailboxIds";
+
+function readHiddenMailboxIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    let stored = localStorage.getItem(HIDDEN_MAILBOX_IDS_STORAGE_KEY);
+    if (!stored) {
+      stored = localStorage.getItem(LEGACY_HIDDEN_MAILBOX_IDS_STORAGE_KEY);
+      if (stored) {
+        localStorage.setItem(HIDDEN_MAILBOX_IDS_STORAGE_KEY, stored);
+        localStorage.removeItem(LEGACY_HIDDEN_MAILBOX_IDS_STORAGE_KEY);
+      }
+    }
+    return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
+  } catch {
+    return new Set();
+  }
+}
 const PROTECTED_ROLES = new Set([
   "inbox",
   "sent",
@@ -88,7 +107,7 @@ function getMailboxIcon(role: string | null | undefined): LucideIcon {
       return Archive;
     case "junk":
     case "spam":
-      return AlertTriangle;
+      return OctagonAlert;
     default:
       return Mail;
   }
@@ -212,15 +231,9 @@ export function MailSidebar({
   onReorderMailboxes,
   isBusy,
 }: MailSidebarProps) {
-  const [hiddenMailboxIds, setHiddenMailboxIds] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
-    try {
-      const stored = localStorage.getItem("mail:hiddenMailboxIds");
-      return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
+  const [hiddenMailboxIds, setHiddenMailboxIds] = useState<Set<string>>(
+    readHiddenMailboxIds,
+  );
   const [hiddenExpanded, setHiddenExpanded] = useState(false);
 
   const sensors = useSensors(
@@ -249,7 +262,7 @@ export function MailSidebar({
       else next.add(id);
       try {
         localStorage.setItem(
-          "mail:hiddenMailboxIds",
+          HIDDEN_MAILBOX_IDS_STORAGE_KEY,
           JSON.stringify([...next]),
         );
       } catch {

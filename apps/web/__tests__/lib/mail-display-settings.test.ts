@@ -5,6 +5,7 @@ import {
   shouldBlockRemoteImages,
   isTrustedSender,
   addTrustedSender,
+  removeTrustedSender,
   htmlContainsRemoteResources,
   resolveMailContentIsDark,
 } from "@/lib/mail/mail-display-settings";
@@ -62,6 +63,30 @@ describe("mail-display-settings", () => {
     expect(resolveMailContentIsDark({ emailAppearance: "original" })).toBe(
       false,
     );
+  });
+
+  it("always blocks remote images when policy is block", () => {
+    expect(
+      shouldBlockRemoteImages({
+        policy: "block",
+        allowExternalContent: true,
+        senderEmail: "alice@example.com",
+        trustedSenders: ["alice@example.com"],
+      }),
+    ).toBe(true);
+  });
+
+  it("deduplicates trusted senders when adding", () => {
+    addTrustedSender("alice@example.com");
+    const again = addTrustedSender("Alice@Example.com");
+    expect(again.trustedSenders).toEqual(["alice@example.com"]);
+  });
+
+  it("removes trusted senders case-insensitively", () => {
+    addTrustedSender("alice@example.com");
+    const next = removeTrustedSender("Alice@Example.com");
+    expect(next.trustedSenders).toEqual([]);
+    expect(isTrustedSender("alice@example.com", next)).toBe(false);
   });
 
   it("reads persisted settings from storage", () => {
