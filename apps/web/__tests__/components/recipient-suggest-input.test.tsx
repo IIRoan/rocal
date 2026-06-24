@@ -33,6 +33,7 @@ const mockSuggestions = [
 
 jest.mock("@/hooks/use-recent-contacts", () => ({
   useRecentContacts: jest.fn(() => ({
+    payload: { version: 1 as const, contacts: mockSuggestions },
     suggestions: mockSuggestions,
     isAvailable: true,
     isLoading: false,
@@ -104,6 +105,18 @@ function getInput() {
 }
 
 describe("RecipientSuggestInput", () => {
+  it("shows recent contacts on focus before typing", () => {
+    renderInput("");
+
+    act(() => {
+      getInput().dispatchEvent(new FocusEvent("focus", { bubbles: true }));
+    });
+
+    expect(container.querySelector('[data-testid="suggestions"]')).not.toBeNull();
+    expect(container.textContent).toContain("Recent contacts");
+    expect(container.textContent).toContain("alice@example.com");
+  });
+
   it("shows recent contact suggestions while typing", () => {
     renderInput("al");
 

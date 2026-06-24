@@ -11,8 +11,12 @@ import {
 } from "react";
 import {
   formatRecentContactForField,
+  getContactDisplayLabel,
   insertRecipientSuggestion,
+  normalizeEmailAddress,
   parseAddressList,
+  filterContactsList,
+  filterRecentContactSuggestions,
   type RecentContactEntry,
 } from "@workspace/calendar-core";
 import { Input } from "@workspace/ui/components/ui/input";
@@ -36,6 +40,7 @@ type RecipientSuggestionsListProps = {
   listboxId: string;
   suggestions: RecentContactEntry[];
   highlightedIndex: number;
+  heading: string;
   onSelect: (entry: RecentContactEntry) => void;
 };
 
@@ -43,12 +48,16 @@ function RecipientSuggestionsList({
   listboxId,
   suggestions,
   highlightedIndex,
+  heading,
   onSelect,
 }: RecipientSuggestionsListProps) {
   return (
-    <div id={listboxId} role="listbox" className="max-h-60 overflow-y-auto overscroll-contain">
+    <div id={listboxId} role="listbox" className="max-h-64 overflow-y-auto overscroll-contain py-1">
+      <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        {heading}
+      </div>
       {suggestions.map((entry, index) => {
-        const label = entry.displayName?.trim() || entry.email;
+        const label = getContactDisplayLabel(entry);
         return (
           <button
             key={entry.email}
@@ -60,17 +69,19 @@ function RecipientSuggestionsList({
               onSelect(entry);
             }}
             className={cn(
-              "flex w-full items-center gap-2 px-2.5 py-2 text-left text-sm transition-colors",
-              index === highlightedIndex ? "bg-muted/60" : "hover:bg-muted/40",
+              "flex w-full items-center gap-2.5 px-2.5 py-2 text-left text-sm transition-colors",
+              index === highlightedIndex ? "bg-accent/60" : "hover:bg-accent/40",
             )}
           >
             <SenderAvatar
               name={label}
               email={entry.email}
-              className="size-7"
+              className="size-7 shrink-0"
             />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-foreground">{label}</span>
+              <span className="block truncate font-medium text-foreground">
+                {label}
+              </span>
               {entry.displayName ? (
                 <span className="block truncate text-xs text-muted-foreground">
                   {entry.email}
@@ -120,17 +131,52 @@ export function RecipientSuggestInput({
 
   const activeToken = getActiveRecipientToken(value);
   const excludeEmails = useMemo(
-    () => parseAddressList(value).map((address) => address.email),
+    () =>
+      new Set(
+        parseAddressList(value).map((address) =>
+          normalizeEmailAddress(address.email),
+        ),
+      ),
     [value],
   );
 
-  const { suggestions, isAvailable } = useRecentContacts({
-    query: activeToken,
-    excludeEmails,
-    limit: 8,
-  });
+  const { payload, isAvailable, isLoading } = useRecentContacts();
 
-  const showSuggestions = open && isAvailable && suggestions.length > 0;
+  const suggestions = useMemo(() => {
+    if (!payload) return [];
+
+    const exclude = [...excludeEmails];
+    const trimmedToken = activeToken.trim();
+
+    if (!trimmedToken) {
+      return filterRecentContactSuggestions(payload, {
+        excludeEmails: exclude,
+        limit: 10,
+      });
+    }
+
+    const prefixMatches = filterRecentContactSuggestions(payload, {
+      query: trimmedToken,
+      excludeEmails: exclude,
+      limit: 8,
+    });
+    if (prefixMatches.length > 0) {
+      return prefixMatches;
+    }
+
+    return filterContactsList(payload, { query: trimmedToken })
+      .filter((entry) => !excludeEmails.has(entry.email))
+      .slice(0, 8);
+  }, [activeToken, excludeEmails, payload]);
+
+  const suggestionsHeading = activeToken.trim()
+    ? "Matching contacts"
+    : "Recent contacts";
+
+  const showSuggestions =
+    open &&
+    isAvailable &&
+    (isLoading || suggestions.length > 0 || activeToken.trim().length > 0);
 
   useEffect(() => {
     setHighlightedIndex(0);
@@ -168,11 +214,16 @@ export function RecipientSuggestInput({
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (!showSuggestions) {
-      if (event.key === "ArrowDown" && suggestions.length > 0) {
+      if (
+        (event.key === "ArrowDown" || event.key === "ArrowUp") &&
+        isAvailable &&
+        (suggestions.length > 0 || isLoading)
+      ) {
+        event.preventDefault();
         setOpen(true);
-      } else {
-        onKeyDown?.(event);
+        return;
       }
+      onKeyDown?.(event);
       return;
     }
 
@@ -216,7 +267,11 @@ export function RecipientSuggestInput({
       onChange(event.target.value);
       setOpen(true);
     },
-    onFocus: () => setOpen(true),
+    onFocus: () => {
+      if (isAvailable) {
+        setOpen(true);
+      }
+    },
     onBlur: () => {
       window.setTimeout(() => {
         if (!selectingRef.current) {
@@ -266,7 +321,7 @@ export function RecipientSuggestInput({
       </PopoverAnchor>
 
       <PopoverContent
-        className="w-[var(--radix-popover-anchor-width)] p-0"
+        className="w-[var(--radix-popover-anchor-width)] min-w-[16rem] max-w-[min(24rem,calc(100dvw-2rem))] p-0 border-border/60 shadow-lg"
         align="start"
         sideOffset={4}
         onOpenAutoFocus={(event) => event.preventDefault()}
@@ -277,12 +332,23 @@ export function RecipientSuggestInput({
           }
         }}
       >
-        <RecipientSuggestionsList
-          listboxId={listboxId}
-          suggestions={suggestions}
-          highlightedIndex={highlightedIndex}
-          onSelect={selectSuggestion}
-        />
+        {isLoading ? (
+          <div className="px-3 py-2.5 text-xs text-muted-foreground">
+            Loading contacts…
+          </div>
+        ) : suggestions.length === 0 ? (
+          <div className="px-3 py-2.5 text-xs text-muted-foreground">
+            No matching contacts
+          </div>
+        ) : (
+          <RecipientSuggestionsList
+            listboxId={listboxId}
+            suggestions={suggestions}
+            highlightedIndex={highlightedIndex}
+            heading={suggestionsHeading}
+            onSelect={selectSuggestion}
+          />
+        )}
       </PopoverContent>
     </Popover>
   );

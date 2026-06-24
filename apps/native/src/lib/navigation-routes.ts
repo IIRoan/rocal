@@ -4,6 +4,7 @@ export const CALENDAR_HOME_ROUTE = "/calendar";
 export const MAIL_HOME_ROUTE = "/mail";
 export const SETTINGS_ROUTE = "/settings";
 export const SETTINGS_TIMEZONE_ROUTE = "/settings/timezone";
+export const SETTINGS_CONTACTS_ROUTE = "/settings/contacts";
 
 export const CALENDAR_TAB_ROUTE = "/(tabs)/calendar";
 export const MAIL_TAB_ROUTE = "/(tabs)/mail";

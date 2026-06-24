@@ -3,9 +3,15 @@
 import { useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  addManualContact,
   createEmptyRecentContactsPayload,
+  filterContactsList,
   filterRecentContactSuggestions,
   recordRecentContactUsage,
+  removeContact,
+  updateContactDetails,
+  type ContactDetailsPatch,
+  type ManualContactInput,
   type RecentContactContext,
   type RecentContactEntry,
   type RecentContactUsageInput,
@@ -53,6 +59,60 @@ export function useRecentContacts(options?: {
       limit: options?.limit,
     });
   }, [payload, options?.query, options?.excludeEmails, options?.limit]);
+
+  const persistPayload = useCallback(
+    async (next: RecentContactsPayload) => {
+      const saved = await saveRecentContacts(next);
+      if (saved) {
+        queryClient.setQueryData(RECENT_CONTACTS_QUERY_KEY, next);
+      }
+      return saved;
+    },
+    [queryClient],
+  );
+
+  const mutatePayload = useCallback(
+    async (
+      updater: (current: RecentContactsPayload) => RecentContactsPayload,
+    ) => {
+      if (!isAvailable) return false;
+
+      let current = payload ?? (await loadRecentContacts());
+      if (!current) {
+        current = createEmptyRecentContactsPayload();
+      }
+
+      const next = updater(current);
+      return persistPayload(next);
+    },
+    [isAvailable, payload, persistPayload],
+  );
+
+  const updateContact = useCallback(
+    async (email: string, patch: ContactDetailsPatch) => {
+      return mutatePayload((current) => updateContactDetails(current, email, patch));
+    },
+    [mutatePayload],
+  );
+
+  const removeContactByEmail = useCallback(
+    async (email: string) => {
+      return mutatePayload((current) => removeContact(current, email));
+    },
+    [mutatePayload],
+  );
+
+  const addContact = useCallback(
+    async (input: ManualContactInput) => {
+      if (!isAvailable) return false;
+
+      let current = payload ?? (await loadRecentContacts());
+      const next = addManualContact(current, input);
+      if (!next) return false;
+      return persistPayload(next);
+    },
+    [isAvailable, payload, persistPayload],
+  );
 
   const flushPendingRecords = useCallback(async () => {
     const pending = pendingEntriesRef.current.splice(0);
@@ -102,7 +162,12 @@ export function useRecentContacts(options?: {
   return {
     payload,
     suggestions,
+    contacts: payload?.contacts ?? [],
+    filterContacts: filterContactsList,
     recordUsage,
+    updateContact,
+    removeContact: removeContactByEmail,
+    addContact,
     refresh,
     isLoading: recentContactsQuery.isLoading,
     isAvailable,

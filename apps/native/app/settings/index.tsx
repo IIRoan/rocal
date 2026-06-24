@@ -41,7 +41,7 @@ import { useToast } from "../../src/providers/ToastProvider";
 import { authClient } from "../../src/lib/auth-client";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { calendarApiService } from "../../src/lib/api";
-import { SETTINGS_TIMEZONE_ROUTE } from "../../src/lib/auth-routing";
+import { SETTINGS_TIMEZONE_ROUTE, SETTINGS_CONTACTS_ROUTE } from "../../src/lib/auth-routing";
 import { formatStoredPasskeyDescription } from "../../src/lib/passkey-auth";
 import { getAuthCapabilities } from "../../src/lib/auth-capabilities";
 import {
@@ -67,6 +67,7 @@ import {
   SheetSecondaryButton,
 } from "../../src/components/sheet";
 import { LoadingScreen } from "../../src/components/ui/loading";
+import { useRecentContacts } from "../../src/hooks/use-recent-contacts";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -192,6 +193,9 @@ export default function SettingsScreen() {
     queryFn: () => calendarApiService.getCalendars(),
     staleTime: 5 * 60 * 1000,
   });
+
+  const { contacts } = useRecentContacts();
+  const contactsCount = contacts.length;
 
   const { ownedCalendars } = useMemo(
     () => partitionCalendarsByKind(calendars),
@@ -777,6 +781,24 @@ export default function SettingsScreen() {
               Intl.DateTimeFormat().resolvedOptions().timeZone
             }
             onPress={() => push(SETTINGS_TIMEZONE_ROUTE)}
+            theme={theme}
+          />
+        </View>
+
+        {/* ── Mail ─────────────────────────────────────────────────────── */}
+        <SectionLabel text="Mail" theme={theme} isFirst={false} />
+        <View style={styles.sectionItems}>
+          <NavigationRow
+            icon="users"
+            label="Contacts"
+            value={
+              contactsCount === 0
+                ? "No contacts yet"
+                : contactsCount === 1
+                  ? "1 contact"
+                  : `${contactsCount} contacts`
+            }
+            onPress={() => push(SETTINGS_CONTACTS_ROUTE)}
             theme={theme}
           />
         </View>

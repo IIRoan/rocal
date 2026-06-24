@@ -5,9 +5,26 @@ export type RecentContactContext = "mail" | "calendar";
 export type RecentContactEntry = {
   email: string;
   displayName?: string;
+  phone?: string;
+  notes?: string;
+  /** True when the user added or explicitly saved this contact. */
+  manual?: boolean;
   lastUsedAt: string;
   useCount: number;
   contexts: RecentContactContext[];
+};
+
+export type ContactDetailsPatch = {
+  displayName?: string;
+  phone?: string;
+  notes?: string;
+};
+
+export type ManualContactInput = {
+  email: string;
+  displayName?: string;
+  phone?: string;
+  notes?: string;
 };
 
 export type RecentContactsPayload = {
@@ -78,10 +95,162 @@ function mergeContactEntry(
   return {
     email: input.email,
     displayName: input.displayName ?? existing?.displayName,
+    phone: existing?.phone,
+    notes: existing?.notes,
+    manual: existing?.manual,
     lastUsedAt: usedAt,
     useCount: (existing?.useCount ?? 0) + 1,
     contexts: nextContexts,
   };
+}
+
+function trimOptionalField(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+export function updateContactDetails(
+  payload: RecentContactsPayload,
+  email: string,
+  patch: ContactDetailsPatch,
+): RecentContactsPayload {
+  const normalized = normalizeEmailAddress(email);
+  if (!normalized) return payload;
+
+  const index = payload.contacts.findIndex(
+    (contact) => contact.email === normalized,
+  );
+  if (index < 0) return payload;
+
+  const existing = payload.contacts[index];
+  if (!existing) return payload;
+
+  const nextEntry: RecentContactEntry = {
+    ...existing,
+    manual: true,
+  };
+
+  if (patch.displayName !== undefined) {
+    nextEntry.displayName = trimOptionalField(patch.displayName);
+  }
+  if (patch.phone !== undefined) {
+    nextEntry.phone = trimOptionalField(patch.phone);
+  }
+  if (patch.notes !== undefined) {
+    nextEntry.notes = trimOptionalField(patch.notes);
+  }
+
+  const contacts = [...payload.contacts];
+  contacts[index] = nextEntry;
+
+  return { ...payload, contacts };
+}
+
+export function removeContact(
+  payload: RecentContactsPayload,
+  email: string,
+): RecentContactsPayload {
+  const normalized = normalizeEmailAddress(email);
+  if (!normalized) return payload;
+
+  return {
+    ...payload,
+    contacts: payload.contacts.filter((contact) => contact.email !== normalized),
+  };
+}
+
+export function addManualContact(
+  payload: RecentContactsPayload | null | undefined,
+  input: ManualContactInput,
+  options?: { addedAt?: string },
+): RecentContactsPayload | null {
+  const email = normalizeEmailAddress(input.email);
+  if (!email) return payload ?? null;
+
+  const addedAt = options?.addedAt ?? new Date().toISOString();
+  const base = payload ?? createEmptyRecentContactsPayload();
+  const existing = base.contacts.find((contact) => contact.email === email);
+
+  const entry: RecentContactEntry = {
+    email,
+    displayName:
+      trimOptionalField(input.displayName) ?? existing?.displayName,
+    phone: trimOptionalField(input.phone) ?? existing?.phone,
+    notes: trimOptionalField(input.notes) ?? existing?.notes,
+    manual: true,
+    lastUsedAt: existing?.lastUsedAt ?? addedAt,
+    useCount: existing?.useCount ?? 0,
+    contexts: existing?.contexts ?? [],
+  };
+
+  const without = base.contacts.filter((contact) => contact.email !== email);
+  const contacts = [entry, ...without].sort((a, b) =>
+    b.lastUsedAt.localeCompare(a.lastUsedAt),
+  );
+
+  return {
+    version: 1,
+    contacts: contacts.slice(0, MAX_RECENT_CONTACTS),
+  };
+}
+
+export type FilterContactsListOptions = {
+  query?: string;
+};
+
+function contactMatchesListQuery(
+  entry: RecentContactEntry,
+  query: string,
+): boolean {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return true;
+
+  if (entry.email.includes(normalized)) return true;
+
+  const displayName = entry.displayName?.trim().toLowerCase();
+  if (displayName?.includes(normalized)) return true;
+
+  const phone = entry.phone?.trim().toLowerCase();
+  if (phone?.includes(normalized)) return true;
+
+  const notes = entry.notes?.trim().toLowerCase();
+  return notes ? notes.includes(normalized) : false;
+}
+
+export function filterContactsList(
+  payload: RecentContactsPayload | null | undefined,
+  options: FilterContactsListOptions = {},
+): RecentContactEntry[] {
+  if (!payload?.contacts.length) return [];
+
+  return payload.contacts
+    .filter((entry) => contactMatchesListQuery(entry, options.query ?? ""))
+    .sort((a, b) => {
+      const nameA = (a.displayName ?? a.email).toLowerCase();
+      const nameB = (b.displayName ?? b.email).toLowerCase();
+      const byName = nameA.localeCompare(nameB);
+      if (byName !== 0) return byName;
+      return b.lastUsedAt.localeCompare(a.lastUsedAt);
+    });
+}
+
+export function getContactDisplayLabel(entry: RecentContactEntry): string {
+  return entry.displayName?.trim() || entry.email;
+}
+
+export function formatContactContextSummary(
+  entry: RecentContactEntry,
+): string | null {
+  if (entry.contexts.length === 0) {
+    return entry.manual ? "Added manually" : null;
+  }
+
+  const parts: string[] = [];
+  if (entry.contexts.includes("mail")) parts.push("mail");
+  if (entry.contexts.includes("calendar")) parts.push("calendar");
+  if (parts.length === 0) return null;
+
+  return `From ${parts.join(" & ")}`;
 }
 
 export function recordRecentContactUsage(
@@ -130,7 +299,10 @@ function matchesQuery(entry: RecentContactEntry, query: string): boolean {
   if (entry.email.startsWith(normalized)) return true;
 
   const displayName = entry.displayName?.trim().toLowerCase();
-  return displayName ? displayName.startsWith(normalized) : false;
+  if (displayName?.startsWith(normalized)) return true;
+
+  const phone = entry.phone?.trim().toLowerCase();
+  return phone ? phone.startsWith(normalized) : false;
 }
 
 export function filterRecentContactSuggestions(
