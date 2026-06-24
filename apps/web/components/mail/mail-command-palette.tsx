@@ -45,6 +45,7 @@ import { TransitionContainer } from "../command-palette/transition-container";
 import { SettingToggleRow } from "../command-palette/setting-toggle-row";
 import { ComposeSettingsPanel } from "./compose-settings-panel";
 import { MailDisplaySettingsPanel } from "./mail-display-settings-panel";
+import { MailListSettingsPanel } from "./mail-list-settings-panel";
 import { ContactsSettingsPanel } from "./contacts-settings-panel";
 import { InviteSettings } from "../command-palette/invite-settings";
 import { PasswordSection } from "../command-palette/password-section";
@@ -79,6 +80,7 @@ type MailPaletteView =
   | "labels"
   | "composing"
   | "mail-display"
+  | "mail-list"
   | "contacts"
   | "mail-settings";
 
@@ -453,7 +455,7 @@ export function MailCommandPalette({
         id: "mail-settings",
         label: "Mail settings",
         icon: Inbox,
-        description: "Mailboxes, labels, contacts, composing, display",
+        description: "Mailboxes, labels, contacts, composing, display, list, shortcuts",
       },
       ...rootPreferenceItems,
     ],
@@ -570,7 +572,7 @@ export function MailCommandPalette({
           className="flex flex-col"
           style={{
             minHeight: "clamp(280px, 50svh, 420px)",
-            maxHeight: "calc(100dvh - 200px)",
+            maxHeight: "calc(100dvh - 80px)",
           }}
         >
           <div className="flex items-center gap-2 p-3 sm:py-2 border-b border-border/50">
@@ -975,6 +977,10 @@ export function MailCommandPalette({
 
     if (currentView === "mail-display") {
       return <MailDisplaySettingsPanel goBack={goBack} />;
+    }
+
+    if (currentView === "mail-list") {
+      return <MailListSettingsPanel goBack={goBack} />;
     }
 
     if (currentView === "contacts") {

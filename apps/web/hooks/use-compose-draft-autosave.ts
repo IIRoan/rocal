@@ -135,7 +135,10 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     const identity =
       input.identities.find((entry) => entry.id === draft.identityId) ??
       input.identities[0];
-    const fromEmail = identity?.email ?? input.fallbackFromEmail;
+    const fromEmail =
+      draft.fromEmailOverride ??
+      identity?.email ??
+      input.fallbackFromEmail;
     const fromName = identity?.name ?? null;
 
     bridge.setDraftSaveStatus("saving");

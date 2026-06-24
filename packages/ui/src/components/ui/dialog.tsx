@@ -68,11 +68,12 @@ function DialogContent({
   // only translates on X — vertical position is fixed, NOT centered. Don't
   // change to `top-1/2 -translate-y-1/2` without a UX review; the command
   // palette and similar surfaces rely on this near-top placement.
+  // The dialog can grow to use most of the viewport height when content is long.
   const positionClasses =
     variant === "center"
       ? "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
       : variant === "spotlight"
-        ? "left-1/2 top-[15%] -translate-x-1/2"
+        ? "left-1/2 top-[10%] -translate-x-1/2"
         : variant === "top"
           ? "left-1/2 top-[calc(env(safe-area-inset-top)+1rem)] -translate-x-1/2"
           : "left-1/2 bottom-[calc(env(safe-area-inset-bottom)+1rem)] -translate-x-1/2";
@@ -81,7 +82,7 @@ function DialogContent({
     variant === "center"
       ? "w-[520px] max-w-[calc(100dvw-1rem)] sm:max-w-[calc(100dvw-2rem)] max-h-[calc(100dvh-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] sm:max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]"
       : variant === "spotlight"
-        ? "w-[560px] max-w-[calc(100dvw-2rem)] max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]"
+        ? "w-[560px] max-w-[calc(100dvw-2rem)] max-h-[calc(100dvh-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]"
         : variant === "top"
           ? "w-[720px] max-w-[min(calc(100dvw-1rem),840px)]"
           : "w-[720px] max-w-[min(calc(100dvw-1rem),840px)]";
