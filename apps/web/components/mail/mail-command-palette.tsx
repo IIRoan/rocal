@@ -7,17 +7,12 @@ import {
   ChevronRight,
   ArrowLeft,
   SquarePen,
-  Eye,
-  EyeOff,
   Sun,
   Moon,
   Monitor,
   Check,
   Shield,
   Inbox,
-  Tag,
-  AlignLeft,
-  Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { UnifiedSearchResult } from "@workspace/calendar-core";
@@ -56,10 +51,14 @@ import { PasswordSection } from "../command-palette/password-section";
 import { PasskeySettings } from "@/components/passkey-settings";
 import { MailboxManager } from "./mailbox-manager";
 import { LabelPickerPanel } from "./label-picker-panel";
-import { getBaseSettingsNavigationItems } from "../command-palette/base-navigation";
+import { getRootBaseSettingsNavigationItems } from "../command-palette/base-navigation";
 import { UnifiedSearchResults } from "../command-palette/unified-search-results";
 import { useUnifiedSearch } from "@/hooks/use-unified-search";
 import { usePrivateSearchIndexControls } from "@/hooks/use-private-search-index-controls";
+import { MailSettingsHub } from "./mail-settings-hub";
+import {
+  MAIL_SETTINGS_NAV_ITEMS,
+} from "./mail-settings-navigation";
 import type { JmapMailbox } from "@/lib/mail/types";
 import type { JmapEmailMessage, LabelDef } from "@/lib/mail/types";
 import type { UserSettings } from "@/lib/types/calendar";
@@ -80,7 +79,8 @@ type MailPaletteView =
   | "labels"
   | "composing"
   | "mail-display"
-  | "contacts";
+  | "contacts"
+  | "mail-settings";
 
 interface PaletteItem {
   id: string;
@@ -409,7 +409,39 @@ export function MailCommandPalette({
     [],
   );
 
-  const allItems = useMemo<PaletteItem[]>(
+  const rootPreferenceItems = useMemo(
+    () =>
+      getRootBaseSettingsNavigationItems({
+        timezone: settings?.timezone,
+      }).map((item) => ({
+        id: item.id,
+        label: item.label,
+        icon: item.icon,
+        description: item.description,
+      })),
+    [settings?.timezone],
+  );
+
+  const searchableItems = useMemo<PaletteItem[]>(
+    () => [
+      {
+        id: "compose",
+        label: "Compose",
+        icon: SquarePen,
+        description: "Write a new message",
+      },
+      ...MAIL_SETTINGS_NAV_ITEMS.map((item) => ({
+        id: item.id,
+        label: item.label,
+        icon: item.icon,
+        description: item.description,
+      })),
+      ...rootPreferenceItems,
+    ],
+    [rootPreferenceItems],
+  );
+
+  const mainBrowseItems = useMemo(
     () => [
       {
         id: "compose",
@@ -418,56 +450,28 @@ export function MailCommandPalette({
         description: "Write a new message",
       },
       {
-        id: "mailboxes",
-        label: "Mailboxes",
+        id: "mail-settings",
+        label: "Mail settings",
         icon: Inbox,
-        description: "Create, edit, and delete mailboxes",
+        description: "Mailboxes, labels, contacts, composing, display",
       },
-      {
-        id: "labels",
-        label: "Labels",
-        icon: Tag,
-        description: "Manage message labels",
-      },
-      {
-        id: "contacts",
-        label: "Contacts",
-        icon: Users,
-        description: "People you email and receive mail from",
-      },
-      {
-        id: "composing",
-        label: "Composing",
-        icon: AlignLeft,
-        description: "Plain text mode, signatures, attachment reminders",
-      },
-      {
-        id: "mail-display",
-        label: "Content & display",
-        icon: Eye,
-        description: "Remote images, dark mode, attachment previews",
-      },
-      ...getBaseSettingsNavigationItems({
-        timezone: settings?.timezone,
-      }).map((item) => ({
-        id: item.id,
-        label: item.label,
-        icon: item.icon,
-        description: item.description,
-      })),
+      ...rootPreferenceItems,
     ],
-    [settings?.timezone],
+    [rootPreferenceItems],
   );
 
   const items = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return allItems;
-    return allItems.filter(
-      (item) =>
-        item.label.toLowerCase().includes(q) ||
-        item.description.toLowerCase().includes(q),
-    );
-  }, [allItems, query]);
+    if (!q) return [];
+    return searchableItems.filter((item) => {
+      if (item.label.toLowerCase().includes(q)) return true;
+      if (item.description.toLowerCase().includes(q)) return true;
+      const mailItem = MAIL_SETTINGS_NAV_ITEMS.find(
+        (entry) => entry.id === item.id,
+      );
+      return mailItem?.keywords.some((keyword) => keyword.includes(q)) ?? false;
+    });
+  }, [query, searchableItems]);
   const showUnifiedSearch = currentView === "main" && debouncedSearchQuery.trim().length >= 2;
   const {
     results: unifiedResults,
@@ -516,6 +520,8 @@ export function MailCommandPalette({
     [onOpenChange, onCompose, goForward],
   );
 
+  const mainListItems = query.trim() ? items : mainBrowseItems;
+
   const handleUnifiedResultSelect = useCallback(
     (result: UnifiedSearchResult<JmapEmailMessage>) => {
       onOpenChange(false);
@@ -534,7 +540,7 @@ export function MailCommandPalette({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (currentView !== "main") return;
     const unifiedCount = showUnifiedSearch ? unifiedResults.length : 0;
-    const totalCount = unifiedCount + items.length;
+    const totalCount = unifiedCount + mainListItems.length;
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setSelectedIndex((i) => Math.min(i + 1, Math.max(totalCount - 1, 0)));
@@ -549,7 +555,7 @@ export function MailCommandPalette({
         return;
       }
 
-      const item = items[selectedIndex - unifiedCount];
+      const item = mainListItems[selectedIndex - unifiedCount];
       if (item) {
         e.preventDefault();
         handleSelect(item);
@@ -617,13 +623,13 @@ export function MailCommandPalette({
                 onSelect={handleUnifiedResultSelect}
               />
             )}
-            {items.length === 0 && unifiedResults.length === 0 ? (
+            {mainListItems.length === 0 && unifiedResults.length === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">
                 No results found.
               </div>
             ) : (
               <div className="px-2">
-                {items.map((item, index) => {
+                {mainListItems.map((item, index) => {
                   const globalIndex =
                     (showUnifiedSearch ? unifiedResults.length : 0) + index;
 
@@ -708,27 +714,6 @@ export function MailCommandPalette({
                 )}
               </button>
             ))}
-            <div className="px-1 pb-1 pt-3 border-t border-border/40 mt-1">
-              <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
-                Mail
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => goForward("mail-display")}
-              className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors group"
-            >
-              <div className="flex items-center justify-center size-6 shrink-0">
-                <Eye className="size-4 text-muted-foreground" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm">Content &amp; display</div>
-                <div className="text-xs text-muted-foreground">
-                  Remote images, trusted senders, email dark mode
-                </div>
-              </div>
-              <ChevronRight className="size-4 text-muted-foreground/40 shrink-0" />
-            </button>
           </div>
         </div>
       );
@@ -805,27 +790,6 @@ export function MailCommandPalette({
                 <div className="text-sm">Passkeys</div>
                 <div className="text-xs text-muted-foreground">
                   Manage passwordless authentication
-                </div>
-              </div>
-              <ChevronRight className="size-4 text-muted-foreground/40 shrink-0" />
-            </button>
-            <div className="px-1 pb-1 pt-3 border-t border-border/40 mt-1">
-              <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
-                Images &amp; Privacy
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => goForward("mail-display")}
-              className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors group"
-            >
-              <div className="flex items-center justify-center size-6 shrink-0">
-                <EyeOff className="size-4 text-muted-foreground" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm">Content &amp; display</div>
-                <div className="text-xs text-muted-foreground">
-                  Remote images, tracking pixels, trusted senders
                 </div>
               </div>
               <ChevronRight className="size-4 text-muted-foreground/40 shrink-0" />
@@ -929,10 +893,20 @@ export function MailCommandPalette({
     }
 
     if (
+      currentView === "mail-settings" ||
       currentView === "mailboxes" ||
       currentView === "mailbox-create" ||
       currentView === "mailbox-edit"
     ) {
+      if (currentView === "mail-settings") {
+        return (
+          <MailSettingsHub
+            goBack={goBack}
+            onNavigate={(view) => goForward(view)}
+          />
+        );
+      }
+
       return (
         <div
           className="flex flex-col"
