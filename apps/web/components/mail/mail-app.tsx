@@ -16,7 +16,20 @@ import {
 } from "@workspace/ui/components/ui/sidebar";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/ui/dialog";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/ui/tooltip";
 import { useIsMobile } from "@workspace/ui/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { useMailApp } from "@/hooks/use-mail-app";
@@ -43,10 +56,10 @@ import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
 import { isDraftMessage } from "@/lib/mail/draft-utils";
 import { messageHasLoadedBody } from "@/lib/mail/mail-message-body";
 import { classifyMessageEncryption } from "@/lib/mail/message-security";
+import { canEmptyMailboxRole } from "@/lib/mail/mail-mailbox-roles";
 
 interface MobileMailHeaderProps {
   selectedMailboxName: string;
-  mailboxMessageCount: number;
   selectedMessageSubject: string | null;
   mailboxEmail: string;
   showReaderOnMobile: boolean;
@@ -60,7 +73,6 @@ interface MobileMailHeaderProps {
 
 function MobileMailHeader({
   selectedMailboxName,
-  mailboxMessageCount,
   selectedMessageSubject,
   mailboxEmail,
   showReaderOnMobile,
@@ -142,10 +154,6 @@ function MobileMailHeader({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-foreground">
                   {selectedMailboxName}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {mailboxMessageCount}{" "}
-                  {mailboxMessageCount === 1 ? "message" : "messages"}
                 </p>
               </div>
 
@@ -277,6 +285,10 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     closeAttachmentPreview,
     handleMoveMessage,
     handleUntrash,
+    handleReportSpam,
+    handleNotSpam,
+    handleBulkReportSpam,
+    handleEmptyMailbox,
     handleCreateMailbox,
     handleDeleteMailbox,
     handleRenameMailbox,
@@ -291,6 +303,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     handleSetMessageLabel,
     handleCreateLabel,
     handleDeleteLabel,
+    handleUpdateLabel,
     labels,
     handleSignOut,
     user,
@@ -311,6 +324,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
   const isMobile = useIsMobile();
   const [mailListSearch, setMailListSearch] = useState("");
   const [debouncedMailListSearch, setDebouncedMailListSearch] = useState("");
+  const [emptyFolderOpen, setEmptyFolderOpen] = useState(false);
   const openedDraftIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -487,14 +501,15 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
   });
 
   // Clear inline search when switching mailboxes
-  const prevMailboxIdRef = useRef<string | null | undefined>(null);
-  useEffect(() => {
-    const currentId = activeMailbox?.selectedMailboxId ?? null;
-    if (prevMailboxIdRef.current !== null && prevMailboxIdRef.current !== currentId) {
-      setMailListSearch("");
-    }
-    prevMailboxIdRef.current = currentId;
-  }, [activeMailbox?.selectedMailboxId]);
+  const currentMailboxId = activeMailbox?.selectedMailboxId ?? null;
+  const prevMailboxIdRef = useRef<string | null | undefined>(undefined);
+  if (
+    prevMailboxIdRef.current !== undefined &&
+    prevMailboxIdRef.current !== currentMailboxId
+  ) {
+    setMailListSearch("");
+  }
+  prevMailboxIdRef.current = currentMailboxId;
 
   // Archive = move to the first mailbox with role "archive"
   const archiveMailbox = activeMailbox?.mailboxes.find(
@@ -510,6 +525,12 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     activeMailbox?.mailboxes.find(
       (m) => m.id === activeMailbox.selectedMailboxId,
     ) ?? null;
+  const canEmptyFolder =
+    Boolean(activeMailbox?.messages.length) &&
+    canEmptyMailboxRole(selectedMailbox?.role);
+  const emptyFolderLabel = selectedMailbox?.role?.toLowerCase() === "trash"
+    ? "Empty trash"
+    : "Empty junk";
 
   // On mobile: show reader/compose pane for real messages or the full composer
   const showMobileDetailPane =
@@ -542,7 +563,6 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
               {isMobile && !showMobileDetailPane && (
                 <MobileMailHeader
                   selectedMailboxName={selectedMailbox?.name ?? "Inbox"}
-                  mailboxMessageCount={activeMailbox.messages.length}
                   selectedMessageSubject={selectedMessage?.subject ?? null}
                   mailboxEmail={activeMailbox.email ?? accountEmail}
                   showReaderOnMobile={showMobileDetailPane}
@@ -568,17 +588,29 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                 >
                   {/* Desktop-only header inside list column */}
                   {!isMobile && (
-                    <header className="flex h-12 shrink-0 items-center border-b border-border/40 px-4 gap-3">
-                      <h1 className="text-sm font-semibold">
+                    <header className="flex h-11 shrink-0 items-center border-b border-border/40 px-3 gap-2">
+                      <h1 className="text-sm font-semibold flex-1 min-w-0 truncate">
                         {selectedMailbox?.name ?? "Inbox"}
                       </h1>
-                      <span className="text-xs text-muted-foreground/60">
-                        {activeMailbox.messages.length}{" "}
-                        {activeMailbox.messages.length === 1
-                          ? "message"
-                          : "messages"}
-                      </span>
-                      <div className="ml-auto flex items-center gap-1">
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {canEmptyFolder ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                                disabled={isBusy || isRefreshing}
+                                onClick={() => setEmptyFolderOpen(true)}
+                              >
+                                {emptyFolderLabel}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Permanently delete all messages in this folder
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : null}
                         <Button
                           variant="ghost"
                           size="icon-sm"
@@ -660,8 +692,13 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                     }
                     onBulkMarkAsRead={(ids) => void handleBulkMarkAsRead(ids)}
                     onToggleFlagged={(id) => void handleToggleFlagged(id)}
+                    onReportSpam={(id) => void handleReportSpam(id)}
+                    onNotSpam={(id) => void handleNotSpam(id)}
+                    onBulkReportSpam={(ids) => void handleBulkReportSpam(ids)}
+                    onSetLabel={(messageId, labelId, assigned) =>
+                      void handleSetMessageLabel(messageId, labelId, assigned)
+                    }
                     labels={labels}
-                    identities={activeMailbox.pickerIdentities}
                     timeFormat={timeFormat}
                     timezone={settings?.timezone}
                     onLoadMore={debouncedMailListSearch ? undefined : () => void loadMoreMessages()}
@@ -732,6 +769,9 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                       onCreateLabel={(name, color) =>
                         handleCreateLabel(name, color)
                       }
+                      onUpdateLabel={(id, updates) =>
+                        void handleUpdateLabel(id, updates)
+                      }
                       onDeleteLabel={(id) => void handleDeleteLabel(id)}
                       labels={labels}
                       timeFormat={timeFormat}
@@ -746,7 +786,9 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                       onLoadAttachmentPreview={loadAttachmentHoverPreview}
                       onPreviewAttachment={handlePreviewAttachment}
                       onDownloadAttachment={handleDownloadAttachment}
-                      onUntrash={handleUntrash}
+                      onUntrash={() => void handleUntrash()}
+                      onReportSpam={() => void handleReportSpam()}
+                      onNotSpam={() => void handleNotSpam()}
                       onConversationMessageDelete={(id) =>
                         void handleDeleteMessage(id)
                       }
@@ -823,6 +865,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
         onRenameMailbox={(id, name) => handleRenameMailbox(id, name)}
         labels={labels}
         onCreateLabel={(name, color) => handleCreateLabel(name, color)}
+        onUpdateLabel={(id, updates) => void handleUpdateLabel(id, updates)}
         onDeleteLabel={(id) => handleDeleteLabel(id)}
         messages={activeMailbox?.messages ?? []}
         onSelectMessage={(id) => void openMessageById(id)}
@@ -857,6 +900,38 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
           }
         }}
       />
+
+      <Dialog open={emptyFolderOpen} onOpenChange={setEmptyFolderOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{emptyFolderLabel}?</DialogTitle>
+            <DialogDescription>
+              Permanently delete all {activeMailbox?.messages.length ?? 0}{" "}
+              messages in {selectedMailbox?.name ?? "this folder"}. This cannot
+              be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setEmptyFolderOpen(false)}
+              disabled={isBusy}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={isBusy}
+              onClick={() => {
+                setEmptyFolderOpen(false);
+                void handleEmptyMailbox();
+              }}
+            >
+              {emptyFolderLabel}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <PageLoadingOverlay
         isLoading={isOverlayLoading}

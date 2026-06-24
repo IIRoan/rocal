@@ -1753,6 +1753,38 @@ export class StalwartJmapClient {
     );
   }
 
+  async bulkDestroyMessages(
+    session: JmapSession,
+    messageIds: string[],
+  ): Promise<void> {
+    if (messageIds.length === 0) return;
+    const accountId = this.requirePrimaryAccountId(session);
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Email/set", { accountId, destroy: messageIds }, "c1"]],
+    );
+  }
+
+  /** Permanently delete every message in a mailbox (trash / junk empty). */
+  async emptyMailbox(session: JmapSession, mailboxId: string): Promise<number> {
+    const batchSize = 100;
+    let destroyed = 0;
+
+    while (true) {
+      const { ids } = await this.getMailboxMessageIds(session, mailboxId, {
+        limit: batchSize,
+        position: 0,
+      });
+      if (ids.length === 0) break;
+      await this.bulkDestroyMessages(session, ids);
+      destroyed += ids.length;
+      if (ids.length < batchSize) break;
+    }
+
+    return destroyed;
+  }
+
   async getBlobAsText(session: JmapSession, blobId: string): Promise<string> {
     const accountId = this.requirePrimaryAccountId(session);
     if (!session.downloadUrl) {

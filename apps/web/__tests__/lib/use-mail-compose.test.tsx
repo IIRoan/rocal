@@ -179,5 +179,40 @@ describe("useMailCompose", () => {
     );
     expect(chrome?.isFullCompose).toBe(true);
     expect(chrome?.isComposeOpen).toBe(false);
+    expect(getMailComposeBridge()?.getDraftIdRef()).toBe("draft-1");
+  });
+
+  it("seedReply sets reply mode and threading context", async () => {
+    await act(async () => {
+      root.render(
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+          <ComposeProbe onReady={() => {}} />
+        </MailComposeProvider>,
+      );
+    });
+
+    const message = {
+      id: "msg-1",
+      subject: "Question",
+      from: [{ email: "bob@solace.onl", name: "Bob" }],
+      to: [{ email: "alice@solace.onl" }],
+      cc: [],
+      bcc: [],
+      receivedAt: "2026-06-19T10:00:00.000Z",
+      textBody: [{ partId: "1", type: "text/plain" }],
+      bodyValues: { "1": { value: "Hello?" } },
+    } as const;
+
+    await act(async () => {
+      getMailComposeBridge()?.seedReply(message as never, null);
+    });
+
+    const draft = getMailComposeBridge()?.getDraft();
+    expect(draft?.to).toBe("bob@solace.onl");
+    expect(draft?.subject).toBe("Re: Question");
+    expect(draft?.composeMode).toBe("reply");
+    expect(draft?.replyContext).toEqual(
+      expect.objectContaining({ threadId: null }),
+    );
   });
 });

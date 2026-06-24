@@ -577,6 +577,60 @@ describe("StalwartJmapClient", () => {
     );
   });
 
+  it("empties a mailbox by repeatedly querying and destroying batches", async () => {
+    let queryCount = 0;
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () => {
+      queryCount += 1;
+      if (queryCount === 1) {
+        return new Response(
+          JSON.stringify({
+            methodResponses: [
+              ["Email/query", { ids: ["m1", "m2"], total: 2 }, "q1"],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (queryCount === 2) {
+        return new Response(
+          JSON.stringify({
+            methodResponses: [
+              [
+                "Email/set",
+                { destroyed: ["m1", "m2"], notDestroyed: {} },
+                "c1",
+              ],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          methodResponses: [["Email/query", { ids: [], total: 0 }, "q2"]],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+
+    const session = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+      accounts: { account: {} },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "account" },
+    };
+
+    await expect(client.emptyMailbox(session, "trash")).resolves.toBe(2);
+    expect(fetcher.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
   it("reads Email/changes for incremental local search refreshes", async () => {
     const fetcher = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>
