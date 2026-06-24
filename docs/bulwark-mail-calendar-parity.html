@@ -248,7 +248,7 @@
       Excludes Files, Contacts app, Sieve admin, Plugins, Marketplace, Setup wizard, and other suite infrastructure.
       <strong>Scope:</strong> web mail parity only — native is tracked separately and out of scope for this roadmap.
       <strong>Architecture:</strong> Stalwart is <em>mail only</em> (JMAP). Calendar, contacts, and recent-contacts sync use the Solace backend — not Stalwart Calendar or JMAP Contacts.
-      <strong>Last updated:</strong> 24 Jun 2026 — web compose depth, recent contacts, display settings, draft editing, list performance, and new tests.
+      <strong>Last updated:</strong> 24 Jun 2026 — web compose depth, recent contacts, display settings, draft editing, list performance, keyboard shortcuts, undo toasts, advanced search, thread expand, auth badges, density settings, sub-address suggestions, and new tests.
     </p>
     <nav>
       <a href="#legend">Legend</a>
@@ -300,6 +300,8 @@
         <li><strong>Web compose depth (24 Jun):</strong> inline images (paste / drag-drop, resizable), edit existing drafts (<code>seedDraft</code>), plain-text mode toggle, signature above/below quote, forgotten-attachment warning, improved quoted HTML island, reply-identity auto-select</li>
         <li><strong>Web mail settings (24 Jun):</strong> display settings panel (external content ask/block/allow, light/dark/original appearance, trusted senders), compose settings panel</li>
         <li><strong>Web performance (24 Jun):</strong> neighbor message-body prefetch, <code>mergeMailMessage</code> body cache, faster list → reader transitions</li>
+        <li><strong>Web mail depth (24 Jun):</strong> keyboard shortcuts (j/k/r/e/s/c/Escape/?), undo toasts on delete + archive, mark-as-read delay setting, thread prefetch (inbox+sent), thread expand in list, advanced search panel + filter chips, list density settings (compact/comfortable), sub-address tag suggestions in compose, layout-preserving quote island (Shadow DOM styles), parallel mail bootstrap on login, SPF/DKIM/DMARC auth badges in reader</li>
+        <li><strong>Undo-send delay:</strong> <em>not implementing</em> — requires Stalwart delayed send support not currently available</li>
         <li><strong>Native compose:</strong> <em>deferred</em> — plain-text only today; not in current web-parity scope</li>
         <li><strong>Backend:</strong> Zod mail validation, external-recipient send fixes, timezone schema enforcement on events, invitation + subscription-auth fixes</li>
         <li><strong>Both:</strong> JMAP 401 retry + token clear on unauthorized</li>
@@ -383,9 +385,9 @@
         <tr>
           <td class="feature">Configurable mark-as-read delay</td>
           <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-med">P2</span> 0s / Ns / never auto-mark</td>
+          <td class="notes">Web: 0s / 3s / never auto-mark in list settings panel</td>
         </tr>
         <tr>
           <td class="feature">Spam / junk + restore</td>
@@ -439,9 +441,9 @@
         <tr>
           <td class="feature">Toast with undo on delete/archive</td>
           <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-med">P2</span></td>
+          <td class="notes">Web: undo toast with configurable duration (3-15s) on delete + move/archive</td>
         </tr>
         <tr>
           <td class="feature">URL / history sync (mailbox + message)</td>
@@ -485,9 +487,9 @@
         <tr>
           <td class="feature">Inline thread expand in list</td>
           <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-med">P2</span> Fetch full thread on expand</td>
+          <td class="notes">Web: chevron expand button on thread rows, fetches full thread on expand</td>
         </tr>
         <tr>
           <td class="feature">Conversation view in reader</td>
@@ -576,9 +578,9 @@
         <tr>
           <td class="feature">List density settings</td>
           <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-low">P3</span> extra-compact → comfortable</td>
+          <td class="notes">Web: compact / comfortable density in list settings panel</td>
         </tr>
         <tr>
           <td class="feature">Snippet preview in list</td>
@@ -618,9 +620,9 @@
         <tr>
           <td class="feature">Full keyboard navigation (j/k, r, e, …)</td>
           <td><span class="badge badge-yes">Yes</span></td>
-          <td><span class="badge badge-partial">Partial</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-med">P2</span> Solace: ⌘K only today</td>
+          <td class="notes">Web: j/k navigate, r reply, f forward, e archive, # delete, s star, u unread, c compose, / search, ? help</td>
         </tr>
         <tr>
           <td class="feature">Three mail layouts (split / focus / bottom pane)</td>
@@ -727,16 +729,16 @@
         <tr>
           <td class="feature">Scheduled send</td>
           <td><span class="badge badge-yes">Yes</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-med">P2</span> Needs Stalwart delayed send</td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td class="notes"><span class="badge badge-no">Not implementing</span> Needs Stalwart delayed send support</td>
         </tr>
         <tr>
           <td class="feature">Configurable send delay (undo send)</td>
           <td><span class="badge badge-yes">Yes</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-med">P2</span> 10 / 30 / 60s</td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td><span class="badge badge-na">N/A</span></td>
+          <td class="notes"><span class="badge badge-no">Not implementing</span> Requires Stalwart delayed send support not currently available</td>
         </tr>
         <tr>
           <td class="feature">Read receipts (MDN request + response policy)</td>
@@ -804,9 +806,9 @@
         <tr>
           <td class="feature">Sub-addressing tag suggestions</td>
           <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-partial">Partial</span></td>
-          <td><span class="badge badge-partial">Partial</span></td>
-          <td class="notes">Identity badge shows <code>+tag</code> in list/reader; no compose suggestions yet</td>
+          <td class="notes">Web: tag suggestion chips in compose + custom tag input; identity badge shows <code>+tag</code> in list/reader</td>
         </tr>
       </tbody>
     </table>
@@ -842,16 +844,16 @@
         <tr>
           <td class="feature">Advanced filter panel (from/to/subject/body/date/…)</td>
           <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-med">P2</span></td>
+          <td class="notes">Web: advanced search panel with from/to/subject/body/date/attachment/starred/unread filters + chips</td>
         </tr>
         <tr>
           <td class="feature">Search chips + clear filters</td>
           <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-med">P2</span></td>
+          <td class="notes">Web: removable filter chips + clear all</td>
         </tr>
         <tr>
           <td class="feature">Cross-mailbox search</td>
@@ -943,9 +945,9 @@
         <tr>
           <td class="feature">SPF / DKIM / DMARC indicators</td>
           <td><span class="badge badge-yes">Yes</span></td>
+          <td><span class="badge badge-yes">Yes</span></td>
           <td><span class="badge badge-no">Gap</span></td>
-          <td><span class="badge badge-no">Gap</span></td>
-          <td class="notes"><span class="priority p-low">P3</span></td>
+          <td class="notes">Web: <code>AuthResultsBadge</code> in reader — parses Authentication-Results header, shows shield icon + tooltip</td>
         </tr>
         <tr>
           <td class="feature">Newsletter unsubscribe (List-Unsubscribe)</td>
@@ -1638,22 +1640,22 @@
         </ul>
       </div>
       <div class="phase-card">
-        <h4>P2 — Web mail depth</h4>
+        <h4>P2 — Web mail depth ✓ shipped</h4>
         <ul>
           <li class="done">Recipient popover + identity badge</li>
           <li class="done">Recent contacts autocomplete (E2EE + backend sync)</li>
           <li class="done">Trusted senders (local display settings)</li>
           <li class="done">Neighbor message-body prefetch</li>
-          <li>Web list thread prefetch (inbox+sent, rate-limit safe)</li>
-          <li>Label chips in list (compact) or density settings</li>
-          <li>Advanced search panel + chips</li>
-          <li>Thread expand in list</li>
-          <li>Undo toasts</li>
-          <li>Keyboard shortcuts (j/k, r, e, …)</li>
-          <li>Mark-as-read delay</li>
-          <li>Layout-preserving quote island</li>
-          <li>Sub-address tag suggestions in compose</li>
-          <li>Parallel mail bootstrap on login</li>
+          <li class="done">Web list thread prefetch (inbox+sent, rate-limit safe)</li>
+          <li class="done">Label chips in list (compact) + density settings</li>
+          <li class="done">Advanced search panel + chips</li>
+          <li class="done">Thread expand in list</li>
+          <li class="done">Undo toasts</li>
+          <li class="done">Keyboard shortcuts (j/k, r, e, …)</li>
+          <li class="done">Mark-as-read delay</li>
+          <li class="done">Layout-preserving quote island</li>
+          <li class="done">Sub-address tag suggestions in compose</li>
+          <li class="done">Parallel mail bootstrap on login</li>
         </ul>
       </div>
       <div class="phase-card">
@@ -1668,10 +1670,10 @@
       <div class="phase-card">
         <h4>P3 — Optional</h4>
         <ul>
-          <li>Scheduled send + undo-send delay</li>
-          <li>Mail layout options + density</li>
-          <li>Empty trash/junk</li>
-          <li>SPF/DKIM/DMARC badges</li>
+          <li class="done">Mail layout options + density</li>
+          <li class="done">Empty trash/junk</li>
+          <li class="done">SPF/DKIM/DMARC badges</li>
+          <li style="color: var(--no); text-decoration: line-through;">Scheduled send + undo-send delay — not implementing (requires Stalwart delayed send support not available)</li>
           <li>Tasks (only if product wants them)</li>
         </ul>
       </div>
@@ -1772,22 +1774,22 @@
         <tr>
           <td class="feature">Keyboard shortcuts + help modal</td>
           <td class="notes">Bulwark power-user muscle memory; web-only first</td>
-          <td class="notes"><span class="priority p-med">P2</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> <span class="badge badge-yes">Shipped</span></td>
         </tr>
         <tr>
           <td class="feature">Undo toast on archive/delete</td>
           <td class="notes">High perceived quality; needs optimistic move + timer</td>
-          <td class="notes"><span class="priority p-med">P2</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> <span class="badge badge-yes">Shipped</span></td>
         </tr>
         <tr>
           <td class="feature">Mark-as-read delay setting</td>
           <td class="notes">Common mail client expectation; store in display settings</td>
-          <td class="notes"><span class="priority p-med">P2</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> <span class="badge badge-yes">Shipped</span></td>
         </tr>
         <tr>
           <td class="feature">Advanced search panel</td>
           <td class="notes">JMAP filter builder (from/to/date/body) with chips</td>
-          <td class="notes"><span class="priority p-med">P2</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> <span class="badge badge-yes">Shipped</span></td>
         </tr>
         <tr>
           <td class="feature">Backend contacts address book</td>
@@ -1797,7 +1799,7 @@
         <tr>
           <td class="feature">Parallel mail bootstrap on login</td>
           <td class="notes">Mailboxes + page 1 + identities in one parallel batch</td>
-          <td class="notes"><span class="priority p-med">P2</span></td>
+          <td class="notes"><span class="priority p-med">P2</span> <span class="badge badge-yes">Shipped</span></td>
         </tr>
         <tr>
           <td class="feature">Tables in compose</td>
@@ -1807,7 +1809,7 @@
         <tr>
           <td class="feature">Scheduled send + undo-send delay</td>
           <td class="notes">Needs Stalwart delayed send support</td>
-          <td class="notes"><span class="priority p-low">P3</span></td>
+          <td class="notes"><span class="badge badge-no">Not implementing</span></td>
         </tr>
         <tr>
           <td class="feature">Newsletter List-Unsubscribe</td>

@@ -18,6 +18,9 @@ import {
   Tag,
   Inbox,
   Check,
+  ChevronDown,
+  ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 import {
   ContextMenu,
@@ -86,21 +89,33 @@ interface MessageListProps {
   onLoadMore?: () => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
+  density?: "compact" | "comfortable";
+  showLabelChips?: boolean;
+  threadExpandEnabled?: boolean;
+  onExpandThread?: (threadId: string) => Promise<JmapEmailMessage[]> | void;
 }
 
 const ROW_HEIGHT_MOBILE = 60;
 const ROW_HEIGHT_DESKTOP = 68;
-const ROW_HEIGHT_WITH_LABELS = 76;
+const ROW_HEIGHT_DESKTOP_COMFORTABLE = 84;
+const ROW_HEIGHT_MOBILE_COMFORTABLE = 76;
+const ROW_HEIGHT_WITH_LABELS = 80;
+const ROW_HEIGHT_WITH_LABELS_COMFORTABLE = 96;
 const SCROLL_LOAD_THRESHOLD = 62;
 
 function getRowHeight(
   message: JmapEmailMessage,
   labels: LabelDef[],
   isMobile: boolean,
+  density: "compact" | "comfortable" = "compact",
+  showLabelChips: boolean = true,
 ): number {
-  if (getAllMessageLabels(message, labels).length > 0) {
-    return ROW_HEIGHT_WITH_LABELS;
+  const hasLabels = showLabelChips && getAllMessageLabels(message, labels).length > 0;
+  if (density === "comfortable") {
+    if (hasLabels) return ROW_HEIGHT_WITH_LABELS_COMFORTABLE;
+    return isMobile ? ROW_HEIGHT_MOBILE_COMFORTABLE : ROW_HEIGHT_DESKTOP_COMFORTABLE;
   }
+  if (hasLabels) return ROW_HEIGHT_WITH_LABELS;
   return isMobile ? ROW_HEIGHT_MOBILE : ROW_HEIGHT_DESKTOP;
 }
 
@@ -185,10 +200,19 @@ export function MessageList({
   onLoadMore,
   hasMore,
   isLoadingMore,
+  density = "compact",
+  showLabelChips = true,
+  threadExpandEnabled = true,
+  onExpandThread,
 }: MessageListProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBarVisible, setIsBarVisible] = useState(false);
   const [bulkActionsOpen, setBulkActionsOpen] = useState(false);
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
+  const [expandedThreadMessages, setExpandedThreadMessages] = useState<
+    Record<string, JmapEmailMessage[]>
+  >({});
+  const [isLoadingThread, setIsLoadingThread] = useState<Set<string>>(new Set());
   const barRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
@@ -228,6 +252,43 @@ export function MessageList({
 
   const clearSelection = () => setSelectedIds(new Set());
 
+  const toggleThreadExpand = useCallback(
+    (threadId: string) => {
+      setExpandedThreads((prev) => {
+        const next = new Set(prev);
+        if (next.has(threadId)) {
+          next.delete(threadId);
+        } else {
+          next.add(threadId);
+          if (onExpandThread && !expandedThreadMessages[threadId]) {
+            setIsLoadingThread((loading) => new Set(loading).add(threadId));
+            void Promise.resolve(onExpandThread(threadId))
+              .then((messages) => {
+                if (messages && messages.length > 0) {
+                  setExpandedThreadMessages((prevMsgs) => ({
+                    ...prevMsgs,
+                    [threadId]: messages,
+                  }));
+                }
+              })
+              .catch(() => {
+                // Non-critical
+              })
+              .finally(() => {
+                setIsLoadingThread((loading) => {
+                  const next = new Set(loading);
+                  next.delete(threadId);
+                  return next;
+                });
+              });
+          }
+        }
+        return next;
+      });
+    },
+    [onExpandThread, expandedThreadMessages],
+  );
+
   const bulkIds = Array.from(selectedIds);
   const hasBulkSelection = selectedIds.size > 0;
 
@@ -254,7 +315,28 @@ export function MessageList({
   const threadRows = useMemo(() => {
     const seenIds = new Set(messages.map((m) => m.id));
     const extras = relatedMessages.filter((m) => !seenIds.has(m.id));
-    return buildMailConversations([...messages, ...extras]);
+    const conversations = buildMailConversations([...messages, ...extras]);
+    // Ensure latestMessage is always from the primary mailbox messages
+    // (not from related/sent extras) so clicking a row selects a message
+    // that exists in the current mailbox list.
+    const primaryIdSet = new Set(messages.map((m) => m.id));
+    return conversations
+      .map((conv) => {
+        const primaryMessages = conv.messages.filter((m) =>
+          primaryIdSet.has(m.id),
+        );
+        if (primaryMessages.length === 0) {
+          return null;
+        }
+        const latestPrimary = primaryMessages.reduce((latest, candidate) =>
+          Date.parse(candidate.receivedAt ?? "") >=
+          Date.parse(latest.receivedAt ?? "")
+            ? candidate
+            : latest,
+        );
+        return { ...conv, latestMessage: latestPrimary };
+      })
+      .filter((conv): conv is NonNullable<typeof conv> => conv !== null);
   }, [messages, relatedMessages]);
 
   const primaryIds = useMemo(
@@ -266,9 +348,9 @@ export function MessageList({
     (index: number) => {
       const row = threadRows[index];
       if (!row) return isMobile ? ROW_HEIGHT_MOBILE : ROW_HEIGHT_DESKTOP;
-      return getRowHeight(row.latestMessage, labels, isMobile);
+      return getRowHeight(row.latestMessage, labels, isMobile, density, showLabelChips);
     },
-    [threadRows, labels, isMobile],
+    [threadRows, labels, isMobile, density, showLabelChips],
   );
 
   const virtualizer = useVirtualizer({
@@ -520,7 +602,7 @@ export function MessageList({
                 entry.hasAttachment === true ||
                 (entry.attachments?.length ?? 0) > 0,
             );
-            const messageLabels = getAllMessageLabels(message, labels);
+            const messageLabels = showLabelChips ? getAllMessageLabels(message, labels) : [];
             const senderLabel =
               row.messages.length > 1
                 ? formatThreadSenders(row.messages)
@@ -549,7 +631,9 @@ export function MessageList({
                     }}
                     className={cn(
                       "group/row relative h-full w-full overflow-hidden text-left transition-colors cursor-pointer border-b border-border/40",
-                      isMobile ? "py-1.5 pl-2.5 pr-1" : "py-1.5 pl-2.5 pr-1",
+                      density === "comfortable"
+                        ? isMobile ? "py-2 pl-2.5 pr-1" : "py-2 pl-2.5 pr-1"
+                        : isMobile ? "py-1.5 pl-2.5 pr-1" : "py-1.5 pl-2.5 pr-1",
                       "data-[state=open]:bg-muted/60",
                       isChecked
                         ? "bg-primary/5 dark:bg-primary/10"
@@ -652,17 +736,43 @@ export function MessageList({
                           </span>
                         </div>
 
-                        <p
-                          className={cn(
-                            "truncate leading-tight",
-                            isMobile ? "text-xs" : "text-[12.5px]",
-                            isRead
-                              ? "text-foreground/55 dark:text-foreground/65"
-                              : "font-medium text-foreground/85 dark:text-foreground/90",
+                        <div className="flex items-center gap-1">
+                          {threadExpandEnabled && row.messages.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleThreadExpand(row.id);
+                              }}
+                              className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                              aria-label={expandedThreads.has(row.id) ? "Collapse thread" : "Expand thread"}
+                            >
+                              {isLoadingThread.has(row.id) ? (
+                                <RotateCcw className="size-3 animate-spin" strokeWidth={2} />
+                              ) : expandedThreads.has(row.id) ? (
+                                <ChevronDown className="size-3" strokeWidth={2.25} />
+                              ) : (
+                                <ChevronRight className="size-3" strokeWidth={2.25} />
+                              )}
+                            </button>
                           )}
-                        >
-                          {message.subject || "(No subject)"}
-                        </p>
+                          {threadExpandEnabled && row.messages.length > 1 && (
+                            <span className="shrink-0 text-[10px] font-medium text-muted-foreground/70 tabular-nums">
+                              ({row.messages.length})
+                            </span>
+                          )}
+                          <p
+                            className={cn(
+                              "truncate leading-tight",
+                              isMobile ? "text-xs" : "text-[12.5px]",
+                              isRead
+                                ? "text-foreground/55 dark:text-foreground/65"
+                                : "font-medium text-foreground/85 dark:text-foreground/90",
+                            )}
+                          >
+                            {message.subject || "(No subject)"}
+                          </p>
+                        </div>
                         <MessageLabelChips messageLabels={messageLabels} />
 
                         {onToggleFlagged ? (
@@ -835,6 +945,60 @@ export function MessageList({
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
+
+              {/* Expanded thread messages */}
+              {threadExpandEnabled &&
+                expandedThreads.has(row.id) &&
+                row.messages.length > 1 && (
+                  <div className="border-l-2 border-border/30 ml-2 mt-0.5 mb-1">
+                    {(expandedThreadMessages[row.id] ?? row.messages)
+                      .filter((m) => m.id !== message.id)
+                      .map((threadMsg) => {
+                        const threadRead = threadMsg.keywords?.["$seen"];
+                        return (
+                          <div
+                            key={threadMsg.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => onSelect(threadMsg.id)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                onSelect(threadMsg.id);
+                              }
+                            }}
+                            className="flex items-center gap-2 px-2.5 py-1 cursor-pointer hover:bg-muted/40 transition-colors border-b border-border/20"
+                          >
+                            <span
+                              className={cn(
+                                "size-1.5 shrink-0 rounded-full",
+                                threadRead
+                                  ? "bg-transparent"
+                                  : "bg-primary",
+                              )}
+                            />
+                            <span
+                              className={cn(
+                                "flex-1 min-w-0 truncate text-[11px]",
+                                threadRead
+                                  ? "text-foreground/50"
+                                  : "font-medium text-foreground/80",
+                              )}
+                            >
+                              {threadMsg.subject || "(No subject)"}
+                            </span>
+                            <span className="shrink-0 text-[10px] text-muted-foreground/60 tabular-nums whitespace-nowrap">
+                              {formatMessageDate(
+                                threadMsg.receivedAt,
+                                timeFormat,
+                                timezone,
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
             );
           })}

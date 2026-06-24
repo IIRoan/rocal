@@ -127,6 +127,7 @@ import {
   RecipientPopoverList,
 } from "./recipient-popover";
 import { MailIdentityBadge } from "./mail-identity-badge";
+import { AuthResultsBadge } from "./auth-results-badge";
 import {
   extractLinkedCalendarEventId,
   extractReminderLeadMinutes,
@@ -1794,6 +1795,9 @@ export function MessageReader({
                   <MailIdentityBadge
                     message={message}
                     identities={identities}
+                  />
+                  <AuthResultsBadge
+                    authResultsHeaders={message["header:Authentication-Results"]}
                   />
                 </>
               ) : (

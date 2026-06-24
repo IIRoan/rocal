@@ -2,6 +2,7 @@ import {
   AlignLeft,
   Eye,
   Inbox,
+  ListFilter,
   Tag,
   Users,
   type LucideIcon,
@@ -12,7 +13,8 @@ export type MailSettingsView =
   | "labels"
   | "contacts"
   | "composing"
-  | "mail-display";
+  | "mail-display"
+  | "mail-list";
 
 export interface MailSettingsNavItem {
   id: MailSettingsView;
@@ -65,6 +67,24 @@ export const MAIL_SETTINGS_NAV_ITEMS: MailSettingsNavItem[] = [
       "tracking",
       "dark mode",
       "appearance",
+    ],
+  },
+  {
+    id: "mail-list",
+    label: "List & shortcuts",
+    icon: ListFilter,
+    description: "Density, mark-as-read delay, undo toasts, keyboard shortcuts",
+    keywords: [
+      "list",
+      "density",
+      "compact",
+      "comfortable",
+      "keyboard",
+      "shortcuts",
+      "undo",
+      "mark as read",
+      "thread",
+      "expand",
     ],
   },
 ];

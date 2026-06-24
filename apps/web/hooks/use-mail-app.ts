@@ -53,6 +53,10 @@ import {
 } from "@/lib/mail/signature-utils";
 import { mergeRefreshedMailboxMessages } from "@/lib/mail/mail-list-merge";
 import {
+  readMailListSettings,
+  MARK_AS_READ_DELAY_MS,
+} from "@/lib/mail/mail-list-settings";
+import {
   rewriteCidImagesForEditor,
   rewriteComposeInlineImages,
   sanitizeQuotedEmailHtml,
@@ -659,6 +663,9 @@ export function useMailApp() {
     useState<string | null>(null);
   const [relatedConversationMessages, setRelatedConversationMessages] =
     useState<JmapEmailMessage[]>([]);
+  const [listThreadRelatedMessages, setListThreadRelatedMessages] =
+    useState<JmapEmailMessage[]>([]);
+  const threadPrefetchedMailboxRef = useRef<string | null>(null);
   const [optimisticConversationMessages, setOptimisticConversationMessages] =
     useState<JmapEmailMessage[]>([]);
   const [isConversationLoading, setIsConversationLoading] = useState(false);
@@ -688,6 +695,15 @@ export function useMailApp() {
   >(new Map());
   const attachmentHoverPreviewUrlsRef = useRef<Set<string>>(new Set());
   const activeMailboxRef = useRef<ActiveMailboxState | null>(null);
+  /** Message the user explicitly marked unread while it remains open. */
+  const manualUnreadWhileOpenRef = useRef<string | null>(null);
+  /** Bumped to cancel pending/in-flight auto-read for a message. */
+  const autoReadNonceRef = useRef<Map<string, number>>(new Map());
+  const bumpAutoReadNonce = useCallback((messageId: string) => {
+    const next = (autoReadNonceRef.current.get(messageId) ?? 0) + 1;
+    autoReadNonceRef.current.set(messageId, next);
+    return next;
+  }, []);
   const hasAttemptedAutoOpenRef = useRef(false);
   const recordedContactMessageRef = useRef<string | null>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
@@ -793,8 +809,23 @@ export function useMailApp() {
   }, [activeMailbox, cachedAuthPassword, loginPassword]);
 
   // Decrypt selected message
-  const selectedMailboxMessage =
-    activeMailbox?.messages.find((m) => m.id === selectedMessageId) ?? null;
+  const selectedMailboxMessage = useMemo(() => {
+    if (!selectedMessageId) {
+      return null;
+    }
+
+    return (
+      activeMailbox?.messages.find((m) => m.id === selectedMessageId) ??
+      listThreadRelatedMessages.find((m) => m.id === selectedMessageId) ??
+      findCachedMailMessage(queryClient, selectedMessageId) ??
+      null
+    );
+  }, [
+    activeMailbox?.messages,
+    listThreadRelatedMessages,
+    queryClient,
+    selectedMessageId,
+  ]);
   const conversationSourceMessages = useMemo(() => {
     const serverMessages = mergeConversationSourceMessages(
       activeMailbox?.messages ?? [],
@@ -867,7 +898,10 @@ export function useMailApp() {
     setSelectedConversationMessageId(null);
   }, []);
 
-  const openMessageById = useCallback(async (messageId: string) => {
+  const openMessageById = useCallback(async (
+    messageId: string,
+    hint?: JmapEmailMessage,
+  ) => {
     const mb = activeMailboxRef.current;
     if (!mb) return;
 
@@ -877,6 +911,7 @@ export function useMailApp() {
     }
 
     const cached =
+      hint ??
       findCachedMailMessage(queryClient, messageId) ??
       mb.messages.find((message) => message.id === messageId);
     if (cached) {
@@ -995,9 +1030,10 @@ export function useMailApp() {
 
     // Use the ref so keyword/flag updates to activeMailbox don't re-trigger
     // a full thread re-fetch (threadId never changes for a given message).
-    const selectedMsg = activeMailboxRef.current.messages.find(
-      (m) => m.id === selectedMessageId,
-    );
+    const selectedMsg =
+      activeMailboxRef.current.messages.find(
+        (m) => m.id === selectedMessageId,
+      ) ?? findCachedMailMessage(queryClient, selectedMessageId);
     const threadId = selectedMsg?.threadId;
 
     if (threadId) {
@@ -1005,24 +1041,36 @@ export function useMailApp() {
     } else {
       clearConversationThread();
     }
-  }, [selectedMessageId, loadConversationThread, clearConversationThread]);
+  }, [selectedMessageId, loadConversationThread, clearConversationThread, queryClient]);
 
   const applyLoadedMessage = useCallback(
     (message: JmapEmailMessage) => {
       mergeMessageIntoMailboxCaches(queryClient, message);
-      setActiveMailbox((current) =>
-        current
-          ? {
-              ...current,
-              messages: current.messages.map((entry) =>
+      setActiveMailbox((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const exists = current.messages.some((entry) => entry.id === message.id);
+        return {
+          ...current,
+          messages: exists
+            ? current.messages.map((entry) =>
                 entry.id === message.id
                   ? mergeMailMessage(entry, message)
                   : entry,
+              )
+            : sortMessages(
+                mergeConversationSourceMessages(current.messages, [message]),
               ),
-            }
-          : current,
-      );
+        };
+      });
       setRelatedConversationMessages((current) =>
+        current.map((entry) =>
+          entry.id === message.id ? mergeMailMessage(entry, message) : entry,
+        ),
+      );
+      setListThreadRelatedMessages((current) =>
         current.map((entry) =>
           entry.id === message.id ? mergeMailMessage(entry, message) : entry,
         ),
@@ -1145,6 +1193,56 @@ export function useMailApp() {
       cancelled = true;
     };
   }, [applyLoadedMessage, queryClient, selectedMessageId]);
+
+  // Thread list prefetch: when a mailbox is loaded, fetch sent messages
+  // for thread grouping in the list (rate-limit safe — only once per mailbox).
+  useEffect(() => {
+    const mailbox = activeMailboxRef.current;
+    if (!mailbox || !mailbox.selectedMailboxId) {
+      setListThreadRelatedMessages([]);
+      return;
+    }
+
+    // Only prefetch once per mailbox switch
+    if (threadPrefetchedMailboxRef.current === mailbox.selectedMailboxId) return;
+    threadPrefetchedMailboxRef.current = mailbox.selectedMailboxId;
+
+    // Don't prefetch if we're already viewing sent (no need for self-reference)
+    const currentMailbox = mailbox.mailboxes.find(
+      (m) => m.id === mailbox.selectedMailboxId,
+    );
+    if (currentMailbox?.role?.toLowerCase() === "sent") {
+      setListThreadRelatedMessages([]);
+      return;
+    }
+
+    let cancelled = false;
+    const sentMailbox = mailbox.mailboxes.find(
+      (m) => m.role?.toLowerCase() === "sent",
+    );
+    if (!sentMailbox) {
+      setListThreadRelatedMessages([]);
+      return;
+    }
+
+    // Fetch first page of sent messages for thread augmentation
+    void mailbox.client
+      .getMailboxMessages(mailbox.session, sentMailbox.id, {
+        limit: 50,
+      })
+      .then(({ messages: sentMessages }) => {
+        if (cancelled) return;
+        setListThreadRelatedMessages(sentMessages);
+      })
+      .catch((error) => {
+        // Non-critical — thread grouping still works with mailbox-only messages
+        log.warn("Failed to prefetch sent messages for thread grouping", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeMailbox?.selectedMailboxId]);
 
   useEffect(() => {
     const mailbox = activeMailboxRef.current;
@@ -1361,38 +1459,67 @@ export function useMailApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMessage?.id, selectedMessageBodyLoaded]);
 
-  // Auto-mark read when a message is opened
+  // Auto-mark read when a message is opened (with configurable delay)
   useEffect(() => {
-    if (!selectedMessageId || !activeMailbox) return;
-    const msg = activeMailbox.messages.find((m) => m.id === selectedMessageId);
+    if (!selectedMessageId) return;
+    manualUnreadWhileOpenRef.current = null;
+
+    const mailbox = activeMailboxRef.current;
+    if (!mailbox) return;
+    const msg = mailbox.messages.find((m) => m.id === selectedMessageId);
     if (!msg || msg.keywords?.["$seen"]) return;
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
+
+    const listSettings = readMailListSettings();
+    if (listSettings.markAsReadDelay === "never") return;
+
+    const messageId = selectedMessageId;
+    const nonce = bumpAutoReadNonce(messageId);
+    const delayMs =
+      listSettings.markAsReadDelay === "delayed" ? MARK_AS_READ_DELAY_MS : 0;
+
+    const timer = setTimeout(() => {
+      if (autoReadNonceRef.current.get(messageId) !== nonce) return;
+      if (manualUnreadWhileOpenRef.current === messageId) return;
+
+      const currentMailbox = activeMailboxRef.current;
+      if (!currentMailbox) return;
+      const currentMsg = currentMailbox.messages.find((m) => m.id === messageId);
+      if (!currentMsg || currentMsg.keywords?.["$seen"]) return;
+
       setActiveMailbox((cur) =>
         cur
           ? {
               ...cur,
               messages: cur.messages.map((m) =>
-                m.id === selectedMessageId
+                m.id === messageId
                   ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
                   : m,
               ),
             }
           : cur,
       );
-    });
-    activeMailbox.client
-      .markAsRead(activeMailbox.session, selectedMessageId)
-      .catch((err) => {
-        log.error("Failed to mark message as read", err);
-      });
+
+      void currentMailbox.client
+        .markAsRead(currentMailbox.session, messageId)
+        .then(() => {
+          if (autoReadNonceRef.current.get(messageId) !== nonce) {
+            return currentMailbox.client.markAsUnread(
+              currentMailbox.session,
+              messageId,
+            );
+          }
+          return undefined;
+        })
+        .catch((err) => {
+          log.error("Failed to mark message as read", err);
+        });
+    }, delayMs);
+
     return () => {
-      cancelled = true;
+      clearTimeout(timer);
+      bumpAutoReadNonce(messageId);
     };
-    // Only run when the selected message changes, not on every activeMailbox update
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMessageId]);
+  }, [bumpAutoReadNonce, selectedMessageId]);
 
   const refreshMailboxMessages = useCallback(
     async (mailboxId: string) => {
@@ -1612,8 +1739,8 @@ export function useMailApp() {
           effectivePassphrase = password;
         }
 
-        // Worker load (CPU) + JMAP metadata (network) in parallel
-        const [, [accountSettings, stalwartPolicy, mailboxes, identities]] =
+        // Worker load (CPU) + JMAP metadata + initial inbox (network) all in parallel
+        const [, [accountSettings, stalwartPolicy, mailboxes, identities, initialInboxResult]] =
           await Promise.all([
           mailCryptoWorkerClient.loadVault({
             privateKeyArmored: unlockedVault.encryptedPrivateKeyArmored,
@@ -1625,6 +1752,9 @@ export function useMailApp() {
             client.getStalwartPolicySingletons(jmapSession),
             client.getMailboxes(jmapSession),
             client.getIdentities(jmapSession),
+            // Pre-fetch inbox in parallel — we don't know the inbox id yet,
+            // but getMailboxMessages needs it. We'll resolve it after mailboxes load.
+            Promise.resolve(null as { messages: JmapEmailMessage[]; total: number } | null),
           ]),
         ]);
 
@@ -1658,6 +1788,7 @@ export function useMailApp() {
         );
 
         const initialMailboxId = getPrimaryMailboxId(mailboxes, "inbox");
+        // Fetch the first inbox page now that we know the mailbox id
         const { messages, total: initialTotal } = initialMailboxId
           ? await client.getMailboxMessages(jmapSession, initialMailboxId, {
               limit: mailboxPageSize,
@@ -1834,6 +1965,7 @@ export function useMailApp() {
       attachments: composeAttachments,
       replyContext: composeReplyContext,
       identityId: composeIdentityId,
+      fromEmailOverride: composeFromEmailOverride,
       draftId: composeDraftId,
       composeMode,
       signatureAlreadyEmbedded,
@@ -1900,7 +2032,7 @@ export function useMailApp() {
           "This mailbox is missing a draft mailbox or sending identity.",
         );
       }
-      const fromEmail = identity.email;
+      const fromEmail = composeFromEmailOverride ?? identity.email;
       const fromName = identity.name ?? null;
       if (!plainTextMode) {
         await waitForQuotedInlineImageHydration();
@@ -2154,31 +2286,94 @@ export function useMailApp() {
         (m) => m.role === "trash",
       );
       const isInTrash = activeMailbox.selectedMailboxId === trashMailbox?.id;
-      const remaining = activeMailbox.messages.filter((m) => m.id !== targetId);
-      setIsBusy(true);
-      try {
-        await activeMailbox.client.moveToTrash(
-          activeMailbox.session,
-          targetId,
-          isInTrash ? null : (trashMailbox?.id ?? null),
-        );
-        setActiveMailbox((cur) =>
-          cur ? { ...cur, messages: remaining } : cur,
-        );
-        setSelectedMessageId((cur) =>
-          cur === targetId ? (remaining[0]?.id ?? null) : cur,
-        );
-        toast(isInTrash ? "Message deleted." : "Moved to trash.");
-      } catch (error) {
-        log.error("Failed to delete message", error);
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Could not delete the message.",
-        );
-      } finally {
-        setIsBusy(false);
+
+      // For permanent deletes (already in trash), no undo
+      if (isInTrash) {
+        const remaining = activeMailbox.messages.filter((m) => m.id !== targetId);
+        setIsBusy(true);
+        try {
+          await activeMailbox.client.moveToTrash(
+            activeMailbox.session,
+            targetId,
+            null,
+          );
+          setActiveMailbox((cur) =>
+            cur ? { ...cur, messages: remaining } : cur,
+          );
+          setSelectedMessageId((cur) =>
+            cur === targetId ? (remaining[0]?.id ?? null) : cur,
+          );
+          toast("Message deleted.");
+        } catch (error) {
+          log.error("Failed to delete message", error);
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Could not delete the message.",
+          );
+        } finally {
+          setIsBusy(false);
+        }
+        return;
       }
+
+      // For move-to-trash, show undo toast
+      const targetMessage = activeMailbox.messages.find((m) => m.id === targetId);
+      const originalMailboxId = targetMessage?.mailboxIds
+        ? Object.entries(targetMessage.mailboxIds).find(([_, v]) => v)?.[0]
+        : activeMailbox.selectedMailboxId;
+      const remaining = activeMailbox.messages.filter((m) => m.id !== targetId);
+
+      // Optimistic removal
+      setActiveMailbox((cur) =>
+        cur ? { ...cur, messages: remaining } : cur,
+      );
+      setSelectedMessageId((cur) =>
+        cur === targetId ? (remaining[0]?.id ?? null) : cur,
+      );
+
+      const listSettings = readMailListSettings();
+      const undoMs = listSettings.undoToastDurationMs;
+
+      let undone = false;
+      toast("Moved to trash.", {
+        duration: undoMs,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            undone = true;
+            // Restore the message to the list
+            if (targetMessage) {
+              setActiveMailbox((cur) => {
+                if (!cur) return cur;
+                const restored = [...cur.messages];
+                // Insert at the original position (or at the start as fallback)
+                const insertIndex = Math.min(
+                  remaining.findIndex((m) =>
+                    m.receivedAt &&
+                    targetMessage.receivedAt &&
+                    Date.parse(m.receivedAt) < Date.parse(targetMessage.receivedAt)
+                  ),
+                  restored.length,
+                );
+                restored.splice(insertIndex < 0 ? 0 : insertIndex, 0, targetMessage);
+                return { ...cur, messages: restored };
+              });
+              setSelectedMessageId(targetId);
+            }
+          },
+        },
+      });
+
+      // After undo window, perform the actual JMAP move
+      setTimeout(() => {
+        if (undone) return;
+        void activeMailbox.client
+          .moveToTrash(activeMailbox.session, targetId, trashMailbox?.id ?? null)
+          .catch((err) => {
+            log.error("Failed to move message to trash", err);
+          });
+      }, undoMs);
     },
     [activeMailbox, selectedMessageId],
   );
@@ -2508,34 +2703,70 @@ export function useMailApp() {
     async (targetMailboxId: string, messageId?: string) => {
       const targetId = messageId ?? selectedMessageId;
       if (!activeMailbox || !targetId) return;
+      const targetMessage = activeMailbox.messages.find((m) => m.id === targetId);
+      const originalMailboxId = targetMessage?.mailboxIds
+        ? Object.entries(targetMessage.mailboxIds).find(([_, v]) => v)?.[0]
+        : activeMailbox.selectedMailboxId;
+      const targetMailbox = activeMailbox.mailboxes.find(
+        (m) => m.id === targetMailboxId,
+      );
       const remaining = activeMailbox.messages.filter((m) => m.id !== targetId);
-      setIsBusy(true);
-      try {
-        await activeMailbox.client.moveToMailbox(
-          activeMailbox.session,
-          targetId,
-          targetMailboxId,
-        );
-        setActiveMailbox((cur) =>
-          cur ? { ...cur, messages: remaining } : cur,
-        );
-        setSelectedMessageId((cur) =>
-          cur === targetId ? (remaining[0]?.id ?? null) : cur,
-        );
-        const targetMailbox = activeMailbox.mailboxes.find(
-          (m) => m.id === targetMailboxId,
-        );
-        toast(`Moved to ${targetMailbox?.name ?? "mailbox"}.`);
-      } catch (error) {
-        log.error("Failed to move message", error);
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Could not move the message.",
-        );
-      } finally {
-        setIsBusy(false);
-      }
+
+      // Optimistic removal
+      setActiveMailbox((cur) =>
+        cur ? { ...cur, messages: remaining } : cur,
+      );
+      setSelectedMessageId((cur) =>
+        cur === targetId ? (remaining[0]?.id ?? null) : cur,
+      );
+
+      const listSettings = readMailListSettings();
+      const undoMs = listSettings.undoToastDurationMs;
+
+      let undone = false;
+      toast(`Moved to ${targetMailbox?.name ?? "mailbox"}.`, {
+        duration: undoMs,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            undone = true;
+            if (targetMessage) {
+              setActiveMailbox((cur) => {
+                if (!cur) return cur;
+                const restored = [...cur.messages];
+                const insertIndex = remaining.findIndex((m) =>
+                  m.receivedAt &&
+                  targetMessage.receivedAt &&
+                  Date.parse(m.receivedAt) < Date.parse(targetMessage.receivedAt),
+                );
+                restored.splice(insertIndex < 0 ? 0 : insertIndex, 0, targetMessage);
+                return { ...cur, messages: restored };
+              });
+              setSelectedMessageId(targetId);
+            }
+          },
+        },
+      });
+
+      // After undo window, perform the actual JMAP move
+      setTimeout(() => {
+        if (undone) return;
+        void activeMailbox.client
+          .moveToMailbox(activeMailbox.session, targetId, targetMailboxId)
+          .catch((err) => {
+            log.error("Failed to move message", err);
+            // On failure, try to restore the message
+            if (targetMessage) {
+              setActiveMailbox((cur) => {
+                if (!cur) return cur;
+                const exists = cur.messages.some((m) => m.id === targetId);
+                if (exists) return cur;
+                return { ...cur, messages: [...cur.messages, targetMessage] };
+              });
+              toast.error("Failed to move message. Restored to list.");
+            }
+          });
+      }, undoMs);
     },
     [activeMailbox, selectedMessageId],
   );
@@ -2930,18 +3161,27 @@ export function useMailApp() {
     async (messageId?: string) => {
       const targetId = messageId ?? selectedMessageId;
       if (!activeMailbox || !targetId) return;
+      if (targetId === selectedMessageId) {
+        manualUnreadWhileOpenRef.current = targetId;
+        bumpAutoReadNonce(targetId);
+      }
+      const markUnread = (message: JmapEmailMessage): JmapEmailMessage => {
+        const keywords = { ...(message.keywords ?? {}) };
+        delete keywords["$seen"];
+        return { ...message, keywords };
+      };
       setActiveMailbox((cur) =>
         cur
           ? {
               ...cur,
-              messages: cur.messages.map((m) => {
-                if (m.id !== targetId) return m;
-                const keywords = { ...(m.keywords ?? {}) };
-                delete keywords["$seen"];
-                return { ...m, keywords };
-              }),
+              messages: cur.messages.map((m) =>
+                m.id === targetId ? markUnread(m) : m,
+              ),
             }
           : cur,
+      );
+      setRelatedConversationMessages((current) =>
+        current.map((m) => (m.id === targetId ? markUnread(m) : m)),
       );
       try {
         await activeMailbox.client.markAsUnread(
@@ -2952,7 +3192,7 @@ export function useMailApp() {
         log.error("Failed to mark message as unread", error);
       }
     },
-    [activeMailbox, selectedMessageId],
+    [activeMailbox, bumpAutoReadNonce, selectedMessageId],
   );
 
   const handleMarkAsRead = useCallback(
@@ -2961,6 +3201,10 @@ export function useMailApp() {
       if (!activeMailbox || !targetId) return;
       const msg = activeMailbox.messages.find((m) => m.id === targetId);
       if (!msg || msg.keywords?.["$seen"]) return;
+      if (targetId === selectedMessageId) {
+        manualUnreadWhileOpenRef.current = null;
+        bumpAutoReadNonce(targetId);
+      }
       setActiveMailbox((cur) =>
         cur
           ? {
@@ -2979,7 +3223,7 @@ export function useMailApp() {
         log.error("Failed to mark message as read", error);
       }
     },
-    [activeMailbox, selectedMessageId],
+    [activeMailbox, bumpAutoReadNonce, selectedMessageId],
   );
 
   const handleRealtimeSync = useCallback(
@@ -3312,6 +3556,7 @@ export function useMailApp() {
     isMailboxStatusLoading,
     activeMailbox,
     composeMailPolicy,
+    listThreadRelatedMessages,
     selectedMessage,
     selectedMessageId,
     setSelectedMessageId: handleSelectMessageId,
@@ -3319,6 +3564,7 @@ export function useMailApp() {
     selectedConversationMessages,
     isConversationLoading,
     isMessageBodyLoading,
+    loadConversationThread,
     setSelectedConversationMessageId: handleSelectConversationMessageId,
     selectedMessagePlaintext,
     selectedMessageDecryptedHtml,

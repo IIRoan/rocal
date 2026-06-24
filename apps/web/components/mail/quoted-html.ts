@@ -45,6 +45,40 @@ export const QuotedHtml = TiptapNode.create({
         "border-left:2px solid color-mix(in oklch, var(--border) 80%, transparent);padding-left:12px;margin-top:8px;";
 
       const shadow = dom.attachShadow({ mode: "open" });
+
+      // Style tag to preserve original email layout (tables, widths, fonts)
+      const style = document.createElement("style");
+      style.textContent = `
+        :host {
+          display: block;
+          all: initial;
+        }
+        * {
+          box-sizing: border-box;
+        }
+        table {
+          border-collapse: collapse;
+          table-layout: auto;
+        }
+        img {
+          max-width: 100%;
+          height: auto;
+        }
+        a {
+          color: var(--primary, #b45309);
+        }
+        body, div {
+          font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+          line-height: 1.5;
+        }
+        @media (prefers-color-scheme: dark) {
+          :host {
+            color-scheme: dark;
+          }
+        }
+      `;
+      shadow.appendChild(style);
+
       const inner = document.createElement("div");
       inner.contentEditable = "true";
       inner.style.cssText = "outline:none;";

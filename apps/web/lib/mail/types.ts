@@ -115,7 +115,63 @@ export type JmapEmailMessage = {
   textBody?: JmapBodyPartRef[];
   htmlBody?: JmapBodyPartRef[];
   attachments?: JmapAttachment[];
+  /** JMAP header:* property — Authentication-Results header values */
+  "header:Authentication-Results"?: string[] | null;
+  /** JMAP header:* property — Received header values */
+  "header:Received"?: string[] | null;
+  /** JMAP header:* property — DKIM-Signature header values */
+  "header:DKIM-Signature"?: string[] | null;
 };
+
+export type MailAuthResult = {
+  spf: "pass" | "fail" | "none" | "unknown";
+  dkim: "pass" | "fail" | "none" | "unknown";
+  dmarc: "pass" | "fail" | "none" | "unknown";
+};
+
+/** JMAP header:* values are string arrays; some servers return a lone string. */
+export function normalizeJmapHeaderValues(
+  value: unknown,
+): string[] {
+  if (value == null) return [];
+  if (typeof value === "string") return value.length > 0 ? [value] : [];
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === "string");
+  }
+  return [];
+}
+
+export function parseAuthResults(
+  headers: unknown,
+): MailAuthResult {
+  const result: MailAuthResult = {
+    spf: "none",
+    dkim: "none",
+    dmarc: "none",
+  };
+
+  const normalized = normalizeJmapHeaderValues(headers);
+  if (normalized.length === 0) return result;
+
+  const combined = normalized.join("\n").toLowerCase();
+
+  const spfMatch = combined.match(/spf\s*=\s*(pass|fail|none|softfail|neutral|temperror|permerror)/);
+  if (spfMatch) {
+    result.spf = spfMatch[1] === "softfail" || spfMatch[1] === "neutral" ? "fail" : spfMatch[1] as MailAuthResult["spf"];
+  }
+
+  const dkimMatch = combined.match(/dkim\s*=\s*(pass|fail|none|temperror|permerror)/);
+  if (dkimMatch) {
+    result.dkim = dkimMatch[1] as MailAuthResult["dkim"];
+  }
+
+  const dmarcMatch = combined.match(/dmarc\s*=\s*(pass|fail|none|bestguesspass|temperror|permerror)/);
+  if (dmarcMatch) {
+    result.dmarc = dmarcMatch[1] === "bestguesspass" ? "pass" : dmarcMatch[1] as MailAuthResult["dmarc"];
+  }
+
+  return result;
+}
 
 export type MailRealtimeEvent = {
   type: "mail.changed";
@@ -186,6 +242,16 @@ function jmapOptional<T extends z.ZodTypeAny>(schema: T) {
   return z.preprocess((value) => (value === null ? undefined : value), schema);
 }
 
+const jmapHeaderValuesSchema = jmapOptional(
+  z.preprocess(
+    (value) => {
+      const normalized = normalizeJmapHeaderValues(value);
+      return normalized.length > 0 ? normalized : undefined;
+    },
+    z.array(z.string()),
+  ),
+);
+
 const jmapBodyStructureSchema: z.ZodType<
   JmapBodyStructure,
   z.ZodTypeDef,
@@ -230,6 +296,9 @@ const jmapEmailMessageSchema = z.object({
   textBody: z.array(jmapBodyPartRefSchema).optional(),
   htmlBody: z.array(jmapBodyPartRefSchema).optional(),
   attachments: z.array(jmapAttachmentSchema).optional(),
+  "header:Authentication-Results": jmapHeaderValuesSchema.optional(),
+  "header:Received": jmapHeaderValuesSchema.optional(),
+  "header:DKIM-Signature": jmapHeaderValuesSchema.optional(),
 });
 
 const jmapMailboxSchema = z.object({

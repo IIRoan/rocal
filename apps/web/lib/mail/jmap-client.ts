@@ -260,6 +260,9 @@ const EMAIL_FULL_GET_PROPERTIES = [
   "textBody",
   "htmlBody",
   "attachments",
+  "header:Authentication-Results",
+  "header:Received",
+  "header:DKIM-Signature",
 ] as const;
 
 export type GetMessagesOptions = {
@@ -1006,6 +1009,194 @@ export class StalwartJmapClient {
             sort: [{ property: "receivedAt", isAscending: false }],
             limit,
             position: 0,
+          },
+          "q1",
+        ],
+        [
+          "Email/get",
+          {
+            accountId,
+            "#ids": {
+              resultOf: "q1",
+              name: "Email/query",
+              path: "/ids",
+            },
+            properties: [...EMAIL_LIST_GET_PROPERTIES],
+          },
+          "g1",
+        ],
+      ],
+    );
+    const queryResult = this.getMethodResult<{
+      ids?: string[];
+      total?: number;
+    }>(envelope, "Email/query");
+    const result = this.getMethodResult<{ list?: JmapEmailMessage[] }>(
+      envelope,
+      "Email/get",
+    );
+    return { messages: result.list ?? [], total: queryResult.total ?? 0 };
+  }
+
+  async searchMailboxMessagesWithFilter(
+    session: JmapSession,
+    mailboxId: string,
+    filter: Record<string, unknown>,
+    limit = this.getDefaultSearchPageSize(),
+  ): Promise<{ messages: JmapEmailMessage[]; total: number }> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/query",
+          {
+            accountId,
+            filter:
+              filter.inMailbox || filter.operator
+                ? filter
+                : { inMailbox: mailboxId, ...filter },
+            sort: [{ property: "receivedAt", isAscending: false }],
+            limit,
+            position: 0,
+          },
+          "q1",
+        ],
+        [
+          "Email/get",
+          {
+            accountId,
+            "#ids": {
+              resultOf: "q1",
+              name: "Email/query",
+              path: "/ids",
+            },
+            properties: [...EMAIL_LIST_GET_PROPERTIES],
+          },
+          "g1",
+        ],
+      ],
+    );
+    const queryResult = this.getMethodResult<{
+      ids?: string[];
+      total?: number;
+    }>(envelope, "Email/query");
+    const result = this.getMethodResult<{ list?: JmapEmailMessage[] }>(
+      envelope,
+      "Email/get",
+    );
+    return { messages: result.list ?? [], total: queryResult.total ?? 0 };
+  }
+
+  async getThreadMessageIds(
+    session: JmapSession,
+    threadId: string,
+  ): Promise<string[]> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Thread/get",
+          {
+            accountId,
+            ids: [threadId],
+          },
+          "t1",
+        ],
+      ],
+    );
+    const result = this.getMethodResult<{ list?: { emailIds?: string[] }[] }>(
+      envelope,
+      "Thread/get",
+    );
+    return result.list?.[0]?.emailIds ?? [];
+  }
+
+  async getMailboxMessagesForThread(
+    session: JmapSession,
+    mailboxIds: string[],
+    threadIds: string[],
+    limit = 50,
+  ): Promise<JmapEmailMessage[]> {
+    if (threadIds.length === 0 || mailboxIds.length === 0) return [];
+    const accountId = this.requirePrimaryAccountId(session);
+
+    const allFilterConditions = mailboxIds.map((id) => ({
+      inMailbox: id,
+    }));
+
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/query",
+          {
+            accountId,
+            filter: {
+              operator: "AND",
+              conditions: [
+                { operator: "OR", conditions: allFilterConditions },
+                { operator: "OR", conditions: threadIds.map((tid) => ({ threadId: tid })) },
+              ],
+            },
+            sort: [{ property: "receivedAt", isAscending: false }],
+            limit,
+            position: 0,
+          },
+          "q1",
+        ],
+        [
+          "Email/get",
+          {
+            accountId,
+            "#ids": {
+              resultOf: "q1",
+              name: "Email/query",
+              path: "/ids",
+            },
+            properties: [...EMAIL_LIST_GET_PROPERTIES],
+          },
+          "g1",
+        ],
+      ],
+    );
+    const result = this.getMethodResult<{ list?: JmapEmailMessage[] }>(
+      envelope,
+      "Email/get",
+    );
+    return result.list ?? [];
+  }
+
+  async getMailboxMessagesByIds(
+    session: JmapSession,
+    mailboxIds: string[],
+    options: { limit?: number; position?: number } = {},
+  ): Promise<{ messages: JmapEmailMessage[]; total: number }> {
+    if (mailboxIds.length === 0) return { messages: [], total: 0 };
+    const { limit = this.getDefaultMailboxPageSize(), position = 0 } = options;
+    const accountId = this.requirePrimaryAccountId(session);
+
+    const conditions = mailboxIds.map((id) => ({ inMailbox: id }));
+
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/query",
+          {
+            accountId,
+            filter:
+              conditions.length === 1
+                ? conditions[0]
+                : { operator: "OR", conditions },
+            sort: [{ property: "receivedAt", isAscending: false }],
+            limit,
+            position,
           },
           "q1",
         ],

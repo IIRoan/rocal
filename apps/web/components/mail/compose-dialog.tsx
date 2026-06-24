@@ -11,8 +11,9 @@ import {
   Check,
   AlertCircle,
   AlignLeft,
+  Plus,
 } from "lucide-react";
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   useMailCompose,
@@ -35,6 +36,11 @@ import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Button } from "@workspace/ui/components/ui/button";
 import { useIsMobile } from "@workspace/ui/hooks";
 import type { JmapIdentity } from "@/lib/mail/types";
+import {
+  generateSubAddressTagSuggestions,
+  extractUsedTagsFromIdentities,
+  resolveSubAddressTagSelection,
+} from "@/lib/mail/sub-address-suggestions";
 import {
   validateComposeRecipients,
   pickOutgoingAttachmentFiles,
@@ -142,6 +148,8 @@ export function ComposeForm({
     mailServerLimits,
     selectedIdentityId,
     setSelectedIdentityId,
+    fromEmailOverride,
+    setFromEmailOverride,
     draftSaveStatus,
     composeDraftId,
     clearCompose,
@@ -168,6 +176,32 @@ export function ComposeForm({
     identities.find((identity) => identity.id === selectedIdentityId) ??
     identities[0] ??
     null;
+
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const [customTagInput, setCustomTagInput] = useState("");
+
+  const tagSuggestions = useMemo(() => {
+    if (!selectedIdentity) return [];
+    const usedTags = extractUsedTagsFromIdentities(identities, selectedIdentity.email);
+    return generateSubAddressTagSuggestions(selectedIdentity.email, { recentTags: usedTags });
+  }, [selectedIdentity, identities]);
+
+  const applyTagSuggestion = useCallback(
+    (tag: string) => {
+      if (!selectedIdentity) return;
+      const resolved = resolveSubAddressTagSelection(
+        identities,
+        selectedIdentity.email,
+        tag,
+      );
+      if (!resolved) return;
+      setSelectedIdentityId(resolved.identityId);
+      setFromEmailOverride(resolved.fromEmailOverride ?? null);
+      setShowTagSuggestions(false);
+      setCustomTagInput("");
+    },
+    [selectedIdentity, identities, setSelectedIdentityId, setFromEmailOverride],
+  );
   const signatureIdentity = resolveComposeSignatureIdentity(
     identities,
     selectedIdentity?.id ?? null,
@@ -266,10 +300,11 @@ export function ComposeForm({
     setComposeHtmlBody,
     signatureIdentity,
   ]);
+  const fromEmail = fromEmailOverride ?? selectedIdentity?.email ?? fallbackFromEmail;
   const fromLabel = selectedIdentity
     ? selectedIdentity.name
-      ? `${selectedIdentity.name} <${selectedIdentity.email}>`
-      : selectedIdentity.email
+      ? `${selectedIdentity.name} <${fromEmail}>`
+      : fromEmail
     : fallbackFromEmail;
 
   const recipientValidation = validateComposeRecipients({
@@ -553,6 +588,46 @@ export function ComposeForm({
             </button>
           )}
       </div>
+
+      {/* Sub-address tag suggestions */}
+      {tagSuggestions.length > 0 && (
+        <div className="flex items-center gap-1 px-3 py-1 border-b border-border/30 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowTagSuggestions((prev) => !prev)}
+            className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Plus className="size-2.5" strokeWidth={2.25} />
+            Tag
+          </button>
+          {showTagSuggestions && (
+            <div className="flex items-center gap-1 flex-wrap">
+              {tagSuggestions.map((suggestion) => (
+                <button
+                  key={suggestion.tag}
+                  type="button"
+                  onClick={() => applyTagSuggestion(suggestion.tag)}
+                  className="inline-flex items-center rounded-md bg-muted/60 hover:bg-accent px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {suggestion.label}
+                </button>
+              ))}
+              <input
+                value={customTagInput}
+                onChange={(e) => setCustomTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && customTagInput.trim()) {
+                    e.preventDefault();
+                    applyTagSuggestion(customTagInput.trim().toLowerCase().replace(/[^a-z0-9._-]/g, ""));
+                  }
+                }}
+                placeholder="custom…"
+                className="w-16 bg-transparent text-[10px] text-foreground border-0 outline-none focus:ring-0 placeholder:text-muted-foreground/40"
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       <div
         className={`flex items-center border-b shrink-0 transition-colors ${
