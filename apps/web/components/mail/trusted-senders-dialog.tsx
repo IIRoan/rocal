@@ -1,14 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { X } from "lucide-react";
-import { Button } from "@workspace/ui/components/ui/button";
-import { Input } from "@workspace/ui/components/ui/input";
-import {
-  addTrustedSender,
-  removeTrustedSender,
-  useMailDisplaySettings,
-} from "@/lib/mail/mail-display-settings";
+import { TrustedSendersPanel } from "./trusted-senders-panel";
 
 export function TrustedSendersDialog({
   open,
@@ -17,9 +10,6 @@ export function TrustedSendersDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { settings } = useMailDisplaySettings();
-  const [newEmail, setNewEmail] = useState("");
-
   if (!open) return null;
 
   return (
@@ -48,61 +38,7 @@ export function TrustedSendersDialog({
           </button>
         </div>
 
-        <div className="p-4 space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Remote images from these senders load automatically when the policy
-            is set to ask.
-          </p>
-
-          <form
-            className="flex gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const trimmed = newEmail.trim();
-              if (!trimmed.includes("@")) return;
-              addTrustedSender(trimmed);
-              setNewEmail("");
-            }}
-          >
-            <Input
-              value={newEmail}
-              onChange={(event) => setNewEmail(event.target.value)}
-              placeholder="sender@example.com"
-              className="h-8 text-sm"
-              type="email"
-            />
-            <Button
-              type="submit"
-              size="sm"
-              variant="secondary"
-              disabled={!newEmail.trim().includes("@")}
-            >
-              Add
-            </Button>
-          </form>
-
-          {settings.trustedSenders.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No trusted senders yet.</p>
-          ) : (
-            <ul className="max-h-48 overflow-y-auto space-y-1">
-              {settings.trustedSenders.map((email) => (
-                <li
-                  key={email}
-                  className="flex items-center justify-between gap-2 rounded-md border border-border/50 px-2 py-1.5 text-sm"
-                >
-                  <span className="truncate">{email}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeTrustedSender(email)}
-                    className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <TrustedSendersPanel className="py-3" />
       </div>
     </div>
   );
