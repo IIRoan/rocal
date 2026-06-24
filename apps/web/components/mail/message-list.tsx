@@ -14,7 +14,10 @@ import {
   MoreHorizontal,
   Star,
   Paperclip,
-  MessageSquare,
+  ShieldAlert,
+  Tag,
+  Inbox,
+  Check,
 } from "lucide-react";
 import {
   ContextMenu,
@@ -33,15 +36,28 @@ import {
   PopoverTrigger,
 } from "@workspace/ui/components/ui/popover";
 import { AppLoadingState } from "@workspace/ui/components/ui";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/ui/tooltip";
 import { useIsMobile } from "@workspace/ui/hooks";
 import { cn } from "@workspace/ui/lib/utils";
-import type { JmapEmailMessage, JmapIdentity, JmapMailbox, LabelDef } from "@/lib/mail/types";
+import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import { formatAddress, formatMessageDate } from "./mail-helpers";
 import { SenderAvatar } from "./mail-avatar";
-import { MailIdentityBadge } from "./mail-identity-badge";
 import { buildMailConversations } from "@/lib/mail/conversation-thread";
+import { getAllMessageLabels } from "@/lib/mail/mail-labels";
+import { resolveLabelDisplayColor } from "@/lib/mail/mail-label-colors";
+import {
+  findJunkMailbox,
+  isJunkMailboxRole,
+  isTrashMailboxRole,
+} from "@/lib/mail/mail-mailbox-roles";
 
 const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
+const EMPTY_RELATED_MESSAGES: JmapEmailMessage[] = [];
+const EMPTY_LABELS: LabelDef[] = [];
 
 interface MessageListProps {
   messages: JmapEmailMessage[];
@@ -60,8 +76,11 @@ interface MessageListProps {
   onBulkMarkAsUnread?: (ids: string[]) => void;
   onBulkMarkAsRead?: (ids: string[]) => void;
   onToggleFlagged?: (id: string) => void;
+  onReportSpam?: (id: string) => void;
+  onNotSpam?: (id: string) => void;
+  onBulkReportSpam?: (ids: string[]) => void;
+  onSetLabel?: (messageId: string, labelId: string, assigned: boolean) => void;
   labels?: LabelDef[];
-  identities?: JmapIdentity[];
   timeFormat?: "12h" | "24h";
   timezone?: string;
   onLoadMore?: () => void;
@@ -71,6 +90,62 @@ interface MessageListProps {
 
 const ROW_HEIGHT_MOBILE = 60;
 const ROW_HEIGHT_DESKTOP = 68;
+const ROW_HEIGHT_WITH_LABELS = 76;
+const SCROLL_LOAD_THRESHOLD = 62;
+
+function getRowHeight(
+  message: JmapEmailMessage,
+  labels: LabelDef[],
+  isMobile: boolean,
+): number {
+  if (getAllMessageLabels(message, labels).length > 0) {
+    return ROW_HEIGHT_WITH_LABELS;
+  }
+  return isMobile ? ROW_HEIGHT_MOBILE : ROW_HEIGHT_DESKTOP;
+}
+
+function MessageLabelChips({
+  messageLabels,
+  max = 2,
+}: {
+  messageLabels: LabelDef[];
+  max?: number;
+}) {
+  if (messageLabels.length === 0) return null;
+  const visible = messageLabels.slice(0, max);
+  const overflow = messageLabels.length - visible.length;
+
+  return (
+    <div className="mt-0.5 flex min-w-0 items-center gap-1 overflow-hidden pr-4">
+      {visible.map((label) => {
+        const displayColor = resolveLabelDisplayColor(label.color);
+        return (
+          <span
+            key={label.id}
+            title={label.name}
+            className="inline-flex max-w-[5.5rem] items-center gap-0.5 rounded px-1 py-px text-[10px] font-medium leading-none"
+            style={{
+              color: displayColor,
+              backgroundColor: `${displayColor}1a`,
+              border: `1px solid ${displayColor}40`,
+            }}
+          >
+            <span
+              className="size-1.5 shrink-0 rounded-full"
+              style={{ backgroundColor: displayColor }}
+            />
+            <span className="truncate">{label.name}</span>
+          </span>
+        );
+      })}
+      {overflow > 0 ? (
+        <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
+          +{overflow}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 function formatThreadSenders(messages: JmapEmailMessage[]): string {
   const uniqueSenders = Array.from(
@@ -86,7 +161,7 @@ function formatThreadSenders(messages: JmapEmailMessage[]): string {
 
 export function MessageList({
   messages,
-  relatedMessages = [],
+  relatedMessages = EMPTY_RELATED_MESSAGES,
   selectedMessageId,
   onSelect,
   mailboxes,
@@ -100,8 +175,11 @@ export function MessageList({
   onBulkMarkAsUnread,
   onBulkMarkAsRead,
   onToggleFlagged,
-  labels = [],
-  identities = [],
+  onReportSpam,
+  onNotSpam,
+  onBulkReportSpam,
+  onSetLabel,
+  labels = EMPTY_LABELS,
   timeFormat,
   timezone,
   onLoadMore,
@@ -116,7 +194,14 @@ export function MessageList({
   const isMobile = useIsMobile();
   const loadMoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const rowHeight = isMobile ? ROW_HEIGHT_MOBILE : ROW_HEIGHT_DESKTOP;
+  const currentMailbox = mailboxes?.find((m) => m.id === currentMailboxId);
+  const currentMailboxRole = currentMailbox?.role;
+  const isInJunk = isJunkMailboxRole(currentMailboxRole);
+  const isInTrash = isTrashMailboxRole(currentMailboxRole);
+  const junkMailbox = findJunkMailbox(mailboxes ?? []);
+  const canReportSpam =
+    Boolean(onReportSpam) && !isInJunk && !isInTrash && Boolean(junkMailbox);
+  const canNotSpam = Boolean(onNotSpam) && isInJunk;
 
   const moveTargets = (mailboxes ?? []).filter(
     (m) =>
@@ -177,11 +262,20 @@ export function MessageList({
     [messages],
   );
 
+  const estimateRowSize = useCallback(
+    (index: number) => {
+      const row = threadRows[index];
+      if (!row) return isMobile ? ROW_HEIGHT_MOBILE : ROW_HEIGHT_DESKTOP;
+      return getRowHeight(row.latestMessage, labels, isMobile);
+    },
+    [threadRows, labels, isMobile],
+  );
+
   const virtualizer = useVirtualizer({
     count: threadRows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => rowHeight,
-    overscan: 6,
+    estimateSize: estimateRowSize,
+    overscan: 8,
     getItemKey: (index) => threadRows[index]?.id ?? String(index),
   });
 
@@ -205,10 +299,10 @@ export function MessageList({
 
     const remaining =
       element.scrollHeight - element.scrollTop - element.clientHeight;
-    if (remaining <= rowHeight * 5) {
+    if (remaining <= SCROLL_LOAD_THRESHOLD * 5) {
       scheduleLoadMore();
     }
-  }, [rowHeight, hasMore, isLoadingMore, onLoadMore, scheduleLoadMore]);
+  }, [hasMore, isLoadingMore, onLoadMore, scheduleLoadMore]);
 
   const virtualItems = virtualizer.getVirtualItems();
   const lastVirtualItemIndex = virtualItems[virtualItems.length - 1]?.index;
@@ -274,7 +368,7 @@ export function MessageList({
     <div
       ref={scrollRef}
       data-mail-list-scroll
-      className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-6 safe-area-inset-bottom"
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-6 safe-area-inset-bottom [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
     >
       {isBarVisible && (
         <div
@@ -351,6 +445,23 @@ export function MessageList({
                   <Trash2 className="size-3.5" strokeWidth={2.25} />
                   Delete
                 </button>
+                {canReportSpam && onBulkReportSpam ? (
+                  <>
+                    <div className="w-px self-stretch bg-border/60" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onBulkReportSpam(bulkIds);
+                        clearSelection();
+                        setBulkActionsOpen(false);
+                      }}
+                      className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      <ShieldAlert className="size-3.5" strokeWidth={2.25} />
+                      Spam
+                    </button>
+                  </>
+                ) : null}
               </div>
               {moveTargets.length > 0 && (
                 <div className="p-1">
@@ -409,23 +520,24 @@ export function MessageList({
                 entry.hasAttachment === true ||
                 (entry.attachments?.length ?? 0) > 0,
             );
+            const messageLabels = getAllMessageLabels(message, labels);
             const senderLabel =
               row.messages.length > 1
                 ? formatThreadSenders(row.messages)
                 : formatAddress(message.from);
             return (
-              <ContextMenu key={row.id}>
+              <div
+                key={virtualRow.key}
+                data-index={virtualRow.index}
+                className="absolute top-0 left-0 w-full"
+                style={{
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+              <ContextMenu>
                 <ContextMenuTrigger asChild>
                   <div
-                    data-index={virtualRow.index}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      height: `${rowHeight}px`,
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
                     role="button"
                     tabIndex={0}
                     onClick={() => onSelect(message.id)}
@@ -436,8 +548,8 @@ export function MessageList({
                       }
                     }}
                     className={cn(
-                      "group/row relative w-full text-left transition-colors cursor-pointer border-b border-border/40 [content-visibility:auto]",
-                      isMobile ? "py-2 pl-3 pr-2.5" : "py-2 pl-[13px] pr-3",
+                      "group/row relative h-full w-full overflow-hidden text-left transition-colors cursor-pointer border-b border-border/40",
+                      isMobile ? "py-1.5 pl-2.5 pr-1" : "py-1.5 pl-2.5 pr-1",
                       "data-[state=open]:bg-muted/60",
                       isChecked
                         ? "bg-primary/5 dark:bg-primary/10"
@@ -458,15 +570,15 @@ export function MessageList({
                       )}
                     />
 
-                    <div className={cn("flex items-start", isMobile ? "gap-2" : "gap-2.5")}>
-                      {/* Avatar / checkbox toggle */}
-                      <button
-                        type="button"
-                        className="relative shrink-0 cursor-pointer rounded-full group/avatar"
-                        onClick={(e) => toggleSelect(e, row.messageIds)}
-                        title="Select"
-                        aria-label="Select message"
-                      >
+                    <div className={cn("flex items-start gap-2")}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="relative shrink-0 cursor-pointer rounded-full group/avatar"
+                            onClick={(e) => toggleSelect(e, row.messageIds)}
+                            aria-label="Select message"
+                          >
                         <SenderAvatar
                           email={message.from?.[0]?.email ?? ""}
                           name={message.from?.[0]?.name ?? undefined}
@@ -492,129 +604,100 @@ export function MessageList({
                             />
                           )}
                         </span>
-                      </button>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">Select message</TooltipContent>
+                      </Tooltip>
 
-                      <div className="flex-1 min-w-0">
-                        {/* Top row: sender + meta */}
-                        <div
-                          className={cn(
-                            "mb-0.5 flex items-center justify-between gap-2",
-                            isMobile ? "mb-0" : "",
-                          )}
-                        >
-                          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <div className="relative min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span
+                            className={cn(
+                              "min-w-0 flex-1 truncate",
+                              isMobile ? "text-[12.5px]" : "text-[13px]",
+                              isRead
+                                ? "font-medium text-foreground/70 dark:text-foreground/85"
+                                : "font-semibold text-foreground",
+                            )}
+                          >
+                            {senderLabel}
+                          </span>
+                          {!isRead && (
                             <span
-                              className={cn(
-                                "truncate",
-                                isMobile ? "text-[12.5px]" : "text-[13px]",
-                                isRead
-                                  ? "font-medium text-foreground/70 dark:text-foreground/85"
-                                  : "font-semibold text-foreground",
-                              )}
-                            >
-                              {senderLabel}
-                            </span>
-                            <MailIdentityBadge
-                              message={message}
-                              identities={identities}
-                              compact
+                              className="size-1.5 shrink-0 rounded-full bg-primary"
+                              aria-label="Unread"
+                              title="Unread"
                             />
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {/* Thread count or unread dot */}
-                            {row.messages.length > 1 ? (
-                              <span
-                                className={cn(
-                                  "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
-                                  unreadCount > 0
-                                    ? "bg-primary/15 text-primary dark:bg-primary/20"
-                                    : "bg-muted text-muted-foreground",
-                                )}
-                                aria-label={
-                                  unreadCount > 0
-                                    ? `${unreadCount} unread of ${row.messages.length}`
-                                    : `${row.messages.length} messages in thread`
-                                }
-                              >
-                                <MessageSquare
-                                  className="size-2.5"
-                                  strokeWidth={2.25}
-                                />
-                                {unreadCount > 0 &&
-                                unreadCount < row.messages.length
-                                  ? `${unreadCount}/${row.messages.length}`
-                                  : row.messages.length}
-                              </span>
-                            ) : (
-                              !isRead && (
-                                <span
-                                  className="size-1.5 rounded-full bg-primary shrink-0"
-                                  aria-label="Unread"
-                                />
-                              )
+                          )}
+                          {hasAttachments && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex shrink-0">
+                                  <Paperclip
+                                    className="size-3 text-muted-foreground/60"
+                                    strokeWidth={2}
+                                    aria-hidden
+                                  />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>Has attachments</TooltipContent>
+                            </Tooltip>
+                          )}
+                          <span className="shrink-0 text-[11px] text-muted-foreground/70 tabular-nums whitespace-nowrap">
+                            {formatMessageDate(
+                              message.receivedAt,
+                              timeFormat,
+                              timezone,
                             )}
-                            {hasAttachments && (
-                              <Paperclip
-                                className="size-3 text-muted-foreground/60 shrink-0"
-                                strokeWidth={2}
-                                aria-label="Has attachments"
-                              />
-                            )}
-                            <span className="text-[11px] text-muted-foreground/65 dark:text-muted-foreground/80 tabular-nums">
-                              {formatMessageDate(
-                                message.receivedAt,
-                                timeFormat,
-                                timezone,
-                              )}
-                            </span>
-                            {/* Star — always slightly visible */}
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onToggleFlagged?.(message.id);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  onToggleFlagged?.(message.id);
-                                }
-                              }}
-                              className={cn(
-                                "shrink-0 cursor-pointer transition-opacity",
-                                isFlagged
-                                  ? "opacity-100"
-                                  : "opacity-20 group-hover/row:opacity-60 hover:!opacity-100",
-                              )}
-                              aria-label={isFlagged ? "Unstar" : "Star"}
-                            >
-                              <Star
-                                className={cn(
-                                  "size-3.5",
-                                  isFlagged
-                                    ? "fill-amber-400 text-amber-400"
-                                    : "text-muted-foreground",
-                                )}
-                                strokeWidth={2}
-                              />
-                            </span>
-                          </div>
+                          </span>
                         </div>
 
-                        {/* Subject */}
-                          <p
-                            className={cn(
-                              "truncate leading-snug",
-                              isMobile ? "text-xs" : "text-[12.5px]",
-                              isRead
-                                ? "text-foreground/50 dark:text-foreground/60"
-                                : "text-foreground/80 dark:text-foreground/90",
+                        <p
+                          className={cn(
+                            "truncate leading-tight",
+                            isMobile ? "text-xs" : "text-[12.5px]",
+                            isRead
+                              ? "text-foreground/55 dark:text-foreground/65"
+                              : "font-medium text-foreground/85 dark:text-foreground/90",
                           )}
                         >
                           {message.subject || "(No subject)"}
                         </p>
+                        <MessageLabelChips messageLabels={messageLabels} />
+
+                        {onToggleFlagged ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onToggleFlagged(message.id);
+                                }}
+                                className={cn(
+                                  "absolute bottom-0 right-0 shrink-0 cursor-pointer p-0.5 transition-opacity",
+                                  isFlagged
+                                    ? "opacity-100"
+                                    : "opacity-0 group-hover/row:opacity-60 hover:!opacity-100",
+                                )}
+                                aria-label={isFlagged ? "Unstar" : "Star"}
+                              >
+                                <Star
+                                  className={cn(
+                                    "size-3.5",
+                                    isFlagged
+                                      ? "fill-amber-400 text-amber-400"
+                                      : "text-muted-foreground",
+                                  )}
+                                  strokeWidth={2}
+                                />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {isFlagged ? "Remove star" : "Star message"}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -657,6 +740,61 @@ export function MessageList({
                     </ContextMenuItem>
                   )}
 
+                  {canReportSpam && (
+                    <ContextMenuItem
+                      onClick={() => onReportSpam?.(message.id)}
+                    >
+                      <ShieldAlert />
+                      Report spam
+                    </ContextMenuItem>
+                  )}
+
+                  {canNotSpam && (
+                    <ContextMenuItem onClick={() => onNotSpam?.(message.id)}>
+                      <Inbox />
+                      Not spam
+                    </ContextMenuItem>
+                  )}
+
+                  {onSetLabel && labels.length > 0 && (
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger className="gap-2">
+                        <Tag />
+                        Labels
+                      </ContextMenuSubTrigger>
+                      <ContextMenuPortal>
+                        <ContextMenuSubContent className="w-44">
+                          {labels.map((label) => {
+                            const assigned =
+                              message.keywords?.[`label:${label.id}`] === true;
+                            const displayColor = resolveLabelDisplayColor(
+                              label.color,
+                            );
+                            return (
+                              <ContextMenuItem
+                                key={label.id}
+                                onClick={() =>
+                                  onSetLabel(message.id, label.id, !assigned)
+                                }
+                              >
+                                <span
+                                  className="size-2.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: displayColor }}
+                                />
+                                <span className="flex-1 truncate">
+                                  {label.name}
+                                </span>
+                                {assigned ? (
+                                  <Check className="size-3.5 opacity-60" />
+                                ) : null}
+                              </ContextMenuItem>
+                            );
+                          })}
+                        </ContextMenuSubContent>
+                      </ContextMenuPortal>
+                    </ContextMenuSub>
+                  )}
+
                   {moveTargets.length > 0 && (
                     <ContextMenuSub>
                       <ContextMenuSubTrigger className="gap-2">
@@ -697,6 +835,7 @@ export function MessageList({
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
+              </div>
             );
           })}
       </div>

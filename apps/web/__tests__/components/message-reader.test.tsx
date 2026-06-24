@@ -1465,13 +1465,13 @@ describe("MessageReader — untrash / restore", () => {
     expect(container.textContent).toContain("Restore to inbox");
   });
 
-  it("shows 'Move to inbox' in dropdown when in junk", () => {
+  it("shows 'Not spam' in dropdown when in junk", () => {
     render({
       mailboxes: junkMailboxes,
       currentMailboxId: "junk",
       onUntrash: jest.fn(),
     });
-    expect(container.textContent).toContain("Move to inbox");
+    expect(container.textContent).toContain("Not spam");
   });
 
   it("calls onUntrash when 'Restore to inbox' is clicked", () => {

@@ -88,6 +88,36 @@ function parseStoredSettings(raw: string | null): MailComposeSettings {
   }
 }
 
+export function findAttachmentReminderKeyword(
+  subject: string,
+  bodyText: string,
+  keywords: readonly string[],
+): string | null {
+  const searchText = `${subject} ${bodyText}`.toLowerCase();
+  return (
+    keywords.find((keyword) => searchText.includes(keyword.toLowerCase())) ??
+    null
+  );
+}
+
+/** Returns the matched keyword when send should be blocked for a missing attachment. */
+export function shouldWarnAboutMissingAttachment(input: {
+  enabled: boolean;
+  attachmentCount: number;
+  subject: string;
+  bodyText: string;
+  keywords: readonly string[];
+}): string | null {
+  if (!input.enabled || input.attachmentCount > 0) {
+    return null;
+  }
+  return findAttachmentReminderKeyword(
+    input.subject,
+    input.bodyText,
+    input.keywords,
+  );
+}
+
 export function readMailComposeSettings(): MailComposeSettings {
   if (typeof window === "undefined") {
     return DEFAULT_MAIL_COMPOSE_SETTINGS;

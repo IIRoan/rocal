@@ -21,6 +21,8 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
 import {
@@ -50,7 +52,10 @@ import {
   swapEmbeddedSignatureInPlainText,
   resolveComposeSignatureIdentity,
 } from "@/lib/mail/signature-utils";
-import { useMailComposeSettings } from "@/lib/mail/compose-settings";
+import {
+  useMailComposeSettings,
+  shouldWarnAboutMissingAttachment,
+} from "@/lib/mail/compose-settings";
 import { useComposeQuotedInlineImages } from "@/hooks/use-compose-quoted-inline-images";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import type { JmapSession } from "@/lib/mail/types";
@@ -379,18 +384,17 @@ export function ComposeForm({
 
   const requestSend = useCallback(
     async (skipAttachmentCheck = false) => {
-      if (
-        !skipAttachmentCheck &&
-        composeSettings.attachmentReminderEnabled &&
-        composeAttachments.length === 0
-      ) {
+      if (!skipAttachmentCheck) {
         const bodyText = plainTextMode
           ? composeBody
           : htmlToPlainText(composeHtmlBody);
-        const searchText = `${composeSubject} ${bodyText}`.toLowerCase();
-        const matched = composeSettings.attachmentReminderKeywords.find(
-          (keyword) => searchText.includes(keyword.toLowerCase()),
-        );
+        const matched = shouldWarnAboutMissingAttachment({
+          enabled: composeSettings.attachmentReminderEnabled,
+          attachmentCount: composeAttachments.length,
+          subject: composeSubject,
+          bodyText,
+          keywords: composeSettings.attachmentReminderKeywords,
+        });
         if (matched) {
           setAttachmentWarningKeyword(matched);
           setShowAttachmentWarning(true);
@@ -673,6 +677,7 @@ export function ComposeForm({
           onChange={(e) => setComposeSubject(e.target.value)}
           placeholder="What's this about?"
           disabled={isBusy}
+          aria-label="Subject"
           className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40"
         />
       </div>
@@ -701,6 +706,7 @@ export function ComposeForm({
             onChange={(event) => setComposeBody(event.target.value)}
             placeholder="Write your message…"
             disabled={isBusy}
+            aria-label="Message body"
             className="min-h-0 flex-1 resize-none bg-transparent px-2 py-2 font-mono text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/40"
           />
         ) : (
@@ -781,6 +787,7 @@ export function ComposeForm({
             multiple
             className="hidden"
             onChange={handleFileChange}
+            aria-label="Attach files"
           />
           <button
             type="button"
@@ -821,45 +828,34 @@ export function ComposeForm({
         </span>
       </div>
 
-      {showAttachmentWarning && (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setShowAttachmentWarning(false)}
-        >
-          <div
-            role="alertdialog"
-            aria-modal="true"
-            className="w-full max-w-md rounded-lg border border-border bg-background shadow-xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-foreground">
-                Forgot an attachment?
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Your message mentions “{attachmentWarningKeyword}” but no files
-                are attached.
-              </p>
-            </div>
-            <div className="flex items-center justify-end gap-3 px-6 pb-6">
-              <Button
-                variant="outline"
-                onClick={() => setShowAttachmentWarning(false)}
-              >
-                Go back
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowAttachmentWarning(false);
-                  void requestSend(true);
-                }}
-              >
-                Send anyway
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog
+        open={showAttachmentWarning}
+        onOpenChange={setShowAttachmentWarning}
+      >
+        <DialogContent className="max-w-md">
+          <DialogTitle>Forgot an attachment?</DialogTitle>
+          <DialogDescription>
+            Your message mentions “{attachmentWarningKeyword}” but no files are
+            attached.
+          </DialogDescription>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowAttachmentWarning(false)}
+            >
+              Go back
+            </Button>
+            <Button
+              onClick={() => {
+                setShowAttachmentWarning(false);
+                void requestSend(true);
+              }}
+            >
+              Send anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -24,7 +24,6 @@ import {
   Check,
   Star,
   Tag,
-  Plus,
   X,
   MoreHorizontal,
   ChevronLeft,
@@ -90,6 +89,9 @@ import { useIsMobile, usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "sonner";
 import { SenderAvatar } from "./mail-avatar";
+import { LabelPickerPanel } from "./label-picker-panel";
+import { getAllMessageLabels } from "@/lib/mail/mail-labels";
+import { resolveLabelDisplayColor } from "@/lib/mail/mail-label-colors";
 import type {
   JmapEmailMessage,
   JmapIdentity,
@@ -639,6 +641,10 @@ export interface MessageReaderProps {
   onToggleFlagged?: () => void;
   onSetLabel?: (labelId: string, assigned: boolean) => void;
   onCreateLabel?: (name: string, color: string) => Promise<LabelDef | null>;
+  onUpdateLabel?: (
+    labelId: string,
+    updates: { name: string; color: string },
+  ) => Promise<void> | void;
   onDeleteLabel?: (labelId: string) => void;
   timeFormat?: "12h" | "24h";
   timezone?: string;
@@ -676,6 +682,9 @@ export interface MessageReaderProps {
   onDownloadAttachment?: (attachment: MailAttachment) => void;
   /** Restore a message from trash/junk to inbox */
   onUntrash?: () => void;
+  /** Move message to junk / restore from junk */
+  onReportSpam?: () => void;
+  onNotSpam?: () => void;
   /** Delete a specific message within the conversation thread */
   onConversationMessageDelete?: (id: string) => void;
   /** Mark a specific message within the conversation thread as unread */
@@ -722,6 +731,7 @@ export function MessageReader({
   onToggleFlagged,
   onSetLabel,
   onCreateLabel,
+  onUpdateLabel,
   onDeleteLabel,
   timeFormat,
   timezone,
@@ -736,6 +746,8 @@ export function MessageReader({
   onPreviewAttachment,
   onDownloadAttachment,
   onUntrash,
+  onReportSpam,
+  onNotSpam,
   onConversationMessageDelete,
   onConversationMessageMarkUnread,
   onConversationMessageMove,
@@ -745,7 +757,15 @@ export function MessageReader({
   mailServerLimits = resolveMailServerLimits({}),
 }: MessageReaderProps) {
   const { settings: displaySettings } = useMailDisplaySettings();
-  const [allowExternalContent, setAllowExternalContent] = useState(false);
+  const [allowExternalContent, setAllowExternalContent] = useState(
+    () => displaySettings.externalContentPolicy === "allow",
+  );
+  const externalContentKey = `${message?.id ?? ""}:${displaySettings.externalContentPolicy}`;
+  const prevExternalContentKeyRef = useRef(externalContentKey);
+  if (prevExternalContentKeyRef.current !== externalContentKey) {
+    prevExternalContentKeyRef.current = externalContentKey;
+    setAllowExternalContent(displaySettings.externalContentPolicy === "allow");
+  }
   const externalContentSenderEmail = message?.from?.[0]?.email ?? null;
   const blockRemoteImages = shouldBlockRemoteImages({
     policy: displaySettings.externalContentPolicy,
@@ -755,13 +775,6 @@ export function MessageReader({
   });
   const blockTrackingPixels = displaySettings.blockTrackingPixels;
   const isDark = resolveMailContentIsDark(displaySettings);
-
-  useEffect(() => {
-    setAllowExternalContent(displaySettings.externalContentPolicy === "allow");
-  }, [message?.id, displaySettings.externalContentPolicy]);
-  const [newLabelName, setNewLabelName] = useState("");
-  const [newLabelColor, setNewLabelColor] = useState("#6366f1");
-  const [isSavingLabel, setIsSavingLabel] = useState(false);
   const [labelPopoverOpen, setLabelPopoverOpen] = useState(false);
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const [morePopoverOpen, setMorePopoverOpen] = useState(false);
@@ -1160,9 +1173,7 @@ export function MessageReader({
   const PLAINTEXT_COLLAPSE_THRESHOLD = 1200;
 
   const isFlagged = message?.keywords?.["$flagged"] === true;
-  const messageLabels = labels.filter(
-    (l) => message?.keywords?.[`label:${l.id}`] === true,
-  );
+  const messageLabels = getAllMessageLabels(message, labels);
 
   const messageState = classifyMessageEncryption(message);
 
@@ -1215,6 +1226,8 @@ export function MessageReader({
   const isInTrash = currentMailboxRole === "trash";
   const isInJunk =
     currentMailboxRole === "junk" || currentMailboxRole === "spam";
+  const canReportSpam = Boolean(onReportSpam) && !isInJunk && !isInTrash;
+  const canNotSpam = Boolean(onNotSpam) && isInJunk;
 
   // ── Label popover content (shared between mobile/desktop) ──────────────────
   const labelPopoverContent = (
@@ -1224,108 +1237,18 @@ export function MessageReader({
       sideOffset={6}
       className="w-56 p-0 overflow-hidden"
     >
-      {labels.length > 0 && (
-        <div className="p-1 border-b border-border/40">
-          {labels.map((label) => {
-            const assigned = message?.keywords?.[`label:${label.id}`] === true;
-            return (
-              <div key={label.id} className="flex items-center rounded hover:bg-accent/50 transition-colors">
-                <button
-                  type="button"
-                  onClick={() => onSetLabel?.(label.id, !assigned)}
-                  className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm text-left cursor-pointer select-none min-w-0"
-                >
-                  <span
-                    className="size-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover"
-                    style={{
-                      backgroundColor: label.color,
-                      boxShadow: assigned
-                        ? `0 0 0 1px ${label.color}`
-                        : undefined,
-                    }}
-                  />
-                  <span className="flex-1 truncate text-foreground/80">
-                    {label.name}
-                  </span>
-                  {assigned && (
-                    <Check
-                      className="size-3 text-foreground/50 shrink-0"
-                      strokeWidth={2.5}
-                    />
-                  )}
-                </button>
-                {onDeleteLabel && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteLabel(label.id);
-                    }}
-                    className="mr-1 size-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors shrink-0"
-                    aria-label={`Delete label ${label.name}`}
-                  >
-                    <X className="size-3" strokeWidth={2.5} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {onCreateLabel && (
-        <div className="p-2 space-y-1.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">
-            New label
-          </div>
-          <div className="flex items-center gap-1.5">
-            <input
-              type="color"
-              value={newLabelColor}
-              onChange={(e) => setNewLabelColor(e.target.value)}
-              className="size-6 rounded cursor-pointer border-0 p-0 bg-transparent"
-              title="Label color"
-              aria-label="Label color"
-            />
-            <input
-              type="text"
-              value={newLabelName}
-              onChange={(e) => setNewLabelName(e.target.value)}
-              aria-label="New label name"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newLabelName.trim()) {
-                  setIsSavingLabel(true);
-                  void onCreateLabel(newLabelName.trim(), newLabelColor).then(
-                    () => {
-                      setNewLabelName("");
-                      setIsSavingLabel(false);
-                    },
-                  );
-                }
-              }}
-              placeholder="Label name…"
-              className="flex-1 h-6 text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-1 focus:ring-ring/50 placeholder:text-muted-foreground/40"
-            />
-            <button
-              type="button"
-              disabled={!newLabelName.trim() || isSavingLabel}
-              onClick={() => {
-                if (!newLabelName.trim()) return;
-                setIsSavingLabel(true);
-                void onCreateLabel(newLabelName.trim(), newLabelColor).then(
-                  () => {
-                    setNewLabelName("");
-                    setIsSavingLabel(false);
-                  },
-                );
-              }}
-              className="size-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-40 transition-colors"
-              aria-label="Create label"
-            >
-              <Plus className="size-3.5" strokeWidth={2.25} />
-            </button>
-          </div>
-        </div>
-      )}
+      <LabelPickerPanel
+        labels={labels}
+        messageKeywords={message?.keywords}
+        onToggleLabel={
+          onSetLabel
+            ? (labelId, assigned) => onSetLabel(labelId, assigned)
+            : undefined
+        }
+        onCreateLabel={onCreateLabel}
+        onUpdateLabel={onUpdateLabel}
+        onDeleteLabel={onDeleteLabel}
+      />
     </PopoverContent>
   );
 
@@ -1347,15 +1270,80 @@ export function MessageReader({
           {message.subject || "(No subject)"}
         </div>
       </div>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label="More actions"
-        disabled={isBusy}
-        onClick={() => setMoreActionsOpen(true)}
-      >
-        <EllipsisVertical />
-      </Button>
+      <div className="flex shrink-0 items-center gap-0.5">
+        {canReportSpam && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Move to junk"
+                title="Move to junk"
+                disabled={isBusy}
+                onClick={onReportSpam}
+              >
+                <ShieldAlert className="text-muted-foreground" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="z-[200]">
+              Move to junk
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {canNotSpam && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Not spam"
+                title="Not spam"
+                disabled={isBusy}
+                onClick={onNotSpam}
+              >
+                <Inbox />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="z-[200]">
+              Not spam
+            </TooltipContent>
+          </Tooltip>
+        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={isInTrash ? "Delete permanently" : "Move to trash"}
+              title={isInTrash ? "Delete permanently" : "Move to trash"}
+              disabled={isBusy}
+              onClick={onDelete}
+            >
+              <Trash2 className="text-destructive" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="z-[200]">
+            {isInTrash ? "Delete permanently" : "Move to trash"}
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="More actions"
+              title="More actions"
+              disabled={isBusy}
+              onClick={() => setMoreActionsOpen(true)}
+            >
+              <EllipsisVertical />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="z-[200]">
+            More actions
+          </TooltipContent>
+        </Tooltip>
+      </div>
     </div>
   ) : (
     <div className="shrink-0 flex items-center gap-0.5 px-3 h-12 border-b border-border/40">
@@ -1409,7 +1397,7 @@ export function MessageReader({
 
       {/* Right: archive, reply, delete */}
       <div className="ml-auto flex items-center gap-0">
-        {onArchive && (
+        {onArchive && !isInJunk && !isInTrash && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -1422,7 +1410,45 @@ export function MessageReader({
                 <Archive />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Archive</TooltipContent>
+            <TooltipContent side="bottom" className="z-[200]">Archive</TooltipContent>
+          </Tooltip>
+        )}
+        {canReportSpam && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Move to junk"
+                title="Move to junk"
+                disabled={isBusy}
+                onClick={onReportSpam}
+              >
+                <ShieldAlert className="text-muted-foreground" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="z-[200]">
+              Move to junk
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {canNotSpam && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Not spam"
+                title="Not spam"
+                disabled={isBusy}
+                onClick={onNotSpam}
+              >
+                <Inbox />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="z-[200]">
+              Not spam
+            </TooltipContent>
           </Tooltip>
         )}
         <Tooltip>
@@ -1431,13 +1457,14 @@ export function MessageReader({
               variant="ghost"
               size="icon-sm"
               aria-label="Reply"
+              title="Reply"
               disabled={isBusy}
               onClick={onReply}
             >
               <Reply />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Reply</TooltipContent>
+          <TooltipContent side="bottom" className="z-[200]">Reply</TooltipContent>
         </Tooltip>
 
         {/* Delete — direct button */}
@@ -1447,13 +1474,14 @@ export function MessageReader({
               variant="ghost"
               size="icon-sm"
               aria-label={isInTrash ? "Delete permanently" : "Move to trash"}
+              title={isInTrash ? "Delete permanently" : "Move to trash"}
               disabled={isBusy}
               onClick={onDelete}
             >
               <Trash2 className="text-destructive" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>
+          <TooltipContent side="bottom" className="z-[200]">
             {isInTrash ? "Delete permanently" : "Move to trash"}
           </TooltipContent>
         </Tooltip>
@@ -1472,13 +1500,16 @@ export function MessageReader({
                   variant="ghost"
                   size="icon-sm"
                   aria-label="More actions"
+                  title="More actions"
                   disabled={isBusy}
                 >
                   <EllipsisVertical />
                 </Button>
               </PopoverTrigger>
             </TooltipTrigger>
-            <TooltipContent>More actions</TooltipContent>
+            <TooltipContent side="bottom" className="z-[200]">
+              More actions
+            </TooltipContent>
           </Tooltip>
           <PopoverContent
             align="end"
@@ -1548,7 +1579,22 @@ export function MessageReader({
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/8 transition-colors"
               >
                 <Inbox className="size-3.5 shrink-0" />
-                {isInTrash ? "Restore to inbox" : "Move to inbox"}
+                {isInTrash ? "Restore to inbox" : "Not spam"}
+              </button>
+            )}
+
+            {canReportSpam && (
+              <button
+                type="button"
+                onClick={() => {
+                  onReportSpam?.();
+                  setMorePopoverOpen(false);
+                }}
+                disabled={isBusy}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground/80 hover:bg-accent/50 transition-colors"
+              >
+                <ShieldAlert className="size-3.5 shrink-0 text-muted-foreground" />
+                Move to junk
               </button>
             )}
 
@@ -2002,9 +2048,12 @@ export function MessageReader({
             isMobile ? "gap-1" : "gap-1.5",
           )}
         >
-          {messageLabels.map((label) => (
+          {messageLabels.map((label) => {
+            const displayColor = resolveLabelDisplayColor(label.color);
+            return (
             <span
               key={label.id}
+              title={label.name}
               className={cn(
                 "inline-flex items-center gap-1 rounded-full font-medium",
                 isMobile
@@ -2012,13 +2061,18 @@ export function MessageReader({
                   : "px-2 py-0.5 text-[11px]",
               )}
               style={{
-                backgroundColor: `${label.color}22`,
-                color: label.color,
+                backgroundColor: `${displayColor}22`,
+                color: displayColor,
               }}
             >
+              <span
+                className="size-1.5 rounded-full shrink-0"
+                style={{ backgroundColor: displayColor }}
+              />
               {label.name}
             </span>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -2177,6 +2231,40 @@ export function MessageReader({
                   {labelPopoverContent}
                 </Popover>
               )}
+              {canReportSpam && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onReportSpam?.();
+                    setMoreActionsOpen(false);
+                  }}
+                  disabled={isBusy}
+                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                >
+                  <ShieldAlert
+                    className="size-4 text-muted-foreground"
+                    strokeWidth={2.25}
+                  />
+                  Move to junk
+                </button>
+              )}
+              {canNotSpam && onNotSpam && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onNotSpam();
+                    setMoreActionsOpen(false);
+                  }}
+                  disabled={isBusy}
+                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                >
+                  <Inbox
+                    className="size-4 text-muted-foreground"
+                    strokeWidth={2.25}
+                  />
+                  Not spam
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -2187,7 +2275,7 @@ export function MessageReader({
                 className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-destructive/80 transition-colors hover:bg-destructive/10 active:bg-destructive/20 disabled:opacity-40"
               >
                 <Trash2 className="size-4" strokeWidth={2} />
-                Delete message
+                {isInTrash ? "Delete permanently" : "Move to trash"}
               </button>
               <DrawerClose asChild>
                 <button

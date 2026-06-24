@@ -38,6 +38,12 @@ import {
   mergeMailMessage,
   messageHasLoadedBody,
 } from "@/lib/mail/mail-message-body";
+import {
+  findInboxMailbox,
+  findJunkMailbox,
+  isJunkMailboxRole,
+  isTrashMailboxRole,
+} from "@/lib/mail/mail-mailbox-roles";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
 import { getMailComposeBridge, flushComposeDraftSave } from "@/components/mail/mail-compose-context";
 import { parseDecryptedMailContent } from "@/lib/mail/decrypted-mail-content";
@@ -2512,17 +2518,82 @@ export function useMailApp() {
     [activeMailbox, selectedMessageId],
   );
 
-  const handleUntrash = useCallback(async () => {
-    if (!activeMailbox || !selectedMessageId) return;
-    const inboxMailbox = activeMailbox.mailboxes.find(
-      (m) => m.role === "inbox" || m.role === "all",
+  const handleUntrash = useCallback(
+    async (messageId?: string) => {
+      if (!activeMailbox) return;
+      const inboxMailbox = findInboxMailbox(activeMailbox.mailboxes);
+      if (!inboxMailbox) {
+        toast.error("Inbox mailbox not found.");
+        return;
+      }
+      await handleMoveMessage(inboxMailbox.id, messageId);
+    },
+    [activeMailbox, handleMoveMessage],
+  );
+
+  const handleReportSpam = useCallback(
+    async (messageId?: string) => {
+      const targetId = messageId ?? selectedMessageId;
+      if (!activeMailbox || !targetId) return;
+      const junkMailbox = findJunkMailbox(activeMailbox.mailboxes);
+      if (!junkMailbox) {
+        toast.error("Junk mailbox not found.");
+        return;
+      }
+      const currentRole = activeMailbox.mailboxes.find(
+        (m) => m.id === activeMailbox.selectedMailboxId,
+      )?.role;
+      if (isJunkMailboxRole(currentRole)) {
+        return;
+      }
+      await handleMoveMessage(junkMailbox.id, targetId);
+    },
+    [activeMailbox, selectedMessageId, handleMoveMessage],
+  );
+
+  const handleNotSpam = useCallback(
+    async (messageId?: string) => {
+      await handleUntrash(messageId);
+    },
+    [handleUntrash],
+  );
+
+  const handleEmptyMailbox = useCallback(async () => {
+    if (!activeMailbox?.selectedMailboxId) return;
+    const mailbox = activeMailbox.mailboxes.find(
+      (m) => m.id === activeMailbox.selectedMailboxId,
     );
-    if (!inboxMailbox) {
-      toast.error("Inbox mailbox not found.");
+    const role = mailbox?.role;
+    if (!isTrashMailboxRole(role) && !isJunkMailboxRole(role)) {
       return;
     }
-    await handleMoveMessage(inboxMailbox.id);
-  }, [activeMailbox, selectedMessageId, handleMoveMessage]);
+
+    setIsBusy(true);
+    try {
+      const destroyed = await activeMailbox.client.emptyMailbox(
+        activeMailbox.session,
+        activeMailbox.selectedMailboxId,
+      );
+      setActiveMailbox((cur) =>
+        cur ? { ...cur, messages: [] } : cur,
+      );
+      setSelectedMessageId(null);
+      toast(
+        destroyed > 0
+          ? `Permanently deleted ${destroyed} ${destroyed === 1 ? "message" : "messages"}.`
+          : "Folder is already empty.",
+      );
+    } catch (error) {
+      log.error("Failed to empty mailbox", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not empty the folder.",
+      );
+    } finally {
+      setIsBusy(false);
+    }
+  }, [activeMailbox]);
 
   const handleReorderMailboxes = useCallback(
     async (reordered: JmapMailbox[]) => {
@@ -2818,6 +2889,19 @@ export function useMailApp() {
       }
     },
     [activeMailbox],
+  );
+
+  const handleBulkReportSpam = useCallback(
+    async (messageIds: string[]) => {
+      if (!activeMailbox || messageIds.length === 0) return;
+      const junkMailbox = findJunkMailbox(activeMailbox.mailboxes);
+      if (!junkMailbox) {
+        toast.error("Junk mailbox not found.");
+        return;
+      }
+      await handleBulkMove(messageIds, junkMailbox.id);
+    },
+    [activeMailbox, handleBulkMove],
   );
 
   const handleMarkAsUnread = useCallback(
@@ -3159,6 +3243,29 @@ export function useMailApp() {
     [activeMailbox, saveLabelsToVault],
   );
 
+  const handleUpdateLabel = useCallback(
+    async (
+      labelId: string,
+      updates: { name: string; color: string },
+    ): Promise<void> => {
+      if (!activeMailbox) return;
+      const updatedLabels = (activeMailbox.unlockedVault.labels ?? []).map(
+        (label) =>
+          label.id === labelId
+            ? { ...label, name: updates.name, color: updates.color }
+            : label,
+      );
+      try {
+        await saveLabelsToVault(updatedLabels);
+      } catch (error) {
+        log.error("Failed to update label", error);
+        toast.error("Could not update the label.");
+        throw error;
+      }
+    },
+    [activeMailbox, saveLabelsToVault],
+  );
+
   const composeMailPolicy = useMemo(
     () =>
       activeMailbox?.mailServerPolicy ??
@@ -3227,6 +3334,10 @@ export function useMailApp() {
     handleDownloadAttachment,
     closeAttachmentPreview,
     handleUntrash,
+    handleReportSpam,
+    handleNotSpam,
+    handleBulkReportSpam,
+    handleEmptyMailbox,
     handleMoveMessage,
     handleCreateMailbox,
     handleDeleteMailbox,
@@ -3242,6 +3353,7 @@ export function useMailApp() {
     handleSetMessageLabel,
     handleCreateLabel,
     handleDeleteLabel,
+    handleUpdateLabel,
     labels: activeMailbox?.unlockedVault.labels ?? [],
     handleDisconnect,
     handleSignOut,
