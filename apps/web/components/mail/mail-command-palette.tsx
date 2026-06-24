@@ -17,6 +17,7 @@ import {
   Inbox,
   Tag,
   AlignLeft,
+  Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { UnifiedSearchResult } from "@workspace/calendar-core";
@@ -49,6 +50,7 @@ import { TransitionContainer } from "../command-palette/transition-container";
 import { SettingToggleRow } from "../command-palette/setting-toggle-row";
 import { ComposeSettingsPanel } from "./compose-settings-panel";
 import { MailDisplaySettingsPanel } from "./mail-display-settings-panel";
+import { ContactsSettingsPanel } from "./contacts-settings-panel";
 import { InviteSettings } from "../command-palette/invite-settings";
 import { PasswordSection } from "../command-palette/password-section";
 import { PasskeySettings } from "@/components/passkey-settings";
@@ -77,7 +79,8 @@ type MailPaletteView =
   | "invites"
   | "labels"
   | "composing"
-  | "mail-display";
+  | "mail-display"
+  | "contacts";
 
 interface PaletteItem {
   id: string;
@@ -425,6 +428,12 @@ export function MailCommandPalette({
         label: "Labels",
         icon: Tag,
         description: "Manage message labels",
+      },
+      {
+        id: "contacts",
+        label: "Contacts",
+        icon: Users,
+        description: "People you email and receive mail from",
       },
       {
         id: "composing",
@@ -992,6 +1001,10 @@ export function MailCommandPalette({
 
     if (currentView === "mail-display") {
       return <MailDisplaySettingsPanel goBack={goBack} />;
+    }
+
+    if (currentView === "contacts") {
+      return <ContactsSettingsPanel goBack={goBack} />;
     }
 
     return null;

@@ -21,6 +21,7 @@ import {
   buildEventReminderMailView,
   enrichSelfMailRecipient,
   getErrorMessage,
+  isCurrentUserMailAddress,
   isDecryptedEventReminderContent,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -78,6 +79,7 @@ import {
   RecipientLinkList,
 } from "../../../../src/components/mail/RecipientSheet";
 import { mailSpacing } from "../../../../src/components/mail/mail-ui";
+import { useRecentContacts } from "../../../../src/hooks/use-recent-contacts";
 import { getMailboxIcon } from "../../../../src/lib/mail/mail-helpers";
 
 import {
@@ -155,6 +157,26 @@ export default function MailMessageScreen() {
   });
 
   const message = messageData ?? null;
+  const { recordUsage } = useRecentContacts();
+  const recordedContactMessageRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const sender = message?.from?.[0];
+    const accountEmail = runtime?.session?.username;
+    if (!message || !sender?.email || !accountEmail) {
+      return;
+    }
+    if (isCurrentUserMailAddress(sender.email, accountEmail)) {
+      return;
+    }
+
+    const recordKey = `${message.id}:${sender.email}`;
+    if (recordedContactMessageRef.current === recordKey) {
+      return;
+    }
+    recordedContactMessageRef.current = recordKey;
+    recordUsage([{ email: sender.email, displayName: sender.name }], "mail");
+  }, [message, recordUsage, runtime?.session?.username]);
 
   useEffect(() => {
     if (!message || !runtime) return;

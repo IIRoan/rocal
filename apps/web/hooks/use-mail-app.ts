@@ -689,6 +689,7 @@ export function useMailApp() {
   const attachmentHoverPreviewUrlsRef = useRef<Set<string>>(new Set());
   const activeMailboxRef = useRef<ActiveMailboxState | null>(null);
   const hasAttemptedAutoOpenRef = useRef(false);
+  const recordedContactMessageRef = useRef<string | null>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [cachedAuthPassword, setCachedAuthPassword] = useState<string | null>(
     () => (typeof window !== "undefined" ? peekCachedAuthPassword() : null),
@@ -839,6 +840,27 @@ export function useMailApp() {
   const selectedMessageBodyLoaded = selectedMessage
     ? messageHasLoadedBody(selectedMessage)
     : false;
+
+  useEffect(() => {
+    const mailbox = activeMailboxRef.current;
+    const sender = selectedMessage?.from?.[0];
+    if (!mailbox || !selectedMessage || !sender?.email) {
+      return;
+    }
+    if (isCurrentUserMailAddress(sender.email, mailbox.email)) {
+      return;
+    }
+
+    const recordKey = `${selectedMessage.id}:${sender.email}`;
+    if (recordedContactMessageRef.current === recordKey) {
+      return;
+    }
+    recordedContactMessageRef.current = recordKey;
+    recordUsage(
+      [{ email: sender.email, displayName: sender.name }],
+      "mail",
+    );
+  }, [recordUsage, selectedMessage]);
 
   const handleSelectMessageId = useCallback((messageId: string | null) => {
     setSelectedMessageId(messageId);

@@ -2,10 +2,15 @@ import { describe, expect, it } from "bun:test";
 import {
   createEmptyRecentContactsPayload,
   filterRecentContactSuggestions,
+  filterContactsList,
   formatRecentContactForField,
   insertRecipientSuggestion,
   MAX_RECENT_CONTACTS,
   recordRecentContactUsage,
+  addManualContact,
+  updateContactDetails,
+  removeContact,
+  getContactDisplayLabel,
 } from "../recent-contacts";
 
 describe("recordRecentContactUsage", () => {
@@ -147,5 +152,93 @@ describe("insertRecipientSuggestion", () => {
     expect(
       insertRecipientSuggestion("", "alice@example.com"),
     ).toBe("alice@example.com");
+  });
+});
+
+describe("contact management", () => {
+  it("adds a manual contact", () => {
+    const result = addManualContact(null, {
+      email: "alice@example.com",
+      displayName: "Alice",
+      phone: "+1 555 0100",
+    });
+
+    expect(result?.contacts).toHaveLength(1);
+    expect(result?.contacts[0]).toMatchObject({
+      email: "alice@example.com",
+      displayName: "Alice",
+      phone: "+1 555 0100",
+      manual: true,
+      useCount: 0,
+      contexts: [],
+    });
+  });
+
+  it("updates contact details without dropping usage metadata", () => {
+    const base = recordRecentContactUsage(
+      null,
+      [{ email: "alice@example.com", displayName: "Alice" }],
+      "mail",
+      { usedAt: "2026-01-01T00:00:00.000Z" },
+    );
+
+    const updated = updateContactDetails(base, "alice@example.com", {
+      phone: "+1 555 0100",
+      notes: "Project lead",
+    });
+
+    expect(updated.contacts[0]).toMatchObject({
+      email: "alice@example.com",
+      displayName: "Alice",
+      phone: "+1 555 0100",
+      notes: "Project lead",
+      manual: true,
+      useCount: 1,
+      contexts: ["mail"],
+    });
+  });
+
+  it("removes a contact by email", () => {
+    const base = recordRecentContactUsage(
+      null,
+      [{ email: "alice@example.com" }, { email: "bob@example.com" }],
+      "mail",
+      { usedAt: "2026-01-01T00:00:00.000Z" },
+    );
+
+    const next = removeContact(base, "alice@example.com");
+    expect(next.contacts.map((entry) => entry.email)).toEqual([
+      "bob@example.com",
+    ]);
+  });
+
+  it("filters contacts by phone and notes", () => {
+    const payload = addManualContact(null, {
+      email: "alice@example.com",
+      displayName: "Alice",
+      phone: "+1 555 0100",
+      notes: "Project lead",
+    });
+
+    expect(
+      filterContactsList(payload, { query: "555" }).map((entry) => entry.email),
+    ).toEqual(["alice@example.com"]);
+    expect(
+      filterContactsList(payload, { query: "project" }).map(
+        (entry) => entry.email,
+      ),
+    ).toEqual(["alice@example.com"]);
+  });
+
+  it("prefers display name for labels", () => {
+    expect(
+      getContactDisplayLabel({
+        email: "alice@example.com",
+        displayName: "Alice",
+        lastUsedAt: "2026-01-01T00:00:00.000Z",
+        useCount: 1,
+        contexts: ["mail"],
+      }),
+    ).toBe("Alice");
   });
 });

@@ -25,6 +25,9 @@ export const DEFAULT_MAIL_DISPLAY_SETTINGS: MailDisplaySettings = {
   attachmentImagePreviewsEnabled: true,
 };
 
+export const TRUSTED_SENDER_DESCRIPTION =
+  "Remote images from these senders load automatically when the policy is set to ask.";
+
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }

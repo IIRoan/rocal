@@ -10,6 +10,7 @@ export {
   CALENDAR_HOME_ROUTE,
   SETTINGS_ROUTE,
   SETTINGS_TIMEZONE_ROUTE,
+  SETTINGS_CONTACTS_ROUTE,
 } from "./navigation-routes";
 
 interface AuthRedirectInput {
