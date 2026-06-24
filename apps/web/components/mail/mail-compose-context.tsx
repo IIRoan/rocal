@@ -64,6 +64,7 @@ export type ComposeDraft = {
   attachments: File[];
   replyContext: MailReplyContext | null;
   identityId: string | null;
+  fromEmailOverride: string | null;
   draftId: string | null;
   composeMode: ComposeMode;
   signatureAlreadyEmbedded: boolean;
@@ -138,6 +139,8 @@ type MailComposeFieldsContextValue = {
   mailServerLimits: MailServerLimits;
   selectedIdentityId: string | null;
   setSelectedIdentityId: (id: string | null) => void;
+  fromEmailOverride: string | null;
+  setFromEmailOverride: (email: string | null) => void;
   draftSaveStatus: DraftSaveStatus;
   setDraftSaveStatus: (status: DraftSaveStatus) => void;
   composeDraftId: string | null;
@@ -271,6 +274,9 @@ export function MailComposeProvider({
   const [selectedIdentityId, setSelectedIdentityId] = useState<string | null>(
     null,
   );
+  const [fromEmailOverride, setFromEmailOverride] = useState<string | null>(
+    null,
+  );
   const resolvedIdentityId =
     selectedIdentityId &&
     identities.some((entry) => entry.id === selectedIdentityId)
@@ -303,6 +309,7 @@ export function MailComposeProvider({
       attachments: composeAttachments,
       replyContext: composeReplyContext,
       identityId: resolvedIdentityId,
+      fromEmailOverride,
       draftId,
       composeMode,
       signatureAlreadyEmbedded,
@@ -317,6 +324,7 @@ export function MailComposeProvider({
       composeAttachments,
       composeReplyContext,
       resolvedIdentityId,
+      fromEmailOverride,
       draftId,
       composeMode,
       signatureAlreadyEmbedded,
@@ -342,6 +350,7 @@ export function MailComposeProvider({
     setIsComposeOpen(false);
     setIsFullCompose(false);
     setSelectedIdentityId(identities[0]?.id ?? null);
+    setFromEmailOverride(null);
   }, [identities]);
 
   const clearCompose = useCallback(() => {
@@ -361,6 +370,7 @@ export function MailComposeProvider({
     isDirtyRef.current = false;
     setDraftSaveStatus("idle");
     setSelectedIdentityId(identities[0]?.id ?? null);
+    setFromEmailOverride(null);
     resetComposeInlineImages();
   }, [identities]);
 
@@ -712,6 +722,12 @@ export function MailComposeProvider({
       setSelectedIdentityId: (id: string | null) => {
         markDirty();
         setSelectedIdentityId(id);
+        setFromEmailOverride(null);
+      },
+      fromEmailOverride,
+      setFromEmailOverride: (email: string | null) => {
+        markDirty();
+        setFromEmailOverride(email);
       },
       draftSaveStatus,
       setDraftSaveStatus,
@@ -731,6 +747,7 @@ export function MailComposeProvider({
       composeAttachments,
       mailServerLimits,
       resolvedIdentityId,
+      fromEmailOverride,
       draftSaveStatus,
       draftId,
       markDirty,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   RotateCcw,
   ArrowLeft,
@@ -35,6 +35,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useMailUrlSync } from "@/hooks/use-mail-url-sync";
 import { useSettings } from "@/hooks/use-settings";
+import { useMailKeyboardShortcuts } from "@/hooks/use-mail-keyboard-shortcuts";
+import { useMailListSettings } from "@/lib/mail/mail-list-settings";
+import {
+  buildJmapFilter,
+  hasActiveFilters,
+  type MailSearchFilters,
+} from "@/lib/mail/mail-search-filter";
+import { AdvancedSearchPanel, AdvancedSearchToggle, countActiveFilters } from "./advanced-search-panel";
 import { MobileAppSwitcher } from "@/components/mobile-app-switcher";
 import { MailSidebar } from "./mail-sidebar";
 import { MailCommandPalette } from "./mail-command-palette";
@@ -249,6 +257,8 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     mailboxStatus,
     isMailboxStatusLoading,
     activeMailbox,
+    composeMailPolicy,
+    listThreadRelatedMessages,
     selectedMessage,
     selectedMessageId,
     setSelectedMessageId,
@@ -256,6 +266,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     selectedConversationMessages,
     isConversationLoading,
     isMessageBodyLoading,
+    loadConversationThread,
     setSelectedConversationMessageId,
     selectedMessagePlaintext,
     selectedMessageDecryptedHtml,
@@ -324,6 +335,11 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
   const isMobile = useIsMobile();
   const [mailListSearch, setMailListSearch] = useState("");
   const [debouncedMailListSearch, setDebouncedMailListSearch] = useState("");
+  const [advancedFilters, setAdvancedFilters] = useState<MailSearchFilters>({
+    text: undefined,
+    conditions: [],
+  });
+  const [filterPanelExpanded, setFilterPanelExpanded] = useState(false);
   const [emptyFolderOpen, setEmptyFolderOpen] = useState(false);
   const openedDraftIdRef = useRef<string | null>(null);
 
@@ -389,13 +405,40 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     selectedMessageDecryptError,
   ]);
 
+  const searchActive =
+    Boolean(debouncedMailListSearch.trim()) || hasActiveFilters(advancedFilters);
+
+  const effectiveSearchFilters: MailSearchFilters = useMemo(
+    () => ({
+      ...advancedFilters,
+      text:
+        advancedFilters.text?.trim() ||
+        debouncedMailListSearch.trim() ||
+        undefined,
+    }),
+    [advancedFilters, debouncedMailListSearch],
+  );
+
   const {
     data: serverSearchResults,
     isFetching: isSearching,
   } = useQuery<JmapEmailMessage[]>({
-    queryKey: mailQueryKeys.inlineSearch(mailboxId, debouncedMailListSearch),
+    queryKey: [
+      ...mailQueryKeys.inlineSearch(mailboxId, debouncedMailListSearch),
+      effectiveSearchFilters,
+    ],
     queryFn: async () => {
-      if (!activeMailbox || !mailboxId || !debouncedMailListSearch.trim()) return [];
+      if (!activeMailbox || !mailboxId || !searchActive) return [];
+      if (hasActiveFilters(effectiveSearchFilters)) {
+        const jmapFilter = buildJmapFilter(mailboxId, effectiveSearchFilters);
+        const { messages } = await activeMailbox.client.searchMailboxMessagesWithFilter(
+          activeMailbox.session,
+          mailboxId,
+          jmapFilter,
+          40,
+        );
+        return messages;
+      }
       const { messages } = await activeMailbox.client.searchMailboxMessages(
         activeMailbox.session,
         mailboxId,
@@ -404,12 +447,12 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
       );
       return messages;
     },
-    enabled: Boolean(debouncedMailListSearch.trim() && activeMailbox && mailboxId),
+    enabled: Boolean(searchActive && activeMailbox && mailboxId),
     staleTime: 10_000,
     placeholderData: (prev) => prev,
   });
 
-  const filteredListMessages: JmapEmailMessage[] = debouncedMailListSearch.trim()
+  const filteredListMessages: JmapEmailMessage[] = searchActive
     ? (serverSearchResults ?? [])
     : (activeMailbox?.messages ?? []);
 
@@ -438,7 +481,8 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
 
       const message =
         filteredListMessages.find((entry) => entry.id === id) ??
-        messages.find((entry) => entry.id === id);
+        messages.find((entry) => entry.id === id) ??
+        listThreadRelatedMessages.find((entry) => entry.id === id);
 
       if (
         message &&
@@ -454,14 +498,16 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
       }
 
       openedDraftIdRef.current = null;
-      setSelectedMessageId(id);
+      void openMessageById(id, message ?? undefined);
     },
     [
       activeMailbox,
       filteredListMessages,
       isFullCompose,
+      listThreadRelatedMessages,
       mailboxId,
       messages,
+      openMessageById,
       setSelectedMessageId,
     ],
   );
@@ -508,6 +554,8 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     prevMailboxIdRef.current !== currentMailboxId
   ) {
     setMailListSearch("");
+    setAdvancedFilters({ text: undefined, conditions: [] });
+    setFilterPanelExpanded(false);
   }
   prevMailboxIdRef.current = currentMailboxId;
 
@@ -518,6 +566,40 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
   const handleArchive = archiveMailbox
     ? () => void handleMoveMessage(archiveMailbox.id)
     : undefined;
+
+  const { settings: listSettings } = useMailListSettings();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useMailKeyboardShortcuts(
+    {
+      navigatePrev: handleNavigatePrev,
+      navigateNext: handleNavigateNext,
+      reply: () => handleReply(),
+      replyAll: () => handleReply(),
+      forward: () => handleForward(),
+      archive: () => handleArchive?.(),
+      deleteMessage: () => void handleDeleteMessage(),
+      toggleFlagged: () => void handleToggleFlagged(),
+      toggleReadUnread: () => {
+        if (selectedMessage?.keywords?.["$seen"]) {
+          void handleMarkAsUnread();
+        } else {
+          void handleMarkAsRead();
+        }
+      },
+      markAsRead: () => void handleMarkAsRead(),
+      markAsUnread: () => void handleMarkAsUnread(),
+      compose: () => openNewCompose(),
+      refresh: () => void handleManualRefresh(),
+      closeMessage: handleCloseMessage,
+      focusSearch: () => {
+        if (!isMobile) {
+          searchInputRef.current?.focus();
+        }
+      },
+    },
+    Boolean(activeMailbox) && listSettings.keyboardShortcutsEnabled,
+  );
 
   const isOverlayLoading = isMailboxStatusLoading || (isBusy && !activeMailbox);
 
@@ -636,43 +718,69 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                   {/* Inline search input — desktop only */}
                   {!isMobile && (
                     <div className="px-3 py-2 border-b border-border/40 shrink-0">
-                      <div className="relative flex items-center">
-                        <Search
-                          size={13}
-                          strokeWidth={2}
-                          className="absolute left-2.5 text-muted-foreground/50 pointer-events-none"
-                        />
-                        <Input
-                          value={mailListSearch}
-                          onChange={(e) => setMailListSearch(e.target.value)}
-                          placeholder="Search all messages…"
-                          className="h-7 pl-7 pr-7 text-xs bg-muted/40 border-0 shadow-none rounded-md focus-visible:ring-1 focus-visible:ring-ring/40 placeholder:text-muted-foreground/40"
-                        />
-                        {isSearching && debouncedMailListSearch && (
-                          <RotateCcw
-                            size={11}
+                      <div className="flex items-center gap-1.5">
+                        <div className="relative flex min-w-0 flex-1 items-center">
+                          <Search
+                            size={13}
                             strokeWidth={2}
-                            className="absolute right-2 text-muted-foreground/40 animate-spin pointer-events-none"
+                            className="absolute left-2.5 text-muted-foreground/50 pointer-events-none"
                           />
-                        )}
-                        {mailListSearch && !isSearching && (
-                          <button
-                            type="button"
-                            onClick={() => setMailListSearch("")}
-                            className="absolute right-2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                            aria-label="Clear search"
-                          >
-                            <X size={12} strokeWidth={2.5} />
-                          </button>
-                        )}
+                          <Input
+                            ref={searchInputRef}
+                            value={mailListSearch}
+                            onChange={(e) => setMailListSearch(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                setAdvancedFilters((prev) => ({
+                                  ...prev,
+                                  text: mailListSearch.trim() || undefined,
+                                }));
+                              }
+                            }}
+                            placeholder="Search all messages… (press / to focus)"
+                            className="h-7 w-full pl-7 pr-7 text-xs bg-muted/40 border-0 shadow-none rounded-md focus-visible:ring-1 focus-visible:ring-ring/40 placeholder:text-muted-foreground/40"
+                          />
+                          {isSearching && searchActive && (
+                            <RotateCcw
+                              size={11}
+                              strokeWidth={2}
+                              className="absolute right-2 text-muted-foreground/40 animate-spin pointer-events-none"
+                            />
+                          )}
+                          {mailListSearch && !isSearching && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMailListSearch("");
+                                setAdvancedFilters({ text: undefined, conditions: [] });
+                                setFilterPanelExpanded(false);
+                              }}
+                              className="absolute right-2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                              aria-label="Clear search"
+                            >
+                              <X size={12} strokeWidth={2.5} />
+                            </button>
+                          )}
+                        </div>
+                        <AdvancedSearchToggle
+                          expanded={filterPanelExpanded}
+                          onExpandedChange={setFilterPanelExpanded}
+                          activeCount={countActiveFilters(advancedFilters)}
+                        />
                       </div>
+                      <AdvancedSearchPanel
+                        filters={advancedFilters}
+                        onFiltersChange={setAdvancedFilters}
+                        expanded={filterPanelExpanded}
+                        onExpandedChange={setFilterPanelExpanded}
+                      />
                     </div>
                   )}
                   <div className="flex min-h-0 flex-1 flex-col">
                     <MessageList
                     key={activeMailbox.selectedMailboxId ?? "mailbox-list"}
                     messages={filteredListMessages}
-                    relatedMessages={[]}
+                    relatedMessages={listThreadRelatedMessages}
                     selectedMessageId={selectedMessageId}
                     onSelect={handleSelectMessage}
                     mailboxes={activeMailbox.mailboxes}
@@ -701,9 +809,27 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                     labels={labels}
                     timeFormat={timeFormat}
                     timezone={settings?.timezone}
-                    onLoadMore={debouncedMailListSearch ? undefined : () => void loadMoreMessages()}
-                    hasMore={debouncedMailListSearch ? false : hasMoreMessages}
+                    onLoadMore={searchActive ? undefined : () => void loadMoreMessages()}
+                    hasMore={searchActive ? false : hasMoreMessages}
                     isLoadingMore={isLoadingMore}
+                    density={listSettings.density}
+                    showLabelChips={listSettings.showLabelChipsInList}
+                    threadExpandEnabled={listSettings.threadExpandInList}
+                    onExpandThread={
+                      activeMailbox
+                        ? async (threadId: string) => {
+                            try {
+                              const messages = await activeMailbox.client.getThreadMessages(
+                                activeMailbox.session,
+                                threadId,
+                              );
+                              return messages;
+                            } catch {
+                              return [];
+                            }
+                          }
+                        : undefined
+                    }
                   />
                   </div>
                 </div>
