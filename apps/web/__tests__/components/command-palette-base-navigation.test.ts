@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   BASE_SETTINGS_NAVIGATION_ITEMS,
   getBaseSettingsNavigationItems,
+  getRootBaseSettingsNavigationItems,
 } from "../../components/command-palette/base-navigation";
 import { NAVIGATION_ITEMS } from "../../components/command-palette/navigation-config";
 
@@ -42,5 +43,11 @@ describe("base command palette navigation", () => {
     expect(mailBaseItems.find((item) => item.id === "security")).toMatchObject({
       parent: "account",
     });
+  });
+
+  it("exposes only root settings for top-level palette navigation", () => {
+    expect(
+      getRootBaseSettingsNavigationItems().map((item) => item.id),
+    ).toEqual(["appearance", "time-region", "notifications", "account"]);
   });
 });

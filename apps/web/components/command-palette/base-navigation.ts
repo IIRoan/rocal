@@ -100,3 +100,9 @@ export function getBaseSettingsNavigationItems(input: { timezone?: string } = {}
         : item.description,
   }));
 }
+
+export function getRootBaseSettingsNavigationItems(input: {
+  timezone?: string;
+} = {}) {
+  return getBaseSettingsNavigationItems(input).filter((item) => item.parent === null);
+}
