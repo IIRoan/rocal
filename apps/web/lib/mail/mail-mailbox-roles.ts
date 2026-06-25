@@ -1,6 +1,6 @@
 import type { JmapMailbox } from "./types";
 
-const JUNK_ROLES = new Set(["junk", "spam"]);
+const SPAM_MAILBOX_ROLES = new Set(["junk", "spam"]);
 const TRASH_ROLES = new Set(["trash"]);
 
 export function normalizeMailboxRole(
@@ -9,8 +9,8 @@ export function normalizeMailboxRole(
   return role?.toLowerCase() ?? "";
 }
 
-export function isJunkMailboxRole(role: string | null | undefined): boolean {
-  return JUNK_ROLES.has(normalizeMailboxRole(role));
+export function isSpamMailboxRole(role: string | null | undefined): boolean {
+  return SPAM_MAILBOX_ROLES.has(normalizeMailboxRole(role));
 }
 
 export function isTrashMailboxRole(role: string | null | undefined): boolean {
@@ -19,7 +19,7 @@ export function isTrashMailboxRole(role: string | null | undefined): boolean {
 
 export function canEmptyMailboxRole(role: string | null | undefined): boolean {
   const normalized = normalizeMailboxRole(role);
-  return JUNK_ROLES.has(normalized) || TRASH_ROLES.has(normalized);
+  return SPAM_MAILBOX_ROLES.has(normalized) || TRASH_ROLES.has(normalized);
 }
 
 export function findMailboxByRole(
@@ -38,7 +38,7 @@ export function findInboxMailbox(
   return findMailboxByRole(mailboxes, ["inbox", "all"]);
 }
 
-export function findJunkMailbox(
+export function findSpamMailbox(
   mailboxes: JmapMailbox[],
 ): JmapMailbox | undefined {
   return findMailboxByRole(mailboxes, ["junk", "spam"]);
@@ -48,4 +48,14 @@ export function findTrashMailbox(
   mailboxes: JmapMailbox[],
 ): JmapMailbox | undefined {
   return findMailboxByRole(mailboxes, ["trash"]);
+}
+
+export function getMailboxDisplayName(mailbox: {
+  name: string;
+  role?: string | null;
+}): string {
+  if (isSpamMailboxRole(mailbox.role)) {
+    return "Spam";
+  }
+  return mailbox.name;
 }

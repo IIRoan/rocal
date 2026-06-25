@@ -4,6 +4,7 @@ import {
   formatAddressFull,
   formatMessageDate,
   getInitials,
+  getMailboxDisplayName,
   getMailboxIcon,
   getPrimaryMailboxId,
   isLikelyEmail,
@@ -151,6 +152,20 @@ describe("sortMailboxes", () => {
     ];
     sortMailboxes(mailboxes);
     expect(mailboxes.map((m) => m.id)).toEqual(["sent", "inbox"]);
+  });
+});
+
+describe("getMailboxDisplayName", () => {
+  it("shows Spam for junk/spam role mailboxes", () => {
+    expect(getMailboxDisplayName(mailbox({ id: "x", name: "Junk Mail", role: "junk" }))).toBe(
+      "Spam",
+    );
+    expect(getMailboxDisplayName(mailbox({ id: "x", name: "Spam", role: "spam" }))).toBe(
+      "Spam",
+    );
+    expect(getMailboxDisplayName(mailbox({ id: "x", name: "Inbox", role: "inbox" }))).toBe(
+      "Inbox",
+    );
   });
 });
 

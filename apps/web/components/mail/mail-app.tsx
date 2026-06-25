@@ -64,7 +64,7 @@ import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
 import { isDraftMessage } from "@/lib/mail/draft-utils";
 import { messageHasLoadedBody } from "@/lib/mail/mail-message-body";
 import { classifyMessageEncryption } from "@/lib/mail/message-security";
-import { canEmptyMailboxRole } from "@/lib/mail/mail-mailbox-roles";
+import { canEmptyMailboxRole, getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
 
 interface MobileMailHeaderProps {
   selectedMailboxName: string;
@@ -612,7 +612,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     canEmptyMailboxRole(selectedMailbox?.role);
   const emptyFolderLabel = selectedMailbox?.role?.toLowerCase() === "trash"
     ? "Empty trash"
-    : "Empty junk";
+    : "Empty spam";
 
   // On mobile: show reader/compose pane for real messages or the full composer
   const showMobileDetailPane =
@@ -644,7 +644,11 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
             <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
               {isMobile && !showMobileDetailPane && (
                 <MobileMailHeader
-                  selectedMailboxName={selectedMailbox?.name ?? "Inbox"}
+                  selectedMailboxName={
+                    selectedMailbox
+                      ? getMailboxDisplayName(selectedMailbox)
+                      : "Inbox"
+                  }
                   selectedMessageSubject={selectedMessage?.subject ?? null}
                   mailboxEmail={activeMailbox.email ?? accountEmail}
                   showReaderOnMobile={showMobileDetailPane}
@@ -672,7 +676,9 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                   {!isMobile && (
                     <header className="flex h-11 shrink-0 items-center border-b border-border/40 px-3 gap-2">
                       <h1 className="text-sm font-semibold flex-1 min-w-0 truncate">
-                        {selectedMailbox?.name ?? "Inbox"}
+                        {selectedMailbox
+                          ? getMailboxDisplayName(selectedMailbox)
+                          : "Inbox"}
                       </h1>
                       <div className="flex items-center gap-0.5 shrink-0">
                         {canEmptyFolder ? (
@@ -1033,7 +1039,11 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
             <DialogTitle>{emptyFolderLabel}?</DialogTitle>
             <DialogDescription>
               Permanently delete all {activeMailbox?.messages.length ?? 0}{" "}
-              messages in {selectedMailbox?.name ?? "this folder"}. This cannot
+              messages in{" "}
+              {selectedMailbox
+                ? getMailboxDisplayName(selectedMailbox)
+                : "this folder"}
+              . This cannot
               be undone.
             </DialogDescription>
           </DialogHeader>
