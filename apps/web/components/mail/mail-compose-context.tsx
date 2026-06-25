@@ -64,13 +64,36 @@ export type ComposeDraft = {
   attachments: File[];
   replyContext: MailReplyContext | null;
   identityId: string | null;
-  fromEmailOverride: string | null;
   draftId: string | null;
   composeMode: ComposeMode;
   signatureAlreadyEmbedded: boolean;
 };
 
 export type DraftSaveStatus = "idle" | "saving" | "saved" | "error";
+
+type ComposeSnapshot = {
+  to: string;
+  cc: string;
+  bcc: string;
+  subject: string;
+  body: string;
+  htmlBody: string;
+  attachmentCount: number;
+  identityId: string | null;
+};
+
+function buildComposeSnapshot(draft: ComposeDraft): ComposeSnapshot {
+  return {
+    to: draft.to,
+    cc: draft.cc,
+    bcc: draft.bcc,
+    subject: draft.subject,
+    body: draft.body,
+    htmlBody: draft.htmlBody,
+    attachmentCount: draft.attachments.length,
+    identityId: draft.identityId,
+  };
+}
 
 export type MailComposeBridge = {
   getDraft: () => ComposeDraft;
@@ -90,18 +113,35 @@ export type MailComposeBridge = {
       html?: string | null;
     },
   ) => void;
+  openDraftEditor: (
+    message: JmapEmailMessage,
+    overrides?: {
+      plaintext?: string | null;
+      html?: string | null;
+    },
+  ) => void;
   markDirty: () => void;
+  isComposeDirty: () => boolean;
+  captureComposeBaseline: () => void;
+  acknowledgeSavedDraft: () => void;
   getDraftIdRef: () => string | null;
   setDraftId: (id: string | null) => void;
   setDraftSaveStatus: (status: DraftSaveStatus) => void;
+  bumpComposeSessionId: () => void;
 };
 
 const composeBridgeRef: { current: MailComposeBridge | null } = {
   current: null,
 };
 
+export type ComposeDraftSaver = {
+  save: () => Promise<string | null>;
+  flush: () => Promise<string | null>;
+  cancelPending: () => void;
+};
+
 const composeDraftSaveRef: {
-  current: (() => Promise<string | null>) | null;
+  current: ComposeDraftSaver | null;
 } = { current: null };
 
 export function getMailComposeBridge(): MailComposeBridge | null {
@@ -109,7 +149,7 @@ export function getMailComposeBridge(): MailComposeBridge | null {
 }
 
 export function registerComposeDraftSaver(
-  saver: (() => Promise<string | null>) | null,
+  saver: ComposeDraftSaver | null,
 ) {
   composeDraftSaveRef.current = saver;
 }
@@ -118,7 +158,26 @@ export async function flushComposeDraftSave(): Promise<string | null> {
   if (!composeDraftSaveRef.current) {
     return null;
   }
-  return composeDraftSaveRef.current();
+  return composeDraftSaveRef.current.flush();
+}
+
+export function cancelComposeDraftSave(): void {
+  composeDraftSaveRef.current?.cancelPending();
+}
+
+export type ComposeCloseActions = {
+  dismiss: () => void;
+  discardDraft?: (draftId: string) => void;
+};
+
+const composeCloseActionsRef: { current: ComposeCloseActions | null } = {
+  current: null,
+};
+
+export function registerComposeCloseActions(
+  actions: ComposeCloseActions | null,
+): void {
+  composeCloseActionsRef.current = actions;
 }
 
 type MailComposeFieldsContextValue = {
@@ -139,8 +198,6 @@ type MailComposeFieldsContextValue = {
   mailServerLimits: MailServerLimits;
   selectedIdentityId: string | null;
   setSelectedIdentityId: (id: string | null) => void;
-  fromEmailOverride: string | null;
-  setFromEmailOverride: (email: string | null) => void;
   draftSaveStatus: DraftSaveStatus;
   setDraftSaveStatus: (status: DraftSaveStatus) => void;
   composeDraftId: string | null;
@@ -148,6 +205,16 @@ type MailComposeFieldsContextValue = {
   composeMode: ComposeMode;
   quotedAttachments: QuotedInlineAttachment[];
   openNewCompose: () => void;
+  composeSessionId: number;
+  requestComposeClose: (afterClose?: () => void) => boolean;
+};
+
+type MailComposeClosePromptContextValue = {
+  composeClosePromptOpen: boolean;
+  setComposeClosePromptOpen: (open: boolean) => void;
+  keepEditing: () => void;
+  saveDraftAndClose: () => Promise<void>;
+  discardAndClose: () => void;
 };
 
 type MailComposeChromeContextValue = {
@@ -164,6 +231,10 @@ const MailComposeFieldsContext = createContext<
 
 const MailComposeChromeContext = createContext<
   MailComposeChromeContextValue | undefined
+>(undefined);
+
+const MailComposeClosePromptContext = createContext<
+  MailComposeClosePromptContextValue | undefined
 >(undefined);
 
 export function useMailCompose() {
@@ -183,6 +254,25 @@ export function useMailComposeChrome() {
   }
   return context;
 }
+
+export function useMailComposeClosePrompt() {
+  const context = use(MailComposeClosePromptContext);
+  if (!context) {
+    throw new Error(
+      "useMailComposeClosePrompt must be used within MailComposeProvider",
+    );
+  }
+  return context;
+}
+
+export function useComposeActive(): boolean {
+  const { isComposeOpen, isFullCompose } = useMailComposeChrome();
+  return isComposeOpen || isFullCompose;
+}
+
+const pendingCloseActionRef: { current: (() => void) | null } = {
+  current: null,
+};
 
 function addressesToCsv(
   addresses: Array<{ email?: string | null }> | undefined,
@@ -274,9 +364,6 @@ export function MailComposeProvider({
   const [selectedIdentityId, setSelectedIdentityId] = useState<string | null>(
     null,
   );
-  const [fromEmailOverride, setFromEmailOverride] = useState<string | null>(
-    null,
-  );
   const resolvedIdentityId =
     selectedIdentityId &&
     identities.some((entry) => entry.id === selectedIdentityId)
@@ -287,16 +374,15 @@ export function MailComposeProvider({
     useState<DraftSaveStatus>("idle");
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isFullCompose, setIsFullCompose] = useState(false);
+  const [composeSessionId, setComposeSessionId] = useState(0);
+  const [composeClosePromptOpen, setComposeClosePromptOpen] = useState(false);
   const draftIdRef = useRef<string | null>(null);
-  const isDirtyRef = useRef(false);
+  const baselineRef = useRef<ComposeSnapshot | null>(null);
+  const explicitCloseRef = useRef(false);
 
   useEffect(() => {
     draftIdRef.current = draftId;
   }, [draftId]);
-
-  const markDirty = useCallback(() => {
-    isDirtyRef.current = true;
-  }, []);
 
   const draft = useMemo(
     () => ({
@@ -309,7 +395,6 @@ export function MailComposeProvider({
       attachments: composeAttachments,
       replyContext: composeReplyContext,
       identityId: resolvedIdentityId,
-      fromEmailOverride,
       draftId,
       composeMode,
       signatureAlreadyEmbedded,
@@ -324,10 +409,100 @@ export function MailComposeProvider({
       composeAttachments,
       composeReplyContext,
       resolvedIdentityId,
-      fromEmailOverride,
       draftId,
       composeMode,
       signatureAlreadyEmbedded,
+    ],
+  );
+
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
+  const markDirty = useCallback(() => {
+    /* baseline comparison handles dirty detection */
+  }, []);
+
+  const captureComposeBaseline = useCallback(() => {
+    baselineRef.current = buildComposeSnapshot(draftRef.current);
+  }, []);
+
+  const acknowledgeSavedDraft = useCallback(() => {
+    baselineRef.current = buildComposeSnapshot(draftRef.current);
+  }, []);
+
+  const isComposeDirty = useCallback(() => {
+    const baseline = baselineRef.current;
+    if (!baseline) return true;
+    return (
+      JSON.stringify(buildComposeSnapshot(draftRef.current)) !==
+      JSON.stringify(baseline)
+    );
+  }, []);
+
+  const shouldConfirmComposeClose = useCallback(() => {
+    if (isComposeDirty()) return true;
+    if (draftIdRef.current) return true;
+    return false;
+  }, [isComposeDirty]);
+
+  const runPendingCloseAction = useCallback(() => {
+    const action = pendingCloseActionRef.current;
+    pendingCloseActionRef.current = null;
+    action?.();
+  }, []);
+
+  const bumpComposeSessionId = useCallback(() => {
+    setComposeSessionId((current) => current + 1);
+  }, []);
+
+  const requestComposeClose = useCallback(
+    (afterClose?: () => void) => {
+      if (!shouldConfirmComposeClose()) {
+        pendingCloseActionRef.current = null;
+        return true;
+      }
+      pendingCloseActionRef.current = afterClose ?? null;
+      setComposeClosePromptOpen(true);
+      return false;
+    },
+    [shouldConfirmComposeClose],
+  );
+
+  const handleKeepEditing = useCallback(() => {
+    pendingCloseActionRef.current = null;
+    setComposeClosePromptOpen(false);
+  }, []);
+
+  const handleSaveDraftAndClose = useCallback(async () => {
+    setComposeClosePromptOpen(false);
+    await flushComposeDraftSave();
+    composeCloseActionsRef.current?.dismiss();
+    runPendingCloseAction();
+  }, [runPendingCloseAction]);
+
+  const handleDiscardAndClose = useCallback(() => {
+    setComposeClosePromptOpen(false);
+    const currentDraftId = draftIdRef.current;
+    if (currentDraftId) {
+      composeCloseActionsRef.current?.discardDraft?.(currentDraftId);
+    }
+    composeCloseActionsRef.current?.dismiss();
+    runPendingCloseAction();
+  }, [runPendingCloseAction]);
+
+  const closePromptValue = useMemo(
+    () => ({
+      composeClosePromptOpen,
+      setComposeClosePromptOpen,
+      keepEditing: handleKeepEditing,
+      saveDraftAndClose: handleSaveDraftAndClose,
+      discardAndClose: handleDiscardAndClose,
+    }),
+    [
+      composeClosePromptOpen,
+      handleKeepEditing,
+      handleSaveDraftAndClose,
+      handleDiscardAndClose,
     ],
   );
 
@@ -345,12 +520,12 @@ export function MailComposeProvider({
     setSignatureAlreadyEmbedded(false);
     setDraftId(null);
     draftIdRef.current = null;
-    isDirtyRef.current = false;
+    baselineRef.current = null;
+    explicitCloseRef.current = false;
     setDraftSaveStatus("idle");
     setIsComposeOpen(false);
     setIsFullCompose(false);
     setSelectedIdentityId(identities[0]?.id ?? null);
-    setFromEmailOverride(null);
   }, [identities]);
 
   const clearCompose = useCallback(() => {
@@ -367,10 +542,10 @@ export function MailComposeProvider({
     setSignatureAlreadyEmbedded(false);
     setDraftId(null);
     draftIdRef.current = null;
-    isDirtyRef.current = false;
+    baselineRef.current = null;
+    explicitCloseRef.current = false;
     setDraftSaveStatus("idle");
     setSelectedIdentityId(identities[0]?.id ?? null);
-    setFromEmailOverride(null);
     resetComposeInlineImages();
   }, [identities]);
 
@@ -395,13 +570,28 @@ export function MailComposeProvider({
     setComposeMode("new");
     setDraftId(null);
     draftIdRef.current = null;
-    isDirtyRef.current = false;
+    baselineRef.current = null;
+    explicitCloseRef.current = false;
     setDraftSaveStatus("idle");
     resetComposeInlineImages();
     const seeded = buildNewComposeBodies(identity);
     setComposeBody(seeded.body);
     setComposeHtmlBody(seeded.htmlBody);
     setSignatureAlreadyEmbedded(seeded.signatureAlreadyEmbedded);
+    baselineRef.current = buildComposeSnapshot({
+      to: "",
+      cc: "",
+      bcc: "",
+      subject: "",
+      body: seeded.body,
+      htmlBody: seeded.htmlBody,
+      attachments: [],
+      replyContext: null,
+      identityId: resolvedIdentityId,
+      draftId: null,
+      composeMode: "new",
+      signatureAlreadyEmbedded: seeded.signatureAlreadyEmbedded,
+    });
     setIsComposeOpen(true);
     setIsFullCompose(false);
   }, [identities, resolvedIdentityId]);
@@ -485,7 +675,8 @@ export function MailComposeProvider({
       setSignatureAlreadyEmbedded(embedAboveQuote);
       setDraftId(null);
       draftIdRef.current = null;
-      isDirtyRef.current = true;
+      baselineRef.current = null;
+      explicitCloseRef.current = false;
       resetComposeInlineImages();
       setIsComposeOpen(true);
     },
@@ -567,7 +758,8 @@ export function MailComposeProvider({
       setSignatureAlreadyEmbedded(embedAboveQuote);
       setDraftId(null);
       draftIdRef.current = null;
-      isDirtyRef.current = true;
+      baselineRef.current = null;
+      explicitCloseRef.current = false;
       resetComposeInlineImages();
       setIsComposeOpen(true);
     },
@@ -601,7 +793,8 @@ export function MailComposeProvider({
       setSignatureAlreadyEmbedded(seeded.signatureAlreadyEmbedded);
       setDraftId(null);
       draftIdRef.current = null;
-      isDirtyRef.current = true;
+      baselineRef.current = null;
+      explicitCloseRef.current = false;
       setDraftSaveStatus("idle");
       resetComposeInlineImages();
       setIsComposeOpen(true);
@@ -637,18 +830,51 @@ export function MailComposeProvider({
       setComposeMode("draft");
       setQuotedAttachments(mapQuotedAttachments(message));
       setSignatureAlreadyEmbedded(hasEmbeddedSignature(htmlBody));
+      const draftFromEmail = message.from?.[0]?.email;
+      const matchedIdentity = draftFromEmail
+        ? identities.find((identity) => identity.email === draftFromEmail)
+        : null;
+      const draftIdentityId =
+        matchedIdentity?.id ?? resolvedIdentityId ?? identities[0]?.id ?? null;
+      if (draftIdentityId) {
+        setSelectedIdentityId(draftIdentityId);
+      }
       setDraftId(message.id);
       draftIdRef.current = message.id;
-      isDirtyRef.current = false;
+      baselineRef.current = buildComposeSnapshot({
+        to: addressesToCsv(message.to),
+        cc: addressesToCsv(message.cc),
+        bcc: addressesToCsv(message.bcc),
+        subject: message.subject ?? "",
+        body: bodyText,
+        htmlBody,
+        attachments: [],
+        replyContext: buildReplyContext(message),
+        identityId: draftIdentityId,
+        draftId: message.id,
+        composeMode: "draft",
+        signatureAlreadyEmbedded: hasEmbeddedSignature(htmlBody),
+      });
       setDraftSaveStatus("idle");
       setIsComposeOpen(false);
       setIsFullCompose(true);
     },
-    [],
+    [identities, resolvedIdentityId],
   );
 
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
+  const openDraftEditor = useCallback(
+    (
+      message: JmapEmailMessage,
+      overrides?: {
+        plaintext?: string | null;
+        html?: string | null;
+      },
+    ) => {
+      bumpComposeSessionId();
+      seedDraft(message, overrides);
+    },
+    [bumpComposeSessionId, seedDraft],
+  );
 
   useEffect(() => {
     composeBridgeRef.current = {
@@ -660,7 +886,12 @@ export function MailComposeProvider({
       seedForward,
       seedNewMessage,
       seedDraft,
+      openDraftEditor,
       markDirty,
+      isComposeDirty,
+      captureComposeBaseline,
+      acknowledgeSavedDraft,
+      bumpComposeSessionId,
       getDraftIdRef: () => draftIdRef.current,
       setDraftId: (id) => {
         draftIdRef.current = id;
@@ -679,7 +910,12 @@ export function MailComposeProvider({
     seedForward,
     seedNewMessage,
     seedDraft,
+    openDraftEditor,
     markDirty,
+    isComposeDirty,
+    captureComposeBaseline,
+    acknowledgeSavedDraft,
+    bumpComposeSessionId,
   ]);
 
   const fieldsValue = useMemo(
@@ -722,12 +958,6 @@ export function MailComposeProvider({
       setSelectedIdentityId: (id: string | null) => {
         markDirty();
         setSelectedIdentityId(id);
-        setFromEmailOverride(null);
-      },
-      fromEmailOverride,
-      setFromEmailOverride: (email: string | null) => {
-        markDirty();
-        setFromEmailOverride(email);
       },
       draftSaveStatus,
       setDraftSaveStatus,
@@ -736,6 +966,8 @@ export function MailComposeProvider({
       composeMode,
       quotedAttachments,
       openNewCompose,
+      composeSessionId,
+      requestComposeClose,
     }),
     [
       composeTo,
@@ -747,7 +979,6 @@ export function MailComposeProvider({
       composeAttachments,
       mailServerLimits,
       resolvedIdentityId,
-      fromEmailOverride,
       draftSaveStatus,
       draftId,
       markDirty,
@@ -755,6 +986,8 @@ export function MailComposeProvider({
       composeMode,
       quotedAttachments,
       openNewCompose,
+      composeSessionId,
+      requestComposeClose,
     ],
   );
 
@@ -772,7 +1005,9 @@ export function MailComposeProvider({
   return (
     <MailComposeChromeContext.Provider value={chromeValue}>
       <MailComposeFieldsContext.Provider value={fieldsValue}>
-        {children}
+        <MailComposeClosePromptContext.Provider value={closePromptValue}>
+          {children}
+        </MailComposeClosePromptContext.Provider>
       </MailComposeFieldsContext.Provider>
     </MailComposeChromeContext.Provider>
   );

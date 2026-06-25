@@ -46,6 +46,9 @@ import {
 } from "@/lib/mail/mail-mailbox-roles";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
 import { getMailComposeBridge, flushComposeDraftSave } from "@/components/mail/mail-compose-context";
+import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose";
+import { replaceSavedDraftInMailboxList } from "@/lib/mail/compose-draft-cache";
+import { getDraftsMailboxId } from "@/lib/mail/draft-utils";
 import { parseDecryptedMailContent } from "@/lib/mail/decrypted-mail-content";
 import {
   hasComposeHtmlBody,
@@ -1965,7 +1968,6 @@ export function useMailApp() {
       attachments: composeAttachments,
       replyContext: composeReplyContext,
       identityId: composeIdentityId,
-      fromEmailOverride: composeFromEmailOverride,
       draftId: composeDraftId,
       composeMode,
       signatureAlreadyEmbedded,
@@ -2032,7 +2034,7 @@ export function useMailApp() {
           "This mailbox is missing a draft mailbox or sending identity.",
         );
       }
-      const fromEmail = composeFromEmailOverride ?? identity.email;
+      const fromEmail = identity.email;
       const fromName = identity.name ?? null;
       if (!plainTextMode) {
         await waitForQuotedInlineImageHydration();
@@ -2393,6 +2395,118 @@ export function useMailApp() {
       selectedMessagePlaintext,
     );
   }, [selectedMessage, selectedMessagePlaintext]);
+
+  const handleDraftSaved = useCallback(
+    (input: {
+      savedDraftId: string;
+      previousDraftId: string | null;
+      preview: JmapEmailMessage;
+    }) => {
+      if (!activeMailbox) return;
+      const draftsMailboxId = getDraftsMailboxId(activeMailbox.mailboxes);
+      if (!draftsMailboxId) return;
+
+      replaceSavedDraftInMailboxList(queryClient, {
+        draftsMailboxId,
+        previousDraftId: input.previousDraftId,
+        savedDraft: input.preview,
+      });
+
+      setActiveMailbox((current) => {
+        if (!current) return current;
+        if (current.selectedMailboxId !== draftsMailboxId) {
+          return current;
+        }
+        const withoutPrevious = input.previousDraftId
+          ? current.messages.filter((message) => message.id !== input.previousDraftId)
+          : current.messages.filter((message) => message.id !== input.savedDraftId);
+        const hasSaved = withoutPrevious.some(
+          (message) => message.id === input.savedDraftId,
+        );
+        const messages = hasSaved
+          ? withoutPrevious.map((message) =>
+              message.id === input.savedDraftId ? input.preview : message,
+            )
+          : [input.preview, ...withoutPrevious];
+        return { ...current, messages };
+      });
+    },
+    [activeMailbox, queryClient],
+  );
+
+  const handleEditDraft = useCallback(
+    async (message: JmapEmailMessage) => {
+      if (!activeMailbox) return;
+      const bridge = getMailComposeBridge();
+      if (!bridge) return;
+
+      let draft = message;
+      if (!messageHasLoadedBody(message)) {
+        try {
+          draft = await fetchMailMessageById(queryClient, {
+            client: activeMailbox.client,
+            session: activeMailbox.session,
+            messageId: message.id,
+          });
+          mergeMessageIntoMailboxCaches(queryClient, draft);
+        } catch (error) {
+          log.error("Failed to load draft", error);
+          toast.error(getErrorMessage(error, "Could not open this draft."));
+          return;
+        }
+      }
+
+      let overrides: { plaintext?: string | null; html?: string | null } | undefined;
+      const encryption = classifyMessageEncryption(draft);
+      if (encryption === "inline_pgp" || encryption === "pgp_mime") {
+        try {
+          const decrypted = await decryptMessageForCompose({
+            client: activeMailbox.client,
+            session: activeMailbox.session,
+            message: draft,
+            config,
+          });
+          overrides = {
+            plaintext: decrypted.text,
+            html: decrypted.html,
+          };
+        } catch (error) {
+          log.error("Failed to decrypt draft", error);
+          toast.error(getErrorMessage(error, "Could not decrypt this draft."));
+          return;
+        }
+      }
+
+      setSelectedMessageId(null);
+      bridge.openDraftEditor(draft, overrides);
+    },
+    [activeMailbox, config, queryClient],
+  );
+
+  const handleDiscardDraft = useCallback(
+    async (draftId: string) => {
+      if (!activeMailbox) return;
+      try {
+        await activeMailbox.client.moveToTrash(
+          activeMailbox.session,
+          draftId,
+          null,
+        );
+        setActiveMailbox((current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            messages: current.messages.filter((message) => message.id !== draftId),
+          };
+        });
+        setSelectedMessageId((current) => (current === draftId ? null : current));
+      } catch (error) {
+        log.error("Failed to discard draft", error);
+        toast.error(getErrorMessage(error, "Could not discard the draft."));
+      }
+    },
+    [activeMailbox],
+  );
 
   const handleQuickReply = useCallback(
     async (replyText: string, files: File[] = []) => {
@@ -3596,6 +3710,9 @@ export function useMailApp() {
     handleDeleteMessage,
     handleReply,
     handleForward,
+    handleEditDraft,
+    handleDiscardDraft,
+    handleDraftSaved,
     handleQuickReply,
     handlePreviewAttachment,
     loadAttachmentHoverPreview,

@@ -47,10 +47,10 @@ import { MobileAppSwitcher } from "@/components/mobile-app-switcher";
 import { MailSidebar } from "./mail-sidebar";
 import { MailCommandPalette } from "./mail-command-palette";
 import { ComposeDialog, ComposeForm } from "./compose-dialog";
+import { ComposeCloseConfirmDialog } from "./compose-close-confirm-dialog";
 import {
   MailComposeProvider,
-  flushComposeDraftSave,
-  getMailComposeBridge,
+  registerComposeCloseActions,
   useMailComposeChrome,
   useMailCompose,
 } from "./mail-compose-context";
@@ -62,8 +62,6 @@ import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
 import { useComposeDraftAutosave } from "@/hooks/use-compose-draft-autosave";
 import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
 import { isDraftMessage } from "@/lib/mail/draft-utils";
-import { messageHasLoadedBody } from "@/lib/mail/mail-message-body";
-import { classifyMessageEncryption } from "@/lib/mail/message-security";
 import { canEmptyMailboxRole, getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
 
 interface MobileMailHeaderProps {
@@ -195,6 +193,7 @@ function MobileMailHeader({
 function MailComposeAutosave({
   activeMailbox,
   accountEmail,
+  onDraftSaved,
 }: {
   activeMailbox: {
     client: import("@/lib/mail/jmap-client").StalwartJmapClient;
@@ -205,6 +204,7 @@ function MailComposeAutosave({
     mailServerPolicy: import("@workspace/calendar-core").MailServerPolicy;
   } | null;
   accountEmail: string;
+  onDraftSaved: Parameters<typeof useComposeDraftAutosave>[0]["onDraftSaved"];
 }) {
   useComposeDraftAutosave({
     client: activeMailbox?.client ?? null,
@@ -214,6 +214,7 @@ function MailComposeAutosave({
     fallbackFromEmail: activeMailbox?.email ?? accountEmail,
     mailServerPolicy: activeMailbox?.mailServerPolicy ?? null,
     enabled: Boolean(activeMailbox),
+    onDraftSaved,
   });
   return null;
 }
@@ -240,7 +241,9 @@ export function MailApp() {
       <MailComposeAutosave
         activeMailbox={mail.activeMailbox}
         accountEmail={mail.accountEmail}
+        onDraftSaved={mail.handleDraftSaved}
       />
+      <ComposeCloseConfirmDialog />
       <MailAppContent mail={mail} />
     </MailComposeProvider>
   );
@@ -249,7 +252,8 @@ export function MailApp() {
 function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
   const { isComposeOpen, setIsComposeOpen, isFullCompose, setIsFullCompose, dismissCompose } =
     useMailComposeChrome();
-  const { openNewCompose } = useMailCompose();
+  const { openNewCompose, composeSessionId, requestComposeClose } = useMailCompose();
+  const composeActive = isComposeOpen || isFullCompose;
   const {
     session,
     config,
@@ -289,6 +293,8 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     handleDeleteMessage,
     handleReply,
     handleForward,
+    handleEditDraft,
+    handleDiscardDraft,
     handleQuickReply,
     handlePreviewAttachment,
     loadAttachmentHoverPreview,
@@ -341,7 +347,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
   });
   const [filterPanelExpanded, setFilterPanelExpanded] = useState(false);
   const [emptyFolderOpen, setEmptyFolderOpen] = useState(false);
-  const openedDraftIdRef = useRef<string | null>(null);
+  const editingDraftIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedMailListSearch(mailListSearch), 300);
@@ -349,61 +355,6 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
   }, [mailListSearch]);
 
   const mailboxId = activeMailbox?.selectedMailboxId ?? null;
-
-  useEffect(() => {
-    if (!selectedMessage || !activeMailbox) {
-      openedDraftIdRef.current = null;
-      return;
-    }
-
-    const mailboxes = activeMailbox.mailboxes ?? [];
-    if (!isDraftMessage(selectedMessage, mailboxId, mailboxes)) {
-      openedDraftIdRef.current = null;
-      return;
-    }
-
-    if (openedDraftIdRef.current === selectedMessage.id) {
-      return;
-    }
-
-    if (!messageHasLoadedBody(selectedMessage)) {
-      return;
-    }
-
-    const bridge = getMailComposeBridge();
-    if (!bridge) {
-      return;
-    }
-
-    const encryption = classifyMessageEncryption(selectedMessage);
-    const needsDecrypt =
-      encryption === "inline_pgp" || encryption === "pgp_mime";
-
-    if (
-      needsDecrypt &&
-      !selectedMessagePlaintext
-    ) {
-      return;
-    }
-
-    bridge.seedDraft(
-      selectedMessage,
-      needsDecrypt
-        ? {
-            plaintext: selectedMessagePlaintext,
-            html: selectedMessageDecryptedHtml,
-          }
-        : undefined,
-    );
-    openedDraftIdRef.current = selectedMessage.id;
-  }, [
-    selectedMessage,
-    mailboxId,
-    activeMailbox,
-    selectedMessagePlaintext,
-    selectedMessageDecryptedHtml,
-    selectedMessageDecryptError,
-  ]);
 
   const searchActive =
     Boolean(debouncedMailListSearch.trim()) || hasActiveFilters(advancedFilters);
@@ -464,17 +415,40 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
       isDraftMessage(selectedMessage, mailboxId, activeMailbox.mailboxes),
   );
 
-  const handleDismissCompose = useCallback(async () => {
-    await flushComposeDraftSave();
+  const handleDismissCompose = useCallback(() => {
     dismissCompose();
-    openedDraftIdRef.current = null;
+    editingDraftIdRef.current = null;
     setSelectedMessageId(null);
   }, [dismissCompose, setSelectedMessageId]);
 
-  const handleSelectMessage = useCallback(
+  useEffect(() => {
+    registerComposeCloseActions({
+      dismiss: handleDismissCompose,
+      discardDraft: (draftId) => {
+        void handleDiscardDraft(draftId);
+      },
+    });
+    return () => registerComposeCloseActions(null);
+  }, [handleDismissCompose, handleDiscardDraft]);
+
+  const closeComposeThen = useCallback(
+    (action: () => void) => {
+      if (!composeActive) {
+        action();
+        return;
+      }
+      if (requestComposeClose(action)) {
+        handleDismissCompose();
+        action();
+      }
+    },
+    [composeActive, handleDismissCompose, requestComposeClose],
+  );
+
+  const performSelectMessage = useCallback(
     (id: string | null) => {
       if (!id) {
-        openedDraftIdRef.current = null;
+        editingDraftIdRef.current = null;
         setSelectedMessageId(null);
         return;
       }
@@ -489,20 +463,21 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
         activeMailbox &&
         isDraftMessage(message, mailboxId, activeMailbox.mailboxes)
       ) {
-        if (openedDraftIdRef.current === id && isFullCompose) {
+        if (editingDraftIdRef.current === id && isFullCompose) {
           return;
         }
-        openedDraftIdRef.current = null;
-        setSelectedMessageId(id);
+        editingDraftIdRef.current = id;
+        void handleEditDraft(message);
         return;
       }
 
-      openedDraftIdRef.current = null;
+      editingDraftIdRef.current = null;
       void openMessageById(id, message ?? undefined);
     },
     [
       activeMailbox,
       filteredListMessages,
+      handleEditDraft,
       isFullCompose,
       listThreadRelatedMessages,
       mailboxId,
@@ -512,9 +487,29 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
     ],
   );
 
+  const handleSelectMessage = useCallback(
+    (id: string | null) => {
+      closeComposeThen(() => performSelectMessage(id));
+    },
+    [closeComposeThen, performSelectMessage],
+  );
+
+  const handleSelectMailbox = useCallback(
+    (mailboxIdToSelect: string) => {
+      closeComposeThen(() => {
+        void refreshMailboxMessages(mailboxIdToSelect);
+      });
+    },
+    [closeComposeThen, refreshMailboxMessages],
+  );
+
+  const handleOpenCompose = useCallback(() => {
+    closeComposeThen(() => openNewCompose());
+  }, [closeComposeThen, openNewCompose]);
+
   const handleBack = () => {
     if (isFullCompose) {
-      void handleDismissCompose();
+      requestComposeClose();
       return;
     }
     setSelectedMessageId(null);
@@ -541,9 +536,11 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
   useMailUrlSync({
     activeMailbox,
     selectedMessageId,
-    onSelectMailbox: refreshMailboxMessages,
+    onSelectMailbox: handleSelectMailbox,
     onSelectMessageId: setSelectedMessageId,
-    openMessageById,
+    openMessageById: (id) => {
+      void handleSelectMessage(id);
+    },
   });
 
   // Clear inline search when switching mailboxes
@@ -589,7 +586,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
       },
       markAsRead: () => void handleMarkAsRead(),
       markAsUnread: () => void handleMarkAsUnread(),
-      compose: () => openNewCompose(),
+      compose: () => handleOpenCompose(),
       refresh: () => void handleManualRefresh(),
       closeMessage: handleCloseMessage,
       focusSearch: () => {
@@ -625,8 +622,8 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
         <MailSidebar
           user={user ?? { name: "User", email: "" }}
           activeMailbox={activeMailbox}
-          onSelectMailbox={(id) => void refreshMailboxMessages(id)}
-          onCompose={() => openNewCompose()}
+          onSelectMailbox={(id) => handleSelectMailbox(id)}
+          onCompose={() => handleOpenCompose()}
           onOpenPalette={() => setIsPaletteOpen(true)}
           onOpenSearch={() => setIsPaletteOpen(true)}
           onOpenMailboxes={() => {
@@ -657,7 +654,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                   isRefreshing={isRefreshing}
                   onBack={handleBack}
                   onRefresh={() => void handleManualRefresh()}
-                  onCompose={() => openNewCompose()}
+                  onCompose={() => handleOpenCompose()}
                 />
               )}
 
@@ -939,9 +936,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                   ) : !isFullCompose ? (
                     <div className="absolute inset-0 flex items-center justify-center p-8">
                       <p className="text-sm text-muted-foreground">
-                        {selectedIsDraft
-                          ? "Opening draft…"
-                          : "Select a message to read"}
+                        Select a message to read
                       </p>
                     </div>
                   ) : null}
@@ -956,6 +951,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                     }}
                   >
                     <ComposeForm
+                      key={composeSessionId}
                       identities={activeMailbox.pickerIdentities}
                       fallbackFromEmail={activeMailbox.email ?? accountEmail}
                       onClose={() => void handleDismissCompose()}
@@ -990,7 +986,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
           if (!v) setPaletteInitialView(undefined);
         }}
         initialView={paletteInitialView}
-        onCompose={() => openNewCompose()}
+        onCompose={() => handleOpenCompose()}
         mailboxes={activeMailbox?.mailboxes ?? []}
         onCreateMailbox={(name) => handleCreateMailbox(name)}
         onDeleteMailbox={(id) => handleDeleteMailbox(id)}
@@ -1034,8 +1030,11 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
       />
 
       <Dialog open={emptyFolderOpen} onOpenChange={setEmptyFolderOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+        <DialogContent
+          showClose={false}
+          className="max-w-md p-0 overflow-hidden bg-popover border-border/50 shadow-2xl"
+        >
+          <DialogHeader className="px-5 pt-5 pb-3">
             <DialogTitle>{emptyFolderLabel}?</DialogTitle>
             <DialogDescription>
               Permanently delete all {activeMailbox?.messages.length ?? 0}{" "}
@@ -1043,13 +1042,13 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
               {selectedMailbox
                 ? getMailboxDisplayName(selectedMailbox)
                 : "this folder"}
-              . This cannot
-              be undone.
+              . This cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="px-5 py-4 border-t border-border/50 gap-2">
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setEmptyFolderOpen(false)}
               disabled={isBusy}
             >
@@ -1057,6 +1056,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
             </Button>
             <Button
               variant="destructive"
+              size="sm"
               disabled={isBusy}
               onClick={() => {
                 setEmptyFolderOpen(false);
