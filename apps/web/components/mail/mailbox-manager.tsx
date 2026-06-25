@@ -8,12 +8,13 @@ import {
   Send,
   FileText,
   Trash2,
-  AlertOctagon,
+  OctagonAlert,
   Folder,
   ChevronRight,
   Loader2,
 } from "lucide-react";
 import type { JmapMailbox } from "@/lib/mail/types";
+import { getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
 
 const ROLE_ICONS: Record<
   string,
@@ -23,8 +24,8 @@ const ROLE_ICONS: Record<
   sent: Send,
   drafts: FileText,
   trash: Trash2,
-  junk: AlertOctagon,
-  spam: AlertOctagon,
+  junk: OctagonAlert,
+  spam: OctagonAlert,
 };
 
 const PROTECTED_ROLES = new Set([
@@ -123,7 +124,7 @@ export function MailboxManager({
                       <div className="flex items-center justify-center size-6 shrink-0">
                         <Icon className="size-4 text-muted-foreground" />
                       </div>
-                      <span className="text-sm flex-1">{mailbox.name}</span>
+                      <span className="text-sm flex-1">{getMailboxDisplayName(mailbox)}</span>
                     </div>
                   );
                 })}

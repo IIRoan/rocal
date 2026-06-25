@@ -80,7 +80,11 @@ import {
 } from "../../../../src/components/mail/RecipientSheet";
 import { mailSpacing } from "../../../../src/components/mail/mail-ui";
 import { useRecentContacts } from "../../../../src/hooks/use-recent-contacts";
-import { getMailboxIcon } from "../../../../src/lib/mail/mail-helpers";
+import {
+  getMailboxDisplayName,
+  getMailboxIcon,
+  isSpamMailboxRole,
+} from "../../../../src/lib/mail/mail-helpers";
 
 import {
   resolveAttachmentPreviewKind,
@@ -1024,7 +1028,7 @@ export default function MailMessageScreen() {
                 showDivider
               />
               {(currentMailboxRole === "trash" ||
-                currentMailboxRole === "junk") &&
+                isSpamMailboxRole(currentMailboxRole)) &&
               inboxMailboxId ? (
                 <SheetRow
                   variant="mail"
@@ -1082,7 +1086,7 @@ export default function MailMessageScreen() {
                   key={mailbox.id}
                   variant="mail"
                   icon="folder"
-                  label={mailbox.name}
+                  label={getMailboxDisplayName(mailbox)}
                   onPress={() => handleMoveToMailbox(mailbox.id)}
                   showDivider={index > 0}
                 />

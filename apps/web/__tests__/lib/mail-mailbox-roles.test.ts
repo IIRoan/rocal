@@ -1,34 +1,48 @@
-import { describe, expect, it } from "@jest/globals";
 import {
   canEmptyMailboxRole,
   findInboxMailbox,
-  findJunkMailbox,
-  isJunkMailboxRole,
+  findSpamMailbox,
+  findTrashMailbox,
+  getMailboxDisplayName,
+  isSpamMailboxRole,
 } from "@/lib/mail/mail-mailbox-roles";
-import type { JmapMailbox } from "@/lib/mail/types";
 
-const mailboxes: JmapMailbox[] = [
+const mailboxes = [
   { id: "inbox", name: "Inbox", role: "inbox" },
-  { id: "junk", name: "Junk", role: "junk" },
+  { id: "junk", name: "Junk Mail", role: "junk" },
   { id: "trash", name: "Trash", role: "trash" },
-  { id: "custom", name: "Projects", role: null },
-];
+] as const;
 
 describe("mail-mailbox-roles", () => {
-  it("detects junk and spam roles", () => {
-    expect(isJunkMailboxRole("junk")).toBe(true);
-    expect(isJunkMailboxRole("spam")).toBe(true);
-    expect(isJunkMailboxRole("inbox")).toBe(false);
+  it("detects spam mailbox roles", () => {
+    expect(isSpamMailboxRole("junk")).toBe(true);
+    expect(isSpamMailboxRole("spam")).toBe(true);
+    expect(isSpamMailboxRole("inbox")).toBe(false);
   });
 
-  it("finds inbox and junk mailboxes", () => {
-    expect(findInboxMailbox(mailboxes)?.id).toBe("inbox");
-    expect(findJunkMailbox(mailboxes)?.id).toBe("junk");
+  it("finds inbox and spam mailboxes", () => {
+    expect(findInboxMailbox([...mailboxes])?.id).toBe("inbox");
+    expect(findSpamMailbox([...mailboxes])?.id).toBe("junk");
   });
 
-  it("allows empty only for trash and junk", () => {
+  it("allows empty only for trash and spam", () => {
     expect(canEmptyMailboxRole("trash")).toBe(true);
     expect(canEmptyMailboxRole("junk")).toBe(true);
+    expect(canEmptyMailboxRole("spam")).toBe(true);
     expect(canEmptyMailboxRole("inbox")).toBe(false);
+  });
+
+  it("finds trash mailbox", () => {
+    expect(findTrashMailbox([...mailboxes])?.id).toBe("trash");
+  });
+
+  it("shows Spam for junk/spam role mailboxes", () => {
+    expect(getMailboxDisplayName({ name: "Junk Mail", role: "junk" })).toBe(
+      "Spam",
+    );
+    expect(getMailboxDisplayName({ name: "Spam", role: "spam" })).toBe("Spam");
+    expect(getMailboxDisplayName({ name: "Inbox", role: "inbox" })).toBe(
+      "Inbox",
+    );
   });
 });
