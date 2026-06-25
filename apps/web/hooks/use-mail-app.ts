@@ -40,8 +40,8 @@ import {
 } from "@/lib/mail/mail-message-body";
 import {
   findInboxMailbox,
-  findJunkMailbox,
-  isJunkMailboxRole,
+  findSpamMailbox,
+  isSpamMailboxRole,
   isTrashMailboxRole,
 } from "@/lib/mail/mail-mailbox-roles";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
@@ -2788,18 +2788,18 @@ export function useMailApp() {
     async (messageId?: string) => {
       const targetId = messageId ?? selectedMessageId;
       if (!activeMailbox || !targetId) return;
-      const junkMailbox = findJunkMailbox(activeMailbox.mailboxes);
-      if (!junkMailbox) {
-        toast.error("Junk mailbox not found.");
+      const spamMailbox = findSpamMailbox(activeMailbox.mailboxes);
+      if (!spamMailbox) {
+        toast.error("Spam folder not found.");
         return;
       }
       const currentRole = activeMailbox.mailboxes.find(
         (m) => m.id === activeMailbox.selectedMailboxId,
       )?.role;
-      if (isJunkMailboxRole(currentRole)) {
+      if (isSpamMailboxRole(currentRole)) {
         return;
       }
-      await handleMoveMessage(junkMailbox.id, targetId);
+      await handleMoveMessage(spamMailbox.id, targetId);
     },
     [activeMailbox, selectedMessageId, handleMoveMessage],
   );
@@ -2817,7 +2817,7 @@ export function useMailApp() {
       (m) => m.id === activeMailbox.selectedMailboxId,
     );
     const role = mailbox?.role;
-    if (!isTrashMailboxRole(role) && !isJunkMailboxRole(role)) {
+    if (!isTrashMailboxRole(role) && !isSpamMailboxRole(role)) {
       return;
     }
 
@@ -3147,12 +3147,12 @@ export function useMailApp() {
   const handleBulkReportSpam = useCallback(
     async (messageIds: string[]) => {
       if (!activeMailbox || messageIds.length === 0) return;
-      const junkMailbox = findJunkMailbox(activeMailbox.mailboxes);
-      if (!junkMailbox) {
-        toast.error("Junk mailbox not found.");
+      const spamMailbox = findSpamMailbox(activeMailbox.mailboxes);
+      if (!spamMailbox) {
+        toast.error("Spam folder not found.");
         return;
       }
-      await handleBulkMove(messageIds, junkMailbox.id);
+      await handleBulkMove(messageIds, spamMailbox.id);
     },
     [activeMailbox, handleBulkMove],
   );

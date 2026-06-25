@@ -14,6 +14,7 @@ import gsap from "gsap";
 import {
   ShieldCheck,
   ShieldAlert,
+  OctagonAlert,
   Lock,
   Reply,
   Forward,
@@ -91,6 +92,10 @@ import { toast } from "sonner";
 import { SenderAvatar } from "./mail-avatar";
 import { LabelPickerPanel } from "./label-picker-panel";
 import { getAllMessageLabels } from "@/lib/mail/mail-labels";
+import {
+  getMailboxDisplayName,
+  isSpamMailboxRole,
+} from "@/lib/mail/mail-mailbox-roles";
 import { resolveLabelDisplayColor } from "@/lib/mail/mail-label-colors";
 import type {
   JmapEmailMessage,
@@ -681,9 +686,9 @@ export interface MessageReaderProps {
   onPreviewAttachment?: (attachment: MailAttachment) => void;
   /** Download an attachment blob */
   onDownloadAttachment?: (attachment: MailAttachment) => void;
-  /** Restore a message from trash/junk to inbox */
+  /** Restore a message from trash/spam to inbox */
   onUntrash?: () => void;
-  /** Move message to junk / restore from junk */
+  /** Move message to spam / restore from spam */
   onReportSpam?: () => void;
   onNotSpam?: () => void;
   /** Delete a specific message within the conversation thread */
@@ -1225,10 +1230,9 @@ export function MessageReader({
     .find((m) => m.id === currentMailboxId)
     ?.role?.toLowerCase();
   const isInTrash = currentMailboxRole === "trash";
-  const isInJunk =
-    currentMailboxRole === "junk" || currentMailboxRole === "spam";
-  const canReportSpam = Boolean(onReportSpam) && !isInJunk && !isInTrash;
-  const canNotSpam = Boolean(onNotSpam) && isInJunk;
+  const isInSpam = isSpamMailboxRole(currentMailboxRole);
+  const canReportSpam = Boolean(onReportSpam) && !isInSpam && !isInTrash;
+  const canNotSpam = Boolean(onNotSpam) && isInSpam;
 
   // ── Label popover content (shared between mobile/desktop) ──────────────────
   const labelPopoverContent = (
@@ -1278,16 +1282,16 @@ export function MessageReader({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                aria-label="Move to junk"
-                title="Move to junk"
+                aria-label="Report spam"
+                title="Report spam"
                 disabled={isBusy}
                 onClick={onReportSpam}
               >
-                <ShieldAlert className="text-muted-foreground" />
+                <OctagonAlert className="text-muted-foreground" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="z-[200]">
-              Move to junk
+              Report spam
             </TooltipContent>
           </Tooltip>
         )}
@@ -1398,7 +1402,7 @@ export function MessageReader({
 
       {/* Right: archive, reply, delete */}
       <div className="ml-auto flex items-center gap-0">
-        {onArchive && !isInJunk && !isInTrash && (
+        {onArchive && !isInSpam && !isInTrash && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -1420,16 +1424,16 @@ export function MessageReader({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                aria-label="Move to junk"
-                title="Move to junk"
+                aria-label="Report spam"
+                title="Report spam"
                 disabled={isBusy}
                 onClick={onReportSpam}
               >
-                <ShieldAlert className="text-muted-foreground" />
+                <OctagonAlert className="text-muted-foreground" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="z-[200]">
-              Move to junk
+              Report spam
             </TooltipContent>
           </Tooltip>
         )}
@@ -1569,8 +1573,8 @@ export function MessageReader({
               </button>
             </div>
 
-            {/* Restore — trash/junk only */}
-            {(isInTrash || isInJunk) && onUntrash && (
+            {/* Restore — trash/spam only */}
+            {(isInTrash || isInSpam) && onUntrash && (
               <button
                 type="button"
                 onClick={() => {
@@ -1594,8 +1598,8 @@ export function MessageReader({
                 disabled={isBusy}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground/80 hover:bg-accent/50 transition-colors"
               >
-                <ShieldAlert className="size-3.5 shrink-0 text-muted-foreground" />
-                Move to junk
+                <OctagonAlert className="size-3.5 shrink-0 text-muted-foreground" />
+                Report spam
               </button>
             )}
 
@@ -1603,7 +1607,7 @@ export function MessageReader({
             {otherMailboxes.length > 0 && (
               <div
                 className={
-                  (isInTrash || isInJunk) && onUntrash
+                  (isInTrash || isInSpam) && onUntrash
                     ? "border-t border-border/60"
                     : ""
                 }
@@ -1641,7 +1645,7 @@ export function MessageReader({
                           }}
                           className="w-full flex items-center gap-2 px-4 py-2 text-[13px] text-foreground/75 hover:bg-accent/60 hover:text-foreground transition-colors text-left"
                         >
-                          {mailbox.name}
+                          {getMailboxDisplayName(mailbox)}
                         </button>
                       </div>
                     ))}
@@ -2208,7 +2212,7 @@ export function MessageReader({
                         }}
                         className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-sm text-foreground/80 hover:bg-accent/50 transition-colors text-left"
                       >
-                        {mailbox.name}
+                        {getMailboxDisplayName(mailbox)}
                       </button>
                     ))}
                   </PopoverContent>
@@ -2245,11 +2249,11 @@ export function MessageReader({
                   disabled={isBusy}
                   className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
                 >
-                  <ShieldAlert
+                  <OctagonAlert
                     className="size-4 text-muted-foreground"
                     strokeWidth={2.25}
                   />
-                  Move to junk
+                  Report spam
                 </button>
               )}
               {canNotSpam && onNotSpam && (

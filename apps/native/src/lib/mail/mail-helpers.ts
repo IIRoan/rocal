@@ -123,6 +123,18 @@ export function sortMailboxes(mailboxes: JmapMailbox[]): JmapMailbox[] {
   });
 }
 
+export function isSpamMailboxRole(role: string | null | undefined): boolean {
+  const normalized = role?.toLowerCase() ?? "";
+  return normalized === "junk" || normalized === "spam";
+}
+
+export function getMailboxDisplayName(mailbox: JmapMailbox): string {
+  if (isSpamMailboxRole(mailbox.role)) {
+    return "Spam";
+  }
+  return mailbox.name;
+}
+
 export function getMailboxIcon(mailbox: JmapMailbox): string {
   switch (mailbox.role) {
     case "inbox":
