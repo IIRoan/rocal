@@ -299,8 +299,8 @@ function resolveMailSecurityMeta(
     return {
       label: verified ? "PGP encrypted & verified" : "PGP encrypted",
       description: verified
-        ? "End-to-end encrypted. The sender signed and encrypted the message content with your PGP public key before sending, so our servers only handled ciphertext for the protected body."
-        : "End-to-end encrypted. The sender encrypted the message content with your PGP public key before sending, so our servers never saw the protected body in plaintext.",
+        ? "End-to-end encrypted. The sender signed and encrypted the message content with your PGP public key before sending, so Solace only handled ciphertext for the protected body."
+        : "End-to-end encrypted. The sender encrypted the message content with your PGP public key before sending, so Solace never saw the protected body in plaintext.",
       Icon: ShieldCheck,
       iconClassName: "text-foreground/70",
       protectedFields: [
@@ -316,7 +316,7 @@ function resolveMailSecurityMeta(
     return {
       label: "Possibly encrypted",
       description:
-        "This message appears to contain encrypted content, but it doesn't match a recognised PGP format. It was received by our server in transit and may have been readable at the source.",
+        "This message appears to contain encrypted content, but it doesn't match a recognised PGP format. Solace received it in transit and it may have been readable at the source.",
       Icon: ShieldAlert,
       iconClassName: "text-amber-500",
       protectedFields: [],
@@ -327,7 +327,7 @@ function resolveMailSecurityMeta(
   return {
     label: "Not encrypted",
     description:
-      "No encryption applied. The sender transmitted this as plaintext, it was readable in transit, and it is stored as plaintext on our server.",
+      "No encryption applied. The sender transmitted this as plaintext, it was readable in transit, and Solace stores it as plaintext.",
     Icon: Lock,
     iconClassName: "text-muted-foreground/35",
     protectedFields: [],
