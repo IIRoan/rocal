@@ -371,7 +371,7 @@ describe("LoginForm", () => {
       "Reset your email sign-in password",
     );
     expect(container.textContent).toContain(
-      "Enter your Solace account email and we’ll send a reset link for your email sign-in password.",
+      "Enter your Solace account email and Solace will send a reset link for your email sign-in password.",
     );
   });
 
@@ -405,7 +405,7 @@ describe("LoginForm", () => {
       redirectTo: "https://solace.test/reset-password",
     });
     expect(container.textContent).toContain(
-      "If an account exists for that email, we sent a password reset link for your email sign-in password.",
+      "If an account exists for that email, Solace sent a password reset link for your email sign-in password.",
     );
   });
 

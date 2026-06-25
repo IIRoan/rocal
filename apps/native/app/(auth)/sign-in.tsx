@@ -172,7 +172,7 @@ export default function SignInScreen() {
 
       Alert.alert(
         "Check your email",
-        "If an account exists for that email, we sent a password reset link for your email sign-in password.",
+        "If an account exists for that email, Solace sent a password reset link for your email sign-in password.",
       );
       toast("Password reset link sent");
       setIsResetMode(false);
@@ -223,7 +223,7 @@ export default function SignInScreen() {
     ? "Reset your email sign-in password"
     : "Welcome back";
   const subtitle = isResetMode
-    ? "Enter your email and we’ll send a web link to reset your email sign-in password."
+    ? "Enter your email and Solace will send a web link to reset your email sign-in password."
     : "Sign in with your email and password. If your account has passkeys, you'll verify with one next.";
 
   return (
@@ -327,7 +327,7 @@ export default function SignInScreen() {
             ) : (
               <View style={styles.helperCard}>
                 <Text style={styles.helperText}>
-                  We&apos;ll email you a secure link to reset your email sign-in
+                  Solace will email you a secure link to reset your email sign-in
                   password on the web. If you sign in with email, Solace also
                   uses that password to protect your encryption keys after you
                   sign in.

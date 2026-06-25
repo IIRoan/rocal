@@ -115,8 +115,8 @@ export default function NativePasskeyBridgePage() {
     mode === "register" ? "Add a passkey" : "Continue with a passkey";
   const description =
     mode === "register"
-      ? "Use your browser's passkey support, then we'll return you to the app."
-      : "Sign in with your passkey in the browser, then we'll return you to the app.";
+      ? "Use your browser's passkey support, then Solace will return you to the app."
+      : "Sign in with your passkey in the browser, then Solace will return you to the app.";
   const actionLabel = mode === "register" ? "Add passkey" : "Continue";
 
   const redirectToApp = useCallback(
