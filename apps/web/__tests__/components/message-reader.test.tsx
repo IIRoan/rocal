@@ -38,6 +38,12 @@ Object.defineProperty(navigator, "clipboard", {
   value: { writeText: jest.fn().mockImplementation(() => Promise.resolve()) },
 });
 
+jest.mock("sonner", () => ({
+  toast: Object.assign(jest.fn(), {
+    error: jest.fn(),
+  }),
+}));
+
 jest.mock("@gsap/react", () => ({
   useGSAP: jest.fn(),
 }));
@@ -241,11 +247,14 @@ jest.mock("../../lib/calendar-api-service", () => ({
   },
 }));
 
+import { toast } from "sonner";
 import {
   MessageReader,
   type MessageReaderProps,
 } from "../../components/mail/message-reader";
 import { calendarApiService } from "../../lib/calendar-api-service";
+
+const mockToast = jest.mocked(toast);
 
 const mockCalendarApiService = jest.mocked(calendarApiService);
 
@@ -265,7 +274,6 @@ const defaultProps: MessageReaderProps = {
   decryptedHtml: null,
   signatureVerificationState: "not_signed",
   decryptError: null,
-  isDecrypting: false,
   accountEncryptedAtRest: false,
   isBusy: false,
   mailboxes: [],
@@ -917,20 +925,20 @@ describe("MessageReader — linked calendar event", () => {
 
 describe("MessageReader — toolbar navigation", () => {
   it("renders Previous message button", () => {
-    render({ hasPrev: true, onNavigatePrev: jest.fn() });
+    render({ navigation: { hasPrev: true }, onNavigatePrev: jest.fn() });
     const btn = container.querySelector("[aria-label='Previous message']");
     expect(btn).not.toBeNull();
   });
 
   it("renders Next message button", () => {
-    render({ hasNext: true, onNavigateNext: jest.fn() });
+    render({ navigation: { hasNext: true }, onNavigateNext: jest.fn() });
     const btn = container.querySelector("[aria-label='Next message']");
     expect(btn).not.toBeNull();
   });
 
   it("calls onNavigatePrev when Previous button is clicked", () => {
     const onNavigatePrev = jest.fn();
-    render({ hasPrev: true, onNavigatePrev });
+    render({ navigation: { hasPrev: true }, onNavigatePrev });
     const btn = container.querySelector(
       "[aria-label='Previous message']",
     ) as HTMLButtonElement;
@@ -942,7 +950,7 @@ describe("MessageReader — toolbar navigation", () => {
 
   it("calls onNavigateNext when Next button is clicked", () => {
     const onNavigateNext = jest.fn();
-    render({ hasNext: true, onNavigateNext });
+    render({ navigation: { hasNext: true }, onNavigateNext });
     const btn = container.querySelector(
       "[aria-label='Next message']",
     ) as HTMLButtonElement;
@@ -953,7 +961,7 @@ describe("MessageReader — toolbar navigation", () => {
   });
 
   it("disables Previous button when hasPrev is false", () => {
-    render({ hasPrev: false, onNavigatePrev: jest.fn() });
+    render({ navigation: { hasPrev: false }, onNavigatePrev: jest.fn() });
     const btn = container.querySelector(
       "[aria-label='Previous message']",
     ) as HTMLButtonElement;
@@ -961,7 +969,7 @@ describe("MessageReader — toolbar navigation", () => {
   });
 
   it("disables Next button when hasNext is false", () => {
-    render({ hasNext: false, onNavigateNext: jest.fn() });
+    render({ navigation: { hasNext: false }, onNavigateNext: jest.fn() });
     const btn = container.querySelector(
       "[aria-label='Next message']",
     ) as HTMLButtonElement;
@@ -1369,6 +1377,35 @@ describe("MessageReader — reply bar", () => {
     expect(onReply).toHaveBeenCalledTimes(1);
   });
 
+  it("shows error toast when onSendReply rejects", async () => {
+    const onSendReply = jest
+      .fn<(text: string, files: File[]) => Promise<void>>()
+      .mockRejectedValue(new Error("Network error"));
+    render({ onSendReply });
+    expandReplyBar();
+    const textarea = container.querySelector(
+      "textarea[aria-label*='Reply to']",
+    ) as HTMLTextAreaElement;
+    const nativeValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype,
+      "value",
+    )?.set;
+    act(() => {
+      nativeValueSetter?.call(textarea, "Thanks for the update");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const sendBtn = container.querySelector(
+      "[aria-label='Send reply']",
+    ) as HTMLButtonElement;
+    expect(sendBtn.disabled).toBe(false);
+    await act(async () => {
+      sendBtn.click();
+      await Promise.resolve();
+    });
+    expect(onSendReply).toHaveBeenCalledWith("Thanks for the update", []);
+    expect(mockToast.error).toHaveBeenCalledWith("Network error");
+  });
+
   it("clears the typed reply when switching to another message", () => {
     render();
     expandReplyBar();
@@ -1416,6 +1453,35 @@ describe("MessageReader — pin / star", () => {
     });
     const starBtn = container.querySelector("[aria-label='Unstar']");
     expect(starBtn).not.toBeNull();
+  });
+
+  it("calls onToggleFlagged when star button is clicked", () => {
+    const onToggleFlagged = jest.fn();
+    render({ onToggleFlagged });
+    const starBtn = container.querySelector(
+      "[aria-label='Star']",
+    ) as HTMLButtonElement;
+    act(() => {
+      starBtn.click();
+    });
+    expect(onToggleFlagged).toHaveBeenCalledTimes(1);
+  });
+
+  it("updates star state when message keywords change", () => {
+    render({
+      onToggleFlagged: jest.fn(),
+      message: { ...baseMessage, keywords: {} } as any,
+    });
+    expect(container.querySelector("[aria-label='Star']")).not.toBeNull();
+
+    render({
+      onToggleFlagged: jest.fn(),
+      message: {
+        ...baseMessage,
+        keywords: { $flagged: true },
+      } as any,
+    });
+    expect(container.querySelector("[aria-label='Unstar']")).not.toBeNull();
   });
 });
 
