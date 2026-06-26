@@ -142,9 +142,10 @@ export function useMessageReaderController(props: MessageReaderProps) {
     () => displaySettings.externalContentPolicy === "allow",
   );
   const externalContentKey = `${message?.id ?? ""}:${displaySettings.externalContentPolicy}`;
-  const prevExternalContentKeyRef = useRef(externalContentKey);
-  if (prevExternalContentKeyRef.current !== externalContentKey) {
-    prevExternalContentKeyRef.current = externalContentKey;
+  const [prevExternalContentKey, setPrevExternalContentKey] =
+    useState(externalContentKey);
+  if (prevExternalContentKey !== externalContentKey) {
+    setPrevExternalContentKey(externalContentKey);
     setAllowExternalContent(displaySettings.externalContentPolicy === "allow");
   }
   const externalContentSenderEmail = message?.from?.[0]?.email ?? null;

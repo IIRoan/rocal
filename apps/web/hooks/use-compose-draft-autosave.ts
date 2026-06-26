@@ -7,6 +7,8 @@ import type { JmapEmailMessage, JmapSession } from "@/lib/mail/types";
 import {
   getMailComposeBridge,
   registerComposeDraftSaver,
+} from "@/components/mail/mail-compose-bridge";
+import {
   useMailCompose,
   useMailComposeChrome,
 } from "@/components/mail/mail-compose-context";

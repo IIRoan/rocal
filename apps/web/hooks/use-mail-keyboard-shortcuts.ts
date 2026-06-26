@@ -69,7 +69,9 @@ export function useMailKeyboardShortcuts(
   enabled: boolean,
 ) {
   const actionsRef = useRef(actions);
-  actionsRef.current = actions;
+  useEffect(() => {
+    actionsRef.current = actions;
+  }, [actions]);
 
   useEffect(() => {
     if (!enabled) return;
