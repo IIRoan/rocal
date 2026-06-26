@@ -45,7 +45,7 @@ import {
   isTrashMailboxRole,
 } from "@/lib/mail/mail-mailbox-roles";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
-import { getMailComposeBridge, flushComposeDraftSave } from "@/components/mail/mail-compose-context";
+import { getMailComposeBridge, flushComposeDraftSave } from "@/components/mail/mail-compose-bridge";
 import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose";
 import { replaceSavedDraftInMailboxList } from "@/lib/mail/compose-draft-cache";
 import { getDraftsMailboxId } from "@/lib/mail/draft-utils";

@@ -62,7 +62,7 @@ jest.mock("@workspace/ui/lib/utils", () => ({
 }));
 
 import { RecipientPopover } from "../../components/mail/recipient-popover";
-import { getMailComposeBridge } from "../../components/mail/mail-compose-context";
+import { getMailComposeBridge } from "../../components/mail/mail-compose-bridge";
 
 const mockGetMailComposeBridge = getMailComposeBridge as jest.MockedFunction<
   typeof getMailComposeBridge

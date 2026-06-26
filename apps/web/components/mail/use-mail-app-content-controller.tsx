@@ -20,8 +20,8 @@ import {
   hasActiveFilters,
   type MailSearchFilters,
 } from "@/lib/mail/mail-search-filter";
+import { registerComposeCloseActions } from "./mail-compose-bridge";
 import {
-  registerComposeCloseActions,
   useMailComposeChrome,
   useMailCompose,
 } from "./mail-compose-context";
@@ -345,14 +345,14 @@ export function useMailAppContentController(
   });
 
   const currentMailboxId = activeMailbox?.selectedMailboxId ?? null;
-  const prevMailboxIdRef = useRef<string | null | undefined>(undefined);
-  if (
-    prevMailboxIdRef.current !== undefined &&
-    prevMailboxIdRef.current !== currentMailboxId
-  ) {
+  const isInitialMailboxMountRef = useRef(true);
+  useEffect(() => {
+    if (isInitialMailboxMountRef.current) {
+      isInitialMailboxMountRef.current = false;
+      return;
+    }
     dispatchListChrome({ type: "resetMailboxFilters" });
-  }
-  prevMailboxIdRef.current = currentMailboxId;
+  }, [currentMailboxId]);
 
   const archiveMailbox = activeMailbox?.mailboxes.find(
     (m) => m.role?.toLowerCase() === "archive",
