@@ -175,8 +175,7 @@ describe("computeRescheduledTimes", () => {
     );
 
     const originalDuration =
-      new Date(event.end as string).getTime() -
-      new Date(event.start as string).getTime();
+      new Date(event.end).getTime() - new Date(event.start).getTime();
     expect(newEnd.getTime() - newStart.getTime()).toBe(originalDuration);
     expectZonedTime(newStart, 14, 0);
   });
@@ -199,8 +198,7 @@ describe("computeRescheduledTimes", () => {
     );
 
     const originalDuration =
-      new Date(event.end as string).getTime() -
-      new Date(event.start as string).getTime();
+      new Date(event.end).getTime() - new Date(event.start).getTime();
     expect(newEnd.getTime() - newStart.getTime()).toBe(originalDuration);
     expectZonedDate(newStart, 17);
     expectZonedTime(newStart, 10, 15);
