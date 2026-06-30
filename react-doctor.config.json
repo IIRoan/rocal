@@ -1,9 +1,7 @@
 {
-  "ignore": {
-    "files": [
-      "apps/native/**",
-      "apps/backend/**",
-      "apps/notifications/**"
-    ]
-  }
+  "$schema": "https://react.doctor/schema/config.json",
+  "diff": true,
+  "failOn": "warning",
+  "noScore": true,
+  "verbose": true
 }

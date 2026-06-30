@@ -1957,7 +1957,7 @@ export class StalwartJmapClient {
     );
   }
 
-  /** Permanently delete every message in a mailbox (trash / junk empty). */
+  /** Permanently delete every message in a mailbox (trash / spam empty). */
   async emptyMailbox(session: JmapSession, mailboxId: string): Promise<number> {
     const batchSize = 100;
     let destroyed = 0;

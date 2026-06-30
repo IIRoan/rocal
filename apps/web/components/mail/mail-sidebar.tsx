@@ -54,6 +54,7 @@ import {
   SidebarIconButton,
 } from "@workspace/ui/components/layout";
 import type { JmapMailbox } from "@/lib/mail/types";
+import { getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
 import type { ActiveMailboxState } from "@/hooks/use-mail-app";
 
 const ROLE_ORDER = [
@@ -187,7 +188,7 @@ function SortableMailboxItem({
         onClick={onSelect}
       >
         <MailboxIcon role={mailbox.role} isSelected={isSelected} />
-        <span className="truncate">{mailbox.name}</span>
+        <span className="truncate">{getMailboxDisplayName(mailbox)}</span>
       </SidebarMenuButton>
 
       {isHideable && (
@@ -195,7 +196,7 @@ function SortableMailboxItem({
           type="button"
           onClick={onHideClick}
           disabled={isBusy}
-          aria-label={`Hide ${mailbox.name}`}
+          aria-label={`Hide ${getMailboxDisplayName(mailbox)}`}
           data-no-press-scale
           className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 h-8 w-8 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-[opacity,color,background-color] disabled:opacity-30"
         >
@@ -309,7 +310,7 @@ export function MailSidebar({
                       className="flex justify-center list-none"
                     >
                       <SidebarIconButton
-                        label={mailbox.name}
+                        label={getMailboxDisplayName(mailbox)}
                         onClick={() => onSelectMailbox(mailbox.id)}
                       >
                         <MailboxIcon
@@ -422,13 +423,13 @@ export function MailSidebar({
                                     isSelected={isSelected}
                                   />
                                   <span className="truncate">
-                                    {mailbox.name}
+                                    {getMailboxDisplayName(mailbox)}
                                   </span>
                                 </SidebarMenuButton>
                                 <button
                                   type="button"
                                   onClick={() => toggleHide(mailbox.id)}
-                                  aria-label={`Show ${mailbox.name}`}
+                                  aria-label={`Show ${getMailboxDisplayName(mailbox)}`}
                                   data-no-press-scale
                                   className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover/hidden:opacity-100 h-8 w-8 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-[opacity,color,background-color]"
                                 >

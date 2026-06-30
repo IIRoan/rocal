@@ -11,7 +11,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
-import { getMailboxIcon } from "../../lib/mail/mail-helpers";
+import { getMailboxDisplayName, getMailboxIcon } from "../../lib/mail/mail-helpers";
 import type { JmapMailbox } from "../../lib/mail/types";
 import {
   MAIL_ICON,
@@ -60,7 +60,7 @@ export function MailBulkMoveSheet({
                 disabled && styles.rowDisabled,
               ]}
               accessibilityRole="button"
-              accessibilityLabel={`Move to ${mailbox.name}`}
+              accessibilityLabel={`Move to ${getMailboxDisplayName(mailbox)}`}
             >
               <Feather
                 name={getMailboxIcon(mailbox) as keyof typeof Feather.glyphMap}
@@ -68,7 +68,7 @@ export function MailBulkMoveSheet({
                 color={theme.colors.mutedForeground}
               />
               <Text style={styles.rowLabel} numberOfLines={1}>
-                {mailbox.name}
+                {getMailboxDisplayName(mailbox)}
               </Text>
             </Pressable>
           </View>

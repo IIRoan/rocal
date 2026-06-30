@@ -50,7 +50,7 @@ import {
   useMailAccount,
   useMailRuntime,
 } from "../lib/mail/use-mail";
-import { getMailboxIcon, sortMailboxes } from "../lib/mail/mail-helpers";
+import { getMailboxDisplayName, getMailboxIcon, sortMailboxes } from "../lib/mail/mail-helpers";
 import { InlineLoader } from "./ui/loading";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
@@ -622,7 +622,7 @@ function MailSidebarBody({
                 ]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-                accessibilityLabel={mailbox.name}
+                accessibilityLabel={getMailboxDisplayName(mailbox)}
               >
                 <Feather
                   name={
@@ -642,7 +642,7 @@ function MailSidebarBody({
                   ]}
                   numberOfLines={1}
                 >
-                  {mailbox.name}
+                  {getMailboxDisplayName(mailbox)}
                 </Text>
               </Pressable>
             );
