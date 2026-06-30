@@ -1266,7 +1266,7 @@ describe("EventService Stalwart integration", () => {
       data: { status: "declined" },
     });
     expect(prisma.calendarEvent.delete).toHaveBeenCalledWith({
-      where: { id: "event-1" },
+      where: { id: { equals: "event-1" } },
     });
   });
 

@@ -7,6 +7,7 @@ module.exports = {
   displayName: "ui",
   rootDir: ".",
   testEnvironment: "node",
+  setupFiles: ["<rootDir>/../../jest.test-env.ts"],
   testMatch: ["<rootDir>/src/**/*.test.ts", "<rootDir>/src/**/*.test.tsx"],
   collectCoverageFrom: [
     "<rootDir>/src/components/calendar/color-utils.ts",

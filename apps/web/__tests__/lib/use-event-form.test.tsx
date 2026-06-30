@@ -30,6 +30,14 @@ jest.mock("@workspace/logger", () => ({
   }),
 }));
 
+jest.mock("@/lib/auth-client", () => ({
+  useSession: jest.fn(() => ({
+    data: { user: { id: "user-1", email: "alice@example.com" } },
+    isPending: false,
+  })),
+  signOut: jest.fn(),
+}));
+
 import { calendarApiService } from "../../lib/calendar-api-service";
 import { useEventForm } from "../../hooks/use-event-form";
 

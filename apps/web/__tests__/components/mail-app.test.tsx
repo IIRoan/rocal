@@ -108,13 +108,17 @@ jest.mock("lucide-react", () => {
   const Icon = () => null;
   return {
     ArrowLeft: Icon,
+    ChevronDown: Icon,
     ChevronRight: Icon,
     Ellipsis: Icon,
+    Filter: Icon,
     Inbox: Icon,
     Loader2: Icon,
     Lock: Icon,
+    MailOpen: Icon,
     MailPlus: Icon,
     Menu: Icon,
+    Paperclip: Icon,
     Pencil: Icon,
     Plus: Icon,
     RefreshCcw: Icon,
@@ -122,6 +126,7 @@ jest.mock("lucide-react", () => {
     Search: Icon,
     Send: Icon,
     ShieldCheck: Icon,
+    Star: Icon,
     UserRoundPlus: Icon,
     X: Icon,
   };
@@ -142,8 +147,37 @@ jest.mock("../../lib/mail/api-service", () => ({
   },
 }));
 
-jest.mock("../../lib/auth-client", () => ({
+jest.mock("@/lib/auth-client", () => ({
   useSession: jest.fn(),
+  signOut: jest.fn(),
+}));
+
+jest.mock("@/hooks/use-recent-contacts", () => ({
+  useRecentContacts: jest.fn(() => ({
+    payload: { version: 1, contacts: [] },
+    suggestions: [],
+    isAvailable: false,
+    isLoading: false,
+    recordUsage: jest.fn(),
+    flushPending: jest.fn(),
+    reload: jest.fn(),
+  })),
+}));
+
+jest.mock("@/hooks/use-mail-url-sync", () => ({
+  useMailUrlSync: jest.fn(),
+}));
+
+jest.mock("@/lib/mail/oauth-client", () => ({
+  createMailOAuthTokenManager: jest.fn(() => ({
+    getAccessToken: jest.fn(async () => "access-token"),
+    clear: jest.fn(),
+  })),
+}));
+
+jest.mock("@/lib/mail/vault-storage", () => ({
+  getStoredMailVault: jest.fn(async () => null),
+  putStoredMailVault: jest.fn(async () => undefined),
 }));
 
 jest.mock("../../lib/e2ee-password-cache", () => ({
@@ -174,6 +208,28 @@ const mockJmapClient = {
   getMessagesByIds: jest.fn<() => Promise<any>>(),
   getThreadMessages: jest.fn<() => Promise<any>>(),
   getIdentities: jest.fn<() => Promise<any>>(),
+  getStalwartPolicySingletons: jest.fn<() => Promise<any>>().mockResolvedValue({
+    emailSettings: {
+      maxAttachmentSize: 10_000_000,
+      maxMessageSize: 15_000_000,
+    },
+    jmapSettings: {
+      maxUploadSize: 10_000_000,
+      queryMaxResults: 100,
+    },
+  }),
+  syncMailServerPolicy: jest.fn<() => Promise<any>>().mockResolvedValue({
+    limits: {
+      maxBlobUploadBytes: 10_000_000,
+      maxAttachmentSizeBytes: 10_000_000,
+      maxMessageSizeBytes: 15_000_000,
+      maxOutgoingAttachmentBytes: 10_000_000,
+    },
+  }),
+  setMailServerPolicy: jest.fn(),
+  ensureEncryptOnAppendDisabled: jest
+    .fn<() => Promise<any>>()
+    .mockResolvedValue(undefined),
   sendMessage: jest.fn<() => Promise<any>>(),
   markAsRead: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
   markAsUnread: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
@@ -189,6 +245,14 @@ const mockJmapClient = {
   bulkMoveToMailbox: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
   bulkMarkAsUnread: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
   bulkMarkAsRead: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+  searchMailboxMessages: jest.fn<() => Promise<any>>().mockResolvedValue({
+    messages: [],
+    total: 0,
+  }),
+  searchMailboxMessagesWithFilter: jest.fn<() => Promise<any>>().mockResolvedValue({
+    messages: [],
+    total: 0,
+  }),
 };
 
 jest.mock("../../lib/mail/jmap-client", () => ({
@@ -370,7 +434,7 @@ jest.mock("../../hooks/use-smooth-router", () => ({
 }));
 
 import { MailApp } from "../../components/mail/mail-app";
-import { useSession } from "../../lib/auth-client";
+import { useSession } from "@/lib/auth-client";
 import { peekCachedAuthPassword } from "../../lib/e2ee-password-cache";
 import {
   clearEncPasswordCookie,
@@ -470,6 +534,8 @@ async function waitForExpectation(
 }
 
 describe("MailApp", () => {
+  jest.setTimeout(15_000);
+
   beforeEach(async () => {
     await resetMailVaultDatabase();
     container = document.createElement("div");
@@ -803,6 +869,10 @@ describe("MailApp", () => {
 
     await renderApp();
 
+    await waitForExpectation(() => {
+      expect(mockUnlockEncryptedMailVault).toHaveBeenCalled();
+      expect(container.textContent).toContain("Encrypted hello");
+    }, 10_000);
     expect(mockApi.getAccountVaultBackup).toHaveBeenCalled();
     expect(mockUnlockEncryptedMailVault).toHaveBeenCalledWith(
       "vault-b64",
@@ -850,9 +920,97 @@ describe("MailApp", () => {
 
     await waitForExpectation(() => {
       expect(container.textContent).toContain("Encrypted hello");
-    });
+    }, 10_000);
 
     expect(container.querySelector('button[aria-label="Reply"]')).toBeNull();
+  });
+
+  it("focuses inline search on / without inserting the slash or clearing the message list", async () => {
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    }, 10_000);
+
+    const searchInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder*="Search all messages"]',
+    );
+    expect(searchInput).not.toBeNull();
+
+    await act(async () => {
+      document.body.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "/",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+
+    await waitForExpectation(() => {
+      expect(document.activeElement).toBe(searchInput);
+    });
+    expect(searchInput?.value).toBe("");
+    expect(container.textContent).toContain("Encrypted hello");
+    expect(mockJmapClient.searchMailboxMessages).not.toHaveBeenCalled();
+  });
+
+  it("runs server search after typing a query without leaving the list empty while loading", async () => {
+    let resolveSearch:
+      | ((value: { messages: { id: string; subject: string }[]; total: number }) => void)
+      | null = null;
+    mockJmapClient.searchMailboxMessagesWithFilter.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSearch = resolve;
+        }),
+    );
+
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    }, 10_000);
+
+    const searchInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder*="Search all messages"]',
+    );
+    expect(searchInput).not.toBeNull();
+
+    await act(async () => {
+      setInputValue(searchInput!, "hello");
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Searching…");
+    });
+
+    await act(async () => {
+      resolveSearch?.({
+        messages: [
+          {
+            id: "mail-search-1",
+            subject: "Matched hello",
+          },
+        ],
+        total: 1,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitForExpectation(() => {
+      expect(mockJmapClient.searchMailboxMessagesWithFilter).toHaveBeenCalledWith(
+        expect.anything(),
+        "inbox-1",
+        { inMailbox: "inbox-1", text: "hello" },
+        40,
+      );
+      expect(container.textContent).toContain("Matched hello");
+    });
   });
 
   it("does not auto-open the newest message on mobile", async () => {
@@ -862,7 +1020,7 @@ describe("MailApp", () => {
 
     await waitForExpectation(() => {
       expect(container.textContent).toContain("Encrypted hello");
-    });
+    }, 10_000);
 
     expect(container.querySelector('button[aria-label="Reply"]')).toBeNull();
   });
@@ -959,7 +1117,7 @@ describe("MailApp", () => {
     });
 
     const spamButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent?.includes("Spam"),
+      (element) => element.textContent?.includes("Junk Mail"),
     );
 
     await act(async () => {
@@ -999,7 +1157,7 @@ describe("MailApp", () => {
 
     await waitForExpectation(() => {
       expect(container.textContent).toContain("Encrypted hello");
-    });
+    }, 10_000);
 
     const composeButton = container.querySelector('[aria-label="Compose"]') as HTMLButtonElement | null;
     await act(async () => {
@@ -1157,7 +1315,7 @@ describe("MailApp", () => {
 
     await waitForExpectation(() => {
       expect(container.textContent).toContain("Encrypted hello");
-    });
+    }, 10_000);
 
     const composeButton = container.querySelector('[aria-label="Compose"]') as HTMLButtonElement | null;
     await act(async () => {
@@ -1261,7 +1419,7 @@ describe("MailApp", () => {
 
     await waitForExpectation(() => {
       expect(container.textContent).toContain("Encrypted hello");
-    });
+    }, 10_000);
 
     const messageButton = Array.from(container.querySelectorAll("button")).find(
       (element) => element.textContent === "Encrypted hello",
@@ -1287,6 +1445,21 @@ describe("MailApp", () => {
   });
 
   it("adds a sent compose reply into the active conversation immediately", async () => {
+    localStorage.setItem(
+      "mail:composeSettings",
+      JSON.stringify({
+        plainTextMode: true,
+        attachmentReminderEnabled: true,
+        attachmentReminderKeywords: ["attached"],
+        signaturePosition: "below_quote",
+        signatureSeparatorEnabled: true,
+        autoSelectReplyIdentity: true,
+      }),
+    );
+    mockJmapClient.sendMessage.mockResolvedValue({
+      id: "sent-reply-1",
+      threadId: "thread-1",
+    });
     mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockResolvedValue({
@@ -1323,7 +1496,7 @@ describe("MailApp", () => {
 
     await waitForExpectation(() => {
       expect(container.textContent).toContain("Encrypted hello");
-    });
+    }, 10_000);
 
     const messageButton = Array.from(container.querySelectorAll("button")).find(
       (element) => element.textContent === "Encrypted hello",

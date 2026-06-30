@@ -105,6 +105,14 @@ jest.mock("../../lib/event-editor-view-model", () => ({
   getRecurringRuleSummary: () => "Every week",
 }));
 
+jest.mock("@/lib/auth-client", () => ({
+  useSession: jest.fn(() => ({
+    data: { user: { id: "user-1", email: "alice@example.com" } },
+    isPending: false,
+  })),
+  signOut: jest.fn(),
+}));
+
 import { EventEditorBody } from "../../components/event-editor/event-editor-body";
 
 let container: HTMLDivElement;

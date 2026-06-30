@@ -238,6 +238,7 @@ jest.mock("../../lib/calendar-api-service", () => ({
     declineInvitationIcs: jest.fn(),
     respondToInvitation: jest.fn(),
     deleteEvent: jest.fn(),
+    sealImportedInvitationIfNeeded: jest.fn(async (event: unknown) => event),
   },
 }));
 
@@ -286,7 +287,12 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  queryClient = new QueryClient();
+  queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
   mockCalendarApiService.getEvent.mockResolvedValue({
     id: "event-1",
     title: "Planning sync",
@@ -335,6 +341,20 @@ function render(props: Partial<MessageReaderProps> = {}) {
         <MessageReader {...defaultProps} {...props} />
       </QueryClientProvider>,
     );
+  });
+}
+
+async function waitForInvitationProcessing(
+  predicate: () => boolean,
+  attempts = 50,
+) {
+  await act(async () => {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      if (predicate()) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
   });
 }
 
@@ -423,18 +443,15 @@ describe("MessageReader — linked calendar event", () => {
       );
     });
 
-    await act(async () => {
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        const state = queryClient.getQueryState(["events", "detail", "event-1"]);
-        if (state?.status === "success") {
-          break;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
-      await Promise.resolve();
+    await waitForInvitationProcessing(() => {
+      const state = queryClient.getQueryState(["events", "detail", "event-1"]);
+      return state?.status === "success";
     });
 
     expect(mockCalendarApiService.getEvent).toHaveBeenCalledWith("event-1");
+    await waitForInvitationProcessing(() =>
+      container.textContent?.includes("Planning sync") ?? false,
+    );
     expect(container.textContent).toContain("Planning sync");
     expect(container.textContent).toContain("Room 42");
     expect(container.textContent).toContain("Work");
@@ -505,9 +522,10 @@ describe("MessageReader — linked calendar event", () => {
           />
         </QueryClientProvider>,
       );
-      await Promise.resolve();
-      await Promise.resolve();
     });
+    await waitForInvitationProcessing(
+      () => mockCalendarApiService.importInvitationIcs.mock.calls.length > 0,
+    );
 
     expect(mockCalendarApiService.importInvitationIcs).toHaveBeenCalledWith(
       icsContent,
@@ -589,9 +607,10 @@ describe("MessageReader — linked calendar event", () => {
           />
         </QueryClientProvider>,
       );
-      await Promise.resolve();
-      await Promise.resolve();
     });
+    await waitForInvitationProcessing(
+      () => mockCalendarApiService.importInvitationIcs.mock.calls.length > 0,
+    );
 
     expect(mockCalendarApiService.getEvent).not.toHaveBeenCalled();
     expect(mockCalendarApiService.importInvitationIcs).toHaveBeenCalledWith(
@@ -680,9 +699,12 @@ describe("MessageReader — linked calendar event", () => {
           />
         </QueryClientProvider>,
       );
-      await Promise.resolve();
-      await Promise.resolve();
     });
+    await waitForInvitationProcessing(() =>
+      Array.from(container.querySelectorAll("button")).some((button) =>
+        button.textContent?.includes("Accept"),
+      ),
+    );
 
     const acceptButton = Array.from(
       container.querySelectorAll("button"),
@@ -775,9 +797,12 @@ describe("MessageReader — linked calendar event", () => {
           />
         </QueryClientProvider>,
       );
-      await Promise.resolve();
-      await Promise.resolve();
     });
+    await waitForInvitationProcessing(() =>
+      Array.from(container.querySelectorAll("button")).some((button) =>
+        button.textContent?.includes("Accept"),
+      ),
+    );
 
     const acceptButton = Array.from(
       container.querySelectorAll("button"),
@@ -892,10 +917,10 @@ describe("MessageReader — linked calendar event", () => {
           />
         </QueryClientProvider>,
       );
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
     });
+    await waitForInvitationProcessing(
+      () => mockCalendarApiService.importInvitationIcs.mock.calls.length > 0,
+    );
 
     expect(mockCalendarApiService.importInvitationIcs).toHaveBeenCalledWith(
       icsContent,
@@ -911,7 +936,9 @@ describe("MessageReader — linked calendar event", () => {
       syncRemote: false,
     });
     expect(container.textContent).toContain("The organiser cancelled this event");
-    expect(container.textContent).toContain("Remove from calendar");
+    expect(container.textContent).toContain(
+      "This cancellation was already applied in your calendar.",
+    );
   });
 });
 

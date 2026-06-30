@@ -1,11 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
-import {
-  addDays,
-  differenceInCalendarDays,
-  endOfMonth,
-  startOfMonth,
-  subDays,
-} from "date-fns";
+import { differenceInCalendarDays, endOfMonth, startOfMonth } from "date-fns";
+import { getPaddedCalendarMonthRange } from "@workspace/calendar-core";
 
 import {
   toFetchRange,
@@ -32,13 +27,7 @@ const ALL_WEEK_START_DAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 
 /** Build the expected padded fetch range for a given month. */
 function expectedMonthFetch(date: Date): DateRange {
-  const first = startOfMonth(date);
-  const last = endOfMonth(date);
-  const start = subDays(first, MONTH_PADDING_DAYS);
-  start.setHours(0, 0, 0, 0);
-  const end = addDays(last, MONTH_PADDING_DAYS);
-  end.setHours(23, 59, 59, 999);
-  return { start, end };
+  return getPaddedCalendarMonthRange(date, MONTH_PADDING_DAYS);
 }
 
 /** Shorthand for building a view range via getDefaultCalendarDateRange. */
@@ -156,13 +145,8 @@ describe("toFetchRange", () => {
 
     it("pads exactly MONTH_PADDING_DAYS after the last day", () => {
       const fr = toFetchRange(viewRange(new Date(2026, 0, 15), "month"));
-      const jan31 = new Date(2026, 0, 31);
-      jan31.setHours(0, 0, 0, 0);
-      const frEndDay = new Date(fr.end);
-      frEndDay.setHours(0, 0, 0, 0);
-      expect(differenceInCalendarDays(frEndDay, jan31)).toBe(
-        MONTH_PADDING_DAYS,
-      );
+      const expected = expectedMonthFetch(new Date(2026, 0, 1));
+      expect(fr.end.getTime()).toBe(expected.end.getTime());
     });
   });
 

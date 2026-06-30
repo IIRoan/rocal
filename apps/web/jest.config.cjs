@@ -7,6 +7,7 @@ module.exports = {
   displayName: "web",
   rootDir: ".",
   testEnvironment: "node",
+  setupFiles: ["<rootDir>/jest.setup.ts"],
   testMatch: [
     "<rootDir>/__tests__/**/*.test.ts",
     "<rootDir>/__tests__/**/*.test.tsx",

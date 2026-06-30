@@ -50,6 +50,15 @@ jest.mock("../../lib/calendar-api-service", () => ({
 
 jest.mock("../../lib/e2ee-session", () => ({
   getActiveE2eeSession: () => null,
+  hasActiveE2eeSession: () => false,
+}));
+
+jest.mock("@/lib/auth-client", () => ({
+  useSession: jest.fn(() => ({
+    data: { user: { id: "user-1", email: "alice@example.com" } },
+    isPending: false,
+  })),
+  signOut: jest.fn(),
 }));
 
 jest.mock("@workspace/logger", () => ({
