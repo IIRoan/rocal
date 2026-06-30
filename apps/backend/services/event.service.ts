@@ -456,7 +456,7 @@ export class EventService implements IEventService {
       where: { eventId: eventIdFilter },
     });
     await this.prisma.calendarEvent.delete({
-      where: { id: eventIdFilter },
+      where: { id: eventIdFilter.equals },
     });
   }
 

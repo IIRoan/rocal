@@ -268,7 +268,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     useEffect(() => {
       if (!visible) {
         keyboardOffset.value = 0;
-        return;
+        return () => {};
       }
 
       const showEvent =
@@ -354,6 +354,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
           finishUnmountIfCurrent(closeSequence);
         }, CLOSE_DURATION + 120);
       }
+
+      return clearCloseFallbackTimer;
     }, [
       visible,
       maxHeight,

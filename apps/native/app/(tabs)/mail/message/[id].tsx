@@ -179,7 +179,10 @@ export default function MailMessageScreen() {
       return;
     }
     recordedContactMessageRef.current = recordKey;
-    recordUsage([{ email: sender.email, displayName: sender.name }], "mail");
+    recordUsage(
+      [{ email: sender.email, displayName: sender.name ?? undefined }],
+      "mail",
+    );
   }, [message, recordUsage, runtime?.session?.username]);
 
   useEffect(() => {
