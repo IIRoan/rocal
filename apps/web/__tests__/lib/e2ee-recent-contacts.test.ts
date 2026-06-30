@@ -1,3 +1,4 @@
+import type { RecentContactsPayload } from "@workspace/calendar-core";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("../../lib/e2ee-session", () => ({
@@ -61,7 +62,7 @@ const activeSession = {
   activatedAt: new Date("2026-06-19T10:00:00.000Z"),
 };
 
-const samplePayload = {
+const samplePayload: RecentContactsPayload = {
   version: 1,
   contacts: [
     {
