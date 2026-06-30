@@ -566,6 +566,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
 
   const { settings: listSettings } = useMailListSettings();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const suppressSearchShortcutInputRef = useRef(false);
 
   useMailKeyboardShortcuts(
     {
@@ -591,7 +592,13 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
       closeMessage: handleCloseMessage,
       focusSearch: () => {
         if (!isMobile) {
-          searchInputRef.current?.focus();
+          suppressSearchShortcutInputRef.current = true;
+          requestAnimationFrame(() => {
+            searchInputRef.current?.focus({ preventScroll: true });
+            requestAnimationFrame(() => {
+              suppressSearchShortcutInputRef.current = false;
+            });
+          });
         }
       },
     },
@@ -731,8 +738,24 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                           <Input
                             ref={searchInputRef}
                             value={mailListSearch}
-                            onChange={(e) => setMailListSearch(e.target.value)}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (
+                                suppressSearchShortcutInputRef.current &&
+                                value === "/"
+                              ) {
+                                return;
+                              }
+                              setMailListSearch(value);
+                            }}
                             onKeyDown={(e) => {
+                              if (
+                                e.key === "/" &&
+                                suppressSearchShortcutInputRef.current
+                              ) {
+                                e.preventDefault();
+                                return;
+                              }
                               if (e.key === "Enter") {
                                 setAdvancedFilters((prev) => ({
                                   ...prev,
@@ -780,6 +803,15 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                     </div>
                   )}
                   <div className="flex min-h-0 flex-1 flex-col">
+                    {searchActive &&
+                    isSearching &&
+                    serverSearchResults === undefined ? (
+                      <div className="flex flex-1 items-center justify-center p-8">
+                        <p className="text-sm text-muted-foreground">
+                          Searching…
+                        </p>
+                      </div>
+                    ) : (
                     <MessageList
                     key={activeMailbox.selectedMailboxId ?? "mailbox-list"}
                     messages={filteredListMessages}
@@ -834,6 +866,7 @@ function MailAppContent({ mail }: { mail: ReturnType<typeof useMailApp> }) {
                         : undefined
                     }
                   />
+                    )}
                   </div>
                 </div>
 
