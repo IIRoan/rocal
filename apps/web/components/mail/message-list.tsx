@@ -14,7 +14,7 @@ import {
   MoreHorizontal,
   Star,
   Paperclip,
-  ShieldAlert,
+  OctagonAlert,
   Tag,
   Inbox,
   Check,
@@ -53,8 +53,9 @@ import { buildMailConversations } from "@/lib/mail/conversation-thread";
 import { getAllMessageLabels } from "@/lib/mail/mail-labels";
 import { resolveLabelDisplayColor } from "@/lib/mail/mail-label-colors";
 import {
-  findJunkMailbox,
-  isJunkMailboxRole,
+  getMailboxDisplayName,
+  findSpamMailbox,
+  isSpamMailboxRole,
   isTrashMailboxRole,
 } from "@/lib/mail/mail-mailbox-roles";
 
@@ -220,12 +221,12 @@ export function MessageList({
 
   const currentMailbox = mailboxes?.find((m) => m.id === currentMailboxId);
   const currentMailboxRole = currentMailbox?.role;
-  const isInJunk = isJunkMailboxRole(currentMailboxRole);
+  const isInSpam = isSpamMailboxRole(currentMailboxRole);
   const isInTrash = isTrashMailboxRole(currentMailboxRole);
-  const junkMailbox = findJunkMailbox(mailboxes ?? []);
+  const spamMailbox = findSpamMailbox(mailboxes ?? []);
   const canReportSpam =
-    Boolean(onReportSpam) && !isInJunk && !isInTrash && Boolean(junkMailbox);
-  const canNotSpam = Boolean(onNotSpam) && isInJunk;
+    Boolean(onReportSpam) && !isInSpam && !isInTrash && Boolean(spamMailbox);
+  const canNotSpam = Boolean(onNotSpam) && isInSpam;
 
   const moveTargets = (mailboxes ?? []).filter(
     (m) =>
@@ -539,7 +540,7 @@ export function MessageList({
                       }}
                       className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
-                      <ShieldAlert className="size-3.5" strokeWidth={2.25} />
+                      <OctagonAlert className="size-3.5" strokeWidth={2.25} />
                       Spam
                     </button>
                   </>
@@ -562,7 +563,7 @@ export function MessageList({
                       className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/50 hover:text-foreground"
                     >
                       <FolderInput className="size-3.5" strokeWidth={2.25} />
-                      <span className="truncate">{mailbox.name}</span>
+                      <span className="truncate">{getMailboxDisplayName(mailbox)}</span>
                     </button>
                   ))}
                 </div>
@@ -854,7 +855,7 @@ export function MessageList({
                     <ContextMenuItem
                       onClick={() => onReportSpam?.(message.id)}
                     >
-                      <ShieldAlert />
+                      <OctagonAlert />
                       Report spam
                     </ContextMenuItem>
                   )}
@@ -922,7 +923,7 @@ export function MessageList({
                                   : onMove?.(message.id, mailbox.id)
                               }
                             >
-                              {mailbox.name}
+                              {getMailboxDisplayName(mailbox)}
                             </ContextMenuItem>
                           ))}
                         </ContextMenuSubContent>

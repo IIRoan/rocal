@@ -196,6 +196,7 @@ jest.mock("lucide-react", () => {
     Reply: Icon,
     Send: Icon,
     ShieldAlert: Icon,
+    OctagonAlert: Icon,
     ShieldCheck: Icon,
     Smile: Icon,
     Star: Icon,
@@ -1451,7 +1452,7 @@ describe("MessageReader — untrash / restore", () => {
     { id: "trash", name: "Trash", role: "trash" } as any,
     { id: "inbox", name: "Inbox", role: "inbox" } as any,
   ];
-  const junkMailboxes = [
+  const spamMailboxes = [
     { id: "junk", name: "Junk", role: "junk" } as any,
     { id: "inbox", name: "Inbox", role: "inbox" } as any,
   ];
@@ -1465,9 +1466,9 @@ describe("MessageReader — untrash / restore", () => {
     expect(container.textContent).toContain("Restore to inbox");
   });
 
-  it("shows 'Not spam' in dropdown when in junk", () => {
+  it("shows 'Not spam' in dropdown when in spam folder", () => {
     render({
-      mailboxes: junkMailboxes,
+      mailboxes: spamMailboxes,
       currentMailboxId: "junk",
       onUntrash: jest.fn(),
     });

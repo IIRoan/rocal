@@ -48,6 +48,7 @@ import {
 } from "../../../src/lib/mail/use-mail";
 import { useLabels } from "../../../src/lib/mail/use-labels";
 import {
+  getMailboxDisplayName,
   getMailboxIcon,
   getPrimaryMailboxId,
   isDraftMessage,
@@ -586,7 +587,11 @@ export default function MailScreen() {
           <MailListHeader
             selectedCount={selectedIds.size}
             totalCount={selectableIds.length}
-            mailboxName={selectedMailbox?.name ?? "Mail"}
+            mailboxName={
+              selectedMailbox
+                ? getMailboxDisplayName(selectedMailbox)
+                : "Mail"
+            }
             mailboxIcon={
               selectedMailbox
                 ? (getMailboxIcon(
