@@ -1,4 +1,5 @@
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import { formatInUserTimezone } from "@workspace/calendar-core";
 import {
   getEventDurationMs,
   snapToInterval,
@@ -9,6 +10,26 @@ import {
 } from "./draggable-event-utils";
 import { HOUR_HEIGHT } from "../calendar/timeline-utils";
 
+const TEST_TIMEZONE = "UTC";
+
+function utcDate(year: number, month: number, day: number): Date {
+  return new Date(Date.UTC(year, month, day));
+}
+
+function expectZonedTime(
+  instant: Date,
+  hour: number,
+  minute: number,
+): void {
+  expect(formatInUserTimezone(instant, TEST_TIMEZONE, "HH:mm")).toBe(
+    `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+  );
+}
+
+function expectZonedDate(instant: Date, day: number): void {
+  expect(formatInUserTimezone(instant, TEST_TIMEZONE, "d")).toBe(String(day));
+}
+
 // ─── Test Helpers ────────────────────────────────────────────────────────────
 
 function makeEvent(
@@ -17,8 +38,9 @@ function makeEvent(
   return {
     id: "evt-1",
     title: "Test Event",
-    start: new Date(2025, 0, 15, 9, 0),
-    end: new Date(2025, 0, 15, 10, 0),
+    start: "2025-01-15T09:00:00.000Z",
+    end: "2025-01-15T10:00:00.000Z",
+    timezone: TEST_TIMEZONE,
     allDay: false,
     calendarId: "cal-1",
     userId: "user-1",
@@ -137,95 +159,95 @@ describe("xOffsetToColumnIndex", () => {
 describe("computeRescheduledTimes", () => {
   it("preserves event duration when rescheduling to a new time", () => {
     const event = makeEvent({
-      start: new Date(2025, 0, 15, 9, 0),
-      end: new Date(2025, 0, 15, 10, 0),
+      start: "2025-01-15T09:00:00.000Z",
+      end: "2025-01-15T10:00:00.000Z",
     });
     const dropTarget = {
-      date: new Date(2025, 0, 15),
+      date: utcDate(2025, 0, 15),
       hour: 14,
       minute: 0,
     };
 
-    const { newStart, newEnd } = computeRescheduledTimes(event, dropTarget);
+    const { newStart, newEnd } = computeRescheduledTimes(
+      event,
+      dropTarget,
+      TEST_TIMEZONE,
+    );
 
-    // Duration should be preserved (1 hour)
     const originalDuration =
-      new Date(event.end).getTime() - new Date(event.start).getTime();
-    const newDuration = newEnd.getTime() - newStart.getTime();
-    expect(newDuration).toBe(originalDuration);
-
-    // New start should match drop target
-    expect(newStart.getHours()).toBe(14);
-    expect(newStart.getMinutes()).toBe(0);
+      new Date(event.end as string).getTime() -
+      new Date(event.start as string).getTime();
+    expect(newEnd.getTime() - newStart.getTime()).toBe(originalDuration);
+    expectZonedTime(newStart, 14, 0);
   });
 
   it("preserves duration when moving to a different day", () => {
     const event = makeEvent({
-      start: new Date(2025, 0, 15, 9, 0),
-      end: new Date(2025, 0, 15, 11, 30),
+      start: "2025-01-15T09:00:00.000Z",
+      end: "2025-01-15T11:30:00.000Z",
     });
     const dropTarget = {
-      date: new Date(2025, 0, 17),
+      date: utcDate(2025, 0, 17),
       hour: 10,
       minute: 15,
     };
 
-    const { newStart, newEnd } = computeRescheduledTimes(event, dropTarget);
+    const { newStart, newEnd } = computeRescheduledTimes(
+      event,
+      dropTarget,
+      TEST_TIMEZONE,
+    );
 
-    // Duration should be preserved (2.5 hours)
     const originalDuration =
-      new Date(event.end).getTime() - new Date(event.start).getTime();
-    const newDuration = newEnd.getTime() - newStart.getTime();
-    expect(newDuration).toBe(originalDuration);
-
-    // New start should be on the target date
-    expect(newStart.getDate()).toBe(17);
-    expect(newStart.getHours()).toBe(10);
-    expect(newStart.getMinutes()).toBe(15);
-
-    // New end should be 2.5 hours later
-    expect(newEnd.getDate()).toBe(17);
-    expect(newEnd.getHours()).toBe(12);
-    expect(newEnd.getMinutes()).toBe(45);
+      new Date(event.end as string).getTime() -
+      new Date(event.start as string).getTime();
+    expect(newEnd.getTime() - newStart.getTime()).toBe(originalDuration);
+    expectZonedDate(newStart, 17);
+    expectZonedTime(newStart, 10, 15);
+    expectZonedDate(newEnd, 17);
+    expectZonedTime(newEnd, 12, 45);
   });
 
   it("preserves duration for short events (15 min)", () => {
     const event = makeEvent({
-      start: new Date(2025, 0, 15, 9, 0),
-      end: new Date(2025, 0, 15, 9, 15),
+      start: "2025-01-15T09:00:00.000Z",
+      end: "2025-01-15T09:15:00.000Z",
     });
     const dropTarget = {
-      date: new Date(2025, 0, 15),
+      date: utcDate(2025, 0, 15),
       hour: 16,
       minute: 30,
     };
 
-    const { newStart, newEnd } = computeRescheduledTimes(event, dropTarget);
+    const { newStart, newEnd } = computeRescheduledTimes(
+      event,
+      dropTarget,
+      TEST_TIMEZONE,
+    );
 
-    const originalDuration =
-      new Date(event.end).getTime() - new Date(event.start).getTime();
-    const newDuration = newEnd.getTime() - newStart.getTime();
-    expect(newDuration).toBe(originalDuration);
-    expect(newDuration).toBe(15 * 60 * 1000);
+    expect(newEnd.getTime() - newStart.getTime()).toBe(15 * 60 * 1000);
+    expectZonedTime(newStart, 16, 30);
   });
 
   it("handles drop at midnight", () => {
     const event = makeEvent({
-      start: new Date(2025, 0, 15, 9, 0),
-      end: new Date(2025, 0, 15, 10, 0),
+      start: "2025-01-15T09:00:00.000Z",
+      end: "2025-01-15T10:00:00.000Z",
     });
     const dropTarget = {
-      date: new Date(2025, 0, 16),
+      date: utcDate(2025, 0, 16),
       hour: 0,
       minute: 0,
     };
 
-    const { newStart, newEnd } = computeRescheduledTimes(event, dropTarget);
+    const { newStart, newEnd } = computeRescheduledTimes(
+      event,
+      dropTarget,
+      TEST_TIMEZONE,
+    );
 
-    expect(newStart.getHours()).toBe(0);
-    expect(newStart.getMinutes()).toBe(0);
-    expect(newEnd.getHours()).toBe(1);
-    expect(newEnd.getMinutes()).toBe(0);
+    expectZonedTime(newStart, 0, 0);
+    expectZonedTime(newEnd, 1, 0);
   });
 });
 
