@@ -84,6 +84,16 @@ describe("EventEditorFooter", () => {
               selectedEvent: {
                 id: "event-1",
                 isSynced: false,
+                externalId: "uid-123@google.com",
+                userId: "user-1",
+                participants: [
+                  {
+                    userId: "user-1",
+                    email: "user@example.com",
+                    role: "attendee",
+                    status: "pending",
+                  },
+                ],
               },
               setEventViewMode: jest.fn(),
               setShowRecurringDeleteModal: jest.fn(),
