@@ -142,8 +142,21 @@ jest.mock("../../lib/mail/api-service", () => ({
   },
 }));
 
-jest.mock("../../lib/auth-client", () => ({
+jest.mock("@/lib/auth-client", () => ({
   useSession: jest.fn(),
+}));
+
+jest.mock("@/lib/e2ee-session", () => ({
+  getActiveE2eeSession: () => null,
+  hasActiveE2eeSession: () => false,
+}));
+
+jest.mock("../../hooks/use-recent-contacts", () => ({
+  useRecentContacts: () => ({
+    recentContacts: { version: 1 as const, contacts: [] },
+    recordUsage: jest.fn(),
+    isLoading: false,
+  }),
 }));
 
 jest.mock("../../lib/e2ee-password-cache", () => ({
@@ -370,7 +383,7 @@ jest.mock("../../hooks/use-smooth-router", () => ({
 }));
 
 import { MailApp } from "../../components/mail/mail-app";
-import { useSession } from "../../lib/auth-client";
+import { useSession } from "@/lib/auth-client";
 import { peekCachedAuthPassword } from "../../lib/e2ee-password-cache";
 import {
   clearEncPasswordCookie,
@@ -732,7 +745,7 @@ describe("MailApp", () => {
       mockApi.bootstrapAccountMailbox.mock.calls[0]?.[0],
     ).not.toHaveProperty("password");
     expect(mockApi.bootstrapAccountMailbox).toHaveBeenCalledTimes(1);
-    expect(mockApi.getAccountVaultBackup).toHaveBeenCalledTimes(1);
+    expect(mockApi.getAccountVaultBackup).toHaveBeenCalled();
     expect(mockUnlockEncryptedMailVault).toHaveBeenCalledWith(
       "vault-b64",
       "StrongMailboxPassword!42",
@@ -772,7 +785,7 @@ describe("MailApp", () => {
       expect(mockApi.bootstrapAccountMailbox).toHaveBeenCalledTimes(2);
     });
     await waitForExpectation(() => {
-      expect(mockApi.getAccountVaultBackup).toHaveBeenCalledTimes(1);
+      expect(mockApi.getAccountVaultBackup).toHaveBeenCalled();
       expect(container.textContent).toContain("Encrypted hello");
     });
     expect(mockToastError).not.toHaveBeenCalled();

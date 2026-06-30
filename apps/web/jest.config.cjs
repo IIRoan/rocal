@@ -6,7 +6,11 @@ const repoRoot = path.join(__dirname, "../..");
 module.exports = {
   displayName: "web",
   rootDir: ".",
+  setupFiles: ["<rootDir>/jest.setup.ts"],
   testEnvironment: "node",
+  transformIgnorePatterns: [
+    "/node_modules/(?!(better-auth|@better-auth)/)",
+  ],
   testMatch: [
     "<rootDir>/__tests__/**/*.test.ts",
     "<rootDir>/__tests__/**/*.test.tsx",
@@ -20,6 +24,9 @@ module.exports = {
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   moduleNameMapper: {
     ...createReactDedupeMapper(repoRoot),
+    "^@/lib/auth-client$": "<rootDir>/__tests__/mocks/auth-client.ts",
+    "^\\.\\./auth-client$": "<rootDir>/__tests__/mocks/auth-client.ts",
+    "^(\\.\\./)+lib/auth-client$": "<rootDir>/__tests__/mocks/auth-client.ts",
     "^@/(.*)$": "<rootDir>/$1",
     "^@workspace/logger$": "<rootDir>/../../packages/logger/src/index.ts",
     "^@workspace/calendar-core$":

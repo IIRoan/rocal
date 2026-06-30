@@ -226,10 +226,11 @@ describe("buildEventRequest", () => {
     });
     expect(result).toEqual({
       title: "Team Standup",
-      start: "2025-06-15T09:00",
-      end: "2025-06-15T09:30",
+      start: "2025-06-15T07:00:00.000Z",
+      end: "2025-06-15T07:30:00.000Z",
       calendarId: "cal-work",
       allDay: false,
+      timezone: "Europe/Amsterdam",
       location: "Room 42",
       description: "Daily sync",
       color: "blue",
