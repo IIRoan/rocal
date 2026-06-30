@@ -260,12 +260,12 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
   useEffect(() => {
     if (!input.enabled || !composeActive) {
       cancelPendingSave();
-      return;
+      return cancelPendingSave;
     }
 
     const bridge = getMailComposeBridge();
     if (!bridge?.isComposeDirty()) {
-      return;
+      return cancelPendingSave;
     }
 
     const hasContent =
@@ -273,7 +273,9 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       composeSubject.trim() ||
       composeBody.trim() ||
       composeHtmlBody.trim();
-    if (!hasContent) return;
+    if (!hasContent) {
+      return cancelPendingSave;
+    }
 
     cancelPendingSave();
     saveTimeoutRef.current = setTimeout(() => {

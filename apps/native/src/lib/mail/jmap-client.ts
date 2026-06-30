@@ -170,6 +170,8 @@ export type JmapAttachmentInput = {
   name: string;
   type: string;
   size: number;
+  disposition?: "attachment" | "inline";
+  cid?: string;
 };
 
 const EMAIL_GET_PROPERTIES = [
