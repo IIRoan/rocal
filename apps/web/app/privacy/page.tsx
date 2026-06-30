@@ -33,7 +33,7 @@ export default function PrivacyPage() {
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Solace is a passion project, not a business built on your data.
-              We make a calendar and a private email client, both designed to
+              It includes a calendar and a private email client, both designed to
               help you manage your time and communication without ads,
               profiling, or data sales.
             </p>
@@ -43,7 +43,7 @@ export default function PrivacyPage() {
           <div className="space-y-8 text-sm leading-7 text-muted-foreground">
             <div>
               <h2 className="text-base font-semibold text-foreground">
-                What we make
+                What Solace includes
               </h2>
               <p className="mt-2">
                 <span className="font-medium text-foreground/80">Calendar</span>{" "}
@@ -54,8 +54,8 @@ export default function PrivacyPage() {
               </p>
               <p className="mt-2">
                 <span className="font-medium text-foreground/80">Mail</span>: a
-                private email client connected to your own mailbox on our
-                server. Messages are encrypted at rest, meaning stored content
+                private email client connected to your own mailbox on Solace
+                servers. Messages are encrypted at rest, meaning stored content
                 is protected from server-level access. Because email is a legacy
                 protocol, messages from external providers like Gmail arrive in
                 plaintext first. This is unavoidable and explained in more
@@ -198,11 +198,11 @@ export default function PrivacyPage() {
                 Email is a decades-old protocol that was not designed with
                 end-to-end encryption in mind. When someone sends you a message
                 from Gmail, Outlook, or any other external provider, that
-                message travels over SMTP and arrives at our server in
+                message travels over SMTP and arrives at Solace in
                 plaintext. There is a brief window between arrival and
-                encryption where the server can read the message content. We
-                encrypt it as soon as it is received, but we want to be honest
-                that this window exists. There is no way to eliminate it while
+                encryption where Solace can read the message content. Solace
+                encrypts it as soon as it is received, but this window exists.
+                There is no way to eliminate it while
                 supporting standard email from external senders.
               </p>
               <p className="mt-3 font-medium text-foreground/80">
@@ -318,17 +318,17 @@ export default function PrivacyPage() {
                 Both calendar and mail encryption keys are derived from your
                 password. That means if you lose your password, you lose access
                 to your encrypted content. There is no recovery path, because
-                we never hold the key ourselves. Keep your password somewhere
+                Solace never holds the encryption key. Keep your password somewhere
                 safe.
               </p>
             </div>
 
             <div>
               <h2 className="text-base font-semibold text-foreground">
-                What we do not do
+                What Solace does not do
               </h2>
               <p className="mt-2">
-                We do not use your data for advertising, resale, or profiling.
+                Solace does not use your data for advertising, resale, or profiling.
                 Your calendar and email are not a product. The app uses your
                 information only to show your schedule, deliver your reminders,
                 and keep your mailbox working.
@@ -340,9 +340,8 @@ export default function PrivacyPage() {
                 Why this project exists
               </h2>
               <p className="mt-2">
-                Solace exists because we wanted tools that respect the person
-                using them. A calmer calendar. A private inbox. Built to be
-                useful, not to extract value.
+                Solace is built to respect the person using it: a calmer
+                calendar, a private inbox — useful, not built to extract value.
               </p>
             </div>
           </div>

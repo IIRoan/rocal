@@ -8,6 +8,7 @@ import {
   getMailComposeBridge,
   useMailCompose,
   useMailComposeChrome,
+  useMailComposeClosePrompt,
 } from "@/components/mail/mail-compose-context";
 import { resolveMailServerLimits } from "@workspace/calendar-core";
 
@@ -34,6 +35,18 @@ function ChromeProbe({
   React.useEffect(() => {
     onReady(chrome);
   }, [chrome, onReady]);
+  return null;
+}
+
+function ClosePromptProbe({
+  onReady,
+}: {
+  onReady: (value: ReturnType<typeof useMailComposeClosePrompt>) => void;
+}) {
+  const prompt = useMailComposeClosePrompt();
+  React.useEffect(() => {
+    onReady(prompt);
+  }, [prompt, onReady]);
   return null;
 }
 
@@ -180,6 +193,47 @@ describe("useMailCompose", () => {
     expect(chrome?.isFullCompose).toBe(true);
     expect(chrome?.isComposeOpen).toBe(false);
     expect(getMailComposeBridge()?.getDraftIdRef()).toBe("draft-1");
+  });
+
+  it("prompts before closing a saved draft even when not dirty", async () => {
+    let latest: ReturnType<typeof useMailCompose> | null = null;
+    let prompt: ReturnType<typeof useMailComposeClosePrompt> | null = null;
+
+    await act(async () => {
+      root.render(
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+          <ComposeProbe onReady={(value) => { latest = value; }} />
+          <ClosePromptProbe onReady={(value) => { prompt = value; }} />
+        </MailComposeProvider>,
+      );
+    });
+
+    const message = {
+      id: "draft-1",
+      subject: "Saved draft",
+      to: [{ email: "bob@solace.onl" }],
+      cc: [],
+      bcc: [],
+      keywords: { $draft: true },
+    } as const;
+
+    await act(async () => {
+      getMailComposeBridge()?.seedDraft(message as never);
+    });
+
+    await act(async () => {
+      getMailComposeBridge()?.acknowledgeSavedDraft();
+    });
+
+    expect(getMailComposeBridge()?.isComposeDirty()).toBe(false);
+
+    let allowed = true;
+    await act(async () => {
+      allowed = latest!.requestComposeClose();
+    });
+
+    expect(allowed).toBe(false);
+    expect(prompt?.composeClosePromptOpen).toBe(true);
   });
 
   it("seedReply sets reply mode and threading context", async () => {

@@ -146,7 +146,7 @@ export function buildPasswordResetEmail({
     <h1 class="email-title" style="margin:0;font-size:22px;line-height:130%;font-weight:700;letter-spacing:-0.01em;color:#000">Reset your password</h1>
     <p class="email-subtitle" style="margin:6px 0 0;font-size:15px;line-height:130%;color:rgba(0,0,0,0.50)">Hi ${safeName}</p>
     <p class="email-body" style="margin:20px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
-      We received a request to reset your Solace password.
+      Solace received a request to reset your password.
       Click the button below to choose a new one &mdash; this link expires in&nbsp;<strong>1&nbsp;hour</strong>.
     </p>
     <p class="email-body" style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
@@ -176,7 +176,7 @@ export function buildPasswordResetEmail({
     text: [
       `Hi ${name},`,
       "",
-      "We received a request to reset your Solace password.",
+      "Solace received a request to reset your password.",
       "If you sign in with email and password, Solace also uses that password to protect your encryption keys after you sign in.",
       "GitHub and passkey sign-in keep using a separate encryption password.",
       "",

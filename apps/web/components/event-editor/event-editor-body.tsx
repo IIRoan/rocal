@@ -136,7 +136,7 @@ function SyncedEventInfoBadge() {
                 Stored on Solace during sync
               </div>
               <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
-                Title, time, location and description are pulled in so we can
+                Title, time, location and description are pulled in so Solace can
                 render the event and trigger reminders.
               </p>
             </div>

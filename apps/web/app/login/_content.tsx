@@ -737,7 +737,7 @@ export function LoginForm() {
       }
 
       setNotice(
-        "If an account exists for that email, we sent a password reset link for your email sign-in password.",
+        "If an account exists for that email, Solace sent a password reset link for your email sign-in password.",
       );
     } catch (err: any) {
       log.error("Password reset request failed:", err);
@@ -784,7 +784,7 @@ export function LoginForm() {
       : "Welcome back";
 
   const subtitle = isForgotPassword
-    ? "Enter your Solace account email and we’ll send a reset link for your email sign-in password."
+    ? "Enter your Solace account email and Solace will send a reset link for your email sign-in password."
     : isSignUp
       ? `Choose your @${signupDomain} Solace email and password. Your Solace email becomes both your account address and mailbox, and this password is used locally to protect your encrypted mail vault.`
       : "Sign in with your email and password. If your account has passkeys, you'll verify with one right after.";
@@ -1180,7 +1180,7 @@ export function LoginForm() {
               )}
 
               <p className="mt-6 text-center text-xs text-muted-foreground">
-                Before continuing, please read our{" "}
+                Before continuing, please read Solace&apos;s{" "}
                 <Link
                   href="/privacy"
                   className="font-medium text-muted-foreground transition-colors hover:text-foreground"

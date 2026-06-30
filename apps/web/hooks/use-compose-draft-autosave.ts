@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { createLogger } from "@workspace/logger";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
-import type { JmapSession } from "@/lib/mail/types";
+import type { JmapEmailMessage, JmapSession } from "@/lib/mail/types";
 import {
   getMailComposeBridge,
   registerComposeDraftSaver,
@@ -41,6 +41,11 @@ type ComposeDraftAutosaveInput = {
   fallbackFromEmail: string;
   mailServerPolicy?: MailServerPolicy | null;
   enabled: boolean;
+  onDraftSaved?: (input: {
+    savedDraftId: string;
+    previousDraftId: string | null;
+    preview: JmapEmailMessage;
+  }) => void;
 };
 
 export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
@@ -90,6 +95,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       return bridge.getDraftIdRef();
     }
 
+    const previousDraftId = bridge.getDraftIdRef();
     const payloadKey = JSON.stringify({
       to: toAddresses,
       cc: ccAddresses,
@@ -98,11 +104,11 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       body: plainBody,
       htmlBody: htmlForDraft ?? "",
       identityId: draft.identityId,
-      draftId: bridge.getDraftIdRef(),
+      draftId: previousDraftId,
     });
 
     if (payloadKey === lastSavedDataRef.current) {
-      return bridge.getDraftIdRef();
+      return previousDraftId;
     }
 
     const draftsMailboxId = getPrimaryMailboxId(input.mailboxes, "drafts");
@@ -135,10 +141,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     const identity =
       input.identities.find((entry) => entry.id === draft.identityId) ??
       input.identities[0];
-    const fromEmail =
-      draft.fromEmailOverride ??
-      identity?.email ??
-      input.fallbackFromEmail;
+    const fromEmail = identity?.email ?? input.fallbackFromEmail;
     const fromName = identity?.name ?? null;
 
     bridge.setDraftSaveStatus("saving");
@@ -154,15 +157,35 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
         subject: draft.subject.trim() || "(No subject)",
         textBody: plainBody,
         htmlBody: htmlForDraft,
-        previousDraftId: bridge.getDraftIdRef() ?? undefined,
+        previousDraftId: previousDraftId ?? undefined,
       });
 
       bridge.setDraftId(savedDraftId);
       lastSavedDataRef.current = payloadKey;
+      bridge.acknowledgeSavedDraft();
       bridge.setDraftSaveStatus("saved");
       window.setTimeout(() => {
         bridge.setDraftSaveStatus("idle");
       }, 2000);
+
+      input.onDraftSaved?.({
+        savedDraftId,
+        previousDraftId,
+        preview: {
+          id: savedDraftId,
+          subject: draft.subject.trim() || "(No subject)",
+          preview: (plainBody || draft.subject.trim() || "(No subject)").slice(
+            0,
+            256,
+          ),
+          receivedAt: new Date().toISOString(),
+          keywords: { $draft: true },
+          mailboxIds: { [draftsMailboxId]: true },
+          from: [{ email: fromEmail, ...(fromName ? { name: fromName } : {}) }],
+          to: toAddresses.map((email) => ({ email })),
+        },
+      });
+
       return savedDraftId;
     } catch (error) {
       log.error("Failed to auto-save draft", error);
@@ -178,8 +201,16 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     input.identities,
     input.mailboxes,
     input.mailServerPolicy,
+    input.onDraftSaved,
     input.session,
   ]);
+
+  const cancelPendingSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+  }, []);
 
   const saveDraft = useCallback((): Promise<string | null> => {
     const previous = inflightSaveRef.current;
@@ -202,17 +233,36 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     return promise;
   }, [saveDraftOnce]);
 
+  const flushDraftSave = useCallback(async (): Promise<string | null> => {
+    cancelPendingSave();
+    const previous = inflightSaveRef.current;
+    if (previous) {
+      try {
+        await previous;
+      } catch {
+        /* prior failure already surfaced */
+      }
+    }
+    return saveDraftOnce();
+  }, [cancelPendingSave, saveDraftOnce]);
+
   useEffect(() => {
-    registerComposeDraftSaver(saveDraft);
+    registerComposeDraftSaver({
+      save: saveDraft,
+      flush: flushDraftSave,
+      cancelPending: cancelPendingSave,
+    });
     return () => registerComposeDraftSaver(null);
-  }, [saveDraft]);
+  }, [cancelPendingSave, flushDraftSave, saveDraft]);
 
   useEffect(() => {
     if (!input.enabled || !composeActive) {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-      }
+      cancelPendingSave();
+      return;
+    }
+
+    const bridge = getMailComposeBridge();
+    if (!bridge?.isComposeDirty()) {
       return;
     }
 
@@ -223,19 +273,13 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       composeHtmlBody.trim();
     if (!hasContent) return;
 
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
+    cancelPendingSave();
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
       void saveDraft();
     }, AUTOSAVE_DEBOUNCE_MS) as ReturnType<typeof setTimeout>;
 
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
+    return cancelPendingSave;
   }, [
     composeTo,
     composeCc,
@@ -247,7 +291,18 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     input.enabled,
     composeActive,
     saveDraft,
+    cancelPendingSave,
   ]);
 
-  return { saveDraft, inflightSaveRef };
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const bridge = getMailComposeBridge();
+      if (!bridge?.isComposeDirty()) return;
+      void flushDraftSave();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [flushDraftSave]);
+
+  return { saveDraft, flushDraftSave, inflightSaveRef };
 }

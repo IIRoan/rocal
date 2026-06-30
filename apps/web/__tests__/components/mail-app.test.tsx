@@ -958,12 +958,12 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Inbox hello");
     });
 
-    const junkButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent?.includes("Junk Mail"),
+    const spamButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Spam"),
     );
 
     await act(async () => {
-      junkButton?.click();
+      spamButton?.click();
       await Promise.resolve();
     });
 

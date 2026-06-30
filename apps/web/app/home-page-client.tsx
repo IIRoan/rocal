@@ -736,7 +736,7 @@ function HeroContent({
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Before continuing, please read our{" "}
+          Before continuing, please read Solace&apos;s{" "}
           <Link
             href="/privacy"
             className="font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -908,7 +908,7 @@ export function HomePageClient() {
             data-hero-footer
             className="mt-6 text-center text-xs text-muted-foreground"
           >
-            Before continuing, please read our{" "}
+            Before continuing, please read Solace&apos;s{" "}
             <Link
               href="/privacy"
               className="font-medium text-muted-foreground transition-colors hover:text-foreground"
