@@ -16,5 +16,8 @@
     "lib": "@workspace/ui/lib",
     "utils": "@workspace/ui/lib/utils",
     "ui": "@workspace/ui/components"
+  },
+  "registries": {
+    "@optics": "https://optics.agusmayol.com.ar/r/{name}.json"
   }
 }

@@ -18,6 +18,7 @@
     "ui": "@workspace/ui/components"
   },
   "registries": {
-    "@animate-ui": "https://animate-ui.com/r/{name}.json"
+    "@animate-ui": "https://animate-ui.com/r/{name}.json",
+    "@optics": "https://optics.agusmayol.com.ar/r/{name}.json"
   }
 }
