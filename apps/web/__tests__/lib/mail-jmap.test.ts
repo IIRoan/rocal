@@ -1114,7 +1114,9 @@ describe("StalwartJmapClient", () => {
     };
 
     it("is a no-op when encryptOnAppend is already disabled", async () => {
-      const fetcher = jest.fn(async () =>
+      const fetcher = jest.fn<
+        (input: string, init?: RequestInit) => Promise<Response>
+      >(async () =>
         new Response(
           JSON.stringify({
             methodResponses: [
@@ -1151,7 +1153,7 @@ describe("StalwartJmapClient", () => {
 
     it("disables encryptOnAppend while preserving the existing encryption settings", async () => {
       const fetcher = jest
-        .fn()
+        .fn<(input: string, init?: RequestInit) => Promise<Response>>()
         .mockResolvedValueOnce(
           new Response(
             JSON.stringify({

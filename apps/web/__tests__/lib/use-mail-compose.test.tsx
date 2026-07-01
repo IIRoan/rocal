@@ -5,11 +5,11 @@ import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
 import {
   MailComposeProvider,
-  getMailComposeBridge,
   useMailCompose,
   useMailComposeChrome,
   useMailComposeClosePrompt,
 } from "@/components/mail/mail-compose-context";
+import { getMailComposeBridge } from "@/components/mail/mail-compose-bridge";
 import { resolveMailServerLimits } from "@workspace/calendar-core";
 
 const fallbackMailServerLimits = resolveMailServerLimits({});

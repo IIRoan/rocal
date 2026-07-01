@@ -20,7 +20,7 @@ jest.mock("lucide-react", () =>
   new Proxy({}, { get: () => () => null }),
 );
 
-jest.mock("../../components/mail/mail-compose-context", () => ({
+jest.mock("../../components/mail/mail-compose-bridge", () => ({
   getMailComposeBridge: jest.fn(),
 }));
 
@@ -62,7 +62,7 @@ jest.mock("@workspace/ui/lib/utils", () => ({
 }));
 
 import { RecipientPopover } from "../../components/mail/recipient-popover";
-import { getMailComposeBridge } from "../../components/mail/mail-compose-context";
+import { getMailComposeBridge } from "../../components/mail/mail-compose-bridge";
 
 const mockGetMailComposeBridge = getMailComposeBridge as jest.MockedFunction<
   typeof getMailComposeBridge

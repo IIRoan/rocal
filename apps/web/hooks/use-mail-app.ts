@@ -45,7 +45,7 @@ import {
   isTrashMailboxRole,
 } from "@/lib/mail/mail-mailbox-roles";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
-import { getMailComposeBridge, flushComposeDraftSave } from "@/components/mail/mail-compose-context";
+import { getMailComposeBridge, flushComposeDraftSave } from "@/components/mail/mail-compose-bridge";
 import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose";
 import { replaceSavedDraftInMailboxList } from "@/lib/mail/compose-draft-cache";
 import { getDraftsMailboxId } from "@/lib/mail/draft-utils";
@@ -571,6 +571,26 @@ function mergeConversationSourceMessages(
   }
 
   return sortMessagesByReceivedAt([...byId.values()]);
+}
+
+function withMessageKeywords(
+  message: JmapEmailMessage,
+  update: (keywords: Record<string, boolean>) => Record<string, boolean>,
+): JmapEmailMessage {
+  return {
+    ...message,
+    keywords: update({ ...(message.keywords ?? {}) }),
+  };
+}
+
+function patchMessagesKeywords(
+  messages: JmapEmailMessage[],
+  messageId: string,
+  update: (keywords: Record<string, boolean>) => Record<string, boolean>,
+): JmapEmailMessage[] {
+  return messages.map((entry) =>
+    entry.id === messageId ? withMessageKeywords(entry, update) : entry,
+  );
 }
 
 function resolveConversationReplyRecipients(input: {
@@ -3497,24 +3517,43 @@ export function useMailApp() {
     async (messageId?: string) => {
       const targetId = messageId ?? selectedMessageId;
       if (!activeMailbox || !targetId) return;
-      const msg = activeMailbox.messages.find((m) => m.id === targetId);
+      const msg =
+        activeMailbox.messages.find((m) => m.id === targetId) ??
+        listThreadRelatedMessages.find((m) => m.id === targetId) ??
+        relatedConversationMessages.find((m) => m.id === targetId) ??
+        findCachedMailMessage(queryClient, targetId);
       if (!msg) return;
-      const isFlagged = msg.keywords?.["$flagged"] === true;
-      const next = !isFlagged;
-      setActiveMailbox((cur) =>
-        cur
-          ? {
-              ...cur,
-              messages: cur.messages.map((m) => {
-                if (m.id !== targetId) return m;
-                const keywords = { ...(m.keywords ?? {}) };
-                if (next) keywords["$flagged"] = true;
-                else delete keywords["$flagged"];
-                return { ...m, keywords };
-              }),
-            }
-          : cur,
-      );
+      const next = !(msg.keywords?.["$flagged"] === true);
+      const applyFlagged =
+        (flagged: boolean) => (keywords: Record<string, boolean>) => {
+          if (flagged) keywords["$flagged"] = true;
+          else delete keywords["$flagged"];
+          return keywords;
+        };
+
+      const patchAll = (flagged: boolean) => {
+        const update = applyFlagged(flagged);
+        setActiveMailbox((cur) =>
+          cur
+            ? {
+                ...cur,
+                messages: patchMessagesKeywords(cur.messages, targetId, update),
+              }
+            : cur,
+        );
+        setRelatedConversationMessages((cur) =>
+          patchMessagesKeywords(cur, targetId, update),
+        );
+        setListThreadRelatedMessages((cur) =>
+          patchMessagesKeywords(cur, targetId, update),
+        );
+        mergeMessageIntoMailboxCaches(
+          queryClient,
+          withMessageKeywords(msg, update),
+        );
+      };
+
+      patchAll(next);
       try {
         await activeMailbox.client.toggleFlagged(
           activeMailbox.session,
@@ -3523,29 +3562,59 @@ export function useMailApp() {
         );
       } catch (error) {
         log.error("Failed to toggle flag", error);
+        toast.error(getErrorMessage(error, "Could not update the star."));
+        patchAll(!next);
       }
     },
-    [activeMailbox, selectedMessageId],
+    [
+      activeMailbox,
+      listThreadRelatedMessages,
+      queryClient,
+      relatedConversationMessages,
+      selectedMessageId,
+    ],
   );
 
   const handleSetMessageLabel = useCallback(
     async (messageId: string, labelId: string, assigned: boolean) => {
       if (!activeMailbox) return;
       const keywordKey = `label:${labelId}`;
-      setActiveMailbox((cur) =>
-        cur
-          ? {
-              ...cur,
-              messages: cur.messages.map((m) => {
-                if (m.id !== messageId) return m;
-                const keywords = { ...(m.keywords ?? {}) };
-                if (assigned) keywords[keywordKey] = true;
-                else delete keywords[keywordKey];
-                return { ...m, keywords };
-              }),
-            }
-          : cur,
-      );
+      const msg =
+        activeMailbox.messages.find((m) => m.id === messageId) ??
+        listThreadRelatedMessages.find((m) => m.id === messageId) ??
+        relatedConversationMessages.find((m) => m.id === messageId) ??
+        findCachedMailMessage(queryClient, messageId);
+      if (!msg) return;
+      const applyLabel =
+        (include: boolean) => (keywords: Record<string, boolean>) => {
+          if (include) keywords[keywordKey] = true;
+          else delete keywords[keywordKey];
+          return keywords;
+        };
+
+      const patchAll = (include: boolean) => {
+        const update = applyLabel(include);
+        setActiveMailbox((cur) =>
+          cur
+            ? {
+                ...cur,
+                messages: patchMessagesKeywords(cur.messages, messageId, update),
+              }
+            : cur,
+        );
+        setRelatedConversationMessages((cur) =>
+          patchMessagesKeywords(cur, messageId, update),
+        );
+        setListThreadRelatedMessages((cur) =>
+          patchMessagesKeywords(cur, messageId, update),
+        );
+        mergeMessageIntoMailboxCaches(
+          queryClient,
+          withMessageKeywords(msg, update),
+        );
+      };
+
+      patchAll(assigned);
       try {
         await activeMailbox.client.setMessageLabel(
           activeMailbox.session,
@@ -3555,9 +3624,16 @@ export function useMailApp() {
         );
       } catch (error) {
         log.error("Failed to set message label", error);
+        toast.error(getErrorMessage(error, "Could not update the label."));
+        patchAll(!assigned);
       }
     },
-    [activeMailbox],
+    [
+      activeMailbox,
+      listThreadRelatedMessages,
+      queryClient,
+      relatedConversationMessages,
+    ],
   );
 
   const saveLabelsToVault = useCallback(

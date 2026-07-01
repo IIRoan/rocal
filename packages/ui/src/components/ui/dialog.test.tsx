@@ -62,7 +62,7 @@ describe("DialogContent spotlight variant", () => {
 
     expect(content).not.toBeNull();
     expect(content?.className).toContain("left-1/2");
-    expect(content?.className).toContain("top-[15%]");
+    expect(content?.className).toContain("top-[10%]");
     expect(content?.className).toContain("-translate-x-1/2");
     // Spotlight does NOT vertically center — keeps the command palette near
     // the top of the viewport. Guard against accidental re-centering.

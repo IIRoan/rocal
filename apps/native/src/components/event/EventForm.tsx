@@ -1242,29 +1242,30 @@ function PickerSheet({
       overlayOpacity.value = withTiming(1, {
         duration: PICKER_CLOSE_DURATION,
       });
-      return;
+    } else {
+      const closeSequence = closeSequenceRef.current + 1;
+      closeSequenceRef.current = closeSequence;
+      clearCloseFallbackTimer();
+      cancelAnimation(translateY);
+      cancelAnimation(overlayOpacity);
+      translateY.value = withTiming(
+        height,
+        { duration: PICKER_CLOSE_DURATION },
+        (finished) => {
+          if (finished) {
+            runOnJS(finishUnmountIfCurrent)(closeSequence);
+          }
+        },
+      );
+      overlayOpacity.value = withTiming(0, {
+        duration: PICKER_CLOSE_DURATION,
+      });
+      closeFallbackTimerRef.current = setTimeout(() => {
+        finishUnmountIfCurrent(closeSequence);
+      }, PICKER_CLOSE_DURATION + 120);
     }
 
-    const closeSequence = closeSequenceRef.current + 1;
-    closeSequenceRef.current = closeSequence;
-    clearCloseFallbackTimer();
-    cancelAnimation(translateY);
-    cancelAnimation(overlayOpacity);
-    translateY.value = withTiming(
-      height,
-      { duration: PICKER_CLOSE_DURATION },
-      (finished) => {
-        if (finished) {
-          runOnJS(finishUnmountIfCurrent)(closeSequence);
-        }
-      },
-    );
-    overlayOpacity.value = withTiming(0, {
-      duration: PICKER_CLOSE_DURATION,
-    });
-    closeFallbackTimerRef.current = setTimeout(() => {
-      finishUnmountIfCurrent(closeSequence);
-    }, PICKER_CLOSE_DURATION + 120);
+    return clearCloseFallbackTimer;
   }, [
     visible,
     height,

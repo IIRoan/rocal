@@ -13,7 +13,7 @@ import {
 } from "@workspace/ui/components/ui/popover";
 import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "sonner";
-import { getMailComposeBridge } from "./mail-compose-context";
+import { getMailComposeBridge } from "./mail-compose-bridge";
 import { SenderAvatar } from "./mail-avatar";
 
 export type RecipientPopoverProps = {

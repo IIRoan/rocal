@@ -92,3 +92,41 @@ export function messageReaderUiReducer(
       return state;
   }
 }
+
+export type MessageReaderChromeState = {
+  labelPopoverOpen: boolean;
+  moreActionsOpen: boolean;
+  morePopoverOpen: boolean;
+  moveToExpanded: boolean;
+  isBodyExpanded: boolean;
+  showOwnMessages: boolean;
+  showRawHtmlDialog: boolean;
+};
+
+export const initialMessageReaderChromeState: MessageReaderChromeState = {
+  labelPopoverOpen: false,
+  moreActionsOpen: false,
+  morePopoverOpen: false,
+  moveToExpanded: false,
+  isBodyExpanded: false,
+  showOwnMessages: false,
+  showRawHtmlDialog: false,
+};
+
+export type MessageReaderChromeAction =
+  | { type: "patch"; patch: Partial<MessageReaderChromeState> }
+  | { type: "toggle"; field: "moveToExpanded" | "isBodyExpanded" | "showOwnMessages" };
+
+export function messageReaderChromeReducer(
+  state: MessageReaderChromeState,
+  action: MessageReaderChromeAction,
+): MessageReaderChromeState {
+  switch (action.type) {
+    case "patch":
+      return { ...state, ...action.patch };
+    case "toggle":
+      return { ...state, [action.field]: !state[action.field] };
+    default:
+      return state;
+  }
+}

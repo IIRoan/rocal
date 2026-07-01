@@ -73,3 +73,88 @@ Patterns that fire diagnostics but are safe to suppress.
   uses `lib: ["DOM", "ES2022"]` and `target: ES2022`. The existing
   `[...arr].sort(compareFn)` pattern is already immutable (spread creates a
   new array). Upgrading to ES2023 lib is deferred.
+
+## react-doctor/no-giant-component — MessageReader (resolved)
+
+- **File**: `apps/web/components/mail/message-reader.tsx`
+- **Note**: Split into `use-message-reader-controller.tsx` plus focused subcomponents
+  under `message-reader/` (2026-06-26). Orchestrator is ~38 lines.
+
+## react-doctor/no-many-boolean-props — MessageReader loading flags (resolved)
+
+- **File**: `apps/web/components/mail/message-reader-types.ts`
+- **Note**: Async loading and navigation flags grouped into `loading` and
+  `navigation` object props (2026-06-26). `isBusy` remains the sole top-level
+  boolean workload flag.
+
+## react-doctor/prefer-useReducer — MessageReader overlay chrome (resolved)
+
+- **File**: `apps/web/components/mail/message-reader.tsx`
+- **Note**: Popover/drawer/dialog visibility state was consolidated into
+  `messageReaderChromeReducer` in `message-reader-ui-state.ts` (2026-06-26).
+  Remaining `useState` slices (`allowExternalContent`, nested helper components)
+  are independent and below the rule threshold.
+
+## react-doctor/no-giant-component — MailAppContent (resolved)
+
+- **File**: `apps/web/components/mail/mail-app.tsx`
+- **Note**: Split into `use-mail-app-content-controller.tsx` and layout
+  subcomponents under `mail-app/` (2026-06-26). `MailAppContent` is ~10 lines.
+
+## react-doctor/prefer-useReducer — MailAppContent list chrome (resolved)
+
+- **File**: `apps/web/components/mail/use-mail-app-content-controller.tsx`
+- **Note**: List/search/filter dialog state uses `mailAppListChromeReducer` in
+  `mail-app-list-chrome-state.ts` (2026-06-26).
+
+## react-doctor/only-export-components — MailCompose bridge helpers
+
+- **File**: `apps/web/components/mail/mail-compose-bridge.ts`
+- **Why FP**: Module-level imperative bridge (`getMailComposeBridge`,
+  `registerComposeDraftSaver`, etc.) must live outside React components so
+  mail hooks and autosave can call compose state without mounting context.
+  `mail-compose-context.tsx` now exports only hooks and `MailComposeProvider`.
+
+## react-doctor/no-giant-component — MailComposeProvider (resolved)
+
+- **File**: `apps/web/components/mail/mail-compose-provider.tsx`
+- **Note**: Provider logic moved out of `mail-compose-context.tsx`; seed
+  builders live in `mail-compose-seed.ts`, reducer in `mail-compose-state.ts`
+  (2026-06-26).
+
+## react-doctor/prefer-useReducer — MailComposeProvider (resolved)
+
+- **File**: `apps/web/components/mail/mail-compose-provider.tsx`
+- **Note**: Draft and chrome fields consolidated into `mailComposeReducer` in
+  `mail-compose-state.ts` (2026-06-26).
+
+## react-doctor/no-giant-component — RichTextEditor (resolved)
+
+- **File**: `apps/web/components/mail/rich-text-editor.tsx`
+- **Note**: Toolbar, table picker, and TipTap extensions split into
+  `rich-text-editor-toolbar.tsx`, `rich-text-editor-table-picker.tsx`, and
+  `rich-text-editor-extensions.ts` (2026-06-26).
+
+## react-doctor/no-event-handler — RichTextEditor TipTap prop sync
+
+- **File**: `apps/web/components/mail/rich-text-editor.tsx`
+- **Why FP**: `content` and `disabled` are synchronized imperatively via
+  `editor.commands.setContent` / `editor.setEditable` in effects because
+  TipTap's `useEditor` hook owns editor lifecycle. Callback refs are synced in
+  effects so drop/paste handlers always invoke the latest parent callbacks
+  without recreating the editor.
+
+## react-doctor/prefer-tag-over-role — RecipientSuggestInput suggestions panel (resolved)
+
+- **File**: `apps/web/components/mail/recipient-suggest-input.tsx`
+- **Note**: Removed `role="listbox"` / `role="option"` in favor of a combobox
+  popup (`role="combobox"` on the input, `aria-controls` + labeled suggestion
+  buttons). Native `<datalist>` cannot render avatars, sections, or keyboard
+  highlight state (2026-06-26).
+
+## react-doctor/no-many-boolean-props — MobileMailHeader (resolved)
+
+- **File**: `apps/web/components/mail/mail-app-mobile-header.tsx`
+- **Note**: List-only mobile header; refresh affordance grouped as
+  `refresh: { disabled, spinning }` (2026-06-26). Reader/compose chrome on
+  mobile remains in `MessageReader` / compose surfaces.

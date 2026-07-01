@@ -66,46 +66,51 @@ describe("formatEventTime", () => {
   it("formats time range in 12h format", () => {
     const event = makeEvent(
       "2",
-      new Date(2025, 0, 15, 9, 0),
-      new Date(2025, 0, 15, 10, 0),
+      new Date("2025-01-15T09:00:00.000Z"),
+      new Date("2025-01-15T10:00:00.000Z"),
+      { timezone: "UTC" },
     );
-    expect(formatEventTime(event, "12h")).toBe("9:00 AM – 10:00 AM");
+    expect(formatEventTime(event, "12h", "UTC")).toBe("9:00 AM – 10:00 AM");
   });
 
   it("formats time range in 24h format", () => {
     const event = makeEvent(
       "3",
-      new Date(2025, 0, 15, 9, 0),
-      new Date(2025, 0, 15, 10, 0),
+      new Date("2025-01-15T09:00:00.000Z"),
+      new Date("2025-01-15T10:00:00.000Z"),
+      { timezone: "UTC" },
     );
-    expect(formatEventTime(event, "24h")).toBe("09:00 – 10:00");
+    expect(formatEventTime(event, "24h", "UTC")).toBe("09:00 – 10:00");
   });
 
   it("formats afternoon times in 12h format", () => {
     const event = makeEvent(
       "4",
-      new Date(2025, 0, 15, 14, 30),
-      new Date(2025, 0, 15, 16, 0),
+      new Date("2025-01-15T14:30:00.000Z"),
+      new Date("2025-01-15T16:00:00.000Z"),
+      { timezone: "UTC" },
     );
-    expect(formatEventTime(event, "12h")).toBe("2:30 PM – 4:00 PM");
+    expect(formatEventTime(event, "12h", "UTC")).toBe("2:30 PM – 4:00 PM");
   });
 
   it("formats afternoon times in 24h format", () => {
     const event = makeEvent(
       "5",
-      new Date(2025, 0, 15, 14, 30),
-      new Date(2025, 0, 15, 16, 0),
+      new Date("2025-01-15T14:30:00.000Z"),
+      new Date("2025-01-15T16:00:00.000Z"),
+      { timezone: "UTC" },
     );
-    expect(formatEventTime(event, "24h")).toBe("14:30 – 16:00");
+    expect(formatEventTime(event, "24h", "UTC")).toBe("14:30 – 16:00");
   });
 
   it("defaults to 12h format when no format is specified", () => {
     const event = makeEvent(
       "6",
-      new Date(2025, 0, 15, 9, 0),
-      new Date(2025, 0, 15, 10, 0),
+      new Date("2025-01-15T09:00:00.000Z"),
+      new Date("2025-01-15T10:00:00.000Z"),
+      { timezone: "UTC" },
     );
-    expect(formatEventTime(event)).toBe("9:00 AM – 10:00 AM");
+    expect(formatEventTime(event, "12h", "UTC")).toBe("9:00 AM – 10:00 AM");
   });
 });
 

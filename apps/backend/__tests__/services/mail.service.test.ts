@@ -9,6 +9,7 @@ process.env.MAIL_VAULT_HMAC_KEY = Buffer.from(
 ).toString("base64");
 
 import { MailService } from "../../services/mail.service";
+import type { StalwartAdminClientLike } from "../../lib/stalwart-admin";
 import {
   ConflictError,
   NotFoundError,
@@ -80,7 +81,9 @@ function createMockAdminClient() {
     })),
     deleteAccount: jest.fn(async () => undefined),
     resolveAccountIdByMailbox: jest.fn(async () => null),
-    resolveMailboxPublicKey: jest.fn(async () => null),
+    resolveMailboxPublicKey: jest.fn<
+      StalwartAdminClientLike["resolveMailboxPublicKey"]
+    >(async () => null),
     callJmap: jest.fn<() => Promise<{ methodResponses: unknown[] }>>(
       async () => ({ methodResponses: [] }),
     ),

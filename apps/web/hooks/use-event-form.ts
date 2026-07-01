@@ -824,7 +824,7 @@ export function useEventForm({
       validateRecurrenceMutation,
       updateNotificationsMutation,
       localSettings.timezone,
-      session?.user?.email,
+      session,
       recordUsage,
     ],
   );
