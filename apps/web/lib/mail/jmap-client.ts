@@ -1,3 +1,4 @@
+import { toJmapTextQuery } from "@/lib/mail/mail-search-filter";
 import type {
   JmapEmailChanges,
   JmapEmailMessage,
@@ -1004,7 +1005,7 @@ export class StalwartJmapClient {
             accountId,
             filter: {
               inMailbox: mailboxId,
-              text: query,
+              text: toJmapTextQuery(query),
             },
             sort: [{ property: "receivedAt", isAscending: false }],
             limit,

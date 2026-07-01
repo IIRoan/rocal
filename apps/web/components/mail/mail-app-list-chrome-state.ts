@@ -33,6 +33,7 @@ export function mailAppListChromeReducer(
       return {
         ...state,
         mailListSearch: "",
+        debouncedMailListSearch: "",
         advancedFilters: { text: undefined, conditions: [] },
         filterPanelExpanded: false,
       };
