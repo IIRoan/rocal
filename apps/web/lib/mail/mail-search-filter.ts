@@ -1,3 +1,6 @@
+import type { JmapEmailMessage } from "@/lib/mail/types";
+import { searchMailMessages } from "@/lib/search/unified-search";
+
 export type MailSearchFilterCondition = {
   from?: string;
   to?: string;
@@ -83,6 +86,46 @@ export const SEARCH_FILTER_FIELDS: {
   },
 ];
 
+/**
+ * Appends `*` to each word so Stalwart FTS prefix-matches tokens. For example,
+ * "hi me" becomes "hi* me*", which matches subject "hi me!" where punctuation
+ * would otherwise prevent a whole-token match on "me".
+ */
+export function toJmapTextQuery(query: string): string {
+  return query
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) =>
+      word.endsWith("*") || word.endsWith('"') ? word : `${word}*`,
+    )
+    .join(" ");
+}
+
+export function mergeInlineSearchResults(
+  serverResults: JmapEmailMessage[],
+  loadedMessages: JmapEmailMessage[],
+  query: string,
+): JmapEmailMessage[] {
+  const trimmed = query.trim();
+  if (!trimmed) return serverResults;
+
+  const localMatches = searchMailMessages(loadedMessages, trimmed, 40).map(
+    (result) => result.message,
+  );
+  if (localMatches.length === 0) return serverResults;
+
+  const seen = new Set(serverResults.map((message) => message.id));
+  const merged = [...serverResults];
+  for (const message of localMatches) {
+    if (!seen.has(message.id)) {
+      merged.push(message);
+      seen.add(message.id);
+    }
+  }
+  return merged;
+}
+
 export function conditionToChip(
   condition: MailSearchFilterCondition,
 ): MailSearchChip[] {
@@ -159,7 +202,7 @@ export function buildJmapFilter(
   const base: Record<string, unknown> = { inMailbox: mailboxId };
   const text = filters.text?.trim();
   if (text) {
-    base.text = text;
+    base.text = toJmapTextQuery(text);
   }
 
   const conditionFragments = filters.conditions
@@ -176,7 +219,7 @@ export function buildJmapFilter(
 
   const andConditions: Record<string, unknown>[] = [];
   if (text) {
-    andConditions.push({ inMailbox: mailboxId, text });
+    andConditions.push({ inMailbox: mailboxId, text: toJmapTextQuery(text) });
   }
   for (const fragment of conditionFragments) {
     andConditions.push({ inMailbox: mailboxId, ...fragment });
