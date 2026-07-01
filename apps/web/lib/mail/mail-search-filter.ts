@@ -1,3 +1,7 @@
+import {
+  extractTextQueryFromJmapFilter,
+  sortMailMessagesBySearchRelevance,
+} from "@workspace/calendar-core";
 import type { JmapEmailMessage } from "@/lib/mail/types";
 import { searchMailMessages } from "@/lib/search/unified-search";
 
@@ -113,7 +117,9 @@ export function mergeInlineSearchResults(
   const localMatches = searchMailMessages(loadedMessages, trimmed, 40).map(
     (result) => result.message,
   );
-  if (localMatches.length === 0) return serverResults;
+  if (localMatches.length === 0) {
+    return sortMailMessagesBySearchRelevance(serverResults, trimmed);
+  }
 
   const seen = new Set(serverResults.map((message) => message.id));
   const merged = [...serverResults];
@@ -123,7 +129,7 @@ export function mergeInlineSearchResults(
       seen.add(message.id);
     }
   }
-  return merged;
+  return sortMailMessagesBySearchRelevance(merged, trimmed);
 }
 
 export function conditionToChip(
@@ -230,6 +236,8 @@ export function buildJmapFilter(
     conditions: andConditions,
   };
 }
+
+export { extractTextQueryFromJmapFilter };
 
 export function hasActiveFilters(filters: MailSearchFilters): boolean {
   return Boolean(

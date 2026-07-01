@@ -45,9 +45,14 @@ describe("toJmapTextQuery", () => {
 });
 
 describe("mergeInlineSearchResults", () => {
-  const message = (id: string, subject: string): JmapEmailMessage => ({
+  const message = (
+    id: string,
+    subject: string,
+    receivedAt = "2026-05-27T10:00:00.000Z",
+  ): JmapEmailMessage => ({
     id,
     subject,
+    receivedAt,
     mailboxIds: { "mailbox-1": true },
   });
 
@@ -73,15 +78,23 @@ describe("mergeInlineSearchResults", () => {
       .toBe(server);
   });
 
-  it("keeps server ordering and appends only unseen local matches", () => {
-    const server = [message("server-1", "hello world")];
+  it("ranks merged server and local matches by relevance", () => {
+    const server = [
+      message("server-1", "Weekly digest", "2026-06-01T10:00:00.000Z"),
+      message("server-2", "hello world", "2026-05-01T10:00:00.000Z"),
+    ];
+    server[0] = {
+      ...server[0],
+      bodyValues: { text: { value: "hello from the newsletter" } },
+      textBody: [{ partId: "text" }],
+    };
     const loaded = [
-      message("server-1", "hello world"),
-      message("local-2", "hello there"),
+      server[1]!,
+      message("local-2", "hello team", "2026-06-02T10:00:00.000Z"),
     ];
     expect(
       mergeInlineSearchResults(server, loaded, "hello").map((entry) => entry.id),
-    ).toEqual(["server-1", "local-2"]);
+    ).toEqual(["local-2", "server-2", "server-1"]);
   });
 
   it("returns server-only results when loaded mailbox has no client matches", () => {

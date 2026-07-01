@@ -144,7 +144,48 @@ Patterns that fire diagnostics but are safe to suppress.
   effects so drop/paste handlers always invoke the latest parent callbacks
   without recreating the editor.
 
-## react-doctor/prefer-tag-over-role — RecipientSuggestInput suggestions panel (resolved)
+## react-doctor/prefer-useReducer — MessageList overlay chrome (resolved)
+
+- **File**: `apps/web/components/mail/message-list.tsx`
+- **Note**: Selection and thread-expand UI state consolidated into
+  `messageListReducer` in `message-list/message-list-state.ts` (2026-07-01).
+
+## react-doctor/no-giant-component — MessageList (resolved)
+
+- **File**: `apps/web/components/mail/message-list.tsx`
+- **Note**: Split into `message-list-bulk-bar.tsx`, `message-list-row.tsx`,
+  `message-list-virtualized.tsx`, and `message-list-utils.ts` (2026-07-01).
+  Orchestrator is ~220 lines.
+
+## react-hooks-js/incompatible-library — @tanstack/react-virtual
+
+- **File**: `apps/web/components/mail/message-list/message-list-virtualized.tsx`
+- **Why FP**: `useVirtualizer` is incompatible with React Compiler memoization.
+  Virtualization is isolated in `MessageListVirtualized` with the `"use no memo"`
+  directive so the rest of the list tree remains compiler-friendly.
+
+## react-doctor/prefer-tag-over-role — MessageList row shell
+
+- **File**: `apps/web/components/mail/message-list/message-list-row.tsx`
+- **Why FP**: The row shell must remain a non-`<button>` container because it
+  nests the avatar selection `<button>`. HTML forbids nested buttons; the row
+  uses `role="button"` + keyboard handlers instead. Expanded thread children use
+  native `<button>` elements where no nesting occurs.
+
+## react-doctor/no-event-handler — MessageList infinite scroll
+
+- **File**: `apps/web/components/mail/message-list/message-list-virtualized.tsx`
+- **Why FP**: Scroll/resize listeners and virtual-window proximity checks react
+  to layout and viewport position. They are not parent event callbacks; refs
+  hold the latest `onLoadMore` state so subscriptions stay stable.
+
+## react-doctor/no-pass-data-to-parent — MessageList virtual proximity load
+
+- **File**: `apps/web/components/mail/message-list/message-list-virtualized.tsx`
+- **Why FP**: The effect that calls `scheduleLoadMore` when the last virtual
+  item nears the list end triggers pagination inside the list surface. It does
+  not lift scroll metrics to a parent — it invokes the existing `onLoadMore`
+  callback already passed as a prop.
 
 - **File**: `apps/web/components/mail/recipient-suggest-input.tsx`
 - **Note**: Removed `role="listbox"` / `role="option"` in favor of a combobox

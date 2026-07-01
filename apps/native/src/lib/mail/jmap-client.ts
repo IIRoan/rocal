@@ -30,6 +30,7 @@ import {
   validateOutgoingMessageSize,
   validateJmapRequestSize,
   isStalwartEncryptOnAppendEnabled,
+  sortMailMessagesBySearchRelevance,
   type MailServerPolicy,
   type MailServerPolicyConfig,
 } from "@workspace/calendar-core";
@@ -864,7 +865,11 @@ export class StalwartJmapClient {
       envelope,
       "Email/get",
     );
-    return { messages: result.list ?? [], total: queryResult.total ?? 0 };
+    const messages = result.list ?? [];
+    return {
+      messages: sortMailMessagesBySearchRelevance(messages, query),
+      total: queryResult.total ?? 0,
+    };
   }
 
   async getMessagesByIds(
