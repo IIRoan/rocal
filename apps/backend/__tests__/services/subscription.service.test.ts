@@ -184,7 +184,7 @@ describe("SubscriptionService", () => {
       });
 
       expect(mockPrisma.calendarEvent.deleteMany).toHaveBeenCalledWith({
-        where: { subscriptionId: "sub-1" },
+        where: { subscriptionId: { equals: "sub-1" } },
       });
       expect(mockPrisma.calendarSubscription.delete).toHaveBeenCalledWith({
         where: { id: "sub-1" },
@@ -204,7 +204,7 @@ describe("SubscriptionService", () => {
       });
 
       expect(mockPrisma.calendarEvent.updateMany).toHaveBeenCalledWith({
-        where: { subscriptionId: "sub-1" },
+        where: { subscriptionId: { equals: "sub-1" } },
         data: {
           subscriptionId: null,
           isSynced: false,
