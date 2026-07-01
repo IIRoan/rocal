@@ -238,6 +238,14 @@ const mockJmapClient = {
     .mockResolvedValue(undefined),
   setMailServerPolicy: jest.fn(),
   syncMailServerPolicy: jest.fn<() => Promise<any>>(),
+  searchMailboxMessages: jest.fn<() => Promise<any>>().mockResolvedValue({
+    messages: [],
+    total: 0,
+  }),
+  searchMailboxMessagesWithFilter: jest.fn<() => Promise<any>>().mockResolvedValue({
+    messages: [],
+    total: 0,
+  }),
 };
 
 jest.mock("../../lib/mail/jmap-client", () => ({
@@ -297,17 +305,20 @@ jest.mock("../../components/mail/message-list", () => ({
   }: {
     messages: { id: string; subject?: string }[];
     onSelect?: (id: string) => void;
-  }) => (
-    <ul>
-      {messages.map((m) => (
-        <li key={m.id}>
-          <button type="button" onClick={() => onSelect?.(m.id)}>
-            {m.subject}
-          </button>
-        </li>
-      ))}
-    </ul>
-  ),
+  }) =>
+    messages.length === 0 ? (
+      <p>No messages</p>
+    ) : (
+      <ul>
+        {messages.map((m) => (
+          <li key={m.id}>
+            <button type="button" onClick={() => onSelect?.(m.id)}>
+              {m.subject}
+            </button>
+          </li>
+        ))}
+      </ul>
+    ),
 }));
 
 jest.mock("../../components/mail/message-reader", () => ({
@@ -725,6 +736,14 @@ describe("MailApp", () => {
     mockJmapClient.getIdentities.mockResolvedValue([
       { id: "identity-1", email: "alice@solace.onl" },
     ]);
+    mockJmapClient.searchMailboxMessages.mockResolvedValue({
+      messages: [],
+      total: 0,
+    });
+    mockJmapClient.searchMailboxMessagesWithFilter.mockResolvedValue({
+      messages: [],
+      total: 0,
+    });
   });
 
   afterEach(async () => {
@@ -904,6 +923,418 @@ describe("MailApp", () => {
       );
     });
     expect(container.textContent).toContain("Encrypted hello");
+  });
+
+  it("focuses inline search on / without inserting the slash or clearing the message list", async () => {
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    const searchInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder*="Search all messages"]',
+    );
+    expect(searchInput).not.toBeNull();
+
+    await act(async () => {
+      document.body.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "/",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+
+    await waitForExpectation(() => {
+      expect(document.activeElement).toBe(searchInput);
+    });
+    expect(searchInput?.value).toBe("");
+    expect(container.textContent).toContain("Encrypted hello");
+    expect(mockJmapClient.searchMailboxMessages).not.toHaveBeenCalled();
+    expect(mockJmapClient.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
+  });
+
+  it("runs server search after typing a query without leaving the list empty while loading", async () => {
+    let resolveSearch:
+      | ((value: { messages: { id: string; subject: string }[]; total: number }) => void)
+      | null = null;
+    mockJmapClient.searchMailboxMessages.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSearch = resolve;
+        }),
+    );
+
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    const searchInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder*="Search all messages"]',
+    );
+    expect(searchInput).not.toBeNull();
+
+    await act(async () => {
+      setInputValue(searchInput!, "hello");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Searching…");
+      expect(container.textContent).not.toContain("Encrypted hello");
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+
+    await waitForExpectation(() => {
+      expect(mockJmapClient.searchMailboxMessages).toHaveBeenCalledWith(
+        expect.anything(),
+        "inbox-1",
+        "hello",
+        40,
+      );
+    });
+
+    await act(async () => {
+      resolveSearch?.({
+        messages: [
+          {
+            id: "mail-search-1",
+            subject: "Matched hello",
+          },
+        ],
+        total: 1,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitForExpectation(() => {
+      expect(mockJmapClient.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
+      expect(container.textContent).toContain("Matched hello");
+    });
+  });
+
+  it("keeps a loaded inbox message visible when punctuation blocks server FTS", async () => {
+    mockJmapClient.getMailboxMessages.mockResolvedValue({
+      messages: [
+        {
+          id: "mail-punct",
+          subject: "hi me!",
+          from: [{ email: "bob@solace.onl", name: "Bob" }],
+          receivedAt: "2026-05-06T21:10:00.000Z",
+          preview: "Body",
+        },
+      ],
+      total: 1,
+    });
+    mockJmapClient.searchMailboxMessages.mockResolvedValue({
+      messages: [],
+      total: 0,
+    });
+
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("hi me!");
+    });
+
+    const searchInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder*="Search all messages"]',
+    );
+    expect(searchInput).not.toBeNull();
+
+    await act(async () => {
+      setInputValue(searchInput!, "hi me");
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+
+    await waitForExpectation(() => {
+      expect(mockJmapClient.searchMailboxMessages).toHaveBeenCalledWith(
+        expect.anything(),
+        "inbox-1",
+        "hi me",
+        40,
+      );
+      expect(container.textContent).toContain("hi me!");
+    });
+  });
+
+  it("shows the search loader while debouncing and after the query changes", async () => {
+    let resolveFirstSearch:
+      | ((value: { messages: { id: string; subject: string }[]; total: number }) => void)
+      | null = null;
+    mockJmapClient.searchMailboxMessages.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFirstSearch = resolve;
+        }),
+    );
+
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    const searchInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder*="Search all messages"]',
+    );
+    expect(searchInput).not.toBeNull();
+
+    await act(async () => {
+      setInputValue(searchInput!, "hello");
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Searching…");
+      expect(container.textContent).not.toContain("Encrypted hello");
+    });
+
+    await act(async () => {
+      resolveFirstSearch?.({
+        messages: [
+          {
+            id: "mail-search-1",
+            subject: "Matched hello",
+          },
+        ],
+        total: 1,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Matched hello");
+    });
+
+    mockJmapClient.searchMailboxMessages.mockImplementation(
+      () => new Promise(() => {}),
+    );
+
+    await act(async () => {
+      setInputValue(searchInput!, "hellos");
+    });
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Searching…");
+      expect(container.textContent).not.toContain("Encrypted hello");
+      expect(container.textContent).not.toContain("Matched hello");
+    });
+  });
+
+  it("restores the inbox list immediately when search is cleared", async () => {
+    mockJmapClient.searchMailboxMessages.mockResolvedValue({
+      messages: [],
+      total: 0,
+    });
+
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    const searchInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder*="Search all messages"]',
+    );
+    expect(searchInput).not.toBeNull();
+
+    await act(async () => {
+      setInputValue(searchInput!, "hello");
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+
+    await waitForExpectation(() => {
+      expect(mockJmapClient.searchMailboxMessages).toHaveBeenCalled();
+      expect(container.textContent).not.toContain("Encrypted hello");
+    });
+
+    await act(async () => {
+      setInputValue(searchInput!, "");
+    });
+
+    await waitForExpectation(() => {
+      expect(searchInput?.value).toBe("");
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+  });
+
+  it("flushes debounced search immediately when Enter is pressed", async () => {
+    mockJmapClient.searchMailboxMessages.mockResolvedValue({
+      messages: [
+        {
+          id: "mail-search-enter",
+          subject: "Enter matched",
+        },
+      ],
+      total: 1,
+    });
+
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    const searchInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder*="Search all messages"]',
+    );
+    expect(searchInput).not.toBeNull();
+
+    await act(async () => {
+      setInputValue(searchInput!, "enter");
+      searchInput!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitForExpectation(() => {
+      expect(mockJmapClient.searchMailboxMessages).toHaveBeenCalledWith(
+        expect.anything(),
+        "inbox-1",
+        "enter",
+        40,
+      );
+      expect(container.textContent).toContain("Enter matched");
+    });
+  });
+
+  it("does not run search for whitespace-only input", async () => {
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    const searchInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder*="Search all messages"]',
+    );
+    expect(searchInput).not.toBeNull();
+
+    await act(async () => {
+      setInputValue(searchInput!, "   ");
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+
+    await waitForExpectation(() => {
+      expect(searchInput?.value).toBe("");
+      expect(container.textContent).toContain("Encrypted hello");
+      expect(mockJmapClient.searchMailboxMessages).not.toHaveBeenCalled();
+      expect(mockJmapClient.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
+    });
+  });
+
+  it("shows an empty search state instead of flashing inbox messages", async () => {
+    mockJmapClient.searchMailboxMessages.mockResolvedValue({
+      messages: [],
+      total: 0,
+    });
+
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    const searchInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder*="Search all messages"]',
+    );
+    expect(searchInput).not.toBeNull();
+
+    await act(async () => {
+      setInputValue(searchInput!, "nomatch");
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+
+    await waitForExpectation(() => {
+      expect(mockJmapClient.searchMailboxMessages).toHaveBeenCalled();
+      expect(container.textContent).toContain("No messages");
+      expect(container.textContent).not.toContain("Encrypted hello");
+    });
+  });
+
+  it("clears inline search when switching mailboxes", async () => {
+    mockJmapClient.getMailboxMessages.mockImplementation(
+      async (...args: unknown[]) => {
+        const mailboxId = args[1] as string;
+        if (mailboxId === "sent-1") {
+          return {
+            messages: [
+              {
+                id: "mail-sent-1",
+                subject: "Sent item",
+                from: [{ email: "alice@solace.onl", name: "Alice" }],
+                receivedAt: "2026-05-06T21:10:00.000Z",
+                preview: "Sent body",
+              },
+            ],
+            total: 1,
+          };
+        }
+        return {
+          messages: [
+            {
+              id: "mail-1",
+              subject: "Encrypted hello",
+              from: [{ email: "bob@solace.onl", name: "Bob" }],
+              receivedAt: "2026-05-06T21:10:00.000Z",
+              preview: "Hello Alice",
+            },
+          ],
+          total: 1,
+        };
+      },
+    );
+
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    const searchInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder*="Search all messages"]',
+    );
+    expect(searchInput).not.toBeNull();
+
+    await act(async () => {
+      setInputValue(searchInput!, "hello");
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+
+    await waitForExpectation(() => {
+      expect(searchInput?.value).toBe("hello");
+    });
+
+    const sentMailboxButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent === "Sent Items");
+    expect(sentMailboxButton).toBeDefined();
+
+    await act(async () => {
+      sentMailboxButton!.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitForExpectation(() => {
+      expect(searchInput?.value).toBe("");
+      expect(container.textContent).toContain("Sent item");
+      expect(container.textContent).not.toContain("Encrypted hello");
+    });
   });
 
   it("does not auto-open the newest message on desktop", async () => {

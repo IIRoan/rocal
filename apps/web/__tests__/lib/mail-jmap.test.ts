@@ -577,6 +577,156 @@ describe("StalwartJmapClient", () => {
     );
   });
 
+  it("wildcard-prefixes inline search text for Stalwart FTS", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            methodResponses: [
+              ["Email/query", { ids: ["m1"], total: 1 }, "q1"],
+              [
+                "Email/get",
+                {
+                  list: [
+                    {
+                      id: "m1",
+                      subject: "hi me!",
+                    },
+                  ],
+                },
+                "g1",
+              ],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+
+    await expect(
+      client.searchMailboxMessages(
+        {
+          apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+          accounts: { account: {} },
+          primaryAccounts: { "urn:ietf:params:jmap:mail": "account" },
+        },
+        "inbox",
+        "hi me",
+      ),
+    ).resolves.toEqual({
+      messages: [{ id: "m1", subject: "hi me!" }],
+      total: 1,
+    });
+
+    const request = JSON.parse(
+      String(fetcher.mock.calls[0]?.[1]?.body),
+    ) as { methodCalls: Array<[string, Record<string, unknown>, string]> };
+    expect(request.methodCalls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        filter: {
+          inMailbox: "inbox",
+          text: "hi* me*",
+        },
+      }),
+    );
+  });
+
+  it("passes complex AND filters through searchMailboxMessagesWithFilter", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            methodResponses: [
+              ["Email/query", { ids: [], total: 0 }, "q1"],
+              ["Email/get", { list: [] }, "g1"],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+
+    const session = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+      accounts: { account: {} },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "account" },
+    };
+
+    const filter = {
+      operator: "AND",
+      conditions: [
+        { inMailbox: "inbox", text: "invoice*" },
+        { inMailbox: "inbox", from: "alice@example.com" },
+      ],
+    };
+
+    await client.searchMailboxMessagesWithFilter(session, "inbox", filter, 40);
+
+    const request = JSON.parse(
+      String(fetcher.mock.calls[0]?.[1]?.body),
+    ) as { methodCalls: Array<[string, Record<string, unknown>, string]> };
+    expect(request.methodCalls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        filter,
+        limit: 40,
+      }),
+    );
+  });
+
+  it("wildcard-prefixes special-character queries for inline search", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            methodResponses: [
+              ["Email/query", { ids: [], total: 0 }, "q1"],
+              ["Email/get", { list: [] }, "g1"],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+
+    const session = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+      accounts: { account: {} },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "account" },
+    };
+
+    await client.searchMailboxMessages(session, "inbox", "alice@example.com #urgent");
+
+    const request = JSON.parse(
+      String(fetcher.mock.calls[0]?.[1]?.body),
+    ) as { methodCalls: Array<[string, Record<string, unknown>, string]> };
+    expect(request.methodCalls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        filter: {
+          inMailbox: "inbox",
+          text: "alice@example.com* #urgent*",
+        },
+      }),
+    );
+  });
+
   it("empties a mailbox by repeatedly querying and destroying batches", async () => {
     let queryCount = 0;
     const fetcher = jest.fn<

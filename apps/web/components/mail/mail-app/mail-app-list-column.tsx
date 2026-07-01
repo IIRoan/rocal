@@ -30,10 +30,14 @@ export function MailAppListColumn({
     advancedFilters,
     filterPanelExpanded,
     isSearching,
+    searchUiActive,
+    isSearchDebouncing,
     searchActive,
+    showSearchLoadingState,
     searchInputRef,
     clearListSearch,
-    handleSearchEnter,
+    handleSearchInputChange,
+    handleSearchInputKeyDown,
     handleManualRefresh,
     activeMailbox,
     filteredListMessages,
@@ -132,25 +136,19 @@ export function MailAppListColumn({
               <Input
                 ref={searchInputRef}
                 value={mailListSearch}
-                onChange={(e) =>
-                  patchListChrome({ mailListSearch: e.target.value })
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleSearchEnter();
-                  }
-                }}
+                onChange={(e) => handleSearchInputChange(e.target.value)}
+                onKeyDown={handleSearchInputKeyDown}
                 placeholder="Search all messages… (press / to focus)"
                 className="h-7 w-full pl-7 pr-7 text-xs bg-muted/40 border-0 shadow-none rounded-md focus-visible:ring-1 focus-visible:ring-ring/40 placeholder:text-muted-foreground/40"
               />
-              {isSearching && searchActive && (
+              {(isSearching || isSearchDebouncing) && searchUiActive && (
                 <RotateCcw
                   size={11}
                   strokeWidth={2}
                   className="absolute right-2 text-muted-foreground/40 animate-spin pointer-events-none"
                 />
               )}
-              {mailListSearch && !isSearching && (
+              {mailListSearch && !isSearching && !isSearchDebouncing && (
                 <button
                   type="button"
                   onClick={clearListSearch}
@@ -182,7 +180,12 @@ export function MailAppListColumn({
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col">
-        <MessageList
+        {showSearchLoadingState ? (
+          <div className="flex flex-1 items-center justify-center p-8">
+            <p className="text-sm text-muted-foreground">Searching…</p>
+          </div>
+        ) : (
+          <MessageList
           key={activeMailbox.selectedMailboxId ?? "mailbox-list"}
           messages={filteredListMessages}
           relatedMessages={listThreadRelatedMessages}
@@ -229,7 +232,8 @@ export function MailAppListColumn({
                 }
               : undefined
           }
-        />
+          />
+        )}
       </div>
     </div>
   );

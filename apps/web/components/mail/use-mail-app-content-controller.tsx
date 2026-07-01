@@ -1,11 +1,10 @@
 "use client";
 
 import {
-  useCallback,
   useEffect,
-  useMemo,
   useReducer,
   useRef,
+  type KeyboardEvent,
   type RefObject,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -18,6 +17,7 @@ import { useMailListSettings } from "@/lib/mail/mail-list-settings";
 import {
   buildJmapFilter,
   hasActiveFilters,
+  mergeInlineSearchResults,
   type MailSearchFilters,
 } from "@/lib/mail/mail-search-filter";
 import { registerComposeCloseActions } from "./mail-compose-bridge";
@@ -140,50 +140,69 @@ export function useMailAppContentController(
   const isMobile = useIsMobile();
   const editingDraftIdRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const suppressSearchShortcutInputRef = useRef(false);
 
-  const patchListChrome = useCallback(
-    (patch: Partial<MailAppListChromeState>) => {
-      dispatchListChrome({ type: "patch", patch });
-    },
-    [],
-  );
+  const patchListChrome = (patch: Partial<MailAppListChromeState>) => {
+    dispatchListChrome({ type: "patch", patch });
+  };
 
   useEffect(() => {
     const timer = setTimeout(
-      () => patchListChrome({ debouncedMailListSearch: mailListSearch }),
+      () =>
+        dispatchListChrome({
+          type: "patch",
+          patch: { debouncedMailListSearch: mailListSearch },
+        }),
       300,
     );
     return () => clearTimeout(timer);
-  }, [mailListSearch, patchListChrome]);
+  }, [mailListSearch]);
 
   const mailboxId = activeMailbox?.selectedMailboxId ?? null;
 
+  const trimmedMailListSearch = mailListSearch.trim();
+  const trimmedDebouncedMailListSearch = debouncedMailListSearch.trim();
+  const hasAdvancedFilters = hasActiveFilters({
+    text: advancedFilters.text,
+    conditions: advancedFilters.conditions,
+  });
+  const searchUiActive = Boolean(trimmedMailListSearch) || hasAdvancedFilters;
   const searchActive =
-    Boolean(debouncedMailListSearch.trim()) || hasActiveFilters(advancedFilters);
-
-  const effectiveSearchFilters: MailSearchFilters = useMemo(
-    () => ({
-      ...advancedFilters,
-      text:
-        advancedFilters.text?.trim() ||
-        debouncedMailListSearch.trim() ||
-        undefined,
-    }),
-    [advancedFilters, debouncedMailListSearch],
-  );
+    Boolean(trimmedDebouncedMailListSearch) || hasAdvancedFilters;
+  const isSearchDebouncing =
+    Boolean(trimmedMailListSearch) &&
+    trimmedMailListSearch !== trimmedDebouncedMailListSearch;
 
   const {
     data: serverSearchResults,
     isFetching: isSearching,
+    isError: isSearchError,
   } = useQuery<JmapEmailMessage[]>({
     queryKey: [
-      ...mailQueryKeys.inlineSearch(mailboxId, debouncedMailListSearch),
-      effectiveSearchFilters,
+      ...mailQueryKeys.inlineSearch(mailboxId, trimmedDebouncedMailListSearch),
+      advancedFilters,
     ],
     queryFn: async () => {
-      if (!activeMailbox || !mailboxId || !searchActive) return [];
-      if (hasActiveFilters(effectiveSearchFilters)) {
-        const jmapFilter = buildJmapFilter(mailboxId, effectiveSearchFilters);
+      if (!activeMailbox || !mailboxId) return [];
+
+      const inlineText = trimmedDebouncedMailListSearch;
+
+      if (inlineText && !hasAdvancedFilters) {
+        const { messages } = await activeMailbox.client.searchMailboxMessages(
+          activeMailbox.session,
+          mailboxId,
+          inlineText,
+          40,
+        );
+        return messages;
+      }
+
+      if (inlineText || hasAdvancedFilters) {
+        const filters: MailSearchFilters = {
+          ...advancedFilters,
+          text: inlineText || advancedFilters.text?.trim() || undefined,
+        };
+        const jmapFilter = buildJmapFilter(mailboxId, filters);
         const { messages } = await activeMailbox.client.searchMailboxMessagesWithFilter(
           activeMailbox.session,
           mailboxId,
@@ -192,31 +211,36 @@ export function useMailAppContentController(
         );
         return messages;
       }
-      const { messages } = await activeMailbox.client.searchMailboxMessages(
-        activeMailbox.session,
-        mailboxId,
-        debouncedMailListSearch.trim(),
-        40,
-      );
-      return messages;
+
+      return [];
     },
     enabled: Boolean(searchActive && activeMailbox && mailboxId),
     staleTime: 10_000,
-    placeholderData: (prev) => prev,
   });
 
-  const filteredListMessages = useMemo<JmapEmailMessage[]>(
-    () =>
-      searchActive
-        ? (serverSearchResults ?? [])
-        : (activeMailbox?.messages ?? []),
-    [searchActive, serverSearchResults, activeMailbox?.messages],
-  );
+  const showSearchLoadingState =
+    searchUiActive &&
+    (isSearchDebouncing ||
+      (searchActive &&
+        isSearching &&
+        serverSearchResults === undefined));
 
-  const messages = useMemo<JmapEmailMessage[]>(
-    () => activeMailbox?.messages ?? [],
-    [activeMailbox?.messages],
-  );
+  const filteredListMessages: JmapEmailMessage[] =
+    searchUiActive || searchActive
+      ? isSearchError && searchActive && !isSearchDebouncing
+        ? (activeMailbox?.messages ?? [])
+        : serverSearchResults === undefined
+          ? []
+          : trimmedDebouncedMailListSearch
+            ? mergeInlineSearchResults(
+                serverSearchResults,
+                activeMailbox?.messages ?? [],
+                trimmedDebouncedMailListSearch,
+              )
+            : serverSearchResults
+      : (activeMailbox?.messages ?? []);
+
+  const messages: JmapEmailMessage[] = activeMailbox?.messages ?? [];
 
   const selectedIsDraft = Boolean(
     selectedMessage &&
@@ -224,97 +248,79 @@ export function useMailAppContentController(
       isDraftMessage(selectedMessage, mailboxId, activeMailbox.mailboxes),
   );
 
-  const handleDismissCompose = useCallback(() => {
+  const handleDismissCompose = () => {
     dismissCompose();
     editingDraftIdRef.current = null;
     setSelectedMessageId(null);
-  }, [dismissCompose, setSelectedMessageId]);
+  };
 
   useEffect(() => {
     registerComposeCloseActions({
-      dismiss: handleDismissCompose,
+      dismiss: () => {
+        dismissCompose();
+        editingDraftIdRef.current = null;
+        setSelectedMessageId(null);
+      },
       discardDraft: (draftId) => {
         void handleDiscardDraft(draftId);
       },
     });
     return () => registerComposeCloseActions(null);
-  }, [handleDismissCompose, handleDiscardDraft]);
+  }, [dismissCompose, handleDiscardDraft, setSelectedMessageId]);
 
-  const closeComposeThen = useCallback(
-    (action: () => void) => {
-      if (!composeActive) {
-        action();
-        return;
-      }
-      if (requestComposeClose(action)) {
-        handleDismissCompose();
-        action();
-      }
-    },
-    [composeActive, handleDismissCompose, requestComposeClose],
-  );
+  const closeComposeThen = (action: () => void) => {
+    if (!composeActive) {
+      action();
+      return;
+    }
+    if (requestComposeClose(action)) {
+      handleDismissCompose();
+      action();
+    }
+  };
 
-  const performSelectMessage = useCallback(
-    (id: string | null) => {
-      if (!id) {
-        editingDraftIdRef.current = null;
-        setSelectedMessageId(null);
-        return;
-      }
-
-      const message =
-        filteredListMessages.find((entry) => entry.id === id) ??
-        messages.find((entry) => entry.id === id) ??
-        listThreadRelatedMessages.find((entry) => entry.id === id);
-
-      if (
-        message &&
-        activeMailbox &&
-        isDraftMessage(message, mailboxId, activeMailbox.mailboxes)
-      ) {
-        if (editingDraftIdRef.current === id && isFullCompose) {
-          return;
-        }
-        editingDraftIdRef.current = id;
-        void handleEditDraft(message);
-        return;
-      }
-
+  const performSelectMessage = (id: string | null) => {
+    if (!id) {
       editingDraftIdRef.current = null;
-      void openMessageById(id, message ?? undefined);
-    },
-    [
-      activeMailbox,
-      filteredListMessages,
-      handleEditDraft,
-      isFullCompose,
-      listThreadRelatedMessages,
-      mailboxId,
-      messages,
-      openMessageById,
-      setSelectedMessageId,
-    ],
-  );
+      setSelectedMessageId(null);
+      return;
+    }
 
-  const handleSelectMessage = useCallback(
-    (id: string | null) => {
-      closeComposeThen(() => performSelectMessage(id));
-    },
-    [closeComposeThen, performSelectMessage],
-  );
+    const message =
+      filteredListMessages.find((entry) => entry.id === id) ??
+      messages.find((entry) => entry.id === id) ??
+      listThreadRelatedMessages.find((entry) => entry.id === id);
 
-  const handleSelectMailbox = useCallback(
-    (mailboxIdToSelect: string) => {
-      closeComposeThen(() => {
-        void refreshMailboxMessages(mailboxIdToSelect);
-      });
-    },
-    [closeComposeThen, refreshMailboxMessages],
-  );
+    if (
+      message &&
+      activeMailbox &&
+      isDraftMessage(message, mailboxId, activeMailbox.mailboxes)
+    ) {
+      if (editingDraftIdRef.current === id && isFullCompose) {
+        return;
+      }
+      editingDraftIdRef.current = id;
+      void handleEditDraft(message);
+      return;
+    }
 
-  const handleOpenCompose = useCallback(() => {
+    editingDraftIdRef.current = null;
+    void openMessageById(id, message ?? undefined);
+  };
+
+  const handleSelectMessage = (id: string | null) => {
+    closeComposeThen(() => performSelectMessage(id));
+  };
+
+  const handleSelectMailbox = (mailboxIdToSelect: string) => {
+    closeComposeThen(() => {
+      void refreshMailboxMessages(mailboxIdToSelect);
+    });
+  };
+
+  const handleOpenCompose = () => {
     closeComposeThen(() => openNewCompose());
-  }, [closeComposeThen, openNewCompose]);
+  };
 
   const selectedIndex = messages.findIndex((m) => m.id === selectedMessageId);
   const hasPrev = selectedIndex > 0;
@@ -387,7 +393,13 @@ export function useMailAppContentController(
       closeMessage: handleCloseMessage,
       focusSearch: () => {
         if (!isMobile) {
-          searchInputRef.current?.focus();
+          suppressSearchShortcutInputRef.current = true;
+          requestAnimationFrame(() => {
+            searchInputRef.current?.focus({ preventScroll: true });
+            requestAnimationFrame(() => {
+              suppressSearchShortcutInputRef.current = false;
+            });
+          });
         }
       },
     },
@@ -415,43 +427,59 @@ export function useMailAppContentController(
     ? getMailboxDisplayName(selectedMailbox)
     : "Inbox";
 
-  const clearListSearch = useCallback(() => {
+  const clearListSearch = () => {
     dispatchListChrome({ type: "resetMailboxFilters" });
-  }, []);
+  };
 
-  const handlePaletteOpenChange = useCallback(
-    (open: boolean) => {
-      setIsPaletteOpen(open);
-      if (!open) {
-        patchListChrome({ paletteInitialView: undefined });
-      }
-    },
-    [patchListChrome, setIsPaletteOpen],
-  );
+  const handlePaletteOpenChange = (open: boolean) => {
+    setIsPaletteOpen(open);
+    if (!open) {
+      patchListChrome({ paletteInitialView: undefined });
+    }
+  };
 
-  const handleOpenMailboxesPalette = useCallback(() => {
+  const handleOpenMailboxesPalette = () => {
     patchListChrome({ paletteInitialView: "mailboxes" });
     setIsPaletteOpen(true);
-  }, [patchListChrome, setIsPaletteOpen]);
+  };
 
-  const handleSearchEnter = useCallback(() => {
-    patchListChrome({
-      advancedFilters: {
-        ...advancedFilters,
-        text: mailListSearch.trim() || undefined,
-      },
+  const handleSearchEnter = () => {
+    dispatchListChrome({
+      type: "patch",
+      patch: { debouncedMailListSearch: mailListSearch },
     });
-  }, [advancedFilters, mailListSearch, patchListChrome]);
+  };
 
-  const handleExpandCompose = useCallback(() => {
+  const handleSearchInputChange = (value: string) => {
+    if (suppressSearchShortcutInputRef.current && value === "/") {
+      return;
+    }
+    if (value.trim() === "") {
+      dispatchListChrome({ type: "resetMailboxFilters" });
+      return;
+    }
+    patchListChrome({ mailListSearch: value });
+  };
+
+  const handleSearchInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "/" && suppressSearchShortcutInputRef.current) {
+      event.preventDefault();
+      return;
+    }
+    if (event.key === "Enter") {
+      handleSearchEnter();
+    }
+  };
+
+  const handleExpandCompose = () => {
     setIsComposeOpen(false);
     setIsFullCompose(true);
-  }, [setIsComposeOpen, setIsFullCompose]);
+  };
 
-  const handleFullComposeSend = useCallback(async () => {
+  const handleFullComposeSend = async () => {
     await handleSendMessage();
     setIsFullCompose(false);
-  }, [handleSendMessage, setIsFullCompose]);
+  };
 
   return {
     mail,
@@ -464,6 +492,9 @@ export function useMailAppContentController(
     isOverlayLoading,
     isSearching,
     searchActive,
+    searchUiActive,
+    isSearchDebouncing,
+    showSearchLoadingState,
     showMobileDetailPane,
     selectedIsDraft,
     selectedMessage,
@@ -519,6 +550,8 @@ export function useMailAppContentController(
     setIsPaletteOpen,
     clearListSearch,
     handleSearchEnter,
+    handleSearchInputChange,
+    handleSearchInputKeyDown,
     handleCloseMessage,
     handleNavigatePrev,
     handleNavigateNext,

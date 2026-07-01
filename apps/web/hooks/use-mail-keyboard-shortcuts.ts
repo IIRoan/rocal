@@ -22,8 +22,8 @@ export type MailKeyboardShortcutActions = {
 };
 
 function isEditableTarget(event: KeyboardEvent): boolean {
-  const target = event.target as HTMLElement | null;
-  if (!target) return false;
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName.toLowerCase();
   return (
     tag === "input" ||
