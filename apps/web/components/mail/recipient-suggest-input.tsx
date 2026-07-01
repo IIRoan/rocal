@@ -2,7 +2,6 @@
 
 import {
   useCallback,
-  useEffect,
   useId,
   useMemo,
   useRef,
@@ -51,9 +50,17 @@ function RecipientSuggestionsList({
   heading,
   onSelect,
 }: RecipientSuggestionsListProps) {
+  const headingId = `${listboxId}-heading`;
   return (
-    <div id={listboxId} role="listbox" className="max-h-64 overflow-y-auto overscroll-contain py-1">
-      <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+    <div
+      id={listboxId}
+      aria-labelledby={headingId}
+      className="max-h-64 overflow-y-auto overscroll-contain py-1"
+    >
+      <div
+        id={headingId}
+        className="px-2.5 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+      >
         {heading}
       </div>
       {suggestions.map((entry, index) => {
@@ -61,9 +68,8 @@ function RecipientSuggestionsList({
         return (
           <button
             key={entry.email}
+            id={`${listboxId}-option-${index}`}
             type="button"
-            role="option"
-            aria-selected={index === highlightedIndex}
             onMouseDown={(event) => {
               event.preventDefault();
               onSelect(entry);
@@ -127,7 +133,11 @@ export function RecipientSuggestInput({
   const containerRef = useRef<HTMLDivElement>(null);
   const selectingRef = useRef(false);
   const [open, setOpen] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [highlightState, setHighlightState] = useState({
+    activeToken: "",
+    suggestionsLength: 0,
+    index: 0,
+  });
 
   const activeToken = getActiveRecipientToken(value);
   const excludeEmails = useMemo(
@@ -178,9 +188,17 @@ export function RecipientSuggestInput({
     isAvailable &&
     (isLoading || suggestions.length > 0 || activeToken.trim().length > 0);
 
-  useEffect(() => {
-    setHighlightedIndex(0);
-  }, [activeToken, suggestions.length]);
+  if (
+    highlightState.activeToken !== activeToken ||
+    highlightState.suggestionsLength !== suggestions.length
+  ) {
+    setHighlightState({
+      activeToken,
+      suggestionsLength: suggestions.length,
+      index: 0,
+    });
+  }
+  const highlightedIndex = highlightState.index;
 
   const selectSuggestion = useCallback(
     (entry: RecentContactEntry) => {
@@ -229,17 +247,21 @@ export function RecipientSuggestInput({
 
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setHighlightedIndex((current) =>
-        current + 1 >= suggestions.length ? 0 : current + 1,
-      );
+      setHighlightState((state) => ({
+        ...state,
+        index:
+          state.index + 1 >= suggestions.length ? 0 : state.index + 1,
+      }));
       return;
     }
 
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      setHighlightedIndex((current) =>
-        current - 1 < 0 ? suggestions.length - 1 : current - 1,
-      );
+      setHighlightState((state) => ({
+        ...state,
+        index:
+          state.index - 1 < 0 ? suggestions.length - 1 : state.index - 1,
+      }));
       return;
     }
 
@@ -288,6 +310,10 @@ export function RecipientSuggestInput({
     "aria-expanded": showSuggestions,
     "aria-controls": showSuggestions ? listboxId : undefined,
     "aria-autocomplete": "list" as const,
+    "aria-activedescendant":
+      showSuggestions && suggestions.length > 0
+        ? `${listboxId}-option-${highlightedIndex}`
+        : undefined,
   };
 
   return (
