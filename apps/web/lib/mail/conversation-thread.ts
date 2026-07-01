@@ -42,10 +42,15 @@ function getReceivedAtTime(message: JmapEmailMessage): number {
 
 export function buildMailConversations(
   messages: JmapEmailMessage[],
+  options?: { preserveMessageOrder?: boolean },
 ): MailConversation[] {
   if (messages.length === 0) {
     return [];
   }
+
+  const messageOrder = options?.preserveMessageOrder
+    ? new Map(messages.map((message, index) => [message.id, index]))
+    : null;
 
   const parents = new Map<string, string>();
   const tokenOwners = new Map<string, string>();
@@ -116,11 +121,21 @@ export function buildMailConversations(
         latestMessage,
       };
     })
-    .sort(
-      (left, right) =>
-        getReceivedAtTime(right.latestMessage) -
-        getReceivedAtTime(left.latestMessage),
-    );
+    .sort((left, right) => {
+      if (messageOrder) {
+        const leftRank = Math.min(
+          ...left.messages.map((message) => messageOrder.get(message.id) ?? Infinity),
+        );
+        const rightRank = Math.min(
+          ...right.messages.map((message) => messageOrder.get(message.id) ?? Infinity),
+        );
+        if (leftRank !== rightRank) return leftRank - rightRank;
+      }
+
+      return (
+        getReceivedAtTime(right.latestMessage) - getReceivedAtTime(left.latestMessage)
+      );
+    });
 }
 
 export function getConversationForMessage(

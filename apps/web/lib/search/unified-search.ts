@@ -3,117 +3,20 @@ import type {
   UnifiedSearchEncryptionStatus,
   UnifiedSearchResult,
 } from "@workspace/calendar-core";
+import {
+  normalizeSearchText as normalizeSearchTextImpl,
+  scoreMailSearchMessage as scoreMailSearchMessageImpl,
+  sortMailMessagesBySearchRelevance as sortMailMessagesBySearchRelevanceImpl,
+  tokenizeSearchQuery as tokenizeSearchQueryImpl,
+} from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import type { JmapEmailMessage } from "@/lib/mail/types";
-import {
-  classifyMessageEncryption,
-  extractMessageBodies,
-} from "@/lib/mail/message-security";
+import { classifyMessageEncryption } from "@/lib/mail/message-security";
 
-const MAX_SNIPPET_LENGTH = 180;
-
-type SearchField = {
-  name: string;
-  value: string;
-  weight: number;
-};
-
-type ScoredDocument = {
-  score: number;
-  matchedFields: string[];
-  snippet?: string;
-};
-
-export function normalizeSearchText(value: string): string {
-  return value
-    .normalize("NFKC")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s@._+-]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-export function tokenizeSearchQuery(query: string): string[] {
-  return Array.from(
-    new Set(
-      normalizeSearchText(query)
-        .split(" ")
-        .map((token) => token.trim())
-        .filter((token) => token.length >= 2),
-    ),
-  );
-}
-
-function createSnippet(value: string, queryTokens: string[]): string | undefined {
-  const compact = value.replace(/\s+/g, " ").trim();
-  if (!compact) return undefined;
-
-  const lower = compact.toLowerCase();
-  const firstMatch = queryTokens
-    .map((token) => lower.indexOf(token))
-    .filter((index) => index >= 0)
-    .sort((a, b) => a - b)[0];
-
-  if (firstMatch === undefined) {
-    return compact.length > MAX_SNIPPET_LENGTH
-      ? `${compact.slice(0, MAX_SNIPPET_LENGTH - 1).trim()}…`
-      : compact;
-  }
-
-  const start = Math.max(0, firstMatch - 48);
-  const end = Math.min(compact.length, start + MAX_SNIPPET_LENGTH);
-  const prefix = start > 0 ? "…" : "";
-  const suffix = end < compact.length ? "…" : "";
-
-  return `${prefix}${compact.slice(start, end).trim()}${suffix}`;
-}
-
-function scoreFields(
-  fields: SearchField[],
-  query: string,
-): ScoredDocument | null {
-  const queryTokens = tokenizeSearchQuery(query);
-  if (queryTokens.length === 0) return null;
-
-  const normalizedPhrase = normalizeSearchText(query);
-  const matchedFields = new Set<string>();
-  let score = 0;
-  let snippetSource = "";
-
-  for (const field of fields) {
-    const normalizedValue = normalizeSearchText(field.value);
-    if (!normalizedValue) continue;
-
-    const allTokensMatch = queryTokens.every((token) =>
-      normalizedValue.includes(token),
-    );
-    const matchingTokenCount = queryTokens.filter((token) =>
-      normalizedValue.includes(token),
-    ).length;
-
-    if (matchingTokenCount === 0) continue;
-
-    matchedFields.add(field.name);
-    score += matchingTokenCount * field.weight;
-
-    if (allTokensMatch) score += field.weight;
-    if (normalizedPhrase && normalizedValue.includes(normalizedPhrase)) {
-      score += field.weight * 2;
-    }
-
-    if (!snippetSource || field.weight < 3) {
-      snippetSource = field.value;
-    }
-  }
-
-  if (score <= 0) return null;
-
-  return {
-    score,
-    matchedFields: Array.from(matchedFields),
-    snippet: createSnippet(snippetSource, queryTokens),
-  };
-}
+export const normalizeSearchText = normalizeSearchTextImpl;
+export const tokenizeSearchQuery = tokenizeSearchQueryImpl;
+export const sortMailMessagesBySearchRelevance =
+  sortMailMessagesBySearchRelevanceImpl;
 
 function getMailFromLabel(message: JmapEmailMessage): string | undefined {
   const first = message.from?.[0];
@@ -139,40 +42,10 @@ export function searchMailMessages(
   limit: number,
 ): UnifiedMailSearchResult<JmapEmailMessage>[] {
   const results = messages.flatMap((message) => {
-    const bodies = extractMessageBodies(message);
-    const from = getMailFromLabel(message);
-    const recipientText = [
-      ...(message.to ?? []),
-      ...(message.cc ?? []),
-      ...(message.bcc ?? []),
-    ]
-      .map((address) => `${address.name ?? ""} ${address.email ?? ""}`.trim())
-      .join(" ");
-    const attachmentText = (message.attachments ?? [])
-      .map((attachment) => `${attachment.name ?? ""} ${attachment.type ?? ""}`)
-      .join(" ");
-    const scored = scoreFields(
-      [
-        { name: "subject", value: message.subject ?? "", weight: 8 },
-        { name: "from", value: from ?? "", weight: 6 },
-        { name: "to", value: recipientText, weight: 4 },
-        { name: "body", value: bodies.text ?? bodies.html ?? "", weight: 2 },
-        { name: "attachment", value: attachmentText, weight: 2 },
-      ],
-      query,
-    );
-
+    const scored = scoreMailSearchMessageImpl(message, query);
     if (!scored) return [];
 
-    const unreadBoost = message.keywords?.["$seen"] ? 0 : 0.4;
-    const recencyBoost = message.receivedAt
-      ? Math.max(
-          0,
-          1 -
-            (Date.now() - new Date(message.receivedAt).getTime()) /
-              (1000 * 60 * 60 * 24 * 180),
-        )
-      : 0;
+    const from = getMailFromLabel(message);
 
     return [
       {
@@ -184,7 +57,7 @@ export function searchMailMessages(
         title: message.subject?.trim() || "(no subject)",
         snippet: scored.snippet,
         timestamp: message.receivedAt,
-        score: scored.score + unreadBoost + recencyBoost,
+        score: scored.score,
         encryptionStatus: getMailEncryptionStatus(message),
         matchedFields: scored.matchedFields,
         from,
