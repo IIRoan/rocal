@@ -7,6 +7,7 @@ type AuthClientMock = {
   signOut: JestMock;
   signUp: JestMock;
   useSession: JestMock;
+  getSession: JestMock;
 };
 
 export const authClient: AuthClientMock = {
@@ -14,6 +15,7 @@ export const authClient: AuthClientMock = {
   signOut: jest.fn(),
   signUp: jest.fn(),
   useSession: jest.fn(() => ({ data: null, isPending: false })),
+  getSession: jest.fn(() => Promise.resolve({ data: null })),
 };
 
 export const signIn: JestMock = authClient.signIn;

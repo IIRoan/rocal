@@ -20,7 +20,7 @@ jest.mock("lucide-react", () =>
   new Proxy({}, { get: () => () => null }),
 );
 
-jest.mock("../../components/mail/mail-compose-context", () => ({
+jest.mock("../../components/mail/mail-compose-bridge", () => ({
   getMailComposeBridge: jest.fn(),
 }));
 

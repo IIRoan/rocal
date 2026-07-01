@@ -51,6 +51,16 @@ type ComposeDraftAutosaveInput = {
 };
 
 export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
+  const {
+    client,
+    session,
+    mailboxes,
+    identities,
+    fallbackFromEmail,
+    mailServerPolicy,
+    onDraftSaved,
+    enabled,
+  } = input;
   const { isComposeOpen, isFullCompose } = useMailComposeChrome();
   const composeActive = isComposeOpen || isFullCompose;
   const {
@@ -68,7 +78,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
 
   const saveDraftOnce = useCallback(async (): Promise<string | null> => {
     const bridge = getMailComposeBridge();
-    if (!bridge || !input.client || !input.session) return null;
+    if (!bridge || !client || !session) return null;
 
     const draft = bridge.getDraft();
     const parseList = (raw: string) =>
@@ -113,10 +123,10 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       return previousDraftId;
     }
 
-    const draftsMailboxId = getPrimaryMailboxId(input.mailboxes, "drafts");
+    const draftsMailboxId = getPrimaryMailboxId(mailboxes, "drafts");
     if (!draftsMailboxId) return null;
 
-    if (input.mailServerPolicy) {
+    if (mailServerPolicy) {
       const estimatedBytes = estimateOutgoingJmapMessageBytes({
         subject: draft.subject.trim() || "(No subject)",
         textBody: plainBody,
@@ -124,7 +134,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       });
       const messageSizeError = validateOutgoingMessageSize(
         estimatedBytes,
-        input.mailServerPolicy.limits.maxMessageSizeBytes,
+        mailServerPolicy.limits.maxMessageSizeBytes,
       );
       if (messageSizeError) {
         bridge.setDraftSaveStatus("error");
@@ -132,7 +142,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       }
       const requestSizeError = validateJmapRequestSize(
         estimatedBytes,
-        input.mailServerPolicy,
+        mailServerPolicy,
       );
       if (requestSizeError) {
         bridge.setDraftSaveStatus("error");
@@ -141,15 +151,15 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     }
 
     const identity =
-      input.identities.find((entry) => entry.id === draft.identityId) ??
-      input.identities[0];
-    const fromEmail = identity?.email ?? input.fallbackFromEmail;
+      identities.find((entry) => entry.id === draft.identityId) ??
+      identities[0];
+    const fromEmail = identity?.email ?? fallbackFromEmail;
     const fromName = identity?.name ?? null;
 
     bridge.setDraftSaveStatus("saving");
 
     try {
-      const savedDraftId = await input.client.saveDraft(input.session, {
+      const savedDraftId = await client.saveDraft(session, {
         draftsMailboxId,
         fromEmail,
         fromName,
@@ -170,7 +180,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
         bridge.setDraftSaveStatus("idle");
       }, 2000);
 
-      input.onDraftSaved?.({
+      onDraftSaved?.({
         savedDraftId,
         previousDraftId,
         preview: {
@@ -198,13 +208,13 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       return null;
     }
   }, [
-    input.client,
-    input.fallbackFromEmail,
-    input.identities,
-    input.mailboxes,
-    input.mailServerPolicy,
-    input.onDraftSaved,
-    input.session,
+    client,
+    fallbackFromEmail,
+    identities,
+    mailboxes,
+    mailServerPolicy,
+    onDraftSaved,
+    session,
   ]);
 
   const cancelPendingSave = useCallback(() => {
@@ -258,7 +268,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
   }, [cancelPendingSave, flushDraftSave, saveDraft]);
 
   useEffect(() => {
-    if (!input.enabled || !composeActive) {
+    if (!enabled || !composeActive) {
       cancelPendingSave();
       return cancelPendingSave;
     }
@@ -292,7 +302,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     composeBody,
     composeHtmlBody,
     selectedIdentityId,
-    input.enabled,
+    enabled,
     composeActive,
     saveDraft,
     cancelPendingSave,

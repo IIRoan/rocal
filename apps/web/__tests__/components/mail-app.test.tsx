@@ -108,13 +108,17 @@ jest.mock("lucide-react", () => {
   const Icon = () => null;
   return {
     ArrowLeft: Icon,
+    ChevronDown: Icon,
     ChevronRight: Icon,
     Ellipsis: Icon,
+    Filter: Icon,
     Inbox: Icon,
     Loader2: Icon,
     Lock: Icon,
+    MailOpen: Icon,
     MailPlus: Icon,
     Menu: Icon,
+    Paperclip: Icon,
     Pencil: Icon,
     Plus: Icon,
     RefreshCcw: Icon,
@@ -122,10 +126,32 @@ jest.mock("lucide-react", () => {
     Search: Icon,
     Send: Icon,
     ShieldCheck: Icon,
+    Star: Icon,
     UserRoundPlus: Icon,
     X: Icon,
   };
 });
+
+jest.mock("@workspace/ui/components/ui/input", () => ({
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
+    <input {...props} />
+  ),
+}));
+
+jest.mock("@workspace/ui/components/ui/tooltip", () => ({
+  Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TooltipTrigger: ({ children, asChild }: any) =>
+    asChild ? children : <span>{children}</span>,
+  TooltipContent: ({ children }: { children: React.ReactNode }) => (
+    <span>{children}</span>
+  ),
+}));
+
+jest.mock("../../components/mail/advanced-search-panel", () => ({
+  AdvancedSearchPanel: () => null,
+  AdvancedSearchToggle: () => null,
+  countActiveFilters: () => 0,
+}));
 
 jest.mock("../../lib/mail/api-service", () => ({
   mailDemoApiService: {
@@ -142,21 +168,25 @@ jest.mock("../../lib/mail/api-service", () => ({
   },
 }));
 
-jest.mock("@/lib/auth-client", () => ({
-  useSession: jest.fn(),
-}));
-
 jest.mock("@/lib/e2ee-session", () => ({
   getActiveE2eeSession: () => null,
   hasActiveE2eeSession: () => false,
 }));
 
-jest.mock("../../hooks/use-recent-contacts", () => ({
+jest.mock("@/hooks/use-recent-contacts", () => ({
   useRecentContacts: () => ({
     recentContacts: { version: 1 as const, contacts: [] },
     recordUsage: jest.fn(),
     isLoading: false,
   }),
+}));
+
+jest.mock("@/hooks/use-mail-realtime", () => ({
+  useMailRealtime: jest.fn(),
+}));
+
+jest.mock("@/hooks/use-compose-draft-autosave", () => ({
+  useComposeDraftAutosave: jest.fn(),
 }));
 
 jest.mock("../../lib/e2ee-password-cache", () => ({
@@ -182,6 +212,7 @@ jest.mock("../../lib/mail/vault-crypto", () => ({
 const mockJmapClient = {
   discoverSession: jest.fn<() => Promise<any>>(),
   getAccountSettings: jest.fn<() => Promise<any>>(),
+  getStalwartPolicySingletons: jest.fn<() => Promise<any>>(),
   getMailboxes: jest.fn<() => Promise<any>>(),
   getMailboxMessages: jest.fn<() => Promise<any>>(),
   getMessagesByIds: jest.fn<() => Promise<any>>(),
@@ -202,6 +233,11 @@ const mockJmapClient = {
   bulkMoveToMailbox: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
   bulkMarkAsUnread: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
   bulkMarkAsRead: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+  ensureEncryptOnAppendDisabled: jest
+    .fn<() => Promise<any>>()
+    .mockResolvedValue(undefined),
+  setMailServerPolicy: jest.fn(),
+  syncMailServerPolicy: jest.fn<() => Promise<any>>(),
 };
 
 jest.mock("../../lib/mail/jmap-client", () => ({
@@ -358,7 +394,10 @@ jest.mock("../../components/mail/compose-dialog", () => {
   }
 
   return {
-    ComposeForm: ({ onSend }: any) => <ComposeFields onSend={onSend} />,
+    ComposeForm: ({ onSend }: any) => {
+      const { isFullCompose } = useMailComposeChrome();
+      return isFullCompose ? <ComposeFields onSend={onSend} /> : null;
+    },
     ComposeDialog: ({ onSend, onExpand }: any) => {
       const { isComposeOpen } = useMailComposeChrome();
       return isComposeOpen ? (
@@ -383,7 +422,7 @@ jest.mock("../../hooks/use-smooth-router", () => ({
 }));
 
 import { MailApp } from "../../components/mail/mail-app";
-import { useSession } from "@/lib/auth-client";
+import { authClient, useSession } from "@/lib/auth-client";
 import { peekCachedAuthPassword } from "../../lib/e2ee-password-cache";
 import {
   clearEncPasswordCookie,
@@ -399,6 +438,7 @@ import { toast } from "sonner";
 
 const mockToast = jest.mocked(toast);
 const mockUseSession = jest.mocked(useSession);
+const mockGetSession = jest.mocked(authClient.getSession);
 const mockPeekCachedAuthPassword = jest.mocked(peekCachedAuthPassword);
 const mockInitEncPasswordFromCookie = jest.mocked(initEncPasswordFromCookie);
 const mockClearEncPasswordCookie = jest.mocked(clearEncPasswordCookie);
@@ -498,8 +538,9 @@ describe("MailApp", () => {
     mockToastError.mockReset();
     mockToggleSidebar.mockReset();
     mockUseIsMobile.mockReturnValue(false);
+    localStorage.removeItem("mail:composeSettings");
 
-    mockUseSession.mockReturnValue({
+    const sessionPayload = {
       data: {
         user: {
           id: "user-1",
@@ -508,7 +549,9 @@ describe("MailApp", () => {
         },
       },
       isPending: false,
-    } as any);
+    } as const;
+    mockUseSession.mockReturnValue(sessionPayload as any);
+    mockGetSession.mockResolvedValue(sessionPayload as any);
     mockPeekCachedAuthPassword.mockReturnValue(null);
     mockInitEncPasswordFromCookie.mockResolvedValue(undefined);
     mockClearEncPasswordCookie.mockReset();
@@ -633,6 +676,11 @@ describe("MailApp", () => {
     mockJmapClient.getAccountSettings.mockResolvedValue({
       encryptionAtRest: { "@type": "Aes256" },
     });
+    mockJmapClient.getStalwartPolicySingletons.mockResolvedValue({
+      emailSettings: null,
+      jmapSettings: null,
+    });
+    mockJmapClient.syncMailServerPolicy.mockResolvedValue(null);
     mockJmapClient.getMailboxes.mockResolvedValue([
       { id: "inbox-1", name: "Inbox", role: "inbox" },
       { id: "drafts-1", name: "Drafts", role: "drafts" },
@@ -971,12 +1019,12 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Inbox hello");
     });
 
-    const spamButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent?.includes("Spam"),
+    const junkButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Junk Mail"),
     );
 
     await act(async () => {
-      spamButton?.click();
+      junkButton?.click();
       await Promise.resolve();
     });
 
@@ -1300,6 +1348,17 @@ describe("MailApp", () => {
   });
 
   it("adds a sent compose reply into the active conversation immediately", async () => {
+    localStorage.setItem(
+      "mail:composeSettings",
+      JSON.stringify({
+        plainTextMode: true,
+        attachmentReminderEnabled: false,
+        attachmentReminderKeywords: [],
+        signaturePosition: "below_quote",
+        signatureSeparatorEnabled: true,
+        autoSelectReplyIdentity: false,
+      }),
+    );
     mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockResolvedValue({
@@ -1356,6 +1415,11 @@ describe("MailApp", () => {
       await Promise.resolve();
     });
 
+    await waitForExpectation(() => {
+      const textarea = container.querySelector("textarea") as HTMLTextAreaElement | null;
+      expect(textarea?.value).toContain("Hello Alice");
+    });
+
     act(() => {
       const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
       const descriptor = Object.getOwnPropertyDescriptor(
@@ -1365,6 +1429,7 @@ describe("MailApp", () => {
 
       descriptor?.set?.call(textarea, "Compose reply body");
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      textarea.dispatchEvent(new Event("change", { bubbles: true }));
     });
 
     const sendButton = Array.from(container.querySelectorAll("button")).find(
@@ -1374,6 +1439,14 @@ describe("MailApp", () => {
     await act(async () => {
       sendButton?.click();
       await Promise.resolve();
+    });
+
+    await waitForExpectation(() => {
+      expect(mockWorkerClient.encryptForRecipients).toHaveBeenCalledWith(
+        expect.objectContaining({
+          plaintext: expect.stringContaining("Compose reply body"),
+        }),
+      );
     });
 
     await waitForExpectation(() => {
