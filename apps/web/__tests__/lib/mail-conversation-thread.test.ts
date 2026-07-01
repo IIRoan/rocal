@@ -73,4 +73,27 @@ describe("mail conversation threading", () => {
       ["first", "second"],
     );
   });
+
+  it("preserves relevance order for search results instead of sorting by date", () => {
+    const messages = [
+      createMessage("exact", {
+        subject: "hi me!",
+        receivedAt: "2026-05-14T10:00:00.000Z",
+      }),
+      createMessage("newest", {
+        subject: "thinking about u",
+        receivedAt: "2026-06-29T10:00:00.000Z",
+      }),
+    ];
+
+    const byDate = buildMailConversations(messages).map(
+      (conversation) => conversation.latestMessage.id,
+    );
+    const byRelevance = buildMailConversations(messages, {
+      preserveMessageOrder: true,
+    }).map((conversation) => conversation.latestMessage.id);
+
+    expect(byDate).toEqual(["newest", "exact"]);
+    expect(byRelevance).toEqual(["exact", "newest"]);
+  });
 });

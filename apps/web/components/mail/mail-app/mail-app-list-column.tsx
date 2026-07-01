@@ -217,6 +217,7 @@ export function MailAppListColumn({
           density={listSettings.density}
           showLabelChips={listSettings.showLabelChipsInList}
           threadExpandEnabled={listSettings.threadExpandInList}
+          preserveMessageOrder={searchActive}
           onExpandThread={
             activeMailbox
               ? async (threadId: string) => {
