@@ -1,4 +1,5 @@
 import type {
+  UnifiedMailSearchResult,
   UnifiedSearchEncryptionStatus,
   UnifiedSearchResult,
 } from "@workspace/calendar-core";
@@ -136,7 +137,7 @@ export function searchMailMessages(
   messages: JmapEmailMessage[],
   query: string,
   limit: number,
-): UnifiedSearchResult<JmapEmailMessage>[] {
+): UnifiedMailSearchResult<JmapEmailMessage>[] {
   const results = messages.flatMap((message) => {
     const bodies = extractMessageBodies(message);
     const from = getMailFromLabel(message);
