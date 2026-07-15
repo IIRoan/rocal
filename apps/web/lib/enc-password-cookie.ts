@@ -71,6 +71,21 @@ function expireCookie(): void {
   document.cookie = `${COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict`;
 }
 
+/**
+ * Remove a persisted encryption cookie when its device key is missing.
+ * This happens after manual cookie clears or browser profile resets.
+ */
+export function clearOrphanedEncPasswordCookie(): void {
+  if (typeof window === "undefined") return;
+
+  const cookieValue = readCookie();
+  if (!cookieValue) return;
+
+  if (!localStorage.getItem(DEVICE_KEY_STORAGE_KEY)) {
+    expireCookie();
+  }
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -119,7 +134,10 @@ export async function initEncPasswordFromCookie(): Promise<void> {
   const cookieValue = readCookie();
   if (!cookieValue) return;
 
-  if (!localStorage.getItem(DEVICE_KEY_STORAGE_KEY)) return;
+  if (!localStorage.getItem(DEVICE_KEY_STORAGE_KEY)) {
+    expireCookie();
+    return;
+  }
 
   try {
     const key = await getOrCreateDeviceKey();

@@ -174,6 +174,12 @@ jest.mock("@/lib/enc-password-cookie", () => ({
   setEncPasswordCookie: jest.fn(),
 }));
 
+jest.mock("@/lib/auth-local-state", () => ({
+  clearOrphanedClientAuthArtifacts: jest.fn(),
+  recoverFromStaleAuthState: jest.fn(),
+  reconcileAuthSession: jest.fn(),
+}));
+
 jest.mock("@/lib/auth-client", () => ({
   authClient: {
     requestPasswordReset: jest.fn(),
@@ -190,7 +196,7 @@ jest.mock("@/lib/auth-client", () => ({
   useSession: jest.fn(),
 }));
 
-import { LoginForm } from "../../app/login/_content";
+import { LoginForm } from "../../app/login/login-form-entry";
 import { accountApiService } from "@/lib/account-api-service";
 import { inviteApiService } from "@/lib/invite-api-service";
 import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
@@ -203,6 +209,11 @@ import {
   clearEncPasswordCookie,
   setEncPasswordCookie,
 } from "@/lib/enc-password-cookie";
+import {
+  clearOrphanedClientAuthArtifacts,
+  recoverFromStaleAuthState,
+  reconcileAuthSession,
+} from "@/lib/auth-local-state";
 
 const mockUseSession = jest.mocked(useSession);
 const mockRequestPasswordReset = jest.mocked(authClient.requestPasswordReset);
@@ -225,6 +236,11 @@ const mockStorePendingAuthPassword = jest.mocked(storePendingAuthPassword);
 const mockClearAuthPasswords = jest.mocked(clearAuthPasswords);
 const mockSetEncPasswordCookie = jest.mocked(setEncPasswordCookie);
 const mockClearEncPasswordCookie = jest.mocked(clearEncPasswordCookie);
+const mockClearOrphanedClientAuthArtifacts = jest.mocked(
+  clearOrphanedClientAuthArtifacts,
+);
+const mockRecoverFromStaleAuthState = jest.mocked(recoverFromStaleAuthState);
+const mockReconcileAuthSession = jest.mocked(reconcileAuthSession);
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -284,6 +300,8 @@ describe("LoginForm", () => {
       hasPasskeys: false,
       requiresPasskeyStepUp: false,
     });
+    mockReconcileAuthSession.mockResolvedValue({ status: "authenticated" });
+    mockRecoverFromStaleAuthState.mockResolvedValue(undefined);
     (
       globalThis as typeof globalThis & {
         PublicKeyCredential?: typeof PublicKeyCredential;
@@ -623,8 +641,7 @@ describe("LoginForm", () => {
       await Promise.resolve();
     });
 
-    expect(mockClearAuthPasswords).toHaveBeenCalledTimes(1);
-    expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
+    expect(mockRecoverFromStaleAuthState).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain("Authentication failed hard.");
     expect(mockStorePendingAuthPassword).not.toHaveBeenCalled();
     expect(mockSetEncPasswordCookie).not.toHaveBeenCalled();
@@ -766,5 +783,55 @@ describe("LoginForm", () => {
 
     expect(inviteTokenInput?.value).toBe("url-pre-fill-token");
     expect(container.textContent).toContain("Create an account");
+  });
+
+  it("recovers stale client sessions instead of redirecting from the login page", async () => {
+    mockUseSession.mockReturnValue({
+      data: {
+        user: {
+          id: "user-1",
+          email: "roan@solace.onl",
+          name: "Roan",
+        },
+      },
+      isPending: false,
+    });
+    mockReconcileAuthSession.mockResolvedValue({ status: "recovered" });
+
+    await renderForm();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockReconcileAuthSession).toHaveBeenCalledWith({
+      hasClientSession: true,
+      reason: "login-page-reconcile",
+    });
+    expect(mockCompleteAuthNavigation).not.toHaveBeenCalled();
+  });
+
+  it("clears orphaned local auth artifacts before email sign-in", async () => {
+    await renderForm();
+
+    const emailInput = container.querySelector(
+      "#email",
+    ) as HTMLInputElement | null;
+    const passwordInput = container.querySelector(
+      "#password",
+    ) as HTMLInputElement | null;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Sign in"),
+    );
+
+    await act(async () => {
+      setInputValue(emailInput as HTMLInputElement, "roan@solace.onl");
+      setInputValue(passwordInput as HTMLInputElement, "secret-password");
+      submitButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(mockClearOrphanedClientAuthArtifacts).toHaveBeenCalled();
   });
 });

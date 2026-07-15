@@ -9,7 +9,7 @@ import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
 import { CALENDAR_HOME_PATH, MAIL_HOME_PATH } from "@/lib/app-routes";
 import { CalendarDays, Mail, ChevronRight, LogOut } from "lucide-react";
-import { signOut } from "@/lib/auth-client";
+import { signOutAndClearLocalState } from "@/lib/auth-local-state";
 import Link from "next/link";
 
 const NAV_ITEMS = [
@@ -95,7 +95,7 @@ export function HomeAppClient() {
           <button
             type="button"
             onClick={() =>
-              void signOut().then(() => {
+              void signOutAndClearLocalState().then(() => {
                 completeAuthNavigation("/login");
               })
             }
