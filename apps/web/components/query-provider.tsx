@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { AuthSessionGuard } from "@/components/auth-session-guard";
 import { E2eeBootstrap } from "@/components/e2ee-bootstrap";
 
 export function QueryProvider({ children }: { children: React.ReactNode }) {
@@ -19,6 +20,7 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <AuthSessionGuard />
       <E2eeBootstrap />
       {children}
     </QueryClientProvider>

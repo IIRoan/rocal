@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef, useReducer } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
 import { createLogger } from "@workspace/logger";
 import { getAppBaseUrl, resolveAuthRedirectTarget } from "@/lib/api-url";
 import { completeAuthNavigation } from "@/lib/auth-navigation";
-import { useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Key, Eye, EyeOff, ArrowRight, Check, X, Ticket } from "lucide-react";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
@@ -28,15 +27,123 @@ import {
   clearEncPasswordCookie,
   setEncPasswordCookie,
 } from "@/lib/enc-password-cookie";
+import {
+  clearOrphanedClientAuthArtifacts,
+  recoverFromStaleAuthState,
+  reconcileAuthSession,
+} from "@/lib/auth-local-state";
 import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
+import {
+  createInitialLoginFormFields,
+  emailAvailabilityUiReducer,
+  initialEmailAvailabilityUi,
+  initialInviteValidationUi,
+  initialLoginFormChrome,
+  inviteValidationUiReducer,
+  loginFormChromeReducer,
+  loginFormFieldsReducer,
+  type AuthMode,
+} from "./login-form-state";
+import type { LoginSearchParams } from "./login-form-params";
 
 const log = createLogger("login");
 const DEFAULT_SIGNUP_DOMAIN = "solace.onl";
 const AUTH_STATUS_RETRY_DELAYS_MS = [0, 75, 150, 300, 500] as const;
 const FIELD_VALIDATION_DEBOUNCE_MS = 500;
 
-type AuthMode = "sign-in" | "sign-up" | "forgot-password";
+async function fetchSignupEmailAvailability(trimmed: string) {
+  try {
+    return await accountApiService.checkEmailAvailability(trimmed);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchInviteTokenValidation(trimmed: string) {
+  try {
+    return await inviteApiService.validateInviteToken(trimmed);
+  } catch {
+    return { valid: false as const, reason: "Could not validate token" };
+  }
+}
+
+async function requestPasswordResetForLogin(email: string, redirectTo: string) {
+  try {
+    const result = await authClient.requestPasswordReset({
+      email,
+      redirectTo,
+    });
+
+    if (result?.error) {
+      return {
+        errorMessage:
+          result.error.message ||
+          "Unable to send a password reset link for your email sign-in password.",
+        notice: null,
+      };
+    }
+
+    return {
+      errorMessage: null,
+      notice:
+        "If an account exists for that email, Solace sent a password reset link for your email sign-in password.",
+    };
+  } catch (err: any) {
+    log.error("Password reset request failed:", err);
+    return {
+      errorMessage:
+        err.message ||
+        "Unable to send a password reset link for your email sign-in password.",
+      notice: null,
+    };
+  }
+}
+
+type AuthStatusResult = Awaited<
+  ReturnType<typeof accountApiService.getAuthStatus>
+>;
+
+async function settleAuthStatusAtIndex(
+  refreshAuthStatus: () => Promise<AuthStatusResult>,
+  index: number,
+  lastStatus: AuthStatusResult | null,
+): Promise<AuthStatusResult | null> {
+  if (index >= AUTH_STATUS_RETRY_DELAYS_MS.length) {
+    return lastStatus;
+  }
+
+  const delayMs = AUTH_STATUS_RETRY_DELAYS_MS[index];
+  if (delayMs > 0) {
+    await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+  }
+
+  const authStatus = await refreshAuthStatus();
+
+  if (authStatus.authenticated && !authStatus.requiresPasskeyStepUp) {
+    return authStatus;
+  }
+
+  return settleAuthStatusAtIndex(refreshAuthStatus, index + 1, authStatus);
+}
+
+async function waitForSettledAuthStatus(
+  refreshAuthStatus: () => Promise<AuthStatusResult>,
+): Promise<AuthStatusResult | null> {
+  return settleAuthStatusAtIndex(refreshAuthStatus, 0, null);
+}
+
+type LoginSessionUi = {
+  overlayVisible: boolean;
+  overlayFading: boolean;
+  requiresPasskeyStepUp: boolean;
+};
+
+const initialLoginSessionUi: LoginSessionUi = {
+  overlayVisible: true,
+  overlayFading: false,
+  requiresPasskeyStepUp: false,
+};
 
 function normalizeFormValue(value: string): string {
   return value.trim().toLowerCase();
@@ -51,7 +158,7 @@ function AnimatedCollapse({
   isOpen: boolean;
   children: React.ReactNode;
 }) {
-  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [shouldRender, setShouldRender] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const tweenRef = useRef<gsap.core.Tween | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -175,43 +282,55 @@ function PasswordRequirements({ password }: { password: string }) {
 
 // ─── LoginForm ────────────────────────────────────────────────────────────────
 
-export function LoginForm() {
-  const [passkeyLoading, setPasskeyLoading] = useState(false);
-  const [emailLoading, setEmailLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+type LoginFormBodyProps = {
+  loginSearchParams: LoginSearchParams;
+};
+
+export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
+  const [chrome, dispatchChrome] = useReducer(
+    loginFormChromeReducer,
+    initialLoginFormChrome,
+  );
+  const [fields, dispatchFields] = useReducer(
+    loginFormFieldsReducer,
+    loginSearchParams,
+    (params) =>
+      createInitialLoginFormFields(
+        params.inviteToken,
+        DEFAULT_SIGNUP_DOMAIN,
+      ),
+  );
+  const [emailAvailabilityUi, dispatchEmailAvailability] = useReducer(
+    emailAvailabilityUiReducer,
+    initialEmailAvailabilityUi,
+  );
+  const [inviteValidationUi, dispatchInviteValidation] = useReducer(
+    inviteValidationUiReducer,
+    initialInviteValidationUi,
+  );
   const [isPasskeySupported] = useState(
     () =>
       typeof window !== "undefined" &&
       typeof window.PublicKeyCredential !== "undefined",
   );
-  const [showPassword, setShowPassword] = useState(false);
-  const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
-  const [overlayFading, setOverlayFading] = useState(false);
-  const [overlayVisible, setOverlayVisible] = useState(true);
-  const [requiresPasskeyStepUp, setRequiresPasskeyStepUp] = useState(false);
-  const [shouldAutoPromptPasskey, setShouldAutoPromptPasskey] = useState(false);
+  const [loginSessionUi, setLoginSessionUi] =
+    useState<LoginSessionUi>(initialLoginSessionUi);
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [desiredEmail, setDesiredEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [signupDomain, setSignupDomain] = useState(DEFAULT_SIGNUP_DOMAIN);
-
-  // Invite token state
-  const [inviteToken, setInviteToken] = useState("");
-  const [inviteValidation, setInviteValidation] = useState<
-    | null
-    | { valid: true; inviterName?: string | null }
-    | { valid: false; reason: string }
-  >(null);
-  const [inviteValidating, setInviteValidating] = useState(false);
-
-  // Real-time email availability state
-  const [emailAvailability, setEmailAvailability] = useState<
-    null | { available: true } | { available: false; message: string }
-  >(null);
-  const [emailChecking, setEmailChecking] = useState(false);
+  const {
+    authMode,
+    name,
+    email,
+    desiredEmail,
+    password,
+    inviteToken,
+    showPassword,
+    signupDomain,
+  } = fields;
+  const { passkeyLoading, emailLoading, error, notice } = chrome;
+  const { availability: emailAvailability, checking: emailChecking } =
+    emailAvailabilityUi;
+  const { validation: inviteValidation, validating: inviteValidating } =
+    inviteValidationUi;
 
   const emailCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inviteValidateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -224,40 +343,24 @@ export function LoginForm() {
 
   const { data: session, isPending } = useSession();
   const router = useSmoothRouter();
-  const searchParams = useSearchParams();
   const { theme: currentTheme } = useTheme();
   const isCheckingSession = isPending;
-  const nextPath = searchParams.get("next");
-  const callbackUrl =
-    searchParams.get("callbackURL") || searchParams.get("callbackUrl");
-  const resetSucceeded = searchParams.get("reset") === "success";
+  const { nextPath, callbackUrl, resetSucceeded } = loginSearchParams;
 
   const isSignUp = authMode === "sign-up";
   const isForgotPassword = authMode === "forgot-password";
+  const { overlayVisible, overlayFading, requiresPasskeyStepUp } = loginSessionUi;
 
-  const getRedirectTarget = useCallback(
-    () => resolveAuthRedirectTarget(nextPath, callbackUrl),
-    [nextPath, callbackUrl],
-  );
+  const getRedirectTarget = () =>
+    resolveAuthRedirectTarget(nextPath, callbackUrl);
 
-  const switchMode = useCallback((mode: AuthMode) => {
-    setAuthMode(mode);
-    setError(null);
-    setNotice(null);
-    setShowPassword(false);
-    setShouldAutoPromptPasskey(false);
-
-    if (mode !== "sign-up") {
-      setName("");
-      setInviteToken("");
-      setInviteValidation(null);
-      setEmailAvailability(null);
-    }
-
-    if (mode === "forgot-password") {
-      setPassword("");
-    }
-  }, []);
+  function switchMode(mode: AuthMode) {
+    dispatchFields({ type: "switch-mode", mode });
+    dispatchChrome({ type: "clear-messages" });
+    dispatchEmailAvailability({ type: "reset", checking: false });
+    dispatchInviteValidation({ type: "reset", validating: false });
+    hasAutoPromptedStepUpRef.current = false;
+  }
 
   // Debounced email availability check
   useEffect(() => {
@@ -267,8 +370,10 @@ export function LoginForm() {
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
-      setEmailAvailability(null);
-      setEmailChecking(Boolean(trimmed));
+      dispatchEmailAvailability({
+        type: "reset",
+        checking: Boolean(trimmed),
+      });
     });
     if (!trimmed) {
       return () => {
@@ -276,19 +381,24 @@ export function LoginForm() {
       };
     }
 
-    emailCheckTimerRef.current = setTimeout(async () => {
-      try {
-        const result = await accountApiService.checkEmailAvailability(trimmed);
-        setEmailAvailability(
-          result.available
+    emailCheckTimerRef.current = setTimeout(() => {
+      void fetchSignupEmailAvailability(trimmed).then((result) => {
+        if (cancelled) {
+          return;
+        }
+
+        if (!result) {
+          dispatchEmailAvailability({ type: "set-result", availability: null });
+          return;
+        }
+
+        dispatchEmailAvailability({
+          type: "set-result",
+          availability: result.available
             ? { available: true }
             : { available: false, message: result.message },
-        );
-      } catch {
-        setEmailAvailability(null);
-      } finally {
-        setEmailChecking(false);
-      }
+        });
+      });
     }, FIELD_VALIDATION_DEBOUNCE_MS);
 
     return () => {
@@ -306,8 +416,10 @@ export function LoginForm() {
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
-      setInviteValidation(null);
-      setInviteValidating(Boolean(trimmed));
+      dispatchInviteValidation({
+        type: "reset",
+        validating: Boolean(trimmed),
+      });
     });
     if (!trimmed) {
       return () => {
@@ -315,26 +427,32 @@ export function LoginForm() {
       };
     }
 
-    inviteValidateTimerRef.current = setTimeout(async () => {
-      try {
-        const result = await inviteApiService.validateInviteToken(trimmed);
+    inviteValidateTimerRef.current = setTimeout(() => {
+      void fetchInviteTokenValidation(trimmed).then((result) => {
+        if (cancelled) {
+          return;
+        }
+
         if (result.valid) {
-          setInviteValidation({ valid: true, inviterName: result.inviterName });
-        } else {
-          const invalid = result as { valid: false; reason: string };
-          setInviteValidation({
+          dispatchInviteValidation({
+            type: "set-result",
+            validation: {
+              valid: true,
+              inviterName: result.inviterName,
+            },
+          });
+          return;
+        }
+
+        const invalid = result as { valid: false; reason: string };
+        dispatchInviteValidation({
+          type: "set-result",
+          validation: {
             valid: false,
             reason: invalid.reason ?? "Invalid token",
-          });
-        }
-      } catch {
-        setInviteValidation({
-          valid: false,
-          reason: "Could not validate token",
+          },
         });
-      } finally {
-        setInviteValidating(false);
-      }
+      });
     }, FIELD_VALIDATION_DEBOUNCE_MS);
 
     return () => {
@@ -344,25 +462,25 @@ export function LoginForm() {
     };
   }, [inviteToken, isSignUp]);
 
-  const redirectAfterAuth = useCallback(() => {
+  function redirectAfterAuth() {
     const target = getRedirectTarget();
     router.startRouteTransition({
       messageContext: "AUTH_FLOW",
       minimumVisibleMs: 120,
     });
     completeAuthNavigation(target.href);
-  }, [getRedirectTarget, router]);
+  }
 
-  const redirectAfterCompletedAuth = useCallback(() => {
+  function redirectAfterCompletedAuth() {
     const target = getRedirectTarget();
     router.startRouteTransition({
       messageContext: "AUTH_FLOW",
       minimumVisibleMs: 120,
     });
     completeAuthNavigation(target.href);
-  }, [getRedirectTarget, router]);
+  }
 
-  const syncThemeAfterAuth = useCallback(async () => {
+  async function syncThemeAfterAuth() {
     if (
       currentTheme &&
       (currentTheme === "light" ||
@@ -375,100 +493,112 @@ export function LoginForm() {
         // Settings sync is best-effort — don't block login
       }
     }
-  }, [currentTheme]);
+  }
 
-  const refreshAuthStatus = useCallback(async () => {
+  async function refreshAuthStatus() {
     const authStatus = await accountApiService.getAuthStatus();
-    setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
+    setLoginSessionUi((ui) => ({
+      ...ui,
+      requiresPasskeyStepUp: authStatus.requiresPasskeyStepUp,
+    }));
     return authStatus;
-  }, []);
+  }
 
-  const waitForSettledAuthStatus = useCallback(async () => {
-    let lastAuthStatus: Awaited<
-      ReturnType<typeof accountApiService.getAuthStatus>
-    > | null = null;
+  async function waitForSettledAuthStatusForLogin() {
+    return waitForSettledAuthStatus(refreshAuthStatus);
+  }
 
-    for (const delayMs of AUTH_STATUS_RETRY_DELAYS_MS) {
-      if (delayMs > 0) {
-        await new Promise((resolve) => window.setTimeout(resolve, delayMs));
-      }
+  const handleSessionRedirectRef = useRef<(() => Promise<void>) | null>(null);
 
-      lastAuthStatus = await refreshAuthStatus();
-
-      if (
-        lastAuthStatus.authenticated &&
-        !lastAuthStatus.requiresPasskeyStepUp
-      ) {
-        return lastAuthStatus;
-      }
+  async function handleSessionRedirect() {
+    if (!session?.user) {
+      setLoginSessionUi((ui) => ({
+        ...ui,
+        requiresPasskeyStepUp: false,
+      }));
+      hasAutoPromptedStepUpRef.current = false;
+      return;
     }
 
-    return lastAuthStatus;
-  }, [refreshAuthStatus]);
+    const reconciliation = await reconcileAuthSession({
+      hasClientSession: true,
+      reason: "login-page-reconcile",
+    });
 
-  const handleSessionRedirect = useCallback(async () => {
-    if (!session?.user) {
-      setRequiresPasskeyStepUp(false);
-      setShouldAutoPromptPasskey(false);
+    if (reconciliation.status === "recovered") {
+      setLoginSessionUi({
+        overlayVisible: false,
+        overlayFading: true,
+        requiresPasskeyStepUp: false,
+      });
+      hasAutoPromptedStepUpRef.current = false;
       return;
     }
 
     const authStatus = await refreshAuthStatus();
-    setShouldAutoPromptPasskey(authStatus.requiresPasskeyStepUp);
 
-    if (!authStatus.requiresPasskeyStepUp) {
+    if (authStatus.authenticated && !authStatus.requiresPasskeyStepUp) {
       redirectAfterAuth();
     }
-  }, [refreshAuthStatus, redirectAfterAuth, session]);
+  }
+
+  useEffect(() => {
+    handleSessionRedirectRef.current = handleSessionRedirect;
+  });
 
   useEffect(() => {
     if (!isPending) {
       let cancelled = false;
       queueMicrotask(() => {
         if (!cancelled) {
-          void handleSessionRedirect();
+          void handleSessionRedirectRef.current?.();
         }
       });
       return () => {
         cancelled = true;
       };
     }
-  }, [session, isPending, handleSessionRedirect]);
+  }, [session, isPending]);
 
   useEffect(() => {
     if (!isPending && !isCheckingSession && !session?.user) {
       let cancelled = false;
-      queueMicrotask(() => {
+      const fadeTimer = window.setTimeout(() => {
         if (!cancelled) {
-          setOverlayFading(true);
+          setLoginSessionUi((ui) => ({ ...ui, overlayFading: true }));
         }
-      });
-      const t = setTimeout(() => setOverlayVisible(false), 300);
+      }, 0);
+      const hideTimer = window.setTimeout(() => {
+        if (!cancelled) {
+          setLoginSessionUi((ui) => ({ ...ui, overlayVisible: false }));
+        }
+      }, 300);
       return () => {
         cancelled = true;
-        clearTimeout(t);
+        window.clearTimeout(fadeTimer);
+        window.clearTimeout(hideTimer);
       };
     }
   }, [isPending, isCheckingSession, session?.user]);
 
-  // Pre-fill invite token from ?invite= URL param and load signup domain
+  useEffect(() => {
+    if (!isPending && !session?.user) {
+      clearOrphanedClientAuthArtifacts();
+    }
+  }, [isPending, session?.user]);
+
+  // Load signup domain on mount
   useEffect(() => {
     let cancelled = false;
-
-    const urlToken = searchParams.get("invite");
-    if (urlToken) {
-      queueMicrotask(() => {
-        if (cancelled) return;
-        setInviteToken(urlToken.trim());
-        setAuthMode("sign-up");
-      });
-    }
 
     void accountApiService
       .getSignupConfig()
       .then((config) => {
         if (!cancelled) {
-          setSignupDomain(config.defaultEmailDomain);
+          dispatchFields({
+            type: "set-signup-domain",
+            signupDomain: config.defaultEmailDomain,
+          });
         }
       })
       .catch((error) => {
@@ -478,7 +608,7 @@ export function LoginForm() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams]);
+  }, []);
 
   // Animate the title in when auth mode switches
   useGSAP(
@@ -494,288 +624,292 @@ export function LoginForm() {
     { dependencies: [authMode] },
   );
 
-  const handlePasskeyStepUp = useCallback(async () => {
-    try {
-      setPasskeyLoading(true);
-      setError(null);
-      setNotice(null);
+  async function handlePasskeyStepUp() {
+    dispatchChrome({ type: "start-passkey-auth" });
 
-      const result = await authClient.signIn.passkey({
-        autoFocus: true,
-      });
+    const result = await authClient.signIn.passkey({
+      autoFocus: true,
+    });
 
-      if (result?.error) {
-        throw new Error(
+    if (result?.error) {
+      log.error("Passkey login failed:", result.error);
+      dispatchChrome({
+        type: "set-error",
+        error:
           result.error.message ||
-            "Passkey authentication failed. Please try again.",
-        );
-      }
-
-      const authStatus = await waitForSettledAuthStatus();
-
-      if (!authStatus?.authenticated) {
-        throw new Error(
-          "Your session could not be confirmed. Please try again.",
-        );
-      }
-
-      if (authStatus.requiresPasskeyStepUp) {
-        setError("Passkey verification is still required. Please try again.");
-        return;
-      }
-
-      await syncThemeAfterAuth();
-      redirectAfterCompletedAuth();
-    } catch (error: any) {
-      log.error("Passkey login failed:", error);
-      setError(
-        error.message || "Passkey authentication failed. Please try again.",
-      );
-    } finally {
-      setPasskeyLoading(false);
+          "Passkey authentication failed. Please try again.",
+      });
+      dispatchChrome({ type: "finish-passkey-auth" });
+      return;
     }
-  }, [
-    redirectAfterCompletedAuth,
-    syncThemeAfterAuth,
-    waitForSettledAuthStatus,
-  ]);
 
-  const triggerAutoPasskeyStepUp = useCallback(() => {
+    const authStatus = await waitForSettledAuthStatusForLogin();
+
+    if (!authStatus?.authenticated) {
+      dispatchChrome({
+        type: "set-error",
+        error: "Your session could not be confirmed. Please try again.",
+      });
+      dispatchChrome({ type: "finish-passkey-auth" });
+      return;
+    }
+
+    if (authStatus.requiresPasskeyStepUp) {
+      dispatchChrome({
+        type: "set-error",
+        error: "Passkey verification is still required. Please try again.",
+      });
+      dispatchChrome({ type: "finish-passkey-auth" });
+      return;
+    }
+
+    await syncThemeAfterAuth();
+    redirectAfterCompletedAuth();
+    dispatchChrome({ type: "finish-passkey-auth" });
+  }
+
+  function triggerAutoPasskeyStepUp() {
     hasAutoPromptedStepUpRef.current = true;
-    setShouldAutoPromptPasskey(false);
-    setNotice("Check your device to finish signing in with your passkey.");
+    dispatchChrome({
+      type: "set-notice",
+      notice: "Check your device to finish signing in with your passkey.",
+    });
     void handlePasskeyStepUp();
-  }, [handlePasskeyStepUp]);
+  }
 
-  const finalizePasswordAuth = useCallback(
-    async (submittedPassword: string) => {
-      storePendingAuthPassword(submittedPassword);
-      try {
-        await setEncPasswordCookie(submittedPassword);
-      } catch (cookieError) {
-        log.warn("Failed to persist encrypted password cookie after auth", {
-          error: cookieError,
+  async function finalizePasswordAuth(submittedPassword: string) {
+    storePendingAuthPassword(submittedPassword);
+    try {
+      await setEncPasswordCookie(submittedPassword);
+    } catch (cookieError) {
+      log.warn("Failed to persist encrypted password cookie after auth", {
+        error: cookieError,
+      });
+    }
+
+    const authStatus = await refreshAuthStatus();
+    if (!authStatus.authenticated) {
+      await recoverFromStaleAuthState("post-sign-in-unsettled");
+      dispatchChrome({
+        type: "set-error",
+        error:
+          "Your sign-in could not be confirmed. Local browser state was reset — please try again.",
+      });
+      return false;
+    }
+
+    if (authStatus.requiresPasskeyStepUp) {
+      if (isPasskeySupported) {
+        triggerAutoPasskeyStepUp();
+      } else {
+        dispatchChrome({
+          type: "set-notice",
+          notice:
+            "Password accepted. Check your device to finish signing in with your passkey.",
         });
       }
+      return false;
+    }
 
-      const authStatus = await refreshAuthStatus();
-      if (authStatus.requiresPasskeyStepUp) {
-        if (isPasskeySupported) {
-          triggerAutoPasskeyStepUp();
-        } else {
-          setNotice(
-            "Password accepted. Check your device to finish signing in with your passkey.",
-          );
-          setShouldAutoPromptPasskey(true);
-        }
-        return false;
-      }
+    await syncThemeAfterAuth();
+    redirectAfterCompletedAuth();
+    return true;
+  }
 
-      await syncThemeAfterAuth();
-      redirectAfterCompletedAuth();
-      return true;
-    },
-    [
-      isPasskeySupported,
-      redirectAfterCompletedAuth,
-      refreshAuthStatus,
-      syncThemeAfterAuth,
-      triggerAutoPasskeyStepUp,
-    ],
-  );
+  async function resolveAvailableSignupEmail(rawDesiredEmail: string) {
+    const normalizedDesiredEmail = normalizeFormValue(rawDesiredEmail);
 
-  const resolveAvailableSignupEmail = useCallback(
-    async (rawDesiredEmail: string) => {
-      const normalizedDesiredEmail = normalizeFormValue(rawDesiredEmail);
+    if (!normalizedDesiredEmail) {
+      dispatchChrome({
+        type: "set-error",
+        error: `Please choose your @${signupDomain} email.`,
+      });
+      return null;
+    }
 
-      if (!normalizedDesiredEmail) {
-        setError(`Please choose your @${signupDomain} email.`);
-        return null;
-      }
+    const availability = await accountApiService.checkEmailAvailability(
+      normalizedDesiredEmail,
+    );
 
-      const availability = await accountApiService.checkEmailAvailability(
-        normalizedDesiredEmail,
-      );
+    if (!availability.available) {
+      dispatchChrome({ type: "set-error", error: availability.message });
+      return null;
+    }
 
-      if (!availability.available) {
-        setError(availability.message);
-        return null;
-      }
+    return availability;
+  }
 
-      return availability;
-    },
-    [signupDomain],
-  );
+  async function claimRequiredInvite(normalizedEmail: string) {
+    const trimmedToken = inviteToken.trim();
+    if (!trimmedToken) {
+      dispatchChrome({
+        type: "set-error",
+        error: "An invite token is required to create an account.",
+      });
+      return false;
+    }
 
-  const claimRequiredInvite = useCallback(
-    async (normalizedEmail: string) => {
-      const trimmedToken = inviteToken.trim();
-      if (!trimmedToken) {
-        setError("An invite token is required to create an account.");
-        return false;
-      }
+    const claimResult = await inviteApiService.claimInviteToken(
+      trimmedToken,
+      normalizedEmail,
+    );
 
-      const claimResult = await inviteApiService.claimInviteToken(
-        trimmedToken,
-        normalizedEmail,
-      );
+    if (!claimResult.success) {
+      dispatchChrome({
+        type: "set-error",
+        error: (claimResult as { success: false; reason: string }).reason,
+      });
+      return false;
+    }
 
-      if (!claimResult.success) {
-        setError((claimResult as { success: false; reason: string }).reason);
-        return false;
-      }
+    return true;
+  }
 
-      return true;
-    },
-    [inviteToken],
-  );
-
-  const handleEmailAuth = async (e: React.FormEvent) => {
+  async function handleEmailAuth(e: React.FormEvent) {
     e.preventDefault();
     const normalizedEmail = normalizeFormValue(email);
     const trimmedName = name.trim();
 
     if (!password) {
-      setError("Please enter your password.");
-      return;
-    }
-
-    try {
-      setEmailLoading(true);
-      setError(null);
-      setNotice(null);
-
-      if (isSignUp) {
-        if (!trimmedName) {
-          setError("Please enter your name.");
-          return;
-        }
-
-        if (!meetsMinPasswordRequirements(password)) {
-          setError(
-            "Your password doesn't meet the requirements. Please check the list below.",
-          );
-          return;
-        }
-
-        const availability = await resolveAvailableSignupEmail(desiredEmail);
-        if (!availability) {
-          return;
-        }
-
-        if (!(await claimRequiredInvite(availability.normalizedEmail))) {
-          return;
-        }
-
-        const result = await signUp.email({
-          email: availability.normalizedEmail,
-          password,
-          name: trimmedName,
-        });
-
-        if (result?.error) {
-          setError(result.error.message || "Sign up failed. Please try again.");
-          return;
-        }
-
-        setEmail(availability.normalizedEmail);
-      } else {
-        if (!normalizedEmail) {
-          setError("Please enter your account email address.");
-          return;
-        }
-
-        const result = await signIn.email({
-          email: normalizedEmail,
-          password,
-        });
-
-        if (result?.error) {
-          setError(result.error.message || "Invalid email or password.");
-          return;
-        }
-      }
-
-      await finalizePasswordAuth(password);
-    } catch (err: any) {
-      log.error("Email auth failed:", err);
-      clearAuthPasswords();
-      clearEncPasswordCookie();
-      setError(
-        getErrorMessage(err, "Authentication failed. Please try again."),
-      );
-    } finally {
-      setEmailLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setEmailLoading(true);
-    setError(null);
-    setNotice(null);
-
-    if (!email.trim()) {
-      setError("Please enter your email address.");
-      setEmailLoading(false);
-      return;
-    }
-
-    try {
-      const redirectTo = new URL("/reset-password", getAppBaseUrl()).toString();
-      const result = await authClient.requestPasswordReset({
-        email: email.trim(),
-        redirectTo,
+      dispatchChrome({
+        type: "set-error",
+        error: "Please enter your password.",
       });
+      return;
+    }
 
-      if (result?.error) {
-        setError(
-          result.error.message ||
-            "Unable to send a password reset link for your email sign-in password.",
-        );
+    dispatchChrome({ type: "start-email-auth" });
+
+    if (isSignUp) {
+      if (!trimmedName) {
+        dispatchChrome({
+          type: "set-error",
+          error: "Please enter your name.",
+        });
+        dispatchChrome({ type: "finish-email-auth" });
         return;
       }
 
-      setNotice(
-        "If an account exists for that email, Solace sent a password reset link for your email sign-in password.",
-      );
-    } catch (err: any) {
-      log.error("Password reset request failed:", err);
-      setError(
-        err.message ||
-          "Unable to send a password reset link for your email sign-in password.",
-      );
-    } finally {
-      setEmailLoading(false);
+      if (!meetsMinPasswordRequirements(password)) {
+        dispatchChrome({
+          type: "set-error",
+          error:
+            "Your password doesn't meet the requirements. Please check the list below.",
+        });
+        dispatchChrome({ type: "finish-email-auth" });
+        return;
+      }
+
+      const availability = await resolveAvailableSignupEmail(desiredEmail);
+      if (!availability) {
+        dispatchChrome({ type: "finish-email-auth" });
+        return;
+      }
+
+      if (!(await claimRequiredInvite(availability.normalizedEmail))) {
+        dispatchChrome({ type: "finish-email-auth" });
+        return;
+      }
+
+      const signUpResult = await signUp.email({
+        email: availability.normalizedEmail,
+        password,
+        name: trimmedName,
+      });
+
+      if (signUpResult?.error) {
+        dispatchChrome({
+          type: "set-error",
+          error: signUpResult.error.message || "Sign up failed. Please try again.",
+        });
+        dispatchChrome({ type: "finish-email-auth" });
+        return;
+      }
+
+      dispatchFields({
+        type: "set-email",
+        email: availability.normalizedEmail,
+      });
+    } else {
+      if (!normalizedEmail) {
+        dispatchChrome({
+          type: "set-error",
+          error: "Please enter your account email address.",
+        });
+        dispatchChrome({ type: "finish-email-auth" });
+        return;
+      }
+
+      clearOrphanedClientAuthArtifacts();
+
+      let signInResult: Awaited<ReturnType<typeof signIn.email>> | undefined;
+      try {
+        signInResult = await signIn.email({
+          email: normalizedEmail,
+          password,
+        });
+      } catch (err: any) {
+        log.error("Email auth failed:", err);
+        await recoverFromStaleAuthState("post-sign-in-unsettled");
+        dispatchChrome({
+          type: "set-error",
+          error: getErrorMessage(err, "Authentication failed. Please try again."),
+        });
+        dispatchChrome({ type: "finish-email-auth" });
+        return;
+      }
+
+      if (signInResult?.error) {
+        dispatchChrome({
+          type: "set-error",
+          error: signInResult.error.message || "Invalid email or password.",
+        });
+        dispatchChrome({ type: "finish-email-auth" });
+        return;
+      }
     }
+
+    try {
+      await finalizePasswordAuth(password);
+    } catch (err: any) {
+      log.error("Email auth failed:", err);
+      await recoverFromStaleAuthState("post-sign-in-unsettled");
+      dispatchChrome({
+        type: "set-error",
+        error: getErrorMessage(err, "Authentication failed. Please try again."),
+      });
+    }
+
+    dispatchChrome({ type: "finish-email-auth" });
   };
 
-  useEffect(() => {
-    if (!requiresPasskeyStepUp) {
-      hasAutoPromptedStepUpRef.current = false;
-      queueMicrotask(() => setShouldAutoPromptPasskey(false));
+  async function handleForgotPassword(event: React.FormEvent) {
+    event.preventDefault();
+    dispatchChrome({ type: "start-email-auth" });
+
+    if (!email.trim()) {
+      dispatchChrome({
+        type: "set-error",
+        error: "Please enter your email address.",
+      });
+      dispatchChrome({ type: "finish-email-auth" });
       return;
     }
 
-    if (
-      !shouldAutoPromptPasskey ||
-      !isPasskeySupported ||
-      passkeyLoading ||
-      authMode === "forgot-password" ||
-      hasAutoPromptedStepUpRef.current
-    ) {
+    const resetResult = await requestPasswordResetForLogin(
+      email.trim(),
+      new URL("/reset-password", getAppBaseUrl()).toString(),
+    );
+
+    if (resetResult.errorMessage) {
+      dispatchChrome({ type: "set-error", error: resetResult.errorMessage });
+      dispatchChrome({ type: "finish-email-auth" });
       return;
     }
 
-    triggerAutoPasskeyStepUp();
-  }, [
-    authMode,
-    isPasskeySupported,
-    passkeyLoading,
-    requiresPasskeyStepUp,
-    shouldAutoPromptPasskey,
-    triggerAutoPasskeyStepUp,
-  ]);
+    dispatchChrome({ type: "set-notice", notice: resetResult.notice });
+    dispatchChrome({ type: "finish-email-auth" });
+  };
 
   const title = isForgotPassword
     ? "Reset your email sign-in password"
@@ -871,7 +1005,9 @@ export function LoginForm() {
                       autoComplete="name"
                       placeholder="Enter your name"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) =>
+                        dispatchFields({ type: "set-name", name: e.target.value })
+                      }
                       required={isSignUp}
                       disabled={emailLoading}
                       className="h-11 rounded-lg"
@@ -905,7 +1041,12 @@ export function LoginForm() {
                         spellCheck={false}
                         placeholder="your-name"
                         value={desiredEmail}
-                        onChange={(e) => setDesiredEmail(e.target.value)}
+                        onChange={(e) =>
+                          dispatchFields({
+                            type: "set-desired-email",
+                            desiredEmail: e.target.value,
+                          })
+                        }
                         required={isSignUp}
                         disabled={emailLoading}
                         className="h-full flex-1 rounded-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -965,7 +1106,12 @@ export function LoginForm() {
                         spellCheck={false}
                         placeholder="Paste your invite token"
                         value={inviteToken}
-                        onChange={(e) => setInviteToken(e.target.value)}
+                        onChange={(e) =>
+                          dispatchFields({
+                            type: "set-invite-token",
+                            inviteToken: e.target.value,
+                          })
+                        }
                         disabled={emailLoading}
                         className={`h-11 rounded-lg pl-9 transition-colors ${
                           inviteValidation === null
@@ -1021,7 +1167,12 @@ export function LoginForm() {
                       autoComplete="email"
                       placeholder={`you@${signupDomain}`}
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) =>
+                        dispatchFields({
+                          type: "set-email",
+                          email: e.target.value,
+                        })
+                      }
                       required={!isSignUp}
                       disabled={emailLoading}
                       className="h-11 rounded-lg"
@@ -1055,14 +1206,21 @@ export function LoginForm() {
                         }
                         placeholder="Enter your password"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) =>
+                          dispatchFields({
+                            type: "set-password",
+                            password: e.target.value,
+                          })
+                        }
                         required={!isForgotPassword}
                         disabled={emailLoading}
                         className="h-11 rounded-lg pr-10"
                       />
                       <button
                         type="button"
-                        onClick={() => setShowPassword(!showPassword)}
+                        onClick={() =>
+                          dispatchFields({ type: "toggle-show-password" })
+                        }
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
                         aria-label={
                           showPassword ? "Hide password" : "Show password"
