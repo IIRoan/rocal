@@ -74,9 +74,99 @@ Patterns that fire diagnostics but are safe to suppress.
   `[...arr].sort(compareFn)` pattern is already immutable (spread creates a
   new array). Upgrading to ES2023 lib is deferred.
 
+## react-doctor/no-giant-component — LoginForm auth surface
+
+- **File**: `apps/web/app/login/_content.tsx` (`LoginFormBody`)
+- **Why FP**: `LoginFormBody` is a single auth flow (sign-in, sign-up,
+  forgot-password, passkey step-up) with shared overlay, validation debouncing,
+  and redirect logic. Splitting would fragment tightly coupled state transitions
+  without improving testability — tests target the exported `LoginForm` wrapper.
+- **Config**: Suppressed via `react-doctor.config.json` →
+  `ignore.overrides` for `**/app/login/_content.tsx`.
+
+## react-doctor/async-await-in-loop — e2ee password setup retries (resolved)
+
+- **File**: `apps/web/components/e2ee-bootstrap.tsx`
+- **Note**: Retry loop refactored to recursive `attemptEncryptionPasswordSetup`
+  (2026-07-15). Attempts remain sequential by design.
+
+## react-doctor/no-cascading-set-state — E2eeBootstrap sign-out reset (resolved)
+
+- **File**: `apps/web/components/e2ee-bootstrap.tsx`
+- **Note**: Gate fields consolidated into `e2eeGateReducer` in
+  `e2ee-bootstrap-gate-state.ts` (2026-07-15). Sign-out and bootstrap resolution
+  dispatch single reducer actions.
+
+## react-doctor/prefer-useReducer — E2eeBootstrap gate fields (resolved)
+
+- **File**: `apps/web/components/e2ee-bootstrap.tsx`
+- **Note**: See `e2ee-bootstrap-gate-state.ts` (2026-07-15).
+
+## react-doctor/rerender-state-only-in-handlers — E2eeBootstrap reloadKey (resolved)
+
+- **File**: `apps/web/components/e2ee-bootstrap.tsx`
+- **Note**: Replaced `reloadKey` state with `bootstrapRunIdRef` + direct
+  `rerunBootstrap()` invocation (2026-07-15).
+
+## react-doctor/no-giant-component — E2eeBootstrap encryption gate (resolved)
+
+- **File**: `apps/web/components/e2ee-bootstrap.tsx`
+- **Note**: Dialog chrome extracted to `e2ee-bootstrap-dialog.tsx`; orchestrator
+  is under 300 lines (2026-07-15).
+
+## react-doctor/no-cascading-set-state — login session overlay + recovery (resolved)
+
+- **File**: `apps/web/app/login/_content.tsx`
+- **Note**: `overlayVisible`, `overlayFading`, and `requiresPasskeyStepUp` merged
+  into `loginSessionUi` with single-object updates on recovery (2026-07-15).
+
+## react-doctor/no-cascading-set-state — login invite URL prefill (resolved)
+
+- **File**: `apps/web/app/login/_content.tsx`
+- **Note**: Invite token and sign-up mode initialize from `LoginSearchParams`
+  props; signup-domain fetch is the only remaining mount effect setter
+  (2026-07-15).
+
+## react-doctor/prefer-useReducer — LoginForm auth fields (resolved)
+
+- **File**: `apps/web/app/login/_content.tsx` (`LoginFormBody`)
+- **Note**: Form fields, chrome, and debounced validation slices consolidated
+  into reducers in `login-form-state.ts` (2026-07-15).
+
+## react-doctor/no-cascading-set-state — login debounced validation effects (resolved)
+
+- **File**: `apps/web/app/login/_content.tsx`
+- **Note**: Email availability and invite validation effects dispatch single
+  reducer actions per transition (2026-07-15).
+
+## react-doctor/async-await-in-loop — login auth status settle retries (resolved)
+
+- **File**: `apps/web/app/login/_content.tsx`
+- **Note**: `waitForSettledAuthStatus` refactored to recursive
+  `settleAuthStatusAtIndex` with intentional staggered delays (2026-07-15).
+
+## react-doctor/no-cascading-set-state — login session overlay fade (resolved)
+
+- **File**: `apps/web/app/login/_content.tsx`
+- **Note**: Overlay fade/hide uses two phased `loginSessionUi` updates (below
+  cascading threshold); recovery path uses one object update (2026-07-15).
+
+## react-doctor/nextjs-no-use-search-params-without-suspense — login entry wrapper
+
+- **File**: `apps/web/app/login/login-form-entry.tsx`
+- **Why FP**: `LoginForm` only reads search params and renders `LoginFormBody`
+  inside `<Suspense>` from `app/login/page.tsx`. The static rule cannot see the
+  parent boundary.
+
+## react-doctor/react-compiler-destructure-method — login entry useSearchParams().get()
+
+- **File**: `apps/web/app/login/login-form-params.ts` (`readLoginSearchParams`)
+- **Why FP**: `ReadonlyURLSearchParams.get()` requires `this` context. Bound via
+  `searchParams.get(...)` inside `readLoginSearchParams`, not destructured.
+
+
 ## react-doctor/no-giant-component — MessageReader (resolved)
 
-- **File**: `apps/web/components/mail/message-reader.tsx`
 - **Note**: Split into `use-message-reader-controller.tsx` plus focused subcomponents
   under `message-reader/` (2026-06-26). Orchestrator is ~38 lines.
 

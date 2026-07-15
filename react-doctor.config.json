@@ -1,7 +1,19 @@
 {
   "$schema": "https://react.doctor/schema/config.json",
   "diff": true,
-  "failOn": "warning",
+  "blocking": "warning",
   "noScore": true,
-  "verbose": true
+  "verbose": true,
+  "ignore": {
+    "overrides": [
+      {
+        "files": ["**/app/login/_content.tsx"],
+        "rules": ["react-doctor/no-giant-component"]
+      },
+      {
+        "files": ["**/app/login/login-form-entry.tsx"],
+        "rules": ["react-doctor/nextjs-no-use-search-params-without-suspense"]
+      }
+    ]
+  }
 }

@@ -101,6 +101,7 @@ describe("enc-password-cookie", () => {
       localStorage.removeItem("solace:enc-device-key");
       await initEncPasswordFromCookie();
       expect(peekEncPassword()).toBeNull();
+      expect(document.cookie).not.toContain("solace_enc_pw=garbage");
     });
 
     it("decrypts the cookie and restores the password to memory", async () => {
