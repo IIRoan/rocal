@@ -77,20 +77,26 @@ export async function reconcileAuthSession(input: {
     return { status: "unauthenticated" };
   }
 
-  try {
-    const authStatus = await accountApiService.getAuthStatus();
+  const retryDelaysMs = [0, 100, 250, 500] as const;
 
-    if (authStatus.authenticated) {
-      return { status: "authenticated" };
+  for (const delayMs of retryDelaysMs) {
+    if (delayMs > 0) {
+      await new Promise((resolve) => window.setTimeout(resolve, delayMs));
     }
-  } catch (error) {
-    log.warn("Auth status check failed during session reconciliation", {
-      error,
-    });
+
+    try {
+      const authStatus = await accountApiService.getAuthStatus();
+
+      if (authStatus.authenticated) {
+        return { status: "authenticated" };
+      }
+    } catch (error) {
+      log.warn("Auth status check failed during session reconciliation", {
+        error,
+      });
+    }
   }
 
-  await recoverFromStaleAuthState(
-    input.reason ?? "session-mismatch",
-  );
+  await recoverFromStaleAuthState(input.reason ?? "session-mismatch");
   return { status: "recovered" };
 }

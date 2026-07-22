@@ -49,7 +49,9 @@ import type { LoginSearchParams } from "./login-form-params";
 
 const log = createLogger("login");
 const DEFAULT_SIGNUP_DOMAIN = "solace.onl";
-const AUTH_STATUS_RETRY_DELAYS_MS = [0, 75, 150, 300, 500] as const;
+const AUTH_STATUS_RETRY_DELAYS_MS = [0, 100, 250, 500, 1000, 1500] as const;
+const LOCAL_STATE_RESET_MESSAGE =
+  "Your sign-in could not be confirmed. Local browser state was reset — please try again.";
 const FIELD_VALIDATION_DEBOUNCE_MS = 500;
 
 async function fetchSignupEmailAvailability(trimmed: string) {
@@ -108,6 +110,7 @@ async function settleAuthStatusAtIndex(
   refreshAuthStatus: () => Promise<AuthStatusResult>,
   index: number,
   lastStatus: AuthStatusResult | null,
+  options?: { allowPasskeyStepUp?: boolean },
 ): Promise<AuthStatusResult | null> {
   if (index >= AUTH_STATUS_RETRY_DELAYS_MS.length) {
     return lastStatus;
@@ -120,17 +123,32 @@ async function settleAuthStatusAtIndex(
 
   const authStatus = await refreshAuthStatus();
 
-  if (authStatus.authenticated && !authStatus.requiresPasskeyStepUp) {
+  if (!authStatus.authenticated) {
+    return settleAuthStatusAtIndex(
+      refreshAuthStatus,
+      index + 1,
+      authStatus,
+      options,
+    );
+  }
+
+  if (options?.allowPasskeyStepUp || !authStatus.requiresPasskeyStepUp) {
     return authStatus;
   }
 
-  return settleAuthStatusAtIndex(refreshAuthStatus, index + 1, authStatus);
+  return settleAuthStatusAtIndex(
+    refreshAuthStatus,
+    index + 1,
+    authStatus,
+    options,
+  );
 }
 
 async function waitForSettledAuthStatus(
   refreshAuthStatus: () => Promise<AuthStatusResult>,
+  options?: { allowPasskeyStepUp?: boolean },
 ): Promise<AuthStatusResult | null> {
-  return settleAuthStatusAtIndex(refreshAuthStatus, 0, null);
+  return settleAuthStatusAtIndex(refreshAuthStatus, 0, null, options);
 }
 
 type LoginSessionUi = {
@@ -504,8 +522,10 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     return authStatus;
   }
 
-  async function waitForSettledAuthStatusForLogin() {
-    return waitForSettledAuthStatus(refreshAuthStatus);
+  async function waitForSettledAuthStatusForLogin(
+    options?: { allowPasskeyStepUp?: boolean },
+  ) {
+    return waitForSettledAuthStatus(refreshAuthStatus, options);
   }
 
   const handleSessionRedirectRef = useRef<(() => Promise<void>) | null>(null);
@@ -687,13 +707,16 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
       });
     }
 
-    const authStatus = await refreshAuthStatus();
-    if (!authStatus.authenticated) {
+    // Wait for the session cookie to become visible to auth-status before
+    // treating an unsettled response as corrupt local state.
+    const authStatus = await waitForSettledAuthStatusForLogin({
+      allowPasskeyStepUp: true,
+    });
+    if (!authStatus?.authenticated) {
       await recoverFromStaleAuthState("post-sign-in-unsettled");
       dispatchChrome({
         type: "set-error",
-        error:
-          "Your sign-in could not be confirmed. Local browser state was reset — please try again.",
+        error: LOCAL_STATE_RESET_MESSAGE,
       });
       return false;
     }
