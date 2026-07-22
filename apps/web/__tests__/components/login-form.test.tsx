@@ -313,6 +313,8 @@ describe("LoginForm", () => {
       }
     ).PublicKeyCredential = function PublicKeyCredential() {} as any;
     mockCompleteAuthNavigation.mockReset();
+    mockRecoverFromStaleAuthState.mockClear();
+    mockClearOrphanedClientAuthArtifacts.mockClear();
   });
 
   afterEach(() => {
@@ -321,6 +323,7 @@ describe("LoginForm", () => {
     });
     container.remove();
     jest.clearAllMocks();
+    jest.useRealTimers();
   });
 
   async function renderForm() {
@@ -833,5 +836,90 @@ describe("LoginForm", () => {
     });
 
     expect(mockClearOrphanedClientAuthArtifacts).toHaveBeenCalled();
+  });
+
+  it("waits for auth status to settle before wiping local state after password sign-in", async () => {
+    jest.useFakeTimers();
+    mockGetAuthStatus
+      .mockResolvedValueOnce({
+        authenticated: false,
+        hasPasskeys: false,
+        requiresPasskeyStepUp: false,
+      })
+      .mockResolvedValueOnce({
+        authenticated: true,
+        hasPasskeys: false,
+        requiresPasskeyStepUp: false,
+      });
+
+    await renderForm();
+
+    const emailInput = container.querySelector(
+      "#email",
+    ) as HTMLInputElement | null;
+    const passwordInput = container.querySelector(
+      "#password",
+    ) as HTMLInputElement | null;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Sign in"),
+    );
+
+    await act(async () => {
+      setInputValue(emailInput as HTMLInputElement, "roan@solace.onl");
+      setInputValue(passwordInput as HTMLInputElement, "Secret123!");
+      submitButton?.click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(100);
+      await Promise.resolve();
+    });
+
+    expect(mockRecoverFromStaleAuthState).not.toHaveBeenCalled();
+    expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("Secret123!");
+    expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("Secret123!");
+    expect(mockCompleteAuthNavigation).toHaveBeenCalled();
+  });
+
+  it("resets local browser state when auth status never becomes authenticated", async () => {
+    jest.useFakeTimers();
+    mockGetAuthStatus.mockResolvedValue({
+      authenticated: false,
+      hasPasskeys: false,
+      requiresPasskeyStepUp: false,
+    });
+
+    await renderForm();
+
+    const emailInput = container.querySelector(
+      "#email",
+    ) as HTMLInputElement | null;
+    const passwordInput = container.querySelector(
+      "#password",
+    ) as HTMLInputElement | null;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Sign in"),
+    );
+
+    await act(async () => {
+      setInputValue(emailInput as HTMLInputElement, "roan@solace.onl");
+      setInputValue(passwordInput as HTMLInputElement, "Secret123!");
+      submitButton?.click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(4000);
+      await Promise.resolve();
+    });
+
+    expect(mockRecoverFromStaleAuthState).toHaveBeenCalledWith(
+      "post-sign-in-unsettled",
+    );
+    expect(container.textContent).toContain(
+      "Your sign-in could not be confirmed. Local browser state was reset — please try again.",
+    );
+    expect(mockCompleteAuthNavigation).not.toHaveBeenCalled();
   });
 });

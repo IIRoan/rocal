@@ -70,6 +70,7 @@ describe("auth-local-state", () => {
 
   afterEach(() => {
     jest.resetModules();
+    jest.useRealTimers();
   });
 
   it("clears all Solace client auth artifacts", () => {
@@ -89,29 +90,57 @@ describe("auth-local-state", () => {
   });
 
   it("recovers when the client session is not confirmed by the server", async () => {
-    mockGetAuthStatus.mockResolvedValueOnce({
+    jest.useFakeTimers();
+    mockGetAuthStatus.mockResolvedValue({
       authenticated: false,
       hasPasskeys: false,
       requiresPasskeyStepUp: false,
     } as never);
 
-    const result = await reconcileAuthSession({
+    const resultPromise = reconcileAuthSession({
       hasClientSession: true,
       reason: "session-mismatch",
     });
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
 
     expect(result).toEqual({ status: "recovered" });
+    expect(mockGetAuthStatus.mock.calls.length).toBeGreaterThan(1);
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(mockClearAuthPasswords).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
   });
 
   it("recovers when auth-status cannot be reached", async () => {
-    mockGetAuthStatus.mockRejectedValueOnce(new Error("network") as never);
+    jest.useFakeTimers();
+    mockGetAuthStatus.mockRejectedValue(new Error("network") as never);
 
-    const result = await reconcileAuthSession({ hasClientSession: true });
+    const resultPromise = reconcileAuthSession({ hasClientSession: true });
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
 
     expect(result).toEqual({ status: "recovered" });
     expect(mockSignOut).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
+  it("keeps the session when auth-status succeeds after a transient failure", async () => {
+    jest.useFakeTimers();
+    mockGetAuthStatus
+      .mockRejectedValueOnce(new Error("network") as never)
+      .mockResolvedValueOnce({
+        authenticated: true,
+        hasPasskeys: false,
+        requiresPasskeyStepUp: false,
+      } as never);
+
+    const resultPromise = reconcileAuthSession({ hasClientSession: true });
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(result).toEqual({ status: "authenticated" });
+    expect(mockSignOut).not.toHaveBeenCalled();
+    jest.useRealTimers();
   });
 
   it("signs out and clears local state even when server sign-out fails", async () => {
