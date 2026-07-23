@@ -114,6 +114,10 @@ describe("accountRoutes", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
+    expect(mockGetSession).toHaveBeenCalledWith({
+      headers: expect.any(Headers),
+      query: { disableCookieCache: true },
+    });
     await expect(readJson(response)).resolves.toEqual({
       authenticated: false,
       hasPasskeys: false,

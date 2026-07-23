@@ -25,7 +25,7 @@ async function reconcileAuthenticatedUser(
  * Mirrors the native AuthProvider startup reconciliation flow.
  */
 export function AuthSessionGuard() {
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending, refetch: refetchSession } = useSession();
   const lastReconciledUserIdRef = useRef<string | null>(null);
   const isRecoveringRef = useRef(false);
 
@@ -50,15 +50,23 @@ export function AuthSessionGuard() {
 
     void (async () => {
       isRecoveringRef.current = true;
+      try {
+        const outcome = await reconcileAuthenticatedUser(
+          userId,
+          () => cancelled,
+        );
 
-      const outcome = await reconcileAuthenticatedUser(userId, () => cancelled);
-
-      if (!cancelled) {
-        if (outcome === "recovered") {
-          lastReconciledUserIdRef.current = null;
-        } else {
-          lastReconciledUserIdRef.current = userId;
+        if (!cancelled) {
+          if (outcome === "recovered") {
+            lastReconciledUserIdRef.current = null;
+            await refetchSession?.({
+              query: { disableCookieCache: true },
+            });
+          } else {
+            lastReconciledUserIdRef.current = userId;
+          }
         }
+      } finally {
         isRecoveringRef.current = false;
       }
     })();
@@ -66,7 +74,7 @@ export function AuthSessionGuard() {
     return () => {
       cancelled = true;
     };
-  }, [isPending, session?.user?.id]);
+  }, [isPending, refetchSession, session?.user?.id]);
 
   return null;
 }

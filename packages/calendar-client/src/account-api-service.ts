@@ -45,6 +45,8 @@ export class AccountApiService {
   async getAuthStatus(): Promise<AuthStatusResponse> {
     return this.client.get<AuthStatusResponse>("/api/account/auth-status", {
       cache: "no-store",
+      retries: 0,
+      timeout: 2_000,
     });
   }
 }

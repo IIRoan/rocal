@@ -29,7 +29,6 @@ import {
 } from "@/lib/enc-password-cookie";
 import {
   clearOrphanedClientAuthArtifacts,
-  recoverFromStaleAuthState,
   reconcileAuthSession,
 } from "@/lib/auth-local-state";
 import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
@@ -49,9 +48,7 @@ import type { LoginSearchParams } from "./login-form-params";
 
 const log = createLogger("login");
 const DEFAULT_SIGNUP_DOMAIN = "solace.onl";
-const AUTH_STATUS_RETRY_DELAYS_MS = [0, 100, 250, 500, 1000, 1500] as const;
-const LOCAL_STATE_RESET_MESSAGE =
-  "Your sign-in could not be confirmed. Local browser state was reset — please try again.";
+const AUTH_STATUS_RETRY_DELAYS_MS = [0, 150, 400] as const;
 const FIELD_VALIDATION_DEBOUNCE_MS = 500;
 
 async function fetchSignupEmailAvailability(trimmed: string) {
@@ -102,6 +99,19 @@ async function requestPasswordResetForLogin(email: string, redirectTo: string) {
   }
 }
 
+async function findAuthenticatedSessionForEmail(normalizedEmail: string) {
+  try {
+    const result = await authClient.getSession({
+      query: { disableCookieCache: true },
+    });
+    const sessionEmail = result?.data?.user?.email?.trim().toLowerCase();
+
+    return sessionEmail === normalizedEmail ? result.data : null;
+  } catch {
+    return null;
+  }
+}
+
 type AuthStatusResult = Awaited<
   ReturnType<typeof accountApiService.getAuthStatus>
 >;
@@ -121,7 +131,17 @@ async function settleAuthStatusAtIndex(
     await new Promise((resolve) => window.setTimeout(resolve, delayMs));
   }
 
-  const authStatus = await refreshAuthStatus();
+  let authStatus: AuthStatusResult;
+  try {
+    authStatus = await refreshAuthStatus();
+  } catch {
+    return settleAuthStatusAtIndex(
+      refreshAuthStatus,
+      index + 1,
+      lastStatus,
+      options,
+    );
+  }
 
   if (!authStatus.authenticated) {
     return settleAuthStatusAtIndex(
@@ -359,7 +379,11 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
   const hasAutoPromptedStepUpRef = useRef(false);
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  const { data: session, isPending } = useSession();
+  const {
+    data: session,
+    isPending,
+    refetch: refetchSession,
+  } = useSession();
   const router = useSmoothRouter();
   const { theme: currentTheme } = useTheme();
   const isCheckingSession = isPending;
@@ -546,6 +570,9 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     });
 
     if (reconciliation.status === "recovered") {
+      await refetchSession?.({
+        query: { disableCookieCache: true },
+      });
       setLoginSessionUi({
         overlayVisible: false,
         overlayFading: true,
@@ -555,9 +582,15 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
       return;
     }
 
-    const authStatus = await refreshAuthStatus();
+    if (reconciliation.status === "unauthenticated") {
+      return;
+    }
 
-    if (authStatus.authenticated && !authStatus.requiresPasskeyStepUp) {
+    const authStatus = await waitForSettledAuthStatusForLogin({
+      allowPasskeyStepUp: true,
+    });
+
+    if (!authStatus?.authenticated || !authStatus.requiresPasskeyStepUp) {
       redirectAfterAuth();
     }
   }
@@ -665,16 +698,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
     const authStatus = await waitForSettledAuthStatusForLogin();
 
-    if (!authStatus?.authenticated) {
-      dispatchChrome({
-        type: "set-error",
-        error: "Your session could not be confirmed. Please try again.",
-      });
-      dispatchChrome({ type: "finish-passkey-auth" });
-      return;
-    }
-
-    if (authStatus.requiresPasskeyStepUp) {
+    if (authStatus?.authenticated && authStatus.requiresPasskeyStepUp) {
       dispatchChrome({
         type: "set-error",
         error: "Passkey verification is still required. Please try again.",
@@ -707,21 +731,14 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
       });
     }
 
-    // Wait for the session cookie to become visible to auth-status before
-    // treating an unsettled response as corrupt local state.
+    // The credential response is authoritative. Auth status is a
+    // non-destructive follow-up used only to decide whether passkey step-up is
+    // required; a delayed or unavailable status endpoint must not undo login.
     const authStatus = await waitForSettledAuthStatusForLogin({
       allowPasskeyStepUp: true,
     });
-    if (!authStatus?.authenticated) {
-      await recoverFromStaleAuthState("post-sign-in-unsettled");
-      dispatchChrome({
-        type: "set-error",
-        error: LOCAL_STATE_RESET_MESSAGE,
-      });
-      return false;
-    }
 
-    if (authStatus.requiresPasskeyStepUp) {
+    if (authStatus?.authenticated && authStatus.requiresPasskeyStepUp) {
       if (isPasskeySupported) {
         triggerAutoPasskeyStepUp();
       } else {
@@ -872,23 +889,35 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
           password,
         });
       } catch (err: any) {
-        log.error("Email auth failed:", err);
-        await recoverFromStaleAuthState("post-sign-in-unsettled");
-        dispatchChrome({
-          type: "set-error",
-          error: getErrorMessage(err, "Authentication failed. Please try again."),
-        });
-        dispatchChrome({ type: "finish-email-auth" });
-        return;
+        const recoveredSession =
+          await findAuthenticatedSessionForEmail(normalizedEmail);
+
+        if (!recoveredSession) {
+          log.error("Email auth failed:", err);
+          dispatchChrome({
+            type: "set-error",
+            error: getErrorMessage(
+              err,
+              "Authentication failed. Please try again.",
+            ),
+          });
+          dispatchChrome({ type: "finish-email-auth" });
+          return;
+        }
       }
 
       if (signInResult?.error) {
-        dispatchChrome({
-          type: "set-error",
-          error: signInResult.error.message || "Invalid email or password.",
-        });
-        dispatchChrome({ type: "finish-email-auth" });
-        return;
+        const recoveredSession =
+          await findAuthenticatedSessionForEmail(normalizedEmail);
+
+        if (!recoveredSession) {
+          dispatchChrome({
+            type: "set-error",
+            error: signInResult.error.message || "Invalid email or password.",
+          });
+          dispatchChrome({ type: "finish-email-auth" });
+          return;
+        }
       }
     }
 
@@ -896,7 +925,6 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
       await finalizePasswordAuth(password);
     } catch (err: any) {
       log.error("Email auth failed:", err);
-      await recoverFromStaleAuthState("post-sign-in-unsettled");
       dispatchChrome({
         type: "set-error",
         error: getErrorMessage(err, "Authentication failed. Please try again."),
