@@ -1,6 +1,5 @@
 import { createLogger } from "@workspace/logger";
-import { signOut } from "@/lib/auth-client";
-import { accountApiService } from "@/lib/account-api-service";
+import { authClient, signOut } from "@/lib/auth-client";
 import { clearAuthPasswords } from "@/lib/e2ee-password-cache";
 import {
   clearEncPasswordCookie,
@@ -10,11 +9,7 @@ import { resetE2eeBootstrap } from "@/lib/e2ee-bootstrap";
 
 const log = createLogger("auth-local-state");
 
-export type AuthRecoveryReason =
-  | "session-mismatch"
-  | "auth-status-unavailable"
-  | "post-sign-in-unsettled"
-  | "login-page-reconcile";
+export type AuthRecoveryReason = "session-mismatch" | "login-page-reconcile";
 
 /**
  * Remove Solace-specific client artifacts that should never survive sign-out
@@ -49,24 +44,17 @@ export async function signOutAndClearLocalState(): Promise<void> {
   clearSolaceClientAuthArtifacts();
 }
 
-/**
- * Recover from stale Better Auth cookies or mismatched encryption artifacts.
- */
-export async function recoverFromStaleAuthState(
-  reason: AuthRecoveryReason,
-): Promise<void> {
-  log.info("Recovering from stale client auth state", { reason });
-  await signOutAndClearLocalState();
-}
-
 export type AuthSessionReconciliation =
   | { status: "authenticated" }
   | { status: "unauthenticated" }
-  | { status: "recovered" };
+  | { status: "recovered" }
+  | { status: "unavailable" };
 
 /**
- * Compare the Better Auth client session with the server auth-status endpoint
- * and self-heal when they disagree.
+ * Validate Better Auth's cached client session against its durable server-side
+ * session. A failed validation never signs out: network failures are not proof
+ * that the session is invalid, and a stale local session can be replaced by the
+ * next successful sign-in without revoking a newly issued server session.
  */
 export async function reconcileAuthSession(input: {
   hasClientSession: boolean;
@@ -77,26 +65,31 @@ export async function reconcileAuthSession(input: {
     return { status: "unauthenticated" };
   }
 
-  const retryDelaysMs = [0, 100, 250, 500] as const;
+  try {
+    const result = await authClient.getSession({
+      query: { disableCookieCache: true },
+    });
 
-  for (const delayMs of retryDelaysMs) {
-    if (delayMs > 0) {
-      await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+    if (result?.data?.user) {
+      return { status: "authenticated" };
     }
 
-    try {
-      const authStatus = await accountApiService.getAuthStatus();
-
-      if (authStatus.authenticated) {
-        return { status: "authenticated" };
-      }
-    } catch (error) {
-      log.warn("Auth status check failed during session reconciliation", {
-        error,
+    if (result?.error) {
+      log.warn("Session validation failed during reconciliation", {
+        reason: input.reason ?? "session-mismatch",
       });
+      return { status: "unavailable" };
     }
-  }
 
-  await recoverFromStaleAuthState(input.reason ?? "session-mismatch");
-  return { status: "recovered" };
+    log.info("Discarding stale client auth artifacts", {
+      reason: input.reason ?? "session-mismatch",
+    });
+    clearSolaceClientAuthArtifacts();
+    return { status: "recovered" };
+  } catch {
+    log.warn("Session validation was unavailable during reconciliation", {
+      reason: input.reason ?? "session-mismatch",
+    });
+    return { status: "unavailable" };
+  }
 }

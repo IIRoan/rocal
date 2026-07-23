@@ -14,9 +14,12 @@ const mockClearAuthPasswords = jest.fn();
 const mockClearEncPasswordCookie = jest.fn();
 const mockClearOrphanedEncPasswordCookie = jest.fn();
 const mockResetE2eeBootstrap = jest.fn();
-const mockGetAuthStatus = jest.fn();
+const mockGetSession = jest.fn();
 
 jest.mock("@/lib/auth-client", () => ({
+  authClient: {
+    getSession: (...args: unknown[]) => mockGetSession(...args),
+  },
   signOut: (...args: unknown[]) => mockSignOut(...args),
 }));
 
@@ -35,12 +38,6 @@ jest.mock("@/lib/e2ee-bootstrap", () => ({
   resetE2eeBootstrap: (...args: unknown[]) => mockResetE2eeBootstrap(...args),
 }));
 
-jest.mock("@/lib/account-api-service", () => ({
-  accountApiService: {
-    getAuthStatus: (...args: unknown[]) => mockGetAuthStatus(...args),
-  },
-}));
-
 jest.mock("@workspace/logger", () => ({
   createLogger: () => ({
     info: jest.fn(),
@@ -53,7 +50,6 @@ import {
   clearOrphanedClientAuthArtifacts,
   clearSolaceClientAuthArtifacts,
   reconcileAuthSession,
-  recoverFromStaleAuthState,
   signOutAndClearLocalState,
 } from "@/lib/auth-local-state";
 
@@ -61,10 +57,9 @@ describe("auth-local-state", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSignOut.mockResolvedValue(undefined as never);
-    mockGetAuthStatus.mockResolvedValue({
-      authenticated: true,
-      hasPasskeys: false,
-      requiresPasskeyStepUp: false,
+    mockGetSession.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+      error: null,
     } as never);
   });
 
@@ -89,58 +84,57 @@ describe("auth-local-state", () => {
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 
-  it("recovers when the client session is not confirmed by the server", async () => {
-    jest.useFakeTimers();
-    mockGetAuthStatus.mockResolvedValue({
-      authenticated: false,
-      hasPasskeys: false,
-      requiresPasskeyStepUp: false,
-    } as never);
-
-    const resultPromise = reconcileAuthSession({
+  it("validates cached sessions against Better Auth's durable session", async () => {
+    const result = await reconcileAuthSession({
       hasClientSession: true,
       reason: "session-mismatch",
     });
-    await jest.runAllTimersAsync();
-    const result = await resultPromise;
-
-    expect(result).toEqual({ status: "recovered" });
-    expect(mockGetAuthStatus.mock.calls.length).toBeGreaterThan(1);
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
-    expect(mockClearAuthPasswords).toHaveBeenCalledTimes(1);
-    jest.useRealTimers();
-  });
-
-  it("recovers when auth-status cannot be reached", async () => {
-    jest.useFakeTimers();
-    mockGetAuthStatus.mockRejectedValue(new Error("network") as never);
-
-    const resultPromise = reconcileAuthSession({ hasClientSession: true });
-    await jest.runAllTimersAsync();
-    const result = await resultPromise;
-
-    expect(result).toEqual({ status: "recovered" });
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
-    jest.useRealTimers();
-  });
-
-  it("keeps the session when auth-status succeeds after a transient failure", async () => {
-    jest.useFakeTimers();
-    mockGetAuthStatus
-      .mockRejectedValueOnce(new Error("network") as never)
-      .mockResolvedValueOnce({
-        authenticated: true,
-        hasPasskeys: false,
-        requiresPasskeyStepUp: false,
-      } as never);
-
-    const resultPromise = reconcileAuthSession({ hasClientSession: true });
-    await jest.runAllTimersAsync();
-    const result = await resultPromise;
 
     expect(result).toEqual({ status: "authenticated" });
+    expect(mockGetSession).toHaveBeenCalledWith({
+      query: { disableCookieCache: true },
+    });
     expect(mockSignOut).not.toHaveBeenCalled();
-    jest.useRealTimers();
+  });
+
+  it("discards stale client artifacts without signing out", async () => {
+    mockGetSession.mockResolvedValue({
+      data: null,
+      error: null,
+    } as never);
+
+    const result = await reconcileAuthSession({
+      hasClientSession: true,
+      reason: "session-mismatch",
+    });
+
+    expect(result).toEqual({ status: "recovered" });
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(mockClearAuthPasswords).toHaveBeenCalledTimes(1);
+    expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the session when validation returns an error", async () => {
+    mockGetSession.mockResolvedValue({
+      data: null,
+      error: { message: "network" },
+    } as never);
+
+    const result = await reconcileAuthSession({ hasClientSession: true });
+
+    expect(result).toEqual({ status: "unavailable" });
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(mockClearAuthPasswords).not.toHaveBeenCalled();
+  });
+
+  it("keeps the session when validation cannot be reached", async () => {
+    mockGetSession.mockRejectedValue(new Error("network") as never);
+
+    const result = await reconcileAuthSession({ hasClientSession: true });
+
+    expect(result).toEqual({ status: "unavailable" });
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(mockClearAuthPasswords).not.toHaveBeenCalled();
   });
 
   it("signs out and clears local state even when server sign-out fails", async () => {
@@ -150,13 +144,6 @@ describe("auth-local-state", () => {
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
-  });
-
-  it("recoverFromStaleAuthState delegates to signOutAndClearLocalState", async () => {
-    await recoverFromStaleAuthState("post-sign-in-unsettled");
-
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
-    expect(mockResetE2eeBootstrap).toHaveBeenCalledTimes(1);
   });
 
   it("clearOrphanedClientAuthArtifacts only clears orphaned encryption state", () => {

@@ -32,6 +32,8 @@ import {
 import { clearVaultCache } from "../lib/mail/mail-crypto";
 import { registerClearSession } from "../lib/session-clear";
 
+const AUTH_STATUS_TIMEOUT_MS = 3_000;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -118,10 +120,22 @@ export function AuthProvider({
 
   // ── Session hydration ────────────────────────────────────────────────
   const fetchAuthStatus = useCallback(async () => {
-    const response = await fetch(`${API_BASE_URL}/api/account/auth-status`, {
-      credentials: "omit",
-      headers: getAuthHeaders(),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      AUTH_STATUS_TIMEOUT_MS,
+    );
+    let response: Response;
+
+    try {
+      response = await fetch(`${API_BASE_URL}/api/account/auth-status`, {
+        credentials: "omit",
+        headers: getAuthHeaders(),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       throw new Error("Unable to load authentication status.");
@@ -181,11 +195,15 @@ export function AuthProvider({
 
   const finalizeAuthenticatedSession = useCallback(
     async (data: unknown, errorPrefix: string) => {
-      const hasSessionCookie = await waitForSessionCookie();
+      // A successful Better Auth response already contains the authoritative
+      // session. Cookie persistence may finish just after the response on
+      // native, so it must not turn that success into a login failure.
+      if (applySessionData(data)) return;
 
-      if (hasSessionCookie && applySessionData(data)) return;
-
-      const sessionResult = await authClient.getSession();
+      await waitForSessionCookie();
+      const sessionResult = await authClient.getSession({
+        query: { disableCookieCache: true },
+      });
       if (applySessionData(sessionResult?.data)) return;
 
       throw new Error(
@@ -194,6 +212,21 @@ export function AuthProvider({
     },
     [applySessionData],
   );
+
+  const syncPasskeyStepUpAfterAuth = useCallback(async () => {
+    try {
+      const authStatus = await fetchAuthStatus();
+      const requiresStepUp =
+        authStatus.authenticated && authStatus.requiresPasskeyStepUp;
+      setRequiresPasskeyStepUp(requiresStepUp);
+      return requiresStepUp;
+    } catch {
+      // Password/passkey authentication already succeeded. The status request
+      // is only a follow-up for step-up UI and must not undo the new session.
+      setRequiresPasskeyStepUp(false);
+      return false;
+    }
+  }, [fetchAuthStatus]);
 
   const clearSession = useCallback(() => {
     setUser(null);
@@ -212,33 +245,58 @@ export function AuthProvider({
 
   const signIn = useCallback(
     async (email: string, password: string) => {
-      const result = await authClient.signIn.email({ email, password });
+      let authData: unknown;
+      try {
+        const result = await authClient.signIn.email({ email, password });
 
-      if (result.error) {
-        throw new Error(
-          result.error.message ?? "Sign-in failed. Please try again.",
-        );
+        if (result.error) {
+          throw new Error(
+            result.error.message ?? "Sign-in failed. Please try again.",
+          );
+        }
+
+        authData = result.data;
+      } catch (error) {
+        let recoveredSession: Awaited<
+          ReturnType<typeof authClient.getSession>
+        > | null = null;
+        try {
+          recoveredSession = await authClient.getSession({
+            query: { disableCookieCache: true },
+          });
+        } catch {
+          // Preserve the original sign-in error below.
+        }
+
+        const requestedEmail = email.trim().toLowerCase();
+        const recoveredEmail = recoveredSession?.data?.user.email
+          ?.trim()
+          .toLowerCase();
+        if (!recoveredSession?.data || recoveredEmail !== requestedEmail) {
+          throw error;
+        }
+
+        authData = recoveredSession.data;
       }
 
       try {
-        await finalizeAuthenticatedSession(result.data, "Sign-in");
+        await finalizeAuthenticatedSession(authData, "Sign-in");
         setEmailPasswordAuthHints(password);
         // Persist password to SecureStore so the mail vault can be unlocked
         // even after an app restart (in-memory ref is lost on restart).
         await saveMailVaultPassword(password);
-        const authStatus = await fetchAuthStatus();
-        setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
-        return { requiresPasskeyStepUp: authStatus.requiresPasskeyStepUp };
+        const requiresStepUp = await syncPasskeyStepUpAfterAuth();
+        return { requiresPasskeyStepUp: requiresStepUp };
       } catch (error) {
         resetAuthMethodHints();
         throw error;
       }
     },
     [
-      fetchAuthStatus,
       finalizeAuthenticatedSession,
       resetAuthMethodHints,
       setEmailPasswordAuthHints,
+      syncPasskeyStepUpAfterAuth,
     ],
   );
 
@@ -293,7 +351,9 @@ export function AuthProvider({
 
     async function loadSession() {
       try {
-        const result = await authClient.getSession();
+        const result = await authClient.getSession({
+          query: { disableCookieCache: true },
+        });
         if (!cancelled && result?.data) {
           setUser(result.data.user as User);
           setSession((result.data as any).session as Session);
@@ -307,9 +367,8 @@ export function AuthProvider({
               }
             }
           } catch {
-            if (!cancelled) {
-              await signOut();
-            }
+            // Keep a session that Better Auth just validated. A temporary
+            // status failure is not evidence that the user signed out.
           }
         } else {
           if (!cancelled) {
@@ -318,7 +377,7 @@ export function AuthProvider({
         }
       } catch {
         if (!cancelled) {
-          await signOut();
+          clearSession();
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -329,7 +388,7 @@ export function AuthProvider({
     return () => {
       cancelled = true;
     };
-  }, [fetchAuthStatus, signOut]);
+  }, [clearSession, fetchAuthStatus, signOut]);
 
   const signInWithPasskey = useCallback(async () => {
     if (!authCapabilities.supportsPasskeys) {
@@ -353,8 +412,7 @@ export function AuthProvider({
 
       try {
         await finalizeAuthenticatedSession(result.data, "Passkey sign-in");
-        const authStatus = await fetchAuthStatus();
-        setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
+        await syncPasskeyStepUpAfterAuth();
       } catch (error) {
         resetAuthMethodHints();
         throw error;
@@ -368,8 +426,7 @@ export function AuthProvider({
 
       try {
         await finalizeAuthenticatedSession(result, "Passkey sign-in");
-        const authStatus = await fetchAuthStatus();
-        setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
+        await syncPasskeyStepUpAfterAuth();
       } catch (error) {
         resetAuthMethodHints();
         throw error;
@@ -380,10 +437,10 @@ export function AuthProvider({
     throw new Error("Passkey sign-in failed. Please try again.");
   }, [
     authCapabilities,
-    fetchAuthStatus,
     finalizeAuthenticatedSession,
     resetAuthMethodHints,
     setProviderAuthHints,
+    syncPasskeyStepUpAfterAuth,
   ]);
 
   const registerPasskey = useCallback(async () => {
@@ -475,4 +532,3 @@ export function useAuth(): AuthContextValue {
   }
   return ctx;
 }
-

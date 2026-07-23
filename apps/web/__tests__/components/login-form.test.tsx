@@ -14,6 +14,7 @@ import { createRoot, type Root } from "react-dom/client";
 const mockRouterReplace = jest.fn();
 const mockStartRouteTransition = jest.fn();
 const mockCompleteAuthNavigation = jest.fn();
+const mockRefetchSession = jest.fn();
 let mockSearchParams = new URLSearchParams();
 
 jest.mock("next/image", () => ({
@@ -176,12 +177,12 @@ jest.mock("@/lib/enc-password-cookie", () => ({
 
 jest.mock("@/lib/auth-local-state", () => ({
   clearOrphanedClientAuthArtifacts: jest.fn(),
-  recoverFromStaleAuthState: jest.fn(),
   reconcileAuthSession: jest.fn(),
 }));
 
 jest.mock("@/lib/auth-client", () => ({
   authClient: {
+    getSession: jest.fn(),
     requestPasswordReset: jest.fn(),
     signIn: {
       passkey: jest.fn(),
@@ -211,11 +212,11 @@ import {
 } from "@/lib/enc-password-cookie";
 import {
   clearOrphanedClientAuthArtifacts,
-  recoverFromStaleAuthState,
   reconcileAuthSession,
 } from "@/lib/auth-local-state";
 
 const mockUseSession = jest.mocked(useSession);
+const mockGetSession = jest.mocked(authClient.getSession);
 const mockRequestPasswordReset = jest.mocked(authClient.requestPasswordReset);
 const mockPasskeySignIn = jest.mocked(authClient.signIn.passkey);
 const mockEmailSignIn = jest.mocked(signIn.email);
@@ -239,7 +240,6 @@ const mockClearEncPasswordCookie = jest.mocked(clearEncPasswordCookie);
 const mockClearOrphanedClientAuthArtifacts = jest.mocked(
   clearOrphanedClientAuthArtifacts,
 );
-const mockRecoverFromStaleAuthState = jest.mocked(recoverFromStaleAuthState);
 const mockReconcileAuthSession = jest.mocked(reconcileAuthSession);
 
 (
@@ -268,6 +268,7 @@ describe("LoginForm", () => {
     mockUseSession.mockReturnValue({
       data: null,
       isPending: false,
+      refetch: mockRefetchSession,
     });
     mockGetSignupConfig.mockResolvedValue({
       defaultEmailDomain: "solace.onl",
@@ -292,6 +293,7 @@ describe("LoginForm", () => {
       message: "That email address is available.",
     });
     mockEmailSignIn.mockResolvedValue({});
+    mockGetSession.mockResolvedValue({ data: null, error: null });
     mockEmailSignUp.mockResolvedValue({});
     mockPasskeySignIn.mockResolvedValue({ user: { id: "user-1" } });
     mockRequestPasswordReset.mockResolvedValue({});
@@ -301,7 +303,6 @@ describe("LoginForm", () => {
       requiresPasskeyStepUp: false,
     });
     mockReconcileAuthSession.mockResolvedValue({ status: "authenticated" });
-    mockRecoverFromStaleAuthState.mockResolvedValue(undefined);
     (
       globalThis as typeof globalThis & {
         PublicKeyCredential?: typeof PublicKeyCredential;
@@ -313,7 +314,8 @@ describe("LoginForm", () => {
       }
     ).PublicKeyCredential = function PublicKeyCredential() {} as any;
     mockCompleteAuthNavigation.mockReset();
-    mockRecoverFromStaleAuthState.mockClear();
+    mockRefetchSession.mockReset();
+    mockRefetchSession.mockResolvedValue(undefined as never);
     mockClearOrphanedClientAuthArtifacts.mockClear();
   });
 
@@ -620,7 +622,7 @@ describe("LoginForm", () => {
     expect(mockEmailSignUp).not.toHaveBeenCalled();
   });
 
-  it("clears cached auth secrets and shows an error when email auth throws", async () => {
+  it("keeps existing auth state recoverable when email auth throws", async () => {
     mockEmailSignIn.mockRejectedValueOnce(
       new Error("Authentication failed hard."),
     );
@@ -644,10 +646,50 @@ describe("LoginForm", () => {
       await Promise.resolve();
     });
 
-    expect(mockRecoverFromStaleAuthState).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain("Authentication failed hard.");
     expect(mockStorePendingAuthPassword).not.toHaveBeenCalled();
     expect(mockSetEncPasswordCookie).not.toHaveBeenCalled();
+    expect(mockClearAuthPasswords).not.toHaveBeenCalled();
+    expect(mockClearEncPasswordCookie).not.toHaveBeenCalled();
+  });
+
+  it("finishes login when a lost sign-in response still created the requested session", async () => {
+    mockEmailSignIn.mockRejectedValueOnce(new Error("response lost"));
+    mockGetSession.mockResolvedValueOnce({
+      data: {
+        user: {
+          id: "user-1",
+          email: "roan@solace.onl",
+        },
+      },
+      error: null,
+    });
+
+    await renderForm();
+
+    const emailInput = container.querySelector(
+      "#email",
+    ) as HTMLInputElement | null;
+    const passwordInput = container.querySelector(
+      "#password",
+    ) as HTMLInputElement | null;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Sign in"),
+    );
+
+    await act(async () => {
+      setInputValue(emailInput as HTMLInputElement, "roan@solace.onl");
+      setInputValue(passwordInput as HTMLInputElement, "Secret123!");
+      submitButton?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockGetSession).toHaveBeenCalledWith({
+      query: { disableCookieCache: true },
+    });
+    expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("Secret123!");
+    expect(mockCompleteAuthNavigation).toHaveBeenCalled();
   });
 
   it("shows a passkey completion notice when step-up is required on a device without passkey support", async () => {
@@ -798,6 +840,7 @@ describe("LoginForm", () => {
         },
       },
       isPending: false,
+      refetch: mockRefetchSession,
     });
     mockReconcileAuthSession.mockResolvedValue({ status: "recovered" });
 
@@ -811,6 +854,9 @@ describe("LoginForm", () => {
     expect(mockReconcileAuthSession).toHaveBeenCalledWith({
       hasClientSession: true,
       reason: "login-page-reconcile",
+    });
+    expect(mockRefetchSession).toHaveBeenCalledWith({
+      query: { disableCookieCache: true },
     });
     expect(mockCompleteAuthNavigation).not.toHaveBeenCalled();
   });
@@ -838,7 +884,7 @@ describe("LoginForm", () => {
     expect(mockClearOrphanedClientAuthArtifacts).toHaveBeenCalled();
   });
 
-  it("waits for auth status to settle before wiping local state after password sign-in", async () => {
+  it("waits briefly for auth status to settle after password sign-in", async () => {
     jest.useFakeTimers();
     mockGetAuthStatus
       .mockResolvedValueOnce({
@@ -872,17 +918,16 @@ describe("LoginForm", () => {
     });
 
     await act(async () => {
-      await jest.advanceTimersByTimeAsync(100);
+      await jest.advanceTimersByTimeAsync(150);
       await Promise.resolve();
     });
 
-    expect(mockRecoverFromStaleAuthState).not.toHaveBeenCalled();
     expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("Secret123!");
     expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("Secret123!");
     expect(mockCompleteAuthNavigation).toHaveBeenCalled();
   });
 
-  it("resets local browser state when auth status never becomes authenticated", async () => {
+  it("continues a successful login when auth status remains unsettled", async () => {
     jest.useFakeTimers();
     mockGetAuthStatus.mockResolvedValue({
       authenticated: false,
@@ -910,16 +955,45 @@ describe("LoginForm", () => {
     });
 
     await act(async () => {
-      await jest.advanceTimersByTimeAsync(4000);
+      await jest.advanceTimersByTimeAsync(550);
       await Promise.resolve();
     });
 
-    expect(mockRecoverFromStaleAuthState).toHaveBeenCalledWith(
-      "post-sign-in-unsettled",
+    expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("Secret123!");
+    expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("Secret123!");
+    expect(container.textContent).not.toContain(
+      "Local browser state was reset",
     );
-    expect(container.textContent).toContain(
-      "Your sign-in could not be confirmed. Local browser state was reset — please try again.",
+    expect(mockCompleteAuthNavigation).toHaveBeenCalled();
+  });
+
+  it("continues a successful login when auth status is unavailable", async () => {
+    jest.useFakeTimers();
+    mockGetAuthStatus.mockRejectedValue(new Error("network"));
+
+    await renderForm();
+
+    const emailInput = container.querySelector(
+      "#email",
+    ) as HTMLInputElement | null;
+    const passwordInput = container.querySelector(
+      "#password",
+    ) as HTMLInputElement | null;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Sign in"),
     );
-    expect(mockCompleteAuthNavigation).not.toHaveBeenCalled();
+
+    await act(async () => {
+      setInputValue(emailInput as HTMLInputElement, "roan@solace.onl");
+      setInputValue(passwordInput as HTMLInputElement, "Secret123!");
+      submitButton?.click();
+      await Promise.resolve();
+      await jest.advanceTimersByTimeAsync(550);
+    });
+
+    expect(mockCompleteAuthNavigation).toHaveBeenCalled();
+    expect(container.textContent).not.toContain(
+      "Local browser state was reset",
+    );
   });
 });
