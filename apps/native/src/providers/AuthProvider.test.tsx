@@ -232,23 +232,62 @@ describe("AuthProvider", () => {
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
   });
 
-  it("resets the auth hints if session setup does not complete after email sign-in", async () => {
+  it("accepts a successful sign-in response while cookie persistence catches up", async () => {
     mockWaitForSessionCookie.mockResolvedValue(false);
     mockGetSession.mockResolvedValue({ data: null });
 
     await renderProvider();
 
-    await expect(
-      act(async () => {
-        await getAuth().signIn("roan@example.com", "secret-password");
-      }),
-    ).rejects.toThrow(
-      "Sign-in succeeded, but session setup did not complete. Please try again.",
-    );
-    await flushPromises();
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
 
-    expect(getAuth().lastAuthMethod).toBe("unknown");
-    expect(getAuth().consumePendingAuthPassword()).toBeNull();
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(getAuth().lastAuthMethod).toBe("email-password");
+    expect(mockWaitForSessionCookie).not.toHaveBeenCalled();
+  });
+
+  it("keeps a successful sign-in when auth status is temporarily unavailable", async () => {
+    await renderProvider();
+    mockSignOut.mockClear();
+    mockFetch.mockRejectedValueOnce(new Error("network"));
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(getAuth().requiresPasskeyStepUp).toBe(false);
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it("finishes login when a lost sign-in response still created the requested session", async () => {
+    await renderProvider();
+    mockEmailSignIn.mockRejectedValueOnce(new Error("response lost"));
+    mockGetSession.mockResolvedValueOnce(createAuthResult());
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+
+    expect(mockGetSession).toHaveBeenLastCalledWith({
+      query: { disableCookieCache: true },
+    });
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(getAuth().lastAuthMethod).toBe("email-password");
+  });
+
+  it("keeps an uncached validated startup session when auth status is unavailable", async () => {
+    mockGetSession.mockResolvedValue(createAuthResult());
+    mockFetch.mockRejectedValueOnce(new Error("network"));
+
+    await renderProvider();
+
+    expect(mockGetSession).toHaveBeenCalledWith({
+      query: { disableCookieCache: true },
+    });
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(mockSignOut).not.toHaveBeenCalled();
   });
 
   it("clears a stale pending password when passkey sign-in is used", async () => {
