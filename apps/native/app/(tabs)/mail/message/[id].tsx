@@ -51,6 +51,7 @@ import {
   writeAttachmentToCache,
 } from "../../../../src/lib/mail/attachment-cache";
 import { useConversationThread } from "../../../../src/lib/mail/use-conversation-thread";
+import { useConversationDecryptedPreviews } from "../../../../src/lib/mail/use-conversation-decrypted-previews";
 import {
   decryptMailMessage,
   decryptPgpMimeMessage,
@@ -240,6 +241,23 @@ export default function MailMessageScreen() {
       throw new Error(`Unsupported encryption type: ${encryption}`);
     },
   });
+
+  const selectedDecryptedPreview = useMemo(
+    () =>
+      decryptResult
+        ? { text: decryptResult.plaintext, html: decryptResult.html }
+        : null,
+    [decryptResult],
+  );
+
+  const conversationPreviews = useConversationDecryptedPreviews(
+    runtime,
+    conversationMessages,
+    {
+      messageId,
+      decrypted: selectedDecryptedPreview,
+    },
+  );
 
   // After decrypt unlocks the vault, refresh label names/colors from the vault backup.
   useEffect(() => {
@@ -798,6 +816,7 @@ export default function MailMessageScreen() {
                 messages={conversationMessages}
                 activeMessageId={messageId}
                 accountEmail={user?.email ?? runtime?.session.username ?? null}
+                previews={conversationPreviews}
                 onSelectMessage={(id) => {
                   if (id !== messageId) {
                     router.replace(`/(tabs)/mail/message/${id}` as never);

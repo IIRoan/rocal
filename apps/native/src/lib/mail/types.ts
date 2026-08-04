@@ -97,6 +97,7 @@ export type JmapEmailMessage = {
   references?: string[];
   mailboxIds?: Record<string, boolean>;
   subject?: string | null;
+  preview?: string | null;
   from?: MailAddress[];
   to?: MailAddress[];
   cc?: MailAddress[];
