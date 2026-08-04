@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  LayoutAnimation,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  UIManager,
   View,
   type TextStyle,
   type ViewStyle,
@@ -12,31 +15,39 @@ import { Feather } from "@expo/vector-icons";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { formatAddress, formatMessageDate } from "../../lib/mail/mail-helpers";
-import { extractMessageBodies } from "../../lib/mail/message-security";
+import { buildMailPreviewSnippet } from "../../lib/mail/mail-preview";
 import type { JmapEmailMessage } from "../../lib/mail/types";
+
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface ConversationThreadStripProps {
   messages: JmapEmailMessage[];
   activeMessageId: string;
   accountEmail?: string | null;
+  previews?: Record<string, string>;
   onSelectMessage: (messageId: string) => void;
-}
-
-function buildPreview(message: JmapEmailMessage): string {
-  const { text, html } = extractMessageBodies(message);
-  const raw = text ?? html?.replace(/<[^>]+>/g, " ") ?? "";
-  return raw.replace(/\s+/g, " ").trim().slice(0, 120);
 }
 
 export function ConversationThreadStrip({
   messages,
   activeMessageId,
   accountEmail,
+  previews,
   onSelectMessage,
 }: ConversationThreadStripProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [collapsed, setCollapsed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const threadKey = messages[0]?.threadId ?? messages[0]?.id ?? "";
+
+  useEffect(() => {
+    setExpanded(false);
+  }, [threadKey]);
 
   if (messages.length <= 1) {
     return null;
@@ -49,16 +60,39 @@ export function ConversationThreadStrip({
       ).length
     : 0;
 
+  function toggleExpanded() {
+    LayoutAnimation.configureNext({
+      duration: 200,
+      update: {
+        type: LayoutAnimation.Types.easeInEaseOut,
+      },
+      create: {
+        type: LayoutAnimation.Types.easeInEaseOut,
+        property: LayoutAnimation.Properties.opacity,
+      },
+      delete: {
+        type: LayoutAnimation.Types.easeInEaseOut,
+        property: LayoutAnimation.Properties.opacity,
+      },
+    });
+    setExpanded((open) => !open);
+  }
+
   return (
     <View style={styles.container}>
       <Pressable
-        onPress={() => setCollapsed((value) => !value)}
-        style={styles.header}
+        onPress={toggleExpanded}
+        style={({ pressed }) => [
+          styles.header,
+          pressed && styles.headerPressed,
+        ]}
+        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
         accessibilityRole="button"
+        accessibilityState={{ expanded }}
         accessibilityLabel={`${messages.length} messages in thread`}
       >
         <Feather
-          name={collapsed ? "chevron-right" : "chevron-down"}
+          name={expanded ? "chevron-down" : "chevron-right"}
           size={14}
           color={theme.colors.mutedForeground}
         />
@@ -72,12 +106,15 @@ export function ConversationThreadStrip({
         </Text>
       </Pressable>
 
-      {!collapsed ? (
+      {expanded ? (
         <ScrollView style={styles.list} nestedScrollEnabled>
           {messages.map((threadMessage) => {
             const isActive = threadMessage.id === activeMessageId;
             const sender = formatAddress(threadMessage.from);
-            const preview = buildPreview(threadMessage) || "(No body)";
+            const preview =
+              (previews?.[threadMessage.id] ??
+                buildMailPreviewSnippet(threadMessage)).slice(0, 120) ||
+              "(No body)";
             const isRead =
               threadMessage.keywords?.["$seen"] === true ||
               (accountEmail
@@ -93,7 +130,11 @@ export function ConversationThreadStrip({
                 accessibilityRole="button"
                 accessibilityLabel={`Open message from ${sender}`}
               >
-                {!isRead ? <View style={styles.unreadDot} /> : <View style={styles.readSpacer} />}
+                {!isRead ? (
+                  <View style={styles.unreadDot} />
+                ) : (
+                  <View style={styles.readSpacer} />
+                )}
                 <View style={styles.rowContent}>
                   <Text
                     style={[styles.sender, isActive && styles.senderActive]}
@@ -114,7 +155,7 @@ export function ConversationThreadStrip({
         </ScrollView>
       ) : null}
 
-      {ownCount > 0 && !collapsed ? (
+      {expanded && ownCount > 0 ? (
         <Text style={styles.ownHint}>
           Includes {ownCount} message{ownCount === 1 ? "" : "s"} you sent
         </Text>
@@ -138,7 +179,11 @@ function createStyles(theme: ThemeTokens) {
       gap: theme.spacing["2"],
       paddingHorizontal: theme.spacing["3"],
       paddingVertical: theme.spacing["2"],
+      minHeight: 44,
       backgroundColor: theme.colors.muted + "28",
+    },
+    headerPressed: {
+      opacity: 0.85,
     },
     list: {
       maxHeight: 160,
@@ -186,6 +231,7 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.xs.size,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
+      fontVariant: ["tabular-nums"] as TextStyle["fontVariant"],
     },
     sender: {
       fontSize: theme.typography.fontSize.sm.size,
@@ -201,6 +247,7 @@ function createStyles(theme: ThemeTokens) {
     date: {
       fontSize: theme.typography.fontSize.xs.size - 1,
       color: theme.colors.mutedForeground,
+      fontVariant: ["tabular-nums"] as TextStyle["fontVariant"],
     },
   } satisfies Record<string, TextStyle>;
 

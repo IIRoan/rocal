@@ -22,14 +22,23 @@ export function MessageReaderShell({
   view: MessageReaderViewModel;
 }) {
   const { showRawHtmlDialog, dispatchChrome } = controller;
-  const { displayHtml } = view;
+  const { displayHtml, orderedConversationMessages, message } = view;
+  const conversationThreadKey =
+    orderedConversationMessages[0]?.threadId ??
+    orderedConversationMessages[0]?.id ??
+    message?.id ??
+    "";
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <MessageReaderToolbar controller={controller} view={view} />
       <div className="shrink min-h-0 overflow-y-auto">
         <MessageReaderHeader controller={controller} view={view} />
-        <MessageReaderConversationStrip controller={controller} view={view} />
+        <MessageReaderConversationStrip
+          key={conversationThreadKey}
+          controller={controller}
+          view={view}
+        />
         <MessageReaderCalendarCards controller={controller} view={view} />
       </div>
       <div className="flex min-h-0 flex-1 flex-col">

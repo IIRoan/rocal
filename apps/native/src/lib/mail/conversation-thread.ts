@@ -123,13 +123,47 @@ export function buildMailConversations(
     );
 }
 
+function messageHasBodyPayload(message: JmapEmailMessage): boolean {
+  return Boolean(
+    message.bodyValues ||
+      message.textBody?.length ||
+      message.htmlBody?.length ||
+      message.attachments?.length,
+  );
+}
+
+function mergeMailMessage(
+  existing: JmapEmailMessage,
+  incoming: JmapEmailMessage,
+): JmapEmailMessage {
+  if (messageHasBodyPayload(incoming)) {
+    return { ...existing, ...incoming };
+  }
+  if (messageHasBodyPayload(existing)) {
+    return {
+      ...existing,
+      ...incoming,
+      bodyStructure: existing.bodyStructure,
+      bodyValues: existing.bodyValues,
+      textBody: existing.textBody,
+      htmlBody: existing.htmlBody,
+      attachments: existing.attachments,
+    };
+  }
+  return { ...existing, ...incoming };
+}
+
 export function mergeConversationSourceMessages(
   ...messageSets: JmapEmailMessage[][]
 ): JmapEmailMessage[] {
   const byId = new Map<string, JmapEmailMessage>();
   for (const messageSet of messageSets) {
     for (const message of messageSet) {
-      byId.set(message.id, message);
+      const existing = byId.get(message.id);
+      byId.set(
+        message.id,
+        existing ? mergeMailMessage(existing, message) : message,
+      );
     }
   }
   return [...byId.values()].sort(

@@ -1,10 +1,12 @@
 import type { JmapEmailMessage } from "./types";
 
-/** True when JMAP returned body fields (triggers server MIME expansion). */
+/**
+ * True when body payload is present. `bodyStructure` alone does not count —
+ * list/thread metadata may include it without bodyValues.
+ */
 export function messageHasLoadedBody(message: JmapEmailMessage): boolean {
   return Boolean(
-    message.bodyStructure ||
-      message.bodyValues ||
+    message.bodyValues ||
       message.textBody?.length ||
       message.htmlBody?.length ||
       message.attachments?.length,

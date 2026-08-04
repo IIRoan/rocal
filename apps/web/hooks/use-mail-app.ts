@@ -47,6 +47,7 @@ import {
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
 import { getMailComposeBridge, flushComposeDraftSave } from "@/components/mail/mail-compose-bridge";
 import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose";
+import { useConversationDecryptedPreviews } from "@/hooks/use-conversation-decrypted-previews";
 import { replaceSavedDraftInMailboxList } from "@/lib/mail/compose-draft-cache";
 import { getDraftsMailboxId } from "@/lib/mail/draft-utils";
 import { parseDecryptedMailContent } from "@/lib/mail/decrypted-mail-content";
@@ -566,7 +567,11 @@ function mergeConversationSourceMessages(
 
   for (const messageSet of messageSets) {
     for (const message of messageSet) {
-      byId.set(message.id, message);
+      const existing = byId.get(message.id);
+      byId.set(
+        message.id,
+        existing ? mergeMailMessage(existing, message) : message,
+      );
     }
   }
 
@@ -1417,6 +1422,26 @@ export function useMailApp() {
     // exclude activeMailbox and use activeMailboxRef.current inside the effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMessage?.id, selectedMessageBodyLoaded, config]);
+
+  const selectedDecryptedPreview = useMemo(
+    () =>
+      selectedMessagePlaintext || selectedMessageDecryptedHtml
+        ? {
+            text: selectedMessagePlaintext,
+            html: selectedMessageDecryptedHtml,
+          }
+        : null,
+    [selectedMessageDecryptedHtml, selectedMessagePlaintext],
+  );
+
+  const conversationDecryptedPreviews = useConversationDecryptedPreviews({
+    messages: selectedConversationMessages,
+    client: activeMailbox?.client,
+    session: activeMailbox?.session,
+    config,
+    selectedMessageId: selectedMessage?.id ?? null,
+    selectedDecrypted: selectedDecryptedPreview,
+  });
 
   useEffect(() => {
     const mailbox = activeMailboxRef.current;
@@ -3752,6 +3777,7 @@ export function useMailApp() {
     setSelectedMessageId: handleSelectMessageId,
     openMessageById,
     selectedConversationMessages,
+    conversationDecryptedPreviews,
     isConversationLoading,
     isMessageBodyLoading,
     loadConversationThread,

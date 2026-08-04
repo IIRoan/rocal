@@ -23,6 +23,7 @@ export interface MessageReaderProps {
   message: JmapEmailMessage | null;
   selectedMessageId?: string | null;
   conversationMessages?: JmapEmailMessage[];
+  conversationPreviews?: Record<string, string>;
   loading?: MessageReaderLoadingState;
   onSelectConversationMessage?: (id: string) => void;
   plaintext: string | null;
