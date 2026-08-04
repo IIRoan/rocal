@@ -242,6 +242,7 @@ const EMAIL_LIST_GET_PROPERTIES = [
   "subject",
   "preview",
   "hasAttachment",
+  "bodyStructure",
 ] as const;
 
 const EMAIL_FULL_GET_PROPERTIES = [

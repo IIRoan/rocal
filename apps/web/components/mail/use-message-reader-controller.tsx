@@ -2,10 +2,8 @@
 
 import {
   useEffect,
-  useMemo,
   useState,
   useRef,
-  useCallback,
   useReducer,
   type ReactNode,
 } from "react";
@@ -189,20 +187,15 @@ export function useMessageReaderController(props: MessageReaderProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const expandedWrapRef = useRef<HTMLDivElement>(null);
   const replyHasInit = useRef(false);
-  const conversationListRef = useRef<HTMLDivElement>(null);
+  const conversationListRef = useRef<HTMLUListElement>(null);
   const isMobile = useIsMobile();
   const prefersReducedMotion = usePrefersReducedMotion();
-  const calendarEventLinkSource = useMemo(
-    () => (message ? getCalendarEventLinkSource(message, plaintext) : null),
-    [message, plaintext],
-  );
-  const linkedCalendarEventId = useMemo(
-    () =>
-      calendarEventLinkSource
-        ? extractLinkedCalendarEventId(message!, plaintext)
-        : null,
-    [calendarEventLinkSource, message, plaintext],
-  );
+  const calendarEventLinkSource = message
+    ? getCalendarEventLinkSource(message, plaintext)
+    : null;
+  const linkedCalendarEventId = calendarEventLinkSource
+    ? extractLinkedCalendarEventId(message!, plaintext)
+    : null;
   const calendarInvitation = useMailCalendarInvitation({
     message,
     plaintext,
@@ -219,7 +212,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
     handleInvitationResponse,
     handleCancelRemove,
   } = calendarInvitation;
-  const isEventReminderEmail = useMemo(() => {
+  const isEventReminderEmail = (() => {
     if (hasCalendarInvitationHint) {
       return false;
     }
@@ -232,11 +225,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
     return calendarEventLinkSource
       ? isSolaceEventReminderEmail(calendarEventLinkSource)
       : false;
-  }, [
-    calendarEventLinkSource,
-    hasCalendarInvitationHint,
-    mailCalendarInvite?.method,
-  ]);
+  })();
   const {
     data: linkedEventData,
     isLoading: isLinkedEventLoading,
@@ -247,7 +236,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
     enabled: Boolean(isEventReminderEmail && linkedCalendarEventId),
     queryFn: () => calendarApiService.getEvent(linkedCalendarEventId!),
   });
-  const linkedCalendarEvent = useMemo((): LinkedCalendarEventState | null => {
+  const linkedCalendarEvent = ((): LinkedCalendarEventState | null => {
     if (!isEventReminderEmail || !linkedCalendarEventId) {
       return null;
     }
@@ -276,15 +265,8 @@ export function useMessageReaderController(props: MessageReaderProps) {
       loading: false,
       error: null,
     };
-  }, [
-    isEventReminderEmail,
-    linkedCalendarEventId,
-    isLinkedEventLoading,
-    isLinkedEventError,
-    linkedEventQueryError,
-    linkedEventData,
-  ]);
-  const mailCalendarInviteMeta = useMemo(() => {
+  })();
+  const mailCalendarInviteMeta = (() => {
     if (!mailCalendarInvite) return undefined;
 
     const items = [];
@@ -312,13 +294,13 @@ export function useMessageReaderController(props: MessageReaderProps) {
     }
 
     return items.length > 0 ? items : undefined;
-  }, [mailCalendarInvite, timeFormat, timezone]);
+  })();
 
   useEffect(() => {
     dispatchMessageUi({ type: "reset" });
   }, [message?.id]);
 
-  const eventReminderView = useMemo(() => {
+  const eventReminderView = (() => {
     if (!linkedCalendarEvent?.event) {
       return null;
     }
@@ -334,7 +316,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
       timezone: timezone ?? undefined,
       timeFormat,
     });
-  }, [calendarEventLinkSource, linkedCalendarEvent, timeFormat, timezone]);
+  })();
 
   const shouldReplaceBodyWithEventReminder = Boolean(
     isEventReminderEmail &&
@@ -350,7 +332,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
         (!shouldReplaceBodyWithEventReminder && !linkedCalendarEvent.error)),
   );
 
-  const displayAttachments = useMemo<MailAttachment[]>(() => {
+  const displayAttachments = (() => {
     const all = attachments ?? message?.attachments ?? [];
     if (!displaySettings.hideInlineImageAttachments) return all;
     return all.filter(
@@ -360,60 +342,52 @@ export function useMessageReaderController(props: MessageReaderProps) {
           Boolean(attachment.cid?.trim())
         ),
     );
-  }, [
-    attachments,
-    displaySettings.hideInlineImageAttachments,
-    message?.attachments,
-  ]);
+  })();
 
-  const handleLoadAttachmentHoverPreview = useCallback(
-    (attachment: MailAttachment, previewKey: string) => {
-      if (
-        !displaySettings.attachmentImagePreviewsEnabled ||
-        !onLoadAttachmentPreview ||
-        previewKey in attachmentHoverPreviews
-      ) {
-        return;
-      }
+  const handleLoadAttachmentHoverPreview = (
+    attachment: MailAttachment,
+    previewKey: string,
+  ) => {
+    if (
+      !displaySettings.attachmentImagePreviewsEnabled ||
+      !onLoadAttachmentPreview ||
+      previewKey in attachmentHoverPreviews
+    ) {
+      return;
+    }
 
-      dispatchMessageUi({
-        type: "patch",
-        patch: { loadingAttachmentPreviewKey: previewKey },
-      });
-      void onLoadAttachmentPreview(attachment)
-        .then((preview) => {
-          dispatchMessageUi({
-            type: "updateAttachmentHoverPreviews",
-            updater: (current) => ({
-              ...current,
-              [previewKey]: preview,
-            }),
-          });
-        })
-        .catch(() => {
-          dispatchMessageUi({
-            type: "updateAttachmentHoverPreviews",
-            updater: (current) => ({
-              ...current,
-              [previewKey]: null,
-            }),
-          });
-        })
-        .finally(() => {
-          dispatchMessageUi({
-            type: "clearLoadingAttachmentPreviewKeyIf",
-            previewKey,
-          });
+    dispatchMessageUi({
+      type: "patch",
+      patch: { loadingAttachmentPreviewKey: previewKey },
+    });
+    void onLoadAttachmentPreview(attachment)
+      .then((preview) => {
+        dispatchMessageUi({
+          type: "updateAttachmentHoverPreviews",
+          updater: (current) => ({
+            ...current,
+            [previewKey]: preview,
+          }),
         });
-    },
-    [
-      attachmentHoverPreviews,
-      displaySettings.attachmentImagePreviewsEnabled,
-      onLoadAttachmentPreview,
-    ],
-  );
+      })
+      .catch(() => {
+        dispatchMessageUi({
+          type: "updateAttachmentHoverPreviews",
+          updater: (current) => ({
+            ...current,
+            [previewKey]: null,
+          }),
+        });
+      })
+      .finally(() => {
+        dispatchMessageUi({
+          type: "clearLoadingAttachmentPreviewKeyIf",
+          previewKey,
+        });
+      });
+  };
 
-  const handleSendReply = useCallback(async () => {
+  const handleSendReply = async () => {
     if (onSendReply) {
       if (!replyText.trim()) {
         toast.error("Enter a reply message.");
@@ -424,35 +398,35 @@ export function useMessageReaderController(props: MessageReaderProps) {
         await onSendReply(replyText, attachedFiles);
         dispatchMessageUi({
           type: "patch",
-          patch: { replyText: "", attachedFiles: [] },
+          patch: {
+            replyText: "",
+            attachedFiles: [],
+            isSendingReply: false,
+          },
         });
       } catch (error) {
         toast.error(getErrorMessage(error, "Could not send reply."));
-      } finally {
         dispatchMessageUi({ type: "patch", patch: { isSendingReply: false } });
       }
     } else {
       onReply();
       dispatchMessageUi({ type: "patch", patch: { replyText: "" } });
     }
-  }, [replyText, attachedFiles, onSendReply, onReply]);
+  };
 
-  const handleFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const accepted = pickOutgoingAttachmentFiles(
-        Array.from(e.target.files ?? []),
-        {
-          maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
-          onReject: (error) => toast.error(error),
-        },
-      );
-      if (accepted.length > 0) {
-        dispatchMessageUi({ type: "appendAttachedFiles", files: accepted });
-      }
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    },
-    [mailServerLimits],
-  );
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const accepted = pickOutgoingAttachmentFiles(
+      Array.from(e.target.files ?? []),
+      {
+        maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
+        onReject: (error) => toast.error(error),
+      },
+    );
+    if (accepted.length > 0) {
+      dispatchMessageUi({ type: "appendAttachedFiles", files: accepted });
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   useGSAP(
     () => {
@@ -506,12 +480,12 @@ export function useMessageReaderController(props: MessageReaderProps) {
     { dependencies: [isReplyExpanded] },
   );
 
-  const autoResizeTextarea = useCallback(() => {
+  const autoResizeTextarea = () => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
-  }, []);
+  };
 
   const _earlyBodies = message ? extractMessageBodies(message) : null;
   const _displayHtml = cleanInviteMailHtml(
@@ -521,18 +495,13 @@ export function useMessageReaderController(props: MessageReaderProps) {
     plaintext ?? (_earlyBodies?.text || ""),
   );
 
-  const { body: plaintextBody, quote: plaintextQuote } = useMemo(
-    () => splitPlaintextQuote(_displayText ?? ""),
-    [_displayText],
+  const { body: plaintextBody, quote: plaintextQuote } = splitPlaintextQuote(
+    _displayText ?? "",
   );
-  const { html: cleanHtml, hasQuote: htmlHasQuote } = useMemo(
-    () => splitHtmlQuote(_displayHtml ?? ""),
-    [_displayHtml],
+  const { html: cleanHtml, hasQuote: htmlHasQuote } = splitHtmlQuote(
+    _displayHtml ?? "",
   );
-  const hasRemoteContent = useMemo(
-    () => htmlContainsRemoteResources(_displayHtml ?? ""),
-    [_displayHtml],
-  );
+  const hasRemoteContent = htmlContainsRemoteResources(_displayHtml ?? "");
 
   useEffect(() => {
     const el = conversationListRef.current;
@@ -549,7 +518,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
     </div>
   ) : null;
 
-  const viewModel = useMemo((): MessageReaderViewModel | null => {
+  const viewModel = ((): MessageReaderViewModel | null => {
     if (!message) return null;
 
     const displayHtml = _displayHtml;
@@ -635,32 +604,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
       bodyAttachedAbove,
       mailCalendarInviteMeta,
     };
-  }, [
-    message,
-    _displayHtml,
-    _displayText,
-    htmlHasQuote,
-    plaintextQuote,
-    plaintextBody,
-    accountEmail,
-    accountName,
-    mailboxes,
-    currentMailboxId,
-    conversationMessages,
-    showOwnMessages,
-    onReportSpam,
-    onNotSpam,
-    labels,
-    mailCalendarInvite?.method,
-    isEventReminderEmail,
-    linkedCalendarEvent,
-    shouldReplaceBodyWithEventReminder,
-    isReminderEventLoading,
-    eventReminderView,
-    mailCalendarInviteMeta,
-    cleanHtml,
-    hasRemoteContent,
-  ]);
+  })();
 
   const isFlagged = message?.keywords?.["$flagged"] === true;
   const messageLabels = message ? getAllMessageLabels(message, labels) : [];

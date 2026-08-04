@@ -27,7 +27,7 @@ import {
   isMessageFlagged,
   isMessageRead,
 } from "../../lib/mail/mail-helpers";
-import { extractMessageBodies } from "../../lib/mail/message-security";
+import { buildMailPreviewSnippet } from "../../lib/mail/mail-preview";
 import { getAllMessageLabels } from "../../lib/mail/use-labels";
 import type { JmapEmailMessage, JmapIdentity, LabelDef } from "../../lib/mail/types";
 import {
@@ -47,6 +47,9 @@ import {
 import { useSelectionProgress } from "./mail-selection-anim";
 import { MailIdentityBadge } from "./MailIdentityBadge";
 
+const EMPTY_LABELS: LabelDef[] = [];
+const EMPTY_IDENTITIES: JmapIdentity[] = [];
+
 interface MailMessageRowProps {
   message: JmapEmailMessage;
   threadMessages?: JmapEmailMessage[];
@@ -63,12 +66,6 @@ interface MailMessageRowProps {
   onToggleSelect?: (message: JmapEmailMessage) => void;
 }
 
-function buildPreview(message: JmapEmailMessage): string {
-  const { text, html } = extractMessageBodies(message);
-  const raw = text ?? html ?? "";
-  return raw.replace(/\s+/g, " ").trim().slice(0, 140);
-}
-
 function MailMessageRowComponent({
   message,
   threadMessages,
@@ -76,8 +73,8 @@ function MailMessageRowComponent({
   threadUnreadCount = 0,
   hasAttachments = false,
   showRecipient = false,
-  labels = [],
-  identities = [],
+  labels = EMPTY_LABELS,
+  identities = EMPTY_IDENTITIES,
   selectionActive = false,
   selected = false,
   onPress,
@@ -101,10 +98,11 @@ function MailMessageRowComponent({
       : null;
   const name = threadSenders ?? formatAddress(addresses);
   const subject = message.subject?.trim() || "(no subject)";
+  const snippet = buildMailPreviewSnippet(message);
   const preview =
     threadCount > 1
-      ? `${threadCount} messages · ${buildPreview(message)}`
-      : buildPreview(message);
+      ? `${threadCount} messages · ${snippet}`
+      : snippet;
 
   const selectionProgress = useSelectionProgress();
   const selectedProgress = useSharedValue(selected ? 1 : 0);
