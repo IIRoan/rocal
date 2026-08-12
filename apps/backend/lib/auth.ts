@@ -22,6 +22,7 @@ import {
   clearPasskeyStepUpCookie,
   setVerifiedPasskeyStepUpCookie,
 } from "./passkey-step-up";
+import { expireLegacyHostScopedAuthCookies } from "./auth-cookie-migration";
 import {
   buildMailOauthAccessTokenClaims,
   buildMailOauthUserInfoClaims,
@@ -74,9 +75,9 @@ type JwtJwkCreateInput = Omit<Jwk, "id">;
 
 let cachedJwks:
   | {
-      keys: Jwk[];
-      expiresAt: number;
-    }
+    keys: Jwk[];
+    expiresAt: number;
+  }
   | null = null;
 
 function normalizeJwk(record: RawJwtJwkRecord): Jwk {
@@ -203,36 +204,36 @@ if (isMailOauthEnabled && mailOauthConfigurationErrors.length > 0) {
 
 const mailOauthProviderPlugin = isMailOauthEnabled
   ? oauthProvider({
-      scopes: mailOauthScopes,
-      validAudiences: mailOauthValidAudiences,
-      cachedTrustedClients: new Set(mailOauthTrustedClientIds),
-      loginPage: mailOauthLoginPageUrl,
-      consentPage: mailOauthConsentPageUrl,
-      allowDynamicClientRegistration: false,
-      silenceWarnings: {
-        oauthAuthServerConfig: true,
-        openidConfig: true,
-      },
-      advertisedMetadata: {
-        scopes_supported: mailOauthScopes,
-      },
-      customAccessTokenClaims: ({ user, scopes, resource, metadata }) =>
-        buildMailOauthAccessTokenClaims({
-          user,
-          scopes,
-          resource,
-          metadata,
-        }),
-      customUserInfoClaims: ({ scopes, jwt }) =>
-        buildMailOauthUserInfoClaims({
-          defaultIssuer: mailOauthIssuer,
-          scopes,
-          jwt: jwt as Record<string, unknown>,
-        }),
-      pairwiseSecret: mailOauthPairwiseSecret || undefined,
-      generateClientId: () => crypto.randomUUID(),
-      generateClientSecret: () => crypto.randomUUID(),
-    })
+    scopes: mailOauthScopes,
+    validAudiences: mailOauthValidAudiences,
+    cachedTrustedClients: new Set(mailOauthTrustedClientIds),
+    loginPage: mailOauthLoginPageUrl,
+    consentPage: mailOauthConsentPageUrl,
+    allowDynamicClientRegistration: false,
+    silenceWarnings: {
+      oauthAuthServerConfig: true,
+      openidConfig: true,
+    },
+    advertisedMetadata: {
+      scopes_supported: mailOauthScopes,
+    },
+    customAccessTokenClaims: ({ user, scopes, resource, metadata }) =>
+      buildMailOauthAccessTokenClaims({
+        user,
+        scopes,
+        resource,
+        metadata,
+      }),
+    customUserInfoClaims: ({ scopes, jwt }) =>
+      buildMailOauthUserInfoClaims({
+        defaultIssuer: mailOauthIssuer,
+        scopes,
+        jwt: jwt as Record<string, unknown>,
+      }),
+    pairwiseSecret: mailOauthPairwiseSecret || undefined,
+    generateClientId: () => crypto.randomUUID(),
+    generateClientSecret: () => crypto.randomUUID(),
+  })
   : null;
 
 const passwordSecurityUrl = new URL(
@@ -350,9 +351,14 @@ const passkeyStepUpPlugin = {
         },
         handler: createAuthMiddleware(async (ctx) => {
           if (ctx.context.responseHeaders) {
-            clearPasskeyStepUpCookie({
-              headers: ctx.context.responseHeaders as Headers,
-            });
+            const headers = ctx.context.responseHeaders as Headers;
+            clearPasskeyStepUpCookie({ headers });
+            // Also expire pre-migration host-scoped session cookies
+            // (Domain=api.*) that Better Auth's eTLD+1 clear misses.
+            expireLegacyHostScopedAuthCookies(
+              { headers },
+              { request: ctx.request },
+            );
           }
         }),
       },
@@ -546,15 +552,20 @@ export const auth = betterAuth({
   },
   advanced: {
     useSecureCookies: isProduction,
-    cookieOptions: {
+    // Better Auth uses `defaultCookieAttributes` — `cookieOptions` is ignored.
+    defaultCookieAttributes: {
       sameSite: cookieSameSite,
-      secure: isProduction,
+      secure: isProduction || cookieSameSite === "none",
       httpOnly: true,
-      domain: isProduction ? getRpId(backendUrl) : undefined,
     },
-    // Cross subdomain cookie sharing for mobile OAuth flow
+    // Omit domain in Better Auth and it becomes the API hostname, not eTLD+1.
     crossSubDomainCookies: {
       enabled: true,
+      ...(isProduction
+        ? {
+          domain: getRpId(backendUrl),
+        }
+        : {}),
     },
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
