@@ -3,6 +3,7 @@ import type { JmapEmailMessage, JmapSession } from "@/lib/mail/types";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import {
   mergeMailMessage,
+  mergeMailMessagePreservingKeywords,
   messageHasLoadedBody,
 } from "@/lib/mail/mail-message-body";
 import {
@@ -128,7 +129,9 @@ export async function fetchMailMessageById(
         throw new Error("Message not found");
       }
       const existing = findCachedMailMessage(queryClient, input.messageId);
-      const merged = existing ? mergeMailMessage(existing, message) : message;
+      const merged = existing
+        ? mergeMailMessagePreservingKeywords(existing, message)
+        : message;
       queryClient.setQueryData(mailQueryKeys.message(input.messageId), merged);
       return merged;
     },
