@@ -332,8 +332,8 @@ export function useMessageReaderController(props: MessageReaderProps) {
         (!shouldReplaceBodyWithEventReminder && !linkedCalendarEvent.error)),
   );
 
-  const displayAttachments = (() => {
-    const all = attachments ?? message?.attachments ?? [];
+  const displayAttachments: MailAttachment[] = (() => {
+    const all: MailAttachment[] = attachments ?? message?.attachments ?? [];
     if (!displaySettings.hideInlineImageAttachments) return all;
     return all.filter(
       (attachment) =>
