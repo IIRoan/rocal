@@ -7,9 +7,9 @@ import type { JmapEmailMessage } from "./types";
 export function messageHasLoadedBody(message: JmapEmailMessage): boolean {
   return Boolean(
     message.bodyValues ||
-      message.textBody?.length ||
-      message.htmlBody?.length ||
-      message.attachments?.length,
+    message.textBody?.length ||
+    message.htmlBody?.length ||
+    message.attachments?.length,
   );
 }
 
@@ -35,4 +35,18 @@ export function mergeMailMessage(
   }
 
   return { ...existing, ...incoming };
+}
+
+/**
+ * Merge a body/metadata fetch without clobbering local keyword state.
+ * Optimistic $seen / $flagged updates must survive slower Email/get responses.
+ */
+export function mergeMailMessagePreservingKeywords(
+  existing: JmapEmailMessage,
+  incoming: JmapEmailMessage,
+): JmapEmailMessage {
+  return {
+    ...mergeMailMessage(existing, incoming),
+    keywords: existing.keywords,
+  };
 }

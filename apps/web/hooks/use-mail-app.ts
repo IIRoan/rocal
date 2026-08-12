@@ -36,6 +36,7 @@ import {
 } from "@/lib/mail/mail-message-query";
 import {
   mergeMailMessage,
+  mergeMailMessagePreservingKeywords,
   messageHasLoadedBody,
 } from "@/lib/mail/mail-message-body";
 import {
@@ -156,25 +157,25 @@ type MailAttachmentPreviewState = {
   name: string;
   type: string;
 } & (
-  | {
+    | {
       kind: "image" | "pdf";
       url: string;
     }
-  | {
+    | {
       kind: "text";
       text: string;
     }
-);
+  );
 
 type MailAttachmentHoverPreview = (
   | {
-      kind: "image" | "pdf";
-      url: string;
-    }
+    kind: "image" | "pdf";
+    url: string;
+  }
   | {
-      kind: "text";
-      text: string;
-    }
+    kind: "text";
+    text: string;
+  }
 ) & {
   type: string;
 };
@@ -410,10 +411,10 @@ async function resolveOutgoingMessageBody(input: {
     Boolean(input.html?.trim()) || (input.mimeAttachments?.length ?? 0) > 0;
   const encryptPayload = shouldUseMime
     ? buildOutgoingMimeMessage({
-        text: input.plaintext,
-        html: input.html,
-        attachments: input.mimeAttachments,
-      })
+      text: input.plaintext,
+      html: input.html,
+      attachments: input.mimeAttachments,
+    })
     : input.plaintext;
 
   const { armoredMessage } = await mailCryptoWorkerClient.encryptForRecipients({
@@ -570,7 +571,11 @@ function mergeConversationSourceMessages(
       const existing = byId.get(message.id);
       byId.set(
         message.id,
-        existing ? mergeMailMessage(existing, message) : message,
+        // Keep keywords from the first copy so later thread fetches don't
+        // wipe optimistic $seen / $flagged on the mailbox list row.
+        existing
+          ? mergeMailMessagePreservingKeywords(existing, message)
+          : message,
       );
     }
   }
@@ -649,7 +654,7 @@ function messagesLikelyMatch(
   if (left.receivedAt && right.receivedAt) {
     const diff = Math.abs(
       new Date(left.receivedAt).getTime() -
-        new Date(right.receivedAt).getTime(),
+      new Date(right.receivedAt).getTime(),
     );
     if (diff > 5 * 60 * 1000) return false;
   }
@@ -946,11 +951,11 @@ export function useMailApp() {
       setActiveMailbox((current) =>
         current
           ? {
-              ...current,
-              messages: sortMessages(
-                mergeConversationSourceMessages(current.messages, [cached]),
-              ),
-            }
+            ...current,
+            messages: sortMessages(
+              mergeConversationSourceMessages(current.messages, [cached]),
+            ),
+          }
           : current,
       );
       handleSelectMessageId(cached.id);
@@ -968,11 +973,11 @@ export function useMailApp() {
       setActiveMailbox((current) =>
         current
           ? {
-              ...current,
-              messages: sortMessages(
-                mergeConversationSourceMessages(current.messages, [message]),
-              ),
-            }
+            ...current,
+            messages: sortMessages(
+              mergeConversationSourceMessages(current.messages, [message]),
+            ),
+          }
           : current,
       );
       handleSelectMessageId(message.id);
@@ -1003,7 +1008,21 @@ export function useMailApp() {
     setIsConversationLoading(true);
     try {
       const messages = await mb.client.getThreadMessages(mb.session, threadId);
-      setRelatedConversationMessages(messages);
+      // Prefer local keywords so optimistic $seen isn't wiped by the thread fetch.
+      const localById = new Map(
+        (activeMailboxRef.current?.messages ?? []).map((message) => [
+          message.id,
+          message,
+        ]),
+      );
+      setRelatedConversationMessages(
+        messages.map((message) => {
+          const local = localById.get(message.id);
+          return local
+            ? mergeMailMessagePreservingKeywords(local, message)
+            : message;
+        }),
+      );
     } catch (error) {
       log.warn("Failed to load thread messages", error);
       setRelatedConversationMessages([]);
@@ -1073,7 +1092,17 @@ export function useMailApp() {
 
   const applyLoadedMessage = useCallback(
     (message: JmapEmailMessage) => {
-      mergeMessageIntoMailboxCaches(queryClient, message);
+      const mergeBody = (
+        existing: JmapEmailMessage,
+        incoming: JmapEmailMessage,
+      ) => mergeMailMessagePreservingKeywords(existing, incoming);
+
+      const existingCached = findCachedMailMessage(queryClient, message.id);
+      const forCache = existingCached
+        ? mergeBody(existingCached, message)
+        : message;
+      mergeMessageIntoMailboxCaches(queryClient, forCache);
+
       setActiveMailbox((current) => {
         if (!current) {
           return current;
@@ -1084,23 +1113,21 @@ export function useMailApp() {
           ...current,
           messages: exists
             ? current.messages.map((entry) =>
-                entry.id === message.id
-                  ? mergeMailMessage(entry, message)
-                  : entry,
-              )
+              entry.id === message.id ? mergeBody(entry, message) : entry,
+            )
             : sortMessages(
-                mergeConversationSourceMessages(current.messages, [message]),
-              ),
+              mergeConversationSourceMessages(current.messages, [forCache]),
+            ),
         };
       });
       setRelatedConversationMessages((current) =>
         current.map((entry) =>
-          entry.id === message.id ? mergeMailMessage(entry, message) : entry,
+          entry.id === message.id ? mergeBody(entry, message) : entry,
         ),
       );
       setListThreadRelatedMessages((current) =>
         current.map((entry) =>
-          entry.id === message.id ? mergeMailMessage(entry, message) : entry,
+          entry.id === message.id ? mergeBody(entry, message) : entry,
         ),
       );
     },
@@ -1427,9 +1454,9 @@ export function useMailApp() {
     () =>
       selectedMessagePlaintext || selectedMessageDecryptedHtml
         ? {
-            text: selectedMessagePlaintext,
-            html: selectedMessageDecryptedHtml,
-          }
+          text: selectedMessagePlaintext,
+          html: selectedMessageDecryptedHtml,
+        }
         : null,
     [selectedMessageDecryptedHtml, selectedMessagePlaintext],
   );
@@ -1514,7 +1541,9 @@ export function useMailApp() {
 
     const mailbox = activeMailboxRef.current;
     if (!mailbox) return;
-    const msg = mailbox.messages.find((m) => m.id === selectedMessageId);
+    const msg =
+      mailbox.messages.find((m) => m.id === selectedMessageId) ??
+      findCachedMailMessage(queryClient, selectedMessageId);
     if (!msg || msg.keywords?.["$seen"]) return;
 
     const listSettings = readMailListSettings();
@@ -1525,27 +1554,47 @@ export function useMailApp() {
     const delayMs =
       listSettings.markAsReadDelay === "delayed" ? MARK_AS_READ_DELAY_MS : 0;
 
+    const applyOptimisticRead = () => {
+      const markRead = (keywords: Record<string, boolean>) => ({
+        ...keywords,
+        $seen: true,
+      });
+      setActiveMailbox((cur) =>
+        cur
+          ? {
+            ...cur,
+            messages: patchMessagesKeywords(cur.messages, messageId, markRead),
+          }
+          : cur,
+      );
+      setRelatedConversationMessages((cur) =>
+        patchMessagesKeywords(cur, messageId, markRead),
+      );
+      setListThreadRelatedMessages((cur) =>
+        patchMessagesKeywords(cur, messageId, markRead),
+      );
+      const cached =
+        activeMailboxRef.current?.messages.find((m) => m.id === messageId) ??
+        findCachedMailMessage(queryClient, messageId) ??
+        msg;
+      mergeMessageIntoMailboxCaches(
+        queryClient,
+        withMessageKeywords(cached, markRead),
+      );
+    };
+
     const timer = setTimeout(() => {
       if (autoReadNonceRef.current.get(messageId) !== nonce) return;
       if (manualUnreadWhileOpenRef.current === messageId) return;
 
       const currentMailbox = activeMailboxRef.current;
       if (!currentMailbox) return;
-      const currentMsg = currentMailbox.messages.find((m) => m.id === messageId);
+      const currentMsg =
+        currentMailbox.messages.find((m) => m.id === messageId) ??
+        findCachedMailMessage(queryClient, messageId);
       if (!currentMsg || currentMsg.keywords?.["$seen"]) return;
 
-      setActiveMailbox((cur) =>
-        cur
-          ? {
-              ...cur,
-              messages: cur.messages.map((m) =>
-                m.id === messageId
-                  ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
-                  : m,
-              ),
-            }
-          : cur,
-      );
+      applyOptimisticRead();
 
       void currentMailbox.client
         .markAsRead(currentMailbox.session, messageId)
@@ -1567,7 +1616,7 @@ export function useMailApp() {
       clearTimeout(timer);
       bumpAutoReadNonce(messageId);
     };
-  }, [bumpAutoReadNonce, selectedMessageId]);
+  }, [bumpAutoReadNonce, queryClient, selectedMessageId]);
 
   const refreshMailboxMessages = useCallback(
     async (mailboxId: string) => {
@@ -1790,21 +1839,21 @@ export function useMailApp() {
         // Worker load (CPU) + JMAP metadata + initial inbox (network) all in parallel
         const [, [accountSettings, stalwartPolicy, mailboxes, identities, initialInboxResult]] =
           await Promise.all([
-          mailCryptoWorkerClient.loadVault({
-            privateKeyArmored: unlockedVault.encryptedPrivateKeyArmored,
-            privateKeyPassphrase: effectivePassphrase,
-            publicKeyArmored: unlockedVault.publicKeyArmored,
-          }),
-          Promise.all([
-            client.getAccountSettings(jmapSession),
-            client.getStalwartPolicySingletons(jmapSession),
-            client.getMailboxes(jmapSession),
-            client.getIdentities(jmapSession),
-            // Pre-fetch inbox in parallel — we don't know the inbox id yet,
-            // but getMailboxMessages needs it. We'll resolve it after mailboxes load.
-            Promise.resolve(null as { messages: JmapEmailMessage[]; total: number } | null),
-          ]),
-        ]);
+            mailCryptoWorkerClient.loadVault({
+              privateKeyArmored: unlockedVault.encryptedPrivateKeyArmored,
+              privateKeyPassphrase: effectivePassphrase,
+              publicKeyArmored: unlockedVault.publicKeyArmored,
+            }),
+            Promise.all([
+              client.getAccountSettings(jmapSession),
+              client.getStalwartPolicySingletons(jmapSession),
+              client.getMailboxes(jmapSession),
+              client.getIdentities(jmapSession),
+              // Pre-fetch inbox in parallel — we don't know the inbox id yet,
+              // but getMailboxMessages needs it. We'll resolve it after mailboxes load.
+              Promise.resolve(null as { messages: JmapEmailMessage[]; total: number } | null),
+            ]),
+          ]);
 
         await client
           .ensureEncryptOnAppendDisabled(jmapSession)
@@ -1839,8 +1888,8 @@ export function useMailApp() {
         // Fetch the first inbox page now that we know the mailbox id
         const { messages, total: initialTotal } = initialMailboxId
           ? await client.getMailboxMessages(jmapSession, initialMailboxId, {
-              limit: mailboxPageSize,
-            })
+            limit: mailboxPageSize,
+          })
           : { messages: [], total: 0 };
         setTotalMessages(initialTotal);
         if (initialMailboxId) {
@@ -1862,8 +1911,8 @@ export function useMailApp() {
           accountEncryptedAtRest:
             (
               accountSettings.encryptionAtRest as
-                | { "@type"?: string }
-                | undefined
+              | { "@type"?: string }
+              | undefined
             )?.["@type"] === "Aes256",
           email,
           selectedMailboxId: initialMailboxId,
@@ -1937,10 +1986,10 @@ export function useMailApp() {
       setActiveMailbox((current) =>
         current && current.session === mailbox.session
           ? {
-              ...current,
-              mailServerPolicy,
-              pickerIdentities,
-            }
+            ...current,
+            mailServerPolicy,
+            pickerIdentities,
+          }
           : current,
       );
 
@@ -2091,21 +2140,21 @@ export function useMailApp() {
       const { textBody: bodyWithSignature, htmlBody: htmlWithSignature } =
         plainTextMode
           ? {
-              textBody: signatureAlreadyEmbedded
-                ? composeBody
-                : resolveOutgoingComposeBodies({
-                    body: composeBody,
-                    htmlBody: "",
-                    signature: identity,
-                  }).textBody,
-              htmlBody: undefined,
-            }
+            textBody: signatureAlreadyEmbedded
+              ? composeBody
+              : resolveOutgoingComposeBodies({
+                body: composeBody,
+                htmlBody: "",
+                signature: identity,
+              }).textBody,
+            htmlBody: undefined,
+          }
           : resolveOutgoingComposeBodies({
-              body: composeBody,
-              htmlBody: composeHtmlBody,
-              signature: identity,
-              signatureAlreadyEmbedded,
-            });
+            body: composeBody,
+            htmlBody: composeHtmlBody,
+            signature: identity,
+            signatureAlreadyEmbedded,
+          });
       const internalDomain = resolveEncryptionInternalDomain(
         config?.defaultDomain,
       );
@@ -2133,29 +2182,29 @@ export function useMailApp() {
         embedInlineImagesInEncryptedHtml
           ? []
           : rewritten.attachments.map((attachment) => ({
-              blobId: attachment.blobId,
-              name: attachment.name,
-              type: attachment.type,
-              size: attachment.size,
-              disposition: "inline" as const,
-              cid: attachment.cid,
-            }));
+            blobId: attachment.blobId,
+            name: attachment.name,
+            type: attachment.type,
+            size: attachment.size,
+            disposition: "inline" as const,
+            cid: attachment.cid,
+          }));
       const inlineMimeAttachments: OutgoingMimeAttachment[] =
         embedInlineImagesInEncryptedHtml
           ? []
           : getComposeInlineImages()
-              .filter((image) =>
-                rewritten.attachments.some(
-                  (attachment) => attachment.cid === image.cid,
-                ),
-              )
-              .map((image) => ({
-                filename: image.name,
-                contentType: image.type,
-                content: image.content,
-                cid: image.cid,
-                disposition: "inline" as const,
-              }));
+            .filter((image) =>
+              rewritten.attachments.some(
+                (attachment) => attachment.cid === image.cid,
+              ),
+            )
+            .map((image) => ({
+              filename: image.name,
+              contentType: image.type,
+              content: image.content,
+              cid: image.cid,
+              disposition: "inline" as const,
+            }));
       const fileMimeAttachments: OutgoingMimeAttachment[] =
         preparedAttachments.map(({ filename, contentType, content }) => ({
           filename,
@@ -2189,9 +2238,9 @@ export function useMailApp() {
         const fileUploads =
           preparedAttachments.length > 0
             ? await mailbox.client.uploadPreparedAttachments(
-                mailbox.session,
-                preparedAttachments,
-              )
+              mailbox.session,
+              preparedAttachments,
+            )
             : [];
         uploadedAttachments = [...inlineJmapAttachments, ...fileUploads];
         if (uploadedAttachments.length > 0) {
@@ -2298,9 +2347,9 @@ export function useMailApp() {
         error,
         statusCode:
           error &&
-          typeof error === "object" &&
-          "statusCode" in error &&
-          typeof (error as { statusCode?: unknown }).statusCode === "number"
+            typeof error === "object" &&
+            "statusCode" in error &&
+            typeof (error as { statusCode?: unknown }).statusCode === "number"
             ? (error as { statusCode: number }).statusCode
             : undefined,
         to: composeTo,
@@ -2470,8 +2519,8 @@ export function useMailApp() {
         );
         const messages = hasSaved
           ? withoutPrevious.map((message) =>
-              message.id === input.savedDraftId ? input.preview : message,
-            )
+            message.id === input.savedDraftId ? input.preview : message,
+          )
           : [input.preview, ...withoutPrevious];
         return { ...current, messages };
       });
@@ -2611,10 +2660,10 @@ export function useMailApp() {
         const mimeAttachments =
           preparedAttachments.length > 0
             ? preparedAttachments.map(({ filename, contentType, content }) => ({
-                filename,
-                contentType,
-                content,
-              }))
+              filename,
+              contentType,
+              content,
+            }))
             : undefined;
         const { textBody, encrypted, pgpMimeCiphertext } =
           await resolveOutgoingMessageBody({
@@ -2685,9 +2734,9 @@ export function useMailApp() {
           error,
           statusCode:
             error &&
-            typeof error === "object" &&
-            "statusCode" in error &&
-            typeof (error as { statusCode?: unknown }).statusCode === "number"
+              typeof error === "object" &&
+              "statusCode" in error &&
+              typeof (error as { statusCode?: unknown }).statusCode === "number"
               ? (error as { statusCode: number }).statusCode
               : undefined,
           attachmentCount: files.length,
@@ -3047,11 +3096,11 @@ export function useMailApp() {
       setActiveMailbox((cur) =>
         cur
           ? {
-              ...cur,
-              mailboxes: cur.mailboxes.map((m) =>
-                m.id === mailboxId ? { ...m, name: trimmed } : m,
-              ),
-            }
+            ...cur,
+            mailboxes: cur.mailboxes.map((m) =>
+              m.id === mailboxId ? { ...m, name: trimmed } : m,
+            ),
+          }
           : cur,
       );
       try {
@@ -3070,11 +3119,11 @@ export function useMailApp() {
         setActiveMailbox((cur) =>
           cur
             ? {
-                ...cur,
-                mailboxes: cur.mailboxes.map((m) =>
-                  m.id === mailboxId ? { ...m, name: mailbox.name } : m,
-                ),
-              }
+              ...cur,
+              mailboxes: cur.mailboxes.map((m) =>
+                m.id === mailboxId ? { ...m, name: mailbox.name } : m,
+              ),
+            }
             : cur,
         );
       }
@@ -3253,14 +3302,14 @@ export function useMailApp() {
       setActiveMailbox((cur) =>
         cur
           ? {
-              ...cur,
-              messages: cur.messages.map((m) => {
-                if (!idSet.has(m.id)) return m;
-                const keywords = { ...(m.keywords ?? {}) };
-                delete keywords["$seen"];
-                return { ...m, keywords };
-              }),
-            }
+            ...cur,
+            messages: cur.messages.map((m) => {
+              if (!idSet.has(m.id)) return m;
+              const keywords = { ...(m.keywords ?? {}) };
+              delete keywords["$seen"];
+              return { ...m, keywords };
+            }),
+          }
           : cur,
       );
       try {
@@ -3282,13 +3331,13 @@ export function useMailApp() {
       setActiveMailbox((cur) =>
         cur
           ? {
-              ...cur,
-              messages: cur.messages.map((m) =>
-                idSet.has(m.id)
-                  ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
-                  : m,
-              ),
-            }
+            ...cur,
+            messages: cur.messages.map((m) =>
+              idSet.has(m.id)
+                ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
+                : m,
+            ),
+          }
           : cur,
       );
       try {
@@ -3332,11 +3381,11 @@ export function useMailApp() {
       setActiveMailbox((cur) =>
         cur
           ? {
-              ...cur,
-              messages: cur.messages.map((m) =>
-                m.id === targetId ? markUnread(m) : m,
-              ),
-            }
+            ...cur,
+            messages: cur.messages.map((m) =>
+              m.id === targetId ? markUnread(m) : m,
+            ),
+          }
           : cur,
       );
       setRelatedConversationMessages((current) =>
@@ -3367,13 +3416,13 @@ export function useMailApp() {
       setActiveMailbox((cur) =>
         cur
           ? {
-              ...cur,
-              messages: cur.messages.map((m) =>
-                m.id === targetId
-                  ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
-                  : m,
-              ),
-            }
+            ...cur,
+            messages: cur.messages.map((m) =>
+              m.id === targetId
+                ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
+                : m,
+            ),
+          }
           : cur,
       );
       try {
@@ -3410,15 +3459,15 @@ export function useMailApp() {
           : current.selectedMailboxId;
         const nextMessages = nextSelectedMailboxId
           ? mergeMessagesForMailbox(
-              current.messages,
-              nextSelectedMailboxId,
-              result.email,
-            )
+            current.messages,
+            nextSelectedMailboxId,
+            result.email,
+          )
           : [];
 
         resolvedSelectedMessageId =
           selectedMessageId &&
-          nextMessages.some((message) => message.id === selectedMessageId)
+            nextMessages.some((message) => message.id === selectedMessageId)
             ? selectedMessageId
             : null;
 
@@ -3561,9 +3610,9 @@ export function useMailApp() {
         setActiveMailbox((cur) =>
           cur
             ? {
-                ...cur,
-                messages: patchMessagesKeywords(cur.messages, targetId, update),
-              }
+              ...cur,
+              messages: patchMessagesKeywords(cur.messages, targetId, update),
+            }
             : cur,
         );
         setRelatedConversationMessages((cur) =>
@@ -3622,9 +3671,9 @@ export function useMailApp() {
         setActiveMailbox((cur) =>
           cur
             ? {
-                ...cur,
-                messages: patchMessagesKeywords(cur.messages, messageId, update),
-              }
+              ...cur,
+              messages: patchMessagesKeywords(cur.messages, messageId, update),
+            }
             : cur,
         );
         setRelatedConversationMessages((cur) =>
@@ -3756,10 +3805,10 @@ export function useMailApp() {
 
   const user = session?.user
     ? {
-        name: session.user.name ?? "User",
-        email: session.user.email ?? "",
-        avatar: session.user.image ?? undefined,
-      }
+      name: session.user.name ?? "User",
+      email: session.user.email ?? "",
+      avatar: session.user.image ?? undefined,
+    }
     : null;
 
   return {
@@ -3795,13 +3844,13 @@ export function useMailApp() {
     loadMoreMessages,
     hasMoreMessages: activeMailbox
       ? hasMoreMailboxMessages(
-          activeMailbox.messages.length,
-          totalMessages,
-          resolveMailboxMessagesPageSize(
-            activeMailbox.mailServerPolicy,
-            MAILBOX_MESSAGES_PAGE_SIZE,
-          ),
-        )
+        activeMailbox.messages.length,
+        totalMessages,
+        resolveMailboxMessagesPageSize(
+          activeMailbox.mailServerPolicy,
+          MAILBOX_MESSAGES_PAGE_SIZE,
+        ),
+      )
       : false,
     isLoadingMore,
     handleManualRefresh,
