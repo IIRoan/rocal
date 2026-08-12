@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   mergeMailMessage,
+  mergeMailMessagePreservingKeywords,
   messageHasLoadedBody,
 } from "@/lib/mail/mail-message-body";
 import type { JmapEmailMessage } from "@/lib/mail/types";
@@ -67,5 +68,36 @@ describe("mail-message-body", () => {
     expect(merged.subject).toBe("List refresh");
     expect(merged.bodyValues?.text?.value).toBe("Body");
     expect(merged.bodyStructure).toBeUndefined();
+  });
+
+  it("preserves local keywords when a body fetch would clear $seen", () => {
+    const local = {
+      ...previewMessage("m1"),
+      keywords: { $seen: true, $flagged: true },
+    };
+    const incoming = {
+      ...fullMessage("m1"),
+      keywords: { $flagged: true },
+    };
+
+    const merged = mergeMailMessagePreservingKeywords(local, incoming);
+
+    expect(merged.bodyValues?.text?.value).toBe("Body");
+    expect(merged.keywords).toEqual({ $seen: true, $flagged: true });
+  });
+
+  it("preserves local unread when a stale body fetch still has $seen", () => {
+    const local = {
+      ...previewMessage("m1"),
+      keywords: { $flagged: true },
+    };
+    const incoming = {
+      ...fullMessage("m1"),
+      keywords: { $seen: true, $flagged: true },
+    };
+
+    const merged = mergeMailMessagePreservingKeywords(local, incoming);
+
+    expect(merged.keywords).toEqual({ $flagged: true });
   });
 });
