@@ -1,20 +1,24 @@
 /**
  * Native-compatible mail vault crypto.
  *
- * The web app uses `hash-wasm`'s argon2id implementation which requires
- * WebAssembly. Hermes (React Native's JS engine) does NOT support WASM,
- * so we replace it with `@noble/hashes/argon2` — a pure TypeScript/JS
- * implementation with zero WASM dependencies.
- *
- * AES-GCM encryption/decryption falls back to `node-forge` (already a
- * dependency for the E2EE module) rather than Web Crypto API, ensuring
- * the code works regardless of whether `globalThis.crypto.subtle` is
- * available.
+ * Prefers `react-native-quick-crypto` (native Argon2id + WebCrypto AES-GCM)
+ * now that the app ships as a development/production client. Jest and any
+ * runtime without those native modules fall back to `@noble/hashes/argon2`
+ * and `node-forge`, which stay byte-compatible with the web vault format.
  */
 import { argon2id as nobleArgon2id } from "@noble/hashes/argon2.js";
+import * as ExpoCrypto from "expo-crypto";
 import forge from "node-forge";
 import { createLogger } from "@workspace/logger";
+import { loadQuickCrypto } from "../load-quick-crypto";
 import type { MailVaultKdfParams } from "./types";
+
+const JS_SAFE_ARGON2_MEMORY_KIB = 8192;
+const JS_SAFE_ARGON2_ITERATIONS = 1;
+const JS_SAFE_ARGON2_PARALLELISM = 1;
+const NATIVE_SAFE_ARGON2_MEMORY_KIB = 65536;
+const NATIVE_SAFE_ARGON2_ITERATIONS = 3;
+const NATIVE_SAFE_ARGON2_PARALLELISM = 4;
 
 const log = createLogger("native:vault-crypto");
 
@@ -95,53 +99,131 @@ function toForgeBinary(bytes: Uint8Array): string {
   return binary;
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
+}
+
+function toUint8Array(value: Uint8Array | ArrayBuffer): Uint8Array {
+  return value instanceof Uint8Array ? new Uint8Array(value) : new Uint8Array(value);
+}
+
+function asArrayBufferView(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+  return bytes as Uint8Array<ArrayBuffer>;
+}
+
+function fillRandomBytes(bytes: Uint8Array): Uint8Array {
+  const view = asArrayBufferView(bytes);
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    globalThis.crypto.getRandomValues(view);
+    return bytes;
+  }
+  ExpoCrypto.getRandomValues(view);
+  return bytes;
+}
+
+export function hasNativeArgon2(): boolean {
+  return typeof loadQuickCrypto()?.argon2Sync === "function";
+}
+
+export function isArgon2SafeToRunLocally(
+  params: MailVaultKdfParams,
+  nativeArgon2 = hasNativeArgon2(),
+): boolean {
+  if (nativeArgon2) {
+    return (
+      params.memoryKiB <= NATIVE_SAFE_ARGON2_MEMORY_KIB &&
+      params.iterations <= NATIVE_SAFE_ARGON2_ITERATIONS &&
+      params.parallelism <= NATIVE_SAFE_ARGON2_PARALLELISM
+    );
+  }
+
+  return (
+    params.memoryKiB <= JS_SAFE_ARGON2_MEMORY_KIB &&
+    params.iterations <= JS_SAFE_ARGON2_ITERATIONS &&
+    params.parallelism <= JS_SAFE_ARGON2_PARALLELISM
+  );
+}
+
+export function tryNativeArgon2id(
+  passwordBytes: Uint8Array,
+  saltBytes: Uint8Array,
+  params: MailVaultKdfParams,
+): Uint8Array | null {
+  const argon2Sync = loadQuickCrypto()?.argon2Sync;
+  if (typeof argon2Sync !== "function") {
+    return null;
+  }
+
+  try {
+    const derived = argon2Sync("argon2id", {
+      message: passwordBytes,
+      nonce: saltBytes,
+      parallelism: params.parallelism,
+      tagLength: 32,
+      memory: params.memoryKiB,
+      passes: params.iterations,
+    });
+    const bytes = toUint8Array(derived);
+    return bytes.length === 32 ? bytes : null;
+  } catch {
+    return null;
+  }
+}
+
+export function deriveArgon2id(
+  passwordBytes: Uint8Array,
+  saltBytes: Uint8Array,
+  params: MailVaultKdfParams,
+): Uint8Array {
+  return (
+    tryNativeArgon2id(passwordBytes, saltBytes, params) ??
+    nobleArgon2id(passwordBytes, saltBytes, {
+      m: params.memoryKiB,
+      t: params.iterations,
+      p: params.parallelism,
+      dkLen: 32,
+    })
+  );
+}
+
 // ---------------------------------------------------------------------------
-// Key derivation — pure-JS argon2id (no WASM)
+// Key derivation — native Argon2id when linked, noble otherwise
 // ---------------------------------------------------------------------------
 
 /**
  * Derives a 32-byte AES-GCM key from the given passphrase and KDF params
- * using argon2id. Returns the raw key bytes as a node-forge binary string.
- *
- * This is the pure-JS equivalent of hash-wasm's argon2id call in the web
- * vault-crypto module. The output is byte-for-byte identical for the same
- * inputs — existing vaults created by the web app can be unlocked here.
+ * using argon2id. Output is byte-for-byte identical to the web vault-crypto
+ * module for the same inputs.
  */
 async function deriveVaultKeyBytes(
   passphrase: string,
   params: MailVaultKdfParams,
-): Promise<string> {
+): Promise<Uint8Array> {
   log.debug("[vault-crypto] deriveVaultKeyBytes: starting argon2id derivation", {
     memoryKiB: params.memoryKiB,
     iterations: params.iterations,
     parallelism: params.parallelism,
     saltLength: params.saltB64.length,
+    native: hasNativeArgon2(),
   });
 
-  const passwordBytes = encodeUtf8(passphrase);
-  const saltBytes = base64ToBytes(params.saltB64);
-
-  // @noble/hashes/argon2 is pure JS — no WASM, works on Hermes
-  const derived = nobleArgon2id(passwordBytes, saltBytes, {
-    m: params.memoryKiB,
-    t: params.iterations,
-    p: params.parallelism,
-    dkLen: 32,
-  });
+  const derived = deriveArgon2id(
+    encodeUtf8(passphrase),
+    base64ToBytes(params.saltB64),
+    params,
+  );
 
   log.debug("[vault-crypto] deriveVaultKeyBytes: argon2id derivation complete, dkLen=32");
-  return toForgeBinary(derived);
+  return derived;
 }
 
 // ---------------------------------------------------------------------------
-// AES-GCM via node-forge
+// AES-GCM via WebCrypto, with node-forge fallback
 // ---------------------------------------------------------------------------
 
-/**
- * Decrypts an AES-GCM ciphertext using node-forge.
- * The `ciphertextWithTag` is expected to be `ciphertext || authTag` where
- * the tag is the last 16 bytes (128-bit) — matching Web Crypto API's format.
- */
 function forgeAesGcmDecrypt(
   keyBinary: string,
   ivBytes: Uint8Array,
@@ -166,17 +248,13 @@ function forgeAesGcmDecrypt(
   if (!decipher.finish()) {
     throw new Error(
       "AES-GCM decryption failed: authentication tag mismatch. " +
-        "The passphrase or ciphertext is incorrect.",
+      "The passphrase or ciphertext is incorrect.",
     );
   }
 
   return decipher.output.toString();
 }
 
-/**
- * Encrypts plaintext using AES-GCM via node-forge.
- * Returns `ciphertext || authTag` (last 16 bytes are the tag).
- */
 function forgeAesGcmEncrypt(
   keyBinary: string,
   ivBytes: Uint8Array,
@@ -191,7 +269,7 @@ function forgeAesGcmEncrypt(
   }
 
   const ciphertextBinary = cipher.output.getBytes();
-  const tagBinary = (cipher.mode as any).tag.getBytes() as string;
+  const tagBinary = (cipher.mode as { tag: { getBytes: () => string } }).tag.getBytes();
   const combined = new Uint8Array(ciphertextBinary.length + tagBinary.length);
   for (let i = 0; i < ciphertextBinary.length; i++) {
     combined[i] = ciphertextBinary.charCodeAt(i);
@@ -200,6 +278,60 @@ function forgeAesGcmEncrypt(
     combined[ciphertextBinary.length + i] = tagBinary.charCodeAt(i);
   }
   return combined;
+}
+
+export async function aesGcmDecrypt(
+  keyBytes: Uint8Array,
+  ivBytes: Uint8Array,
+  ciphertextWithTag: Uint8Array,
+): Promise<string> {
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle) {
+    const key = await subtle.importKey(
+      "raw",
+      toArrayBuffer(keyBytes),
+      { name: "AES-GCM" },
+      false,
+      ["decrypt"],
+    );
+    const plaintext = await subtle.decrypt(
+      { name: "AES-GCM", iv: toArrayBuffer(ivBytes), tagLength: 128 },
+      key,
+      toArrayBuffer(ciphertextWithTag),
+    );
+    return decodeUtf8(new Uint8Array(plaintext));
+  }
+
+  return forgeAesGcmDecrypt(toForgeBinary(keyBytes), ivBytes, ciphertextWithTag);
+}
+
+export async function aesGcmEncrypt(
+  keyBytes: Uint8Array,
+  ivBytes: Uint8Array,
+  plaintextBytes: Uint8Array,
+): Promise<Uint8Array> {
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle) {
+    const key = await subtle.importKey(
+      "raw",
+      toArrayBuffer(keyBytes),
+      { name: "AES-GCM" },
+      false,
+      ["encrypt"],
+    );
+    const ciphertext = await subtle.encrypt(
+      { name: "AES-GCM", iv: toArrayBuffer(ivBytes), tagLength: 128 },
+      key,
+      toArrayBuffer(plaintextBytes),
+    );
+    return new Uint8Array(ciphertext);
+  }
+
+  return forgeAesGcmEncrypt(
+    toForgeBinary(keyBytes),
+    ivBytes,
+    toForgeBinary(plaintextBytes),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +367,6 @@ export async function unlockEncryptedMailVaultWithDerivedKey(
     }
 
     const keyBytes = base64ToBytes(derivedKeyBase64);
-    const keyBinary = toForgeBinary(keyBytes);
     const ivBytes = base64ToBytes(envelope.ivB64);
     const ciphertextWithTag = base64ToBytes(envelope.ciphertextB64);
 
@@ -245,7 +376,7 @@ export async function unlockEncryptedMailVaultWithDerivedKey(
       ciphertextLength: ciphertextWithTag.length,
     });
 
-    const plaintextBinary = forgeAesGcmDecrypt(keyBinary, ivBytes, ciphertextWithTag);
+    const plaintextBinary = await aesGcmDecrypt(keyBytes, ivBytes, ciphertextWithTag);
     const vault = JSON.parse(plaintextBinary) as UserKeyVault;
 
     log.debug("[vault-crypto] unlockEncryptedMailVaultWithDerivedKey: SUCCESS, email=%s", vault.email);
@@ -287,7 +418,7 @@ export async function unlockEncryptedMailVault(
     log.debug("[vault-crypto] unlockEncryptedMailVault: envelope version=1, algorithm=AES-GCM-256, deriving key...");
 
     // 2. Derive the AES-GCM key from the passphrase using pure-JS argon2id
-    const keyBinary = await deriveVaultKeyBytes(passphrase, kdfParams);
+    const keyBytes = await deriveVaultKeyBytes(passphrase, kdfParams);
 
     // 3. Decode IV and ciphertext
     const ivBytes = base64ToBytes(envelope.ivB64);
@@ -298,8 +429,7 @@ export async function unlockEncryptedMailVault(
       ciphertextLength: ciphertextWithTag.length,
     });
 
-    // 4. Decrypt with node-forge AES-GCM
-    const plaintextBinary = forgeAesGcmDecrypt(keyBinary, ivBytes, ciphertextWithTag);
+    const plaintextBinary = await aesGcmDecrypt(keyBytes, ivBytes, ciphertextWithTag);
     const vault = JSON.parse(plaintextBinary) as UserKeyVault;
 
     log.debug("[vault-crypto] unlockEncryptedMailVault: SUCCESS, email=%s vaultVersion=%d",
@@ -334,26 +464,14 @@ export async function createEncryptedMailVault(
     parallelism: overrides?.parallelism ?? 4,
   };
 
-  const keyBinary = await deriveVaultKeyBytes(passphrase, kdfParams);
+  const keyBytes = await deriveVaultKeyBytes(passphrase, kdfParams);
 
-  const ivBytes = new Uint8Array(12);
-  // Use crypto.getRandomValues if available, else generate deterministically
-  if (typeof globalThis.crypto?.getRandomValues === "function") {
-    globalThis.crypto.getRandomValues(ivBytes);
-  } else {
-    for (let i = 0; i < ivBytes.length; i++) {
-      ivBytes[i] = Math.floor(Math.random() * 256);
-    }
-  }
+  const ivBytes = fillRandomBytes(new Uint8Array(12));
 
   const persistedVault: UserKeyVault = { ...vault, kdf: "argon2id", kdfParams };
-  const plaintextBinary = encodeUtf8(JSON.stringify(persistedVault));
+  const plaintextBytes = encodeUtf8(JSON.stringify(persistedVault));
 
-  const ciphertextWithTag = forgeAesGcmEncrypt(
-    keyBinary,
-    ivBytes,
-    toForgeBinary(plaintextBinary),
-  );
+  const ciphertextWithTag = await aesGcmEncrypt(keyBytes, ivBytes, plaintextBytes);
 
   const envelope: VaultEnvelope = {
     version: 1,
@@ -368,13 +486,5 @@ export async function createEncryptedMailVault(
 }
 
 function generateSalt(): string {
-  const salt = new Uint8Array(16);
-  if (typeof globalThis.crypto?.getRandomValues === "function") {
-    globalThis.crypto.getRandomValues(salt);
-  } else {
-    for (let i = 0; i < salt.length; i++) {
-      salt[i] = Math.floor(Math.random() * 256);
-    }
-  }
-  return bytesToBase64(salt);
+  return bytesToBase64(fillRandomBytes(new Uint8Array(16)));
 }

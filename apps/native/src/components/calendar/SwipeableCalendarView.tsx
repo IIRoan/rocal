@@ -2,7 +2,6 @@ import React, { useCallback } from "react";
 import { StyleSheet, useWindowDimensions } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -11,6 +10,7 @@ import Animated, {
   interpolate,
   Extrapolation,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -113,8 +113,8 @@ export function SwipeableCalendarView({
           { duration: EXIT_DURATION, easing: Easing.out(Easing.cubic) },
           (finished) => {
             if (finished) {
-              runOnJS(handleSwipeLeft)();
-              runOnJS(resetPosition)();
+              scheduleOnRN(handleSwipeLeft);
+              scheduleOnRN(resetPosition);
             }
           },
         );
@@ -126,8 +126,8 @@ export function SwipeableCalendarView({
           { duration: EXIT_DURATION, easing: Easing.out(Easing.cubic) },
           (finished) => {
             if (finished) {
-              runOnJS(handleSwipeRight)();
-              runOnJS(resetPosition)();
+              scheduleOnRN(handleSwipeRight);
+              scheduleOnRN(resetPosition);
             }
           },
         );

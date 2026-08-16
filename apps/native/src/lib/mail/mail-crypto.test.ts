@@ -55,13 +55,17 @@ jest.mock("../constants", () => ({
 const mockUnlockVault = jest.fn();
 const mockUnlockVaultWithDerivedKey = jest.fn();
 const mockCreateEncryptedMailVault = jest.fn();
-jest.mock("./native-vault-crypto", () => ({
-  unlockEncryptedMailVault: (...args: unknown[]) => mockUnlockVault(...args),
-  unlockEncryptedMailVaultWithDerivedKey: (...args: unknown[]) =>
-    mockUnlockVaultWithDerivedKey(...args),
-  createEncryptedMailVault: (...args: unknown[]) =>
-    mockCreateEncryptedMailVault(...args),
-}));
+jest.mock("./native-vault-crypto", () => {
+  const actual = jest.requireActual("./native-vault-crypto") as typeof import("./native-vault-crypto");
+  return {
+    ...actual,
+    unlockEncryptedMailVault: (...args: unknown[]) => mockUnlockVault(...args),
+    unlockEncryptedMailVaultWithDerivedKey: (...args: unknown[]) =>
+      mockUnlockVaultWithDerivedKey(...args),
+    createEncryptedMailVault: (...args: unknown[]) =>
+      mockCreateEncryptedMailVault(...args),
+  };
+});
 
 // Control stored password + derived key + cached private key
 const mockLoadMailVaultPassword = jest.fn<Promise<string | null>, []>();

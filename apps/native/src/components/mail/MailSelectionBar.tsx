@@ -107,7 +107,7 @@ function createStyles(theme: ThemeTokens) {
       paddingVertical: pad.headerV,
       backgroundColor: colors.selectionBar,
       ...layoutHairlineBorder(theme),
-    } as ViewStyle,
+    },
     unselectButton: {
       minWidth: 72,
       paddingVertical: pad.tight,

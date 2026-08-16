@@ -1,13 +1,13 @@
 /**
  * Mobile CryptoProvider implementation for native iOS/Android builds.
  *
- * React Native (Hermes) does not ship a WebCrypto `subtle` implementation, so
- * E2EE runs on the pure-JavaScript provider backed by `node-forge`. If the
- * runtime *does* expose a real `crypto.subtle` (for example via the installed
- * `react-native-quick-crypto` polyfill), we transparently use it instead.
+ * `react-native-quick-crypto` is installed at the Expo entry (`index.js`) so
+ * `globalThis.crypto.subtle` is the native SubtleCrypto implementation.
+ * Calendar E2EE uses that backend. `expo-crypto` still supplies the CSPRNG
+ * (`getRandomValues`, `randomUUID`).
  *
- * `expo-crypto` always provides a hardware-backed CSPRNG (`getRandomValues`,
- * `randomUUID`), so those primitives are used regardless of the subtle backend.
+ * The pure-JavaScript `node-forge` provider remains as a fallback for Jest
+ * and any runtime that still lacks `crypto.subtle`.
  */
 import type { CryptoProvider } from "@workspace/e2ee";
 import * as ExpoCrypto from "expo-crypto";
@@ -44,8 +44,8 @@ function buildFallbackMessage() {
 
   return (
     `Using the JavaScript crypto fallback for calendar E2EE on ${runtimeName} because this runtime does not expose a usable crypto.subtle implementation. ` +
-    "Mail OpenPGP still uses the native mail vault path, but first-time calendar key setup is slower until native WebCrypto is available. " +
-    "If you just enabled react-native-quick-crypto, rebuild the native app so the new module is linked."
+    "Mail OpenPGP and the mail vault expect react-native-quick-crypto to be installed at app entry. " +
+    "Rebuild the development client so the native module is linked."
   );
 }
 
@@ -69,8 +69,10 @@ function resolveSubtleCrypto(): SubtleCrypto | null {
 function createSubtleCryptoProvider(subtle: SubtleCrypto): CryptoProvider {
   return {
     randomUUID: () => ExpoCrypto.randomUUID(),
-    getRandomValues: (buffer: Uint8Array): Uint8Array =>
-      ExpoCrypto.getRandomValues(buffer),
+    getRandomValues: (buffer: Uint8Array): Uint8Array => {
+      ExpoCrypto.getRandomValues(buffer as Uint8Array<ArrayBuffer>);
+      return buffer;
+    },
     subtle: {
       generateKey: (
         algorithm: any,

@@ -23,12 +23,12 @@ import { format } from "date-fns";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Easing,
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 import {
   formatCalendarDayKey,
@@ -268,17 +268,17 @@ export function TimelinePager({
         event.velocityX > VELOCITY_COMMIT;
 
       if (committedLeft) {
-        runOnJS(handleSwipeCommit)(1);
+        scheduleOnRN(handleSwipeCommit, 1);
         translateX.value = withTiming(-pageWidth * 2, PAGE_TIMING, (done) => {
           if (done) {
-            runOnJS(handleNavigate)(1);
+            scheduleOnRN(handleNavigate, 1);
           }
         });
       } else if (committedRight) {
-        runOnJS(handleSwipeCommit)(-1);
+        scheduleOnRN(handleSwipeCommit, -1);
         translateX.value = withTiming(0, PAGE_TIMING, (done) => {
           if (done) {
-            runOnJS(handleNavigate)(-1);
+            scheduleOnRN(handleNavigate, -1);
           }
         });
       } else {

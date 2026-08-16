@@ -10,12 +10,12 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useToast } from "../../providers/ToastProvider";
@@ -95,8 +95,8 @@ export function SwipeableEventRow({
           onPress: () => {
             // Animate row off-screen then trigger delete
             translateX.value = withTiming(-500, { duration: 200 }, () => {
-              runOnJS(onDelete)(eventId);
-              runOnJS(toast)("Event deleted");
+              scheduleOnRN(onDelete, eventId);
+              scheduleOnRN(toast, "Event deleted");
             });
           },
         },
@@ -129,7 +129,7 @@ export function SwipeableEventRow({
         Math.abs(translateX.value) >= DELETE_ACTION_WIDTH * DELETE_THRESHOLD;
       if (thresholdReached && !hasReachedThreshold.value) {
         hasReachedThreshold.value = true;
-        runOnJS(triggerThresholdHaptic)();
+        scheduleOnRN(triggerThresholdHaptic);
       } else if (!thresholdReached && hasReachedThreshold.value) {
         hasReachedThreshold.value = false;
       }

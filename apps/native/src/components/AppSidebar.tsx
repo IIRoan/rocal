@@ -668,7 +668,7 @@ function createStyles(theme: ThemeTokens) {
       zIndex: 5,
     },
     overlay: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: "#000",
     },
     sidebar: {

@@ -1,0 +1,5 @@
+[install]
+# Expo autolinking and expo-doctor expect a single physical copy of native
+# modules. Bun's isolated linker nests same-version copies under expo,
+# reanimated, and worklets, which fails `npx expo-doctor`.
+linker = "hoisted"

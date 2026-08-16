@@ -1,7 +1,16 @@
 import { createRuntimeOriginPolicy } from "@workspace/runtime";
 import { env, parseCsvEnv } from "./env";
 
-function buildMobileTrustedOriginVariants(url?: string | null): string[] {
+/** Production + development-client deep links trusted without extra env. */
+export const DEFAULT_MOBILE_AUTH_CALLBACK_URLS = [
+  "solace://api/auth",
+  "solace-dev://api/auth",
+  "app.solace.onl://api/auth",
+] as const;
+
+export function buildMobileTrustedOriginVariants(
+  url?: string | null,
+): string[] {
   const trimmed = url?.trim();
 
   if (!trimmed) {
@@ -49,8 +58,7 @@ const mobileTrustedOrigins = Array.from(
     [
       env.mobileAuthCallbackUrl,
       process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL,
-      "solace://api/auth",
-      "app.solace.onl://api/auth",
+      ...DEFAULT_MOBILE_AUTH_CALLBACK_URLS,
     ].flatMap((value) => buildMobileTrustedOriginVariants(value)),
   ),
 );

@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+      - main
+      - testing
     paths:
       - "apps/native/**"
       - "packages/**"
@@ -30,6 +32,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  publish-preview-update:
+    name: Publish Preview EAS Update
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Publish update to preview
+        working-directory: apps/native
+        env:
+          APP_VARIANT: preview
+          EAS_UPDATE_MESSAGE: preview-${{ github.ref_name }}-${{ github.sha }}
+        run: eas update --branch preview --environment preview --message "$EAS_UPDATE_MESSAGE" --non-interactive
+
+  publish-development-update:
+    name: Publish Development EAS Update
+    if: github.event_name == 'push' && github.ref == 'refs/heads/testing'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Publish update to development
+        working-directory: apps/native
+        env:
+          APP_VARIANT: development
+          EAS_UPDATE_MESSAGE: development-${{ github.sha }}
+        run: eas update --branch development --environment development --message "$EAS_UPDATE_MESSAGE" --non-interactive
+
   publish-testing-update:
     name: Publish Testing EAS Update
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
@@ -59,12 +123,13 @@ jobs:
       - name: Publish update to testing
         working-directory: apps/native
         env:
+          APP_VARIANT: preview
           EAS_UPDATE_MESSAGE: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-        run: eas update --branch testing --environment production --message "$EAS_UPDATE_MESSAGE"
+        run: eas update --branch testing --environment preview --message "$EAS_UPDATE_MESSAGE" --non-interactive
 
   publish-master-update:
     name: Publish Master EAS Update
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -89,5 +154,6 @@ jobs:
       - name: Publish update to master
         working-directory: apps/native
         env:
+          APP_VARIANT: production
           EAS_UPDATE_MESSAGE: master-${{ github.sha }}
-        run: eas update --branch master --environment production --message "$EAS_UPDATE_MESSAGE"
+        run: eas update --branch master --environment production --message "$EAS_UPDATE_MESSAGE" --non-interactive

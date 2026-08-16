@@ -103,7 +103,7 @@ function createStyles(theme: ThemeTokens) {
       overflow: "hidden",
     } as ViewStyle,
     layer: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       justifyContent: "center",
     } as ViewStyle,
   });

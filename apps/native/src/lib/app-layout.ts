@@ -65,7 +65,7 @@ export function layoutHeaderShell(
   };
 }
 
-export function layoutHairlineBorder(theme: ThemeTokens): ViewStyle {
+export function layoutHairlineBorder(theme: ThemeTokens) {
   return {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.colors.border,

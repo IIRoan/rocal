@@ -25,6 +25,7 @@ import {
   createEncryptedMailVault,
   unlockEncryptedMailVault,
   unlockEncryptedMailVaultWithDerivedKey,
+  isArgon2SafeToRunLocally,
   type UserKeyVault,
 } from "./native-vault-crypto";
 import {
@@ -57,9 +58,6 @@ const KEY_MATERIAL_KDF: Partial<MailVaultKdfParams> = {
   iterations: 1,
   parallelism: 1,
 };
-const MAX_SAFE_NATIVE_ARGON2_MEMORY_KIB = 8192;
-const MAX_SAFE_NATIVE_ARGON2_ITERATIONS = 1;
-const MAX_SAFE_NATIVE_ARGON2_PARALLELISM = 1;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -181,11 +179,7 @@ async function fetchKeyMaterial(endpoint: string): Promise<KeyMaterialResult> {
 }
 
 function canAttemptLocalVaultUnlock(kdfParams: MailVaultKdfParams): boolean {
-  return (
-    kdfParams.memoryKiB <= MAX_SAFE_NATIVE_ARGON2_MEMORY_KIB &&
-    kdfParams.iterations <= MAX_SAFE_NATIVE_ARGON2_ITERATIONS &&
-    kdfParams.parallelism <= MAX_SAFE_NATIVE_ARGON2_PARALLELISM
-  );
+  return isArgon2SafeToRunLocally(kdfParams);
 }
 
 function getPassphraseCandidates(input: {
@@ -282,7 +276,7 @@ async function decryptVaultPrivateKey(
       );
     }
     // Cache the unprotected key so we skip S2K on the next app session.
-    saveCachedPrivateKey(privateKey.armor()).catch(() => {});
+    saveCachedPrivateKey(privateKey.armor()).catch(() => { });
   } else {
     log.debug("[mail-crypto] decryptVaultPrivateKey: private key is already decrypted (no passphrase needed)");
   }
@@ -304,7 +298,7 @@ async function loadCachedPrivateKeyForVault(
     if (
       candidate.isDecrypted() &&
       candidate.getFingerprint().toUpperCase() ===
-        vault.publicKeyFingerprint.toUpperCase()
+      vault.publicKeyFingerprint.toUpperCase()
     ) {
       log.debug(
         "[mail-crypto] loadCachedPrivateKeyForVault: using cached decrypted private key",
@@ -508,7 +502,7 @@ async function doLoadVault(
 
   if (!canAttemptLocalVaultUnlock(backup.kdfParams)) {
     log.error(
-      "[mail-crypto] doLoadVault: ABORTING — local argon2id migration is too expensive for Hermes (memoryKiB=%d iterations=%d parallelism=%d)",
+      "[mail-crypto] doLoadVault: ABORTING — local argon2id params exceed this device's safe limits (memoryKiB=%d iterations=%d parallelism=%d)",
       backup.kdfParams.memoryKiB,
       backup.kdfParams.iterations,
       backup.kdfParams.parallelism,
@@ -678,7 +672,7 @@ export async function decryptPgpMimeMessage(
   } catch (err) {
     throw new Error(
       `[mail-crypto] id=${messageId}: Failed to fetch PGP/MIME ciphertext blob: ` +
-        (err instanceof Error ? err.message : String(err)),
+      (err instanceof Error ? err.message : String(err)),
     );
   }
 
@@ -780,7 +774,7 @@ async function decryptArmoredMessage(
     } catch (err) {
       throw new Error(
         `[mail-crypto] id=${messageId}: Failed to parse PGP message: ` +
-          (err instanceof Error ? err.message : String(err)),
+        (err instanceof Error ? err.message : String(err)),
       );
     }
 
@@ -794,7 +788,7 @@ async function decryptArmoredMessage(
     } catch (err) {
       throw new Error(
         `[mail-crypto] id=${messageId}: PGP decryption failed: ` +
-          (err instanceof Error ? err.message : String(err)),
+        (err instanceof Error ? err.message : String(err)),
       );
     }
 
@@ -873,11 +867,11 @@ export async function saveVaultLabels(labels: LabelDef[]): Promise<void> {
     cachedVault.passphrase,
     kdfParams
       ? {
-          saltB64: kdfParams.saltB64,
-          memoryKiB: kdfParams.memoryKiB,
-          iterations: kdfParams.iterations,
-          parallelism: kdfParams.parallelism,
-        }
+        saltB64: kdfParams.saltB64,
+        memoryKiB: kdfParams.memoryKiB,
+        iterations: kdfParams.iterations,
+        parallelism: kdfParams.parallelism,
+      }
       : KEY_MATERIAL_KDF,
   );
 

@@ -1,17 +1,22 @@
 /**
  * Tests for native-vault-crypto.ts
  *
- * Verifies that the pure-JS argon2id + node-forge AES-GCM implementation
- * can round-trip encrypt/decrypt a mail vault — and that it is byte-for-byte
- * compatible with the web's vault-crypto.ts output (same KDF, same cipher).
- *
- * Tests run in a Node environment (jest testEnvironment: "node"), so
- * `globalThis.crypto` is the native Node.js `Crypto` object.
+ * Verifies that argon2id + AES-GCM can round-trip a mail vault. Jest uses
+ * Node's WebCrypto for AES-GCM (the same API the native client uses via
+ * react-native-quick-crypto) and @noble/hashes for Argon2id unless a native
+ * argon2Sync mock is provided.
  */
 
 import {
   createEncryptedMailVault,
   unlockEncryptedMailVault,
+  unlockEncryptedMailVaultWithDerivedKey,
+  aesGcmEncrypt,
+  aesGcmDecrypt,
+  deriveArgon2id,
+  tryNativeArgon2id,
+  isArgon2SafeToRunLocally,
+  hasNativeArgon2,
   type UserKeyVault,
 } from "./native-vault-crypto";
 import type { MailVaultKdfParams } from "./types";
@@ -212,6 +217,132 @@ describe("native-vault-crypto", () => {
       await expect(
         unlockEncryptedMailVault(tampered, "pw", kdfParams),
       ).rejects.toThrow(/algorithm/i);
+    }, 30_000);
+  });
+
+  describe("WebCrypto AES-GCM", () => {
+    it("encrypts and decrypts through crypto.subtle when it is available", async () => {
+      const encryptSpy = jest.spyOn(globalThis.crypto.subtle, "encrypt");
+      const decryptSpy = jest.spyOn(globalThis.crypto.subtle, "decrypt");
+
+      const { encryptedVaultB64, kdfParams } = await createEncryptedMailVault(
+        SAMPLE_VAULT,
+        "subtle-pass",
+        FAST_KDF,
+      );
+      const unlocked = await unlockEncryptedMailVault(
+        encryptedVaultB64,
+        "subtle-pass",
+        kdfParams,
+      );
+
+      expect(encryptSpy).toHaveBeenCalled();
+      expect(decryptSpy).toHaveBeenCalled();
+      expect(unlocked.email).toBe(SAMPLE_VAULT.email);
+
+      encryptSpy.mockRestore();
+      decryptSpy.mockRestore();
+    }, 30_000);
+
+    it("falls back to node-forge when subtle is missing", async () => {
+      const original = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+      Object.defineProperty(globalThis, "crypto", {
+        value: { getRandomValues: globalThis.crypto.getRandomValues.bind(globalThis.crypto) },
+        configurable: true,
+        writable: true,
+      });
+
+      try {
+        const key = new Uint8Array(32).fill(7);
+        const iv = new Uint8Array(12).fill(3);
+        const plaintext = new TextEncoder().encode("forge-fallback");
+        const ciphertext = await aesGcmEncrypt(key, iv, plaintext);
+        await expect(aesGcmDecrypt(key, iv, ciphertext)).resolves.toBe(
+          "forge-fallback",
+        );
+      } finally {
+        if (original) {
+          Object.defineProperty(globalThis, "crypto", original);
+        }
+      }
+    });
+  });
+
+  describe("Argon2id backends", () => {
+    it("allows web-default KDF params only when native argon2 is present", () => {
+      const webDefault = {
+        saltB64: FAST_KDF.saltB64,
+        memoryKiB: 65536,
+        iterations: 3,
+        parallelism: 4,
+      };
+
+      expect(hasNativeArgon2()).toBe(false);
+      expect(isArgon2SafeToRunLocally(webDefault, false)).toBe(false);
+      expect(isArgon2SafeToRunLocally(webDefault, true)).toBe(true);
+      expect(isArgon2SafeToRunLocally(FAST_KDF, false)).toBe(true);
+      expect(
+        isArgon2SafeToRunLocally(
+          { ...webDefault, memoryKiB: 131072 },
+          true,
+        ),
+      ).toBe(false);
+    });
+
+    it("prefers native argon2Sync when it returns 32 bytes", () => {
+      const password = new TextEncoder().encode("pw");
+      const salt = new Uint8Array(16);
+      const nativeKey = new Uint8Array(32).fill(9);
+      const quickCrypto = jest.requireMock("react-native-quick-crypto") as {
+        argon2Sync?: jest.Mock;
+      };
+      quickCrypto.argon2Sync = jest.fn(() => nativeKey);
+
+      try {
+        expect(hasNativeArgon2()).toBe(true);
+        expect(tryNativeArgon2id(password, salt, FAST_KDF)).toEqual(nativeKey);
+        expect(deriveArgon2id(password, salt, FAST_KDF)).toEqual(nativeKey);
+        expect(quickCrypto.argon2Sync).toHaveBeenCalledWith(
+          "argon2id",
+          expect.objectContaining({
+            memory: FAST_KDF.memoryKiB,
+            passes: FAST_KDF.iterations,
+            parallelism: FAST_KDF.parallelism,
+            tagLength: 32,
+          }),
+        );
+      } finally {
+        delete quickCrypto.argon2Sync;
+      }
+    });
+
+    it("falls back to noble when native argon2Sync is missing", () => {
+      const password = new TextEncoder().encode("pw");
+      const salt = new Uint8Array(16).fill(1);
+      expect(tryNativeArgon2id(password, salt, FAST_KDF)).toBeNull();
+      expect(deriveArgon2id(password, salt, FAST_KDF)).toHaveLength(32);
+    });
+  });
+
+  describe("unlockEncryptedMailVaultWithDerivedKey", () => {
+    it("decrypts a vault sealed with a raw AES key", async () => {
+      const passphrase = "derived-key-path";
+      const { encryptedVaultB64, kdfParams } = await createEncryptedMailVault(
+        SAMPLE_VAULT,
+        passphrase,
+        FAST_KDF,
+      );
+      const derivedKey = deriveArgon2id(
+        new TextEncoder().encode(passphrase),
+        Uint8Array.from(atob(kdfParams.saltB64), (c) => c.charCodeAt(0)),
+        kdfParams,
+      );
+
+      const unlocked = await unlockEncryptedMailVaultWithDerivedKey(
+        encryptedVaultB64,
+        btoa(String.fromCharCode(...derivedKey)),
+      );
+      expect(unlocked.email).toBe(SAMPLE_VAULT.email);
     }, 30_000);
   });
 });

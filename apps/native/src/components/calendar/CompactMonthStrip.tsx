@@ -21,13 +21,13 @@ import Animated, {
   Easing,
   Extrapolation,
   interpolate,
-  runOnJS,
   type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { addMonths, format, isSameDay, isSameMonth } from "date-fns";
 import { useTheme } from "../../providers/ThemeProvider";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
@@ -499,7 +499,7 @@ function CompactMonthStripComponent({
     if (embeddedInHeader && expanded) {
       animatedContentHeight.value = target;
       if (onExpandAnimationEnd != null) {
-        runOnJS(onExpandAnimationEnd)(true);
+        scheduleOnRN(onExpandAnimationEnd, true);
       }
       return;
     }
@@ -511,14 +511,14 @@ function CompactMonthStripComponent({
           { duration: EXPAND_TIMING_MS },
           (finished) => {
             if (finished && expandAnimationSessionRef.current === session && onExpandAnimationEnd != null) {
-              runOnJS(onExpandAnimationEnd)(true);
+              scheduleOnRN(onExpandAnimationEnd, true);
             }
           },
         );
       } else {
         animatedContentHeight.value = withSpring(target, HEIGHT_SPRING, (finished) => {
           if (finished && expandAnimationSessionRef.current === session && onExpandAnimationEnd != null) {
-            runOnJS(onExpandAnimationEnd)(true);
+            scheduleOnRN(onExpandAnimationEnd, true);
           }
         });
       }
@@ -527,7 +527,7 @@ function CompactMonthStripComponent({
 
     const onCollapseFinished = (finished?: boolean) => {
       if (finished && expandAnimationSessionRef.current === session && onExpandAnimationEnd != null) {
-        runOnJS(onExpandAnimationEnd)(false);
+        scheduleOnRN(onExpandAnimationEnd, false);
       }
     };
 
@@ -653,7 +653,7 @@ function CompactMonthStripComponent({
               { duration: PAGE_DURATION, easing: PAGE_EASING },
               (finished) => {
                 if (finished) {
-                  runOnJS(handleNavigateLeft)();
+                  scheduleOnRN(handleNavigateLeft);
                 }
               },
             );
@@ -663,7 +663,7 @@ function CompactMonthStripComponent({
               { duration: PAGE_DURATION, easing: PAGE_EASING },
               (finished) => {
                 if (finished) {
-                  runOnJS(handleNavigateRight)();
+                  scheduleOnRN(handleNavigateRight);
                 }
               },
             );

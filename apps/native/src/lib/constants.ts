@@ -1,4 +1,23 @@
-export const APP_SCHEME = "solace";
+import Constants from "expo-constants";
+
+function firstScheme(scheme: unknown): string | null {
+  if (typeof scheme === "string" && scheme.length > 0) {
+    return scheme;
+  }
+
+  if (
+    Array.isArray(scheme) &&
+    typeof scheme[0] === "string" &&
+    scheme[0].length > 0
+  ) {
+    return scheme[0];
+  }
+
+  return null;
+}
+
+/** Deep-link scheme for this binary (`solace` or `solace-dev`). */
+export const APP_SCHEME = firstScheme(Constants.expoConfig?.scheme) ?? "solace";
 export const AUTH_STORAGE_PREFIX = "solace";
 
 /**

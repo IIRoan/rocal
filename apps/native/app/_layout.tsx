@@ -7,6 +7,8 @@ import "../src/lib/install-native-crypto";
 import { QueryProvider } from "../src/providers/QueryProvider";
 import { AuthProvider, useAuth } from "../src/providers/AuthProvider";
 import { ThemeProvider } from "../src/providers/ThemeProvider";
+import { AppUpdateProvider } from "../src/providers/AppUpdateProvider";
+import { AppUpdateScreen } from "../src/components/settings/AppUpdateScreen";
 import { E2eeProvider, useE2ee } from "../src/providers/E2eeProvider";
 import { SheetProvider } from "../src/providers/SheetProvider";
 import { ToastProvider } from "../src/providers/ToastProvider";
@@ -164,37 +166,48 @@ export default function RootLayout() {
       <QueryProvider>
         <AuthProvider>
           <ThemeProvider>
-            <E2eeProvider>
-              <SidebarProvider>
-                <MailSelectionProvider>
-                  <CalendarViewProvider>
-                    <NavigationGuard>
-                      <ToastProvider>
-                        <SheetProvider>
-                          <CommandPaletteProvider>
-                            <Stack screenOptions={NATIVE_STACK_SCREEN_OPTIONS}>
-                              <Stack.Screen
-                                name="index"
-                                options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
-                              />
-                              <Stack.Screen
-                                name="(auth)"
-                                options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
-                              />
-                              <Stack.Screen
-                                name="(tabs)"
-                                options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
-                              />
-                            </Stack>
-                            <AuthenticatedChrome />
-                          </CommandPaletteProvider>
-                        </SheetProvider>
-                      </ToastProvider>
-                    </NavigationGuard>
-                  </CalendarViewProvider>
-                </MailSelectionProvider>
-              </SidebarProvider>
-            </E2eeProvider>
+            <AppUpdateProvider>
+              <AppUpdateScreen />
+              <E2eeProvider>
+                <SidebarProvider>
+                  <MailSelectionProvider>
+                    <CalendarViewProvider>
+                      <NavigationGuard>
+                        <ToastProvider>
+                          <SheetProvider>
+                            <CommandPaletteProvider>
+                              <Stack
+                                screenOptions={NATIVE_STACK_SCREEN_OPTIONS}
+                              >
+                                <Stack.Screen
+                                  name="index"
+                                  options={
+                                    NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
+                                  }
+                                />
+                                <Stack.Screen
+                                  name="(auth)"
+                                  options={
+                                    NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
+                                  }
+                                />
+                                <Stack.Screen
+                                  name="(tabs)"
+                                  options={
+                                    NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
+                                  }
+                                />
+                              </Stack>
+                              <AuthenticatedChrome />
+                            </CommandPaletteProvider>
+                          </SheetProvider>
+                        </ToastProvider>
+                      </NavigationGuard>
+                    </CalendarViewProvider>
+                  </MailSelectionProvider>
+                </SidebarProvider>
+              </E2eeProvider>
+            </AppUpdateProvider>
           </ThemeProvider>
         </AuthProvider>
       </QueryProvider>
