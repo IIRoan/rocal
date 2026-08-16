@@ -10,12 +10,12 @@ import React, {
 import { Platform, StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import * as Haptics from "expo-haptics";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -103,7 +103,7 @@ function ToastItem({
       80,
       { duration: EXIT_DURATION },
       (finished) => {
-        if (finished) runOnJS(onRemove)(item.id);
+        if (finished) scheduleOnRN(onRemove, item.id);
       },
     );
     scale.value = withTiming(0.92, { duration: EXIT_DURATION });
@@ -142,7 +142,7 @@ function ToastItem({
         e.translationY > SWIPE_DISMISS_THRESHOLD ||
         e.velocityY > SWIPE_VELOCITY_THRESHOLD
       ) {
-        runOnJS(triggerDismiss)();
+        scheduleOnRN(triggerDismiss);
       } else {
         gestureTranslateY.value = withSpring(0, { damping: 20, stiffness: 300 });
         opacity.value = withTiming(1, { duration: 150 });
@@ -150,7 +150,7 @@ function ToastItem({
     });
 
   const tapGesture = Gesture.Tap().onEnd(() => {
-    runOnJS(triggerDismiss)();
+    scheduleOnRN(triggerDismiss);
   });
 
   const combinedGesture = Gesture.Race(panGesture, tapGesture);

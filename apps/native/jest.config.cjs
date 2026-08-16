@@ -16,13 +16,11 @@ module.exports = {
   ],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   moduleNameMapper: {
-    // Force a single React instance to prevent "Invalid hook call" errors
-    // caused by react-dom (19.2.0) bundling its own react (19.2.0) while the
-    // app imports react@19.1.0 from the root. Redirecting all react imports to
-    // react-dom's peer version keeps them in sync.
-    "^react$": "<rootDir>/../../node_modules/react-dom/node_modules/react/index.js",
-    "^react/jsx-runtime$": "<rootDir>/../../node_modules/react-dom/node_modules/react/jsx-runtime.js",
-    "^react/jsx-dev-runtime$": "<rootDir>/../../node_modules/react-dom/node_modules/react/jsx-dev-runtime.js",
+    // Keep a single React instance. react-dom still nests an older copy in
+    // some layouts; native is on React 19.2.3 from Expo SDK 57.
+    "^react$": "<rootDir>/../../node_modules/react/index.js",
+    "^react/jsx-runtime$": "<rootDir>/../../node_modules/react/jsx-runtime.js",
+    "^react/jsx-dev-runtime$": "<rootDir>/../../node_modules/react/jsx-dev-runtime.js",
     "^@/(.*)$": "<rootDir>/$1",
     "^@workspace/design-tokens$":
       "<rootDir>/../../packages/design-tokens/src/index.ts",

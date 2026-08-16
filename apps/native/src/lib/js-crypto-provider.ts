@@ -6,7 +6,7 @@ import forge from "node-forge";
 type SecretKeyKind = "aes-gcm" | "hmac" | "pbkdf2";
 
 interface BaseForgeKey {
-  algorithm: { name: string; [key: string]: unknown };
+  algorithm: { name: string;[key: string]: unknown };
   extractable: boolean;
   usages: string[];
 }
@@ -54,8 +54,10 @@ interface JsonWebKeyShape {
 export function createJsCryptoProvider(): CryptoProvider {
   return {
     randomUUID: () => ExpoCrypto.randomUUID(),
-    getRandomValues: (buffer: Uint8Array): Uint8Array =>
-      ExpoCrypto.getRandomValues(buffer),
+    getRandomValues: (buffer: Uint8Array): Uint8Array => {
+      ExpoCrypto.getRandomValues(buffer as Uint8Array<ArrayBuffer>);
+      return buffer;
+    },
     subtle: {
       generateKey: async (
         algorithm: any,
@@ -425,7 +427,7 @@ function exportRsaPrivateJwk(key: ForgeRsaPrivateKey): JsonWebKeyShape {
 function createSecretKey(
   kind: SecretKeyKind,
   bytes: string,
-  algorithm: { name: string; [key: string]: unknown },
+  algorithm: { name: string;[key: string]: unknown },
   extractable: boolean,
   usages: string[],
 ): ForgeSecretKey {
@@ -473,7 +475,9 @@ function expectRsaPrivateKey(key: CryptoKey): ForgeRsaPrivateKey {
 }
 
 function createRandomBytes(byteLength: number): string {
-  return toBinaryString(ExpoCrypto.getRandomValues(new Uint8Array(byteLength)));
+  const bytes = new Uint8Array(byteLength);
+  ExpoCrypto.getRandomValues(bytes as Uint8Array<ArrayBuffer>);
+  return toBinaryString(bytes);
 }
 
 function toBinaryString(

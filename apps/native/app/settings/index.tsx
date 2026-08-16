@@ -41,7 +41,10 @@ import { useToast } from "../../src/providers/ToastProvider";
 import { authClient } from "../../src/lib/auth-client";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { calendarApiService } from "../../src/lib/api";
-import { SETTINGS_TIMEZONE_ROUTE, SETTINGS_CONTACTS_ROUTE } from "../../src/lib/auth-routing";
+import {
+  SETTINGS_TIMEZONE_ROUTE,
+  SETTINGS_CONTACTS_ROUTE,
+} from "../../src/lib/auth-routing";
 import { formatStoredPasskeyDescription } from "../../src/lib/passkey-auth";
 import { getAuthCapabilities } from "../../src/lib/auth-capabilities";
 import {
@@ -58,6 +61,7 @@ import {
 } from "../../src/lib/settings-options";
 import { getSettingsAccountActions } from "../../src/lib/settings-screen-utils";
 import { AppScreen } from "../../src/components/layout";
+import { AppUpdateSettingsSection } from "../../src/components/settings/AppUpdateSettingsSection";
 import { StackScreenHeader } from "../../src/components/StackScreenHeader";
 import { layoutScrollContent } from "../../src/lib/app-layout";
 import { BottomSheet } from "../../src/components/BottomSheet";
@@ -893,6 +897,12 @@ export default function SettingsScreen() {
               theme={theme}
             />
           )}
+        </View>
+
+        {/* ── App ──────────────────────────────────────────────────────── */}
+        <SectionLabel text="App" theme={theme} isFirst={false} />
+        <View style={styles.sectionItems}>
+          <AppUpdateSettingsSection />
         </View>
 
         {/* ── Account ──────────────────────────────────────────────────── */}

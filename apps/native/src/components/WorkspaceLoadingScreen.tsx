@@ -281,7 +281,7 @@ function createStyles(theme: ThemeTokens) {
       opacity: 0.07,
     },
     centerOverlay: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       alignItems: "center",
       justifyContent: "center",
       gap: 2,

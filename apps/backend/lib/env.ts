@@ -163,7 +163,7 @@ export const env = {
     | "strict"
     | "none",
 
-  /** Mobile deep-link callback URL for OAuth flows. */
+  /** Mobile deep-link callback URL for OAuth flows (production `solace://` scheme). */
   mobileAuthCallbackUrl:
     process.env.MOBILE_AUTH_CALLBACK_URL ||
     process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL ||
@@ -221,7 +221,7 @@ export const env = {
   /** Trusted client ids that should be cached and treated as managed. */
   mailOauthCachedTrustedClientIds: parseCsvEnv(
     process.env.MAIL_OAUTH_CACHED_TRUSTED_CLIENT_IDS ||
-      process.env.MAIL_OAUTH_CLIENT_ID,
+    process.env.MAIL_OAUTH_CLIENT_ID,
   ),
 
   /** Optional frontend login page override for OAuth redirects. */
