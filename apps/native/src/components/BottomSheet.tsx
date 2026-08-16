@@ -22,13 +22,13 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   cancelAnimation,
   clamp,
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
   type SharedValue,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { useTheme } from "../providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
@@ -346,7 +346,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         cancelAnimation(backdropOpacity);
         translateY.value = withSpring(maxHeight, SPRING_CLOSE, (finished) => {
           if (finished) {
-            runOnJS(finishUnmountIfCurrent)(closeSequence);
+            scheduleOnRN(finishUnmountIfCurrent, closeSequence);
           }
         });
         backdropOpacity.value = withTiming(0, { duration: CLOSE_DURATION });
@@ -428,7 +428,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
               maxHeight,
             );
             if (dismiss) {
-              runOnJS(requestClose)();
+              scheduleOnRN(requestClose);
             } else {
               translateY.value = withSpring(target, SPRING_SETTLE);
             }
@@ -488,7 +488,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
               maxHeight,
             );
             if (dismiss) {
-              runOnJS(requestClose)();
+              scheduleOnRN(requestClose);
             } else {
               translateY.value = withSpring(target, SPRING_SETTLE);
             }
@@ -580,16 +580,16 @@ function createStyles(theme: ThemeTokens) {
     } as ViewStyle,
 
     overlay: {
-      position: "absolute",
+      position: "absolute" as const,
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
       backgroundColor: SCRIM_COLOR,
-    } as ViewStyle,
+    },
 
     sheet: {
-      position: "absolute",
+      position: "absolute" as const,
       bottom: 0,
       left: 0,
       right: 0,
@@ -605,7 +605,7 @@ function createStyles(theme: ThemeTokens) {
           }
         : { elevation: 24 }),
       overflow: "hidden",
-    } as ViewStyle,
+    },
 
     handleArea: {
       height: HANDLE_HEIGHT,
@@ -625,6 +625,6 @@ function createStyles(theme: ThemeTokens) {
     contentWrapper: {
       flex: 1,
       minHeight: 0,
-    } as ViewStyle,
+    },
   });
 }

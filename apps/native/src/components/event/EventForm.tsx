@@ -29,12 +29,12 @@ import Animated, {
   Extrapolation,
   cancelAnimation,
   interpolate,
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { format } from "date-fns";
 import { useTheme } from "../../providers/ThemeProvider";
@@ -1253,7 +1253,7 @@ function PickerSheet({
         { duration: PICKER_CLOSE_DURATION },
         (finished) => {
           if (finished) {
-            runOnJS(finishUnmountIfCurrent)(closeSequence);
+            scheduleOnRN(finishUnmountIfCurrent, closeSequence);
           }
         },
       );
@@ -1301,7 +1301,7 @@ function PickerSheet({
         e.translationY > PICKER_DISMISS_DISTANCE ||
         e.velocityY > PICKER_DISMISS_VELOCITY
       ) {
-        runOnJS(requestClose)();
+        scheduleOnRN(requestClose);
       } else {
         translateY.value = withSpring(0, PICKER_SPRING);
       }

@@ -1,42 +1,82 @@
 import type { ExpoConfig } from "expo/config";
 
+const variant = process.env.APP_VARIANT ?? "production";
+const isDev = variant === "development";
+
 const baseConfig = {
-  name: "Solace",
+  name: isDev ? "Solace Dev" : "Solace",
   slug: "solace",
   version: "1.0.0",
   orientation: "portrait",
-  scheme: "solace",
-  newArchEnabled: true,
+  icon: isDev ? "./assets/icon-dev.png" : "./assets/icon.png",
+  scheme: isDev ? "solace-dev" : "solace",
   userInterfaceStyle: "automatic",
   runtimeVersion: {
-    policy: "appVersion",
+    policy: "fingerprint",
   },
   updates: {
-    checkAutomatically: "ON_LOAD",
+    enabled: true,
+    checkAutomatically: "NEVER",
     fallbackToCacheTimeout: 0,
   },
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "onl.solace.mobile",
+    bundleIdentifier: isDev ? "onl.solace.mobile.dev" : "onl.solace.mobile",
     buildNumber: "1",
-  },
-  android: {
-    package: "onl.solace.mobile",
-    versionCode: 1,
-    adaptiveIcon: {
-      backgroundColor: "#ffffff",
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
     },
   },
-  plugins: ["expo-router", "expo-secure-store"],
+  android: {
+    package: isDev ? "onl.solace.mobile.dev" : "onl.solace.mobile",
+    versionCode: 1,
+    adaptiveIcon: {
+      foregroundImage: isDev
+        ? "./assets/adaptive-icon-dev.png"
+        : "./assets/adaptive-icon.png",
+      backgroundColor: "#2d2d2d",
+    },
+  },
+  plugins: [
+    "expo-router",
+    ...(isDev
+      ? ([["expo-dev-client", { addGeneratedScheme: true }]] as [
+        string,
+        { addGeneratedScheme: boolean },
+      ][])
+      : []),
+    "expo-secure-store",
+    [
+      "expo-splash-screen",
+      {
+        image: isDev
+          ? "./assets/splash-icon-dev.png"
+          : "./assets/splash-icon.png",
+        imageWidth: 200,
+        resizeMode: "contain",
+        backgroundColor: "#fafafa",
+        dark: {
+          backgroundColor: "#2d2d2d",
+        },
+      },
+    ],
+    "expo-web-browser",
+    "expo-updates",
+    "expo-sharing",
+    "expo-status-bar",
+    "react-native-quick-crypto",
+  ],
   experiments: {
     typedRoutes: true,
+    autolinkingModuleResolution: true,
   },
   extra: {
     eas: {
       projectId: "1047b680-b99f-4671-9824-23b9a0487125",
     },
+    appVariant: variant,
   },
-  owner: "iroan",
+  owner: "astralgrove",
 } as ExpoConfig;
 
 const expoOwner = process.env.EXPO_OWNER || baseConfig.owner;
@@ -105,7 +145,7 @@ const configuredPlugins = [
     "expo-build-properties",
     {
       ios: {
-        deploymentTarget: "15.1",
+        deploymentTarget: "16.4",
       },
     },
   ] as [string, { ios: { deploymentTarget: string } }],
@@ -131,9 +171,9 @@ const config: ExpoConfig = {
     ...baseConfig.extra,
     eas: expoProjectId
       ? {
-          ...(baseConfig.extra?.eas ?? {}),
-          projectId: expoProjectId,
-        }
+        ...(baseConfig.extra?.eas ?? {}),
+        projectId: expoProjectId,
+      }
       : baseConfig.extra?.eas,
   },
   updates: {

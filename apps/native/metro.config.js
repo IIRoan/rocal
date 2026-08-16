@@ -27,6 +27,9 @@ const config = getDefaultConfig(__dirname);
 // real build via the `openpgp/dist/openpgp.min.mjs` path, which does NOT match
 // the bare `openpgp` specifier below, so there is no resolution loop.
 // TypeScript types still come from the package's own `openpgp.d.ts`.
+// Native `crypto` imports are redirected to react-native-quick-crypto so
+// OpenPGP's Node fallback (`require("crypto")`) and any other Node crypto
+// consumers get the native implementation on iOS/Android.
 // ---------------------------------------------------------------------------
 const openpgpHermesShim = path.resolve(
   __dirname,
@@ -37,6 +40,16 @@ const defaultResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === "openpgp") {
     return { type: "sourceFile", filePath: openpgpHermesShim };
+  }
+  if (
+    moduleName === "crypto" &&
+    (platform === "ios" || platform === "android")
+  ) {
+    return context.resolveRequest(
+      context,
+      "react-native-quick-crypto",
+      platform,
+    );
   }
   if (defaultResolveRequest) {
     return defaultResolveRequest(context, moduleName, platform);

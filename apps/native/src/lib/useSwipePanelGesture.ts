@@ -1,12 +1,12 @@
 import { Gesture } from "react-native-gesture-handler";
 import {
   cancelAnimation,
-  runOnJS,
   useSharedValue,
   withSpring,
   type SharedValue,
   type WithSpringConfig,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
 
@@ -156,10 +156,10 @@ export function useSwipePanelGesture(
 
       if (movedDown && onCommitDown != null) {
         animatedValue.value = withSpring(upperBound, springConfig);
-        runOnJS(onCommitDown)();
+        scheduleOnRN(onCommitDown);
       } else if (movedUp && onCommitUp != null) {
         animatedValue.value = withSpring(lowerBound, springConfig);
-        runOnJS(onCommitUp)();
+        scheduleOnRN(onCommitUp);
       } else {
         animatedValue.value = withSpring(restValue, springConfig);
       }
