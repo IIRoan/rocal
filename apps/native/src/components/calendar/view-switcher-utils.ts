@@ -1,5 +1,9 @@
-import { format, startOfWeek, endOfWeek, isSameMonth } from "date-fns";
+import { format, isSameMonth } from "date-fns";
 import type { CalendarView } from "@workspace/calendar-core";
+import {
+  getWeekCalendarRange,
+  resolveTimezone,
+} from "@workspace/calendar-core";
 import { getThreeDayDates } from "./timeline-utils";
 
 // ─── View Labels ─────────────────────────────────────────────────────────────
@@ -28,10 +32,36 @@ export function formatCalendarToolbarTitle(currentDate: Date): string {
   return format(currentDate, "MMM yyyy");
 }
 
+const TIMELINE_VIEWS = new Set<CalendarView>(["week", "day", "3day"]);
+
+/**
+ * Date used by the calendar toolbar title. Timeline swipes preview the next
+ * page before `selectedDate` commits, so the title must follow that preview
+ * or it stays a week behind the day row.
+ */
+export function resolveCalendarSwitcherDate({
+  view,
+  currentDate,
+  selectedDate,
+  previewDate,
+}: {
+  view: CalendarView;
+  currentDate: Date;
+  selectedDate: Date;
+  previewDate?: Date | null;
+}): Date {
+  if (TIMELINE_VIEWS.has(view)) {
+    return previewDate ?? selectedDate;
+  }
+
+  return currentDate;
+}
+
 export function formatViewDateHeader(
   view: CalendarView,
   currentDate: Date,
   weekStartDay: number = 0,
+  timezone?: string | null,
 ): string {
   switch (view) {
     case "month":
@@ -39,12 +69,11 @@ export function formatViewDateHeader(
       return format(currentDate, "MMMM yyyy");
 
     case "week": {
-      const weekStart = startOfWeek(currentDate, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-      const weekEnd = endOfWeek(currentDate, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
+      const { start: weekStart, end: weekEnd } = getWeekCalendarRange(
+        currentDate,
+        weekStartDay,
+        resolveTimezone(timezone),
+      );
 
       if (isSameMonth(weekStart, weekEnd)) {
         return `${format(weekStart, "MMM d")} – ${format(weekEnd, "d")}`;

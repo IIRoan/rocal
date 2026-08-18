@@ -32,6 +32,7 @@ import {
 } from "../../../src/components/calendar/navigation-utils";
 import { getThreeDayStripDates } from "../../../src/components/calendar/timeline-utils";
 import { CalendarViewSwitcher } from "../../../src/components/calendar/CalendarViewSwitcher";
+import { resolveCalendarSwitcherDate } from "../../../src/components/calendar/view-switcher-utils";
 import { CompactMonthStrip } from "../../../src/components/calendar/CompactMonthStrip";
 import { MonthGrid } from "../../../src/components/calendar/MonthGrid";
 import { SkeletonLoader } from "../../../src/components/calendar/SkeletonLoader";
@@ -58,6 +59,9 @@ export default function CalendarScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [monthStripExpanded, setMonthStripExpanded] = useState(false);
+  const [timelinePreviewDate, setTimelinePreviewDate] = useState<Date | null>(
+    null,
+  );
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: QUERY_KEYS.settings(),
@@ -71,7 +75,7 @@ export default function CalendarScreen() {
   });
 
   const detailDateRange = useMemo(() => {
-    const weekStartDay = settings?.weekStartDay ?? 0;
+    const weekStartDay = settings?.weekStartDay ?? 1;
 
     if (
       activeView === "day" ||
@@ -297,13 +301,46 @@ export default function CalendarScreen() {
     [monthStartDate, monthStripExpanded, setCurrentDate, setSelectedDate],
   );
 
+  const isTimelineView =
+    activeView === "week" || activeView === "3day" || activeView === "day";
+
+  const handleDetailNavigate = useCallback(
+    (direction: 1 | -1) => {
+      setTimelinePreviewDate(null);
+      setSelectedDate((prev) => {
+        const next = navigateCalendarDate(prev, activeView, direction);
+        setCurrentDate(next);
+        return next;
+      });
+    },
+    [activeView, setCurrentDate, setSelectedDate],
+  );
+
   const handleNavigateForward = useCallback(() => {
+    if (isTimelineView && !monthStripExpanded) {
+      handleDetailNavigate(1);
+      return;
+    }
     navigateMonth(1, !monthStripExpanded);
-  }, [navigateMonth, monthStripExpanded]);
+  }, [
+    handleDetailNavigate,
+    isTimelineView,
+    monthStripExpanded,
+    navigateMonth,
+  ]);
 
   const handleNavigateBackward = useCallback(() => {
+    if (isTimelineView && !monthStripExpanded) {
+      handleDetailNavigate(-1);
+      return;
+    }
     navigateMonth(-1, !monthStripExpanded);
-  }, [navigateMonth, monthStripExpanded]);
+  }, [
+    handleDetailNavigate,
+    isTimelineView,
+    monthStripExpanded,
+    navigateMonth,
+  ]);
 
   const handleMonthChange = useCallback(
     (direction: 1 | -1) => {
@@ -314,12 +351,14 @@ export default function CalendarScreen() {
 
   const handleTodayPress = useCallback(() => {
     const now = new Date();
+    setTimelinePreviewDate(null);
     setCurrentDate(now);
     setSelectedDate(now);
   }, [setCurrentDate, setSelectedDate]);
 
   const handleDayPress = useCallback(
     (date: Date) => {
+      setTimelinePreviewDate(null);
       setSelectedDate(date);
       setCurrentDate(date);
       setMonthStripExpanded(false);
@@ -363,20 +402,11 @@ export default function CalendarScreen() {
     [openEventSheet],
   );
 
-  const handleDetailNavigate = useCallback(
-    (direction: 1 | -1) => {
-      setSelectedDate((prev) => {
-        const next = navigateCalendarDate(prev, activeView, direction);
-        setCurrentDate(next);
-        return next;
-      });
-    },
-    [activeView, setCurrentDate, setSelectedDate],
-  );
-
   const handleDetailSwipeCommit = useCallback(
     (direction: 1 | -1) => {
-      setCurrentDate(navigateCalendarDate(selectedDate, activeView, direction));
+      const next = navigateCalendarDate(selectedDate, activeView, direction);
+      setTimelinePreviewDate(next);
+      setCurrentDate(next);
     },
     [activeView, selectedDate, setCurrentDate],
   );
@@ -388,8 +418,16 @@ export default function CalendarScreen() {
     [deleteEventMutation],
   );
 
-  const isTimelineView =
-    activeView === "week" || activeView === "3day" || activeView === "day";
+  useEffect(() => {
+    setTimelinePreviewDate(null);
+  }, [selectedDate]);
+
+  const switcherDate = resolveCalendarSwitcherDate({
+    view: activeView,
+    currentDate,
+    selectedDate,
+    previewDate: timelinePreviewDate,
+  });
 
   const renderTimelineHeaderPage = useCallback(
     (page: TimelinePage) => (
@@ -407,7 +445,7 @@ export default function CalendarScreen() {
               : undefined
         }
         events={monthStripEvents}
-        weekStartDay={settings?.weekStartDay ?? 0}
+        weekStartDay={settings?.weekStartDay ?? 1}
         timezone={resolvedTimezone}
         expanded={false}
         onDayPress={handleDayPress}
@@ -431,8 +469,9 @@ export default function CalendarScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <CalendarViewSwitcher
         activeView={activeView}
-        currentDate={currentDate}
-        weekStartDay={settings?.weekStartDay ?? 0}
+        currentDate={switcherDate}
+        weekStartDay={settings?.weekStartDay ?? 1}
+        timezone={resolvedTimezone}
         onTodayPress={handleTodayPress}
         onForwardPress={handleNavigateForward}
         onBackwardPress={handleNavigateBackward}
@@ -445,7 +484,7 @@ export default function CalendarScreen() {
           currentDate={currentDate}
           selectedDate={selectedDate}
           events={monthStripEvents}
-          weekStartDay={settings?.weekStartDay ?? 0}
+          weekStartDay={settings?.weekStartDay ?? 1}
           timezone={resolvedTimezone}
           expanded={monthStripExpanded}
           externalExpandControl={monthStripExpanded}
@@ -466,7 +505,7 @@ export default function CalendarScreen() {
             currentDate={currentDate}
             selectedDate={selectedDate}
             events={decoratedDetailEvents}
-            weekStartDay={settings?.weekStartDay ?? 0}
+            weekStartDay={settings?.weekStartDay ?? 1}
             timezone={resolvedTimezone}
             onDayPress={handleDayPress}
           />
@@ -493,7 +532,7 @@ export default function CalendarScreen() {
             <WeekTimeline
               currentDate={selectedDate}
               events={decoratedDetailEvents}
-              weekStartDay={settings?.weekStartDay ?? 0}
+              weekStartDay={settings?.weekStartDay ?? 1}
               timeFormat={settings?.timeFormat ?? "12h"}
               timezone={resolvedTimezone}
               onSwipeCommit={handleDetailSwipeCommit}

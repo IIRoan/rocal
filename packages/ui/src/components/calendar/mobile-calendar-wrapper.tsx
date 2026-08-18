@@ -5,6 +5,7 @@ import React, {
   useRef,
   useMemo,
   useEffect,
+  useLayoutEffect,
   useCallback,
 } from "react";
 import useEmblaCarousel from "embla-carousel-react";
@@ -12,31 +13,13 @@ import {
   MobileEventCalendar,
   MobileEventCalendarProps,
 } from "./mobile-event-calendar";
+import { MobileCalendarOverlays } from "./mobile-calendar-overlays";
+import { shiftMobileCalendarDate } from "./mobile-calendar-navigation";
 import { MobileTopNav } from "../navigation/mobile-top-nav";
-import { SidebarCalendar } from "../navigation/sidebar-calendar";
-import { AppSidebar } from "../layout/app-sidebar";
-import { Sheet, SheetContent, SheetTitle, SheetDescription } from "../ui/sheet";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerTitle,
-  DrawerDescription,
-} from "../ui/drawer";
-import { SidebarProvider, SIDEBAR_WIDTH_MOBILE } from "../ui/sidebar";
-import { VisuallyHidden } from "../ui/visually-hidden";
 import { useCalendarContext } from "./calendar-context";
 import { useIsMobile } from "../../hooks/use-mobile";
-import { CalendarEvent, CalendarView, User, CALENDAR_VIEWS } from "./types";
-import { AgendaDaysToShow } from "./constants";
+import { CalendarEvent, CalendarView, User } from "./types";
 import { cn } from "../../lib/utils";
-import {
-  addDays,
-  addMonths,
-  addWeeks,
-  subDays,
-  subMonths,
-  subWeeks,
-} from "date-fns";
 
 interface MobileCalendarWrapperProps extends MobileEventCalendarProps {
   user?: User;
@@ -74,36 +57,6 @@ export function MobileCalendarWrapper({
   const { currentDate, setCurrentDate, currentView, setCurrentView } =
     useCalendarContext();
 
-  // Initialize context view from props on first render
-  React.useEffect(() => {
-    if (
-      currentView === "month" &&
-      props.initialView &&
-      props.initialView !== "month"
-    ) {
-      // Check sessionStorage first
-      if (typeof window !== "undefined") {
-        const savedViewData = sessionStorage.getItem("calendar-view-selection");
-        if (savedViewData) {
-          try {
-            const parsedData = JSON.parse(savedViewData);
-            if (
-              parsedData.expires &&
-              parsedData.expires > Date.now() &&
-              (CALENDAR_VIEWS as readonly string[]).includes(parsedData.view)
-            ) {
-              setCurrentView(parsedData.view as CalendarView);
-              return;
-            }
-          } catch {
-            // ignore
-          }
-        }
-      }
-      setCurrentView(props.initialView);
-    }
-  }, []); // Only run once on mount
-
   const handleToday = () => setCurrentDate(new Date());
   const handleOpenSidebar = () => setIsSidebarOpen(true);
   const handleOpenQuickNav = () => setIsQuickNavOpen(true);
@@ -122,115 +75,23 @@ export function MobileCalendarWrapper({
   };
   const handleViewChange = (view: CalendarView) => {
     setCurrentView(view);
-    // Also save to sessionStorage
-    if (typeof window !== "undefined") {
-      const expirationTime = new Date();
-      expirationTime.setHours(expirationTime.getHours() + 1);
-      const viewData = { view, expires: expirationTime.getTime() };
-      sessionStorage.setItem(
-        "calendar-view-selection",
-        JSON.stringify(viewData),
-      );
-    }
   };
-  const handleCalendarViewChange = handleViewChange;
 
   const handlePrevious = useCallback(() => {
-    let newDate: Date;
-    switch (currentView) {
-      case "day":
-        newDate = subDays(currentDate, 1);
-        break;
-      case "3day":
-        newDate = subDays(currentDate, 3);
-        break;
-      case "week":
-        newDate = subWeeks(currentDate, 1);
-        break;
-      case "month":
-        newDate = subMonths(currentDate, 1);
-        break;
-      case "agenda":
-        newDate = subDays(currentDate, AgendaDaysToShow);
-        break;
-      default:
-        newDate = subWeeks(currentDate, 1);
-    }
-    setCurrentDate(newDate);
+    setCurrentDate(shiftMobileCalendarDate(currentDate, currentView, -1));
   }, [currentDate, currentView, setCurrentDate]);
 
   const handleNext = useCallback(() => {
-    let newDate: Date;
-    switch (currentView) {
-      case "day":
-        newDate = addDays(currentDate, 1);
-        break;
-      case "3day":
-        newDate = addDays(currentDate, 3);
-        break;
-      case "week":
-        newDate = addWeeks(currentDate, 1);
-        break;
-      case "month":
-        newDate = addMonths(currentDate, 1);
-        break;
-      case "agenda":
-        newDate = addDays(currentDate, AgendaDaysToShow);
-        break;
-      default:
-        newDate = addWeeks(currentDate, 1);
-    }
-    setCurrentDate(newDate);
+    setCurrentDate(shiftMobileCalendarDate(currentDate, currentView, 1));
   }, [currentDate, currentView, setCurrentDate]);
 
-  // Date helpers for adjacent slides
-  const getNextDate = useCallback(
-    (date: Date) => {
-      switch (currentView) {
-        case "day":
-          return addDays(date, 1);
-        case "3day":
-          return addDays(date, 3);
-        case "week":
-          return addWeeks(date, 1);
-        case "month":
-          return addMonths(date, 1);
-        case "agenda":
-          return addDays(date, AgendaDaysToShow);
-        default:
-          return addWeeks(date, 1);
-      }
-    },
-    [currentView],
-  );
-
-  const getPrevDate = useCallback(
-    (date: Date) => {
-      switch (currentView) {
-        case "day":
-          return subDays(date, 1);
-        case "3day":
-          return subDays(date, 3);
-        case "week":
-          return subWeeks(date, 1);
-        case "month":
-          return subMonths(date, 1);
-        case "agenda":
-          return subDays(date, AgendaDaysToShow);
-        default:
-          return subWeeks(date, 1);
-      }
-    },
-    [currentView],
-  );
-
   const prevDate = useMemo(
-    () => getPrevDate(currentDate),
-    [currentDate, getPrevDate],
+    () => shiftMobileCalendarDate(currentDate, currentView, -1),
+    [currentDate, currentView],
   );
   const nextDate = useMemo(
-    () => getNextDate(currentDate),
-    [currentDate, getNextDate],
+    () => shiftMobileCalendarDate(currentDate, currentView, 1),
+    [currentDate, currentView],
   );
 
   // Embla Carousel - 3 slides, start on center (index 1)
@@ -246,26 +107,33 @@ export function MobileCalendarWrapper({
   // Infinite loop logic: on slide change, update date and recenter
   const isScrollingRef = useRef(false);
 
-  const handleSlideSelect = useCallback(() => {
-    if (!emblaApi || isScrollingRef.current) return;
-    const newIndex = emblaApi.selectedScrollSnap();
+  const handleSlideSelectRef = useRef(() => {});
 
-    if (newIndex === 0) {
-      isScrollingRef.current = true;
-      handlePrevious();
-    } else if (newIndex === 2) {
-      isScrollingRef.current = true;
-      handleNext();
-    }
+  useLayoutEffect(() => {
+    handleSlideSelectRef.current = () => {
+      if (!emblaApi || isScrollingRef.current) return;
+      const newIndex = emblaApi.selectedScrollSnap();
+
+      if (newIndex === 0) {
+        isScrollingRef.current = true;
+        handlePrevious();
+      } else if (newIndex === 2) {
+        isScrollingRef.current = true;
+        handleNext();
+      }
+    };
   }, [emblaApi, handlePrevious, handleNext]);
 
   useEffect(() => {
     if (!emblaApi) return;
-    emblaApi.on("select", handleSlideSelect);
-    return () => {
-      emblaApi.off("select", handleSlideSelect);
+    const onSelect = () => {
+      handleSlideSelectRef.current();
     };
-  }, [emblaApi, handleSlideSelect]);
+    emblaApi.on("select", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+    };
+  }, [emblaApi]);
 
   // After currentDate changes from a swipe, recenter carousel to slide 1 instantly.
   // Use a double-RAF to ensure React has flushed DOM updates before recentering.
@@ -316,6 +184,8 @@ export function MobileCalendarWrapper({
         <MobileTopNav
           currentDate={currentDate}
           currentView={currentView}
+          weekStartDay={props.weekStartDay}
+          timezone={props.timezone}
           onPrevious={handlePrevious}
           onNext={handleNext}
           onToday={handleToday}
@@ -349,10 +219,8 @@ export function MobileCalendarWrapper({
               <MobileEventCalendar
                 {...props}
                 user={user}
-                initialView={currentView}
                 currentDateOverride={prevDate}
                 onSidebarToggle={handleOpenSidebar}
-                onViewChange={handleCalendarViewChange}
               />
             </div>
             {/* Current */}
@@ -364,10 +232,8 @@ export function MobileCalendarWrapper({
                 <MobileEventCalendar
                   {...props}
                   user={user}
-                  initialView={currentView}
-                  currentDateOverride={currentDate}
-                  onSidebarToggle={handleOpenSidebar}
-                  onViewChange={handleCalendarViewChange}
+                currentDateOverride={currentDate}
+                onSidebarToggle={handleOpenSidebar}
                 />
               )}
             </div>
@@ -379,73 +245,29 @@ export function MobileCalendarWrapper({
               <MobileEventCalendar
                 {...props}
                 user={user}
-                initialView={currentView}
                 currentDateOverride={nextDate}
                 onSidebarToggle={handleOpenSidebar}
-                onViewChange={handleCalendarViewChange}
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Mobile Quick Navigation Drawer */}
-      <Drawer
-        open={isQuickNavOpen}
-        onOpenChange={setIsQuickNavOpen}
-        direction="bottom"
-      >
-        <DrawerContent
-          responsive
-          responsiveHeight="85dvh"
-          className="w-full p-0 sm:max-w-none overflow-hidden safe-area-inset-bottom"
-        >
-          <VisuallyHidden>
-            <DrawerTitle>Quick Date Navigation</DrawerTitle>
-            <DrawerDescription>
-              Select a date from the mini calendar.
-            </DrawerDescription>
-          </VisuallyHidden>
-          <div className="p-4 pt-6">
-            <SidebarCalendar
-              getCachedEventsForRange={getCachedEventsForRange}
-              prefetchRange={prefetchRange}
-              onDateSelect={handleCloseQuickNav}
-              isMobile={true}
-            />
-          </div>
-        </DrawerContent>
-      </Drawer>
-
-      {/* Mobile Sidebar Sheet */}
-      <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-        <SheetContent
-          side="left"
-          showClose={false}
-          style={{ width: SIDEBAR_WIDTH_MOBILE }}
-          className="h-[100dvh] max-w-[92vw] rounded-none border-r border-border p-0 safe-area-inset-bottom"
-        >
-          <VisuallyHidden>
-            <SheetTitle>Calendar Sidebar</SheetTitle>
-            <SheetDescription>
-              Access your calendars, mini calendar, and account settings
-            </SheetDescription>
-          </VisuallyHidden>
-          <SidebarProvider defaultOpen={true}>
-            <AppSidebar
-              user={user}
-              onLogout={onLogout}
-              onOpenSettings={handleOpenSettings}
-              onOpenCalendarManagement={onOpenCalendarManagement}
-              onOpenSearch={handleOpenSearch}
-              onCreateEvent={handleOpenAddEvent}
-              getCachedEventsForRange={getCachedEventsForRange}
-              prefetchRange={prefetchRange}
-              isMobile={true}
-            />
-          </SidebarProvider>
-        </SheetContent>
-      </Sheet>
+      <MobileCalendarOverlays
+        getCachedEventsForRange={getCachedEventsForRange}
+        isQuickNavOpen={isQuickNavOpen}
+        isSidebarOpen={isSidebarOpen}
+        onCloseQuickNav={handleCloseQuickNav}
+        onCreateEvent={handleOpenAddEvent}
+        onLogout={onLogout}
+        onOpenCalendarManagement={onOpenCalendarManagement}
+        onOpenSearch={handleOpenSearch}
+        onOpenSettings={handleOpenSettings}
+        onQuickNavOpenChange={setIsQuickNavOpen}
+        onSidebarOpenChange={setIsSidebarOpen}
+        prefetchRange={prefetchRange}
+        user={user}
+      />
     </div>
   );
 }

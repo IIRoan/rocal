@@ -267,6 +267,23 @@ export function getWeekCalendarDays(
   return eachDayOfInterval({ start: weekStart, end: weekEnd });
 }
 
+export function getWeekCalendarRange(
+  currentDate: Date,
+  weekStartDay: number,
+  timezone?: string | null,
+): { start: Date; end: Date } {
+  const days = getWeekCalendarDays(
+    currentDate,
+    weekStartDay,
+    resolveTimezone(timezone),
+  );
+
+  return {
+    start: days[0] ?? currentDate,
+    end: days[days.length - 1] ?? currentDate,
+  };
+}
+
 export function getZonedDayUtcBounds(
   calendarDay: Date,
   timezone: string,
