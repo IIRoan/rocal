@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
-import { format, startOfWeek, endOfWeek, addDays, isSameMonth } from "date-fns";
+import { format, addDays, isSameMonth } from "date-fns";
+import { getWeekCalendarRange, resolveTimezone } from "@workspace/calendar-core";
 import { CalendarView } from "../calendar/types";
 import { AgendaDaysToShow } from "../calendar/constants";
 import {
@@ -44,6 +45,8 @@ const VIEW_OPTIONS: Array<{
 interface MobileTopNavProps {
   currentDate: Date;
   currentView: CalendarView;
+  weekStartDay?: number;
+  timezone?: string | null;
   onPrevious?: () => void;
   onNext?: () => void;
   onToday?: () => void;
@@ -58,6 +61,8 @@ interface MobileTopNavProps {
 export function MobileTopNav({
   currentDate,
   currentView,
+  weekStartDay = 1,
+  timezone,
   onPrevious,
   onNext,
   onToday,
@@ -90,13 +95,17 @@ export function MobileTopNav({
           };
         }
       }
-      case "week":
-        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-        const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+      case "week": {
+        const { start: weekStart, end: weekEnd } = getWeekCalendarRange(
+          currentDate,
+          weekStartDay,
+          resolveTimezone(timezone),
+        );
         return {
           main: `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d, yyyy")}`,
           sub: `Week ${format(currentDate, "w")}`,
         };
+      }
       case "month":
         return {
           main: format(currentDate, "MMMM yyyy"),
@@ -115,13 +124,18 @@ export function MobileTopNav({
             sub: `${AgendaDaysToShow} days`,
           };
         }
-      default:
-        const defaultWeekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-        const defaultWeekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+      default: {
+        const { start: defaultWeekStart, end: defaultWeekEnd } =
+          getWeekCalendarRange(
+            currentDate,
+            weekStartDay,
+            resolveTimezone(timezone),
+          );
         return {
           main: `${format(defaultWeekStart, "MMM d")} - ${format(defaultWeekEnd, "MMM d, yyyy")}`,
           sub: `Week ${format(currentDate, "w")}`,
         };
+      }
     }
   };
 

@@ -2,7 +2,56 @@ import { describe, expect, it } from "@jest/globals";
 import {
   applyHiddenEventOptionalSections,
   clearedFieldsForDisabledEventSection,
+  hasOptionalEventParticipants,
+  organizerOnlyParticipants,
 } from "../event-optional-sections";
+
+describe("hasOptionalEventParticipants", () => {
+  it("treats a solo organizer as the participants option unused", () => {
+    expect(
+      hasOptionalEventParticipants([
+        { email: "me@example.com", role: "organizer" },
+      ]),
+    ).toBe(false);
+  });
+
+  it("treats an empty or single participant list as unused", () => {
+    expect(hasOptionalEventParticipants(undefined)).toBe(false);
+    expect(hasOptionalEventParticipants([])).toBe(false);
+    expect(
+      hasOptionalEventParticipants([{ email: "ada@example.com" }]),
+    ).toBe(false);
+  });
+
+  it("treats organizer plus the same person as attendee as unused", () => {
+    expect(
+      hasOptionalEventParticipants([
+        { email: "me@example.com", role: "organizer" },
+        { email: "me@example.com", role: "attendee" },
+      ]),
+    ).toBe(false);
+  });
+
+  it("uses the participants option when there is at least one other invitee", () => {
+    expect(
+      hasOptionalEventParticipants([
+        { email: "me@example.com", role: "organizer" },
+        { email: "ada@example.com", role: "attendee" },
+      ]),
+    ).toBe(true);
+  });
+});
+
+describe("organizerOnlyParticipants", () => {
+  it("keeps the organizer when invitees are cleared", () => {
+    expect(
+      organizerOnlyParticipants([
+        { email: "me@example.com", role: "organizer" },
+        { email: "ada@example.com", role: "attendee" },
+      ]),
+    ).toEqual([{ email: "me@example.com", role: "organizer" }]);
+  });
+});
 
 describe("clearedFieldsForDisabledEventSection", () => {
   it("clears the matching optional field for each event editor toggle", () => {
@@ -63,5 +112,20 @@ describe("applyHiddenEventOptionalSections", () => {
       reminder: 0,
       title: "Planning",
     });
+  });
+
+  it("keeps the organizer when the participants option is disabled", () => {
+    expect(
+      applyHiddenEventOptionalSections(
+        {
+          ...filled,
+          participants: [
+            { email: "me@example.com", role: "organizer" },
+            { email: "ada@example.com", role: "attendee" },
+          ],
+        },
+        { participants: false },
+      ).participants,
+    ).toEqual([{ email: "me@example.com", role: "organizer" }]);
   });
 });

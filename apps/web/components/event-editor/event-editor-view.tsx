@@ -96,9 +96,7 @@ export function EventEditorView({
       <EventEditorBody
         eventForm={eventForm}
         isViewMode={flags.isViewMode}
-        showLocation={visibleSections.location}
-        showDescription={visibleSections.description}
-        showParticipants={visibleSections.participants}
+        visibleSections={visibleSections}
         setShowLocation={setShowLocation}
         setShowDescription={setShowDescription}
         setShowParticipants={setShowParticipants}
@@ -179,9 +177,7 @@ export function EventEditorView({
                 <EventEditorBody
                   eventForm={eventForm}
                   isViewMode={flags.isViewMode}
-                  showLocation={visibleSections.location}
-                  showDescription={visibleSections.description}
-                  showParticipants={visibleSections.participants}
+                  visibleSections={visibleSections}
                   setShowLocation={setShowLocation}
                   setShowDescription={setShowDescription}
                   setShowParticipants={setShowParticipants}
@@ -210,10 +206,9 @@ export function EventEditorView({
         handleEventSave={handleEventSave}
         handleEventDelete={handleEventDelete}
         handleEventDownloadIcs={handleEventDownloadIcs}
-        canEditEvent={flags.canEdit}
+        flags={flags}
         invitationResponsePending={invitationResponsePending}
         invitationStatus={invitationStatus}
-        isViewMode={flags.isViewMode}
         leadingSlot={standardLeadingSlot}
         localSettings={localSettings}
         onInvitationResponse={handleInvitationResponse}
@@ -221,9 +216,7 @@ export function EventEditorView({
         setShowLocation={setShowLocation}
         setShowDescription={setShowDescription}
         setShowParticipants={setShowParticipants}
-        showLocation={visibleSections.location}
-        showDescription={visibleSections.description}
-        showParticipants={visibleSections.participants}
+        visibleSections={visibleSections}
       />
     );
   }

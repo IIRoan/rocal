@@ -5,6 +5,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   canCurrentUserDeleteEvent,
   canCurrentUserEditEvent,
+  hasOptionalEventParticipants,
+  organizerOnlyParticipants,
 } from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
@@ -155,7 +157,7 @@ export function EventEditor({
       setSections({
         description: Boolean(eventToEdit.description),
         location: Boolean(eventToEdit.location),
-        participants: (eventToEdit.participants?.length ?? 0) > 0,
+        participants: hasOptionalEventParticipants(eventToEdit.participants),
       });
     });
   }, [
@@ -220,7 +222,9 @@ export function EventEditor({
   function setParticipantsVisible(value: boolean) {
     setSections((current) => ({ ...current, participants: value }));
     if (!value) {
-      setEventParticipants([]);
+      setEventParticipants(
+        organizerOnlyParticipants(eventForm.eventParticipants),
+      );
     }
   }
 

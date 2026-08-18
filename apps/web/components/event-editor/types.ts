@@ -23,9 +23,10 @@ export type EventEditorBodyProps = {
   setShowDescription: (value: boolean) => void;
   setShowLocation: (value: boolean) => void;
   setShowParticipants: (value: boolean) => void;
-  showDescription: boolean;
-  showLocation: boolean;
-  showParticipants: boolean;
+  visibleSections: Pick<
+    EventEditorVisibleSections,
+    "description" | "location" | "participants"
+  >;
 };
 
 export type EventEditorFooterProps = {
