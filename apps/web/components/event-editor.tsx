@@ -1,46 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   canCurrentUserDeleteEvent,
   canCurrentUserEditEvent,
-  getCurrentUserInvitationStatus,
-  invitationByExternalIdQueryKey,
-  pickerDateAndTimeToUtc,
-  pickerDateToAllDayUtcRange,
 } from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
-import { EncryptionStatusBadge } from "@workspace/ui/components/calendar";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@workspace/ui/components/ui/dialog";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerShell,
-  DrawerTitle,
-} from "@workspace/ui/components/ui/drawer";
-import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
-import { ArrowLeft, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { RecurringDeleteModal } from "@/components/command-palette/recurring-delete-modal";
 import { useEventForm } from "@/hooks/use-event-form";
-import { calendarApiService } from "@/lib/calendar-api-service";
 import { buildEventEditorEncryptionPreview } from "@/lib/event-editor-view-model";
 import { getActiveE2eeSession } from "@/lib/e2ee-session";
 import type { UserSettings } from "@/lib/types/calendar";
 
-import { EventEditorBody } from "./event-editor/event-editor-body";
-import { EventEditorFooter } from "./event-editor/event-editor-footer";
-import { EventEditorDesktopHeader } from "./event-editor/event-editor-header";
-import { EventEditorPopover } from "./event-editor/event-editor-popover";
 import type { EventEditorMode } from "./command-palette-context";
+import {
+  downloadEventIcs,
+  getInvitationResponseStatus,
+  respondToEventInvitation,
+} from "./event-editor/event-editor-invitation";
+import { useEventEditorLivePreview } from "./event-editor/event-editor-preview";
+import { EventEditorView } from "./event-editor/event-editor-view";
 import type { EventEditorInvitationResponseStatus } from "./event-editor/types";
 
 interface EventEditorProps {
@@ -56,6 +40,18 @@ interface EventEditorProps {
   updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
   showBackButton?: boolean;
 }
+
+type SectionVisibility = {
+  description: boolean;
+  location: boolean;
+  participants: boolean;
+};
+
+const HIDDEN_SECTIONS: SectionVisibility = {
+  description: false,
+  location: false,
+  participants: false,
+};
 
 export function EventEditor({
   open,
@@ -73,14 +69,11 @@ export function EventEditor({
   const calendarData = useSharedCalendarData();
   const queryClient = useQueryClient();
   const { calendars } = calendarData;
-  const handleClose = useCallback(() => {
-    onOpenChange(false);
-  }, [onOpenChange]);
   const eventForm = useEventForm({
     calendars,
     localSettings,
     onEventSaved,
-    onClose: handleClose,
+    onClose: () => onOpenChange(false),
   });
   const {
     eventAllDay,
@@ -89,8 +82,6 @@ export function EventEditor({
     eventEndDate,
     eventEndTime,
     eventLocation,
-    eventNotifications,
-    eventSaving,
     eventStartDate,
     eventStartTime,
     eventTitle,
@@ -104,26 +95,42 @@ export function EventEditor({
     resetForm,
     selectedEvent,
     setEventViewMode,
+    setEventLocation,
+    setEventDescription,
+    setEventParticipants,
     setIsRecurring,
     setShowNotifications,
     setShowRecurringDeleteModal,
     showNotifications,
     showRecurringDeleteModal,
+    eventSaving,
   } = eventForm;
-  const [showDescription, setShowDescription] = useState(false);
-  const [showLocation, setShowLocation] = useState(false);
-  const [showParticipants, setShowParticipants] = useState(false);
+  const [sections, setSections] = useState<SectionVisibility>(HIDDEN_SECTIONS);
   const [inviteResponsePending, setInviteResponsePending] =
     useState<EventEditorInvitationResponseStatus | null>(null);
-  const lastPreviewPayloadRef = useRef<string>("");
+  const isMobile = useIsMobile();
+
+  useEventEditorLivePreview({
+    editorMode,
+    eventAllDay,
+    eventCalendarId,
+    eventDescription,
+    eventEndDate,
+    eventEndTime,
+    eventLocation,
+    eventStartDate,
+    eventStartTime,
+    eventTitle,
+    open,
+    timezone: localSettings.timezone,
+    updatePreviewEvent,
+  });
 
   useEffect(() => {
     if (!open) {
       resetForm();
       requestAnimationFrame(() => {
-        setShowDescription(false);
-        setShowLocation(false);
-        setShowParticipants(false);
+        setSections(HIDDEN_SECTIONS);
       });
     }
   }, [open, resetForm]);
@@ -145,17 +152,11 @@ export function EventEditor({
     }
 
     requestAnimationFrame(() => {
-      if (eventToEdit.description) {
-        setShowDescription(true);
-      }
-
-      if (eventToEdit.location) {
-        setShowLocation(true);
-      }
-
-      if ((eventToEdit.participants?.length ?? 0) > 0) {
-        setShowParticipants(true);
-      }
+      setSections({
+        description: Boolean(eventToEdit.description),
+        location: Boolean(eventToEdit.location),
+        participants: (eventToEdit.participants?.length ?? 0) > 0,
+      });
     });
   }, [
     eventToEdit,
@@ -165,422 +166,148 @@ export function EventEditor({
     setEventViewMode,
   ]);
 
-  useEffect(() => {
-    if (editorMode !== "popover" || !updatePreviewEvent || !open) {
-      lastPreviewPayloadRef.current = "";
-      return;
-    }
-
-    const { start, end } = eventAllDay
-      ? pickerDateToAllDayUtcRange(
-          eventStartDate,
-          eventEndDate,
-          localSettings.timezone,
-        )
-      : {
-          start: pickerDateAndTimeToUtc(
-            eventStartDate,
-            eventStartTime,
-            localSettings.timezone,
-          ),
-          end: pickerDateAndTimeToUtc(
-            eventEndDate,
-            eventEndTime,
-            localSettings.timezone,
-          ),
-        };
-
-    const payload = {
-      allDay: eventAllDay,
-      calendarId: eventCalendarId,
-      description: eventDescription || "",
-      endIso: end.toISOString(),
-      location: eventLocation || "",
-      startIso: start.toISOString(),
-      title: eventTitle || "(No title)",
-    };
-    const payloadKey = JSON.stringify(payload);
-
-    if (payloadKey === lastPreviewPayloadRef.current) {
-      return;
-    }
-
-    lastPreviewPayloadRef.current = payloadKey;
-    updatePreviewEvent({
-      title: payload.title,
-      start,
-      end,
-      allDay: payload.allDay,
-      calendarId: payload.calendarId,
-      location: payload.location || undefined,
-      description: payload.description || undefined,
-      timezone: localSettings.timezone,
-    });
-  }, [
-    editorMode,
-    eventAllDay,
-    eventCalendarId,
-    eventDescription,
-    eventEndDate,
-    eventEndTime,
-    eventLocation,
-    eventStartDate,
-    eventStartTime,
-    eventTitle,
-    localSettings.timezone,
-    open,
-    updatePreviewEvent,
-  ]);
-
-  const handleEventSave = useCallback(() => {
+  function handleEventSave() {
     if (selectedEvent && !canCurrentUserEditEvent(selectedEvent)) {
       toast.error("Imported invitation events are read-only for attendees.");
       return;
     }
     void saveEvent(calendarData);
-  }, [calendarData, saveEvent, selectedEvent]);
-  const handleRecurringDeleteThis = useCallback(
-    () => deleteRecurringThis(calendarData),
-    [calendarData, deleteRecurringThis],
-  );
-  const handleRecurringDeleteAll = useCallback(
-    () => deleteRecurringAll(calendarData),
-    [calendarData, deleteRecurringAll],
-  );
-  const handleEventDownloadIcs = useCallback(async () => {
-    if (!selectedEvent?.id) {
-      return;
-    }
+  }
 
-    try {
-      await calendarApiService.downloadEventICS(selectedEvent.id);
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to download event as ICS file");
-    }
-  }, [selectedEvent]);
-  const handleInvitationResponse = useCallback(
-    async (status: EventEditorInvitationResponseStatus) => {
-      if (!selectedEvent?.id) {
-        return;
-      }
-
-      setInviteResponsePending(status);
-      try {
-        const result = await calendarApiService.respondToInvitation(
-          selectedEvent.id,
-          status,
-        );
-        void calendarData.refetchEvents();
-        if ("deleted" in result && result.deleted) {
-          if (selectedEvent.externalId) {
-            void queryClient.invalidateQueries({
-              queryKey: invitationByExternalIdQueryKey(selectedEvent.externalId),
-            });
-          }
-          // Event was declined and removed from calendar — close the modal
-          onEventSaved?.();
-          handleClose();
-          toast.success("Invitation declined and removed from your calendar.");
-        } else {
-          const updatedEvent = result as CalendarEvent;
-          loadEventData(updatedEvent);
-          onEventSaved?.();
-          toast.success(
-            status === "accepted"
-              ? "Invitation accepted."
-              : "Marked as tentative.",
-          );
-        }
-      } catch (error: any) {
-        toast.error(error?.message || "Failed to update invitation response.");
-      } finally {
-        setInviteResponsePending(null);
-      }
-    },
-    [calendarData, handleClose, loadEventData, onEventSaved, queryClient, selectedEvent],
-  );
-  const handleToggleLocation = useCallback(() => {
-    setShowLocation((current) => !current);
-  }, []);
-  const handleToggleDescription = useCallback(() => {
-    setShowDescription((current) => !current);
-  }, []);
-  const handleToggleRecurring = useCallback(() => {
-    setIsRecurring(!isRecurring);
-  }, [isRecurring, setIsRecurring]);
-  const handleToggleNotifications = useCallback(() => {
-    setShowNotifications(!showNotifications);
-  }, [setShowNotifications, showNotifications]);
-  const handleToggleParticipants = useCallback(() => {
-    setShowParticipants((current) => !current);
-  }, []);
-
-  const canEditSelectedEvent = useMemo(
-    () => (selectedEvent ? canCurrentUserEditEvent(selectedEvent) : true),
-    [selectedEvent],
-  );
-  const canDeleteSelectedEvent = useMemo(() => {
-    if (!selectedEvent?.id) {
-      return false;
-    }
-
-    return canCurrentUserDeleteEvent(selectedEvent);
-  }, [selectedEvent]);
-  const handleEventDelete = useCallback(() => {
-    if (selectedEvent && !canDeleteSelectedEvent) {
+  function handleEventDelete() {
+    if (
+      selectedEvent &&
+      (!selectedEvent.id || !canCurrentUserDeleteEvent(selectedEvent))
+    ) {
       toast.error("Synced calendar events cannot be deleted.");
       return;
     }
     void deleteEvent(calendarData);
-  }, [
-    calendarData,
-    canDeleteSelectedEvent,
-    deleteEvent,
-    selectedEvent,
-  ]);
-  const invitationStatus = useMemo(() => {
-    if (!selectedEvent || canEditSelectedEvent) {
-      return null;
-    }
+  }
 
-    const status = getCurrentUserInvitationStatus(selectedEvent);
-    return status === "accepted" ||
-      status === "declined" ||
-      status === "tentative"
-      ? status
-      : null;
-  }, [canEditSelectedEvent, selectedEvent]);
+  function handleInvitationResponse(
+    status: EventEditorInvitationResponseStatus,
+  ) {
+    if (!selectedEvent?.id) {
+      return;
+    }
+    void respondToEventInvitation({
+      event: selectedEvent,
+      status,
+      refetchEvents: calendarData.refetchEvents,
+      queryClient,
+      loadEventData,
+      onEventSaved,
+      onClose: () => onOpenChange(false),
+      setPending: setInviteResponsePending,
+    });
+  }
+
+  function setDescriptionVisible(value: boolean) {
+    setSections((current) => ({ ...current, description: value }));
+    if (!value) {
+      setEventDescription("");
+    }
+  }
+
+  function setLocationVisible(value: boolean) {
+    setSections((current) => ({ ...current, location: value }));
+    if (!value) {
+      setEventLocation("");
+    }
+  }
+
+  function setParticipantsVisible(value: boolean) {
+    setSections((current) => ({ ...current, participants: value }));
+    if (!value) {
+      setEventParticipants([]);
+    }
+  }
+
+  const canEditSelectedEvent = selectedEvent
+    ? canCurrentUserEditEvent(selectedEvent)
+    : true;
+  const invitationStatus = getInvitationResponseStatus(
+    selectedEvent,
+    canEditSelectedEvent,
+  );
   const isViewMode = eventViewMode === "view" || !canEditSelectedEvent;
-  const isMobile = useIsMobile();
-  const selectedCalendar = useMemo(
-    () => calendars.find((calendar) => calendar.id === eventCalendarId),
-    [calendars, eventCalendarId],
-  );
-  const enabledNotificationCount = useMemo(
-    () =>
-      eventNotifications.filter((notification) => notification.isEnabled)
-        .length,
-    [eventNotifications],
-  );
-  const hasActiveEncryptionSession = useMemo(
-    () => getActiveE2eeSession() !== null,
-    [],
-  );
-  const previewBadgeItem = useMemo(
-    () =>
-      buildEventEditorEncryptionPreview({
-        hasActiveEncryptionSession,
-      }),
-    [hasActiveEncryptionSession],
-  );
-  const badgeItem = selectedEvent?.id ? selectedEvent : previewBadgeItem;
+  const badgeItem = selectedEvent?.id
+    ? selectedEvent
+    : buildEventEditorEncryptionPreview({
+        hasActiveEncryptionSession: getActiveE2eeSession() !== null,
+      });
   const dialogTitle = !selectedEvent?.id
     ? "Create Event"
     : isViewMode
       ? "Event Details"
       : "Edit Event";
-  const recurringModal = selectedEvent && (
-    <RecurringDeleteModal
-      open={showRecurringDeleteModal}
-      onOpenChange={setShowRecurringDeleteModal}
-      eventTitle={selectedEvent.title}
-      onDeleteThis={handleRecurringDeleteThis}
-      onDeleteAll={handleRecurringDeleteAll}
-      loading={eventSaving}
-    />
-  );
-
-  const standardLeadingSlot = selectedEvent?.id ? (
-    <button
-      onClick={() => onOpenChange(false)}
-      className="p-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
-    >
-      <ArrowLeft className="size-4 text-muted-foreground" />
-    </button>
-  ) : (
-    <Plus className="size-4 text-muted-foreground ml-1" />
-  );
-  const embeddedLeadingSlot = (
-    <button
-      onClick={onBack}
-      className="p-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
-    >
-      <ArrowLeft className="size-4 text-muted-foreground" />
-    </button>
-  );
-
-  const desktopContent = (
-    <>
-      <EventEditorDesktopHeader
-        badgeItem={badgeItem}
-        dialogTitle={dialogTitle}
-        isRecurring={isRecurring}
-        isViewMode={isViewMode}
-        leadingSlot={showBackButton ? embeddedLeadingSlot : standardLeadingSlot}
-        onToggleDescription={handleToggleDescription}
-        onToggleLocation={handleToggleLocation}
-        onToggleNotifications={handleToggleNotifications}
-        onToggleParticipants={handleToggleParticipants}
-        onToggleRecurring={handleToggleRecurring}
-        showDescription={showDescription}
-        showLocation={showLocation}
-        showNotifications={showNotifications}
-        showParticipants={showParticipants}
-      />
-      <EventEditorBody
-        eventForm={eventForm}
-        isViewMode={isViewMode}
-        showLocation={showLocation}
-        showDescription={showDescription}
-        showParticipants={showParticipants}
-        setShowLocation={setShowLocation}
-        setShowDescription={setShowDescription}
-        setShowParticipants={setShowParticipants}
-        localSettings={localSettings}
-        calendars={calendars}
-        desktop
-      />
-      <EventEditorFooter
-        canEditEvent={canEditSelectedEvent}
-        isViewMode={isViewMode}
-        eventForm={eventForm}
-        handleEventSave={handleEventSave}
-        handleEventDelete={handleEventDelete}
-        handleEventDownloadIcs={handleEventDownloadIcs}
-        invitationResponsePending={inviteResponsePending}
-        invitationStatus={invitationStatus}
-        onInvitationResponse={handleInvitationResponse}
-        desktop
-        onClose={() => onOpenChange(false)}
-      />
-    </>
-  );
-
-  if (isMobile) {
-    return (
-      <>
-        <Drawer
-          open={open}
-          onOpenChange={onOpenChange}
-          direction="bottom"
-          modal={true}
-        >
-          <DrawerContent
-            responsive
-            responsiveHeight="92dvh"
-            className="rounded-t-2xl bg-card/95 backdrop-blur-xl border-none flex flex-col gap-0 overflow-hidden pb-0 transition-[max-height,bottom] duration-200 ease-out"
-          >
-            <DrawerTitle className="sr-only">{dialogTitle}</DrawerTitle>
-            <DrawerShell
-              data-testid="mobile-event-editor-shell"
-              header={
-                <div className="px-5 py-3 border-b border-border/40 flex flex-row items-center shrink-0">
-                  <h2 className="inline-flex items-center h-5 text-base font-semibold leading-none">
-                    {dialogTitle}
-                  </h2>
-                  <EncryptionStatusBadge
-                    item={badgeItem}
-                    className="ml-1"
-                    hidePlaintext={false}
-                    iconSize="sm"
-                  />
-                </div>
-              }
-              footer={
-                <EventEditorFooter
-                  canEditEvent={canEditSelectedEvent}
-                  isViewMode={isViewMode}
-                  eventForm={eventForm}
-                  onBack={onBack}
-                  handleEventSave={handleEventSave}
-                  handleEventDelete={handleEventDelete}
-                  handleEventDownloadIcs={handleEventDownloadIcs}
-                  invitationResponsePending={inviteResponsePending}
-                  invitationStatus={invitationStatus}
-                  onInvitationResponse={handleInvitationResponse}
-                />
-              }
-              bodyClassName="min-h-0"
-            >
-              <div
-                data-testid="mobile-event-editor-main"
-                className="flex min-h-0 flex-col overflow-hidden"
-              >
-                <EventEditorBody
-                  eventForm={eventForm}
-                  isViewMode={isViewMode}
-                  showLocation={showLocation}
-                  showDescription={showDescription}
-                  showParticipants={showParticipants}
-                  setShowLocation={setShowLocation}
-                  setShowDescription={setShowDescription}
-                  setShowParticipants={setShowParticipants}
-                  localSettings={localSettings}
-                  calendars={calendars}
-                />
-              </div>
-            </DrawerShell>
-          </DrawerContent>
-        </Drawer>
-        {recurringModal}
-      </>
-    );
-  }
-
-  if (editorMode === "popover" && anchorPosition) {
-    return (
-      <EventEditorPopover
-        open={open}
-        onOpenChange={onOpenChange}
-        anchorPosition={anchorPosition}
-        badgeItem={badgeItem}
-        calendars={calendars}
-        dialogTitle={dialogTitle}
-        eventForm={eventForm}
-        handleEventSave={handleEventSave}
-        handleEventDelete={handleEventDelete}
-        handleEventDownloadIcs={handleEventDownloadIcs}
-        canEditEvent={canEditSelectedEvent}
-        invitationResponsePending={inviteResponsePending}
-        invitationStatus={invitationStatus}
-        isViewMode={isViewMode}
-        leadingSlot={standardLeadingSlot}
-        localSettings={localSettings}
-        onInvitationResponse={handleInvitationResponse}
-        recurringModal={recurringModal}
-        setShowLocation={setShowLocation}
-        setShowDescription={setShowDescription}
-        setShowParticipants={setShowParticipants}
-        showLocation={showLocation}
-        showDescription={showDescription}
-        showParticipants={showParticipants}
-      />
-    );
-  }
-
-  if (showBackButton) {
-    return (
-      <>
-        {desktopContent}
-        {recurringModal}
-      </>
-    );
-  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        variant="spotlight"
-        showClose={false}
-        aria-describedby={undefined}
-        className="overflow-hidden p-0 bg-popover border-border shadow-xl min-w-[420px] max-h-[750px] flex flex-col"
-      >
-        <VisuallyHidden>
-          <DialogTitle>{dialogTitle}</DialogTitle>
-        </VisuallyHidden>
-        {desktopContent}
-      </DialogContent>
-      {recurringModal}
-    </Dialog>
+    <EventEditorView
+      anchorPosition={anchorPosition}
+      badgeItem={badgeItem}
+      calendars={calendars}
+      dialogTitle={dialogTitle}
+      eventForm={eventForm}
+      flags={{
+        canEdit: canEditSelectedEvent,
+        isRecurring,
+        isViewMode,
+      }}
+      handleEventDelete={handleEventDelete}
+      handleEventDownloadIcs={() => {
+        if (selectedEvent?.id) {
+          void downloadEventIcs(selectedEvent.id);
+        }
+      }}
+      handleEventSave={handleEventSave}
+      handleInvitationResponse={handleInvitationResponse}
+      handleToggleDescription={() =>
+        setDescriptionVisible(!sections.description)
+      }
+      handleToggleLocation={() => setLocationVisible(!sections.location)}
+      handleToggleNotifications={() => setShowNotifications(!showNotifications)}
+      handleToggleParticipants={() =>
+        setParticipantsVisible(!sections.participants)
+      }
+      handleToggleRecurring={() => setIsRecurring(!isRecurring)}
+      invitationResponsePending={inviteResponsePending}
+      invitationStatus={invitationStatus}
+      layout={
+        isMobile
+          ? "mobile"
+          : editorMode === "popover" && anchorPosition
+            ? "popover"
+            : showBackButton
+              ? "embedded"
+              : "dialog"
+      }
+      localSettings={localSettings}
+      onBack={onBack}
+      onOpenChange={onOpenChange}
+      open={open}
+      recurringModal={
+        selectedEvent ? (
+          <RecurringDeleteModal
+            open={showRecurringDeleteModal}
+            onOpenChange={setShowRecurringDeleteModal}
+            eventTitle={selectedEvent.title}
+            onDeleteThis={() => deleteRecurringThis(calendarData)}
+            onDeleteAll={() => deleteRecurringAll(calendarData)}
+            loading={eventSaving}
+          />
+        ) : null
+      }
+      setShowDescription={setDescriptionVisible}
+      setShowLocation={setLocationVisible}
+      setShowParticipants={setParticipantsVisible}
+      visibleSections={{
+        description: sections.description,
+        location: sections.location,
+        notifications: showNotifications,
+        participants: sections.participants,
+      }}
+    />
   );
 }

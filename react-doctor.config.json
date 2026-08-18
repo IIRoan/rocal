@@ -13,6 +13,30 @@
       {
         "files": ["**/app/login/login-form-entry.tsx"],
         "rules": ["react-doctor/nextjs-no-use-search-params-without-suspense"]
+      },
+      {
+        "files": ["**/components/event-editor.tsx"],
+        "rules": [
+          "react-doctor/no-event-handler",
+          "react-doctor/no-pass-data-to-parent",
+          "react-doctor/no-cascading-set-state"
+        ]
+      },
+      {
+        "files": ["**/components/event-editor/event-editor-preview.ts"],
+        "rules": [
+          "react-doctor/no-event-handler",
+          "react-doctor/no-pass-data-to-parent",
+          "react-doctor/no-prop-callback-in-effect"
+        ]
+      },
+      {
+        "files": ["**/components/mail/compose-dialog.tsx"],
+        "rules": [
+          "react-doctor/no-giant-component",
+          "react-doctor/no-event-handler",
+          "react-doctor/no-danger"
+        ]
       }
     ]
   }

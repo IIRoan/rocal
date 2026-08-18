@@ -158,7 +158,7 @@ describe("buildEventRequest", () => {
     expect(result.description).toBe("Notes");
   });
 
-  it("omits empty optional fields", () => {
+  it("sends empty optional fields so updates can clear them", () => {
     const result = buildEventRequest({
       title: "Event",
       start: "2025-06-15T09:00",
@@ -168,11 +168,13 @@ describe("buildEventRequest", () => {
       location: "",
       description: "  ",
     });
-    expect(result).not.toHaveProperty("location");
-    expect(result).not.toHaveProperty("description");
+    expect(result.location).toBe("");
+    expect(result.description).toBe("");
+    expect(result.recurrence).toBe("");
+    expect(result.reminder).toBe(0);
+    expect(result.participants).toEqual([]);
     expect(result).not.toHaveProperty("color");
     expect(result).not.toHaveProperty("categoryId");
-    expect(result).not.toHaveProperty("recurrence");
   });
 
   it("includes optional fields when provided", () => {
@@ -196,7 +198,7 @@ describe("buildEventRequest", () => {
     expect(result.allDay).toBe(true);
   });
 
-  it("omits reminder when zero", () => {
+  it("sends reminder 0 so updates can clear a reminder", () => {
     const result = buildEventRequest({
       title: "Event",
       start: "2025-06-15T09:00",
@@ -207,7 +209,7 @@ describe("buildEventRequest", () => {
       description: "",
       reminder: 0,
     });
-    expect(result).not.toHaveProperty("reminder");
+    expect(result.reminder).toBe(0);
   });
 
   it("includes all fields when fully populated", () => {
@@ -237,6 +239,7 @@ describe("buildEventRequest", () => {
       categoryId: "cat-meetings",
       recurrence: "FREQ=DAILY;COUNT=5",
       reminder: 10,
+      participants: [],
     });
   });
 

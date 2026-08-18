@@ -46,6 +46,7 @@ import {
 } from "../sheet";
 import {
   PARTICIPANTS_INVITE_HELP_TEXT,
+  CLEARED_EVENT_OPTIONAL_FIELDS,
   isMailInvitationStagingCalendar,
   resolveTimezone,
   type Calendar,
@@ -328,6 +329,13 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
           role: participant.role,
           status: participant.status,
         })),
+        visibleOptionalSections: {
+          description: showDescription,
+          location: showLocation,
+          notifications: showReminder,
+          participants: showParticipants,
+          recurrence: showRecurring,
+        },
       });
 
       const { fieldErrors: newFieldErrors, generalErrors: newGeneralErrors } =
@@ -358,6 +366,12 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       reminder,
       resolvedTimezone,
       onSubmit,
+      showDescription,
+      showLocation,
+      showParticipants,
+      showRecurring,
+      showReminder,
+      participants,
     ]);
 
     useImperativeHandle(ref, () => ({ submit: handleSubmit }), [handleSubmit]);
@@ -728,6 +742,9 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       active={showLocation}
                       onPress={() => {
                         Keyboard.dismiss();
+                        if (showLocation) {
+                          setLocation(CLEARED_EVENT_OPTIONAL_FIELDS.location);
+                        }
                         setShowLocation((v) => !v);
                       }}
                       theme={theme}
@@ -738,6 +755,11 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       active={showDescription}
                       onPress={() => {
                         Keyboard.dismiss();
+                        if (showDescription) {
+                          setDescription(
+                            CLEARED_EVENT_OPTIONAL_FIELDS.description,
+                          );
+                        }
                         setShowDescription((v) => !v);
                       }}
                       theme={theme}
@@ -750,6 +772,11 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       active={showRecurring}
                       onPress={() => {
                         Keyboard.dismiss();
+                        if (showRecurring) {
+                          setRecurrence(
+                            CLEARED_EVENT_OPTIONAL_FIELDS.recurrence,
+                          );
+                        }
                         setShowRecurring((v) => !v);
                       }}
                       theme={theme}
@@ -760,6 +787,9 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       active={showReminder}
                       onPress={() => {
                         Keyboard.dismiss();
+                        if (showReminder) {
+                          setReminder(CLEARED_EVENT_OPTIONAL_FIELDS.reminder);
+                        }
                         setShowReminder((v) => !v);
                       }}
                       theme={theme}
@@ -772,6 +802,10 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       active={showParticipants}
                       onPress={() => {
                         Keyboard.dismiss();
+                        if (showParticipants) {
+                          setParticipants([]);
+                          setParticipantDraft("");
+                        }
                         setShowParticipants((v) => !v);
                       }}
                       theme={theme}
