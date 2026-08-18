@@ -139,8 +139,8 @@ describe("EventEditorBody", () => {
               isDefault: true,
               isSyncOnly: false,
               userId: "user-1",
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: new Date("2026-05-27T09:00:00.000Z"),
+              updatedAt: new Date("2026-05-27T09:00:00.000Z"),
             },
           ]}
           desktop={true}
@@ -149,9 +149,11 @@ describe("EventEditorBody", () => {
           setShowDescription={() => {}}
           setShowLocation={() => {}}
           setShowParticipants={() => {}}
-          showDescription={true}
-          showLocation={true}
-          showParticipants={true}
+          visibleSections={{
+            description: true,
+            location: true,
+            participants: true,
+          }}
           eventForm={
             {
               eventAllDay: false,
@@ -189,8 +191,8 @@ describe("EventEditorBody", () => {
                 start: new Date("2026-05-27T10:00:00.000Z"),
                 end: new Date("2026-05-27T11:00:00.000Z"),
                 userId: "user-1",
-                createdAt: new Date(),
-                updatedAt: new Date(),
+                createdAt: new Date("2026-05-27T09:00:00.000Z"),
+                updatedAt: new Date("2026-05-27T09:00:00.000Z"),
                 participants: [
                   {
                     id: "participant-1",
@@ -242,8 +244,8 @@ describe("EventEditorBody", () => {
               isDefault: true,
               isSyncOnly: false,
               userId: "user-1",
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: new Date("2026-05-27T09:00:00.000Z"),
+              updatedAt: new Date("2026-05-27T09:00:00.000Z"),
             },
           ]}
           desktop={true}
@@ -252,9 +254,11 @@ describe("EventEditorBody", () => {
           setShowDescription={() => {}}
           setShowLocation={() => {}}
           setShowParticipants={() => {}}
-          showDescription={true}
-          showLocation={true}
-          showParticipants={true}
+          visibleSections={{
+            description: true,
+            location: true,
+            participants: true,
+          }}
           eventForm={
             {
               eventAllDay: false,
@@ -280,8 +284,8 @@ describe("EventEditorBody", () => {
                 end: new Date("2026-05-27T11:00:00.000Z"),
                 userId: "user-1",
                 isCancelled: true,
-                createdAt: new Date(),
-                updatedAt: new Date(),
+                createdAt: new Date("2026-05-27T09:00:00.000Z"),
+                updatedAt: new Date("2026-05-27T09:00:00.000Z"),
               },
               showNotifications: false,
             } as any

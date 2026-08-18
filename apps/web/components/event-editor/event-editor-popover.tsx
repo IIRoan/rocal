@@ -6,10 +6,14 @@ import { gsap } from "@workspace/ui/lib/gsap";
 import { EventEditorBody } from "./event-editor-body";
 import { EventEditorFooter } from "./event-editor-footer";
 import { EventEditorDesktopHeader } from "./event-editor-header";
+import { useEffectEvent } from "./use-effect-event";
+import { useEventEditorPopoverPosition } from "./use-event-editor-popover-position";
 import type {
   EventEditorBadgeItem,
   EventEditorFormState,
   EventEditorInvitationResponseStatus,
+  EventEditorViewFlags,
+  EventEditorVisibleSections,
 } from "./types";
 import type { Calendar } from "@workspace/ui/components/calendar";
 import type { UserSettings } from "@/lib/types/calendar";
@@ -19,14 +23,13 @@ type EventEditorPopoverProps = {
   badgeItem: EventEditorBadgeItem;
   calendars: Calendar[];
   dialogTitle: string;
-  canEditEvent: boolean;
   eventForm: EventEditorFormState;
+  flags: Pick<EventEditorViewFlags, "canEdit" | "isViewMode">;
   handleEventDelete: () => void;
   handleEventDownloadIcs: () => void;
   handleEventSave: () => void;
   invitationResponsePending: EventEditorInvitationResponseStatus | null;
   invitationStatus: EventEditorInvitationResponseStatus | null;
-  isViewMode: boolean;
   leadingSlot: React.ReactNode;
   localSettings: UserSettings;
   onInvitationResponse: (
@@ -38,24 +41,24 @@ type EventEditorPopoverProps = {
   setShowDescription: (value: boolean) => void;
   setShowLocation: (value: boolean) => void;
   setShowParticipants: (value: boolean) => void;
-  showDescription: boolean;
-  showLocation: boolean;
-  showParticipants: boolean;
+  visibleSections: Pick<
+    EventEditorVisibleSections,
+    "description" | "location" | "participants"
+  >;
 };
 
 export function EventEditorPopover({
   anchorPosition,
   badgeItem,
-  canEditEvent,
   calendars,
   dialogTitle,
   eventForm,
+  flags,
   handleEventDelete,
   handleEventDownloadIcs,
   handleEventSave,
   invitationResponsePending,
   invitationStatus,
-  isViewMode,
   leadingSlot,
   localSettings,
   onInvitationResponse,
@@ -65,183 +68,27 @@ export function EventEditorPopover({
   setShowDescription,
   setShowLocation,
   setShowParticipants,
-  showDescription,
-  showLocation,
-  showParticipants,
+  visibleSections,
 }: EventEditorPopoverProps) {
-  const popoverRef = React.useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
-  const [position, setPosition] = React.useState<{
-    top: number;
-    left: number;
-    maxHeight: number;
-  } | null>(null);
-  const positionRef = React.useRef<{
-    top: number;
-    left: number;
-    maxHeight: number;
-  } | null>(null);
+  const { popoverRef, position } = useEventEditorPopoverPosition({
+    anchorPosition,
+    open,
+    sectionKey: [
+      visibleSections.description,
+      visibleSections.location,
+      visibleSections.participants,
+    ].join(":"),
+  });
   const appliedPositionRef = React.useRef<{
     top: number;
     left: number;
     maxHeight: number;
   } | null>(null);
   const allowPositionAnimationRef = React.useRef(false);
-
-  React.useLayoutEffect(() => {
-    if (!open || !anchorPosition) {
-      if (!open) {
-        queueMicrotask(() => setPosition(null));
-        positionRef.current = null;
-      }
-
-      return;
-    }
-
-    const POPOVER_WIDTH = 420;
-    const POPOVER_MAX_HEIGHT = 750;
-    const POPOVER_MIN_HEIGHT = 320;
-    const VIEWPORT_PADDING = 16;
-    const GAP = 12;
-
-    const computePosition = () => {
-      const previewElement = document.querySelector(
-        "[data-preview-event='true']",
-      ) as HTMLElement | null;
-
-      const previewRect = previewElement?.getBoundingClientRect();
-      const hasValidPreviewRect =
-        previewRect && previewRect.width > 0 && previewRect.height > 0;
-
-      const fallbackRect = {
-        top: anchorPosition.y,
-        left: anchorPosition.x,
-        right: anchorPosition.x,
-        bottom: anchorPosition.y,
-        width: 0,
-        height: 0,
-      };
-      const anchorRect = hasValidPreviewRect ? previewRect : fallbackRect;
-
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const spaceRight =
-        viewportWidth - anchorRect.right - GAP - VIEWPORT_PADDING;
-      const spaceLeft = anchorRect.left - GAP - VIEWPORT_PADDING;
-
-      let left = VIEWPORT_PADDING;
-      if (spaceRight >= POPOVER_WIDTH) {
-        left = anchorRect.right + GAP;
-      } else if (spaceLeft >= POPOVER_WIDTH) {
-        left = anchorRect.left - POPOVER_WIDTH - GAP;
-      } else if (spaceRight >= spaceLeft) {
-        left = viewportWidth - POPOVER_WIDTH - VIEWPORT_PADDING;
-      }
-
-      let top = anchorRect.top;
-      const bottomLimit = viewportHeight - VIEWPORT_PADDING;
-      const viewportMax = viewportHeight - VIEWPORT_PADDING * 2;
-      let measuredHeight = 0;
-      const root = popoverRef.current;
-
-      if (root) {
-        const children = Array.from(root.children) as HTMLElement[];
-        for (const child of children) {
-          const isScrollable =
-            getComputedStyle(child).overflowY !== "visible" &&
-            child.scrollHeight > child.clientHeight;
-          measuredHeight += isScrollable
-            ? child.scrollHeight
-            : child.offsetHeight;
-        }
-
-        if (measuredHeight === 0) {
-          measuredHeight = root.offsetHeight;
-        }
-
-        measuredHeight += root.offsetHeight - root.clientHeight + 2;
-      }
-
-      let maxHeight = Math.min(
-        POPOVER_MAX_HEIGHT,
-        Math.max(measuredHeight, POPOVER_MIN_HEIGHT),
-        viewportMax,
-      );
-
-      if (top + maxHeight > bottomLimit) {
-        top = bottomLimit - maxHeight;
-      }
-
-      if (top < VIEWPORT_PADDING) {
-        top = VIEWPORT_PADDING;
-        maxHeight = Math.min(maxHeight, bottomLimit - top);
-      }
-
-      const nextPosition = { left, maxHeight, top };
-      const previousPosition = positionRef.current;
-
-      if (
-        !previousPosition ||
-        previousPosition.top !== nextPosition.top ||
-        previousPosition.left !== nextPosition.left ||
-        previousPosition.maxHeight !== nextPosition.maxHeight
-      ) {
-        positionRef.current = nextPosition;
-        setPosition(nextPosition);
-      }
-
-      return true;
-    };
-
-    computePosition();
-    const animationFrameId = requestAnimationFrame(computePosition);
-    const timeoutId = window.setTimeout(computePosition, 80);
-    const handleResize = () => computePosition();
-
-    window.addEventListener("resize", handleResize);
-
-    let resizeObserver: ResizeObserver | null = null;
-    if (popoverRef.current && typeof ResizeObserver !== "undefined") {
-      resizeObserver = new ResizeObserver(() => computePosition());
-      resizeObserver.observe(popoverRef.current);
-
-      for (const child of Array.from(popoverRef.current.children)) {
-        resizeObserver.observe(child as HTMLElement);
-        for (const grandChild of Array.from(child.children)) {
-          resizeObserver.observe(grandChild as HTMLElement);
-        }
-      }
-    }
-
-    let mutationObserver: MutationObserver | null = null;
-    if (typeof MutationObserver !== "undefined") {
-      mutationObserver = new MutationObserver(() => {
-        computePosition();
-      });
-      const previewEl = document.querySelector("[data-preview-event='true']");
-      if (previewEl) {
-        mutationObserver.observe(previewEl, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-        });
-      }
-      if (popoverRef.current) {
-        mutationObserver.observe(popoverRef.current, {
-          childList: true,
-          subtree: true,
-        });
-      }
-    }
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.clearTimeout(timeoutId);
-      window.removeEventListener("resize", handleResize);
-      resizeObserver?.disconnect();
-      mutationObserver?.disconnect();
-    };
-  }, [anchorPosition, open, showDescription, showLocation, showParticipants]);
+  const closePopover = useEffectEvent(() => {
+    onOpenChange(false);
+  });
 
   React.useEffect(() => {
     if (!open) {
@@ -308,7 +155,7 @@ export function EventEditorPopover({
     return () => {
       gsap.killTweensOf(popover);
     };
-  }, [open, position, prefersReducedMotion]);
+  }, [open, popoverRef, position, prefersReducedMotion]);
 
   React.useEffect(() => {
     if (!open) {
@@ -322,19 +169,24 @@ export function EventEditorPopover({
 
       event.preventDefault();
       event.stopPropagation();
-      onOpenChange(false);
+      closePopover();
     };
 
     document.addEventListener("keydown", handleKeyDown, true);
     return () => document.removeEventListener("keydown", handleKeyDown, true);
-  }, [onOpenChange, open]);
+  }, [open]);
 
   React.useEffect(() => {
     if (!open) {
       return;
     }
 
+    const ignoreUntil = Date.now() + 100;
     const handleClickOutside = (event: MouseEvent) => {
+      if (Date.now() < ignoreUntil) {
+        return;
+      }
+
       if (popoverRef.current?.contains(event.target as Node)) {
         return;
       }
@@ -348,20 +200,16 @@ export function EventEditorPopover({
         return;
       }
 
-      onOpenChange(false);
+      closePopover();
     };
 
-    const timeoutId = setTimeout(() => {
-      document.addEventListener("mousedown", handleClickOutside);
-    }, 100);
-
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      clearTimeout(timeoutId);
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [onOpenChange, open]);
+  }, [open, popoverRef]);
 
-  if (!open || !position) {
+  if (!open || !position || typeof document === "undefined") {
     return null;
   }
 
@@ -386,28 +234,30 @@ export function EventEditorPopover({
           badgeItem={badgeItem}
           dialogTitle={dialogTitle}
           isRecurring={eventForm.isRecurring}
-          isViewMode={isViewMode}
+          isViewMode={flags.isViewMode}
           leadingSlot={leadingSlot}
-          onToggleDescription={() => setShowDescription(!showDescription)}
-          onToggleLocation={() => setShowLocation(!showLocation)}
+          onToggleDescription={() =>
+            setShowDescription(!visibleSections.description)
+          }
+          onToggleLocation={() => setShowLocation(!visibleSections.location)}
           onToggleNotifications={() =>
             eventForm.setShowNotifications(!eventForm.showNotifications)
           }
-          onToggleParticipants={() => setShowParticipants(!showParticipants)}
+          onToggleParticipants={() =>
+            setShowParticipants(!visibleSections.participants)
+          }
           onToggleRecurring={() =>
             eventForm.setIsRecurring(!eventForm.isRecurring)
           }
-          showDescription={showDescription}
-          showLocation={showLocation}
+          showDescription={visibleSections.description}
+          showLocation={visibleSections.location}
           showNotifications={eventForm.showNotifications}
-          showParticipants={showParticipants}
+          showParticipants={visibleSections.participants}
         />
         <EventEditorBody
           eventForm={eventForm}
-          isViewMode={isViewMode}
-          showLocation={showLocation}
-          showDescription={showDescription}
-          showParticipants={showParticipants}
+          isViewMode={flags.isViewMode}
+          visibleSections={visibleSections}
           setShowLocation={setShowLocation}
           setShowDescription={setShowDescription}
           setShowParticipants={setShowParticipants}
@@ -416,8 +266,8 @@ export function EventEditorPopover({
           desktop
         />
         <EventEditorFooter
-          canEditEvent={canEditEvent}
-          isViewMode={isViewMode}
+          canEditEvent={flags.canEdit}
+          isViewMode={flags.isViewMode}
           eventForm={eventForm}
           handleEventSave={handleEventSave}
           handleEventDelete={handleEventDelete}

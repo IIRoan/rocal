@@ -1,6 +1,7 @@
 import {
   formatCalendarToolbarTitle,
   formatViewDateHeader,
+  resolveCalendarSwitcherDate,
 } from "./view-switcher-utils";
 
 // ─── formatViewDateHeader ────────────────────────────────────────────────────
@@ -86,5 +87,50 @@ describe("formatViewDateHeader", () => {
     const result = formatViewDateHeader("week", date);
     // Sunday Jan 12 – Saturday Jan 18
     expect(result).toBe("Jan 12 – 18");
+  });
+
+  it("uses the configured timezone so the week title matches the grid", () => {
+    const date = new Date("2026-08-23T22:30:00.000Z");
+    expect(formatViewDateHeader("week", date, 1, "Europe/Amsterdam")).toBe(
+      "Aug 24 – 30",
+    );
+  });
+});
+
+describe("resolveCalendarSwitcherDate", () => {
+  it("keeps the week title on the page being previewed during a swipe", () => {
+    const selectedDate = new Date(2026, 7, 11);
+    const previewDate = new Date(2026, 7, 18);
+
+    expect(
+      formatViewDateHeader(
+        "week",
+        resolveCalendarSwitcherDate({
+          view: "week",
+          currentDate: selectedDate,
+          selectedDate,
+          previewDate,
+        }),
+        1,
+        "Europe/Amsterdam",
+      ),
+    ).toBe("Aug 17 – 23");
+  });
+
+  it("uses the selected date for timeline titles once the swipe commits", () => {
+    const selectedDate = new Date(2026, 7, 18);
+
+    expect(
+      formatViewDateHeader(
+        "week",
+        resolveCalendarSwitcherDate({
+          view: "week",
+          currentDate: new Date(2026, 7, 1),
+          selectedDate,
+        }),
+        1,
+        "Europe/Amsterdam",
+      ),
+    ).toBe("Aug 17 – 23");
   });
 });

@@ -1,145 +1,61 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { createLogger } from "@workspace/logger";
 import {
-  formatInUserTimezone,
-  getOperationWarningMessages,
-  getTimezoneAwareCalendarDateRange,
   getZonedDateParts,
   isTodayInTimezone,
   navigateCalendarDate,
   resolveTimezone,
   wallClockToUtc,
 } from "@workspace/calendar-core";
-import { useCalendarContext } from "./calendar-context";
-import {
-  addDays,
-  endOfWeek,
-  format,
-  isSameMonth,
-  startOfWeek,
-} from "date-fns";
-import {
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  Loader2,
-  Menu,
-} from "lucide-react";
+import { addDays } from "date-fns";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const log = createLogger("mobile-calendar");
-
-function toastEventSaved(
-  savedEvent: unknown,
-  message: string,
-  description: string,
-) {
-  toast.success(message, {
-    description,
-    position: "bottom-left",
-  });
-
-  for (const warningMessage of getOperationWarningMessages(savedEvent)) {
-    toast.warning(warningMessage, {
-      position: "bottom-left",
-    });
-  }
-}
 import { useIsMobile } from "../../hooks/use-mobile";
-
+import { useDropdownShortcuts } from "../../hooks/use-keyboard-shortcuts";
+import { cn } from "../../lib/utils";
+import { Button } from "../ui/button";
+import { ErrorBoundary } from "../ui/error-boundary";
+import { useCalendarContext } from "./calendar-context";
+import { CalendarDndProvider } from "./calendar-dnd-context";
+import { CalendarSkeleton } from "./calendar-skeleton";
 import {
   AgendaDaysToShow,
   EventGap,
   EventHeight,
   WeekCellsHeight,
 } from "./constants";
-import { addHoursToDate, addMinutesToDate } from "./utils";
-import { CalendarEvent, CalendarView, User, CALENDAR_VIEWS } from "./types";
-import dynamic from "next/dynamic";
-import { CalendarSkeleton } from "./calendar-skeleton";
+import { persistDraggedCalendarEvent } from "./event-calendar-mutations";
+import { MobileEventCalendarToolbar } from "./mobile-event-calendar-toolbar";
+import { MobileEventCalendarViews } from "./mobile-event-calendar-views";
+import type { EventNotification } from "./notification-manager";
+import type { CalendarEvent, CalendarView, User } from "./types";
+import { addMinutesToDate } from "./utils";
 
-const AgendaView = dynamic(
-  () => import("./agenda-view").then((mod) => mod.AgendaView),
-  {
-    ssr: false,
-    loading: () => <CalendarSkeleton view="agenda" compactView={false} />,
-  },
-);
-const DayView = dynamic(() => import("./day-view").then((mod) => mod.DayView), {
-  ssr: false,
-  loading: () => <CalendarSkeleton view="day" compactView={false} />,
-});
-const MonthView = dynamic(
-  () => import("./month-view").then((mod) => mod.MonthView),
-  {
-    ssr: false,
-    loading: () => <CalendarSkeleton view="month" compactView={false} />,
-  },
-);
-const WeekView = dynamic(
-  () => import("./week-view").then((mod) => mod.WeekView),
-  {
-    ssr: false,
-    loading: () => <CalendarSkeleton view="week" compactView={false} />,
-  },
-);
-const MobileDayView = dynamic(
-  () => import("./mobile-day-view").then((mod) => mod.MobileDayView),
-  {
-    ssr: false,
-    loading: () => <CalendarSkeleton view="day" compactView={false} />,
-  },
-);
-const MobileWeekView = dynamic(
-  () => import("./mobile-week-view").then((mod) => mod.MobileWeekView),
-  {
-    ssr: false,
-    loading: () => <CalendarSkeleton view="week" compactView={false} />,
-  },
-);
-const MobileThreeDayView = dynamic(
-  () => import("./mobile-three-day-view").then((mod) => mod.MobileThreeDayView),
-  {
-    ssr: false,
-    loading: () => <CalendarSkeleton view="3day" compactView={false} />,
-  },
-);
-import { EventNotification } from "./notification-manager";
-import { CalendarDndProvider } from "./calendar-dnd-context";
-import { cn } from "../../lib/utils";
-import { Button } from "../ui/button";
-import { ErrorBoundary } from "../ui/error-boundary";
-import { AppLoadingState } from "../ui/app-loading-state";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
-import { ThemeToggle } from "../layout/theme-toggle";
-import { useDropdownShortcuts } from "../../hooks";
+const log = createLogger("mobile-calendar");
+
+const EMPTY_CALENDAR_EVENTS: CalendarEvent[] = [];
+const DEFAULT_WORKING_DAYS = [1, 2, 3, 4, 5];
+
+function reloadWindow() {
+  window.location.reload();
+}
 
 export interface MobileEventCalendarProps {
   className?: string;
   initialView?: CalendarView;
   currentDateOverride?: Date;
-  // Data props
   events?: CalendarEvent[];
-  categories?: any[];
+  categories?: unknown[];
   loading?: boolean;
   eventsLoading?: boolean;
-  error?: any;
-  // Event handlers
-  onCreateEvent?: (event: any) => Promise<any>;
-  onUpdateEvent?: (id: string, event: any) => Promise<any>;
+  error?: { message?: string } | null;
+  onCreateEvent?: (event: unknown) => Promise<unknown>;
+  onUpdateEvent?: (id: string, event: unknown) => Promise<unknown>;
   onDeleteEvent?: (id: string) => Promise<void>;
-  onCreateCategory?: (category: any) => Promise<any>;
-  // Date range change handler
+  onCreateCategory?: (category: unknown) => Promise<unknown>;
   onDateRangeChange?: (dateRange: { start: Date; end: Date }) => void;
-  // Settings
   showWeekNumbers?: boolean;
   compactView?: boolean;
   timeFormat?: "12h" | "24h";
@@ -148,18 +64,15 @@ export interface MobileEventCalendarProps {
   weekStartDay?: number;
   workingDays?: number[];
   timezone?: string;
-  // Theme settings
   themeSettings?: {
     currentTheme: "light" | "dark" | "system";
     updateTheme: (theme: "light" | "dark" | "system") => Promise<void>;
   };
-  // Notification handlers
   onLoadNotifications?: (eventId: string) => Promise<EventNotification[]>;
   onUpdateNotifications?: (
     eventId: string,
     notifications: EventNotification[],
   ) => Promise<void>;
-  // Command palette integration
   onEventEdit?: (
     event: CalendarEvent,
     options?: {
@@ -167,123 +80,45 @@ export interface MobileEventCalendarProps {
       anchorPosition?: { x: number; y: number };
     },
   ) => void;
-  // Mobile specific
   onSidebarToggle?: () => void;
-  // View change handler
   onViewChange?: (view: CalendarView) => void;
   user?: User;
 }
 
 export function MobileEventCalendar({
   className,
-  initialView = "month",
-  events = [],
-  categories = [],
+  events = EMPTY_CALENDAR_EVENTS,
   loading = false,
   eventsLoading = false,
   error = null,
-  onCreateEvent,
   onUpdateEvent,
   onDeleteEvent,
-  onCreateCategory,
-  onDateRangeChange,
   showWeekNumbers = false,
   compactView = false,
   timeFormat = "24h",
   defaultEventDuration = 60,
   defaultCalendarId = null,
   weekStartDay = 1,
-  workingDays = [1, 2, 3, 4, 5],
+  workingDays = DEFAULT_WORKING_DAYS,
   timezone,
   themeSettings,
-  onLoadNotifications,
-  onUpdateNotifications,
   onEventEdit,
-  onSidebarToggle,
   onViewChange,
   currentDateOverride,
-  user,
 }: MobileEventCalendarProps) {
-  // Use the shared calendar context instead of local state
-  const { currentDate: contextCurrentDate, setCurrentDate } =
+  const { currentDate: contextCurrentDate, currentView, setCurrentDate, setCurrentView } =
     useCalendarContext();
   const currentDate = currentDateOverride || contextCurrentDate;
+  const view = currentView;
   const isMobile = useIsMobile();
   const resolvedTimezone = resolveTimezone(timezone);
+  const updateEvent = onUpdateEvent || (async () => {});
 
-  // Initialize view from sessionStorage or fallback to smart default
-  const [view, setViewState] = useState<CalendarView>(() => {
-    if (typeof window !== "undefined") {
-      const savedView = sessionStorage.getItem("calendar-view-selection");
-      if (
-        savedView &&
-        (CALENDAR_VIEWS as readonly string[]).includes(savedView)
-      ) {
-        return savedView as CalendarView;
-      }
-    }
-    // Default based on screen size - will be updated by useEffect when isMobile is determined
-    return initialView;
-  });
-
-  // Update view when isMobile status changes and no saved preference exists
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedViewData = sessionStorage.getItem("calendar-view-selection");
-      let validSavedView = null;
-
-      // Check if we have saved data and it's not expired
-      if (savedViewData) {
-        try {
-          const parsedData = JSON.parse(savedViewData);
-          const now = new Date().getTime();
-
-          // Only use the saved view if it hasn't expired
-          if (parsedData.expires && parsedData.expires > now) {
-            validSavedView = parsedData.view;
-            // Set the view state to the valid saved view
-            setViewState(parsedData.view);
-          } else {
-            // Clear expired data
-            sessionStorage.removeItem("calendar-view-selection");
-          }
-        } catch (e) {
-          // Handle legacy format or invalid JSON
-          log.warn("Invalid calendar view data in sessionStorage");
-          sessionStorage.removeItem("calendar-view-selection");
-        }
-      }
-
-      if (!validSavedView && isMobile) {
-        // On mobile, always default to 3-day view regardless of initialView
-        setViewState("3day");
-        // Notify parent about the view change
-        onViewChange?.("3day");
-      }
-    }
-  }, [isMobile, onViewChange]);
-
-  // Custom setView function that also saves to sessionStorage with expiration and notifies parent
-  const setView = (newView: CalendarView) => {
-    setViewState(newView);
-    if (typeof window !== "undefined") {
-      // Save view with expiration time (1 hour from now)
-      const expirationTime = new Date();
-      expirationTime.setHours(expirationTime.getHours() + 1);
-      const viewData = {
-        view: newView,
-        expires: expirationTime.getTime(),
-      };
-      sessionStorage.setItem(
-        "calendar-view-selection",
-        JSON.stringify(viewData),
-      );
-    }
-    // Notify parent component about view change
-    onViewChange?.(newView);
+  const setView = (nextView: CalendarView) => {
+    setCurrentView(nextView);
+    onViewChange?.(nextView);
   };
 
-  // Add keyboard shortcuts for view changes
   useDropdownShortcuts([
     { key: "m", action: () => setView("month") },
     { key: "w", action: () => setView("week") },
@@ -292,96 +127,36 @@ export function MobileEventCalendar({
     { key: "t", action: () => setView("3day") },
   ]);
 
-  // Notify parent about the initial view on mount
-  useEffect(() => {
-    onViewChange?.(view);
-  }, []);
-
-  // Update view when initialView changes from external source (like bottom nav)
-  useEffect(() => {
-    if (initialView && initialView !== view) {
-      setViewState(initialView);
-      if (typeof window !== "undefined") {
-        const expirationTime = new Date();
-        expirationTime.setHours(expirationTime.getHours() + 1);
-        sessionStorage.setItem(
-          "calendar-view-selection",
-          JSON.stringify({
-            view: initialView,
-            expires: expirationTime.getTime(),
-          }),
-        );
-      }
-    }
-  }, [initialView, view]);
-
-  // Compute the date range for a given date and view
-  const computeDateRange = (date: Date, v: CalendarView) =>
-    getTimezoneAwareCalendarDateRange({
-      baseDate: date,
-      view: v,
-      weekStartDay,
-      timezone: resolvedTimezone,
-    });
-
-  // Calculate date range based on current view and date
-  const dateRange = useMemo(
-    () => computeDateRange(currentDate, view),
-    [currentDate, resolvedTimezone, view],
-  );
-
-  // Notify parent of date range changes (fallback for view changes, external date changes, etc.)
-  useEffect(() => {
-    onDateRangeChange?.(dateRange);
-  }, [dateRange, onDateRangeChange]);
-
-  // Use the provided event handlers with fallbacks
-  const createEvent = onCreateEvent || (async () => {});
-  const updateEvent = onUpdateEvent || (async () => {});
-  const deleteEvent = onDeleteEvent || (async () => {});
-
-  // Navigate and eagerly start the fetch in the same React batch
   const navigateTo = (newDate: Date) => {
     setCurrentDate(newDate);
-    onDateRangeChange?.(computeDateRange(newDate, view));
   };
 
-  // Navigation handlers
   const handlePrevious = () => {
-    const newDate =
+    navigateTo(
       view === "agenda"
         ? addDays(currentDate, -AgendaDaysToShow)
-        : navigateCalendarDate(currentDate, view, -1);
-
-    navigateTo(newDate);
+        : navigateCalendarDate(currentDate, view, -1),
+    );
   };
 
   const handleNext = () => {
-    const newDate =
+    navigateTo(
       view === "agenda"
         ? addDays(currentDate, AgendaDaysToShow)
-        : navigateCalendarDate(currentDate, view, 1);
-
-    navigateTo(newDate);
-  };
-
-  const handleToday = () => {
-    navigateTo(new Date());
+        : navigateCalendarDate(currentDate, view, 1),
+    );
   };
 
   const handleEventSelect = (event: CalendarEvent) => {
-    // Open command palette with event to edit
     onEventEdit?.(event);
   };
 
   const handleEventCreate = (startTime: Date) => {
-    // Keep exact time without rounding to intervals
-    // Just reset seconds and milliseconds for consistency
     startTime.setSeconds(0);
     startTime.setMilliseconds(0);
 
-    const newEvent: CalendarEvent = {
-      id: undefined as any, // This ensures it's treated as a new event
+    onEventEdit?.({
+      id: undefined as unknown as string,
       title: "",
       start: startTime,
       end: addMinutesToDate(startTime, defaultEventDuration),
@@ -390,189 +165,25 @@ export function MobileEventCalendar({
       userId: "",
       createdAt: new Date(),
       updatedAt: new Date(),
-    };
-    // Open command palette with new event
-    onEventEdit?.(newEvent);
+    });
   };
 
-  const handleEventSave = async (
-    event: CalendarEvent,
-  ): Promise<CalendarEvent> => {
-    try {
-      const eventData = {
-        title: event.title,
-        description: event.description,
-        start: event.start.toISOString(),
-        end: event.end.toISOString(),
-        allDay: event.allDay || false,
-        location: event.location,
-        color: event.color,
-        calendarId: event.calendarId,
-        categoryId: (event as any).categoryId || undefined,
-        reminder: event.reminder,
-      };
-
-      let savedEvent: any;
-      if (event.id) {
-        savedEvent = await updateEvent(event.id, eventData);
-        toastEventSaved(
-          savedEvent,
-          `Event "${event.title}" updated`,
-          formatInUserTimezone(
-            new Date(event.start),
-            resolvedTimezone,
-            "MMM d, yyyy 'at' h:mm a",
-          ),
-        );
-      } else {
-        savedEvent = await createEvent(eventData);
-        toastEventSaved(
-          savedEvent,
-          `Event "${event.title}" created`,
-          formatInUserTimezone(
-            new Date(event.start),
-            resolvedTimezone,
-            "MMM d, yyyy 'at' h:mm a",
-          ),
-        );
-      }
-
-      return savedEvent || event;
-    } catch (error: any) {
-      log.error("Failed to save event:", error);
-
-      const errorMessage = error?.message || "Failed to save event";
-      const isNetworkError =
-        error?.error === "Network Error" ||
-        error?.statusCode === 0 ||
-        !navigator.onLine;
-
-      if (isNetworkError) {
-        toast.error("Network error", {
-          description: "Please check your connection and try again",
-          position: "bottom-left",
-        });
-      } else {
-        toast.error("Failed to save event", {
-          description: errorMessage,
-          position: "bottom-left",
-        });
-      }
-
-      throw error;
-    }
+  const handleToday = () => {
+    navigateTo(new Date());
   };
 
-  const handleEventDelete = async (eventId: string) => {
-    try {
-      const deletedEvent = events.find((e: CalendarEvent) => e.id === eventId);
-      await deleteEvent(eventId);
-
-      if (deletedEvent) {
-        toast.success(`Event "${deletedEvent.title}" deleted`, {
-          description: formatInUserTimezone(
-            new Date(deletedEvent.start),
-            resolvedTimezone,
-            "MMM d, yyyy",
-          ),
-          position: "bottom-left",
-        });
-      }
-    } catch (error: any) {
-      log.error("Failed to delete event:", error);
-      const errorMessage = error?.message || "Failed to delete event";
-      toast.error("Failed to delete event", {
-        description: errorMessage,
-        position: "bottom-left",
-      });
-    }
-  };
-
-  const handleEventUpdate = async (updatedEvent: CalendarEvent) => {
-    try {
-      const eventData = {
-        title: updatedEvent.title,
-        description: updatedEvent.description,
-        start: updatedEvent.start.toISOString(),
-        end: updatedEvent.end.toISOString(),
-        allDay: updatedEvent.allDay,
-        location: updatedEvent.location,
-        color: updatedEvent.color,
-      };
-
-      await updateEvent(updatedEvent.id, eventData);
-
-      toast.success(`Event "${updatedEvent.title}" moved`, {
-        description: formatInUserTimezone(
-          new Date(updatedEvent.start),
-          resolvedTimezone,
-          "MMM d, yyyy 'at' h:mm a",
-        ),
-        position: "bottom-left",
-      });
-    } catch (error: any) {
-      log.error("Failed to update event:", error);
-      const errorMessage = error?.message || "Failed to move event";
-      toast.error("Failed to move event", {
-        description: errorMessage,
-        position: "bottom-left",
-      });
-    }
-  };
-
-  const viewTitle = useMemo(() => {
-    if (view === "month") {
-      return format(currentDate, "MMMM yyyy");
-    } else if (view === "week") {
-      const start = startOfWeek(currentDate, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-      const end = endOfWeek(currentDate, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-      if (isSameMonth(start, end)) {
-        return format(start, "MMMM yyyy");
-      } else {
-        return `${format(start, "MMM")} - ${format(end, "MMM yyyy")}`;
-      }
-    } else if (view === "day") {
-      return (
-        <>
-          <span className="min-sm:hidden" aria-hidden="true">
-            {format(currentDate, "MMM d, yyyy")}
-          </span>
-          <span className="max-sm:hidden min-md:hidden" aria-hidden="true">
-            {format(currentDate, "MMMM d, yyyy")}
-          </span>
-          <span className="max-md:hidden">
-            {format(currentDate, "EEE MMMM d, yyyy")}
-          </span>
-        </>
+  const handleNewEventPress = () => {
+    if (isTodayInTimezone(currentDate, resolvedTimezone)) {
+      const { hours, minutes } = getZonedDateParts(new Date(), resolvedTimezone);
+      handleEventCreate(
+        wallClockToUtc(currentDate, hours, minutes, resolvedTimezone),
       );
-    } else if (view === "3day") {
-      const start = addDays(currentDate, -1);
-      const end = addDays(currentDate, 1);
-      if (isSameMonth(start, end)) {
-        return `${format(start, "MMM d")} - ${format(end, "d, yyyy")}`;
-      } else {
-        return `${format(start, "MMM d")} - ${format(end, "MMM d, yyyy")}`;
-      }
-    } else if (view === "agenda") {
-      const start = currentDate;
-      const end = addDays(currentDate, AgendaDaysToShow - 1);
-
-      if (isSameMonth(start, end)) {
-        return format(start, "MMMM yyyy");
-      } else {
-        return `${format(start, "MMM")} - ${format(end, "MMM yyyy")}`;
-      }
-    } else {
-      return format(currentDate, "MMMM yyyy");
+      return;
     }
-  }, [currentDate, view]);
 
-  // Show skeleton only for initial structure loading (calendars/categories)
-  // Events can load separately without blocking the calendar UI
+    handleEventCreate(wallClockToUtc(currentDate, 9, 0, resolvedTimezone));
+  };
+
   if (loading) {
     return (
       <div className={cn("rounded-lg", className)}>
@@ -581,19 +192,14 @@ export function MobileEventCalendar({
     );
   }
 
-  // Show error state
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <p className="text-destructive mb-2">Failed to load calendar</p>
           <p className="text-sm text-muted-foreground">{error.message}</p>
-          <Button
-            variant="outline"
-            className="mt-4"
-            onClick={() => window.location.reload()}
-          >
-            <Loader2 className="w-4 h-4 mr-2" />
+          <Button variant="outline" className="mt-4" onClick={reloadWindow}>
+            <Loader2 className="size-4 mr-2" />
             Retry
           </Button>
         </div>
@@ -603,8 +209,8 @@ export function MobileEventCalendar({
 
   return (
     <ErrorBoundary
-      onError={(error, errorInfo) => {
-        log.error("Calendar error:", error, errorInfo);
+      onError={(caughtError, errorInfo) => {
+        log.error("Calendar error:", caughtError, errorInfo);
         toast.error("Calendar encountered an error. Please refresh the page.");
       }}
     >
@@ -614,228 +220,54 @@ export function MobileEventCalendar({
           {
             "--event-height": `${compactView ? Math.round(EventHeight * 0.75) : EventHeight}px`,
             "--event-gap": `${compactView ? Math.round(EventGap * 0.5) : EventGap}px`,
-            // Enhanced mobile-responsive week cell height
             "--week-cells-height": `${
               compactView
                 ? Math.round(WeekCellsHeight * 0.85)
-                : typeof window !== "undefined" && window.innerWidth < 640
-                  ? Math.round(WeekCellsHeight * 0.9) // Slightly more compact on mobile
+                : isMobile
+                  ? Math.round(WeekCellsHeight * 0.9)
                   : WeekCellsHeight
             }px`,
           } as React.CSSProperties
         }
       >
         <CalendarDndProvider
-          onEventUpdate={handleEventUpdate}
+          onEventUpdate={(updatedEvent) =>
+            persistDraggedCalendarEvent({
+              timezone: resolvedTimezone,
+              updateEvent,
+              updatedEvent,
+            })
+          }
           timezone={timezone}
         >
-          {/* Desktop-only calendar header - hidden on mobile since we have mobile nav */}
-          <div className="hidden md:flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4">
-            <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
-              <div className="flex items-center gap-1.5">
-                <h2 className="font-semibold text-xl">{viewTitle}</h2>
-                {eventsLoading && (
-                  <AppLoadingState
-                    variant="inline-icon"
-                    size="sm"
-                    className="shrink-0"
-                  />
-                )}
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center sm:gap-2 max-sm:order-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="max-sm:size-8"
-                    onClick={handlePrevious}
-                    aria-label="Previous"
-                    disabled={loading}
-                  >
-                    <ChevronLeftIcon size={16} aria-hidden="true" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="max-sm:size-8"
-                    onClick={handleNext}
-                    aria-label="Next"
-                    disabled={loading}
-                  >
-                    <ChevronRightIcon size={16} aria-hidden="true" />
-                  </Button>
-                </div>
-                <Button
-                  className="max-sm:h-8 max-sm:px-2.5! bg-accent hover:bg-accent/80 text-accent-foreground"
-                  onClick={handleToday}
-                  disabled={loading}
-                >
-                  Today
-                </Button>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="outline"
-                  className="max-sm:h-8 max-sm:px-2.5!"
-                  onClick={() => {
-                    const now = new Date();
-                    let startTime: Date;
-
-                    if (isTodayInTimezone(currentDate, resolvedTimezone)) {
-                      const { hours, minutes } = getZonedDateParts(
-                        now,
-                        resolvedTimezone,
-                      );
-                      startTime = wallClockToUtc(
-                        currentDate,
-                        hours,
-                        minutes,
-                        resolvedTimezone,
-                      );
-                    } else {
-                      startTime = wallClockToUtc(
-                        currentDate,
-                        9,
-                        0,
-                        resolvedTimezone,
-                      );
-                    }
-
-                    handleEventCreate(startTime);
-                  }}
-                  disabled={loading}
-                >
-                  New Event
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="gap-1.5 max-sm:h-8 max-sm:px-2! max-sm:gap-1"
-                      disabled={loading}
-                    >
-                      <span className="capitalize">{view}</span>
-                      <ChevronDownIcon
-                        className="-me-1 opacity-60"
-                        size={16}
-                        aria-hidden="true"
-                      />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-32">
-                    <DropdownMenuItem onClick={() => setView("month")}>
-                      Month <DropdownMenuShortcut>⌘+M</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setView("week")}>
-                      Week <DropdownMenuShortcut>⌘+W</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setView("day")}>
-                      Day <DropdownMenuShortcut>⌘+D</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setView("agenda")}>
-                      Agenda <DropdownMenuShortcut>⌘+A</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setView("3day")}>
-                      3 Days <DropdownMenuShortcut>⌘+T</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <ThemeToggle useSettingsTheme={themeSettings} />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-1 flex-col">
-            {view === "month" && (
-              <MonthView
-                currentDate={currentDate}
-                events={events}
-                onEventSelect={handleEventSelect}
-                onEventCreate={handleEventCreate}
-                showWeekNumbers={showWeekNumbers}
-                compactView={compactView}
-                timeFormat={timeFormat}
-                weekStartDay={weekStartDay}
-                workingDays={workingDays}
-                timezone={timezone}
-              />
-            )}
-            {view === "week" &&
-              (isMobile ? (
-                <MobileWeekView
-                  currentDate={currentDate}
-                  events={events}
-                  onEventSelect={handleEventSelect}
-                  onEventCreate={handleEventCreate}
-                  timeFormat={timeFormat}
-                  weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
-                  workingDays={workingDays}
-                  timezone={timezone}
-                  showMonthPicker={true}
-                />
-              ) : (
-                <WeekView
-                  currentDate={currentDate}
-                  events={events}
-                  onEventSelect={handleEventSelect}
-                  onEventCreate={handleEventCreate}
-                  compactView={compactView}
-                  timeFormat={timeFormat}
-                  weekStartDay={weekStartDay}
-                  workingDays={workingDays}
-                  timezone={timezone}
-                />
-              ))}
-            {view === "3day" && isMobile && (
-              <MobileThreeDayView
-                currentDate={currentDate}
-                events={events}
-                onEventSelect={handleEventSelect}
-                onEventCreate={handleEventCreate}
-                timeFormat={timeFormat}
-                weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
-                workingDays={workingDays}
-                timezone={timezone}
-              />
-            )}
-            {view === "day" &&
-              (isMobile ? (
-                <MobileDayView
-                  currentDate={currentDate}
-                  events={events}
-                  onEventSelect={handleEventSelect}
-                  onEventCreate={handleEventCreate}
-                  timeFormat={timeFormat}
-                  timezone={timezone}
-                  workingDays={workingDays}
-                  showMonthPicker={true}
-                  weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
-                />
-              ) : (
-                <DayView
-                  currentDate={currentDate}
-                  events={events}
-                  onEventSelect={handleEventSelect}
-                  onEventCreate={handleEventCreate}
-                  compactView={compactView}
-                  timeFormat={timeFormat}
-                  workingDays={workingDays}
-                  timezone={timezone}
-                />
-              ))}
-            {view === "agenda" && (
-              <AgendaView
-                currentDate={currentDate}
-                events={events}
-                onEventSelect={handleEventSelect}
-                onEventCreate={handleEventCreate}
-                timeFormat={timeFormat}
-                timezone={timezone}
-              />
-            )}
-          </div>
+          <MobileEventCalendarToolbar
+            currentDate={currentDate}
+            eventsLoading={eventsLoading}
+            loading={loading}
+            onNext={handleNext}
+            onNewEvent={handleNewEventPress}
+            onPrevious={handlePrevious}
+            onToday={handleToday}
+            onViewChange={setView}
+            themeSettings={themeSettings}
+            timezone={resolvedTimezone}
+            view={view}
+            weekStartDay={weekStartDay}
+          />
+          <MobileEventCalendarViews
+            compactView={compactView}
+            currentDate={currentDate}
+            events={events}
+            isMobile={isMobile}
+            onEventCreate={handleEventCreate}
+            onEventSelect={handleEventSelect}
+            showWeekNumbers={showWeekNumbers}
+            timeFormat={timeFormat}
+            timezone={timezone}
+            view={view}
+            weekStartDay={weekStartDay}
+            workingDays={workingDays}
+          />
         </CalendarDndProvider>
       </div>
     </ErrorBoundary>

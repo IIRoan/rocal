@@ -377,18 +377,30 @@ const MonthPage = React.memo(function MonthPage({
     ],
   );
 
+  const providedCollapsedRow =
+    collapsedRowDates != null && collapsedRowDates.length > 0
+      ? collapsedRowDates
+      : null;
+
   return (
-    <Animated.View style={[styles.monthPageContent, pageAnimatedStyle]}>
-      {Array.from(
-        { length: COMPACT_STRIP_EXPANDED_WEEK_ROWS },
-        (_, index) => {
-          const rowIndex = expandedWeekRowOffset + index;
-          return renderDatesRow(
-            gridDates.slice(rowIndex * 7, rowIndex * 7 + 7),
-            rowIndex,
-          );
-        },
-      )}
+    <Animated.View
+      style={[
+        styles.monthPageContent,
+        providedCollapsedRow ? null : pageAnimatedStyle,
+      ]}
+    >
+      {providedCollapsedRow
+        ? renderDatesRow(providedCollapsedRow, "collapsed")
+        : Array.from(
+            { length: COMPACT_STRIP_EXPANDED_WEEK_ROWS },
+            (_, index) => {
+              const rowIndex = expandedWeekRowOffset + index;
+              return renderDatesRow(
+                gridDates.slice(rowIndex * 7, rowIndex * 7 + 7),
+                rowIndex,
+              );
+            },
+          )}
     </Animated.View>
   );
 });

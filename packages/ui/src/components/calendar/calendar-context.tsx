@@ -2,22 +2,36 @@
 
 import React, {
   createContext,
-  useContext,
+  use,
   useState,
   useEffect,
+  useMemo,
   useRef,
   useCallback,
+  useSyncExternalStore,
   ReactNode,
 } from "react";
 import { createLogger } from "@workspace/logger";
 import {
   Calendar,
-  EventColor,
   CreateCalendarData,
   CalendarView,
 } from "./types";
+import {
+  getStoredCalendarViewServerSnapshot,
+  getStoredCalendarViewSnapshot,
+  subscribeStoredCalendarView,
+  writeStoredCalendarView,
+} from "./calendar-view-storage";
+import {
+  getCalendarVisibilityServerSnapshot,
+  getCalendarVisibilitySnapshot,
+  patchCalendarVisibility,
+  subscribeCalendarVisibility,
+} from "./calendar-visibility-storage";
 
 const log = createLogger("calendar-context");
+const EMPTY_CALENDARS: Calendar[] = [];
 
 interface CalendarContextType {
   // Date management
@@ -49,7 +63,7 @@ const CalendarContext = createContext<CalendarContextType | undefined>(
 );
 
 export function useCalendarContext() {
-  const context = useContext(CalendarContext);
+  const context = use(CalendarContext);
   if (context === undefined) {
     throw new Error(
       "useCalendarContext must be used within a CalendarProvider",
@@ -60,6 +74,7 @@ export function useCalendarContext() {
 
 interface CalendarProviderProps {
   children: ReactNode;
+  defaultView?: CalendarView;
   initialCalendars?: Calendar[];
   onCreateCalendar?: (calendarData: CreateCalendarData) => Promise<Calendar>;
   onUpdateCalendar?: (
@@ -104,184 +119,158 @@ function getBootstrapCalendarDate(): Date {
   return new Date();
 }
 
+function calendarListKey(calendars: Calendar[]): string {
+  return calendars
+    .map(
+      (calendar) =>
+        `${calendar.id}:${calendar.name}:${calendar.color}:${calendar.kind}:${calendar.isVisible}:${calendar.isDefault}:${calendar.isPublic}:${calendar.isSyncOnly}`,
+    )
+    .join("|");
+}
+
+function validateCalendarDate(date: Date | string | null | undefined): Date {
+  if (!date) {
+    return new Date();
+  }
+
+  const dateObj = typeof date === "string" ? new Date(date) : date;
+
+  if (isNaN(dateObj.getTime())) {
+    log.warn("Invalid date provided, falling back to current date:", date);
+    return new Date();
+  }
+
+  const now = new Date();
+  const minDate = new Date(now.getFullYear() - 10, 0, 1);
+  const maxDate = new Date(now.getFullYear() + 10, 11, 31);
+
+  if (dateObj < minDate || dateObj > maxDate) {
+    log.warn(
+      "Date out of reasonable bounds, falling back to current date:",
+      date,
+    );
+    return new Date();
+  }
+
+  const daysDiff =
+    Math.abs(dateObj.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+  if (daysDiff > 365 * 5) {
+    log.warn("Date seems too far from current date, falling back:", date);
+    return new Date();
+  }
+
+  return dateObj;
+}
+
+function useStoredCalendarView(defaultView: CalendarView) {
+  const getViewSnapshot = useCallback(
+    () => getStoredCalendarViewSnapshot(defaultView),
+    [defaultView],
+  );
+  const getViewServerSnapshot = useCallback(
+    () => getStoredCalendarViewServerSnapshot(defaultView),
+    [defaultView],
+  );
+  const currentView = useSyncExternalStore(
+    subscribeStoredCalendarView,
+    getViewSnapshot,
+    getViewServerSnapshot,
+  );
+  const setCurrentView = useCallback((view: CalendarView) => {
+    writeStoredCalendarView(view);
+  }, []);
+
+  return { currentView, setCurrentView };
+}
+
+function useCalendarList(initialCalendars: Calendar[]) {
+  const sourceKey = calendarListKey(initialCalendars);
+  const [replacement, setReplacement] = useState<{
+    calendars: Calendar[];
+    sourceKey: string;
+  } | null>(null);
+  const [extrasById, setExtrasById] = useState<Record<string, Calendar>>({});
+
+  const calendars = useMemo(() => {
+    const base =
+      replacement?.sourceKey === sourceKey
+        ? replacement.calendars
+        : initialCalendars;
+    const byId = new Map(base.map((calendar) => [calendar.id, calendar]));
+    for (const extra of Object.values(extrasById)) {
+      if (!byId.has(extra.id)) {
+        byId.set(extra.id, extra);
+      }
+    }
+    return [...byId.values()];
+  }, [extrasById, initialCalendars, replacement, sourceKey]);
+
+  const setCalendars = useCallback(
+    (next: Calendar[]) => {
+      setReplacement({ calendars: next, sourceKey });
+    },
+    [sourceKey],
+  );
+
+  const addLocalCalendar = useCallback((calendar: Calendar) => {
+    setExtrasById((prev) => ({ ...prev, [calendar.id]: calendar }));
+  }, []);
+
+  return { calendars, setCalendars, addLocalCalendar };
+}
+
+function resolveCalendarVisibility(
+  calendarId: string,
+  storedVisibility: Record<string, boolean>,
+  calendars: Calendar[],
+): boolean {
+  const stored = storedVisibility[calendarId];
+  if (stored !== undefined) {
+    return stored;
+  }
+
+  return calendars.find((calendar) => calendar.id === calendarId)?.isVisible ?? true;
+}
+
 export function CalendarProvider({
   children,
-  initialCalendars = [],
+  defaultView = "month",
+  initialCalendars = EMPTY_CALENDARS,
   onCreateCalendar,
   onUpdateCalendar,
   onRefreshCalendars,
 }: CalendarProviderProps) {
-  // Helper function to validate and sanitize dates
-  const validateDate = useCallback(
-    (date: Date | string | null | undefined): Date => {
-      if (!date) {
-        return new Date();
-      }
-
-      const dateObj = typeof date === "string" ? new Date(date) : date;
-
-      // Check if date is valid
-      if (isNaN(dateObj.getTime())) {
-        log.warn("Invalid date provided, falling back to current date:", date);
-        return new Date();
-      }
-
-      // Check if date is within reasonable bounds (not too far in past/future)
-      const now = new Date();
-      const minDate = new Date(now.getFullYear() - 10, 0, 1); // 10 years ago (more restrictive)
-      const maxDate = new Date(now.getFullYear() + 10, 11, 31); // 10 years from now (more restrictive)
-
-      if (dateObj < minDate || dateObj > maxDate) {
-        log.warn(
-          "Date out of reasonable bounds, falling back to current date:",
-          date,
-        );
-        return new Date();
-      }
-
-      // Additional check for problematic dates (like timezone edge cases)
-      // If the date is more than 1 day different from what we expect, it might be problematic
-      const timeDiff = Math.abs(dateObj.getTime() - now.getTime());
-      const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
-
-      // If it's more than 5 years different, treat as suspicious
-      if (daysDiff > 365 * 5) {
-        log.warn("Date seems too far from current date, falling back:", date);
-        return new Date();
-      }
-
-      return dateObj;
-    },
-    [],
-  );
-
   const [currentDate, setCurrentDate] = useState<Date>(() =>
     getBootstrapCalendarDate(),
   );
-  const [currentView, setCurrentViewState] = useState<CalendarView>("month");
-  const setCurrentView = useCallback((view: CalendarView) => {
-    setCurrentViewState(view);
-  }, []);
-  const [calendars, setCalendars] = useState<Calendar[]>([]);
-  const hasInitialized = useRef(false);
-
-  // Performance optimization: Local visibility state with debounced sync and localStorage persistence
-  const [localVisibilityState, setLocalVisibilityState] = useState<
-    Record<string, boolean>
-  >({});
-  // Ref always reflects the latest localVisibilityState so debounced callbacks
-  // don't capture stale closure values when the timeout fires.
-  const localVisibilityStateRef = useRef<Record<string, boolean>>({});
-  localVisibilityStateRef.current = localVisibilityState;
+  const { currentView, setCurrentView } = useStoredCalendarView(defaultView);
+  const { calendars, setCalendars, addLocalCalendar } =
+    useCalendarList(initialCalendars);
+  const storedVisibility = useSyncExternalStore(
+    subscribeCalendarVisibility,
+    getCalendarVisibilitySnapshot,
+    getCalendarVisibilityServerSnapshot,
+  );
   const pendingUpdatesRef = useRef<Set<string>>(new Set());
-  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const syncTimeoutRef = useRef<{ id: ReturnType<typeof setTimeout> | null }>({
+    id: null,
+  });
+  const visibleColors = useMemo(
+    () =>
+      calendars.flatMap((calendar) =>
+        resolveCalendarVisibility(calendar.id, storedVisibility, calendars)
+          ? [calendar.color]
+          : [],
+      ),
+    [calendars, storedVisibility],
+  );
 
-  // localStorage key for calendar visibility state
-  const VISIBILITY_STORAGE_KEY = "rocani-calendar-visibility";
-
-  // Legacy color visibility for backward compatibility
-  const [visibleColors, setVisibleColors] = useState<string[]>([]);
-
-  // Load visibility state from localStorage
-  const loadVisibilityFromStorage = (): Record<string, boolean> => {
-    if (typeof window === "undefined") return {};
-
-    try {
-      const stored = localStorage.getItem(VISIBILITY_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : {};
-    } catch (error) {
-      log.warn("Failed to load calendar visibility from localStorage:", error);
-      return {};
-    }
-  };
-
-  // Save visibility state to localStorage
-  const saveVisibilityToStorage = (state: Record<string, boolean>) => {
-    if (typeof window === "undefined") return;
-
-    try {
-      localStorage.setItem(VISIBILITY_STORAGE_KEY, JSON.stringify(state));
-    } catch (error) {
-      log.warn("Failed to save calendar visibility to localStorage:", error);
-    }
-  };
-
-  // Initialize calendars and local visibility state, and sync when calendars change
-  useEffect(() => {
-    if (initialCalendars.length > 0) {
-      // Check if calendars have actually changed (by id and content)
-      const hasChanges =
-        calendars.length !== initialCalendars.length ||
-        calendars.some((cal, i) => {
-          const newCal = initialCalendars.find((c) => c.id === cal.id);
-          return (
-            !newCal ||
-            newCal.name !== cal.name ||
-            newCal.color !== cal.color ||
-            newCal.kind !== cal.kind ||
-            newCal.isPublic !== cal.isPublic ||
-            newCal.isVisible !== cal.isVisible ||
-            newCal.isDefault !== cal.isDefault ||
-            newCal.isSyncOnly !== cal.isSyncOnly
-          );
-        }) ||
-        initialCalendars.some(
-          (newCal) => !calendars.find((c) => c.id === newCal.id),
-        );
-
-      if (hasChanges || !hasInitialized.current) {
-        setCalendars(initialCalendars);
-
-        // Load visibility state from localStorage first
-        const storedVisibility = loadVisibilityFromStorage();
-
-        // Initialize local visibility state, prioritizing stored values but defaulting to server state
-        const initialVisibility: Record<string, boolean> = {};
-        initialCalendars.forEach((calendar) => {
-          // Use stored value if available, otherwise use server state (defaults to true)
-          initialVisibility[calendar.id] =
-            storedVisibility[calendar.id] ?? calendar.isVisible;
-        });
-        setLocalVisibilityState(initialVisibility);
-
-        // Clean up localStorage - remove visibility for deleted calendars
-        const currentIds = new Set(initialCalendars.map((c) => c.id));
-        const cleanedStoredVisibility: Record<string, boolean> = {};
-        Object.entries(storedVisibility).forEach(([id, visible]) => {
-          if (currentIds.has(id)) {
-            cleanedStoredVisibility[id] = visible;
-          }
-        });
-        saveVisibilityToStorage(cleanedStoredVisibility);
-
-        hasInitialized.current = true;
-      }
-    }
-  }, [initialCalendars]);
-
-  // Persist visibility state to localStorage whenever it changes
-  useEffect(() => {
-    if (Object.keys(localVisibilityState).length > 0) {
-      saveVisibilityToStorage(localVisibilityState);
-    }
-  }, [localVisibilityState]);
-
-  // Update visible colors based on local visibility state for performance
-  useEffect(() => {
-    const visibleCalendars = calendars.filter(
-      (cal) => localVisibilityState[cal.id] ?? cal.isVisible,
-    );
-    setVisibleColors(visibleCalendars.map((cal) => cal.color));
-  }, [calendars, localVisibilityState]);
-
-  // Debounced sync function to batch API updates
   const syncPendingUpdates = useCallback(async () => {
     if (!onUpdateCalendar || pendingUpdatesRef.current.size === 0) return;
 
     const updates = Array.from(pendingUpdatesRef.current);
     pendingUpdatesRef.current.clear();
-    // Capture the latest visibility state via ref, not stale closure
-    const currentVisibility = localVisibilityStateRef.current;
+    const currentVisibility = getCalendarVisibilitySnapshot();
     const previousVisibilityByCalendarId = new Map(
       updates.map((calendarId) => [
         calendarId,
@@ -289,7 +278,6 @@ export function CalendarProvider({
       ]),
     );
 
-    // Batch update all pending visibility changes
     const results = await Promise.allSettled(
       updates.map(async (calendarId) => {
         const newVisibility = currentVisibility[calendarId];
@@ -297,15 +285,9 @@ export function CalendarProvider({
           return;
         }
 
-        const updatedCalendar = await onUpdateCalendar(calendarId, {
+        await onUpdateCalendar(calendarId, {
           isVisible: newVisibility,
         });
-
-        setCalendars((prev) =>
-          prev.map((calendar) =>
-            calendar.id === calendarId ? updatedCalendar : calendar,
-          ),
-        );
       }),
     );
 
@@ -322,10 +304,7 @@ export function CalendarProvider({
       const previousVisibility =
         previousVisibilityByCalendarId.get(calendarId) ?? true;
 
-      setLocalVisibilityState((prev) => ({
-        ...prev,
-        [calendarId]: previousVisibility,
-      }));
+      patchCalendarVisibility(calendarId, previousVisibility);
       log.error(
         "Failed to sync calendar visibility update:",
         calendarId,
@@ -334,146 +313,135 @@ export function CalendarProvider({
     });
   }, [calendars, onUpdateCalendar]);
 
-  // Cleanup timeout on unmount
   useEffect(() => {
+    const timeout = syncTimeoutRef.current;
     return () => {
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
+      if (timeout.id !== null) {
+        clearTimeout(timeout.id);
       }
     };
   }, []);
 
-  // Add a new calendar
-  const addCalendar = async (calendarData: CreateCalendarData) => {
-    if (onCreateCalendar) {
+  const addCalendar = useCallback(
+    async (calendarData: CreateCalendarData) => {
+      if (!onCreateCalendar) {
+        return;
+      }
+
       try {
         const newCalendar = await onCreateCalendar(calendarData);
-        setCalendars((prev) => [...prev, newCalendar]);
+        addLocalCalendar(newCalendar);
       } catch (error) {
         log.error("Failed to create calendar:", error);
         throw error;
       }
-    }
-  };
+    },
+    [addLocalCalendar, onCreateCalendar],
+  );
 
-  // Optimized toggle calendar visibility with immediate local update
   const toggleCalendarVisibility = useCallback(
     async (calendarId: string) => {
-      const currentVisibility =
-        localVisibilityState[calendarId] ??
-        calendars.find((cal) => cal.id === calendarId)?.isVisible ??
-        false;
-
+      const currentVisibility = resolveCalendarVisibility(
+        calendarId,
+        getCalendarVisibilitySnapshot(),
+        calendars,
+      );
       const newVisibility = !currentVisibility;
 
-      // Immediate optimistic update to local state
-      setLocalVisibilityState((prev) => ({
-        ...prev,
-        [calendarId]: newVisibility,
-      }));
-
-      // Add to pending updates
+      patchCalendarVisibility(calendarId, newVisibility);
       pendingUpdatesRef.current.add(calendarId);
 
-      // Debounce API sync - clear existing timeout and set new one
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
+      if (syncTimeoutRef.current.id !== null) {
+        clearTimeout(syncTimeoutRef.current.id);
       }
 
-      syncTimeoutRef.current = setTimeout(() => {
+      syncTimeoutRef.current.id = setTimeout(() => {
         syncPendingUpdates();
-      }, 500); // 500ms debounce
+      }, 500);
     },
-    [localVisibilityState, calendars, syncPendingUpdates],
+    [calendars, syncPendingUpdates],
   );
 
-  // Refresh calendars from API
-  const refreshCalendars = async () => {
-    if (onRefreshCalendars) {
-      try {
-        const refreshedCalendars = await onRefreshCalendars();
-        setCalendars(refreshedCalendars);
-      } catch (error) {
-        log.error("Failed to refresh calendars:", error);
-        throw error;
-      }
+  const refreshCalendars = useCallback(async () => {
+    if (!onRefreshCalendars) {
+      return;
     }
-  };
 
-  // Check if calendar is visible (uses local state for immediate response)
+    try {
+      setCalendars(await onRefreshCalendars());
+    } catch (error) {
+      log.error("Failed to refresh calendars:", error);
+      throw error;
+    }
+  }, [onRefreshCalendars, setCalendars]);
+
   const isCalendarVisible = useCallback(
-    (calendarId: string) => {
-      // Use local state first for immediate response, fallback to server state
-      const localVisibility = localVisibilityState[calendarId];
-      if (localVisibility !== undefined) {
-        return localVisibility;
-      }
-
-      const calendar = calendars.find((cal) => cal.id === calendarId);
-      // Default to true (visible) for calendars not yet tracked — they're newly
-      // added and should appear until the user explicitly hides them.
-      return calendar?.isVisible ?? true;
-    },
-    [localVisibilityState, calendars],
+    (calendarId: string) =>
+      resolveCalendarVisibility(calendarId, storedVisibility, calendars),
+    [calendars, storedVisibility],
   );
 
-  // Get visible calendars (uses local state for immediate response)
   const getVisibleCalendars = useCallback(() => {
-    return calendars.filter((cal) => {
-      const localVisibility = localVisibilityState[cal.id];
-      return localVisibility !== undefined
-        ? localVisibility
-        : (cal.isVisible ?? true);
-    });
-  }, [calendars, localVisibilityState]);
+    return calendars.filter((calendar) =>
+      resolveCalendarVisibility(calendar.id, storedVisibility, calendars),
+    );
+  }, [calendars, storedVisibility]);
 
-  // Legacy color visibility functions
-  const toggleColorVisibility = (color: string) => {
-    setVisibleColors((prev) => {
-      if (prev.includes(color)) {
-        return prev.filter((c) => c !== color);
-      } else {
-        return [...prev, color];
-      }
-    });
-  };
+  const toggleColorVisibility = useCallback((_color: string) => {}, []);
 
-  const isColorVisible = (color: string | undefined) => {
-    if (!color) return true;
-    return visibleColors.includes(color);
-  };
-
-  // Custom setCurrentDate that validates the date before setting it
-  const setCurrentDateWithPersistence = useCallback(
-    (date: Date) => {
-      const validatedDate = validateDate(date);
-      setCurrentDate(validatedDate);
+  const isColorVisible = useCallback(
+    (color: string | undefined) => {
+      if (!color) return true;
+      return visibleColors.includes(color);
     },
-    [validateDate],
+    [visibleColors],
   );
 
-  // Utility function to reset to current date
+  const setCurrentDateWithPersistence = useCallback((date: Date) => {
+    const validatedDate = validateCalendarDate(date);
+    setCurrentDate(validatedDate);
+  }, []);
+
   const clearSavedDate = useCallback(() => {
     setCurrentDate(new Date());
   }, []);
 
-  const value = {
-    currentDate,
-    setCurrentDate: setCurrentDateWithPersistence,
-    clearSavedDate,
-    currentView,
-    setCurrentView,
-    calendars,
-    setCalendars,
-    addCalendar,
-    toggleCalendarVisibility,
-    isCalendarVisible,
-    getVisibleCalendars,
-    refreshCalendars,
-    visibleColors,
-    toggleColorVisibility,
-    isColorVisible,
-  };
+  const value = useMemo(
+    () => ({
+      currentDate,
+      setCurrentDate: setCurrentDateWithPersistence,
+      clearSavedDate,
+      currentView,
+      setCurrentView,
+      calendars,
+      setCalendars,
+      addCalendar,
+      toggleCalendarVisibility,
+      isCalendarVisible,
+      getVisibleCalendars,
+      refreshCalendars,
+      visibleColors,
+      toggleColorVisibility,
+      isColorVisible,
+    }),
+    [
+      addCalendar,
+      calendars,
+      clearSavedDate,
+      currentDate,
+      currentView,
+      getVisibleCalendars,
+      isCalendarVisible,
+      isColorVisible,
+      refreshCalendars,
+      setCalendars,
+      setCurrentDateWithPersistence,
+      setCurrentView,
+      toggleCalendarVisibility,
+      toggleColorVisibility,
+      visibleColors,
+    ],
+  );
 
   return (
     <CalendarContext.Provider value={value}>

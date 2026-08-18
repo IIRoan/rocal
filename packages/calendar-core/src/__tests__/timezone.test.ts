@@ -13,6 +13,7 @@ import {
   formatWallClockTime,
   getInclusiveCalendarDayRange,
   getWeekCalendarDays,
+  getWeekCalendarRange,
   getZonedDateParts,
   getZonedDayUtcBounds,
   isSameCalendarDayInTimezone,
@@ -241,6 +242,18 @@ describe("week calendar days", () => {
     expect(days[0]?.getDay()).toBe(0);
     expect(days[0]?.getDate()).toBe(14);
     expect(days[6]?.getDate()).toBe(20);
+  });
+
+  it("keeps the week range on the zoned calendar day across UTC week boundaries", () => {
+    const currentDate = new Date("2026-08-23T22:30:00.000Z");
+    const { start, end } = getWeekCalendarRange(
+      currentDate,
+      1,
+      "Europe/Amsterdam",
+    );
+
+    expect(start.getDate()).toBe(24);
+    expect(end.getDate()).toBe(30);
   });
 
   it("normalizes negative week start offsets", () => {

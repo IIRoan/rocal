@@ -13,6 +13,24 @@ export type EventOptionalSectionVisibility = {
   participants?: boolean;
 };
 
+export type EventOptionalParticipant = {
+  email?: string | null;
+  role?: string;
+};
+
+function uniqueParticipantEmails(
+  participants: readonly EventOptionalParticipant[] | null | undefined,
+): Set<string> {
+  const emails = new Set<string>();
+  for (const participant of participants ?? []) {
+    const email = participant.email?.trim().toLowerCase();
+    if (email) {
+      emails.add(email);
+    }
+  }
+  return emails;
+}
+
 export type EventOptionalSectionFields<TParticipant = never> = {
   location?: string;
   description?: string;
@@ -20,6 +38,25 @@ export type EventOptionalSectionFields<TParticipant = never> = {
   reminder?: number | null;
   participants?: TParticipant[];
 };
+
+export function hasOptionalEventParticipants(
+  participants: readonly EventOptionalParticipant[] | null | undefined,
+): boolean {
+  const list = participants ?? [];
+  const emails = uniqueParticipantEmails(list);
+  if (emails.size > 0) {
+    return emails.size > 1;
+  }
+  return list.length > 1;
+}
+
+export function organizerOnlyParticipants<T extends EventOptionalParticipant>(
+  participants: readonly T[] | null | undefined,
+): T[] {
+  return (participants ?? []).filter(
+    (participant) => participant.role === "organizer",
+  );
+}
 
 export const CLEARED_EVENT_OPTIONAL_FIELDS = {
   location: "",
@@ -53,7 +90,7 @@ export function clearedFieldsForDisabledEventSection(
 }
 
 export function applyHiddenEventOptionalSections<
-  TParticipant,
+  TParticipant extends EventOptionalParticipant,
   TFields extends EventOptionalSectionFields<TParticipant>,
 >(fields: TFields, visible: EventOptionalSectionVisibility): TFields {
   return {
@@ -71,7 +108,7 @@ export function applyHiddenEventOptionalSections<
       ? { reminder: CLEARED_EVENT_OPTIONAL_FIELDS.reminder }
       : {}),
     ...(visible.participants === false
-      ? { participants: [...CLEARED_EVENT_OPTIONAL_FIELDS.participants] }
+      ? { participants: organizerOnlyParticipants(fields.participants) }
       : {}),
   };
 }

@@ -18,6 +18,7 @@ interface CalendarViewSwitcherProps {
   activeView: CalendarView;
   currentDate: Date;
   weekStartDay?: number;
+  timezone?: string | null;
   onTodayPress?: () => void;
   onForwardPress?: () => void;
   onBackwardPress?: () => void;
@@ -29,6 +30,7 @@ export function CalendarViewSwitcher({
   activeView,
   currentDate,
   weekStartDay = 0,
+  timezone,
   onTodayPress,
   onForwardPress,
   onBackwardPress,
@@ -40,8 +42,8 @@ export function CalendarViewSwitcher({
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const dateHeader = useMemo(
-    () => formatViewDateHeader(activeView, currentDate, weekStartDay),
-    [activeView, currentDate, weekStartDay],
+    () => formatViewDateHeader(activeView, currentDate, weekStartDay, timezone),
+    [activeView, currentDate, weekStartDay, timezone],
   );
 
   return (

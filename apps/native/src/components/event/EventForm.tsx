@@ -47,6 +47,8 @@ import {
 import {
   PARTICIPANTS_INVITE_HELP_TEXT,
   CLEARED_EVENT_OPTIONAL_FIELDS,
+  hasOptionalEventParticipants,
+  organizerOnlyParticipants,
   isMailInvitationStagingCalendar,
   resolveTimezone,
   type Calendar,
@@ -195,7 +197,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       (initialValues?.reminder ?? 0) > 0,
     );
     const [showParticipants, setShowParticipants] = useState(
-      (initialValues?.participants?.length ?? 0) > 0,
+      hasOptionalEventParticipants(initialValues?.participants),
     );
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [generalErrors, setGeneralErrors] = useState<string[]>([]);
@@ -803,7 +805,9 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       onPress={() => {
                         Keyboard.dismiss();
                         if (showParticipants) {
-                          setParticipants([]);
+                          setParticipants(
+                            organizerOnlyParticipants(participants),
+                          );
                           setParticipantDraft("");
                         }
                         setShowParticipants((v) => !v);

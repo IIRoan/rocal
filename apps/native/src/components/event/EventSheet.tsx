@@ -25,6 +25,7 @@ import type {
 } from "@workspace/calendar-core";
 import {
   getErrorMessage,
+  hasOptionalEventParticipants,
   resolveTimezone,
   wallClockToUtc,
 } from "@workspace/calendar-core";
@@ -624,7 +625,7 @@ export function EventSheet({
                   </>
                 ) : null}
 
-                {event.participants && event.participants.length > 0 ? (
+                {hasOptionalEventParticipants(event.participants) ? (
                   <>
                     <View style={styles.sectionDivider} />
                     <View
@@ -632,7 +633,7 @@ export function EventSheet({
                     >
                       <IconBox name="users" color={iconColor} bg={iconBg} />
                       <View style={styles.participantList}>
-                        {event.participants.map((participant) => (
+                        {(event.participants ?? []).map((participant) => (
                           <View
                             key={participant.id}
                             style={styles.participantRow}

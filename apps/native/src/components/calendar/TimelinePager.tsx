@@ -269,17 +269,13 @@ export function TimelinePager({
 
       if (committedLeft) {
         scheduleOnRN(handleSwipeCommit, 1);
-        translateX.value = withTiming(-pageWidth * 2, PAGE_TIMING, (done) => {
-          if (done) {
-            scheduleOnRN(handleNavigate, 1);
-          }
+        translateX.value = withTiming(-pageWidth * 2, PAGE_TIMING, () => {
+          scheduleOnRN(handleNavigate, 1);
         });
       } else if (committedRight) {
         scheduleOnRN(handleSwipeCommit, -1);
-        translateX.value = withTiming(0, PAGE_TIMING, (done) => {
-          if (done) {
-            scheduleOnRN(handleNavigate, -1);
-          }
+        translateX.value = withTiming(0, PAGE_TIMING, () => {
+          scheduleOnRN(handleNavigate, -1);
         });
       } else {
         translateX.value = withSpring(-pageWidth, PAGE_SPRING);
