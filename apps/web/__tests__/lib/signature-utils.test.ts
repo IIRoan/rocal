@@ -8,6 +8,7 @@ import {
   hasComposeHtmlBody,
   htmlToPlainText,
   resolveOutgoingComposeBodies,
+  sanitizeSignatureHtml,
   stripTrailingPlainTextSignature,
   swapEmbeddedSignatureInPlainText,
 } from "@/lib/mail/signature-utils";
@@ -162,5 +163,15 @@ describe("signature-utils", () => {
       textBody: "",
       htmlBody: html,
     });
+  });
+
+  it("strips script tags and inline event handlers from signature HTML", () => {
+    const sanitized = sanitizeSignatureHtml(
+      '<p onclick="alert(1)">Hi</p><script>alert(2)</script><img src="x" onerror="alert(3)">',
+    );
+    expect(sanitized).toContain("Hi");
+    expect(sanitized).not.toMatch(/script/i);
+    expect(sanitized).not.toMatch(/onerror/i);
+    expect(sanitized).not.toMatch(/onclick/i);
   });
 });

@@ -164,6 +164,65 @@ Patterns that fire diagnostics but are safe to suppress.
 - **Why FP**: `ReadonlyURLSearchParams.get()` requires `this` context. Bound via
   `searchParams.get(...)` inside `readLoginSearchParams`, not destructured.
 
+## react-doctor/no-event-handler + no-pass-data-to-parent — EventEditor prop sync
+
+- **File**: `apps/web/components/event-editor.tsx`
+- **Why FP**: Opening, closing, and `eventToEdit` changes must hydrate
+  `useEventForm` (`resetForm` / `loadEventData` / view-mode) and reveal optional
+  sections from the loaded event. This is prop→form synchronization, not a
+  parent event handler or data lift. The calendar parent already owns
+  `eventToEdit`; the editor cannot fetch it independently.
+- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+  for `**/components/event-editor.tsx`.
+
+## react-doctor/no-cascading-set-state — EventEditor open/load effects
+
+- **File**: `apps/web/components/event-editor.tsx`
+- **Why FP**: Rule is retired. Remaining setters (`setEventViewMode` plus one
+  batched `setSections`) are the minimum needed to hydrate form chrome when a
+  different event is selected. Section flags are a single object update.
+- **Config**: Suppressed via `ignore.overrides` for `**/components/event-editor.tsx`.
+
+## react-doctor/no-prop-callback-in-effect + no-pass-data-to-parent — live event preview
+
+- **File**: `apps/web/components/event-editor/event-editor-preview.ts`
+- **Why FP**: Popover create/edit paints a ghost event on the calendar while the
+  user types. The calendar already owns preview state (`updatePreviewEvent`);
+  lifting the full editor form into a shared Provider would duplicate
+  `useEventForm`. The effect is deduped with a payload-key ref so it only
+  notifies when wall-clock fields actually change.
+- **Config**: Suppressed via `ignore.overrides` for
+  `**/components/event-editor/event-editor-preview.ts`.
+
+## react-doctor/no-giant-component — ComposeForm
+
+- **File**: `apps/web/components/mail/compose-dialog.tsx` (`ComposeForm`)
+- **Why FP**: Compose is one surface (recipients, identity/signature swap, body
+  editor, attachments, send-guard). Splitting would fragment tightly coupled
+  draft state from `useMailCompose` without a new test seam — the exported
+  `ComposeDialog` wrapper is the public entry.
+- **Config**: Suppressed via `ignore.overrides` for
+  `**/components/mail/compose-dialog.tsx`.
+
+## react-doctor/no-event-handler — ComposeForm signature identity swap
+
+- **File**: `apps/web/components/mail/compose-dialog.tsx`
+- **Why FP**: Changing the From identity must rewrite the embedded signature in
+  the current body. That is a context/identity sync into editor content, not a
+  parent-owned click handler. The previous identity is tracked in a ref because
+  the swap needs both old and new signature sources.
+- **Config**: Suppressed via `ignore.overrides` for
+  `**/components/mail/compose-dialog.tsx`.
+
+## react-doctor/no-danger — ComposeForm signature preview
+
+- **File**: `apps/web/components/mail/compose-dialog.tsx`
+- **Why FP**: Below-quote signature preview must render identity HTML. The HTML
+  is passed through `sanitizeSignatureHtml` at this boundary (script/style/
+  embed tags and `on*` handlers stripped) before `dangerouslySetInnerHTML`.
+  The rule cannot see sanitization.
+- **Config**: Suppressed via `ignore.overrides` for
+  `**/components/mail/compose-dialog.tsx`.
 
 ## react-doctor/no-giant-component — MessageReader (resolved)
 

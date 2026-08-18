@@ -115,6 +115,9 @@ jest.mock("@workspace/ui/components/ui/drawer", () => ({
     </div>
   ),
   DrawerTitle: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DrawerClose: ({ children }: { children: React.ReactNode }) => (
+    <button type="button">{children}</button>
+  ),
 }));
 
 jest.mock("@workspace/ui/components/ui/visually-hidden", () => ({
@@ -133,6 +136,7 @@ jest.mock("lucide-react", () => {
   return {
     ArrowLeft: Icon,
     Plus: Icon,
+    X: Icon,
   };
 });
 

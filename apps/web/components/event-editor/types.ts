@@ -61,3 +61,54 @@ export type EventEditorDesktopHeaderProps = {
   showNotifications: boolean;
   showParticipants: boolean;
 };
+
+export type EventEditorViewLayout =
+  | "mobile"
+  | "popover"
+  | "embedded"
+  | "dialog";
+
+export type EventEditorViewFlags = {
+  canEdit: boolean;
+  isRecurring: boolean;
+  isViewMode: boolean;
+};
+
+export type EventEditorVisibleSections = {
+  description: boolean;
+  location: boolean;
+  notifications: boolean;
+  participants: boolean;
+};
+
+export type EventEditorViewProps = {
+  anchorPosition: { x: number; y: number } | null;
+  badgeItem: EventEditorBadgeItem;
+  calendars: Calendar[];
+  dialogTitle: string;
+  eventForm: EventEditorFormState;
+  flags: EventEditorViewFlags;
+  handleEventDelete: () => void;
+  handleEventDownloadIcs: () => void;
+  handleEventSave: () => void;
+  handleInvitationResponse: (
+    status: EventEditorInvitationResponseStatus,
+  ) => void;
+  handleToggleDescription: () => void;
+  handleToggleLocation: () => void;
+  handleToggleNotifications: () => void;
+  handleToggleParticipants: () => void;
+  handleToggleRecurring: () => void;
+  invitationResponsePending: EventEditorInvitationResponseStatus | null;
+  invitationStatus: EventEditorInvitationResponseStatus | null;
+  layout: EventEditorViewLayout;
+  localSettings: UserSettings;
+  onBack: () => void;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  recurringModal: ReactNode;
+  setShowDescription: (value: boolean) => void;
+  setShowLocation: (value: boolean) => void;
+  setShowParticipants: (value: boolean) => void;
+  visibleSections: EventEditorVisibleSections;
+};

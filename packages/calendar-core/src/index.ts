@@ -18,6 +18,7 @@ export * from "./date-utils";
 export * from "./timezone";
 export * from "./event-date";
 export * from "./event-utils";
+export * from "./event-optional-sections";
 export * from "./view-model";
 export * from "./validation";
 export * from "./calendar-helpers";

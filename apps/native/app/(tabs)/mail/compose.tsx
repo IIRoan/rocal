@@ -24,7 +24,11 @@ import { getErrorMessage, resolveReplyRecipients, validateComposeRecipients } fr
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useToast } from "../../../src/providers/ToastProvider";
-import { BottomSheet } from "../../../src/components/BottomSheet";
+import {
+  BottomSheet,
+  BottomSheetHeader,
+  BottomSheetTitle,
+} from "../../../src/components/BottomSheet";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import {
   useCachedMessage,
@@ -567,9 +571,9 @@ export default function ComposeScreen() {
         onDismiss={() => setIdentityPickerOpen(false)}
         snapPoints={[0.45]}
       >
-        <View style={styles.identitySheetHeader}>
-          <Text style={styles.identitySheetTitle}>Send from</Text>
-        </View>
+        <BottomSheetHeader>
+          <BottomSheetTitle>Send from</BottomSheetTitle>
+        </BottomSheetHeader>
         {identities.map((identity) => (
           <IdentityPickerRow
             key={identity.id}
@@ -834,10 +838,6 @@ function createStyles(theme: ThemeTokens) {
     identityRowSelected: {
       backgroundColor: theme.colors.muted,
     },
-    identitySheetHeader: {
-      paddingHorizontal: theme.spacing["4"],
-      paddingBottom: theme.spacing["2"],
-    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
@@ -888,11 +888,6 @@ function createStyles(theme: ThemeTokens) {
     identityLabel: {
       flex: 1,
       fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.foreground,
-    },
-    identitySheetTitle: {
-      fontSize: theme.typography.fontSize.base.size,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
     noticeText: {

@@ -63,7 +63,11 @@ import { AttachmentPreviewModal } from "../../../../src/components/mail/Attachme
 import { ConversationThreadStrip } from "../../../../src/components/mail/ConversationThreadStrip";
 import { useAuth } from "../../../../src/providers/AuthProvider";
 import { useE2ee } from "../../../../src/providers/E2eeProvider";
-import { BottomSheet } from "../../../../src/components/BottomSheet";
+import {
+  BottomSheet,
+  BottomSheetHeader,
+  BottomSheetTitle,
+} from "../../../../src/components/BottomSheet";
 import { SheetNavButton, SheetRow } from "../../../../src/components/sheet";
 import { MailSheetPanel } from "../../../../src/components/mail/MailSheetPanel";
 import { MailSheetList } from "../../../../src/components/mail/MailSheetList";
@@ -1013,9 +1017,20 @@ export default function MailMessageScreen() {
             ? [0.92]
             : activeSheetView === "label"
               ? [0.65]
-              : [0.45]
+              : [0.52]
         }
       >
+        <BottomSheetHeader>
+          <BottomSheetTitle>
+            {activeSheetView === "move"
+              ? "Move to"
+              : activeSheetView === "label"
+                ? "Labels"
+                : activeSheetView === "html"
+                  ? "HTML source"
+                  : "Actions"}
+          </BottomSheetTitle>
+        </BottomSheetHeader>
         {activeSheetView === "menu" ? (
           <MailSheetPanel bottomInset={insets.bottom}>
             <MailSheetList>
