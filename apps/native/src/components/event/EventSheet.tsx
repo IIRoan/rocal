@@ -24,14 +24,12 @@ import type {
   RecurrenceEditScope,
 } from "@workspace/calendar-core";
 import {
-  canCurrentUserDeleteEvent,
   getErrorMessage,
   resolveTimezone,
   wallClockToUtc,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../providers/AuthProvider";
 import { useRecentContacts } from "../../hooks/use-recent-contacts";
 import { extractRecentContactEntries } from "../../lib/record-recent-contacts";
@@ -47,7 +45,13 @@ import {
   rollbackFromSnapshot,
   type CacheSnapshot,
 } from "../../lib/optimistic-events";
-import { BottomSheet, type BottomSheetHandle } from "../BottomSheet";
+import {
+  BottomSheet,
+  BottomSheetFooter,
+  BottomSheetHeader,
+  BottomSheetTitle,
+  type BottomSheetHandle,
+} from "../BottomSheet";
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 import { CenteredLoader } from "../ui/loading";
@@ -64,6 +68,7 @@ import {
   formatEventTime,
   formatReminderLabel,
 } from "./event-detail-utils";
+import { resolveEventSheetViewActions } from "./event-sheet-view-actions";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -180,7 +185,6 @@ export function EventSheet({
   onCloseComplete,
 }: EventSheetProps) {
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -522,7 +526,12 @@ export function EventSheet({
     if (!event || !calendars) return null;
     return calendars.find((c) => c.id === event.calendarId) ?? null;
   }, [event, calendars]);
-  const canDeleteEvent = event ? canCurrentUserDeleteEvent(event) : false;
+  const viewActions = resolveEventSheetViewActions(event);
+  const sheetTitle = isCreate
+    ? "New event"
+    : viewMode === "edit"
+      ? "Edit event"
+      : "Event";
 
   // ─── Render ────────────────────────────────────────────────────────────
 
@@ -535,6 +544,9 @@ export function EventSheet({
         onCloseComplete={onCloseComplete}
         swipeContentToDismissAtTop={viewScrollAtTop}
       >
+        <BottomSheetHeader>
+          <BottomSheetTitle>{sheetTitle}</BottomSheetTitle>
+        </BottomSheetHeader>
         {isLoading ? (
           <CenteredLoader theme={theme} message="Loading…" />
         ) : viewMode === "view" && event ? (
@@ -542,10 +554,7 @@ export function EventSheet({
             {/* ── View mode body ─────────────────────────────────── */}
             <AnimatedScrollView
               style={styles.viewScroll}
-              contentContainerStyle={[
-                styles.viewBody,
-                { paddingBottom: Math.max(insets.bottom, 16) + 88 },
-              ]}
+              contentContainerStyle={styles.viewBody}
               showsVerticalScrollIndicator={false}
               bounces={false}
               overScrollMode="never"
@@ -689,24 +698,6 @@ export function EventSheet({
                 </View>
               ) : null}
 
-              {/* Delete */}
-              {event.id && canDeleteEvent ? (
-                <Pressable
-                  style={styles.deleteRow}
-                  onPress={handleDeletePress}
-                  disabled={isPending}
-                  accessibilityRole="button"
-                  accessibilityLabel="Delete event"
-                >
-                  <Feather
-                    name="trash-2"
-                    size={16}
-                    color={theme.colors.destructive}
-                  />
-                  <Text style={styles.deleteText}>Delete event</Text>
-                </Pressable>
-              ) : null}
-
               {/* Errors */}
               {serverErrors.length > 0 && (
                 <View style={styles.errorContainer}>
@@ -718,16 +709,27 @@ export function EventSheet({
                 </View>
               )}
             </AnimatedScrollView>
-            <SheetActions>
-              <SheetSecondaryButton label="Close" onPress={dismissSheet} />
-              {event.id ? (
-                <SheetPrimaryButton
-                  label="Edit"
-                  icon="edit-2"
-                  onPress={handleEditPress}
-                />
-              ) : null}
-            </SheetActions>
+            <BottomSheetFooter>
+              <SheetActions chrome={false}>
+                {viewActions.showDelete ? (
+                  <SheetSecondaryButton
+                    label={viewActions.deleteLabel}
+                    variant="destructive"
+                    onPress={handleDeletePress}
+                    disabled={isPending}
+                  />
+                ) : null}
+                <SheetSecondaryButton label="Close" onPress={dismissSheet} />
+                {viewActions.showEdit ? (
+                  <SheetPrimaryButton
+                    label="Edit"
+                    icon="edit-2"
+                    onPress={handleEditPress}
+                    disabled={isPending}
+                  />
+                ) : null}
+              </SheetActions>
+            </BottomSheetFooter>
           </>
         ) : (
           /* ── Edit / Create mode ──────────────────────────────── */
@@ -882,18 +884,6 @@ function createStyles(theme: ThemeTokens) {
       padding: 12,
       marginTop: 8,
     },
-    deleteRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 13,
-      marginTop: 4,
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: theme.colors.destructive + "10",
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.destructive + "28",
-    },
 
     // ── Scope modal ────────────────────────────────────────────────────
     modalOverlay: {
@@ -950,12 +940,6 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.xs.size,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
-    },
-    deleteText: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.destructive,
     },
     errorText: {
       fontSize: theme.typography.fontSize.sm.size,

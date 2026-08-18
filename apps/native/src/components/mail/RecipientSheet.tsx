@@ -17,7 +17,7 @@ import {
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useToast } from "../../providers/ToastProvider";
-import { BottomSheet } from "../BottomSheet";
+import { BottomSheet, BottomSheetHeader } from "../BottomSheet";
 import { getInitials } from "../../lib/mail/mail-helpers";
 import { mailSpacing } from "./mail-ui";
 
@@ -70,20 +70,22 @@ export function RecipientSheet({
         {children}
       </Pressable>
 
-      <BottomSheet visible={open} onDismiss={() => setOpen(false)}>
-        <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+      <BottomSheet visible={open} onDismiss={() => setOpen(false)} snapPoints={[0.4]}>
+        <BottomSheetHeader>
+          <View style={styles.header}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+            <View style={styles.headerText}>
+              <Text style={styles.name}>{displayName}</Text>
+              {displayName !== recipient.email ? (
+                <Text style={styles.email} numberOfLines={2}>
+                  {recipient.email}
+                </Text>
+              ) : null}
+            </View>
           </View>
-          <View style={styles.headerText}>
-            <Text style={styles.name}>{displayName}</Text>
-            {displayName !== recipient.email ? (
-              <Text style={styles.email} numberOfLines={2}>
-                {recipient.email}
-              </Text>
-            ) : null}
-          </View>
-        </View>
+        </BottomSheetHeader>
 
         <View style={styles.actions}>
           <Pressable
@@ -207,8 +209,6 @@ function createStyles(theme: ThemeTokens) {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: pad.rowGap,
-      paddingHorizontal: pad.rowH,
-      paddingBottom: pad.section,
     },
     avatar: {
       width: 40,

@@ -230,7 +230,7 @@ export function useEventForm({
   const [eventLocation, setEventLocation] = useState("");
   const [eventCalendarId, setEventCalendarId] = useState<string>("");
   const [eventSaving, setEventSaving] = useState(false);
-  const [isRecurring, setIsRecurring] = useState(false);
+  const [isRecurring, setIsRecurringState] = useState(false);
   const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule | null>(
     null,
   );
@@ -253,7 +253,7 @@ export function useEventForm({
     EventParticipantInput[]
   >([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
+  const [showNotifications, setShowNotificationsState] = useState(false);
   const eventReminder = getReminderFromNotifications(eventNotifications);
 
   const setEventReminder = useCallback((reminder: number | null) => {
@@ -268,6 +268,20 @@ export function useEventForm({
     },
     [],
   );
+
+  const setShowNotifications = useCallback((show: boolean) => {
+    setShowNotificationsState(show);
+    if (!show) {
+      setEventNotificationsState([]);
+    }
+  }, []);
+
+  const setIsRecurring = useCallback((recurring: boolean) => {
+    setIsRecurringState(recurring);
+    if (!recurring) {
+      setRecurrenceRule(null);
+    }
+  }, []);
 
   // Mutations
   const validateRecurrenceMutation = useMutation({
@@ -328,8 +342,8 @@ export function useEventForm({
       setEventLocation(event.location || "");
       setEventCalendarId(
         event.calendarId ||
-          calendarsRef.current?.find((c) => !c.isSyncOnly)?.id ||
-          "",
+        calendarsRef.current?.find((c) => !c.isSyncOnly)?.id ||
+        "",
       );
       setEventNotifications(fallbackNotifications);
       setEventParticipants(
@@ -379,13 +393,13 @@ export function useEventForm({
               (n) =>
                 n.notificationType === "email"
                   ? [
-                      {
-                        id: n.id,
-                        notificationType: "email" as const,
-                        minutesBefore: n.minutesBefore,
-                        isEnabled: n.isEnabled,
-                      },
-                    ]
+                    {
+                      id: n.id,
+                      notificationType: "email" as const,
+                      minutesBefore: n.minutesBefore,
+                      isEnabled: n.isEnabled,
+                    },
+                  ]
                   : [],
             );
             const notificationsToUse =
@@ -432,6 +446,7 @@ export function useEventForm({
       calendarsRef.current?.find((c) => !c.isSyncOnly)?.id || "",
     );
     setEventNotifications([]);
+    setEventParticipants([]);
     setIsRecurring(false);
     setRecurrenceRule(null);
     setShowRecurringDeleteModal(false);
@@ -549,7 +564,7 @@ export function useEventForm({
           uniqueDuplicates.length === 1
             ? `${uniqueDuplicates[0]} minutes before`
             : uniqueDuplicates.map((time) => `${time} minutes`).join(", ") +
-              " before";
+            " before";
 
         toast.error(
           `Cannot have multiple notifications for the same time: ${timeText}`,
@@ -584,12 +599,12 @@ export function useEventForm({
       const eventData = {
         id: selectedEvent?.id || "",
         title: eventTitle.trim(),
-        description: eventDescription.trim() || undefined,
+        description: eventDescription.trim(),
         start,
         end,
         timezone: localSettings.timezone,
         allDay: eventAllDay,
-        location: eventLocation.trim() || undefined,
+        location: eventLocation.trim(),
         color: calendarColor as any,
         calendarId: eventCalendarId,
         userId: selectedEvent?.userId || "demo-user",
@@ -608,7 +623,9 @@ export function useEventForm({
         participants: EventParticipantInput[];
       };
 
-      const notificationData = normalizeNotificationPayload(eventNotifications);
+      const notificationData = normalizeNotificationPayload(
+        showNotifications ? eventNotifications : [],
+      );
       eventData.reminder = getReminderFromNotifications(notificationData);
 
       setEventSaving(true);
@@ -706,8 +723,8 @@ export function useEventForm({
             end: new Date(persistedEvent?.end ?? eventData.end),
             createdAt: new Date(
               persistedEvent?.createdAt ??
-                selectedEvent?.createdAt ??
-                eventData.createdAt,
+              selectedEvent?.createdAt ??
+              eventData.createdAt,
             ),
             updatedAt: new Date(
               persistedEvent?.updatedAt ?? eventData.updatedAt,
@@ -815,6 +832,7 @@ export function useEventForm({
       eventParticipants,
       eventDescription,
       eventLocation,
+      showNotifications,
       calendars,
       selectedEvent,
       onEventSaved,

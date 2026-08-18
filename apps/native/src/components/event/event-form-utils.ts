@@ -1,5 +1,6 @@
 import type { CreateEventRequest } from "@workspace/calendar-core";
 import {
+  applyHiddenEventOptionalSections,
   formatWallClockTime,
   parseCalendarDayKey,
   pickerDateAndTimeToUtc,
@@ -143,18 +144,35 @@ export function buildEventRequest(fields: {
   reminder?: number;
   participants?: CreateEventRequest["participants"];
   timezone?: string;
+  visibleOptionalSections?: {
+    location?: boolean;
+    description?: boolean;
+    recurrence?: boolean;
+    notifications?: boolean;
+    participants?: boolean;
+  };
 }): CreateEventRequest {
   const resolvedTimezone = resolveTimezone(fields.timezone);
+  const optionalFields = applyHiddenEventOptionalSections(
+    {
+      description: fields.description,
+      location: fields.location,
+      participants: fields.participants,
+      recurrence: fields.recurrence ?? null,
+      reminder: fields.reminder,
+    },
+    fields.visibleOptionalSections ?? {},
+  );
   const { start, end } = fields.allDay
     ? pickerDateToAllDayUtcRange(
-        pickerISOStringToCalendarDay(fields.start),
-        pickerISOStringToCalendarDay(fields.end),
-        resolvedTimezone,
-      )
+      pickerISOStringToCalendarDay(fields.start),
+      pickerISOStringToCalendarDay(fields.end),
+      resolvedTimezone,
+    )
     : {
-        start: pickerISOStringToUtc(fields.start, resolvedTimezone),
-        end: pickerISOStringToUtc(fields.end, resolvedTimezone),
-      };
+      start: pickerISOStringToUtc(fields.start, resolvedTimezone),
+      end: pickerISOStringToUtc(fields.end, resolvedTimezone),
+    };
 
   return {
     title: fields.title.trim(),
@@ -163,19 +181,16 @@ export function buildEventRequest(fields: {
     calendarId: fields.calendarId,
     allDay: fields.allDay,
     timezone: resolvedTimezone,
-    ...(fields.location.trim() ? { location: fields.location.trim() } : {}),
-    ...(fields.description.trim()
-      ? { description: fields.description.trim() }
-      : {}),
+    location: optionalFields.location?.trim() ?? "",
+    description: optionalFields.description?.trim() ?? "",
     ...(fields.color ? { color: fields.color } : {}),
     ...(fields.categoryId ? { categoryId: fields.categoryId } : {}),
-    ...(fields.recurrence ? { recurrence: fields.recurrence } : {}),
-    ...(fields.reminder && fields.reminder > 0
-      ? { reminder: fields.reminder }
-      : {}),
-    ...(fields.participants !== undefined
-      ? { participants: fields.participants }
-      : {}),
+    recurrence: optionalFields.recurrence || "",
+    reminder:
+      optionalFields.reminder && optionalFields.reminder > 0
+        ? optionalFields.reminder
+        : 0,
+    participants: optionalFields.participants ?? [],
   };
 }
 

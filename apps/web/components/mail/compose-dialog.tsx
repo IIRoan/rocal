@@ -12,7 +12,7 @@ import {
   AlertCircle,
   AlignLeft,
 } from "lucide-react";
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   useMailCompose,
@@ -52,6 +52,7 @@ import {
   swapEmbeddedSignatureInHtml,
   swapEmbeddedSignatureInPlainText,
   resolveComposeSignatureIdentity,
+  sanitizeSignatureHtml,
 } from "@/lib/mail/signature-utils";
 import {
   useMailComposeSettings,
@@ -152,16 +153,20 @@ export function ComposeForm({
   } = useMailCompose();
   const { settings: composeSettings, updateSettings } = useMailComposeSettings();
   const plainTextMode = composeSettings.plainTextMode;
-  const [showAttachmentWarning, setShowAttachmentWarning] = useState(false);
-  const [attachmentWarningKeyword, setAttachmentWarningKeyword] = useState("");
+  const [attachmentWarning, setAttachmentWarning] = useState({
+    open: false,
+    keyword: "",
+  });
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const prevSignatureIdentityIdRef = useRef<string | null>(null);
   const prevPlainTextModeRef = useRef(plainTextMode);
-  const [showCc, setShowCc] = useState(!!composeCc);
-  const [showBcc, setShowBcc] = useState(!!composeBcc);
+  const [ccBccVisible, setCcBccVisible] = useState({
+    cc: !!composeCc,
+    bcc: !!composeBcc,
+  });
   const [toTouched, setToTouched] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
@@ -315,109 +320,81 @@ export function ComposeForm({
     );
   };
 
-  const addDroppedFiles = useCallback(
-    (files: File[]) => {
-      const accepted = pickOutgoingAttachmentFiles(files, {
-        maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
-        onReject: (error) => toast.error(error),
-      });
-      if (accepted.length > 0) {
-        setComposeAttachments((prev) => [...prev, ...accepted]);
-      }
-    },
-    [mailServerLimits.maxOutgoingAttachmentBytes, setComposeAttachments],
-  );
+  function addDroppedFiles(files: File[]) {
+    const accepted = pickOutgoingAttachmentFiles(files, {
+      maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
+      onReject: (error) => toast.error(error),
+    });
+    if (accepted.length > 0) {
+      setComposeAttachments((prev) => [...prev, ...accepted]);
+    }
+  }
 
-  const clearDragState = useCallback(() => {
+  function clearDragState() {
     if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
     dragTimeoutRef.current = null;
     setIsDraggingOver(false);
-  }, []);
+  }
 
-  const resetDragTimeout = useCallback(() => {
+  function resetDragTimeout() {
     if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
     dragTimeoutRef.current = setTimeout(clearDragState, 150);
-  }, [clearDragState]);
+  }
 
-  const handleDragEnter = useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.dataTransfer.types.includes("Files")) {
-        setIsDraggingOver(true);
-        resetDragTimeout();
-      }
-    },
-    [resetDragTimeout],
-  );
-
-  const handleDragLeave = useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
+  function handleDragEnter(event: React.DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer.types.includes("Files")) {
+      setIsDraggingOver(true);
       resetDragTimeout();
-    },
-    [resetDragTimeout],
-  );
+    }
+  }
 
-  const handleDragOver = useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-      resetDragTimeout();
-    },
-    [resetDragTimeout],
-  );
+  function handleDragLeave(event: React.DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    resetDragTimeout();
+  }
 
-  const handleDrop = useCallback(
-    (event: React.DragEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest(".ProseMirror, .tiptap")) {
-        clearDragState();
+  function handleDragOver(event: React.DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    resetDragTimeout();
+  }
+
+  function handleDrop(event: React.DragEvent) {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest(".ProseMirror, .tiptap")) {
+      clearDragState();
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    clearDragState();
+    if (event.dataTransfer.files?.length) {
+      addDroppedFiles(Array.from(event.dataTransfer.files));
+    }
+  }
+
+  async function requestSend(skipAttachmentCheck = false) {
+    if (!skipAttachmentCheck) {
+      const bodyText = plainTextMode
+        ? composeBody
+        : htmlToPlainText(composeHtmlBody);
+      const matched = shouldWarnAboutMissingAttachment({
+        enabled: composeSettings.attachmentReminderEnabled,
+        attachmentCount: composeAttachments.length,
+        subject: composeSubject,
+        bodyText,
+        keywords: composeSettings.attachmentReminderKeywords,
+      });
+      if (matched) {
+        setAttachmentWarning({ open: true, keyword: matched });
         return;
       }
-      event.preventDefault();
-      event.stopPropagation();
-      clearDragState();
-      if (event.dataTransfer.files?.length) {
-        addDroppedFiles(Array.from(event.dataTransfer.files));
-      }
-    },
-    [addDroppedFiles, clearDragState],
-  );
-
-  const requestSend = useCallback(
-    async (skipAttachmentCheck = false) => {
-      if (!skipAttachmentCheck) {
-        const bodyText = plainTextMode
-          ? composeBody
-          : htmlToPlainText(composeHtmlBody);
-        const matched = shouldWarnAboutMissingAttachment({
-          enabled: composeSettings.attachmentReminderEnabled,
-          attachmentCount: composeAttachments.length,
-          subject: composeSubject,
-          bodyText,
-          keywords: composeSettings.attachmentReminderKeywords,
-        });
-        if (matched) {
-          setAttachmentWarningKeyword(matched);
-          setShowAttachmentWarning(true);
-          return;
-        }
-      }
-      await onSend({ skipAttachmentCheck });
-    },
-    [
-      composeAttachments.length,
-      composeBody,
-      composeHtmlBody,
-      composeSettings.attachmentReminderEnabled,
-      composeSettings.attachmentReminderKeywords,
-      composeSubject,
-      onSend,
-      plainTextMode,
-    ],
-  );
+    }
+    await onSend({ skipAttachmentCheck });
+  }
 
   const applySignaturePreview = () => {
     if (!signatureIdentity) return;
@@ -450,11 +427,11 @@ export function ComposeForm({
     );
   };
 
-  const handleRequestClose = useCallback(() => {
+  function handleRequestClose() {
     if (requestComposeClose()) {
       onClose();
     }
-  }, [onClose, requestComposeClose]);
+  }
 
   return (
     <div
@@ -480,6 +457,7 @@ export function ComposeForm({
         <button
           type="button"
           onClick={handleRequestClose}
+          aria-label="Close"
           className="p-1 rounded hover:bg-muted/50 transition-colors"
         >
           <ArrowLeft className="size-4 text-muted-foreground" />
@@ -535,6 +513,7 @@ export function ComposeForm({
             value={selectedIdentityId ?? ""}
             onChange={(event) => setSelectedIdentityId(event.target.value || null)}
             disabled={isBusy}
+            aria-label="From"
             className="flex-1 min-w-0 bg-transparent text-sm text-foreground border-0 outline-none focus:ring-0"
           >
             {identities.map((identity) => (
@@ -584,19 +563,23 @@ export function ComposeForm({
           disabled={isBusy}
         />
         <div className="flex items-center gap-1 shrink-0">
-          {!showCc && (
+          {!ccBccVisible.cc && (
             <button
               type="button"
-              onClick={() => setShowCc(true)}
+              onClick={() =>
+                setCcBccVisible((current) => ({ ...current, cc: true }))
+              }
               className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors px-1"
             >
               CC
             </button>
           )}
-          {!showBcc && (
+          {!ccBccVisible.bcc && (
             <button
               type="button"
-              onClick={() => setShowBcc(true)}
+              onClick={() =>
+                setCcBccVisible((current) => ({ ...current, bcc: true }))
+              }
               className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors px-1"
             >
               BCC
@@ -605,7 +588,7 @@ export function ComposeForm({
         </div>
       </div>
 
-      {showCc && (
+      {ccBccVisible.cc && (
         <div
           className={`flex items-center border-b border-border/50 shrink-0 ${
             isMobile ? "h-9 gap-2 px-3" : "h-10 gap-3 px-4"
@@ -627,9 +610,10 @@ export function ComposeForm({
           <button
             type="button"
             onClick={() => {
-              setShowCc(false);
+              setCcBccVisible((current) => ({ ...current, cc: false }));
               setComposeCc("");
             }}
+            aria-label="Hide CC"
             className="shrink-0 p-0.5 rounded hover:bg-muted/50 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
           >
             <Minus className="size-3" />
@@ -637,7 +621,7 @@ export function ComposeForm({
         </div>
       )}
 
-      {showBcc && (
+      {ccBccVisible.bcc && (
         <div
           className={`flex items-center border-b border-border/50 shrink-0 ${
             isMobile ? "h-9 gap-2 px-3" : "h-10 gap-3 px-4"
@@ -659,9 +643,10 @@ export function ComposeForm({
           <button
             type="button"
             onClick={() => {
-              setShowBcc(false);
+              setCcBccVisible((current) => ({ ...current, bcc: false }));
               setComposeBcc("");
             }}
+            aria-label="Hide BCC"
             className="shrink-0 p-0.5 rounded hover:bg-muted/50 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
           >
             <Minus className="size-3" />
@@ -746,7 +731,7 @@ export function ComposeForm({
             <div
               className="break-words [&_a]:text-primary [&_a]:underline"
               dangerouslySetInnerHTML={{
-                __html: signatureIdentity.htmlSignature,
+                __html: sanitizeSignatureHtml(signatureIdentity.htmlSignature),
               }}
             />
           ) : (
@@ -776,6 +761,7 @@ export function ComposeForm({
               <button
                 type="button"
                 onClick={() => removeAttachment(file)}
+                aria-label={`Remove ${file.name}`}
                 className="shrink-0 ml-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
               >
                 <X className="size-3" />
@@ -839,8 +825,10 @@ export function ComposeForm({
       </div>
 
       <Dialog
-        open={showAttachmentWarning}
-        onOpenChange={setShowAttachmentWarning}
+        open={attachmentWarning.open}
+        onOpenChange={(open) =>
+          setAttachmentWarning((current) => ({ ...current, open }))
+        }
       >
         <DialogContent
           showClose={false}
@@ -849,7 +837,7 @@ export function ComposeForm({
           <DialogHeader className="px-5 pt-5 pb-3">
             <DialogTitle>Forgot an attachment?</DialogTitle>
             <DialogDescription>
-              Your message mentions “{attachmentWarningKeyword}” but no files are
+              Your message mentions “{attachmentWarning.keyword}” but no files are
               attached.
             </DialogDescription>
           </DialogHeader>
@@ -857,14 +845,16 @@ export function ComposeForm({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowAttachmentWarning(false)}
+              onClick={() =>
+                setAttachmentWarning((current) => ({ ...current, open: false }))
+              }
             >
               Go back
             </Button>
             <Button
               size="sm"
               onClick={() => {
-                setShowAttachmentWarning(false);
+                setAttachmentWarning((current) => ({ ...current, open: false }));
                 void requestSend(true);
               }}
             >
@@ -892,11 +882,11 @@ export function ComposeDialog({
   const isMobile = useIsMobile();
   const open = isComposeOpen;
 
-  const handleDismiss = useCallback(() => {
+  function handleDismiss() {
     if (requestComposeClose()) {
       onClose();
     }
-  }, [onClose, requestComposeClose]);
+  }
 
   const formProps = {
     identities,
@@ -909,13 +899,10 @@ export function ComposeDialog({
     activeMailbox,
   };
 
-  const handleDismissRequest = useCallback(
-    (event?: Event) => {
-      event?.preventDefault();
-      handleDismiss();
-    },
-    [handleDismiss],
-  );
+  function handleDismissRequest(event?: Event) {
+    event?.preventDefault();
+    handleDismiss();
+  }
 
   if (isMobile) {
     return (
@@ -932,7 +919,7 @@ export function ComposeDialog({
           onEscapeKeyDown={handleDismissRequest}
         >
           <VisuallyHidden>
-            <DrawerHeader>
+            <DrawerHeader showClose={false}>
               <DrawerTitle>New mail</DrawerTitle>
             </DrawerHeader>
           </VisuallyHidden>

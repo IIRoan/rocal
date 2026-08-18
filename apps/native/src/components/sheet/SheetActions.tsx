@@ -16,6 +16,8 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 
 export interface SheetActionsProps {
   children: React.ReactNode;
+  /** When false, only the button row — parent owns padding, border, and safe area. */
+  chrome?: boolean;
 }
 
 export interface SheetPrimaryButtonProps {
@@ -30,16 +32,19 @@ export interface SheetSecondaryButtonProps {
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  variant?: "default" | "destructive";
 }
 
 // ─── Container ─────────────────────────────────────────────────────────────
 
-export function SheetActions({ children }: SheetActionsProps) {
+export function SheetActions({ children, chrome = true }: SheetActionsProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = createSheetActionsStyles(theme, insets.bottom);
 
-  return <View style={styles.container}>{children}</View>;
+  return (
+    <View style={chrome ? styles.container : styles.row}>{children}</View>
+  );
 }
 
 // ─── Primary Button ──────────────────────────────────────────────────────────
@@ -90,15 +95,18 @@ export function SheetSecondaryButton({
   label,
   onPress,
   disabled,
+  variant = "default",
 }: SheetSecondaryButtonProps) {
   const { theme } = useTheme();
   const styles = createSecondaryStyles(theme);
+  const destructive = variant === "destructive";
 
   return (
     <Pressable
       style={({ pressed }) => [
         styles.button,
-        pressed && styles.pressed,
+        destructive && styles.destructiveButton,
+        pressed && (destructive ? styles.destructivePressed : styles.pressed),
         disabled && styles.disabled,
       ]}
       onPress={onPress}
@@ -106,7 +114,9 @@ export function SheetSecondaryButton({
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <Text style={styles.text}>{label}</Text>
+      <Text style={[styles.text, destructive && styles.destructiveText]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -115,6 +125,11 @@ export function SheetSecondaryButton({
 
 function createSheetActionsStyles(theme: ThemeTokens, bottomInset: number) {
   return StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    } as ViewStyle,
     container: {
       flexDirection: "row",
       alignItems: "center",
@@ -169,6 +184,12 @@ function createSecondaryStyles(theme: ThemeTokens) {
     pressed: {
       backgroundColor: theme.colors.accent,
     } as ViewStyle,
+    destructiveButton: {
+      borderColor: theme.colors.destructive + "4D",
+    } as ViewStyle,
+    destructivePressed: {
+      backgroundColor: theme.colors.destructive + "14",
+    } as ViewStyle,
     disabled: {
       opacity: 0.55,
     } as ViewStyle,
@@ -176,6 +197,9 @@ function createSecondaryStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
+    } as TextStyle,
+    destructiveText: {
+      color: theme.colors.destructive,
     } as TextStyle,
   });
 }

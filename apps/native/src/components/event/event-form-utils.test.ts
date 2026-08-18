@@ -129,4 +129,33 @@ describe("event-form timezone helpers", () => {
     expect(pickerValue).toBe("2026-06-16T14:15");
     expect(roundTrippedUtc.toISOString()).toBe(originalUtc.toISOString());
   });
+
+  it("sends empty optional fields when those editor options are disabled", () => {
+    const request = buildEventRequest({
+      title: "Planning",
+      start: "2026-06-16T09:30",
+      end: "2026-06-16T10:30",
+      calendarId: "calendar-1",
+      allDay: false,
+      location: "Office",
+      description: "Agenda",
+      recurrence: "FREQ=WEEKLY",
+      reminder: 15,
+      participants: [{ email: "ada@example.com" }],
+      timezone,
+      visibleOptionalSections: {
+        description: false,
+        location: false,
+        notifications: false,
+        participants: false,
+        recurrence: false,
+      },
+    });
+
+    expect(request.location).toBe("");
+    expect(request.description).toBe("");
+    expect(request.recurrence).toBe("");
+    expect(request.reminder).toBe(0);
+    expect(request.participants).toEqual([]);
+  });
 });

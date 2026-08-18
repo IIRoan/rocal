@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -34,7 +33,11 @@ import { useMailRuntime } from "../lib/mail/use-mail";
 import { formatAddress } from "../lib/mail/mail-helpers";
 import type { JmapEmailMessage } from "../lib/mail/types";
 
-import { BottomSheet } from "./BottomSheet";
+import {
+  BottomSheet,
+  BottomSheetHeader,
+  BottomSheetScrollView,
+} from "./BottomSheet";
 import {
   buildCommandActions,
   filterCommandActions,
@@ -77,7 +80,7 @@ export function CommandPalette() {
 
   useEffect(() => {
     if (!isOpen) return;
-    const timeout = setTimeout(() => inputRef.current?.focus(), 250);
+    const timeout = setTimeout(() => inputRef.current?.focus(), 400);
     return () => clearTimeout(timeout);
   }, [isOpen]);
 
@@ -229,41 +232,43 @@ export function CommandPalette() {
       onDismiss={close}
       onCloseComplete={handleCloseComplete}
     >
-      <View style={styles.searchRow}>
-        <Feather
-          name="search"
-          size={18}
-          color={theme.colors.mutedForeground}
-        />
-        <TextInput
-          ref={inputRef}
-          style={styles.searchInput}
-          placeholder={searchPlaceholder}
-          placeholderTextColor={theme.colors.mutedForeground}
-          value={query}
-          onChangeText={setQuery}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          accessibilityLabel="Command palette search"
-        />
-        {query.length > 0 ? (
-          <Pressable
-            onPress={() => setQuery("")}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Clear search"
-          >
-            <Feather name="x" size={18} color={theme.colors.mutedForeground} />
-          </Pressable>
-        ) : null}
-      </View>
+      <BottomSheetHeader showClose={false}>
+        <View style={styles.searchRow}>
+          <Feather
+            name="search"
+            size={18}
+            color={theme.colors.mutedForeground}
+          />
+          <TextInput
+            ref={inputRef}
+            style={styles.searchInput}
+            placeholder={searchPlaceholder}
+            placeholderTextColor={theme.colors.mutedForeground}
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            accessibilityLabel="Command palette search"
+          />
+          {query.length > 0 ? (
+            <Pressable
+              onPress={() => setQuery("")}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <Feather name="x" size={18} color={theme.colors.mutedForeground} />
+            </Pressable>
+          ) : null}
+        </View>
+      </BottomSheetHeader>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 8 }]}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
+      <BottomSheetScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + 8 },
+        ]}
       >
         {showSearchResults ? (
           <View style={styles.section}>
@@ -324,7 +329,7 @@ export function CommandPalette() {
             </View>
           ))
         )}
-      </ScrollView>
+      </BottomSheetScrollView>
     </BottomSheet>
   );
 }
@@ -453,17 +458,12 @@ function createStyles(theme: ThemeTokens) {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: theme.spacing["2"],
-      marginHorizontal: theme.spacing["4"],
-      marginBottom: theme.spacing["2"],
       paddingHorizontal: theme.spacing["3"],
       paddingVertical: theme.spacing["2"],
       borderRadius: theme.borderRadius.lg,
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.secondary,
-    },
-    scroll: {
-      flex: 1,
     },
     scrollContent: {
       paddingHorizontal: theme.spacing["4"],

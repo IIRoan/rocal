@@ -24,7 +24,11 @@ import { CenteredLoader } from "../../../src/components/ui/loading";
 import { MailMessageRow } from "../../../src/components/mail/MailMessageRow";
 import { MAIL_COMPOSE_LIST_EXTRA } from "../../../src/components/mail/MailComposeButton";
 import { mailBottomBarTotalHeight } from "../../../src/components/mail/mail-bottom-action-bar-layout";
-import { BottomSheet } from "../../../src/components/BottomSheet";
+import {
+  BottomSheet,
+  BottomSheetHeader,
+  BottomSheetTitle,
+} from "../../../src/components/BottomSheet";
 import { MailBulkMoveSheet } from "../../../src/components/mail/MailBulkMoveSheet";
 import { MailBulkMoreSheet } from "../../../src/components/mail/MailBulkMoreSheet";
 import { MailBulkLabelsSheet } from "../../../src/components/mail/MailBulkLabelsSheet";
@@ -294,8 +298,8 @@ export default function MailScreen() {
 
   const bulkMoveSnapPoints = useMemo(() => {
     const count = Math.max(bulkMoveTargets.length, 1);
-    const fraction = 0.12 + Math.min(count, 7) * 0.05;
-    return [Math.min(0.48, Math.max(0.24, fraction))];
+    const fraction = 0.2 + Math.min(count, 7) * 0.05;
+    return [Math.min(0.55, Math.max(0.36, fraction))];
   }, [bulkMoveTargets.length]);
 
   const trashMailboxId = useMemo(
@@ -480,7 +484,7 @@ export default function MailScreen() {
   const bulkSheetSnapPoints = useMemo(() => {
     if (activeSheetView === "bulkLabel") return [0.55];
     if (activeSheetView === "bulkMove") return bulkMoveSnapPoints;
-    if (activeSheetView === "bulkMore") return [0.32];
+    if (activeSheetView === "bulkMore") return [0.4];
     return [0.4];
   }, [activeSheetView, bulkMoveSnapPoints]);
 
@@ -713,6 +717,15 @@ export default function MailScreen() {
           onDismiss={() => setActiveSheetView(null)}
           snapPoints={bulkSheetSnapPoints}
         >
+          <BottomSheetHeader>
+            <BottomSheetTitle>
+              {activeSheetView === "bulkMove"
+                ? "Move to"
+                : activeSheetView === "bulkLabel"
+                  ? "Labels"
+                  : "Actions"}
+            </BottomSheetTitle>
+          </BottomSheetHeader>
           {activeSheetView === "bulkMore" ? (
             <MailSheetPanel bottomInset={insets.bottom}>
               <MailBulkMoreSheet

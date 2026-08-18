@@ -197,12 +197,19 @@ export function hasEmbeddedSignature(html: string): boolean {
   return /data-signature-block=/i.test(html);
 }
 
-function sanitizeSignatureHtml(html: string): string {
+export function sanitizeSignatureHtml(html: string): string {
   if (!html.trim()) return "";
   if (typeof document === "undefined") return html.trim();
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
   doc.querySelectorAll("script, style, iframe, object, embed").forEach((el) => {
     el.remove();
+  });
+  doc.querySelectorAll("*").forEach((el) => {
+    for (const attr of Array.from(el.attributes)) {
+      if (/^on/i.test(attr.name)) {
+        el.removeAttribute(attr.name);
+      }
+    }
   });
   return doc.body.innerHTML.trim();
 }

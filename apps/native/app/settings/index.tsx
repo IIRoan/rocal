@@ -64,7 +64,12 @@ import { AppScreen } from "../../src/components/layout";
 import { AppUpdateSettingsSection } from "../../src/components/settings/AppUpdateSettingsSection";
 import { StackScreenHeader } from "../../src/components/StackScreenHeader";
 import { layoutScrollContent } from "../../src/lib/app-layout";
-import { BottomSheet } from "../../src/components/BottomSheet";
+import {
+  BottomSheet,
+  BottomSheetHeader,
+  BottomSheetScrollView,
+  BottomSheetTitle,
+} from "../../src/components/BottomSheet";
 import {
   SheetActions,
   SheetPrimaryButton,
@@ -277,6 +282,14 @@ export default function SettingsScreen() {
     | "workingDays";
   const [activePicker, setActivePicker] = useState<PickerKey | null>(null);
   const [lastPicker, setLastPicker] = useState<PickerKey | null>(null);
+  const pickerTitles: Record<PickerKey, string> = {
+    theme: "Theme",
+    defaultView: "Default view",
+    timeFormat: "Time format",
+    weekStart: "Start of week",
+    defaultCalendar: "Default calendar",
+    workingDays: "Working days",
+  };
   const openPicker = useCallback((key: PickerKey) => {
     setLastPicker(key);
     setActivePicker(key);
@@ -957,8 +970,16 @@ export default function SettingsScreen() {
       <BottomSheet
         visible={activePicker !== null}
         onDismiss={() => setActivePicker(null)}
+        snapPoints={[0.52]}
       >
-        <View style={{ paddingVertical: 8, paddingBottom: insets.bottom + 8 }}>
+        <BottomSheetHeader>
+          <BottomSheetTitle>
+            {lastPicker ? pickerTitles[lastPicker] : "Choose"}
+          </BottomSheetTitle>
+        </BottomSheetHeader>
+        <BottomSheetScrollView
+          contentContainerStyle={{ paddingVertical: 8, paddingBottom: insets.bottom + 8 }}
+        >
           {lastPicker === "theme" &&
             THEME_OPTIONS.map((opt) => (
               <SheetPickerOption
@@ -1058,7 +1079,7 @@ export default function SettingsScreen() {
                 />
               );
             })}
-        </View>
+        </BottomSheetScrollView>
       </BottomSheet>
 
       {/* Profile picture bottom sheet */}
@@ -1069,6 +1090,9 @@ export default function SettingsScreen() {
           setProfilePictureUrlInput("");
         }}
       >
+        <BottomSheetHeader>
+          <BottomSheetTitle>Profile picture</BottomSheetTitle>
+        </BottomSheetHeader>
         <View style={{ paddingBottom: insets.bottom + 8 }}>
           <ProfilePictureCard
             value={profilePictureUrlInput}
@@ -1092,6 +1116,13 @@ export default function SettingsScreen() {
           resetChangePasswordForm();
         }}
       >
+        <BottomSheetHeader>
+          <BottomSheetTitle>
+            {activePasswordSheet === "set-password"
+              ? "Set password"
+              : "Change password"}
+          </BottomSheetTitle>
+        </BottomSheetHeader>
         <View style={{ paddingBottom: insets.bottom + 8 }}>
           <PasswordChangeCard
             mode={activePasswordSheet ?? "change-password"}
@@ -1451,31 +1482,17 @@ function PasswordChangeCard({
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
-      <View style={{ gap: theme.spacing["1"] }}>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.base.size,
-            lineHeight: theme.typography.fontSize.base.lineHeight,
-            color: theme.colors.foreground,
-            fontWeight: theme.typography.fontWeight
-              .semibold as TextStyle["fontWeight"],
-          }}
-        >
-          {isChangePassword ? "Change Password" : "Set Email Password"}
-        </Text>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.sm.size,
-            lineHeight: theme.typography.fontSize.sm.lineHeight,
-            color: theme.colors.mutedForeground,
-          }}
-        >
-          {isChangePassword
-            ? "Update your email sign-in password. After email sign-in, Solace also uses it to protect your encryption keys."
-            : "Add an email sign-in password to this account. This gives you an email/password sign-in option without changing your existing encrypted data."}
-        </Text>
-      </View>
+      <Text
+        style={{
+          fontSize: theme.typography.fontSize.sm.size,
+          lineHeight: theme.typography.fontSize.sm.lineHeight,
+          color: theme.colors.mutedForeground,
+        }}
+      >
+        {isChangePassword
+          ? "Update your email sign-in password. After email sign-in, Solace also uses it to protect your encryption keys."
+          : "Add an email sign-in password to this account. This gives you an email/password sign-in option without changing your existing encrypted data."}
+      </Text>
 
       {error ? (
         <View
@@ -1576,29 +1593,15 @@ function ProfilePictureCard({
         gap: theme.spacing["4"],
       }}
     >
-      {/* Header */}
-      <View style={{ gap: theme.spacing["1"] }}>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.base.size,
-            lineHeight: theme.typography.fontSize.base.lineHeight,
-            color: theme.colors.foreground,
-            fontWeight: theme.typography.fontWeight
-              .semibold as TextStyle["fontWeight"],
-          }}
-        >
-          Change Profile Picture
-        </Text>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.sm.size,
-            lineHeight: theme.typography.fontSize.sm.lineHeight,
-            color: theme.colors.mutedForeground,
-          }}
-        >
-          Paste the URL of the image you want to use.
-        </Text>
-      </View>
+      <Text
+        style={{
+          fontSize: theme.typography.fontSize.sm.size,
+          lineHeight: theme.typography.fontSize.sm.lineHeight,
+          color: theme.colors.mutedForeground,
+        }}
+      >
+        Paste the URL of the image you want to use.
+      </Text>
 
       <View style={{ gap: theme.spacing["1.5"] ?? 6 }}>
         <Text

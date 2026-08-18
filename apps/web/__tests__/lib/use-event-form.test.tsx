@@ -262,12 +262,12 @@ describe("useEventForm reminder hydration", () => {
 
     expect(calendarData.updateEvent).toHaveBeenCalledWith("event-1", {
       title: "Reminder reshuffle",
-      description: undefined,
+      description: "",
       start: "2099-04-24T16:45:00.000Z",
       end: "2099-04-24T17:30:00.000Z",
       timezone: "UTC",
       allDay: false,
-      location: undefined,
+      location: "",
       calendarId: "cal-1",
       participants: [],
       reminder: 30,
@@ -331,12 +331,12 @@ describe("useEventForm reminder hydration", () => {
 
     expect(calendarData.updateEvent).toHaveBeenCalledWith("event-1", {
       title: "Last reminder removal",
-      description: undefined,
+      description: "",
       start: "2099-04-24T16:45:00.000Z",
       end: "2099-04-24T17:30:00.000Z",
       timezone: "UTC",
       allDay: false,
-      location: undefined,
+      location: "",
       calendarId: "cal-1",
       participants: [],
       reminder: null,
@@ -401,12 +401,12 @@ describe("useEventForm reminder hydration", () => {
 
     expect(calendarData.updateEvent).toHaveBeenCalledWith("event-1", {
       title: "Manon winkel",
-      description: undefined,
+      description: "",
       start: "2099-04-24T16:45:00.000Z",
       end: "2099-04-24T17:30:00.000Z",
       timezone: "UTC",
       allDay: false,
-      location: undefined,
+      location: "",
       calendarId: "cal-1",
       participants: [],
       reminder: null,
@@ -436,5 +436,108 @@ describe("useEventForm reminder hydration", () => {
     expect(latestFormRef.current?.eventReminder).toBeNull();
     expect(latestFormRef.current?.eventNotifications).toEqual([]);
     expect(latestFormRef.current?.showNotifications).toBe(false);
+  });
+
+  it("clears selected reminders when the reminder option is disabled", async () => {
+    mockGetEventNotifications.mockResolvedValue({
+      data: {
+        notifications: [
+          {
+            id: "notif-15",
+            isEnabled: true,
+            minutesBefore: 15,
+            notificationType: "email",
+          },
+        ],
+      },
+      success: true,
+    } as any);
+
+    await act(async () => {
+      await latestFormRef.current!.loadEventData({
+        ...baseEvent,
+        reminder: 15,
+      } as any);
+    });
+
+    act(() => {
+      latestFormRef.current!.setShowNotifications(false);
+    });
+
+    expect(latestFormRef.current?.showNotifications).toBe(false);
+    expect(latestFormRef.current?.eventNotifications).toEqual([]);
+    expect(latestFormRef.current?.eventReminder).toBeNull();
+  });
+
+  it("clears the recurrence rule when repeating is disabled", async () => {
+    await act(async () => {
+      await latestFormRef.current!.loadEventData({
+        ...baseEvent,
+        recurrence: JSON.stringify({ frequency: "weekly", interval: 1 }),
+      } as any);
+    });
+
+    expect(latestFormRef.current?.isRecurring).toBe(true);
+    expect(latestFormRef.current?.recurrenceRule).toEqual(
+      expect.objectContaining({ frequency: "weekly", interval: 1 }),
+    );
+
+    act(() => {
+      latestFormRef.current!.setIsRecurring(false);
+    });
+
+    expect(latestFormRef.current?.isRecurring).toBe(false);
+    expect(latestFormRef.current?.recurrenceRule).toBeNull();
+  });
+
+  it("sends empty location, description, and participants when those values are cleared", async () => {
+    const calendarData = {
+      updateEvent: jest.fn(async (_eventId: string, event: any) => ({
+        ...baseEvent,
+        ...event,
+        id: "event-1",
+        start: new Date(event.start),
+        end: new Date(event.end),
+      })),
+    };
+
+    mockGetEventNotifications.mockResolvedValue({
+      data: { notifications: [] },
+      success: true,
+    } as any);
+
+    await act(async () => {
+      await latestFormRef.current!.loadEventData({
+        ...baseEvent,
+        description: "Agenda",
+        location: "Office",
+        participants: [
+          {
+            email: "ada@example.com",
+            role: "required",
+            status: "needs-action",
+          },
+        ],
+      } as any);
+    });
+
+    act(() => {
+      latestFormRef.current!.setEventDescription("");
+      latestFormRef.current!.setEventLocation("");
+      latestFormRef.current!.setEventParticipants([]);
+    });
+
+    await act(async () => {
+      await latestFormRef.current!.handleEventSave(calendarData);
+    });
+
+    expect(calendarData.updateEvent).toHaveBeenCalledWith(
+      "event-1",
+      expect.objectContaining({
+        description: "",
+        location: "",
+        participants: [],
+      }),
+    );
   });
 });
