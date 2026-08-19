@@ -3,6 +3,7 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -18,19 +19,21 @@ import { Feather } from "@expo/vector-icons";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   cancelAnimation,
-  Easing,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
+  type WithSpringConfig,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 import {
-  keepPreviousData,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import { addMonths, format, isSameDay, isSameMonth, subMonths } from "date-fns";
+  addMonths,
+  differenceInCalendarMonths,
+  format,
+  isSameDay,
+  isSameMonth,
+  startOfMonth,
+} from "date-fns";
 import {
   buildPaddedCalendarMonthRanges,
   formatCalendarMonthKey,
@@ -51,6 +54,15 @@ import {
   resolveEventDotColor,
 } from "./calendar/month-grid-utils";
 import { useCurrentDateTime } from "./calendar/useCurrentDateTime";
+import {
+  getMiniCalendarPagerWindow,
+  rubberBandPagerPosition,
+  MINI_CALENDAR_WINDOW_RADIUS,
+} from "./sidebar-mini-calendar-pager";
+import {
+  getMiniCalendarSwipeTarget,
+  retainMonthEvents,
+} from "./sidebar-mini-calendar-utils";
 
 interface SidebarMiniCalendarProps {
   weekStartDay?: number;
@@ -59,45 +71,113 @@ interface SidebarMiniCalendarProps {
   timezone?: string | null;
 }
 
-type MiniCalendarEventsResponse = Awaited<
-  ReturnType<typeof calendarApiService.getEvents>
->;
-
-const SWIPE_COMMIT_THRESHOLD = 50;
+/** Release velocity (px/s) that counts as a flick. */
 const VELOCITY_COMMIT = 600;
+/** Seconds of flick momentum carried into the predicted landing page. */
+const FLICK_MOMENTUM_SECONDS = 0.16;
+/** Overscroll resistance at the window edges. */
 const RUBBER_BAND_FACTOR = 0.3;
-const PAGE_DURATION = 240;
-const PAGE_EASING = Easing.out(Easing.cubic);
-const PAGE_SPRING = { damping: 30, stiffness: 320, mass: 0.8 };
+/** Settle spring for the pager (animated value is a page index). */
+const PAGE_SPRING: WithSpringConfig = {
+  damping: 30,
+  stiffness: 320,
+  mass: 0.8,
+};
 const MINI_CALENDAR_STALE_TIME = 1000 * 60 * 2;
 
-function rubberBand(offset: number, limit: number, factor: number): number {
-  "worklet";
-  if (Math.abs(offset) < limit) return offset;
-
-  const sign = offset < 0 ? -1 : 1;
-  const overshoot = Math.abs(offset) - limit;
-  return sign * (limit + overshoot * factor);
+interface MiniCalendarMonthPageProps {
+  monthDate: Date;
+  weeks: Date[][];
+  eventsByDay: Map<string, DecoratedCalendarEvent[]>;
+  selectedDate: Date;
+  today: Date;
+  onDayPress?: (date: Date) => void;
+  theme: ThemeTokens;
+  styles: ReturnType<typeof createStyles>;
 }
 
-function decorateEvents(
-  data: MiniCalendarEventsResponse | undefined,
-): DecoratedCalendarEvent[] {
-  if (!data) return [];
+const MiniCalendarMonthPage = React.memo(function MiniCalendarMonthPage({
+  monthDate,
+  weeks,
+  eventsByDay,
+  selectedDate,
+  today,
+  onDayPress,
+  theme,
+  styles,
+}: MiniCalendarMonthPageProps) {
+  return (
+    <View>
+      {weeks.map((week, weekIndex) => (
+        <View key={weekIndex} style={styles.weekRow}>
+          {week.map((date) => {
+            const inCurrentMonth = isSameMonth(date, monthDate);
+            const isSelected = inCurrentMonth && isSameDay(date, selectedDate);
+            const isCurrentDay = inCurrentMonth && isSameDay(date, today);
+            const dayEvents = getMonthDayEvents(
+              eventsByDay,
+              date,
+              inCurrentMonth,
+            );
 
-  const calendarColorById = new Map(
-    data.calendars.map((calendar) => [calendar.id, calendar.color]),
+            return (
+              <Pressable
+                key={date.toISOString()}
+                onPress={() => onDayPress?.(date)}
+                hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                style={({ pressed }) => [
+                  styles.dayCell,
+                  pressed && { opacity: 0.7 },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${format(date, "MMMM d, yyyy")}${isCurrentDay ? ", today" : ""}`}
+                accessibilityState={{ selected: isSelected }}
+              >
+                <View
+                  style={[
+                    styles.dayNumberContainer,
+                    isSelected && styles.selectedDayNumberContainer,
+                    isCurrentDay && styles.todayDayNumberContainer,
+                    isCurrentDay &&
+                      isSelected &&
+                      styles.todaySelectedDayNumberContainer,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.dayNumberText,
+                      !inCurrentMonth && styles.outsideMonthDayNumberText,
+                      isCurrentDay && styles.todayDayNumberText,
+                      isSelected && styles.selectedDayNumberText,
+                    ]}
+                  >
+                    {format(date, "d")}
+                  </Text>
+                </View>
+
+                <View style={styles.dotsRow}>
+                  {dayEvents.slice(0, MAX_DOTS).map((event, index) => (
+                    <View
+                      key={`${event.id}-${index}`}
+                      style={[
+                        styles.dot,
+                        {
+                          backgroundColor: isSelected
+                            ? theme.colors.primaryForeground
+                            : resolveEventDotColor(event.color, theme),
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
+    </View>
   );
-
-  return data.events.map((event) => ({
-    ...event,
-    color: event.color ?? calendarColorById.get(event.calendarId) ?? undefined,
-    description: event.description ?? undefined,
-    location: event.location ?? undefined,
-    categoryId: event.categoryId ?? undefined,
-    reminder: event.reminder ?? undefined,
-  }));
-}
+});
 
 export function SidebarMiniCalendar({
   weekStartDay = 1,
@@ -112,42 +192,115 @@ export function SidebarMiniCalendar({
   const resolvedTimezone = resolveTimezone(timezone);
   const fallbackSelectedDate = useMemo(() => new Date(), []);
   const effectiveSelectedDate = selectedDate ?? fallbackSelectedDate;
-  const [calendarMonth, setCalendarMonth] = useState<Date>(
-    selectedDate ?? new Date(),
-  );
+
+  // Absolute-coordinate pager: months are indexed on an unbounded number
+  // line anchored at the month the pager mounted with. The strip position
+  // (`pageIndex`) lives in the same coordinate, so committing a swipe only
+  // re-centers the rendered window — the visible page keeps its native view
+  // and nothing re-positions mid-flight (no wrong-month frame, no flicker).
+  const [epochMonth] = useState(() => startOfMonth(selectedDate ?? new Date()));
+  const [committedIndex, setCommittedIndex] = useState(0);
   const [pageWidth, setPageWidth] = useState(1);
+
   const pageWidthShared = useSharedValue(1);
-  const translateX = useSharedValue(-1);
+  // Fractional strip position in absolute page units.
+  const pageIndex = useSharedValue(0);
+  // Committed index mirrored for worklets (bounds + chaining).
+  const committedIndexShared = useSharedValue(0);
+  // pageIndex captured when the active gesture began.
+  const dragStartPageIndex = useSharedValue(0);
+
+  const retainedEventsByMonthRef = useRef(
+    new Map<string, DecoratedCalendarEvent[]>(),
+  );
+
+  const calendarMonth = useMemo(
+    () => addMonths(epochMonth, committedIndex),
+    [committedIndex, epochMonth],
+  );
+  const monthKey = formatCalendarMonthKey(calendarMonth);
+  const monthKeyRef = useRef(monthKey);
+  monthKeyRef.current = monthKey;
+
+  const commitToIndex = useCallback((index: number) => {
+    setCommittedIndex(index);
+  }, []);
+
+  const jumpToMonth = useCallback(
+    (monthDate: Date) => {
+      const index = differenceInCalendarMonths(
+        startOfMonth(monthDate),
+        epochMonth,
+      );
+      cancelAnimation(pageIndex);
+      pageIndex.value = index;
+      setCommittedIndex(index);
+    },
+    [epochMonth, pageIndex],
+  );
 
   useEffect(() => {
     if (!selectedDate) return;
+    if (formatCalendarMonthKey(selectedDate) === monthKeyRef.current) return;
+    jumpToMonth(selectedDate);
+  }, [jumpToMonth, selectedDate]);
 
-    setCalendarMonth((previousMonth) =>
-      isSameMonth(selectedDate, previousMonth) ? previousMonth : selectedDate,
-    );
-  }, [selectedDate]);
+  const { start: windowStartIndex, end: windowEndIndex } = useMemo(
+    () => getMiniCalendarPagerWindow(committedIndex, MINI_CALENDAR_WINDOW_RADIUS),
+    [committedIndex],
+  );
 
-  const previousMonth = useMemo(
-    () => subMonths(calendarMonth, 1),
-    [calendarMonth],
+  const monthWindow = useMemo(() => {
+    const indices: number[] = [];
+    for (let index = windowStartIndex; index <= windowEndIndex; index++) {
+      indices.push(index);
+    }
+
+    return indices.map((absoluteIndex) => {
+      const monthDate = addMonths(epochMonth, absoluteIndex);
+      const range = getPaddedCalendarMonthRange(
+        monthDate,
+        undefined,
+        resolvedTimezone,
+      );
+
+      return {
+        key: formatCalendarMonthKey(monthDate),
+        monthDate,
+        range,
+        weeks: Array.from({ length: 6 }, (_, weekIndex) =>
+          generateGridDates(monthDate, weekStartDay).slice(
+            weekIndex * 7,
+            weekIndex * 7 + 7,
+          ),
+        ),
+      };
+    });
+  }, [epochMonth, resolvedTimezone, weekStartDay, windowEndIndex, windowStartIndex]);
+
+  const monthEventQueries = useMemo(
+    () =>
+      monthWindow.map(({ range }) => ({
+        queryKey: QUERY_KEYS.events(
+          range.start.toISOString(),
+          range.end.toISOString(),
+        ),
+        queryFn: () => calendarApiService.getEvents(range.start, range.end),
+        staleTime: MINI_CALENDAR_STALE_TIME,
+      })),
+    [monthWindow],
   );
-  const nextMonth = useMemo(() => addMonths(calendarMonth, 1), [calendarMonth]);
-  const previousMonthRange = useMemo(
-    () => getPaddedCalendarMonthRange(previousMonth, undefined, resolvedTimezone),
-    [previousMonth, resolvedTimezone],
-  );
-  const currentMonthRange = useMemo(
-    () => getPaddedCalendarMonthRange(calendarMonth, undefined, resolvedTimezone),
-    [calendarMonth, resolvedTimezone],
-  );
-  const nextMonthRange = useMemo(
-    () => getPaddedCalendarMonthRange(nextMonth, undefined, resolvedTimezone),
-    [nextMonth, resolvedTimezone],
-  );
+
+  const eventQueries = useQueries({ queries: monthEventQueries });
+  const secondPreviousMonthEvents = eventQueries[0]?.data;
+  const previousMonthEvents = eventQueries[1]?.data;
+  const currentMonthEvents = eventQueries[2]?.data;
+  const nextMonthEvents = eventQueries[3]?.data;
+  const secondNextMonthEvents = eventQueries[4]?.data;
 
   useEffect(() => {
     for (const range of buildPaddedCalendarMonthRanges(calendarMonth, {
-      adjacentMonthDepth: 2,
+      adjacentMonthDepth: MINI_CALENDAR_WINDOW_RADIUS + 1,
       timezone: resolvedTimezone,
     })) {
       void queryClient.prefetchQuery({
@@ -161,168 +314,75 @@ export function SidebarMiniCalendar({
     }
   }, [calendarMonth, queryClient, resolvedTimezone]);
 
-  const { data: previousMonthData } = useQuery({
-    queryKey: QUERY_KEYS.events(
-      previousMonthRange.start.toISOString(),
-      previousMonthRange.end.toISOString(),
-    ),
-    queryFn: () =>
-      calendarApiService.getEvents(
-        previousMonthRange.start,
-        previousMonthRange.end,
-      ),
-    staleTime: MINI_CALENDAR_STALE_TIME,
-    placeholderData: keepPreviousData,
-  });
-
-  const { data: currentMonthData } = useQuery({
-    queryKey: QUERY_KEYS.events(
-      currentMonthRange.start.toISOString(),
-      currentMonthRange.end.toISOString(),
-    ),
-    queryFn: () =>
-      calendarApiService.getEvents(
-        currentMonthRange.start,
-        currentMonthRange.end,
-      ),
-    staleTime: MINI_CALENDAR_STALE_TIME,
-    placeholderData: keepPreviousData,
-  });
-
-  const { data: nextMonthData } = useQuery({
-    queryKey: QUERY_KEYS.events(
-      nextMonthRange.start.toISOString(),
-      nextMonthRange.end.toISOString(),
-    ),
-    queryFn: () =>
-      calendarApiService.getEvents(nextMonthRange.start, nextMonthRange.end),
-    staleTime: MINI_CALENDAR_STALE_TIME,
-    placeholderData: keepPreviousData,
-  });
-
   const dayLabels = useMemo(
     () => getOrderedDayLabels(weekStartDay).map((label) => label.charAt(0)),
     [weekStartDay],
   );
 
-  const pages = useMemo(
-    () => [
-      {
-        key: `prev-${formatCalendarMonthKey(previousMonth)}`,
-        monthDate: previousMonth,
-        weeks: Array.from({ length: 6 }, (_, index) =>
-          generateGridDates(previousMonth, weekStartDay).slice(
-            index * 7,
-            index * 7 + 7,
-          ),
+  const pages = useMemo(() => {
+    const queryData = [
+      secondPreviousMonthEvents,
+      previousMonthEvents,
+      currentMonthEvents,
+      nextMonthEvents,
+      secondNextMonthEvents,
+    ];
+
+    return monthWindow.map((page, index) => ({
+      key: page.key,
+      monthDate: page.monthDate,
+      weeks: page.weeks,
+      eventsByDay: groupEventsByDay(
+        retainMonthEvents(
+          retainedEventsByMonthRef.current,
+          page.key,
+          queryData[index],
         ),
-        eventsByDay: groupEventsByDay(
-          decorateEvents(previousMonthData),
-          resolvedTimezone,
-        ),
-      },
-      {
-        key: `current-${formatCalendarMonthKey(calendarMonth)}`,
-        monthDate: calendarMonth,
-        weeks: Array.from({ length: 6 }, (_, index) =>
-          generateGridDates(calendarMonth, weekStartDay).slice(
-            index * 7,
-            index * 7 + 7,
-          ),
-        ),
-        eventsByDay: groupEventsByDay(
-          decorateEvents(currentMonthData),
-          resolvedTimezone,
-        ),
-      },
-      {
-        key: `next-${formatCalendarMonthKey(nextMonth)}`,
-        monthDate: nextMonth,
-        weeks: Array.from({ length: 6 }, (_, index) =>
-          generateGridDates(nextMonth, weekStartDay).slice(
-            index * 7,
-            index * 7 + 7,
-          ),
-        ),
-        eventsByDay: groupEventsByDay(
-          decorateEvents(nextMonthData),
-          resolvedTimezone,
-        ),
-      },
-    ],
-    [
-      calendarMonth,
-      currentMonthData,
-      nextMonth,
-      nextMonthData,
-      previousMonth,
-      previousMonthData,
-      resolvedTimezone,
-      weekStartDay,
-    ],
-  );
+        resolvedTimezone,
+      ),
+    }));
+  }, [
+    currentMonthEvents,
+    monthWindow,
+    nextMonthEvents,
+    previousMonthEvents,
+    resolvedTimezone,
+    secondNextMonthEvents,
+    secondPreviousMonthEvents,
+  ]);
 
   useLayoutEffect(() => {
     pageWidthShared.value = pageWidth;
-    cancelAnimation(translateX);
-    translateX.value = -pageWidth;
-  }, [calendarMonth, pageWidth, pageWidthShared, translateX]);
+    // Keep the worklet-facing committed index in lockstep with the rendered
+    // window so the gesture's rubber-band bounds always match what is mounted.
+    committedIndexShared.value = committedIndex;
+  }, [committedIndex, committedIndexShared, pageWidth, pageWidthShared]);
 
-  const handleGoToToday = () => {
-    const today = new Date();
-    setCalendarMonth(today);
-    onDayPress?.(today);
-  };
+  const handleGoToToday = useCallback(() => {
+    const todayDate = new Date();
+    if (formatCalendarMonthKey(todayDate) !== monthKeyRef.current) {
+      jumpToMonth(todayDate);
+    }
+    onDayPress?.(todayDate);
+  }, [jumpToMonth, onDayPress]);
 
-  const commitMonthChange = useCallback((direction: 1 | -1) => {
-    setCalendarMonth((current) => addMonths(current, direction));
-  }, []);
-
-  const commitNextMonth = useCallback(() => {
-    commitMonthChange(1);
-  }, [commitMonthChange]);
-
-  const commitPreviousMonth = useCallback(() => {
-    commitMonthChange(-1);
-  }, [commitMonthChange]);
-
-  const animateMonthChange = useCallback(
-    (direction: 1 | -1) => {
-      const width = pageWidthShared.value;
-      if (width <= 1) {
-        commitMonthChange(direction);
-        return;
-      }
-
-      cancelAnimation(translateX);
-      translateX.value = withTiming(
-        direction > 0 ? -width * 2 : 0,
-        { duration: PAGE_DURATION, easing: PAGE_EASING },
-        (finished) => {
-          if (finished) {
-            scheduleOnRN(
-              direction > 0 ? commitNextMonth : commitPreviousMonth,
-            );
-          }
-        },
-      );
+  const stepMonth = useCallback(
+    (delta: 1 | -1) => {
+      const target = committedIndexShared.value + delta;
+      cancelAnimation(pageIndex);
+      pageIndex.value = withSpring(target, PAGE_SPRING);
+      commitToIndex(target);
     },
-    [
-      commitMonthChange,
-      commitNextMonth,
-      commitPreviousMonth,
-      pageWidthShared,
-      translateX,
-    ],
+    [commitToIndex, committedIndexShared, pageIndex],
   );
 
   const handlePreviousMonth = useCallback(() => {
-    animateMonthChange(-1);
-  }, [animateMonthChange]);
+    stepMonth(-1);
+  }, [stepMonth]);
 
   const handleNextMonth = useCallback(() => {
-    animateMonthChange(1);
-  }, [animateMonthChange]);
+    stepMonth(1);
+  }, [stepMonth]);
 
   const handleGridLayout = useCallback((event: LayoutChangeEvent) => {
     const nextWidth = Math.max(1, event.nativeEvent.layout.width);
@@ -338,148 +398,74 @@ export function SidebarMiniCalendar({
         .failOffsetY([-14, 14])
         .onBegin(() => {
           "worklet";
-          cancelAnimation(translateX);
+          // Grab the strip wherever it is — even mid-settle — so the motion
+          // stays with the finger instead of snapping to a page edge.
+          cancelAnimation(pageIndex);
+          dragStartPageIndex.value = pageIndex.value;
         })
         .onUpdate((event) => {
           "worklet";
           const width = pageWidthShared.value;
           if (width <= 1) return;
-          translateX.value =
-            -width +
-            rubberBand(event.translationX, width * 0.9, RUBBER_BAND_FACTOR);
+          const committed = committedIndexShared.value;
+          const raw = dragStartPageIndex.value - event.translationX / width;
+          pageIndex.value = rubberBandPagerPosition(
+            raw,
+            committed - MINI_CALENDAR_WINDOW_RADIUS,
+            committed + MINI_CALENDAR_WINDOW_RADIUS,
+            RUBBER_BAND_FACTOR,
+          );
         })
         .onEnd((event) => {
           "worklet";
           const width = pageWidthShared.value;
+          const committed = committedIndexShared.value;
           if (width <= 1) {
-            translateX.value = withSpring(-width, PAGE_SPRING);
+            pageIndex.value = withSpring(committed, PAGE_SPRING);
             return;
           }
 
-          const committedLeft =
-            event.translationX < -SWIPE_COMMIT_THRESHOLD ||
-            event.velocityX < -VELOCITY_COMMIT;
-          const committedRight =
-            event.translationX > SWIPE_COMMIT_THRESHOLD ||
-            event.velocityX > VELOCITY_COMMIT;
+          const target = getMiniCalendarSwipeTarget({
+            startIndex: dragStartPageIndex.value,
+            currentIndex: pageIndex.value,
+            translationX: event.translationX,
+            velocityX: event.velocityX,
+            pageWidth: width,
+            minIndex: committed - MINI_CALENDAR_WINDOW_RADIUS,
+            maxIndex: committed + MINI_CALENDAR_WINDOW_RADIUS,
+            commitVelocity: VELOCITY_COMMIT,
+            momentumSeconds: FLICK_MOMENTUM_SECONDS,
+          });
 
-          if (committedLeft) {
-            translateX.value = withTiming(
-              -width * 2,
-              { duration: PAGE_DURATION, easing: PAGE_EASING },
-              (finished) => {
-                if (finished) {
-                  scheduleOnRN(commitNextMonth);
-                }
-              },
-            );
-            return;
+          // Commit at release — not when the settle animation finishes — so a
+          // second swipe can chain off this one instead of dropping it. The
+          // target is an absolute index, so commits are order-safe. The
+          // committed-index shared value is re-synced by the layout effect
+          // once the window re-renders around the new month.
+          if (target !== committed) {
+            scheduleOnRN(commitToIndex, target);
           }
 
-          if (committedRight) {
-            translateX.value = withTiming(
-              0,
-              { duration: PAGE_DURATION, easing: PAGE_EASING },
-              (finished) => {
-                if (finished) {
-                  scheduleOnRN(commitPreviousMonth);
-                }
-              },
-            );
-            return;
-          }
-
-          translateX.value = withSpring(-width, PAGE_SPRING);
+          pageIndex.value = withSpring(target, {
+            ...PAGE_SPRING,
+            velocity: -event.velocityX / width,
+          });
         }),
-    [commitNextMonth, commitPreviousMonth, pageWidthShared, translateX],
+    [commitToIndex, committedIndexShared, dragStartPageIndex, pageIndex, pageWidthShared],
   );
+
+  // The strip lays pages out in a flex row starting at x=0, but the pages
+  // live at absolute month indices. `left` shifts the whole row so page
+  // `windowStartIndex` sits at absolute position `windowStartIndex*width`.
+  // `left` is a layout property committed by React in the same pass as the
+  // page set, so the two can never disagree on a painted frame. The animated
+  // transform then applies the finger/settle position on top and depends only
+  // on `pageIndex`, so recycling the window never moves the strip.
+  const windowOffsetPx = windowStartIndex * pageWidth;
 
   const pagesAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
+    transform: [{ translateX: -pageIndex.value * pageWidthShared.value }],
   }));
-
-  const renderMonthPage = useCallback(
-    (
-      pageMonth: Date,
-      pageWeeks: Date[][],
-      pageEventsByDay: Map<string, DecoratedCalendarEvent[]>,
-    ) => (
-      <View>
-        {pageWeeks.map((week, weekIndex) => (
-          <View
-            key={`${formatCalendarMonthKey(pageMonth)}-week-${weekIndex}`}
-            style={styles.weekRow}
-          >
-            {week.map((date) => {
-              const inCurrentMonth = isSameMonth(date, pageMonth);
-              const isSelected =
-                inCurrentMonth && isSameDay(date, effectiveSelectedDate);
-              const isCurrentDay = inCurrentMonth && isSameDay(date, today);
-              const dayEvents = getMonthDayEvents(
-                pageEventsByDay,
-                date,
-                inCurrentMonth,
-              );
-
-              return (
-                <Pressable
-                  key={date.toISOString()}
-                  onPress={() => onDayPress?.(date)}
-                  hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
-                  style={({ pressed }) => [
-                    styles.dayCell,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${format(date, "MMMM d, yyyy")}${isCurrentDay ? ", today" : ""}`}
-                  accessibilityState={{ selected: isSelected }}
-                >
-                  <View
-                    style={[
-                      styles.dayNumberContainer,
-                      isSelected && styles.selectedDayNumberContainer,
-                      isCurrentDay && styles.todayDayNumberContainer,
-                      isCurrentDay &&
-                        isSelected &&
-                        styles.todaySelectedDayNumberContainer,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.dayNumberText,
-                        !inCurrentMonth && styles.outsideMonthDayNumberText,
-                        isCurrentDay && styles.todayDayNumberText,
-                        isSelected && styles.selectedDayNumberText,
-                      ]}
-                    >
-                      {format(date, "d")}
-                    </Text>
-                  </View>
-
-                  <View style={styles.dotsRow}>
-                    {dayEvents.slice(0, MAX_DOTS).map((event, index) => (
-                      <View
-                        key={`${event.id}-${index}`}
-                        style={[
-                          styles.dot,
-                          {
-                            backgroundColor: isSelected
-                              ? theme.colors.primaryForeground
-                              : resolveEventDotColor(event.color, theme),
-                          },
-                        ]}
-                      />
-                    ))}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        ))}
-      </View>
-    ),
-    [effectiveSelectedDate, onDayPress, styles, theme, today],
-  );
 
   return (
     <View>
@@ -547,26 +533,27 @@ export function SidebarMiniCalendar({
           </View>
 
           <View style={styles.gridViewport} onLayout={handleGridLayout}>
-            <Animated.View
-              style={[
-                styles.pagesStrip,
-                { width: pageWidth * pages.length },
-                pagesAnimatedStyle,
-              ]}
-            >
-              {pages.map((page) => (
-                <View
-                  key={page.key}
-                  style={[styles.page, { width: pageWidth }]}
-                >
-                  {renderMonthPage(
-                    page.monthDate,
-                    page.weeks,
-                    page.eventsByDay,
-                  )}
-                </View>
-              ))}
-            </Animated.View>
+            <View style={[styles.pagesStripOffset, { left: windowOffsetPx }]}>
+              <Animated.View style={[styles.pagesStrip, pagesAnimatedStyle]}>
+                {pages.map((page) => (
+                  <View
+                    key={page.key}
+                    style={[styles.page, { width: pageWidth }]}
+                  >
+                    <MiniCalendarMonthPage
+                      monthDate={page.monthDate}
+                      weeks={page.weeks}
+                      eventsByDay={page.eventsByDay}
+                      selectedDate={effectiveSelectedDate}
+                      today={today}
+                      onDayPress={onDayPress}
+                      theme={theme}
+                      styles={styles}
+                    />
+                  </View>
+                ))}
+              </Animated.View>
+            </View>
           </View>
         </View>
       </GestureDetector>
@@ -608,6 +595,9 @@ function createStyles(theme: ThemeTokens) {
     },
     gridViewport: {
       overflow: "hidden" as const,
+    },
+    pagesStripOffset: {
+      position: "relative" as const,
     },
     pagesStrip: {
       flexDirection: "row" as const,
