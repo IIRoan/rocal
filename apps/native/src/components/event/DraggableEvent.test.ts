@@ -7,8 +7,8 @@ import {
   xOffsetToColumnIndex,
   computeRescheduledTimes,
   findEventColumnIndex,
+  HOUR_HEIGHT,
 } from "./draggable-event-utils";
-import { HOUR_HEIGHT } from "../calendar/timeline-utils";
 
 const TEST_TIMEZONE = "UTC";
 

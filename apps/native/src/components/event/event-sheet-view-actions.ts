@@ -2,6 +2,7 @@ import type { CalendarEvent } from "@workspace/calendar-core";
 import {
   canCurrentUserDeleteEvent,
   canCurrentUserEditEvent,
+  canCurrentUserModifyEvent,
   isCancelledCalendarEvent,
 } from "@workspace/calendar-core";
 
@@ -23,7 +24,7 @@ export function resolveEventSheetViewActions(
 
   return {
     showDelete: canCurrentUserDeleteEvent(event),
-    showEdit: canEdit && event.isSynced !== true && !cancelled,
+    showEdit: canCurrentUserModifyEvent(event),
     deleteLabel: !canEdit && cancelled ? "Remove" : "Delete",
   };
 }

@@ -40,6 +40,7 @@ import { calendarApiService } from "../../lib/api";
 import { QUERY_KEYS } from "../../lib/query-keys";
 import {
   buildOptimisticEvent,
+  findCachedEvent,
   generateOptimisticId,
   optimisticallyInsertEvent,
   optimisticallyRemoveEvent,
@@ -60,15 +61,18 @@ import {
   SheetActions,
   SheetPrimaryButton,
   SheetSecondaryButton,
-} from "../sheet";
+} from "../sheet/SheetActions";
 
 import { EventForm } from "./EventForm";
 import { toTimezonePickerISOString, parseCreateEventCalendarDay } from "./event-form-utils";
 import {
   formatEventDate,
   formatEventTime,
+  formatRecurrenceLabel,
   formatReminderLabel,
 } from "./event-detail-utils";
+import { EncryptionStatusIcon } from "../calendar/EncryptionStatusIcon";
+import { shouldShowEncryptionIcon } from "../calendar/timeline-event-content";
 import { resolveEventSheetViewActions } from "./event-sheet-view-actions";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -262,11 +266,17 @@ export function EventSheet({
 
   // ─── Data fetching ─────────────────────────────────────────────────────
 
-  const { data: event, isLoading: eventLoading } = useQuery({
+  const cachedEvent = eventId
+    ? findCachedEvent(queryClient, eventId)
+    : undefined;
+
+  const { data: fetchedEvent, isLoading: eventLoading } = useQuery({
     queryKey: QUERY_KEYS.eventDetail(eventId ?? ""),
     queryFn: () => calendarApiService.getEvent(eventId!),
     enabled: !!eventId && visible,
+    placeholderData: cachedEvent,
   });
+  const event = fetchedEvent;
 
   const { data: calendars, isLoading: calendarsLoading } = useQuery({
     queryKey: QUERY_KEYS.calendars(),
@@ -415,6 +425,10 @@ export function EventSheet({
   }, [viewMode, isViewOrEdit, event, dismissSheet]);
 
   const isRecurring = !!(event?.recurrence || event?.parentEventId);
+  const recurrenceLabel = event
+    ? formatRecurrenceLabel(event.recurrence) ??
+      (event.parentEventId || event.isRecurringInstance ? "Repeats" : null)
+    : null;
 
   const handleEditPress = useCallback(() => {
     if (isRecurring) {
@@ -515,7 +529,8 @@ export function EventSheet({
 
   // ─── Derived ───────────────────────────────────────────────────────────
 
-  const isLoading = calendarsLoading || (isViewOrEdit && eventLoading);
+  const isLoading =
+    calendarsLoading || (isViewOrEdit && eventLoading && !event);
   const isPending =
     createMutation.isPending ||
     updateMutation.isPending ||
@@ -563,9 +578,21 @@ export function EventSheet({
               onScroll={viewScrollHandler}
             >
               {/* Event title */}
-              <Text style={styles.viewEventTitle} numberOfLines={2}>
-                {event.title || "Untitled Event"}
-              </Text>
+              <View style={styles.viewTitleRow}>
+                <EncryptionStatusIcon
+                  encrypted={shouldShowEncryptionIcon(event)}
+                  color={theme.colors.foreground}
+                  size={18}
+                />
+                <Text style={styles.viewEventTitle} numberOfLines={2}>
+                  {event.title || "Untitled Event"}
+                </Text>
+              </View>
+              {event.isSynced ? (
+                <Text style={styles.viewSyncedHint}>
+                  Synced from an external calendar — view only
+                </Text>
+              ) : null}
 
               {/* Primary section: date/time + calendar + reminder + recurrence */}
               <View style={styles.sectionCard}>
@@ -615,12 +642,16 @@ export function EventSheet({
                   </>
                 ) : null}
 
-                {event.recurrence ? (
+                {recurrenceLabel ? (
                   <>
                     <View style={styles.sectionDivider} />
-                    <View style={styles.sectionRow}>
-                      <IconBox name="repeat" color={iconColor} bg={iconBg} />
-                      <Text style={styles.viewText}>{event.recurrence}</Text>
+                    <View
+                      style={[styles.sectionRow, { alignItems: "flex-start" }]}
+                    >
+                      <View style={{ marginTop: 2 }}>
+                        <IconBox name="repeat" color={iconColor} bg={iconBg} />
+                      </View>
+                      <Text style={styles.viewText}>{recurrenceLabel}</Text>
                     </View>
                   </>
                 ) : null}
@@ -732,6 +763,17 @@ export function EventSheet({
               </SheetActions>
             </BottomSheetFooter>
           </>
+        ) : viewMode === "view" ? (
+          <>
+            <View style={styles.viewBody}>
+              <Text style={styles.viewText}>Couldn't load this event.</Text>
+            </View>
+            <BottomSheetFooter>
+              <SheetActions chrome={false}>
+                <SheetSecondaryButton label="Close" onPress={dismissSheet} />
+              </SheetActions>
+            </BottomSheetFooter>
+          </>
         ) : (
           /* ── Edit / Create mode ──────────────────────────────── */
           <View style={styles.editBody}>
@@ -808,6 +850,13 @@ function createStyles(theme: ThemeTokens) {
     },
     viewScroll: {
       flex: 1,
+    },
+    viewTitleRow: {
+      flexDirection: "row" as const,
+      alignItems: "flex-start" as const,
+      gap: 8,
+      marginBottom: 10,
+      paddingHorizontal: 4,
     },
 
     editBody: {
@@ -913,13 +962,19 @@ function createStyles(theme: ThemeTokens) {
 
   const text = {
     viewEventTitle: {
+      flex: 1,
       fontSize: theme.typography.fontSize.xl.size,
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
+      lineHeight: theme.typography.fontSize.xl.lineHeight,
+    },
+    viewSyncedHint: {
+      fontSize: theme.typography.fontSize.xs.size,
+      color: theme.colors.mutedForeground,
+      marginTop: -6,
       marginBottom: 10,
       paddingHorizontal: 4,
-      lineHeight: theme.typography.fontSize.xl.lineHeight,
     },
     viewText: {
       flex: 1,

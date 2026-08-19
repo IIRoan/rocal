@@ -100,16 +100,15 @@ describe("formatViewDateHeader", () => {
 describe("resolveCalendarSwitcherDate", () => {
   it("keeps the week title on the page being previewed during a swipe", () => {
     const selectedDate = new Date(2026, 7, 11);
-    const previewDate = new Date(2026, 7, 18);
+    const pagingDate = new Date(2026, 7, 18);
 
     expect(
       formatViewDateHeader(
         "week",
         resolveCalendarSwitcherDate({
           view: "week",
-          currentDate: selectedDate,
+          currentDate: pagingDate,
           selectedDate,
-          previewDate,
         }),
         1,
         "Europe/Amsterdam",
@@ -125,7 +124,7 @@ describe("resolveCalendarSwitcherDate", () => {
         "week",
         resolveCalendarSwitcherDate({
           view: "week",
-          currentDate: new Date(2026, 7, 1),
+          currentDate: selectedDate,
           selectedDate,
         }),
         1,
