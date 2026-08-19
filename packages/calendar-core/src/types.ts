@@ -254,6 +254,27 @@ export function isCancelledCalendarEvent(
   return event.isCancelled === true;
 }
 
+export function canCurrentUserModifyEvent(
+  event: Pick<
+    CalendarEvent,
+    "id" | "userId" | "participants" | "isSynced" | "isCancelled"
+  >,
+): boolean {
+  if (!event.id) {
+    return false;
+  }
+
+  if (event.isSynced === true) {
+    return false;
+  }
+
+  if (isCancelledCalendarEvent(event)) {
+    return false;
+  }
+
+  return canCurrentUserEditEvent(event);
+}
+
 export interface EventCategory {
   id: string;
   name: string;

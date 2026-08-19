@@ -97,6 +97,12 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
           }
         },
       });
+
+      if (cancelled) return;
+
+      queryClient.removeQueries({ queryKey: ["events"] });
+      queryClient.removeQueries({ queryKey: ["calendars"] });
+      queryClient.removeQueries({ queryKey: ["categories"] });
     })()
       .catch(() => {})
       .finally(() => {

@@ -1,6 +1,7 @@
 import {
   formatEventDate,
   formatEventTime,
+  formatRecurrenceLabel,
   formatReminderLabel,
 } from "./event-detail-utils";
 import type { CalendarEvent } from "@workspace/calendar-core";
@@ -138,5 +139,41 @@ describe("formatReminderLabel", () => {
 
   it("returns mixed hours and minutes for 90 minutes", () => {
     expect(formatReminderLabel(90)).toBe("1h 30m before");
+  });
+});
+
+describe("formatRecurrenceLabel", () => {
+  it("formats RRULE weekly days into readable copy", () => {
+    expect(formatRecurrenceLabel("FREQ=WEEKLY;BYDAY=MO,WE,FR")).toBe(
+      "Weekly on Mon, Wed, Fri",
+    );
+  });
+
+  it("formats a JSON recurrence rule the same way as web", () => {
+    expect(
+      formatRecurrenceLabel(
+        JSON.stringify({
+          frequency: "weekly",
+          interval: 2,
+          byWeekDay: [1, 3, 5],
+          count: 10,
+        }),
+      ),
+    ).toBe("Every 2 weeks on Mon, Wed, Fri, 10 times");
+  });
+
+  it("formats a monthly rule that ends on a date", () => {
+    expect(formatRecurrenceLabel("FREQ=MONTHLY;UNTIL=20260501")).toBe(
+      "Monthly, until May 1, 2026",
+    );
+  });
+
+  it("returns Repeats when the payload cannot be parsed", () => {
+    expect(formatRecurrenceLabel("not-a-rule")).toBe("Repeats");
+  });
+
+  it("returns null when there is no recurrence", () => {
+    expect(formatRecurrenceLabel(null)).toBeNull();
+    expect(formatRecurrenceLabel("")).toBeNull();
   });
 });

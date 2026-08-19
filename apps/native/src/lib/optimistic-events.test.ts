@@ -1,7 +1,9 @@
 import {
   generateOptimisticId,
   buildOptimisticEvent,
+  findCachedEvent,
   optimisticallyInsertEvent,
+  optimisticallyPatchEvent,
   optimisticallyRemoveEvent,
   rollbackFromSnapshot,
 } from "./optimistic-events";
@@ -144,6 +146,30 @@ describe("buildOptimisticEvent", () => {
   });
 });
 
+// ─── findCachedEvent ─────────────────────────────────────────────────────────
+
+describe("findCachedEvent", () => {
+  it("returns the event from an overlapping events query", () => {
+    const key = ["events", "2024-03-15T00:00:00", "2024-03-16T00:00:00"];
+    const client = makeMockQueryClient({
+      [key.join("|")]: makeEventResponse([EXISTING_EVENT]),
+    });
+
+    expect(findCachedEvent(client as never, "ev-existing")).toEqual(
+      EXISTING_EVENT,
+    );
+  });
+
+  it("returns undefined when the event is not cached", () => {
+    const key = ["events", "2024-03-15T00:00:00", "2024-03-16T00:00:00"];
+    const client = makeMockQueryClient({
+      [key.join("|")]: makeEventResponse([EXISTING_EVENT]),
+    });
+
+    expect(findCachedEvent(client as never, "missing")).toBeUndefined();
+  });
+});
+
 // ─── optimisticallyInsertEvent ────────────────────────────────────────────────
 
 describe("optimisticallyInsertEvent", () => {
@@ -240,6 +266,82 @@ describe("optimisticallyRemoveEvent", () => {
 
     expect(snapshot.length).toBe(1);
     expect(snapshot[0].data?.events).toContainEqual(EXISTING_EVENT);
+  });
+});
+
+// ─── optimisticallyPatchEvent ─────────────────────────────────────────────────
+
+describe("optimisticallyPatchEvent", () => {
+  it("updates start and end on the matching event", async () => {
+    const key = ["events", "2024-03-15T00:00:00", "2024-03-16T00:00:00"];
+    const client = makeMockQueryClient({
+      [key.join("|")]: makeEventResponse([EXISTING_EVENT]),
+    });
+    const start = new Date("2024-03-15T11:00:00.000Z");
+    const end = new Date("2024-03-15T12:00:00.000Z");
+
+    await optimisticallyPatchEvent(client as never, "ev-existing", {
+      start,
+      end,
+    });
+
+    const stored = client._store[key.join("|")]?.events[0];
+    expect(stored?.start).toEqual(start);
+    expect(stored?.end).toEqual(end);
+    expect(stored?.title).toBe("Existing");
+  });
+
+  it("leaves other events intact", async () => {
+    const other: CalendarEvent = { ...EXISTING_EVENT, id: "ev-other" };
+    const key = ["events", "2024-03-15T00:00:00", "2024-03-16T00:00:00"];
+    const client = makeMockQueryClient({
+      [key.join("|")]: makeEventResponse([EXISTING_EVENT, other]),
+    });
+
+    await optimisticallyPatchEvent(client as never, "ev-existing", {
+      start: new Date("2024-03-15T14:00:00.000Z"),
+      end: new Date("2024-03-15T15:00:00.000Z"),
+    });
+
+    const stored = client._store[key.join("|")];
+    expect(stored?.events.find((event) => event.id === "ev-other")).toEqual(
+      other,
+    );
+  });
+
+  it("moves an event from the current week cache into the next week cache", async () => {
+    const week1 = ["events", "2026-08-10T00:00:00.000Z", "2026-08-17T00:00:00.000Z"];
+    const week2 = ["events", "2026-08-17T00:00:00.000Z", "2026-08-24T00:00:00.000Z"];
+    const friday = {
+      ...EXISTING_EVENT,
+      start: new Date("2026-08-14T07:00:00.000Z"),
+      end: new Date("2026-08-14T08:00:00.000Z"),
+    };
+    const client = makeMockQueryClient({
+      [week1.join("|")]: makeEventResponse([friday]),
+      [week2.join("|")]: makeEventResponse([]),
+    });
+    const start = new Date("2026-08-17T12:00:00.000Z");
+    const end = new Date("2026-08-17T13:00:00.000Z");
+
+    const snapshot = await optimisticallyPatchEvent(
+      client as never,
+      "ev-existing",
+      { start, end },
+    );
+
+    expect(
+      client._store[week1.join("|")]?.events.find(
+        (event) => event.id === "ev-existing",
+      ),
+    ).toBeUndefined();
+    expect(client._store[week2.join("|")]?.events).toEqual([
+      { ...friday, start, end },
+    ]);
+
+    rollbackFromSnapshot(client as never, snapshot);
+    expect(client._store[week1.join("|")]?.events).toEqual([friday]);
+    expect(client._store[week2.join("|")]?.events).toEqual([]);
   });
 });
 

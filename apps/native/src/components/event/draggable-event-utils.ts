@@ -9,6 +9,9 @@ export const LONG_PRESS_DURATION_MS = 400;
 /** Snap interval in minutes for drop targets */
 export const SNAP_INTERVAL_MINUTES = 15;
 
+/** Vertical pixel height of one hour in unused drag helpers / tests */
+export const HOUR_HEIGHT = 60;
+
 /** Scale applied to the event block while dragging */
 export const DRAG_SCALE = 1.05;
 

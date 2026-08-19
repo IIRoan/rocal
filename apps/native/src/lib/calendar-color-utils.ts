@@ -33,3 +33,25 @@ export function resolveCalendarSwatchColor(
 
   return theme.colors.calendar.blue.bg;
 }
+
+export interface ResolvedEventColor {
+  bg: string;
+  fg: string;
+}
+
+export function resolveEventBlockColor(
+  eventColor: string | undefined,
+  theme: ThemeTokens,
+): ResolvedEventColor {
+  if (eventColor && isNamedCalendarColor(eventColor)) {
+    const palette = theme.colors.calendar[eventColor];
+    return { bg: palette.bg, fg: palette.fg };
+  }
+  if (eventColor && HEX_COLOR_PATTERN.test(eventColor)) {
+    return { bg: eventColor, fg: theme.colors.foreground };
+  }
+  if (eventColor) {
+    return { bg: eventColor, fg: theme.colors.foreground };
+  }
+  return { bg: theme.colors.muted, fg: theme.colors.mutedForeground };
+}

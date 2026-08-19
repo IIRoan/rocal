@@ -48,7 +48,7 @@ apps/native/app/
 ├── _layout.tsx                 # Root providers (Query, Auth, Theme, E2EE, Sidebar, Mail, CommandPalette, …)
 ├── (auth)/                     # sign-in, sign-up
 ├── (tabs)/                     # Primary surfaces (tab bar hidden — navigation via sidebar)
-│   ├── calendar/               # Calendar views (month/week/day/3day/agenda)
+│   ├── calendar/               # Calendar views (month/week/day/3day/agenda; day/3-day/week use @howljs/calendar-kit)
 │   └── mail/                   # Mail list, message detail, compose
 ├── event/                      # Event create, edit, detail
 ├── calendar-manage/            # Calendar CRUD
@@ -83,7 +83,7 @@ If only one platform changes, **say so explicitly** and why.
 
 | Feature area           | Web                                                | Native                                                            |
 | ---------------------- | -------------------------------------------------- | ----------------------------------------------------------------- |
-| Calendar views         | `apps/web/app/calendar/`, `@workspace/ui` calendar | `apps/native/app/(tabs)/calendar/`, `src/components/calendar/`    |
+| Calendar views         | `apps/web/app/calendar/`, `@workspace/ui` calendar | `apps/native/app/(tabs)/calendar/`, `src/components/calendar/` (day/3-day/week via `@howljs/calendar-kit`; month/agenda custom) |
 | Event create/edit/view | `apps/web/components/event-editor/`                | `src/components/event/` (`EventForm`, `EventSheet`), `app/event/` |
 | Mail                   | `apps/web/components/mail/`, `app/mail/`           | `app/(tabs)/mail/`, `src/components/mail/`                        |
 | Calendar CRUD          | `apps/web/components/calendar-manager.tsx`         | `app/calendar-manage/`                                            |

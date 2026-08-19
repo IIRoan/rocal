@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   canCurrentUserDeleteEvent,
+  canCurrentUserModifyEvent,
   type CalendarEvent,
 } from "../types";
 
@@ -88,5 +89,67 @@ describe("canCurrentUserDeleteEvent", () => {
         attendeeInviteEvent("accepted", { isCancelled: true }),
       ),
     ).toBe(true);
+  });
+});
+
+describe("canCurrentUserModifyEvent", () => {
+  it("allows organizers to reschedule their own events", () => {
+    expect(
+      canCurrentUserModifyEvent(
+        attendeeInviteEvent("accepted", {
+          externalId: null,
+          participants: [
+            {
+              id: "participant-1",
+              userId,
+              email: "user@example.com",
+              role: "organizer",
+              status: "accepted",
+            },
+          ],
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("allows events with no participant list", () => {
+    expect(
+      canCurrentUserModifyEvent(
+        attendeeInviteEvent("accepted", {
+          externalId: null,
+          participants: undefined,
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("blocks synced calendar events", () => {
+    expect(
+      canCurrentUserModifyEvent(
+        attendeeInviteEvent("accepted", {
+          externalId: null,
+          participants: undefined,
+          isSynced: true,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("blocks cancelled events", () => {
+    expect(
+      canCurrentUserModifyEvent(
+        attendeeInviteEvent("accepted", {
+          externalId: null,
+          participants: undefined,
+          isCancelled: true,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("blocks attendee invitations", () => {
+    expect(canCurrentUserModifyEvent(attendeeInviteEvent("accepted"))).toBe(
+      false,
+    );
   });
 });

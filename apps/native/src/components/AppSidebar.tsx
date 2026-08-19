@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -23,7 +23,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import type { Calendar } from "@workspace/calendar-core";
+import type { Calendar, CalendarView } from "@workspace/calendar-core";
 import { getErrorMessage, resolveTimezone } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
@@ -46,6 +46,7 @@ import { QUERY_KEYS } from "../lib/query-keys";
 import { buildSidebarCalendarSections } from "./app-sidebar-utils";
 import { SidebarMiniCalendar } from "./SidebarMiniCalendar";
 import { AppSwitcher } from "./AppSwitcher";
+import { CalendarViewToggle } from "./calendar/CalendarViewToggle";
 import {
   useMailAccount,
   useMailRuntime,
@@ -72,7 +73,8 @@ export function AppSidebar() {
   const { theme } = useTheme();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const { selectedDate, setCurrentDate, setSelectedDate } = useCalendarView();
+  const { activeView, selectedDate, setActiveView, setCurrentDate, setSelectedDate } =
+    useCalendarView();
   const { isOpen, open, close } = useSidebar();
   const { open: openCommandPalette } = useCommandPalette();
   const { selectedMailboxId, setSelectedMailboxId } = useMailSelection();
@@ -146,7 +148,10 @@ export function AppSidebar() {
     },
   });
 
-  const translateX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
+  const translateX = useMemo(
+    () => new Animated.Value(-SIDEBAR_WIDTH),
+    [],
+  );
 
   const animateSidebar = useCallback(
     (toValue: number) => {
@@ -287,6 +292,20 @@ export function AppSidebar() {
       setTimeout(() => router.replace(CALENDAR_TAB_ROUTE as any), 80);
     },
     [close, isCalendarContext, router, setCurrentDate, setSelectedDate],
+  );
+
+  const handleSelectCalendarView = useCallback(
+    (view: CalendarView) => {
+      setActiveView(view);
+      close();
+
+      if (isCalendarContext) {
+        return;
+      }
+
+      setTimeout(() => router.replace(CALENDAR_TAB_ROUTE as any), 80);
+    },
+    [close, isCalendarContext, router, setActiveView],
   );
 
   return (
@@ -430,6 +449,16 @@ export function AppSidebar() {
                   >
                     <Text style={styles.todayButtonText}>Today</Text>
                   </Pressable>
+                </View>
+              </View>
+
+              <View style={styles.sectionBlock}>
+                <Text style={styles.sectionLabel}>View</Text>
+                <View style={styles.viewToggleWrap}>
+                  <CalendarViewToggle
+                    activeView={activeView}
+                    onViewChange={handleSelectCalendarView}
+                  />
                 </View>
               </View>
 
@@ -741,6 +770,9 @@ function createStyles(theme: ThemeTokens) {
     },
     sectionBlock: {
       marginBottom: 20,
+    },
+    viewToggleWrap: {
+      marginTop: 10,
     },
     primaryActionRow: {
       flexDirection: "row" as const,
