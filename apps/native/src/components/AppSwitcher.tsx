@@ -42,8 +42,7 @@ interface AppSwitcherProps {
 }
 
 /**
- * Segmented control for switching between the Calendar and Mail apps,
- * mirroring the web `MobileAppSwitcher`.
+ * Full-width segmented control for switching between Calendar and Mail.
  */
 export function AppSwitcher({ active, onNavigate }: AppSwitcherProps) {
   const { theme } = useTheme();
@@ -70,13 +69,19 @@ export function AppSwitcher({ active, onNavigate }: AppSwitcherProps) {
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}
             accessibilityLabel={app.label}
-            style={[styles.segment, isActive && styles.segmentActive]}
+            style={({ pressed }) => [
+              styles.segment,
+              isActive && styles.segmentActive,
+              pressed && styles.segmentPressed,
+            ]}
           >
             <Feather
               name={app.icon}
               size={15}
               color={
-                isActive ? theme.colors.foreground : theme.colors.mutedForeground
+                isActive
+                  ? theme.colors.primaryBase
+                  : theme.colors.mutedForeground
               }
             />
             <Text style={[styles.label, isActive && styles.labelActive]}>
@@ -94,36 +99,39 @@ function createStyles(theme: ThemeTokens) {
     container: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: theme.spacing["1"],
-      alignSelf: "center" as const,
-      padding: theme.spacing["1"],
-      borderRadius: theme.borderRadius.full,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
+      gap: 3,
+      padding: 3,
+      borderRadius: theme.borderRadius.xl,
+      backgroundColor: theme.colors.muted + "30",
     },
     segment: {
+      flex: 1,
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: theme.spacing["1"],
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["1"],
-      borderRadius: theme.borderRadius.full,
+      justifyContent: "center" as const,
+      gap: 6,
+      minHeight: 40,
+      borderRadius: theme.borderRadius.lg,
     },
     segmentActive: {
-      backgroundColor: theme.colors.secondary,
+      backgroundColor: theme.colors.card,
+    },
+    segmentPressed: {
+      opacity: 0.7,
     },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
     label: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.mutedForeground,
     },
     labelActive: {
-      color: theme.colors.foreground,
+      color: theme.colors.primaryBase,
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
     },
   } satisfies Record<string, TextStyle>;
 

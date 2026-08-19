@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -7,13 +7,13 @@ import {
   PanResponder,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import { ScrollView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useSegments } from "expo-router";
 import { Feather } from "@expo/vector-icons";
@@ -86,6 +86,7 @@ export function AppSidebar() {
   const [pendingVisibilityCalendarId, setPendingVisibilityCalendarId] =
     useState<string | null>(null);
   const [avatarError, setAvatarError] = useState(false);
+  const blockDrawerCloseRef = useRef(false);
 
   const { data: calendars = [], isLoading: calendarsLoading } = useQuery({
     queryKey: QUERY_KEYS.calendars(),
@@ -212,6 +213,7 @@ export function AppSidebar() {
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) =>
           isOpen &&
+          !blockDrawerCloseRef.current &&
           Math.abs(gestureState.dx) > 6 &&
           Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
         onPanResponderGrant: () => {
@@ -393,6 +395,7 @@ export function AppSidebar() {
                   </Pressable>
                 </View>
               </View>
+              <AppSwitcher onNavigate={close} />
             </View>
 
             <ScrollView
@@ -400,10 +403,6 @@ export function AppSidebar() {
               contentContainerStyle={styles.sidebarScrollContent}
               showsVerticalScrollIndicator={false}
             >
-              <View style={styles.sectionBlock}>
-                <AppSwitcher onNavigate={close} />
-              </View>
-
               {isMailContext ? (
                 <MailSidebarBody
                   styles={styles}
@@ -462,7 +461,18 @@ export function AppSidebar() {
                 </View>
               </View>
 
-              <View style={styles.sectionBlock}>
+              <View
+                style={styles.sectionBlock}
+                onTouchStart={() => {
+                  blockDrawerCloseRef.current = true;
+                }}
+                onTouchEnd={() => {
+                  blockDrawerCloseRef.current = false;
+                }}
+                onTouchCancel={() => {
+                  blockDrawerCloseRef.current = false;
+                }}
+              >
                 <SidebarMiniCalendar
                   weekStartDay={1}
                   selectedDate={selectedDate}
@@ -713,6 +723,7 @@ function createStyles(theme: ThemeTokens) {
     header: {
       paddingHorizontal: 20,
       paddingBottom: 12,
+      gap: 12,
       borderBottomWidth: 1,
       borderBottomColor: borderSubtle,
     },
