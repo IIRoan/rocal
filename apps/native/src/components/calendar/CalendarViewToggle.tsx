@@ -26,7 +26,7 @@ export function CalendarViewToggle({
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
-    <View style={styles.row} accessibilityRole="tablist">
+    <View style={styles.list} accessibilityRole="tablist">
       {SIDEBAR_VIEW_OPTIONS.map((option) => {
         const selected = option.view === activeView;
 
@@ -34,14 +34,17 @@ export function CalendarViewToggle({
           <Pressable
             key={option.view}
             onPress={() => onViewChange(option.view)}
-            style={[styles.pill, selected && styles.pillSelected]}
+            style={({ pressed }) => [
+              styles.row,
+              pressed && styles.rowPressed,
+            ]}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             accessibilityLabel={option.label}
           >
             <Feather
               name={option.icon}
-              size={13}
+              size={16}
               color={
                 selected
                   ? theme.colors.primaryBase
@@ -63,29 +66,26 @@ export function CalendarViewToggle({
 
 function createStyles(theme: ThemeTokens) {
   const view = {
+    list: {
+      gap: 2,
+    },
     row: {
       flexDirection: "row" as const,
-      flexWrap: "wrap" as const,
-      gap: theme.spacing["1"],
-    },
-    pill: {
-      flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: 5,
-      paddingHorizontal: theme.spacing["2"],
-      paddingVertical: 7,
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: theme.colors.muted + "30",
+      gap: 10,
+      minHeight: 44,
+      paddingHorizontal: 4,
     },
-    pillSelected: {
-      backgroundColor: theme.colors.primaryBase + "18",
+    rowPressed: {
+      opacity: 0.7,
     },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
     label: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      flex: 1,
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.mutedForeground,
     },
