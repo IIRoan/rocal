@@ -28,6 +28,7 @@ import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
 import { SECURE_STORE_KEYS } from "../lib/constants";
 import { getE2eeApiUrl } from "../lib/e2ee-api-url";
 import { getAuthHeaders } from "../lib/api";
+import { shouldAttachEventContentEncryption } from "../lib/e2ee-event-shadow";
 import { readChunkedSecureValue, writeChunkedSecureValue } from "../lib/secure-store-chunked";
 import { createLogger } from "@workspace/logger";
 import { useAuth } from "./AuthProvider";
@@ -69,6 +70,21 @@ export function E2eeProvider({
   const sessionRef = useRef<E2eeSession | null>(null);
   const moduleRef = useRef<E2eeModule | null>(null);
   const bootstrapGenerationRef = useRef(0);
+  const pendingBootstrapRef = useRef<Promise<void> | null>(null);
+  const resolvePendingBootstrapRef = useRef<(() => void) | null>(null);
+
+  const beginPendingBootstrap = useCallback(() => {
+    resolvePendingBootstrapRef.current?.();
+    pendingBootstrapRef.current = new Promise((resolve) => {
+      resolvePendingBootstrapRef.current = resolve;
+    });
+  }, []);
+
+  const finishPendingBootstrap = useCallback(() => {
+    resolvePendingBootstrapRef.current?.();
+    resolvePendingBootstrapRef.current = null;
+    pendingBootstrapRef.current = null;
+  }, []);
 
   const getModule = useCallback(async (): Promise<E2eeModule | null> => {
     if (moduleRef.current) {
@@ -99,15 +115,11 @@ export function E2eeProvider({
       blindIndexKey: CryptoKey;
     }): Promise<E2eeSession> => {
       const keyPair = await e2ee.generateWrappingKeyPair();
-      const publicKey = await e2ee.exportWrappingPublicKey(keyPair.publicKey);
-      const wrappedAccountKey = await e2ee.wrapSymmetricKey(
-        accountKey,
-        keyPair.publicKey,
-      );
-      const wrappedSearchKey = await e2ee.wrapSymmetricKey(
-        blindIndexKey,
-        keyPair.publicKey,
-      );
+      const [publicKey, wrappedAccountKey, wrappedSearchKey] = await Promise.all([
+        e2ee.exportWrappingPublicKey(keyPair.publicKey),
+        e2ee.wrapSymmetricKey(accountKey, keyPair.publicKey),
+        e2ee.wrapSymmetricKey(blindIndexKey, keyPair.publicKey),
+      ]);
       const deviceId = e2ee.generateDeviceId();
 
       const crypto = createNativeCryptoProvider();
@@ -119,6 +131,7 @@ export function E2eeProvider({
         "jwk",
         keyPair.privateKey,
       );
+      const exportedPrivateKeyJson = JSON.stringify(exportedPrivateKey);
 
       const deviceResponse = await fetch(getE2eeApiUrl(apiBaseUrl, "/device"), {
         method: "PUT",
@@ -147,7 +160,7 @@ export function E2eeProvider({
       );
       await writeChunkedSecureValue(
         SECURE_STORE_KEYS.E2EE_PRIVATE_KEY,
-        JSON.stringify(exportedPrivateKey),
+        exportedPrivateKeyJson,
       );
 
       return {
@@ -219,6 +232,7 @@ export function E2eeProvider({
       sessionRef.current = null;
       setIsEnabled(false);
       setIsReady(false);
+      beginPendingBootstrap();
 
       try {
         const e2ee = await getModule();
@@ -414,25 +428,30 @@ export function E2eeProvider({
         }
       } finally {
         if (isCurrentBootstrap()) {
+          finishPendingBootstrap();
           setIsReady(true);
         }
       }
     },
     [
       consumePendingAuthPassword,
+      clearPendingAuthPassword,
       getModule,
       registerDeviceForSession,
       storePasswordEnvelopeForActiveSession,
+      beginPendingBootstrap,
+      finishPendingBootstrap,
     ],
   );
 
   const clearSession = useCallback(() => {
     bootstrapGenerationRef.current += 1;
     sessionRef.current = null;
+    finishPendingBootstrap();
     setIsEnabled(false);
     setIsReady(false);
     clearPendingAuthPassword();
-  }, [clearPendingAuthPassword]);
+  }, [clearPendingAuthPassword, finishPendingBootstrap]);
 
   const resetEncryptionPassword = useCallback(
     async (password: string) => {
@@ -473,33 +492,39 @@ export function E2eeProvider({
       async attachEventEncryptionShadow<
         T extends CreateEventRequest | UpdateEventRequest,
       >(request: T): Promise<T> {
+        const session = getSession();
+        if (!session || !shouldAttachEventContentEncryption(request)) {
+          return request;
+        }
+
+        const title = request.title?.trim() ?? "";
+
         try {
-          const session = getRequiredSession();
           const e2ee = await getModule();
           if (!e2ee) {
-            throw new Error("Native encryption runtime is unavailable.");
+            return request;
           }
 
-          const payload = {
-            title: (request as { title?: string }).title,
-            description:
-              (request as { description?: string | null }).description ?? null,
-            location:
-              (request as { location?: string | null }).location ?? null,
-          };
+          const description =
+            (request as { description?: string | null }).description?.trim() ||
+            null;
+          const location =
+            (request as { location?: string | null }).location?.trim() || null;
 
           const encrypted = await e2ee.encryptJsonPayload(
             session.accountKey,
-            payload,
+            {
+              title,
+              description,
+              location,
+            },
             "event-content:v1",
           );
 
-          const blindIndexTokens = (request as { title?: string }).title
-            ? await e2ee.createBlindIndexTokens(
-                session.blindIndexKey,
-                (request as { title: string }).title,
-              )
-            : [];
+          const blindIndexTokens = await e2ee.createBlindIndexTokens(
+            session.blindIndexKey,
+            [title, description, location].filter(Boolean).join(" "),
+          );
 
           return {
             ...request,
@@ -592,6 +617,11 @@ export function E2eeProvider({
           typeof event.encryptedContent !== "string"
         ) {
           return event;
+        }
+
+        const pendingBootstrap = pendingBootstrapRef.current;
+        if (pendingBootstrap && !getSession()) {
+          await pendingBootstrap;
         }
 
         const session = getSession();

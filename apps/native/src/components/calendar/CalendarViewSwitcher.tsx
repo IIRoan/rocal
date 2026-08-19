@@ -38,7 +38,7 @@ export function CalendarViewSwitcher({
   onToggleMonthStrip,
 }: CalendarViewSwitcherProps) {
   const { theme } = useTheme();
-  const { toggle: toggleSidebar } = useSidebar();
+  const { open: openSidebar, toggle: toggleSidebar } = useSidebar();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const dateHeader = useMemo(
@@ -67,19 +67,32 @@ export function CalendarViewSwitcher({
           <Text style={styles.navArrow}>‹</Text>
         </Pressable>
 
-        <Pressable
-          onPress={() => onToggleMonthStrip?.()}
-          style={styles.dateHeaderButton}
-          accessibilityRole="button"
-          accessibilityLabel={
-            monthStripExpanded
-              ? "Collapse month calendar"
-              : "Expand month calendar"
-          }
-        >
-          <Text style={styles.dateHeader}>{dateHeader}</Text>
-          <Text style={styles.chevron}>{monthStripExpanded ? "▲" : "▼"}</Text>
-        </Pressable>
+        {onToggleMonthStrip ? (
+          <Pressable
+            onPress={onToggleMonthStrip}
+            style={styles.dateHeaderButton}
+            accessibilityRole="button"
+            accessibilityLabel={
+              monthStripExpanded
+                ? "Collapse month calendar"
+                : "Expand month calendar"
+            }
+          >
+            <Text style={styles.dateHeader}>{dateHeader}</Text>
+            <Text style={styles.chevron}>
+              {monthStripExpanded ? "▲" : "▼"}
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={openSidebar}
+            style={styles.dateHeaderButton}
+            accessibilityRole="button"
+            accessibilityLabel="Open menu"
+          >
+            <Text style={styles.dateHeader}>{dateHeader}</Text>
+          </Pressable>
+        )}
 
         <Pressable
           onPress={onTodayPress}
