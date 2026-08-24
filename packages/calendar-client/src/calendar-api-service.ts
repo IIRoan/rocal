@@ -51,6 +51,8 @@ import type {
   EventSearchParams,
   EventSearchCorpusResult,
   EventSearchCorpusParams,
+  SolaceProfileLookupRequest,
+  SolaceProfileLookupResponse,
 } from "@workspace/calendar-core";
 
 const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
@@ -691,6 +693,19 @@ export class CalendarApiService {
       );
     } catch (error) {
       throw this.transformError(error, "Failed to save recent contacts");
+    }
+  }
+
+  async lookupSolaceProfiles(
+    request: SolaceProfileLookupRequest,
+  ): Promise<SolaceProfileLookupResponse> {
+    try {
+      return await this.client.post<SolaceProfileLookupResponse>(
+        "/api/profiles/lookup",
+        request,
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to look up profile pictures");
     }
   }
 

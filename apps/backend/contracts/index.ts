@@ -51,6 +51,7 @@ import {
   validateRecurrenceBodySchema,
 } from "./recurring.contract";
 import { updateSettingsBodySchema } from "./settings.contract";
+import { lookupProfilesBodySchema, profileAvatarQuerySchema } from "./profiles.contract";
 import { putRecentContactsBodySchema } from "./recent-contacts.contract";
 import {
   createSubscriptionBodySchema,
@@ -96,6 +97,8 @@ export const routeModels = new Elysia({ name: "route-models" }).model({
   "notifications.updateBody": updateEventNotificationsBodySchema,
   "settings.updateBody": updateSettingsBodySchema,
   "recentContacts.putBody": putRecentContactsBodySchema,
+  "profiles.lookupBody": lookupProfilesBodySchema,
+  "profiles.avatarQuery": profileAvatarQuerySchema,
   "recurring.validateBody": validateRecurrenceBodySchema,
   "recurring.previewBody": previewRecurrenceBodySchema,
   "recurring.editBody": editRecurringEventBodySchema,
@@ -118,6 +121,7 @@ export * from "./invite.contract";
 export * from "./logging.contract";
 export * from "./mail.contract";
 export * from "./notification.contract";
+export * from "./profiles.contract";
 export * from "./recurring.contract";
 export * from "./route-model-names";
 export * from "./settings.contract";

@@ -66,6 +66,11 @@ export const apiDocumentationTags = [
       "User preferences for display, working hours, reminders, and default calendar behavior.",
   },
   {
+    name: "Profiles",
+    description:
+      "Authenticated lookup of Solace user profile pictures by email for mail and calendar avatars.",
+  },
+  {
     name: "Notifications",
     description: "Reminder rules and delivery scheduling for upcoming events.",
   },

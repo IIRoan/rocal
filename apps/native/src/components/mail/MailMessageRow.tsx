@@ -23,7 +23,6 @@ import {
   formatAddress,
   formatMessageDate,
   formatThreadSenders,
-  getInitials,
   isMessageFlagged,
   isMessageRead,
 } from "../../lib/mail/mail-helpers";
@@ -46,6 +45,7 @@ import {
 } from "./mail-selection-anim-utils";
 import { useSelectionProgress } from "./mail-selection-anim";
 import { MailIdentityBadge } from "./MailIdentityBadge";
+import { BlobatarAvatar } from "../BlobatarAvatar";
 
 const EMPTY_LABELS: LabelDef[] = [];
 const EMPTY_IDENTITIES: JmapIdentity[] = [];
@@ -189,9 +189,12 @@ function MailMessageRowComponent({
     >
       <Animated.View style={[styles.rowInner, rowShiftStyle]}>
         <View style={styles.avatarWrap}>
-          <View style={[styles.avatar, { borderRadius: radii.avatar }]}>
-            <Text style={styles.avatarText}>{getInitials(addresses)}</Text>
-          </View>
+          <BlobatarAvatar
+            email={addresses?.[0]?.email}
+            name={addresses?.[0]?.name}
+            size={MAIL_LAYOUT.avatarSize}
+            borderRadius={radii.avatar}
+          />
           <Animated.View
             style={[styles.checkBadgeWrap, badgeWrapStyle]}
             pointerEvents="none"

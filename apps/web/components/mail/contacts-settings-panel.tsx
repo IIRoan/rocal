@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   ArrowLeft,
   Loader2,
@@ -21,6 +21,7 @@ import {
   type RecentContactEntry,
 } from "@workspace/calendar-core";
 import { useRecentContacts } from "@/hooks/use-recent-contacts";
+import { SolaceAvatar } from "../solace-avatar";
 import {
   addTrustedSender,
   isTrustedSender,
@@ -29,12 +30,71 @@ import {
 } from "@/lib/mail/mail-display-settings";
 import { TrustedSenderSwitchRow } from "./trusted-sender-switch-row";
 
-function ContactAvatar({ label }: { label: string }) {
-  const initial = label.trim().charAt(0).toUpperCase() || "?";
+async function runWithSavingFlag<T>(
+  setSaving: (value: boolean) => void,
+  task: () => Promise<T>,
+): Promise<T> {
+  setSaving(true);
+  try {
+    return await task();
+  } finally {
+    setSaving(false);
+  }
+}
+
+function AddContactForm({
+  isSaving,
+  onCancel,
+  onSave,
+}: {
+  isSaving: boolean;
+  onCancel: () => void;
+  onSave: (email: string, displayName?: string) => Promise<boolean>;
+}) {
+  const [newEmail, setNewEmail] = useState("");
+  const [newName, setNewName] = useState("");
 
   return (
-    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-foreground">
-      {initial}
+    <div className="px-3 py-3 border-b border-border/40 space-y-2">
+      <div className="text-xs text-muted-foreground">
+        Add someone you email even if they have not appeared in your history
+        yet.
+      </div>
+      <Input
+        value={newEmail}
+        onChange={(event) => setNewEmail(event.target.value)}
+        placeholder="email@example.com"
+        className="h-8 text-sm"
+        type="email"
+        autoComplete="email"
+      />
+      <Input
+        value={newName}
+        onChange={(event) => setNewName(event.target.value)}
+        placeholder="Full name (optional)"
+        className="h-8 text-sm"
+      />
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          size="sm"
+          disabled={!newEmail.trim().includes("@") || isSaving}
+          onClick={() => {
+            const email = normalizeEmailAddress(newEmail);
+            if (!email) return;
+            void onSave(email, newName.trim() || undefined).then((saved) => {
+              if (!saved) return;
+              setNewEmail("");
+              setNewName("");
+            });
+          }}
+        >
+          Save contact
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
     </div>
   );
 }
@@ -91,7 +151,11 @@ function ContactDetailView({
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div className="flex items-center gap-3">
-          <ContactAvatar label={getContactDisplayLabel(contact)} />
+          <SolaceAvatar
+            email={contact.email}
+            name={getContactDisplayLabel(contact)}
+            className="size-8"
+          />
           <div className="min-w-0">
             <div className="text-sm font-medium truncate">{contact.email}</div>
             {contextSummary ? (
@@ -213,22 +277,11 @@ export function ContactsSettingsPanel({ goBack }: { goBack: () => void }) {
   const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [newEmail, setNewEmail] = useState("");
-  const [newName, setNewName] = useState("");
 
-  const contacts = useMemo(
-    () => filterContacts(payload, { query }),
-    [filterContacts, payload, query],
-  );
-
-  const selectedContact = useMemo(
-    () =>
-      selectedEmail
-        ? (payload?.contacts.find((entry) => entry.email === selectedEmail) ??
-          null)
-        : null,
-    [payload?.contacts, selectedEmail],
-  );
+  const contacts = filterContacts(payload, { query });
+  const selectedContact = selectedEmail
+    ? (payload?.contacts.find((entry) => entry.email === selectedEmail) ?? null)
+    : null;
 
   if (!isAvailable) {
     return (
@@ -263,14 +316,11 @@ export function ContactsSettingsPanel({ goBack }: { goBack: () => void }) {
           contact={selectedContact}
           onBack={() => setSelectedEmail(null)}
           isSaving={isSaving}
-          onSave={async (patch) => {
-            setIsSaving(true);
-            try {
-              return await updateContact(selectedContact.email, patch);
-            } finally {
-              setIsSaving(false);
-            }
-          }}
+          onSave={(patch) =>
+            runWithSavingFlag(setIsSaving, () =>
+              updateContact(selectedContact.email, patch),
+            )
+          }
           onRemove={async () => {
             await removeContact(selectedContact.email);
             setSelectedEmail(null);
@@ -318,64 +368,23 @@ export function ContactsSettingsPanel({ goBack }: { goBack: () => void }) {
       </div>
 
       {isAdding ? (
-        <div className="px-3 py-3 border-b border-border/40 space-y-2">
-          <div className="text-xs text-muted-foreground">
-            Add someone you email even if they have not appeared in your history
-            yet.
-          </div>
-          <Input
-            value={newEmail}
-            onChange={(event) => setNewEmail(event.target.value)}
-            placeholder="email@example.com"
-            className="h-8 text-sm"
-            type="email"
-            autoComplete="email"
-          />
-          <Input
-            value={newName}
-            onChange={(event) => setNewName(event.target.value)}
-            placeholder="Full name (optional)"
-            className="h-8 text-sm"
-          />
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              disabled={!newEmail.trim().includes("@") || isSaving}
-              onClick={() => {
-                const email = normalizeEmailAddress(newEmail);
-                if (!email) return;
-                setIsSaving(true);
-                void addContact({
-                  email,
-                  displayName: newName.trim() || undefined,
-                })
-                  .then((saved) => {
-                    if (!saved) return;
-                    setNewEmail("");
-                    setNewName("");
-                    setIsAdding(false);
-                    setSelectedEmail(email);
-                  })
-                  .finally(() => setIsSaving(false));
-              }}
-            >
-              Save contact
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setIsAdding(false);
-                setNewEmail("");
-                setNewName("");
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
+        <AddContactForm
+          isSaving={isSaving}
+          onCancel={() => setIsAdding(false)}
+          onSave={async (email, displayName) => {
+            const saved = await runWithSavingFlag(setIsSaving, () =>
+              addContact({
+                email,
+                displayName,
+              }),
+            );
+            if (saved) {
+              setIsAdding(false);
+              setSelectedEmail(email);
+            }
+            return saved;
+          }}
+        />
       ) : null}
 
       <div className="flex-1 overflow-y-auto py-2">
@@ -403,7 +412,11 @@ export function ContactsSettingsPanel({ goBack }: { goBack: () => void }) {
                     onClick={() => setSelectedEmail(contact.email)}
                     className="flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-accent/50 transition-colors"
                   >
-                    <ContactAvatar label={label} />
+                    <SolaceAvatar
+                      email={contact.email}
+                      name={label}
+                      className="size-8"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span className="text-sm font-medium truncate">

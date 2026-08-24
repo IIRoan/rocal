@@ -12,5 +12,9 @@ module.exports = {
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
+    "^@workspace/calendar-core$":
+      "<rootDir>/../calendar-core/src/index.ts",
+    "^@workspace/calendar-core/(.*)$":
+      "<rootDir>/../calendar-core/src/$1",
   },
 };
