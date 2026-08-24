@@ -13,6 +13,7 @@ import {
   AccountApiService,
   HttpClient,
   CalendarApiService,
+  InviteApiService,
   NoopE2eeProvider,
 } from "@workspace/calendar-client";
 import * as Linking from "expo-linking";
@@ -72,3 +73,5 @@ export const calendarApiService = new CalendarApiService(
 );
 
 export const accountApiService = new AccountApiService(httpClient);
+
+export const inviteApiService = new InviteApiService(httpClient);

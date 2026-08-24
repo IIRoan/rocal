@@ -11,6 +11,8 @@ export {
   SETTINGS_ROUTE,
   SETTINGS_TIMEZONE_ROUTE,
   SETTINGS_CONTACTS_ROUTE,
+  SETTINGS_INVITES_ROUTE,
+  SETTINGS_MAILBOXES_ROUTE,
 } from "./navigation-routes";
 
 interface AuthRedirectInput {

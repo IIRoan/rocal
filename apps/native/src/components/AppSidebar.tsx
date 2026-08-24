@@ -39,6 +39,7 @@ import {
   CALENDAR_TAB_ROUTE,
   MAIL_TAB_ROUTE,
   SETTINGS_ROUTE,
+  SETTINGS_MAILBOXES_ROUTE,
   isCalendarRouteSegments,
   isMailRouteSegments,
   isSidebarGestureRootSegments,
@@ -53,6 +54,8 @@ import {
   useMailRuntime,
 } from "../lib/mail/use-mail";
 import { getMailboxDisplayName, getMailboxIcon, sortMailboxes } from "../lib/mail/mail-helpers";
+import { filterVisibleMailboxes } from "../lib/mail/mailbox-management";
+import { useHiddenMailboxIds } from "../hooks/use-hidden-mailbox-ids";
 import { InlineLoader } from "./ui/loading";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
@@ -116,10 +119,11 @@ export function AppSidebar() {
   const mailProvisioned = mailAccountQuery.data?.provisioned ?? false;
   const mailRuntimeQuery = useMailRuntime(isMailContext && mailProvisioned);
   const mailRuntime = mailRuntimeQuery.data;
-  const sortedMailboxes = useMemo(
-    () => (mailRuntime ? sortMailboxes(mailRuntime.mailboxes) : []),
-    [mailRuntime],
-  );
+  const { hiddenIds } = useHiddenMailboxIds();
+  const sortedMailboxes = useMemo(() => {
+    const sorted = mailRuntime ? sortMailboxes(mailRuntime.mailboxes) : [];
+    return filterVisibleMailboxes(sorted, hiddenIds);
+  }, [hiddenIds, mailRuntime]);
 
   const calendarById = useMemo(
     () => new Map(calendars.map((calendar) => [calendar.id, calendar])),
@@ -409,6 +413,9 @@ export function AppSidebar() {
                   selectedMailboxId={selectedMailboxId}
                   onSelectMailbox={handleSelectMailbox}
                   onCompose={() => handleNavigate(`${MAIL_TAB_ROUTE}/compose`)}
+                  onManageMailboxes={() =>
+                    handleNavigate(SETTINGS_MAILBOXES_ROUTE)
+                  }
                 />
               ) : (
                 <>
@@ -595,6 +602,7 @@ function MailSidebarBody({
   selectedMailboxId,
   onSelectMailbox,
   onCompose,
+  onManageMailboxes,
 }: {
   styles: ReturnType<typeof createStyles>;
   theme: ThemeTokens;
@@ -604,6 +612,7 @@ function MailSidebarBody({
   selectedMailboxId: string | null;
   onSelectMailbox: (id: string) => void;
   onCompose: () => void;
+  onManageMailboxes: () => void;
 }) {
   return (
     <>
@@ -631,6 +640,23 @@ function MailSidebarBody({
       <View>
         <View style={styles.calendarsSectionHeader}>
           <Text style={styles.sectionLabel}>Mailboxes</Text>
+          <View style={styles.calendarsSectionActions}>
+            <Pressable
+              onPress={onManageMailboxes}
+              style={({ pressed }) => [
+                styles.sectionActionButton,
+                pressed && styles.pressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Manage mailboxes"
+            >
+              <Feather
+                name="settings"
+                size={13}
+                color={theme.colors.mutedForeground}
+              />
+            </Pressable>
+          </View>
         </View>
 
         {isLoading ? (

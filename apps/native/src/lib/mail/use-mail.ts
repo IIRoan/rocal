@@ -431,6 +431,7 @@ export interface ComposeMessageInput {
   htmlBody?: string;
   identityId?: string | null;
   previousDraftId?: string | null;
+  attachments?: import("./jmap-client").JmapAttachmentInput[];
 }
 
 /**
@@ -511,6 +512,7 @@ export function useSendMessage(runtime: MailRuntime | undefined) {
         htmlBody: input.htmlBody,
         identityId: context.identityId,
         previousDraftId: input.previousDraftId ?? undefined,
+        attachments: input.attachments,
       });
     },
     onSuccess: (_data, variables) => {

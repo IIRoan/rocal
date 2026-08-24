@@ -187,6 +187,43 @@ export function getCurrentUserInvitationStatus(
   return participant?.status ?? null;
 }
 
+export type InvitationResponseStatus = Extract<
+  EventParticipantStatus,
+  "accepted" | "declined" | "tentative"
+>;
+
+/** Status to show in RSVP controls. Organizers and unanswered invites return null. */
+export function getInvitationResponseStatus(
+  event: Pick<CalendarEvent, "userId" | "participants"> | null | undefined,
+  canEdit: boolean,
+): InvitationResponseStatus | null {
+  if (!event || canEdit) {
+    return null;
+  }
+
+  const status = getCurrentUserInvitationStatus(event);
+  return status === "accepted" ||
+    status === "declined" ||
+    status === "tentative"
+    ? status
+    : null;
+}
+
+export function shouldShowInvitationActions(
+  event:
+    | Pick<CalendarEvent, "id" | "userId" | "participants" | "isCancelled">
+    | null
+    | undefined,
+): boolean {
+  if (!event?.id) {
+    return false;
+  }
+  if (canCurrentUserEditEvent(event)) {
+    return false;
+  }
+  return !isCancelledCalendarEvent(event);
+}
+
 export function isAwaitingUserInvitationResponse(
   event: Pick<CalendarEvent, "userId" | "participants">,
 ): boolean {

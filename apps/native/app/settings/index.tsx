@@ -44,7 +44,14 @@ import { calendarApiService } from "../../src/lib/api";
 import {
   SETTINGS_TIMEZONE_ROUTE,
   SETTINGS_CONTACTS_ROUTE,
+  SETTINGS_INVITES_ROUTE,
+  SETTINGS_MAILBOXES_ROUTE,
 } from "../../src/lib/auth-routing";
+import { useE2ee } from "../../src/providers/E2eeProvider";
+import {
+  canResetEncryptionPassword,
+  getEncryptionPasswordValidationError,
+} from "../../src/lib/settings-encryption-password";
 import { formatStoredPasskeyDescription } from "../../src/lib/passkey-auth";
 import { getAuthCapabilities } from "../../src/lib/auth-capabilities";
 import {
@@ -155,6 +162,7 @@ export default function SettingsScreen() {
   const { push } = useRouter();
   const { user, signOut, registerPasskey, deletePasskey } = useAuth();
   const { toast } = useToast();
+  const { resetEncryptionPassword } = useE2ee();
   const passkeysQuery = authClient.useListPasskeys();
   const accountsQuery = useQuery({
     queryKey: ["auth", "accounts", user?.id ?? null],
@@ -241,7 +249,7 @@ export default function SettingsScreen() {
     string | null
   >(null);
   const [activePasswordSheet, setActivePasswordSheet] = useState<
-    "change-password" | "set-password" | null
+    "change-password" | "set-password" | "reset-encryption" | null
   >(null);
   const [currentPasswordInput, setCurrentPasswordInput] = useState("");
   const [newPasswordInput, setNewPasswordInput] = useState("");
@@ -250,6 +258,8 @@ export default function SettingsScreen() {
     null,
   );
   const [isSettingPassword, setIsSettingPassword] = useState(false);
+  const [isResettingEncryptionPassword, setIsResettingEncryptionPassword] =
+    useState(false);
   const linkedAccounts = useMemo(
     () => accountsQuery.data ?? ([] as LinkedAuthAccountLike[]),
     [accountsQuery.data],
@@ -271,6 +281,10 @@ export default function SettingsScreen() {
     () => (Array.isArray(passkeysQuery.data) ? passkeysQuery.data : []),
     [passkeysQuery.data],
   );
+  const canResetEncryption = canResetEncryptionPassword({
+    hasOAuthAccount,
+    passkeyCount: storedPasskeys.length,
+  });
 
   // ─── Picker sheet state ──────────────────────────────────────────────────────
   type PickerKey =
@@ -577,6 +591,21 @@ export default function SettingsScreen() {
 
         await accountsQuery?.refetch?.();
         toast("Email password added");
+      } else if (activePasswordSheet === "reset-encryption") {
+        const validationError = getEncryptionPasswordValidationError({
+          newPassword: newPasswordInput,
+          confirmPassword: confirmPasswordInput,
+        });
+        if (validationError) {
+          setPasswordChangeError(validationError);
+          return;
+        }
+        setIsResettingEncryptionPassword(true);
+        const ok = await resetEncryptionPassword(newPasswordInput);
+        if (!ok) {
+          throw new Error("Unable to reset your encryption password.");
+        }
+        toast("Encryption password updated");
       }
 
       resetChangePasswordForm();
@@ -588,6 +617,7 @@ export default function SettingsScreen() {
     } finally {
       setIsChangingPassword(false);
       setIsSettingPassword(false);
+      setIsResettingEncryptionPassword(false);
     }
   }, [
     accountsQuery,
@@ -596,6 +626,7 @@ export default function SettingsScreen() {
     currentPasswordInput,
     newPasswordInput,
     resetChangePasswordForm,
+    resetEncryptionPassword,
   ]);
 
   const handleSubmitProfilePicture = useCallback(async () => {
@@ -818,6 +849,20 @@ export default function SettingsScreen() {
             onPress={() => push(SETTINGS_CONTACTS_ROUTE)}
             theme={theme}
           />
+          <NavigationRow
+            icon="user-plus"
+            label="Invites"
+            value="Create and share invite links"
+            onPress={() => push(SETTINGS_INVITES_ROUTE)}
+            theme={theme}
+          />
+          <NavigationRow
+            icon="folder"
+            label="Mailboxes"
+            value="Create, hide, and reorder folders"
+            onPress={() => push(SETTINGS_MAILBOXES_ROUTE)}
+            theme={theme}
+          />
         </View>
 
         {/* ── Calendar Defaults ────────────────────────────────────────── */}
@@ -910,6 +955,19 @@ export default function SettingsScreen() {
               theme={theme}
             />
           )}
+          {canResetEncryption ? (
+            <ActionRow
+              icon="lock"
+              label="Reset encryption password"
+              description="Update the password that protects your encryption keys on this device. Existing data is not re-encrypted."
+              onPress={() => {
+                resetChangePasswordForm();
+                setActivePasswordSheet("reset-encryption");
+              }}
+              theme={theme}
+              isPending={isResettingEncryptionPassword}
+            />
+          ) : null}
         </View>
 
         {/* ── App ──────────────────────────────────────────────────────── */}
@@ -1120,7 +1178,9 @@ export default function SettingsScreen() {
           <BottomSheetTitle>
             {activePasswordSheet === "set-password"
               ? "Set password"
-              : "Change password"}
+              : activePasswordSheet === "reset-encryption"
+                ? "Reset encryption password"
+                : "Change password"}
           </BottomSheetTitle>
         </BottomSheetHeader>
         <View style={{ paddingBottom: insets.bottom + 8 }}>
@@ -1138,7 +1198,11 @@ export default function SettingsScreen() {
               resetChangePasswordForm();
             }}
             error={passwordChangeError}
-            isPending={isChangingPassword || isSettingPassword}
+            isPending={
+              isChangingPassword ||
+              isSettingPassword ||
+              isResettingEncryptionPassword
+            }
             theme={theme}
           />
         </View>
@@ -1428,7 +1492,7 @@ function PasswordChangeCard({
   isPending,
   theme,
 }: {
-  mode: "change-password" | "set-password";
+  mode: "change-password" | "set-password" | "reset-encryption";
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
@@ -1442,6 +1506,7 @@ function PasswordChangeCard({
   theme: ThemeTokens;
 }) {
   const isChangePassword = mode === "change-password";
+  const isResetEncryption = mode === "reset-encryption";
 
   return (
     <ScrollView
@@ -1459,9 +1524,11 @@ function PasswordChangeCard({
           color: theme.colors.mutedForeground,
         }}
       >
-        {isChangePassword
-          ? "Update your email sign-in password. After email sign-in, Solace also uses it to protect your encryption keys."
-          : "Add an email sign-in password to this account. This gives you an email/password sign-in option without changing your existing encrypted data."}
+        {isResetEncryption
+          ? "This updates the password that protects your encryption keys on this device. It does not re-encrypt existing data. You can only do this if you have a passkey or a social sign-in option."
+          : isChangePassword
+            ? "Update your email sign-in password. After email sign-in, Solace also uses it to protect your encryption keys."
+            : "Add an email sign-in password to this account. This gives you an email/password sign-in option without changing your existing encrypted data."}
       </Text>
 
       {error ? (
@@ -1515,7 +1582,13 @@ function PasswordChangeCard({
 
       <SheetActions>
         <SheetPrimaryButton
-          label={isChangePassword ? "Update Password" : "Set Password"}
+          label={
+            isResetEncryption
+              ? "Reset encryption password"
+              : isChangePassword
+                ? "Update Password"
+                : "Set Password"
+          }
           onPress={onSubmit}
           loading={isPending}
           disabled={isPending}

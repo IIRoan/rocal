@@ -34,6 +34,7 @@ import {
   type ManagedMailOauthClientInput,
 } from "./mail-oauth-managed-client";
 import { inviteService } from "./invite-service";
+import { passkeyBridgeFreshSessionPlugin } from "./passkey-bridge-session";
 
 const {
   backendUrl,
@@ -473,6 +474,7 @@ const authPlugins = [
     expiresIn: 3,
     storeToken: "hashed",
   }),
+  passkeyBridgeFreshSessionPlugin,
   jwt({
     adapter: {
       getJwks: async () => getCachedJwks(),

@@ -394,6 +394,34 @@ export function EventSheet({
     },
   });
 
+  const rsvpMutation = useMutation({
+    mutationFn: (status: "accepted" | "declined" | "tentative") =>
+      calendarApiService.respondToInvitation(eventId!, status),
+    onSuccess: (result, status) => {
+      if (eventId) {
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.eventDetail(eventId),
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      if ("deleted" in result && result.deleted) {
+        toast("Invitation declined");
+        dismissSheet();
+        return;
+      }
+      toast(
+        status === "accepted"
+          ? "Invitation accepted"
+          : status === "tentative"
+            ? "Marked as maybe"
+            : "Invitation declined",
+      );
+    },
+    onError: (err: unknown) => {
+      toast(getErrorMessage(err, "Failed to respond to invitation"), "error");
+    },
+  });
+
   // ─── Handlers ──────────────────────────────────────────────────────────
 
   const handleSubmit = useCallback(
@@ -524,7 +552,8 @@ export function EventSheet({
   const isPending =
     createMutation.isPending ||
     updateMutation.isPending ||
-    deleteMutation.isPending;
+    deleteMutation.isPending ||
+    rsvpMutation.isPending;
   const iconColor = theme.colors.mutedForeground;
   const iconBg = theme.colors.mutedForeground + "18";
 
@@ -724,6 +753,43 @@ export function EventSheet({
               )}
             </AnimatedScrollView>
             <BottomSheetFooter>
+              {viewActions.showInvitationActions ? (
+                <View style={styles.rsvpRow}>
+                  {(
+                    [
+                      ["accepted", "Accept"],
+                      ["tentative", "Maybe"],
+                      ["declined", "Decline"],
+                    ] as const
+                  ).map(([status, label]) => {
+                    const selected = viewActions.invitationStatus === status;
+                    return (
+                      <Pressable
+                        key={status}
+                        onPress={() => rsvpMutation.mutate(status)}
+                        disabled={isPending}
+                        style={({ pressed }) => [
+                          styles.rsvpButton,
+                          selected && styles.rsvpButtonSelected,
+                          pressed && styles.rsvpButtonPressed,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected, disabled: isPending }}
+                        accessibilityLabel={label}
+                      >
+                        <Text
+                          style={[
+                            styles.rsvpButtonText,
+                            selected && styles.rsvpButtonTextSelected,
+                          ]}
+                        >
+                          {label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
               <SheetActions chrome={false}>
                 {viewActions.showDelete ? (
                   <SheetSecondaryButton
@@ -825,6 +891,30 @@ export function EventSheet({
 
 function createStyles(theme: ThemeTokens) {
   const view = {
+    rsvpRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+    },
+    rsvpButton: {
+      flex: 1,
+      minHeight: 44,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
+    },
+    rsvpButtonSelected: {
+      borderColor: theme.colors.primaryBase,
+      backgroundColor: theme.colors.primaryBase + "18",
+    },
+    rsvpButtonPressed: {
+      opacity: 0.85,
+    },
     viewBody: {
       paddingHorizontal: 16,
       paddingTop: 12,
@@ -943,6 +1033,14 @@ function createStyles(theme: ThemeTokens) {
   } satisfies Record<string, ViewStyle>;
 
   const text = {
+    rsvpButtonText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
+    },
+    rsvpButtonTextSelected: {
+      color: theme.colors.primaryBase,
+    },
     viewEventTitle: {
       flex: 1,
       fontSize: theme.typography.fontSize.xl.size,

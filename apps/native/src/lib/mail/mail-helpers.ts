@@ -2,6 +2,7 @@ import type { JmapEmailMessage, JmapMailbox, MailAddress } from "./types";
 import {
   isValidEmailAddress,
   parseAddressList,
+  resolveReplyAllRecipients,
   validateComposeRecipients,
 } from "@workspace/calendar-core";
 
@@ -113,9 +114,15 @@ export function getPrimaryMailboxId(
   return mailboxes.find((mailbox) => mailbox.role === role)?.id ?? null;
 }
 
-/** Sorts mailboxes with well-known roles first, then alphabetically. */
+/** Sorts mailboxes by JMAP sortOrder when set, then well-known roles, then name. */
 export function sortMailboxes(mailboxes: JmapMailbox[]): JmapMailbox[] {
+  const hasSortOrder = mailboxes.some((mailbox) => mailbox.sortOrder != null);
   return [...mailboxes].sort((a, b) => {
+    if (hasSortOrder) {
+      const aOrder = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+      const bOrder = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+    }
     const aRole = a.role ? (MAILBOX_ROLE_ORDER[a.role] ?? 50) : 60;
     const bRole = b.role ? (MAILBOX_ROLE_ORDER[b.role] ?? 50) : 60;
     if (aRole !== bRole) return aRole - bRole;
@@ -204,5 +211,22 @@ export function validateComposeInput(input: {
     cc: validation.cc.map((address) => address.email),
     bcc: validation.bcc.map((address) => address.email),
     errors: validation.errors,
+  };
+}
+
+/** Formats Reply All To/Cc fields from a source message. */
+export function formatReplyAllRecipientFields(
+  message: Pick<JmapEmailMessage, "from" | "to" | "cc">,
+  currentUserEmail?: string | null,
+): { to: string; cc: string } {
+  const recipients = resolveReplyAllRecipients({
+    from: message.from,
+    to: message.to,
+    cc: message.cc,
+    currentUserEmail,
+  });
+  return {
+    to: recipients.to.join(", "),
+    cc: recipients.cc.join(", "),
   };
 }

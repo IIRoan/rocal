@@ -31,6 +31,7 @@ import {
   validateJmapRequestSize,
   isStalwartEncryptOnAppendEnabled,
   sortMailMessagesBySearchRelevance,
+  parseJmapBlobUploadResponse,
   type MailServerPolicy,
   type MailServerPolicyConfig,
 } from "@workspace/calendar-core";
@@ -726,6 +727,112 @@ export class StalwartJmapClient {
       "Mailbox/get",
     );
     return result.list ?? [];
+  }
+
+  async createMailbox(
+    session: JmapSession,
+    name: string,
+    role?: string | null,
+  ): Promise<JmapMailbox> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const createPayload: Record<string, unknown> = { name };
+    if (role) {
+      createPayload.role = role;
+    }
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Mailbox/set", { accountId, create: { new: createPayload } }, "c1"]],
+    );
+    const result = this.getMethodResult<{
+      created?: Record<string, JmapMailbox>;
+    }>(envelope, "Mailbox/set");
+    const created = result.created?.new;
+    if (!created) {
+      throw new Error("Mailbox was not created.");
+    }
+    return { ...created, name, role: role ?? created.role ?? null };
+  }
+
+  async renameMailbox(
+    session: JmapSession,
+    mailboxId: string,
+    name: string,
+  ): Promise<void> {
+    const accountId = this.requirePrimaryAccountId(session);
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Mailbox/set", { accountId, update: { [mailboxId]: { name } } }, "c1"]],
+    );
+  }
+
+  async deleteMailbox(session: JmapSession, mailboxId: string): Promise<void> {
+    const accountId = this.requirePrimaryAccountId(session);
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Mailbox/set", { accountId, destroy: [mailboxId] }, "c1"]],
+    );
+  }
+
+  async updateMailboxSortOrders(
+    session: JmapSession,
+    updates: { id: string; sortOrder: number }[],
+  ): Promise<void> {
+    if (updates.length === 0) return;
+    const accountId = this.requirePrimaryAccountId(session);
+    const update = Object.fromEntries(
+      updates.map(({ id, sortOrder }) => [id, { sortOrder }]),
+    );
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Mailbox/set", { accountId, update }, "c1"]],
+    );
+  }
+
+  async uploadBlob(
+    session: JmapSession,
+    bytes: Uint8Array,
+    contentType: string,
+  ): Promise<JmapAttachmentInput> {
+    const accountId = this.requirePrimaryAccountId(session);
+    if (!session.uploadUrl) {
+      throw new Error("No upload URL in JMAP session.");
+    }
+    const url = session.uploadUrl.replace(
+      "{accountId}",
+      encodeURIComponent(accountId),
+    );
+    const authorization = await this.getAuthorizationHeader();
+    const body = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
+    const response = await this.fetcher(url, {
+      method: "POST",
+      headers: {
+        Authorization: authorization,
+        "Content-Type": contentType || "application/octet-stream",
+      },
+      body,
+    });
+    if (!response.ok) {
+      throw new Error(`Blob upload failed with status ${response.status}.`);
+    }
+    const json: unknown = await response.json();
+    const parsed = parseJmapBlobUploadResponse(
+      json,
+      bytes.byteLength,
+      "Blob upload",
+    );
+    return {
+      blobId: parsed.blobId,
+      name: "attachment",
+      type: parsed.type || contentType || "application/octet-stream",
+      size: parsed.size,
+    };
   }
 
   async getIdentities(session: JmapSession): Promise<JmapIdentity[]> {
