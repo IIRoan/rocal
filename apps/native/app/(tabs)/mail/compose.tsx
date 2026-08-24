@@ -20,7 +20,7 @@ import {
   layoutFormFieldBorder,
 } from "../../../src/lib/app-layout";
 import { useQuery } from "@tanstack/react-query";
-import { getErrorMessage, resolveReplyRecipients, validateComposeRecipients } from "@workspace/calendar-core";
+import { getErrorMessage, resolveReplyRecipients, validateComposeRecipients, applyComposeBold, applyComposeItalic, applyComposeUnderline, toggleComposeList, resolveComposeSendBodies, type TextSelection } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useToast } from "../../../src/providers/ToastProvider";
@@ -37,7 +37,19 @@ import {
   useMailRuntime,
   useSendMessage,
 } from "../../../src/lib/mail/use-mail";
-import { validateComposeInput } from "../../../src/lib/mail/mail-helpers";
+import {
+  formatReplyAllRecipientFields,
+  validateComposeInput,
+} from "../../../src/lib/mail/mail-helpers";
+import {
+  createPendingComposeAttachment,
+  formatAttachmentSize,
+  toJmapAttachmentInput,
+  type PendingComposeAttachment,
+} from "../../../src/lib/mail/compose-attachments";
+import { decodeBase64ToBytes } from "../../../src/lib/mail/binary-utils";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import {
   classifyMessageEncryption,
   extractMessageBodies,
@@ -97,6 +109,13 @@ export default function ComposeScreen() {
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draftSaveStatus, setDraftSaveStatus] =
     useState<DraftSaveStatus>("idle");
+  const [attachments, setAttachments] = useState<PendingComposeAttachment[]>(
+    [],
+  );
+  const [selection, setSelection] = useState<TextSelection>({
+    start: 0,
+    end: 0,
+  });
   const [isDraftDecrypting, setIsDraftDecrypting] = useState(false);
 
   const composeContext = resolveComposeContext(
@@ -160,6 +179,11 @@ export default function ComposeScreen() {
     }
 
     const bodyWithSignature = appendPlainTextSignature(body, selectedIdentity);
+    const { plaintext, htmlBody: unencryptedHtml } = resolveComposeSendBodies({
+      body,
+      bodyWithSignature,
+      encrypted: false,
+    });
     const allRecipients = [
       ...validation.to,
       ...validation.cc,
@@ -171,9 +195,25 @@ export default function ComposeScreen() {
         ? await resolveOutgoingMessageBody({
             runtime,
             recipients: allRecipients,
-            plaintext: bodyWithSignature,
+            plaintext,
           })
-        : { textBody: bodyWithSignature, encrypted: false };
+        : { textBody: plaintext, encrypted: false };
+      const htmlBody = encrypted ? undefined : unencryptedHtml;
+
+      const uploadedAttachments = [];
+      if (runtime && attachments.length > 0) {
+        for (const pending of attachments) {
+          const uploaded = await runtime.client.uploadBlob(
+            runtime.session,
+            pending.bytes,
+            pending.type,
+          );
+          uploadedAttachments.push(
+            toJmapAttachmentInput(pending, uploaded.blobId),
+          );
+        }
+      }
+
       const savedDraftId = await saveDraft();
 
       sendMessage.mutate(
@@ -183,8 +223,11 @@ export default function ComposeScreen() {
           bcc: validation.bcc,
           subject: subject.trim(),
           textBody,
+          htmlBody,
           identityId: selectedIdentityId,
           previousDraftId: savedDraftId ?? draftId,
+          attachments:
+            uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
         },
         {
           onSuccess: () => {
@@ -240,6 +283,7 @@ export default function ComposeScreen() {
     recordUsage,
     router,
     toast,
+    attachments,
   ]);
 
   const handleInsertSignature = useCallback(() => {
@@ -247,6 +291,47 @@ export default function ComposeScreen() {
     if (!signature) return;
     setBody((current) => appendPlainTextSignature(current, selectedIdentity));
   }, [selectedIdentity]);
+
+  const applyFormat = useCallback(
+    (
+      fn: (
+        text: string,
+        selection: TextSelection,
+      ) => { text: string; selection: TextSelection },
+    ) => {
+      const next = fn(body, selection);
+      setBody(next.text);
+      setSelection(next.selection);
+    },
+    [body, selection],
+  );
+
+  const handleAttach = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "*/*",
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      if (!asset?.uri) return;
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const bytes = decodeBase64ToBytes(base64);
+      setAttachments((current) => [
+        ...current,
+        createPendingComposeAttachment({
+          name: asset.name ?? "attachment",
+          type: asset.mimeType,
+          bytes,
+        }),
+      ]);
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to attach file."));
+    }
+  }, []);
 
   const handleClose = useCallback(async () => {
     await saveDraft();
@@ -260,6 +345,7 @@ export default function ComposeScreen() {
     setDraftSaveStatus("idle");
     setShowCcBcc(false);
     setHasInitializedFromParams(false);
+    setAttachments([]);
     router.back();
   }, [router, saveDraft]);
 
@@ -273,6 +359,7 @@ export default function ComposeScreen() {
     setDraftId(null);
     setDraftSaveStatus("idle");
     setShowCcBcc(false);
+    setAttachments([]);
   }, []);
 
   const canSend =
@@ -309,6 +396,18 @@ export default function ComposeScreen() {
           composeContext?.fromEmail ?? runtime?.session.username ?? null,
         ),
       );
+      setSubject(prefixSubject(sourceMessage.subject, "Re:"));
+      setBody(buildReplyBody(sourceMessage));
+    } else if (params.mode === "reply-all") {
+      const fields = formatReplyAllRecipientFields(
+        sourceMessage,
+        composeContext?.fromEmail ?? runtime?.session.username ?? null,
+      );
+      setTo(fields.to);
+      setCc(fields.cc);
+      if (fields.cc) {
+        setShowCcBcc(true);
+      }
       setSubject(prefixSubject(sourceMessage.subject, "Re:"));
       setBody(buildReplyBody(sourceMessage));
     } else if (params.mode === "forward") {
@@ -532,6 +631,67 @@ export default function ComposeScreen() {
           />
 
           <View style={styles.composeToolbar}>
+            <View style={styles.formatToolbar}>
+              <Pressable
+                onPress={() => applyFormat(applyComposeBold)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Bold"
+                style={styles.formatButton}
+              >
+                <Text style={styles.formatButtonText}>B</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => applyFormat(applyComposeItalic)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Italic"
+                style={styles.formatButton}
+              >
+                <Text style={[styles.formatButtonText, styles.formatItalic]}>
+                  I
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => applyFormat(applyComposeUnderline)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Underline"
+                style={styles.formatButton}
+              >
+                <Text
+                  style={[styles.formatButtonText, styles.formatUnderline]}
+                >
+                  U
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => applyFormat(toggleComposeList)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="List"
+                style={styles.formatButton}
+              >
+                <Feather
+                  name="list"
+                  size={16}
+                  color={theme.colors.mutedForeground}
+                />
+              </Pressable>
+              <Pressable
+                onPress={() => void handleAttach()}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Attach file"
+                style={styles.formatButton}
+              >
+                <Feather
+                  name="paperclip"
+                  size={16}
+                  color={theme.colors.mutedForeground}
+                />
+              </Pressable>
+            </View>
             {getPlainTextSignature(selectedIdentity) ? (
               <Pressable
                 onPress={handleInsertSignature}
@@ -551,10 +711,46 @@ export default function ComposeScreen() {
             ) : null}
           </View>
 
+          {attachments.length > 0 ? (
+            <View style={styles.attachmentList}>
+              {attachments.map((attachment) => (
+                <View key={attachment.id} style={styles.attachmentChip}>
+                  <Feather
+                    name="paperclip"
+                    size={12}
+                    color={theme.colors.mutedForeground}
+                  />
+                  <Text style={styles.attachmentName} numberOfLines={1}>
+                    {attachment.name} ({formatAttachmentSize(attachment.size)})
+                  </Text>
+                  <Pressable
+                    onPress={() =>
+                      setAttachments((current) =>
+                        current.filter((item) => item.id !== attachment.id),
+                      )
+                    }
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${attachment.name}`}
+                  >
+                    <Feather
+                      name="x"
+                      size={14}
+                      color={theme.colors.mutedForeground}
+                    />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           <TextInput
             style={styles.bodyInput}
             value={body}
             onChangeText={setBody}
+            onSelectionChange={(event) =>
+              setSelection(event.nativeEvent.selection)
+            }
             placeholder="Write your message…"
             placeholderTextColor={theme.colors.mutedForeground}
             multiline
@@ -823,8 +1019,36 @@ function createStyles(theme: ThemeTokens) {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       justifyContent: "space-between" as const,
+      flexWrap: "wrap" as const,
       marginTop: theme.spacing["2"],
       minHeight: 24,
+      gap: theme.spacing["2"],
+    },
+    formatToolbar: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 4,
+    },
+    formatButton: {
+      minWidth: 32,
+      height: 32,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      borderRadius: theme.borderRadius.md,
+    },
+    attachmentList: {
+      gap: theme.spacing["1"],
+      marginTop: theme.spacing["2"],
+    },
+    attachmentChip: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 6,
+      minHeight: 36,
+      paddingHorizontal: theme.spacing["2"],
+      borderRadius: theme.borderRadius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
     },
     identityRow: {
       flexDirection: "row" as const,
@@ -850,6 +1074,23 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryForeground,
+    },
+    formatButtonText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      fontWeight: theme.typography.fontWeight.bold as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
+    },
+    formatItalic: {
+      fontStyle: "italic" as const,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    formatUnderline: {
+      textDecorationLine: "underline" as const,
+    },
+    attachmentName: {
+      flex: 1,
+      fontSize: theme.typography.fontSize.xs.size,
+      color: theme.colors.foreground,
     },
     fromLabel: {
       width: 56,

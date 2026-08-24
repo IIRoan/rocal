@@ -62,4 +62,5 @@ export const SECURE_STORE_KEYS = {
    * so subsequent app sessions skip the ~14 s S2K derivation on Hermes.
    */
   MAIL_VAULT_PGP_KEY_PART: "MAIL_VAULT_PGP_KEY_PART_",
+  HIDDEN_MAILBOX_IDS: "HIDDEN_MAILBOX_IDS",
 } as const;

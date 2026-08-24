@@ -188,3 +188,57 @@ export function resolveReplyRecipients(input: {
 
   return collectUnique([...(input.to ?? []), ...(input.cc ?? [])]);
 }
+
+export type ReplyAllRecipients = {
+  to: string[];
+  cc: string[];
+};
+
+/**
+ * Resolve recipients for a "Reply all" action.
+ *
+ * - To: original sender(s), excluding the current user.
+ * - Cc: original To + Cc, excluding the current user and anyone already in To.
+ * - If the selected message was sent by the current user, To is original To
+ *   (minus self) and Cc is original Cc (minus self).
+ */
+export function resolveReplyAllRecipients(input: {
+  from?: ReplyAddress[];
+  to?: ReplyAddress[];
+  cc?: ReplyAddress[];
+  currentUserEmail?: string | null;
+}): ReplyAllRecipients {
+  const currentUserEmail = input.currentUserEmail
+    ? normalizeEmailAddress(input.currentUserEmail)
+    : null;
+
+  const collectUnique = (entries: ReplyAddress[] | undefined): string[] => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const entry of entries ?? []) {
+      const email = entry.email?.trim();
+      if (!email) continue;
+      const normalized = normalizeEmailAddress(email);
+      if (currentUserEmail && normalized === currentUserEmail) continue;
+      if (seen.has(normalized)) continue;
+      seen.add(normalized);
+      list.push(normalized);
+    }
+    return list;
+  };
+
+  const senderRecipients = collectUnique(input.from);
+  if (senderRecipients.length > 0) {
+    const to = senderRecipients;
+    const toSet = new Set(to);
+    const cc = collectUnique([...(input.to ?? []), ...(input.cc ?? [])]).filter(
+      (email) => !toSet.has(email),
+    );
+    return { to, cc };
+  }
+
+  return {
+    to: collectUnique(input.to),
+    cc: collectUnique(input.cc),
+  };
+}

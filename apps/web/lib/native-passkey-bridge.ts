@@ -1,9 +1,101 @@
 export type NativePasskeyBridgeMode = "sign-in" | "register";
 
+export const PASSKEY_BRIDGE_FRESHEN_PATH = "/passkey-bridge/freshen-session";
+
+export function getPasskeyBridgeFreshenRequest(
+  mode: NativePasskeyBridgeMode,
+): { path: string; method: "POST" } | undefined {
+  if (mode !== "register") {
+    return undefined;
+  }
+
+  return {
+    path: PASSKEY_BRIDGE_FRESHEN_PATH,
+    method: "POST",
+  };
+}
+
+export type NativePasskeyBridgeParams = {
+  mode: NativePasskeyBridgeMode;
+  callbackURL: string | null;
+  bridgeToken: string | null;
+  passkeyName: string;
+};
+
+export const DEFAULT_NATIVE_PASSKEY_BRIDGE_PARAMS: NativePasskeyBridgeParams = {
+  mode: "sign-in",
+  callbackURL: null,
+  bridgeToken: null,
+  passkeyName: "This device",
+};
+
+export const NATIVE_PASSKEY_BRIDGE_PENDING_COPY = {
+  title: "Passkey",
+  description: "Preparing passkey handoff…",
+  actionLabel: "Continue",
+  cancelMessage: "",
+  failureMessage: "",
+} as const;
+
 export function getNativePasskeyBridgeMode(
   value: string | null,
 ): NativePasskeyBridgeMode {
   return value === "register" ? "register" : "sign-in";
+}
+
+export function readNativePasskeyBridgeParams(search: {
+  get(name: string): string | null;
+}): NativePasskeyBridgeParams {
+  return {
+    mode: getNativePasskeyBridgeMode(search.get("mode")),
+    callbackURL: search.get("callbackURL"),
+    bridgeToken: search.get("bridgeToken"),
+    passkeyName: search.get("passkeyName")?.trim() || "This device",
+  };
+}
+
+export function getWebAuthnSupportError(env: {
+  isSecureContext: boolean;
+  origin: string;
+  PublicKeyCredential: unknown;
+}): string | null {
+  if (!env.isSecureContext) {
+    return `Passkeys require HTTPS or localhost in Safari. The current page origin is ${env.origin}.`;
+  }
+
+  if (typeof env.PublicKeyCredential !== "function") {
+    return "Passkeys are unavailable in this browser.";
+  }
+
+  return null;
+}
+
+export function getNativePasskeyBridgeCopy(mode: NativePasskeyBridgeMode): {
+  title: string;
+  description: string;
+  actionLabel: string;
+  cancelMessage: string;
+  failureMessage: string;
+} {
+  if (mode === "register") {
+    return {
+      title: "Add a passkey",
+      description:
+        "Use your browser's passkey support, then Solace will return you to the app.",
+      actionLabel: "Add passkey",
+      cancelMessage: "Passkey setup was cancelled.",
+      failureMessage: "Unable to finish passkey setup.",
+    };
+  }
+
+  return {
+    title: "Continue with a passkey",
+    description:
+      "Sign in with your passkey in the browser, then Solace will return you to the app.",
+    actionLabel: "Continue",
+    cancelMessage: "Passkey sign-in was cancelled.",
+    failureMessage: "Passkey sign-in failed. Please try again.",
+  };
 }
 
 const DISALLOWED_CALLBACK_PROTOCOLS = new Set([

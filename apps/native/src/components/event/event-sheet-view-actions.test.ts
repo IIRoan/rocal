@@ -22,6 +22,8 @@ describe("resolveEventSheetViewActions", () => {
       showDelete: true,
       showEdit: true,
       deleteLabel: "Delete",
+      showInvitationActions: false,
+      invitationStatus: null,
     });
   });
 
@@ -32,6 +34,8 @@ describe("resolveEventSheetViewActions", () => {
       showDelete: false,
       showEdit: false,
       deleteLabel: "Delete",
+      showInvitationActions: false,
+      invitationStatus: null,
     });
   });
 
@@ -42,6 +46,8 @@ describe("resolveEventSheetViewActions", () => {
       showDelete: false,
       showEdit: false,
       deleteLabel: "Delete",
+      showInvitationActions: false,
+      invitationStatus: null,
     });
   });
 
@@ -65,6 +71,8 @@ describe("resolveEventSheetViewActions", () => {
       showDelete: true,
       showEdit: false,
       deleteLabel: "Delete",
+      showInvitationActions: true,
+      invitationStatus: "accepted",
     });
   });
 
@@ -89,6 +97,8 @@ describe("resolveEventSheetViewActions", () => {
       showDelete: true,
       showEdit: false,
       deleteLabel: "Remove",
+      showInvitationActions: false,
+      invitationStatus: "accepted",
     });
   });
 });

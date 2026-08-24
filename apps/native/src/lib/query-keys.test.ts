@@ -39,5 +39,7 @@ describe("QUERY_KEYS", () => {
       "inbox",
     ]);
     expect(QUERY_KEYS.mailMessage("m-1")).toEqual(["mail", "message", "m-1"]);
+    expect(QUERY_KEYS.invites()).toEqual(["invites"]);
+    expect(QUERY_KEYS.hiddenMailboxIds()).toEqual(["mail", "hiddenMailboxIds"]);
   });
 });

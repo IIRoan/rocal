@@ -494,6 +494,15 @@ export default function MailMessageScreen() {
     });
   };
 
+  const handleReplyAll = () => {
+    if (!messageId) return;
+    setActiveSheetView(null);
+    router.push({
+      pathname: "/(tabs)/mail/compose",
+      params: { mode: "reply-all", messageId },
+    });
+  };
+
   const handleForward = () => {
     if (!messageId) return;
     setActiveSheetView(null);
@@ -1034,6 +1043,12 @@ export default function MailMessageScreen() {
         {activeSheetView === "menu" ? (
           <MailSheetPanel bottomInset={insets.bottom}>
             <MailSheetList>
+              <SheetRow
+                variant="mail"
+                icon="corner-up-left"
+                label="Reply all"
+                onPress={handleReplyAll}
+              />
               <SheetRow
                 variant="mail"
                 icon="corner-up-right"
