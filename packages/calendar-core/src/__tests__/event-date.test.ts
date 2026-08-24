@@ -3,6 +3,7 @@ import { pickerDateToAllDayUtcRange } from "../timezone";
 import {
   eventOverlapsCalendarDay,
   formatEventCalendarDate,
+  formatEventSpanLabel,
   formatPickerDate,
   getEventPickerDateRange,
   getPickerDateRangeDisplay,
@@ -49,6 +50,60 @@ describe("getPickerDateRangeDisplay", () => {
       startLabel: "Sat, Jun 13",
       endLabel: "Sat, Jun 13",
     });
+  });
+});
+
+describe("formatEventSpanLabel", () => {
+  it("returns a single day for same-day events", () => {
+    expect(
+      formatEventSpanLabel(
+        {
+          start: "2026-08-26T05:45:00.000Z",
+          end: "2026-08-26T06:45:00.000Z",
+          allDay: false,
+        },
+        timezone,
+      ),
+    ).toBe("Aug 26");
+  });
+
+  it("returns a date-to-date label for timed multi-day events", () => {
+    expect(
+      formatEventSpanLabel(
+        {
+          start: "2026-08-26T05:45:00.000Z",
+          end: "2026-08-28T06:45:00.000Z",
+          allDay: false,
+        },
+        timezone,
+      ),
+    ).toBe("Aug 26 – Aug 28");
+  });
+
+  it("uses inclusive picker days for all-day spans", () => {
+    expect(
+      formatEventSpanLabel(
+        {
+          start: "2026-08-26T00:00:00.000Z",
+          end: "2026-08-29T00:00:00.000Z",
+          allDay: true,
+        },
+        timezone,
+      ),
+    ).toBe("Aug 26 – Aug 28");
+  });
+
+  it("includes years when the span crosses a year boundary", () => {
+    expect(
+      formatEventSpanLabel(
+        {
+          start: "2026-12-30T10:00:00.000Z",
+          end: "2027-01-02T08:00:00.000Z",
+          allDay: false,
+        },
+        timezone,
+      ),
+    ).toBe("Dec 30, 2026 – Jan 2, 2027");
   });
 });
 

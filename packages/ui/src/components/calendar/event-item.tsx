@@ -72,6 +72,7 @@ interface EventWrapperProps {
   children: React.ReactNode;
   currentTime?: Date;
   compact?: boolean;
+  connectAcrossCells?: boolean;
   dndListeners?: SyntheticListenerMap;
   dndAttributes?: DraggableAttributes;
   onMouseDown?: (e: React.MouseEvent) => void;
@@ -89,6 +90,7 @@ function EventWrapper({
   children,
   currentTime,
   compact = false,
+  connectAcrossCells = true,
   dndListeners,
   dndAttributes,
   onMouseDown,
@@ -144,6 +146,7 @@ function EventWrapper({
 
   return (
     <button
+      type="button"
       className={cn(
         "group/ev relative flex h-full w-full overflow-hidden text-left transition-all duration-150 ease-out outline-none select-none",
         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
@@ -158,7 +161,7 @@ function EventWrapper({
           ? "min-h-0 px-1"
           : "min-h-[20px] sm:min-h-[24px] px-1.5 sm:px-2",
         getEventColorClasses(event.color),
-        getBorderRadiusClasses(isFirstDay, isLastDay),
+        getBorderRadiusClasses(isFirstDay, isLastDay, { connectAcrossCells }),
         className,
       )}
       style={getEventColorStyles(event.color)}
@@ -180,7 +183,7 @@ function EventWrapper({
 interface EventItemProps {
   event: CalendarEvent;
   view: CalendarView;
-  isDragging?: boolean;
+  dragging?: boolean;
   onClick?: (e: React.MouseEvent) => void;
   showTime?: boolean;
   height?: number;
@@ -189,6 +192,7 @@ interface EventItemProps {
   isLastDay?: boolean;
   children?: React.ReactNode;
   className?: string;
+  connectAcrossCells?: boolean;
   dndListeners?: SyntheticListenerMap;
   dndAttributes?: DraggableAttributes;
   onMouseDown?: (e: React.MouseEvent) => void;
@@ -204,7 +208,7 @@ interface EventItemProps {
 export function EventItem({
   event,
   view,
-  isDragging,
+  dragging,
   onClick,
   showTime,
   height,
@@ -213,6 +217,7 @@ export function EventItem({
   isLastDay = true,
   children,
   className,
+  connectAcrossCells = true,
   dndListeners,
   dndAttributes,
   onMouseDown,
@@ -249,13 +254,14 @@ export function EventItem({
           event={event}
           isFirstDay={isFirstDay}
           isLastDay={isLastDay}
-          isDragging={isDragging}
+          isDragging={dragging}
           onClick={onClick}
           className={cn(
             "mt-[var(--event-gap)] h-[var(--event-height)] items-center text-[10px] sm:text-[13px]",
             className,
           )}
           currentTime={currentTime}
+          connectAcrossCells={connectAcrossCells}
           dndListeners={dndListeners}
           dndAttributes={dndAttributes}
           onMouseDown={onMouseDown}
@@ -305,7 +311,7 @@ export function EventItem({
           event={event}
           isFirstDay={isFirstDay}
           isLastDay={isLastDay}
-          isDragging={isDragging}
+          isDragging={dragging}
           onClick={onClick}
           compact={isCompact}
           className={cn(
@@ -392,6 +398,7 @@ export function EventItem({
 
     return (
       <button
+        type="button"
         className={cn(
           "group/ev relative isolate w-full rounded-lg text-left transition-colors duration-150 ease-out outline-none",
           "hover:bg-muted/60 active:bg-muted/80",
@@ -432,7 +439,7 @@ export function EventItem({
           {/* Color indicator */}
           <span
             aria-hidden
-            className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background"
+            className="mt-1.5 size-2.5 shrink-0 rounded-full ring-2 ring-background"
             style={{ backgroundColor: "var(--ev-accent)" }}
           />
 
