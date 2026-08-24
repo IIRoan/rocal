@@ -1,4 +1,9 @@
+import { resolveMailServerPolicy } from "@workspace/calendar-core";
 import type { JmapSession } from "./types";
+import {
+  createPendingComposeAttachment,
+  toJmapAttachmentInput,
+} from "./compose-attachments";
 import {
   buildBearerAuthHeader,
   buildSendMessageMethodCalls,
@@ -179,6 +184,42 @@ describe("buildSendMessageMethodCalls", () => {
       },
     ]);
   });
+
+  it("adds an htmlBody part and html bodyValues when HTML is provided", () => {
+    const draft = (
+      buildSendMessageMethodCalls({
+        ...base,
+        htmlBody: "<p>Hello <strong>world</strong></p>",
+      })[0][1].create as Record<string, any>
+    ).draft1;
+    expect(draft.htmlBody).toEqual([{ partId: "html", type: "text/html" }]);
+    expect(draft.bodyValues.html.value).toBe(
+      "<p>Hello <strong>world</strong></p>",
+    );
+    expect(draft.textBody).toEqual([{ partId: "text", type: "text/plain" }]);
+    expect(draft.bodyValues.text.value).toBe("Hello");
+  });
+
+  it("keeps htmlBody and top-level attachments on the same draft", () => {
+    const draft = (
+      buildSendMessageMethodCalls({
+        ...base,
+        htmlBody: "<p>Hi</p>",
+        attachments: [
+          { blobId: "blob-2", name: "note.txt", type: "text/plain", size: 4 },
+        ],
+      })[0][1].create as Record<string, any>
+    ).draft1;
+    expect(draft.htmlBody).toEqual([{ partId: "html", type: "text/html" }]);
+    expect(draft.attachments).toEqual([
+      {
+        blobId: "blob-2",
+        name: "note.txt",
+        type: "text/plain",
+        disposition: "attachment",
+      },
+    ]);
+  });
 });
 
 describe("ensureEncryptOnAppendDisabled", () => {
@@ -278,5 +319,192 @@ describe("ensureEncryptOnAppendDisabled", () => {
     await expect(client.ensureEncryptOnAppendDisabled(session)).rejects.toThrow(
       "Permission denied",
     );
+  });
+});
+
+function jsonOk(body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function parseJmapRequest(init?: RequestInit) {
+  return JSON.parse(String(init?.body)) as {
+    using: string[];
+    methodCalls: Array<[string, Record<string, any>, string]>;
+  };
+}
+
+describe("StalwartJmapClient mailbox and send implementations", () => {
+  const session: JmapSession = {
+    apiUrl: "http://localhost:4001/api/mail/jmap/",
+    uploadUrl: "http://localhost:4001/api/mail/jmap/upload/{accountId}",
+    accounts: { acc1: { name: "alice@solace.onl" } },
+    primaryAccounts: { "urn:ietf:params:jmap:mail": "acc1" },
+  };
+
+  function createClient(
+    fetcher: jest.MockedFunction<(url: string, init?: RequestInit) => Promise<Response>>,
+  ) {
+    return new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      getAccessToken: async () => "mail-access-token",
+      fetcher,
+    });
+  }
+
+  it("creates a mailbox with Mailbox/set and returns the created folder", async () => {
+    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
+      jsonOk({
+        methodResponses: [
+          [
+            "Mailbox/set",
+            {
+              created: {
+                new: { id: "mbx-9", name: "Projects", role: null },
+              },
+            },
+            "c1",
+          ],
+        ],
+      }),
+    );
+    const created = await createClient(fetcher).createMailbox(
+      session,
+      "Projects",
+    );
+
+    expect(created).toMatchObject({ id: "mbx-9", name: "Projects", role: null });
+    const request = parseJmapRequest(fetcher.mock.calls[0][1]);
+    expect(request.methodCalls[0][0]).toBe("Mailbox/set");
+    expect(request.methodCalls[0][1]).toEqual({
+      accountId: "acc1",
+      create: { new: { name: "Projects" } },
+    });
+  });
+
+  it("renames, deletes, and reorders mailboxes through Mailbox/set", async () => {
+    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
+      jsonOk({ methodResponses: [["Mailbox/set", {}, "c1"]] }),
+    );
+    const client = createClient(fetcher);
+
+    await client.renameMailbox(session, "mbx-9", "Work");
+    await client.deleteMailbox(session, "mbx-9");
+    await client.updateMailboxSortOrders(session, [
+      { id: "mbx-1", sortOrder: 0 },
+      { id: "mbx-2", sortOrder: 1 },
+    ]);
+    await client.updateMailboxSortOrders(session, []);
+
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1]).toEqual({
+      accountId: "acc1",
+      update: { "mbx-9": { name: "Work" } },
+    });
+    expect(parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1]).toEqual({
+      accountId: "acc1",
+      destroy: ["mbx-9"],
+    });
+    expect(parseJmapRequest(fetcher.mock.calls[2][1]).methodCalls[0][1]).toEqual({
+      accountId: "acc1",
+      update: {
+        "mbx-1": { sortOrder: 0 },
+        "mbx-2": { sortOrder: 1 },
+      },
+    });
+  });
+
+  it("uploads a blob, then sends HTML plus that attachment over JMAP", async () => {
+    const pending = createPendingComposeAttachment({
+      name: "notes.txt",
+      type: "text/plain",
+      bytes: new Uint8Array([110, 111, 116, 101]),
+    });
+    const fetcher = jest.fn(async (url: string, _init?: RequestInit) => {
+      if (String(url).includes("/upload/")) {
+        return jsonOk({
+          blobId: "blob-uploaded",
+          type: "text/plain",
+          size: pending.bytes.byteLength,
+        });
+      }
+      return jsonOk({
+        methodResponses: [
+          [
+            "Email/set",
+            {
+              created: {
+                draft1: { id: "email-1", threadId: "thread-1" },
+              },
+            },
+            "c1",
+          ],
+          [
+            "EmailSubmission/set",
+            { created: { s1: { id: "sub-1" } } },
+            "c2",
+          ],
+        ],
+      });
+    });
+    const client = createClient(fetcher);
+    client.setMailServerPolicy(resolveMailServerPolicy());
+
+    const uploaded = await client.uploadBlob(
+      session,
+      pending.bytes,
+      pending.type,
+    );
+    expect(uploaded.blobId).toBe("blob-uploaded");
+    expect(fetcher.mock.calls[0][0]).toBe(
+      "http://localhost:4001/api/mail/jmap/upload/acc1",
+    );
+    expect(fetcher.mock.calls[0][1]).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer mail-access-token",
+          "Content-Type": "text/plain",
+        }),
+      }),
+    );
+
+    const sent = await client.sendMessage(session, {
+      draftsMailboxId: "drafts",
+      sentMailboxId: "sent",
+      fromEmail: "me@example.com",
+      to: ["you@example.com"],
+      subject: "Notes",
+      textBody: "Hello world",
+      htmlBody: "<p>Hello <strong>world</strong></p>",
+      identityId: "identity-1",
+      attachments: [toJmapAttachmentInput(pending, uploaded.blobId)],
+    });
+    expect(sent).toEqual({
+      emailId: "email-1",
+      threadId: "thread-1",
+      submissionId: "sub-1",
+    });
+
+    const sendRequest = parseJmapRequest(fetcher.mock.calls[1][1]);
+    expect(sendRequest.methodCalls.map((call) => call[0])).toEqual([
+      "Email/set",
+      "EmailSubmission/set",
+    ]);
+    const draft = sendRequest.methodCalls[0][1].create.draft1;
+    expect(draft.htmlBody).toEqual([{ partId: "html", type: "text/html" }]);
+    expect(draft.bodyValues.html.value).toBe(
+      "<p>Hello <strong>world</strong></p>",
+    );
+    expect(draft.attachments).toEqual([
+      {
+        blobId: "blob-uploaded",
+        name: "notes.txt",
+        type: "text/plain",
+        disposition: "attachment",
+      },
+    ]);
   });
 });

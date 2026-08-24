@@ -5,6 +5,7 @@ import {
   parseAddressList,
   parseRecipientString,
   resolveEncryptionInternalDomain,
+  resolveReplyAllRecipients,
   resolveReplyRecipients,
   shouldEncryptOutgoingMail,
   validateComposeRecipients,
@@ -98,5 +99,33 @@ describe("mail address parsing", () => {
         currentUserEmail: "me@solace.onl",
       }),
     ).toEqual(["alice@solace.onl", "bob@solace.onl"]);
+  });
+
+  it("puts the sender in To and remaining recipients in Cc for reply-all", () => {
+    expect(
+      resolveReplyAllRecipients({
+        from: [{ email: "alice@solace.onl" }],
+        to: [{ email: "me@solace.onl" }, { email: "bob@solace.onl" }],
+        cc: [{ email: "cara@solace.onl" }],
+        currentUserEmail: "me@solace.onl",
+      }),
+    ).toEqual({
+      to: ["alice@solace.onl"],
+      cc: ["bob@solace.onl", "cara@solace.onl"],
+    });
+  });
+
+  it("uses original To/Cc when reply-all is used on a message you sent", () => {
+    expect(
+      resolveReplyAllRecipients({
+        from: [{ email: "me@solace.onl" }],
+        to: [{ email: "alice@solace.onl" }],
+        cc: [{ email: "bob@solace.onl" }],
+        currentUserEmail: "me@solace.onl",
+      }),
+    ).toEqual({
+      to: ["alice@solace.onl"],
+      cc: ["bob@solace.onl"],
+    });
   });
 });

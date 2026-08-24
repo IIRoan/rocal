@@ -25,7 +25,13 @@ const nextConfig: NextConfig = {
         ? { exclude: ["error"] }
         : false,
   },
-  transpilePackages: [...workspacePackages, "blobatar", "@blobatar/react"],
+  transpilePackages: [
+    ...workspacePackages,
+    "blobatar",
+    "@blobatar/react",
+    "@paper-design/shaders-react",
+    "@paper-design/shaders",
+  ],
   turbopack: {
     root: repoRoot,
   },

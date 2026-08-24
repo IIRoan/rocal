@@ -1,9 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   buildNativePasskeyCallbackURL,
+  getNativePasskeyBridgeCopy,
   getNativePasskeyBridgeError,
   getNativePasskeyBridgeMode,
+  getPasskeyBridgeFreshenRequest,
+  getWebAuthnSupportError,
   isValidNativePasskeyCallbackURL,
+  readNativePasskeyBridgeParams,
 } from "@/lib/native-passkey-bridge";
 
 describe("native passkey bridge helpers", () => {
@@ -28,6 +32,22 @@ describe("native passkey bridge helpers", () => {
     expect(getNativePasskeyBridgeMode("register")).toBe("register");
   });
 
+  it("reads register mode from search params instead of defaulting to sign-in", () => {
+    const search = new URLSearchParams(
+      "mode=register&callbackURL=solace-dev:///settings&passkeyName=This+Apple+device",
+    );
+    expect(readNativePasskeyBridgeParams(search)).toEqual({
+      mode: "register",
+      callbackURL: "solace-dev:///settings",
+      bridgeToken: null,
+      passkeyName: "This Apple device",
+    });
+    expect(getNativePasskeyBridgeCopy("register").title).toBe("Add a passkey");
+    expect(getNativePasskeyBridgeCopy("sign-in").title).toBe(
+      "Continue with a passkey",
+    );
+  });
+
   it("appends bridge results onto the native callback url", () => {
     expect(
       buildNativePasskeyCallbackURL("solace://settings", {
@@ -45,5 +65,37 @@ describe("native passkey bridge helpers", () => {
       ),
     ).toBe("Passkey sign-in failed.");
     expect(getNativePasskeyBridgeError(null, "fallback")).toBe("fallback");
+  });
+
+  it("freshens the webview session only for passkey setup", () => {
+    expect(getPasskeyBridgeFreshenRequest("sign-in")).toBeUndefined();
+    expect(getPasskeyBridgeFreshenRequest("register")).toEqual({
+      path: "/passkey-bridge/freshen-session",
+      method: "POST",
+    });
+  });
+
+  it("reports missing WebAuthn support", () => {
+    expect(
+      getWebAuthnSupportError({
+        isSecureContext: false,
+        origin: "http://example.com",
+        PublicKeyCredential: function PublicKeyCredential() { },
+      }),
+    ).toContain("http://example.com");
+    expect(
+      getWebAuthnSupportError({
+        isSecureContext: true,
+        origin: "https://app.example.com",
+        PublicKeyCredential: undefined,
+      }),
+    ).toBe("Passkeys are unavailable in this browser.");
+    expect(
+      getWebAuthnSupportError({
+        isSecureContext: true,
+        origin: "https://app.example.com",
+        PublicKeyCredential: function PublicKeyCredential() { },
+      }),
+    ).toBeNull();
   });
 });

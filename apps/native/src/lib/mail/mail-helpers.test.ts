@@ -11,6 +11,7 @@ import {
   isMessageFlagged,
   isMessageRead,
   parseEmailList,
+  formatReplyAllRecipientFields,
   sortMailboxes,
   sortMessagesByDate,
   validateComposeInput,
@@ -153,6 +154,19 @@ describe("sortMailboxes", () => {
     sortMailboxes(mailboxes);
     expect(mailboxes.map((m) => m.id)).toEqual(["sent", "inbox"]);
   });
+
+  it("prefers JMAP sortOrder when any mailbox has one", () => {
+    const mailboxes = [
+      mailbox({ id: "inbox", name: "Inbox", role: "inbox", sortOrder: 2 }),
+      mailbox({ id: "custom", name: "Projects", role: null, sortOrder: 0 }),
+      mailbox({ id: "sent", name: "Sent", role: "sent", sortOrder: 1 }),
+    ];
+    expect(sortMailboxes(mailboxes).map((entry) => entry.id)).toEqual([
+      "custom",
+      "sent",
+      "inbox",
+    ]);
+  });
 });
 
 describe("getMailboxDisplayName", () => {
@@ -278,5 +292,44 @@ describe("validateComposeInput", () => {
       subject: "Hi",
     });
     expect(result.errors.recipients).toContain("not-an-email");
+  });
+});
+
+describe("formatReplyAllRecipientFields", () => {
+  it("puts the sender on To and other recipients on Cc, excluding the current user", () => {
+    expect(
+      formatReplyAllRecipientFields(
+        message({
+          id: "m-1",
+          from: [{ email: "sender@example.com", name: "Sender" }],
+          to: [
+            { email: "me@example.com" },
+            { email: "alex@example.com" },
+          ],
+          cc: [{ email: "blair@example.com" }],
+        }),
+        "me@example.com",
+      ),
+    ).toEqual({
+      to: "sender@example.com",
+      cc: "alex@example.com, blair@example.com",
+    });
+  });
+
+  it("uses the original To/Cc when the current user sent the message", () => {
+    expect(
+      formatReplyAllRecipientFields(
+        message({
+          id: "m-2",
+          from: [{ email: "me@example.com" }],
+          to: [{ email: "alex@example.com" }],
+          cc: [{ email: "blair@example.com" }],
+        }),
+        "me@example.com",
+      ),
+    ).toEqual({
+      to: "alex@example.com",
+      cc: "blair@example.com",
+    });
   });
 });
