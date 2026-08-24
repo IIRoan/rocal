@@ -20,6 +20,7 @@ import {
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { AppScreen, StackScreenHeader } from "../../src/components/layout";
+import { BlobatarAvatar } from "../../src/components/BlobatarAvatar";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { useRecentContacts } from "../../src/hooks/use-recent-contacts";
 
@@ -241,7 +242,6 @@ function ContactRow({
 }) {
   const label = getContactDisplayLabel(contact);
   const summary = formatContactContextSummary(contact);
-  const initial = label.trim().charAt(0).toUpperCase() || "?";
 
   return (
     <Pressable
@@ -259,26 +259,11 @@ function ContactRow({
         pressed && { backgroundColor: theme.colors.accent },
       ]}
     >
-      <View
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 16,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: theme.colors.muted,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.xs.size,
-            fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-            color: theme.colors.foreground,
-          }}
-        >
-          {initial}
-        </Text>
-      </View>
+      <BlobatarAvatar
+        email={contact.email}
+        name={label}
+        size={32}
+      />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text
           style={{

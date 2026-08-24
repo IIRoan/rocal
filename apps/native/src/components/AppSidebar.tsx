@@ -31,6 +31,7 @@ import { useAuth } from "../providers/AuthProvider";
 import { useToast } from "../providers/ToastProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
 import { useSidebar } from "../providers/SidebarProvider";
+import { BlobatarAvatar } from "./BlobatarAvatar";
 import { useMailSelection } from "../providers/MailSelectionProvider";
 import { useCommandPalette } from "../providers/CommandPaletteProvider";
 import { calendarApiService } from "../lib/api";
@@ -85,7 +86,6 @@ export function AppSidebar() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [pendingVisibilityCalendarId, setPendingVisibilityCalendarId] =
     useState<string | null>(null);
-  const [avatarError, setAvatarError] = useState(false);
   const blockDrawerCloseRef = useRef(false);
 
   const { data: calendars = [], isLoading: calendarsLoading } = useQuery({
@@ -379,19 +379,13 @@ export function AppSidebar() {
                     accessibilityRole="button"
                     accessibilityLabel="Account settings"
                   >
-                    {user?.image && !avatarError ? (
-                      <Image
-                        source={{ uri: user.image }}
-                        style={styles.avatar}
-                        onError={() => setAvatarError(true)}
-                      />
-                    ) : (
-                      <View style={styles.avatarFallback}>
-                        <Text style={styles.avatarText}>
-                          {user?.name?.charAt(0)?.toUpperCase() ?? "?"}
-                        </Text>
-                      </View>
-                    )}
+                    <BlobatarAvatar
+                      email={user?.email}
+                      name={user?.name}
+                      src={user?.image}
+                      size={32}
+                      animate
+                    />
                   </Pressable>
                 </View>
               </View>

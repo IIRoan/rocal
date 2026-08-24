@@ -1,6 +1,6 @@
 import { CaretDownIcon, GearSixIcon, SignOutIcon } from "@phosphor-icons/react";
 
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { BlobatarAvatar } from "../ui/blobatar-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,8 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
-import { useDropdownShortcuts } from "../../hooks";
-import { cn } from "../../lib/utils";
+import { useDropdownShortcuts } from "../../hooks/use-keyboard-shortcuts";
 import { User } from "../calendar/types";
 
 export function NavUser({
@@ -23,12 +22,6 @@ export function NavUser({
   onLogout?: () => void;
   onOpenSettings?: () => void;
 }) {
-  const initials = user.name
-    .split(" ")
-    .map((name) => name.charAt(0).toUpperCase())
-    .join("")
-    .slice(0, 2);
-
   // Add keyboard shortcuts
   useDropdownShortcuts([
     { key: "s", action: () => onOpenSettings?.() },
@@ -43,12 +36,14 @@ export function NavUser({
               size="lg"
               className="group data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="size-8">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
+              <BlobatarAvatar
+                email={user.email}
+                name={user.name}
+                src={user.avatar}
+                className="size-8"
+                title={user.name}
+                animate="hover"
+              />
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
               </div>

@@ -21,6 +21,14 @@ jest.mock("@workspace/ui/components/calendar", () => ({
   getColorSwatchValue: () => "#3b82f6",
 }));
 
+jest.mock("@workspace/ui/components/ui/blobatar-avatar", () => ({
+  BlobatarAvatar: ({ email }: { email?: string }) => (
+    <div data-testid="blobatar-avatar">{email}</div>
+  ),
+}));
+jest.mock("@/hooks/use-solace-profile-image", () => ({
+  useSolaceProfileImage: () => null,
+}));
 jest.mock("@workspace/ui/components/ui/avatar", () => ({
   Avatar: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   AvatarImage: ({ alt }: { alt?: string }) => <div aria-label={alt} />,

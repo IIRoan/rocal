@@ -24,7 +24,7 @@ import {
   SidebarMenuItem,
 } from "../ui/sidebar";
 import { SheetClose } from "../ui/sheet";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { BlobatarAvatar } from "../ui/blobatar-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,13 +78,6 @@ export function AppSidebar({
   const sidebarCalendars = listSidebarCalendars(calendars);
 
   if (isMobile) {
-    const initials =
-      user?.name
-        ?.split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase() || "GU";
-
     return (
       <div className="flex h-full w-full flex-col overflow-hidden overscroll-none bg-background">
         {/* Header */}
@@ -114,12 +107,14 @@ export function AppSidebar({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" className="outline-none active:scale-90 transition-transform">
-                  <Avatar className="size-8 rounded-full">
-                    <AvatarImage src={user?.avatar} alt={user?.name} />
-                    <AvatarFallback className="bg-primary/10 text-primary font-semibold text-xs">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
+                  <BlobatarAvatar
+                    email={user?.email}
+                    name={user?.name}
+                    src={user?.avatar}
+                    className="size-8"
+                    title={user?.name}
+                    animate="hover"
+                  />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52 rounded-xl">

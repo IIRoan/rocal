@@ -9,7 +9,7 @@ module.exports = {
   setupFiles: ["<rootDir>/jest.setup.ts"],
   testEnvironment: "node",
   transformIgnorePatterns: [
-    "/node_modules/(?!(better-auth|@better-auth)/)",
+    "/node_modules/(?!(better-auth|@better-auth|blobatar|@blobatar)/)",
   ],
   testMatch: [
     "<rootDir>/__tests__/**/*.test.ts",
@@ -37,6 +37,10 @@ module.exports = {
       "<rootDir>/../../packages/calendar-ics/src/index.ts",
     "^@workspace/calendar-ics/(.*)$":
       "<rootDir>/../../packages/calendar-ics/src/$1",
+    "^@workspace/calendar-client$":
+      "<rootDir>/../../packages/calendar-client/src/index.ts",
+    "^@workspace/calendar-client/(.*)$":
+      "<rootDir>/../../packages/calendar-client/src/$1",
     "^@workspace/runtime$": "<rootDir>/../../packages/runtime/src/index.ts",
     "^@workspace/runtime/(.*)$": "<rootDir>/../../packages/runtime/src/$1",
     "^@workspace/ui$": "<rootDir>/../../packages/ui/src/index.ts",
