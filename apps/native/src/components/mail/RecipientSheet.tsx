@@ -18,7 +18,7 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useToast } from "../../providers/ToastProvider";
 import { BottomSheet, BottomSheetHeader } from "../BottomSheet";
-import { getInitials } from "../../lib/mail/mail-helpers";
+import { BlobatarAvatar } from "../BlobatarAvatar";
 import { mailSpacing } from "./mail-ui";
 
 export type RecipientAddress = {
@@ -42,7 +42,6 @@ export function RecipientSheet({
   const [open, setOpen] = React.useState(false);
 
   const displayName = recipient.name?.trim() || recipient.email;
-  const initials = getInitials([recipient]);
 
   const handleCopy = async () => {
     await Clipboard.setStringAsync(recipient.email);
@@ -73,9 +72,11 @@ export function RecipientSheet({
       <BottomSheet visible={open} onDismiss={() => setOpen(false)} snapPoints={[0.4]}>
         <BottomSheetHeader>
           <View style={styles.header}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initials}</Text>
-            </View>
+            <BlobatarAvatar
+              email={recipient.email}
+              name={recipient.name}
+              size={40}
+            />
             <View style={styles.headerText}>
               <Text style={styles.name}>{displayName}</Text>
               {displayName !== recipient.email ? (

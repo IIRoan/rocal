@@ -10,6 +10,7 @@ export type {
 
 export { CalendarApiService } from "./calendar-api-service";
 export type { DeleteAccountResponse } from "./calendar-api-service";
+export { createSolaceProfileLookupBatcher } from "./solace-profile-lookup";
 
 export { InviteApiService } from "./invite-api-service";
 export type {

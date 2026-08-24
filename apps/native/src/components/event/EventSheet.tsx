@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -64,6 +63,7 @@ import {
 } from "../sheet/SheetActions";
 
 import { EventForm } from "./EventForm";
+import { BlobatarAvatar } from "../BlobatarAvatar";
 import { toTimezonePickerISOString, parseCreateEventCalendarDay } from "./event-form-utils";
 import {
   formatEventDate,
@@ -169,16 +169,6 @@ function formatParticipantStatus(status?: string) {
     default:
       return "Invited";
   }
-}
-
-function getParticipantInitials(
-  participant: Pick<
-    NonNullable<CalendarEvent["participants"]>[number],
-    "displayName" | "email"
-  >,
-) {
-  const label = participant.displayName?.trim() || participant.email;
-  return label.replace(/@.*$/, "").slice(0, 2).toUpperCase() || "P";
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -669,20 +659,12 @@ export function EventSheet({
                             key={participant.id}
                             style={styles.participantRow}
                           >
-                            {participant.image ? (
-                              <Image
-                                source={{ uri: participant.image }}
-                                style={styles.participantAvatarImage}
-                              />
-                            ) : (
-                              <View style={styles.participantAvatarFallback}>
-                                <Text
-                                  style={styles.participantAvatarFallbackText}
-                                >
-                                  {getParticipantInitials(participant)}
-                                </Text>
-                              </View>
-                            )}
+                            <BlobatarAvatar
+                              email={participant.email}
+                              name={participant.displayName}
+                              src={participant.image}
+                              size={32}
+                            />
                             <View style={styles.participantMeta}>
                               <Text style={styles.viewText}>
                                 {participant.displayName || participant.email}

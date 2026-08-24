@@ -58,6 +58,7 @@ import {
 } from "@workspace/calendar-core";
 import { RecurrencePicker } from "./RecurrencePicker";
 import { RecipientSuggestInput } from "../mail/RecipientSuggestInput";
+import { BlobatarAvatar } from "../BlobatarAvatar";
 import {
   REMINDER_OPTIONS,
   roundToNextHour,
@@ -981,14 +982,11 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                               key={participant.email}
                               style={styles.participantRow}
                             >
-                              <View style={styles.participantAvatar}>
-                                <Text style={styles.participantAvatarText}>
-                                  {(participant.displayName?.trim() ||
-                                    participant.email)
-                                    .slice(0, 2)
-                                    .toUpperCase()}
-                                </Text>
-                              </View>
+                              <BlobatarAvatar
+                                email={participant.email}
+                                name={participant.displayName}
+                                size={32}
+                              />
                               <View style={styles.participantMeta}>
                                 <Text style={styles.participantName}>
                                   {participant.displayName || participant.email}

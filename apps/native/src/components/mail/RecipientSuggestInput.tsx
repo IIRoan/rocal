@@ -17,6 +17,7 @@ import {
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useRecentContacts } from "../../hooks/use-recent-contacts";
+import { BlobatarAvatar } from "../BlobatarAvatar";
 
 function getActiveRecipientToken(value: string): string {
   const separatorIndex = Math.max(value.lastIndexOf(","), value.lastIndexOf(";"));
@@ -127,11 +128,11 @@ export function RecipientSuggestInput({
                 style={styles.suggestionRow}
                 onPress={() => selectSuggestion(entry)}
               >
-                <View style={styles.suggestionAvatar}>
-                  <Text style={styles.suggestionAvatarText}>
-                    {label.slice(0, 2).toUpperCase()}
-                  </Text>
-                </View>
+                <BlobatarAvatar
+                  email={entry.email}
+                  name={entry.displayName}
+                  size={28}
+                />
                 <View style={styles.suggestionMeta}>
                   <Text style={styles.suggestionName} numberOfLines={1}>
                     {label}

@@ -1,9 +1,4 @@
 import { NotificationManager } from "@workspace/ui/components/calendar";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@workspace/ui/components/ui/avatar";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
@@ -13,8 +8,8 @@ import type { EventParticipantInput, RecentContactEntry } from "@workspace/calen
 
 import { RecurringEventForm } from "../command-palette/recurring-event-form";
 import { RecipientSuggestInput } from "../mail/recipient-suggest-input";
+import { SolaceAvatar } from "../solace-avatar";
 import { ParticipantsInviteInfo } from "./participants-invite-info";
-import { getParticipantInitials } from "./event-editor-participant-utils";
 import type { EventEditorFormState } from "./types";
 
 const OPTIONAL_SECTION_ENTER = "animate-fade-in";
@@ -154,15 +149,13 @@ export function EventEditorOptionalFields({
                   key={participant.email}
                   className="flex items-center gap-3 px-3 py-2.5"
                 >
-                  <Avatar className="size-9 border border-border/60">
-                    <AvatarImage
-                      src={participant.image ?? undefined}
-                      alt={participant.email}
-                    />
-                    <AvatarFallback className="text-[11px]">
-                      {getParticipantInitials(participant)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <SolaceAvatar
+                    email={participant.email}
+                    name={participant.displayName}
+                    src={participant.image}
+                    className="size-9 border border-border/60"
+                    title={participant.displayName || participant.email}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm truncate">
                       {participant.displayName || participant.email}

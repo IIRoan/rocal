@@ -10,11 +10,6 @@ import {
 } from "@workspace/ui/components/ui/alert";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@workspace/ui/components/ui/avatar";
-import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -33,13 +28,11 @@ import {
   Users,
 } from "lucide-react";
 
+import { SolaceAvatar } from "../solace-avatar";
 import { stopEventPropagation } from "@/lib/event-propagation";
 import { formatReminderMinutes } from "@/lib/event-editor-view-model";
 import type { EventEditorFormState } from "./types";
-import {
-  formatParticipantStatus,
-  getParticipantInitials,
-} from "./event-editor-participant-utils";
+import { formatParticipantStatus } from "./event-editor-participant-utils";
 import type { EventParticipantInput } from "@workspace/calendar-core";
 import type { PickerDateRangeDisplay } from "@workspace/calendar-core";
 
@@ -282,15 +275,13 @@ export function EventEditorReadView({
                   key={participant.email}
                   className="flex items-center gap-3 min-w-0"
                 >
-                  <Avatar className="size-8 border border-border/60">
-                    <AvatarImage
-                      src={participant.image ?? undefined}
-                      alt={participant.email}
-                    />
-                    <AvatarFallback className="text-[11px]">
-                      {getParticipantInitials(participant)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <SolaceAvatar
+                    email={participant.email}
+                    name={participant.displayName}
+                    src={participant.image}
+                    className="size-8 border border-border/60"
+                    title={participant.displayName || participant.email}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm truncate">
                       {participant.displayName || participant.email}

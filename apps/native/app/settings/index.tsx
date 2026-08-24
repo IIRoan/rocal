@@ -2,7 +2,6 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image as ImageNative,
   Platform,
   Pressable,
   ScrollView,
@@ -37,6 +36,7 @@ import {
   useTheme,
   type ThemePreference,
 } from "../../src/providers/ThemeProvider";
+import { BlobatarAvatar } from "../../src/components/BlobatarAvatar";
 import { useToast } from "../../src/providers/ToastProvider";
 import { authClient } from "../../src/lib/auth-client";
 import { useAuth } from "../../src/providers/AuthProvider";
@@ -1358,11 +1358,9 @@ function AccountInfoCard({
   imageUrl?: string | null;
   theme: ThemeTokens;
 }) {
-  const [imgError, setImgError] = useState(false);
   const displayName = name?.trim() || null;
   const displayEmail = email?.trim() || null;
   const title = displayName ?? displayEmail ?? "Solace account";
-  const initial = title.charAt(0).toUpperCase() || "S";
   const cardStyle = {
     flexDirection: "row" as const,
     gap: theme.spacing["3"],
@@ -1378,41 +1376,13 @@ function AccountInfoCard({
 
   return (
     <View style={cardStyle}>
-      {/* Avatar */}
-      {imageUrl && !imgError ? (
-        <ImageNative
-          source={{ uri: imageUrl }}
-          onError={() => setImgError(true)}
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-          }}
-        />
-      ) : (
-        <View
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: theme.colors.primaryBase + "18",
-          }}
-        >
-          <Text
-            style={{
-              fontSize: theme.typography.fontSize.base.size,
-              lineHeight: theme.typography.fontSize.base.lineHeight,
-              fontWeight: theme.typography.fontWeight
-                .semibold as TextStyle["fontWeight"],
-              color: theme.colors.primaryBase,
-            }}
-          >
-            {initial}
-          </Text>
-        </View>
-      )}
+      <BlobatarAvatar
+        email={email}
+        name={name}
+        src={imageUrl}
+        size={44}
+        animate
+      />
       <View style={{ flex: 1, minWidth: 0, justifyContent: "center" }}>
         <Text
           style={{

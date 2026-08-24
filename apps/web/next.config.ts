@@ -25,7 +25,7 @@ const nextConfig: NextConfig = {
         ? { exclude: ["error"] }
         : false,
   },
-  transpilePackages: [...workspacePackages],
+  transpilePackages: [...workspacePackages, "blobatar", "@blobatar/react"],
   turbopack: {
     root: repoRoot,
   },
