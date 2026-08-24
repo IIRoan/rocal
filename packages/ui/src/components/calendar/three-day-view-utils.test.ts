@@ -147,6 +147,27 @@ describe("three-day all-day event helpers", () => {
     ]);
   });
 
+  it("places timed multi-day events in the all-day grouping", () => {
+    const events = [
+      createEvent({
+        id: "multiday",
+        start: "2026-06-15T05:45:00.000Z",
+        end: "2026-06-17T06:45:00.000Z",
+      }),
+    ];
+
+    const grouped = groupThreeDayAllDayEventsByDay(events, baseDate, timezone);
+
+    expect(getThreeDayAllDayEvents(events, baseDate, timezone).map((event) => event.id)).toEqual(
+      ["multiday"],
+    );
+    expect(grouped.map((dayEvents) => dayEvents.map((event) => event.id))).toEqual([
+      ["multiday"],
+      ["multiday"],
+      ["multiday"],
+    ]);
+  });
+
   it("sorts multi-day all-day events before single-day events within each column", () => {
     const events = [
       createEvent({

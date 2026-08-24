@@ -34,23 +34,40 @@ export {
 export function getBorderRadiusClasses(
   isFirstDay: boolean,
   isLastDay: boolean,
+  options?: { connectAcrossCells?: boolean },
 ): string {
+  const connectAcrossCells = options?.connectAcrossCells !== false;
+
   if (isFirstDay && isLastDay) {
-    return "rounded"; // Both ends rounded
-  } else if (isFirstDay) {
-    return "rounded-l rounded-r-none not-in-data-[slot=popover-content]:w-[calc(100%+5px)]"; // Only left end rounded
-  } else if (isLastDay) {
-    return "rounded-r rounded-l-none not-in-data-[slot=popover-content]:w-[calc(100%+4px)] not-in-data-[slot=popover-content]:-translate-x-[4px]"; // Only right end rounded
-  } else {
-    return "rounded-none not-in-data-[slot=popover-content]:w-[calc(100%+9px)] not-in-data-[slot=popover-content]:-translate-x-[4px]"; // No rounded corners
+    return "rounded";
   }
+
+  if (isFirstDay) {
+    return connectAcrossCells
+      ? "rounded-l rounded-r-none not-in-data-[slot=popover-content]:w-[calc(100%+5px)]"
+      : "rounded-l rounded-r-none";
+  }
+
+  if (isLastDay) {
+    return connectAcrossCells
+      ? "rounded-r rounded-l-none not-in-data-[slot=popover-content]:w-[calc(100%+4px)] not-in-data-[slot=popover-content]:-translate-x-[4px]"
+      : "rounded-r rounded-l-none";
+  }
+
+  return connectAcrossCells
+    ? "rounded-none not-in-data-[slot=popover-content]:w-[calc(100%+9px)] not-in-data-[slot=popover-content]:-translate-x-[4px]"
+    : "rounded-none";
 }
 
 /**
  * Events rendered in the all-day header row of timeline views.
+ * Includes true all-day events and timed events that span multiple calendar days.
  */
-export function isAllDayRowEvent(event: CalendarEvent): boolean {
-  return event.allDay === true;
+export function isAllDayRowEvent(
+  event: CalendarEvent,
+  timezone?: string,
+): boolean {
+  return event.allDay === true || isMultiDayEvent(event, timezone);
 }
 
 /**
@@ -161,9 +178,9 @@ export function eventOverlapsRange(
   const bounds =
     granularity === "day" && timezone
       ? {
-          start: getZonedDayUtcBounds(rangeStart, timezone).start,
-          end: getZonedDayUtcBounds(rangeEnd, timezone).end,
-        }
+        start: getZonedDayUtcBounds(rangeStart, timezone).start,
+        end: getZonedDayUtcBounds(rangeEnd, timezone).end,
+      }
       : null;
   const rStart = bounds
     ? bounds.start

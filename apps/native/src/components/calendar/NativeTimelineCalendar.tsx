@@ -29,7 +29,12 @@ import {
   type WeekdayNumbers,
 } from "@howljs/calendar-kit";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
-import { isCancelledCalendarEvent, resolveTimezone } from "@workspace/calendar-core";
+import {
+  formatEventSpanLabel,
+  isCancelledCalendarEvent,
+  resolveTimezone,
+  spansMultipleCalendarDays,
+} from "@workspace/calendar-core";
 import { useTheme } from "../../providers/ThemeProvider";
 import { resolveEventBlockColor } from "../../lib/calendar-color-utils";
 import {
@@ -241,6 +246,17 @@ export const NativeTimelineCalendar = forwardRef<
         allDay: options.allDay,
       });
       const titleLines = timelineEventTitleLines(density, durationMinutes);
+      const spanLabel =
+        options.allDay &&
+        source &&
+        spansMultipleCalendarDays(
+          new Date(source.start),
+          new Date(source.end),
+          resolvedTimezone,
+          { allDay: Boolean(source.allDay) },
+        )
+          ? formatEventSpanLabel(source, resolvedTimezone)
+          : null;
 
       const content = (
         <TimelineEventContent
@@ -249,6 +265,7 @@ export const NativeTimelineCalendar = forwardRef<
           cancelled={source ? isCancelledCalendarEvent(source) : false}
           density={density}
           titleLines={titleLines}
+          spanLabel={spanLabel}
         />
       );
 
@@ -266,7 +283,7 @@ export const NativeTimelineCalendar = forwardRef<
         </Pressable>
       );
     },
-    [eventsById, onEventPress, theme.colors.primaryForeground],
+    [eventsById, onEventPress, resolvedTimezone, theme.colors.primaryForeground],
   );
 
   const renderEvent = useCallback(

@@ -6,15 +6,10 @@ import {
   resolveTimezone,
 } from "@workspace/calendar-core";
 
-import { WeekViewAllDayRow } from "./week-view-all-day-row";
+import { AllDayEventRow } from "./all-day-event-row";
 import { WeekViewDayHeaders } from "./week-view-day-headers";
 import { WeekViewTimeGrid } from "./week-view-time-grid";
-import {
-  sortEvents,
-  eventOverlapsRange,
-  isAllDayRowEvent,
-  getTimedTimelineEventsForDay,
-} from "./utils";
+import { getTimedTimelineEventsForDay } from "./utils";
 import { StartHour, WeekCellsHeight } from "./constants";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
@@ -54,36 +49,13 @@ export const WeekView = React.memo(function WeekView({
     [currentDate, weekStartDay, resolvedTimezone],
   );
 
-  const weekStart = days[0] ?? currentDate;
-  const weekEnd = days[days.length - 1] ?? currentDate;
-
-  const allDayEvents = useMemo(() => {
-    return events.filter(
-      (event) =>
-        isAllDayRowEvent(event) &&
-        eventOverlapsRange(event, weekStart, weekEnd, "day", resolvedTimezone),
-    );
-  }, [events, resolvedTimezone, weekStart, weekEnd]);
-
-  const allDayEventsByDay = useMemo(
-    () =>
-      days.map((day) =>
-        sortEvents(
-          allDayEvents.filter((event) =>
-            eventOverlapsRange(event, day, day, "day", resolvedTimezone),
-          ),
-          resolvedTimezone,
-        ),
-      ),
-    [allDayEvents, days, resolvedTimezone],
-  );
-
   const processedDayEvents = useMemo(() => {
     return days.map((day) => {
       const dayEvents = getTimedTimelineEventsForDay(
         events,
         day,
         resolvedTimezone,
+        { excludeMultiDay: true },
       );
 
       dayEvents.sort((left, right) => {
@@ -143,9 +115,10 @@ export const WeekView = React.memo(function WeekView({
         days={days}
         timezone={resolvedTimezone}
       />
-      <WeekViewAllDayRow
-        allDayEventsByDay={allDayEventsByDay}
+      <AllDayEventRow
+        columnTemplate="3rem repeat(7, minmax(0, 1fr))"
         days={days}
+        events={events}
         handlers={handlers}
         timezone={resolvedTimezone}
       />

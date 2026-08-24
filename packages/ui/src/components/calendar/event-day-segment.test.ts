@@ -215,13 +215,23 @@ describe("multi-day event membership", () => {
     });
   });
 
-  it("detects timed overnight events as multi-day without all-day row eligibility", () => {
+  it("detects timed overnight events as multi-day all-day row events", () => {
     const event = createEvent({
       start: "2026-06-19T21:00:00.000Z",
       end: "2026-06-19T23:00:00.000Z",
     });
 
     expect(isMultiDayEvent(event, timezone)).toBe(true);
-    expect(isAllDayRowEvent(event)).toBe(false);
+    expect(isAllDayRowEvent(event, timezone)).toBe(true);
+  });
+
+  it("puts timed events that span several calendar days in the all-day row", () => {
+    const event = createEvent({
+      start: "2026-08-26T05:45:00.000Z",
+      end: "2026-08-28T06:45:00.000Z",
+    });
+
+    expect(isMultiDayEvent(event, timezone)).toBe(true);
+    expect(isAllDayRowEvent(event, timezone)).toBe(true);
   });
 });

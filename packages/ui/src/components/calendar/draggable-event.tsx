@@ -15,7 +15,7 @@ interface DraggableEventProps {
   showTime?: boolean;
   onClick?: (e: React.MouseEvent) => void;
   height?: number;
-  isMultiDay?: boolean;
+  multiDay?: boolean;
   multiDayWidth?: number;
   isFirstDay?: boolean;
   isLastDay?: boolean;
@@ -34,7 +34,7 @@ export function DraggableEvent({
   showTime,
   onClick,
   height,
-  isMultiDay,
+  multiDay,
   multiDayWidth,
   isFirstDay = true,
   isLastDay = true,
@@ -58,7 +58,7 @@ export function DraggableEvent({
   const eventStart = new Date(event.start);
   const eventEnd = new Date(event.end);
   const isMultiDayEvent =
-    isMultiDay || event.allDay || differenceInDays(eventEnd, eventStart) >= 1;
+    multiDay || event.allDay || differenceInDays(eventEnd, eventStart) >= 1;
 
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -141,7 +141,7 @@ export function DraggableEvent({
         height={height}
         isFirstDay={isFirstDay}
         isLastDay={isLastDay}
-        isDragging={isDragging}
+        dragging={isDragging}
         onClick={isPreview ? undefined : onClick}
         onMouseDown={isPreview ? undefined : handleMouseDown}
         onTouchStart={isPreview ? undefined : handleTouchStart}

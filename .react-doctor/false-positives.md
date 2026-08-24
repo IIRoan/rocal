@@ -348,3 +348,25 @@ Patterns that fire diagnostics but are safe to suppress.
 - **Note**: List-only mobile header; refresh affordance grouped as
   `refresh: { disabled, spinning }` (2026-06-26). Reader/compose chrome on
   mobile remains in `MessageReader` / compose surfaces.
+
+## react-doctor/no-giant-component — CalendarDndProvider
+
+- **File**: `packages/ui/src/components/calendar/calendar-dnd-context.tsx`
+- **Why FP**: `CalendarDndProvider` is a single dnd-kit drag session: sensors,
+  start/over/end handlers, overlay preview, and context for active event
+  dimensions. Splitting the provider would fragment one coordinated drag
+  lifecycle without a reusable seam. The file was only touched to pass
+  `EventItem`'s `dragging` prop.
+- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+  for `**/components/calendar/calendar-dnd-context.tsx`.
+
+## react-doctor/prefer-useReducer — CalendarDndProvider drag session fields
+
+- **File**: `packages/ui/src/components/calendar/calendar-dnd-context.tsx`
+- **Why FP**: The `useState` slices (`activeEvent`, `activeId`, `activeView`,
+  `currentTime`, dimensions, multi-day width, handle position) update on
+  independent dnd-kit callbacks, not as one state machine. A reducer would
+  add boilerplate without reducing related-update bugs. Overlay snapshot is
+  memoized separately.
+- **Config**: Suppressed via `ignore.overrides` for
+  `**/components/calendar/calendar-dnd-context.tsx`.

@@ -9,13 +9,14 @@ import { endOfDay, startOfDay } from "date-fns";
 import type { CalendarEvent } from "./types";
 import {
   eventOverlapsRange,
-  getEventSegmentForCalendarDay,
   isAllDayRowEvent,
   sortEvents,
 } from "./utils";
 import { WeekCellsHeight } from "./constants";
 
 export { getThreeDayCalendarDays };
+
+export const THREE_DAY_GRID_COLS = "grid-cols-[3rem_repeat(3,minmax(0,1fr))]";
 
 export function getThreeDayLocalRangeBounds(days: [Date, Date, Date]): {
   rangeStart: Date;
@@ -64,11 +65,16 @@ export function getThreeDayAllDayEvents(events: CalendarEvent[], baseDate: Date,
   const { rangeStart, rangeEnd } = getThreeDayLocalRangeBounds(days);
   const resolvedTimezone = resolveTimezone(timezone);
 
-  return events
-    .filter((event) => isAllDayRowEvent(event))
-    .filter((event) =>
-      eventOverlapsRange(event, rangeStart, rangeEnd, "day", resolvedTimezone),
-    );
+  const matching: CalendarEvent[] = [];
+  for (const event of events) {
+    if (
+      isAllDayRowEvent(event, resolvedTimezone) &&
+      eventOverlapsRange(event, rangeStart, rangeEnd, "day", resolvedTimezone)
+    ) {
+      matching.push(event);
+    }
+  }
+  return matching;
 }
 
 export function groupThreeDayAllDayEventsByDay(

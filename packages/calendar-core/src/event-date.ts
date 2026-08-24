@@ -73,6 +73,31 @@ export function getPickerDateRangeDisplay(
   };
 }
 
+/**
+ * Compact inclusive date range for multi-day calendar chips, e.g. "Aug 26 – Aug 28".
+ */
+export function formatEventSpanLabel(
+  event: EventDateInput,
+  timezone?: string | null,
+): string {
+  const { startDate, endDate } = getEventPickerDateRange(event, timezone);
+  const sameYear = startDate.getFullYear() === endDate.getFullYear();
+  const sameDay =
+    sameYear &&
+    startDate.getMonth() === endDate.getMonth() &&
+    startDate.getDate() === endDate.getDate();
+
+  if (sameDay) {
+    return formatPickerDate(startDate, "MMM d");
+  }
+
+  if (sameYear) {
+    return `${formatPickerDate(startDate, "MMM d")} – ${formatPickerDate(endDate, "MMM d")}`;
+  }
+
+  return `${formatPickerDate(startDate, "MMM d, yyyy")} – ${formatPickerDate(endDate, "MMM d, yyyy")}`;
+}
+
 export function formatEventCalendarDate(
   event: EventDateInput,
   timezone?: string | null,

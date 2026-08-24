@@ -4,28 +4,23 @@ import React, { useMemo } from "react";
 import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
   eventOverlapsZonedCalendarDay,
+  formatEventSpanLabel,
   resolveTimezone,
   utcToPickerDate,
   wallClockToUtc,
 } from "@workspace/calendar-core";
-import {
-  addHours,
-  eachHourOfInterval,
-  format,
-  getHours,
-} from "date-fns";
-
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EncryptionStatusBadge } from "./encryption-status";
 import { EventItem } from "./event-item";
-import { getEventSegmentForCalendarDay, isAllDayRowEvent } from "./utils";
-import { WeekCellsHeight, StartHour, EndHour } from "./constants";
+import { getEventSegmentForCalendarDay, isAllDayRowEvent, isMultiDayEvent } from "./utils";
+import { WeekCellsHeight, StartHour } from "./constants";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
 import { cn } from "../../lib/utils";
 import { CurrentTimeIndicator } from "./current-time-indicator";
 import { layoutTimelineEvents } from "./timeline-layout";
+import { WEEK_HOUR_VALUES, formatWeekHourLabel } from "./week-view-hours";
 
 interface DayViewProps {
   currentDate: Date;
@@ -60,13 +55,6 @@ export function DayView({
     [currentDate, resolvedTimezone],
   );
 
-  const hours = useMemo(() => {
-    return eachHourOfInterval({
-      start: addHours(new Date(2000, 0, 1), StartHour),
-      end: addHours(new Date(2000, 0, 1), EndHour),
-    });
-  }, []);
-
   const dayEvents = useMemo(() => {
     return events
       .filter((event) =>
@@ -84,13 +72,16 @@ export function DayView({
 
   // Filter all-day events
   const allDayEvents = useMemo(() => {
-    return dayEvents.filter((event) => isAllDayRowEvent(event));
+    return dayEvents.filter((event) =>
+      isAllDayRowEvent(event, resolvedTimezone),
+    );
   }, [dayEvents, resolvedTimezone]);
 
-  // Get only single-day time-based events
   const timeEvents = useMemo(() => {
-    return dayEvents.filter((event) => !event.allDay);
-  }, [dayEvents]);
+    return dayEvents.filter(
+      (event) => !isAllDayRowEvent(event, resolvedTimezone),
+    );
+  }, [dayEvents, resolvedTimezone]);
 
   // Process events to calculate positions
   const positionedEvents = useMemo(() => {
@@ -135,6 +126,9 @@ export function DayView({
                   calendarDay,
                   resolvedTimezone,
                 );
+                const spanLabel = isMultiDayEvent(event, resolvedTimezone)
+                  ? formatEventSpanLabel(event, resolvedTimezone)
+                  : null;
 
                 return (
                   <EventItem
@@ -144,23 +138,28 @@ export function DayView({
                     view="month"
                     isFirstDay={isFirstDay}
                     isLastDay={isLastDay}
+                    connectAcrossCells={false}
                     timezone={timezone}
                     onEdit={onEventEdit}
                     onDelete={onEventDelete}
                     onView={onEventView}
                   >
-                    {/* Always show the title in day view for better usability */}
-                    <div className="flex items-center gap-1 min-w-0">
+                    <div className="flex min-w-0 items-center gap-1">
                       <EncryptionStatusBadge item={event} asIcon />
                       <span
                         className={cn(
-                          "truncate",
+                          "min-w-0 flex-1 truncate font-semibold",
                           isCancelledCalendarEvent(event) &&
                             "line-through opacity-70",
                         )}
                       >
                         {event.title}
                       </span>
+                      {spanLabel ? (
+                        <span className="shrink-0 text-[10px] font-normal tabular-nums opacity-80">
+                          {spanLabel}
+                        </span>
+                      ) : null}
                     </div>
                   </EventItem>
                 );
@@ -172,14 +171,14 @@ export function DayView({
 
       <div className="border-border/70 grid flex-1 grid-cols-[3rem_1fr] border-t sm:grid-cols-[4rem_1fr] overflow-y-auto relative min-h-0">
         <div>
-          {hours.map((hour, hourIndex) => (
+          {WEEK_HOUR_VALUES.map((hourValue) => (
             <div
-              key={hourIndex}
+              key={hourValue}
               className="border-border/70 relative h-[var(--week-cells-height)] border-b last:border-b-0"
             >
-              {hourIndex > 0 && (
+              {hourValue > StartHour && (
                 <span className="bg-background text-muted-foreground/70 absolute -top-3 left-0 flex h-6 w-16 max-w-full items-center justify-end pe-2 text-[10px] sm:pe-4 sm:text-xs">
-                  {format(hour, timeFormat === "24h" ? "HH:mm" : "h a")}
+                  {formatWeekHourLabel(hourValue, timeFormat)}
                 </span>
               )}
             </div>
@@ -226,11 +225,10 @@ export function DayView({
           )}
 
           {/* Time grid */}
-          {hours.map((hour, hourIndex) => {
-            const hourValue = getHours(hour);
+          {WEEK_HOUR_VALUES.map((hourValue) => {
             return (
               <div
-                key={hourIndex}
+                key={hourValue}
                 className="border-border/70 relative h-[var(--week-cells-height)] border-b last:border-b-0"
               >
                 {/* Quarter-hour intervals */}
@@ -239,7 +237,7 @@ export function DayView({
                   return (
                     <DroppableCell
                       key={quarter}
-                      id={`day-cell-h${hourIndex}-q${quarter}`}
+                      id={`day-cell-h${hourValue}-q${quarter}`}
                       date={calendarDay}
                       time={quarterHourTime}
                       className={cn(

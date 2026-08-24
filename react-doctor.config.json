@@ -37,6 +37,13 @@
           "react-doctor/no-event-handler",
           "react-doctor/no-danger"
         ]
+      },
+      {
+        "files": ["**/components/calendar/calendar-dnd-context.tsx"],
+        "rules": [
+          "react-doctor/no-giant-component",
+          "react-doctor/prefer-useReducer"
+        ]
       }
     ]
   }
