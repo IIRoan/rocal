@@ -4,6 +4,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   DEFAULT_CALENDAR_TIMEZONE,
   eventOverlapsZonedCalendarDay,
+  comparePickerDays,
   formatCalendarDayKey,
   formatCalendarMonthKey,
   formatCalendarWeekKey,
@@ -264,6 +265,18 @@ describe("week calendar days", () => {
     );
 
     expect(days[0]?.getDay()).toBe(6);
+  });
+});
+
+describe("comparePickerDays", () => {
+  it("orders picker dates by calendar day, not time of day", () => {
+    const morning = new Date(2026, 7, 26, 8, 0);
+    const evening = new Date(2026, 7, 26, 21, 0);
+    const next = new Date(2026, 7, 27, 0, 0);
+
+    expect(comparePickerDays(morning, evening)).toBe(0);
+    expect(comparePickerDays(morning, next)).toBeLessThan(0);
+    expect(comparePickerDays(next, evening)).toBeGreaterThan(0);
   });
 });
 

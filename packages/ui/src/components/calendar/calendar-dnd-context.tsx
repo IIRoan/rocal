@@ -2,8 +2,9 @@
 
 import {
   createContext,
-  useContext,
+  use,
   useId,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -66,7 +67,7 @@ const CalendarDndContext = createContext<CalendarDndContextType>({
 });
 
 // Hook to use the context
-export const useCalendarDnd = () => useContext(CalendarDndContext);
+export const useCalendarDnd = () => use(CalendarDndContext);
 
 // Props for the provider
 interface CalendarDndProviderProps {
@@ -331,6 +332,29 @@ export function CalendarDndProvider({
     }
   };
 
+  const dndValue = useMemo(
+    () => ({
+      activeEvent,
+      activeId,
+      activeView,
+      currentTime,
+      eventHeight,
+      isMultiDay,
+      multiDayWidth,
+      dragHandlePosition,
+    }),
+    [
+      activeEvent,
+      activeId,
+      activeView,
+      currentTime,
+      eventHeight,
+      isMultiDay,
+      multiDayWidth,
+      dragHandlePosition,
+    ],
+  );
+
   return (
     <DndContext
       id={dndContextId}
@@ -339,18 +363,7 @@ export function CalendarDndProvider({
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <CalendarDndContext.Provider
-        value={{
-          activeEvent,
-          activeId,
-          activeView,
-          currentTime,
-          eventHeight,
-          isMultiDay,
-          multiDayWidth,
-          dragHandlePosition,
-        }}
-      >
+      <CalendarDndContext.Provider value={dndValue}>
         {children}
 
         <DragOverlay adjustScale={false} dropAnimation={null}>
@@ -366,7 +379,7 @@ export function CalendarDndProvider({
               <EventItem
                 event={activeEvent}
                 view={activeView}
-                isDragging={true}
+                dragging={true}
                 showTime={activeView !== "month"}
                 currentTime={currentTime || undefined}
                 isFirstDay={dragHandlePosition?.data?.isFirstDay !== false}

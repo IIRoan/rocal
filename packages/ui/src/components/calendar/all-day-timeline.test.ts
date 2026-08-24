@@ -119,6 +119,27 @@ describe("Friday all-day event does not leak to Saturday", () => {
   );
 });
 
+describe("timed multi-day events belong in the all-day row", () => {
+  it("treats a timed span across calendar days as an all-day row event", () => {
+    const event = createEvent({
+      start: "2026-08-26T05:45:00.000Z",
+      end: "2026-08-28T06:45:00.000Z",
+    });
+    const wednesday = new Date(2026, 7, 26);
+    const thursday = new Date(2026, 7, 27);
+
+    expect(isMultiDayEvent(event, timezone)).toBe(true);
+    expect(
+      getTimedTimelineEventsForDay([event], wednesday, timezone, {
+        excludeMultiDay: true,
+      }),
+    ).toEqual([]);
+    expect(
+      eventOverlapsRange(event, wednesday, thursday, "day", timezone),
+    ).toBe(true);
+  });
+});
+
 describe("timeline overlap without allDay flag", () => {
   it("would incorrectly include UTC-midnight spans on Saturday without allDay semantics", () => {
     const pseudoAllDay = createEvent({

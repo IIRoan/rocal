@@ -151,11 +151,16 @@ export function isStartOfZonedDay(instant: Date, timezone: string): boolean {
 }
 
 export function isSamePickerDay(left: Date, right: Date): boolean {
-  return (
-    left.getFullYear() === right.getFullYear() &&
-    left.getMonth() === right.getMonth() &&
-    left.getDate() === right.getDate()
-  );
+  return comparePickerDays(left, right) === 0;
+}
+
+/** Compare picker calendar days by Y-M-D only (not as UTC instants). */
+export function comparePickerDays(left: Date, right: Date): number {
+  const yearDelta = left.getFullYear() - right.getFullYear();
+  if (yearDelta !== 0) return yearDelta;
+  const monthDelta = left.getMonth() - right.getMonth();
+  if (monthDelta !== 0) return monthDelta;
+  return left.getDate() - right.getDate();
 }
 
 function isUtcMidnight(instant: Date): boolean {
