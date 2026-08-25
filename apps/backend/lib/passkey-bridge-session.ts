@@ -4,13 +4,16 @@ import { setSessionCookie } from "better-auth/cookies";
 import type { User } from "better-auth";
 import { createLogger } from "@workspace/logger";
 import { errorLogDetails } from "./log-sanitization";
+import { setVerifiedPasskeyStepUpCookie } from "./passkey-step-up";
 import {
+  PASSKEY_BRIDGE_COMPLETE_STEP_UP_PATH,
   PASSKEY_BRIDGE_FRESHEN_PATH,
   isFreshSessionRecord,
   parsePasskeyBridgeSession,
 } from "./passkey-bridge-session-helpers";
 
 export {
+  PASSKEY_BRIDGE_COMPLETE_STEP_UP_PATH,
   PASSKEY_BRIDGE_FRESHEN_PATH,
   parsePasskeyBridgeSession,
 } from "./passkey-bridge-session-helpers";
@@ -56,6 +59,30 @@ export const passkeyBridgeFreshSessionPlugin = {
             message: "Unable to prepare passkey setup.",
           });
         }
+
+        return ctx.json({ ok: true as const });
+      },
+    ),
+    completePasskeyBridgeStepUp: createAuthEndpoint(
+      PASSKEY_BRIDGE_COMPLETE_STEP_UP_PATH,
+      {
+        method: "POST",
+        requireHeaders: true,
+        use: [sessionMiddleware],
+      },
+      async (ctx) => {
+        const current = parsePasskeyBridgeSession(ctx.context.session);
+        if (!current) {
+          throw ctx.error("UNAUTHORIZED", {
+            message: "Unauthorized",
+          });
+        }
+
+        setVerifiedPasskeyStepUpCookie({
+          setCookie: (name, value, options) => {
+            ctx.setCookie(name, value, options);
+          },
+        });
 
         return ctx.json({ ok: true as const });
       },

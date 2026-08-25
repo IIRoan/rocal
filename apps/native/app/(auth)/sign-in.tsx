@@ -13,7 +13,6 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
@@ -21,14 +20,9 @@ import { authClient } from "../../src/lib/auth-client";
 import { APP_BASE_URL } from "../../src/lib/constants";
 import { useAuth } from "../../src/providers/AuthProvider";
 import {
-  isPasskeyBridgeOriginSecure,
-  resolvePasskeyBridgeBaseUrl,
-} from "../../src/lib/passkey-browser-bridge";
-import {
   AUTH_SIGN_UP_ROUTE,
   CALENDAR_HOME_ROUTE,
 } from "../../src/lib/auth-routing";
-import { getAuthCapabilities } from "../../src/lib/auth-capabilities";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { useToast } from "../../src/providers/ToastProvider";
 import { ThemeToggle } from "../../src/components/ThemeToggle";
@@ -62,23 +56,11 @@ function resolvePasswordResetRedirectUrl(): string | null {
 }
 
 export default function SignInScreen() {
-  const { signIn, signInWithPasskey, requiresPasskeyStepUp } = useAuth();
+  const { signIn } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const authCapabilities = useMemo(() => {
-    const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
-
-    return getAuthCapabilities({
-      platformOs: Platform.OS,
-      hasPublicKeyCredential:
-        typeof globalThis.PublicKeyCredential === "function",
-      hasSecurePasskeyBridgeOrigin:
-        isPasskeyBridgeOriginSecure(passkeyBridgeBaseUrl),
-    });
-  }, []);
-  const showPasskeyButton = authCapabilities.supportsPasskeys;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -88,7 +70,6 @@ export default function SignInScreen() {
   const [isResetMode, setIsResetMode] = useState(false);
 
   const [isSigningIn, setIsSigningIn] = useState(false);
-  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
   const [isRequestingPasswordReset, setIsRequestingPasswordReset] =
     useState(false);
 
@@ -123,11 +104,11 @@ export default function SignInScreen() {
       log.ok("Sign-in successful");
       if (result.requiresPasskeyStepUp) {
         setServerError(
-          "Password accepted. Complete your passkey verification.",
+          "Password accepted, but passkeys are unavailable on this device. Sign in from a device that can verify your passkey.",
         );
-      } else {
-        router.replace(CALENDAR_HOME_ROUTE);
+        return;
       }
+      router.replace(CALENDAR_HOME_ROUTE);
     } catch (err: any) {
       const message =
         err?.message ?? "Sign-in failed. Please check your credentials.";
@@ -186,24 +167,6 @@ export default function SignInScreen() {
     }
   }, [clearErrors, email]);
 
-  const handlePasskeySignIn = useCallback(async () => {
-    clearErrors();
-    log.info("Attempting passkey sign-in");
-    setIsPasskeyLoading(true);
-    try {
-      await signInWithPasskey();
-      log.ok("Passkey sign-in successful");
-      router.replace(CALENDAR_HOME_ROUTE);
-    } catch (err: any) {
-      const message =
-        err?.message ?? "Passkey sign-in failed. Please try again.";
-      log.error("Passkey sign-in failed", err);
-      setServerError(message);
-    } finally {
-      setIsPasskeyLoading(false);
-    }
-  }, [clearErrors, router, signInWithPasskey]);
-
   const switchMode = useCallback(
     (nextMode: boolean) => {
       setIsResetMode(nextMode);
@@ -216,15 +179,14 @@ export default function SignInScreen() {
     [clearErrors],
   );
 
-  const isLoading =
-    isSigningIn || isPasskeyLoading || isRequestingPasswordReset;
+  const isLoading = isSigningIn || isRequestingPasswordReset;
 
   const title = isResetMode
     ? "Reset your email sign-in password"
     : "Welcome back";
   const subtitle = isResetMode
     ? "Enter your email and Solace will send a web link to reset your email sign-in password."
-    : "Sign in with your email and password. If your account has passkeys, you'll verify with one next.";
+    : "Sign in with your email and password.";
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
@@ -356,52 +318,6 @@ export default function SignInScreen() {
               )}
             </Pressable>
 
-            {!isResetMode ? (
-              <>
-                {requiresPasskeyStepUp && showPasskeyButton ? (
-                  <>
-                    <View style={styles.divider}>
-                      <View style={styles.dividerLine} />
-                      <Text style={styles.dividerText}>
-                        second factor required
-                      </Text>
-                      <View style={styles.dividerLine} />
-                    </View>
-
-                    <View style={styles.socialButtonsRow}>
-                      <Pressable
-                        style={({ pressed }) => [
-                          styles.socialButton,
-                          pressed && styles.secondaryButtonPressed,
-                          isLoading && styles.buttonDisabled,
-                        ]}
-                        onPress={handlePasskeySignIn}
-                        disabled={isLoading}
-                        accessibilityRole="button"
-                        accessibilityLabel="Continue with passkey"
-                        accessibilityState={{ disabled: isLoading }}
-                      >
-                        {isPasskeyLoading ? (
-                          <ActivityIndicator color={theme.colors.foreground} />
-                        ) : (
-                          <>
-                            <Feather
-                              name="key"
-                              size={16}
-                              color={theme.colors.foreground}
-                            />
-                            <Text style={styles.secondaryButtonText}>
-                              Passkey
-                            </Text>
-                          </>
-                        )}
-                      </Pressable>
-                    </View>
-                  </>
-                ) : null}
-              </>
-            ) : null}
-
             <View style={styles.footer}>
               {isResetMode ? (
                 <>
@@ -501,36 +417,6 @@ function createStyles(theme: ThemeTokens) {
     primaryButtonPressed: {
       opacity: 0.85,
     },
-    divider: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      marginVertical: theme.spacing["5"],
-    },
-    dividerLine: {
-      flex: 1,
-      height: 1,
-      backgroundColor: theme.colors.border,
-    },
-    socialButtonsRow: {
-      flexDirection: "row" as const,
-      gap: theme.spacing["3"],
-    },
-    socialButton: {
-      flex: 1,
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      gap: theme.spacing["2"],
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.lg,
-      paddingVertical: theme.spacing["3"],
-      minHeight: 48,
-      backgroundColor: theme.colors.background,
-    },
-    secondaryButtonPressed: {
-      backgroundColor: theme.colors.accent,
-    },
     buttonDisabled: {
       opacity: 0.6,
     },
@@ -610,17 +496,6 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryForeground,
-    },
-    dividerText: {
-      marginHorizontal: theme.spacing["3"],
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.mutedForeground,
-    },
-    secondaryButtonText: {
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
     },
     footerText: {
       fontSize: theme.typography.fontSize.sm.size,
