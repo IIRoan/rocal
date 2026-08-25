@@ -31,6 +31,7 @@ import {
 } from "../lib/mail/mail-password-cache";
 import { clearVaultCache } from "../lib/mail/mail-crypto";
 import { registerClearSession } from "../lib/session-clear";
+import { registerPasskeyStepUpRequired } from "../lib/passkey-step-up-required";
 
 const AUTH_STATUS_TIMEOUT_MS = 3_000;
 const AUTH_STATUS_RETRY_DELAYS_MS = [0, 150, 400] as const;
@@ -267,6 +268,15 @@ export function AuthProvider({
       registerClearSession(() => {});
     };
   }, [clearSession]);
+
+  useEffect(() => {
+    registerPasskeyStepUpRequired(() => {
+      setRequiresPasskeyStepUp(true);
+    });
+    return () => {
+      registerPasskeyStepUpRequired(() => {});
+    };
+  }, []);
 
   const completePasskeyStepUp = useCallback(async () => {
     if (!authCapabilities.supportsPasskeys) {

@@ -41,18 +41,17 @@ export const buttonVariants = cva(
 				"icon-lg": "size-8 [&_svg:not([class*='size-'])]:size-4",
 			},
 			animation: {
-				all: "active:scale-[0.97] duration-150 [transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter,outline-color,--tw-gradient-from,--tw-gradient-to] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)]",
+				all: "duration-150 [transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,filter,backdrop-filter,outline-color,--tw-gradient-from,--tw-gradient-to] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)]",
 				colors:
 					"duration-150 [transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,--tw-gradient-from,--tw-gradient-to] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)]",
 				none: "",
-				"only-scale":
-					"active:scale-[0.97] duration-150 [transition-property:transform] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)]",
+				"only-scale": "",
 			},
 		},
 		defaultVariants: {
 			variant: "default",
 			size: "default",
-			animation: "all",
+			animation: "colors",
 		},
 	},
 );

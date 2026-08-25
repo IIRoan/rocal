@@ -388,7 +388,8 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
   const router = useSmoothRouter();
   const { theme: currentTheme } = useTheme();
   const isCheckingSession = isPending;
-  const { nextPath, callbackUrl, resetSucceeded } = loginSearchParams;
+  const { nextPath, callbackUrl, resetSucceeded, stepUpRequired } =
+    loginSearchParams;
 
   const isSignUp = authMode === "sign-up";
   const isForgotPassword = authMode === "forgot-password";
@@ -590,10 +591,36 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     const authStatus = await waitForSettledAuthStatusForLogin({
       allowPasskeyStepUp: true,
     });
+    const requiresStepUp = Boolean(
+      authStatus?.authenticated && authStatus.requiresPasskeyStepUp,
+    );
+    const awaitingStepUpStatus =
+      stepUpRequired &&
+      (!authStatus ||
+        (authStatus.authenticated && authStatus.requiresPasskeyStepUp));
 
-    if (!authStatus?.authenticated || !authStatus.requiresPasskeyStepUp) {
-      redirectAfterAuth();
+    if (requiresStepUp || awaitingStepUpStatus) {
+      setLoginSessionUi({
+        overlayVisible: false,
+        overlayFading: true,
+        requiresPasskeyStepUp: true,
+      });
+
+      if (!hasAutoPromptedStepUpRef.current) {
+        if (isPasskeySupported) {
+          triggerAutoPasskeyStepUp();
+        } else {
+          dispatchChrome({
+            type: "set-notice",
+            notice:
+              "This device still needs to verify your passkey. Continue from a device that can complete passkey verification.",
+          });
+        }
+      }
+      return;
     }
+
+    redirectAfterAuth();
   }
 
   useEffect(() => {
@@ -997,13 +1024,17 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     ? "Reset your email sign-in password"
     : isSignUp
       ? "Create an account"
-      : "Welcome back";
+      : requiresPasskeyStepUp
+        ? "Verify your passkey"
+        : "Welcome back";
 
   const subtitle = isForgotPassword
     ? "Enter your Solace account email and Solace will send a reset link for your email sign-in password."
     : isSignUp
       ? `Choose your @${signupDomain} Solace email and password. Your Solace email becomes both your account address and mailbox, and this password is used locally to protect your encrypted mail vault.`
-      : "Sign in with your email and password. If your account has passkeys, you'll verify with one right after.";
+      : requiresPasskeyStepUp
+        ? "This device still needs to verify a passkey registered on another device."
+        : "Sign in with your email and password. If your account has passkeys, you'll verify with one right after.";
 
   const primaryButtonLabel = isForgotPassword
     ? "Send reset link"

@@ -158,7 +158,7 @@ export function HomePageClient() {
           </div>
           <Button
             size="sm"
-            className="ml-1 active:scale-[0.96]"
+            className="ml-1"
             onClick={handleSignIn}
             disabled={isLeaving}
           >
@@ -189,19 +189,13 @@ export function HomePageClient() {
           <div data-hero-cta className="mt-8 flex items-center gap-3">
             <Button
               size="lg"
-              className="active:scale-[0.96]"
               onClick={handleSignIn}
               disabled={isLeaving}
             >
               Sign in
               <ArrowRight />
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="active:scale-[0.96]"
-              asChild
-            >
+            <Button size="lg" variant="outline" asChild>
               <Link href="/privacy">Privacy</Link>
             </Button>
           </div>

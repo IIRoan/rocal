@@ -1,4 +1,7 @@
-import type { ApiError } from "@workspace/calendar-core";
+import {
+  isPasskeyStepUpRequiredError,
+  type ApiError,
+} from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 
 const log = createLogger("http-client");
@@ -21,6 +24,8 @@ export interface HttpClientConfig {
   getHeaders?: () => Record<string, string> | Promise<Record<string, string>>;
   /** Optional callback invoked when the API returns 401. */
   onAuthError?: (statusCode: 401) => void;
+  /** Optional callback invoked when passkey step-up is required. */
+  onPasskeyStepUpRequired?: () => void;
 }
 
 export interface RequestOptions extends RequestInit {
@@ -38,6 +43,7 @@ export class HttpClient {
     | Record<string, string>
     | Promise<Record<string, string>>;
   private onAuthError?: (statusCode: 401) => void;
+  private onPasskeyStepUpRequired?: () => void;
 
   constructor(config: HttpClientConfig) {
     this.baseURL = config.baseURL;
@@ -47,6 +53,7 @@ export class HttpClient {
     this.credentials = config.credentials ?? "include";
     this.getHeaders = config.getHeaders;
     this.onAuthError = config.onAuthError;
+    this.onPasskeyStepUpRequired = config.onPasskeyStepUpRequired;
   }
 
   private async delay(ms: number): Promise<void> {
@@ -235,6 +242,9 @@ export class HttpClient {
         if (error?.statusCode === 401 || error?.statusCode === 403) {
           if (error.statusCode === 401) {
             this.onAuthError?.(401);
+          }
+          if (isPasskeyStepUpRequiredError(error)) {
+            this.onPasskeyStepUpRequired?.();
           }
           throw error;
         }

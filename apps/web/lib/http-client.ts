@@ -10,8 +10,10 @@ export type {
 
 import { HttpClient } from "@workspace/calendar-client";
 import { getApiBaseUrl } from "./api-url";
+import { redirectToPasskeyStepUpLogin } from "./auth-navigation";
 
 // Default web instance with cookie-based auth and web API base URL
 export const httpClient = new HttpClient({
   baseURL: getApiBaseUrl(),
+  onPasskeyStepUpRequired: redirectToPasskeyStepUpLogin,
 });

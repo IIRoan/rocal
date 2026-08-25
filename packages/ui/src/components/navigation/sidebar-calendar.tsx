@@ -43,7 +43,7 @@ export function SidebarCalendar({
   const { currentDate, setCurrentDate, calendars, getVisibleCalendars } =
     useCalendarContext();
   const [calendarMonth, setCalendarMonth] = useState<Date>(currentDate);
-  const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
+  const slideDirectionRef = useRef<1 | -1>(1);
   const containerRef = useRef<HTMLDivElement>(null);
   const monthStageRef = useRef<HTMLDivElement>(null);
   const swipeLockRef = useRef(false);
@@ -76,7 +76,7 @@ export function SidebarCalendar({
   const goToPreviousMonth = () => {
     if (swipeLockRef.current) return;
     swipeLockRef.current = true;
-    setSlideDirection(-1);
+    slideDirectionRef.current = -1;
     setCalendarMonth((prev) => subMonths(prev, 1));
     window.setTimeout(() => {
       swipeLockRef.current = false;
@@ -86,7 +86,7 @@ export function SidebarCalendar({
   const goToNextMonth = () => {
     if (swipeLockRef.current) return;
     swipeLockRef.current = true;
-    setSlideDirection(1);
+    slideDirectionRef.current = 1;
     setCalendarMonth((prev) => addMonths(prev, 1));
     window.setTimeout(() => {
       swipeLockRef.current = false;
@@ -106,10 +106,13 @@ export function SidebarCalendar({
     if (hoverPrefetchRef.current) clearTimeout(hoverPrefetchRef.current);
   };
 
-  const goToCurrentMonth = () => {
-    const isGoingForward = currentDate.getTime() >= calendarMonth.getTime();
-    setSlideDirection(isGoingForward ? 1 : -1);
-    setCalendarMonth(currentDate);
+  const goToToday = () => {
+    const now = new Date();
+    const isGoingForward = now.getTime() >= calendarMonth.getTime();
+    slideDirectionRef.current = isGoingForward ? 1 : -1;
+    setCalendarMonth(now);
+    setCurrentDate(now);
+    onDateSelect?.(now);
   };
 
   useHorizontalSwipeGesture(containerRef, {
@@ -134,7 +137,7 @@ export function SidebarCalendar({
       gsap.fromTo(
         node,
         {
-          x: slideDirection > 0 ? 18 : -18,
+          x: slideDirectionRef.current > 0 ? 18 : -18,
           autoAlpha: 0,
         },
         {
@@ -147,7 +150,7 @@ export function SidebarCalendar({
       );
     },
     {
-      dependencies: [monthKey, shouldReduceMotion, slideDirection],
+      dependencies: [monthKey, shouldReduceMotion],
       scope: monthStageRef,
     },
   );
@@ -156,15 +159,9 @@ export function SidebarCalendar({
     <div ref={containerRef} className={cn("w-full", className)}>
       <div className="flex w-full items-center justify-between mb-1">
         <button
-          onClick={() => {
-            const now = new Date();
-            const isGoingForward = now.getTime() >= calendarMonth.getTime();
-            setSlideDirection(isGoingForward ? 1 : -1);
-            setCalendarMonth(now);
-            setCurrentDate(now);
-            onDateSelect?.(now);
-          }}
-          className="text-sm tracking-tight text-left hover:opacity-80 transition-opacity"
+          type="button"
+          onClick={goToToday}
+          className="text-sm tracking-tight text-left hover:opacity-80 transition-opacity cursor-pointer"
         >
           <span className="font-semibold text-foreground">
             {format(calendarMonth, "MMMM")}
@@ -175,19 +172,21 @@ export function SidebarCalendar({
         </button>
         <div className="flex items-center">
           <button
+            type="button"
             onClick={goToPreviousMonth}
             onMouseEnter={() => schedulePrefetch(subMonths(calendarMonth, 1))}
             onMouseLeave={cancelPrefetch}
-            className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
             aria-label="Previous month"
           >
             <ChevronLeft size={16} strokeWidth={2} />
           </button>
           <button
+            type="button"
             onClick={goToNextMonth}
             onMouseEnter={() => schedulePrefetch(addMonths(calendarMonth, 1))}
             onMouseLeave={cancelPrefetch}
-            className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
             aria-label="Next month"
           >
             <ChevronRight size={16} strokeWidth={2} />
@@ -217,6 +216,7 @@ export function SidebarCalendar({
 
               return (
                 <button
+                  type="button"
                   key={day.toISOString()}
                   onClick={() => {
                     setCurrentDate(day);
@@ -225,10 +225,10 @@ export function SidebarCalendar({
                   onMouseEnter={() => schedulePrefetch(day)}
                   onMouseLeave={cancelPrefetch}
                   className={cn(
-                    "relative flex items-center justify-center transition-transform",
+                    "relative flex items-center justify-center",
                     isMobile
-                      ? "aspect-square rounded-[12px] text-[14px] active:scale-90 flex-col gap-1"
-                      : "aspect-square rounded-lg text-[13px] font-medium",
+                      ? "aspect-square rounded-[12px] text-[14px] flex-col gap-1 cursor-pointer"
+                      : "aspect-square rounded-lg text-[13px] font-medium cursor-pointer",
                     !isCurrentMonth && "text-muted-foreground/30",
                     isCurrentMonth &&
                       !isSelected &&

@@ -616,19 +616,33 @@
       inset 0 1px 0 color-mix(in oklch, var(--background) 70%, transparent);
   }
 
-  /* Buttons: consistent hover/focus feedback - subtle, no excessive animation */
+  /* Buttons: color/surface feedback only — never press-scale / indent */
   button {
     transition:
       color 0.15s ease,
       background-color 0.15s ease,
       border-color 0.15s ease,
       box-shadow 0.15s ease,
-      transform 0.15s ease-out,
       opacity 0.15s ease;
   }
 
-  button:not(:disabled):not([data-no-press-scale]):active {
-    scale: 0.96;
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  summary,
+  label[for],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"],
+  select:disabled,
+  input:disabled {
+    cursor: not-allowed;
   }
 
   /* Focus visibility for a11y */
@@ -1466,10 +1480,12 @@
 }
 
 .btn-action-primary:active {
-  transform: translateY(0);
+  /* No press indent — keep surface flat; hover lift already resets via :active specificity if needed */
+  transform: none;
   box-shadow:
-    0 1px 2px color-mix(in oklch, var(--primary) 20%, transparent),
-    inset 0 1px 2px color-mix(in oklch, black 10%, transparent);
+    0 1px 2px color-mix(in oklch, var(--primary) 30%, transparent),
+    0 4px 12px color-mix(in oklch, var(--primary) 20%, transparent),
+    inset 0 1px 0 color-mix(in oklch, white 15%, transparent);
 }
 
 /* Command Palette Premium Styling */

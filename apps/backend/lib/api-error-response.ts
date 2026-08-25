@@ -19,6 +19,9 @@ export function unauthorizedBody(message = "Unauthorized access") {
   return createApiErrorBody(401, "Unauthorized", message);
 }
 
-export function forbiddenBody(message = "Access forbidden") {
-  return createApiErrorBody(403, "Forbidden", message);
+export function forbiddenBody(
+  message = "Access forbidden",
+  details?: Record<string, unknown>,
+) {
+  return createApiErrorBody(403, "Forbidden", message, details);
 }
