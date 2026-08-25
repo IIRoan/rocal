@@ -75,6 +75,12 @@ describe("NativePasskeyBridgePage", () => {
     document.body.appendChild(container);
     root = createRoot(container);
     mockRunNativePasskeyBridgeAction.mockReset();
+    mockRunNativePasskeyBridgeAction.mockImplementation(
+      async () =>
+        new Promise(() => {
+          // Leave the native sign-in prompt open until a test resolves it.
+        }),
+    );
     setBridgeSearch(
       "?mode=sign-in&callbackURL=solace%3A%2F%2Fcalendar&bridgeToken=token-1",
     );
@@ -95,15 +101,30 @@ describe("NativePasskeyBridgePage", () => {
     });
 
     expect(container.textContent).toContain("Solace");
-    expect(container.textContent).toContain("Verify your passkey");
+    expect(container.textContent).toContain("Confirm it's you");
     expect(container.textContent).toContain(
-      "Confirm it's you with a passkey, then you'll return to the Solace app.",
+      "Finish signing in with your passkey.",
     );
-    expect(container.textContent).toContain(
-      "Your password is already accepted. This last step proves it's you.",
-    );
-    expect(container.textContent).toContain("Verify passkey");
+    expect(container.textContent).toContain("Waiting for your passkey…");
+    expect(container.textContent).not.toContain("Try again");
     expect(container.textContent).toContain("Cancel and return to the app");
+  });
+
+  it("starts passkey verification automatically after password sign-in", async () => {
+    mockRunNativePasskeyBridgeAction.mockImplementation(
+      async () =>
+        new Promise(() => {
+          // Keep the prompt open for this assertion.
+        }),
+    );
+
+    await act(async () => {
+      root.render(<NativePasskeyBridgePage />);
+      await Promise.resolve();
+    });
+
+    expect(mockRunNativePasskeyBridgeAction).toHaveBeenCalled();
+    expect(container.textContent).toContain("Waiting for your passkey…");
   });
 
   it("shows a clean cancelled notice when the browser passkey prompt is dismissed", async () => {
@@ -117,20 +138,10 @@ describe("NativePasskeyBridgePage", () => {
       await Promise.resolve();
     });
 
-    const verifyButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent?.includes("Verify passkey"),
-    );
-
-    expect(verifyButton).toBeDefined();
-
-    await act(async () => {
-      verifyButton?.click();
-      await Promise.resolve();
-    });
-
     expect(container.textContent).toContain(
       "Passkey authentication was cancelled.",
     );
+    expect(container.textContent).toContain("Try again");
     expect(container.querySelector("[role='alert']")).toBeNull();
   });
 });

@@ -1,11 +1,21 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import {
+  Suspense,
+  use,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Key } from "lucide-react";
 import { createLogger } from "@workspace/logger";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { Button } from "@workspace/ui/components/ui/button";
-import { runNativePasskeyBridgeAction } from "@/lib/native-passkey-bridge-action";
+import {
+  runNativePasskeyBridgeAction,
+  type NativePasskeyBridgeActionInput,
+  type NativePasskeyBridgeActionResult,
+} from "@/lib/native-passkey-bridge-action";
 import {
   DEFAULT_NATIVE_PASSKEY_BRIDGE_PARAMS,
   NATIVE_PASSKEY_BRIDGE_PENDING_COPY,
@@ -19,6 +29,10 @@ const log = createLogger("web:passkey-bridge");
 const subscribeNever = () => () => {};
 const getClientMounted = () => true;
 const getServerMounted = () => false;
+const passkeyChallengeCache = new Map<
+  string,
+  Promise<NativePasskeyBridgeActionResult>
+>();
 
 function subscribeWindowSearch(onStoreChange: () => void) {
   window.addEventListener("popstate", onStoreChange);
@@ -69,63 +83,174 @@ function ButtonSpinner() {
   );
 }
 
-async function continuePasskeyBridge(options: {
-  mode: "sign-in" | "register";
+function WaitingRow({ label }: { label: string }) {
+  return (
+    <div
+      className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground"
+      aria-live="polite"
+      aria-busy
+    >
+      <ButtonSpinner />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function getPasskeyChallenge(
+  input: NativePasskeyBridgeActionInput & { retryKey: number },
+) {
+  const cacheKey = [
+    input.mode,
+    input.callbackURL,
+    input.bridgeToken ?? "",
+    input.passkeyName,
+    String(input.retryKey),
+  ].join("\0");
+  const cached = passkeyChallengeCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const pending = (async () => {
+    emitLog("info", "Starting passkey bridge action", {
+      mode: input.mode,
+      callbackUrl: summarizeUrl(input.callbackURL),
+      hasBridgeToken: Boolean(input.bridgeToken),
+      passkeyName: input.passkeyName,
+    });
+
+    const result = await runNativePasskeyBridgeAction(input);
+    applyPasskeyBridgeRedirect(result, input.callbackURL);
+
+    if (result.status === "cancelled") {
+      emitLog("info", "Passkey bridge action cancelled", {
+        mode: input.mode,
+        message: result.message,
+        callbackUrl: summarizeUrl(input.callbackURL),
+      });
+    } else if (result.status === "error") {
+      emitLog("error", "Passkey bridge action failed", {
+        mode: input.mode,
+        message: result.message,
+        callbackUrl: summarizeUrl(input.callbackURL),
+      });
+    }
+
+    return result;
+  })();
+  passkeyChallengeCache.set(cacheKey, pending);
+  return pending;
+}
+
+function applyPasskeyBridgeRedirect(
+  result: NativePasskeyBridgeActionResult,
+  callbackURL: string,
+) {
+  if (result.status !== "redirect") {
+    return;
+  }
+
+  emitLog("info", "Redirecting back to native app", {
+    callbackUrl: summarizeUrl(callbackURL),
+    optionKeys: ["url"],
+  });
+  window.location.replace(result.url);
+}
+
+function SignInPasskeyAttempt({
+  callbackURL,
+  bridgeToken,
+  passkeyName,
+  copy,
+  retryKey,
+  onRetry,
+}: {
   callbackURL: string;
   bridgeToken: string | null;
   passkeyName: string;
-  cancelMessage: string;
-  failureMessage: string;
-  onError: (message: string | null) => void;
-  onNotice: (message: string | null) => void;
-  onWorking: (working: boolean) => void;
+  copy: ReturnType<typeof getNativePasskeyBridgeCopy>;
+  retryKey: number;
+  onRetry: () => void;
 }) {
-  options.onWorking(true);
-  options.onError(null);
-  options.onNotice(null);
-  emitLog("info", "Starting passkey bridge action", {
-    mode: options.mode,
-    callbackUrl: summarizeUrl(options.callbackURL),
-    hasBridgeToken: Boolean(options.bridgeToken),
-    passkeyName: options.passkeyName,
-  });
-
-  const result = await runNativePasskeyBridgeAction({
-    mode: options.mode,
-    callbackURL: options.callbackURL,
-    bridgeToken: options.bridgeToken,
-    passkeyName: options.passkeyName,
-    cancelMessage: options.cancelMessage,
-    failureMessage: options.failureMessage,
-  });
+  const result = use(
+    getPasskeyChallenge({
+      mode: "sign-in",
+      callbackURL,
+      bridgeToken,
+      passkeyName,
+      cancelMessage: copy.cancelMessage,
+      failureMessage: copy.failureMessage,
+      retryKey,
+    }),
+  );
 
   if (result.status === "redirect") {
-    emitLog("info", "Redirecting back to native app", {
-      callbackUrl: summarizeUrl(options.callbackURL),
-      optionKeys: ["url"],
-    });
-    window.location.replace(result.url);
-    return;
+    return <WaitingRow label={copy.workingLabel} />;
   }
 
   if (result.status === "cancelled") {
-    options.onNotice(result.message);
-    emitLog("info", "Passkey bridge action cancelled", {
-      mode: options.mode,
-      message: result.message,
-      callbackUrl: summarizeUrl(options.callbackURL),
-    });
-    options.onWorking(false);
-    return;
+    return (
+      <>
+        <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
+          <p className="text-sm text-foreground">{result.message}</p>
+        </div>
+        <Button
+          type="button"
+          onClick={onRetry}
+          className="h-11 w-full rounded-lg font-medium"
+        >
+          <Key className="size-4" />
+          <span>{copy.actionLabel}</span>
+        </Button>
+      </>
+    );
   }
 
-  options.onError(result.message);
-  emitLog("error", "Passkey bridge action failed", {
-    mode: options.mode,
-    message: result.message,
-    callbackUrl: summarizeUrl(options.callbackURL),
-  });
-  options.onWorking(false);
+  return (
+    <>
+      <div
+        className="mb-5 rounded-lg border border-destructive/20 bg-destructive/10 p-3"
+        role="alert"
+      >
+        <p className="text-sm text-destructive">{result.message}</p>
+      </div>
+      <Button
+        type="button"
+        onClick={onRetry}
+        className="h-11 w-full rounded-lg font-medium"
+      >
+        <Key className="size-4" />
+        <span>{copy.actionLabel}</span>
+      </Button>
+    </>
+  );
+}
+
+function SignInPasskeyPanel({
+  callbackURL,
+  bridgeToken,
+  passkeyName,
+  copy,
+}: {
+  callbackURL: string;
+  bridgeToken: string | null;
+  passkeyName: string;
+  copy: ReturnType<typeof getNativePasskeyBridgeCopy>;
+}) {
+  const [retryKey, setRetryKey] = useState(0);
+
+  return (
+    <Suspense fallback={<WaitingRow label={copy.workingLabel} />}>
+      <SignInPasskeyAttempt
+        callbackURL={callbackURL}
+        bridgeToken={bridgeToken}
+        passkeyName={passkeyName}
+        copy={copy}
+        retryKey={retryKey}
+        onRetry={() => setRetryKey((current) => current + 1)}
+      />
+    </Suspense>
+  );
 }
 
 export function NativePasskeyBridgeContent() {
@@ -150,10 +275,12 @@ export function NativePasskeyBridgeContent() {
     ? getNativePasskeyBridgeCopy(mode)
     : NATIVE_PASSKEY_BRIDGE_PENDING_COPY;
   const isValidCallback = isValidNativePasskeyCallbackURL(callbackURL);
-  const helperText =
-    mode === "register"
-      ? `This passkey will be saved as “${passkeyName}”.`
-      : "Your password is already accepted. This last step proves it's you.";
+  const canStart =
+    Boolean(callbackURL) &&
+    isValidCallback &&
+    (mode === "register" || Boolean(bridgeToken));
+  const autoStartSignIn =
+    isMounted && mode === "sign-in" && canStart && callbackURL;
 
   useEffect(() => {
     if (!isMounted) {
@@ -219,18 +346,46 @@ export function NativePasskeyBridgeContent() {
       return;
     }
 
-    void continuePasskeyBridge({
+    setIsWorking(true);
+    setError(null);
+    setNotice(null);
+    void runNativePasskeyBridgeAction({
       mode,
       callbackURL,
       bridgeToken,
       passkeyName,
       cancelMessage: copy.cancelMessage,
       failureMessage: copy.failureMessage,
-      onError: setError,
-      onNotice: setNotice,
-      onWorking: setIsWorking,
+    }).then((result) => {
+      applyPasskeyBridgeRedirect(result, callbackURL);
+
+      if (result.status === "redirect") {
+        return;
+      }
+
+      setIsWorking(false);
+
+      if (result.status === "cancelled") {
+        emitLog("info", "Passkey bridge action cancelled", {
+          mode,
+          message: result.message,
+          callbackUrl: summarizeUrl(callbackURL),
+        });
+        setNotice(result.message);
+        return;
+      }
+
+      emitLog("error", "Passkey bridge action failed", {
+        mode,
+        message: result.message,
+        callbackUrl: summarizeUrl(callbackURL),
+      });
+      setError(result.message);
     });
   }
+
+  const showWaiting =
+    isWorking || (mode === "sign-in" && !isMounted && !notice && !error);
 
   return (
     <section className="flex min-h-[100dvh]">
@@ -283,38 +438,40 @@ export function NativePasskeyBridgeContent() {
             </div>
           ) : null}
 
-          {isMounted && isValidCallback ? (
+          {mode === "register" && isMounted && isValidCallback ? (
             <div className="mb-6 rounded-lg border border-border/50 bg-muted/30 p-3">
-              <p className="text-sm text-muted-foreground">{helperText}</p>
+              <p className="text-sm text-muted-foreground">
+                This passkey will be saved as “{passkeyName}”.
+              </p>
             </div>
           ) : null}
 
-          <Button
-            type="button"
-            disabled={isWorking || !isMounted}
-            onClick={handleContinue}
-            className="h-11 w-full rounded-lg font-medium"
-            aria-busy={isWorking}
-          >
-            {isWorking ? (
-              <>
-                <ButtonSpinner />
-                <span>{copy.workingLabel}</span>
-              </>
-            ) : (
-              <>
-                <Key className="size-4" />
-                <span>{copy.actionLabel}</span>
-              </>
-            )}
-          </Button>
+          {autoStartSignIn ? (
+            <SignInPasskeyPanel
+              callbackURL={callbackURL}
+              bridgeToken={bridgeToken}
+              passkeyName={passkeyName}
+              copy={copy}
+            />
+          ) : showWaiting ? (
+            <WaitingRow label={copy.workingLabel} />
+          ) : (
+            <Button
+              type="button"
+              disabled={!isMounted || !canStart}
+              onClick={handleContinue}
+              className="h-11 w-full rounded-lg font-medium"
+            >
+              <Key className="size-4" />
+              <span>{copy.actionLabel}</span>
+            </Button>
+          )}
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             <button
               type="button"
-              disabled={isWorking}
               onClick={handleCancel}
-              className="font-medium text-primary transition-colors hover:text-primary/80 disabled:pointer-events-none disabled:opacity-50"
+              className="font-medium text-primary transition-colors hover:text-primary/80"
             >
               Cancel and return to the app
             </button>

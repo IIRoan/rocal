@@ -116,16 +116,15 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
     };
   }, [isAuthenticated, user, bootstrap, clearSession, provider, queryClient]);
 
-  // Gate the main app until E2EE is ready so keys are generated before the
-  // user reaches any screen that reads or writes encrypted content. Children
-  // mount only once the gate clears; the loading layer then fades out on top
-  // of them for a smooth hand-off to the app.
+  // Keep the navigator mounted and cover it until encryption is ready. That
+  // way sign-in stays put during passkey, then one loading board covers the
+  // hand-off to calendar instead of flashing the calendar underneath.
   const isPreparingWorkspace =
     isAuthenticated && !isLoading && (!isE2eeReady || isPreparingStartupCrypto);
 
   return (
     <View style={{ flex: 1 }}>
-      {!isPreparingWorkspace && children}
+      {children}
       <WorkspaceLoadingScreen
         active={isPreparingWorkspace}
         message={setupMessage}

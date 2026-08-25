@@ -23,7 +23,6 @@ import { useTheme } from "../providers/ThemeProvider";
 const logoSource = require("../assets/logo.png");
 
 const FADE_OUT_MS = 460;
-const FADE_IN_MS = 180;
 
 interface WorkspaceLoadingScreenProps {
   /** When true the gate is shown; when it flips to false the screen fades out. */
@@ -72,11 +71,7 @@ export function WorkspaceLoadingScreen({
   useEffect(() => {
     if (active) {
       setMounted(true);
-      Animated.timing(screenOpacity, {
-        toValue: 1,
-        duration: FADE_IN_MS,
-        useNativeDriver: true,
-      }).start();
+      screenOpacity.setValue(1);
       return;
     }
     Animated.timing(screenOpacity, {
@@ -235,6 +230,7 @@ function createStyles(theme: ThemeTokens) {
   return StyleSheet.create({
     screen: {
       backgroundColor: theme.colors.background,
+      pointerEvents: "auto",
     },
     content: {
       flex: 1,
