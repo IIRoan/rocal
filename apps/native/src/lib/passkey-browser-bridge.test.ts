@@ -102,13 +102,13 @@ describe("passkey browser bridge", () => {
 
     const openAuthSessionAsync = jest.fn(async () => ({
       type: "success",
-      url: "solace://calendar?oneTimeToken=bridge-ott&passkeyVerified=1",
+      url: "solace://sign-in?oneTimeToken=bridge-ott&passkeyVerified=1",
     }));
 
     await expect(
       signInWithBrowserPasskey(routeClient, {
         appBaseUrl: "https://app.example.com",
-        createCallbackUrl: () => "solace://calendar",
+        createCallbackUrl: () => "solace://sign-in",
         addUrlListener: jest.fn(() => createNoopSubscription()),
         openAuthSessionAsync,
       }),
@@ -126,8 +126,8 @@ describe("passkey browser bridge", () => {
       },
     );
     expect(openAuthSessionAsync).toHaveBeenCalledWith(
-      "https://app.example.com/passkey/native?mode=sign-in&callbackURL=solace%3A%2F%2Fcalendar&bridgeToken=handoff-ott",
-      "solace://calendar",
+      "https://app.example.com/passkey/native?mode=sign-in&callbackURL=solace%3A%2F%2Fsign-in&bridgeToken=handoff-ott",
+      "solace://sign-in",
     );
     expect(routeClient.$fetch).toHaveBeenNthCalledWith(
       2,
@@ -208,7 +208,7 @@ describe("passkey browser bridge", () => {
 
     const resultPromise = signInWithBrowserPasskey(routeClient, {
       appBaseUrl: "https://app.example.com",
-      createCallbackUrl: () => "solace:///calendar",
+      createCallbackUrl: () => "solace:///sign-in",
       addUrlListener: jest.fn((nextListener: (url: string) => void) => {
         listener = nextListener;
         return createNoopSubscription();
@@ -224,7 +224,7 @@ describe("passkey browser bridge", () => {
     while (!listener) {
       await Promise.resolve();
     }
-    listener("solace:///calendar?oneTimeToken=bridge-ott");
+    listener("solace:///sign-in?oneTimeToken=bridge-ott");
 
     await expect(resultPromise).resolves.toEqual({
       session: { token: "session-token" },

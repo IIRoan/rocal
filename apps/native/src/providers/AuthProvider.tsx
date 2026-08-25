@@ -287,24 +287,18 @@ export function AuthProvider({
         );
       }
 
-      applySessionData(result.data);
       await waitForPasskeyStepUpToClear();
       return;
     }
 
     if (authCapabilities.passkeyMode === "browser-bridge") {
-      const result = await signInWithBrowserPasskey(authClient);
-      applySessionData(result);
+      await signInWithBrowserPasskey(authClient);
       await waitForPasskeyStepUpToClear();
       return;
     }
 
     throw new Error("Passkey verification failed. Please try again.");
-  }, [
-    applySessionData,
-    authCapabilities,
-    waitForPasskeyStepUpToClear,
-  ]);
+  }, [authCapabilities, waitForPasskeyStepUpToClear]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {
@@ -343,25 +337,25 @@ export function AuthProvider({
       }
 
       try {
-        await finalizeAuthenticatedSession(authData, "Sign-in");
         setEmailPasswordAuthHints(password);
-        // Persist password to SecureStore so the mail vault can be unlocked
-        // even after an app restart (in-memory ref is lost on restart).
         await saveMailVaultPassword(password);
       } catch (error) {
         resetAuthMethodHints();
         throw error;
       }
 
+      await waitForSessionCookie();
       const requiresStepUp = await syncPasskeyStepUpAfterAuth();
       if (requiresStepUp) {
         if (!authCapabilities.supportsPasskeys) {
+          await finalizeAuthenticatedSession(authData, "Sign-in");
           return { requiresPasskeyStepUp: true };
         }
 
         await completePasskeyStepUp();
       }
 
+      await finalizeAuthenticatedSession(authData, "Sign-in");
       return { requiresPasskeyStepUp: false };
     },
     [
@@ -391,7 +385,6 @@ export function AuthProvider({
       try {
         await finalizeAuthenticatedSession(result.data, "Sign-up");
         setEmailPasswordAuthHints(password);
-        // Persist password to SecureStore (mirrors signIn behaviour above).
         await saveMailVaultPassword(password);
         setRequiresPasskeyStepUp(false);
       } catch (error) {

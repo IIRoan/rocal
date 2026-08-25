@@ -1,7 +1,7 @@
 import * as Linking from "expo-linking";
 import { createLogger } from "@workspace/logger";
 import type { PasskeyRouteClient } from "./passkey-auth";
-import { CALENDAR_HOME_ROUTE, SETTINGS_ROUTE } from "./auth-routing";
+import { AUTH_SIGN_IN_ROUTE, SETTINGS_ROUTE } from "./auth-routing";
 import { persistPasskeyStepUpCookie } from "./session-cookie";
 import { API_BASE_URL, APP_BASE_URL } from "./constants";
 
@@ -128,7 +128,7 @@ export async function signInWithBrowserPasskey(
     client,
     "Unable to start passkey verification.",
   );
-  const callbackUrl = dependencies.createCallbackUrl(CALENDAR_HOME_ROUTE);
+  const callbackUrl = dependencies.createCallbackUrl(AUTH_SIGN_IN_ROUTE);
   const startUrl = buildPasskeyBridgeUrl({
     appBaseUrl: dependencies.appBaseUrl,
     mode: "sign-in",

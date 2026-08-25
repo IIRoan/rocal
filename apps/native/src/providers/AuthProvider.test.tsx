@@ -248,7 +248,6 @@ describe("AuthProvider", () => {
 
     expect(getAuth().isAuthenticated).toBe(true);
     expect(getAuth().lastAuthMethod).toBe("email-password");
-    expect(mockWaitForSessionCookie).not.toHaveBeenCalled();
   });
 
   it("keeps a successful sign-in when auth status is temporarily unavailable", async () => {
@@ -395,6 +394,60 @@ describe("AuthProvider", () => {
     expect(mockPasskeySignIn).not.toHaveBeenCalled();
     expect(getAuth().lastAuthMethod).toBe("email-password");
     expect(getAuth().consumePendingAuthPassword()).toBe("secret-password");
+    expect(getAuth().isAuthenticated).toBe(true);
+  });
+
+  it("keeps the session unauthenticated until passkey verification finishes", async () => {
+    mockGetAuthCapabilities.mockReturnValue({
+      supportsPassword: true,
+      supportsGitHubOAuth: true,
+      supportsPasskeys: true,
+      passkeyMode: "browser-bridge",
+      passkeyMessage: null,
+    });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        authenticated: true,
+        hasPasskeys: true,
+        requiresPasskeyStepUp: true,
+      }),
+    } as Response);
+
+    let releasePasskey: (value: ReturnType<typeof createSessionData>) => void =
+      () => {};
+    mockSignInWithBrowserPasskey.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releasePasskey = resolve;
+        }),
+    );
+
+    await renderProvider();
+
+    let signInPromise: Promise<{ requiresPasskeyStepUp: boolean }> | undefined;
+    await act(async () => {
+      signInPromise = getAuth().signIn("roan@example.com", "secret-password");
+      await Promise.resolve();
+    });
+
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(mockSignInWithBrowserPasskey).toHaveBeenCalled();
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        authenticated: true,
+        hasPasskeys: true,
+        requiresPasskeyStepUp: false,
+      }),
+    } as Response);
+
+    await act(async () => {
+      releasePasskey(createSessionData());
+      await signInPromise;
+    });
+
     expect(getAuth().isAuthenticated).toBe(true);
   });
 

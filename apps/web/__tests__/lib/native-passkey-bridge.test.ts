@@ -45,7 +45,7 @@ describe("native passkey bridge helpers", () => {
     });
     expect(getNativePasskeyBridgeCopy("register").title).toBe("Add a passkey");
     expect(getNativePasskeyBridgeCopy("sign-in").title).toBe(
-      "Verify your passkey",
+      "Confirm it's you",
     );
   });
 

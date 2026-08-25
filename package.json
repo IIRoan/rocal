@@ -51,6 +51,7 @@
     "bun-types": "^1.3.14",
     "minimatch": "10.1.1",
     "prettier": "3.7.4",
+    "railway": "^3.11.0",
     "react-doctor": "^0.2.10",
     "typescript": "5.9.3"
   },

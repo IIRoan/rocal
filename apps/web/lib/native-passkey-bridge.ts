@@ -96,10 +96,9 @@ export function getNativePasskeyBridgeCopy(mode: NativePasskeyBridgeMode): {
   }
 
   return {
-    title: "Verify your passkey",
-    description:
-      "Confirm it's you with a passkey, then you'll return to the Solace app.",
-    actionLabel: "Verify passkey",
+    title: "Confirm it's you",
+    description: "Finish signing in with your passkey.",
+    actionLabel: "Try again",
     workingLabel: "Waiting for your passkey…",
     cancelMessage: "Passkey authentication was cancelled.",
     failureMessage: "Unable to finish passkey verification.",

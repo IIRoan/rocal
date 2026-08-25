@@ -12,14 +12,11 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
 import { useAuth } from "../../src/providers/AuthProvider";
-import {
-  AUTH_SIGN_IN_ROUTE,
-  CALENDAR_HOME_ROUTE,
-} from "../../src/lib/auth-routing";
+import { AUTH_SIGN_IN_ROUTE } from "../../src/lib/auth-routing";
 import { accountApiService } from "../../src/lib/api";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { ThemeToggle } from "../../src/components/ThemeToggle";
@@ -60,7 +57,6 @@ function validatePassword(password: string): string | null {
 
 export default function SignUpScreen() {
   const { signUp } = useAuth();
-  const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -149,7 +145,6 @@ export default function SignUpScreen() {
 
       await signUp(trimmedName, availability.normalizedEmail, password);
       log.ok("Sign-up successful");
-      router.replace(CALENDAR_HOME_ROUTE);
     } catch (err: any) {
       const message = err?.message ?? "Sign-up failed. Please try again.";
       log.error("Sign-up failed", err);
@@ -157,7 +152,7 @@ export default function SignUpScreen() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [clearErrors, desiredEmail, name, password, router, signUp]);
+  }, [clearErrors, desiredEmail, name, password, signUp]);
 
   // ── Render ─────────────────────────────────────────────────────────
 

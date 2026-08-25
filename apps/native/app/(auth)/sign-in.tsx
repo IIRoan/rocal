@@ -13,16 +13,13 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
 import { authClient } from "../../src/lib/auth-client";
 import { APP_BASE_URL } from "../../src/lib/constants";
 import { useAuth } from "../../src/providers/AuthProvider";
-import {
-  AUTH_SIGN_UP_ROUTE,
-  CALENDAR_HOME_ROUTE,
-} from "../../src/lib/auth-routing";
+import { AUTH_SIGN_UP_ROUTE } from "../../src/lib/auth-routing";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { useToast } from "../../src/providers/ToastProvider";
 import { ThemeToggle } from "../../src/components/ThemeToggle";
@@ -58,7 +55,6 @@ function resolvePasswordResetRedirectUrl(): string | null {
 export default function SignInScreen() {
   const { signIn } = useAuth();
   const { toast } = useToast();
-  const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -106,9 +102,7 @@ export default function SignInScreen() {
         setServerError(
           "Password accepted, but passkeys are unavailable on this device. Sign in from a device that can verify your passkey.",
         );
-        return;
       }
-      router.replace(CALENDAR_HOME_ROUTE);
     } catch (err: any) {
       const message =
         err?.message ?? "Sign-in failed. Please check your credentials.";
@@ -117,7 +111,7 @@ export default function SignInScreen() {
     } finally {
       setIsSigningIn(false);
     }
-  }, [clearErrors, email, password, router, signIn]);
+  }, [clearErrors, email, password, signIn]);
 
   const handleRequestPasswordReset = useCallback(async () => {
     clearErrors();
