@@ -17,6 +17,7 @@ import { useTheme } from "../../providers/ThemeProvider";
 import { formatAddress, formatMessageDate } from "../../lib/mail/mail-helpers";
 import { buildMailPreviewSnippet } from "../../lib/mail/mail-preview";
 import type { JmapEmailMessage } from "../../lib/mail/types";
+import { BlobatarAvatar } from "../BlobatarAvatar";
 
 if (
   Platform.OS === "android" &&
@@ -135,6 +136,11 @@ export function ConversationThreadStrip({
                 ) : (
                   <View style={styles.readSpacer} />
                 )}
+                <BlobatarAvatar
+                  email={threadMessage.from?.[0]?.email}
+                  name={threadMessage.from?.[0]?.name}
+                  size={20}
+                />
                 <View style={styles.rowContent}>
                   <Text
                     style={[styles.sender, isActive && styles.senderActive]}

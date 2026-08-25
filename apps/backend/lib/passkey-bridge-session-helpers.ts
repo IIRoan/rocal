@@ -1,4 +1,6 @@
 export const PASSKEY_BRIDGE_FRESHEN_PATH = "/passkey-bridge/freshen-session";
+export const PASSKEY_BRIDGE_COMPLETE_STEP_UP_PATH =
+  "/passkey-bridge/complete-step-up";
 
 type SessionRecord = {
   token?: unknown;

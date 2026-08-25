@@ -124,6 +124,7 @@ function createMockAuthContext(
     signUp: jest.fn(),
     signOut: jest.fn(),
     signInWithPasskey: jest.fn(),
+    completePasskeyStepUp: jest.fn(),
     registerPasskey: jest.fn(),
     deletePasskey: jest.fn(),
     consumePendingAuthPassword: jest.fn(() => null),
