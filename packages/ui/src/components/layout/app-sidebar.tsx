@@ -98,7 +98,7 @@ export function AppSidebar({
                   type="button"
                   onClick={onOpenSearch}
                   aria-label="Search"
-                  className="size-9 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors active:scale-90"
+                  className="size-9 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors cursor-pointer"
                 >
                   <Search size={18} strokeWidth={2} />
                 </button>
@@ -106,7 +106,7 @@ export function AppSidebar({
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="outline-none active:scale-90 transition-transform">
+                <button type="button" className="outline-none cursor-pointer">
                   <BlobatarAvatar
                     email={user?.email}
                     name={user?.name}
@@ -159,7 +159,7 @@ export function AppSidebar({
               <Button
                 onClick={onCreateEvent}
                 variant="outline"
-                className="h-10 w-full rounded-xl border-border/60 text-foreground/80 font-medium transition-colors active:scale-[0.98]"
+                className="h-10 w-full rounded-xl border-border/60 text-foreground/80 font-medium transition-colors"
                 style={{ fontWeight: 470 }}
               >
                 <Plus size={17} strokeWidth={2} />
@@ -329,7 +329,7 @@ export function AppSidebar({
           <SheetClose asChild>
             <Button
               variant="ghost"
-              className="w-full h-11 rounded-xl bg-muted/50 hover:bg-muted font-medium text-sm transition-all active:scale-[0.98]"
+              className="w-full h-11 rounded-xl bg-muted/50 hover:bg-muted font-medium text-sm transition-colors"
             >
               Close
             </Button>

@@ -36,10 +36,10 @@ export function WallpaperBackdrop() {
   return (
     <div aria-hidden className="absolute inset-0 overflow-hidden bg-background">
       <div
-        className="absolute inset-0 will-change-transform"
+        className="absolute inset-0 opacity-[0.6] will-change-transform"
         style={{
-          transformOrigin: "16% 32%",
-          transform: "translate(12%, 10%) scale(1.78)",
+          transformOrigin: "26% 32%",
+          transform: "translate(20%, 10%) scale(1.78)",
         }}
       >
         <ImageDithering

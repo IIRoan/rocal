@@ -20,9 +20,10 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthSessionGuard />
-      <E2eeBootstrap />
-      {children}
+      <AuthSessionGuard>
+        <E2eeBootstrap />
+        {children}
+      </AuthSessionGuard>
     </QueryClientProvider>
   );
 }

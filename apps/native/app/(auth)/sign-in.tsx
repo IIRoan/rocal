@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +20,7 @@ import { authClient } from "../../src/lib/auth-client";
 import { APP_BASE_URL } from "../../src/lib/constants";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { AUTH_SIGN_UP_ROUTE } from "../../src/lib/auth-routing";
+import { resolvePasskeyAutoPromptAction } from "../../src/lib/passkey-step-up-prompt";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { useToast } from "../../src/providers/ToastProvider";
 import { ThemeToggle } from "../../src/components/ThemeToggle";
@@ -53,7 +54,7 @@ function resolvePasswordResetRedirectUrl(): string | null {
 }
 
 export default function SignInScreen() {
-  const { signIn } = useAuth();
+  const { signIn, requiresPasskeyStepUp, completePasskeyStepUp } = useAuth();
   const { toast } = useToast();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -68,6 +69,8 @@ export default function SignInScreen() {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isRequestingPasswordReset, setIsRequestingPasswordReset] =
     useState(false);
+  const [isVerifyingPasskey, setIsVerifyingPasskey] = useState(false);
+  const hasStartedPasskeyPromptRef = useRef(false);
 
   const passwordRef = useRef<TextInput>(null);
 
@@ -159,7 +162,42 @@ export default function SignInScreen() {
     } finally {
       setIsRequestingPasswordReset(false);
     }
-  }, [clearErrors, email]);
+  }, [clearErrors, email, toast]);
+
+  const handleVerifyPasskey = useCallback(async () => {
+    hasStartedPasskeyPromptRef.current = true;
+    clearErrors();
+    setIsVerifyingPasskey(true);
+    try {
+      await completePasskeyStepUp();
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Passkey verification failed. Please try again.";
+      log.error("Passkey verification failed", err);
+      setServerError(message);
+    } finally {
+      setIsVerifyingPasskey(false);
+    }
+  }, [clearErrors, completePasskeyStepUp]);
+
+  useEffect(() => {
+    const action = resolvePasskeyAutoPromptAction({
+      requiresPasskeyStepUp,
+      isPasswordSignInInFlight: isSigningIn,
+      hasStartedPrompt: hasStartedPasskeyPromptRef.current,
+    });
+
+    if (action === "skip") {
+      return;
+    }
+
+    hasStartedPasskeyPromptRef.current = true;
+    if (action === "prompt") {
+      void handleVerifyPasskey();
+    }
+  }, [handleVerifyPasskey, isSigningIn, requiresPasskeyStepUp]);
 
   const switchMode = useCallback(
     (nextMode: boolean) => {
@@ -173,14 +211,19 @@ export default function SignInScreen() {
     [clearErrors],
   );
 
-  const isLoading = isSigningIn || isRequestingPasswordReset;
+  const isLoading =
+    isSigningIn || isRequestingPasswordReset || isVerifyingPasskey;
 
   const title = isResetMode
     ? "Reset your email sign-in password"
-    : "Welcome back";
+    : requiresPasskeyStepUp
+      ? "Verify your passkey"
+      : "Welcome back";
   const subtitle = isResetMode
     ? "Enter your email and Solace will send a web link to reset your email sign-in password."
-    : "Sign in with your email and password.";
+    : requiresPasskeyStepUp
+      ? "This device still needs to verify a passkey registered on another device."
+      : "Sign in with your email and password.";
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
@@ -312,6 +355,29 @@ export default function SignInScreen() {
               )}
             </Pressable>
 
+            {requiresPasskeyStepUp && !isResetMode ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  pressed && styles.secondaryButtonPressed,
+                  isLoading && styles.buttonDisabled,
+                ]}
+                onPress={() => {
+                  void handleVerifyPasskey();
+                }}
+                disabled={isLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Use passkey"
+                accessibilityState={{ disabled: isLoading }}
+              >
+                {isVerifyingPasskey ? (
+                  <ActivityIndicator color={theme.colors.foreground} />
+                ) : (
+                  <Text style={styles.secondaryButtonText}>Use passkey</Text>
+                )}
+              </Pressable>
+            ) : null}
+
             <View style={styles.footer}>
               {isResetMode ? (
                 <>
@@ -411,6 +477,20 @@ function createStyles(theme: ThemeTokens) {
     primaryButtonPressed: {
       opacity: 0.85,
     },
+    secondaryButton: {
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.lg,
+      paddingVertical: theme.spacing["3"],
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      minHeight: 48,
+      marginTop: theme.spacing["3"],
+    },
+    secondaryButtonPressed: {
+      opacity: 0.85,
+    },
     buttonDisabled: {
       opacity: 0.6,
     },
@@ -490,6 +570,13 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryForeground,
+    },
+    secondaryButtonText: {
+      fontSize: theme.typography.fontSize.base.size,
+      lineHeight: theme.typography.fontSize.base.lineHeight,
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
     },
     footerText: {
       fontSize: theme.typography.fontSize.sm.size,

@@ -155,7 +155,6 @@ function EventWrapper({
         "data-past-event:opacity-65",
         "data-invitation-ghost:border data-invitation-ghost:border-dashed data-invitation-ghost:border-current/60 data-invitation-ghost:bg-transparent data-invitation-ghost:opacity-75",
         "hover:brightness-[1.04] hover:shadow-sm hover:ring-1 hover:ring-black/10 dark:hover:ring-white/15 hover:z-10",
-        "active:brightness-[0.97]",
         "touch-manipulation",
         compact
           ? "min-h-0 px-1"
