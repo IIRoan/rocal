@@ -13,6 +13,7 @@ This repository is a monorepo for **Solace** — a calendar and mail application
   - `lib/` — Auth, errors, recurrence, ICS, notification calculator, etc.
 - **Mail server**: Stalwart, accessed **only via JMAP** (clients through `StalwartJmapClient` + backend JMAP proxy; provisioning via Stalwart admin JMAP).
 - **apps/notifications**: Go service for scheduled email notifications (Resend + HTML templates).
+- **Railway**: the Rocal project is defined in `.railway/railway.ts`. Do not add per-service `railway.toml` / `railway.json`. Preview with `railway config plan`; apply only when asked.
 
 ### Shared Packages
 
@@ -81,16 +82,16 @@ If only one platform changes, **say so explicitly** and why.
 
 ### Feature map
 
-| Feature area           | Web                                                | Native                                                            |
-| ---------------------- | -------------------------------------------------- | ----------------------------------------------------------------- |
+| Feature area           | Web                                                | Native                                                                                                                          |
+| ---------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | Calendar views         | `apps/web/app/calendar/`, `@workspace/ui` calendar | `apps/native/app/(tabs)/calendar/`, `src/components/calendar/` (day/3-day/week via `@howljs/calendar-kit`; month/agenda custom) |
-| Event create/edit/view | `apps/web/components/event-editor/`                | `src/components/event/` (`EventForm`, `EventSheet`), `app/event/` |
-| Mail                   | `apps/web/components/mail/`, `app/mail/`           | `app/(tabs)/mail/`, `src/components/mail/`                        |
-| Calendar CRUD          | `apps/web/components/calendar-manager.tsx`         | `app/calendar-manage/`                                            |
-| Subscriptions (ICS)    | `apps/web/components/subscription-management.tsx`  | `app/subscription/`                                               |
-| Search / quick actions | `apps/web/components/command-palette/`             | `src/components/CommandPalette.tsx`                               |
-| Settings               | command palette + `app/settings/` (web)            | `app/settings/`                                                   |
-| Auth                   | `apps/web/app/login/`                              | `app/(auth)/`                                                     |
+| Event create/edit/view | `apps/web/components/event-editor/`                | `src/components/event/` (`EventForm`, `EventSheet`), `app/event/`                                                               |
+| Mail                   | `apps/web/components/mail/`, `app/mail/`           | `app/(tabs)/mail/`, `src/components/mail/`                                                                                      |
+| Calendar CRUD          | `apps/web/components/calendar-manager.tsx`         | `app/calendar-manage/`                                                                                                          |
+| Subscriptions (ICS)    | `apps/web/components/subscription-management.tsx`  | `app/subscription/`                                                                                                             |
+| Search / quick actions | `apps/web/components/command-palette/`             | `src/components/CommandPalette.tsx`                                                                                             |
+| Settings               | command palette + `app/settings/` (web)            | `app/settings/`                                                                                                                 |
+| Auth                   | `apps/web/app/login/`                              | `app/(auth)/`                                                                                                                   |
 
 Search both codebases for domain terms (`participants`, `recurrence`, `mailbox`, etc.) before implementing.
 
