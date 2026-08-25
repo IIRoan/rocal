@@ -116,6 +116,8 @@ Search both codebases for domain terms (`participants`, `recurrence`, `mailbox`,
 - **Warm, restrained palette** — amber/ochre primary (`--primary`), soft neutrals, subtle borders. Defined in `apps/web/app/globals.css` and `@workspace/design-tokens`. **Never** introduce random purple/blue gradients, neon accents, or new palette colors outside tokens/CSS variables.
 - **Density over decoration** — tight spacing, clear hierarchy, minimal chrome. No hero cards, oversized rounded corners, or heavy drop shadows unless an adjacent screen already uses them.
 - **Subtle motion only** — small fades/slides where the codebase already animates (drawers, popovers). No gratuitous bounce, parallax, or staggered list theatrics.
+- **No press-scale / indent** — never shrink, scale down, translate inward, or inset-shadow “dent” controls on `:active` / press (`active:scale-*`, `scale: 0.9x`, `whileTap` scale, global button press transforms). Click feedback is color/background/opacity only. Hover may brighten or lift slightly; press must not squash the control.
+- **Pointer cursor on clickables** — interactive controls (`button`, links, `[role="button"]`, clickable rows) must show `cursor-pointer` (disabled → `not-allowed`). Do not leave the default arrow on clickable UI.
 - **Real copy** — use product-appropriate labels. No lorem ipsum, “Welcome to…”, or marketing filler in functional UI.
 
 ### Web rules
@@ -125,6 +127,7 @@ Search both codebases for domain terms (`participants`, `recurrence`, `mailbox`,
 3. **Icons: `lucide-react` only** (project standard via shadcn). Match size/weight of neighboring icons (`size-4`, `strokeWidth={2.25}` where used nearby).
 4. **Follow local patterns** — e.g. event editor toggle pills, drawer shells, `border-border/50` section dividers, `text-sm` form labels, popover info buttons (see `SyncedEventInfoBadge`, `ParticipantsInviteInfo`).
 5. **Do not add** new UI libraries, CSS-in-JS, or global style overrides for one feature.
+6. **No press indent** — do not add `active:scale-*`, press `transform`/`scale`, or inset active shadows that make controls dent in. Prefer `cursor-pointer` + color/hover feedback.
 
 ### Native rules
 
@@ -143,6 +146,8 @@ Search both codebases for domain terms (`participants`, `recurrence`, `mailbox`,
 - Emoji as icons; mixed icon libraries
 - One-off components when an existing shared or feature component can be extended
 - Desktop-only hover affordances without a tap equivalent on mobile/native
+- Press-scale / “dent in” on click (`active:scale-*`, global `button:active { scale }`, inset press shadows)
+- Missing `cursor-pointer` on clickable web controls
 
 When unsure, **copy structure and classes from the closest existing feature** and change only what the task requires.
 

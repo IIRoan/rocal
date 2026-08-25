@@ -1,6 +1,10 @@
 import { Elysia, status } from "elysia";
 import { createLogger } from "@workspace/logger";
 import { auth } from "./auth";
+import {
+  PASSKEY_STEP_UP_REQUIRED_CODE,
+  PASSKEY_STEP_UP_REQUIRED_MESSAGE,
+} from "@workspace/calendar-core";
 import { forbiddenBody, unauthorizedBody } from "./api-error-response";
 import { hasUserId, type AuthenticatedUser } from "./auth-utils";
 import { errorLogDetails } from "./log-sanitization";
@@ -66,7 +70,12 @@ export const requireAuth = new Elysia({ name: "require-auth" }).derive(
       });
 
       if (stepUpStatus.requiresPasskeyStepUp) {
-        return status(403, forbiddenBody("Passkey verification required."));
+        return status(
+          403,
+          forbiddenBody(PASSKEY_STEP_UP_REQUIRED_MESSAGE, {
+            code: PASSKEY_STEP_UP_REQUIRED_CODE,
+          }),
+        );
       }
     }
 

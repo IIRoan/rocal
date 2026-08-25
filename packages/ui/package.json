@@ -60,6 +60,7 @@
     "./components": "./src/components/index.ts",
     "./components/*": "./src/components/*/index.ts",
     "./components/ui": "./src/components/ui/index.ts",
+    "./components/ui/button-variants": "./src/components/ui/button-variants.ts",
     "./components/ui/*": "./src/components/ui/*.tsx",
     "./components/calendar": "./src/components/calendar/index.ts",
     "./components/layout": "./src/components/layout/index.ts",

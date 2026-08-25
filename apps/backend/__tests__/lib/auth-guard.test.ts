@@ -96,6 +96,7 @@ describe("requireAuth", () => {
       error: "Forbidden",
       message: "Passkey verification required.",
       statusCode: 403,
+      details: { code: "PASSKEY_STEP_UP_REQUIRED" },
     });
   });
 

@@ -90,7 +90,7 @@ export function EventDots({
           <button
             type="button"
             className={cn(
-              "group/evdots focus-visible:border-ring focus-visible:ring-ring/50 relative flex h-full w-full overflow-hidden text-left font-medium transition-all duration-200 ease-out outline-none select-none focus-visible:ring-[3px] hover:-translate-y-px hover:brightness-[1.07] hover:shadow-md hover:z-10 active:translate-y-0 active:brightness-95 active:shadow-sm rounded shadow-sm",
+              "group/evdots focus-visible:border-ring focus-visible:ring-ring/50 relative flex h-full w-full cursor-pointer overflow-hidden text-left font-medium transition-[box-shadow,filter,z-index] duration-200 ease-out outline-none select-none focus-visible:ring-[3px] hover:brightness-[1.07] hover:shadow-md hover:z-10 rounded shadow-sm",
               "min-h-[20px] sm:min-h-[24px]",
             )}
             onClick={(e) => {

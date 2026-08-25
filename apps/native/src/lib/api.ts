@@ -24,6 +24,7 @@ import {
   waitForSessionCookie,
 } from "./session-cookie";
 import { triggerSessionClear } from "./session-clear";
+import { triggerPasskeyStepUpRequired } from "./passkey-step-up-required";
 
 export function getNativeExpoOrigin() {
   return Linking.createURL("", { scheme: APP_SCHEME });
@@ -65,6 +66,7 @@ export const httpClient = new HttpClient({
   credentials: "omit",
   getHeaders: getAuthHeadersAsync,
   onAuthError: triggerSessionClear,
+  onPasskeyStepUpRequired: triggerPasskeyStepUpRequired,
 });
 
 export const calendarApiService = new CalendarApiService(

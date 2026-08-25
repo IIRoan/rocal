@@ -861,6 +861,45 @@ describe("LoginForm", () => {
     expect(mockCompleteAuthNavigation).not.toHaveBeenCalled();
   });
 
+  it("stays on login and prompts for passkey when step-up is required", async () => {
+    mockUseSession.mockReturnValue({
+      data: {
+        user: {
+          id: "user-1",
+          email: "roan@solace.onl",
+          name: "Roan",
+        },
+      },
+      isPending: false,
+      refetch: mockRefetchSession,
+    });
+    mockGetAuthStatus.mockResolvedValue({
+      authenticated: true,
+      hasPasskeys: true,
+      requiresPasskeyStepUp: true,
+    });
+    mockPasskeySignIn.mockImplementation(
+      () => new Promise(() => undefined) as never,
+    );
+
+    await renderForm();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockCompleteAuthNavigation).not.toHaveBeenCalled();
+    expect(mockPasskeySignIn).toHaveBeenCalledWith({
+      autoFocus: true,
+    });
+    expect(container.textContent).toContain("Verify your passkey");
+    expect(container.textContent).toContain(
+      "This device still needs to verify a passkey registered on another device.",
+    );
+  });
+
   it("clears orphaned local auth artifacts before email sign-in", async () => {
     await renderForm();
 

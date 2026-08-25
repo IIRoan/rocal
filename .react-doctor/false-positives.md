@@ -20,12 +20,13 @@ Patterns that fire diagnostics but are safe to suppress.
 
 ## react-doctor/only-export-components — shadcn convention
 
-- **Files**: `packages/ui/src/components/ui/button.tsx`,
-  `packages/ui/src/components/ui/badge.tsx`
+- **Files**: `packages/ui/src/components/ui/badge.tsx`
 - **Why FP**: shadcn/ui's component template colocates `xxxVariants` (a
   cva-built helper) with the component itself. Splitting these defeats the
   reason callers import from a single file and is an upstream convention we
   intentionally follow.
+- **Note**: `button.tsx` was split (`button-variants.ts`) so Fast Refresh
+  stays valid (2026-08-25).
 
 ## react-doctor/only-export-components — encryption-status companion re-exports
 

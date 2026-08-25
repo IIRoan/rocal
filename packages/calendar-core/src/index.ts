@@ -27,6 +27,7 @@ export * from "./calendar-helpers";
 export * from "./calendar-month-ranges";
 export * from "./calendar-navigation";
 export * from "./auth-accounts";
+export * from "./passkey-step-up";
 export { RecurrenceEngine } from "@workspace/calendar-ics/recurrence";
 export * from "./calendar-event-link";
 export * from "./event-reminder-mail";

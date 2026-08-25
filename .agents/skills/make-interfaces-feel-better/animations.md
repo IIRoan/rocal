@@ -278,68 +278,23 @@ The non-absolute icon (InactiveIcon) defines the layout size. The absolute icon 
 - `filter`: `"blur(4px)"` → `"blur(0px)"`
 - `transition`: `{ type: "spring", duration: 0.3, bounce: 0 }` — **bounce must always be `0`**, never `0.1` or any other value
 
-## Scale on Press
+## No Press-Scale / Indent (Solace)
 
-A subtle scale-down on click gives buttons tactile feedback. Always use `scale(0.96)`. Never use a value smaller than `0.95` — anything below feels exaggerated. Use CSS transitions for interruptibility — if the user releases mid-press, it should smoothly return.
+**Do not** scale controls down on click. Press-scale (`active:scale-*`, `button:active { scale }`, `whileTap={{ scale }}`) and inset active shadows that dent the surface are forbidden in Solace — they feel cheap and fight pointer/hover affordances.
 
-Not every button needs this. Add a `static` prop to your button component that disables the scale effect when the motion would be distracting.
-
-### CSS Example
-
-```css
-.button {
-  transition-property: scale;
-  transition-duration: 150ms;
-  transition-timing-function: ease-out;
-}
-
-.button:active {
-  scale: 0.96;
-}
-```
-
-### Tailwind Example
+Use color, background, or opacity for press/hover feedback. Always set `cursor-pointer` on clickable controls (disabled → `not-allowed`).
 
 ```tsx
-<button className="transition-transform duration-150 ease-out active:scale-[0.96]">
+// Good
+<button className="cursor-pointer transition-colors hover:bg-muted">
   Click me
 </button>
+
+// Bad — never
+<button className="active:scale-[0.96] transition-transform">Click me</button>
 ```
 
-### Motion Example
-
-```tsx
-<motion.button whileTap={{ scale: 0.96 }}>
-  Click me
-</motion.button>
-```
-
-### Static Prop Pattern
-
-Extract the scale class into a variable and conditionally apply it based on a `static` prop:
-
-```tsx
-const tapScale = "active:not-disabled:scale-[0.96]";
-
-function Button({ static: isStatic, className, children, ...props }) {
-  return (
-    <button
-      className={cn(
-        "transition-transform duration-150 ease-out",
-        !isStatic && tapScale,
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-}
-
-// Usage
-<Button>Click me</Button>           {/* scales on press */}
-<Button static>Submit</Button>       {/* no scale */}
-```
+Enter/exit dialog scale animations (mount/unmount) are fine — only press/indent on interaction is banned.
 
 ## Skip Animation on Page Load
 

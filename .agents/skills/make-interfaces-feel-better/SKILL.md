@@ -13,7 +13,7 @@ Great interfaces rarely come from a single thing. It's usually a collection of s
 | --- | --- |
 | [Typography](typography.md) | Text wrapping, font smoothing, tabular numbers |
 | [Surfaces](surfaces.md) | Border radius, optical alignment, shadows, image outlines, hit areas |
-| [Animations](animations.md) | Interruptible animations, enter/exit transitions, icon animations, scale on press |
+| [Animations](animations.md) | Interruptible animations, enter/exit transitions, icon animations (no press-scale) |
 | [Performance](performance.md) | Transition specificity, `will-change` usage |
 
 ## Core Principles
@@ -62,9 +62,11 @@ Use `text-wrap: balance` on headings. Use `text-wrap: pretty` for body text to a
 
 Add a subtle `1px` outline with low opacity to images for consistent depth. The color must be pure black in light mode (`rgba(0, 0, 0, 0.1)`) and pure white in dark mode (`rgba(255, 255, 255, 0.1)`) — never a near-black like slate, zinc, or any tinted neutral. A tinted outline picks up the surface color underneath it and reads as dirt on the image edge.
 
-### 12. Scale on Press
+### 12. No Press-Scale / Indent (Solace)
 
-A subtle `scale(0.96)` on click gives buttons tactile feedback. Always use `0.96`. Never use a value smaller than `0.95` — anything below feels exaggerated. Add a `static` prop to disable it when motion would be distracting.
+**Do not** scale, shrink, or inset-shadow controls on press. Solace treats press-scale as bad UX. Click feedback is color, background, or opacity only. Always use `cursor-pointer` on clickable controls.
+
+Forbidden: `active:scale-*`, `button:active { scale }`, `whileTap={{ scale }}`, inset active shadows that dent the surface.
 
 ### 13. Skip Animation on Page Load
 
@@ -72,7 +74,7 @@ Use `initial={false}` on `AnimatePresence` to prevent enter animations on first 
 
 ### 14. Never Use `transition: all`
 
-Always specify exact properties: `transition-property: scale, opacity`. Tailwind's `transition-transform` covers `transform, translate, scale, rotate`.
+Always specify exact properties: `transition-property: opacity, background-color`. Tailwind's `transition-colors` / `transition-opacity` are preferred over `transition-transform` for press feedback.
 
 ### 15. Use `will-change` Sparingly
 
@@ -96,6 +98,7 @@ Interactive elements need at least 40×40px hit area. Extend with a pseudo-eleme
 | `transition: all` on elements | Specify exact properties |
 | First-frame animation stutter | Add `will-change: transform` (sparingly) |
 | Tiny hit areas on small controls | Extend with pseudo-element to 40×40px |
+| Press-scale / dent on click | Remove `active:scale-*`; use color/opacity + `cursor-pointer` |
 
 ## Review Output Format
 
@@ -115,11 +118,11 @@ Always present changes as a markdown table with **Before** and **After** columns
 | `<span>{count}</span>` on animated counter | `<span className="tabular-nums">{count}</span>` |
 | Default numerals on timer | Added `font-variant-numeric: tabular-nums` to root |
 
-#### Scale on press
+#### No press-scale
 | Before | After |
 | --- | --- |
-| `<button className="...">` | Added `active:scale-[0.96] transition-transform` |
-| `scale(0.9)` on press | Raised to `scale(0.96)` — anything below `0.95` feels exaggerated |
+| `active:scale-[0.96] transition-transform` | Removed; color hover only + `cursor-pointer` |
+| Global `button:active { scale: 0.96 }` | Removed |
 
 Rows should cite the specific file and the specific property that changed when it isn't obvious from the snippet. If a principle was reviewed but nothing needed to change, omit that table entirely — empty tables add noise.
 
@@ -134,7 +137,7 @@ Rows should cite the specific file and the specific property that changed when i
 - [ ] Font smoothing is applied
 - [ ] Headings use text-wrap: balance
 - [ ] Images have subtle outlines
-- [ ] Buttons use scale on press where appropriate
+- [ ] No press-scale / indent on clickables; `cursor-pointer` present
 - [ ] AnimatePresence uses `initial={false}` for default-state elements
 - [ ] No `transition: all` — only specific properties
 - [ ] `will-change` only on transform/opacity/filter, never `all`
