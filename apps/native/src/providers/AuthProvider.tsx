@@ -33,6 +33,7 @@ import { clearVaultCache } from "../lib/mail/mail-crypto";
 import { registerClearSession } from "../lib/session-clear";
 
 const AUTH_STATUS_TIMEOUT_MS = 3_000;
+const AUTH_STATUS_RETRY_DELAYS_MS = [0, 150, 400] as const;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -75,6 +76,8 @@ export interface AuthContextValue {
   signOut: () => Promise<void>;
   /** Authenticate using platform biometrics (passkey). */
   signInWithPasskey: () => Promise<void>;
+  /** Verify a registered passkey after email/password sign-in. */
+  completePasskeyStepUp: () => Promise<void>;
   /** Register a passkey for the current account. */
   registerPasskey: () => Promise<void>;
   /** Delete a passkey from the current account. */
@@ -228,6 +231,28 @@ export function AuthProvider({
     }
   }, [fetchAuthStatus]);
 
+  const waitForPasskeyStepUpToClear = useCallback(async () => {
+    for (const delayMs of AUTH_STATUS_RETRY_DELAYS_MS) {
+      if (delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+
+      try {
+        const authStatus = await fetchAuthStatus();
+        const requiresStepUp =
+          authStatus.authenticated && authStatus.requiresPasskeyStepUp;
+        if (!requiresStepUp) {
+          setRequiresPasskeyStepUp(false);
+          return;
+        }
+      } catch {
+        // Retry while cookie persistence catches up.
+      }
+    }
+
+    setRequiresPasskeyStepUp(false);
+  }, [fetchAuthStatus]);
+
   const clearSession = useCallback(() => {
     setUser(null);
     setSession(null);
@@ -242,6 +267,44 @@ export function AuthProvider({
       registerClearSession(() => {});
     };
   }, [clearSession]);
+
+  const completePasskeyStepUp = useCallback(async () => {
+    if (!authCapabilities.supportsPasskeys) {
+      throw new Error(
+        authCapabilities.passkeyMessage ??
+          "Passkey verification failed. Please try again.",
+      );
+    }
+
+    if (authCapabilities.passkeyMode === "web") {
+      const result = await authClient.signIn.passkey();
+
+      if (result.error) {
+        throw new Error(
+          typeof result.error.message === "string"
+            ? result.error.message
+            : "Passkey verification failed. Please try again.",
+        );
+      }
+
+      applySessionData(result.data);
+      await waitForPasskeyStepUpToClear();
+      return;
+    }
+
+    if (authCapabilities.passkeyMode === "browser-bridge") {
+      const result = await signInWithBrowserPasskey(authClient);
+      applySessionData(result);
+      await waitForPasskeyStepUpToClear();
+      return;
+    }
+
+    throw new Error("Passkey verification failed. Please try again.");
+  }, [
+    applySessionData,
+    authCapabilities,
+    waitForPasskeyStepUpToClear,
+  ]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {
@@ -285,14 +348,25 @@ export function AuthProvider({
         // Persist password to SecureStore so the mail vault can be unlocked
         // even after an app restart (in-memory ref is lost on restart).
         await saveMailVaultPassword(password);
-        const requiresStepUp = await syncPasskeyStepUpAfterAuth();
-        return { requiresPasskeyStepUp: requiresStepUp };
       } catch (error) {
         resetAuthMethodHints();
         throw error;
       }
+
+      const requiresStepUp = await syncPasskeyStepUpAfterAuth();
+      if (requiresStepUp) {
+        if (!authCapabilities.supportsPasskeys) {
+          return { requiresPasskeyStepUp: true };
+        }
+
+        await completePasskeyStepUp();
+      }
+
+      return { requiresPasskeyStepUp: false };
     },
     [
+      authCapabilities.supportsPasskeys,
+      completePasskeyStepUp,
       finalizeAuthenticatedSession,
       resetAuthMethodHints,
       setEmailPasswordAuthHints,
@@ -496,6 +570,7 @@ export function AuthProvider({
       signUp,
       signOut,
       signInWithPasskey,
+      completePasskeyStepUp,
       registerPasskey,
       deletePasskey,
       consumePendingAuthPassword,
@@ -511,6 +586,7 @@ export function AuthProvider({
       signUp,
       signOut,
       signInWithPasskey,
+      completePasskeyStepUp,
       registerPasskey,
       deletePasskey,
       consumePendingAuthPassword,

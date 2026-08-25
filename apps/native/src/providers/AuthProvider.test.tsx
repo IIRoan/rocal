@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { authClient } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { waitForSessionCookie } from "../lib/session-cookie";
+import { signInWithBrowserPasskey } from "../lib/passkey-browser-bridge";
 import { AuthProvider, useAuth } from "./AuthProvider";
 
 jest.mock("react-native", () => ({
@@ -88,6 +89,7 @@ const mockEmailSignUp = jest.mocked(authClient.signUp.email);
 const mockSignOut = jest.mocked(authClient.signOut);
 const mockGetAuthCapabilities = jest.mocked(getAuthCapabilities);
 const mockWaitForSessionCookie = jest.mocked(waitForSessionCookie);
+const mockSignInWithBrowserPasskey = jest.mocked(signInWithBrowserPasskey);
 const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 
 function createSessionData() {
@@ -171,6 +173,7 @@ describe("AuthProvider", () => {
     mockSignOut.mockReset();
     mockGetAuthCapabilities.mockReset();
     mockWaitForSessionCookie.mockReset();
+    mockSignInWithBrowserPasskey.mockReset();
 
     mockGetAuthCapabilities.mockReturnValue({
       supportsPassword: true,
@@ -181,6 +184,7 @@ describe("AuthProvider", () => {
     });
     mockGetSession.mockResolvedValue({ data: null });
     mockWaitForSessionCookie.mockResolvedValue(true);
+    mockSignInWithBrowserPasskey.mockResolvedValue(createSessionData());
     mockEmailSignIn.mockResolvedValue(createAuthResult());
     mockEmailSignUp.mockResolvedValue(createAuthResult());
     mockSocialSignIn.mockResolvedValue(createAuthResult());
@@ -321,5 +325,114 @@ describe("AuthProvider", () => {
     expect(mockSignOut).toHaveBeenCalled();
     expect(getAuth().lastAuthMethod).toBe("unknown");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
+  });
+
+  it("opens passkey verification after password sign-in without clearing the pending password", async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          authenticated: true,
+          hasPasskeys: true,
+          requiresPasskeyStepUp: true,
+        }),
+      } as Response)
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          authenticated: true,
+          hasPasskeys: true,
+          requiresPasskeyStepUp: false,
+        }),
+      } as Response);
+
+    await renderProvider();
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+
+    expect(mockPasskeySignIn).toHaveBeenCalled();
+    expect(getAuth().lastAuthMethod).toBe("email-password");
+    expect(getAuth().consumePendingAuthPassword()).toBe("secret-password");
+    expect(getAuth().requiresPasskeyStepUp).toBe(false);
+    expect(getAuth().isAuthenticated).toBe(true);
+  });
+
+  it("uses the browser passkey popup for native step-up after password sign-in", async () => {
+    mockGetAuthCapabilities.mockReturnValue({
+      supportsPassword: true,
+      supportsGitHubOAuth: true,
+      supportsPasskeys: true,
+      passkeyMode: "browser-bridge",
+      passkeyMessage: null,
+    });
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          authenticated: true,
+          hasPasskeys: true,
+          requiresPasskeyStepUp: true,
+        }),
+      } as Response)
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          authenticated: true,
+          hasPasskeys: true,
+          requiresPasskeyStepUp: false,
+        }),
+      } as Response);
+
+    await renderProvider();
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+
+    expect(mockSignInWithBrowserPasskey).toHaveBeenCalled();
+    expect(mockPasskeySignIn).not.toHaveBeenCalled();
+    expect(getAuth().lastAuthMethod).toBe("email-password");
+    expect(getAuth().consumePendingAuthPassword()).toBe("secret-password");
+    expect(getAuth().isAuthenticated).toBe(true);
+  });
+
+  it("keeps the password session when passkey verification is cancelled", async () => {
+    mockGetAuthCapabilities.mockReturnValue({
+      supportsPassword: true,
+      supportsGitHubOAuth: true,
+      supportsPasskeys: true,
+      passkeyMode: "browser-bridge",
+      passkeyMessage: null,
+    });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        authenticated: true,
+        hasPasskeys: true,
+        requiresPasskeyStepUp: true,
+      }),
+    } as Response);
+    mockSignInWithBrowserPasskey.mockRejectedValue(
+      new Error("Passkey verification was cancelled."),
+    );
+
+    await renderProvider();
+
+    let thrown: unknown;
+    await act(async () => {
+      try {
+        await getAuth().signIn("roan@example.com", "secret-password");
+      } catch (error) {
+        thrown = error;
+      }
+    });
+
+    expect(thrown).toEqual(new Error("Passkey verification was cancelled."));
+    expect(getAuth().lastAuthMethod).toBe("email-password");
+    expect(getAuth().consumePendingAuthPassword()).toBe("secret-password");
+    expect(getAuth().requiresPasskeyStepUp).toBe(true);
+    expect(getAuth().isAuthenticated).toBe(false);
   });
 });

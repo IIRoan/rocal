@@ -33,9 +33,14 @@ export const NATIVE_PASSKEY_BRIDGE_PENDING_COPY = {
   title: "Passkey",
   description: "Preparing passkey handoff…",
   actionLabel: "Continue",
+  workingLabel: "Waiting for your passkey…",
   cancelMessage: "",
   failureMessage: "",
 } as const;
+
+const PASSKEY_CANCELLED_NAMES = new Set(["AbortError", "NotAllowedError"]);
+const PASSKEY_CANCELLED_MESSAGE =
+  /not allowed|timed out|denied permission|user cancelled|user canceled|the operation was aborted|\babort(?:ed)?\b/i;
 
 export function getNativePasskeyBridgeMode(
   value: string | null,
@@ -74,6 +79,7 @@ export function getNativePasskeyBridgeCopy(mode: NativePasskeyBridgeMode): {
   title: string;
   description: string;
   actionLabel: string;
+  workingLabel: string;
   cancelMessage: string;
   failureMessage: string;
 } {
@@ -81,21 +87,60 @@ export function getNativePasskeyBridgeCopy(mode: NativePasskeyBridgeMode): {
     return {
       title: "Add a passkey",
       description:
-        "Use your browser's passkey support, then Solace will return you to the app.",
+        "Create a passkey in this browser, then you'll return to the Solace app.",
       actionLabel: "Add passkey",
-      cancelMessage: "Passkey setup was cancelled.",
+      workingLabel: "Waiting for your passkey…",
+      cancelMessage: "Passkey authentication was cancelled.",
       failureMessage: "Unable to finish passkey setup.",
     };
   }
 
   return {
-    title: "Continue with a passkey",
+    title: "Verify your passkey",
     description:
-      "Sign in with your passkey in the browser, then Solace will return you to the app.",
-    actionLabel: "Continue",
-    cancelMessage: "Passkey sign-in was cancelled.",
-    failureMessage: "Passkey sign-in failed. Please try again.",
+      "Confirm it's you with a passkey, then you'll return to the Solace app.",
+    actionLabel: "Verify passkey",
+    workingLabel: "Waiting for your passkey…",
+    cancelMessage: "Passkey authentication was cancelled.",
+    failureMessage: "Unable to finish passkey verification.",
   };
+}
+
+export function isPasskeyAuthCancelled(error: unknown): boolean {
+  if (!error) {
+    return false;
+  }
+
+  if (typeof error === "string") {
+    return PASSKEY_CANCELLED_MESSAGE.test(error);
+  }
+
+  if (typeof error !== "object") {
+    return false;
+  }
+
+  const record = error as {
+    name?: unknown;
+    message?: unknown;
+    error?: unknown;
+  };
+
+  if (typeof record.name === "string" && PASSKEY_CANCELLED_NAMES.has(record.name)) {
+    return true;
+  }
+
+  if (
+    typeof record.message === "string" &&
+    PASSKEY_CANCELLED_MESSAGE.test(record.message)
+  ) {
+    return true;
+  }
+
+  if (record.error && record.error !== error) {
+    return isPasskeyAuthCancelled(record.error);
+  }
+
+  return false;
 }
 
 const DISALLOWED_CALLBACK_PROTOCOLS = new Set([
@@ -128,6 +173,7 @@ export function buildNativePasskeyCallbackURL(
   options: {
     oneTimeToken?: string;
     passkeyRegistered?: boolean;
+    passkeyVerified?: boolean;
     error?: string;
   },
 ): string {
@@ -141,6 +187,10 @@ export function buildNativePasskeyCallbackURL(
     url.searchParams.set("passkeyRegistered", "1");
   }
 
+  if (options.passkeyVerified) {
+    url.searchParams.set("passkeyVerified", "1");
+  }
+
   if (options.error) {
     url.searchParams.set("error", options.error);
   }
@@ -151,7 +201,12 @@ export function buildNativePasskeyCallbackURL(
 export function getNativePasskeyBridgeError(
   error: unknown,
   fallbackMessage: string,
+  cancelMessage?: string,
 ): string {
+  if (cancelMessage && isPasskeyAuthCancelled(error)) {
+    return cancelMessage;
+  }
+
   if (typeof error === "string" && error.trim()) {
     return error;
   }

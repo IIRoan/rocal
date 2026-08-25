@@ -4,6 +4,7 @@ import {
   getNativePasskeyBridgeError,
   getPasskeyBridgeFreshenRequest,
   getWebAuthnSupportError,
+  isPasskeyAuthCancelled,
   type NativePasskeyBridgeMode,
 } from "@/lib/native-passkey-bridge";
 
@@ -12,17 +13,33 @@ export type NativePasskeyBridgeActionInput = {
   callbackURL: string;
   bridgeToken: string | null;
   passkeyName: string;
+  cancelMessage: string;
   failureMessage: string;
 };
 
 export type NativePasskeyBridgeActionResult =
   | { status: "redirect"; url: string }
+  | { status: "cancelled"; message: string }
   | { status: "error"; message: string };
 
 type AuthClientFetchResult = {
   data: { token?: string } | null;
   error: { message?: string } | null;
 };
+
+function resolvePasskeyClientError(
+  error: unknown,
+  input: Pick<NativePasskeyBridgeActionInput, "cancelMessage" | "failureMessage">,
+): NativePasskeyBridgeActionResult {
+  if (isPasskeyAuthCancelled(error)) {
+    return { status: "cancelled", message: input.cancelMessage };
+  }
+
+  return {
+    status: "error",
+    message: getNativePasskeyBridgeError(error, input.failureMessage),
+  };
+}
 
 function getBrowserWebAuthnSupportError() {
   return getWebAuthnSupportError({
@@ -93,13 +110,7 @@ export async function runNativePasskeyBridgeAction(
       });
 
       if (registration.error) {
-        return {
-          status: "error",
-          message:
-            typeof registration.error.message === "string"
-              ? registration.error.message
-              : "Unable to finish passkey setup.",
-        };
+        return resolvePasskeyClientError(registration.error, input);
       }
 
       return {
@@ -110,18 +121,35 @@ export async function runNativePasskeyBridgeAction(
       };
     }
 
+    if (!input.bridgeToken) {
+      return {
+        status: "error",
+        message:
+          "Sign in with email and password in the app first, then verify your passkey.",
+      };
+    }
+
+    const bridgeSession = (await authClient.$fetch("/one-time-token/verify", {
+      method: "POST",
+      body: { token: input.bridgeToken },
+      throw: false,
+    })) as AuthClientFetchResult;
+
+    if (!bridgeSession.data) {
+      return {
+        status: "error",
+        message:
+          bridgeSession.error?.message ??
+          "Unable to start passkey verification.",
+      };
+    }
+
     const signInResult = await authClient.signIn.passkey({
       autoFocus: true,
     });
 
     if (signInResult.error) {
-      return {
-        status: "error",
-        message:
-          typeof signInResult.error.message === "string"
-            ? signInResult.error.message
-            : "Passkey sign-in failed. Please try again.",
-      };
+      return resolvePasskeyClientError(signInResult.error, input);
     }
 
     const tokenResult = (await authClient.$fetch("/one-time-token/generate", {
@@ -133,7 +161,8 @@ export async function runNativePasskeyBridgeAction(
       return {
         status: "error",
         message:
-          tokenResult.error?.message ?? "Unable to finish passkey sign-in.",
+          tokenResult.error?.message ??
+          "Unable to finish passkey verification.",
       };
     }
 
@@ -141,12 +170,10 @@ export async function runNativePasskeyBridgeAction(
       status: "redirect",
       url: buildNativePasskeyCallbackURL(input.callbackURL, {
         oneTimeToken: tokenResult.data.token,
+        passkeyVerified: true,
       }),
     };
   } catch (caughtError) {
-    return {
-      status: "error",
-      message: getNativePasskeyBridgeError(caughtError, input.failureMessage),
-    };
+    return resolvePasskeyClientError(caughtError, input);
   }
 }

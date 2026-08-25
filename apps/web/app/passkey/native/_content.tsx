@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { Key } from "lucide-react";
 import { createLogger } from "@workspace/logger";
+import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
+import { Button } from "@workspace/ui/components/ui/button";
 import { runNativePasskeyBridgeAction } from "@/lib/native-passkey-bridge-action";
 import {
   DEFAULT_NATIVE_PASSKEY_BRIDGE_PARAMS,
@@ -12,10 +15,6 @@ import {
   readNativePasskeyBridgeParams,
 } from "@/lib/native-passkey-bridge";
 
-const PRIMARY_BUTTON =
-  "inline-flex h-11 w-full items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground shadow-md transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50";
-const SECONDARY_BUTTON =
-  "inline-flex h-11 w-full items-center justify-center rounded-full border border-border bg-background px-5 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50";
 const log = createLogger("web:passkey-bridge");
 const subscribeNever = () => () => {};
 const getClientMounted = () => true;
@@ -61,17 +60,29 @@ function emitLog(
   log[level](event, data);
 }
 
+function ButtonSpinner() {
+  return (
+    <div
+      className="size-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
+      aria-hidden="true"
+    />
+  );
+}
+
 async function continuePasskeyBridge(options: {
   mode: "sign-in" | "register";
   callbackURL: string;
   bridgeToken: string | null;
   passkeyName: string;
+  cancelMessage: string;
   failureMessage: string;
   onError: (message: string | null) => void;
+  onNotice: (message: string | null) => void;
   onWorking: (working: boolean) => void;
 }) {
   options.onWorking(true);
   options.onError(null);
+  options.onNotice(null);
   emitLog("info", "Starting passkey bridge action", {
     mode: options.mode,
     callbackUrl: summarizeUrl(options.callbackURL),
@@ -84,6 +95,7 @@ async function continuePasskeyBridge(options: {
     callbackURL: options.callbackURL,
     bridgeToken: options.bridgeToken,
     passkeyName: options.passkeyName,
+    cancelMessage: options.cancelMessage,
     failureMessage: options.failureMessage,
   });
 
@@ -93,6 +105,17 @@ async function continuePasskeyBridge(options: {
       optionKeys: ["url"],
     });
     window.location.replace(result.url);
+    return;
+  }
+
+  if (result.status === "cancelled") {
+    options.onNotice(result.message);
+    emitLog("info", "Passkey bridge action cancelled", {
+      mode: options.mode,
+      message: result.message,
+      callbackUrl: summarizeUrl(options.callbackURL),
+    });
+    options.onWorking(false);
     return;
   }
 
@@ -108,6 +131,7 @@ async function continuePasskeyBridge(options: {
 export function NativePasskeyBridgeContent() {
   const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const isMounted = useSyncExternalStore(
     subscribeNever,
     getClientMounted,
@@ -126,6 +150,10 @@ export function NativePasskeyBridgeContent() {
     ? getNativePasskeyBridgeCopy(mode)
     : NATIVE_PASSKEY_BRIDGE_PENDING_COPY;
   const isValidCallback = isValidNativePasskeyCallbackURL(callbackURL);
+  const helperText =
+    mode === "register"
+      ? `This passkey will be saved as “${passkeyName}”.`
+      : "Your password is already accepted. This last step proves it's you.";
 
   useEffect(() => {
     if (!isMounted) {
@@ -172,7 +200,7 @@ export function NativePasskeyBridgeContent() {
       return;
     }
 
-    setError(copy.cancelMessage);
+    setNotice(copy.cancelMessage);
 
     if (window.history.length > 1) {
       window.history.back();
@@ -196,64 +224,103 @@ export function NativePasskeyBridgeContent() {
       callbackURL,
       bridgeToken,
       passkeyName,
+      cancelMessage: copy.cancelMessage,
       failureMessage: copy.failureMessage,
       onError: setError,
+      onNotice: setNotice,
       onWorking: setIsWorking,
     });
   }
 
   return (
-    <main className="min-h-[100dvh] bg-background px-4 py-10 text-foreground">
-      <div className="mx-auto flex min-h-[calc(100dvh-5rem)] max-w-md items-center justify-center">
-        <div className="w-full rounded-3xl border border-border/70 bg-card/95 p-8 shadow-sm">
-          <div className="space-y-3 text-center">
-            <p className="text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Solace
-            </p>
-            <h1 className="text-2xl font-semibold tracking-tight">{copy.title}</h1>
-            <p className="text-sm leading-6 text-muted-foreground">
+    <section className="flex min-h-[100dvh]">
+      <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-12">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-secondary/30 via-background to-background" />
+
+        <div className="relative z-10 mx-auto w-full max-w-md">
+          <div className="mb-10 flex items-center justify-between">
+            <Logo
+              width={44}
+              height={44}
+              className="text-primary"
+              aria-label="Solace"
+            />
+            <ThemeToggle />
+          </div>
+
+          <div className="mb-8">
+            <h1 className="text-2xl font-semibold tracking-tight text-balance text-foreground">
+              {copy.title}
+            </h1>
+            <p className="mt-2 text-sm text-pretty text-muted-foreground">
               {copy.description}
             </p>
           </div>
 
-          {!isMounted && (
-            <div className="mt-6 rounded-2xl border border-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-              Preparing passkey handoff…
+          {notice ? (
+            <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
+              <p className="text-sm text-foreground">{notice}</p>
             </div>
-          )}
+          ) : null}
 
-          {isMounted && !isValidCallback && (
-            <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              This passkey request is missing a valid app callback URL.
-            </div>
-          )}
-
-          {error && (
-            <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {error}
-            </div>
-          )}
-
-          <div className="mt-8 space-y-3">
-            <button
-              className={PRIMARY_BUTTON}
-              disabled={isWorking || !isMounted}
-              onClick={handleContinue}
-              type="button"
+          {error ? (
+            <div
+              className="mb-5 rounded-lg border border-destructive/20 bg-destructive/10 p-3"
+              role="alert"
             >
-              {isWorking ? "Working..." : copy.actionLabel}
-            </button>
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          ) : null}
+
+          {isMounted && !isValidCallback ? (
+            <div
+              className="mb-5 rounded-lg border border-destructive/20 bg-destructive/10 p-3"
+              role="alert"
+            >
+              <p className="text-sm text-destructive">
+                This passkey request is missing a valid app callback URL.
+              </p>
+            </div>
+          ) : null}
+
+          {isMounted && isValidCallback ? (
+            <div className="mb-6 rounded-lg border border-border/50 bg-muted/30 p-3">
+              <p className="text-sm text-muted-foreground">{helperText}</p>
+            </div>
+          ) : null}
+
+          <Button
+            type="button"
+            disabled={isWorking || !isMounted}
+            onClick={handleContinue}
+            className="h-11 w-full rounded-lg font-medium"
+            aria-busy={isWorking}
+          >
+            {isWorking ? (
+              <>
+                <ButtonSpinner />
+                <span>{copy.workingLabel}</span>
+              </>
+            ) : (
+              <>
+                <Key className="size-4" />
+                <span>{copy.actionLabel}</span>
+              </>
+            )}
+          </Button>
+
+          <p className="mt-6 text-center text-sm text-muted-foreground">
             <button
-              className={SECONDARY_BUTTON}
+              type="button"
               disabled={isWorking}
               onClick={handleCancel}
-              type="button"
+              className="font-medium text-primary transition-colors hover:text-primary/80 disabled:pointer-events-none disabled:opacity-50"
             >
-              Cancel
+              Cancel and return to the app
             </button>
-          </div>
+          </p>
         </div>
       </div>
-    </main>
+    </section>
   );
 }

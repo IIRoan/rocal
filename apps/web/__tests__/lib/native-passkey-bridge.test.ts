@@ -6,6 +6,7 @@ import {
   getNativePasskeyBridgeMode,
   getPasskeyBridgeFreshenRequest,
   getWebAuthnSupportError,
+  isPasskeyAuthCancelled,
   isValidNativePasskeyCallbackURL,
   readNativePasskeyBridgeParams,
 } from "@/lib/native-passkey-bridge";
@@ -44,7 +45,7 @@ describe("native passkey bridge helpers", () => {
     });
     expect(getNativePasskeyBridgeCopy("register").title).toBe("Add a passkey");
     expect(getNativePasskeyBridgeCopy("sign-in").title).toBe(
-      "Continue with a passkey",
+      "Verify your passkey",
     );
   });
 
@@ -55,6 +56,12 @@ describe("native passkey bridge helpers", () => {
         oneTimeToken: "bridge-token",
       }),
     ).toBe("solace://settings?oneTimeToken=bridge-token&passkeyRegistered=1");
+    expect(
+      buildNativePasskeyCallbackURL("solace://calendar", {
+        oneTimeToken: "login-token",
+        passkeyVerified: true,
+      }),
+    ).toBe("solace://calendar?oneTimeToken=login-token&passkeyVerified=1");
   });
 
   it("extracts friendly error messages", () => {
@@ -65,6 +72,31 @@ describe("native passkey bridge helpers", () => {
       ),
     ).toBe("Passkey sign-in failed.");
     expect(getNativePasskeyBridgeError(null, "fallback")).toBe("fallback");
+    expect(
+      getNativePasskeyBridgeError(
+        Object.assign(new Error("The operation either timed out or was not allowed."), {
+          name: "NotAllowedError",
+        }),
+        "fallback",
+        "Passkey authentication was cancelled.",
+      ),
+    ).toBe("Passkey authentication was cancelled.");
+  });
+
+  it("recognizes WebAuthn cancellation from the browser prompt", () => {
+    expect(
+      isPasskeyAuthCancelled(
+        Object.assign(new Error("The operation either timed out or was not allowed."), {
+          name: "NotAllowedError",
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isPasskeyAuthCancelled({
+        error: { name: "AbortError", message: "The operation was aborted." },
+      }),
+    ).toBe(true);
+    expect(isPasskeyAuthCancelled("Passkey sign-in failed.")).toBe(false);
   });
 
   it("freshens the webview session only for passkey setup", () => {

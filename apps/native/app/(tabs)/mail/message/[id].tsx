@@ -83,6 +83,7 @@ import {
   RecipientLink,
   RecipientLinkList,
 } from "../../../../src/components/mail/RecipientSheet";
+import { BlobatarAvatar } from "../../../../src/components/BlobatarAvatar";
 import { mailSpacing } from "../../../../src/components/mail/mail-ui";
 import { useRecentContacts } from "../../../../src/hooks/use-recent-contacts";
 import {
@@ -669,58 +670,67 @@ export default function MailMessageScreen() {
         </View>
       ) : null}
 
-      <View style={styles.metaBlock}>
+      <View style={styles.senderBlock}>
         {message.from?.[0] ? (
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>From</Text>
-            <View style={styles.metaValueRow}>
-              <RecipientLink
-                recipient={enrichedFrom ?? message.from[0]}
-                currentUserEmail={accountEmail}
-                currentUserName={accountName}
-                textStyle={styles.metaLink}
-                showInlineAddress
-              />
-              <MailIdentityBadge
-                message={message}
-                identities={runtime?.identities ?? []}
-              />
-            </View>
-          </View>
-        ) : (
-          <MetaRow theme={theme} label="From" value="Unknown sender" />
-        )}
-        {message.to?.length ? (
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>To</Text>
-            <View style={styles.metaValueWrap}>
-              <RecipientLinkList
-                recipients={message.to}
-                currentUserEmail={accountEmail}
-                currentUserName={accountName}
-                textStyle={styles.metaLink}
-              />
-            </View>
-          </View>
+          <BlobatarAvatar
+            email={(enrichedFrom ?? message.from[0]).email}
+            name={(enrichedFrom ?? message.from[0]).name}
+            size={28}
+          />
         ) : null}
-        {message.cc?.length ? (
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Cc</Text>
-            <View style={styles.metaValueWrap}>
-              <RecipientLinkList
-                recipients={message.cc}
-                currentUserEmail={accountEmail}
-                currentUserName={accountName}
-                textStyle={styles.metaLink}
-              />
+        <View style={styles.metaBlock}>
+          {message.from?.[0] ? (
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>From</Text>
+              <View style={styles.metaValueRow}>
+                <RecipientLink
+                  recipient={enrichedFrom ?? message.from[0]}
+                  currentUserEmail={accountEmail}
+                  currentUserName={accountName}
+                  textStyle={styles.metaLink}
+                  showInlineAddress
+                />
+                <MailIdentityBadge
+                  message={message}
+                  identities={runtime?.identities ?? []}
+                />
+              </View>
             </View>
-          </View>
-        ) : null}
-        <MetaRow
-          theme={theme}
-          label="Date"
-          value={formatMessageDate(message.receivedAt)}
-        />
+          ) : (
+            <MetaRow theme={theme} label="From" value="Unknown sender" />
+          )}
+          {message.to?.length ? (
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>To</Text>
+              <View style={styles.metaValueWrap}>
+                <RecipientLinkList
+                  recipients={message.to}
+                  currentUserEmail={accountEmail}
+                  currentUserName={accountName}
+                  textStyle={styles.metaLink}
+                />
+              </View>
+            </View>
+          ) : null}
+          {message.cc?.length ? (
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>Cc</Text>
+              <View style={styles.metaValueWrap}>
+                <RecipientLinkList
+                  recipients={message.cc}
+                  currentUserEmail={accountEmail}
+                  currentUserName={accountName}
+                  textStyle={styles.metaLink}
+                />
+              </View>
+            </View>
+          ) : null}
+          <MetaRow
+            theme={theme}
+            label="Date"
+            value={formatMessageDate(message.receivedAt)}
+          />
+        </View>
       </View>
 
       {displayAttachments.length > 0 ? (
@@ -1316,7 +1326,14 @@ function createStyles(theme: ThemeTokens) {
       padding: theme.spacing["4"],
       gap: theme.spacing["3"],
     },
+    senderBlock: {
+      flexDirection: "row" as const,
+      alignItems: "flex-start" as const,
+      gap: theme.spacing["2"],
+    },
     metaBlock: {
+      flex: 1,
+      minWidth: 0,
       gap: theme.spacing["1"],
     },
     labelRow: {

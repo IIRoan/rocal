@@ -2,6 +2,7 @@ import * as Linking from "expo-linking";
 import { createLogger } from "@workspace/logger";
 import type { PasskeyRouteClient } from "./passkey-auth";
 import { CALENDAR_HOME_ROUTE, SETTINGS_ROUTE } from "./auth-routing";
+import { persistPasskeyStepUpCookie } from "./session-cookie";
 import { API_BASE_URL, APP_BASE_URL } from "./constants";
 
 export type BrowserPasskeyMode = "sign-in" | "register";
@@ -30,7 +31,9 @@ interface BrowserPasskeyDependencies {
 const PASSKEY_BRIDGE_PATH = "/passkey/native";
 const PASSKEY_TOKEN_QUERY_PARAM = "oneTimeToken";
 const PASSKEY_REGISTERED_QUERY_PARAM = "passkeyRegistered";
+const PASSKEY_VERIFIED_QUERY_PARAM = "passkeyVerified";
 const PASSKEY_ERROR_QUERY_PARAM = "error";
+const PASSKEY_BRIDGE_COMPLETE_STEP_UP_PATH = "/passkey-bridge/complete-step-up";
 const AUTH_SESSION_CALLBACK_GRACE_MS = 1500;
 const log = createLogger("native:passkey-bridge");
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
@@ -94,6 +97,7 @@ export function buildPasskeyBridgeUrl(options: {
 export function parsePasskeyBridgeCallback(urlString: string): {
   oneTimeToken: string | null;
   passkeyRegistered: boolean;
+  passkeyVerified: boolean;
   error: string | null;
 } {
   const url = new URL(urlString);
@@ -102,6 +106,8 @@ export function parsePasskeyBridgeCallback(urlString: string): {
     oneTimeToken: url.searchParams.get(PASSKEY_TOKEN_QUERY_PARAM),
     passkeyRegistered:
       url.searchParams.get(PASSKEY_REGISTERED_QUERY_PARAM) === "1",
+    passkeyVerified:
+      url.searchParams.get(PASSKEY_VERIFIED_QUERY_PARAM) === "1",
     error: url.searchParams.get(PASSKEY_ERROR_QUERY_PARAM),
   };
 }
@@ -118,14 +124,19 @@ export async function signInWithBrowserPasskey(
     throw new Error(message);
   }
 
+  const bridgeToken = await generateOneTimeToken(
+    client,
+    "Unable to start passkey verification.",
+  );
   const callbackUrl = dependencies.createCallbackUrl(CALENDAR_HOME_ROUTE);
   const startUrl = buildPasskeyBridgeUrl({
     appBaseUrl: dependencies.appBaseUrl,
     mode: "sign-in",
     callbackUrl,
+    bridgeToken,
   });
 
-  log.info("Starting browser passkey sign-in", {
+  log.info("Starting browser passkey verification", {
     callbackUrl: summarizeUrl(callbackUrl),
     startUrl: summarizeUrl(startUrl),
   });
@@ -134,7 +145,7 @@ export async function signInWithBrowserPasskey(
     {
       startUrl,
       callbackUrl,
-      cancelMessage: "Passkey sign-in was cancelled.",
+      cancelMessage: "Passkey verification was cancelled.",
     },
     dependencies,
   );
@@ -143,11 +154,12 @@ export async function signInWithBrowserPasskey(
   log.info("Received browser passkey callback", {
     callbackUrl: summarizeUrl(resultUrl),
     hasOneTimeToken: Boolean(parsed.oneTimeToken),
+    passkeyVerified: parsed.passkeyVerified,
     hasError: Boolean(parsed.error),
   });
 
   if (parsed.error) {
-    log.error("Browser passkey sign-in returned error", {
+    log.error("Browser passkey verification returned error", {
       error: parsed.error,
     });
     throw new Error(parsed.error);
@@ -155,12 +167,13 @@ export async function signInWithBrowserPasskey(
 
   if (!parsed.oneTimeToken) {
     throw new Error(
-      "Passkey sign-in did not finish correctly. Please try again.",
+      "Passkey verification did not finish correctly. Please try again.",
     );
   }
 
   const verified = await verifyOneTimeToken(client, parsed.oneTimeToken);
-  log.ok("Browser passkey sign-in completed");
+  await completePasskeyStepUpCookie(client);
+  log.ok("Browser passkey verification completed");
   return verified;
 }
 
@@ -177,7 +190,10 @@ export async function registerBrowserPasskey(
     throw new Error(message);
   }
 
-  const bridgeToken = await generateOneTimeToken(client);
+  const bridgeToken = await generateOneTimeToken(
+    client,
+    "Unable to start passkey setup.",
+  );
   const callbackUrl = dependencies.createCallbackUrl(SETTINGS_ROUTE);
   const startUrl = buildPasskeyBridgeUrl({
     appBaseUrl: dependencies.appBaseUrl,
@@ -336,6 +352,7 @@ async function resolveAuthSessionCallback(
 
 async function generateOneTimeToken(
   client: PasskeyRouteClient,
+  failureMessage: string,
 ): Promise<string> {
   log.debug("Generating browser passkey bridge token");
   const result = await client.$fetch<{ token: string }>(
@@ -348,11 +365,31 @@ async function generateOneTimeToken(
 
   if (!result.data?.token) {
     log.error("Failed to generate browser passkey bridge token", result.error);
-    throw new Error("Unable to start passkey setup.");
+    throw new Error(failureMessage);
   }
 
   log.debug("Generated browser passkey bridge token");
   return result.data.token;
+}
+
+async function completePasskeyStepUpCookie(
+  client: PasskeyRouteClient,
+): Promise<void> {
+  log.debug("Completing native passkey step-up cookie");
+  const result = await client.$fetch(PASSKEY_BRIDGE_COMPLETE_STEP_UP_PATH, {
+    method: "POST",
+    body: {},
+    throw: false,
+  });
+
+  if (!result.data) {
+    log.error("Failed to complete native passkey step-up", result.error);
+    throw new Error(
+      result.error?.message ?? "Unable to finish passkey verification.",
+    );
+  }
+
+  await persistPasskeyStepUpCookie();
 }
 
 async function verifyOneTimeToken(
@@ -369,7 +406,7 @@ async function verifyOneTimeToken(
   if (!result.data) {
     log.error("Failed to verify browser passkey one-time token", result.error);
     throw new Error(
-      result.error?.message ?? "Unable to finish passkey sign-in.",
+      result.error?.message ?? "Unable to finish passkey verification.",
     );
   }
 
