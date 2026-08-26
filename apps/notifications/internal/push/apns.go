@@ -106,17 +106,20 @@ func MetadataPayload(n Notification) map[string]any {
 	if n.CollapseID != "" {
 		aps["thread-id"] = n.CollapseID
 	}
-	payload := map[string]any{
-		"aps": aps,
-		"t":   n.Type,
+	// expo-notifications maps remote `content.data` from userInfo["body"] on iOS.
+	body := map[string]any{
+		"t": n.Type,
 	}
 	if n.EventID != "" {
-		payload["eid"] = n.EventID
+		body["eid"] = n.EventID
 	}
 	if n.EmailID != "" {
-		payload["mid"] = n.EmailID
+		body["mid"] = n.EmailID
 	}
-	return payload
+	return map[string]any{
+		"aps":  aps,
+		"body": body,
+	}
 }
 
 func EventReminder(minutesBefore int, eventID, title string) Notification {

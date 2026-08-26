@@ -1,19 +1,43 @@
 import type { Prisma, PrismaClient } from "../generated/prisma/index.js";
 import type {
   IPushDeviceService,
+  ListPushDevicesInput,
+  ListPushDevicesResult,
   PushDeviceRegistrationResult,
+  PushDeviceSummary,
   PushDeviceUnregisterResult,
   PushTestNotificationInput,
   PushTestNotificationResult,
   RegisterPushDeviceInput,
   UnregisterPushDeviceInput,
 } from "../contracts/push-device.contract";
+import { pushDeviceSummarySchema } from "../contracts/push-device.contract";
 import { ValidationError } from "../lib/errors";
 import { eventReminderPayload } from "../lib/notification-job";
 import { hashPushToken } from "../lib/push-token";
 
 const TEST_NOTIFICATION_EVENT_ID = "test-notification";
 const TEST_NOTIFICATION_MINUTES_BEFORE = 15;
+
+function toPublicPushDevice(device: {
+  id: string;
+  platform: string;
+  bundleId: string;
+  environment: string;
+  isEnabled: boolean;
+  lastSeenAt: Date;
+  createdAt: Date;
+}): PushDeviceSummary {
+  return pushDeviceSummarySchema.parse({
+    id: device.id,
+    platform: device.platform,
+    bundleId: device.bundleId,
+    environment: device.environment,
+    isEnabled: device.isEnabled,
+    lastSeenAt: device.lastSeenAt.toISOString(),
+    createdAt: device.createdAt.toISOString(),
+  });
+}
 
 export class PushDeviceService implements IPushDeviceService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -85,6 +109,26 @@ export class PushDeviceService implements IPushDeviceService {
       where: { userId: input.userId },
     });
     return { success: true, deletedCount: result.count };
+  }
+
+  async list(input: ListPushDevicesInput): Promise<ListPushDevicesResult> {
+    const devices = await this.prisma.pushDevice.findMany({
+      where: { userId: input.userId, isEnabled: true },
+      orderBy: { lastSeenAt: "desc" },
+      select: {
+        id: true,
+        platform: true,
+        bundleId: true,
+        environment: true,
+        isEnabled: true,
+        lastSeenAt: true,
+        createdAt: true,
+      },
+    });
+
+    return {
+      devices: devices.map(toPublicPushDevice),
+    };
   }
 
   async enqueueTest(

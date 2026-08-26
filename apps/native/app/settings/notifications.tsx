@@ -19,8 +19,11 @@ import {
   APP_NOTIFICATION_SETTING,
   EMAIL_REMINDER_SETTING,
   NOTIFICATION_SETTINGS_INTRO,
+  PUSH_DEVICES_SECTION,
   TEST_NOTIFICATION_SETTING,
   TEST_NOTIFICATION_SUCCESS,
+  formatPushDeviceLabel,
+  formatPushDeviceLastSeen,
   getErrorMessage,
   type UpdateSettingsRequest,
   type UserSettings,
@@ -48,6 +51,12 @@ export default function NotificationsSettingsScreen() {
     queryKey: QUERY_KEYS.settings(),
     queryFn: () => calendarApiService.getUserSettings(),
     staleTime: 5 * 60 * 1000,
+  });
+
+  const devicesQuery = useQuery({
+    queryKey: QUERY_KEYS.pushDevices(),
+    queryFn: () => calendarApiService.listPushDevices(),
+    staleTime: 30_000,
   });
 
   const updateSettingsMutation = useMutation({
@@ -98,11 +107,13 @@ export default function NotificationsSettingsScreen() {
   const handleAppNotificationsChange = useCallback(
     (enabled: boolean) => {
       if (enabled) {
-        void refreshRegistration();
+        void refreshRegistration().then(() => {
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pushDevices() });
+        });
       }
       updateSetting({ pushNotifications: enabled });
     },
-    [refreshRegistration, updateSetting],
+    [queryClient, refreshRegistration, updateSetting],
   );
 
   const handleSendTest = useCallback(async () => {
@@ -112,6 +123,7 @@ export default function NotificationsSettingsScreen() {
       await refreshRegistration();
       await calendarApiService.sendTestPushNotification();
       toast(TEST_NOTIFICATION_SUCCESS);
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pushDevices() });
     } catch (error) {
       toast(
         getErrorMessage(error, "Failed to send test notification."),
@@ -120,10 +132,11 @@ export default function NotificationsSettingsScreen() {
     } finally {
       setIsSendingTest(false);
     }
-  }, [isSendingTest, refreshRegistration, toast]);
+  }, [isSendingTest, queryClient, refreshRegistration, toast]);
 
   const emailEnabled = settings?.emailNotifications ?? true;
   const appEnabled = settings?.pushNotifications ?? true;
+  const devices = devicesQuery.data?.devices ?? [];
 
   return (
     <AppScreen header={<StackScreenHeader title="Notifications" />}>
@@ -176,6 +189,32 @@ export default function NotificationsSettingsScreen() {
               disabled={!appEnabled || permissionDenied}
             />
           ) : null}
+        </View>
+
+        <SectionLabel text={PUSH_DEVICES_SECTION.label} theme={theme} isFirst={false} />
+        <View style={styles.sectionItems}>
+          {!appEnabled ? (
+            <HintRow text={PUSH_DEVICES_SECTION.paused} theme={theme} />
+          ) : null}
+          {devicesQuery.isLoading ? (
+            <HintRow text={PUSH_DEVICES_SECTION.loading} theme={theme} />
+          ) : null}
+          {devicesQuery.isError ? (
+            <HintRow text={PUSH_DEVICES_SECTION.error} theme={theme} />
+          ) : null}
+          {!devicesQuery.isLoading &&
+          !devicesQuery.isError &&
+          devices.length === 0 ? (
+            <HintRow text={PUSH_DEVICES_SECTION.empty} theme={theme} />
+          ) : null}
+          {devices.map((device) => (
+            <DeviceRow
+              key={device.id}
+              label={formatPushDeviceLabel(device)}
+              description={formatPushDeviceLastSeen(device.lastSeenAt)}
+              theme={theme}
+            />
+          ))}
         </View>
       </ScrollView>
     </AppScreen>
@@ -239,6 +278,57 @@ function HintRow({ text, theme }: { text: string; theme: ThemeTokens }) {
       >
         {text}
       </Text>
+    </View>
+  );
+}
+
+function DeviceRow({
+  label,
+  description,
+  theme,
+}: {
+  label: string;
+  description: string;
+  theme: ThemeTokens;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: theme.spacing["3"],
+        paddingHorizontal: theme.spacing["3"],
+        paddingVertical: theme.spacing["3"],
+        marginHorizontal: theme.spacing["1"],
+      }}
+      accessibilityRole="text"
+      accessibilityLabel={`${label}. ${description}`}
+    >
+      <Feather
+        name="smartphone"
+        size={16}
+        color={theme.colors.mutedForeground}
+      />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          style={{
+            fontSize: theme.typography.fontSize.sm.size,
+            lineHeight: theme.typography.fontSize.sm.lineHeight,
+            color: theme.colors.foreground,
+          }}
+        >
+          {label}
+        </Text>
+        <Text
+          style={{
+            fontSize: theme.typography.fontSize.xs.size,
+            lineHeight: theme.typography.fontSize.xs.lineHeight,
+            color: theme.colors.mutedForeground,
+          }}
+        >
+          {description}
+        </Text>
+      </View>
     </View>
   );
 }
