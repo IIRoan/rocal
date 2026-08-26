@@ -11,7 +11,8 @@ import (
 func TestEventReminderUsesProvidedTitle(t *testing.T) {
 	payload := MetadataPayload(EventReminder(15, "evt-1", "Lunch with Sam"))
 	raw, _ := json.Marshal(payload)
-	if payload["t"] != "event" || payload["eid"] != "evt-1" {
+	body, ok := payload["body"].(map[string]any)
+	if !ok || body["t"] != "event" || body["eid"] != "evt-1" {
 		t.Fatalf("unexpected payload: %s", raw)
 	}
 	aps := payload["aps"].(map[string]any)
@@ -32,7 +33,8 @@ func TestNewMailUsesSenderAndSubject(t *testing.T) {
 	if alert["title"] != "Sam Wilson" || alert["body"] != "Invoice attached" {
 		t.Fatalf("unexpected alert %+v", alert)
 	}
-	if payload["t"] != "mail" || payload["mid"] != "em-1" {
+	body, ok := payload["body"].(map[string]any)
+	if !ok || body["t"] != "mail" || body["mid"] != "em-1" {
 		t.Fatalf("unexpected payload %+v", payload)
 	}
 	if notification.CollapseID != "mail:em-1" {

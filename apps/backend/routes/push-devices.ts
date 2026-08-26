@@ -9,6 +9,7 @@ import { RouteModel, routeModels } from "../contracts";
 const pushDeviceService = new PushDeviceService(prisma);
 
 const RATE_LIMITS = {
+  LIST: { requests: 60, windowMs: 60_000 },
   REGISTER: { requests: 30, windowMs: 60_000 },
   UNREGISTER: { requests: 30, windowMs: 60_000 },
   TEST: { requests: 5, windowMs: 60_000 },
@@ -57,6 +58,20 @@ export const pushDeviceRoutes = new Elysia({
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Push"), (app) =>
     app
+      .get(
+        "/devices",
+        async ({ request, routeUser }) => {
+          enforceRateLimit(`${routeUser.id}:${request.url}`, RATE_LIMITS.LIST);
+          return pushDeviceService.list({ userId: routeUser.id });
+        },
+        {
+          detail: {
+            summary: "List registered push devices",
+            description:
+              "Returns the authenticated user's enabled iOS devices that can receive lock-screen alerts. Device tokens are never included.",
+          },
+        },
+      )
       .put(
         "/devices",
         async ({ body, request, routeUser }) => {

@@ -4,32 +4,19 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
-import { useRouter } from "expo-router";
 import { useAuth } from "./AuthProvider";
-import { queryClient } from "./QueryProvider";
+import { registerForegroundPushNotificationHandler } from "../lib/push-notification-handler";
 import {
-  invalidateQueriesForPushTap,
-  mapPushNotificationToRoute,
   registerNativePushDevice,
   resolvePushDeviceMeta,
-  type PushTapData,
 } from "../lib/push-notifications";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+registerForegroundPushNotificationHandler();
 
 type PushPermissionStatus = "unknown" | "granted" | "denied";
 
@@ -41,16 +28,6 @@ interface PushContextValue {
 }
 
 const PushContext = createContext<PushContextValue | null>(null);
-
-function tapDataFromNotification(
-  notification: Notifications.Notification | null | undefined,
-): PushTapData {
-  const data = notification?.request.content.data;
-  if (!data || typeof data !== "object") {
-    return {};
-  }
-  return data as PushTapData;
-}
 
 async function syncDeviceToken(force = false): Promise<void> {
   if (Platform.OS !== "ios") {
@@ -85,31 +62,8 @@ export function PushProvider({
   children: React.ReactNode;
 }): React.ReactNode {
   const { isAuthenticated } = useAuth();
-  const router = useRouter();
-  const routerRef = useRef(router);
-  routerRef.current = router;
   const [permissionStatus, setPermissionStatus] =
     useState<PushPermissionStatus>("unknown");
-  const handledTapIdsRef = useRef(new Set<string>());
-
-  const openFromNotification = useCallback(
-    (notification: Notifications.Notification | null | undefined) => {
-      const identifier = notification?.request.identifier;
-      if (identifier) {
-        if (handledTapIdsRef.current.has(identifier)) {
-          return;
-        }
-        handledTapIdsRef.current.add(identifier);
-      }
-      const data = tapDataFromNotification(notification);
-      const route = mapPushNotificationToRoute(data);
-      invalidateQueriesForPushTap(queryClient, data);
-      if (route) {
-        routerRef.current.push(route as never);
-      }
-    },
-    [],
-  );
 
   const refreshPermission = useCallback(async (): Promise<boolean> => {
     if (Platform.OS !== "ios") {
@@ -169,11 +123,6 @@ export function PushProvider({
       void registerNativePushDevice({ token, meta }).catch(() => {});
     });
 
-    const responseSubscription =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        openFromNotification(response.notification);
-      });
-
     (async () => {
       const granted = await refreshPermission();
       if (cancelled || !granted) {
@@ -184,25 +133,13 @@ export function PushProvider({
       } catch {
         // Simulator and missing entitlements fail here; registration is best-effort.
       }
-
-      if (cancelled) {
-        return;
-      }
-
-      const lastResponse = await Notifications.getLastNotificationResponseAsync();
-      if (!cancelled && lastResponse) {
-        openFromNotification(lastResponse.notification);
-      }
     })().catch(() => {});
 
     return () => {
       cancelled = true;
       tokenSubscription.remove();
-      responseSubscription.remove();
     };
-    // Intentionally omit `router` — expo-router's object identity churned and
-    // remounted this effect, which DDoS'd PUT /api/push/devices.
-  }, [isAuthenticated, openFromNotification, refreshPermission]);
+  }, [isAuthenticated, refreshPermission]);
 
   const value = useMemo<PushContextValue>(
     () => ({

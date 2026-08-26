@@ -7,6 +7,7 @@ import "../src/lib/install-native-crypto";
 import { QueryProvider } from "../src/providers/QueryProvider";
 import { AuthProvider, useAuth } from "../src/providers/AuthProvider";
 import { PushProvider } from "../src/providers/PushProvider";
+import { PushNotificationNavigation } from "../src/providers/PushNotificationNavigation";
 import { ThemeProvider } from "../src/providers/ThemeProvider";
 import { AppUpdateProvider } from "../src/providers/AppUpdateProvider";
 import { AppUpdateScreen } from "../src/components/settings/AppUpdateScreen";
@@ -122,10 +123,12 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   // hand-off to calendar instead of flashing the calendar underneath.
   const isPreparingWorkspace =
     isAuthenticated && !isLoading && (!isE2eeReady || isPreparingStartupCrypto);
+  const isPushNavigationReady = isAuthenticated && !isLoading && !isPreparingWorkspace;
 
   return (
     <View style={{ flex: 1 }}>
       {children}
+      <PushNotificationNavigation navigationReady={isPushNavigationReady} />
       <WorkspaceLoadingScreen
         active={isPreparingWorkspace}
         message={setupMessage}

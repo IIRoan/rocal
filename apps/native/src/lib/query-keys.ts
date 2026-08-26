@@ -4,6 +4,8 @@
  * Using a constant map avoids typos and makes cache invalidation
  * predictable across the app.
  */
+import { PUSH_DEVICES_QUERY_KEY } from "@workspace/calendar-core";
+
 export const QUERY_KEYS = {
   events: (start: string, end: string) => ["events", start, end] as const,
   calendars: () => ["calendars"] as const,
@@ -25,5 +27,6 @@ export const QUERY_KEYS = {
   mailLabels: () => ["mail", "labels"] as const,
   mailThread: (threadId: string | null) => ["mail", "thread", threadId] as const,
   invites: () => ["invites"] as const,
+  pushDevices: () => PUSH_DEVICES_QUERY_KEY,
   hiddenMailboxIds: () => ["mail", "hiddenMailboxIds"] as const,
 } as const;

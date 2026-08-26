@@ -15,6 +15,7 @@ jest.mock("lucide-react", () => {
     Mail: Icon,
     Send: Icon,
     Shield: Icon,
+    Smartphone: Icon,
   };
 });
 
@@ -31,10 +32,14 @@ jest.mock("../../lib/calendar-api-service", () => ({
       success: true,
       jobId: "job-1",
     })),
+    listPushDevices: jest.fn(async () => ({ devices: [] })),
   },
 }));
 
-import { NotificationSettings } from "../../components/command-palette/notification-settings";
+import {
+  SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+} from "@workspace/calendar-core";
+import { NotificationSettingsView } from "../../components/command-palette/notification-settings";
 import { SecuritySettings } from "../../components/command-palette/security-settings";
 
 (
@@ -57,9 +62,9 @@ describe("settings toggle rows", () => {
     expect(html).not.toContain("Full Event Encryption");
   });
 
-  it("renders notification email toggle as a single switch control without nested buttons", () => {
+  it("renders email and app toggles plus registered devices", () => {
     const html = renderToStaticMarkup(
-      <NotificationSettings
+      <NotificationSettingsView
         localSettings={
           {
             emailNotifications: true,
@@ -69,6 +74,21 @@ describe("settings toggle rows", () => {
         }
         updateSetting={jest.fn()}
         goBack={() => {}}
+        isSendingTest={false}
+        onSendTest={() => {}}
+        devices={[
+          {
+            id: "dev-1",
+            platform: "ios",
+            bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+            environment: "production",
+            isEnabled: true,
+            lastSeenAt: "2026-08-26T10:00:00.000Z",
+            createdAt: "2026-08-01T10:00:00.000Z",
+          },
+        ]}
+        devicesLoading={false}
+        devicesError={false}
       />,
     );
 
@@ -77,6 +97,8 @@ describe("settings toggle rows", () => {
     expect(html).toContain("Mail");
     expect(html).toContain("iPhone");
     expect(html).toContain("Send test notification");
+    expect(html).toContain("Devices");
+    expect(html).toContain("Last seen");
     expect(html).toContain('role="switch"');
     expect(html).toContain('aria-checked="true"');
   });

@@ -1,6 +1,10 @@
 import * as SecureStore from "expo-secure-store";
+import type { Notification } from "expo-notifications";
 import type { QueryClient } from "@tanstack/react-query";
-import type { RegisterPushDeviceRequest } from "@workspace/calendar-core";
+import {
+  isSolaceIosBundleId,
+  type RegisterPushDeviceRequest,
+} from "@workspace/calendar-core";
 import { calendarApiService } from "./api";
 import { SECURE_STORE_KEYS } from "./constants";
 import {
@@ -29,6 +33,85 @@ export function resetPushRegistrationDedupeForTests(): void {
   lastRegisteredToken = null;
   registerInFlight = null;
   registerInFlightToken = null;
+}
+
+export function normalizePushTapData(raw: unknown): PushTapData | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const record = raw as Record<string, unknown>;
+  const type = typeof record.t === "string" ? record.t.trim() : "";
+  if (type !== "event" && type !== "mail") {
+    return null;
+  }
+
+  const data: PushTapData = { t: type };
+  const eventId = typeof record.eid === "string" ? record.eid.trim() : "";
+  const mailId =
+    typeof record.mid === "string"
+      ? record.mid.trim()
+      : typeof record.emailId === "string"
+        ? record.emailId.trim()
+        : "";
+
+  if (eventId) {
+    data.eid = eventId;
+  }
+  if (mailId) {
+    data.mid = mailId;
+  }
+
+  return data;
+}
+
+function collectPushTapDataCandidates(
+  notification: Notification | null | undefined,
+): unknown[] {
+  const candidates: unknown[] = [];
+  const contentData = notification?.request.content.data;
+  if (contentData && typeof contentData === "object") {
+    candidates.push(contentData);
+    const nestedBody = (contentData as Record<string, unknown>).body;
+    if (nestedBody && typeof nestedBody === "object") {
+      candidates.push(nestedBody);
+    }
+  }
+
+  const trigger = notification?.request.trigger;
+  if (
+    trigger &&
+    typeof trigger === "object" &&
+    "type" in trigger &&
+    trigger.type === "push"
+  ) {
+    const payload = (trigger as { payload?: unknown }).payload;
+    if (payload && typeof payload === "object") {
+      candidates.push(payload);
+      const nestedBody = (payload as Record<string, unknown>).body;
+      if (nestedBody && typeof nestedBody === "object") {
+        candidates.push(nestedBody);
+      }
+      const { t, eid, mid, emailId } = payload as Record<string, unknown>;
+      if (t || eid || mid || emailId) {
+        candidates.push({ t, eid, mid, emailId });
+      }
+    }
+  }
+
+  return candidates;
+}
+
+export function extractPushTapData(
+  notification: Notification | null | undefined,
+): PushTapData {
+  for (const candidate of collectPushTapDataCandidates(notification)) {
+    const normalized = normalizePushTapData(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return {};
 }
 
 export function mapPushNotificationToRoute(data: PushTapData): string | null {
@@ -79,18 +162,13 @@ export function resolvePushDeviceMeta(input: {
     return null;
   }
 
-  const bundleId =
-    input.bundleId === "onl.solace.mobile.dev" ||
-      input.bundleId === "onl.solace.mobile"
-      ? input.bundleId
-      : null;
-  if (!bundleId) {
+  if (!isSolaceIosBundleId(input.bundleId)) {
     return null;
   }
 
   return {
     platform: "ios",
-    bundleId,
+    bundleId: input.bundleId,
     environment: input.appVariant === "development" ? "sandbox" : "production",
   };
 }

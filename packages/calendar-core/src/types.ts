@@ -566,35 +566,6 @@ export interface NotificationStatus {
   queueProcessInterval: string;
 }
 
-export type PushPlatform = "ios" | "android";
-export type PushEnvironment = "sandbox" | "production";
-
-export interface RegisterPushDeviceRequest {
-  token: string;
-  platform: PushPlatform;
-  bundleId: string;
-  environment: PushEnvironment;
-}
-
-export interface UnregisterPushDeviceRequest {
-  token?: string;
-}
-
-export interface PushDeviceRegistrationResult {
-  success: boolean;
-  deviceId: string;
-}
-
-export interface PushDeviceUnregisterResult {
-  success: boolean;
-  deletedCount: number;
-}
-
-export interface PushTestNotificationResult {
-  success: boolean;
-  jobId: string;
-}
-
 // ─── ICS and Subscription API Types ──────────────────────────────────────────
 
 export type CalendarSubscription = CalendarSubscriptionSummary;

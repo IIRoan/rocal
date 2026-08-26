@@ -1,20 +1,29 @@
 import { z } from "zod";
+import {
+  listPushDevicesResultSchema,
+  pushDeviceRegistrationResultSchema,
+  pushDeviceSummarySchema,
+  pushDeviceUnregisterResultSchema,
+  pushTestNotificationResultSchema,
+  registerPushDeviceRequestSchema,
+  unregisterPushDeviceRequestSchema,
+  type ListPushDevicesResult,
+  type PushDeviceRegistrationResult,
+  type PushDeviceSummary,
+  type PushDeviceUnregisterResult,
+  type PushTestNotificationResult,
+} from "@workspace/calendar-core";
 import { strictZodObject } from "../lib/validation";
 import { userIdField } from "./_zod";
 
-export const pushPlatformSchema = z.enum(["ios", "android"]);
-export const pushEnvironmentSchema = z.enum(["sandbox", "production"]);
+/** Route body — same fields as calendar-core, via strictZodObject for Elysia. */
+export const registerPushDeviceBodySchema = strictZodObject(
+  registerPushDeviceRequestSchema.shape,
+);
 
-export const registerPushDeviceBodySchema = strictZodObject({
-  token: z.string().trim().min(16).max(4096),
-  platform: pushPlatformSchema,
-  bundleId: z.enum(["onl.solace.mobile", "onl.solace.mobile.dev"]),
-  environment: pushEnvironmentSchema,
-});
-
-export const unregisterPushDeviceBodySchema = strictZodObject({
-  token: z.string().trim().min(16).max(4096).optional(),
-});
+export const unregisterPushDeviceBodySchema = strictZodObject(
+  unregisterPushDeviceRequestSchema.shape,
+);
 
 export const registerPushDeviceInputSchema =
   registerPushDeviceBodySchema.extend(userIdField);
@@ -22,37 +31,44 @@ export const registerPushDeviceInputSchema =
 export const unregisterPushDeviceInputSchema =
   unregisterPushDeviceBodySchema.extend(userIdField);
 
+export const listPushDevicesInputSchema = strictZodObject(userIdField);
+
 export type RegisterPushDeviceInput = z.infer<
   typeof registerPushDeviceInputSchema
 >;
 export type UnregisterPushDeviceInput = z.infer<
   typeof unregisterPushDeviceInputSchema
 >;
+export type ListPushDevicesInput = z.infer<typeof listPushDevicesInputSchema>;
 
-export type PushDeviceRegistrationResult = {
-  success: boolean;
-  deviceId: string;
-};
-
-export type PushDeviceUnregisterResult = {
-  success: boolean;
-  deletedCount: number;
+export type {
+  PushDeviceRegistrationResult,
+  PushDeviceUnregisterResult,
+  PushDeviceSummary,
+  ListPushDevicesResult,
+  PushTestNotificationResult,
 };
 
 export type PushTestNotificationInput = {
   userId: string;
 };
 
-export type PushTestNotificationResult = {
-  success: boolean;
-  jobId: string;
+export {
+  listPushDevicesResultSchema,
+  pushDeviceRegistrationResultSchema,
+  pushDeviceSummarySchema,
+  pushDeviceUnregisterResultSchema,
+  pushTestNotificationResultSchema,
 };
 
 export interface IPushDeviceService {
-  register(input: RegisterPushDeviceInput): Promise<PushDeviceRegistrationResult>;
+  register(
+    input: RegisterPushDeviceInput,
+  ): Promise<PushDeviceRegistrationResult>;
   unregister(
     input: UnregisterPushDeviceInput,
   ): Promise<PushDeviceUnregisterResult>;
+  list(input: ListPushDevicesInput): Promise<ListPushDevicesResult>;
   enqueueTest(
     input: PushTestNotificationInput,
   ): Promise<PushTestNotificationResult>;
