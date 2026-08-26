@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChevronDown, Mail, CalendarDays } from "lucide-react";
 import { cn } from "../../lib/utils";
 import LogoSvg from "./logo";
@@ -19,7 +20,7 @@ export function SidebarAppSwitcher({ activeApp }: SidebarAppSwitcherProps) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-2 rounded-lg px-1.5 py-1 -ml-1.5 hover:bg-muted/50 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-1.5 py-1 -ml-1.5 hover:bg-muted/50 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
         >
           <LogoSvg width="26" height="26" className="text-primary shrink-0" />
           <div className="flex items-baseline gap-1.5">
@@ -45,10 +46,10 @@ export function SidebarAppSwitcher({ activeApp }: SidebarAppSwitcherProps) {
         className="w-40 p-0 overflow-hidden rounded-lg border border-border shadow-md"
       >
         <div className="flex">
-          <a
+          <Link
             href="/mail"
             className={cn(
-              "flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors",
+              "flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors cursor-pointer",
               activeApp === "mail"
                 ? "text-primary bg-primary/8"
                 : "text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -56,12 +57,12 @@ export function SidebarAppSwitcher({ activeApp }: SidebarAppSwitcherProps) {
           >
             <Mail className="h-3.5 w-3.5" strokeWidth={2} />
             Mail
-          </a>
+          </Link>
           <div className="w-px bg-border/60 self-stretch" />
-          <a
+          <Link
             href="/calendar"
             className={cn(
-              "flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors",
+              "flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors cursor-pointer",
               activeApp === "calendar"
                 ? "text-primary bg-primary/8"
                 : "text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -69,7 +70,7 @@ export function SidebarAppSwitcher({ activeApp }: SidebarAppSwitcherProps) {
           >
             <CalendarDays className="h-3.5 w-3.5" strokeWidth={2} />
             Calendar
-          </a>
+          </Link>
         </div>
       </PopoverContent>
     </Popover>
