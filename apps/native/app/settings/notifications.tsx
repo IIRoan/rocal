@@ -25,6 +25,7 @@ import {
   formatPushDeviceLabel,
   formatPushDeviceLastSeen,
   getErrorMessage,
+  getPushDevicesListStatus,
   type UpdateSettingsRequest,
   type UserSettings,
 } from "@workspace/calendar-core";
@@ -53,10 +54,14 @@ export default function NotificationsSettingsScreen() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const emailEnabled = settings?.emailNotifications ?? true;
+  const appEnabled = settings?.pushNotifications ?? true;
+
   const devicesQuery = useQuery({
     queryKey: QUERY_KEYS.pushDevices(),
     queryFn: () => calendarApiService.listPushDevices(),
     staleTime: 30_000,
+    enabled: appEnabled,
   });
 
   const updateSettingsMutation = useMutation({
@@ -134,9 +139,13 @@ export default function NotificationsSettingsScreen() {
     }
   }, [isSendingTest, queryClient, refreshRegistration, toast]);
 
-  const emailEnabled = settings?.emailNotifications ?? true;
-  const appEnabled = settings?.pushNotifications ?? true;
   const devices = devicesQuery.data?.devices ?? [];
+  const devicesStatus = getPushDevicesListStatus({
+    appEnabled,
+    loading: devicesQuery.isLoading,
+    error: devicesQuery.isError,
+    deviceCount: devices.length,
+  });
 
   return (
     <AppScreen header={<StackScreenHeader title="Notifications" />}>
@@ -193,28 +202,28 @@ export default function NotificationsSettingsScreen() {
 
         <SectionLabel text={PUSH_DEVICES_SECTION.label} theme={theme} isFirst={false} />
         <View style={styles.sectionItems}>
-          {!appEnabled ? (
+          {devicesStatus === "paused" ? (
             <HintRow text={PUSH_DEVICES_SECTION.paused} theme={theme} />
           ) : null}
-          {devicesQuery.isLoading ? (
+          {devicesStatus === "loading" ? (
             <HintRow text={PUSH_DEVICES_SECTION.loading} theme={theme} />
           ) : null}
-          {devicesQuery.isError ? (
+          {devicesStatus === "error" ? (
             <HintRow text={PUSH_DEVICES_SECTION.error} theme={theme} />
           ) : null}
-          {!devicesQuery.isLoading &&
-          !devicesQuery.isError &&
-          devices.length === 0 ? (
+          {devicesStatus === "empty" ? (
             <HintRow text={PUSH_DEVICES_SECTION.empty} theme={theme} />
           ) : null}
-          {devices.map((device) => (
-            <DeviceRow
-              key={device.id}
-              label={formatPushDeviceLabel(device)}
-              description={formatPushDeviceLastSeen(device.lastSeenAt)}
-              theme={theme}
-            />
-          ))}
+          {devicesStatus === "ready"
+            ? devices.map((device) => (
+                <DeviceRow
+                  key={device.id}
+                  label={formatPushDeviceLabel(device)}
+                  description={formatPushDeviceLastSeen(device.lastSeenAt)}
+                  theme={theme}
+                />
+              ))
+            : null}
         </View>
       </ScrollView>
     </AppScreen>

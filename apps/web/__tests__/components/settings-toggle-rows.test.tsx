@@ -37,6 +37,7 @@ jest.mock("../../lib/calendar-api-service", () => ({
 }));
 
 import {
+  PUSH_DEVICES_SECTION,
   SOLACE_IOS_PRODUCTION_BUNDLE_ID,
 } from "@workspace/calendar-core";
 import { NotificationSettingsView } from "../../components/command-palette/notification-settings";
@@ -101,5 +102,42 @@ describe("settings toggle rows", () => {
     expect(html).toContain("Last seen");
     expect(html).toContain('role="switch"');
     expect(html).toContain('aria-checked="true"');
+  });
+
+  it("shows only the paused device message when app notifications are off", () => {
+    const html = renderToStaticMarkup(
+      <NotificationSettingsView
+        localSettings={
+          {
+            emailNotifications: true,
+            pushNotifications: false,
+            eventEncryptionMode: "hybrid",
+          } as any
+        }
+        updateSetting={jest.fn()}
+        goBack={() => {}}
+        isSendingTest={false}
+        onSendTest={() => {}}
+        devices={[
+          {
+            id: "dev-1",
+            platform: "ios",
+            bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+            environment: "production",
+            isEnabled: true,
+            lastSeenAt: "2026-08-26T10:00:00.000Z",
+            createdAt: "2026-08-01T10:00:00.000Z",
+          },
+        ]}
+        devicesLoading={true}
+        devicesError={true}
+      />,
+    );
+
+    expect(html).toContain(PUSH_DEVICES_SECTION.paused);
+    expect(html).not.toContain(PUSH_DEVICES_SECTION.loading);
+    expect(html).not.toContain(PUSH_DEVICES_SECTION.error);
+    expect(html).not.toContain(PUSH_DEVICES_SECTION.empty);
+    expect(html).not.toContain("Last seen");
   });
 });
