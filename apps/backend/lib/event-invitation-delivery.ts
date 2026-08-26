@@ -10,7 +10,7 @@ import { normalizeParticipantEmail } from "./event-participants";
 import type { StalwartJmapAdminClientLike } from "./stalwart-admin";
 import { errorLogDetails, logRef } from "./log-sanitization";
 
-export type EventInvitationDeliveryChannel = "mailbox" | "resend";
+export type EventInvitationDeliveryChannel = "mailbox" | "stalwart";
 
 export type EventInvitationDeliveryResult = EmailDeliveryResult & {
   channel: EventInvitationDeliveryChannel;
@@ -21,7 +21,7 @@ export async function sendEventInvitationEmail(input: {
   from: string;
   message: AuthEmailMessage;
   logger: AuthEmailLogger;
-  resendClient: AuthEmailClient | null;
+  mailerClient: AuthEmailClient | null;
   adminClient: StalwartJmapAdminClientLike | null;
   adminToken: string;
   resolveInternalMailbox: (
@@ -62,7 +62,7 @@ export async function sendEventInvitationEmail(input: {
       });
       return { delivered: true, channel: "mailbox" };
     } catch (error) {
-      input.logger.warn("Mailbox invitation delivery failed; falling back to Resend", {
+      input.logger.warn("Mailbox invitation delivery failed; falling back to Stalwart submission", {
         recipientRef: logRef(email),
         ...errorLogDetails(error),
       });
@@ -70,7 +70,7 @@ export async function sendEventInvitationEmail(input: {
   }
 
   const delivery = await sendAuthEmail({
-    client: input.resendClient,
+    client: input.mailerClient,
     from: input.from,
     to: email,
     label: "event invitation",
@@ -83,6 +83,6 @@ export async function sendEventInvitationEmail(input: {
 
   return {
     ...delivery,
-    channel: "resend",
+    channel: "stalwart",
   };
 }

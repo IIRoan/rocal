@@ -13,6 +13,7 @@ export {
   SETTINGS_CONTACTS_ROUTE,
   SETTINGS_INVITES_ROUTE,
   SETTINGS_MAILBOXES_ROUTE,
+  SETTINGS_NOTIFICATIONS_ROUTE,
 } from "./navigation-routes";
 
 interface AuthRedirectInput {

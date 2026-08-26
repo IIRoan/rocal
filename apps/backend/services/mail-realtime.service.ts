@@ -1,6 +1,7 @@
 import { createLogger } from "@workspace/logger";
 import { z } from "zod";
 import type { MailSyncResult } from "./mail-sync.service";
+import { coalescePendingMailSync } from "../lib/inbound-mail-push";
 import { errorLogDetails } from "../lib/log-sanitization";
 
 export type MailChangedEvent = {
@@ -133,6 +134,7 @@ type MailRealtimeSyncProvider = {
   syncKnownChangedAccounts: () => Promise<
     Array<{
       accountId: string;
+      userId?: string;
       changedTypes: string[];
       sync: MailSyncResult;
     }>
@@ -140,6 +142,7 @@ type MailRealtimeSyncProvider = {
   syncAccount?: (accountId: string) => Promise<
     | {
         accountId: string;
+        userId?: string;
         changedTypes: string[];
         sync: MailSyncResult;
       }
@@ -150,7 +153,9 @@ type MailRealtimeSyncProvider = {
 type PendingAccountChange = {
   changedTypes: Set<string>;
   receivedAt: string;
+  userId?: string;
   sync?: MailSyncResult;
+  needsLiveSync?: boolean;
 };
 
 export class MailRealtimeService {
@@ -176,6 +181,11 @@ export class MailRealtimeService {
       receiptPollIntervalMs?: number;
       notificationThrottleMs?: number;
       syncProvider?: MailRealtimeSyncProvider;
+      onInboundMail?: (input: {
+        accountId: string;
+        userId?: string;
+        sync: MailSyncResult;
+      }) => Promise<void> | void;
     },
   ) {}
 
@@ -248,6 +258,43 @@ export class MailRealtimeService {
     }
   }
 
+  private notifyInboundMail(
+    accountId: string,
+    sync: MailSyncResult,
+    userId?: string,
+  ): void {
+    if (!this.input.onInboundMail) {
+      return;
+    }
+
+    const payload = {
+      accountId,
+      sync,
+      ...(userId ? { userId } : {}),
+    };
+
+    void (async () => {
+      let lastError: unknown;
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          await this.input.onInboundMail!(payload);
+          return;
+        } catch (error) {
+          lastError = error;
+          if (attempt < 3) {
+            await new Promise((resolve) => {
+              setTimeout(resolve, 200 * attempt);
+            });
+          }
+        }
+      }
+      logger.warn("Inbound mail push enqueue failed", {
+        accountId,
+        ...errorLogDetails(lastError),
+      });
+    })();
+  }
+
   private unsubscribe(subscriberId: string): void {
     const existing = this.subscribers.get(subscriberId);
 
@@ -274,7 +321,7 @@ export class MailRealtimeService {
     return (this.subscribersByAccountId.get(accountId)?.size ?? 0) > 0;
   }
 
-  private enqueueEvent(event: MailChangedEvent): void {
+  private enqueueEvent(event: MailChangedEvent, userId?: string): void {
     const pending = this.pendingByAccountId.get(event.accountId) ?? {
       changedTypes: new Set<string>(),
       receivedAt: event.receivedAt,
@@ -288,11 +335,15 @@ export class MailRealtimeService {
       pending.receivedAt = event.receivedAt;
     }
 
-    if (event.sync) {
-      pending.sync = event.sync;
-    } else if (pending.sync) {
-      pending.sync = undefined;
+    if (userId) {
+      pending.userId = userId;
     }
+
+    if (!event.sync) {
+      pending.needsLiveSync = true;
+    }
+
+    pending.sync = coalescePendingMailSync(pending.sync, event.sync);
 
     this.pendingByAccountId.set(event.accountId, pending);
     this.scheduleFlush(event.accountId);
@@ -332,24 +383,43 @@ export class MailRealtimeService {
 
     const flushPromise = (async () => {
       try {
-        if (pending.sync) {
-          this.publish({
-            ...fallbackEvent,
-            changedTypes: resolveChangedTypes(
-              pending.sync.changedTypes,
+        let snapshot = pending.sync;
+        let snapshotUserId = pending.userId;
+        let snapshotChangedTypes = snapshot
+          ? resolveChangedTypes(snapshot.changedTypes, fallbackChangedTypes)
+          : fallbackChangedTypes;
+
+        if (pending.needsLiveSync && this.input.syncProvider?.syncAccount) {
+          const result = await this.input.syncProvider.syncAccount(accountId);
+          if (result) {
+            snapshot =
+              coalescePendingMailSync(pending.sync, result.sync) ?? result.sync;
+            snapshotUserId = result.userId ?? pending.userId;
+            snapshotChangedTypes = resolveChangedTypes(
+              result.changedTypes,
               fallbackChangedTypes,
-            ),
-            sync: pending.sync,
-          });
-          return;
+            );
+          } else if (!snapshot) {
+            return;
+          }
         }
 
-        if (!this.hasSubscribers(accountId)) {
+        if (snapshot) {
+          this.notifyInboundMail(accountId, snapshot, snapshotUserId);
+          if (this.hasSubscribers(accountId)) {
+            this.publish({
+              ...fallbackEvent,
+              changedTypes: snapshotChangedTypes,
+              sync: snapshot,
+            });
+          }
           return;
         }
 
         if (!this.input.syncProvider?.syncAccount) {
-          this.publish(fallbackEvent);
+          if (this.hasSubscribers(accountId)) {
+            this.publish(fallbackEvent);
+          }
           return;
         }
 
@@ -359,16 +429,23 @@ export class MailRealtimeService {
           return;
         }
 
-        this.publish({
-          type: "mail.changed",
+        this.notifyInboundMail(
           accountId,
-          changedTypes: resolveChangedTypes(
-            result.changedTypes,
-            fallbackChangedTypes,
-          ),
-          receivedAt: pending.receivedAt,
-          sync: result.sync,
-        });
+          result.sync,
+          result.userId ?? pending.userId,
+        );
+        if (this.hasSubscribers(accountId)) {
+          this.publish({
+            type: "mail.changed",
+            accountId,
+            changedTypes: resolveChangedTypes(
+              result.changedTypes,
+              fallbackChangedTypes,
+            ),
+            receivedAt: pending.receivedAt,
+            sync: result.sync,
+          });
+        }
       } catch (error) {
         logger.warn("Mail realtime flush failed", {
           accountId,
@@ -408,16 +485,19 @@ export class MailRealtimeService {
         .then((results) => {
           const receivedAt = new Date().toISOString();
           for (const result of results) {
-            this.enqueueEvent({
-              type: "mail.changed",
-              accountId: result.accountId,
-              changedTypes: resolveChangedTypes(
-                result.sync.changedTypes,
-                result.changedTypes,
-              ),
-              receivedAt,
-              sync: result.sync,
-            });
+            this.enqueueEvent(
+              {
+                type: "mail.changed",
+                accountId: result.accountId,
+                changedTypes: resolveChangedTypes(
+                  result.sync.changedTypes,
+                  result.changedTypes,
+                ),
+                receivedAt,
+                sync: result.sync,
+              },
+              result.userId,
+            );
           }
         })
         .catch((error) => {

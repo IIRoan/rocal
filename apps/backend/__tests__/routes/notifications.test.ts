@@ -8,6 +8,7 @@ jest.mock("../../lib/prisma", () => ({
       update: jest.fn(async (): Promise<any> => null),
     },
     eventNotification: {
+      findFirst: jest.fn(async (): Promise<any> => null),
       deleteMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
       createMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
     },
@@ -48,6 +49,7 @@ jest.mock("../../lib/auth-guard", () => {
 jest.mock("../../lib/notification-calculator", () => ({
   NotificationCalculator: {
     buildNotificationSchedule: jest.fn(),
+    scheduleUpcomingReminder: jest.fn(),
   },
 }));
 
@@ -76,6 +78,7 @@ const mockPrisma = prisma as unknown as {
     update: jest.Mock<() => Promise<any>>;
   };
   eventNotification: {
+    findFirst: jest.Mock<() => Promise<any>>;
     deleteMany: jest.Mock<() => Promise<any>>;
     createMany: jest.Mock<() => Promise<any>>;
   };
@@ -93,6 +96,8 @@ const mockPrisma = prisma as unknown as {
 };
 const mockBuildNotificationSchedule =
   NotificationCalculator.buildNotificationSchedule as jest.Mock;
+const mockScheduleUpcomingReminder =
+  NotificationCalculator.scheduleUpcomingReminder as jest.Mock;
 
 function createApp() {
   return new Elysia({ normalize: false })
@@ -139,6 +144,8 @@ describe("notificationsRoutes", () => {
     mockPrisma.userSettings.findUnique.mockResolvedValue({
       eventEncryptionMode: "hybrid",
     });
+    mockScheduleUpcomingReminder.mockReset();
+    mockBuildNotificationSchedule.mockReset();
   });
 
   it("returns no notifications for recurring instance ids", async () => {
@@ -381,17 +388,13 @@ describe("notificationsRoutes", () => {
   it("creates valid notifications and skips disabled or past schedules", async () => {
     jest.useFakeTimers().setSystemTime(new Date("2024-02-01T12:00:00.000Z"));
     mockPrisma.calendarEvent.findFirst.mockResolvedValue(eventFixture());
-    mockBuildNotificationSchedule
+    mockScheduleUpcomingReminder
       .mockReturnValueOnce({
         notificationTime: new Date("2024-02-01T12:20:00.000Z"),
         notificationDateLocal: "2024-02-01T12:20:00",
         notificationTimezone: "UTC",
       })
-      .mockReturnValueOnce({
-        notificationTime: new Date("2024-02-01T11:50:00.000Z"),
-        notificationDateLocal: "2024-02-01T11:50:00",
-        notificationTimezone: "UTC",
-      });
+      .mockReturnValueOnce(null);
 
     const response = await createApp().handle(
       new Request("http://localhost/notifications/event/event-create", {
@@ -476,7 +479,7 @@ describe("notificationsRoutes", () => {
   it("surfaces unexpected update failures", async () => {
     jest.useFakeTimers().setSystemTime(new Date("2024-02-01T12:00:00.000Z"));
     mockPrisma.calendarEvent.findFirst.mockResolvedValue(eventFixture());
-    mockBuildNotificationSchedule.mockReturnValue({
+    mockScheduleUpcomingReminder.mockReturnValue({
       notificationTime: new Date("2024-02-01T12:20:00.000Z"),
       notificationDateLocal: "2024-02-01T12:20:00",
       notificationTimezone: "UTC",
@@ -563,7 +566,7 @@ describe("notificationsRoutes", () => {
         encryptionState: "encrypted",
       }),
     );
-    mockBuildNotificationSchedule.mockReturnValue({
+    mockScheduleUpcomingReminder.mockReturnValue({
       notificationTime: new Date("2024-02-01T12:15:00.000Z"),
       notificationDateLocal: "2024-02-01T12:15:00",
       notificationTimezone: "UTC",

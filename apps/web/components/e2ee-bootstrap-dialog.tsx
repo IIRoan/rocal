@@ -21,7 +21,7 @@ type E2eeBootstrapDialogProps = {
   onRetryBootstrap: () => void;
 };
 
-function getGateCopy(mode: GateMode, isEmailPasswordUser: boolean) {
+function getGateCopy(mode: GateMode) {
   const isUnlock = mode === "unlock";
   const isLegacy = mode === "legacy";
 
@@ -32,29 +32,17 @@ function getGateCopy(mode: GateMode, isEmailPasswordUser: boolean) {
       : "Protect your encryption keys";
 
   const description = isUnlock
-    ? isEmailPasswordUser
-      ? "Solace normally reuses your email sign-in password to unlock encrypted data on this device. If that did not finish automatically, enter the same password here. If you recently changed it, use your previous password."
-      : "Enter your encryption password to unlock encrypted data on this device."
+    ? "Your email sign-in password did not unlock encrypted data on this device. If you recently changed it, enter the previous password."
     : isLegacy
       ? "This account still uses the older device-only key flow. Open a device that can already decrypt your data, sign in there, and save an encryption password once."
-      : isEmailPasswordUser
-        ? "Solace normally reuses your email sign-in password to protect your encryption keys. Re-enter it below only if automatic setup did not finish."
-        : "Choose an encryption password to protect your end-to-end encryption keys for recovery and legacy device flows.";
-
-  const passwordLabel = isUnlock
-    ? isEmailPasswordUser
-      ? "Email sign-in password"
-      : "Encryption password"
-    : isEmailPasswordUser
-      ? "Email sign-in password"
-      : "Encryption password";
+      : "Solace reuses your email sign-in password to protect your encryption keys. Re-enter it below only if automatic setup did not finish.";
 
   const primaryLabel = isUnlock ? "Unlock" : isLegacy ? "Retry" : "Save password";
 
   return {
     title,
     description,
-    passwordLabel,
+    passwordLabel: "Email sign-in password",
     primaryLabel,
     Icon: isUnlock ? KeyRound : Shield,
     isUnlock,
@@ -70,10 +58,9 @@ export function E2eeBootstrapDialog({
   onSignOut,
   onRetryBootstrap,
 }: E2eeBootstrapDialogProps) {
-  const { mode, password, confirmPassword, error, isSubmitting, isEmailPasswordUser } =
-    gate;
+  const { mode, password, confirmPassword, error, isSubmitting } = gate;
   const { title, description, passwordLabel, primaryLabel, Icon, isUnlock, isLegacy } =
-    getGateCopy(mode, isEmailPasswordUser);
+    getGateCopy(mode);
 
   return (
     <Dialog open onOpenChange={() => undefined}>

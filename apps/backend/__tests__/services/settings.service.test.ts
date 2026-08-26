@@ -25,6 +25,7 @@ type SettingsFixtureInput = Partial<{
   workingHoursEnd: number;
   workingDays: string;
   emailNotifications: boolean;
+  pushNotifications: boolean;
   browserNotifications: boolean;
   reminderSound: boolean;
   eventEncryptionMode: "hybrid" | "full";
@@ -48,6 +49,7 @@ function settingsFixture(overrides: SettingsFixtureInput = {}) {
     workingHoursEnd: 17,
     workingDays: "[1,2,3,4,5]",
     emailNotifications: true,
+    pushNotifications: true,
     browserNotifications: true,
     reminderSound: true,
     eventEncryptionMode: "hybrid" as const,

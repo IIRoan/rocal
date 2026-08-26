@@ -4,9 +4,11 @@ import { prisma } from "../lib/prisma";
 import { createStalwartAdminClient } from "../lib/stalwart-admin";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { MailSyncService } from "../services/mail-sync.service";
+import type { MailSyncResult } from "../services/mail-sync.service";
 import { createStalwartCalendarClient } from "../lib/stalwart-calendar";
 import { MailCalendarIngestionService } from "../services/mail-calendar-ingestion.service";
 import { RouteModel, routeModels } from "../contracts";
+import { enqueueInboundMailPush } from "../lib/mail-push-enqueue";
 
 export const defaultMailSyncService = new MailSyncService(
   prisma,
@@ -18,8 +20,17 @@ export const defaultMailSyncService = new MailSyncService(
   ),
 );
 
+type InboundMailPushHandler = (input: {
+  accountId: string;
+  userId: string;
+  sync: MailSyncResult;
+}) => Promise<void>;
+
 export function createMailSyncRoutes(
   mailSyncService: MailSyncService = defaultMailSyncService,
+  onInboundMail: InboundMailPushHandler = async (input) => {
+    await enqueueInboundMailPush(prisma, input);
+  },
 ) {
   return new Elysia({
     prefix: "/mail",
@@ -31,10 +42,16 @@ export function createMailSyncRoutes(
       app.get(
         "/sync",
         async ({ routeUser, query }) => {
-          return mailSyncService.syncForUser({
+          const sync = await mailSyncService.syncForUser({
             userId: routeUser.id,
             accountId: query.accountId,
           });
+          await onInboundMail({
+            accountId: sync.accountId,
+            userId: routeUser.id,
+            sync,
+          });
+          return sync;
         },
         {
           query: RouteModel.mail.syncQuery,

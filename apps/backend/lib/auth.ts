@@ -16,7 +16,7 @@ import {
   getPasswordChangeRecipient,
   sendAuthEmail,
 } from "./auth-email";
-import { resend, authEmailFrom } from "./email-client";
+import { mailer, authEmailFrom } from "./email-client";
 import { getAuthTrustedOrigins } from "./origin-policy";
 import {
   clearPasskeyStepUpCookie,
@@ -176,9 +176,10 @@ const mailOauthTrustedClientIds = [
   ...mailOauthCachedTrustedClientIds,
   mailOauthClientId,
   mailOauthBrowserClientId,
-]
-  .map((value) => value.trim())
-  .filter(Boolean);
+].flatMap((value) => {
+  const trimmed = value.trim();
+  return trimmed ? [trimmed] : [];
+});
 
 const mailOauthValidAudiences =
   mailOauthAudiences.length > 0 ? mailOauthAudiences : [stalwartBaseUrl];
@@ -276,7 +277,7 @@ async function sendPasswordUpdatedNotification({
   });
 
   await sendAuthEmail({
-    client: resend,
+    client: mailer,
     from: authEmailFrom,
     to: email,
     label: "password update notification",
@@ -503,7 +504,7 @@ export const auth = betterAuth({
         resetUrl: url,
       });
       await sendAuthEmail({
-        client: resend,
+        client: mailer,
         from: authEmailFrom,
         to: email,
         label: "password reset",

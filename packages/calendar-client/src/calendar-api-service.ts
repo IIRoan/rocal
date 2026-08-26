@@ -38,6 +38,10 @@ import type {
   EventNotification,
   CreateNotificationRequest,
   CalendarSubscription,
+  RegisterPushDeviceRequest,
+  PushDeviceRegistrationResult,
+  PushDeviceUnregisterResult,
+  PushTestNotificationResult,
   CreateSubscriptionRequest,
   UpdateSubscriptionRequest,
   DeleteSubscriptionResponse,
@@ -974,12 +978,18 @@ export class CalendarApiService {
   async updateEventNotifications(
     eventId: string,
     notifications: CreateNotificationRequest["notifications"],
+    options?: { displayTitle?: string | null },
   ): Promise<{ success: boolean; message: string }> {
     try {
       return await this.client.put<{
         success: boolean;
         message: string;
-      }>(`/api/notifications/event/${eventId}`, { notifications });
+      }>(`/api/notifications/event/${eventId}`, {
+        notifications,
+        ...(options?.displayTitle !== undefined
+          ? { displayTitle: options.displayTitle }
+          : {}),
+      });
     } catch (error) {
       throw this.transformError(error, "Failed to update event notifications");
     }
@@ -1004,6 +1014,45 @@ export class CalendarApiService {
         error,
         "Failed to create multiple notifications",
       );
+    }
+  }
+
+  async registerPushDevice(
+    input: RegisterPushDeviceRequest,
+  ): Promise<PushDeviceRegistrationResult> {
+    try {
+      return await this.client.put<PushDeviceRegistrationResult>(
+        "/api/push/devices",
+        input,
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to register push device");
+    }
+  }
+
+  async unregisterPushDevice(
+    token?: string,
+  ): Promise<PushDeviceUnregisterResult> {
+    try {
+      return await this.client.delete<PushDeviceUnregisterResult>(
+        "/api/push/devices",
+        {
+          body: JSON.stringify(token ? { token } : {}),
+        },
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to unregister push device");
+    }
+  }
+
+  async sendTestPushNotification(): Promise<PushTestNotificationResult> {
+    try {
+      return await this.client.post<PushTestNotificationResult>(
+        "/api/push/test",
+        {},
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to send test notification");
     }
   }
 

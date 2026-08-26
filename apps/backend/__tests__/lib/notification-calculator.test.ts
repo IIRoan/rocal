@@ -27,6 +27,36 @@ describe("NotificationCalculator", () => {
     expect(schedule.notificationDateLocal).toBe("2024-01-10T12:45:00");
   });
 
+  it("clamps overdue reminders to now when the event is still upcoming", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2024-01-10T11:50:30.000Z"));
+
+    const schedule = NotificationCalculator.scheduleUpcomingReminder(
+      new Date("2024-01-10T12:00:00.000Z"),
+      15,
+      "UTC",
+    );
+
+    expect(schedule).toEqual({
+      notificationTime: new Date("2024-01-10T11:50:00.000Z"),
+      notificationDateLocal: "2024-01-10T11:50:00",
+      notificationTimezone: "UTC",
+    });
+    jest.useRealTimers();
+  });
+
+  it("does not schedule reminders after the event has started", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2024-01-10T12:01:00.000Z"));
+
+    expect(
+      NotificationCalculator.scheduleUpcomingReminder(
+        new Date("2024-01-10T12:00:00.000Z"),
+        15,
+        "UTC",
+      ),
+    ).toBeNull();
+    jest.useRealTimers();
+  });
+
   it("calculates the notification time and rounds to the minute", () => {
     const notificationTime = NotificationCalculator.calculateNotificationTime(
       new Date("2024-01-10T12:00:45.123Z"),

@@ -49,6 +49,10 @@ export const RouteModel = {
     eventIdParams: "notifications.eventIdParams",
     updateBody: "notifications.updateBody",
   },
+  push: {
+    registerBody: "push.registerBody",
+    unregisterBody: "push.unregisterBody",
+  },
   settings: {
     updateBody: "settings.updateBody",
   },

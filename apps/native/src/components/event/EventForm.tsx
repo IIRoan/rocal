@@ -195,7 +195,9 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       !!initialValues?.recurrence,
     );
     const [showReminder, setShowReminder] = useState(
-      (initialValues?.reminder ?? 0) > 0,
+      initialValues != null && "reminder" in initialValues
+        ? (initialValues.reminder ?? 0) > 0
+        : true,
     );
     const [showParticipants, setShowParticipants] = useState(
       hasOptionalEventParticipants(initialValues?.participants),
@@ -502,8 +504,8 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
               {/* Server errors */}
               {serverErrors && serverErrors.length > 0 && (
                 <View style={styles.errorContainer}>
-                  {serverErrors.map((err, idx) => (
-                    <Text key={idx} style={styles.errorText}>
+                  {serverErrors.map((err) => (
+                    <Text key={err} style={styles.errorText}>
                       {err}
                     </Text>
                   ))}
@@ -513,8 +515,8 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
               {/* General validation errors */}
               {generalErrors.length > 0 && (
                 <View style={styles.errorContainer}>
-                  {generalErrors.map((err, idx) => (
-                    <Text key={idx} style={styles.errorText}>
+                  {generalErrors.map((err) => (
+                    <Text key={err} style={styles.errorText}>
                       {err}
                     </Text>
                   ))}
@@ -1612,6 +1614,8 @@ function TogglePill({
 
 // ─── Calendar Grid ───────────────────────────────────────────────────────────
 
+const CALENDAR_DAY_HEADERS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+
 function CalendarGrid({
   selectedDate,
   onSelect,
@@ -1654,7 +1658,6 @@ function CalendarGrid({
   const nextMonth = () => setViewMonth(new Date(year, month + 1, 1));
 
   const monthLabel = format(viewMonth, "MMMM yyyy");
-  const dayHeaders = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 
   const isSelected = (day: number) =>
     day === selectedDate.getDate() &&
@@ -1715,7 +1718,7 @@ function CalendarGrid({
       </View>
 
       <View style={{ flexDirection: "row" }}>
-        {dayHeaders.map((d) => (
+        {CALENDAR_DAY_HEADERS.map((d) => (
           <View
             key={d}
             style={{ flex: 1, alignItems: "center", paddingVertical: 4 }}

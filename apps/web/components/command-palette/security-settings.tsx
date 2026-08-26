@@ -2,6 +2,7 @@ import React from "react";
 import { Key, ChevronRight, ArrowLeft, Shield } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
 import { PasswordSection } from "./password-section";
+import { EVENT_ENCRYPTION_HINT } from "@workspace/calendar-core";
 
 interface SecuritySettingsProps {
   localSettings: UserSettings;
@@ -40,8 +41,10 @@ export function SecuritySettings({
     <div className="flex flex-col">
       <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
         <button
+          type="button"
           onClick={() => goBack()}
-          className="p-1 rounded hover:bg-muted/50 transition-colors"
+          className="p-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
+          aria-label="Back"
         >
           <ArrowLeft className="size-4 text-muted-foreground" />
         </button>
@@ -57,9 +60,7 @@ export function SecuritySettings({
             <div className="min-w-0">
               <div className="text-sm">Event Encryption</div>
               <div className="text-xs text-muted-foreground leading-relaxed">
-                Event title, description, and location stay ciphertext-only.
-                Reminder emails remain available but only include timing
-                details.
+                {EVENT_ENCRYPTION_HINT}
               </div>
             </div>
           </div>

@@ -23,6 +23,11 @@ go.work
 .env.local
 .env.production
 
+# Apple APNs auth keys — never commit
+*.p8
+AuthKey*.p8
+secrets/
+
 # Node.js
 node_modules/
 npm-debug.log*

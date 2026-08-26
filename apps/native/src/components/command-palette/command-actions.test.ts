@@ -15,7 +15,12 @@ describe("buildCommandActions", () => {
   it("returns mail-only actions in mail scope", () => {
     const actions = buildCommandActions("mail");
     const ids = actions.map((a) => a.id);
-    expect(ids).toEqual(["compose-mail", "open-settings", "open-calendar"]);
+    expect(ids).toEqual([
+      "compose-mail",
+      "open-settings",
+      "open-notification-settings",
+      "open-calendar",
+    ]);
     expect(actions.every((a) => a.group !== "Calendar")).toBe(true);
   });
 

@@ -18,6 +18,7 @@ import { useRecentContacts } from "../../src/hooks/use-recent-contacts";
 import { extractRecentContactEntries } from "../../src/lib/record-recent-contacts";
 import { useToast } from "../../src/providers/ToastProvider";
 import { toastOperationWarnings } from "../../src/lib/operation-warnings";
+import { persistEventReminderNotifications } from "../../src/lib/event-reminder-notifications";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
 import {
@@ -71,8 +72,11 @@ export default function EventCreateScreen() {
   // ─── Create mutation (optimistic) ─────────────────────────────────────────
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateEventRequest) =>
-      calendarApiService.createEvent(data),
+    mutationFn: async (data: CreateEventRequest) => {
+      const saved = await calendarApiService.createEvent(data);
+      await persistEventReminderNotifications(saved.id, data);
+      return saved;
+    },
     onMutate: async (data: CreateEventRequest) => {
       const tempId = generateOptimisticId();
       const optimisticEvent = buildOptimisticEvent(

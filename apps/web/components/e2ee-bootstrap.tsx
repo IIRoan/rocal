@@ -12,10 +12,7 @@ import {
 import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
 import {
   clearAuthPasswords,
-  clearPendingAuthPassword,
-  consumePendingAuthPassword,
-  peekCachedAuthPassword,
-  peekPendingAuthPassword,
+  peekAuthPassword,
 } from "@/lib/e2ee-password-cache";
 import {
   clearEncPasswordCookie,
@@ -98,8 +95,7 @@ async function resolveBootstrapGateState(input: {
   }
 
   if (result.activated && !result.bootstrap.passwordEnvelope) {
-    const pendingPassword =
-      consumePendingAuthPassword() ?? peekCachedAuthPassword();
+    const pendingPassword = peekAuthPassword();
 
     if (pendingPassword) {
       const stored = await attemptEncryptionPasswordSetup(
@@ -124,7 +120,26 @@ async function resolveBootstrapGateState(input: {
   }
 
   if (result.bootstrap.passwordEnvelope) {
-    return { mode: "unlock", isSubmitting: false };
+    if (result.passwordUnlockFailed) {
+      return { mode: "unlock", isSubmitting: false };
+    }
+
+    const pendingPassword = peekAuthPassword();
+    if (pendingPassword) {
+      const unlocked = await unlockE2eeWithPassword(userId, pendingPassword);
+
+      if (isCancelled()) {
+        return null;
+      }
+
+      if (unlocked) {
+        return { mode: "hidden", isSubmitting: false };
+      }
+
+      return { mode: "unlock", isSubmitting: false };
+    }
+
+    return { mode: "hidden", isSubmitting: false };
   }
 
   if (result.bootstrap.devices.length > 0) {
@@ -170,17 +185,14 @@ async function runEncryptionPasswordSetup(input: {
 async function runEncryptionPasswordUnlock(input: {
   userId: string;
   password: string;
-  isEmailPasswordUser: boolean;
   queryClient: ReturnType<typeof useQueryClient>;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { userId, password, isEmailPasswordUser, queryClient } = input;
+  const { userId, password, queryClient } = input;
 
   if (!password) {
     return {
       ok: false,
-      error: isEmailPasswordUser
-        ? "Enter your email sign-in password."
-        : "Enter your encryption password.",
+      error: "Enter your previous email sign-in password.",
     };
   }
 
@@ -189,9 +201,8 @@ async function runEncryptionPasswordUnlock(input: {
   if (!unlocked) {
     return {
       ok: false,
-      error: isEmailPasswordUser
-        ? "That password didn't match. If you recently changed your email sign-in password, use your previous one here."
-        : "That password did not unlock your encrypted data.",
+      error:
+        "That password didn't match. If you recently changed your email sign-in password, use your previous one here.",
     };
   }
 
@@ -221,7 +232,6 @@ async function runBootstrapCycle(input: {
   runId: number;
   bootstrapRunIdRef: MutableRefObject<number>;
   isCancelled: () => boolean;
-  onEmailPasswordUser: (value: boolean) => void;
   onGateResolved: (gate: BootstrapGateState) => void;
 }): Promise<void> {
   const {
@@ -230,7 +240,6 @@ async function runBootstrapCycle(input: {
     runId,
     bootstrapRunIdRef,
     isCancelled,
-    onEmailPasswordUser,
     onGateResolved,
   } = input;
 
@@ -238,10 +247,6 @@ async function runBootstrapCycle(input: {
   if (isCancelled() || runId !== bootstrapRunIdRef.current) {
     return;
   }
-
-  const hadPendingPassword =
-    !!peekPendingAuthPassword() || !!peekCachedAuthPassword();
-  onEmailPasswordUser(hadPendingPassword);
 
   try {
     const result = await ensureE2eeBootstrap(userId);
@@ -329,9 +334,6 @@ export function E2eeBootstrap() {
       runId,
       bootstrapRunIdRef,
       isCancelled: () => isCancelled,
-      onEmailPasswordUser: (value) => {
-        dispatchGate({ type: "set-email-password-user", value });
-      },
       onGateResolved: (nextGate) => {
         dispatchGate({
           type: "set-from-bootstrap",
@@ -360,9 +362,6 @@ export function E2eeBootstrap() {
       runId,
       bootstrapRunIdRef,
       isCancelled: () => runId !== bootstrapRunIdRef.current,
-      onEmailPasswordUser: (value) => {
-        dispatchGate({ type: "set-email-password-user", value });
-      },
       onGateResolved: (nextGate) => {
         dispatchGate({
           type: "set-from-bootstrap",
@@ -419,7 +418,6 @@ export function E2eeBootstrap() {
     const outcome = await runEncryptionPasswordUnlock({
       userId,
       password: gate.password,
-      isEmailPasswordUser: gate.isEmailPasswordUser,
       queryClient,
     });
 

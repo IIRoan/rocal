@@ -31,6 +31,7 @@ export * from "./passkey-step-up";
 export { RecurrenceEngine } from "@workspace/calendar-ics/recurrence";
 export * from "./calendar-event-link";
 export * from "./event-reminder-mail";
+export * from "./notification-settings";
 export * from "./mail-calendar-invite";
 export * from "./mail-invitation-staging";
 export * from "./invitation-encryption";

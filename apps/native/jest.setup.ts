@@ -29,6 +29,18 @@ jest.mock("expo-updates", () => ({
   reloadAsync: jest.fn(),
 }));
 
+jest.mock("expo-notifications", () => ({
+  setNotificationHandler: jest.fn(),
+  getPermissionsAsync: jest.fn(async () => ({ status: "granted" })),
+  requestPermissionsAsync: jest.fn(async () => ({ status: "granted" })),
+  getDevicePushTokenAsync: jest.fn(async () => ({ data: "token", type: "ios" })),
+  addPushTokenListener: jest.fn(() => ({ remove: jest.fn() })),
+  addNotificationResponseReceivedListener: jest.fn(() => ({
+    remove: jest.fn(),
+  })),
+  getLastNotificationResponseAsync: jest.fn(async () => null),
+}));
+
 jest.mock("expo-crypto", () => ({
   randomUUID: () => "00000000-0000-4000-8000-000000000000",
   getRandomValues: (buffer: Uint8Array) =>

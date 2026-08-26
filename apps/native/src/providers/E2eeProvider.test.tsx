@@ -128,6 +128,7 @@ function createMockAuthContext(
     registerPasskey: jest.fn(),
     deletePasskey: jest.fn(),
     consumePendingAuthPassword: jest.fn(() => null),
+    peekPendingAuthPassword: jest.fn(() => null),
     clearPendingAuthPassword: jest.fn(),
     ...overrides,
   };
@@ -154,6 +155,7 @@ describe("E2eeProvider", () => {
   let container: HTMLDivElement;
   let root: Root;
   let mockFetch: jest.Mock;
+  let peekPendingAuthPassword: jest.Mock;
   let consumePendingAuthPassword: jest.Mock;
   let clearPendingAuthPassword: jest.Mock;
 
@@ -215,6 +217,7 @@ describe("E2eeProvider", () => {
     mockFetch = jest.fn();
     (globalThis as { fetch?: typeof fetch }).fetch = mockFetch as typeof fetch;
 
+    peekPendingAuthPassword = jest.fn().mockReturnValue(null);
     consumePendingAuthPassword = jest.fn().mockReturnValue(null);
     clearPendingAuthPassword = jest.fn();
 
@@ -239,6 +242,7 @@ describe("E2eeProvider", () => {
       createMockAuthContext({
         clearPendingAuthPassword,
         consumePendingAuthPassword,
+        peekPendingAuthPassword,
         lastAuthMethod: "unknown",
       }),
     );
@@ -292,11 +296,12 @@ describe("E2eeProvider", () => {
   });
 
   it("auto-unlocks a password envelope with the pending email sign-in password", async () => {
-    consumePendingAuthPassword.mockReturnValue("secret-password");
+    peekPendingAuthPassword.mockReturnValue("secret-password");
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
         consumePendingAuthPassword,
+        peekPendingAuthPassword,
         lastAuthMethod: "email-password",
       }),
     );
@@ -340,11 +345,12 @@ describe("E2eeProvider", () => {
   });
 
   it("starts a fresh E2EE session when the auto-unlock fails (e.g. password changed)", async () => {
-    consumePendingAuthPassword.mockReturnValue("wrong-password");
+    peekPendingAuthPassword.mockReturnValue("wrong-password");
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
         consumePendingAuthPassword,
+        peekPendingAuthPassword,
         lastAuthMethod: "email-password",
       }),
     );
@@ -382,14 +388,53 @@ describe("E2eeProvider", () => {
       "https://api.solace.test/api/e2ee/device",
       expect.objectContaining({ method: "PUT" }),
     );
+    expect(clearPendingAuthPassword).toHaveBeenCalled();
   });
 
-  it("auto-saves a password envelope for first-device email sign-in", async () => {
-    consumePendingAuthPassword.mockReturnValue("secret-password");
+  it("clears the pending auth password when auto-storing the envelope fails", async () => {
+    peekPendingAuthPassword.mockReturnValue("secret-password");
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
         consumePendingAuthPassword,
+        peekPendingAuthPassword,
+        lastAuthMethod: "email-password",
+      }),
+    );
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
+        return jsonResponse(createBootstrapResponse());
+      }
+
+      if (url.endsWith("/api/e2ee/device")) {
+        return jsonResponse({});
+      }
+
+      if (url.endsWith("/api/e2ee/password")) {
+        return new Response("nope", { status: 500 });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    await renderProvider();
+
+    await act(async () => {
+      await getE2ee().bootstrap("user-1", "https://api.solace.test");
+    });
+    await flushBootstrap();
+
+    expect(getE2ee().isReady).toBe(true);
+    expect(clearPendingAuthPassword).toHaveBeenCalled();
+  });
+
+  it("auto-saves a password envelope for first-device email sign-in", async () => {
+    peekPendingAuthPassword.mockReturnValue("secret-password");
+    mockUseAuth.mockReturnValue(
+      createMockAuthContext({
+        clearPendingAuthPassword,
+        consumePendingAuthPassword,
+        peekPendingAuthPassword,
         lastAuthMethod: "email-password",
       }),
     );
@@ -431,11 +476,12 @@ describe("E2eeProvider", () => {
   });
 
   it("can reset the active encryption password after bootstrap completes", async () => {
-    consumePendingAuthPassword.mockReturnValue("secret-password");
+    peekPendingAuthPassword.mockReturnValue("secret-password");
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
         consumePendingAuthPassword,
+        peekPendingAuthPassword,
         lastAuthMethod: "email-password",
       }),
     );
@@ -484,7 +530,8 @@ describe("E2eeProvider", () => {
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
-        consumePendingAuthPassword, // returns null — no password from passkey auth
+        consumePendingAuthPassword,
+        peekPendingAuthPassword,
         lastAuthMethod: "passkey",
       }),
     );
@@ -523,7 +570,8 @@ describe("E2eeProvider", () => {
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
-        consumePendingAuthPassword, // returns null
+        consumePendingAuthPassword,
+        peekPendingAuthPassword,
         lastAuthMethod: "passkey",
       }),
     );

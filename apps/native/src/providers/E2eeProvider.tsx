@@ -62,7 +62,7 @@ export function E2eeProvider({
 }: {
   children: React.ReactNode;
 }): React.ReactNode {
-  const { clearPendingAuthPassword, consumePendingAuthPassword } = useAuth();
+  const { clearPendingAuthPassword, peekPendingAuthPassword } = useAuth();
 
   const [isReady, setIsReady] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
@@ -336,7 +336,7 @@ export function E2eeProvider({
           return;
         }
 
-        const pendingPassword = consumePendingAuthPassword();
+        const pendingPassword = peekPendingAuthPassword();
 
         // If a password envelope exists, try to unlock it with the auth
         // password that was captured at sign-in time. This covers email/
@@ -361,6 +361,7 @@ export function E2eeProvider({
             }
 
             sessionRef.current = nextSession;
+            clearPendingAuthPassword();
             log.info("Unlocked native E2EE with pending auth password", {
               userId,
               deviceId: nextSession.deviceId,
@@ -418,6 +419,10 @@ export function E2eeProvider({
               userId,
               error,
             });
+          } finally {
+            // Drop the sign-in password once this bootstrap is done with it,
+            // including failed envelope writes (the unlock path already clears).
+            clearPendingAuthPassword();
           }
         }
 
@@ -434,7 +439,7 @@ export function E2eeProvider({
       }
     },
     [
-      consumePendingAuthPassword,
+      peekPendingAuthPassword,
       clearPendingAuthPassword,
       getModule,
       registerDeviceForSession,

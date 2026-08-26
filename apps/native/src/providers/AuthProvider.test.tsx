@@ -7,6 +7,7 @@ import { authClient } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { waitForSessionCookie } from "../lib/session-cookie";
 import { signInWithBrowserPasskey } from "../lib/passkey-browser-bridge";
+import { unregisterNativePushDevice } from "../lib/push-notifications";
 import { AuthProvider, useAuth } from "./AuthProvider";
 
 jest.mock("react-native", () => ({
@@ -75,6 +76,10 @@ jest.mock("../lib/mail/mail-crypto", () => ({
   clearVaultCache: jest.fn(),
 }));
 
+jest.mock("../lib/push-notifications", () => ({
+  unregisterNativePushDevice: jest.fn(async () => {}),
+}));
+
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -90,6 +95,7 @@ const mockSignOut = jest.mocked(authClient.signOut);
 const mockGetAuthCapabilities = jest.mocked(getAuthCapabilities);
 const mockWaitForSessionCookie = jest.mocked(waitForSessionCookie);
 const mockSignInWithBrowserPasskey = jest.mocked(signInWithBrowserPasskey);
+const mockUnregisterNativePushDevice = jest.mocked(unregisterNativePushDevice);
 const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 
 function createSessionData() {
@@ -174,6 +180,7 @@ describe("AuthProvider", () => {
     mockGetAuthCapabilities.mockReset();
     mockWaitForSessionCookie.mockReset();
     mockSignInWithBrowserPasskey.mockReset();
+    mockUnregisterNativePushDevice.mockReset();
 
     mockGetAuthCapabilities.mockReturnValue({
       supportsPassword: true,
@@ -216,8 +223,28 @@ describe("AuthProvider", () => {
     });
 
     expect(getAuth().lastAuthMethod).toBe("email-password");
+    expect(getAuth().peekPendingAuthPassword()).toBe("secret-password");
+    expect(getAuth().peekPendingAuthPassword()).toBe("secret-password");
     expect(getAuth().consumePendingAuthPassword()).toBe("secret-password");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
+  });
+
+  it("stashes the email sign-in password before the session can become available", async () => {
+    await renderProvider();
+
+    mockEmailSignIn.mockImplementation(async () => {
+      expect(getAuth().peekPendingAuthPassword()).toBe("secret-password");
+      return createAuthResult();
+    });
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+
+    expect(mockEmailSignIn).toHaveBeenCalledWith({
+      email: "roan@example.com",
+      password: "secret-password",
+    });
   });
 
   it("stores the email sign-up password as the pending encryption password", async () => {
@@ -321,6 +348,7 @@ describe("AuthProvider", () => {
     });
     await flushPromises();
 
+    expect(mockUnregisterNativePushDevice).toHaveBeenCalled();
     expect(mockSignOut).toHaveBeenCalled();
     expect(getAuth().lastAuthMethod).toBe("unknown");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();

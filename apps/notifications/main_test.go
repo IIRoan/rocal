@@ -1,17 +1,22 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
+	"notifications/internal/email"
+	"notifications/internal/jobs"
 	"notifications/internal/logger"
+	"notifications/internal/push"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/resend/resend-go/v2"
 )
 
 func newTestServer(t *testing.T) *NotificationServer {
@@ -252,13 +257,15 @@ func TestSenderDisplayAndFromAddress(t *testing.T) {
 
 func TestResolveBaseFromAddress(t *testing.T) {
 	tests := []struct {
-		name      string
-		emailFrom string
-		fromEmail string
-		want      string
-		wantErr   string
+		name         string
+		emailFrom    string
+		emailFromAlt string
+		fromEmail    string
+		want         string
+		wantErr      string
 	}{
-		{name: "prefers EMAIL_FROM_ADDRESS", emailFrom: "Notifications <no-reply@example.com>", want: "no-reply@example.com"},
+		{name: "prefers EMAIL_FROM", emailFrom: "Solace <noreply@solace.onl>", want: "noreply@solace.onl"},
+		{name: "falls back to EMAIL_FROM_ADDRESS", emailFromAlt: "Notifications <no-reply@example.com>", want: "no-reply@example.com"},
 		{name: "falls back to FROM_EMAIL", fromEmail: "alerts@example.com", want: "alerts@example.com"},
 		{name: "empty when unset", want: ""},
 		{name: "rejects invalid address", emailFrom: "not-an-email", wantErr: "must contain a valid email address"},
@@ -266,7 +273,8 @@ func TestResolveBaseFromAddress(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Setenv("EMAIL_FROM_ADDRESS", test.emailFrom)
+			t.Setenv("EMAIL_FROM", test.emailFrom)
+			t.Setenv("EMAIL_FROM_ADDRESS", test.emailFromAlt)
 			t.Setenv("FROM_EMAIL", test.fromEmail)
 
 			got, err := resolveBaseFromAddress()
@@ -394,20 +402,20 @@ func TestGenerateEmailContentAndSubjectForEncryptedEvent(t *testing.T) {
 		t.Fatalf("unexpected generateEmailContent error: %v", err)
 	}
 
-	if !strings.Contains(content.HTML, "Encrypted event") {
-		t.Fatalf("expected HTML to contain generic encrypted title, got %q", content.HTML)
+	if !strings.Contains(content.HTML, "Private Planning") {
+		t.Fatalf("expected HTML to contain reminder title, got %q", content.HTML)
 	}
-	if strings.Contains(content.HTML, "Private Planning") || strings.Contains(content.HTML, "Secret Room") || strings.Contains(content.HTML, "Classified") {
-		t.Fatalf("expected HTML to redact encrypted event content, got %q", content.HTML)
+	if strings.Contains(content.HTML, "Secret Room") || strings.Contains(content.HTML, "Classified") || strings.Contains(content.HTML, "Board") {
+		t.Fatalf("expected HTML to redact encrypted event details, got %q", content.HTML)
 	}
-	if strings.Contains(content.Text, "Private Planning") || strings.Contains(content.Text, "Secret Room") || strings.Contains(content.Text, "Classified") {
-		t.Fatalf("expected text email to redact encrypted event content, got %q", content.Text)
+	if strings.Contains(content.Text, "Secret Room") || strings.Contains(content.Text, "Classified") {
+		t.Fatalf("expected text email to redact encrypted event details, got %q", content.Text)
 	}
 
-	if subject := server.generateEmailSubject(event, 30); subject != "Event reminder in 30 minutes" {
+	if subject := server.generateEmailSubject(event, 30); subject != "Private Planning in 30 minutes" {
 		t.Fatalf("unexpected encrypted subject %q", subject)
 	}
-	if display := server.senderDisplayName(event, 30); display != "Event reminder in 30 minutes" {
+	if display := server.senderDisplayName(event, 30); display != "Private Planning in 30 minutes" {
 		t.Fatalf("unexpected encrypted sender display %q", display)
 	}
 
@@ -419,8 +427,52 @@ func TestGenerateEmailContentAndSubjectForEncryptedEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected valid mail address, got error: %v", err)
 	}
-	if parsed.Name != "Event reminder in 30 minutes" {
-		t.Fatalf("expected encrypted sender display name, got %q", parsed.Name)
+	if parsed.Name != "Private Planning in 30 minutes" {
+		t.Fatalf("expected reminder title in sender display name, got %q", parsed.Name)
+	}
+}
+
+func TestGenerateEmailContentFallsBackWhenEncryptedTitleIsMissing(t *testing.T) {
+	t.Setenv("FRONTEND_URL", "https://app.solace.test")
+	server := newTestServer(t)
+	event := EventData{
+		Title:           "",
+		Start:           time.Date(2026, time.May, 12, 9, 0, 0, 0, time.UTC),
+		End:             time.Date(2026, time.May, 12, 10, 30, 0, 0, time.UTC),
+		EncryptionState: "encrypted",
+		Location:        "Secret Room",
+	}
+	user := UserData{Name: "Roan", Email: "roan@example.com", TimeZone: "UTC"}
+
+	content, err := server.generateEmailContent(event, user, 30, "evt-1")
+	if err != nil {
+		t.Fatalf("unexpected generateEmailContent error: %v", err)
+	}
+	if !strings.Contains(content.HTML, "Encrypted event") {
+		t.Fatalf("expected fallback encrypted title, got %q", content.HTML)
+	}
+	if strings.Contains(content.HTML, "Secret Room") {
+		t.Fatalf("expected location to stay redacted, got %q", content.HTML)
+	}
+	if subject := server.generateEmailSubject(event, 30); subject != "Encrypted event in 30 minutes" {
+		t.Fatalf("unexpected fallback subject %q", subject)
+	}
+}
+
+func TestReminderDisplayTitleIgnoresPlaceholder(t *testing.T) {
+	server := newTestServer(t)
+	event := EventData{
+		Title:           "Encrypted event",
+		EncryptionState: "encrypted",
+	}
+	if title := server.reminderDisplayTitle(event); title != "Encrypted event" {
+		t.Fatalf("expected placeholder fallback, got %q", title)
+	}
+	if title := capturedReminderTitle("Encrypted event"); title != "" {
+		t.Fatalf("expected captured title to ignore placeholder, got %q", title)
+	}
+	if title := capturedReminderTitle("Lunch with Sam"); title != "Lunch with Sam" {
+		t.Fatalf("expected captured title, got %q", title)
 	}
 }
 
@@ -490,13 +542,41 @@ func TestSendEmailNotificationValidation(t *testing.T) {
 
 	err := server.sendEmailNotification(nil, EventData{Title: "Test"}, UserData{Email: "user@example.com"}, 15, "evt-1")
 	if err == nil || !strings.Contains(err.Error(), "email service not configured") {
-		t.Fatalf("expected resend configuration error, got %v", err)
+		t.Fatalf("expected email configuration error, got %v", err)
 	}
 
-	server.resend = resend.NewClient("test-api-key")
+	server.mailer = email.NewClient(email.Config{})
 	err = server.sendEmailNotification(nil, EventData{Title: "Test"}, UserData{}, 15, "evt-1")
 	if err == nil || !strings.Contains(err.Error(), "user email is required") {
 		t.Fatalf("expected missing email validation error, got %v", err)
+	}
+}
+
+func TestDispatchSkipsAfterMaxAttempts(t *testing.T) {
+	server := newTestServer(t)
+
+	err := server.dispatchJob(context.Background(), jobs.Job{
+		ID:       "job-1",
+		Channel:  "push",
+		Kind:     "new_mail",
+		Attempts: jobs.MaxAttempts,
+	})
+	if !errors.Is(err, errJobSkipped) {
+		t.Fatalf("expected skip after max attempts, got %v", err)
+	}
+}
+
+func TestDispatchSkipsUnconfiguredChannelsIndependently(t *testing.T) {
+	server := newTestServer(t)
+
+	err := server.dispatchJob(context.Background(), jobs.Job{ID: "email-1", Channel: "email"})
+	if !errors.Is(err, errJobSkipped) {
+		t.Fatalf("expected email job to skip without a mailer, got %v", err)
+	}
+
+	err = server.dispatchJob(context.Background(), jobs.Job{ID: "push-1", Channel: "push"})
+	if !errors.Is(err, errJobSkipped) {
+		t.Fatalf("expected push job to skip without APNs, got %v", err)
 	}
 }
 
@@ -541,10 +621,10 @@ func TestNullableString(t *testing.T) {
 }
 
 func TestGetPort(t *testing.T) {
-	t.Run("defaults to 8080", func(t *testing.T) {
+	t.Run("defaults to 4002", func(t *testing.T) {
 		t.Setenv("PORT", "")
-		if got := getPort(); got != "8080" {
-			t.Fatalf("expected default port 8080, got %q", got)
+		if got := getPort(); got != "4002" {
+			t.Fatalf("expected default port 4002, got %q", got)
 		}
 	})
 
@@ -552,6 +632,55 @@ func TestGetPort(t *testing.T) {
 		t.Setenv("PORT", "9090")
 		if got := getPort(); got != "9090" {
 			t.Fatalf("expected port 9090, got %q", got)
+		}
+	})
+}
+
+func TestLoadAPNsConfig(t *testing.T) {
+	t.Run("reports missing vars", func(t *testing.T) {
+		t.Setenv("APNS_KEY_ID", "")
+		t.Setenv("APNS_TEAM_ID", "")
+		t.Setenv("APNS_AUTH_KEY", "")
+		t.Setenv("APNS_AUTH_KEY_FILE", "")
+		_, missing, err := loadAPNsConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(missing) != 3 {
+			t.Fatalf("expected 3 missing vars, got %v", missing)
+		}
+	})
+
+	t.Run("loads PEM from APNS_AUTH_KEY_FILE", func(t *testing.T) {
+		pemBytes, err := push.GenerateTestKeyPEM()
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(t.TempDir(), "AuthKey.p8")
+		if err := os.WriteFile(path, pemBytes, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("APNS_KEY_ID", "KEYID12345")
+		t.Setenv("APNS_TEAM_ID", "TEAMID1234")
+		t.Setenv("APNS_AUTH_KEY", "")
+		t.Setenv("APNS_AUTH_KEY_FILE", path)
+
+		cfg, missing, err := loadAPNsConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(missing) != 0 {
+			t.Fatalf("expected complete config, missing %v", missing)
+		}
+		if _, err := push.ParseAuthKey(cfg.pem); err != nil {
+			t.Fatalf("file PEM should parse: %v", err)
+		}
+	})
+
+	t.Run("wraps bare key material as PEM", func(t *testing.T) {
+		got := string(normalizeAPNsPEM([]byte("  abcdef  ")))
+		if !strings.Contains(got, "BEGIN PRIVATE KEY") || !strings.Contains(got, "abcdef") {
+			t.Fatalf("expected wrapped PEM, got %q", got)
 		}
 	})
 }
@@ -816,6 +945,7 @@ func TestGetFromAddressErrors(t *testing.T) {
 	event := EventData{Title: "Test"}
 
 	t.Run("missing from address", func(t *testing.T) {
+		t.Setenv("EMAIL_FROM", "")
 		t.Setenv("EMAIL_FROM_ADDRESS", "")
 		t.Setenv("FROM_EMAIL", "")
 
@@ -826,7 +956,8 @@ func TestGetFromAddressErrors(t *testing.T) {
 	})
 
 	t.Run("invalid from address", func(t *testing.T) {
-		t.Setenv("EMAIL_FROM_ADDRESS", "not-an-email")
+		t.Setenv("EMAIL_FROM", "not-an-email")
+		t.Setenv("EMAIL_FROM_ADDRESS", "")
 		t.Setenv("FROM_EMAIL", "")
 
 		_, err := server.getFromAddress(event, 15)
@@ -836,7 +967,8 @@ func TestGetFromAddressErrors(t *testing.T) {
 	})
 
 	t.Run("valid from address includes display name", func(t *testing.T) {
-		t.Setenv("EMAIL_FROM_ADDRESS", "noreply@solace.onl")
+		t.Setenv("EMAIL_FROM", "noreply@solace.onl")
+		t.Setenv("EMAIL_FROM_ADDRESS", "")
 		t.Setenv("FROM_EMAIL", "")
 
 		from, err := server.getFromAddress(event, 30)
@@ -917,8 +1049,52 @@ func TestSendTestEmailRequiresRecipient(t *testing.T) {
 	}
 }
 
-func TestSendTestEmailRequiresResend(t *testing.T) {
-	t.Setenv("RESEND_API_KEY", "")
+func TestSendTestPushRequiresRecipient(t *testing.T) {
+	server := newTestServer(t)
+
+	err := server.sendTestPush("")
+	if err == nil || !strings.Contains(err.Error(), "test recipient is required") {
+		t.Fatalf("expected recipient required error, got %v", err)
+	}
+}
+
+func TestSendTestPushRequiresPusher(t *testing.T) {
+	t.Setenv("APNS_KEY_ID", "")
+	t.Setenv("APNS_TEAM_ID", "")
+	t.Setenv("APNS_AUTH_KEY", "")
+	t.Setenv("APNS_AUTH_KEY_FILE", "")
+	server := newTestServer(t)
+
+	err := server.sendTestPush("test@example.com")
+	if err == nil || !strings.Contains(err.Error(), "push service not configured") {
+		t.Fatalf("expected push service error, got %v", err)
+	}
+}
+
+func TestSendTestPushRequiresDatabase(t *testing.T) {
+	pem, err := push.GenerateTestKeyPEM()
+	if err != nil {
+		t.Fatalf("generate test APNs key: %v", err)
+	}
+	t.Setenv("APNS_KEY_ID", "TESTID12")
+	t.Setenv("APNS_TEAM_ID", "TEAMID12")
+	t.Setenv("APNS_AUTH_KEY", string(pem))
+	t.Setenv("APNS_AUTH_KEY_FILE", "")
+	t.Setenv("DATABASE_URL", "")
+	server := newTestServer(t)
+
+	err = server.sendTestPush("test@example.com")
+	if err == nil || !strings.Contains(err.Error(), "DATABASE_URL") {
+		t.Fatalf("expected DATABASE_URL error, got %v", err)
+	}
+}
+
+func TestSendTestEmailRequiresMailer(t *testing.T) {
+	t.Setenv("STALWART_JMAP_USERNAME", "")
+	t.Setenv("STALWART_JMAP_PASSWORD", "")
+	t.Setenv("EMAIL_FROM", "")
+	t.Setenv("FROM_EMAIL", "")
+	t.Setenv("EMAIL_FROM_ADDRESS", "")
 	server := newTestServer(t)
 
 	err := server.sendTestEmail("test@example.com")
@@ -973,5 +1149,102 @@ func TestBuildFrontendURLEmptyQuery(t *testing.T) {
 	got := buildFrontendURL("/settings", map[string]string{})
 	if got != "https://app.solace.onl/settings" {
 		t.Fatalf("expected clean URL with empty query map, got %q", got)
+	}
+}
+
+func TestDiscoverEnvFilesFindsBackendEnv(t *testing.T) {
+	root := t.TempDir()
+	backendDir := filepath.Join(root, "apps", "backend")
+	notifDir := filepath.Join(root, "apps", "notifications")
+	if err := os.MkdirAll(backendDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(notifDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	backendEnv := filepath.Join(backendDir, ".env")
+	if err := os.WriteFile(backendEnv, []byte("DATABASE_URL=postgres://local\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Chdir(notifDir)
+	files := discoverEnvFiles()
+	want, err := filepath.Abs(backendEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || files[0] != want {
+		t.Fatalf("expected [%s], got %v", want, files)
+	}
+}
+
+func TestDiscoverEnvFilesPrefersLocalOverBackend(t *testing.T) {
+	root := t.TempDir()
+	backendDir := filepath.Join(root, "apps", "backend")
+	notifDir := filepath.Join(root, "apps", "notifications")
+	if err := os.MkdirAll(backendDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(notifDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	localEnv := filepath.Join(notifDir, ".env")
+	backendEnv := filepath.Join(backendDir, ".env")
+	if err := os.WriteFile(localEnv, []byte("DATABASE_URL=local\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(backendEnv, []byte("DATABASE_URL=backend\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Chdir(notifDir)
+	files := discoverEnvFiles()
+	wantLocal, err := filepath.Abs(localEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantBackend, err := filepath.Abs(backendEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) < 2 || files[0] != wantLocal {
+		t.Fatalf("expected local .env first, got %v", files)
+	}
+	foundBackend := false
+	for _, file := range files[1:] {
+		if file == wantBackend {
+			foundBackend = true
+			break
+		}
+	}
+	if !foundBackend {
+		t.Fatalf("expected backend .env as fallback, got %v", files)
+	}
+}
+
+func TestApplyEnvFileSkipsBackendPort(t *testing.T) {
+	t.Setenv("PORT", "")
+	t.Setenv("DATABASE_URL", "")
+
+	dir := filepath.Join(t.TempDir(), "backend")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, ".env")
+	if err := os.WriteFile(path, []byte("PORT=4001\nDATABASE_URL=postgres://from-backend\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := applyEnvFile(path, envSkipKeys(path)); err != nil {
+		t.Fatal(err)
+	}
+	if got := os.Getenv("PORT"); got != "" {
+		t.Fatalf("expected backend PORT to be ignored, got %q", got)
+	}
+	if got := getPort(); got != "4002" {
+		t.Fatalf("expected default 4002 after skipping backend PORT, got %q", got)
+	}
+	if got := os.Getenv("DATABASE_URL"); got != "postgres://from-backend" {
+		t.Fatalf("expected DATABASE_URL from backend env, got %q", got)
 	}
 }

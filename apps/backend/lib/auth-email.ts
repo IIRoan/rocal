@@ -562,9 +562,9 @@ export async function sendAuthEmail({
 
     logger.info(`Sent ${label} email`, {
       recipientRef: logRef(email),
-      resendId: result.data?.id ?? null,
+      submissionId: result.data?.id ?? null,
     });
-    return { delivered: true, channel: "resend" };
+    return { delivered: true, channel: "stalwart" };
   } catch (error) {
     const reason = `Failed to send ${label} email. Try again later or contact support.`;
 
@@ -574,7 +574,7 @@ export async function sendAuthEmail({
         label,
         ...errorLogDetails(error),
       });
-      return { delivered: false, channel: "resend", reason };
+      return { delivered: false, channel: "stalwart", reason };
     }
 
     throw error instanceof Error

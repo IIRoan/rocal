@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -27,6 +26,8 @@ import type {
 } from "@workspace/calendar-core";
 import {
   extractLinkedAuthAccounts,
+  EVENT_ENCRYPTION_HINT,
+  formatNotificationChannelsSummary,
   getErrorMessage,
   partitionCalendarsByKind,
   summarizeLinkedAuthAccounts,
@@ -46,6 +47,7 @@ import {
   SETTINGS_CONTACTS_ROUTE,
   SETTINGS_INVITES_ROUTE,
   SETTINGS_MAILBOXES_ROUTE,
+  SETTINGS_NOTIFICATIONS_ROUTE,
 } from "../../src/lib/auth-routing";
 import { useE2ee } from "../../src/providers/E2eeProvider";
 import {
@@ -70,7 +72,6 @@ import { getSettingsAccountActions } from "../../src/lib/settings-screen-utils";
 import { AppScreen } from "../../src/components/layout";
 import { AppUpdateSettingsSection } from "../../src/components/settings/AppUpdateSettingsSection";
 import { StackScreenHeader } from "../../src/components/StackScreenHeader";
-import { layoutScrollContent } from "../../src/lib/app-layout";
 import {
   BottomSheet,
   BottomSheetHeader,
@@ -92,6 +93,23 @@ type FeatherIcon = React.ComponentProps<typeof Feather>["name"];
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEFAULT_WORKING_DAYS = [1, 2, 3, 4, 5];
+
+type PickerKey =
+  | "theme"
+  | "defaultView"
+  | "timeFormat"
+  | "weekStart"
+  | "defaultCalendar"
+  | "workingDays";
+
+const PICKER_TITLES: Record<PickerKey, string> = {
+  theme: "Theme",
+  defaultView: "Default view",
+  timeFormat: "Time format",
+  weekStart: "Start of week",
+  defaultCalendar: "Default calendar",
+  workingDays: "Working days",
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -287,23 +305,8 @@ export default function SettingsScreen() {
   });
 
   // ─── Picker sheet state ──────────────────────────────────────────────────────
-  type PickerKey =
-    | "theme"
-    | "defaultView"
-    | "timeFormat"
-    | "weekStart"
-    | "defaultCalendar"
-    | "workingDays";
   const [activePicker, setActivePicker] = useState<PickerKey | null>(null);
   const [lastPicker, setLastPicker] = useState<PickerKey | null>(null);
-  const pickerTitles: Record<PickerKey, string> = {
-    theme: "Theme",
-    defaultView: "Default view",
-    timeFormat: "Time format",
-    weekStart: "Start of week",
-    defaultCalendar: "Default calendar",
-    workingDays: "Working days",
-  };
   const openPicker = useCallback((key: PickerKey) => {
     setLastPicker(key);
     setActivePicker(key);
@@ -896,13 +899,11 @@ export default function SettingsScreen() {
         {/* ── Notifications ────────────────────────────────────────────── */}
         <SectionLabel text="Notifications" theme={theme} isFirst={false} />
         <View style={styles.sectionItems}>
-          <SettingToggleRow
-            icon="mail"
-            label="Email Notifications"
-            description="Receive event reminders via email"
-            value={settings?.emailNotifications ?? true}
-            onValueChange={(v) => updateSetting({ emailNotifications: v })}
-            isPending={pendingKeys.has("emailNotifications")}
+          <NavigationRow
+            icon="bell"
+            label="Notifications"
+            value={formatNotificationChannelsSummary(settings)}
+            onPress={() => push(SETTINGS_NOTIFICATIONS_ROUTE)}
             theme={theme}
           />
         </View>
@@ -911,7 +912,7 @@ export default function SettingsScreen() {
         <SectionLabel text="Security" theme={theme} isFirst={false} />
         <View style={styles.sectionItems}>
           <HintRow
-            text="Event content is always end-to-end encrypted on mobile. Reminder emails only include timing details."
+            text={EVENT_ENCRYPTION_HINT}
             theme={theme}
           />
           {isPasskeySupported ? (
@@ -1032,7 +1033,7 @@ export default function SettingsScreen() {
       >
         <BottomSheetHeader>
           <BottomSheetTitle>
-            {lastPicker ? pickerTitles[lastPicker] : "Choose"}
+            {lastPicker ? PICKER_TITLES[lastPicker] : "Choose"}
           </BottomSheetTitle>
         </BottomSheetHeader>
         <BottomSheetScrollView
@@ -1802,87 +1803,6 @@ function NavigationRow({
         color={theme.colors.mutedForeground}
         style={{ opacity: 0.4 }}
       />
-    </Pressable>
-  );
-}
-
-/** A toggle row with icon, label, description, and a switch. */
-function SettingToggleRow({
-  icon,
-  label,
-  description,
-  value,
-  onValueChange,
-  isPending,
-  theme,
-}: {
-  icon: FeatherIcon;
-  label: string;
-  description: string;
-  value: boolean;
-  onValueChange: (v: boolean) => void;
-  isPending: boolean;
-  theme: ThemeTokens;
-}) {
-  return (
-    <Pressable
-      onPress={() => onValueChange(!value)}
-      style={({ pressed }) => [
-        {
-          flexDirection: "row" as const,
-          alignItems: "center" as const,
-          gap: theme.spacing["3"],
-          paddingHorizontal: theme.spacing["3"],
-          paddingVertical: theme.spacing["3"],
-          borderRadius: theme.borderRadius.md,
-          marginHorizontal: theme.spacing["1"],
-        },
-        pressed && { backgroundColor: theme.colors.accent },
-      ]}
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
-      accessibilityLabel={label}
-    >
-      <Feather
-        name={icon}
-        size={16}
-        color={theme.colors.mutedForeground}
-        style={{ marginTop: 2 }}
-      />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.sm.size,
-            lineHeight: theme.typography.fontSize.sm.lineHeight,
-            color: theme.colors.foreground,
-          }}
-        >
-          {label}
-        </Text>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.xs.size,
-            lineHeight: theme.typography.fontSize.xs.lineHeight,
-            color: theme.colors.mutedForeground,
-          }}
-        >
-          {description}
-        </Text>
-      </View>
-      {isPending ? (
-        <ActivityIndicator size="small" />
-      ) : (
-        <Switch
-          value={value}
-          onValueChange={onValueChange}
-          trackColor={{
-            false: theme.colors.input,
-            true: theme.colors.primaryBase,
-          }}
-          thumbColor="#ffffff"
-          style={{ transform: [{ scale: 0.85 }] }}
-        />
-      )}
     </Pressable>
   );
 }

@@ -6,7 +6,7 @@ import {
   type ReminderScheduleWarningContext,
 } from "@workspace/calendar-core";
 
-export type EmailDeliveryChannel = "resend" | "mailbox";
+export type EmailDeliveryChannel = "stalwart" | "mailbox";
 
 export type EmailDeliveryResult = {
   delivered: boolean;

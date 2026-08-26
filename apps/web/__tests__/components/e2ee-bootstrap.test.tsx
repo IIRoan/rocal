@@ -47,10 +47,7 @@ jest.mock("@/lib/e2ee-password-reset", () => ({
 
 jest.mock("@/lib/e2ee-password-cache", () => ({
   clearAuthPasswords: jest.fn(),
-  clearPendingAuthPassword: jest.fn(),
-  consumePendingAuthPassword: jest.fn(),
-  peekCachedAuthPassword: jest.fn(),
-  peekPendingAuthPassword: jest.fn(),
+  peekAuthPassword: jest.fn(),
 }));
 
 jest.mock("@/lib/enc-password-cookie", () => ({
@@ -112,10 +109,7 @@ import {
 import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
 import {
   clearAuthPasswords,
-  clearPendingAuthPassword,
-  consumePendingAuthPassword,
-  peekCachedAuthPassword,
-  peekPendingAuthPassword,
+  peekAuthPassword,
 } from "@/lib/e2ee-password-cache";
 import {
   clearEncPasswordCookie,
@@ -139,10 +133,7 @@ const mockResetEncryptionPasswordForActiveSession = jest.mocked(
   resetEncryptionPasswordForActiveSession,
 );
 const mockClearAuthPasswords = jest.mocked(clearAuthPasswords);
-const mockClearPendingAuthPassword = jest.mocked(clearPendingAuthPassword);
-const mockConsumePendingAuthPassword = jest.mocked(consumePendingAuthPassword);
-const mockPeekCachedAuthPassword = jest.mocked(peekCachedAuthPassword);
-const mockPeekPendingAuthPassword = jest.mocked(peekPendingAuthPassword);
+const mockPeekAuthPassword = jest.mocked(peekAuthPassword);
 const mockInitEncPasswordFromCookie = jest.mocked(initEncPasswordFromCookie);
 const mockSetEncPasswordCookie = jest.mocked(setEncPasswordCookie);
 const mockClearEncPasswordCookie = jest.mocked(clearEncPasswordCookie);
@@ -218,9 +209,7 @@ describe("E2eeBootstrap component", () => {
       activated: false,
       bootstrap: createBootstrap(),
     });
-    mockPeekCachedAuthPassword.mockReturnValue(null);
-    mockPeekPendingAuthPassword.mockReturnValue(null);
-    mockConsumePendingAuthPassword.mockReturnValue(null);
+    mockPeekAuthPassword.mockReturnValue(null);
     mockUnlockE2eeWithPassword.mockResolvedValue(true);
     mockResetEncryptionPasswordForActiveSession.mockResolvedValue(true);
     mockClearAuthPasswords.mockReset();
@@ -250,8 +239,23 @@ describe("E2eeBootstrap component", () => {
     await flushEffects();
   }
 
-  it("shows email sign-in password unlock copy for email/password sessions", async () => {
-    mockPeekPendingAuthPassword.mockReturnValue("pw");
+  it("auto-unlocks with the sign-in password instead of showing the unlock dialog", async () => {
+    mockPeekAuthPassword.mockReturnValue("pw");
+    mockEnsureE2eeBootstrap.mockResolvedValue({
+      activated: false,
+      bootstrap: createBootstrap({
+        passwordEnvelope: createPasswordEnvelope(),
+      }),
+    });
+    mockUnlockE2eeWithPassword.mockResolvedValue(true);
+
+    await renderComponent();
+
+    expect(mockUnlockE2eeWithPassword).toHaveBeenCalledWith("user-1", "pw");
+    expect(container.textContent).not.toContain("Unlock encrypted data");
+  });
+
+  it("does not show the unlock dialog when no sign-in password is available yet", async () => {
     mockEnsureE2eeBootstrap.mockResolvedValue({
       activated: false,
       bootstrap: createBootstrap({
@@ -261,34 +265,32 @@ describe("E2eeBootstrap component", () => {
 
     await renderComponent();
 
+    expect(container.textContent).not.toContain("Unlock encrypted data");
+    expect(mockUnlockE2eeWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("shows the previous-password dialog only after the sign-in password fails to unwrap", async () => {
+    mockEnsureE2eeBootstrap.mockResolvedValue({
+      activated: false,
+      passwordUnlockFailed: true,
+      bootstrap: createBootstrap({
+        passwordEnvelope: createPasswordEnvelope(),
+      }),
+    });
+
+    await renderComponent();
+
     expect(container.textContent).toContain("Unlock encrypted data");
     expect(container.textContent).toContain(
-      "Solace normally reuses your email sign-in password to unlock encrypted data on this device.",
+      "Your email sign-in password did not unlock encrypted data on this device.",
     );
     expect(container.textContent).toContain("Email sign-in password");
   });
 
-  it("shows encryption-password unlock copy for OAuth and passkey sessions", async () => {
+  it("shows an empty-submit error in unlock mode", async () => {
     mockEnsureE2eeBootstrap.mockResolvedValue({
       activated: false,
-      bootstrap: createBootstrap({
-        passwordEnvelope: createPasswordEnvelope(),
-      }),
-    });
-
-    await renderComponent();
-
-    expect(container.textContent).toContain("Unlock encrypted data");
-    expect(container.textContent).toContain(
-      "Enter your encryption password to unlock encrypted data on this device.",
-    );
-    expect(container.textContent).toContain("Encryption password");
-  });
-
-  it("shows auth-method-specific empty-submit errors in unlock mode", async () => {
-    mockPeekPendingAuthPassword.mockReturnValue("pw");
-    mockEnsureE2eeBootstrap.mockResolvedValue({
-      activated: false,
+      passwordUnlockFailed: true,
       bootstrap: createBootstrap({
         passwordEnvelope: createPasswordEnvelope(),
       }),
@@ -306,13 +308,14 @@ describe("E2eeBootstrap component", () => {
     });
 
     expect(container.textContent).toContain(
-      "Enter your email sign-in password.",
+      "Enter your previous email sign-in password.",
     );
   });
 
-  it("shows auth-method-specific wrong-password errors in unlock mode", async () => {
+  it("shows a previous-password error when manual unlock fails", async () => {
     mockEnsureE2eeBootstrap.mockResolvedValue({
       activated: false,
+      passwordUnlockFailed: true,
       bootstrap: createBootstrap({
         passwordEnvelope: createPasswordEnvelope(),
       }),
@@ -338,13 +341,10 @@ describe("E2eeBootstrap component", () => {
       "user-1",
       "wrong-password",
     );
-    expect(container.textContent).toContain(
-      "That password did not unlock your encrypted data.",
-    );
+    expect(container.textContent).toContain("That password didn't match.");
   });
 
   it("shows the email sign-in setup copy when automatic setup does not finish", async () => {
-    mockPeekPendingAuthPassword.mockReturnValue("pw");
     mockEnsureE2eeBootstrap.mockResolvedValue({
       activated: true,
       bootstrap: createBootstrap(),
@@ -354,30 +354,14 @@ describe("E2eeBootstrap component", () => {
 
     expect(container.textContent).toContain("Protect your encryption keys");
     expect(container.textContent).toContain(
-      "Solace normally reuses your email sign-in password to protect your encryption keys.",
+      "Solace reuses your email sign-in password to protect your encryption keys.",
     );
     expect(container.textContent).toContain("Email sign-in password");
     expect(container.textContent).toContain("Confirm password");
   });
 
-  it("shows the separate encryption-password setup copy for OAuth and passkey sessions", async () => {
-    mockEnsureE2eeBootstrap.mockResolvedValue({
-      activated: true,
-      bootstrap: createBootstrap(),
-    });
-
-    await renderComponent();
-
-    expect(container.textContent).toContain("Protect your encryption keys");
-    expect(container.textContent).toContain(
-      "Choose an encryption password to protect your end-to-end encryption keys for recovery and legacy device flows.",
-    );
-    expect(container.textContent).toContain("Encryption password");
-  });
-
   it("auto-saves the encryption password for email sign-in users without rendering the setup dialog", async () => {
-    mockPeekPendingAuthPassword.mockReturnValue("pw");
-    mockConsumePendingAuthPassword.mockReturnValue("pw");
+    mockPeekAuthPassword.mockReturnValue("pw");
     mockEnsureE2eeBootstrap.mockResolvedValue({
       activated: true,
       bootstrap: createBootstrap(),
@@ -393,7 +377,7 @@ describe("E2eeBootstrap component", () => {
   });
 
   it("retries automatic email-password setup before showing the manual encryption dialog", async () => {
-    mockPeekCachedAuthPassword.mockReturnValue("pw");
+    mockPeekAuthPassword.mockReturnValue("pw");
     mockEnsureE2eeBootstrap.mockResolvedValue({
       activated: true,
       bootstrap: createBootstrap(),
@@ -436,12 +420,9 @@ describe("E2eeBootstrap component", () => {
   });
 
   it("cookie-restored password auto-saves encryption without showing the setup dialog", async () => {
-    // Simulate: cookie init restores a password into the cache
     mockInitEncPasswordFromCookie.mockImplementation(async () => {
-      mockPeekCachedAuthPassword.mockReturnValue("cookie-pw");
-      mockPeekPendingAuthPassword.mockReturnValue("cookie-pw");
+      mockPeekAuthPassword.mockReturnValue("cookie-pw");
     });
-    mockConsumePendingAuthPassword.mockReturnValue("cookie-pw");
     mockEnsureE2eeBootstrap.mockResolvedValue({
       activated: true,
       bootstrap: createBootstrap(),
@@ -459,6 +440,7 @@ describe("E2eeBootstrap component", () => {
   it("writes the cookie after a successful manual unlock", async () => {
     mockEnsureE2eeBootstrap.mockResolvedValue({
       activated: false,
+      passwordUnlockFailed: true,
       bootstrap: createBootstrap({
         passwordEnvelope: createPasswordEnvelope(),
       }),

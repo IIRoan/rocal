@@ -88,6 +88,7 @@ export const notificationsRoutes = new Elysia({
             routeUser.id,
             params.eventId,
             body.notifications,
+            body.displayTitle,
           );
         },
         {

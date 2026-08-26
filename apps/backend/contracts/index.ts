@@ -44,6 +44,10 @@ import {
   updateEventNotificationsBodySchema,
 } from "./notification.contract";
 import {
+  registerPushDeviceBodySchema,
+  unregisterPushDeviceBodySchema,
+} from "./push-device.contract";
+import {
   deleteRecurringEventQuerySchema,
   editRecurringEventBodySchema,
   previewRecurrenceBodySchema,
@@ -95,6 +99,8 @@ export const routeModels = new Elysia({ name: "route-models" }).model({
   "mail.syncQuery": mailSyncQuerySchema,
   "notifications.eventIdParams": eventIdParamsSchema,
   "notifications.updateBody": updateEventNotificationsBodySchema,
+  "push.registerBody": registerPushDeviceBodySchema,
+  "push.unregisterBody": unregisterPushDeviceBodySchema,
   "settings.updateBody": updateSettingsBodySchema,
   "recentContacts.putBody": putRecentContactsBodySchema,
   "profiles.lookupBody": lookupProfilesBodySchema,
@@ -121,6 +127,7 @@ export * from "./invite.contract";
 export * from "./logging.contract";
 export * from "./mail.contract";
 export * from "./notification.contract";
+export * from "./push-device.contract";
 export * from "./profiles.contract";
 export * from "./recurring.contract";
 export * from "./route-model-names";

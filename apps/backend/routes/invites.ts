@@ -10,7 +10,7 @@ import {
 } from "../lib/errors";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { env } from "../lib/env";
-import { resend, authEmailFrom } from "../lib/email-client";
+import { mailer, authEmailFrom } from "../lib/email-client";
 import { buildInviteEmail, sendAuthEmail } from "../lib/auth-email";
 import { emailDeliveryWarning } from "../lib/email-delivery";
 import { errorLogDetails } from "../lib/log-sanitization";
@@ -95,7 +95,7 @@ export const inviteRoutes = new Elysia({
               (routeUser.name as string | null | undefined)?.trim() || "Someone";
 
             const delivery = await sendAuthEmail({
-              client: resend,
+              client: mailer,
               from: authEmailFrom,
               to: invite.email,
               label: "invite",

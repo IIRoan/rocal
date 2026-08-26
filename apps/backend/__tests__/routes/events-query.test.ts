@@ -75,7 +75,7 @@ jest.mock("../../lib/prisma", () => ({
 }));
 
 jest.mock("../../lib/email-client", () => ({
-  resend: {
+  mailer: {
     emails: {
       send: jest.fn(async () => ({ data: { id: "email-1" } })),
     },

@@ -167,6 +167,7 @@ jest.mock("@/lib/invite-api-service", () => ({
 
 jest.mock("@/lib/e2ee-password-cache", () => ({
   clearAuthPasswords: jest.fn(),
+  clearPendingAuthPassword: jest.fn(),
   storePendingAuthPassword: jest.fn(),
 }));
 
@@ -204,6 +205,7 @@ import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import {
   clearAuthPasswords,
+  clearPendingAuthPassword,
   storePendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
 import {
@@ -235,6 +237,7 @@ const mockUpdateUserSettings = jest.mocked(
 );
 const mockStorePendingAuthPassword = jest.mocked(storePendingAuthPassword);
 const mockClearAuthPasswords = jest.mocked(clearAuthPasswords);
+const mockClearPendingAuthPassword = jest.mocked(clearPendingAuthPassword);
 const mockSetEncPasswordCookie = jest.mocked(setEncPasswordCookie);
 const mockClearEncPasswordCookie = jest.mocked(clearEncPasswordCookie);
 const mockClearOrphanedClientAuthArtifacts = jest.mocked(
@@ -469,6 +472,9 @@ describe("LoginForm", () => {
     expect(mockStorePendingAuthPassword).toHaveBeenCalledWith(
       "secret-password",
     );
+    expect(
+      mockStorePendingAuthPassword.mock.invocationCallOrder[0],
+    ).toBeLessThan(mockEmailSignIn.mock.invocationCallOrder[0] ?? Infinity);
     expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("secret-password");
   });
 
@@ -647,7 +653,10 @@ describe("LoginForm", () => {
     });
 
     expect(container.textContent).toContain("Authentication failed hard.");
-    expect(mockStorePendingAuthPassword).not.toHaveBeenCalled();
+    expect(mockStorePendingAuthPassword).toHaveBeenCalledWith(
+      "secret-password",
+    );
+    expect(mockClearPendingAuthPassword).toHaveBeenCalled();
     expect(mockSetEncPasswordCookie).not.toHaveBeenCalled();
     expect(mockClearAuthPasswords).not.toHaveBeenCalled();
     expect(mockClearEncPasswordCookie).not.toHaveBeenCalled();

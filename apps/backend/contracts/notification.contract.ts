@@ -11,6 +11,7 @@ export const eventNotificationSettingSchema = strictZodObject({
 
 export const updateEventNotificationsBodySchema = strictZodObject({
   notifications: z.array(eventNotificationSettingSchema).max(20),
+  displayTitle: z.string().max(500).nullable().optional(),
 });
 
 export { eventIdParamsSchema };
@@ -101,6 +102,7 @@ export interface INotificationService {
     userId: string,
     eventId: string,
     notifications: NotificationConfigInput[],
+    displayTitle?: string | null,
   ): Promise<NotificationUpdateResult>;
   deleteForEvent(
     userId: string,

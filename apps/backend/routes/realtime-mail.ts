@@ -7,6 +7,9 @@ import { authenticatedRouteDetail } from "../lib/openapi";
 import { MailRealtimeService } from "../services/mail-realtime.service";
 import type { MailSyncService } from "../services/mail-sync.service";
 import { defaultMailSyncService } from "./mail-sync";
+import { prisma } from "../lib/prisma";
+import { enqueueInboundMailPush } from "../lib/mail-push-enqueue";
+import { logRef } from "../lib/log-sanitization";
 
 const logger = createLogger("backend:mail-sse");
 const encoder = new TextEncoder();
@@ -16,6 +19,9 @@ export const defaultMailRealtimeService = new MailRealtimeService({
   adminToken: env.stalwartAdminToken,
   syncProvider: defaultMailSyncService,
   receiptPollIntervalMs: 10_000,
+  onInboundMail: async ({ accountId, userId, sync }) => {
+    await enqueueInboundMailPush(prisma, { accountId, userId, sync });
+  },
 });
 
 async function writeChunk(
@@ -88,7 +94,7 @@ export function createRealtimeMailRoutes(
             void writer.close().catch(() => undefined);
             logger.info("Mail SSE client disconnected", {
               subscriberId,
-              userId: routeUser.id,
+              userRef: logRef(routeUser.id),
             });
           };
 
@@ -109,8 +115,8 @@ export function createRealtimeMailRoutes(
 
           logger.info("Mail SSE client connected", {
             subscriberId,
-            userId: routeUser.id,
-            accountIds,
+            userRef: logRef(routeUser.id),
+            accountCount: accountIds.length,
           });
 
           return response;

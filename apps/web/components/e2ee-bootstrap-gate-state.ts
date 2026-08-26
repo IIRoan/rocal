@@ -6,7 +6,6 @@ export type E2eeGateState = {
   confirmPassword: string;
   error: string | null;
   isSubmitting: boolean;
-  isEmailPasswordUser: boolean;
 };
 
 export const initialE2eeGateState: E2eeGateState = {
@@ -15,14 +14,12 @@ export const initialE2eeGateState: E2eeGateState = {
   confirmPassword: "",
   error: null,
   isSubmitting: false,
-  isEmailPasswordUser: false,
 };
 
 export type E2eeGateAction =
   | { type: "reset" }
   | { type: "clear-error" }
   | { type: "set-from-bootstrap"; mode: GateMode; isSubmitting: boolean }
-  | { type: "set-email-password-user"; value: boolean }
   | { type: "start-submit" }
   | { type: "end-submit" }
   | { type: "set-error"; error: string }
@@ -45,8 +42,6 @@ export function e2eeGateReducer(
         mode: action.mode,
         isSubmitting: action.isSubmitting,
       };
-    case "set-email-password-user":
-      return { ...state, isEmailPasswordUser: action.value };
     case "start-submit":
       return { ...state, isSubmitting: true, error: null };
     case "end-submit":

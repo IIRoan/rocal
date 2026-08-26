@@ -290,8 +290,18 @@ export function useEventForm({
   });
 
   const updateNotificationsMutation = useMutation({
-    mutationFn: ({ eventId, data }: { eventId: string; data: any[] }) =>
-      calendarApiService.updateEventNotifications(eventId, data),
+    mutationFn: ({
+      eventId,
+      data,
+      displayTitle,
+    }: {
+      eventId: string;
+      data: any[];
+      displayTitle?: string | null;
+    }) =>
+      calendarApiService.updateEventNotifications(eventId, data, {
+        displayTitle,
+      }),
     onSuccess: (_result, variables) => {
       // Invalidate the cached notifications list so the editor shows the
       // freshly saved entries instead of the stale 5-minute cache.
@@ -693,6 +703,7 @@ export function useEventForm({
               await updateNotificationsMutation.mutateAsync({
                 eventId: savedEventId,
                 data: notificationData,
+                displayTitle: eventTitle,
               });
             } catch (notifError) {
               log.warn(
@@ -757,15 +768,19 @@ export function useEventForm({
 
         if (eventData.participants.length > 0) {
           const accountEmail = session?.user?.email ?? null;
-          const entries = eventData.participants
-            .filter(
-              (participant) =>
-                !isCurrentUserMailAddress(participant.email, accountEmail),
-            )
-            .map((participant) => ({
+          const entries: Array<{
+            email: string;
+            displayName: string | null | undefined;
+          }> = [];
+          for (const participant of eventData.participants) {
+            if (isCurrentUserMailAddress(participant.email, accountEmail)) {
+              continue;
+            }
+            entries.push({
               email: participant.email,
               displayName: participant.displayName,
-            }));
+            });
+          }
           if (entries.length > 0) {
             recordUsage(entries, "calendar");
           }

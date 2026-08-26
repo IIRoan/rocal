@@ -400,6 +400,7 @@ describe("EventService Stalwart integration", () => {
         findUnique: jest.fn(async () => ({
           timezone: "UTC",
           emailNotifications: false,
+          pushNotifications: false,
           eventEncryptionMode: "metadata",
         })),
       },
@@ -420,6 +421,7 @@ describe("EventService Stalwart integration", () => {
       eventNotification: {
         findMany: jest.fn(async () => []),
         deleteMany: jest.fn(async () => ({ count: 0 })),
+        create: jest.fn(async () => ({ id: "notif-1" })),
       },
       notificationLog: {
         deleteMany: jest.fn(async () => ({ count: 0 })),
@@ -487,6 +489,7 @@ describe("EventService Stalwart integration", () => {
         findUnique: jest.fn(async () => ({
           timezone: "UTC",
           emailNotifications: false,
+          pushNotifications: false,
           eventEncryptionMode: "metadata",
         })),
       },
@@ -557,12 +560,14 @@ describe("EventService Stalwart integration", () => {
         findUnique: jest.fn(async () => ({
           timezone: "UTC",
           emailNotifications: false,
+          pushNotifications: false,
           eventEncryptionMode: "metadata",
         })),
       },
       eventNotification: {
         findMany: jest.fn(async () => []),
         deleteMany: jest.fn(async () => ({ count: 0 })),
+        create: jest.fn(async () => ({ id: "notif-1" })),
       },
       eventParticipant: {
         findMany: jest.fn(async () => []),

@@ -9,12 +9,30 @@ jest.mock("lucide-react", () => {
 
   return {
     ArrowLeft: Icon,
+    Bell: Icon,
     ChevronRight: Icon,
     Key: Icon,
     Mail: Icon,
+    Send: Icon,
     Shield: Icon,
   };
 });
+
+jest.mock("sonner", () => ({
+  toast: {
+    success: jest.fn(),
+    error: jest.fn(),
+  },
+}));
+
+jest.mock("../../lib/calendar-api-service", () => ({
+  calendarApiService: {
+    sendTestPushNotification: jest.fn(async () => ({
+      success: true,
+      jobId: "job-1",
+    })),
+  },
+}));
 
 import { NotificationSettings } from "../../components/command-palette/notification-settings";
 import { SecuritySettings } from "../../components/command-palette/security-settings";
@@ -45,6 +63,7 @@ describe("settings toggle rows", () => {
         localSettings={
           {
             emailNotifications: true,
+            pushNotifications: true,
             eventEncryptionMode: "hybrid",
           } as any
         }
@@ -53,7 +72,11 @@ describe("settings toggle rows", () => {
       />,
     );
 
-    expect(html).toContain("Email Notifications");
+    expect(html).toContain("Email reminders");
+    expect(html).toContain("App notifications");
+    expect(html).toContain("Mail");
+    expect(html).toContain("iPhone");
+    expect(html).toContain("Send test notification");
     expect(html).toContain('role="switch"');
     expect(html).toContain('aria-checked="true"');
   });

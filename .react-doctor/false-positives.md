@@ -69,11 +69,33 @@ Patterns that fire diagnostics but are safe to suppress.
 ## react-doctor/js-tosorted-immutable — native tsconfig ES2022
 
 - **Files**: `apps/native/app/calendar-manage/index.tsx:76`,
-  `apps/native/app/(tabs)/settings/index.tsx:197`
+  `apps/native/app/settings/index.tsx` (timezone/calendar sort),
+  `apps/native/app/(tabs)/settings/index.tsx:197` (legacy path)
 - **Why FP**: `Array.prototype.toSorted` is ES2023. The native app tsconfig
   uses `lib: ["DOM", "ES2022"]` and `target: ES2022`. The existing
   `[...arr].sort(compareFn)` pattern is already immutable (spread creates a
   new array). Upgrading to ES2023 lib is deferred.
+
+## react-doctor/js-hoist-intl — NotificationCalculator timezone cache
+
+- **File**: `apps/backend/lib/notification-calculator.ts`
+- **Why FP**: `Intl.DateTimeFormat` options include a per-call IANA timezone.
+  Formatters are cached in a module-level `Map` keyed by resolved timezone
+  (`getLocalDateTimeFormatter`). Hoisting a single formatter to module scope
+  would drop timezone correctness.
+- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+  for `**/lib/notification-calculator.ts`.
+
+## react-doctor/async-await-in-loop — intentional sequential side effects
+
+- **Files**:
+  - `apps/backend/services/event.service.ts` (event duplicate fan-out)
+  - `apps/backend/services/event-participant.service.ts` (invitation email delivery)
+  - `apps/backend/services/mail-sync.service.ts` (per-account JMAP receipt poll)
+- **Why FP**: Each iteration performs ordered side effects (create → sync
+  participants → send invites; outbound mail delivery; JMAP change detection
+  per mailbox). Parallelizing would race DB uniqueness, amplify rate limits,
+  or send invitations before dependent rows exist. Keep sequential `for…of`.
 
 ## react-doctor/no-giant-component — LoginForm auth surface
 
@@ -371,3 +393,14 @@ Patterns that fire diagnostics but are safe to suppress.
   memoized separately.
 - **Config**: Suppressed via `ignore.overrides` for
   `**/components/calendar/calendar-dnd-context.tsx`.
+
+## next-themes React 19 "Encountered a script tag" (not a react-doctor rule)
+
+- **File**: `packages/ui/src/providers/theme-provider.tsx`
+- **Why FP**: `next-themes` renders an inline `<script>` (via
+  `React.createElement("script", …)`) so the correct theme class is applied
+  before hydration (no FOUC). React 19 logs that client-rendered scripts are
+  never executed; the script still runs correctly on SSR. Upstream issue:
+  https://github.com/pacocoursey/next-themes/issues/385. We filter that
+  specific `console.error` in development only (same approach as the shadcn
+  Next.js dark-mode docs).

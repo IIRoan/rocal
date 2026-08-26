@@ -7,6 +7,7 @@ export const SETTINGS_TIMEZONE_ROUTE = "/settings/timezone";
 export const SETTINGS_CONTACTS_ROUTE = "/settings/contacts";
 export const SETTINGS_INVITES_ROUTE = "/settings/invites";
 export const SETTINGS_MAILBOXES_ROUTE = "/settings/mailboxes";
+export const SETTINGS_NOTIFICATIONS_ROUTE = "/settings/notifications";
 
 export const CALENDAR_TAB_ROUTE = "/(tabs)/calendar";
 export const MAIL_TAB_ROUTE = "/(tabs)/mail";

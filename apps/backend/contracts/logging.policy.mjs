@@ -25,6 +25,12 @@ export const LOG_OMIT_FIELD_KEYS = Object.freeze([
   "publicKeyArmored",
   "mime",
   "icsContent",
+  "pushToken",
+  "deviceToken",
+  "apnsToken",
+  "bodyValues",
+  "displayTitle",
+  "display_title",
 ]);
 
 /** @type {readonly string[]} */

@@ -35,6 +35,7 @@ import { useRecentContacts } from "../../hooks/use-recent-contacts";
 import { extractRecentContactEntries } from "../../lib/record-recent-contacts";
 import { useToast } from "../../providers/ToastProvider";
 import { toastOperationWarnings } from "../../lib/operation-warnings";
+import { persistEventReminderNotifications } from "../../lib/event-reminder-notifications";
 import { calendarApiService } from "../../lib/api";
 import { QUERY_KEYS } from "../../lib/query-keys";
 import {
@@ -283,8 +284,11 @@ export function EventSheet({
   // ─── Mutations ─────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateEventRequest) =>
-      calendarApiService.createEvent(data),
+    mutationFn: async (data: CreateEventRequest) => {
+      const saved = await calendarApiService.createEvent(data);
+      await persistEventReminderNotifications(saved.id, data);
+      return saved;
+    },
     onMutate: async (data: CreateEventRequest) => {
       const tempId = generateOptimisticId();
       const optimisticEvent = buildOptimisticEvent(
@@ -319,15 +323,16 @@ export function EventSheet({
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: CreateEventRequest) => {
-      if (editScope) {
-        return calendarApiService.editRecurringEvent(eventId!, {
-          editScope,
-          occurrenceDate: editOccurrenceDate,
-          updates: data,
-        });
-      }
-      return calendarApiService.updateEvent(eventId!, data);
+    mutationFn: async (data: CreateEventRequest) => {
+      const saved = editScope
+        ? await calendarApiService.editRecurringEvent(eventId!, {
+            editScope,
+            occurrenceDate: editOccurrenceDate,
+            updates: data,
+          })
+        : await calendarApiService.updateEvent(eventId!, data);
+      await persistEventReminderNotifications(saved.id, data);
+      return saved;
     },
     onSuccess: (savedEvent, variables) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });

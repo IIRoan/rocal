@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import "../src/lib/install-native-crypto";
 import { QueryProvider } from "../src/providers/QueryProvider";
 import { AuthProvider, useAuth } from "../src/providers/AuthProvider";
+import { PushProvider } from "../src/providers/PushProvider";
 import { ThemeProvider } from "../src/providers/ThemeProvider";
 import { AppUpdateProvider } from "../src/providers/AppUpdateProvider";
 import { AppUpdateScreen } from "../src/components/settings/AppUpdateScreen";
@@ -170,50 +171,52 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryProvider>
         <AuthProvider>
-          <ThemeProvider>
-            <AppUpdateProvider>
-              <AppUpdateScreen />
-              <E2eeProvider>
-                <SidebarProvider>
-                  <MailSelectionProvider>
-                    <CalendarViewProvider>
-                      <NavigationGuard>
-                        <ToastProvider>
-                          <SheetProvider>
-                            <CommandPaletteProvider>
-                              <Stack
-                                screenOptions={NATIVE_STACK_SCREEN_OPTIONS}
-                              >
-                                <Stack.Screen
-                                  name="index"
-                                  options={
-                                    NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
-                                  }
-                                />
-                                <Stack.Screen
-                                  name="(auth)"
-                                  options={
-                                    NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
-                                  }
-                                />
-                                <Stack.Screen
-                                  name="(tabs)"
-                                  options={
-                                    NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
-                                  }
-                                />
-                              </Stack>
-                              <AuthenticatedChrome />
-                            </CommandPaletteProvider>
-                          </SheetProvider>
-                        </ToastProvider>
-                      </NavigationGuard>
-                    </CalendarViewProvider>
-                  </MailSelectionProvider>
-                </SidebarProvider>
-              </E2eeProvider>
-            </AppUpdateProvider>
-          </ThemeProvider>
+          <PushProvider>
+            <ThemeProvider>
+              <AppUpdateProvider>
+                <AppUpdateScreen />
+                <E2eeProvider>
+                  <SidebarProvider>
+                    <MailSelectionProvider>
+                      <CalendarViewProvider>
+                        <NavigationGuard>
+                          <ToastProvider>
+                            <SheetProvider>
+                              <CommandPaletteProvider>
+                                <Stack
+                                  screenOptions={NATIVE_STACK_SCREEN_OPTIONS}
+                                >
+                                  <Stack.Screen
+                                    name="index"
+                                    options={
+                                      NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
+                                    }
+                                  />
+                                  <Stack.Screen
+                                    name="(auth)"
+                                    options={
+                                      NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
+                                    }
+                                  />
+                                  <Stack.Screen
+                                    name="(tabs)"
+                                    options={
+                                      NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
+                                    }
+                                  />
+                                </Stack>
+                                <AuthenticatedChrome />
+                              </CommandPaletteProvider>
+                            </SheetProvider>
+                          </ToastProvider>
+                        </NavigationGuard>
+                      </CalendarViewProvider>
+                    </MailSelectionProvider>
+                  </SidebarProvider>
+                </E2eeProvider>
+              </AppUpdateProvider>
+            </ThemeProvider>
+          </PushProvider>
         </AuthProvider>
       </QueryProvider>
     </GestureHandlerRootView>
