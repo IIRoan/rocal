@@ -35,7 +35,7 @@ jest.mock("../../lib/e2ee-crypto", () => ({
 
 jest.mock("../../lib/e2ee-password-cache", () => ({
   clearPendingAuthPassword: jest.fn(),
-  consumePendingAuthPassword: jest.fn(),
+  peekAuthPassword: jest.fn(),
 }));
 
 import { e2eeApiService } from "../../lib/e2ee-api-service";
@@ -68,7 +68,7 @@ import {
 } from "../../lib/e2ee-bootstrap";
 import {
   clearPendingAuthPassword,
-  consumePendingAuthPassword,
+  peekAuthPassword,
 } from "../../lib/e2ee-password-cache";
 import type { E2eeBootstrapResponse } from "../../lib/types/calendar";
 
@@ -133,10 +133,9 @@ const mockClearPendingAuthPassword =
   clearPendingAuthPassword as jest.MockedFunction<
     typeof clearPendingAuthPassword
   >;
-const mockConsumePendingAuthPassword =
-  consumePendingAuthPassword as jest.MockedFunction<
-    typeof consumePendingAuthPassword
-  >;
+const mockPeekAuthPassword = peekAuthPassword as jest.MockedFunction<
+  typeof peekAuthPassword
+>;
 
 function createLocalDeviceRecord(userId: string) {
   return {
@@ -204,7 +203,7 @@ describe("e2ee bootstrap guards", () => {
     mockExportWrappingPublicKey.mockResolvedValue("public-key");
     mockGenerateDeviceId.mockReturnValue("generated-device");
     mockWrapSymmetricKey.mockResolvedValue("wrapped-key");
-    mockConsumePendingAuthPassword.mockReturnValue(null);
+    mockPeekAuthPassword.mockReturnValue(null);
     mockGetActiveE2eeSession.mockReturnValue(null);
     mockCreatePasswordEnvelope.mockResolvedValue({
       kdfAlgorithm: "PBKDF2-SHA-256",
@@ -303,7 +302,7 @@ describe("e2ee bootstrap guards", () => {
 
   it("unlocks with a pending auth password when a password envelope exists", async () => {
     mockGetStoredE2eeDevice.mockResolvedValueOnce(null);
-    mockConsumePendingAuthPassword.mockReturnValueOnce(
+    mockPeekAuthPassword.mockReturnValueOnce(
       "correct horse battery staple",
     );
     mockGetBootstrap.mockResolvedValue({
@@ -332,6 +331,42 @@ describe("e2ee bootstrap guards", () => {
       expect.objectContaining({ kdfSalt: "salt-1" }),
     );
     expect(mockClearPendingAuthPassword).toHaveBeenCalled();
+  });
+
+  it("does not mint a new device when the sign-in password fails to unwrap", async () => {
+    mockGetStoredE2eeDevice.mockResolvedValueOnce(null);
+    mockPeekAuthPassword.mockReturnValueOnce("wrong-password");
+    mockUnwrapPasswordEnvelope.mockRejectedValueOnce(
+      new Error("decryption failed"),
+    );
+    mockGetBootstrap.mockResolvedValue({
+      ...createRemoteBootstrap("user-1"),
+      devices: [],
+      passwordEnvelope: {
+        id: "password-envelope-1",
+        userId: "user-1",
+        kdfAlgorithm: "PBKDF2-SHA-256",
+        kdfSalt: "salt-1",
+        kdfIterations: 310000,
+        wrappedAccountKey: "wrapped-account",
+        wrappedSearchKey: "wrapped-search",
+        wrapAlgorithm: "AES-GCM-256",
+        keyVersion: 1,
+        createdAt: new Date("2026-04-22T10:00:00.000Z"),
+        updatedAt: new Date("2026-04-22T10:00:00.000Z"),
+      },
+    });
+
+    const result = await ensureE2eeBootstrap("user-1");
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        activated: false,
+        passwordUnlockFailed: true,
+      }),
+    );
+    expect(mockGenerateAccountKey).not.toHaveBeenCalled();
+    expect(mockSetActiveE2eeSession).not.toHaveBeenCalled();
   });
 
   it("stores a password envelope for the active session", async () => {

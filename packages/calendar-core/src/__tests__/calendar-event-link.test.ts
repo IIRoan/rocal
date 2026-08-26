@@ -34,6 +34,20 @@ describe("calendar-event-link", () => {
     expect(extractReminderLeadMinutes(source)).toBe(15);
   });
 
+  it("detects titled reminder emails", () => {
+    const source = {
+      subject: "Lunch with Sam in 15 minutes",
+      bodies: [
+        "Lunch with Sam",
+        "Event ID: event-1",
+        "Open event: https://solace.onl/calendar?eventId=event-1",
+      ],
+    };
+
+    expect(isSolaceEventReminderEmail(source)).toBe(true);
+    expect(extractReminderLeadMinutes(source)).toBe(15);
+  });
+
   it("does not classify Solace invitation emails as reminders", () => {
     const source = {
       subject: "Bob invited you to Planning sync",

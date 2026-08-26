@@ -5,14 +5,14 @@ This repository is a monorepo for **Solace** — a calendar and mail application
 ## High-Level Architecture
 
 - **apps/web**: Next.js App Router frontend (React 19, Tailwind CSS v4, shadcn/ui **new-york** style). Primary routes: `/calendar`, `/mail`, `/login`. Feature code lives in `apps/web/components/`, `apps/web/hooks/`, and `apps/web/lib/`. Uses `@workspace/ui` for shared web/calendar UI, plus `@workspace/calendar-client`, `@workspace/calendar-core`, `@workspace/design-tokens`, and `@workspace/e2ee`.
-- **apps/native**: Expo React Native app (SDK 57, React Native 0.86, React 19.2). File-based routing via Expo Router. Styling is **`StyleSheet.create()` + `useTheme()`** from `@workspace/design-tokens` — **no NativeWind/Tailwind**. Uses `react-native-gesture-handler`, `react-native-reanimated` 4, `react-native-worklets`, and `expo-secure-store` for auth. Native WebCrypto/OpenPGP/mail-vault crypto is `react-native-quick-crypto`, installed from `apps/native/index.js` before Expo Router loads. Source in `apps/native/src/`; screens in `apps/native/app/`. EAS `APP_VARIANT=development` produces a separate **Solace Dev** binary (`.dev` bundle ID + DEV icon). EAS iOS builds use the `sdk-57` image. Git `main`/`master` publishes the `preview` update channel, git `testing` publishes `development`, and git `master` also publishes production (`master`).
+- **apps/native**: Expo React Native app (SDK 57, React Native 0.86, React 19.2). File-based routing via Expo Router. Styling is **`StyleSheet.create()` + `useTheme()`** from `@workspace/design-tokens` — **no NativeWind/Tailwind**. Uses `react-native-gesture-handler`, `react-native-reanimated` 4, `react-native-worklets`, and `expo-secure-store` for auth. iOS lock-screen alerts use **`expo-notifications` + `getDevicePushTokenAsync()`** (raw APNs token via `PUT /api/push/devices`, not Expo Push). Enable Push Notifications on both App IDs, store the APNs `.p8` in EAS/Railway (`APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_AUTH_KEY`) — never commit the key. New EAS iOS builds are required after the entitlement changes. Native WebCrypto/OpenPGP/mail-vault crypto is `react-native-quick-crypto`, installed from `apps/native/index.js` before Expo Router loads. Source in `apps/native/src/`; screens in `apps/native/app/`. EAS `APP_VARIANT=development` produces a separate **Solace Dev** binary (`.dev` bundle ID + DEV icon). EAS iOS builds use the `sdk-57` image. Git `main`/`master` publishes the `preview` update channel, git `testing` publishes `development`, and git `master` also publishes production (`master`).
 - **apps/backend**: Elysia.js API on Bun, Prisma + PostgreSQL, Better Auth (passkeys). Service-layer architecture:
   - `routes/` — HTTP adapters (auth, TypeBox validation, rate limits). Delegate to services.
   - `contracts/` — Service interfaces, DTOs, and cross-cutting policies (e.g. `logging.contract.ts` for log sanitization).
   - `services/` — Business logic, DB access, notifications. Constructor-injected `PrismaClient`.
   - `lib/` — Auth, errors, recurrence, ICS, notification calculator, etc.
 - **Mail server**: Stalwart, accessed **only via JMAP** (clients through `StalwartJmapClient` + backend JMAP proxy; provisioning via Stalwart admin JMAP).
-- **apps/notifications**: Go service for scheduled email notifications (Resend + HTML templates).
+- **apps/notifications**: Go dispatcher. Polls Postgres every 15s (`event_notification` schedules fan out into a `notification_job` outbox). Mail jobs are claimed even if reminder `ClaimDue` fails. **Email** is Stalwart JMAP `Email/set` + `EmailSubmission/set` as the noreply identity (Railway Hobby cannot SMTP). **Push** is APNs HTTP/2 with a 2-minute claim lease, exponential backoff, and a max of 8 attempts. Reminder alerts use `event_notification.display_title` (captured when the user sets a reminder). New-mail alerts use sender display name + subject. The worker does **not** JMAP-read user mailboxes. Local `go run ./` loads `.env` from cwd, then walks up and falls back to `apps/backend/.env` (existing process env still wins).
 - **Railway**: the Rocal project is defined in `.railway/railway.ts`. Do not add per-service `railway.toml` / `railway.json`. Preview with `railway config plan`; apply only when asked.
 
 ### Shared Packages
@@ -54,7 +54,7 @@ apps/native/app/
 ├── event/                      # Event create, edit, detail
 ├── calendar-manage/            # Calendar CRUD
 ├── subscription/               # ICS subscription CRUD
-├── settings/                   # Settings + timezone picker
+├── settings/                   # Settings + timezone + notifications
 └── +not-found.tsx
 ```
 
@@ -225,9 +225,13 @@ Solace mail is **JMAP end-to-end**. Agents must use **JMAP as the only protocol*
 
 **Outbound delivery:** clients submit with `Email/set` + `EmailSubmission/set` over JMAP. Stalwart relays to external recipients over SMTP on the server side — apps do **not** speak SMTP.
 
+**Outbound app mail (noreply identity):** Better Auth mail, calendar share invites, external event-invitation fallback, and reminder mail all submit over Stalwart JMAP as a dedicated mailbox (`STALWART_JMAP_URL` / `STALWART_JMAP_USERNAME` / `STALWART_JMAP_PASSWORD` + `EMAIL_FROM`). Do **not** use Resend or SMTP from Railway or the Go worker. Internal Solace inboxes still receive invitations via JMAP import (`internal-mailbox-delivery.ts`), not a round-trip through public SMTP.
+
+**Push notifications (native iOS only):** `PushDevice` stores APNs tokens. Event reminder jobs may include a captured `title` (from `event_notification.display_title`). New-mail jobs may include JMAP `fromName` + `subject` for a single inbound message. Sending mail does not notify the sender. Web has no Web Push; `UserSettings.pushNotifications` still round-trips so iPhone delivery can be toggled from either client. Inbound mail is detected via Stalwart JMAP EventSource plus receipt-time polling in `MailRealtimeService` — not by the Go worker reading mailboxes.
+
 **Not user-mailbox JMAP (allowed, separate concern):**
 
-- `apps/notifications` — scheduled calendar reminders via Resend.
+- `apps/notifications` — reminder **email** as the noreply identity, plus APNs for lock-screen alerts. Reminder emails and lock-screen alerts use `event_notification.display_title` (captured when the user sets a reminder). Do not poll user Inboxes from Go; new-mail push is enqueued by backend MailSync / Stalwart EventSource (with receipt-time polling as backup) and may include the sender display name and JMAP subject for a single inbound message.
 - Auth/system email helpers — transactional only; not mailbox read/write.
 
 When implementing mail features, search for existing JMAP method builders (`buildSendMessageMethodCalls`, `buildDraftMethodCalls`, etc.) and extend them rather than inventing a new transport.

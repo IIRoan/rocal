@@ -6,18 +6,18 @@ jest.mock("../../lib/auth-email", () => ({
     text: "Invite text",
     html: "<p>Invite</p>",
   })),
-  sendAuthEmail: jest.fn(async () => ({ delivered: true, channel: "resend" })),
+  sendAuthEmail: jest.fn(async () => ({ delivered: true, channel: "stalwart" })),
 }));
 
 jest.mock("../../lib/event-invitation-delivery", () => ({
   sendEventInvitationEmail: jest.fn(async () => ({
     delivered: true,
-    channel: "resend",
+    channel: "stalwart",
   })),
 }));
 
 jest.mock("../../lib/email-client", () => ({
-  resend: {
+  mailer: {
     emails: {
       send: jest.fn(async () => ({ data: { id: "email-1" } })),
     },
@@ -66,7 +66,7 @@ describe("EventParticipantService", () => {
     mockSendEventInvitationEmail.mockClear();
     mockSendEventInvitationEmail.mockResolvedValue({
       delivered: true,
-      channel: "resend",
+      channel: "stalwart",
     });
   });
 
@@ -191,7 +191,6 @@ describe("EventParticipantService", () => {
       }),
       expect.objectContaining({
         email: "teammate@example.com",
-        image: "https://example.com/avatar.png",
         role: "attendee",
       }),
     ]);

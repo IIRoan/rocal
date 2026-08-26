@@ -21,6 +21,10 @@ import type {
 import { ValidationError } from "../lib/errors";
 import { prismaStringEquals } from "../lib/prisma-query";
 import { reminderScheduleWarning } from "../lib/email-delivery";
+import {
+  firstNotificationDisplayTitle,
+  shouldScheduleEventReminder,
+} from "../lib/notification-job";
 import { errorLogDetails } from "../lib/log-sanitization";
 import {
   assertCalendarWritable,
@@ -92,6 +96,39 @@ export class EventService implements IEventService {
 
   private hasEncryptedPayload(value?: string | null): boolean {
     return typeof value === "string" && value.trim().length > 0;
+  }
+
+  private async insertUpcomingEventReminder(input: {
+    eventId: string;
+    eventStart: Date;
+    minutesBefore: number;
+    timezone: string;
+    displayTitle: string | null;
+    notificationType?: "email" | "browser";
+  }): Promise<boolean> {
+    const schedule = NotificationCalculator.scheduleUpcomingReminder(
+      input.eventStart,
+      input.minutesBefore,
+      input.timezone,
+    );
+    if (!schedule) {
+      return false;
+    }
+
+    await this.prisma.eventNotification.create({
+      data: {
+        eventId: input.eventId,
+        notificationType: input.notificationType ?? "email",
+        minutesBefore: input.minutesBefore,
+        notificationTime: schedule.notificationTime,
+        notificationDateLocal: schedule.notificationDateLocal,
+        notificationTimezone: schedule.notificationTimezone,
+        isEnabled: true,
+        isSent: false,
+        displayTitle: input.displayTitle,
+      },
+    });
+    return true;
   }
 
   private async resolveEventTimezone(
@@ -326,7 +363,9 @@ export class EventService implements IEventService {
         allDay: mapped.allDay,
         timezone: mapped.timezone,
         recurrence: mapped.recurrence,
-        reminder: mapped.reminder,
+        ...(encrypted && mapped.reminder == null
+          ? {}
+          : { reminder: mapped.reminder }),
         calendarId,
         externalId: mapped.stalwartUid,
         stalwartAccountId: input.accountId,
@@ -464,29 +503,30 @@ export class EventService implements IEventService {
     events: Record<string, unknown>[],
     userId: string,
   ) {
-    const participantMap = await this.buildParticipantMap(
-      events
-        .map((event) =>
-          typeof event.id === "string" && event.id ? event.id : null,
-        )
-        .filter((eventId): eventId is string => eventId !== null),
-    );
+    const eventIds: string[] = [];
+    for (const event of events) {
+      if (typeof event.id === "string" && event.id) {
+        eventIds.push(event.id);
+      }
+    }
+    const participantMap = await this.buildParticipantMap(eventIds);
 
-    return events
-      .map((event) => ({
-        ...event,
-        participants:
-          typeof event.id === "string"
-            ? (participantMap.get(event.id) ?? [])
-            : [],
-      }))
-      .filter(
-        (event) =>
-          !this.shouldHideDeclinedInvitationEvent(
-            userId,
-            event.participants as ReturnType<typeof mapEventParticipant>[],
-          ),
-      );
+    return events.reduce<Record<string, unknown>[]>((acc, event) => {
+      const participants =
+        typeof event.id === "string"
+          ? (participantMap.get(event.id) ?? [])
+          : [];
+      if (
+        this.shouldHideDeclinedInvitationEvent(
+          userId,
+          participants as ReturnType<typeof mapEventParticipant>[],
+        )
+      ) {
+        return acc;
+      }
+      acc.push({ ...event, participants });
+      return acc;
+    }, []);
   }
 
   private buildInvitationEventPayload(input: {
@@ -914,20 +954,19 @@ export class EventService implements IEventService {
       }),
     ]);
 
-    const events = [
+    const events = [];
+    for (const event of [
       ...regularEvents,
       ...recurringInstances,
       ...modifiedInstances,
-    ]
-      .map((event) => ({
-        ...event,
-        participants: mapAndSortParticipants(event),
-      }))
-      .filter(
-        (event) =>
-          !this.shouldHideDeclinedInvitationEvent(userId, event.participants),
-      )
-      .sort((a, b) => a.start.getTime() - b.start.getTime());
+    ]) {
+      const participants = mapAndSortParticipants(event);
+      if (this.shouldHideDeclinedInvitationEvent(userId, participants)) {
+        continue;
+      }
+      events.push({ ...event, participants });
+    }
+    events.sort((a, b) => a.start.getTime() - b.start.getTime());
 
     return {
       events,
@@ -1475,6 +1514,7 @@ export class EventService implements IEventService {
         select: {
           timezone: true,
           emailNotifications: true,
+          pushNotifications: true,
         },
       });
       const eventTimezone = resolveTimezone(timezone ?? userSettings?.timezone);
@@ -1614,49 +1654,22 @@ export class EventService implements IEventService {
 
       try {
         if (reminder && reminder > 0) {
-          if (userSettings?.emailNotifications !== false) {
-            const notificationSchedule =
-              NotificationCalculator.buildNotificationSchedule(
-                startDate,
-                reminder,
-                eventTimezone,
-              );
-
-            if (notificationSchedule.notificationTime > new Date()) {
-              await this.prisma.$executeRaw`
-                INSERT INTO public.event_notification (
-                  id,
-                  event_id,
-                  notification_type,
-                  minutes_before,
-                  notification_time,
-                  notification_date_local,
-                  notification_timezone,
-                  is_enabled,
-                  is_sent,
-                  created_at,
-                  updated_at
-                ) VALUES (
-                  ${crypto.randomUUID()},
-                  ${event.id},
-                  ${"email"},
-                  ${reminder},
-                  ${notificationSchedule.notificationTime},
-                  ${notificationSchedule.notificationDateLocal},
-                  ${notificationSchedule.notificationTimezone},
-                  true,
-                  false,
-                  NOW(),
-                  NOW()
-                )
-              `;
+          if (shouldScheduleEventReminder(userSettings)) {
+            const reminderDisplayTitle = firstNotificationDisplayTitle(title);
+            const created = await this.insertUpcomingEventReminder({
+              eventId: event.id,
+              eventStart: startDate,
+              minutesBefore: reminder,
+              timezone: eventTimezone,
+              displayTitle: reminderDisplayTitle,
+            });
+            if (created) {
+              logger.ok(`Created notification for event ${event.id}`);
             } else {
               logger.info(
                 `Skipping creating past notification for event ${event.id}`,
               );
             }
-
-            logger.ok(`Created notification for event ${event.id}`);
           }
         }
       } catch (notificationError) {
@@ -1837,6 +1850,7 @@ export class EventService implements IEventService {
         select: {
           timezone: true,
           emailNotifications: true,
+          pushNotifications: true,
         },
       });
       const eventTimezone =
@@ -2102,28 +2116,45 @@ export class EventService implements IEventService {
             notificationType: "email" | "browser";
             minutesBefore: number;
             isEnabled: boolean;
+            displayTitle: string | null;
           }[] = [];
+
+          const existingNotifications =
+            await this.prisma.eventNotification.findMany({
+              where: { eventId: id },
+              select: {
+                notificationType: true,
+                minutesBefore: true,
+                isEnabled: true,
+                displayTitle: true,
+              },
+            });
+          const preservedDisplayTitle = firstNotificationDisplayTitle(
+            input.title,
+            nextTitle,
+            ...existingNotifications.map((n) => n.displayTitle),
+          );
 
           if (reminderChanged) {
             if (finalReminderValue && finalReminderValue > 0) {
-              if (userSettings?.emailNotifications !== false) {
+              if (shouldScheduleEventReminder(userSettings)) {
                 notificationConfigs.push({
                   notificationType: "email",
                   minutesBefore: finalReminderValue,
                   isEnabled: true,
+                  displayTitle: preservedDisplayTitle,
                 });
               }
             }
           } else {
-            const existingNotifications =
-              await this.prisma.eventNotification.findMany({
-                where: { eventId: id },
-              });
-
             notificationConfigs = existingNotifications.map((n) => ({
               notificationType: n.notificationType as "email" | "browser",
               minutesBefore: n.minutesBefore,
               isEnabled: n.isEnabled,
+              displayTitle: firstNotificationDisplayTitle(
+                n.displayTitle,
+                preservedDisplayTitle,
+              ),
             }));
           }
 
@@ -2131,45 +2162,21 @@ export class EventService implements IEventService {
             where: { eventId: id },
           });
 
-          if (notificationConfigs.length > 0) {
-            const now = new Date();
-            for (const config of notificationConfigs) {
-              const notificationSchedule =
-                NotificationCalculator.buildNotificationSchedule(
-                  finalStartDate,
-                  config.minutesBefore,
-                  eventTimezone,
-                );
-              if (notificationSchedule.notificationTime <= now) continue;
-              await this.prisma.$executeRaw`
-                INSERT INTO public.event_notification (
-                  id,
-                  event_id,
-                  notification_type,
-                  minutes_before,
-                  notification_time,
-                  notification_date_local,
-                  notification_timezone,
-                  is_enabled,
-                  is_sent,
-                  created_at,
-                  updated_at
-                ) VALUES (
-                  ${crypto.randomUUID()},
-                  ${id},
-                  ${config.notificationType},
-                  ${config.minutesBefore},
-                  ${notificationSchedule.notificationTime},
-                  ${notificationSchedule.notificationDateLocal},
-                  ${notificationSchedule.notificationTimezone},
-                  ${config.isEnabled},
-                  false,
-                  NOW(),
-                  NOW()
-                )
-              `;
-            }
+          const reminderInserts = [];
+          for (const config of notificationConfigs) {
+            if (!config.isEnabled) continue;
+            reminderInserts.push(
+              this.insertUpcomingEventReminder({
+                eventId: id,
+                eventStart: finalStartDate,
+                minutesBefore: config.minutesBefore,
+                timezone: eventTimezone,
+                displayTitle: config.displayTitle,
+                notificationType: config.notificationType,
+              }),
+            );
           }
+          await Promise.all(reminderInserts);
 
           logger.ok(`Updated notifications for event ${id}`);
         }
@@ -2402,18 +2409,22 @@ export class EventService implements IEventService {
             stalwartAccountId &&
             targetStalwartCalendarId
           ) {
+            const moveUpdates = [];
             for (const event of events) {
               if (!event.stalwartEventId) continue;
-              await this.stalwartClient.updateEvent({
-                accountId: event.stalwartAccountId ?? stalwartAccountId,
-                eventId: event.stalwartEventId,
-                patch: {
-                  calendarIds: {
-                    [targetStalwartCalendarId]: true,
+              moveUpdates.push(
+                this.stalwartClient.updateEvent({
+                  accountId: event.stalwartAccountId ?? stalwartAccountId,
+                  eventId: event.stalwartEventId,
+                  patch: {
+                    calendarIds: {
+                      [targetStalwartCalendarId]: true,
+                    },
                   },
-                },
-              });
+                }),
+              );
             }
+            await Promise.all(moveUpdates);
           }
 
           result = await this.prisma.calendarEvent.updateMany({
@@ -2450,31 +2461,38 @@ export class EventService implements IEventService {
               !this.isAttendeeImportedInvitationForUser(userId, event),
           );
 
-          for (const event of activeAttendeeInvitationEvents) {
-            await this.respondToInvitation({
-              userId,
-              eventId: event.id,
-              status: "declined",
-            });
-          }
+          await Promise.all(
+            activeAttendeeInvitationEvents.map((event) =>
+              this.respondToInvitation({
+                userId,
+                eventId: event.id,
+                status: "declined",
+              }),
+            ),
+          );
 
           const eventsToDeleteLocally = [
             ...regularEvents,
             ...cancelledAttendeeInvitationEvents,
           ];
 
+          const remoteDeletes = [];
           for (const event of eventsToDeleteLocally) {
             if (
-              this.stalwartClient &&
-              event.stalwartAccountId &&
-              event.stalwartEventId
+              !this.stalwartClient ||
+              !event.stalwartAccountId ||
+              !event.stalwartEventId
             ) {
-              await this.stalwartClient.deleteEvent({
+              continue;
+            }
+            remoteDeletes.push(
+              this.stalwartClient.deleteEvent({
                 accountId: event.stalwartAccountId,
                 eventId: event.stalwartEventId,
-              });
-            }
+              }),
+            );
           }
+          await Promise.all(remoteDeletes);
 
           const localDeleteEventIds = eventsToDeleteLocally.map(
             (event) => event.id,
@@ -2544,20 +2562,28 @@ export class EventService implements IEventService {
               },
             });
 
+            const attendeeParticipants: Array<{
+              email: string;
+              displayName: string | undefined;
+              role: "attendee";
+              status: EventParticipantStatus;
+            }> = [];
+            for (const participant of event.participants ?? []) {
+              if (participant.role === "organizer") continue;
+              attendeeParticipants.push({
+                email: participant.email,
+                displayName:
+                  participant.displayName ??
+                  participant.user?.name ??
+                  undefined,
+                role: "attendee",
+                status: participant.status as EventParticipantStatus,
+              });
+            }
             const duplicatedParticipants =
               await this.eventParticipantService.syncParticipants({
                 eventId: duplicated.id,
-                participants: (event.participants ?? [])
-                  .filter((participant) => participant.role !== "organizer")
-                  .map((participant) => ({
-                    email: participant.email,
-                    displayName:
-                      participant.displayName ??
-                      participant.user?.name ??
-                      undefined,
-                    role: "attendee" as const,
-                    status: participant.status as EventParticipantStatus,
-                  })),
+                participants: attendeeParticipants,
                 ownerUserId: userId,
                 tx: this.prisma,
               });
@@ -2569,45 +2595,32 @@ export class EventService implements IEventService {
                   where: { userId },
                 });
 
-                if (userSettings?.emailNotifications !== false) {
-                  const notificationSchedule =
-                    NotificationCalculator.buildNotificationSchedule(
-                      duplicated.start,
-                      event.reminder,
-                      duplicated.timezone,
-                    );
-
-                  await this.prisma.$executeRaw`
-                    INSERT INTO public.event_notification (
-                      id,
-                      event_id,
-                      notification_type,
-                      minutes_before,
-                      notification_time,
-                      notification_date_local,
-                      notification_timezone,
-                      is_enabled,
-                      is_sent,
-                      created_at,
-                      updated_at
-                    ) VALUES (
-                      ${crypto.randomUUID()},
-                      ${duplicated.id},
-                      ${"email"},
-                      ${event.reminder},
-                      ${notificationSchedule.notificationTime},
-                      ${notificationSchedule.notificationDateLocal},
-                      ${notificationSchedule.notificationTimezone},
-                      true,
-                      false,
-                      NOW(),
-                      NOW()
-                    )
-                  `;
-
-                  logger.ok(
-                    `Created notification for duplicated event ${duplicated.id}`,
+                if (shouldScheduleEventReminder(userSettings)) {
+                  const sourceReminder = await this.prisma.eventNotification.findFirst(
+                    {
+                      where: {
+                        eventId: event.id,
+                        displayTitle: { not: null },
+                      },
+                      select: { displayTitle: true },
+                    },
                   );
+                  const reminderDisplayTitle = firstNotificationDisplayTitle(
+                    sourceReminder?.displayTitle,
+                    event.title,
+                  );
+                  const created = await this.insertUpcomingEventReminder({
+                    eventId: duplicated.id,
+                    eventStart: duplicated.start,
+                    minutesBefore: event.reminder,
+                    timezone: duplicated.timezone,
+                    displayTitle: reminderDisplayTitle,
+                  });
+                  if (created) {
+                    logger.ok(
+                      `Created notification for duplicated event ${duplicated.id}`,
+                    );
+                  }
                 }
               }
             } catch (notificationError) {

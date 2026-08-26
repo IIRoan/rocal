@@ -116,6 +116,173 @@ describe("MailSyncService", () => {
     });
   });
 
+  it("forces a full sync when Email/changes cannot be calculated", async () => {
+    const { prisma, jmapAdminClient, service } = createHarness();
+    prisma.mailDirectoryEntry.findUnique.mockResolvedValue({
+      id: "entry-1",
+      userId: "user-1",
+      stalwartAccountId: "acct-1",
+    });
+    prisma.mailJmapSyncState.findUnique.mockResolvedValue({
+      id: "sync-1",
+      directoryEntryId: "entry-1",
+      stalwartAccountId: "acct-1",
+      emailState: "email-state-1",
+      mailboxState: "mailbox-state-1",
+      threadState: "thread-state-1",
+    });
+    jmapAdminClient.callJmap.mockImplementation(
+      async ({
+        methodCalls,
+      }: {
+        methodCalls: Array<[string, Record<string, unknown>, string]>;
+      }) => {
+        const [methodName] = methodCalls[0]!;
+        if (methodName === "Email/changes") {
+          return {
+            methodResponses: [
+              ["error", { type: "cannotCalculateChanges" }, "c1"],
+            ],
+          };
+        }
+
+        return {
+          methodResponses: [
+            [
+              methodName,
+              {
+                oldState: "state-0",
+                newState: "state-0",
+                hasMoreChanges: false,
+                created: [],
+                updated: [],
+                destroyed: [],
+              },
+              "c1",
+            ],
+          ],
+        };
+      },
+    );
+
+    await expect(
+      service.detectChanges({ userId: "user-1", accountId: "acct-1" }),
+    ).resolves.toEqual({ hasChanges: true, changedTypes: ["Email"] });
+  });
+
+  it("retries Email/get without bodies when the full fetch fails", async () => {
+    const { prisma, jmapAdminClient, service } = createHarness();
+    prisma.mailDirectoryEntry.findUnique.mockResolvedValue({
+      id: "entry-1",
+      userId: "user-1",
+      stalwartAccountId: "acct-1",
+    });
+    prisma.mailJmapSyncState.findUnique.mockResolvedValue({
+      id: "sync-1",
+      directoryEntryId: "entry-1",
+      stalwartAccountId: "acct-1",
+      emailState: "email-state-1",
+      mailboxState: "mailbox-state-1",
+      threadState: "thread-state-1",
+    });
+    prisma.mailJmapSyncState.update.mockResolvedValue({
+      id: "sync-1",
+      directoryEntryId: "entry-1",
+      stalwartAccountId: "acct-1",
+      emailState: "email-state-2",
+      mailboxState: "mailbox-state-1",
+      threadState: "thread-state-1",
+    });
+    let fullFetches = 0;
+    jmapAdminClient.callJmap.mockImplementation(
+      async ({
+        methodCalls,
+      }: {
+        methodCalls: Array<[string, Record<string, unknown>, string]>;
+      }) => {
+        const [methodName, params] = methodCalls[0]!;
+        if (methodName === "Email/changes") {
+          return {
+            methodResponses: [
+              [
+                methodName,
+                {
+                  oldState: "email-state-1",
+                  newState: "email-state-2",
+                  hasMoreChanges: false,
+                  created: ["in-1"],
+                  updated: [],
+                  destroyed: [],
+                },
+                "c1",
+              ],
+            ],
+          };
+        }
+        if (methodName === "Email/get" && Array.isArray(params.ids)) {
+          if (params.fetchAllBodyValues === true) {
+            fullFetches += 1;
+            return {
+              methodResponses: [
+                ["error", { type: "invalidArguments" }, "c1"],
+              ],
+            };
+          }
+          return {
+            methodResponses: [
+              [
+                methodName,
+                {
+                  state: "email-state-2",
+                  list: [
+                    {
+                      id: "in-1",
+                      subject: "Lunch",
+                      mailboxIds: { "mb-inbox": true },
+                      from: [{ email: "a@example.com", name: "Sam" }],
+                    },
+                  ],
+                },
+                "c1",
+              ],
+            ],
+          };
+        }
+
+        return {
+          methodResponses: [
+            [
+              methodName,
+              {
+                oldState: "state-0",
+                newState: "state-0",
+                hasMoreChanges: false,
+                created: [],
+                updated: [],
+                destroyed: [],
+              },
+              "c1",
+            ],
+          ],
+        };
+      },
+    );
+
+    const result = await service.syncForUser({
+      userId: "user-1",
+      accountId: "acct-1",
+    });
+
+    expect(fullFetches).toBe(1);
+    expect(result.email.created).toEqual(["in-1"]);
+    expect(result.email.records).toEqual([
+      expect.objectContaining({
+        id: "in-1",
+        subject: "Lunch",
+      }),
+    ]);
+  });
+
   it("passes changed email records through the calendar ICS ingestion hook", async () => {
     const { prisma, jmapAdminClient } = createHarness();
     const calendarImport = {

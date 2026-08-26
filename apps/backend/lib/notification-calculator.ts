@@ -1,12 +1,28 @@
-/**
- * Notification Calculator Utility
- *
- * Provides precise time calculation functions for event notifications.
- * Handles exact notification time calculations, validation, and date rounding.
- */
-
 import { errorMessage } from "./errors";
 import { resolveTimezone } from "@workspace/calendar-core";
+
+const localDateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function getLocalDateTimeFormatter(timezone: string): Intl.DateTimeFormat {
+  const resolved = resolveTimezone(timezone);
+  const cached = localDateTimeFormatters.get(resolved);
+  if (cached) {
+    return cached;
+  }
+
+  const formatter = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: resolved,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+  localDateTimeFormatters.set(resolved, formatter);
+  return formatter;
+}
 
 export interface NotificationConfig {
   notificationType: "email" | "browser";
@@ -48,6 +64,37 @@ export class NotificationCalculator {
     };
   }
 
+  // Past offset + upcoming event: fire on the current minute instead of dropping.
+  static scheduleUpcomingReminder(
+    eventStart: Date,
+    minutesBefore: number,
+    timezone?: string | null,
+    now: Date = new Date(),
+  ): NotificationScheduleResult | null {
+    if (!this.isEventInFuture(eventStart, now)) {
+      return null;
+    }
+
+    const schedule = this.buildNotificationSchedule(
+      eventStart,
+      minutesBefore,
+      timezone,
+    );
+    if (schedule.notificationTime.getTime() > now.getTime()) {
+      return schedule;
+    }
+
+    const notificationTime = this.roundToMinute(now);
+    return {
+      notificationTime,
+      notificationDateLocal: this.formatLocalDateTime(
+        notificationTime,
+        schedule.notificationTimezone,
+      ),
+      notificationTimezone: schedule.notificationTimezone,
+    };
+  }
+
   /**
    * Calculate exact notification time based on event start time and minutes before
    * @param eventStart - The start time of the event
@@ -66,13 +113,9 @@ export class NotificationCalculator {
       throw new Error("Minutes before must be a non-negative integer");
     }
 
-    // Calculate notification time by subtracting minutes from event start
-    const notificationTime = new Date(
-      eventStart.getTime() - minutesBefore * 60 * 1000,
+    return this.roundToMinute(
+      new Date(eventStart.getTime() - minutesBefore * 60 * 1000),
     );
-
-    // Round to minute precision to avoid second-level precision issues
-    return this.roundToMinute(notificationTime);
   }
 
   /**
@@ -163,16 +206,7 @@ export class NotificationCalculator {
       throw new Error("Invalid date provided");
     }
 
-    const formatter = new Intl.DateTimeFormat("sv-SE", {
-      timeZone: resolveTimezone(timezone),
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hourCycle: "h23",
-    });
+    const formatter = getLocalDateTimeFormatter(timezone);
 
     const parts = formatter.formatToParts(date);
     const lookup = (type: Intl.DateTimeFormatPartTypes) =>

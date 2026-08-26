@@ -4,7 +4,7 @@ import {
   getBaseSettingsNavigationItems,
   getRootBaseSettingsNavigationItems,
 } from "../../components/command-palette/base-navigation";
-import { NAVIGATION_ITEMS } from "../../components/command-palette/navigation-config";
+import { NAVIGATION_ITEMS, SEARCH_INDEX } from "../../components/command-palette/navigation-config";
 
 describe("base command palette navigation", () => {
   it("defines shared settings used by app-specific palettes", () => {
@@ -28,6 +28,9 @@ describe("base command palette navigation", () => {
         "calendar-defaults",
         ...BASE_SETTINGS_NAVIGATION_ITEMS.map((item) => item.id),
       ]),
+    );
+    expect(SEARCH_INDEX.map((item) => item.id)).toEqual(
+      expect.arrayContaining(["email-notifications", "app-notifications"]),
     );
   });
 

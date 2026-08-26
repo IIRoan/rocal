@@ -420,6 +420,7 @@ export interface UserSettings {
   workingHoursEnd: number;
   workingDays: string;
   emailNotifications: boolean;
+  pushNotifications: boolean;
   browserNotifications: boolean;
   reminderSound: boolean;
   eventEncryptionMode: EventEncryptionMode;
@@ -545,6 +546,7 @@ export interface CreateNotificationRequest {
     minutesBefore: number;
     isEnabled: boolean;
   }>;
+  displayTitle?: string | null;
 }
 
 export interface NotificationTestRequest {
@@ -558,9 +560,39 @@ export interface NotificationStatus {
     email: boolean;
     browser: boolean;
     reminders: boolean;
+    push: boolean;
   };
   checkInterval: string;
   queueProcessInterval: string;
+}
+
+export type PushPlatform = "ios" | "android";
+export type PushEnvironment = "sandbox" | "production";
+
+export interface RegisterPushDeviceRequest {
+  token: string;
+  platform: PushPlatform;
+  bundleId: string;
+  environment: PushEnvironment;
+}
+
+export interface UnregisterPushDeviceRequest {
+  token?: string;
+}
+
+export interface PushDeviceRegistrationResult {
+  success: boolean;
+  deviceId: string;
+}
+
+export interface PushDeviceUnregisterResult {
+  success: boolean;
+  deletedCount: number;
+}
+
+export interface PushTestNotificationResult {
+  success: boolean;
+  jobId: string;
 }
 
 // ─── ICS and Subscription API Types ──────────────────────────────────────────

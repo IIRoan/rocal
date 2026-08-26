@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("../../lib/notification-calculator", () => ({
   NotificationCalculator: {
     buildNotificationSchedule: jest.fn(),
+    scheduleUpcomingReminder: jest.fn(),
   },
 }));
 
@@ -51,6 +52,7 @@ function createHarness(
       update: jest.fn<() => Promise<any>>(),
     },
     eventNotification: {
+      findFirst: jest.fn<() => Promise<any>>(),
       deleteMany: jest.fn<() => Promise<{ count: number }>>(),
       createMany: jest.fn<() => Promise<{ count: number }>>(),
     },
@@ -64,6 +66,7 @@ function createHarness(
     options.event ?? eventFixture(),
   );
   prisma.calendarEvent.update.mockResolvedValue({ id: "event-1" });
+  prisma.eventNotification.findFirst.mockResolvedValue(null);
   prisma.eventNotification.deleteMany.mockResolvedValue({ count: 1 });
   prisma.eventNotification.createMany.mockResolvedValue({ count: 1 });
 
@@ -75,11 +78,19 @@ function createHarness(
 
 const mockBuildNotificationSchedule =
   NotificationCalculator.buildNotificationSchedule as jest.Mock;
+const mockScheduleUpcomingReminder =
+  NotificationCalculator.scheduleUpcomingReminder as jest.Mock;
 
 describe("NotificationService reminder field updates", () => {
   beforeEach(() => {
     mockBuildNotificationSchedule.mockReset();
     mockBuildNotificationSchedule.mockReturnValue({
+      notificationTime: new Date("2026-12-01T12:20:00.000Z"),
+      notificationDateLocal: "2026-12-01T12:20:00",
+      notificationTimezone: "UTC",
+    });
+    mockScheduleUpcomingReminder.mockReset();
+    mockScheduleUpcomingReminder.mockReturnValue({
       notificationTime: new Date("2026-12-01T12:20:00.000Z"),
       notificationDateLocal: "2026-12-01T12:20:00",
       notificationTimezone: "UTC",
@@ -206,6 +217,60 @@ describe("NotificationService reminder field updates", () => {
       }),
     });
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("stores the decrypted reminder title when the client provides one", async () => {
+    const { prisma, service } = createHarness({
+      event: eventFixture({ title: "" }),
+    });
+
+    await service.setForEvent(
+      "user-1",
+      "event-1",
+      [
+        {
+          notificationType: "email",
+          minutesBefore: 15,
+          isEnabled: true,
+        },
+      ],
+      "Lunch with Sam",
+    );
+
+    expect(prisma.eventNotification.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          eventId: "event-1",
+          displayTitle: "Lunch with Sam",
+        }),
+      ],
+    });
+  });
+
+  it("preserves an existing reminder title when the client omits one", async () => {
+    const { prisma, service } = createHarness({
+      event: eventFixture({ title: "" }),
+    });
+    prisma.eventNotification.findFirst.mockResolvedValueOnce({
+      displayTitle: "Lunch with Sam",
+    });
+
+    await service.setForEvent("user-1", "event-1", [
+      {
+        notificationType: "email",
+        minutesBefore: 15,
+        isEnabled: true,
+      },
+    ]);
+
+    expect(prisma.eventNotification.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          eventId: "event-1",
+          displayTitle: "Lunch with Sam",
+        }),
+      ],
+    });
   });
 
   it("wraps setForEvent writes in a prisma transaction", async () => {

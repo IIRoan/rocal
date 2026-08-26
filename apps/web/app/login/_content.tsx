@@ -20,7 +20,7 @@ import { calendarApiService } from "@/lib/calendar-api-service";
 import { accountApiService } from "@/lib/account-api-service";
 import { inviteApiService } from "@/lib/invite-api-service";
 import {
-  clearAuthPasswords,
+  clearPendingAuthPassword,
   storePendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
 import {
@@ -909,6 +909,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
         return;
       }
 
+      storePendingAuthPassword(password);
       const signUpResult = await signUp.email({
         email: availability.normalizedEmail,
         password,
@@ -916,6 +917,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
       });
 
       if (signUpResult?.error) {
+        clearPendingAuthPassword();
         dispatchChrome({
           type: "set-error",
           error: signUpResult.error.message || "Sign up failed. Please try again.",
@@ -940,6 +942,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
       clearOrphanedClientAuthArtifacts();
 
+      storePendingAuthPassword(password);
       let signInResult: Awaited<ReturnType<typeof signIn.email>> | undefined;
       try {
         signInResult = await signIn.email({
@@ -951,6 +954,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
           await findAuthenticatedSessionForEmail(normalizedEmail);
 
         if (!recoveredSession) {
+          clearPendingAuthPassword();
           log.error("Email auth failed:", err);
           dispatchChrome({
             type: "set-error",
@@ -969,6 +973,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
           await findAuthenticatedSessionForEmail(normalizedEmail);
 
         if (!recoveredSession) {
+          clearPendingAuthPassword();
           dispatchChrome({
             type: "set-error",
             error: signInResult.error.message || "Invalid email or password.",

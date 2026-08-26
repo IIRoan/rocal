@@ -1,7 +1,7 @@
 import { createLogger } from "@workspace/logger";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import { ForbiddenError, ValidationError } from "../lib/errors";
-import { errorLogDetails } from "../lib/log-sanitization";
+import { errorLogDetails, logRef } from "../lib/log-sanitization";
 import type {
   StalwartJmapAdminClientLike,
   StalwartJmapEnvelope,
@@ -21,6 +21,27 @@ const CORE_MAIL_CAPABILITIES = [
   "urn:ietf:params:jmap:mail",
 ] as const;
 const MAIL_SYNC_CACHE_TTL_MS = 60_000;
+const RECENT_INBOUND_BACKUP_WINDOW_MS = 5 * 60 * 1000;
+const EMAIL_HEADER_PROPERTIES = [
+  "id",
+  "threadId",
+  "mailboxIds",
+  "from",
+  "subject",
+  "receivedAt",
+  "keywords",
+] as const;
+const EMAIL_FULL_PROPERTIES = [
+  ...EMAIL_HEADER_PROPERTIES,
+  "to",
+  "cc",
+  "bcc",
+  "bodyStructure",
+  "bodyValues",
+  "textBody",
+  "htmlBody",
+  "attachments",
+] as const;
 
 type CacheEntry<T> = {
   value: T;
@@ -130,10 +151,26 @@ function uniqueIds(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
+function mailboxIdsFromEmails(
+  records: Array<{ mailboxIds?: Record<string, boolean> }>,
+): string[] {
+  return uniqueIds(
+    records.flatMap((record) => {
+      const mailboxIds: string[] = [];
+      for (const [mailboxId, included] of Object.entries(
+        record.mailboxIds ?? {},
+      )) {
+        if (included) mailboxIds.push(mailboxId);
+      }
+      return mailboxIds;
+    }),
+  );
+}
+
 function sortEmailsDescending<T extends { receivedAt?: string }>(
   records: T[],
 ): T[] {
-  return [...records].sort((left, right) => {
+  return records.toSorted((left, right) => {
     const leftTime = left.receivedAt ? Date.parse(left.receivedAt) : 0;
     const rightTime = right.receivedAt ? Date.parse(right.receivedAt) : 0;
     return rightTime - leftTime;
@@ -156,6 +193,18 @@ function collectionResult<T>(input: {
     destroyed: uniqueIds(input.destroyed ?? []),
     records: input.records ?? [],
   };
+}
+
+function recentlyReceived(record: JmapEmail, nowMs: number): boolean {
+  if (!record.receivedAt) {
+    return false;
+  }
+
+  const received = Date.parse(record.receivedAt);
+  return (
+    Number.isFinite(received) &&
+    nowMs - received <= RECENT_INBOUND_BACKUP_WINDOW_MS
+  );
 }
 
 export class MailSyncService {
@@ -276,11 +325,11 @@ export class MailSyncService {
     const [emailChanged, mailboxChanged] = await Promise.all([
       this.quickChangesCheck("Email", accountId, syncState.emailState).catch(
         (error) => {
-          logger.debug("JMAP Email/changes check failed", {
+          logger.warn("JMAP Email/changes check failed; forcing sync", {
             accountId,
             ...errorLogDetails(error),
           });
-          return false;
+          return true;
         },
       ),
       this.quickChangesCheck(
@@ -288,11 +337,11 @@ export class MailSyncService {
         accountId,
         syncState.mailboxState,
       ).catch((error) => {
-        logger.debug("JMAP Mailbox/changes check failed", {
+        logger.warn("JMAP Mailbox/changes check failed; forcing sync", {
           accountId,
           ...errorLogDetails(error),
         });
-        return false;
+        return true;
       }),
     ]);
 
@@ -390,7 +439,7 @@ export class MailSyncService {
       } catch (error) {
         logger.warn("Receipt-time mail sync failed", {
           accountId: entry.stalwartAccountId,
-          userId: entry.userId,
+          userRef: logRef(entry.userId),
           ...errorLogDetails(error),
         });
       }
@@ -469,14 +518,27 @@ export class MailSyncService {
       return initialized;
     }
 
-    const [emailChanges, mailboxChanges, threadChanges] = await Promise.all([
-      this.fetchEmailChanges(accountId, existingState.emailState),
-      this.fetchMailboxChanges(accountId, existingState.mailboxState),
-      this.fetchThreadChanges(
+    let emailChanges: MailSyncCollection<JmapEmail>;
+    let mailboxChanges: MailSyncCollection<JmapMailbox>;
+    let threadChanges: MailSyncCollection<MailSyncThreadRecord>;
+
+    try {
+      [emailChanges, mailboxChanges, threadChanges] = await Promise.all([
+        this.fetchEmailChanges(accountId, existingState.emailState),
+        this.fetchMailboxChanges(accountId, existingState.mailboxState),
+        this.fetchThreadChanges(
+          accountId,
+          existingState.threadState ?? existingState.emailState,
+        ),
+      ]);
+    } catch (error) {
+      logger.warn("Mail sync changes failed; reinitializing JMAP state", {
         accountId,
-        existingState.threadState ?? existingState.emailState,
-      ),
-    ]);
+        ...errorLogDetails(error),
+      });
+      this.syncStateCache.delete(directoryEntry.id);
+      return this.initializeSyncState(directoryEntry, input.userId);
+    }
 
     const updatedState = await this.prisma.mailJmapSyncState.update({
       where: { id: existingState.id },
@@ -489,6 +551,28 @@ export class MailSyncService {
       select: mailSyncStateSelect,
     });
     this.cacheSyncState(updatedState);
+
+    const knownMailboxIds = new Set(
+      mailboxChanges.records.map((mailbox) => mailbox.id),
+    );
+    const missingMailboxIds = mailboxIdsFromEmails(emailChanges.records).filter(
+      (mailboxId) => !knownMailboxIds.has(mailboxId),
+    );
+    if (missingMailboxIds.length > 0) {
+      try {
+        const extraMailboxes = await this.getMailboxesByIds(
+          accountId,
+          missingMailboxIds,
+        );
+        mailboxChanges.records.push(...extraMailboxes);
+      } catch (error) {
+        logger.warn("Failed to hydrate mailboxes for inbound detection", {
+          accountId,
+          missingCount: missingMailboxIds.length,
+          ...errorLogDetails(error),
+        });
+      }
+    }
 
     const changedTypes = [
       ...(emailChanges.created.length ||
@@ -598,14 +682,20 @@ export class MailSyncService {
       userId,
       records: recentEmails,
     });
+    const nowMs = Date.now();
+    const recentInbound = recentEmails.filter((record) =>
+      recentlyReceived(record, nowMs),
+    );
 
     return {
       accountId: directoryEntry.stalwartAccountId,
       initialized: true,
-      changedTypes: [],
+      changedTypes: recentInbound.length > 0 ? ["Email"] : [],
       email: collectionResult({
         oldState: null,
         newState: emailResponse.state,
+        created: recentInbound.map((record) => record.id),
+        records: recentInbound,
       }),
       mailbox: collectionResult({
         oldState: null,
@@ -661,6 +751,27 @@ export class MailSyncService {
     const changes = await this.collectChanges("Email", accountId, sinceState);
     const ids = uniqueIds([...changes.created, ...changes.updated]);
     const records = ids.length > 0 ? await this.getEmails(accountId, ids) : [];
+    const foundIds = new Set(records.map((record) => record.id));
+    const missingCreated = uniqueIds(
+      changes.created.filter((createdId) => !foundIds.has(createdId)),
+    );
+    if (missingCreated.length > 0) {
+      try {
+        const extra = await this.getEmailsWithProperties(
+          accountId,
+          missingCreated,
+          EMAIL_HEADER_PROPERTIES,
+          false,
+        );
+        records.push(...extra);
+      } catch (error) {
+        logger.warn("Header backup fetch failed for created mail", {
+          accountId,
+          missingCount: missingCreated.length,
+          ...errorLogDetails(error),
+        });
+      }
+    }
 
     return collectionResult({
       oldState: changes.oldState,
@@ -810,31 +921,51 @@ export class MailSyncService {
     accountId: string,
     ids: string[],
   ): Promise<JmapEmail[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    try {
+      return await this.getEmailsWithProperties(
+        accountId,
+        ids,
+        EMAIL_FULL_PROPERTIES,
+        true,
+      );
+    } catch (error) {
+      logger.warn("Full email fetch failed; retrying headers only", {
+        accountId,
+        requestedCount: ids.length,
+        ...errorLogDetails(error),
+      });
+      return this.getEmailsWithProperties(
+        accountId,
+        ids,
+        EMAIL_HEADER_PROPERTIES,
+        false,
+      );
+    }
+  }
+
+  private async getEmailsWithProperties(
+    accountId: string,
+    ids: string[],
+    properties: readonly string[],
+    fetchBodies: boolean,
+  ): Promise<JmapEmail[]> {
     const response = await this.callMethod<JmapGetResponse<JmapEmail>>(
       "Email/get",
       {
         accountId,
         ids,
-        properties: [
-          "id",
-          "threadId",
-          "mailboxIds",
-          "from",
-          "to",
-          "cc",
-          "bcc",
-          "subject",
-          "receivedAt",
-          "keywords",
-          "bodyStructure",
-          "bodyValues",
-          "textBody",
-          "htmlBody",
-          "attachments",
-        ],
-        fetchTextBodyValues: true,
-        fetchHTMLBodyValues: true,
-        fetchAllBodyValues: true,
+        properties: [...properties],
+        ...(fetchBodies
+          ? {
+              fetchTextBodyValues: true,
+              fetchHTMLBodyValues: true,
+              fetchAllBodyValues: true,
+            }
+          : {}),
       },
     );
 
@@ -894,10 +1025,20 @@ export class MailSyncService {
       (entry) => entry[0] === methodName,
     );
 
-    if (!tuple) {
-      throw new Error(`Stalwart JMAP response did not include ${methodName}.`);
+    if (tuple) {
+      return tuple[1] as T;
     }
 
-    return tuple[1] as T;
+    const errorTuple = (envelope.methodResponses ?? []).find(
+      (entry) => entry[0] === "error",
+    );
+    if (errorTuple) {
+      const details = errorTuple[1] as { type?: string };
+      throw new Error(
+        `Stalwart JMAP ${methodName} failed (${details.type ?? "error"}).`,
+      );
+    }
+
+    throw new Error(`Stalwart JMAP response did not include ${methodName}.`);
   }
 }

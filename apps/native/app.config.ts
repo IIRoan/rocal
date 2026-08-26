@@ -46,6 +46,7 @@ const baseConfig = {
       ][])
       : []),
     "expo-secure-store",
+    "expo-notifications",
     [
       "expo-splash-screen",
       {

@@ -2,7 +2,7 @@ const EVENT_ID_LINE_REGEX =
   /\bEvent\s+ID\s*:\s*([A-Za-z0-9][A-Za-z0-9_.:-]{2,})\b/i;
 const EVENT_QUERY_REGEX = /[?&]eventId=([^&#\s<>"']+)/i;
 const SOLACE_REMINDER_SUBJECT_REGEX =
-  /\b(?:encrypted event|event reminder)\b/i;
+  /\b(?:encrypted event|event reminder|starting now)\b|\bin (?:\d+\s+minutes?|1 minute|1 hour|\d+\s+hours?(?: \d+ minutes?)?)\s*$/i;
 const SOLACE_INVITATION_SUBJECT_REGEX = /\binvited you to\b/i;
 const REMINDER_LEAD_TIME_REGEX =
   /\b(\d+)\s+minutes?\b/i;

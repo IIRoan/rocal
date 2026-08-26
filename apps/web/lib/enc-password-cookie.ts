@@ -121,9 +121,9 @@ export function peekEncPassword(): string | null {
 }
 
 /**
- * Decrypt the cookie using the device key and populate both the in-memory
- * cache and the sessionStorage-backed cache (so existing callers of
- * peekCachedAuthPassword() see the value without any changes on their side).
+ * Decrypt the cookie using the device key and populate both the cookie module
+ * memory cache and the shared auth-password memory cache (so existing callers
+ * of peekCachedAuthPassword() see the value without any changes on their side).
  *
  * Safe to call multiple times — no-ops if the memory cache is already set.
  */
@@ -149,8 +149,8 @@ export async function initEncPasswordFromCookie(): Promise<void> {
     );
     const password = new TextDecoder().decode(decrypted);
     _memoryPassword = password;
-    // Populate the sessionStorage cache so peekCachedAuthPassword() works
-    // without needing any changes in calendar/mail bootstrap code.
+    // Populate the shared auth-password memory cache so peekCachedAuthPassword()
+    // works without needing any changes in calendar/mail bootstrap code.
     storePendingAuthPassword(password);
   } catch {
     // Cookie or device key is corrupt/mismatched — clean up.
@@ -160,7 +160,7 @@ export async function initEncPasswordFromCookie(): Promise<void> {
 
 /**
  * Remove the cookie, the device key, and the in-memory cache.
- * Also clears the sessionStorage-backed cache via clearAuthPasswords().
+ * Also clears the shared auth-password memory cache via clearAuthPasswords().
  * Call this on every sign-out path.
  */
 export function clearEncPasswordCookie(): void {

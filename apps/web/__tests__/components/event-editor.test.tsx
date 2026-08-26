@@ -188,6 +188,7 @@ const localSettings = {
   defaultEventDuration: 60,
   defaultView: "month",
   emailNotifications: true,
+  pushNotifications: true,
   eventEncryptionMode: "hybrid",
   id: "settings-1",
   reminderSound: true,
