@@ -358,7 +358,7 @@ func (ns *NotificationServer) Start() error {
 	ns.initMailer()
 	ns.initPush()
 
-	_, err := ns.cron.AddFunc("*/15 * * * * *", func() {
+	_, err := ns.cron.AddFunc("*/5 * * * * *", func() {
 		if err := ns.processScheduledNotifications(); err != nil {
 			ns.failedCount++
 			ns.addError(err.Error())
@@ -370,6 +370,13 @@ func (ns *NotificationServer) Start() error {
 	}
 
 	ns.cron.Start()
+	go func() {
+		if err := ns.processScheduledNotifications(); err != nil {
+			ns.failedCount++
+			ns.addError(err.Error())
+			ns.log.Err("Startup notification processing failed: %v", err)
+		}
+	}()
 	ns.log.OK("Notification server started")
 	return nil
 }
@@ -441,6 +448,8 @@ func (ns *NotificationServer) processScheduledNotifications() error {
 		ns.log.Info("Notification tick executed - no due jobs")
 		return nil
 	}
+
+	ns.log.Info("Dispatching %d claimed job(s)", len(claimed))
 
 	processed := 0
 	skipped := 0
@@ -549,8 +558,11 @@ func (ns *NotificationServer) dispatchPushJob(ctx context.Context, job jobs.Job)
 		if count < 1 {
 			count = 1
 		}
-		notification = push.NewMail(count, job.FromName, job.Subject)
-		notification.CollapseID = "mail:" + job.ID
+		emailID := strings.TrimSpace(job.Payload.EmailID)
+		notification = push.NewMail(count, job.FromName, job.Subject, emailID)
+		if notification.CollapseID == "mail:" || notification.CollapseID == "" {
+			notification.CollapseID = "mail:" + job.ID
+		}
 	case "event_reminder":
 		eventID := job.Payload.EventID
 		if eventID == "" && job.EventID.Valid {
@@ -569,19 +581,25 @@ func (ns *NotificationServer) dispatchPushJob(ctx context.Context, job jobs.Job)
 		return ns.skipJob(ctx, job, "unknown kind")
 	}
 
+	ns.log.Info("Sending %s push to %d device(s)", kind, len(devices))
 	var lastErr error
 	sent := 0
 	for _, device := range devices {
 		if err := ns.sendPushToDevice(ctx, device, notification); err != nil {
 			lastErr = err
+			ns.log.Warn("APNs delivery failed for %s env=%s: %v", device.BundleID, device.Environment, err)
 			continue
 		}
 		sent++
 	}
-	if sent == 0 && lastErr != nil {
+	if sent < len(devices) {
+		if lastErr == nil {
+			lastErr = fmt.Errorf("APNs delivered to %d/%d devices", sent, len(devices))
+		}
+		ns.log.Warn("Delivered %s push to %d/%d device(s)", kind, sent, len(devices))
 		return lastErr
 	}
-	ns.log.Info("Delivered %s push to %d device(s)", kind, sent)
+	ns.log.Info("Delivered %s push to %d/%d device(s)", kind, sent, len(devices))
 	return nil
 }
 
@@ -607,7 +625,7 @@ func (ns *NotificationServer) sendPushToDevice(ctx context.Context, device jobs.
 	if used.Environment != device.Environment {
 		_ = jobs.UpdatePushDeviceEnvironment(ctx, ns.db, device.TokenHash, used.Environment)
 	}
-	ns.log.Info("APNs accepted %s push env=%s status=%d", notification.Type, used.Environment, result.StatusCode)
+	ns.log.Info("APNs accepted %s push env=%s status=%d bundle=%s", notification.Type, used.Environment, result.StatusCode, used.BundleID)
 	return nil
 }
 

@@ -1,10 +1,9 @@
 import type { Prisma, PrismaClient } from "../generated/prisma/index.js";
-import { listInboundCreatedEmails } from "./inbound-mail-push";
+import { mergeInboundMailPushItems, type InboundMailPushItem } from "./inbound-mail-push";
 import {
   newMailPayload,
   NotificationJobPayloadError,
 } from "./notification-job";
-import type { MailSyncResult } from "../services/mail-sync.service";
 import { createLogger } from "@workspace/logger";
 import { errorLogDetails, logRef } from "./log-sanitization";
 
@@ -14,6 +13,14 @@ type PrismaLike = Pick<
   PrismaClient,
   "mailDirectoryEntry" | "userSettings" | "notificationJob"
 >;
+
+export type { InboundMailPushItem };
+
+export type InboundMailPushInput = {
+  accountId: string;
+  userId?: string | null;
+  items: InboundMailPushItem[];
+};
 
 function isUniqueConstraintError(error: unknown): boolean {
   return (
@@ -26,13 +33,9 @@ function isUniqueConstraintError(error: unknown): boolean {
 
 export async function enqueueInboundMailPush(
   prisma: PrismaLike,
-  input: {
-    accountId: string;
-    userId?: string | null;
-    sync: MailSyncResult;
-  },
+  input: InboundMailPushInput,
 ): Promise<void> {
-  const items = listInboundCreatedEmails(input.sync);
+  const items = mergeInboundMailPushItems(input.items);
   if (items.length === 0) {
     return;
   }
@@ -48,7 +51,7 @@ export async function enqueueInboundMailPush(
 
   if (!userId) {
     logger.warn("Skipped mail push; mailbox is not linked to a user", {
-      accountId: input.accountId,
+      accountRef: logRef(input.accountId),
       inboundCount: items.length,
     });
     return;
@@ -59,10 +62,15 @@ export async function enqueueInboundMailPush(
     select: { pushNotifications: true },
   });
   if (settings?.pushNotifications === false) {
+    logger.info("Skipped mail push; app notifications are disabled", {
+      userRef: logRef(userId),
+      inboundCount: items.length,
+    });
     return;
   }
 
   let enqueued = 0;
+  let skippedDuplicate = 0;
   for (const item of items) {
     let payload;
     try {
@@ -73,10 +81,20 @@ export async function enqueueInboundMailPush(
       });
     } catch (error) {
       if (error instanceof NotificationJobPayloadError) {
-        logger.warn("Rejected mail push payload", errorLogDetails(error));
+        logger.warn("Rejected mail push payload", {
+          emailRef: logRef(item.emailId),
+          ...errorLogDetails(error),
+        });
         continue;
       }
       throw error;
+    }
+
+    if (!payload.emailId) {
+      logger.warn("Rejected mail push payload without emailId", {
+        userRef: logRef(userId),
+      });
+      continue;
     }
 
     const existing = await prisma.notificationJob.findFirst({
@@ -92,6 +110,7 @@ export async function enqueueInboundMailPush(
       select: { id: true },
     });
     if (existing) {
+      skippedDuplicate += 1;
       continue;
     }
 
@@ -107,20 +126,23 @@ export async function enqueueInboundMailPush(
       });
       enqueued += 1;
     } catch (error) {
-      if (!isUniqueConstraintError(error)) {
-        logger.warn("Failed to enqueue mail push", {
-          userRef: logRef(userId),
-          ...errorLogDetails(error),
-        });
+      if (isUniqueConstraintError(error)) {
+        skippedDuplicate += 1;
+        continue;
       }
+      logger.warn("Failed to enqueue mail push", {
+        userRef: logRef(userId),
+        emailRef: logRef(item.emailId),
+        ...errorLogDetails(error),
+      });
     }
   }
 
-  if (enqueued > 0) {
-    logger.info("Enqueued inbound mail push", {
-      userRef: logRef(userId),
-      inboundCount: items.length,
-      enqueuedCount: enqueued,
-    });
-  }
+  logger.info("Enqueued inbound mail push", {
+    userRef: logRef(userId),
+    inboundCount: items.length,
+    enqueuedCount: enqueued,
+    skippedDuplicateCount: skippedDuplicate,
+    emailRefs: items.map((item) => logRef(item.emailId)),
+  });
 }

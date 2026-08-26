@@ -4,8 +4,6 @@ import type {
   MailSyncResult,
 } from "../services/mail-sync.service";
 
-const SKIP_MAILBOX_ROLES = new Set(["sent", "drafts", "junk", "trash"]);
-
 export type InboundMailPushItem = {
   emailId: string;
   subject: string | null;
@@ -37,48 +35,27 @@ function mergeCollection<T extends { id: string }>(
   };
 }
 
-export function listInboundCreatedEmails(
-  sync: MailSyncResult,
+export function mergeInboundMailPushItems(
+  ...groups: InboundMailPushItem[][]
 ): InboundMailPushItem[] {
-  const mailboxRoleById = new Map(
-    sync.mailbox.records.map((mailbox) => [
-      mailbox.id,
-      mailbox.role?.trim().toLowerCase() ?? null,
-    ]),
-  );
-  const emailById = new Map(
-    sync.email.records.map((record) => [record.id, record]),
-  );
-
-  return sync.email.created.flatMap((createdId) => {
-    const record = emailById.get(createdId);
-    if (!record || record.keywords?.$draft === true) {
-      return [];
+  const byId = new Map<string, InboundMailPushItem>();
+  for (const group of groups) {
+    for (const item of group) {
+      const emailId = item.emailId.trim();
+      if (!emailId) continue;
+      const existing = byId.get(emailId);
+      if (!existing) {
+        byId.set(emailId, { ...item, emailId });
+        continue;
+      }
+      byId.set(emailId, {
+        emailId,
+        subject: existing.subject ?? item.subject,
+        fromName: existing.fromName ?? item.fromName,
+      });
     }
-
-    const roles: Array<string | null> = [];
-    for (const [mailboxId, included] of Object.entries(
-      record.mailboxIds ?? {},
-    )) {
-      if (!included) continue;
-      roles.push(mailboxRoleById.get(mailboxId) ?? null);
-    }
-
-    if (
-      roles.length === 0 ||
-      roles.every((role) => role !== null && SKIP_MAILBOX_ROLES.has(role))
-    ) {
-      return [];
-    }
-
-    return [
-      {
-        emailId: createdId,
-        subject: sanitizeNotificationDisplayTitle(record.subject),
-        fromName: sanitizeNotificationDisplayTitle(record.from?.[0]?.name),
-      },
-    ];
-  });
+  }
+  return [...byId.values()];
 }
 
 export function coalescePendingMailSync(
@@ -118,5 +95,43 @@ export function coalescePendingMailSync(
         ...next.calendarImport.errors,
       ]),
     },
+  };
+}
+
+export function isEmailAddressForPush(
+  value: string | null | undefined,
+): boolean {
+  const trimmed = value?.trim();
+  return Boolean(
+    trimmed && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed),
+  );
+}
+
+export function mergeInboundMailPushMetadata(
+  item: InboundMailPushItem,
+  metadata: InboundMailPushItem,
+): InboundMailPushItem {
+  const fromName = isEmailAddressForPush(item.fromName)
+    ? (metadata.fromName ?? item.fromName)
+    : (item.fromName ?? metadata.fromName);
+
+  return {
+    emailId: metadata.emailId,
+    subject: item.subject ?? metadata.subject,
+    fromName,
+  };
+}
+
+export function inboundPushItemFromEmailRecord(record: {
+  id: string;
+  subject?: string | null;
+  from?: Array<{ email: string; name?: string | null }>;
+}): InboundMailPushItem {
+  return {
+    emailId: record.id,
+    subject: sanitizeNotificationDisplayTitle(record.subject),
+    fromName:
+      sanitizeNotificationDisplayTitle(record.from?.[0]?.name) ??
+      sanitizeNotificationDisplayTitle(record.from?.[0]?.email),
   };
 }

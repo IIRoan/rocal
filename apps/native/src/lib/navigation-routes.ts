@@ -12,6 +12,14 @@ export const SETTINGS_NOTIFICATIONS_ROUTE = "/settings/notifications";
 export const CALENDAR_TAB_ROUTE = "/(tabs)/calendar";
 export const MAIL_TAB_ROUTE = "/(tabs)/mail";
 
+export function eventDetailRoute(eventId: string): string {
+  return `/event/${eventId}`;
+}
+
+export function mailMessageRoute(messageId: string): string {
+  return `${MAIL_TAB_ROUTE}/message/${encodeURIComponent(messageId)}`;
+}
+
 /** Native stack defaults — interactive swipe-back (iOS full-screen gesture). */
 export const NATIVE_STACK_SCREEN_OPTIONS = {
   headerShown: false,

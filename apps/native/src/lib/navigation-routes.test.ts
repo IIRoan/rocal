@@ -1,6 +1,8 @@
 import {
   CALENDAR_TAB_ROUTE,
   MAIL_TAB_ROUTE,
+  eventDetailRoute,
+  mailMessageRoute,
   NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS,
   NATIVE_STACK_SCREEN_OPTIONS,
   isCalendarRouteSegments,
@@ -12,6 +14,8 @@ describe("navigation-routes", () => {
   it("keeps the internal tab routes stable", () => {
     expect(CALENDAR_TAB_ROUTE).toBe("/(tabs)/calendar");
     expect(MAIL_TAB_ROUTE).toBe("/(tabs)/mail");
+    expect(eventDetailRoute("evt-1")).toBe("/event/evt-1");
+    expect(mailMessageRoute("em-1")).toBe("/(tabs)/mail/message/em-1");
   });
 
   it("marks calendar and mail segments correctly", () => {

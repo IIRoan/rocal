@@ -32,11 +32,15 @@ import { accountRoutes } from "./routes/account";
 import { inviteRoutes } from "./routes/invites";
 import { mailAccountRoutes } from "./routes/mail-account";
 import { mailRoutes } from "./routes/mail";
-import { mailSyncRoutes } from "./routes/mail-sync";
+import { mailSyncRoutes, defaultMailSyncService } from "./routes/mail-sync";
 import {
   defaultMailRealtimeService,
   realtimeMailRoutes,
 } from "./routes/realtime-mail";
+import { createStalwartWebhookRoutes } from "./routes/stalwart-webhook";
+import { createStalwartAdminClient } from "./lib/stalwart-admin";
+import { StalwartWebhookService } from "./services/stalwart-webhook.service";
+import { prisma } from "./lib/prisma";
 import { handleApiError } from "./lib/errors";
 import { errorLogDetails } from "./lib/log-sanitization";
 import { requestContext } from "./lib/request-context";
@@ -451,6 +455,14 @@ export const createAPI = (prefix = "") => {
     .use(mailAccountRoutes)
     .use(mailSyncRoutes)
     .use(realtimeMailRoutes)
+    .use(
+      createStalwartWebhookRoutes(
+        new StalwartWebhookService({
+          prisma,
+          mailSyncService: defaultMailSyncService,
+        }),
+      ),
+    )
     .use(accountPublicRoutes)
     .use(accountRoutes)
     .use(inviteRoutes);
@@ -489,4 +501,18 @@ app.listen(port, () => {
     cookieSameSite: process.env.AUTH_COOKIE_SAME_SITE || "lax",
     nodeEnv: process.env.NODE_ENV || "development",
   });
+
+  if (env.stalwartWebhookSecret && env.stalwartAdminToken) {
+    void createStalwartAdminClient()
+      .ensureMailIngestWebhook({
+        url: env.stalwartWebhookUrl,
+        secret: env.stalwartWebhookSecret,
+      })
+      .catch((error) => {
+        logger.warn("Failed to ensure Stalwart mail ingest webhook", {
+          message:
+            error instanceof Error ? error.message : "Unknown webhook error",
+        });
+      });
+  }
 });

@@ -66,6 +66,10 @@ export interface StalwartAdminClientLike {
     secret: string;
   }): Promise<void>;
   deleteAccount(accountId: string): Promise<void>;
+  ensureMailIngestWebhook(input: {
+    url: string;
+    secret: string;
+  }): Promise<void>;
   resolveAccountIdByMailbox(input: {
     localPart: string;
     domainId: string;
@@ -653,7 +657,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
                 expiresAt: null,
                 allowedIps:
                   typeof passwordCredential.allowedIps === "object" &&
-                  passwordCredential.allowedIps !== null
+                    passwordCredential.allowedIps !== null
                     ? passwordCredential.allowedIps
                     : {},
               },
@@ -788,10 +792,10 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
 
     type AuthCodeResponse =
       | {
-          type: "authenticated";
-          clientCode?: string;
-          client_code?: string;
-        }
+        type: "authenticated";
+        clientCode?: string;
+        client_code?: string;
+      }
       | { type: "failure" }
       | { type: "mfaRequired" }
       | Record<string, unknown>;
@@ -838,12 +842,12 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
       .json()
       .catch(() => null)) as
       | {
-          access_token?: string;
-          expires_in?: number;
-          expires_at?: number;
-          refresh_token?: string;
-          error?: string;
-        }
+        access_token?: string;
+        expires_in?: number;
+        expires_at?: number;
+        refresh_token?: string;
+        error?: string;
+      }
       | null;
 
     if (!tokenResponse.ok || !tokenPayload?.access_token) {
@@ -1054,7 +1058,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     if (updateError) {
       throw new Error(
         updateError.description ||
-          "Stalwart public-key update failed during recovery.",
+        "Stalwart public-key update failed during recovery.",
       );
     }
 
@@ -1136,6 +1140,153 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
         "Stalwart encryption-at-rest update was not acknowledged.",
       );
     }
+  }
+
+  async ensureMailIngestWebhook(input: {
+    url: string;
+    secret: string;
+  }): Promise<void> {
+    const webhookId = "solace-inbound-mail";
+    const queryEnvelope = await this.postJmap([["x:WebHook/query", {}, "q1"]]);
+    const queryResult = this.getMethodResult<{
+      ids?: string[];
+    }>(queryEnvelope, "x:WebHook/query");
+    const existingIds = queryResult.ids ?? [];
+    const normalizedUrl = input.url.replace(/\/+$/, "");
+    const duplicateWebhookIds: string[] = [];
+    let existingWebhookId: string | null = null;
+
+    if (existingIds.length > 0) {
+      const getEnvelope = await this.postJmap([
+        ["x:WebHook/get", { ids: existingIds }, "g1"],
+      ]);
+      const existing = this.getMethodResult<{
+        list?: Array<{ id?: string; url?: string }>;
+      }>(getEnvelope, "x:WebHook/get");
+
+      for (const webhook of existing.list ?? []) {
+        const webhookUrl = webhook.url?.replace(/\/+$/, "");
+        if (webhookUrl !== normalizedUrl || !webhook.id) {
+          continue;
+        }
+        if (!existingWebhookId) {
+          existingWebhookId = webhook.id;
+          continue;
+        }
+        if (webhook.id !== existingWebhookId) {
+          duplicateWebhookIds.push(webhook.id);
+        }
+      }
+    }
+
+    if (!existingWebhookId && existingIds.includes(webhookId)) {
+      existingWebhookId = webhookId;
+    }
+
+    const webhookPayload = {
+      url: input.url,
+      enable: true,
+      events: { "message-ingest.ham": true },
+      eventsPolicy: "include",
+      level: "info",
+      throttle: 1000,
+      timeout: 30_000,
+      discardAfter: 300_000,
+      allowInvalidCerts: false,
+      lossy: false,
+      httpHeaders: { "X-Solace-Source": "solace-mail-ingest" },
+      httpAuth: { "@type": "Unauthenticated" },
+      signatureKey: {
+        "@type": "Value",
+        secret: input.secret,
+      },
+    };
+
+    const envelope = await this.postJmap([
+      [
+        "x:WebHook/set",
+        existingWebhookId
+          ? {
+            update: {
+              [existingWebhookId]: webhookPayload,
+            },
+          }
+          : {
+            create: {
+              [webhookId]: webhookPayload,
+            },
+          },
+        "s1",
+      ],
+    ]);
+
+    const result = this.getMethodResult<{
+      created?: Record<string, null>;
+      updated?: Record<string, null>;
+      notCreated?: Record<string, StalwartSetError>;
+      notUpdated?: Record<string, StalwartSetError>;
+    }>(envelope, "x:WebHook/set");
+
+    const createError = result.notCreated?.[webhookId];
+    const updateError = existingWebhookId
+      ? result.notUpdated?.[existingWebhookId]
+      : undefined;
+
+    if (createError || updateError) {
+      throw new Error(
+        createError?.description ||
+        updateError?.description ||
+        "Stalwart mail ingest webhook update failed.",
+      );
+    }
+
+    if (duplicateWebhookIds.length > 0) {
+      const destroyEnvelope = await this.postJmap([
+        [
+          "x:WebHook/set",
+          {
+            destroy: duplicateWebhookIds,
+          },
+          "d1",
+        ],
+      ]);
+      const destroyResult = this.getMethodResult<{
+        notDestroyed?: Record<string, StalwartSetError>;
+      }>(destroyEnvelope, "x:WebHook/set");
+      const destroyError = destroyResult.notDestroyed
+        ? Object.values(destroyResult.notDestroyed)[0]
+        : undefined;
+      if (destroyError) {
+        throw new Error(
+          destroyError.description ||
+          "Stalwart duplicate mail ingest webhook cleanup failed.",
+        );
+      }
+    }
+
+    await this.reloadSettings();
+
+    logger.info("Ensured Stalwart mail ingest webhook", {
+      webhookRef: logRef(existingWebhookId ?? webhookId),
+    });
+  }
+
+  private async reloadSettings(): Promise<void> {
+    const envelope = await this.postJmap([
+      [
+        "x:Action/set",
+        {
+          create: {
+            reload: {
+              "@type": "ReloadSettings",
+            },
+          },
+        },
+        "r1",
+      ],
+    ]);
+
+    this.getMethodResult(envelope, "x:Action/set");
   }
 
   async getSession(): Promise<StalwartJmapEnvelope> {
