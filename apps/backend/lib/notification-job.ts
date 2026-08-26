@@ -201,6 +201,10 @@ export function newMailPayload(
     kind: "new_mail",
     inboundCount,
   };
+  const emailId = details?.emailId?.trim();
+  if (emailId) {
+    payload.emailId = emailId;
+  }
   if (inboundCount === 1) {
     const subject = sanitizeNotificationDisplayTitle(details?.subject);
     if (subject) {
@@ -209,10 +213,6 @@ export function newMailPayload(
     const fromName = sanitizeNotificationDisplayTitle(details?.fromName);
     if (fromName) {
       payload.fromName = fromName;
-    }
-    const emailId = details?.emailId?.trim();
-    if (emailId) {
-      payload.emailId = emailId;
     }
   }
   return sanitizeNotificationJobPayload(payload);

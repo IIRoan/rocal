@@ -2,6 +2,10 @@ import { createLogger } from "@workspace/logger";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import { ForbiddenError, ValidationError } from "../lib/errors";
 import { errorLogDetails, logRef } from "../lib/log-sanitization";
+import {
+  inboundPushItemFromEmailRecord,
+  type InboundMailPushItem,
+} from "../lib/inbound-mail-push";
 import type {
   StalwartJmapAdminClientLike,
   StalwartJmapEnvelope,
@@ -22,6 +26,7 @@ const CORE_MAIL_CAPABILITIES = [
 ] as const;
 const MAIL_SYNC_CACHE_TTL_MS = 60_000;
 const RECENT_INBOUND_BACKUP_WINDOW_MS = 5 * 60 * 1000;
+const RECENT_INGEST_LOOKUP_WINDOW_MS = 2 * 60 * 1000;
 const EMAIL_HEADER_PROPERTIES = [
   "id",
   "threadId",
@@ -65,6 +70,7 @@ type JmapEmail = {
   cc?: Array<{ email: string; name?: string | null }>;
   bcc?: Array<{ email: string; name?: string | null }>;
   subject?: string | null;
+  messageId?: string[];
   receivedAt?: string;
   keywords?: Record<string, boolean>;
   bodyStructure?: MailCalendarIngestionEmail["bodyStructure"];
@@ -223,7 +229,7 @@ export class MailSyncService {
     private readonly mailCalendarIngestion: MailCalendarIngestionService = new MailCalendarIngestionService(
       prisma,
     ),
-  ) {}
+  ) { }
 
   private readCached<T>(
     cache: Map<string, CacheEntry<T>>,
@@ -390,6 +396,165 @@ export class MailSyncService {
 
     this.cacheAuthorizedDirectoryEntry(userId, entry);
     return [entry.stalwartAccountId];
+  }
+
+  async resolveIngestedJmapEmailId(
+    accountId: string,
+    input: {
+      documentId: string;
+      subject?: string | null;
+      messageId?: string | null;
+      fromEmail?: string | null;
+    },
+  ): Promise<string | null> {
+    const direct = await this.getEmailsWithProperties(
+      accountId,
+      [input.documentId],
+      EMAIL_HEADER_PROPERTIES,
+      false,
+    );
+    if (direct[0]?.id) {
+      return direct[0].id;
+    }
+
+    const byMessageId = await this.findIngestedEmailIdByMessageId(
+      accountId,
+      input.messageId,
+    );
+    if (byMessageId) {
+      return byMessageId;
+    }
+
+    if (input.subject?.trim()) {
+      const query = await this.callMethod<JmapQueryResponse>("Email/query", {
+        accountId,
+        filter: { text: input.subject.trim() },
+        sort: [{ property: "receivedAt", isAscending: false }],
+        limit: 5,
+      });
+      const ids = query.ids ?? [];
+      if (ids.length > 0) {
+        const emails = await this.getEmailsWithProperties(
+          accountId,
+          ids,
+          ["id", "subject", "receivedAt"],
+          false,
+        );
+        const normalizedSubject = input.subject.trim().toLowerCase();
+        const exact = emails.find(
+          (email) => email.subject?.trim().toLowerCase() === normalizedSubject,
+        );
+        return exact?.id ?? emails[0]?.id ?? null;
+      }
+    }
+
+    return this.findIngestedEmailIdByRecentDelivery(accountId, {
+      messageId: input.messageId,
+      fromEmail: input.fromEmail,
+    });
+  }
+
+  private async findIngestedEmailIdByRecentDelivery(
+    accountId: string,
+    input: {
+      messageId?: string | null;
+      fromEmail?: string | null;
+    },
+  ): Promise<string | null> {
+    const recent = await this.getRecentEmailsWithProperties(
+      accountId,
+      10,
+      [...EMAIL_HEADER_PROPERTIES, "messageId"],
+    );
+    const cutoff = Date.now() - RECENT_INGEST_LOOKUP_WINDOW_MS;
+    const recentWindow = recent.filter((email) => {
+      if (!email.receivedAt) {
+        return false;
+      }
+      return new Date(email.receivedAt).getTime() >= cutoff;
+    });
+    if (recentWindow.length === 0) {
+      return null;
+    }
+
+    const normalizedMessageId = input.messageId
+      ? this.normalizeMessageIdHeader(input.messageId)
+      : "";
+    if (normalizedMessageId) {
+      const byMessageId = recentWindow.find((email) =>
+        (email.messageId ?? []).some(
+          (candidate) =>
+            this.normalizeMessageIdHeader(candidate) === normalizedMessageId,
+        ),
+      );
+      if (byMessageId) {
+        return byMessageId.id;
+      }
+    }
+
+    const normalizedFromEmail = input.fromEmail?.trim().toLowerCase();
+    if (normalizedFromEmail) {
+      const bySender = recentWindow.find(
+        (email) =>
+          email.from?.[0]?.email?.trim().toLowerCase() === normalizedFromEmail,
+      );
+      if (bySender) {
+        return bySender.id;
+      }
+    }
+
+    return recentWindow[0]?.id ?? null;
+  }
+
+  private normalizeMessageIdHeader(value: string): string {
+    return value.trim().replace(/^<|>$/g, "").toLowerCase();
+  }
+
+  private async findIngestedEmailIdByMessageId(
+    accountId: string,
+    messageId: string | null | undefined,
+  ): Promise<string | null> {
+    const normalizedMessageId = messageId
+      ? this.normalizeMessageIdHeader(messageId)
+      : "";
+    if (!normalizedMessageId) {
+      return null;
+    }
+
+    const recent = await this.getRecentEmailsWithProperties(
+      accountId,
+      20,
+      [...EMAIL_HEADER_PROPERTIES, "messageId"],
+    );
+    for (const email of recent) {
+      const matches = (email.messageId ?? []).some(
+        (candidate) =>
+          this.normalizeMessageIdHeader(candidate) === normalizedMessageId,
+      );
+      if (matches) {
+        return email.id;
+      }
+    }
+
+    return null;
+  }
+
+  async getEmailPushMetadata(
+    accountId: string,
+    emailId: string,
+  ): Promise<InboundMailPushItem | null> {
+    const emails = await this.getEmailsWithProperties(
+      accountId,
+      [emailId],
+      EMAIL_HEADER_PROPERTIES,
+      false,
+    );
+    const record = emails[0];
+    if (!record) {
+      return null;
+    }
+
+    return inboundPushItemFromEmailRecord(record);
   }
 
   async syncKnownChangedAccounts(): Promise<MailReceiptSyncResult[]> {
@@ -576,18 +741,18 @@ export class MailSyncService {
 
     const changedTypes = [
       ...(emailChanges.created.length ||
-      emailChanges.updated.length ||
-      emailChanges.destroyed.length
+        emailChanges.updated.length ||
+        emailChanges.destroyed.length
         ? ["Email"]
         : []),
       ...(mailboxChanges.created.length ||
-      mailboxChanges.updated.length ||
-      mailboxChanges.destroyed.length
+        mailboxChanges.updated.length ||
+        mailboxChanges.destroyed.length
         ? ["Mailbox"]
         : []),
       ...(threadChanges.created.length ||
-      threadChanges.updated.length ||
-      threadChanges.destroyed.length
+        threadChanges.updated.length ||
+        threadChanges.destroyed.length
         ? ["Thread"]
         : []),
     ];
@@ -961,10 +1126,10 @@ export class MailSyncService {
         properties: [...properties],
         ...(fetchBodies
           ? {
-              fetchTextBodyValues: true,
-              fetchHTMLBodyValues: true,
-              fetchAllBodyValues: true,
-            }
+            fetchTextBodyValues: true,
+            fetchHTMLBodyValues: true,
+            fetchAllBodyValues: true,
+          }
           : {}),
       },
     );
@@ -983,6 +1148,24 @@ export class MailSyncService {
     });
     const ids = response.ids ?? [];
     return ids.length > 0 ? this.getEmails(accountId, ids) : [];
+  }
+
+  private async getRecentEmailsWithProperties(
+    accountId: string,
+    limit: number,
+    properties: readonly string[],
+  ): Promise<JmapEmail[]> {
+    const response = await this.callMethod<JmapQueryResponse>("Email/query", {
+      accountId,
+      sort: [{ property: "receivedAt", isAscending: false }],
+      limit,
+    });
+    const ids = response.ids ?? [];
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return this.getEmailsWithProperties(accountId, ids, properties, false);
   }
 
   private async getThreads(

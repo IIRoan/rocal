@@ -48,6 +48,7 @@ export const LOG_HASH_FIELD_KEYS = Object.freeze([
   "inviterName",
   "attendeeName",
   "localPart",
+  "emailId",
 ]);
 
 /**
