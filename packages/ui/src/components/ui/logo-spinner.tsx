@@ -20,7 +20,7 @@ const loadingMonthFormatter = new Intl.DateTimeFormat(undefined, {
 
 const loadingNowListeners = new Set<() => void>();
 let loadingNowClient: Date | null = null;
-let loadingNowIntervalId: ReturnType<typeof setInterval> | null = null;
+let loadingNowIntervalId: number | null = null;
 
 function subscribeLoadingNow(onStoreChange: () => void) {
   loadingNowListeners.add(onStoreChange);
