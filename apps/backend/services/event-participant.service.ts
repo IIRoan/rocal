@@ -21,7 +21,7 @@ import {
   EVENT_PARTICIPANT_USER_SELECT,
 } from "../lib/event-participants";
 import { buildEventInvitationEmail } from "../lib/auth-email";
-import { authEmailFrom, resend } from "../lib/email-client";
+import { authEmailFrom, mailer } from "../lib/email-client";
 import { sendEventInvitationEmail } from "../lib/event-invitation-delivery";
 import { createStalwartAdminClient } from "../lib/stalwart-admin";
 import { env } from "../lib/env";
@@ -113,21 +113,23 @@ export class EventParticipantService {
     if (emails.length === 0) {
       return [];
     }
-    const users = await client.user.findMany({
-      where: { email: { in: emails } },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-      },
-    });
-    const directoryEntries = await client.mailDirectoryEntry.findMany({
-      where: { email: { in: emails } },
-      select: {
-        email: true,
-        userId: true,
-      },
-    });
+    const [users, directoryEntries] = await Promise.all([
+      client.user.findMany({
+        where: { email: { in: emails } },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+        },
+      }),
+      client.mailDirectoryEntry.findMany({
+        where: { email: { in: emails } },
+        select: {
+          email: true,
+          userId: true,
+        },
+      }),
+    ]);
     const userByEmail = new Map(
       users.map((user) => [normalizeParticipantEmail(user.email), user]),
     );
@@ -216,59 +218,58 @@ export class EventParticipantService {
       changed = true;
     }
 
-    for (const participant of resolvedParticipants) {
-      const existingParticipant = existingByEmail.get(participant.email);
-      if (
-        existingParticipant &&
-        existingParticipant.userId === participant.userId &&
-        existingParticipant.displayName === participant.displayName &&
-        existingParticipant.role === participant.role &&
-        existingParticipant.status === participant.status
-      ) {
-        continue;
-      }
+    await Promise.all(
+      resolvedParticipants.map(async (participant) => {
+        const existingParticipant = existingByEmail.get(participant.email);
+        if (
+          existingParticipant &&
+          existingParticipant.userId === participant.userId &&
+          existingParticipant.displayName === participant.displayName &&
+          existingParticipant.role === participant.role &&
+          existingParticipant.status === participant.status
+        ) {
+          return;
+        }
 
-      await client.eventParticipant.upsert({
-        where: {
-          eventId_email: {
+        await client.eventParticipant.upsert({
+          where: {
+            eventId_email: {
+              eventId: input.eventId,
+              email: participant.email,
+            },
+          },
+          create: {
             eventId: input.eventId,
+            userId: participant.userId,
             email: participant.email,
+            displayName: participant.displayName,
+            role: participant.role,
+            status: participant.status,
+          },
+          update: {
+            userId: participant.userId,
+            displayName: participant.displayName,
+            role: participant.role,
+            status: participant.status,
+          },
+        });
+        changed = true;
+      }),
+    );
+
+    const [finalParticipants, sendPendingInvitations] = await Promise.all([
+      client.eventParticipant.findMany({
+        where: { eventId: input.eventId },
+        include: {
+          user: {
+            select: EVENT_PARTICIPANT_USER_SELECT,
           },
         },
-        create: {
-          eventId: input.eventId,
-          userId: participant.userId,
-          email: participant.email,
-          displayName: participant.displayName,
-          role: participant.role,
-          status: participant.status,
-        },
-        update: {
-          userId: participant.userId,
-          displayName: participant.displayName,
-          role: participant.role,
-          status: participant.status,
-        },
-      });
-      changed = true;
-    }
-
-    const finalParticipants = await client.eventParticipant.findMany({
-      where: { eventId: input.eventId },
-      include: {
-        user: {
-          select: EVENT_PARTICIPANT_USER_SELECT,
-        },
-      },
-    });
-
-    // Build the invitation-sending closure now (while we have the resolved data)
-    // but return it to the caller so emails are sent AFTER the DB transaction commits.
-    const sendPendingInvitations = await this.buildInvitationSender(
-      input,
-      resolvedParticipants,
-      existingByEmail,
-    );
+      }),
+      // Build the invitation-sending closure now (while we have the resolved data)
+      // but return it to the caller so emails are sent AFTER the DB transaction commits.
+      this.buildInvitationSender(input, resolvedParticipants, existingByEmail),
+    ]);
 
     return {
       changed,
@@ -364,7 +365,7 @@ export class EventParticipantService {
             from: authEmailFrom,
             message: invitationMessage,
             logger,
-            resendClient: resend,
+            mailerClient: mailer,
             adminClient,
             adminToken: env.stalwartAdminToken,
             resolveInternalMailbox: async (email) => {

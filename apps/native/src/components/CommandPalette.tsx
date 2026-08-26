@@ -26,6 +26,7 @@ import {
   CALENDAR_TAB_ROUTE,
   MAIL_TAB_ROUTE,
   SETTINGS_ROUTE,
+  SETTINGS_NOTIFICATIONS_ROUTE,
   isMailRouteSegments,
 } from "../lib/navigation-routes";
 import { useMailAccount } from "../lib/mail/use-mail";
@@ -179,6 +180,9 @@ export function CommandPalette() {
           break;
         case "open-settings":
           router.push(SETTINGS_ROUTE as never);
+          break;
+        case "open-notification-settings":
+          router.push(SETTINGS_NOTIFICATIONS_ROUTE as never);
           break;
       }
     },

@@ -22,6 +22,7 @@ import { useRecentContacts } from "../../../src/hooks/use-recent-contacts";
 import { extractRecentContactEntries } from "../../../src/lib/record-recent-contacts";
 import { useToast } from "../../../src/providers/ToastProvider";
 import { toastOperationWarnings } from "../../../src/lib/operation-warnings";
+import { persistEventReminderNotifications } from "../../../src/lib/event-reminder-notifications";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { EventForm } from "../../../src/components/event/EventForm";
@@ -100,16 +101,16 @@ export default function EventEditScreen() {
   // ─── Update mutation ───────────────────────────────────────────────────────
 
   const updateMutation = useMutation({
-    mutationFn: (data: CreateEventRequest) => {
-      if (scope) {
-        // Recurring event edit with scope
-        return calendarApiService.editRecurringEvent(id!, {
-          editScope: scope,
-          occurrenceDate,
-          updates: data,
-        });
-      }
-      return calendarApiService.updateEvent(id!, data);
+    mutationFn: async (data: CreateEventRequest) => {
+      const saved = scope
+        ? await calendarApiService.editRecurringEvent(id!, {
+            editScope: scope,
+            occurrenceDate,
+            updates: data,
+          })
+        : await calendarApiService.updateEvent(id!, data);
+      await persistEventReminderNotifications(saved.id, data);
+      return saved;
     },
     onSuccess: (savedEvent, variables) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });

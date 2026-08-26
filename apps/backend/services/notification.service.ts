@@ -10,6 +10,7 @@ import type {
 import { ValidationError, NotFoundError } from "../lib/errors";
 import { createLogger } from "@workspace/logger";
 import { NotificationCalculator } from "../lib/notification-calculator";
+import { firstNotificationDisplayTitle } from "../lib/notification-job";
 
 const logger = createLogger("backend:notification-service");
 
@@ -145,6 +146,7 @@ export class NotificationService implements INotificationService {
     userId: string,
     eventId: string,
     notifications: NotificationConfigInput[],
+    displayTitle?: string | null,
   ): Promise<NotificationUpdateResult> {
     const event = await this.validateEventOwnership(eventId, userId);
 
@@ -205,6 +207,7 @@ export class NotificationService implements INotificationService {
       notificationTimezone: string;
       isEnabled: boolean;
       isSent: boolean;
+      displayTitle: string | null;
       createdAt: Date;
       updatedAt: Date;
     }> = [];
@@ -213,6 +216,17 @@ export class NotificationService implements INotificationService {
       minutesBefore: number;
       reason: string;
     }> = [];
+
+    const existingReminder = await this.prisma.eventNotification.findFirst({
+      where: { eventId, displayTitle: { not: null } },
+      select: { displayTitle: true },
+      orderBy: { updatedAt: "desc" },
+    });
+    const reminderDisplayTitle = firstNotificationDisplayTitle(
+      displayTitle,
+      event.title,
+      existingReminder?.displayTitle,
+    );
 
     const now = new Date();
     const createdAt = now;
@@ -229,12 +243,12 @@ export class NotificationService implements INotificationService {
         continue;
       }
 
-      const schedule = NotificationCalculator.buildNotificationSchedule(
+      const schedule = NotificationCalculator.scheduleUpcomingReminder(
         event.start,
         config.minutesBefore,
         event.timezone,
       );
-      if (schedule.notificationTime <= now) {
+      if (!schedule) {
         skippedConfigurations.push({
           notificationType: config.notificationType,
           minutesBefore: config.minutesBefore,
@@ -254,6 +268,7 @@ export class NotificationService implements INotificationService {
         notificationTimezone: schedule.notificationTimezone,
         isEnabled: true,
         isSent: false,
+        displayTitle: reminderDisplayTitle,
         createdAt,
         updatedAt: createdAt,
       });

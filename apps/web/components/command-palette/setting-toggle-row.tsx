@@ -42,7 +42,7 @@ export function SettingToggleRow({
       role="switch"
       aria-checked={checked}
       onClick={onToggle}
-      className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:bg-accent/50 focus:outline-none"
+      className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:bg-accent/50 focus:outline-none"
     >
       <Icon className="size-4 text-muted-foreground shrink-0" />
       <div className="flex-1 min-w-0">

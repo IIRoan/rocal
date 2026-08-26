@@ -32,6 +32,7 @@ import {
 import { clearVaultCache } from "../lib/mail/mail-crypto";
 import { registerClearSession } from "../lib/session-clear";
 import { registerPasskeyStepUpRequired } from "../lib/passkey-step-up-required";
+import { unregisterNativePushDevice } from "../lib/push-notifications";
 
 const AUTH_STATUS_TIMEOUT_MS = 3_000;
 const AUTH_STATUS_RETRY_DELAYS_MS = [0, 150, 400] as const;
@@ -83,6 +84,8 @@ export interface AuthContextValue {
   registerPasskey: () => Promise<void>;
   /** Delete a passkey from the current account. */
   deletePasskey: (id: string) => Promise<void>;
+  /** Read the pending email/password sign-in password without clearing it. */
+  peekPendingAuthPassword: () => string | null;
   /** Retrieve and clear the pending email/password sign-in password. */
   consumePendingAuthPassword: () => string | null;
   /** Clear any pending email/password sign-in password. */
@@ -173,6 +176,10 @@ export function AuthProvider({
 
   const clearPendingAuthPassword = useCallback(() => {
     pendingAuthPasswordRef.current = null;
+  }, []);
+
+  const peekPendingAuthPassword = useCallback(() => {
+    return pendingAuthPasswordRef.current;
   }, []);
 
   const consumePendingAuthPassword = useCallback(() => {
@@ -312,6 +319,7 @@ export function AuthProvider({
 
   const signIn = useCallback(
     async (email: string, password: string) => {
+      setEmailPasswordAuthHints(password);
       let authData: unknown;
       try {
         const result = await authClient.signIn.email({ email, password });
@@ -340,6 +348,7 @@ export function AuthProvider({
           ?.trim()
           .toLowerCase();
         if (!recoveredSession?.data || recoveredEmail !== requestedEmail) {
+          resetAuthMethodHints();
           throw error;
         }
 
@@ -347,7 +356,6 @@ export function AuthProvider({
       }
 
       try {
-        setEmailPasswordAuthHints(password);
         await saveMailVaultPassword(password);
       } catch (error) {
         resetAuthMethodHints();
@@ -380,6 +388,7 @@ export function AuthProvider({
 
   const signUp = useCallback(
     async (name: string, email: string, password: string) => {
+      setEmailPasswordAuthHints(password);
       const result = await authClient.signUp.email({
         name,
         email,
@@ -387,6 +396,7 @@ export function AuthProvider({
       });
 
       if (result.error) {
+        resetAuthMethodHints();
         throw new Error(
           result.error.message ?? "Sign-up failed. Please try again.",
         );
@@ -394,7 +404,6 @@ export function AuthProvider({
 
       try {
         await finalizeAuthenticatedSession(result.data, "Sign-up");
-        setEmailPasswordAuthHints(password);
         await saveMailVaultPassword(password);
         setRequiresPasskeyStepUp(false);
       } catch (error) {
@@ -410,6 +419,7 @@ export function AuthProvider({
   );
 
   const signOut = useCallback(async () => {
+    await unregisterNativePushDevice();
     try {
       await authClient.signOut();
     } catch {
@@ -577,6 +587,7 @@ export function AuthProvider({
       registerPasskey,
       deletePasskey,
       consumePendingAuthPassword,
+      peekPendingAuthPassword,
       clearPendingAuthPassword,
     }),
     [
@@ -593,6 +604,7 @@ export function AuthProvider({
       registerPasskey,
       deletePasskey,
       consumePendingAuthPassword,
+      peekPendingAuthPassword,
       clearPendingAuthPassword,
     ],
   );

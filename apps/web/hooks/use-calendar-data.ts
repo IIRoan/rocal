@@ -141,6 +141,7 @@ export interface UseCalendarDataReturn {
   updateNotifications: (
     eventId: string,
     notifications: EventNotification[],
+    displayTitle?: string | null,
   ) => Promise<void>;
 }
 
@@ -364,7 +365,11 @@ export function useCalendarData(
   }, []);
 
   const updateNotifications = useCallback(
-    async (eventId: string, notifications: EventNotification[]) => {
+    async (
+      eventId: string,
+      notifications: EventNotification[],
+      displayTitle?: string | null,
+    ) => {
       try {
         const notificationData = notifications.map((n) => ({
           notificationType: n.notificationType,
@@ -374,6 +379,7 @@ export function useCalendarData(
         await calendarApiService.updateEventNotifications(
           eventId,
           notificationData,
+          { displayTitle },
         );
       } catch (error) {
         log.error("Failed to update event notifications:", error);

@@ -46,23 +46,29 @@ const mockMailSyncService = {
   })),
 };
 
-function createApp() {
-  return new Elysia({ normalize: false })
-    .use(errorHandler)
-    .use(createMailSyncRoutes(mockMailSyncService as any));
-}
-
 describe("mailSyncRoutes", () => {
   it("syncs mail changes for the authenticated user and requested account", async () => {
-    const response = await createApp().handle(
-      new Request("http://localhost/mail/sync?accountId=acct-1"),
-    );
+    const onInboundMail = jest.fn(async () => undefined);
+    const response = await new Elysia({ normalize: false })
+      .use(errorHandler)
+      .use(createMailSyncRoutes(mockMailSyncService as any, onInboundMail))
+      .handle(new Request("http://localhost/mail/sync?accountId=acct-1"));
 
     expect(response.status).toBe(200);
     expect(mockMailSyncService.syncForUser).toHaveBeenCalledWith({
       userId: "user-1",
       accountId: "acct-1",
     });
+    expect(onInboundMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: "acct-1",
+        userId: "user-1",
+        sync: expect.objectContaining({
+          accountId: "acct-1",
+          email: expect.objectContaining({ created: ["msg-1"] }),
+        }),
+      }),
+    );
     await expect(response.json()).resolves.toEqual(
       expect.objectContaining({
         accountId: "acct-1",

@@ -15,7 +15,8 @@ export type CommandActionId =
   | "open-calendar"
   | "open-mail"
   | "compose-mail"
-  | "open-settings";
+  | "open-settings"
+  | "open-notification-settings";
 
 export type CommandActionGroup = "Calendar" | "Mail" | "Navigation";
 
@@ -51,6 +52,13 @@ function buildMailCommandActions(): CommandAction[] {
       group: "Navigation",
       icon: "settings",
       keywords: ["preferences", "account", "options"],
+    },
+    {
+      id: "open-notification-settings",
+      label: "Notification settings",
+      group: "Navigation",
+      icon: "bell",
+      keywords: ["email", "push", "reminder", "alert", "iphone"],
     },
     {
       id: "open-calendar",
@@ -146,6 +154,13 @@ function buildCalendarCommandActions(): CommandAction[] {
       icon: "settings",
       keywords: ["preferences", "account", "options"],
     },
+    {
+      id: "open-notification-settings",
+      label: "Notification settings",
+      group: "Navigation",
+      icon: "bell",
+      keywords: ["email", "push", "reminder", "alert", "iphone"],
+    },
   ];
 }
 
@@ -177,10 +192,8 @@ export function groupCommandActions(
     scope === "mail"
       ? ["Mail", "Navigation"]
       : ["Calendar", "Mail", "Navigation"];
-  return order
-    .map((group) => ({
-      group,
-      actions: actions.filter((action) => action.group === group),
-    }))
-    .filter((section) => section.actions.length > 0);
+  return order.flatMap((group) => {
+    const grouped = actions.filter((action) => action.group === group);
+    return grouped.length > 0 ? [{ group, actions: grouped }] : [];
+  });
 }

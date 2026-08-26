@@ -51,6 +51,32 @@ function createSyncPayload(changedTypes: string[] = ["Email"]) {
   };
 }
 
+function createInboundSyncPayload() {
+  const payload = createSyncPayload(["Email"]);
+  return {
+    ...payload,
+    email: {
+      ...payload.email,
+      created: ["in-1"],
+      records: [
+        {
+          id: "in-1",
+          subject: "Lunch tomorrow",
+          from: [{ email: "sam@example.com", name: "Sam" }],
+          mailboxIds: { "mb-inbox": true },
+        },
+      ],
+    },
+    mailbox: {
+      ...payload.mailbox,
+      records: [{ id: "mb-inbox", name: "Inbox", role: "inbox" }],
+    },
+  };
+}
+
+const EVENT_SOURCE_URL =
+  "https://mail.example.com/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}";
+
 async function flushMicrotasks() {
   await Promise.resolve();
   await Promise.resolve();
@@ -310,6 +336,283 @@ describe("mail realtime service", () => {
     await flushMicrotasks();
 
     expect(syncAccount).toHaveBeenCalledTimes(2);
+  });
+
+  it("live-syncs EventSource changes and still notifies from a receipt snapshot", async () => {
+    jest.useFakeTimers();
+    const inboundSync = createInboundSyncPayload();
+    const emptySync = createSyncPayload(["Email"]);
+    const syncAccount = jest.fn(async () => ({
+      accountId: "acct-1",
+      changedTypes: ["Email"],
+      sync: emptySync,
+    }));
+    const onInboundMail = jest.fn(async () => undefined);
+    const service = new MailRealtimeService({
+      eventSourceUrl: EVENT_SOURCE_URL,
+      adminToken: "token-1",
+      notificationThrottleMs: 50,
+      syncProvider: {
+        syncKnownChangedAccounts: jest.fn(async () => []),
+        syncAccount,
+      },
+      onInboundMail,
+    });
+
+    (service as any).enqueueEvent({
+      type: "mail.changed",
+      accountId: "acct-1",
+      changedTypes: ["Email"],
+      receivedAt: "2026-05-13T09:00:00.000Z",
+      sync: inboundSync,
+    });
+    (service as any).enqueueEvent({
+      type: "mail.changed",
+      accountId: "acct-1",
+      changedTypes: ["Email"],
+      receivedAt: "2026-05-13T09:00:01.000Z",
+    });
+
+    await jest.advanceTimersByTimeAsync(50);
+    await flushMicrotasks();
+    service.stop();
+
+    expect(syncAccount).toHaveBeenCalledTimes(1);
+    expect(onInboundMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: "acct-1",
+        sync: expect.objectContaining({
+          email: expect.objectContaining({
+            created: ["in-1"],
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("live-syncs when EventSource arrives first, then keeps a later inbound snapshot", async () => {
+    jest.useFakeTimers();
+    const inboundSync = createInboundSyncPayload();
+    const emptySync = createSyncPayload(["Email"]);
+    const syncAccount = jest.fn(async () => ({
+      accountId: "acct-1",
+      changedTypes: ["Email"],
+      sync: emptySync,
+    }));
+    const onInboundMail = jest.fn(async () => undefined);
+    const service = new MailRealtimeService({
+      eventSourceUrl: EVENT_SOURCE_URL,
+      adminToken: "token-1",
+      notificationThrottleMs: 50,
+      syncProvider: {
+        syncKnownChangedAccounts: jest.fn(async () => []),
+        syncAccount,
+      },
+      onInboundMail,
+    });
+
+    (service as any).enqueueEvent({
+      type: "mail.changed",
+      accountId: "acct-1",
+      changedTypes: ["Email"],
+      receivedAt: "2026-05-13T09:00:00.000Z",
+    });
+    (service as any).enqueueEvent({
+      type: "mail.changed",
+      accountId: "acct-1",
+      changedTypes: ["Email"],
+      receivedAt: "2026-05-13T09:00:01.000Z",
+      sync: inboundSync,
+    });
+
+    await jest.advanceTimersByTimeAsync(50);
+    await flushMicrotasks();
+    service.stop();
+
+    expect(syncAccount).toHaveBeenCalledTimes(1);
+    expect(onInboundMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: "acct-1",
+        sync: expect.objectContaining({
+          email: expect.objectContaining({
+            created: ["in-1"],
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("does not replace an inbound snapshot with a later empty re-sync payload", async () => {
+    jest.useFakeTimers();
+    const inboundSync = createInboundSyncPayload();
+    const emptySync = createSyncPayload(["Email"]);
+    const onInboundMail = jest.fn(async () => undefined);
+    const syncAccount = jest.fn(async () => ({
+      accountId: "acct-1",
+      changedTypes: ["Email"],
+      sync: emptySync,
+    }));
+    const service = new MailRealtimeService({
+      eventSourceUrl: EVENT_SOURCE_URL,
+      adminToken: "token-1",
+      notificationThrottleMs: 50,
+      syncProvider: {
+        syncKnownChangedAccounts: jest.fn(async () => []),
+        syncAccount,
+      },
+      onInboundMail,
+    });
+
+    (service as any).enqueueEvent({
+      type: "mail.changed",
+      accountId: "acct-1",
+      changedTypes: ["Email"],
+      receivedAt: "2026-05-13T09:00:00.000Z",
+      sync: inboundSync,
+    });
+    (service as any).enqueueEvent({
+      type: "mail.changed",
+      accountId: "acct-1",
+      changedTypes: ["Email"],
+      receivedAt: "2026-05-13T09:00:01.000Z",
+      sync: emptySync,
+    });
+
+    await jest.advanceTimersByTimeAsync(50);
+    await flushMicrotasks();
+    service.stop();
+
+    expect(onInboundMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: "acct-1",
+        sync: expect.objectContaining({
+          email: expect.objectContaining({
+            created: ["in-1"],
+          }),
+        }),
+      }),
+    );
+    expect(syncAccount).not.toHaveBeenCalled();
+  });
+
+  it("merges inbound created emails from overlapping receipt-time snapshots", async () => {
+    jest.useFakeTimers();
+    const first = createInboundSyncPayload();
+    const second = {
+      ...createInboundSyncPayload(),
+      email: {
+        ...createInboundSyncPayload().email,
+        created: ["in-2"],
+        records: [
+          {
+            id: "in-2",
+            subject: "Dinner tomorrow",
+            from: [{ email: "sam@example.com", name: "Sam" }],
+            mailboxIds: { "mb-inbox": true },
+          },
+        ],
+      },
+    };
+    const onInboundMail = jest.fn(async () => undefined);
+    const service = new MailRealtimeService({
+      eventSourceUrl: EVENT_SOURCE_URL,
+      adminToken: "token-1",
+      notificationThrottleMs: 50,
+      onInboundMail,
+    });
+
+    (service as any).enqueueEvent({
+      type: "mail.changed",
+      accountId: "acct-1",
+      changedTypes: ["Email"],
+      receivedAt: "2026-05-13T09:00:00.000Z",
+      sync: first,
+    });
+    (service as any).enqueueEvent({
+      type: "mail.changed",
+      accountId: "acct-1",
+      changedTypes: ["Email"],
+      receivedAt: "2026-05-13T09:00:01.000Z",
+      sync: second,
+    });
+
+    await jest.advanceTimersByTimeAsync(50);
+    await flushMicrotasks();
+    service.stop();
+
+    expect(onInboundMail).toHaveBeenCalledTimes(1);
+    expect(onInboundMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: "acct-1",
+        sync: expect.objectContaining({
+          email: expect.objectContaining({
+            created: ["in-1", "in-2"],
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("notifies inbound mail from a cached snapshot even without web subscribers", async () => {
+    jest.useFakeTimers();
+    const inboundSync = createInboundSyncPayload();
+    const onInboundMail = jest.fn(async () => undefined);
+    const service = new MailRealtimeService({
+      eventSourceUrl: EVENT_SOURCE_URL,
+      adminToken: "token-1",
+      notificationThrottleMs: 50,
+      onInboundMail,
+    });
+
+    (service as any).enqueueEvent({
+      type: "mail.changed",
+      accountId: "acct-1",
+      changedTypes: ["Email"],
+      receivedAt: "2026-05-13T09:00:00.000Z",
+      sync: inboundSync,
+    });
+
+    await jest.advanceTimersByTimeAsync(50);
+    await flushMicrotasks();
+    service.stop();
+
+    expect(onInboundMail).toHaveBeenCalledWith({
+      accountId: "acct-1",
+      sync: inboundSync,
+    });
+  });
+
+  it("polls linked accounts and enqueues inbound mail from the fetched snapshot", async () => {
+    jest.useFakeTimers();
+    const inboundSync = createInboundSyncPayload();
+    const onInboundMail = jest.fn(async () => undefined);
+    const service = new MailRealtimeService({
+      eventSourceUrl: EVENT_SOURCE_URL,
+      adminToken: "",
+      notificationThrottleMs: 25,
+      receiptPollIntervalMs: 60_000,
+      syncProvider: {
+        syncKnownChangedAccounts: jest.fn(async () => [
+          {
+            accountId: "acct-1",
+            changedTypes: ["Email"],
+            sync: inboundSync,
+          },
+        ]),
+      },
+      onInboundMail,
+    });
+
+    service.start();
+    await flushMicrotasks();
+    await jest.advanceTimersByTimeAsync(25);
+    await flushMicrotasks();
+    service.stop();
+
+    expect(onInboundMail).toHaveBeenCalledWith({
+      accountId: "acct-1",
+      sync: inboundSync,
+    });
   });
 
   it("aborts the active EventSource listener when stopped", async () => {

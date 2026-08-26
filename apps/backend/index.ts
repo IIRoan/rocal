@@ -23,6 +23,7 @@ import { settingsRoutes } from "./routes/settings";
 import { recentContactsRoutes } from "./routes/recent-contacts";
 import { profilesRoutes } from "./routes/profiles";
 import { notificationsRoutes } from "./routes/notifications";
+import { pushDeviceRoutes } from "./routes/push-devices";
 import { recurringRoutes } from "./routes/recurring";
 import { subscriptionsRoute } from "./routes/subscriptions";
 import { calendarSharingRoutes } from "./routes/calendar-sharing";
@@ -443,6 +444,7 @@ export const createAPI = (prefix = "") => {
     .use(recentContactsRoutes)
     .use(profilesRoutes)
     .use(notificationsRoutes)
+    .use(pushDeviceRoutes)
     .use(recurringRoutes)
     .use(subscriptionsRoute)
     .use(mailRoutes)

@@ -115,7 +115,7 @@ describe("enc-password-cookie", () => {
       // fresh module instance via resetModules.
     });
 
-    it("restores the password and populates the sessionStorage-backed cache", async () => {
+    it("restores the password and populates the shared auth-password memory cache", async () => {
       await setEncPasswordCookie("session-password");
 
       // Grab the cookie and device key written above, then reset module state
@@ -172,7 +172,7 @@ describe("enc-password-cookie", () => {
       expect(localStorage.getItem("solace:enc-device-key")).toBeNull();
     });
 
-    it("calls clearAuthPasswords to wipe the sessionStorage-backed cache", async () => {
+    it("calls clearAuthPasswords to wipe the shared auth-password memory cache", async () => {
       await setEncPasswordCookie("pw");
       mockClearAuthPasswords.mockReset();
       clearEncPasswordCookie();

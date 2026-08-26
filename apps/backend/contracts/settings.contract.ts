@@ -20,6 +20,7 @@ export const updateSettingsBodySchema = strictZodObject({
   workingHoursEnd: z.number().int().min(0).max(1440).optional(),
   workingDays: z.string().optional(),
   emailNotifications: z.boolean().optional(),
+  pushNotifications: z.boolean().optional(),
   browserNotifications: z.boolean().optional(),
   reminderSound: z.boolean().optional(),
   eventEncryptionMode: eventEncryptionModeSchema.optional(),

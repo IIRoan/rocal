@@ -138,6 +138,7 @@ function createDefaultSettings(
     workingHoursEnd: 17,
     workingDays: "[1,2,3,4,5]",
     emailNotifications: true,
+    pushNotifications: true,
     browserNotifications: true,
     reminderSound: true,
     eventEncryptionMode: "hybrid",
@@ -244,6 +245,15 @@ describe("Setting changes - optimistic updates", () => {
       browserNotifications: false,
     });
     expect(updated.browserNotifications).toBe(false);
+  });
+
+  it("changes app push notifications independently", () => {
+    const updated = applyOptimisticUpdate(settings, {
+      pushNotifications: false,
+    });
+    expect(updated.pushNotifications).toBe(false);
+    expect(updated.emailNotifications).toBe(true);
+    expect(updated.browserNotifications).toBe(true);
   });
 
   it("applies multiple settings at once", () => {

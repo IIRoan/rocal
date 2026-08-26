@@ -161,7 +161,7 @@ describe("auth-email", () => {
       }),
     ).resolves.toEqual({
       delivered: false,
-      channel: "resend",
+      channel: "stalwart",
       reason: "Failed to send password update notification email. Try again later or contact support.",
     });
 
