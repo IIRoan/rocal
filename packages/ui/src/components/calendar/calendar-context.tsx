@@ -32,6 +32,8 @@ import {
 
 const log = createLogger("calendar-context");
 const EMPTY_CALENDARS: Calendar[] = [];
+const PRERENDER_CALENDAR_DATE = new Date(0);
+const subscribeNever = () => () => {};
 
 interface CalendarContextType {
   // Date management
@@ -117,6 +119,24 @@ function getBootstrapCalendarDate(): Date {
   }
 
   return new Date();
+}
+
+function getServerBootstrapCalendarDate(): Date {
+  return PRERENDER_CALENDAR_DATE;
+}
+
+function useBootstrapCalendarDate(): Date {
+  const clientDateRef = useRef<Date | null>(null);
+  const getClientSnapshot = useCallback(() => {
+    clientDateRef.current ??= getBootstrapCalendarDate();
+    return clientDateRef.current;
+  }, []);
+
+  return useSyncExternalStore(
+    subscribeNever,
+    getClientSnapshot,
+    getServerBootstrapCalendarDate,
+  );
 }
 
 function calendarListKey(calendars: Calendar[]): string {
@@ -240,9 +260,10 @@ export function CalendarProvider({
   onUpdateCalendar,
   onRefreshCalendars,
 }: CalendarProviderProps) {
-  const [currentDate, setCurrentDate] = useState<Date>(() =>
-    getBootstrapCalendarDate(),
-  );
+  const bootstrappedDate = useBootstrapCalendarDate();
+  const [overrideDate, setOverrideDate] = useState<Date | null>(null);
+  const currentDate = overrideDate ?? bootstrappedDate;
+
   const { currentView, setCurrentView } = useStoredCalendarView(defaultView);
   const { calendars, setCalendars, addLocalCalendar } =
     useCalendarList(initialCalendars);
@@ -398,12 +419,11 @@ export function CalendarProvider({
   );
 
   const setCurrentDateWithPersistence = useCallback((date: Date) => {
-    const validatedDate = validateCalendarDate(date);
-    setCurrentDate(validatedDate);
+    setOverrideDate(validateCalendarDate(date));
   }, []);
 
   const clearSavedDate = useCallback(() => {
-    setCurrentDate(new Date());
+    setOverrideDate(new Date());
   }, []);
 
   const value = useMemo(

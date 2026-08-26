@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { gsap } from "../../lib/gsap";
 import { cn } from "@workspace/ui/lib/utils";
 import { default as Logo } from "../layout/logo";
@@ -9,6 +9,56 @@ import { usePrefersReducedMotion } from "../../hooks/use-prefers-reduced-motion"
 import type { COMBINED_MESSAGES } from "../../constants/loading-messages";
 
 export const FORCE_LOADING_DESIGN_PREVIEW = false;
+
+const LOADING_NOW_TICK_MS = 60_000;
+const loadingWeekdayFormatter = new Intl.DateTimeFormat(undefined, {
+  weekday: "long",
+});
+const loadingMonthFormatter = new Intl.DateTimeFormat(undefined, {
+  month: "long",
+});
+
+const loadingNowListeners = new Set<() => void>();
+let loadingNowClient: Date | null = null;
+let loadingNowIntervalId: ReturnType<typeof setInterval> | null = null;
+
+function subscribeLoadingNow(onStoreChange: () => void) {
+  loadingNowListeners.add(onStoreChange);
+  loadingNowClient ??= new Date();
+  if (loadingNowIntervalId === null && typeof window !== "undefined") {
+    loadingNowIntervalId = window.setInterval(() => {
+      loadingNowClient = new Date();
+      loadingNowListeners.forEach((listener) => listener());
+    }, LOADING_NOW_TICK_MS);
+  }
+  return () => {
+    loadingNowListeners.delete(onStoreChange);
+    if (loadingNowListeners.size === 0) {
+      if (loadingNowIntervalId !== null) {
+        window.clearInterval(loadingNowIntervalId);
+        loadingNowIntervalId = null;
+      }
+      loadingNowClient = null;
+    }
+  };
+}
+
+function getLoadingNowClient(): Date {
+  loadingNowClient ??= new Date();
+  return loadingNowClient;
+}
+
+function getLoadingNowServer(): null {
+  return null;
+}
+
+function useLoadingNow(): Date | null {
+  return useSyncExternalStore(
+    subscribeLoadingNow,
+    getLoadingNowClient,
+    getLoadingNowServer,
+  );
+}
 
 function getLoadingDateParts(now: Date | null) {
   if (!now) {
@@ -21,16 +71,31 @@ function getLoadingDateParts(now: Date | null) {
   }
 
   return {
-    dayName: new Intl.DateTimeFormat(undefined, {
-      weekday: "long",
-    }).format(now),
+    dayName: loadingWeekdayFormatter.format(now),
     dayNum: now.getDate().toString().padStart(2, "0"),
-    monthName: new Intl.DateTimeFormat(undefined, {
-      month: "long",
-    }).format(now),
+    monthName: loadingMonthFormatter.format(now),
     year: now.getFullYear().toString(),
   };
 }
+
+const LOGO_SPINNER_SIZE_CLASSES = {
+  sm: "h-8 w-8",
+  md: "h-12 w-12",
+  lg: "h-16 w-16",
+  xl: "h-20 w-20",
+} as const;
+
+const LOGO_SPINNER_SHELL_CLASSES = {
+  sm: "h-12 w-12 rounded-xl",
+  md: "h-16 w-16 rounded-2xl",
+  lg: "h-20 w-20 rounded-[1.4rem]",
+  xl: "h-24 w-24 rounded-[1.75rem]",
+} as const;
+
+const INLINE_LOGO_SPINNER_SIZE_CLASSES = {
+  sm: "h-4 w-4",
+  md: "h-6 w-6",
+} as const;
 
 interface LogoSpinnerProps {
   size?: "sm" | "md" | "lg" | "xl";
@@ -60,20 +125,6 @@ export function LogoSpinner({
 
   // Use static text if provided, otherwise use cycling message
   const displayText = text || message;
-
-  const sizeClasses = {
-    sm: "h-8 w-8",
-    md: "h-12 w-12",
-    lg: "h-16 w-16",
-    xl: "h-20 w-20",
-  };
-
-  const shellClasses = {
-    sm: "h-12 w-12 rounded-xl",
-    md: "h-16 w-16 rounded-2xl",
-    lg: "h-20 w-20 rounded-[1.4rem]",
-    xl: "h-24 w-24 rounded-[1.75rem]",
-  };
 
   useEffect(() => {
     const logoNode = logoRef.current;
@@ -110,13 +161,13 @@ export function LogoSpinner({
       <div
         className={cn(
           "relative flex items-center justify-center overflow-hidden rounded-[1.4rem] border border-border/80 bg-card shadow-sm",
-          shellClasses[size],
+          LOGO_SPINNER_SHELL_CLASSES[size],
         )}
       >
         <div className="absolute inset-[8px] rounded-[inherit] border border-border/50" />
         <div ref={logoRef} className="relative">
           <Logo
-            className={cn("relative text-primary", sizeClasses[size])}
+            className={cn("relative text-primary", LOGO_SPINNER_SIZE_CLASSES[size])}
             fill="currentColor"
           />
         </div>
@@ -151,7 +202,7 @@ function LoadingBoard({
 }: LoadingBoardProps) {
   const sweepRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
-  const [now, setNow] = useState<Date>(() => new Date());
+  const now = useLoadingNow();
   const { message: cyclingMessage, isTransitioning } = useCyclingMessage({
     context: messageContext,
     enabled: enableCycling && !message,
@@ -159,22 +210,6 @@ function LoadingBoard({
 
   const displayText = message || cyclingMessage;
   const { dayName, dayNum, monthName, year } = getLoadingDateParts(now);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    setNow(new Date());
-
-    const intervalId = window.setInterval(() => {
-      setNow(new Date());
-    }, 60_000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, []);
 
   useEffect(() => {
     const sweepNode = sweepRef.current;
@@ -295,22 +330,23 @@ export function PageLoadingOverlay({
   fadeDurationMs = 300,
   priority = false,
 }: PageLoadingOverlayProps) {
-  const [visible, setVisible] = useState(isLoading);
+  const [stayMounted, setStayMounted] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const visible = isLoading || stayMounted;
 
   useEffect(() => {
     if (isLoading) {
-      setVisible(true);
+      setStayMounted(true);
       return;
     }
 
     if (prefersReducedMotion || fadeDurationMs <= 0) {
-      setVisible(false);
+      setStayMounted(false);
       return;
     }
 
     const timeoutId = window.setTimeout(() => {
-      setVisible(false);
+      setStayMounted(false);
     }, fadeDurationMs);
 
     return () => {
@@ -383,11 +419,6 @@ export function InlineLogoSpinner({
 
   const displayText = text || message;
 
-  const sizeClasses = {
-    sm: "h-4 w-4",
-    md: "h-6 w-6",
-  };
-
   useEffect(() => {
     const logoNode = logoRef.current;
 
@@ -422,7 +453,7 @@ export function InlineLogoSpinner({
     <div className={cn("flex items-center gap-2", className)}>
       <div ref={logoRef}>
         <Logo
-          className={cn("text-primary", sizeClasses[size])}
+          className={cn("text-primary", INLINE_LOGO_SPINNER_SIZE_CLASSES[size])}
           fill="currentColor"
         />
       </div>

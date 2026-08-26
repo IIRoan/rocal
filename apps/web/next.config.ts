@@ -16,7 +16,8 @@ const workspacePackages = [
 ] as const;
 
 const nextConfig: NextConfig = {
-  output: "export",
+  cacheComponents: true,
+  partialPrefetching: true,
   allowedDevOrigins: getAllowedNextDevOrigins(),
   reactCompiler: true,
   compiler: {

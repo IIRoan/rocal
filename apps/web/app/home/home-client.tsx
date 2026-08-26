@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { completeAuthNavigation } from "@/lib/auth-navigation";
@@ -27,11 +27,29 @@ const NAV_ITEMS = [
   },
 ];
 
+const subscribeNever = () => () => {};
+const getServerTimeOfDay = () => "";
+
 export function HomeAppClient() {
   const { data: session, isPending } = useSession();
   const router = useSmoothRouter();
   const prefersReducedMotion = usePrefersReducedMotion();
   const containerRef = useRef<HTMLDivElement>(null);
+  const timeOfDay = useSyncExternalStore(
+    subscribeNever,
+    getTimeOfDay,
+    getServerTimeOfDay,
+  );
+
+  const handleSignOut = () => {
+    void signOutAndClearLocalState()
+      .then(() => {
+        completeAuthNavigation("/login");
+      })
+      .catch(() => {
+        completeAuthNavigation("/login");
+      });
+  };
 
   useEffect(() => {
     if (!isPending && !session?.user) {
@@ -94,11 +112,7 @@ export function HomeAppClient() {
           <ThemeToggle />
           <button
             type="button"
-            onClick={() =>
-              void signOutAndClearLocalState().then(() => {
-                completeAuthNavigation("/login");
-              })
-            }
+            onClick={handleSignOut}
             className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
             aria-label="Sign out"
             title="Sign out"
@@ -113,7 +127,7 @@ export function HomeAppClient() {
         {/* Greeting */}
         <div data-home-greeting className="mb-10">
           <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">
-            Good{getTimeOfDay()}
+            Good{timeOfDay}
           </p>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
             {firstName}
@@ -127,7 +141,7 @@ export function HomeAppClient() {
               <li key={item.href} data-home-nav-item>
                 <Link
                   href={item.href}
-                  className="flex items-center justify-between py-4 group transition-colors hover:text-primary"
+                  className="flex items-center justify-between py-4 group transition-colors hover:text-primary cursor-pointer"
                 >
                   <div className="flex items-center gap-3.5">
                     <item.icon
