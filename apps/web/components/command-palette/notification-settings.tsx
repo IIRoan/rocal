@@ -15,6 +15,7 @@ import {
   formatPushDeviceLabel,
   formatPushDeviceLastSeen,
   getErrorMessage,
+  getPushDevicesListStatus,
   type PushDeviceSummary,
 } from "@workspace/calendar-core";
 import { calendarApiService } from "@/lib/calendar-api-service";
@@ -33,11 +34,13 @@ export function NotificationSettings({
 }: NotificationSettingsProps) {
   const [isSendingTest, setIsSendingTest] = useState(false);
   const queryClient = useQueryClient();
+  const appEnabled = localSettings.pushNotifications !== false;
 
   const devicesQuery = useQuery({
     queryKey: PUSH_DEVICES_QUERY_KEY,
     queryFn: () => calendarApiService.listPushDevices(),
     staleTime: 30_000,
+    enabled: appEnabled,
   });
 
   const handleSendTest = () => {
@@ -95,6 +98,12 @@ export function NotificationSettingsView({
   devicesError,
 }: NotificationSettingsViewProps) {
   const appEnabled = localSettings.pushNotifications !== false;
+  const devicesStatus = getPushDevicesListStatus({
+    appEnabled,
+    loading: devicesLoading,
+    error: devicesError,
+    deviceCount: devices.length,
+  });
 
   return (
     <div className="flex flex-col">
@@ -163,40 +172,47 @@ export function NotificationSettingsView({
           {PUSH_DEVICES_SECTION.label}
         </div>
         <div className="p-1">
-          {!appEnabled ? (
+          {devicesStatus === "paused" ? (
             <p className="px-3 py-2 text-xs text-muted-foreground leading-relaxed">
               {PUSH_DEVICES_SECTION.paused}
             </p>
           ) : null}
-          {devicesLoading ? (
+          {devicesStatus === "loading" ? (
             <p className="px-3 py-2 text-xs text-muted-foreground leading-relaxed">
               {PUSH_DEVICES_SECTION.loading}
             </p>
           ) : null}
-          {devicesError ? (
+          {devicesStatus === "error" ? (
             <p className="px-3 py-2 text-xs text-muted-foreground leading-relaxed">
               {PUSH_DEVICES_SECTION.error}
             </p>
           ) : null}
-          {!devicesLoading && !devicesError && devices.length === 0 ? (
+          {devicesStatus === "empty" ? (
             <p className="px-3 py-2 text-xs text-muted-foreground leading-relaxed">
               {PUSH_DEVICES_SECTION.empty}
             </p>
           ) : null}
-          {devices.map((device) => (
-            <div
-              key={device.id}
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2"
-            >
-              <Smartphone className="size-4 text-muted-foreground shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm">{formatPushDeviceLabel(device)}</div>
-                <div className="text-xs text-muted-foreground">
-                  {formatPushDeviceLastSeen(device.lastSeenAt)}
+          {devicesStatus === "ready"
+            ? devices.map((device) => (
+                <div
+                  key={device.id}
+                  className="flex w-full items-center gap-3 rounded-md px-3 py-2"
+                >
+                  <Smartphone className="size-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm">
+                      {formatPushDeviceLabel({
+                        platform: device.platform ?? "",
+                        bundleId: device.bundleId ?? "",
+                      })}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatPushDeviceLastSeen(device.lastSeenAt)}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
+              ))
+            : null}
         </div>
       </div>
     </div>

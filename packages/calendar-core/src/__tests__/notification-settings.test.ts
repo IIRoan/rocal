@@ -3,6 +3,7 @@ import {
   formatNotificationChannelsSummary,
   formatPushDeviceLabel,
   formatPushDeviceLastSeen,
+  getPushDevicesListStatus,
 } from "../notification-settings";
 import {
   SOLACE_IOS_DEV_BUNDLE_ID,
@@ -41,6 +42,54 @@ describe("formatNotificationChannelsSummary", () => {
         pushNotifications: false,
       }),
     ).toBe("Off");
+  });
+});
+
+describe("getPushDevicesListStatus", () => {
+  it("keeps paused exclusive of loading, error, empty, and ready", () => {
+    expect(
+      getPushDevicesListStatus({
+        appEnabled: false,
+        loading: true,
+        error: true,
+        deviceCount: 2,
+      }),
+    ).toBe("paused");
+  });
+
+  it("returns loading, error, empty, then ready when app notifications are on", () => {
+    expect(
+      getPushDevicesListStatus({
+        appEnabled: true,
+        loading: true,
+        error: false,
+        deviceCount: 0,
+      }),
+    ).toBe("loading");
+    expect(
+      getPushDevicesListStatus({
+        appEnabled: true,
+        loading: false,
+        error: true,
+        deviceCount: 0,
+      }),
+    ).toBe("error");
+    expect(
+      getPushDevicesListStatus({
+        appEnabled: true,
+        loading: false,
+        error: false,
+        deviceCount: 0,
+      }),
+    ).toBe("empty");
+    expect(
+      getPushDevicesListStatus({
+        appEnabled: true,
+        loading: false,
+        error: false,
+        deviceCount: 1,
+      }),
+    ).toBe("ready");
   });
 });
 
