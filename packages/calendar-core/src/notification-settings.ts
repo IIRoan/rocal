@@ -57,6 +57,31 @@ export function formatNotificationChannelsSummary(settings?: {
   return "Off";
 }
 
+export type PushDevicesListStatus =
+  | "paused"
+  | "loading"
+  | "error"
+  | "empty"
+  | "ready";
+
+export function getPushDevicesListStatus({
+  appEnabled,
+  loading,
+  error,
+  deviceCount,
+}: {
+  appEnabled: boolean;
+  loading: boolean;
+  error: boolean;
+  deviceCount: number;
+}): PushDevicesListStatus {
+  if (!appEnabled) return "paused";
+  if (loading) return "loading";
+  if (error) return "error";
+  if (deviceCount === 0) return "empty";
+  return "ready";
+}
+
 const SOLACE_DEV_BUNDLE_ID = SOLACE_IOS_DEV_BUNDLE_ID;
 
 export function formatPushDeviceLabel(device: {
