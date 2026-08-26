@@ -47,7 +47,7 @@ export default defineRailway(() => {
   const web = service("Solace NextJS", {
     source: rocal,
     build: "bun install && bun run build:web",
-    start: "cd apps/web && bunx serve out -p $PORT",
+    start: "cd apps/web && bun --bun next start -H 0.0.0.0 -p $PORT",
     healthcheck: "/",
     healthcheckTimeout: 300,
     replicas: { "europe-west4-drams3a": 1 },
