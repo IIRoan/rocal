@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Mail, Bell, ArrowLeft, Send } from "lucide-react";
+import { Mail, Bell, ArrowLeft, Send, Smartphone } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { UserSettings } from "@/lib/types/calendar";
 import {
@@ -7,9 +8,14 @@ import {
   APP_NOTIFICATION_WEB_HINT,
   EMAIL_REMINDER_SETTING,
   NOTIFICATION_SETTINGS_INTRO,
+  PUSH_DEVICES_QUERY_KEY,
+  PUSH_DEVICES_SECTION,
   TEST_NOTIFICATION_SETTING,
   TEST_NOTIFICATION_SUCCESS,
+  formatPushDeviceLabel,
+  formatPushDeviceLastSeen,
   getErrorMessage,
+  type PushDeviceSummary,
 } from "@workspace/calendar-core";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { SettingToggleRow } from "./setting-toggle-row";
@@ -26,7 +32,13 @@ export function NotificationSettings({
   goBack,
 }: NotificationSettingsProps) {
   const [isSendingTest, setIsSendingTest] = useState(false);
-  const appEnabled = localSettings.pushNotifications !== false;
+  const queryClient = useQueryClient();
+
+  const devicesQuery = useQuery({
+    queryKey: PUSH_DEVICES_QUERY_KEY,
+    queryFn: () => calendarApiService.listPushDevices(),
+    staleTime: 30_000,
+  });
 
   const handleSendTest = () => {
     if (isSendingTest) return;
@@ -35,6 +47,7 @@ export function NotificationSettings({
       .sendTestPushNotification()
       .then(() => {
         toast.success(TEST_NOTIFICATION_SUCCESS);
+        void queryClient.invalidateQueries({ queryKey: PUSH_DEVICES_QUERY_KEY });
       })
       .catch((error: unknown) => {
         toast.error(
@@ -45,6 +58,43 @@ export function NotificationSettings({
         setIsSendingTest(false);
       });
   };
+
+  return (
+    <NotificationSettingsView
+      localSettings={localSettings}
+      updateSetting={updateSetting}
+      goBack={goBack}
+      isSendingTest={isSendingTest}
+      onSendTest={handleSendTest}
+      devices={devicesQuery.data?.devices ?? []}
+      devicesLoading={devicesQuery.isLoading}
+      devicesError={devicesQuery.isError}
+    />
+  );
+}
+
+type NotificationSettingsViewProps = {
+  localSettings: UserSettings;
+  updateSetting: (key: keyof UserSettings, value: any) => void;
+  goBack: () => void;
+  isSendingTest: boolean;
+  onSendTest: () => void;
+  devices: PushDeviceSummary[];
+  devicesLoading: boolean;
+  devicesError: boolean;
+};
+
+export function NotificationSettingsView({
+  localSettings,
+  updateSetting,
+  goBack,
+  isSendingTest,
+  onSendTest,
+  devices,
+  devicesLoading,
+  devicesError,
+}: NotificationSettingsViewProps) {
+  const appEnabled = localSettings.pushNotifications !== false;
 
   return (
     <div className="flex flex-col">
@@ -96,7 +146,7 @@ export function NotificationSettings({
           </p>
           <button
             type="button"
-            onClick={handleSendTest}
+            onClick={onSendTest}
             disabled={!appEnabled || isSendingTest}
             className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -108,6 +158,45 @@ export function NotificationSettings({
               </div>
             </div>
           </button>
+        </div>
+        <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+          {PUSH_DEVICES_SECTION.label}
+        </div>
+        <div className="p-1">
+          {!appEnabled ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground leading-relaxed">
+              {PUSH_DEVICES_SECTION.paused}
+            </p>
+          ) : null}
+          {devicesLoading ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground leading-relaxed">
+              {PUSH_DEVICES_SECTION.loading}
+            </p>
+          ) : null}
+          {devicesError ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground leading-relaxed">
+              {PUSH_DEVICES_SECTION.error}
+            </p>
+          ) : null}
+          {!devicesLoading && !devicesError && devices.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground leading-relaxed">
+              {PUSH_DEVICES_SECTION.empty}
+            </p>
+          ) : null}
+          {devices.map((device) => (
+            <div
+              key={device.id}
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2"
+            >
+              <Smartphone className="size-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm">{formatPushDeviceLabel(device)}</div>
+                <div className="text-xs text-muted-foreground">
+                  {formatPushDeviceLastSeen(device.lastSeenAt)}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

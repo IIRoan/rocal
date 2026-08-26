@@ -1,3 +1,7 @@
+import {
+  SOLACE_IOS_DEV_BUNDLE_ID,
+  SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+} from "@workspace/calendar-core";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { hashPushToken } from "../../lib/push-token";
 import { PushDeviceService } from "../../services/push-device.service";
@@ -17,6 +21,15 @@ describe("PushDeviceService", () => {
     }),
   );
   const countDevices = jest.fn(async () => 1);
+  const findManyDevices = jest.fn(async () => [] as Array<{
+    id: string;
+    platform: string;
+    bundleId: string;
+    environment: string;
+    isEnabled: boolean;
+    lastSeenAt: Date;
+    createdAt: Date;
+  }>);
   const createJob = jest.fn(async (_args: unknown) => ({ id: "job-test-1" }));
 
   const prisma = {
@@ -26,6 +39,7 @@ describe("PushDeviceService", () => {
       delete: deleteOne,
       deleteMany,
       count: countDevices,
+      findMany: findManyDevices,
     },
     userSettings: {
       findUnique: findUniqueSettings,
@@ -44,10 +58,12 @@ describe("PushDeviceService", () => {
     deleteMany.mockClear();
     findUniqueSettings.mockClear();
     countDevices.mockClear();
+    findManyDevices.mockClear();
     createJob.mockClear();
     findUnique.mockResolvedValue(null);
     findUniqueSettings.mockResolvedValue({ pushNotifications: true });
     countDevices.mockResolvedValue(1);
+    findManyDevices.mockResolvedValue([]);
     createJob.mockResolvedValue({ id: "job-test-1" });
   });
 
@@ -56,7 +72,7 @@ describe("PushDeviceService", () => {
       userId: "user-1",
       token,
       platform: "ios",
-      bundleId: "onl.solace.mobile",
+      bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
       environment: "production",
     });
 
@@ -84,7 +100,7 @@ describe("PushDeviceService", () => {
       userId: "user-1",
       token,
       platform: "ios",
-      bundleId: "onl.solace.mobile.dev",
+      bundleId: SOLACE_IOS_DEV_BUNDLE_ID,
       environment: "sandbox",
     });
 
@@ -108,7 +124,7 @@ describe("PushDeviceService", () => {
       userId: "user-1",
       token,
       platform: "ios",
-      bundleId: "onl.solace.mobile.dev",
+      bundleId: SOLACE_IOS_DEV_BUNDLE_ID,
       environment: "sandbox",
     });
 
@@ -130,6 +146,49 @@ describe("PushDeviceService", () => {
     await expect(service.unregister({ userId: "user-1" })).resolves.toEqual({
       success: true,
       deletedCount: 3,
+    });
+  });
+
+  it("lists enabled devices without tokens", async () => {
+    const lastSeenAt = new Date("2026-08-26T10:00:00.000Z");
+    const createdAt = new Date("2026-08-01T10:00:00.000Z");
+    findManyDevices.mockResolvedValueOnce([
+      {
+        id: "dev-1",
+        platform: "ios",
+        bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+        environment: "production",
+        isEnabled: true,
+        lastSeenAt,
+        createdAt,
+      },
+    ]);
+
+    await expect(service.list({ userId: "user-1" })).resolves.toEqual({
+      devices: [
+        {
+          id: "dev-1",
+          platform: "ios",
+          bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+          environment: "production",
+          isEnabled: true,
+          lastSeenAt: lastSeenAt.toISOString(),
+          createdAt: createdAt.toISOString(),
+        },
+      ],
+    });
+    expect(findManyDevices).toHaveBeenCalledWith({
+      where: { userId: "user-1", isEnabled: true },
+      orderBy: { lastSeenAt: "desc" },
+      select: {
+        id: true,
+        platform: true,
+        bundleId: true,
+        environment: true,
+        isEnabled: true,
+        lastSeenAt: true,
+        createdAt: true,
+      },
     });
   });
 

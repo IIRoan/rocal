@@ -41,6 +41,7 @@ import type {
   RegisterPushDeviceRequest,
   PushDeviceRegistrationResult,
   PushDeviceUnregisterResult,
+  ListPushDevicesResult,
   PushTestNotificationResult,
   CreateSubscriptionRequest,
   UpdateSubscriptionRequest,
@@ -1027,6 +1028,14 @@ export class CalendarApiService {
       );
     } catch (error) {
       throw this.transformError(error, "Failed to register push device");
+    }
+  }
+
+  async listPushDevices(): Promise<ListPushDevicesResult> {
+    try {
+      return await this.client.get<ListPushDevicesResult>("/api/push/devices");
+    } catch (error) {
+      throw this.transformError(error, "Failed to list push devices");
     }
   }
 

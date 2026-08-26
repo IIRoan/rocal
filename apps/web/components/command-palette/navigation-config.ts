@@ -8,12 +8,18 @@ import {
   Clock,
   Mail,
   Bell,
+  Smartphone,
   Plus,
   Trash2,
   Users,
   Shield,
 } from "lucide-react";
-import { PRESET_COLOR_OPTIONS } from "@workspace/calendar-core";
+import {
+  APP_NOTIFICATION_SETTING,
+  EMAIL_REMINDER_SETTING,
+  PRESET_COLOR_OPTIONS,
+  PUSH_DEVICES_SECTION,
+} from "@workspace/calendar-core";
 import { BASE_SETTINGS_NAVIGATION_ITEMS } from "./base-navigation";
 
 // View labels for breadcrumb display
@@ -260,9 +266,9 @@ export const SEARCH_INDEX = [
   // Notification settings
   {
     id: "email-notifications",
-    label: "Email reminders",
+    label: EMAIL_REMINDER_SETTING.label,
     icon: Mail,
-    description: "Send event reminders to your inbox",
+    description: EMAIL_REMINDER_SETTING.description,
     targetView: "notifications",
     keywords: ["email", "notification", "alert", "reminder", "inbox", "mail"],
     parent: "notifications",
@@ -270,11 +276,21 @@ export const SEARCH_INDEX = [
   },
   {
     id: "app-notifications",
-    label: "App notifications",
+    label: APP_NOTIFICATION_SETTING.label,
     icon: Bell,
-    description: "Lock-screen alerts on iPhone for reminders and new mail",
+    description: APP_NOTIFICATION_SETTING.description,
     targetView: "notifications",
     keywords: ["push", "iphone", "lock screen", "app", "alert", "mail"],
+    parent: "notifications",
+    parentLabel: "Notifications",
+  },
+  {
+    id: "notification-devices",
+    label: PUSH_DEVICES_SECTION.label,
+    icon: Smartphone,
+    description: PUSH_DEVICES_SECTION.description,
+    targetView: "notifications",
+    keywords: ["device", "iphone", "push", "registered", "notifications"],
     parent: "notifications",
     parentLabel: "Notifications",
   },

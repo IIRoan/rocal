@@ -1,7 +1,13 @@
 import {
+  SOLACE_IOS_DEV_BUNDLE_ID,
+  SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+} from "@workspace/calendar-core";
+import {
   clearStoredPushToken,
+  extractPushTapData,
   invalidateQueriesForPushTap,
   mapPushNotificationToRoute,
+  normalizePushTapData,
   persistPushToken,
   registerNativePushDevice,
   resetPushRegistrationDedupeForTests,
@@ -42,6 +48,55 @@ jest.mock("expo-secure-store", () => ({
 }));
 
 describe("push notification routing", () => {
+  it("normalizes event and mail tap payloads", () => {
+    expect(normalizePushTapData({ t: "event", eid: "evt-1" })).toEqual({
+      t: "event",
+      eid: "evt-1",
+    });
+    expect(
+      normalizePushTapData({ t: "mail", emailId: "em-legacy" }),
+    ).toEqual({
+      t: "mail",
+      mid: "em-legacy",
+    });
+    expect(normalizePushTapData({ t: "unknown" })).toBeNull();
+  });
+
+  it("extracts tap data from expo-notifications body and trigger payload", () => {
+    expect(
+      extractPushTapData({
+        date: 0,
+        request: {
+          identifier: "notif-1",
+          content: {
+            data: { body: { t: "mail", mid: "em-1" } },
+          },
+          trigger: {
+            type: "push",
+            payload: {
+              aps: { alert: { title: "Sam", body: "Hello" } },
+              body: { t: "mail", mid: "em-1" },
+            },
+          },
+        },
+      } as never),
+    ).toEqual({ t: "mail", mid: "em-1" });
+
+    expect(
+      extractPushTapData({
+        date: 0,
+        request: {
+          identifier: "notif-2",
+          content: { data: {} },
+          trigger: {
+            type: "push",
+            payload: { t: "event", eid: "evt-legacy" },
+          },
+        },
+      } as never),
+    ).toEqual({ t: "event", eid: "evt-legacy" });
+  });
+
   it("maps event and mail taps to native routes", () => {
     expect(mapPushNotificationToRoute({ t: "event", eid: "evt-1" })).toBe(
       "/event/evt-1",
@@ -86,7 +141,7 @@ describe("push device registration", () => {
   const token = "a".repeat(64);
   const meta = {
     platform: "ios" as const,
-    bundleId: "onl.solace.mobile.dev" as const,
+    bundleId: SOLACE_IOS_DEV_BUNDLE_ID,
     environment: "sandbox" as const,
   };
 
@@ -102,29 +157,29 @@ describe("push device registration", () => {
     expect(
       resolvePushDeviceMeta({
         platform: "ios",
-        bundleId: "onl.solace.mobile.dev",
+        bundleId: SOLACE_IOS_DEV_BUNDLE_ID,
         appVariant: "development",
       }),
     ).toEqual({
       platform: "ios",
-      bundleId: "onl.solace.mobile.dev",
+      bundleId: SOLACE_IOS_DEV_BUNDLE_ID,
       environment: "sandbox",
     });
     expect(
       resolvePushDeviceMeta({
         platform: "ios",
-        bundleId: "onl.solace.mobile",
+        bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
         appVariant: "production",
       }),
     ).toEqual({
       platform: "ios",
-      bundleId: "onl.solace.mobile",
+      bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
       environment: "production",
     });
     expect(
       resolvePushDeviceMeta({
         platform: "android",
-        bundleId: "onl.solace.mobile",
+        bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
         appVariant: "production",
       }),
     ).toBeNull();

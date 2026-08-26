@@ -3,4 +3,5 @@
 // this must run before `expo-router/entry` pulls in mail-crypto / AuthProvider.
 // CommonJS `require` keeps that order; ESM `import` would hoist both modules.
 require("./src/lib/install-native-crypto");
+require("./src/lib/push-notification-handler").registerForegroundPushNotificationHandler();
 require("expo-router/entry");
