@@ -178,6 +178,14 @@ export const env = {
   /** Admin token used for Stalwart provisioning via JMAP registry methods. */
   stalwartAdminToken: process.env.STALWART_ADMIN_TOKEN || "",
 
+  /** Shared secret used to verify Stalwart telemetry webhook signatures. */
+  stalwartWebhookSecret: process.env.STALWART_WEBHOOK_SECRET?.trim() || "",
+
+  /** Optional override for the Stalwart mail-ingest webhook callback URL. */
+  stalwartWebhookUrl:
+    process.env.STALWART_WEBHOOK_URL?.trim() ||
+    `${process.env.BACKEND_URL || DEV_BACKEND_URL}/api/internal/stalwart/webhook`,
+
   /** OAuth client id used for hidden mail OAuth flows. */
   mailOauthClientId: resolvedMailOauthClientId,
 

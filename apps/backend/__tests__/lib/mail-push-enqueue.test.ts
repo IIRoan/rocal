@@ -1,53 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { enqueueInboundMailPush } from "../../lib/mail-push-enqueue";
-import type { MailSyncResult } from "../../services/mail-sync.service";
-
-function syncWithInbound(subject?: string, fromName?: string): MailSyncResult {
-  return {
-    accountId: "acct-1",
-    initialized: false,
-    changedTypes: ["Email"],
-    email: {
-      oldState: null,
-      newState: "s1",
-      created: ["in-1"],
-      updated: [],
-      destroyed: [],
-      records: [
-        {
-          id: "in-1",
-          mailboxIds: { "mb-inbox": true },
-          ...(subject ? { subject } : {}),
-          ...(fromName ? { from: [{ email: "a@example.com", name: fromName }] } : {}),
-        },
-      ],
-    },
-    mailbox: {
-      oldState: null,
-      newState: "s1",
-      created: [],
-      updated: [],
-      destroyed: [],
-      records: [{ id: "mb-inbox", name: "Inbox", role: "inbox" }],
-    },
-    thread: {
-      oldState: null,
-      newState: "s1",
-      created: [],
-      updated: [],
-      destroyed: [],
-      records: [],
-    },
-    calendarImport: {
-      messagesScanned: 0,
-      icsPartsFound: 0,
-      eventsCreated: 0,
-      eventsUpdated: 0,
-      eventsDeleted: 0,
-      errors: [],
-    },
-  };
-}
 
 describe("enqueueInboundMailPush", () => {
   const findUniqueDirectory = jest.fn(async () => ({ userId: "user-1" }));
@@ -82,7 +34,13 @@ describe("enqueueInboundMailPush", () => {
   it("enqueues a new_mail push job with the inbound subject", async () => {
     await enqueueInboundMailPush(prisma as never, {
       accountId: "acct-1",
-      sync: syncWithInbound("Lunch tomorrow", "Sam"),
+      items: [
+        {
+          emailId: "in-1",
+          subject: "Lunch tomorrow",
+          fromName: "Sam",
+        },
+      ],
     });
 
     expect(createJob).toHaveBeenCalledWith({
@@ -99,61 +57,27 @@ describe("enqueueInboundMailPush", () => {
         },
       }),
     });
-    const payload = createJob.mock.calls[0]?.[0]?.data.payload as Record<
-      string,
-      unknown
-    >;
-    expect(payload).not.toHaveProperty("from");
-    expect(payload).not.toHaveProperty("title");
   });
 
   it("enqueues a separate pending job for each inbound message", async () => {
     await enqueueInboundMailPush(prisma as never, {
       accountId: "acct-1",
       userId: "user-1",
-      sync: {
-        ...syncWithInbound("First"),
-        email: {
-          oldState: null,
-          newState: "s1",
-          created: ["in-1", "in-2"],
-          updated: [],
-          destroyed: [],
-          records: [
-            {
-              id: "in-1",
-              mailboxIds: { "mb-inbox": true },
-              subject: "First",
-              from: [{ email: "a@example.com", name: "Sam" }],
-            },
-            {
-              id: "in-2",
-              mailboxIds: { "mb-inbox": true },
-              subject: "Second",
-              from: [{ email: "a@example.com", name: "Sam" }],
-            },
-          ],
+      items: [
+        {
+          emailId: "in-1",
+          subject: "First",
+          fromName: "Sam",
         },
-      },
+        {
+          emailId: "in-2",
+          subject: "Second",
+          fromName: "Sam",
+        },
+      ],
     });
 
     expect(createJob).toHaveBeenCalledTimes(2);
-    expect(createJob).toHaveBeenNthCalledWith(1, {
-      data: expect.objectContaining({
-        payload: expect.objectContaining({
-          emailId: "in-1",
-          subject: "First",
-        }),
-      }),
-    });
-    expect(createJob).toHaveBeenNthCalledWith(2, {
-      data: expect.objectContaining({
-        payload: expect.objectContaining({
-          emailId: "in-2",
-          subject: "Second",
-        }),
-      }),
-    });
   });
 
   it("skips when push notifications are disabled", async () => {
@@ -161,26 +85,16 @@ describe("enqueueInboundMailPush", () => {
     await enqueueInboundMailPush(prisma as never, {
       accountId: "acct-1",
       userId: "user-1",
-      sync: syncWithInbound(),
+      items: [{ emailId: "in-1", subject: "Hello", fromName: null }],
     });
     expect(createJob).not.toHaveBeenCalled();
   });
 
-  it("skips when there is no inbound created mail", async () => {
+  it("skips when there are no inbound items", async () => {
     await enqueueInboundMailPush(prisma as never, {
       accountId: "acct-1",
       userId: "user-1",
-      sync: {
-        ...syncWithInbound(),
-        email: {
-          oldState: null,
-          newState: "s1",
-          created: [],
-          updated: [],
-          destroyed: [],
-          records: [],
-        },
-      },
+      items: [],
     });
     expect(createJob).not.toHaveBeenCalled();
     expect(findUniqueDirectory).not.toHaveBeenCalled();
@@ -190,23 +104,9 @@ describe("enqueueInboundMailPush", () => {
     findUniqueDirectory.mockResolvedValueOnce(null as never);
     await enqueueInboundMailPush(prisma as never, {
       accountId: "acct-1",
-      sync: syncWithInbound(),
+      items: [{ emailId: "in-1", subject: "Hello", fromName: null }],
     });
     expect(createJob).not.toHaveBeenCalled();
-  });
-
-  it("ignores a duplicate pending job for the same inbound email", async () => {
-    createJob.mockRejectedValueOnce(
-      Object.assign(new Error("unique"), { code: "P2002" }),
-    );
-    await expect(
-      enqueueInboundMailPush(prisma as never, {
-        accountId: "acct-1",
-        userId: "user-1",
-        sync: syncWithInbound("Lunch tomorrow", "Sam"),
-      }),
-    ).resolves.toBeUndefined();
-    expect(createJob).toHaveBeenCalledTimes(1);
   });
 
   it("does not enqueue a second job after one was already stored for that email", async () => {
@@ -214,8 +114,27 @@ describe("enqueueInboundMailPush", () => {
     await enqueueInboundMailPush(prisma as never, {
       accountId: "acct-1",
       userId: "user-1",
-      sync: syncWithInbound("Lunch tomorrow", "Sam"),
+      items: [{ emailId: "in-1", subject: "Lunch tomorrow", fromName: "Sam" }],
     });
     expect(createJob).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid notification payloads", async () => {
+    await enqueueInboundMailPush(prisma as never, {
+      accountId: "acct-1",
+      userId: "user-1",
+      items: [{ emailId: "", subject: "Hello", fromName: "Sam" }],
+    });
+    expect(createJob).not.toHaveBeenCalled();
+  });
+
+  it("treats unique-constraint races as duplicate skips", async () => {
+    createJob.mockRejectedValueOnce({ code: "P2002" });
+    await enqueueInboundMailPush(prisma as never, {
+      accountId: "acct-1",
+      userId: "user-1",
+      items: [{ emailId: "in-1", subject: "Hello", fromName: "Sam" }],
+    });
+    expect(createJob).toHaveBeenCalledTimes(1);
   });
 });

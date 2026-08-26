@@ -843,4 +843,135 @@ describe("StalwartAdminClient", () => {
 
     await expect(client.deleteAccount("acct-1")).resolves.toBeUndefined();
   });
+
+  it("creates the Solace inbound-mail webhook and reloads settings", async () => {
+    fetcher
+      .mockResolvedValueOnce(
+        jsonResponse({
+          methodResponses: [["x:WebHook/query", { ids: [] }, "q1"]],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          methodResponses: [
+            [
+              "x:WebHook/set",
+              {
+                created: { "solace-inbound-mail": { id: "hook-1" } },
+              },
+              "s1",
+            ],
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          methodResponses: [
+            ["x:Action/set", { created: { reload: { id: "reload-1" } } }, "r1"],
+          ],
+        }),
+      );
+
+    await client.ensureMailIngestWebhook({
+      url: "https://api.solace.onl/api/internal/stalwart/webhook",
+      secret: "shared-secret",
+    });
+
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    const setBody = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body ?? "{}"));
+    expect(setBody.methodCalls[0][1]).toEqual(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          "solace-inbound-mail": expect.objectContaining({
+            url: "https://api.solace.onl/api/internal/stalwart/webhook",
+            events: { "message-ingest.ham": true },
+            httpHeaders: { "X-Solace-Source": "solace-mail-ingest" },
+            signatureKey: {
+              "@type": "Value",
+              secret: "shared-secret",
+            },
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("updates an existing webhook by url and removes duplicates", async () => {
+    fetcher
+      .mockResolvedValueOnce(
+        jsonResponse({
+          methodResponses: [
+            ["x:WebHook/query", { ids: ["hook-1", "hook-2"] }, "q1"],
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          methodResponses: [
+            [
+              "x:WebHook/get",
+              {
+                list: [
+                  {
+                    id: "hook-1",
+                    url: "https://api.solace.onl/api/internal/stalwart/webhook",
+                  },
+                  {
+                    id: "hook-2",
+                    url: "https://api.solace.onl/api/internal/stalwart/webhook",
+                  },
+                ],
+              },
+              "g1",
+            ],
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          methodResponses: [
+            ["x:WebHook/set", { updated: { "hook-1": null } }, "s1"],
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          methodResponses: [
+            ["x:WebHook/set", { destroyed: ["hook-2"] }, "d1"],
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          methodResponses: [
+            ["x:Action/set", { created: { reload: { id: "reload-1" } } }, "r1"],
+          ],
+        }),
+      );
+
+    await client.ensureMailIngestWebhook({
+      url: "https://api.solace.onl/api/internal/stalwart/webhook/",
+      secret: "shared-secret",
+    });
+
+    const updateBody = JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(updateBody.methodCalls[0]).toEqual([
+      "x:WebHook/set",
+      {
+        update: {
+          "hook-1": expect.objectContaining({
+            url: "https://api.solace.onl/api/internal/stalwart/webhook/",
+          }),
+        },
+      },
+      "s1",
+    ]);
+
+    const destroyBody = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body ?? "{}"));
+    expect(destroyBody.methodCalls[0]).toEqual([
+      "x:WebHook/set",
+      { destroy: ["hook-2"] },
+      "d1",
+    ]);
+  });
 });

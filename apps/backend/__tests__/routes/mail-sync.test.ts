@@ -48,10 +48,9 @@ const mockMailSyncService = {
 
 describe("mailSyncRoutes", () => {
   it("syncs mail changes for the authenticated user and requested account", async () => {
-    const onInboundMail = jest.fn(async () => undefined);
     const response = await new Elysia({ normalize: false })
       .use(errorHandler)
-      .use(createMailSyncRoutes(mockMailSyncService as any, onInboundMail))
+      .use(createMailSyncRoutes(mockMailSyncService as any))
       .handle(new Request("http://localhost/mail/sync?accountId=acct-1"));
 
     expect(response.status).toBe(200);
@@ -59,16 +58,6 @@ describe("mailSyncRoutes", () => {
       userId: "user-1",
       accountId: "acct-1",
     });
-    expect(onInboundMail).toHaveBeenCalledWith(
-      expect.objectContaining({
-        accountId: "acct-1",
-        userId: "user-1",
-        sync: expect.objectContaining({
-          accountId: "acct-1",
-          email: expect.objectContaining({ created: ["msg-1"] }),
-        }),
-      }),
-    );
     await expect(response.json()).resolves.toEqual(
       expect.objectContaining({
         accountId: "acct-1",

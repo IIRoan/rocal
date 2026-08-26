@@ -493,21 +493,21 @@ describe("MailSyncService", () => {
                 methodName,
                 ids.length === 0
                   ? {
-                      state: "email-state-1",
-                      list: [],
-                    }
+                    state: "email-state-1",
+                    list: [],
+                  }
                   : {
-                      state: "email-state-1",
-                      list: [
-                        {
-                          id: "email-1",
-                          subject: "Google invite",
-                          bodyValues: {
-                            calendar: { value: "BEGIN:VCALENDAR" },
-                          },
+                    state: "email-state-1",
+                    list: [
+                      {
+                        id: "email-1",
+                        subject: "Google invite",
+                        bodyValues: {
+                          calendar: { value: "BEGIN:VCALENDAR" },
                         },
-                      ],
-                    },
+                      },
+                    ],
+                  },
                 "c1",
               ],
             ],
@@ -669,6 +669,151 @@ describe("MailSyncService", () => {
           bodyValues: { calendar: { value: "BEGIN:VCALENDAR" } },
         },
       ],
+    });
+  });
+
+  it("resolves ingested telemetry document ids via recent sender match", async () => {
+    const { jmapAdminClient, service } = createHarness();
+    const now = new Date();
+    const recentReceivedAt = now.toISOString();
+    const olderReceivedAt = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
+    jmapAdminClient.callJmap.mockImplementation(
+      async ({
+        methodCalls,
+      }: {
+        methodCalls: Array<[string, Record<string, unknown>, string]>;
+      }) => {
+        const [methodName, params] = methodCalls[0]!;
+
+        if (methodName === "Email/query") {
+          return {
+            methodResponses: [
+              [
+                methodName,
+                { ids: ["gcqaaabqw", "gcuaaabqv"] },
+                "c1",
+              ],
+            ],
+          };
+        }
+        if (methodName === "Email/get" && Array.isArray(params.ids)) {
+          const ids = params.ids as string[];
+          if (ids.includes("1558")) {
+            return {
+              methodResponses: [[methodName, { list: [] }, "c1"]],
+            };
+          }
+          return {
+            methodResponses: [
+              [
+                methodName,
+                {
+                  list: ids.map((id) => ({
+                    id,
+                    subject: id === "gcqaaabqw" ? "Re: 5142" : "Older",
+                    from: [{ email: "vanwesteropbroan@gmail.com", name: "Roan" }],
+                    receivedAt: id === "gcqaaabqw"
+                      ? recentReceivedAt
+                      : olderReceivedAt,
+                    messageId: ["<latest@example.com>"],
+                  })),
+                },
+                "c1",
+              ],
+            ],
+          };
+        }
+
+        throw new Error(`Unexpected JMAP method ${methodName}`);
+      },
+    );
+
+    await expect(
+      service.resolveIngestedJmapEmailId("acct-1", {
+        documentId: "1558",
+        fromEmail: "vanwesteropbroan@gmail.com",
+      }),
+    ).resolves.toBe("gcqaaabqw");
+  });
+
+  it("resolves ingested telemetry document ids via RFC Message-ID", async () => {
+    const { jmapAdminClient, service } = createHarness();
+    jmapAdminClient.callJmap.mockImplementation(
+      async ({
+        methodCalls,
+      }: {
+        methodCalls: Array<[string, Record<string, unknown>, string]>;
+      }) => {
+        const [methodName, params] = methodCalls[0]!;
+
+        if (methodName === "Email/query") {
+          return {
+            methodResponses: [[methodName, { ids: ["gceaaabqr"] }, "c1"]],
+          };
+        }
+        if (methodName === "Email/get" && Array.isArray(params.ids)) {
+          const ids = params.ids as string[];
+          if (ids.includes("1556")) {
+            return {
+              methodResponses: [[methodName, { list: [] }, "c1"]],
+            };
+          }
+          return {
+            methodResponses: [
+              [
+                methodName,
+                {
+                  list: ids.map((id) => ({
+                    id,
+                    subject: "Invoice attached",
+                    from: [{ email: "sam@example.com", name: "Sam Wilson" }],
+                    messageId: ["<abc@example.com>"],
+                  })),
+                },
+                "c1",
+              ],
+            ],
+          };
+        }
+
+        throw new Error(`Unexpected JMAP method ${methodName}`);
+      },
+    );
+
+    await expect(
+      service.resolveIngestedJmapEmailId("acct-1", {
+        documentId: "1556",
+        messageId: "abc@example.com",
+      }),
+    ).resolves.toBe("gceaaabqr");
+  });
+
+  it("loads email metadata for push enrichment", async () => {
+    const { jmapAdminClient, service } = createHarness();
+    jmapAdminClient.callJmap.mockResolvedValue({
+      methodResponses: [
+        [
+          "Email/get",
+          {
+            list: [
+              {
+                id: "in-1",
+                subject: "54321",
+                from: [{ email: "sam@example.com" }],
+              },
+            ],
+          },
+          "c1",
+        ],
+      ],
+    });
+
+    await expect(
+      service.getEmailPushMetadata("acct-1", "in-1"),
+    ).resolves.toEqual({
+      emailId: "in-1",
+      subject: "54321",
+      fromName: "sam@example.com",
     });
   });
 });

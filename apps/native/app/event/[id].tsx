@@ -5,11 +5,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { useSheet } from "../../src/providers/SheetProvider";
+import { CALENDAR_TAB_ROUTE } from "../../src/lib/navigation-routes";
 
 /**
  * Event detail screen — used for deep links (e.g. `solace://event/{id}`).
- * Opens the EventSheet in view mode immediately via the root-level provider.
- * When the sheet is dismissed the user stays on whatever screen was behind it.
+ * Opens the EventSheet in view mode immediately via the root-level provider
+ * and lands the user on the calendar so the sheet sits on the right surface.
  */
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -21,9 +22,7 @@ export default function EventDetailScreen() {
   useEffect(() => {
     if (id) {
       openEventSheet({ type: "view", eventId: id });
-      // Navigate back immediately — the sheet is rendered at root level
-      // so it stays visible even after this screen unmounts.
-      router.back();
+      router.replace(CALENDAR_TAB_ROUTE as never);
     }
   }, [id, openEventSheet, router]);
 

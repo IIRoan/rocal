@@ -3,12 +3,18 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { RegisterPushDeviceRequest } from "@workspace/calendar-core";
 import { calendarApiService } from "./api";
 import { SECURE_STORE_KEYS } from "./constants";
-import { MAIL_TAB_ROUTE } from "./navigation-routes";
+import {
+  CALENDAR_TAB_ROUTE,
+  eventDetailRoute,
+  MAIL_TAB_ROUTE,
+  mailMessageRoute,
+} from "./navigation-routes";
 import { QUERY_KEYS } from "./query-keys";
 
 export type PushTapData = {
   t?: unknown;
   eid?: unknown;
+  mid?: unknown;
 };
 
 export type PushDeviceMeta = Omit<RegisterPushDeviceRequest, "token">;
@@ -29,10 +35,11 @@ export function mapPushNotificationToRoute(data: PushTapData): string | null {
   const type = typeof data.t === "string" ? data.t : "";
   if (type === "event") {
     const eventId = typeof data.eid === "string" ? data.eid.trim() : "";
-    return eventId ? `/event/${eventId}` : null;
+    return eventId ? eventDetailRoute(eventId) : CALENDAR_TAB_ROUTE;
   }
   if (type === "mail") {
-    return MAIL_TAB_ROUTE;
+    const mailId = typeof data.mid === "string" ? data.mid.trim() : "";
+    return mailId ? mailMessageRoute(mailId) : MAIL_TAB_ROUTE;
   }
   return null;
 }
@@ -53,6 +60,12 @@ export function invalidateQueriesForPushTap(
     return;
   }
   if (type === "mail") {
+    const mailId = typeof data.mid === "string" ? data.mid.trim() : "";
+    if (mailId) {
+      void queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.mailMessage(mailId),
+      });
+    }
     void queryClient.invalidateQueries({ queryKey: ["mail", "messages"] });
   }
 }

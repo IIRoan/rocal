@@ -117,6 +117,8 @@ export default defineRailway(() => {
       EMAIL_FROM: preserve(),
       EMAIL_FROM_NAME: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
+      STALWART_WEBHOOK_SECRET: preserve(),
+      STALWART_WEBHOOK_URL: preserve(),
       STALWART_BASE_URL: preserve(),
       STALWART_DEFAULT_DOMAIN: preserve(),
       STALWART_JMAP_URL: preserve(),

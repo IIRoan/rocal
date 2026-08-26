@@ -80,6 +80,7 @@ function createMockAdminClient() {
       expires_at: 1779149999,
     })),
     deleteAccount: jest.fn(async () => undefined),
+    ensureMailIngestWebhook: jest.fn(async () => undefined),
     resolveAccountIdByMailbox: jest.fn(async () => null),
     resolveMailboxPublicKey: jest.fn<
       StalwartAdminClientLike["resolveMailboxPublicKey"]

@@ -10,7 +10,11 @@ import {
 } from "./push-notifications";
 import { calendarApiService } from "./api";
 import { SECURE_STORE_KEYS } from "./constants";
-import { MAIL_TAB_ROUTE } from "./navigation-routes";
+import {
+  CALENDAR_TAB_ROUTE,
+  MAIL_TAB_ROUTE,
+  mailMessageRoute,
+} from "./navigation-routes";
 
 jest.mock("./api", () => ({
   calendarApiService: {
@@ -42,8 +46,11 @@ describe("push notification routing", () => {
     expect(mapPushNotificationToRoute({ t: "event", eid: "evt-1" })).toBe(
       "/event/evt-1",
     );
+    expect(mapPushNotificationToRoute({ t: "mail", mid: "em-1" })).toBe(
+      mailMessageRoute("em-1"),
+    );
     expect(mapPushNotificationToRoute({ t: "mail" })).toBe(MAIL_TAB_ROUTE);
-    expect(mapPushNotificationToRoute({ t: "event" })).toBeNull();
+    expect(mapPushNotificationToRoute({ t: "event" })).toBe(CALENDAR_TAB_ROUTE);
     expect(mapPushNotificationToRoute({})).toBeNull();
   });
 
@@ -59,7 +66,13 @@ describe("push notification routing", () => {
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["events"] });
 
     invalidateQueries.mockClear();
-    invalidateQueriesForPushTap({ invalidateQueries } as never, { t: "mail" });
+    invalidateQueriesForPushTap(
+      { invalidateQueries } as never,
+      { t: "mail", mid: "em-1" },
+    );
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["mail", "message", "em-1"],
+    });
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["mail", "messages"],
     });

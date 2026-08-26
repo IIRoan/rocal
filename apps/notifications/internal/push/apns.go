@@ -35,6 +35,7 @@ type Notification struct {
 	CollapseID string
 	Type       string
 	EventID    string
+	EmailID    string
 }
 
 type Result struct {
@@ -82,19 +83,38 @@ func NewClient(keyID, teamID string, key *ecdsa.PrivateKey, httpClient *http.Cli
 	return &Client{keyID: keyID, teamID: teamID, key: key, http: httpClient}
 }
 
+func collapseID(prefix, id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return prefix
+	}
+	value := prefix + id
+	if len(value) <= 64 {
+		return value
+	}
+	return value[:64]
+}
+
 func MetadataPayload(n Notification) map[string]any {
-	payload := map[string]any{
-		"aps": map[string]any{
-			"alert": map[string]any{
-				"title": n.Alert.Title,
-				"body":  n.Alert.Body,
-			},
-			"sound": "default",
+	aps := map[string]any{
+		"alert": map[string]any{
+			"title": n.Alert.Title,
+			"body":  n.Alert.Body,
 		},
-		"t": n.Type,
+		"sound": "default",
+	}
+	if n.CollapseID != "" {
+		aps["thread-id"] = n.CollapseID
+	}
+	payload := map[string]any{
+		"aps": aps,
+		"t":   n.Type,
 	}
 	if n.EventID != "" {
 		payload["eid"] = n.EventID
+	}
+	if n.EmailID != "" {
+		payload["mid"] = n.EmailID
 	}
 	return payload
 }
@@ -113,15 +133,16 @@ func EventReminder(minutesBefore int, eventID, title string) Notification {
 	}
 	return Notification{
 		Alert:      Alert{Title: alertTitle, Body: body},
-		CollapseID: "event:" + eventID,
+		CollapseID: collapseID("event:", eventID),
 		Type:       "event",
 		EventID:    eventID,
 	}
 }
 
-func NewMail(count int, fromName, subject string) Notification {
+func NewMail(count int, fromName, subject, emailID string) Notification {
 	fromName = strings.TrimSpace(fromName)
 	subject = strings.TrimSpace(subject)
+	emailID = strings.TrimSpace(emailID)
 	title := "New email"
 	body := "You have a new message"
 	if count > 1 {
@@ -138,8 +159,9 @@ func NewMail(count int, fromName, subject string) Notification {
 	}
 	return Notification{
 		Alert:      Alert{Title: title, Body: body},
-		CollapseID: "mail",
+		CollapseID: collapseID("mail:", emailID),
 		Type:       "mail",
+		EmailID:    emailID,
 	}
 }
 

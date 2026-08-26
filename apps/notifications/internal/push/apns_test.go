@@ -25,16 +25,26 @@ func TestEventReminderUsesProvidedTitle(t *testing.T) {
 }
 
 func TestNewMailUsesSenderAndSubject(t *testing.T) {
-	payload := MetadataPayload(NewMail(1, "Sam Wilson", "Invoice attached"))
+	notification := NewMail(1, "Sam Wilson", "Invoice attached", "em-1")
+	payload := MetadataPayload(notification)
 	aps := payload["aps"].(map[string]any)
 	alert := aps["alert"].(map[string]any)
 	if alert["title"] != "Sam Wilson" || alert["body"] != "Invoice attached" {
 		t.Fatalf("unexpected alert %+v", alert)
 	}
+	if payload["t"] != "mail" || payload["mid"] != "em-1" {
+		t.Fatalf("unexpected payload %+v", payload)
+	}
+	if notification.CollapseID != "mail:em-1" {
+		t.Fatalf("unexpected collapse id %q", notification.CollapseID)
+	}
+	if aps["thread-id"] != "mail:em-1" {
+		t.Fatalf("unexpected thread-id %v", aps["thread-id"])
+	}
 }
 
 func TestNewMailFallsBackWithoutSender(t *testing.T) {
-	payload := MetadataPayload(NewMail(1, "", "Invoice attached"))
+	payload := MetadataPayload(NewMail(1, "", "Invoice attached", "em-2"))
 	aps := payload["aps"].(map[string]any)
 	alert := aps["alert"].(map[string]any)
 	if alert["title"] != "New email" || alert["body"] != "Invoice attached" {
@@ -43,11 +53,19 @@ func TestNewMailFallsBackWithoutSender(t *testing.T) {
 }
 
 func TestNewMailCollapsesMultipleMessages(t *testing.T) {
-	payload := MetadataPayload(NewMail(3, "Sam", "Invoice attached"))
+	payload := MetadataPayload(NewMail(3, "Sam", "Invoice attached", ""))
 	aps := payload["aps"].(map[string]any)
 	alert := aps["alert"].(map[string]any)
 	if alert["title"] != "New email" || alert["body"] != "3 new emails" {
 		t.Fatalf("unexpected alert %+v", alert)
+	}
+}
+
+func TestNewMailKeepsDistinctCollapseIDs(t *testing.T) {
+	first := NewMail(1, "Sam", "First", "em-1")
+	second := NewMail(1, "Sam", "Second", "em-2")
+	if first.CollapseID == second.CollapseID {
+		t.Fatalf("expected distinct collapse ids, got %q", first.CollapseID)
 	}
 }
 
@@ -77,7 +95,7 @@ func TestSendMarksUnregistered(t *testing.T) {
 		return http.DefaultTransport.RoundTrip(req)
 	})
 
-	result, err := client.Send(Device{Token: "abcd", BundleID: "onl.solace.mobile", Environment: "production"}, NewMail(1, "", ""))
+	result, err := client.Send(Device{Token: "abcd", BundleID: "onl.solace.mobile", Environment: "production"}, NewMail(1, "", "", "em-1"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +126,7 @@ func TestSendBadDeviceTokenIsNotUnregistered(t *testing.T) {
 		return http.DefaultTransport.RoundTrip(req)
 	})
 
-	result, err := client.Send(Device{Token: "abcd", BundleID: "onl.solace.mobile.dev", Environment: "sandbox"}, NewMail(1, "", ""))
+	result, err := client.Send(Device{Token: "abcd", BundleID: "onl.solace.mobile.dev", Environment: "sandbox"}, NewMail(1, "", "", "em-1"))
 	if err != nil {
 		t.Fatal(err)
 	}

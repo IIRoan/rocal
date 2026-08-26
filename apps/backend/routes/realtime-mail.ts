@@ -7,8 +7,6 @@ import { authenticatedRouteDetail } from "../lib/openapi";
 import { MailRealtimeService } from "../services/mail-realtime.service";
 import type { MailSyncService } from "../services/mail-sync.service";
 import { defaultMailSyncService } from "./mail-sync";
-import { prisma } from "../lib/prisma";
-import { enqueueInboundMailPush } from "../lib/mail-push-enqueue";
 import { logRef } from "../lib/log-sanitization";
 
 const logger = createLogger("backend:mail-sse");
@@ -19,9 +17,6 @@ export const defaultMailRealtimeService = new MailRealtimeService({
   adminToken: env.stalwartAdminToken,
   syncProvider: defaultMailSyncService,
   receiptPollIntervalMs: 10_000,
-  onInboundMail: async ({ accountId, userId, sync }) => {
-    await enqueueInboundMailPush(prisma, { accountId, userId, sync });
-  },
 });
 
 async function writeChunk(

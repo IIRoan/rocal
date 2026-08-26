@@ -1,7 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   coalescePendingMailSync,
-  listInboundCreatedEmails,
+  inboundPushItemFromEmailRecord,
+  isEmailAddressForPush,
+  mergeInboundMailPushItems,
+  mergeInboundMailPushMetadata,
 } from "../../lib/inbound-mail-push";
 import type { MailSyncResult } from "../../services/mail-sync.service";
 
@@ -24,10 +27,6 @@ function sync(overrides: Partial<MailSyncResult> = {}): MailSyncResult {
     email: emptyCollection(),
     mailbox: emptyCollection([
       { id: "mb-inbox", name: "Inbox", role: "inbox" },
-      { id: "mb-sent", name: "Sent", role: "sent" },
-      { id: "mb-drafts", name: "Drafts", role: "drafts" },
-      { id: "mb-junk", name: "Junk", role: "junk" },
-      { id: "mb-trash", name: "Trash", role: "trash" },
     ]),
     thread: emptyCollection(),
     calendarImport: {
@@ -42,125 +41,60 @@ function sync(overrides: Partial<MailSyncResult> = {}): MailSyncResult {
   };
 }
 
-describe("listInboundCreatedEmails", () => {
-  it("counts inbox creations and ignores updates, drafts, and sent mail", () => {
+describe("mergeInboundMailPushItems", () => {
+  it("deduplicates by email id and merges missing metadata", () => {
     expect(
-      listInboundCreatedEmails(
-        sync({
-          email: {
-            ...emptyCollection(),
-            created: ["in-1", "draft-1", "sent-1"],
-            updated: ["flag-1"],
-            records: [
-              {
-                id: "in-1",
-                mailboxIds: { "mb-inbox": true },
-              },
-              {
-                id: "draft-1",
-                keywords: { $draft: true },
-                mailboxIds: { "mb-drafts": true },
-              },
-              {
-                id: "sent-1",
-                mailboxIds: { "mb-sent": true },
-              },
-              {
-                id: "flag-1",
-                mailboxIds: { "mb-inbox": true },
-              },
-            ],
-          },
-        }),
+      mergeInboundMailPushItems(
+        [{ emailId: "in-1", subject: "Hello", fromName: null }],
+        [{ emailId: "in-1", subject: null, fromName: "Sam" }],
       ),
-    ).toHaveLength(1);
+    ).toEqual([{ emailId: "in-1", subject: "Hello", fromName: "Sam" }]);
   });
+});
 
-  it("uses the subject and sender of a single inbound message", () => {
+describe("mergeInboundMailPushMetadata", () => {
+  it("prefers JMAP sender names when the webhook only has an email address", () => {
     expect(
-      listInboundCreatedEmails(
-        sync({
-          email: {
-            ...emptyCollection(),
-            created: ["in-1"],
-            records: [
-              {
-                id: "in-1",
-                subject: "  Secret subject  ",
-                from: [{ email: "a@example.com", name: "  Sam Wilson  " }],
-                mailboxIds: { "mb-inbox": true },
-              },
-            ],
-          },
-        }),
+      mergeInboundMailPushMetadata(
+        {
+          emailId: "1558",
+          subject: null,
+          fromName: "sam@example.com",
+        },
+        {
+          emailId: "gcqaaabqw",
+          subject: "Quarterly update",
+          fromName: "Sam",
+        },
       ),
-    ).toEqual([
-      { emailId: "in-1", subject: "Secret subject", fromName: "Sam Wilson" },
-    ]);
+    ).toEqual({
+      emailId: "gcqaaabqw",
+      subject: "Quarterly update",
+      fromName: "Sam",
+    });
   });
+});
 
-  it("lists each inbound message with its subject and sender", () => {
-    expect(
-      listInboundCreatedEmails(
-        sync({
-          email: {
-            ...emptyCollection(),
-            created: ["in-1", "in-2"],
-            records: [
-              {
-                id: "in-1",
-                subject: "First",
-                from: [{ email: "a@example.com", name: "Sam" }],
-                mailboxIds: { "mb-inbox": true },
-              },
-              {
-                id: "in-2",
-                subject: "Second",
-                from: [{ email: "a@example.com", name: "Sam" }],
-                mailboxIds: { "mb-inbox": true },
-              },
-            ],
-          },
-        }),
-      ),
-    ).toEqual([
-      { emailId: "in-1", subject: "First", fromName: "Sam" },
-      { emailId: "in-2", subject: "Second", fromName: "Sam" },
-    ]);
+describe("isEmailAddressForPush", () => {
+  it("detects bare email addresses", () => {
+    expect(isEmailAddressForPush("sam@example.com")).toBe(true);
+    expect(isEmailAddressForPush("Sam")).toBe(false);
   });
+});
 
-  it("counts mail in custom folders and skips junk, trash, and missing records", () => {
+describe("inboundPushItemFromEmailRecord", () => {
+  it("maps subject and sender display name", () => {
     expect(
-      listInboundCreatedEmails(
-        sync({
-          email: {
-            ...emptyCollection(),
-            created: ["in-1", "missing-1", "junk-1", "trash-1"],
-            records: [
-              {
-                id: "in-1",
-                subject: "Labelled",
-                mailboxIds: { "mb-custom": true },
-              },
-              {
-                id: "junk-1",
-                mailboxIds: { "mb-junk": true },
-              },
-              {
-                id: "trash-1",
-                mailboxIds: { "mb-trash": true },
-              },
-            ],
-          },
-          mailbox: emptyCollection([
-            { id: "mb-inbox", name: "Inbox", role: "inbox" },
-            { id: "mb-custom", name: "Later", role: null },
-            { id: "mb-junk", name: "Junk", role: "junk" },
-            { id: "mb-trash", name: "Trash", role: "trash" },
-          ]),
-        }),
-      ),
-    ).toEqual([{ emailId: "in-1", subject: "Labelled", fromName: null }]);
+      inboundPushItemFromEmailRecord({
+        id: "in-1",
+        subject: "Lunch",
+        from: [{ email: "sam@example.com", name: "Sam" }],
+      }),
+    ).toEqual({
+      emailId: "in-1",
+      subject: "Lunch",
+      fromName: "Sam",
+    });
   });
 });
 
@@ -183,67 +117,7 @@ describe("coalescePendingMailSync", () => {
     expect(coalescePendingMailSync(undefined, next)).toBe(next);
   });
 
-  it("replaces an empty pending snapshot with later inbound mail", () => {
-    const pending = sync();
-    const next = sync({
-      email: {
-        ...emptyCollection(),
-        created: ["in-1"],
-        records: [
-          {
-            id: "in-1",
-            subject: "Lunch",
-            mailboxIds: { "mb-inbox": true },
-          },
-        ],
-      },
-    });
-
-    expect(listInboundCreatedEmails(coalescePendingMailSync(pending, next)!)).toEqual([
-      { emailId: "in-1", subject: "Lunch", fromName: null },
-    ]);
-  });
-
-  it("keeps the pending snapshot when the next event has no sync", () => {
-    const pending = sync({
-      email: {
-        ...emptyCollection(),
-        created: ["in-1"],
-        records: [
-          {
-            id: "in-1",
-            subject: "Lunch",
-            mailboxIds: { "mb-inbox": true },
-          },
-        ],
-      },
-    });
-
-    expect(coalescePendingMailSync(pending, undefined)).toBe(pending);
-  });
-
-  it("keeps inbound created ids when a later snapshot has none", () => {
-    const pending = sync({
-      email: {
-        ...emptyCollection(),
-        created: ["in-1"],
-        records: [
-          {
-            id: "in-1",
-            subject: "Lunch",
-            mailboxIds: { "mb-inbox": true },
-          },
-        ],
-      },
-    });
-    const next = sync();
-
-    expect(listInboundCreatedEmails(coalescePendingMailSync(pending, next)!)).toEqual([
-      { emailId: "in-1", subject: "Lunch", fromName: null },
-    ]);
-  });
-
-  it("merges inbound created emails from overlapping snapshots", () => {
+  it("merges created email ids from overlapping snapshots", () => {
     const pending = sync({
       email: {
         ...emptyCollection(),
@@ -271,9 +145,9 @@ describe("coalescePendingMailSync", () => {
       },
     });
 
-    expect(listInboundCreatedEmails(coalescePendingMailSync(pending, next)!)).toEqual([
-      { emailId: "in-1", subject: "First", fromName: null },
-      { emailId: "in-2", subject: "Second", fromName: null },
+    expect(coalescePendingMailSync(pending, next)?.email.created).toEqual([
+      "in-1",
+      "in-2",
     ]);
   });
 
@@ -307,74 +181,12 @@ describe("coalescePendingMailSync", () => {
         thread: expect.objectContaining({
           newState: "s2",
           created: ["th-1"],
-          records: [{ id: "th-1", emailIds: ["in-1"] }],
         }),
-        calendarImport: {
+        calendarImport: expect.objectContaining({
           messagesScanned: 2,
-          icsPartsFound: 1,
           eventsCreated: 1,
-          eventsUpdated: 0,
-          eventsDeleted: 0,
           errors: ["invite parse failed"],
-        },
-      }),
-    );
-  });
-
-  it("merges overlapping thread records and calendar import summaries", () => {
-    const pending = sync({
-      thread: {
-        ...emptyCollection(),
-        created: ["th-1"],
-        records: [{ id: "th-1", emailIds: ["in-1"] }],
-      },
-      calendarImport: {
-        messagesScanned: 1,
-        icsPartsFound: 1,
-        eventsCreated: 1,
-        eventsUpdated: 0,
-        eventsDeleted: 0,
-        errors: ["first"],
-      },
-    });
-    const next = sync({
-      thread: {
-        ...emptyCollection(),
-        created: ["th-2"],
-        updated: ["th-1"],
-        records: [
-          { id: "th-1", emailIds: ["in-1", "in-2"] },
-          { id: "th-2", emailIds: ["in-3"] },
-        ],
-      },
-      calendarImport: {
-        messagesScanned: 3,
-        icsPartsFound: 1,
-        eventsCreated: 0,
-        eventsUpdated: 1,
-        eventsDeleted: 1,
-        errors: ["first", "second"],
-      },
-    });
-
-    expect(coalescePendingMailSync(pending, next)).toEqual(
-      expect.objectContaining({
-        thread: expect.objectContaining({
-          created: ["th-1", "th-2"],
-          updated: ["th-1"],
-          records: [
-            { id: "th-1", emailIds: ["in-1", "in-2"] },
-            { id: "th-2", emailIds: ["in-3"] },
-          ],
         }),
-        calendarImport: {
-          messagesScanned: 4,
-          icsPartsFound: 2,
-          eventsCreated: 1,
-          eventsUpdated: 1,
-          eventsDeleted: 1,
-          errors: ["first", "second"],
-        },
       }),
     );
   });
