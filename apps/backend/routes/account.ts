@@ -20,17 +20,13 @@ export const accountRoutes = new Elysia({
 })
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Account"), (app) =>
-    app.delete(
-      "/",
-      async ({ routeUser }) => {
-        return accountService.deleteAccount({ userId: routeUser.id });
+    app.delete("/", {
+      detail: {
+        summary: "Delete the authenticated account",
+        description:
+          "Deletes the authenticated user account, linked Stalwart mailbox, and all related calendar/auth data.",
       },
-      {
-        detail: {
-          summary: "Delete the authenticated account",
-          description:
-            "Deletes the authenticated user account, linked Stalwart mailbox, and all related calendar/auth data.",
-        },
-      },
-    ),
+    }, async ({ routeUser }) => {
+      return accountService.deleteAccount({ userId: routeUser.id });
+    }),
   );

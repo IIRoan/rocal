@@ -1,4 +1,9 @@
-import { Elysia } from "elysia";
+import {
+  Elysia,
+  NotFound as ElysiaNotFound,
+  ParseError as ElysiaParseError,
+  ValidationError as ElysiaValidationError,
+} from "elysia";
 import { createLogger } from "@workspace/logger";
 import { resolveRequestId } from "./request-context";
 import {
@@ -178,7 +183,39 @@ function finishErrorResponse(
   return response;
 }
 
-// Error handling middleware — must be registered with `.onError(handleApiError)` on the
+function resolveErrorCode(
+  error: unknown,
+  explicitCode?: string | number,
+): string | number {
+  if (explicitCode !== undefined) {
+    return explicitCode;
+  }
+
+  if (error instanceof ElysiaValidationError) {
+    return "VALIDATION";
+  }
+
+  if (error instanceof ElysiaNotFound) {
+    return "NOT_FOUND";
+  }
+
+  if (error instanceof ElysiaParseError) {
+    return "PARSE";
+  }
+
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    (typeof error.code === "string" || typeof error.code === "number")
+  ) {
+    return error.code;
+  }
+
+  return "UNKNOWN";
+}
+
+// Error handling middleware — must be registered with `.error(handleApiError)` on the
 // root app *before* route definitions so thrown errors are formatted consistently.
 export function handleApiError({
   code,
@@ -186,17 +223,20 @@ export function handleApiError({
   set,
   request,
 }: {
-  code: string | number;
+  code?: string | number;
   error: unknown;
   set: {
     status?: number | string;
-    headers: Record<string, string | number | undefined>;
+    headers: {
+      [header: string]: string | number | string[] | undefined;
+    };
   };
   request: Request;
 }) {
     const timestamp = new Date().toISOString();
     const requestId = resolveRequestId(request);
     set.headers["x-request-id"] = requestId;
+    const resolvedCode = resolveErrorCode(error, code);
 
     const requestMeta = request
       ? {
@@ -208,13 +248,13 @@ export function handleApiError({
     const errorDetails = errorLogDetails(error);
     const logContext = {
       requestId,
-      code,
+      code: resolvedCode,
       ...requestMeta,
       ...errorDetails,
     };
 
     // Handle different error types
-    switch (code) {
+    switch (resolvedCode) {
       case "VALIDATION":
         set.status = 400;
         return finishErrorResponse(
@@ -450,7 +490,7 @@ export function handleApiError({
     }
 }
 
-/** @deprecated Prefer `.onError(handleApiError)` on the root app instance. */
-export const errorHandler = new Elysia({ name: "error-handler" }).onError(
+/** @deprecated Prefer `.error(handleApiError)` on the root app instance. */
+export const errorHandler = new Elysia({ name: "error-handler" }).error(
   handleApiError,
 );

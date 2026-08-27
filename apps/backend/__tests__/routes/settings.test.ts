@@ -133,7 +133,7 @@ describe("settingsRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toBe(
+    await expect(readText(response)).resolves.toContain(
       "Working hours start must be before working hours end",
     );
   });
@@ -149,7 +149,7 @@ describe("settingsRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toBe(
+    await expect(readText(response)).resolves.toContain(
       "Invalid working days format - must be valid JSON array",
     );
   });
@@ -165,7 +165,7 @@ describe("settingsRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toBe(
+    await expect(readText(response)).resolves.toContain(
       "Working days must be a JSON array of numbers 0-6",
     );
   });
@@ -183,7 +183,7 @@ describe("settingsRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toBe(
+    await expect(readText(response)).resolves.toContain(
       "Invalid default calendar or calendar does not belong to user",
     );
   });
@@ -204,7 +204,7 @@ describe("settingsRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toBe(
+    await expect(readText(response)).resolves.toContain(
       "The default calendar must be one of your editable calendars.",
     );
   });

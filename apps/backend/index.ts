@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { unauthorizedBody } from "./lib/api-error-response";
-import { cors } from "@elysiajs/cors";
-import { swagger } from "@elysiajs/swagger";
+import { cors } from "@elysia/cors";
 import {
   oauthProviderAuthServerMetadata,
   oauthProviderOpenIdConfigMetadata,
@@ -10,7 +9,6 @@ import { createLogger, installGlobalConsoleLogger } from "@workspace/logger";
 import {
   auth,
   ensureMailOAuthClients,
-  getAuthOpenApiDocumentation,
   isMailOauthEnabled,
 } from "./lib/auth";
 import { BETTER_AUTH_BASE_PATH } from "./lib/auth-constants";
@@ -45,18 +43,7 @@ import { handleApiError } from "./lib/errors";
 import { errorLogDetails } from "./lib/log-sanitization";
 import { requestContext } from "./lib/request-context";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
-import {
-  API_DOCS_SPEC_PATH,
-  API_DOCS_UI_PATH,
-  createApiDocsErrorBody,
-  getApiDocsAccess,
-} from "./lib/docs-access";
-import {
-  apiDocumentationDescription,
-  apiDocumentationTags,
-  apiSecuritySchemes,
-  sessionCookieAuthSecurity,
-} from "./lib/openapi";
+import { sessionCookieAuthSecurity } from "./lib/openapi";
 import { corsOriginPolicy } from "./lib/origin-policy";
 import { patchOauthMetadataResponse } from "./lib/oauth-metadata";
 import { routeModels } from "./contracts";
@@ -82,55 +69,10 @@ function getLocalAuthBasePath(prefix: string): string {
   return normalizePath(BETTER_AUTH_BASE_PATH);
 }
 
-async function buildApiDocumentation() {
-  try {
-    const authDocumentation = await getAuthOpenApiDocumentation();
-    const authComponents = authDocumentation.components ?? {};
-    const authSecuritySchemes =
-      "securitySchemes" in authComponents &&
-      authComponents.securitySchemes &&
-      typeof authComponents.securitySchemes === "object"
-        ? (authComponents.securitySchemes as Record<string, unknown>)
-        : {};
-
-    return {
-      info: {
-        title: "Rocani API Reference",
-        version: "1.0.0",
-        description: apiDocumentationDescription,
-      },
-      tags: apiDocumentationTags,
-      components: {
-        ...authComponents,
-        securitySchemes: {
-          ...authSecuritySchemes,
-          ...apiSecuritySchemes,
-        },
-      },
-      paths: authDocumentation.paths,
-    };
-  } catch (error) {
-    logger.warn("Failed to generate Better Auth OpenAPI schema", errorLogDetails(error));
-
-    return {
-      info: {
-        title: "Rocani API Reference",
-        version: "1.0.0",
-        description: apiDocumentationDescription,
-      },
-      tags: apiDocumentationTags,
-      components: {
-        securitySchemes: apiSecuritySchemes,
-      },
-    };
-  }
-}
-
 if (isMailOauthEnabled) {
   await ensureMailOAuthClients();
 }
 
-const apiDocumentation = await buildApiDocumentation();
 const oauthAuthorizationServerMetadata = isMailOauthEnabled
   ? oauthProviderAuthServerMetadata(auth)
   : null;
@@ -162,83 +104,8 @@ const betterAuth = new Elysia({ name: "better-auth" })
 
 export const createAPI = (prefix = "") => {
   const app = new Elysia({ prefix, normalize: false });
-  const docsUiPath = normalizePath(
-    `${prefix}${API_DOCS_UI_PATH}` || API_DOCS_UI_PATH,
-  );
-  const docsSpecPath = normalizePath(
-    `${prefix}${API_DOCS_SPEC_PATH}` || API_DOCS_SPEC_PATH,
-  );
-  const authOpenApiSchemaPath = normalizePath(
-    `${prefix}${BETTER_AUTH_BASE_PATH}/open-api/generate-schema`,
-  );
   const localAuthBasePath = getLocalAuthBasePath(prefix);
-
   const calendarSyncService = CalendarSyncService.getInstance();
-
-  app
-    .onBeforeHandle(async ({ request, set }) => {
-      const pathname = normalizePath(new URL(request.url).pathname);
-
-      if (
-        pathname !== docsUiPath &&
-        pathname !== docsSpecPath &&
-        pathname !== authOpenApiSchemaPath
-      ) {
-        return;
-      }
-
-      const result = await getApiDocsAccess(request);
-      const requestAwareLoginUrl = new URL(
-        "/login",
-        frontendUrl.replace(/\/+$/, "") + "/",
-      );
-      requestAwareLoginUrl.searchParams.set("callbackURL", request.url);
-      const loginUrl = requestAwareLoginUrl.toString();
-
-      if (result.allowed) {
-        return;
-      }
-
-      if (pathname === docsUiPath && result.status === 401) {
-        return new Response(null, {
-          status: 302,
-          headers: {
-            Location: loginUrl,
-            "Cache-Control": "no-store, max-age=0",
-          },
-        });
-      }
-
-      set.status = result.status;
-      set.headers["Cache-Control"] = "no-store, max-age=0";
-
-      if (pathname === docsSpecPath || pathname === authOpenApiSchemaPath) {
-        return createApiDocsErrorBody(result);
-      }
-
-      return new Response(result.message, {
-        status: result.status,
-        headers: {
-          "Cache-Control": "no-store, max-age=0",
-          "Content-Type": "text/plain; charset=utf-8",
-        },
-      });
-    })
-    .use(
-      swagger({
-        path: API_DOCS_UI_PATH,
-        specPath: API_DOCS_SPEC_PATH,
-        documentation: apiDocumentation,
-        scalarConfig: {
-          theme: "none",
-          layout: "modern",
-          darkMode: false,
-          withDefaultFonts: false,
-          hideDownloadButton: false,
-          searchHotKey: "k",
-        },
-      }),
-    );
 
   calendarSyncService.start();
   defaultMailRealtimeService.start();
@@ -265,180 +132,152 @@ export const createAPI = (prefix = "") => {
         exposeHeaders: ["Set-Cookie"],
       }),
     )
-    .get(
-      "/.well-known/oauth-authorization-server",
-      async ({ request, set }) => {
-        if (!oauthAuthorizationServerMetadata) {
-          set.status = 404;
-          return {
-            error: "Not found",
-            message: "Mail OAuth is not enabled.",
-          };
-        }
-
-        return patchOauthMetadataResponse(
-          await oauthAuthorizationServerMetadata(request),
-        );
+    .get("/.well-known/oauth-authorization-server", {
+      detail: {
+        tags: ["Auth"],
+        summary: "Get OAuth 2.0 authorization server metadata",
+        description:
+          "Returns authorization-server metadata for the Solace mail OAuth issuer when mail OAuth is enabled.",
       },
-      {
-        detail: {
-          tags: ["Auth"],
-          summary: "Get OAuth 2.0 authorization server metadata",
-          description:
-            "Returns authorization-server metadata for the Solace mail OAuth issuer when mail OAuth is enabled.",
-        },
+    }, async ({ request, set }) => {
+      if (!oauthAuthorizationServerMetadata) {
+        set.status = 404;
+        return {
+          error: "Not found",
+          message: "Mail OAuth is not enabled.",
+        };
+      }
+    
+      return patchOauthMetadataResponse(
+        await oauthAuthorizationServerMetadata(request),
+      );
+    })
+    .get(`${localAuthBasePath}/.well-known/oauth-authorization-server`, {
+      detail: {
+        tags: ["Auth"],
+        summary: "Get OAuth 2.0 authorization server metadata",
+        description:
+          "Returns authorization-server metadata on the issuer-relative path expected by OIDC clients.",
       },
-    )
-    .get(
-      `${localAuthBasePath}/.well-known/oauth-authorization-server`,
-      async ({ request, set }) => {
-        if (!oauthAuthorizationServerMetadata) {
-          set.status = 404;
-          return {
-            error: "Not found",
-            message: "Mail OAuth is not enabled.",
-          };
-        }
-
-        return patchOauthMetadataResponse(
-          await oauthAuthorizationServerMetadata(request),
-        );
+    }, async ({ request, set }) => {
+      if (!oauthAuthorizationServerMetadata) {
+        set.status = 404;
+        return {
+          error: "Not found",
+          message: "Mail OAuth is not enabled.",
+        };
+      }
+    
+      return patchOauthMetadataResponse(
+        await oauthAuthorizationServerMetadata(request),
+      );
+    })
+    .get("/.well-known/openid-configuration", {
+      detail: {
+        tags: ["Auth"],
+        summary: "Get OpenID Connect discovery metadata",
+        description:
+          "Returns OpenID Connect discovery metadata for the Solace mail OAuth issuer when mail OAuth is enabled.",
       },
-      {
-        detail: {
-          tags: ["Auth"],
-          summary: "Get OAuth 2.0 authorization server metadata",
-          description:
-            "Returns authorization-server metadata on the issuer-relative path expected by OIDC clients.",
-        },
+    }, async ({ request, set }) => {
+      if (!oauthOpenIdConfiguration) {
+        set.status = 404;
+        return {
+          error: "Not found",
+          message: "Mail OAuth is not enabled.",
+        };
+      }
+    
+      return patchOauthMetadataResponse(
+        await oauthOpenIdConfiguration(request),
+      );
+    })
+    .get(`${localAuthBasePath}/.well-known/openid-configuration`, {
+      detail: {
+        tags: ["Auth"],
+        summary: "Get OpenID Connect discovery metadata",
+        description:
+          "Returns OIDC discovery metadata on the issuer-relative path expected by external clients such as Stalwart.",
       },
-    )
-    .get(
-      "/.well-known/openid-configuration",
-      async ({ request, set }) => {
-        if (!oauthOpenIdConfiguration) {
-          set.status = 404;
-          return {
-            error: "Not found",
-            message: "Mail OAuth is not enabled.",
-          };
-        }
-
-        return patchOauthMetadataResponse(
-          await oauthOpenIdConfiguration(request),
-        );
-      },
-      {
-        detail: {
-          tags: ["Auth"],
-          summary: "Get OpenID Connect discovery metadata",
-          description:
-            "Returns OpenID Connect discovery metadata for the Solace mail OAuth issuer when mail OAuth is enabled.",
-        },
-      },
-    )
-    .get(
-      `${localAuthBasePath}/.well-known/openid-configuration`,
-      async ({ request, set }) => {
-        if (!oauthOpenIdConfiguration) {
-          set.status = 404;
-          return {
-            error: "Not found",
-            message: "Mail OAuth is not enabled.",
-          };
-        }
-
-        return patchOauthMetadataResponse(
-          await oauthOpenIdConfiguration(request),
-        );
-      },
-      {
-        detail: {
-          tags: ["Auth"],
-          summary: "Get OpenID Connect discovery metadata",
-          description:
-            "Returns OIDC discovery metadata on the issuer-relative path expected by external clients such as Stalwart.",
-        },
-      },
-    )
+    }, async ({ request, set }) => {
+      if (!oauthOpenIdConfiguration) {
+        set.status = 404;
+        return {
+          error: "Not found",
+          message: "Mail OAuth is not enabled.",
+        };
+      }
+    
+      return patchOauthMetadataResponse(
+        await oauthOpenIdConfiguration(request),
+      );
+    })
     .use(requestContext)
-    .onError(handleApiError)
+    .error("global", handleApiError)
     .use(betterAuth)
-    .get("/", () => ({ message: "API is running" }), {
+    .get("/", {
       detail: {
         tags: ["Health"],
         summary: "API root status",
         description:
           "Simple root endpoint used to verify that the API process is reachable.",
       },
-    })
-    .get("/health", () => ({ status: "ok" }), {
+    }, () => ({ message: "API is running" }))
+    .get("/health", {
       detail: {
         tags: ["Health"],
         summary: "Health check",
         description:
           "Lightweight liveness probe for uptime checks, deploy verification, and container health monitoring.",
       },
-    })
-    .get(
-      "/me",
-      async ({ request }) => {
-        try {
-          const session = await auth.api.getSession({
-            headers: request.headers as Headers,
-          });
-          return session ? { user: session.user } : { user: null };
-        } catch {
-          return { user: null };
-        }
+    }, () => ({ status: "ok" }))
+    .get("/me", {
+      detail: {
+        tags: ["Auth"],
+        summary: "Get current session user",
+        description:
+          "Returns the authenticated user when a Better Auth session cookie is present. Returns a null user payload when no session is active.",
       },
-      {
-        detail: {
-          tags: ["Auth"],
-          summary: "Get current session user",
-          description:
-            "Returns the authenticated user when a Better Auth session cookie is present. Returns a null user payload when no session is active.",
-        },
-      },
-    )
-    .get(
-      "/user",
-      async ({ request, status }) => {
+    }, async ({ request }) => {
+      try {
         const session = await auth.api.getSession({
           headers: request.headers as Headers,
         });
-
-        if (!session) {
-          return status(401, unauthorizedBody());
-        }
-
-        return session.user;
+        return session ? { user: session.user } : { user: null };
+      } catch {
+        return { user: null };
+      }
+    })
+    .get("/user", {
+      detail: {
+        tags: ["Auth"],
+        summary: "Require an authenticated user",
+        description:
+          "Returns the current user object and fails with 401 when the Better Auth session is missing or invalid.",
+        security: sessionCookieAuthSecurity,
       },
-      {
-        detail: {
-          tags: ["Auth"],
-          summary: "Require an authenticated user",
-          description:
-            "Returns the current user object and fails with 401 when the Better Auth session is missing or invalid.",
-          security: sessionCookieAuthSecurity,
-        },
+    }, async ({ request, status }) => {
+      const session = await auth.api.getSession({
+        headers: request.headers as Headers,
+      });
+    
+      if (!session) {
+        return status(401, unauthorizedBody());
+      }
+    
+      return session.user;
+    })
+    .get("/test", {
+      detail: {
+        tags: ["Health"],
+        summary: "Backend connectivity test",
+        description:
+          "Debug endpoint for confirming request routing and current server time during integration checks.",
       },
-    )
-    .get(
-      "/test",
-      () => ({
-        message: "Backend connection working",
-        timestamp: new Date().toISOString(),
-      }),
-      {
-        detail: {
-          tags: ["Health"],
-          summary: "Backend connectivity test",
-          description:
-            "Debug endpoint for confirming request routing and current server time during integration checks.",
-        },
-      },
-    )
+    }, () => ({
+      message: "Backend connection working",
+      timestamp: new Date().toISOString(),
+    }))
     .use(e2eeRoutes)
     .use(eventsRoutes)
     .use(calendarSharingRoutes)
@@ -494,7 +333,6 @@ app.get("/", ({ query, redirect }) => {
 
 app.listen(port, () => {
   logger.ok(`Server is running on ${backendUrl}`);
-  logger.info(`API documentation: ${backendUrl}/api/docs`);
   logger.info("Auth runtime config", {
     backendUrl,
     frontendUrl,
