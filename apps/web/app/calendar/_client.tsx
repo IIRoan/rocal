@@ -3,7 +3,6 @@
 import { useSession } from "@/lib/auth-client";
 import { useSearchParams } from "next/navigation";
 import { createLogger } from "@workspace/logger";
-import dynamic from "next/dynamic";
 import { completeAuthNavigation } from "@/lib/auth-navigation";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import {
@@ -15,6 +14,8 @@ import {
   PageLoadingOverlay,
 } from "@workspace/ui/components/ui";
 import { MobileCalendarWrapper } from "@workspace/ui/components";
+import { AppSidebar } from "@workspace/ui/components/layout";
+import { CommandPalette } from "@/components/command-palette";
 import { CommandPaletteProvider } from "@/components/command-palette-context";
 import {
   CalendarDataProvider,
@@ -36,6 +37,7 @@ import { useDashboardUserActions } from "@/hooks/use-dashboard-user-actions";
 import { useSettings } from "@/hooks/use-settings";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { CALENDAR_HOME_PATH } from "@/lib/app-routes";
+import { readCalendarLinkSearchParams } from "./calendar-link-params";
 import {
   createContext,
   use,
@@ -54,17 +56,6 @@ const log = createLogger("calendar");
 const KeyboardPaletteContext = createContext<{
   openPalette: (query?: string) => void;
 } | null>(null);
-
-const AppSidebar = dynamic(
-  () => import("@workspace/ui/components/layout").then((mod) => mod.AppSidebar),
-  { ssr: false },
-);
-
-const CommandPalette = dynamic(
-  () =>
-    import("@/components/command-palette").then((mod) => mod.CommandPalette),
-  { ssr: false },
-);
 
 function MobileCalendarLoadingScreen({
   messageContext,
@@ -90,14 +81,13 @@ function CalendarUrlSyncWrapper() {
 
 function CalendarSearchParamHandlers() {
   const searchParams = useSearchParams();
+  const { eventId, palette } = readCalendarLinkSearchParams(searchParams);
   const keyboardPalette = use(KeyboardPaletteContext);
   const { data: session, isPending } = useSession();
   const { openEventEditor } = useCommandPaletteContext();
   const calendarData = useSharedCalendarData();
   const handledEventIdRef = useRef<string | null>(null);
   const handledPaletteRef = useRef<string | null>(null);
-  const eventId = searchParams.get("eventId");
-  const palette = searchParams.get("palette");
 
   useEffect(() => {
     if (!eventId || handledEventIdRef.current === eventId) {
@@ -294,9 +284,10 @@ export function CalendarPageContent() {
     () => true,
     () => false,
   );
+  const { data: session, isPending } = useSession();
   const isMobile = useIsMobile();
 
-  if (!mounted) {
+  if (!mounted || isPending || !session?.user) {
     return <DashboardSkeleton />;
   }
 
@@ -334,11 +325,16 @@ export function CalendarShell({ children }: { children: ReactNode }) {
     }
   }, [isPending, session?.user, router]);
 
+  const keyboardPaletteValue = { openPalette };
+
   return (
     <CalendarWorkspaceReadyProvider>
-      <KeyboardPaletteContext.Provider value={{ openPalette }}>
+      <KeyboardPaletteContext.Provider value={keyboardPaletteValue}>
         {showAuthGate ? (
-          <DashboardSkeleton />
+          <>
+            <DashboardSkeleton />
+            <div className="hidden">{children}</div>
+          </>
         ) : (
           <SettingsProvider>
             <CalendarDataProvider>

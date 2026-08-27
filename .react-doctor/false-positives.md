@@ -57,11 +57,12 @@ Patterns that fire diagnostics but are safe to suppress.
 ## react-doctor/react-compiler-destructure-method — useSearchParams().get()
 
 - **File**: `apps/web/app/reset-password/_content.tsx:24,25`,
-  `apps/web/app/calendar/_client.tsx:99,100`
+  `apps/web/app/calendar/calendar-link-params.ts` (`readCalendarLinkSearchParams`)
 - **Why FP**: `useSearchParams()` returns a `ReadonlyURLSearchParams` object
   where `.get()` is a method requiring `this` context. Destructuring
   `const { get } = useSearchParams()` would produce an unbound function that
-  throws at runtime. The correct pattern is `searchParams.get("key")`.
+  throws at runtime. The correct pattern is `searchParams.get("key")` inside a
+  helper that receives the params object (same as `readLoginSearchParams`).
 
 ## react-doctor/exhaustive-deps — mailCalendarInvite in message-reader.tsx
 
@@ -201,12 +202,14 @@ Patterns that fire diagnostics but are safe to suppress.
 
 ## react-doctor/jsx-no-constructed-context-values — React Compiler memoization
 
-- **Files**: `apps/web/components/calendar-workspace-ready.tsx`,
-  `apps/web/app/calendar/_client.tsx` (`KeyboardPaletteContext.Provider`)
+- **Files**: `apps/web/components/calendar-workspace-ready.tsx`
 - **Why FP**: Next.js has `reactCompiler: true`. Wrapping context `value` in
   `useMemo`/`useCallback` re-triggers `react-compiler-no-manual-memoization`.
-  The compiler auto-memoizes the inline `{ isReady, markReady }` /
-  `{ openPalette }` objects; keeping the memos is noise, not a leak.
+  The compiler auto-memoizes the inline `{ isReady, markReady }` object;
+  keeping the memo is noise, not a leak.
+- **Note**: `apps/web/app/calendar/_client.tsx` (`KeyboardPaletteContext`)
+  passes a local `keyboardPaletteValue` identifier so this rule does not fire
+  on the Provider. React Compiler still memoizes `{ openPalette }`.
 
 ## react-doctor/no-event-handler + no-pass-data-to-parent — EventEditor prop sync
 
