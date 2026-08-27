@@ -53,7 +53,7 @@ async function resolveAuthenticatedUser(
 
 // Auth guard plugin — resolves `routeUser` for authenticated routes.
 export const requireAuth = new Elysia({ name: "require-auth" }).derive(
-  { as: "scoped" },
+  "plugin",
   async (ctx) => {
     const parent = ctx as typeof ctx & AuthParentContext;
     const routeUser = await resolveAuthenticatedUser(parent);

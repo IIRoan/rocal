@@ -19,6 +19,6 @@ export const requestContext = new Elysia({ name: "request-context" })
   .derive(({ request }) => ({
     requestId: resolveRequestId(request),
   }))
-  .onAfterHandle(({ set, requestId }) => {
+  .afterHandle(({ set, requestId }) => {
     set.headers[REQUEST_ID_HEADER] = requestId;
   });

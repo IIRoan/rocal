@@ -15,94 +15,74 @@ export const recurringRoutes = new Elysia({
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Recurring"), (app) =>
     app
-      .post(
-        "/validate",
-        ({ body }) => {
-          return recurringService.validate(body.rule);
+      .post("/validate", {
+        body: RouteModel.recurring.validateBody,
+        detail: {
+          summary: "Validate a recurrence rule",
+          description:
+            "Validates a recurrence rule and returns a human-readable description",
         },
-        {
-          body: RouteModel.recurring.validateBody,
-          detail: {
-            summary: "Validate a recurrence rule",
-            description:
-              "Validates a recurrence rule and returns a human-readable description",
-          },
-        },
-      )
+      }, ({ body }) => {
+        return recurringService.validate(body.rule);
+      })
 
-      .post(
-        "/preview",
-        ({ body }) => {
-          return recurringService.preview({
-            eventStart: body.eventStart,
-            eventEnd: body.eventEnd,
-            recurrenceRule: body.recurrenceRule,
-            previewDays: body.previewDays,
-          });
+      .post("/preview", {
+        body: RouteModel.recurring.previewBody,
+        detail: {
+          summary: "Preview recurring event instances",
+          description:
+            "Generate a preview of recurring event instances for the specified period",
         },
-        {
-          body: RouteModel.recurring.previewBody,
-          detail: {
-            summary: "Preview recurring event instances",
-            description:
-              "Generate a preview of recurring event instances for the specified period",
-          },
-        },
-      )
+      }, ({ body }) => {
+        return recurringService.preview({
+          eventStart: body.eventStart,
+          eventEnd: body.eventEnd,
+          recurrenceRule: body.recurrenceRule,
+          previewDays: body.previewDays,
+        });
+      })
 
-      .put(
-        "/event/:id",
-        async ({ params, body, routeUser }) => {
-          return recurringService.editSeries({
-            userId: routeUser.id,
-            eventId: params.id,
-            editScope: body.editScope,
-            occurrenceDate: body.occurrenceDate,
-            updates: body.updates,
-          });
+      .put("/event/:id", {
+        params: RouteModel.recurring.eventIdParams,
+        body: RouteModel.recurring.editBody,
+        detail: {
+          summary: "Edit recurring event series",
+          description:
+            "Edit a recurring event with options for scope: single occurrence, this and future, or entire series",
         },
-        {
-          params: RouteModel.recurring.eventIdParams,
-          body: RouteModel.recurring.editBody,
-          detail: {
-            summary: "Edit recurring event series",
-            description:
-              "Edit a recurring event with options for scope: single occurrence, this and future, or entire series",
-          },
-        },
-      )
+      }, async ({ params, body, routeUser }) => {
+        return recurringService.editSeries({
+          userId: routeUser.id,
+          eventId: params.id,
+          editScope: body.editScope,
+          occurrenceDate: body.occurrenceDate,
+          updates: body.updates,
+        });
+      })
 
-      .delete(
-        "/event/:id",
-        async ({ params, query, routeUser }) => {
-          return recurringService.deleteSeries({
-            userId: routeUser.id,
-            eventId: params.id,
-            deleteScope: query.deleteScope,
-            occurrenceDate: query.occurrenceDate,
-          });
+      .delete("/event/:id", {
+        params: RouteModel.recurring.eventIdParams,
+        query: RouteModel.recurring.deleteQuery,
+        detail: {
+          summary: "Delete recurring event series",
+          description:
+            "Delete a recurring event with options for scope: single occurrence, this and future, or entire series",
         },
-        {
-          params: RouteModel.recurring.eventIdParams,
-          query: RouteModel.recurring.deleteQuery,
-          detail: {
-            summary: "Delete recurring event series",
-            description:
-              "Delete a recurring event with options for scope: single occurrence, this and future, or entire series",
-          },
-        },
-      )
+      }, async ({ params, query, routeUser }) => {
+        return recurringService.deleteSeries({
+          userId: routeUser.id,
+          eventId: params.id,
+          deleteScope: query.deleteScope,
+          occurrenceDate: query.occurrenceDate,
+        });
+      })
 
-      .get(
-        "/patterns",
-        () => {
-          return recurringService.getCommonPatterns();
+      .get("/patterns", {
+        detail: {
+          summary: "Get common recurrence patterns",
+          description: "Returns pre-defined common recurrence patterns",
         },
-        {
-          detail: {
-            summary: "Get common recurrence patterns",
-            description: "Returns pre-defined common recurrence patterns",
-          },
-        },
-      ),
+      }, () => {
+        return recurringService.getCommonPatterns();
+      }),
   );

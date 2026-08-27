@@ -49,12 +49,15 @@ function isElysiaHttpRouteCall(node) {
  * @returns {import('estree').ObjectExpression | null}
  */
 function getRouteOptionsObject(node) {
-  if (!isElysiaHttpRouteCall(node) || node.arguments.length === 0) {
+  if (!isElysiaHttpRouteCall(node) || node.arguments.length < 2) {
     return null;
   }
 
-  const lastArgument = node.arguments[node.arguments.length - 1];
-  return lastArgument.type === "ObjectExpression" ? lastArgument : null;
+  // Elysia 2: path, schema, handler. Elysia 1: path, handler, schema.
+  const schemaArgument = node.arguments.find(
+    (argument) => argument.type === "ObjectExpression",
+  );
+  return schemaArgument?.type === "ObjectExpression" ? schemaArgument : null;
 }
 
 /**

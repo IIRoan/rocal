@@ -510,196 +510,168 @@ export function createMailRoutes(
     prefix: "/mail",
     normalize: false,
   })
-    .get("/config", () => mailService.getConfig(), {
+    .get("/config", {
       detail: {
         tags: ["Mail"],
         summary: "Get public mail-demo configuration",
         description:
           "Returns the public mailbox domain and Stalwart discovery base used by the mail demo.",
       },
+    }, () => mailService.getConfig())
+    .get("/keys/:email", {
+      detail: {
+        tags: ["Mail"],
+        summary: "Look up an internal recipient public key",
+        description:
+          "Returns the stored OpenPGP public key directory entry for an internal mailbox.",
+      },
+    }, async ({ params }) => {
+      try {
+        return await mailService.getDirectoryKey(params.email);
+      } catch (err) {
+        logger.error("Failed to look up internal recipient key", {
+          recipientRef: logRef(params.email),
+          ...errorLogDetails(err),
+        });
+        throw err;
+      }
     })
-    .get(
-      "/keys/:email",
-      async ({ params }) => {
-        try {
-          return await mailService.getDirectoryKey(params.email);
-        } catch (err) {
-          logger.error("Failed to look up internal recipient key", {
-            recipientRef: logRef(params.email),
-            ...errorLogDetails(err),
-          });
-          throw err;
-        }
+    .all("/jmap/.well-known/jmap", {
+      detail: {
+        tags: ["Mail"],
+        summary: "Proxy JMAP discovery for the mail demo",
+        description:
+          "Forwards JMAP discovery to the configured Stalwart instance so browser clients can operate without direct cross-origin access.",
       },
-      {
-        detail: {
-          tags: ["Mail"],
-          summary: "Look up an internal recipient public key",
-          description:
-            "Returns the stored OpenPGP public key directory entry for an internal mailbox.",
-        },
+    }, ({ request }) =>
+      proxyJmapRequest({
+        request,
+        upstreamPath: "/.well-known/jmap",
+        upstreamBaseUrl: jmapUpstreamBaseUrl,
+        fetcher: jmapFetch,
+        mailService,
+      }))
+    .all("/jmap/jmap", {
+      detail: {
+        tags: ["Mail"],
+        summary: "Proxy root JMAP calls for the mail demo",
+        description:
+          "Forwards authenticated JMAP calls to Stalwart while keeping private-key operations in the browser.",
       },
-    )
-    .all(
-      "/jmap/.well-known/jmap",
-      ({ request }) =>
-        proxyJmapRequest({
-          request,
-          upstreamPath: "/.well-known/jmap",
-          upstreamBaseUrl: jmapUpstreamBaseUrl,
-          fetcher: jmapFetch,
-          mailService,
-        }),
-      {
-        detail: {
-          tags: ["Mail"],
-          summary: "Proxy JMAP discovery for the mail demo",
-          description:
-            "Forwards JMAP discovery to the configured Stalwart instance so browser clients can operate without direct cross-origin access.",
-        },
+    }, ({ request }) =>
+      proxyJmapRequest({
+        request,
+        upstreamPath: "/jmap/",
+        upstreamBaseUrl: jmapUpstreamBaseUrl,
+        fetcher: jmapFetch,
+        mailService,
+      }))
+    .all("/jmap/jmap/", {
+      detail: {
+        tags: ["Mail"],
+        summary: "Proxy root JMAP calls for the mail demo",
+        description:
+          "Forwards authenticated JMAP calls to Stalwart while keeping private-key operations in the browser.",
       },
-    )
-    .all(
-      "/jmap/jmap",
-      ({ request }) =>
-        proxyJmapRequest({
-          request,
-          upstreamPath: "/jmap/",
-          upstreamBaseUrl: jmapUpstreamBaseUrl,
-          fetcher: jmapFetch,
-          mailService,
-        }),
-      {
-        detail: {
-          tags: ["Mail"],
-          summary: "Proxy root JMAP calls for the mail demo",
-          description:
-            "Forwards authenticated JMAP calls to Stalwart while keeping private-key operations in the browser.",
-        },
+    }, ({ request }) =>
+      proxyJmapRequest({
+        request,
+        upstreamPath: "/jmap/",
+        upstreamBaseUrl: jmapUpstreamBaseUrl,
+        fetcher: jmapFetch,
+        mailService,
+      }))
+    .all("/jmap/jmap/*", {
+      detail: {
+        tags: ["Mail"],
+        summary: "Proxy nested JMAP resources for the mail demo",
+        description:
+          "Forwards nested JMAP download, upload, and event-source requests to Stalwart through the backend proxy.",
       },
-    )
-    .all(
-      "/jmap/jmap/",
-      ({ request }) =>
-        proxyJmapRequest({
-          request,
-          upstreamPath: "/jmap/",
-          upstreamBaseUrl: jmapUpstreamBaseUrl,
-          fetcher: jmapFetch,
-          mailService,
-        }),
-      {
-        detail: {
-          tags: ["Mail"],
-          summary: "Proxy root JMAP calls for the mail demo",
-          description:
-            "Forwards authenticated JMAP calls to Stalwart while keeping private-key operations in the browser.",
-        },
-      },
-    )
-    .all(
-      "/jmap/jmap/*",
-      ({ params, request }) =>
-        proxyJmapRequest({
-          request,
-          upstreamPath: `/jmap/${params["*"]}`,
-          upstreamBaseUrl: jmapUpstreamBaseUrl,
-          fetcher: jmapFetch,
-          mailService,
-        }),
-      {
-        detail: {
-          tags: ["Mail"],
-          summary: "Proxy nested JMAP resources for the mail demo",
-          description:
-            "Forwards nested JMAP download, upload, and event-source requests to Stalwart through the backend proxy.",
-        },
-      },
-    )
+    }, ({ params, request }) =>
+      proxyJmapRequest({
+        request,
+        upstreamPath: `/jmap/${params["*"]}`,
+        upstreamBaseUrl: jmapUpstreamBaseUrl,
+        fetcher: jmapFetch,
+        mailService,
+      }))
     .use(
       requireAuth.guard(authenticatedRouteDetail("Mail"), (app) =>
-        app.get(
-          "/oauth/access-token",
-      async ({ routeUser, status }) => {
-        const userId = routeUser.id;
-        const email = routeUser.email?.trim();
-        if (!email) {
-          return status(
-            401,
-            unauthorizedBody(
-              "A valid session is required to obtain a mail token.",
-            ),
-          );
-        }
-
-        try {
-          return await mailService.getAccessTokenForUser({
-            userId,
-            email,
-          });
-        } catch (err) {
-          const message = errorMessage(err, "Could not issue mail token.");
-          logger.error("Failed to issue mail access token", {
-            userId,
-            recipientRef: logRef(email),
-            ...errorLogDetails(err),
-          });
-          return status(
-            400,
-            createApiErrorBody(400, "mail_token_error", message),
-          );
-        }
-      },
-      {
-        detail: {
-          ...authDetail.detail,
-          summary: "Exchange session for a mail OAuth access token",
-          description:
-            "Performs a server-side OAuth authorization code flow using the caller's session cookie and returns a JWT access token accepted by the mail server.",
-        },
-      },
-    )
-    .get(
-      "/vault-key-material",
-      async ({ routeUser, status }) => {
-        const userId = routeUser.id;
-        try {
-          const keyMaterial = await deriveVaultKeyMaterial(userId);
-          let derivedKeyB64: string | null = null;
-          try {
-            derivedKeyB64 = await deriveVaultKeyForNative(userId, keyMaterial);
-          } catch (derivedErr) {
-            logger.error("[vault-key-material] deriveVaultKeyForNative failed", {
-              userId,
-              ...errorLogDetails(derivedErr),
-            });
+        app.get("/oauth/access-token", {
+          detail: {
+            ...authDetail.detail,
+            summary: "Exchange session for a mail OAuth access token",
+            description:
+              "Performs a server-side OAuth authorization code flow using the caller's session cookie and returns a JWT access token accepted by the mail server.",
+          },
+        }, async ({ routeUser, status }) => {
+          const userId = routeUser.id;
+          const email = routeUser.email?.trim();
+          if (!email) {
+            return status(
+              401,
+              unauthorizedBody(
+                "A valid session is required to obtain a mail token.",
+              ),
+            );
           }
-          logger.debug(
-            "[vault-key-material] responding hasDerivedKey=%s for userId=%s",
-            derivedKeyB64 ? "yes" : "no",
+        
+          try {
+            return await mailService.getAccessTokenForUser({
+              userId,
+              email,
+            });
+          } catch (err) {
+            const message = errorMessage(err, "Could not issue mail token.");
+            logger.error("Failed to issue mail access token", {
+              userId,
+              recipientRef: logRef(email),
+              ...errorLogDetails(err),
+            });
+            return status(
+              400,
+              createApiErrorBody(400, "mail_token_error", message),
+            );
+          }
+        })
+    .get("/vault-key-material", {
+      detail: {
+        ...authDetail.detail,
+        summary: "Get server-derived vault key material",
+        description:
+          "Returns an HMAC-SHA256 derived key material unique to the authenticated user. Used client-side to derive the vault encryption key without a user-typed password.",
+      },
+    }, async ({ routeUser, status }) => {
+      const userId = routeUser.id;
+      try {
+        const keyMaterial = await deriveVaultKeyMaterial(userId);
+        let derivedKeyB64: string | null = null;
+        try {
+          derivedKeyB64 = await deriveVaultKeyForNative(userId, keyMaterial);
+        } catch (derivedErr) {
+          logger.error("[vault-key-material] deriveVaultKeyForNative failed", {
             userId,
-          );
-          return { keyMaterial, derivedKeyB64, version: "v1" };
-        } catch (err) {
-          const message = errorMessage(
-            err,
-            "Could not derive vault key material.",
-          );
-          return status(
-            500,
-            createApiErrorBody(500, "vault_key_error", message),
-          );
+            ...errorLogDetails(derivedErr),
+          });
         }
-      },
-      {
-        detail: {
-          ...authDetail.detail,
-          summary: "Get server-derived vault key material",
-          description:
-            "Returns an HMAC-SHA256 derived key material unique to the authenticated user. Used client-side to derive the vault encryption key without a user-typed password.",
-        },
-      },
-      ),
+        logger.debug(
+          "[vault-key-material] responding hasDerivedKey=%s for userId=%s",
+          derivedKeyB64 ? "yes" : "no",
+          userId,
+        );
+        return { keyMaterial, derivedKeyB64, version: "v1" };
+      } catch (err) {
+        const message = errorMessage(
+          err,
+          "Could not derive vault key material.",
+        );
+        return status(
+          500,
+          createApiErrorBody(500, "vault_key_error", message),
+        );
+      }
+    }),
     ),
     );
 }

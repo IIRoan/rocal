@@ -4,7 +4,9 @@ import {
   ConflictError,
   NotFoundError,
   UpstreamServiceError,
-  ValidationError, errorString} from "../lib/errors";
+  ValidationError,
+  errorString,
+} from "../lib/errors";
 import {
   errorLogDetails,
   logRef,

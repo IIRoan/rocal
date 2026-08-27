@@ -16,92 +16,76 @@ export const accountPublicRoutes = new Elysia({
   normalize: false,
 })
   .use(routeModels)
-  .get("/signup-config", () => accountService.getSignupConfig(), {
+  .get("/signup-config", {
     detail: {
       tags: ["Account"],
       summary: "Get public Solace sign-up configuration",
       description:
         "Returns the Solace email domain used when new password accounts choose their in-app email address.",
     },
-  })
-  .get(
-    "/email-availability",
-    async ({ query }) => accountService.checkEmailAvailability(query),
-    {
-      query: RouteModel.account.emailAvailabilityQuery,
-      detail: {
-        tags: ["Account"],
-        summary: "Check whether a Solace email address can be used for sign-up",
-        description:
-          "Validates the chosen Solace email handle or full in-app address, normalizes it to the configured domain, and checks whether it is already reserved by an existing Solace account or linked mailbox.",
-      },
+  }, () => accountService.getSignupConfig())
+  .get("/email-availability", {
+    query: RouteModel.account.emailAvailabilityQuery,
+    detail: {
+      tags: ["Account"],
+      summary: "Check whether a Solace email address can be used for sign-up",
+      description:
+        "Validates the chosen Solace email handle or full in-app address, normalizes it to the configured domain, and checks whether it is already reserved by an existing Solace account or linked mailbox.",
     },
-  )
-  .get(
-    "/auth-status",
-    async ({ request, set }) => {
-      set.headers["Cache-Control"] = "no-store, max-age=0";
-      const session = await auth.api.getSession({
-        headers: request.headers as Headers,
-        query: { disableCookieCache: true },
-      });
-
-      if (!session?.user?.id) {
-        return {
-          authenticated: false,
-          hasPasskeys: false,
-          requiresPasskeyStepUp: false,
-        };
-      }
-
-      const stepUpStatus = await getPasskeyStepUpStatus({
-        prisma,
-        request,
-        userId: session.user.id,
-      });
-
+  }, async ({ query }) => accountService.checkEmailAvailability(query))
+  .get("/auth-status", {
+    detail: {
+      tags: ["Account"],
+      summary: "Get current authentication status",
+      description:
+        "Returns whether the current session is authenticated and whether a registered passkey still needs to complete the required second-factor step-up.",
+    },
+  }, async ({ request, set }) => {
+    set.headers["Cache-Control"] = "no-store, max-age=0";
+    const session = await auth.api.getSession({
+      headers: request.headers as Headers,
+      query: { disableCookieCache: true },
+    });
+  
+    if (!session?.user?.id) {
       return {
-        authenticated: true,
-        hasPasskeys: stepUpStatus.hasPasskeys,
-        requiresPasskeyStepUp: stepUpStatus.requiresPasskeyStepUp,
+        authenticated: false,
+        hasPasskeys: false,
+        requiresPasskeyStepUp: false,
       };
+    }
+  
+    const stepUpStatus = await getPasskeyStepUpStatus({
+      prisma,
+      request,
+      userId: session.user.id,
+    });
+  
+    return {
+      authenticated: true,
+      hasPasskeys: stepUpStatus.hasPasskeys,
+      requiresPasskeyStepUp: stepUpStatus.requiresPasskeyStepUp,
+    };
+  })
+  .get("/invite/validate", {
+    query: RouteModel.invite.tokenQuery,
+    detail: {
+      tags: ["Account"],
+      summary: "Validate an invite token",
+      description: "Check whether an invite token is valid before sign-up.",
     },
-    {
-      detail: {
-        tags: ["Account"],
-        summary: "Get current authentication status",
-        description:
-          "Returns whether the current session is authenticated and whether a registered passkey still needs to complete the required second-factor step-up.",
-      },
+  }, async ({ query }) =>
+    inviteService.validateInviteToken({ token: query.token }))
+  .post("/invite/claim", {
+    body: RouteModel.invite.claimBody,
+    detail: {
+      tags: ["Account"],
+      summary: "Claim an invite token",
+      description:
+        "Link an invite token to the chosen Solace email. Must be called within 15 minutes of sign-up.",
     },
-  )
-  .get(
-    "/invite/validate",
-    async ({ query }) =>
-      inviteService.validateInviteToken({ token: query.token }),
-    {
-      query: RouteModel.invite.tokenQuery,
-      detail: {
-        tags: ["Account"],
-        summary: "Validate an invite token",
-        description: "Check whether an invite token is valid before sign-up.",
-      },
-    },
-  )
-  .post(
-    "/invite/claim",
-    async ({ body }) =>
-      inviteService.claimInviteToken({
-        token: body.token,
-        chosenEmail: body.chosenEmail,
-      }),
-    {
-      body: RouteModel.invite.claimBody,
-      detail: {
-        tags: ["Account"],
-        summary: "Claim an invite token",
-        description:
-          "Link an invite token to the chosen Solace email. Must be called within 15 minutes of sign-up.",
-      },
-    },
-  );
+  }, async ({ body }) =>
+    inviteService.claimInviteToken({
+      token: body.token,
+      chosenEmail: body.chosenEmail,
+    }));

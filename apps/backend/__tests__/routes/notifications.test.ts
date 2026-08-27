@@ -101,7 +101,7 @@ const mockScheduleUpcomingReminder =
 
 function createApp() {
   return new Elysia({ normalize: false })
-    .onError(handleApiError)
+    .error(handleApiError)
     .use(notificationsRoutes);
 }
 

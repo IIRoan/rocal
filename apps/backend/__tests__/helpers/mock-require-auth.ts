@@ -6,10 +6,7 @@ export function createMockRequireAuth(
     email: "user@example.com",
   },
 ) {
-  return new Elysia({ name: "require-auth-test" }).derive(
-    { as: "scoped" },
-    () => ({
-      routeUser: user,
-    }),
-  );
+  return new Elysia({ name: "require-auth-test" }).derive("plugin", () => ({
+    routeUser: user,
+  }));
 }

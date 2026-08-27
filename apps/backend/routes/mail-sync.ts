@@ -28,22 +28,18 @@ export function createMailSyncRoutes(
     .use(routeModels)
     .use(requireAuth)
     .guard(authenticatedRouteDetail("Mail"), (app) =>
-      app.get(
-        "/sync",
-        async ({ routeUser, query }) =>
-          mailSyncService.syncForUser({
-            userId: routeUser.id,
-            accountId: query.accountId,
-          }),
-        {
-          query: RouteModel.mail.syncQuery,
-          detail: {
-            summary: "Synchronize mail changes for an authorized account",
-            description:
-              "Runs JMAP changes for Email, Mailbox, and Thread using server-side Stalwart credentials and returns normalized deltas for the authenticated user's mailbox.",
-          },
+      app.get("/sync", {
+        query: RouteModel.mail.syncQuery,
+        detail: {
+          summary: "Synchronize mail changes for an authorized account",
+          description:
+            "Runs JMAP changes for Email, Mailbox, and Thread using server-side Stalwart credentials and returns normalized deltas for the authenticated user's mailbox.",
         },
-      ),
+      }, async ({ routeUser, query }) =>
+        mailSyncService.syncForUser({
+          userId: routeUser.id,
+          accountId: query.accountId,
+        })),
     );
 }
 

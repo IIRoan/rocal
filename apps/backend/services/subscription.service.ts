@@ -22,7 +22,7 @@ import {
   isEventModified,
 } from "../lib/ics-parser";
 import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
-import { ValidationError, NotFoundError , errorMessage} from "../lib/errors";
+import { ValidationError, NotFoundError, errorMessage } from "../lib/errors";
 import { prismaStringEquals } from "../lib/prisma-query";
 import { createLogger } from "@workspace/logger";
 import { EventParticipantService } from "./event-participant.service";

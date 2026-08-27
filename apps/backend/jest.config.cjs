@@ -32,6 +32,9 @@ module.exports = {
       { configFile: require.resolve("../../babel.config.cts") },
     ],
   },
+  transformIgnorePatterns: [
+    "/node_modules/(?!(deuri)/)",
+  ],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "mjs", "json", "node"],
   moduleNameMapper: {
     "^@workspace/calendar-ics$":

@@ -55,75 +55,71 @@ export function createRealtimeMailRoutes(
   })
     .use(requireAuth)
     .guard(authenticatedRouteDetail("Mail"), (app) =>
-      app.get(
-        "/mail",
-        async ({ routeUser, request }) => {
-          const accountIds =
-            await mailSyncService.listAuthorizedAccountIdsForUser(routeUser.id);
-          const stream = new TransformStream<Uint8Array, Uint8Array>();
-          const writer = stream.writable.getWriter();
-          const subscriberId = randomUUID();
-          let closed = false;
-          let keepaliveId: ReturnType<typeof setInterval> | null = null;
-
-          const unsubscribe = realtimeService.subscribe({
-            subscriberId,
-            accountIds,
-            onEvent: (event) => {
-              scheduleWrite(
-                writer,
-                `event: mail.changed\ndata: ${JSON.stringify(event)}\n\n`,
-                close,
-              );
-            },
-          });
-
-          const close = () => {
-            if (closed) {
-              return;
-            }
-
-            closed = true;
-            if (keepaliveId) clearInterval(keepaliveId);
-            unsubscribe();
-            void writer.close().catch(() => undefined);
-            logger.info("Mail SSE client disconnected", {
-              subscriberId,
-              userRef: logRef(routeUser.id),
-            });
-          };
-
-          request.signal.addEventListener("abort", close, { once: true });
-          const response = new Response(stream.readable, {
-            headers: {
-              "Cache-Control": "no-cache, no-transform",
-              Connection: "keep-alive",
-              "Content-Type": "text/event-stream",
-              "X-Accel-Buffering": "no",
-            },
-          });
-
-          scheduleWrite(writer, "retry: 5000\n: connected\n\n", close);
-          keepaliveId = setInterval(() => {
-            scheduleWrite(writer, ": keepalive\n\n", close);
-          }, heartbeatIntervalMs);
-
-          logger.info("Mail SSE client connected", {
+      app.get("/mail", {
+        detail: {
+          summary: "Subscribe to realtime mail change signals",
+          description:
+            "Streams mail.changed events for the authenticated user's authorized mail accounts without exposing mailbox content.",
+        },
+      }, async ({ routeUser, request }) => {
+        const accountIds =
+          await mailSyncService.listAuthorizedAccountIdsForUser(routeUser.id);
+        const stream = new TransformStream<Uint8Array, Uint8Array>();
+        const writer = stream.writable.getWriter();
+        const subscriberId = randomUUID();
+        let closed = false;
+        let keepaliveId: ReturnType<typeof setInterval> | null = null;
+      
+        const unsubscribe = realtimeService.subscribe({
+          subscriberId,
+          accountIds,
+          onEvent: (event) => {
+            scheduleWrite(
+              writer,
+              `event: mail.changed\ndata: ${JSON.stringify(event)}\n\n`,
+              close,
+            );
+          },
+        });
+      
+        const close = () => {
+          if (closed) {
+            return;
+          }
+      
+          closed = true;
+          if (keepaliveId) clearInterval(keepaliveId);
+          unsubscribe();
+          void writer.close().catch(() => undefined);
+          logger.info("Mail SSE client disconnected", {
             subscriberId,
             userRef: logRef(routeUser.id),
-            accountCount: accountIds.length,
           });
-
-          return response;
-        },
-        {
-          detail: {
-            summary: "Subscribe to realtime mail change signals",
-            description:
-              "Streams mail.changed events for the authenticated user's authorized mail accounts without exposing mailbox content.",
+        };
+      
+        request.signal.addEventListener("abort", close, { once: true });
+        const response = new Response(stream.readable, {
+          headers: {
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+            "Content-Type": "text/event-stream",
+            "X-Accel-Buffering": "no",
           },
-        },
-      ),
+        });
+      
+        scheduleWrite(writer, "retry: 5000\n: connected\n\n", close);
+        keepaliveId = setInterval(() => {
+          scheduleWrite(writer, ": keepalive\n\n", close);
+        }, heartbeatIntervalMs);
+      
+        logger.info("Mail SSE client connected", {
+          subscriberId,
+          userRef: logRef(routeUser.id),
+          accountCount: accountIds.length,
+        });
+      
+        return response;
+      }),
     );
 }
 

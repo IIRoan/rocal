@@ -4,7 +4,7 @@ import { oauthProvider } from "@better-auth/oauth-provider";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { passkey } from "@better-auth/passkey";
 import { createAuthMiddleware } from "@better-auth/core/api";
-import { oneTimeToken, openAPI, jwt } from "better-auth/plugins";
+import { oneTimeToken, jwt } from "better-auth/plugins";
 import type { Jwk } from "better-auth/plugins/jwt";
 import { createLogger } from "@workspace/logger";
 import { prisma } from "./prisma";
@@ -460,9 +460,6 @@ const inviteRequiredPlugin = {
 
 const authPlugins = [
   expo(),
-  openAPI({
-    disableDefaultReference: true,
-  }),
   passwordChangeNotificationPlugin,
   passkeyStepUpPlugin,
   inviteRequiredPlugin,
@@ -695,41 +692,4 @@ export async function ensureMailOAuthClients() {
   return runMailOauthClientSeedTasks(
     managedClients.map((client) => () => ensureManagedMailOAuthClient(client)),
   );
-}
-
-type AuthOpenApiSchema = {
-  components?: Record<string, unknown>;
-  paths?: Record<string, Record<string, { tags?: string[] }>>;
-};
-
-let authOpenApiSchemaPromise: Promise<AuthOpenApiSchema> | null = null;
-
-async function getGeneratedAuthOpenApiSchema(): Promise<AuthOpenApiSchema> {
-  authOpenApiSchemaPromise ??= Promise.resolve(
-    auth.api.generateOpenAPISchema(),
-  ) as Promise<AuthOpenApiSchema>;
-
-  return authOpenApiSchemaPromise;
-}
-
-export async function getAuthOpenApiDocumentation(
-  prefix = BETTER_AUTH_BASE_PATH,
-) {
-  const normalizedPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
-  const schema = await getGeneratedAuthOpenApiSchema();
-  const prefixedPaths: Record<string, Record<string, { tags?: string[] }>> = {};
-
-  for (const [path, pathItem] of Object.entries(schema.paths ?? {})) {
-    const operationPath = `${normalizedPrefix}${path}`;
-    prefixedPaths[operationPath] = pathItem;
-
-    for (const operation of Object.values(pathItem)) {
-      operation.tags = ["Better Auth"];
-    }
-  }
-
-  return {
-    components: schema.components ?? {},
-    paths: prefixedPaths,
-  };
 }
