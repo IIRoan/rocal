@@ -60,6 +60,7 @@ import {
 import { layoutListSeparator } from "../../../src/lib/app-layout";
 import { buildMailConversations } from "../../../src/lib/mail/conversation-thread";
 import { useConversationListExtras } from "../../../src/lib/mail/use-conversation-thread";
+import { useConversationDecryptedPreviews } from "../../../src/lib/mail/use-conversation-decrypted-previews";
 import { messageHasVisibleAttachments } from "../../../src/lib/mail/message-security";
 import {
   isWebMailAvailable,
@@ -193,6 +194,15 @@ export default function MailScreen() {
     );
     return buildMailConversations([...mailboxMessages, ...extras]);
   }, [mailboxMessages, conversationExtras]);
+
+  const latestMessages = useMemo(
+    () => threadRows.map((row) => row.latestMessage),
+    [threadRows],
+  );
+  const decryptedPreviews = useConversationDecryptedPreviews(
+    runtime,
+    latestMessages,
+  );
 
   const selectableIds = useMemo(
     () =>
@@ -493,8 +503,9 @@ export default function MailScreen() {
       mailboxId: selectedMailboxId,
       selectionActive,
       selectedKey: Array.from(selectedIds).sort().join(","),
+      previewKey: Object.keys(decryptedPreviews).sort().join(","),
     }),
-    [selectedMailboxId, selectionActive, selectedIds],
+    [selectedMailboxId, selectionActive, selectedIds, decryptedPreviews],
   );
 
   const renderItem = useCallback(
@@ -527,6 +538,7 @@ export default function MailScreen() {
           showRecipient={showRecipient}
           labels={labels}
           identities={runtime?.identities ?? []}
+          preview={decryptedPreviews[item.latestMessage.id]}
           selectionActive={selectionActive}
           selected={isRowSelected}
           onPress={handleOpenMessage}
@@ -547,7 +559,7 @@ export default function MailScreen() {
       runtime?.identities,
       selectedIds,
       selectionActive,
-      threadRows,
+      decryptedPreviews,
     ],
   );
 

@@ -92,13 +92,22 @@ export function NavigationHeader({
           variant === "stack" && styles.titleBlockCentered,
         ]}
       >
-        <Text
-          style={[styles.title, layoutTitleStyle(theme, titleSize)]}
-          numberOfLines={variant === "reader" ? 1 : 2}
-          accessibilityRole="header"
-        >
-          {title}
-        </Text>
+        <View style={styles.titleRow}>
+          {subtitleIcon && !subtitle ? (
+            <Feather
+              name={subtitleIcon}
+              size={LAYOUT_ICON.context}
+              color={theme.colors.mutedForeground}
+            />
+          ) : null}
+          <Text
+            style={[styles.title, layoutTitleStyle(theme, titleSize)]}
+            numberOfLines={variant === "reader" ? 1 : 2}
+            accessibilityRole="header"
+          >
+            {title}
+          </Text>
+        </View>
         {subtitle ? (
           <View style={styles.subtitleRow}>
             {subtitleIcon ? (
@@ -152,10 +161,19 @@ function createStyles(theme: ThemeTokens, variant: NavigationHeaderVariant) {
       minWidth: 0,
       gap: 2,
     } as ViewStyle,
+    titleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing["1"],
+      minWidth: 0,
+      alignSelf: "stretch",
+    } as ViewStyle,
     titleBlockCentered: {
       alignItems: "center",
     } as ViewStyle,
     title: {
+      flex: 1,
+      minWidth: 0,
       ...(isStack ? { textAlign: "center" as const } : {}),
     } as TextStyle,
     subtitleRow: {

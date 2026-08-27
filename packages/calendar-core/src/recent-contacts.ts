@@ -323,3 +323,28 @@ export function filterRecentContactSuggestions(
     .sort((a, b) => b.lastUsedAt.localeCompare(a.lastUsedAt))
     .slice(0, limit);
 }
+
+/** Prefix matches first; substring search if nothing starts with the query. */
+export function resolveRecipientSuggestions(
+  payload: RecentContactsPayload | null | undefined,
+  options: FilterRecentContactSuggestionsOptions = {},
+): RecentContactEntry[] {
+  const query = options.query?.trim() ?? "";
+  const limit = options.limit ?? (query ? 8 : 12);
+  const excludeEmails = options.excludeEmails;
+  const prefixMatches = filterRecentContactSuggestions(payload, {
+    query,
+    excludeEmails,
+    limit,
+  });
+  if (!query || prefixMatches.length > 0) {
+    return prefixMatches;
+  }
+
+  const exclude = new Set(
+    (excludeEmails ?? []).map((email) => normalizeEmailAddress(email)),
+  );
+  return filterContactsList(payload, { query })
+    .filter((entry) => !exclude.has(entry.email))
+    .slice(0, limit);
+}

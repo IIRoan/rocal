@@ -4,8 +4,8 @@ import {
   addManualContact,
   createEmptyRecentContactsPayload,
   filterContactsList,
-  filterRecentContactSuggestions,
   recordRecentContactUsage,
+  resolveRecipientSuggestions,
   removeContact,
   updateContactDetails,
   type ContactDetailsPatch,
@@ -22,7 +22,7 @@ import {
   saveRecentContactsCrypto,
 } from "../lib/e2ee-recent-contacts";
 
-const RECENT_CONTACTS_QUERY_KEY = ["recent-contacts"] as const;
+const RECENT_CONTACTS_QUERY_KEY = ["recent-contacts", "v2"] as const;
 const RECORD_DEBOUNCE_MS = 500;
 
 export function useRecentContacts(options?: {
@@ -40,14 +40,19 @@ export function useRecentContacts(options?: {
 
   const isAvailable = isEnabled;
 
-  const recentContactsQuery = useQuery<RecentContactsPayload | null>({
+  const recentContactsQuery = useQuery<RecentContactsPayload>({
     queryKey: RECENT_CONTACTS_QUERY_KEY,
     queryFn: async () => {
-      return (
-        (await runWithAccountKey((accountKey, e2ee) =>
-          loadRecentContactsCrypto(accountKey, e2ee),
-        )) ?? null
+      const loaded = await runWithAccountKey((accountKey, e2ee) =>
+        loadRecentContactsCrypto(accountKey, e2ee),
       );
+      if (loaded) {
+        return loaded;
+      }
+      const cached = queryClient.getQueryData<RecentContactsPayload>(
+        RECENT_CONTACTS_QUERY_KEY,
+      );
+      return cached ?? createEmptyRecentContactsPayload();
     },
     enabled: Boolean(user) && isAvailable,
     staleTime: 60_000,
@@ -56,14 +61,16 @@ export function useRecentContacts(options?: {
 
   const payload = recentContactsQuery.data ?? null;
 
+  const query = options?.query;
+  const limit = options?.limit;
+  const excludeKey = (options?.excludeEmails ?? []).join("\0");
   const suggestions = useMemo<RecentContactEntry[]>(() => {
-    if (!payload) return [];
-    return filterRecentContactSuggestions(payload, {
-      query: options?.query,
-      excludeEmails: options?.excludeEmails,
-      limit: options?.limit,
+    return resolveRecipientSuggestions(payload, {
+      query,
+      excludeEmails: excludeKey ? excludeKey.split("\0") : undefined,
+      limit,
     });
-  }, [payload, options?.query, options?.excludeEmails, options?.limit]);
+  }, [payload, query, excludeKey, limit]);
 
   const mutatePayload = useCallback(
     async (
@@ -179,6 +186,7 @@ export function useRecentContacts(options?: {
     addContact,
     refresh,
     isLoading: recentContactsQuery.isLoading,
+    isError: recentContactsQuery.isError,
     isAvailable,
   };
 }

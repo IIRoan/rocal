@@ -20,6 +20,23 @@ function stripHtmlToText(html: string): string {
   return html.replace(/<[^>]+>/g, " ");
 }
 
+function stripQuotedReply(raw: string): string {
+  const normalized = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const patterns = [
+    /\n\n---[ \t]*\n(?:[ \t]*\n)*(?=On .+?wrote:)/,
+    /\n\n(?=On .{5,120}wrote:\s*\n)/,
+    /\n[-]{3,}\s*(?:Original|Forwarded) Message\s*[-]{3,}\n/i,
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (match?.index && match.index > 0) {
+      const body = normalized.slice(0, match.index).trimEnd();
+      if (body) return body;
+    }
+  }
+  return normalized;
+}
+
 function finalizePreview(raw: string): string {
   if (!raw.trim()) {
     return "";
@@ -27,7 +44,7 @@ function finalizePreview(raw: string): string {
   if (containsArmoredPgpMessage(raw)) {
     return "";
   }
-  return collapseWhitespace(raw);
+  return collapseWhitespace(stripQuotedReply(raw));
 }
 
 /** True when conversation/list preview needs local decryption. */
@@ -79,4 +96,19 @@ export function buildMailPreviewSnippet(
   }
 
   return "";
+}
+
+/**
+ * Inbox-row snippet. Hides the "Encrypted message" placeholder so the list
+ * can show decrypted text once it lands, instead of a useless always-on label.
+ */
+export function listPreviewSnippet(
+  message: JmapEmailMessage,
+  decrypted?: DecryptedMailPreviewContent | null,
+): string {
+  const snippet = buildMailPreviewSnippet(message, decrypted);
+  if (!snippet || snippet === ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER) {
+    return "";
+  }
+  return snippet;
 }

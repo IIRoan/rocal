@@ -1,9 +1,7 @@
 "use client";
 
 import {
-  useCallback,
   useId,
-  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -14,8 +12,7 @@ import {
   insertRecipientSuggestion,
   normalizeEmailAddress,
   parseAddressList,
-  filterContactsList,
-  filterRecentContactSuggestions,
+  resolveRecipientSuggestions,
   type RecentContactEntry,
 } from "@workspace/calendar-core";
 import { Input } from "@workspace/ui/components/ui/input";
@@ -140,44 +137,19 @@ export function RecipientSuggestInput({
   });
 
   const activeToken = getActiveRecipientToken(value);
-  const excludeEmails = useMemo(
-    () =>
-      new Set(
-        parseAddressList(value).map((address) =>
-          normalizeEmailAddress(address.email),
-        ),
-      ),
-    [value],
+  const excludeEmails = new Set(
+    parseAddressList(value).map((address) =>
+      normalizeEmailAddress(address.email),
+    ),
   );
 
   const { payload, isAvailable, isLoading } = useRecentContacts();
 
-  const suggestions = useMemo(() => {
-    if (!payload) return [];
-
-    const exclude = [...excludeEmails];
-    const trimmedToken = activeToken.trim();
-
-    if (!trimmedToken) {
-      return filterRecentContactSuggestions(payload, {
-        excludeEmails: exclude,
-        limit: 10,
-      });
-    }
-
-    const prefixMatches = filterRecentContactSuggestions(payload, {
-      query: trimmedToken,
-      excludeEmails: exclude,
-      limit: 8,
-    });
-    if (prefixMatches.length > 0) {
-      return prefixMatches;
-    }
-
-    return filterContactsList(payload, { query: trimmedToken })
-      .filter((entry) => !excludeEmails.has(entry.email))
-      .slice(0, 8);
-  }, [activeToken, excludeEmails, payload]);
+  const suggestions = resolveRecipientSuggestions(payload, {
+    query: activeToken,
+    excludeEmails: [...excludeEmails],
+    limit: activeToken.trim() ? 8 : 10,
+  });
 
   const suggestionsHeading = activeToken.trim()
     ? "Matching contacts"
@@ -200,35 +172,32 @@ export function RecipientSuggestInput({
   }
   const highlightedIndex = highlightState.index;
 
-  const selectSuggestion = useCallback(
-    (entry: RecentContactEntry) => {
-      selectingRef.current = true;
+  const selectSuggestion = (entry: RecentContactEntry) => {
+    selectingRef.current = true;
 
-      if (onSelectSuggestion) {
-        onSelectSuggestion(entry);
-        setOpen(false);
-        queueMicrotask(() => {
-          selectingRef.current = false;
-        });
-        return;
-      }
-
-      const formatted = formatRecentContactForField(entry);
-      const nextValue =
-        mode === "mail"
-          ? insertRecipientSuggestion(value, formatted, {
-              appendSeparator: true,
-            })
-          : formatted;
-
-      onChange(nextValue);
+    if (onSelectSuggestion) {
+      onSelectSuggestion(entry);
       setOpen(false);
       queueMicrotask(() => {
         selectingRef.current = false;
       });
-    },
-    [mode, onChange, onSelectSuggestion, value],
-  );
+      return;
+    }
+
+    const formatted = formatRecentContactForField(entry);
+    const nextValue =
+      mode === "mail"
+        ? insertRecipientSuggestion(value, formatted, {
+            appendSeparator: true,
+          })
+        : formatted;
+
+    onChange(nextValue);
+    setOpen(false);
+    queueMicrotask(() => {
+      selectingRef.current = false;
+    });
+  };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (!showSuggestions) {

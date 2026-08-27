@@ -1,19 +1,18 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addManualContact,
   createEmptyRecentContactsPayload,
   filterContactsList,
-  filterRecentContactSuggestions,
   recordRecentContactUsage,
+  resolveRecipientSuggestions,
   removeContact,
   updateContactDetails,
   type ContactDetailsPatch,
   type ManualContactInput,
   type RecentContactContext,
-  type RecentContactEntry,
   type RecentContactUsageInput,
   type RecentContactsPayload,
 } from "@workspace/calendar-core";
@@ -50,71 +49,52 @@ export function useRecentContacts(options?: {
   });
 
   const payload = recentContactsQuery.data ?? null;
+  const suggestions = resolveRecipientSuggestions(payload, {
+    query: options?.query,
+    excludeEmails: options?.excludeEmails,
+    limit: options?.limit,
+  });
 
-  const suggestions = useMemo<RecentContactEntry[]>(() => {
-    if (!payload) return [];
-    return filterRecentContactSuggestions(payload, {
-      query: options?.query,
-      excludeEmails: options?.excludeEmails,
-      limit: options?.limit,
-    });
-  }, [payload, options?.query, options?.excludeEmails, options?.limit]);
+  async function persistPayload(next: RecentContactsPayload) {
+    const saved = await saveRecentContacts(next);
+    if (saved) {
+      queryClient.setQueryData(RECENT_CONTACTS_QUERY_KEY, next);
+    }
+    return saved;
+  }
 
-  const persistPayload = useCallback(
-    async (next: RecentContactsPayload) => {
-      const saved = await saveRecentContacts(next);
-      if (saved) {
-        queryClient.setQueryData(RECENT_CONTACTS_QUERY_KEY, next);
-      }
-      return saved;
-    },
-    [queryClient],
-  );
+  async function mutatePayload(
+    updater: (current: RecentContactsPayload) => RecentContactsPayload,
+  ) {
+    if (!isAvailable) return false;
 
-  const mutatePayload = useCallback(
-    async (
-      updater: (current: RecentContactsPayload) => RecentContactsPayload,
-    ) => {
-      if (!isAvailable) return false;
+    let current = payload ?? (await loadRecentContacts());
+    if (!current) {
+      current = createEmptyRecentContactsPayload();
+    }
 
-      let current = payload ?? (await loadRecentContacts());
-      if (!current) {
-        current = createEmptyRecentContactsPayload();
-      }
+    const next = updater(current);
+    return persistPayload(next);
+  }
 
-      const next = updater(current);
-      return persistPayload(next);
-    },
-    [isAvailable, payload, persistPayload],
-  );
+  async function updateContact(email: string, patch: ContactDetailsPatch) {
+    return mutatePayload((current) => updateContactDetails(current, email, patch));
+  }
 
-  const updateContact = useCallback(
-    async (email: string, patch: ContactDetailsPatch) => {
-      return mutatePayload((current) => updateContactDetails(current, email, patch));
-    },
-    [mutatePayload],
-  );
+  async function removeContactByEmail(email: string) {
+    return mutatePayload((current) => removeContact(current, email));
+  }
 
-  const removeContactByEmail = useCallback(
-    async (email: string) => {
-      return mutatePayload((current) => removeContact(current, email));
-    },
-    [mutatePayload],
-  );
+  async function addContact(input: ManualContactInput) {
+    if (!isAvailable) return false;
 
-  const addContact = useCallback(
-    async (input: ManualContactInput) => {
-      if (!isAvailable) return false;
+    let current = payload ?? (await loadRecentContacts());
+    const next = addManualContact(current, input);
+    if (!next) return false;
+    return persistPayload(next);
+  }
 
-      let current = payload ?? (await loadRecentContacts());
-      const next = addManualContact(current, input);
-      if (!next) return false;
-      return persistPayload(next);
-    },
-    [isAvailable, payload, persistPayload],
-  );
-
-  const flushPendingRecords = useCallback(async () => {
+  async function flushPendingRecords() {
     const pending = pendingEntriesRef.current.splice(0);
     if (pending.length === 0) {
       return;
@@ -133,31 +113,31 @@ export function useRecentContacts(options?: {
     if (saved) {
       queryClient.setQueryData(RECENT_CONTACTS_QUERY_KEY, current);
     }
-  }, [queryClient]);
+  }
 
-  const recordUsage = useCallback(
-    (entries: RecentContactUsageInput[], context: RecentContactContext) => {
-      if (!isAvailable || entries.length === 0) {
-        return;
-      }
+  function recordUsage(
+    entries: RecentContactUsageInput[],
+    context: RecentContactContext,
+  ) {
+    if (!isAvailable || entries.length === 0) {
+      return;
+    }
 
-      pendingEntriesRef.current.push({ entries, context });
+    pendingEntriesRef.current.push({ entries, context });
 
-      if (recordTimerRef.current) {
-        clearTimeout(recordTimerRef.current);
-      }
+    if (recordTimerRef.current) {
+      clearTimeout(recordTimerRef.current);
+    }
 
-      recordTimerRef.current = setTimeout(() => {
-        recordTimerRef.current = null;
-        void flushPendingRecords();
-      }, RECORD_DEBOUNCE_MS);
-    },
-    [flushPendingRecords, isAvailable],
-  );
+    recordTimerRef.current = setTimeout(() => {
+      recordTimerRef.current = null;
+      void flushPendingRecords();
+    }, RECORD_DEBOUNCE_MS);
+  }
 
-  const refresh = useCallback(async () => {
+  async function refresh() {
     await recentContactsQuery.refetch();
-  }, [recentContactsQuery]);
+  }
 
   return {
     payload,

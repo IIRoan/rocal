@@ -1,6 +1,8 @@
 import React, { useMemo } from "react";
 import { StyleSheet, View, type ViewStyle } from "react-native";
 import Animated, {
+  Extrapolation,
+  interpolate,
   useAnimatedProps,
   useAnimatedStyle,
 } from "react-native-reanimated";
@@ -8,7 +10,6 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { MailSelectionBar } from "./MailSelectionBar";
 import { MailTopToolbar } from "./MailTopToolbar";
-import { headerChromeMotion } from "./mail-selection-anim-utils";
 import { useSelectionProgress } from "./mail-selection-anim";
 import { Feather } from "@expo/vector-icons";
 import { LAYOUT_METRICS, layoutHairlineBorder } from "../../lib/app-layout";
@@ -40,21 +41,23 @@ export function MailListHeader({
   const styles = useMemo(() => createStyles(theme), [theme]);
   const progress = useSelectionProgress();
 
-  const toolbarStyle = useAnimatedStyle(() => {
-    const motion = headerChromeMotion(progress.value, "outgoing");
-    return {
-      opacity: motion.opacity,
-      transform: [{ translateY: motion.translateY }, { scale: motion.scale }],
-    };
-  });
+  const toolbarStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      progress.value,
+      [0, 0.55, 1],
+      [1, 0.15, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
 
-  const selectionStyle = useAnimatedStyle(() => {
-    const motion = headerChromeMotion(progress.value, "incoming");
-    return {
-      opacity: motion.opacity,
-      transform: [{ translateY: motion.translateY }, { scale: motion.scale }],
-    };
-  });
+  const selectionStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      progress.value,
+      [0, 0.45, 1],
+      [0, 0.85, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
 
   const toolbarPointerProps = useAnimatedProps(() => ({
     pointerEvents:
