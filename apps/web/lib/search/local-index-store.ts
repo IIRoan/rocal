@@ -1,141 +1,62 @@
+import {
+  decryptSearchShard,
+  encryptSearchShard,
+  generateLocalSearchIndexKey,
+  type EncryptedSearchShard,
+} from "@workspace/calendar-core";
+
+export {
+  decryptSearchShard,
+  encryptSearchShard,
+  generateLocalSearchIndexKey,
+  type EncryptedSearchShard,
+};
+
 const LOCAL_SEARCH_DB_NAME = "solace-private-search";
 const LOCAL_SEARCH_STORE_NAME = "encrypted-shards";
-const LOCAL_SEARCH_DB_VERSION = 1;
-const AES_GCM_ALGORITHM = "AES-GCM";
-const IV_BYTES = 12;
-
-export type EncryptedSearchShard = {
-  version: 1;
-  algorithm: "AES-GCM";
-  iv: string;
-  ciphertext: string;
-  updatedAt: string;
-  itemCount: number;
-};
+const LOCAL_SEARCH_KEY_STORE_NAME = "keys";
+const LOCAL_SEARCH_DB_VERSION = 2;
+const TITLE_INDEX_RECORD_ID = "title-index";
+const TITLE_INDEX_KEY_ID = "title-index-key";
 
 export type SearchShardRecord = {
   id: string;
-  source: "calendar" | "mail";
+  source: "calendar" | "mail" | "title";
   accountId: string;
   shard: EncryptedSearchShard;
 };
 
-const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
-  const padded = value
-    .replace(/-/g, "+")
-    .replace(/_/g, "/")
-    .padEnd(Math.ceil(value.length / 4) * 4, "=");
-  const binary = atob(padded);
-  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-}
-
-export async function generateLocalSearchIndexKey(): Promise<CryptoKey> {
-  return crypto.subtle.generateKey(
-    { name: AES_GCM_ALGORITHM, length: 256 },
-    false,
-    ["encrypt", "decrypt"],
-  );
-}
-
-export async function encryptSearchShard<T>(
-  key: CryptoKey,
-  value: T,
-  options: { additionalData?: string; itemCount?: number } = {},
-): Promise<EncryptedSearchShard> {
-  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
-  const encoded = textEncoder.encode(JSON.stringify(value));
-  const ciphertext = await crypto.subtle.encrypt(
-    {
-      name: AES_GCM_ALGORITHM,
-      iv,
-      ...(options.additionalData
-        ? { additionalData: textEncoder.encode(options.additionalData) }
-        : {}),
-    },
-    key,
-    encoded,
-  );
-
-  return {
-    version: 1,
-    algorithm: "AES-GCM",
-    iv: bytesToBase64Url(iv),
-    ciphertext: bytesToBase64Url(new Uint8Array(ciphertext)),
-    updatedAt: new Date().toISOString(),
-    itemCount: options.itemCount ?? 0,
-  };
-}
-
-export async function decryptSearchShard<T>(
-  key: CryptoKey,
-  shard: EncryptedSearchShard,
-  options: { additionalData?: string } = {},
-): Promise<T> {
-  if (shard.algorithm !== AES_GCM_ALGORITHM || shard.version !== 1) {
-    throw new Error("Unsupported local search shard format.");
+function openDatabase(): Promise<IDBDatabase> {
+  if (typeof indexedDB === "undefined") {
+    return Promise.reject(
+      new Error("Local private search index storage is unavailable."),
+    );
   }
 
-  const plaintext = await crypto.subtle.decrypt(
-    {
-      name: AES_GCM_ALGORITHM,
-      iv: base64UrlToBytes(shard.iv),
-      ...(options.additionalData
-        ? { additionalData: textEncoder.encode(options.additionalData) }
-        : {}),
-    },
-    key,
-    base64UrlToBytes(shard.ciphertext),
-  );
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(LOCAL_SEARCH_DB_NAME, LOCAL_SEARCH_DB_VERSION);
 
-  return JSON.parse(textDecoder.decode(plaintext)) as T;
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(LOCAL_SEARCH_STORE_NAME)) {
+        database.createObjectStore(LOCAL_SEARCH_STORE_NAME, { keyPath: "id" });
+      }
+      if (!database.objectStoreNames.contains(LOCAL_SEARCH_KEY_STORE_NAME)) {
+        database.createObjectStore(LOCAL_SEARCH_KEY_STORE_NAME);
+      }
+    };
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+  });
 }
 
 export class BrowserSearchIndexStore {
   private databasePromise: Promise<IDBDatabase> | null = null;
 
   private getDatabase(): Promise<IDBDatabase> {
-    if (typeof indexedDB === "undefined") {
-      return Promise.reject(
-        new Error("Local private search index storage is unavailable."),
-      );
+    if (!this.databasePromise) {
+      this.databasePromise = openDatabase();
     }
-
-    if (this.databasePromise) return this.databasePromise;
-
-    this.databasePromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(
-        LOCAL_SEARCH_DB_NAME,
-        LOCAL_SEARCH_DB_VERSION,
-      );
-
-      request.onupgradeneeded = () => {
-        const database = request.result;
-        if (!database.objectStoreNames.contains(LOCAL_SEARCH_STORE_NAME)) {
-          database.createObjectStore(LOCAL_SEARCH_STORE_NAME, { keyPath: "id" });
-        }
-      };
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-
     return this.databasePromise;
   }
 
@@ -157,7 +78,8 @@ export class BrowserSearchIndexStore {
     return new Promise((resolve, reject) => {
       const transaction = database.transaction(LOCAL_SEARCH_STORE_NAME, "readonly");
       const request = transaction.objectStore(LOCAL_SEARCH_STORE_NAME).get(id);
-      request.onsuccess = () => resolve((request.result as SearchShardRecord) ?? null);
+      request.onsuccess = () =>
+        resolve((request.result as SearchShardRecord) ?? null);
       request.onerror = () => reject(request.error);
     });
   }
@@ -174,6 +96,42 @@ export class BrowserSearchIndexStore {
       transaction.onerror = () => reject(transaction.error);
     });
   }
+
+  async getOrCreateKey(): Promise<CryptoKey> {
+    const database = await this.getDatabase();
+    const existing = await new Promise<CryptoKey | null>((resolve, reject) => {
+      const transaction = database.transaction(
+        LOCAL_SEARCH_KEY_STORE_NAME,
+        "readonly",
+      );
+      const request = transaction
+        .objectStore(LOCAL_SEARCH_KEY_STORE_NAME)
+        .get(TITLE_INDEX_KEY_ID);
+      request.onsuccess = () =>
+        resolve((request.result as CryptoKey | undefined) ?? null);
+      request.onerror = () => reject(request.error);
+    });
+
+    if (existing) return existing;
+
+    const key = await generateLocalSearchIndexKey();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(
+        LOCAL_SEARCH_KEY_STORE_NAME,
+        "readwrite",
+      );
+      transaction.objectStore(LOCAL_SEARCH_KEY_STORE_NAME).put(key, TITLE_INDEX_KEY_ID);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+    return key;
+  }
+}
+
+export const TITLE_INDEX_SHARD_ID = TITLE_INDEX_RECORD_ID;
+
+export function titleIndexAdditionalData(accountId: string): string {
+  return `title:${accountId}`;
 }
 
 export function clearLocalSearchIndexDatabase(): Promise<void> {

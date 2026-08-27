@@ -13,7 +13,6 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter, useSegments } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import type { CalendarEvent } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,15 +28,19 @@ import {
   SETTINGS_NOTIFICATIONS_ROUTE,
   isMailRouteSegments,
 } from "../lib/navigation-routes";
-import { useMailAccount } from "../lib/mail/use-mail";
-import { useMailRuntime } from "../lib/mail/use-mail";
+import { useMailAccount, useMailRuntime } from "../lib/mail/use-mail";
 import { formatAddress } from "../lib/mail/mail-helpers";
-import type { JmapEmailMessage } from "../lib/mail/types";
+import { useNativeTitleIndex } from "../hooks/use-native-title-index";
+import {
+  mergePaletteSearchResults,
+  type NativePaletteSearchResult,
+} from "../lib/search/palette-search";
 
 import {
   BottomSheet,
   BottomSheetHeader,
   BottomSheetScrollView,
+  BottomSheetTitle,
 } from "./BottomSheet";
 import {
   buildCommandActions,
@@ -49,11 +52,36 @@ import {
 
 const SEARCH_MIN_LENGTH = 2;
 const SEARCH_DEBOUNCE_MS = 250;
-const SEARCH_LIMIT = 8;
+const SEARCH_LIMIT = 12;
+
+function IconBox({
+  name,
+  color,
+  bg,
+}: {
+  name: React.ComponentProps<typeof Feather>["name"];
+  color: string;
+  bg: string;
+}) {
+  return (
+    <View
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: 9,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: bg,
+      }}
+    >
+      <Feather name={name} size={16} color={color} />
+    </View>
+  );
+}
 
 /**
- * Global command palette. Scope follows the active tab: mail screens search
- * messages and show mail actions only; calendar screens search events.
+ * Global command palette. Commands follow the active tab. Search looks across
+ * the on-device title index plus live calendar/mail results.
  */
 export function CommandPalette() {
   const { theme } = useTheme();
@@ -65,6 +93,7 @@ export function CommandPalette() {
   const router = useRouter();
   const segments = useSegments();
   const inputRef = useRef<TextInput>(null);
+  const titleIndex = useNativeTitleIndex();
 
   const scope: CommandPaletteScope = isMailRouteSegments(segments)
     ? "mail"
@@ -75,7 +104,7 @@ export function CommandPalette() {
 
   const accountQuery = useMailAccount();
   const mailProvisioned = accountQuery.data?.provisioned ?? false;
-  const runtimeQuery = useMailRuntime(scope === "mail" && mailProvisioned);
+  const runtimeQuery = useMailRuntime(isOpen && mailProvisioned);
   const runtime = runtimeQuery.data;
   const { selectedMailboxId } = useMailSelection();
 
@@ -103,7 +132,7 @@ export function CommandPalette() {
         { q: trimmedQuery, limit: SEARCH_LIMIT },
         signal,
       ),
-    enabled: scope === "calendar" && searchEnabled,
+    enabled: searchEnabled,
     staleTime: 10_000,
   });
 
@@ -121,10 +150,7 @@ export function CommandPalette() {
         trimmedQuery,
         SEARCH_LIMIT,
       ),
-    enabled:
-      scope === "mail" &&
-      searchEnabled &&
-      Boolean(runtime && selectedMailboxId),
+    enabled: searchEnabled && Boolean(runtime && selectedMailboxId),
     staleTime: 10_000,
   });
 
@@ -136,6 +162,30 @@ export function CommandPalette() {
   const actionSections = useMemo(
     () => groupCommandActions(filteredActions, scope),
     [filteredActions, scope],
+  );
+
+  const searchResults = useMemo(
+    () =>
+      searchEnabled
+        ? mergePaletteSearchResults({
+            titleDocuments: titleIndex.documents,
+            query: trimmedQuery,
+            events: eventSearchData?.events ?? [],
+            messages: mailSearchData?.messages ?? [],
+            limit: SEARCH_LIMIT,
+          })
+        : [],
+    [
+      eventSearchData?.events,
+      mailSearchData?.messages,
+      searchEnabled,
+      titleIndex.documents,
+      trimmedQuery,
+    ],
+  );
+  const mailResults = searchResults.filter((result) => result.source === "mail");
+  const calendarResults = searchResults.filter(
+    (result) => result.source === "calendar",
   );
 
   const handleCloseComplete = useCallback(() => {
@@ -197,38 +247,31 @@ export function CommandPalette() {
     ],
   );
 
-  const handleEventPress = useCallback(
-    (event: CalendarEvent) => {
+  const handleSearchResultPress = useCallback(
+    (result: NativePaletteSearchResult) => {
       close();
-      const start = new Date(event.start);
-      if (!Number.isNaN(start.getTime())) {
+      if (result.source === "mail") {
+        router.push(`/(tabs)/mail/message/${result.messageId}` as never);
+        return;
+      }
+
+      const start = new Date(result.event.start);
+      if (!Number.isNaN(start.getTime()) && start.getTime() !== 0) {
         setCurrentDate(start);
         setSelectedDate(start);
       }
-      openEventSheet({ type: "view", eventId: event.id });
+      openEventSheet({ type: "view", eventId: result.eventId });
       navigateToCalendar();
     },
-    [close, openEventSheet, setCurrentDate, setSelectedDate, navigateToCalendar],
+    [close, navigateToCalendar, openEventSheet, router, setCurrentDate, setSelectedDate],
   );
 
-  const handleMailMessagePress = useCallback(
-    (message: JmapEmailMessage) => {
-      close();
-      router.push(`/(tabs)/mail/message/${message.id}` as never);
-    },
-    [close, router],
-  );
-
-  const events = eventSearchData?.events ?? [];
-  const mailMessages = mailSearchData?.messages ?? [];
   const showSearchResults = trimmedQuery.length >= SEARCH_MIN_LENGTH;
   const noActionMatches = !showSearchResults && filteredActions.length === 0;
-  const searchPlaceholder =
-    scope === "mail"
-      ? "Search mail or run a command…"
-      : "Search events or run a command…";
   const searchFetching =
-    scope === "mail" ? mailSearchFetching : eventSearchFetching;
+    eventSearchFetching || mailSearchFetching || titleIndex.isIndexing;
+  const iconColor = theme.colors.mutedForeground;
+  const iconBg = theme.colors.mutedForeground + "18";
 
   return (
     <BottomSheet
@@ -236,36 +279,8 @@ export function CommandPalette() {
       onDismiss={close}
       onCloseComplete={handleCloseComplete}
     >
-      <BottomSheetHeader showClose={false}>
-        <View style={styles.searchRow}>
-          <Feather
-            name="search"
-            size={18}
-            color={theme.colors.mutedForeground}
-          />
-          <TextInput
-            ref={inputRef}
-            style={styles.searchInput}
-            placeholder={searchPlaceholder}
-            placeholderTextColor={theme.colors.mutedForeground}
-            value={query}
-            onChangeText={setQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
-            accessibilityLabel="Command palette search"
-          />
-          {query.length > 0 ? (
-            <Pressable
-              onPress={() => setQuery("")}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-            >
-              <Feather name="x" size={18} color={theme.colors.mutedForeground} />
-            </Pressable>
-          ) : null}
-        </View>
+      <BottomSheetHeader>
+        <BottomSheetTitle>Search</BottomSheetTitle>
       </BottomSheetHeader>
 
       <BottomSheetScrollView
@@ -274,62 +289,116 @@ export function CommandPalette() {
           { paddingBottom: insets.bottom + 8 },
         ]}
       >
-        {showSearchResults ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionLabel}>
-                {scope === "mail" ? "Messages" : "Events"}
-              </Text>
-              {searchFetching ? (
-                <ActivityIndicator
-                  size="small"
+        <View style={styles.sectionCard}>
+          <View style={styles.searchRow}>
+            <Feather
+              name="search"
+              size={16}
+              color={theme.colors.mutedForeground}
+            />
+            <TextInput
+              ref={inputRef}
+              style={styles.searchInput}
+              placeholder="Mail, events, and commands"
+              placeholderTextColor={theme.colors.mutedForeground}
+              value={query}
+              onChangeText={setQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+              accessibilityLabel="Search mail, events, and commands"
+            />
+            {query.length > 0 ? (
+              <Pressable
+                onPress={() => setQuery("")}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
+                <Feather
+                  name="x"
+                  size={16}
                   color={theme.colors.mutedForeground}
                 />
-              ) : null}
-            </View>
-            {scope === "mail" ? (
-              mailMessages.length === 0 && !searchFetching ? (
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+
+        {showSearchResults ? (
+          <>
+            <SectionHeading
+              label="Mail"
+              fetching={searchFetching && mailResults.length === 0}
+              theme={theme}
+              styles={styles}
+            />
+            <View style={styles.sectionCard}>
+              {mailResults.length === 0 ? (
                 <Text style={styles.emptyText}>No matching messages.</Text>
               ) : (
-                mailMessages.map((message) => (
-                  <MailMessageResultRow
-                    key={message.id}
-                    message={message}
+                mailResults.map((result, index) => (
+                  <SearchResultRow
+                    key={result.id}
+                    result={result}
                     theme={theme}
                     styles={styles}
-                    onPress={handleMailMessagePress}
+                    iconColor={iconColor}
+                    iconBg={iconBg}
+                    showDivider={index > 0}
+                    onPress={handleSearchResultPress}
                   />
                 ))
-              )
-            ) : events.length === 0 && !searchFetching ? (
-              <Text style={styles.emptyText}>No matching events.</Text>
-            ) : (
-              events.map((event) => (
-                <EventResultRow
-                  key={event.id}
-                  event={event}
-                  theme={theme}
-                  styles={styles}
-                  onPress={handleEventPress}
-                />
-              ))
-            )}
-          </View>
+              )}
+            </View>
+
+            <SectionHeading
+              label="Events"
+              fetching={searchFetching && calendarResults.length === 0}
+              theme={theme}
+              styles={styles}
+            />
+            <View style={styles.sectionCard}>
+              {calendarResults.length === 0 ? (
+                <Text style={styles.emptyText}>No matching events.</Text>
+              ) : (
+                calendarResults.map((result, index) => (
+                  <SearchResultRow
+                    key={result.id}
+                    result={result}
+                    theme={theme}
+                    styles={styles}
+                    iconColor={iconColor}
+                    iconBg={iconBg}
+                    showDivider={index > 0}
+                    onPress={handleSearchResultPress}
+                  />
+                ))
+              )}
+            </View>
+          </>
         ) : noActionMatches ? (
-          <Text style={styles.emptyText}>No matching commands.</Text>
+          <View style={styles.sectionCard}>
+            <Text style={styles.emptyText}>No matching commands.</Text>
+          </View>
         ) : (
           actionSections.map((section) => (
-            <View key={section.group} style={styles.section}>
+            <View key={section.group}>
               <Text style={styles.sectionLabel}>{section.group}</Text>
-              {section.actions.map((action) => (
-                <ActionRow
-                  key={action.id}
-                  action={action}
-                  theme={theme}
-                  styles={styles}
-                  onPress={runAction}
-                />
-              ))}
+              <View style={styles.sectionCard}>
+                {section.actions.map((action, index) => (
+                  <ActionRow
+                    key={action.id}
+                    action={action}
+                    theme={theme}
+                    styles={styles}
+                    iconColor={iconColor}
+                    iconBg={iconBg}
+                    showDivider={index > 0}
+                    onPress={runAction}
+                  />
+                ))}
+              </View>
             </View>
           ))
         )}
@@ -338,163 +407,170 @@ export function CommandPalette() {
   );
 }
 
-// ─── Rows ──────────────────────────────────────────────────────────────────
-
 type Styles = ReturnType<typeof createStyles>;
+
+function SectionHeading({
+  label,
+  fetching,
+  theme,
+  styles,
+}: {
+  label: string;
+  fetching: boolean;
+  theme: ThemeTokens;
+  styles: Styles;
+}) {
+  return (
+    <View style={styles.sectionHeaderRow}>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      {fetching ? (
+        <ActivityIndicator size="small" color={theme.colors.mutedForeground} />
+      ) : null}
+    </View>
+  );
+}
 
 function ActionRow({
   action,
-  theme,
   styles,
+  iconColor,
+  iconBg,
+  showDivider,
   onPress,
 }: {
   action: CommandAction;
   theme: ThemeTokens;
   styles: Styles;
+  iconColor: string;
+  iconBg: string;
+  showDivider: boolean;
   onPress: (action: CommandAction) => void;
 }) {
   return (
-    <Pressable
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-      onPress={() => onPress(action)}
-      accessibilityRole="button"
-      accessibilityLabel={action.label}
-    >
-      <View style={styles.rowIcon}>
-        <Feather name={action.icon} size={18} color={theme.colors.foreground} />
-      </View>
-      <Text style={styles.rowLabel} numberOfLines={1}>
-        {action.label}
-      </Text>
-    </Pressable>
+    <View>
+      {showDivider ? <View style={styles.sectionDivider} /> : null}
+      <Pressable
+        style={({ pressed }) => [styles.sectionRow, pressed && styles.rowPressed]}
+        onPress={() => onPress(action)}
+        accessibilityRole="button"
+        accessibilityLabel={action.label}
+      >
+        <IconBox name={action.icon} color={iconColor} bg={iconBg} />
+        <Text style={styles.rowLabel} numberOfLines={1}>
+          {action.label}
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
-function EventResultRow({
-  event,
-  theme,
+function SearchResultRow({
+  result,
   styles,
+  iconColor,
+  iconBg,
+  showDivider,
   onPress,
 }: {
-  event: CalendarEvent;
+  result: NativePaletteSearchResult;
   theme: ThemeTokens;
   styles: Styles;
-  onPress: (event: CalendarEvent) => void;
+  iconColor: string;
+  iconBg: string;
+  showDivider: boolean;
+  onPress: (result: NativePaletteSearchResult) => void;
 }) {
-  const start = new Date(event.start);
-  const subtitle = Number.isNaN(start.getTime())
-    ? null
-    : event.allDay
-      ? format(start, "EEE, MMM d")
-      : format(start, "EEE, MMM d • p");
+  const subtitle = formatSearchSubtitle(result);
+  const icon = result.source === "mail" ? "mail" : "calendar";
 
   return (
-    <Pressable
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-      onPress={() => onPress(event)}
-      accessibilityRole="button"
-      accessibilityLabel={event.title || "Untitled event"}
-    >
-      <View style={styles.rowIcon}>
-        <Feather name="calendar" size={18} color={theme.colors.foreground} />
-      </View>
-      <View style={styles.rowTextWrap}>
-        <Text style={styles.rowLabel} numberOfLines={1}>
-          {event.title || "Untitled event"}
-        </Text>
-        {subtitle ? (
-          <Text style={styles.rowSubtitle} numberOfLines={1}>
-            {subtitle}
+    <View>
+      {showDivider ? <View style={styles.sectionDivider} /> : null}
+      <Pressable
+        style={({ pressed }) => [styles.sectionRow, pressed && styles.rowPressed]}
+        onPress={() => onPress(result)}
+        accessibilityRole="button"
+        accessibilityLabel={result.title}
+      >
+        <IconBox name={icon} color={iconColor} bg={iconBg} />
+        <View style={styles.rowTextWrap}>
+          <Text style={styles.rowLabel} numberOfLines={1}>
+            {result.title || "Untitled"}
           </Text>
-        ) : null}
-      </View>
-    </Pressable>
+          {subtitle ? (
+            <Text style={styles.rowSubtitle} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
+    </View>
   );
 }
 
-function MailMessageResultRow({
-  message,
-  theme,
-  styles,
-  onPress,
-}: {
-  message: JmapEmailMessage;
-  theme: ThemeTokens;
-  styles: Styles;
-  onPress: (message: JmapEmailMessage) => void;
-}) {
-  const title = message.subject?.trim() || "(no subject)";
-  const from = formatAddress(message.from);
-  const receivedAt = message.receivedAt
-    ? format(new Date(message.receivedAt), "MMM d")
-    : null;
-  const subtitle = [from, receivedAt].filter(Boolean).join(" · ");
+function formatSearchSubtitle(result: NativePaletteSearchResult): string | null {
+  if (result.source === "mail") {
+    const from =
+      result.from ??
+      formatAddress(result.message.from) ??
+      result.snippet ??
+      null;
+    const receivedAt = result.timestamp
+      ? format(new Date(result.timestamp), "MMM d")
+      : null;
+    const parts = [from, receivedAt].filter(Boolean);
+    return parts.length > 0 ? parts.join(" · ") : null;
+  }
 
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-      onPress={() => onPress(message)}
-      accessibilityRole="button"
-      accessibilityLabel={title}
-    >
-      <View style={styles.rowIcon}>
-        <Feather name="mail" size={18} color={theme.colors.foreground} />
-      </View>
-      <View style={styles.rowTextWrap}>
-        <Text style={styles.rowLabel} numberOfLines={1}>
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text style={styles.rowSubtitle} numberOfLines={1}>
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-    </Pressable>
-  );
+  const start = new Date(result.event.start);
+  if (Number.isNaN(start.getTime()) || start.getTime() === 0) {
+    return result.snippet ?? null;
+  }
+  return result.event.allDay
+    ? format(start, "EEE, MMM d")
+    : format(start, "EEE, MMM d · p");
 }
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
 
 function createStyles(theme: ThemeTokens) {
   const view = {
-    searchRow: {
+    scrollContent: {
+      paddingHorizontal: 16,
+      paddingTop: 4,
+      paddingBottom: 20,
+    },
+    sectionCard: {
+      backgroundColor: theme.colors.muted + "28",
+      borderRadius: theme.borderRadius.lg,
+      marginBottom: 8,
+      overflow: "hidden" as const,
+    },
+    sectionRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-      borderRadius: theme.borderRadius.lg,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.secondary,
+      gap: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      minHeight: 44,
     },
-    scrollContent: {
-      paddingHorizontal: theme.spacing["4"],
-      paddingBottom: theme.spacing["6"],
-    },
-    section: {
-      marginBottom: theme.spacing["4"],
+    sectionDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: theme.colors.border + "60",
+      marginLeft: 14 + 32 + 12,
     },
     sectionHeaderRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       justifyContent: "space-between" as const,
     },
-    row: {
+    searchRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: theme.spacing["3"],
-      paddingVertical: theme.spacing["3"],
-      paddingHorizontal: theme.spacing["2"],
-      borderRadius: theme.borderRadius.md,
+      gap: theme.spacing["2"],
+      paddingHorizontal: 14,
+      paddingVertical: 12,
     },
     rowPressed: {
-      backgroundColor: theme.colors.muted,
-    },
-    rowIcon: {
-      width: 28,
-      alignItems: "center" as const,
+      backgroundColor: theme.colors.muted + "40",
     },
     rowTextWrap: {
       flex: 1,
@@ -517,6 +593,8 @@ function createStyles(theme: ThemeTokens) {
       letterSpacing: 0.5,
       color: theme.colors.mutedForeground,
       marginBottom: theme.spacing["1"],
+      marginTop: theme.spacing["2"],
+      paddingHorizontal: 4,
     },
     rowLabel: {
       flex: 1,
@@ -533,6 +611,7 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       color: theme.colors.mutedForeground,
       paddingVertical: theme.spacing["4"],
+      paddingHorizontal: 14,
       textAlign: "center" as const,
     },
   } satisfies Record<string, TextStyle>;

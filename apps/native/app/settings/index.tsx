@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -61,6 +62,11 @@ import {
   resolvePasskeyBridgeBaseUrl,
 } from "../../src/lib/passkey-browser-bridge";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
+import {
+  isNativeTitleIndexEnabled,
+  setNativeTitleIndexEnabled,
+  subscribeNativeTitleIndexEnabled,
+} from "../../src/lib/search/title-index-store";
 import {
   THEME_OPTIONS,
   VIEW_OPTIONS,
@@ -278,6 +284,19 @@ export default function SettingsScreen() {
   const [isSettingPassword, setIsSettingPassword] = useState(false);
   const [isResettingEncryptionPassword, setIsResettingEncryptionPassword] =
     useState(false);
+  const [titleIndexEnabled, setTitleIndexEnabled] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void isNativeTitleIndexEnabled().then((value) => {
+      if (!cancelled) setTitleIndexEnabled(value);
+    });
+    const unsubscribe = subscribeNativeTitleIndexEnabled(setTitleIndexEnabled);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
   const linkedAccounts = useMemo(
     () => accountsQuery.data ?? ([] as LinkedAuthAccountLike[]),
     [accountsQuery.data],
@@ -913,6 +932,17 @@ export default function SettingsScreen() {
         <View style={styles.sectionItems}>
           <HintRow
             text={EVENT_ENCRYPTION_HINT}
+            theme={theme}
+          />
+          <SettingToggleRow
+            icon="search"
+            label="On-device search index"
+            description="Keep encrypted titles of your mail and events on this device so older items stay searchable."
+            value={titleIndexEnabled}
+            onValueChange={(value) => {
+              setTitleIndexEnabled(value);
+              void setNativeTitleIndexEnabled(value);
+            }}
             theme={theme}
           />
           {isPasskeySupported ? (
@@ -1802,6 +1832,80 @@ function NavigationRow({
         size={14}
         color={theme.colors.mutedForeground}
         style={{ opacity: 0.4 }}
+      />
+    </Pressable>
+  );
+}
+
+function SettingToggleRow({
+  icon,
+  label,
+  description,
+  value,
+  onValueChange,
+  theme,
+}: {
+  icon: FeatherIcon;
+  label: string;
+  description: string;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+  theme: ThemeTokens;
+}) {
+  return (
+    <Pressable
+      onPress={() => onValueChange(!value)}
+      style={({ pressed }) => [
+        {
+          flexDirection: "row" as const,
+          alignItems: "center" as const,
+          gap: theme.spacing["3"],
+          paddingHorizontal: theme.spacing["3"],
+          paddingVertical: theme.spacing["3"],
+          borderRadius: theme.borderRadius.md,
+          marginHorizontal: theme.spacing["1"],
+        },
+        pressed && { backgroundColor: theme.colors.accent },
+      ]}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      accessibilityLabel={label}
+    >
+      <Feather
+        name={icon}
+        size={16}
+        color={theme.colors.mutedForeground}
+        style={{ marginTop: 2 }}
+      />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          style={{
+            fontSize: theme.typography.fontSize.sm.size,
+            lineHeight: theme.typography.fontSize.sm.lineHeight,
+            color: theme.colors.foreground,
+          }}
+        >
+          {label}
+        </Text>
+        <Text
+          style={{
+            fontSize: theme.typography.fontSize.xs.size,
+            lineHeight: theme.typography.fontSize.xs.lineHeight,
+            color: theme.colors.mutedForeground,
+          }}
+        >
+          {description}
+        </Text>
+      </View>
+      <Switch
+        value={value}
+        pointerEvents="none"
+        trackColor={{
+          false: theme.colors.input,
+          true: theme.colors.primaryBase,
+        }}
+        thumbColor="#ffffff"
+        style={{ transform: [{ scale: 0.85 }] }}
       />
     </Pressable>
   );

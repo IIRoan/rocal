@@ -6,8 +6,15 @@ import { clearLocalSearchIndexDatabase } from "@/lib/search/local-index-store";
 const ENABLED_KEY = "search:private-content-index-enabled";
 const PAUSED_KEY = "search:private-content-index-paused";
 const CONSENT_KEY = "search:private-content-index-consent";
+export const PRIVATE_SEARCH_INDEX_CHANGE_EVENT =
+  "solace-private-search-index-changed";
 
 export type PrivateSearchIndexConsent = "undecided" | "accepted" | "declined";
+
+function notifyPrivateSearchIndexChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(PRIVATE_SEARCH_INDEX_CHANGE_EVENT));
+}
 
 function readBoolean(key: string, fallback = false): boolean {
   if (typeof window === "undefined") return fallback;
@@ -33,6 +40,7 @@ export function usePrivateSearchIndexControls() {
   const setConsent = useCallback((value: PrivateSearchIndexConsent) => {
     setConsentState(value);
     window.localStorage.setItem(CONSENT_KEY, value);
+    notifyPrivateSearchIndexChanged();
   }, []);
 
   const setEnabled = useCallback((value: boolean) => {
@@ -48,6 +56,7 @@ export function usePrivateSearchIndexControls() {
   const setPaused = useCallback((value: boolean) => {
     setPausedState(value);
     window.localStorage.setItem(PAUSED_KEY, String(value));
+    notifyPrivateSearchIndexChanged();
   }, []);
 
   const clearIndex = useCallback(async () => {
