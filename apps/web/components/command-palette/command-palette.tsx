@@ -5,6 +5,7 @@ import { EventEditor } from "../event-editor";
 import { TransitionContainer } from "./transition-container";
 import { CommandPaletteViewContent } from "./command-palette-view-content";
 import { CommandPaletteDesktopDialog } from "./command-palette-desktop-dialog";
+import { PrivateSearchIndexPrompt } from "./private-search-index-prompt";
 import { useCommandPaletteController } from "./use-command-palette-controller";
 import {
   Dialog,
@@ -180,29 +181,41 @@ export function CommandPalette({
 
   if (c.isMobile) {
     return (
-      <Drawer open={open} onOpenChange={onOpenChange} direction="bottom">
-        <DrawerContent
-          responsive
-          responsiveHeight="90svh"
-          className="bg-popover border-border/50 flex flex-col overflow-hidden p-0"
-        >
-          <VisuallyHidden>
-            <DrawerTitle>{c.title}</DrawerTitle>
-          </VisuallyHidden>
-          {paletteContent}
-        </DrawerContent>
-      </Drawer>
+      <>
+        <Drawer open={open} onOpenChange={onOpenChange} direction="bottom">
+          <DrawerContent
+            responsive
+            responsiveHeight="90svh"
+            className="bg-popover border-border/50 flex flex-col overflow-hidden p-0"
+          >
+            <VisuallyHidden>
+              <DrawerTitle>{c.title}</DrawerTitle>
+            </VisuallyHidden>
+            {paletteContent}
+          </DrawerContent>
+        </Drawer>
+        <PrivateSearchIndexPrompt
+          open={open}
+          query={c.paletteSearch.searchQuery}
+        />
+      </>
     );
   }
 
   return (
-    <CommandPaletteDesktopDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={c.title}
-      hasBothResults={c.hasBothResults}
-    >
-      {paletteContent}
-    </CommandPaletteDesktopDialog>
+    <>
+      <CommandPaletteDesktopDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title={c.title}
+        hasBothResults={c.hasBothResults}
+      >
+        {paletteContent}
+      </CommandPaletteDesktopDialog>
+      <PrivateSearchIndexPrompt
+        open={open}
+        query={c.paletteSearch.searchQuery}
+      />
+    </>
   );
 }
