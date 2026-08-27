@@ -8,6 +8,7 @@
         "@better-auth/oauth-provider": "1.6.13",
         "@phosphor-icons/react": "2.1.10",
         "babel-jest": "^30.4.1",
+        "exact-mirror": "^1.2.2",
         "jest-environment-jsdom": "30.3.0",
       },
       "devDependencies": {
@@ -45,6 +46,7 @@
         "better-auth": "^1.6.13",
         "better-call": "^2.0.2",
         "elysia": "next",
+        "exact-mirror": "^1.2.2",
         "ical": "^0.8.0",
         "openpgp": "^6.3.0",
         "react": "19.2.3",
@@ -2073,7 +2075,7 @@
 
     "electron-to-chromium": ["electron-to-chromium@1.5.361", "", {}, "sha512-Q6Hts7N9FnJc5LeGRINFvLhCI9xZmNtTDe5ZbcVezQz7cU4a8Aua3GH1b8J2XY8Al9PF+OCwYqhgsOOheMdvkA=="],
 
-    "elysia": ["elysia@2.0.0-beta.8", "", { "dependencies": { "deuri": "^3.0.0", "memoirist": "1.2.2" }, "peerDependencies": { "@types/bun": ">= 1.3.0", "exact-mirror": ">= 1.2.2", "openapi-types": ">= 12.0.0", "typebox": ">= 1.3.0", "typescript": ">= 5.7.0" }, "optionalPeers": ["@types/bun", "openapi-types", "typescript"] }, "sha512-DrYPIxNpgSgtU6rU8EbFdbq2NXc6AliDF8IhXwazQJXhiRU0ErevDe5tsFoz/02/OHI6oclvKRBo3JiibQYFcA=="],
+    "elysia": ["elysia@2.0.0-beta.9", "", { "dependencies": { "deuri": "^3.0.0", "memoirist": "1.2.2" }, "peerDependencies": { "@types/bun": ">= 1.3.0", "exact-mirror": ">= 1.2.2", "openapi-types": ">= 12.0.0", "typebox": ">= 1.3.0", "typescript": ">= 5.7.0" }, "optionalPeers": ["@types/bun", "openapi-types", "typescript"] }, "sha512-Nw248GyCPdW8eNKQJe09idvOsvFi7YAOCkHXJBoMoVQWPS9Mo8USkflsSIEPJEliWvTQL0QtzAQ+klWOdW8L3w=="],
 
     "embla-carousel": ["embla-carousel@8.6.0", "", {}, "sha512-SjWyZBHJPbqxHOzckOfo8lHisEaJWmwd23XppYFYVh10bU66/Pn5tkVkbkCMZVdbUE5eTCI2nD8OyIP4Z+uwkA=="],
 

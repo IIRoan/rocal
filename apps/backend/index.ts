@@ -1,4 +1,4 @@
-import { Elysia } from "elysia";
+import { Elysia, Manifest } from "elysia";
 import { unauthorizedBody } from "./lib/api-error-response";
 import { cors } from "@elysia/cors";
 import {
@@ -39,6 +39,7 @@ import { createStalwartWebhookRoutes } from "./routes/stalwart-webhook";
 import { createStalwartAdminClient } from "./lib/stalwart-admin";
 import { StalwartWebhookService } from "./services/stalwart-webhook.service";
 import { prisma } from "./lib/prisma";
+import { createBetterAuthPlugin } from "./lib/better-auth-plugin";
 import { handleApiError } from "./lib/errors";
 import { errorLogDetails } from "./lib/log-sanitization";
 import { requestContext } from "./lib/request-context";
@@ -69,7 +70,7 @@ function getLocalAuthBasePath(prefix: string): string {
   return normalizePath(BETTER_AUTH_BASE_PATH);
 }
 
-if (isMailOauthEnabled) {
+if (isMailOauthEnabled && !Manifest.isCapturing()) {
   await ensureMailOAuthClients();
 }
 
@@ -80,35 +81,15 @@ const oauthOpenIdConfiguration = isMailOauthEnabled
   ? oauthProviderOpenIdConfigMetadata(auth)
   : null;
 
-// Better Auth middleware
-const betterAuth = new Elysia({ name: "better-auth" })
-  .mount(auth.handler)
-  .derive(async ({ request }) => {
-    try {
-      const session = await auth.api.getSession({
-        headers: request.headers as Headers,
-      });
-
-      return {
-        user: session?.user,
-        session: session?.session,
-      };
-    } catch (error) {
-      logger.error("Auth middleware error", errorLogDetails(error));
-      return {
-        user: null,
-        session: null,
-      };
-    }
-  });
-
 export const createAPI = (prefix = "") => {
   const app = new Elysia({ prefix, normalize: false });
   const localAuthBasePath = getLocalAuthBasePath(prefix);
   const calendarSyncService = CalendarSyncService.getInstance();
 
-  calendarSyncService.start();
-  defaultMailRealtimeService.start();
+  if (!Manifest.isCapturing()) {
+    calendarSyncService.start();
+    defaultMailRealtimeService.start();
+  }
 
   return app
     .use(routeModels)
@@ -214,7 +195,7 @@ export const createAPI = (prefix = "") => {
     })
     .use(requestContext)
     .error("global", handleApiError)
-    .use(betterAuth)
+    .use(createBetterAuthPlugin(localAuthBasePath))
     .get("/", {
       detail: {
         tags: ["Health"],
@@ -307,9 +288,8 @@ export const createAPI = (prefix = "") => {
     .use(inviteRoutes);
 };
 
-// Start the server when this file is run directly
 const port = env.port;
-const app = createAPI("/api");
+export const app = createAPI("/api");
 const calendarSyncService = CalendarSyncService.getInstance();
 
 const shutdown = () => {
@@ -317,8 +297,10 @@ const shutdown = () => {
   defaultMailRealtimeService.stop();
 };
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+if (!Manifest.isCapturing()) {
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
 
 // Handle OAuth errors at root (better-auth redirects here on error)
 app.get("/", ({ query, redirect }) => {
@@ -331,26 +313,28 @@ app.get("/", ({ query, redirect }) => {
   return redirect(frontendUrl);
 });
 
-app.listen(port, () => {
-  logger.ok(`Server is running on ${backendUrl}`);
-  logger.info("Auth runtime config", {
-    backendUrl,
-    frontendUrl,
-    cookieSameSite: process.env.AUTH_COOKIE_SAME_SITE || "lax",
-    nodeEnv: process.env.NODE_ENV || "development",
-  });
+if (!Manifest.isCapturing() && import.meta.main) {
+  app.listen(port, () => {
+    logger.ok(`Server is running on ${backendUrl}`);
+    logger.info("Auth runtime config", {
+      backendUrl,
+      frontendUrl,
+      cookieSameSite: process.env.AUTH_COOKIE_SAME_SITE || "lax",
+      nodeEnv: process.env.NODE_ENV || "development",
+    });
 
-  if (env.stalwartWebhookSecret && env.stalwartAdminToken) {
-    void createStalwartAdminClient()
-      .ensureMailIngestWebhook({
-        url: env.stalwartWebhookUrl,
-        secret: env.stalwartWebhookSecret,
-      })
-      .catch((error) => {
-        logger.warn("Failed to ensure Stalwart mail ingest webhook", {
-          message:
-            error instanceof Error ? error.message : "Unknown webhook error",
+    if (env.stalwartWebhookSecret && env.stalwartAdminToken) {
+      void createStalwartAdminClient()
+        .ensureMailIngestWebhook({
+          url: env.stalwartWebhookUrl,
+          secret: env.stalwartWebhookSecret,
+        })
+        .catch((error) => {
+          logger.warn(
+            "Failed to ensure Stalwart mail ingest webhook",
+            errorLogDetails(error),
+          );
         });
-      });
-  }
-});
+    }
+  });
+}

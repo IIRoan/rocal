@@ -2,7 +2,7 @@
   "name": "backend",
   "type": "module",
   "scripts": {
-    "build": "prisma generate && bun build --compile --minify-whitespace --minify-syntax --target bun-linux-x64 --outfile server index.ts",
+    "build": "prisma generate && bun ./build.ts",
     "dev": "bun --watch index.ts",
     "postinstall": "prisma generate",
     "lint": "eslint .",
@@ -51,6 +51,7 @@
     "better-auth": "^1.6.13",
     "better-call": "^2.0.2",
     "elysia": "next",
+    "exact-mirror": "^1.2.2",
     "ical": "^0.8.0",
     "openpgp": "^6.3.0",
     "react": "19.2.3",

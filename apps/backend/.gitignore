@@ -2,5 +2,6 @@
 .env
 .env.local
 node_modules/
+dist/
 server
 server.exe
