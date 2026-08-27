@@ -11,17 +11,32 @@ function normalizeConversationToken(value: string): string {
   return value.trim().replace(/^<|>$/g, "").toLowerCase();
 }
 
+function headerFieldValues(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter(
+      (entry): entry is string => typeof entry === "string" && entry.trim().length > 0,
+    );
+  }
+  if (typeof value === "string" && value.trim()) {
+    return [value];
+  }
+  return [];
+}
+
 function getConversationTokens(message: JmapEmailMessage): string[] {
   const tokens = new Set<string>();
 
   if (message.threadId) {
-    tokens.add(`thread:${normalizeConversationToken(message.threadId)}`);
+    const threadToken = normalizeConversationToken(message.threadId);
+    if (threadToken) {
+      tokens.add(`thread:${threadToken}`);
+    }
   }
 
   for (const value of [
-    ...(message.messageId ?? []),
-    ...(message.inReplyTo ?? []),
-    ...(message.references ?? []),
+    ...headerFieldValues(message.messageId),
+    ...headerFieldValues(message.inReplyTo),
+    ...headerFieldValues(message.references),
   ]) {
     const normalized = normalizeConversationToken(value);
     if (normalized) {
@@ -171,6 +186,53 @@ export function mergeConversationSourceMessages(
   );
 }
 
+export function filterRelatedThreadMessages(
+  mailboxMessages: JmapEmailMessage[],
+  relatedMessages: JmapEmailMessage[],
+): JmapEmailMessage[] {
+  const primaryIds = new Set(mailboxMessages.map((message) => message.id));
+  const threadIds = new Set(
+    mailboxMessages
+      .map((message) => message.threadId)
+      .filter((threadId): threadId is string => Boolean(threadId)),
+  );
+
+  return relatedMessages.filter((message) => {
+    if (primaryIds.has(message.id)) return false;
+    return Boolean(message.threadId && threadIds.has(message.threadId));
+  });
+}
+
+export function buildMailboxThreadRows(
+  mailboxMessages: JmapEmailMessage[],
+  relatedMessages: JmapEmailMessage[] = [],
+): MailConversation[] {
+  const extras = filterRelatedThreadMessages(mailboxMessages, relatedMessages);
+  const conversations = buildMailConversations([
+    ...mailboxMessages,
+    ...extras,
+  ]);
+  const primaryIdSet = new Set(mailboxMessages.map((message) => message.id));
+
+  const rows: MailConversation[] = [];
+  for (const conversation of conversations) {
+    const primaryMessages = conversation.messages.filter((message) =>
+      primaryIdSet.has(message.id),
+    );
+    if (primaryMessages.length === 0) continue;
+
+    const latestPrimary = primaryMessages.reduce((latest, candidate) =>
+      getReceivedAtTime(candidate) >= getReceivedAtTime(latest)
+        ? candidate
+        : latest,
+    );
+
+    rows.push({ ...conversation, latestMessage: latestPrimary });
+  }
+
+  return rows;
+}
+
 export function getConversationForMessage(
   messages: JmapEmailMessage[],
   messageId: string | null | undefined,
@@ -179,9 +241,17 @@ export function getConversationForMessage(
     return [];
   }
 
-  const conversation = buildMailConversations(messages).find((entry) =>
+  const anchor = messages.find((message) => message.id === messageId);
+  const threadId = anchor?.threadId;
+  const scoped = threadId
+    ? messages.filter(
+        (message) => message.id === messageId || message.threadId === threadId,
+      )
+    : messages;
+
+  const conversation = buildMailConversations(scoped).find((entry) =>
     entry.messageIds.includes(messageId),
   );
 
-  return conversation?.messages ?? [];
+  return conversation?.messages ?? (anchor ? [anchor] : []);
 }

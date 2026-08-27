@@ -1,5 +1,5 @@
 import type { JmapEmailMessage } from "@/lib/mail/types";
-import { buildMailConversations } from "@/lib/mail/conversation-thread";
+import { buildMailboxThreadRows } from "@/lib/mail/conversation-thread";
 import { getAllMessageLabels } from "@/lib/mail/mail-labels";
 import type { LabelDef } from "@/lib/mail/types";
 import { formatAddress } from "../mail-helpers";
@@ -55,44 +55,9 @@ export function buildMessageListThreadRows(
   relatedMessages: JmapEmailMessage[],
   preserveMessageOrder: boolean,
 ): MessageListThreadRow[] {
-  const seenIds = new Set(messages.map((message) => message.id));
-  const extras = preserveMessageOrder
-    ? []
-    : relatedMessages.filter((message) => !seenIds.has(message.id));
-  const conversations = buildMailConversations(
-    preserveMessageOrder ? messages : [...messages, ...extras],
-    { preserveMessageOrder },
-  );
-  const primaryIdSet = new Set(messages.map((message) => message.id));
-  const messageOrder = new Map(
-    messages.map((message, index) => [message.id, index]),
-  );
-
-  const rows: MessageListThreadRow[] = [];
-  for (const conversation of conversations) {
-    const primaryMessages = conversation.messages.filter((message) =>
-      primaryIdSet.has(message.id),
-    );
-    if (primaryMessages.length === 0) continue;
-
-    const latestPrimary = preserveMessageOrder
-      ? primaryMessages.reduce((best, candidate) =>
-          (messageOrder.get(candidate.id) ?? Infinity) <
-          (messageOrder.get(best.id) ?? Infinity)
-            ? candidate
-            : best,
-        )
-      : primaryMessages.reduce((latest, candidate) =>
-          Date.parse(candidate.receivedAt ?? "") >=
-          Date.parse(latest.receivedAt ?? "")
-            ? candidate
-            : latest,
-        );
-
-    rows.push({ ...conversation, latestMessage: latestPrimary });
-  }
-
-  return rows;
+  return buildMailboxThreadRows(messages, relatedMessages, {
+    preserveMessageOrder,
+  });
 }
 
 export function getSecondaryThreadMessages(

@@ -6,6 +6,7 @@ import {
   type MailboxMessagesCacheData,
 } from "./mail-message-cache";
 import {
+  filterRelatedThreadMessages,
   getConversationForMessage,
   mergeConversationSourceMessages,
 } from "./conversation-thread";
@@ -111,15 +112,22 @@ export function useConversationListExtras(
 
   return useMemo(
     () =>
-      mergeConversationSourceMessages(
-        filterMessagesToMailboxes(companionMessages, allowedMailboxIdSet),
-        filterMessagesToMailboxes(prefetchedThreadMessages, allowedMailboxIdSet),
-        filterMessagesToMailboxes(
-          getCachedThreadMessages(queryClient),
-          allowedMailboxIdSet,
+      filterRelatedThreadMessages(
+        mailboxMessages,
+        mergeConversationSourceMessages(
+          filterMessagesToMailboxes(companionMessages, allowedMailboxIdSet),
+          filterMessagesToMailboxes(
+            prefetchedThreadMessages,
+            allowedMailboxIdSet,
+          ),
+          filterMessagesToMailboxes(
+            getCachedThreadMessages(queryClient),
+            allowedMailboxIdSet,
+          ),
         ),
       ),
     [
+      mailboxMessages,
       companionMessages,
       prefetchedThreadMessages,
       queryClient,
@@ -146,9 +154,21 @@ export function useConversationThread(
   const conversationMessages = useMemo(() => {
     if (!message) return [];
 
-    const cached = getAllCachedMailboxMessages(queryClient);
+    const threadId = message.threadId;
+    const sameThread = (entry: JmapEmailMessage) =>
+      entry.id === message.id ||
+      Boolean(threadId && entry.threadId === threadId);
+
+    const cached = getAllCachedMailboxMessages(queryClient).filter(sameThread);
+    const cachedThreadMessages =
+      getCachedThreadMessages(queryClient).filter(sameThread);
     const threadMessages = threadQuery.data ?? [];
-    const merged = mergeConversationSourceMessages(cached, threadMessages);
+    const merged = mergeConversationSourceMessages(
+      [message],
+      cached,
+      cachedThreadMessages,
+      threadMessages,
+    );
     const conversation = getConversationForMessage(merged, message.id);
 
     if (conversation.length > 0) {

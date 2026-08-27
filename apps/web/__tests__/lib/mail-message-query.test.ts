@@ -43,17 +43,23 @@ describe("mail message query cache", () => {
     expect(findCachedMailMessage(queryClient, "message-2")).toEqual(cached);
   });
 
-  it("merges a fetched message into mailbox caches", () => {
+  it("updates an existing mailbox-cache row without appending foreign mail", () => {
     const queryClient = new QueryClient();
     seedMailMessageCache(
       queryClient,
       "mb-inbox",
-      [message({ id: "message-1" })],
+      [message({ id: "message-1", mailboxIds: { "mb-inbox": true } })],
       1,
     );
 
-    const fetched = message({ id: "message-2", subject: "Fetched" });
-    mergeMessageIntoMailboxCaches(queryClient, fetched);
+    mergeMessageIntoMailboxCaches(
+      queryClient,
+      message({
+        id: "message-1",
+        subject: "Updated",
+        mailboxIds: { "mb-inbox": true },
+      }),
+    );
 
     const mailboxCache = queryClient.getQueryData<{
       messages: JmapEmailMessage[];
@@ -61,10 +67,40 @@ describe("mail message query cache", () => {
 
     expect(mailboxCache?.messages.map((entry) => entry.id)).toEqual([
       "message-1",
-      "message-2",
     ]);
-    expect(findCachedMailMessage(queryClient, "message-2")?.subject).toBe(
-      "Fetched",
+    expect(mailboxCache?.messages[0]?.subject).toBe("Updated");
+  });
+
+  it("does not insert sent mail into the inbox mailbox cache", () => {
+    const queryClient = new QueryClient();
+    seedMailMessageCache(
+      queryClient,
+      "mb-inbox",
+      [message({ id: "inbox-1", mailboxIds: { "mb-inbox": true } })],
+      1,
+    );
+    seedMailMessageCache(queryClient, "mb-sent", [], 0);
+
+    mergeMessageIntoMailboxCaches(
+      queryClient,
+      message({
+        id: "sent-1",
+        subject: "Sent reply",
+        mailboxIds: { "mb-sent": true },
+      }),
+    );
+
+    const inboxCache = queryClient.getQueryData<{
+      messages: JmapEmailMessage[];
+    }>(mailQueryKeys.mailboxMessages("mb-inbox"));
+    const sentCache = queryClient.getQueryData<{
+      messages: JmapEmailMessage[];
+    }>(mailQueryKeys.mailboxMessages("mb-sent"));
+
+    expect(inboxCache?.messages.map((entry) => entry.id)).toEqual(["inbox-1"]);
+    expect(sentCache?.messages.map((entry) => entry.id)).toEqual(["sent-1"]);
+    expect(findCachedMailMessage(queryClient, "sent-1")?.subject).toBe(
+      "Sent reply",
     );
   });
 

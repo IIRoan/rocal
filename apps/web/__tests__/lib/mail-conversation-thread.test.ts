@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 
 import {
   buildMailConversations,
+  buildMailboxThreadRows,
   getConversationForMessage,
 } from "../../lib/mail/conversation-thread";
 import type { JmapEmailMessage } from "../../lib/mail/types";
@@ -95,5 +96,58 @@ describe("mail conversation threading", () => {
 
     expect(byDate).toEqual(["newest", "exact"]);
     expect(byRelevance).toEqual(["exact", "newest"]);
+  });
+
+  it("keeps unrelated sent mail out of inbox thread rows", () => {
+    const inbox = [
+      createMessage("inbound", {
+        threadId: "thread-inbound",
+        mailboxIds: { inbox: true },
+        receivedAt: "2026-05-19T10:00:00.000Z",
+      }),
+    ];
+    const sent = [
+      createMessage("sent-unrelated", {
+        threadId: "thread-sent",
+        mailboxIds: { sent: true },
+        from: [{ email: "me@example.com" }],
+        receivedAt: "2026-05-19T12:00:00.000Z",
+      }),
+      createMessage("sent-reply", {
+        threadId: "thread-inbound",
+        mailboxIds: { sent: true },
+        from: [{ email: "me@example.com" }],
+        receivedAt: "2026-05-19T11:00:00.000Z",
+      }),
+    ];
+
+    const rows = buildMailboxThreadRows(inbox, sent);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.latestMessage.id).toBe("inbound");
+    expect(rows[0]?.messageIds).toEqual(["inbound", "sent-reply"]);
+  });
+
+  it("does not attach unrelated sent mail when opening a conversation", () => {
+    const messages = [
+      createMessage("inbound", {
+        threadId: "thread-inbound",
+        receivedAt: "2026-05-19T10:00:00.000Z",
+      }),
+      createMessage("sent-unrelated", {
+        threadId: "thread-sent",
+        from: [{ email: "me@example.com" }],
+        receivedAt: "2026-05-19T12:00:00.000Z",
+      }),
+      createMessage("sent-reply", {
+        threadId: "thread-inbound",
+        from: [{ email: "me@example.com" }],
+        receivedAt: "2026-05-19T11:00:00.000Z",
+      }),
+    ];
+
+    expect(getConversationForMessage(messages, "inbound").map((m) => m.id)).toEqual(
+      ["inbound", "sent-reply"],
+    );
   });
 });
