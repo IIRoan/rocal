@@ -1,24 +1,26 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import { useSyncExternalStore } from "react";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
+import { MailApp } from "../../components/mail/mail-app";
 
-const MailApp = dynamic(
-  () =>
-    import("../../components/mail/mail-app").then((module) => module.MailApp),
-  {
-    ssr: false,
-    loading: () => (
+export function MailPageContent() {
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+
+  if (!mounted) {
+    return (
       <PageLoadingOverlay
         isLoading={true}
         messageContext="PAGE_LOAD"
         enableCycling
         priority
       />
-    ),
-  },
-);
+    );
+  }
 
-export function MailPageContent() {
   return <MailApp />;
 }
