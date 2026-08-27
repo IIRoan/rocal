@@ -42,8 +42,14 @@ function MailComposeAutosave({
 
 export function MailApp() {
   const mail = useMailApp();
+  const isOpeningMailbox =
+    Boolean(mail.session?.user) &&
+    !mail.activeMailbox &&
+    (mail.isMailboxStatusLoading ||
+      mail.isBusy ||
+      !mail.hasAttemptedMailboxOpen);
 
-  if (mail.isSessionPending || !mail.session?.user) {
+  if (mail.isSessionPending || !mail.session?.user || isOpeningMailbox) {
     return (
       <PageLoadingOverlay
         isLoading={true}

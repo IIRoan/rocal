@@ -73,6 +73,47 @@ describe("recordRecentContactUsage", () => {
       `user${MAX_RECENT_CONTACTS + 4}@example.com`,
     );
   });
+
+  it("does not store automated noreply addresses", () => {
+    const result = recordRecentContactUsage(
+      null,
+      [
+        { email: "noreply@solace.onl" },
+        { email: "alice@example.com" },
+      ],
+      "mail",
+      { usedAt: "2026-01-01T00:00:00.000Z" },
+    );
+
+    expect(result.contacts.map((entry) => entry.email)).toEqual([
+      "alice@example.com",
+    ]);
+  });
+
+  it("drops previously stored automated addresses on the next write", () => {
+    const stale: ReturnType<typeof createEmptyRecentContactsPayload> = {
+      version: 1,
+      contacts: [
+        {
+          email: "no-reply@example.com",
+          lastUsedAt: "2026-01-01T00:00:00.000Z",
+          useCount: 3,
+          contexts: ["mail"],
+        },
+      ],
+    };
+
+    const result = recordRecentContactUsage(
+      stale,
+      [{ email: "alice@example.com" }],
+      "mail",
+      { usedAt: "2026-01-02T00:00:00.000Z" },
+    );
+
+    expect(result.contacts.map((entry) => entry.email)).toEqual([
+      "alice@example.com",
+    ]);
+  });
 });
 
 describe("filterRecentContactSuggestions", () => {
@@ -272,6 +313,28 @@ describe("contact management", () => {
       filterContactsList(payload, { query: "project" }).map(
         (entry) => entry.email,
       ),
+    ).toEqual(["alice@example.com"]);
+  });
+
+  it("hides automated addresses from the contacts list", () => {
+    expect(
+      filterContactsList({
+        version: 1,
+        contacts: [
+          {
+            email: "noreply@solace.onl",
+            lastUsedAt: "2026-01-01T00:00:00.000Z",
+            useCount: 1,
+            contexts: ["mail"],
+          },
+          {
+            email: "alice@example.com",
+            lastUsedAt: "2026-01-01T00:00:00.000Z",
+            useCount: 1,
+            contexts: ["mail"],
+          },
+        ],
+      }).map((entry) => entry.email),
     ).toEqual(["alice@example.com"]);
   });
 

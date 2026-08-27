@@ -283,7 +283,9 @@ export function useCalendarEventsLoader(
 
   return {
     events: eventsQuery.data ?? [],
-    eventsLoading: eventsQuery.isLoading,
+    // `isLoading` is false for disabled queries, so the workspace overlay
+    // would dismiss before the first month fetch even starts.
+    eventsLoading: !fetchRange || eventsQuery.isPending,
     eventsError: eventsQuery.error as unknown as ApiError | null,
     currentDateRange: fetchRange,
     setDateRange,

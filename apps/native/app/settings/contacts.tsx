@@ -58,6 +58,16 @@ export default function ContactsScreen() {
     [payload?.contacts, selectedEmail],
   );
 
+  if (isLoading && !payload) {
+    return (
+      <AppScreen header={<StackScreenHeader title="Contacts" />}>
+        <View style={styles.emptyState}>
+          <ActivityIndicator color={theme.colors.mutedForeground} />
+        </View>
+      </AppScreen>
+    );
+  }
+
   if (!isAvailable) {
     return (
       <AppScreen header={<StackScreenHeader title="Contacts" />}>

@@ -9,7 +9,10 @@ export function completeAuthNavigation(href: string) {
   window.location.replace(href);
 }
 
-export function isPasskeyStepUpExemptPath(pathname: string): boolean {
+export function isPasskeyStepUpExemptPath(pathname: string | null | undefined): boolean {
+  if (!pathname) {
+    return false;
+  }
   return (
     pathname === LOGIN_PATH ||
     pathname.startsWith(`${LOGIN_PATH}/`) ||

@@ -160,6 +160,7 @@ export function AppSidebar() {
 
   const animateSidebar = useCallback(
     (toValue: number) => {
+      translateX.stopAnimation();
       Animated.spring(translateX, {
         toValue,
         ...DRAWER_SPRING,

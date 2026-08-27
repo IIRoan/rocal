@@ -14,6 +14,7 @@ import {
   MobileCalendarSkeleton,
   PageLoadingOverlay,
 } from "@workspace/ui/components/ui";
+import { MobileCalendarWrapper } from "@workspace/ui/components";
 import { CommandPaletteProvider } from "@/components/command-palette-context";
 import {
   CalendarDataProvider,
@@ -21,6 +22,11 @@ import {
   useSharedCalendarData,
 } from "@/components/calendar-data-provider";
 import { CalendarProviderWrapper } from "@/components/calendar-provider-wrapper";
+import { CalendarWithData } from "@/components/calendar-with-data";
+import {
+  CalendarWorkspaceReadyProvider,
+  useCalendarWorkspaceReady,
+} from "@/components/calendar-workspace-ready";
 import { SettingsProvider } from "@/components/settings-provider";
 import { useCommandPalette } from "@/hooks/use-command-palette";
 import { useCommandPalette as useCommandPaletteContext } from "@/components/command-palette-context";
@@ -31,6 +37,8 @@ import { useSettings } from "@/hooks/use-settings";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { CALENDAR_HOME_PATH } from "@/lib/app-routes";
 import {
+  createContext,
+  use,
   useEffect,
   useRef,
   Suspense,
@@ -43,27 +51,12 @@ import { MobileAppSwitcher } from "@/components/mobile-app-switcher";
 
 const log = createLogger("calendar");
 
+const KeyboardPaletteContext = createContext<{
+  openPalette: (query?: string) => void;
+} | null>(null);
+
 const AppSidebar = dynamic(
   () => import("@workspace/ui/components/layout").then((mod) => mod.AppSidebar),
-  { ssr: false },
-);
-
-const MobileCalendarWrapper = dynamic(
-  () =>
-    import("@workspace/ui/components").then((mod) => mod.MobileCalendarWrapper),
-  {
-    ssr: false,
-    loading: () => (
-      <MobileCalendarLoadingScreen messageContext="CALENDAR_LOAD" />
-    ),
-  },
-);
-
-const CalendarWithData = dynamic(
-  () =>
-    import("@/components/calendar-with-data").then(
-      (mod) => mod.CalendarWithData,
-    ),
   { ssr: false },
 );
 
@@ -95,12 +88,9 @@ function CalendarUrlSyncWrapper() {
   return null;
 }
 
-function CalendarSearchParamHandlers({
-  onOpenPalette,
-}: {
-  onOpenPalette: (query?: string) => void;
-}) {
+function CalendarSearchParamHandlers() {
   const searchParams = useSearchParams();
+  const keyboardPalette = use(KeyboardPaletteContext);
   const { data: session, isPending } = useSession();
   const { openEventEditor } = useCommandPaletteContext();
   const calendarData = useSharedCalendarData();
@@ -160,8 +150,8 @@ function CalendarSearchParamHandlers({
     }
 
     handledPaletteRef.current = palette;
-    onOpenPalette(palette === "settings" ? "settings" : "");
-  }, [palette, isPending, session?.user, onOpenPalette]);
+    keyboardPalette?.openPalette(palette === "settings" ? "settings" : "");
+  }, [palette, isPending, session?.user, keyboardPalette]);
 
   return null;
 }
@@ -236,8 +226,16 @@ function MobileLayoutContent() {
       await updateSettings({ theme });
     },
   });
+  const workspace = useCalendarWorkspaceReady();
 
-  if (FORCE_LOADING_DESIGN_PREVIEW || isAllInitialLoading) {
+  useEffect(() => {
+    if (FORCE_LOADING_DESIGN_PREVIEW || isAllInitialLoading) {
+      return;
+    }
+    workspace?.markReady();
+  }, [isAllInitialLoading, workspace]);
+
+  if (FORCE_LOADING_DESIGN_PREVIEW) {
     return (
       <MobileCalendarLoadingScreen
         messageContext={overlayContext ?? "CALENDAR_LOAD"}
@@ -320,6 +318,7 @@ export function CalendarShell({ children }: { children: ReactNode }) {
     openPalette,
     initialQuery,
   } = useCommandPalette();
+  const showAuthGate = isPending || !session?.user;
 
   useEffect(() => {
     if (!isPending && !session?.user) {
@@ -335,53 +334,56 @@ export function CalendarShell({ children }: { children: ReactNode }) {
     }
   }, [isPending, session?.user, router]);
 
-  if (isPending || !session?.user) {
-    return (
-      <>
-        <DashboardSkeleton />
-        <PageLoadingOverlay
-          isLoading={true}
-          messageContext="AUTH_FLOW"
-          enableCycling={true}
-          priority
-        />
-      </>
-    );
-  }
+  return (
+    <CalendarWorkspaceReadyProvider>
+      <KeyboardPaletteContext.Provider value={{ openPalette }}>
+        {showAuthGate ? (
+          <DashboardSkeleton />
+        ) : (
+          <SettingsProvider>
+            <CalendarDataProvider>
+              <CalendarProviderWrapper>
+                <CalendarDateSync />
+                <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
+                  <Suspense fallback={null}>
+                    <CalendarUrlSyncWrapper />
+                    <CalendarSearchParamHandlers />
+                  </Suspense>
+
+                  <SidebarProvider>
+                    <SidebarWithContext />
+                    <SidebarInset>{children}</SidebarInset>
+                  </SidebarProvider>
+                </CommandPaletteProvider>
+
+                <CommandPalette
+                  open={commandPaletteOpen}
+                  onOpenChange={setCommandPaletteOpen}
+                  initialSearchQuery={initialQuery}
+                />
+              </CalendarProviderWrapper>
+            </CalendarDataProvider>
+          </SettingsProvider>
+        )}
+        <CalendarWorkspaceLoadingOverlay authPending={showAuthGate} />
+      </KeyboardPaletteContext.Provider>
+    </CalendarWorkspaceReadyProvider>
+  );
+}
+
+function CalendarWorkspaceLoadingOverlay({
+  authPending,
+}: {
+  authPending: boolean;
+}) {
+  const workspace = useCalendarWorkspaceReady();
 
   return (
-    <>
-      <SettingsProvider>
-        <CalendarDataProvider>
-          <CalendarProviderWrapper>
-            <CalendarDateSync />
-            <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
-              <Suspense fallback={null}>
-                <CalendarUrlSyncWrapper />
-                <CalendarSearchParamHandlers onOpenPalette={openPalette} />
-              </Suspense>
-
-              <SidebarProvider>
-                <SidebarWithContext />
-                <SidebarInset>{children}</SidebarInset>
-              </SidebarProvider>
-            </CommandPaletteProvider>
-
-            <CommandPalette
-              open={commandPaletteOpen}
-              onOpenChange={setCommandPaletteOpen}
-              initialSearchQuery={initialQuery}
-            />
-          </CalendarProviderWrapper>
-        </CalendarDataProvider>
-      </SettingsProvider>
-
-      <PageLoadingOverlay
-        isLoading={false}
-        messageContext="AUTH_FLOW"
-        enableCycling={true}
-        priority
-      />
-    </>
+    <PageLoadingOverlay
+      isLoading={authPending || !workspace?.isReady}
+      messageContext={authPending ? "AUTH_FLOW" : "CALENDAR_LOAD"}
+      enableCycling={true}
+      priority
+    />
   );
 }

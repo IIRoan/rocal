@@ -31,7 +31,7 @@ export function useRecentContacts(options?: {
   limit?: number;
 }) {
   const { user } = useAuth();
-  const { isEnabled, runWithAccountKey } = useE2ee();
+  const { isEnabled, isReady, runWithAccountKey } = useE2ee();
   const queryClient = useQueryClient();
   const recordTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingEntriesRef = useRef<
@@ -46,17 +46,11 @@ export function useRecentContacts(options?: {
       const loaded = await runWithAccountKey((accountKey, e2ee) =>
         loadRecentContactsCrypto(accountKey, e2ee),
       );
-      if (loaded) {
-        return loaded;
-      }
-      const cached = queryClient.getQueryData<RecentContactsPayload>(
-        RECENT_CONTACTS_QUERY_KEY,
-      );
-      return cached ?? createEmptyRecentContactsPayload();
+      return loaded ?? createEmptyRecentContactsPayload();
     },
-    enabled: Boolean(user) && isAvailable,
+    enabled: Boolean(user) && isAvailable && isReady,
     staleTime: 60_000,
-    retry: false,
+    retry: 2,
   });
 
   const payload = recentContactsQuery.data ?? null;
@@ -80,10 +74,7 @@ export function useRecentContacts(options?: {
 
       let saved = false;
       await runWithAccountKey(async (accountKey, e2ee) => {
-        let current = await loadRecentContactsCrypto(accountKey, e2ee);
-        if (!current) {
-          current = createEmptyRecentContactsPayload();
-        }
+        const current = await loadRecentContactsCrypto(accountKey, e2ee);
         const next = updater(current);
         saved = await saveRecentContactsCrypto(accountKey, e2ee, next);
         if (saved) {
@@ -136,9 +127,6 @@ export function useRecentContacts(options?: {
 
     await runWithAccountKey(async (accountKey, e2ee) => {
       let current = await loadRecentContactsCrypto(accountKey, e2ee);
-      if (!current) {
-        current = createEmptyRecentContactsPayload();
-      }
 
       for (const batch of pending) {
         current = recordRecentContactUsage(current, batch.entries, batch.context);
@@ -178,15 +166,16 @@ export function useRecentContacts(options?: {
   return {
     payload,
     suggestions,
-    contacts: payload?.contacts ?? [],
+    contacts: filterContactsList(payload),
     filterContacts: filterContactsList,
     recordUsage,
     updateContact,
     removeContact: removeContactByEmail,
     addContact,
     refresh,
-    isLoading: recentContactsQuery.isLoading,
+    isLoading: recentContactsQuery.isLoading || (isAvailable && !isReady),
     isError: recentContactsQuery.isError,
     isAvailable,
+    isReady,
   };
 }

@@ -49,6 +49,37 @@ export function isValidEmailAddress(value: string): boolean {
   return EMAIL_PATTERN.test(parseRecipientString(value).email);
 }
 
+const AUTOMATED_LOCAL_PARTS = new Set([
+  "noreply",
+  "no-reply",
+  "no_reply",
+  "donotreply",
+  "do-not-reply",
+  "do_not_reply",
+  "mailer-daemon",
+  "mailerdaemon",
+  "postmaster",
+  "bounce",
+  "bounces",
+  "notifications",
+  "notification",
+  "notify",
+  "alerts",
+  "alert",
+]);
+
+/** Machine inboxes (noreply, bounce, mailer-daemon) — not people you contact. */
+export function isAutomatedMailAddress(value: string): boolean {
+  const email = normalizeEmailAddress(parseRecipientString(value).email);
+  const local = email.split("@")[0] ?? "";
+  const base = (local.split("+")[0] ?? local).replace(/[._]/g, "-");
+  if (!base) return false;
+  if (AUTOMATED_LOCAL_PARTS.has(base) || AUTOMATED_LOCAL_PARTS.has(local)) {
+    return true;
+  }
+  return base.includes("noreply") || base.includes("no-reply");
+}
+
 export type ComposeRecipientValidation = {
   to: ParsedMailAddress[];
   cc: ParsedMailAddress[];

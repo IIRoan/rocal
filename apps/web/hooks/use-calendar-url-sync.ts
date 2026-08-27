@@ -72,7 +72,8 @@ export function useCalendarUrlSync() {
         params.set(VIEW_PARAM, view);
 
         const newSearch = params.toString();
-        const newUrl = `${pathname}${newSearch ? `?${newSearch}` : ""}`;
+        const path = pathname ?? window.location.pathname;
+        const newUrl = `${path}${newSearch ? `?${newSearch}` : ""}`;
 
         window.history.replaceState(null, "", newUrl);
       } finally {

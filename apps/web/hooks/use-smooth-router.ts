@@ -24,6 +24,9 @@ export function useSmoothRouter() {
       options?: NavigateOptions,
       transitionOptions?: RouteTransitionOptions,
     ) => {
+      if (typeof href !== "string" || href.length === 0) {
+        return;
+      }
       startRouteTransition(transitionOptions);
       router.push(href, options);
     },
@@ -36,17 +39,33 @@ export function useSmoothRouter() {
       options?: NavigateOptions,
       transitionOptions?: RouteTransitionOptions,
     ) => {
+      if (typeof href !== "string" || href.length === 0) {
+        return;
+      }
       startRouteTransition(transitionOptions);
       router.replace(href, options);
     },
     [router, startRouteTransition],
   );
 
+  const prefetch = useCallback(
+    (
+      href: string,
+      options?: Parameters<AppRouterInstance["prefetch"]>[1],
+    ) => {
+      if (typeof href !== "string" || href.length === 0) {
+        return;
+      }
+      router.prefetch(href, options);
+    },
+    [router],
+  );
+
   return useMemo(
     () => ({
       back: router.back,
       forward: router.forward,
-      prefetch: router.prefetch,
+      prefetch,
       refresh: router.refresh,
       push,
       replace,
@@ -61,7 +80,7 @@ export function useSmoothRouter() {
       replace,
       router.back,
       router.forward,
-      router.prefetch,
+      prefetch,
       router.refresh,
       startRouteTransition,
     ],

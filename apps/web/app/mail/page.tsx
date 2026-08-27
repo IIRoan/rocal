@@ -1,13 +1,11 @@
-"use client";
+import type { Metadata } from "next";
+import { MailPageContent } from "./_client";
 
-import dynamic from "next/dynamic";
-
-const MailApp = dynamic(
-  () =>
-    import("../../components/mail/mail-app").then((module) => module.MailApp),
-  { ssr: false },
-);
+export const metadata: Metadata = {
+  title: "Mail – Solace",
+  description: "Read and send mail in Solace.",
+};
 
 export default function MailPage() {
-  return <MailApp />;
+  return <MailPageContent />;
 }

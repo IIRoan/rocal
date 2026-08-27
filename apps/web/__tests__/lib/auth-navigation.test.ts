@@ -10,6 +10,8 @@ describe("passkey step-up login navigation", () => {
     expect(isPasskeyStepUpExemptPath("/passkey/native")).toBe(true);
     expect(isPasskeyStepUpExemptPath("/reset-password")).toBe(true);
     expect(isPasskeyStepUpExemptPath("/calendar")).toBe(false);
+    expect(isPasskeyStepUpExemptPath(null)).toBe(false);
+    expect(isPasskeyStepUpExemptPath(undefined)).toBe(false);
   });
 
   it("sends protected routes to login with a step-up hint", () => {

@@ -142,7 +142,7 @@ export function useRecentContacts(options?: {
   return {
     payload,
     suggestions,
-    contacts: payload?.contacts ?? [],
+    contacts: filterContactsList(payload),
     filterContacts: filterContactsList,
     recordUsage,
     updateContact,

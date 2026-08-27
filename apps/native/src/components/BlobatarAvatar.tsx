@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Image,
+  InteractionManager,
   View,
   type StyleProp,
   type ViewStyle,
@@ -41,10 +42,11 @@ export function BlobatarAvatar({
   size: number;
   borderRadius?: number;
   style?: StyleProp<ViewStyle>;
-  /** Profile/sidebar only — keep false in mail lists. */
+  /** Idle motion. Off in lists/settings — the animated adapter writes shared values during render. */
   animate?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
+  const [idleReady, setIdleReady] = useState(false);
   const resolvedSrc = resolveSolaceProfileAvatarUrl(src, API_BASE_URL);
   const lookedUp = useSolaceProfileImage(email, { enabled: !resolvedSrc });
   const imageSrc = resolvedSrc || lookedUp;
@@ -54,6 +56,16 @@ export function BlobatarAvatar({
   useEffect(() => {
     setFailed(false);
   }, [imageSrc]);
+
+  useEffect(() => {
+    if (!animate) {
+      return;
+    }
+    const task = InteractionManager.runAfterInteractions(() => {
+      setIdleReady(true);
+    });
+    return () => task.cancel();
+  }, [animate]);
 
   const boxStyle = [
     { width: size, height: size, borderRadius: radius, overflow: "hidden" as const },
@@ -94,7 +106,7 @@ export function BlobatarAvatar({
 
   return (
     <View style={boxStyle}>
-      {animate ? (
+      {animate && idleReady ? (
         <AnimatedBlobatar {...blobatarProps} animate />
       ) : (
         <Blobatar {...blobatarProps} />
