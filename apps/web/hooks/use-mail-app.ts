@@ -208,6 +208,13 @@ function getPrimaryMailboxId(
   return mailboxes.find((m) => m.role === role)?.id ?? mailboxes[0]?.id ?? null;
 }
 
+function messageBelongsToMailbox(
+  message: JmapEmailMessage,
+  mailboxId: string | null | undefined,
+): boolean {
+  return Boolean(mailboxId && message.mailboxIds?.[mailboxId]);
+}
+
 function sortMessages(messages: JmapEmailMessage[]): JmapEmailMessage[] {
   return Array.from(messages).sort((left, right) => {
     const leftTime = left.receivedAt ? Date.parse(left.receivedAt) : 0;
@@ -948,16 +955,21 @@ export function useMailApp() {
       findCachedMailMessage(queryClient, messageId) ??
       mb.messages.find((message) => message.id === messageId);
     if (cached) {
-      setActiveMailbox((current) =>
-        current
-          ? {
-            ...current,
-            messages: sortMessages(
-              mergeConversationSourceMessages(current.messages, [cached]),
-            ),
-          }
-          : current,
-      );
+      setActiveMailbox((current) => {
+        if (!current) return current;
+        if (current.messages.some((message) => message.id === cached.id)) {
+          return current;
+        }
+        if (!messageBelongsToMailbox(cached, current.selectedMailboxId)) {
+          return current;
+        }
+        return {
+          ...current,
+          messages: sortMessages(
+            mergeConversationSourceMessages(current.messages, [cached]),
+          ),
+        };
+      });
       handleSelectMessageId(cached.id);
       return;
     }
@@ -970,16 +982,21 @@ export function useMailApp() {
       });
 
       mergeMessageIntoMailboxCaches(queryClient, message);
-      setActiveMailbox((current) =>
-        current
-          ? {
-            ...current,
-            messages: sortMessages(
-              mergeConversationSourceMessages(current.messages, [message]),
-            ),
-          }
-          : current,
-      );
+      setActiveMailbox((current) => {
+        if (!current) return current;
+        if (current.messages.some((entry) => entry.id === message.id)) {
+          return current;
+        }
+        if (!messageBelongsToMailbox(message, current.selectedMailboxId)) {
+          return current;
+        }
+        return {
+          ...current,
+          messages: sortMessages(
+            mergeConversationSourceMessages(current.messages, [message]),
+          ),
+        };
+      });
       handleSelectMessageId(message.id);
     } catch (error) {
       log.error("Failed to open message by id", error);
@@ -1109,15 +1126,22 @@ export function useMailApp() {
         }
 
         const exists = current.messages.some((entry) => entry.id === message.id);
+        if (exists) {
+          return {
+            ...current,
+            messages: current.messages.map((entry) =>
+              entry.id === message.id ? mergeBody(entry, message) : entry,
+            ),
+          };
+        }
+        if (!messageBelongsToMailbox(forCache, current.selectedMailboxId)) {
+          return current;
+        }
         return {
           ...current,
-          messages: exists
-            ? current.messages.map((entry) =>
-              entry.id === message.id ? mergeBody(entry, message) : entry,
-            )
-            : sortMessages(
-              mergeConversationSourceMessages(current.messages, [forCache]),
-            ),
+          messages: sortMessages(
+            mergeConversationSourceMessages(current.messages, [forCache]),
+          ),
         };
       });
       setRelatedConversationMessages((current) =>

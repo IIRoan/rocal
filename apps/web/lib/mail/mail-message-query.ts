@@ -27,6 +27,23 @@ function mergeUniqueMessages(
   return merged;
 }
 
+function mailboxIdFromMessagesQueryKey(
+  queryKey: readonly unknown[],
+): string | null {
+  const mailboxId = queryKey[2];
+  return typeof mailboxId === "string" && mailboxId.length > 0
+    ? mailboxId
+    : null;
+}
+
+function mailboxIdsForMessage(message: JmapEmailMessage): Set<string> {
+  return new Set(
+    Object.entries(message.mailboxIds ?? {})
+      .filter(([, included]) => included)
+      .map(([mailboxId]) => mailboxId),
+  );
+}
+
 export function findCachedMailMessage(
   queryClient: QueryClient,
   messageId: string,
@@ -82,19 +99,42 @@ export function mergeMessageIntoMailboxCaches(
   const merged = existing ? mergeMailMessage(existing, message) : message;
   queryClient.setQueryData(mailQueryKeys.message(message.id), merged);
 
+  const belongingIds = mailboxIdsForMessage(merged);
   const mailboxLists = queryClient.getQueriesData<MailMailboxMessagesCache>({
     queryKey: mailQueryKeys.messages(),
   });
 
   for (const [key, data] of mailboxLists) {
     if (!data) continue;
-    const messages = data.messages.map((entry) =>
-      entry.id === merged.id ? mergeMailMessage(entry, merged) : entry,
-    );
-    const hasMessage = messages.some((entry) => entry.id === merged.id);
+    const mailboxId = mailboxIdFromMessagesQueryKey(key);
+    const alreadyPresent = data.messages.some((entry) => entry.id === merged.id);
+    const belongsHere = Boolean(mailboxId && belongingIds.has(mailboxId));
+
+    if (alreadyPresent && belongingIds.size > 0 && !belongsHere) {
+      queryClient.setQueryData(key, {
+        ...data,
+        messages: data.messages.filter((entry) => entry.id !== merged.id),
+        total: Math.max(0, data.total - 1),
+      });
+      continue;
+    }
+
+    if (alreadyPresent) {
+      queryClient.setQueryData(key, {
+        ...data,
+        messages: data.messages.map((entry) =>
+          entry.id === merged.id ? mergeMailMessage(entry, merged) : entry,
+        ),
+      });
+      continue;
+    }
+
+    if (!belongsHere) continue;
+
     queryClient.setQueryData(key, {
       ...data,
-      messages: hasMessage ? messages : mergeUniqueMessages(data.messages, [merged]),
+      messages: mergeUniqueMessages(data.messages, [merged]),
+      total: data.total + 1,
     });
   }
 }

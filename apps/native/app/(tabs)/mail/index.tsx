@@ -58,7 +58,7 @@ import {
   isDraftMessage,
 } from "../../../src/lib/mail/mail-helpers";
 import { layoutListSeparator } from "../../../src/lib/app-layout";
-import { buildMailConversations } from "../../../src/lib/mail/conversation-thread";
+import { buildMailboxThreadRows } from "../../../src/lib/mail/conversation-thread";
 import { useConversationListExtras } from "../../../src/lib/mail/use-conversation-thread";
 import { useConversationDecryptedPreviews } from "../../../src/lib/mail/use-conversation-decrypted-previews";
 import { messageHasVisibleAttachments } from "../../../src/lib/mail/message-security";
@@ -187,13 +187,10 @@ export default function MailScreen() {
     [mailboxMessages],
   );
 
-  const threadRows = useMemo(() => {
-    const seen = new Set(mailboxMessages.map((message) => message.id));
-    const extras = conversationExtras.filter(
-      (message) => !seen.has(message.id),
-    );
-    return buildMailConversations([...mailboxMessages, ...extras]);
-  }, [mailboxMessages, conversationExtras]);
+  const threadRows = useMemo(
+    () => buildMailboxThreadRows(mailboxMessages, conversationExtras),
+    [mailboxMessages, conversationExtras],
+  );
 
   const latestMessages = useMemo(
     () => threadRows.map((row) => row.latestMessage),
