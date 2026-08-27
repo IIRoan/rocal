@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -10,11 +10,11 @@ import {
 import Animated, {
   Extrapolation,
   interpolate,
-  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 import { Feather } from "@expo/vector-icons";
 import { FontAwesome } from "@expo/vector-icons";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -26,7 +26,10 @@ import {
   isMessageFlagged,
   isMessageRead,
 } from "../../lib/mail/mail-helpers";
-import { buildMailPreviewSnippet } from "../../lib/mail/mail-preview";
+import {
+  ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER,
+  listPreviewSnippet,
+} from "../../lib/mail/mail-preview";
 import { getAllMessageLabels } from "../../lib/mail/use-labels";
 import type { JmapEmailMessage, JmapIdentity, LabelDef } from "../../lib/mail/types";
 import {
@@ -36,19 +39,20 @@ import {
   mailRadii,
   mailSpacing,
 } from "./mail-ui";
-import {
-  MAIL_SELECT_CHECK_SPRING,
-  selectionCheckScale,
-  selectionRowOpacity,
-  selectionRowShift,
-  selectionUnreadDotOpacity,
-} from "./mail-selection-anim-utils";
-import { useSelectionProgress } from "./mail-selection-anim";
+import { MAIL_SELECT_CHECK_SPRING } from "./mail-selection-anim-utils";
 import { MailIdentityBadge } from "./MailIdentityBadge";
 import { BlobatarAvatar } from "../BlobatarAvatar";
 
 const EMPTY_LABELS: LabelDef[] = [];
 const EMPTY_IDENTITIES: JmapIdentity[] = [];
+
+function pulseSelect(entering: boolean) {
+  void Haptics.impactAsync(
+    entering
+      ? Haptics.ImpactFeedbackStyle.Medium
+      : Haptics.ImpactFeedbackStyle.Light,
+  );
+}
 
 interface MailMessageRowProps {
   message: JmapEmailMessage;
@@ -59,6 +63,7 @@ interface MailMessageRowProps {
   showRecipient?: boolean;
   labels?: LabelDef[];
   identities?: JmapIdentity[];
+  preview?: string;
   selectionActive?: boolean;
   selected?: boolean;
   onPress: (message: JmapEmailMessage) => void;
@@ -75,6 +80,7 @@ function MailMessageRowComponent({
   showRecipient = false,
   labels = EMPTY_LABELS,
   identities = EMPTY_IDENTITIES,
+  preview: previewOverride,
   selectionActive = false,
   selected = false,
   onPress,
@@ -98,13 +104,13 @@ function MailMessageRowComponent({
       : null;
   const name = threadSenders ?? formatAddress(addresses);
   const subject = message.subject?.trim() || "(no subject)";
-  const snippet = buildMailPreviewSnippet(message);
+  const previewRaw = previewOverride?.trim() || listPreviewSnippet(message);
   const preview =
-    threadCount > 1
-      ? `${threadCount} messages · ${snippet}`
-      : snippet;
+    previewRaw === ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER ? "" : previewRaw;
+  const visibleLabels = messageLabels.slice(0, 2);
+  const extraLabelCount = messageLabels.length - visibleLabels.length;
+  const skipRowPressRef = useRef(false);
 
-  const selectionProgress = useSelectionProgress();
   const selectedProgress = useSharedValue(selected ? 1 : 0);
 
   useEffect(() => {
@@ -114,59 +120,71 @@ function MailMessageRowComponent({
     );
   }, [selected, selectedProgress]);
 
-  const rowShiftStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: selectionRowShift(selectionProgress.value) }],
-  }));
-
-  const badgeWrapStyle = useAnimatedStyle(() => ({
-    opacity: selectionRowOpacity(selectionProgress.value),
-    transform: [{ scale: selectionCheckScale(selectionProgress.value) }],
-  }));
-
-  const unreadDotStyle = useAnimatedStyle(() => ({
-    opacity: selectionUnreadDotOpacity(selectionProgress.value),
-  }));
-
-  const badgeStyle = useAnimatedStyle(
-    () => ({
-      backgroundColor: interpolateColor(
-        selectedProgress.value,
-        [0, 1],
-        [theme.colors.background, colors.selectIndicatorOn],
-      ),
-      borderColor: interpolateColor(
-        selectedProgress.value,
-        [0, 1],
-        [colors.selectIndicator, theme.colors.background],
-      ),
+  const avatarFaceStyle = useAnimatedStyle(() => {
+    const progress = selectedProgress.value;
+    return {
+      opacity: progress < 0.5 ? 1 : 0,
       transform: [
         {
-          scale: interpolate(selectedProgress.value, [0, 1], [1, 1.06]),
+          scaleX: interpolate(
+            progress,
+            [0, 0.5],
+            [1, 0.02],
+            Extrapolation.CLAMP,
+          ),
         },
       ],
-    }),
-    [colors.selectIndicator, colors.selectIndicatorOn, theme.colors.background],
-  );
+    };
+  });
 
-  const checkStyle = useAnimatedStyle(() => ({
-    opacity: selectedProgress.value,
-    transform: [{ scale: selectedProgress.value }],
-  }));
+  const checkFaceStyle = useAnimatedStyle(() => {
+    const progress = selectedProgress.value;
+    return {
+      opacity: progress > 0.5 ? 1 : 0,
+      transform: [
+        {
+          scaleX: interpolate(
+            progress,
+            [0.5, 1],
+            [0.02, 1],
+            Extrapolation.CLAMP,
+          ),
+        },
+      ],
+    };
+  });
+
+  const applyToggle = () => {
+    pulseSelect(!selectionActive || !selected);
+    onToggleSelect?.(message);
+  };
+
+  const handleAvatarPress = () => {
+    skipRowPressRef.current = true;
+    applyToggle();
+    setTimeout(() => {
+      skipRowPressRef.current = false;
+    }, 80);
+  };
 
   const handleRowPress = () => {
+    if (skipRowPressRef.current) {
+      skipRowPressRef.current = false;
+      return;
+    }
     if (selectionActive) {
-      onToggleSelect?.(message);
+      applyToggle();
       return;
     }
     onPress(message);
   };
 
   const handleRowLongPress = () => {
-    if (selectionActive) {
-      onToggleSelect?.(message);
+    if (skipRowPressRef.current) {
+      skipRowPressRef.current = false;
       return;
     }
-    onLongPress?.(message);
+    applyToggle();
   };
 
   return (
@@ -175,10 +193,9 @@ function MailMessageRowComponent({
       onLongPress={
         onLongPress || onToggleSelect ? handleRowLongPress : undefined
       }
-      delayLongPress={320}
+      delayLongPress={350}
       style={({ pressed }) => [
         styles.row,
-        !read && !selected && !selectionActive && styles.rowUnread,
         selected && styles.rowSelected,
         pressed && !selected && styles.rowPressed,
         pressed && selected && styles.rowSelectedPressed,
@@ -187,35 +204,51 @@ function MailMessageRowComponent({
       accessibilityLabel={`${name}: ${subject}`}
       accessibilityState={{ selected: selectionActive ? selected : undefined }}
     >
-      <Animated.View style={[styles.rowInner, rowShiftStyle]}>
-        <View style={styles.avatarWrap}>
-          <BlobatarAvatar
-            email={addresses?.[0]?.email}
-            name={addresses?.[0]?.name}
-            size={MAIL_LAYOUT.avatarSize}
-            borderRadius={radii.avatar}
-          />
-          <Animated.View
-            style={[styles.checkBadgeWrap, badgeWrapStyle]}
-            pointerEvents="none"
+      <View style={styles.rowInner}>
+        <Pressable
+          onPress={handleAvatarPress}
+          onLongPress={handleAvatarPress}
+          delayLongPress={350}
+          hitSlop={6}
+          style={styles.avatarHit}
+          accessibilityRole="checkbox"
+          accessibilityLabel={selected ? "Deselect conversation" : "Select conversation"}
+          accessibilityState={{ checked: selected }}
+        >
+          {!read && !selected ? <View style={styles.unreadDot} /> : null}
+          <View
+            style={[
+              styles.avatarWrap,
+              { borderRadius: radii.avatar, overflow: "hidden" },
+            ]}
           >
             <Animated.View
-              style={[
-                styles.checkBadge,
-                { borderRadius: radii.selectBox },
-                badgeStyle,
-              ]}
+              style={[styles.avatarFace, avatarFaceStyle]}
+              pointerEvents="none"
             >
-              <Animated.View style={checkStyle}>
-                <Feather
-                  name="check"
-                  size={MAIL_ICON.rowMeta}
-                  color={theme.colors.primaryForeground}
-                />
-              </Animated.View>
+              <BlobatarAvatar
+                email={addresses?.[0]?.email}
+                name={addresses?.[0]?.name}
+                size={MAIL_LAYOUT.avatarSize}
+                borderRadius={radii.avatar}
+              />
             </Animated.View>
-          </Animated.View>
-        </View>
+            <Animated.View
+              style={[
+                styles.checkFace,
+                { backgroundColor: colors.selectIndicatorOn },
+                checkFaceStyle,
+              ]}
+              pointerEvents="none"
+            >
+              <Feather
+                name="check"
+                size={MAIL_ICON.rowSelect}
+                color={theme.colors.primaryForeground}
+              />
+            </Animated.View>
+          </View>
+        </Pressable>
 
         <View style={styles.content}>
           <View style={styles.topLine}>
@@ -223,12 +256,24 @@ function MailMessageRowComponent({
               <Text
                 style={[
                   styles.sender,
-                  read ? styles.readText : styles.unreadText,
+                  read ? styles.senderRead : styles.senderUnread,
                 ]}
                 numberOfLines={1}
               >
                 {name}
               </Text>
+              {showThreadBadge ? (
+                <Text
+                  style={[
+                    styles.threadCount,
+                    threadUnreadCount > 0 && styles.threadCountUnread,
+                  ]}
+                >
+                  {threadUnreadCount > 0 && threadUnreadCount < threadCount
+                    ? `(${threadUnreadCount}/${threadCount})`
+                    : `(${threadCount})`}
+                </Text>
+              ) : null}
               <MailIdentityBadge
                 message={message}
                 identities={identities}
@@ -236,34 +281,6 @@ function MailMessageRowComponent({
               />
             </View>
             <View style={styles.meta}>
-              {showThreadBadge ? (
-                <View
-                  style={[
-                    styles.threadBadge,
-                    threadUnreadCount > 0 && styles.threadBadgeUnread,
-                  ]}
-                >
-                  <Feather
-                    name="message-square"
-                    size={MAIL_ICON.rowMeta}
-                    color={
-                      threadUnreadCount > 0
-                        ? theme.colors.primaryBase
-                        : theme.colors.mutedForeground
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.threadBadgeText,
-                      threadUnreadCount > 0 && styles.threadBadgeTextUnread,
-                    ]}
-                  >
-                    {threadUnreadCount > 0 && threadUnreadCount < threadCount
-                      ? `${threadUnreadCount}/${threadCount}`
-                      : threadCount}
-                  </Text>
-                </View>
-              ) : null}
               {hasAttachments ? (
                 <Feather
                   name="paperclip"
@@ -275,48 +292,35 @@ function MailMessageRowComponent({
               <Text style={[styles.date, !read && styles.dateUnread]}>
                 {formatMessageDate(message.receivedAt)}
               </Text>
+              {flagged ? (
+                <FontAwesome
+                  name="star"
+                  size={MAIL_ICON.rowMeta}
+                  color="#fbbf24"
+                />
+              ) : null}
             </View>
-          </View>
-
-          <View style={styles.subjectLine}>
-            <Text
-              style={[
-                styles.subject,
-                read ? styles.readText : styles.unreadText,
-              ]}
-              numberOfLines={1}
-            >
-              {subject}
-            </Text>
-            {flagged ? (
-              <FontAwesome
-                name="star"
-                size={MAIL_ICON.rowMeta}
-                color="#fbbf24"
-                style={styles.flagIcon}
-              />
-            ) : null}
           </View>
 
           <Text
             style={[
-              styles.preview,
-              read ? styles.previewRead : styles.previewUnread,
+              styles.subject,
+              read ? styles.subjectRead : styles.subjectUnread,
             ]}
             numberOfLines={1}
           >
-            {preview}
+            {subject}
           </Text>
 
-          {messageLabels.length > 0 ? (
-            <View style={styles.labelRow}>
-              {messageLabels.map((label) => (
+          {preview || visibleLabels.length > 0 ? (
+            <View style={styles.snippetLine}>
+              {visibleLabels.map((label) => (
                 <View
                   key={label.id}
                   style={[
                     styles.labelChip,
                     {
-                      borderColor: `${label.color}50`,
+                      borderColor: `${label.color}40`,
                       backgroundColor: `${label.color}18`,
                     },
                   ]}
@@ -332,14 +336,18 @@ function MailMessageRowComponent({
                   </Text>
                 </View>
               ))}
+              {extraLabelCount > 0 ? (
+                <Text style={styles.labelOverflow}>+{extraLabelCount}</Text>
+              ) : null}
+              {preview ? (
+                <Text style={styles.preview} numberOfLines={1}>
+                  {preview}
+                </Text>
+              ) : null}
             </View>
           ) : null}
         </View>
-
-        {!read && !showThreadBadge ? (
-          <Animated.View style={[styles.unreadDot, unreadDotStyle]} />
-        ) : null}
-      </Animated.View>
+      </View>
     </Pressable>
   );
 }
@@ -349,23 +357,17 @@ export const MailMessageRow = React.memo(MailMessageRowComponent);
 function createStyles(theme: ThemeTokens) {
   const pad = mailSpacing(theme);
   const colors = mailColors(theme);
-  const radii = mailRadii(theme);
-  const badgeSize = MAIL_LAYOUT.selectBoxSize;
 
   const view = {
     row: {
       paddingHorizontal: pad.rowH,
       paddingVertical: pad.rowV,
       backgroundColor: theme.colors.background,
-      overflow: "hidden" as const,
     },
     rowInner: {
       flexDirection: "row" as const,
       alignItems: "flex-start" as const,
       gap: pad.rowGap,
-    },
-    rowUnread: {
-      backgroundColor: colors.unreadRow,
     },
     rowSelected: {
       backgroundColor: colors.selectedRow,
@@ -376,32 +378,38 @@ function createStyles(theme: ThemeTokens) {
     rowSelectedPressed: {
       backgroundColor: theme.colors.primaryBase + "22",
     },
+    avatarHit: {
+      width: MAIL_LAYOUT.avatarSize,
+      height: MAIL_LAYOUT.avatarSize,
+    },
+    unreadDot: {
+      position: "absolute" as const,
+      left: -5,
+      top: (MAIL_LAYOUT.avatarSize - MAIL_LAYOUT.unreadDotSize) / 2,
+      width: MAIL_LAYOUT.unreadDotSize,
+      height: MAIL_LAYOUT.unreadDotSize,
+      borderRadius: theme.borderRadius.full,
+      backgroundColor: theme.colors.primaryBase,
+      zIndex: 2,
+    },
     avatarWrap: {
       width: MAIL_LAYOUT.avatarSize,
       height: MAIL_LAYOUT.avatarSize,
     },
-    avatar: {
-      width: MAIL_LAYOUT.avatarSize,
-      height: MAIL_LAYOUT.avatarSize,
-      backgroundColor: theme.colors.secondary,
+    avatarFace: {
+      ...StyleSheet.absoluteFill,
       alignItems: "center" as const,
       justifyContent: "center" as const,
     },
-    checkBadgeWrap: {
-      position: "absolute" as const,
-      right: -2,
-      bottom: -2,
-    },
-    checkBadge: {
-      width: badgeSize,
-      height: badgeSize,
-      borderWidth: 2,
+    checkFace: {
+      ...StyleSheet.absoluteFill,
       alignItems: "center" as const,
       justifyContent: "center" as const,
     },
     content: {
       flex: 1,
-      gap: pad.tight,
+      minWidth: 0,
+      gap: 2,
     },
     topLine: {
       flexDirection: "row" as const,
@@ -422,119 +430,94 @@ function createStyles(theme: ThemeTokens) {
       gap: pad.tight,
       flexShrink: 0,
     },
-    threadBadge: {
+    snippetLine: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: pad.tight,
-      paddingHorizontal: pad.section,
-      paddingVertical: pad.tight,
-      borderRadius: radii.selectBox,
-      backgroundColor: theme.colors.muted,
-    },
-    threadBadgeUnread: {
-      backgroundColor: theme.colors.primaryBase + "1f",
-    },
-    subjectLine: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: pad.tight,
-    },
-    flagIcon: {
-      marginLeft: pad.tight,
-    },
-    unreadDot: {
-      width: MAIL_LAYOUT.unreadDotSize,
-      height: MAIL_LAYOUT.unreadDotSize,
-      borderRadius: theme.borderRadius.full,
-      backgroundColor: theme.colors.primaryBase,
-      marginTop: pad.section,
-    },
-    labelRow: {
-      flexDirection: "row" as const,
-      flexWrap: "wrap" as const,
-      gap: pad.tight,
-      marginTop: pad.tight,
     },
     labelChip: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: pad.tight,
-      paddingHorizontal: pad.section,
-      paddingVertical: pad.tight,
-      borderRadius: radii.selectBox,
-      borderWidth: 1,
+      maxWidth: 88,
+      gap: 4,
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: theme.borderRadius.full,
+      borderWidth: StyleSheet.hairlineWidth,
     },
     labelDot: {
-      width: 6,
-      height: 6,
+      width: 5,
+      height: 5,
       borderRadius: theme.borderRadius.full,
     },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    avatarText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.secondaryForeground,
-    },
     sender: {
       flexShrink: 1,
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
+    },
+    senderUnread: {
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
+    },
+    senderRead: {
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    threadCount: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      color: theme.colors.mutedForeground,
+      fontVariant: ["tabular-nums"] as TextStyle["fontVariant"],
+    },
+    threadCountUnread: {
+      color: theme.colors.primaryBase,
     },
     date: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
       color: theme.colors.mutedForeground,
+      fontVariant: ["tabular-nums"] as TextStyle["fontVariant"],
     },
     dateUnread: {
       color: theme.colors.primaryBase,
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
     },
-    threadBadgeText: {
-      fontSize: theme.typography.fontSize.xs.size,
+    subject: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: 18,
+    },
+    subjectUnread: {
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
-      color: theme.colors.mutedForeground,
-    },
-    threadBadgeTextUnread: {
-      color: theme.colors.primaryBase,
-    },
-    subject: {
-      flexShrink: 1,
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.foreground,
+    },
+    subjectRead: {
+      fontWeight: theme.typography.fontWeight.normal as TextStyle["fontWeight"],
+      color: theme.colors.mutedForeground,
     },
     preview: {
+      flex: 1,
+      minWidth: 0,
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
-    },
-    previewRead: {
       color: theme.colors.mutedForeground,
-      fontWeight: theme.typography.fontWeight.normal as TextStyle["fontWeight"],
-    },
-    previewUnread: {
-      color: theme.colors.foreground,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
-    readText: {
-      fontWeight: theme.typography.fontWeight.normal as TextStyle["fontWeight"],
-      color: theme.colors.mutedForeground,
-    },
-    unreadText: {
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
     },
     labelText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      flexShrink: 1,
+      fontSize: 11,
+      lineHeight: 14,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    labelOverflow: {
+      fontSize: 11,
+      lineHeight: 14,
+      color: theme.colors.mutedForeground,
+      fontVariant: ["tabular-nums"] as TextStyle["fontVariant"],
     },
   } satisfies Record<string, TextStyle>;
 

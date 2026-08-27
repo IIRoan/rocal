@@ -1,5 +1,6 @@
 import type { JmapEmailMessage, JmapMailbox, MailAddress } from "./types";
 import {
+  isCurrentUserMailAddress,
   isValidEmailAddress,
   parseAddressList,
   resolveReplyAllRecipients,
@@ -48,24 +49,87 @@ export function formatAddressFull(
   return formatted.join(", ");
 }
 
-export function formatMessageDate(receivedAt: string | undefined): string {
+export type FormatMessageDateOptions = {
+  timeFormat?: "12h" | "24h";
+  timezone?: string;
+  style?: "compact" | "full";
+};
+
+export function formatMessageDate(
+  receivedAt: string | undefined,
+  options?: FormatMessageDateOptions,
+): string {
   if (!receivedAt) return "";
   const date = new Date(receivedAt);
   if (Number.isNaN(date.getTime())) return "";
+
+  const hour12 =
+    options?.timeFormat === "12h"
+      ? true
+      : options?.timeFormat === "24h"
+        ? false
+        : undefined;
+  const timeZone = options?.timezone;
+  const localeOptions = timeZone ? { timeZone } : undefined;
+
+  if (options?.style === "full") {
+    return date.toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+      hour12,
+      ...localeOptions,
+    });
+  }
+
   const now = new Date();
-  const sameDay = date.toDateString() === now.toDateString();
-  if (sameDay) {
+  const dateStr = date.toLocaleDateString(undefined, localeOptions);
+  const todayStr = now.toLocaleDateString(undefined, localeOptions);
+  if (dateStr === todayStr) {
     return date.toLocaleTimeString(undefined, {
       hour: "2-digit",
       minute: "2-digit",
+      hour12,
+      ...localeOptions,
     });
   }
-  const sameYear = date.getFullYear() === now.getFullYear();
+
+  const yearStr = date.toLocaleDateString(undefined, {
+    year: "numeric",
+    ...localeOptions,
+  });
+  const thisYearStr = now.toLocaleDateString(undefined, {
+    year: "numeric",
+    ...localeOptions,
+  });
   return date.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" }),
+    ...(yearStr === thisYearStr ? {} : { year: "numeric" }),
+    ...localeOptions,
   });
+}
+
+/** Collapsed "to me, Alice" line used by the native message reader. */
+export function formatRecipientSummary(
+  recipients: MailAddress[] | undefined,
+  currentUserEmail?: string | null,
+): string {
+  if (!recipients?.length) return "";
+
+  const names = recipients.map((recipient) => {
+    if (isCurrentUserMailAddress(recipient.email, currentUserEmail)) {
+      return "me";
+    }
+    return recipient.name?.trim() || recipient.email;
+  });
+
+  if (names.length === 1) {
+    return `to ${names[0]}`;
+  }
+  if (names.length === 2) {
+    return `to ${names[0]} and ${names[1]}`;
+  }
+  return `to ${names[0]}, ${names[1]} +${names.length - 2}`;
 }
 
 export function isMessageRead(message: JmapEmailMessage): boolean {

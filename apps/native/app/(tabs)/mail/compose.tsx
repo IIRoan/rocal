@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
+  Alert,
+  BackHandler,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,14 +12,12 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { AppScreen, NavigationHeader } from "../../../src/components/layout";
-import {
-  layoutFormContent,
-  layoutFormFieldBorder,
-} from "../../../src/lib/app-layout";
+import { AppScreen, HeaderIconButton, NavigationHeader } from "../../../src/components/layout";
+import { LAYOUT_METRICS } from "../../../src/lib/app-layout";
 import { useQuery } from "@tanstack/react-query";
-import { getErrorMessage, resolveReplyRecipients, validateComposeRecipients, applyComposeBold, applyComposeItalic, applyComposeUnderline, toggleComposeList, resolveComposeSendBodies, type TextSelection } from "@workspace/calendar-core";
+import { getErrorMessage, resolveReplyRecipients, validateComposeRecipients, resolveComposeSendBodies, messageBodiesToComposeText } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useToast } from "../../../src/providers/ToastProvider";
@@ -34,6 +31,7 @@ import {
   useCachedMessage,
   resolveComposeContext,
   useMailAccount,
+  useMailMutations,
   useMailRuntime,
   useSendMessage,
 } from "../../../src/lib/mail/use-mail";
@@ -69,13 +67,18 @@ import {
   type DraftSaveStatus,
 } from "../../../src/hooks/use-compose-draft-autosave";
 import type { JmapEmailMessage, JmapIdentity, MailAddress } from "../../../src/lib/mail/types";
-import { RecipientSuggestInput } from "../../../src/components/mail/RecipientSuggestInput";
+import { ComposeRecipientField } from "../../../src/components/mail/ComposeRecipientField";
+import { ComposeBodyEditor, type ComposeBodyEditorHandle } from "../../../src/components/mail/ComposeBodyEditor";
 import { useRecentContacts } from "../../../src/hooks/use-recent-contacts";
 import { extractRecentContactEntries } from "../../../src/lib/record-recent-contacts";
+import { collectCommittedEmails } from "../../../src/lib/mail/compose-recipients";
+import { useKeyboardInset } from "../../../src/hooks/use-keyboard-inset";
 
 export default function ComposeScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardInset();
   const params = useLocalSearchParams<{
     mode?: string;
     messageId?: string;
@@ -90,6 +93,7 @@ export default function ComposeScreen() {
   const runtimeQuery = useMailRuntime(provisioned);
   const runtime = runtimeQuery.data;
   const sendMessage = useSendMessage(runtime);
+  const { moveToTrash } = useMailMutations(runtime, null);
   const { recordUsage } = useRecentContacts();
   const cachedMessage = useCachedMessage(params.messageId ?? "");
 
@@ -112,11 +116,9 @@ export default function ComposeScreen() {
   const [attachments, setAttachments] = useState<PendingComposeAttachment[]>(
     [],
   );
-  const [selection, setSelection] = useState<TextSelection>({
-    start: 0,
-    end: 0,
-  });
   const [isDraftDecrypting, setIsDraftDecrypting] = useState(false);
+  const [bodyFocused, setBodyFocused] = useState(false);
+  const bodyEditorRef = useRef<ComposeBodyEditorHandle>(null);
 
   const composeContext = resolveComposeContext(
     runtime,
@@ -292,20 +294,6 @@ export default function ComposeScreen() {
     setBody((current) => appendPlainTextSignature(current, selectedIdentity));
   }, [selectedIdentity]);
 
-  const applyFormat = useCallback(
-    (
-      fn: (
-        text: string,
-        selection: TextSelection,
-      ) => { text: string; selection: TextSelection },
-    ) => {
-      const next = fn(body, selection);
-      setBody(next.text);
-      setSelection(next.selection);
-    },
-    [body, selection],
-  );
-
   const handleAttach = useCallback(async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -333,37 +321,70 @@ export default function ComposeScreen() {
     }
   }, []);
 
-  const handleClose = useCallback(async () => {
-    await saveDraft();
-    setTo("");
-    setCc("");
-    setBcc("");
-    setSubject("");
-    setBody("");
-    setError(null);
-    setDraftId(null);
-    setDraftSaveStatus("idle");
-    setShowCcBcc(false);
-    setHasInitializedFromParams(false);
-    setAttachments([]);
-    router.back();
-  }, [router, saveDraft]);
+  const isDirty = Boolean(
+    to.trim() ||
+      cc.trim() ||
+      bcc.trim() ||
+      subject.trim() ||
+      body.trim() ||
+      attachments.length > 0 ||
+      draftId,
+  );
 
-  const handleClear = useCallback(() => {
-    setTo("");
-    setCc("");
-    setBcc("");
-    setSubject("");
-    setBody("");
-    setError(null);
-    setDraftId(null);
-    setDraftSaveStatus("idle");
-    setShowCcBcc(false);
-    setAttachments([]);
-  }, []);
+  const leaveCompose = useCallback(() => {
+    router.back();
+  }, [router]);
+
+  const handleDiscard = useCallback(() => {
+    if (draftId && runtime) {
+      moveToTrash.mutate(draftId);
+    }
+    leaveCompose();
+  }, [draftId, leaveCompose, moveToTrash, runtime]);
+
+  const handleSaveAndLeave = useCallback(async () => {
+    await saveDraft();
+    leaveCompose();
+  }, [leaveCompose, saveDraft]);
+
+  const handleCancel = useCallback(() => {
+    if (!isDirty) {
+      leaveCompose();
+      return;
+    }
+
+    Alert.alert("Draft", undefined, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete Draft",
+        style: "destructive",
+        onPress: handleDiscard,
+      },
+      {
+        text: "Save Draft",
+        onPress: () => {
+          void handleSaveAndLeave();
+        },
+      },
+    ]);
+  }, [handleDiscard, handleSaveAndLeave, isDirty, leaveCompose]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        handleCancel();
+        return true;
+      },
+    );
+    return () => subscription.remove();
+  }, [handleCancel]);
 
   const canSend =
-    Boolean(composeContext) && !sendMessage.isPending && !isDraftDecrypting;
+    Boolean(composeContext) &&
+    !sendMessage.isPending &&
+    !isDraftDecrypting &&
+    to.trim().length > 0;
 
   useEffect(() => {
     if (hasInitializedFromParams) {
@@ -478,12 +499,12 @@ export default function ComposeScreen() {
       }
 
       const bodies = extractMessageBodies(sourceMessage);
-      setBody(bodies.text?.trim() || stripHtmlToText(bodies.html));
+      setBody(messageBodiesToComposeText(bodies));
     }
 
     setHasInitializedFromParams(true);
   }, [
-              composeContext?.fromEmail,
+    composeContext?.fromEmail,
     hasInitializedFromParams,
     params.mode,
     params.to,
@@ -492,83 +513,77 @@ export default function ComposeScreen() {
     sourceMessage,
   ]);
 
+  const hasSignature = Boolean(getPlainTextSignature(selectedIdentity));
+  const toExcludeEmails = useMemo(() => collectCommittedEmails(cc, bcc), [bcc, cc]);
+  const ccExcludeEmails = useMemo(() => collectCommittedEmails(to, bcc), [bcc, to]);
+  const bccExcludeEmails = useMemo(() => collectCommittedEmails(to, cc), [cc, to]);
+  const showFormatBar = bodyFocused;
+  const formatBar = (
+    <ComposeFormatBar
+      theme={theme}
+      styles={styles}
+      draftSaveStatus={draftSaveStatus}
+      hasSignature={hasSignature}
+      onBold={() => bodyEditorRef.current?.applyBold()}
+      onItalic={() => bodyEditorRef.current?.applyItalic()}
+      onUnderline={() => bodyEditorRef.current?.applyUnderline()}
+      onList={() => bodyEditorRef.current?.applyList()}
+      onInsertSignature={handleInsertSignature}
+    />
+  );
+
   return (
     <AppScreen
       header={
         <NavigationHeader
           variant="compose"
-          title={draftId ? "Draft" : "New message"}
-          onBack={() => void handleClose()}
+          title={draftId ? "Draft" : "New Message"}
+          onBack={handleCancel}
           trailing={
-            <View style={styles.headerActions}>
-              <Pressable
-                onPress={handleClear}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Clear compose"
-              >
-                <Text style={styles.clearButton}>Clear</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleSend}
-                disabled={!canSend}
-                style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
-                accessibilityRole="button"
-                accessibilityLabel="Send message"
-              >
-                {sendMessage.isPending ? (
+            <View style={styles.headerTrailing}>
+              <HeaderIconButton
+                name="paperclip"
+                onPress={() => {
+                  void handleAttach();
+                }}
+                accessibilityLabel="Attach file"
+              />
+              {sendMessage.isPending ? (
+                <View style={styles.sendPending}>
                   <ActivityIndicator
                     size="small"
-                    color={theme.colors.primaryForeground}
+                    color={theme.colors.primaryBase}
                   />
-                ) : (
-                  <Feather
-                    name="send"
-                    size={16}
-                    color={theme.colors.primaryForeground}
-                  />
-                )}
-                <Text style={styles.sendButtonText}>Send</Text>
-              </Pressable>
+                </View>
+              ) : (
+                <HeaderIconButton
+                  name="send"
+                  onPress={() => {
+                    void handleSend();
+                  }}
+                  disabled={!canSend}
+                  color={
+                    canSend
+                      ? theme.colors.primaryBase
+                      : theme.colors.mutedForeground
+                  }
+                  accessibilityLabel="Send"
+                />
+              )}
             </View>
           }
         />
       }
     >
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      <View
+        style={[
+          styles.composeShell,
+          { paddingBottom: keyboardHeight > 0 ? 0 : insets.bottom },
+        ]}
       >
-        <ScrollView
-          contentContainerStyle={styles.body}
-          keyboardShouldPersistTaps="handled"
-        >
-          {composeContext ? (
-            <Pressable
-              style={styles.fromRow}
-              onPress={
-                identities.length > 1
-                  ? () => setIdentityPickerOpen(true)
-                  : undefined
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Choose sending identity"
-            >
-              <Text style={styles.fromLabel}>From</Text>
-              <Text style={styles.fromValue} numberOfLines={1}>
-                {composeContext.fromName
-                  ? `${composeContext.fromName} <${composeContext.fromEmail}>`
-                  : composeContext.fromEmail}
-              </Text>
-              {identities.length > 1 ? (
-                <Feather
-                  name="chevron-down"
-                  size={16}
-                  color={theme.colors.mutedForeground}
-                />
-              ) : null}
-            </Pressable>
-          ) : runtimeQuery.isLoading ? (
+        <View style={styles.flex}>
+        <View style={styles.headerFields}>
+          {runtimeQuery.isLoading && !composeContext ? (
             <View style={styles.fromRow}>
               <ActivityIndicator
                 size="small"
@@ -576,140 +591,93 @@ export default function ComposeScreen() {
               />
               <Text style={styles.fromValue}>Preparing your mailbox…</Text>
             </View>
-          ) : (
+          ) : null}
+
+          {!runtimeQuery.isLoading && !composeContext ? (
             <Text style={styles.noticeText}>
               Your mailbox cannot send messages right now.
             </Text>
-          )}
+          ) : null}
 
-          <SuggestField
-            theme={theme}
-            label="To"
+          <ComposeRecipientField
             value={to}
             onChangeText={setTo}
-            placeholder="name@example.com"
-            autoFocus
+            placeholder="To"
+            excludeEmails={toExcludeEmails}
             trailing={
               <Pressable
                 onPress={() => setShowCcBcc((prev) => !prev)}
                 hitSlop={8}
+                style={styles.ccToggleHit}
                 accessibilityRole="button"
-                accessibilityLabel="Toggle Cc and Bcc"
+                accessibilityLabel={
+                  showCcBcc ? "Hide Cc, Bcc, and From" : "Show Cc, Bcc, and From"
+                }
               >
-                <Text style={styles.ccToggle}>
-                  {showCcBcc ? "Hide" : "Cc/Bcc"}
-                </Text>
+                <Feather
+                  name={showCcBcc ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color={theme.colors.mutedForeground}
+                />
               </Pressable>
             }
           />
 
           {showCcBcc ? (
             <>
-              <SuggestField
-                theme={theme}
-                label="Cc"
+              <ComposeRecipientField
                 value={cc}
                 onChangeText={setCc}
-                placeholder="name@example.com"
+                placeholder="Cc"
+                excludeEmails={ccExcludeEmails}
               />
-              <SuggestField
-                theme={theme}
-                label="Bcc"
+              <ComposeRecipientField
                 value={bcc}
                 onChangeText={setBcc}
-                placeholder="name@example.com"
+                placeholder="Bcc"
+                excludeEmails={bccExcludeEmails}
               />
+              {composeContext ? (
+                <Pressable
+                  style={styles.fromRow}
+                  onPress={
+                    identities.length > 1
+                      ? () => setIdentityPickerOpen(true)
+                      : undefined
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose sending identity"
+                >
+                  <Text style={styles.fromLabel}>From</Text>
+                  <Text style={styles.fromValue} numberOfLines={1}>
+                    {composeContext.fromName
+                      ? `${composeContext.fromName}`
+                      : composeContext.fromEmail}
+                  </Text>
+                  {identities.length > 1 ? (
+                    <Feather
+                      name="chevron-down"
+                      size={16}
+                      color={theme.colors.mutedForeground}
+                    />
+                  ) : null}
+                </Pressable>
+              ) : null}
             </>
           ) : null}
 
-          <Field
-            theme={theme}
-            label="Subject"
+          <TextInput
+            style={styles.subjectInput}
             value={subject}
             onChangeText={setSubject}
+            onFocus={() => setBodyFocused(false)}
             placeholder="Subject"
+            placeholderTextColor={theme.colors.mutedForeground}
+            autoCapitalize="sentences"
+            autoCorrect
+            autoFocus={false}
+            accessibilityLabel="Subject"
           />
-
-          <View style={styles.composeToolbar}>
-            <View style={styles.formatToolbar}>
-              <Pressable
-                onPress={() => applyFormat(applyComposeBold)}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Bold"
-                style={styles.formatButton}
-              >
-                <Text style={styles.formatButtonText}>B</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => applyFormat(applyComposeItalic)}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Italic"
-                style={styles.formatButton}
-              >
-                <Text style={[styles.formatButtonText, styles.formatItalic]}>
-                  I
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => applyFormat(applyComposeUnderline)}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Underline"
-                style={styles.formatButton}
-              >
-                <Text
-                  style={[styles.formatButtonText, styles.formatUnderline]}
-                >
-                  U
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => applyFormat(toggleComposeList)}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="List"
-                style={styles.formatButton}
-              >
-                <Feather
-                  name="list"
-                  size={16}
-                  color={theme.colors.mutedForeground}
-                />
-              </Pressable>
-              <Pressable
-                onPress={() => void handleAttach()}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Attach file"
-                style={styles.formatButton}
-              >
-                <Feather
-                  name="paperclip"
-                  size={16}
-                  color={theme.colors.mutedForeground}
-                />
-              </Pressable>
-            </View>
-            {getPlainTextSignature(selectedIdentity) ? (
-              <Pressable
-                onPress={handleInsertSignature}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Insert signature"
-              >
-                <Text style={styles.ccToggle}>Insert signature</Text>
-              </Pressable>
-            ) : null}
-            {draftSaveStatus === "saving" ? (
-              <Text style={styles.draftStatus}>Saving draft…</Text>
-            ) : draftSaveStatus === "saved" ? (
-              <Text style={styles.draftStatus}>Draft saved</Text>
-            ) : draftSaveStatus === "error" ? (
-              <Text style={styles.draftStatusError}>Draft save failed</Text>
-            ) : null}
-          </View>
 
           {attachments.length > 0 ? (
             <View style={styles.attachmentList}>
@@ -744,23 +712,33 @@ export default function ComposeScreen() {
             </View>
           ) : null}
 
-          <TextInput
-            style={styles.bodyInput}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        </View>
+
+        {isDraftDecrypting ? (
+          <View style={styles.bodyLoading}>
+            <ActivityIndicator
+              size="small"
+              color={theme.colors.mutedForeground}
+            />
+            <Text style={styles.draftStatus}>Decrypting draft…</Text>
+          </View>
+        ) : (
+          <ComposeBodyEditor
+            ref={bodyEditorRef}
             value={body}
             onChangeText={setBody}
-            onSelectionChange={(event) =>
-              setSelection(event.nativeEvent.selection)
-            }
-            placeholder="Write your message…"
-            placeholderTextColor={theme.colors.mutedForeground}
-            multiline
-            textAlignVertical="top"
-            accessibilityLabel="Message body"
+            onFocusChange={setBodyFocused}
+            placeholder="Message"
           />
+        )}
+        </View>
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        </ScrollView>
-      </KeyboardAvoidingView>
+        {showFormatBar ? formatBar : null}
+        {keyboardHeight > 0 ? (
+          <View style={{ height: keyboardHeight }} />
+        ) : null}
+      </View>
 
       <BottomSheet
         visible={identityPickerOpen}
@@ -875,6 +853,86 @@ function stripHtmlToText(html: string | null | undefined): string {
     .trim();
 }
 
+function ComposeFormatBar({
+  theme,
+  styles,
+  draftSaveStatus,
+  hasSignature,
+  onBold,
+  onItalic,
+  onUnderline,
+  onList,
+  onInsertSignature,
+}: {
+  theme: ThemeTokens;
+  styles: ReturnType<typeof createStyles>;
+  draftSaveStatus: DraftSaveStatus;
+  hasSignature: boolean;
+  onBold: () => void;
+  onItalic: () => void;
+  onUnderline: () => void;
+  onList: () => void;
+  onInsertSignature: () => void;
+}) {
+  return (
+    <View style={styles.formatBar}>
+      <View style={styles.formatToolbar}>
+        <Pressable
+          onPressIn={onBold}
+          accessibilityRole="button"
+          accessibilityLabel="Bold"
+          style={styles.formatButton}
+        >
+          <Text style={styles.formatButtonText}>B</Text>
+        </Pressable>
+        <Pressable
+          onPressIn={onItalic}
+          accessibilityRole="button"
+          accessibilityLabel="Italic"
+          style={styles.formatButton}
+        >
+          <Text style={[styles.formatButtonText, styles.formatItalic]}>I</Text>
+        </Pressable>
+        <Pressable
+          onPressIn={onUnderline}
+          accessibilityRole="button"
+          accessibilityLabel="Underline"
+          style={styles.formatButton}
+        >
+          <Text style={[styles.formatButtonText, styles.formatUnderline]}>
+            U
+          </Text>
+        </Pressable>
+        <Pressable
+          onPressIn={onList}
+          accessibilityRole="button"
+          accessibilityLabel="List"
+          style={styles.formatButton}
+        >
+          <Feather name="list" size={16} color={theme.colors.mutedForeground} />
+        </Pressable>
+        {hasSignature ? (
+          <Pressable
+            onPress={onInsertSignature}
+            accessibilityRole="button"
+            accessibilityLabel="Insert signature"
+            style={styles.formatButton}
+          >
+            <Text style={styles.formatSigText}>Sig</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {draftSaveStatus === "saving" ? (
+        <Text style={styles.draftStatus}>Saving…</Text>
+      ) : draftSaveStatus === "saved" ? (
+        <Text style={styles.draftStatus}>Saved</Text>
+      ) : draftSaveStatus === "error" ? (
+        <Text style={styles.draftStatusError}>Save failed</Text>
+      ) : null}
+    </View>
+  );
+}
+
 function IdentityPickerRow({
   identity,
   selected,
@@ -907,138 +965,74 @@ function IdentityPickerRow({
   );
 }
 
-function SuggestField({
-  theme,
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  autoFocus,
-  trailing,
-}: {
-  theme: ThemeTokens;
-  label: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder: string;
-  autoFocus?: boolean;
-  trailing?: React.ReactNode;
-}) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  return (
-    <View style={styles.fieldRow}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <RecipientSuggestInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        autoFocus={autoFocus}
-        style={styles.fieldInput}
-      />
-      {trailing}
-    </View>
-  );
-}
-
-function Field({
-  theme,
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  keyboardType,
-  autoFocus,
-  trailing,
-}: {
-  theme: ThemeTokens;
-  label: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder: string;
-  keyboardType?: "email-address" | "default";
-  autoFocus?: boolean;
-  trailing?: React.ReactNode;
-}) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  return (
-    <View style={styles.fieldRow}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        style={styles.fieldInput}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={theme.colors.mutedForeground}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType={keyboardType ?? "default"}
-        autoFocus={autoFocus}
-      />
-      {trailing}
-    </View>
-  );
-}
-
 function createStyles(theme: ThemeTokens) {
   const view = {
     flex: {
       flex: 1,
+      minHeight: 0,
     },
-    headerActions: {
+    composeShell: {
+      flex: 1,
+      minHeight: 0,
+      overflow: "hidden" as const,
+    },
+    headerTrailing: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: theme.spacing["2"],
     },
-    sendButton: {
-      flexDirection: "row" as const,
+    sendPending: {
+      width: LAYOUT_METRICS.sideSlot,
+      height: LAYOUT_METRICS.sideSlot,
       alignItems: "center" as const,
-      gap: theme.spacing["1"],
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-      borderRadius: theme.borderRadius.full,
-      backgroundColor: theme.colors.primaryBase,
+      justifyContent: "center" as const,
     },
-    sendButtonDisabled: {
-      opacity: 0.5,
+    headerFields: {
+      flexShrink: 0,
     },
-    body: layoutFormContent(theme),
     fromRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: theme.spacing["2"],
-      paddingBottom: theme.spacing["1"],
+      minHeight: LAYOUT_METRICS.hitSize,
+      paddingHorizontal: theme.spacing["4"],
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.colors.border,
     },
-    fieldRow: {
-      flexDirection: "row" as const,
+    ccToggleHit: {
+      width: LAYOUT_METRICS.hitSize,
+      height: LAYOUT_METRICS.hitSize,
       alignItems: "center" as const,
-      gap: theme.spacing["2"],
-      ...layoutFormFieldBorder(theme),
-      paddingVertical: theme.spacing["2"],
+      justifyContent: "center" as const,
+      flexShrink: 0,
     },
-    composeToolbar: {
+    formatBar: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       justifyContent: "space-between" as const,
-      flexWrap: "wrap" as const,
-      marginTop: theme.spacing["2"],
-      minHeight: 24,
-      gap: theme.spacing["2"],
+      flexShrink: 0,
+      minHeight: LAYOUT_METRICS.hitSize,
+      paddingHorizontal: theme.spacing["2"],
+      backgroundColor: theme.colors.card,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.colors.border,
     },
     formatToolbar: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: 4,
+      gap: 2,
     },
     formatButton: {
-      minWidth: 32,
-      height: 32,
+      minWidth: LAYOUT_METRICS.hitSize,
+      height: LAYOUT_METRICS.hitSize,
       alignItems: "center" as const,
       justifyContent: "center" as const,
-      borderRadius: theme.borderRadius.md,
     },
     attachmentList: {
       gap: theme.spacing["1"],
-      marginTop: theme.spacing["2"],
+      paddingHorizontal: theme.spacing["4"],
+      paddingVertical: theme.spacing["2"],
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.colors.border,
     },
     attachmentChip: {
       flexDirection: "row" as const,
@@ -1062,21 +1056,17 @@ function createStyles(theme: ThemeTokens) {
     identityRowSelected: {
       backgroundColor: theme.colors.muted,
     },
+    bodyLoading: {
+      flex: 1,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      gap: theme.spacing["2"],
+    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    clearButton: {
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.mutedForeground,
-    },
-    sendButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.primaryForeground,
-    },
     formatButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
+      fontSize: theme.typography.fontSize.base.size,
       fontWeight: theme.typography.fontWeight.bold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
@@ -1087,44 +1077,43 @@ function createStyles(theme: ThemeTokens) {
     formatUnderline: {
       textDecorationLine: "underline" as const,
     },
+    formatSigText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      color: theme.colors.mutedForeground,
+    },
     attachmentName: {
       flex: 1,
       fontSize: theme.typography.fontSize.xs.size,
       color: theme.colors.foreground,
     },
     fromLabel: {
-      width: 56,
-      fontSize: theme.typography.fontSize.sm.size,
+      fontSize: theme.typography.fontSize.base.size,
       color: theme.colors.mutedForeground,
     },
     fromValue: {
       flex: 1,
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.foreground,
-    },
-    fieldLabel: {
-      width: 56,
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.mutedForeground,
-    },
-    fieldInput: {
-      flex: 1,
+      minWidth: 0,
       fontSize: theme.typography.fontSize.base.size,
       color: theme.colors.foreground,
-      paddingVertical: theme.spacing["1"],
     },
-    ccToggle: {
-      fontSize: theme.typography.fontSize.xs.size,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.primaryBase,
+    subjectInput: {
+      minHeight: LAYOUT_METRICS.hitSize,
+      paddingHorizontal: theme.spacing["4"],
+      paddingVertical: theme.spacing["3"],
+      fontSize: theme.typography.fontSize.base.size,
+      color: theme.colors.foreground,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.colors.border,
     },
     draftStatus: {
       fontSize: theme.typography.fontSize.xs.size,
       color: theme.colors.mutedForeground,
+      paddingRight: theme.spacing["2"],
     },
     draftStatusError: {
       fontSize: theme.typography.fontSize.xs.size,
       color: theme.colors.destructive,
+      paddingRight: theme.spacing["2"],
     },
     identityLabel: {
       flex: 1,
@@ -1132,20 +1121,16 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.foreground,
     },
     noticeText: {
+      paddingHorizontal: theme.spacing["4"],
+      paddingVertical: theme.spacing["2"],
       fontSize: theme.typography.fontSize.sm.size,
       color: theme.colors.mutedForeground,
     },
     errorText: {
-      marginTop: theme.spacing["2"],
+      paddingHorizontal: theme.spacing["4"],
+      paddingVertical: theme.spacing["2"],
       fontSize: theme.typography.fontSize.sm.size,
       color: theme.colors.destructive,
-    },
-    bodyInput: {
-      minHeight: 200,
-      marginTop: theme.spacing["2"],
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      color: theme.colors.foreground,
     },
   } satisfies Record<string, TextStyle>;
 

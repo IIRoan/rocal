@@ -1,8 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
   type TextStyle,
@@ -17,7 +15,7 @@ import {
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useRecentContacts } from "../../hooks/use-recent-contacts";
-import { BlobatarAvatar } from "../BlobatarAvatar";
+import { RecipientSuggestionList } from "./RecipientSuggestionList";
 
 function getActiveRecipientToken(value: string): string {
   const separatorIndex = Math.max(value.lastIndexOf(","), value.lastIndexOf(";"));
@@ -53,6 +51,7 @@ export function RecipientSuggestInput({
 }: RecipientSuggestInputProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const selectingRef = useRef(false);
   const [open, setOpen] = useState(false);
 
   const activeToken = getActiveRecipientToken(value);
@@ -61,32 +60,37 @@ export function RecipientSuggestInput({
     [value],
   );
 
-  const { suggestions, isAvailable } = useRecentContacts({
+  const { suggestions, isAvailable, isLoading } = useRecentContacts({
     query: activeToken,
     excludeEmails,
-    limit: 8,
+    limit: activeToken.trim() ? 8 : 12,
   });
 
-  const showSuggestions = open && isAvailable && suggestions.length > 0;
+  const showSuggestions =
+    open &&
+    isAvailable &&
+    (isLoading || suggestions.length > 0 || activeToken.trim().length > 0);
 
   const selectSuggestion = useCallback(
     (entry: RecentContactEntry) => {
+      selectingRef.current = true;
       if (onSelectSuggestion) {
         onSelectSuggestion(entry);
         setOpen(false);
-        return;
+      } else {
+        const formatted = formatRecentContactForField(entry);
+        const nextValue =
+          mode === "mail"
+            ? insertRecipientSuggestion(value, formatted, {
+                appendSeparator: true,
+              })
+            : formatted;
+        onChangeText(nextValue);
+        setOpen(false);
       }
-
-      const formatted = formatRecentContactForField(entry);
-      const nextValue =
-        mode === "mail"
-          ? insertRecipientSuggestion(value, formatted, {
-              appendSeparator: true,
-            })
-          : formatted;
-
-      onChangeText(nextValue);
-      setOpen(false);
+      requestAnimationFrame(() => {
+        selectingRef.current = false;
+      });
     },
     [mode, onChangeText, onSelectSuggestion, value],
   );
@@ -106,7 +110,14 @@ export function RecipientSuggestInput({
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => {
-          setTimeout(() => setOpen(false), 120);
+          if (selectingRef.current) {
+            return;
+          }
+          setTimeout(() => {
+            if (!selectingRef.current) {
+              setOpen(false);
+            }
+          }, 120);
         }}
         placeholder={placeholder}
         placeholderTextColor={theme.colors.mutedForeground}
@@ -120,32 +131,13 @@ export function RecipientSuggestInput({
 
       {showSuggestions ? (
         <View style={styles.suggestions}>
-          {suggestions.map((entry) => {
-            const label = entry.displayName?.trim() || entry.email;
-            return (
-              <Pressable
-                key={entry.email}
-                style={styles.suggestionRow}
-                onPress={() => selectSuggestion(entry)}
-              >
-                <BlobatarAvatar
-                  email={entry.email}
-                  name={entry.displayName}
-                  size={28}
-                />
-                <View style={styles.suggestionMeta}>
-                  <Text style={styles.suggestionName} numberOfLines={1}>
-                    {label}
-                  </Text>
-                  {entry.displayName ? (
-                    <Text style={styles.suggestionEmail} numberOfLines={1}>
-                      {entry.email}
-                    </Text>
-                  ) : null}
-                </View>
-              </Pressable>
-            );
-          })}
+          <RecipientSuggestionList
+            rows={suggestions}
+            query={activeToken}
+            isAvailable={isAvailable}
+            isLoading={isLoading}
+            onSelect={selectSuggestion}
+          />
         </View>
       ) : null}
     </View>
@@ -166,28 +158,6 @@ function createStyles(theme: ThemeTokens) {
       overflow: "hidden" as const,
       backgroundColor: theme.colors.card,
     },
-    suggestionRow: {
-      minHeight: 44,
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
-    },
-    suggestionAvatar: {
-      width: 28,
-      height: 28,
-      borderRadius: theme.borderRadius.full,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      backgroundColor: theme.colors.muted,
-    },
-    suggestionMeta: {
-      flex: 1,
-      minWidth: 0,
-    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
@@ -201,22 +171,6 @@ function createStyles(theme: ThemeTokens) {
     },
     inputError: {
       color: theme.colors.destructive,
-    },
-    suggestionAvatarText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    suggestionName: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-    },
-    suggestionEmail: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
     },
   } satisfies Record<string, TextStyle>;
 

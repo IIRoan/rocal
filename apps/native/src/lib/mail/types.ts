@@ -109,6 +109,8 @@ export type JmapEmailMessage = {
   textBody?: JmapBodyPartRef[];
   htmlBody?: JmapBodyPartRef[];
   attachments?: JmapAttachment[];
+  /** JMAP header:* property — Authentication-Results header values */
+  "header:Authentication-Results"?: string[] | null;
 };
 
 export type JmapEmailChanges = {

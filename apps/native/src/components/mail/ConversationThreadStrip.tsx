@@ -15,7 +15,7 @@ import { Feather } from "@expo/vector-icons";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { formatAddress, formatMessageDate } from "../../lib/mail/mail-helpers";
-import { buildMailPreviewSnippet } from "../../lib/mail/mail-preview";
+import { listPreviewSnippet } from "../../lib/mail/mail-preview";
 import type { JmapEmailMessage } from "../../lib/mail/types";
 import { BlobatarAvatar } from "../BlobatarAvatar";
 
@@ -114,7 +114,7 @@ export function ConversationThreadStrip({
             const sender = formatAddress(threadMessage.from);
             const preview =
               (previews?.[threadMessage.id] ??
-                buildMailPreviewSnippet(threadMessage)).slice(0, 120) ||
+                listPreviewSnippet(threadMessage)).slice(0, 120) ||
               "(No body)";
             const isRead =
               threadMessage.keywords?.["$seen"] === true ||
@@ -173,20 +173,15 @@ export function ConversationThreadStrip({
 function createStyles(theme: ThemeTokens) {
   const view = {
     container: {
-      borderWidth: 1,
-      borderColor: theme.colors.border + "80",
-      borderRadius: theme.borderRadius.lg,
       overflow: "hidden" as const,
-      marginBottom: theme.spacing["3"],
     },
     header: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["3"],
+      paddingHorizontal: theme.spacing["1"],
       paddingVertical: theme.spacing["2"],
-      minHeight: 44,
-      backgroundColor: theme.colors.muted + "28",
+      minHeight: 40,
     },
     headerPressed: {
       opacity: 0.85,

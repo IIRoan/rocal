@@ -1,6 +1,7 @@
 import {
   buildMailPreviewSnippet,
   ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER,
+  listPreviewSnippet,
   messageNeedsDecryptedPreview,
 } from "./mail-preview";
 import type { JmapEmailMessage } from "./types";
@@ -57,6 +58,22 @@ describe("buildMailPreviewSnippet", () => {
     ).toBe("Secret hello");
   });
 
+  it("strips quoted reply chains from decrypted previews", () => {
+    expect(
+      buildMailPreviewSnippet(
+        message({
+          textBody: [{ partId: "text" }],
+          bodyValues: {
+            text: {
+              value:
+                "Let's meet Thursday.\n\nOn Mon, 1 Jan 2026 at 12:00, Ada wrote:\n> earlier",
+            },
+          },
+        }),
+      ),
+    ).toBe("Let's meet Thursday.");
+  });
+
   it("treats PGP preview metadata as needing decryption", () => {
     expect(
       messageNeedsDecryptedPreview(
@@ -77,5 +94,35 @@ describe("buildMailPreviewSnippet", () => {
         }),
       ),
     ).toBe("Hello from the full body");
+  });
+
+  it("hides the encrypted placeholder in list snippets", () => {
+    expect(
+      listPreviewSnippet(
+        message({
+          textBody: [{ partId: "text" }],
+          bodyValues: {
+            text: {
+              value:
+                "-----BEGIN PGP MESSAGE-----\nciphertext\n-----END PGP MESSAGE-----",
+            },
+          },
+        }),
+      ),
+    ).toBe("");
+    expect(
+      listPreviewSnippet(
+        message({
+          textBody: [{ partId: "text" }],
+          bodyValues: {
+            text: {
+              value:
+                "-----BEGIN PGP MESSAGE-----\nciphertext\n-----END PGP MESSAGE-----",
+            },
+          },
+        }),
+        { text: "Lunch at noon" },
+      ),
+    ).toBe("Lunch at noon");
   });
 });

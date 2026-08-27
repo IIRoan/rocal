@@ -1,20 +1,14 @@
 import { useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { QUERY_KEYS } from "../query-keys";
+import type { MailDecryptResult } from "./mail-crypto";
 import {
-  decryptMailMessage,
-  decryptPgpMimeMessage,
-  type MailDecryptResult,
-} from "./mail-crypto";
-import {
-  buildMailPreviewSnippet,
+  listPreviewSnippet,
   messageNeedsDecryptedPreview,
   type DecryptedMailPreviewContent,
 } from "./mail-preview";
-import {
-  classifyMessageEncryption,
-  resolveInlinePgpArmoredCiphertext,
-} from "./message-security";
+import { classifyMessageEncryption } from "./message-security";
+import { decryptEncryptedMessage } from "./mail-sender-key";
 import type { JmapEmailMessage } from "./types";
 import type { MailRuntime } from "./mail-runtime";
 
@@ -56,22 +50,7 @@ export function useConversationDecryptedPreviews(
           if (!runtime) {
             throw new Error("Runtime not available");
           }
-          if (encryption === "inline_pgp") {
-            const armoredMessage = await resolveInlinePgpArmoredCiphertext({
-              message,
-              fetchBlob: (blobId) =>
-                runtime.client.getBlobAsText(runtime.session, blobId),
-            });
-            return decryptMailMessage(runtime, message.id, armoredMessage);
-          }
-          if (encryption === "pgp_mime") {
-            return decryptPgpMimeMessage(
-              runtime,
-              message.id,
-              message.bodyStructure,
-            );
-          }
-          throw new Error(`Unsupported encryption type: ${encryption}`);
+          return decryptEncryptedMessage(runtime, message);
         },
       };
     }),
@@ -100,7 +79,7 @@ export function useConversationDecryptedPreviews(
       if (!decrypted) {
         continue;
       }
-      const snippet = buildMailPreviewSnippet(message, decrypted);
+      const snippet = listPreviewSnippet(message, decrypted);
       if (snippet) {
         previews[message.id] = snippet;
       }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { composeTextToHtml, hasComposeFormatting } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import { getPrimaryMailboxId } from "../lib/mail/mail-helpers";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
@@ -87,6 +88,9 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
           bcc: bccAddresses.length ? bccAddresses : undefined,
           subject: input.subject.trim() || "(No subject)",
           textBody: plainBody,
+          htmlBody: hasComposeFormatting(plainBody)
+            ? composeTextToHtml(plainBody)
+            : undefined,
           previousDraftId: input.draftId ?? undefined,
         },
       );

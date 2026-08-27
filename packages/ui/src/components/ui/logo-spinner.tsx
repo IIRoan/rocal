@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { gsap } from "../../lib/gsap";
 import { cn } from "@workspace/ui/lib/utils";
 import { default as Logo } from "../layout/logo";
@@ -321,6 +321,26 @@ interface PageLoadingOverlayProps {
   priority?: boolean;
 }
 
+function FadeUnmountTimer({
+  durationMs,
+  onComplete,
+}: {
+  durationMs: number;
+  onComplete: () => void;
+}) {
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      onComplete();
+    }, durationMs);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [durationMs, onComplete]);
+
+  return null;
+}
+
 export function PageLoadingOverlay({
   isLoading = true,
   message,
@@ -330,29 +350,23 @@ export function PageLoadingOverlay({
   fadeDurationMs = 300,
   priority = false,
 }: PageLoadingOverlayProps) {
-  const [stayMounted, setStayMounted] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
-  const visible = isLoading || stayMounted;
+  const canFade = !prefersReducedMotion && fadeDurationMs > 0;
+  const [mounted, setMounted] = useState(false);
+  const unmountOverlay = useCallback(() => {
+    setMounted(false);
+  }, []);
 
-  useEffect(() => {
-    if (isLoading) {
-      setStayMounted(true);
-      return;
+  if (isLoading) {
+    if (!mounted) {
+      setMounted(true);
     }
+  } else if (!canFade && mounted) {
+    setMounted(false);
+  }
 
-    if (prefersReducedMotion || fadeDurationMs <= 0) {
-      setStayMounted(false);
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setStayMounted(false);
-    }, fadeDurationMs);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [fadeDurationMs, isLoading, prefersReducedMotion]);
+  const visible = isLoading || mounted;
+  const isFadingOut = visible && canFade && !isLoading;
 
   if (!visible) return null;
 
@@ -380,6 +394,12 @@ export function PageLoadingOverlay({
             : { pointerEvents: "none" }
       }
     >
+      {isFadingOut ? (
+        <FadeUnmountTimer
+          durationMs={fadeDurationMs}
+          onComplete={unmountOverlay}
+        />
+      ) : null}
       <LoadingBoard
         message={message}
         messageContext={messageContext}

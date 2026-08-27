@@ -7,6 +7,8 @@ import {
   composeTextToHtml,
   composeTextToPlain,
   hasComposeFormatting,
+  htmlToComposeText,
+  messageBodiesToComposeText,
   resolveComposeSendBodies,
   toggleComposeList,
 } from "./mail-compose-format";
@@ -82,5 +84,42 @@ describe("mail compose formatting", () => {
     ).toEqual({
       plaintext: "Just text\n\n-- \nRoan",
     });
+  });
+
+  it("converts editor HTML back into markdown-lite", () => {
+    expect(htmlToComposeText("<p>Hello <strong>world</strong></p>")).toBe(
+      "Hello **world**",
+    );
+    expect(htmlToComposeText("<p>See <em>this</em> and <u>that</u></p>")).toBe(
+      "See _this_ and __that__",
+    );
+    expect(htmlToComposeText("<ul><li>one</li><li>two</li></ul>")).toBe(
+      "- one\n- two",
+    );
+    expect(
+      htmlToComposeText(
+        '<p>Hello <span style="font-weight: 700">world</span></p>',
+      ),
+    ).toBe("Hello **world**");
+    expect(htmlToComposeText("<p>&lt;script&gt;</p>")).toBe("<script>");
+    expect(htmlToComposeText(composeTextToHtml("Hello **world**"))).toBe(
+      "Hello **world**",
+    );
+  });
+
+  it("prefers markdown-lite text when reopening a draft", () => {
+    expect(
+      messageBodiesToComposeText({
+        text: "Hello **world**",
+        html: "<p>Hello <strong>world</strong></p>",
+      }),
+    ).toBe("Hello **world**");
+    expect(
+      messageBodiesToComposeText({
+        text: "Hello world",
+        html: "<p>Hello <strong>world</strong></p>",
+      }),
+    ).toBe("Hello **world**");
+    expect(messageBodiesToComposeText({ text: "Just text" })).toBe("Just text");
   });
 });

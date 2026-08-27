@@ -1,14 +1,16 @@
 import React, { useMemo } from "react";
 import {
+  Modal,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type StyleProp,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { Feather } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
   enrichSelfMailRecipient,
@@ -18,8 +20,11 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useToast } from "../../providers/ToastProvider";
 import { BottomSheet, BottomSheetHeader } from "../BottomSheet";
+import { SheetRow } from "../sheet/SheetRow";
 import { BlobatarAvatar } from "../BlobatarAvatar";
-import { mailSpacing } from "./mail-ui";
+import { MailSheetList } from "./MailSheetList";
+import { MailSheetPanel } from "./MailSheetPanel";
+import { MAIL_LAYOUT, mailSpacing } from "./mail-ui";
 
 export type RecipientAddress = {
   email: string;
@@ -29,15 +34,18 @@ export type RecipientAddress = {
 type RecipientSheetProps = {
   recipient: RecipientAddress;
   children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
 };
 
 export function RecipientSheet({
   recipient,
   children,
+  style,
 }: RecipientSheetProps) {
   const { theme } = useTheme();
   const { toast } = useToast();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [open, setOpen] = React.useState(false);
 
@@ -63,62 +71,64 @@ export function RecipientSheet({
     <>
       <Pressable
         onPress={() => setOpen(true)}
+        style={style}
         accessibilityRole="button"
         accessibilityLabel={`View details for ${displayName}`}
       >
         {children}
       </Pressable>
 
-      <BottomSheet visible={open} onDismiss={() => setOpen(false)} snapPoints={[0.4]}>
-        <BottomSheetHeader>
-          <View style={styles.header}>
-            <BlobatarAvatar
-              email={recipient.email}
-              name={recipient.name}
-              size={40}
-            />
-            <View style={styles.headerText}>
-              <Text style={styles.name}>{displayName}</Text>
-              {displayName !== recipient.email ? (
-                <Text style={styles.email} numberOfLines={2}>
-                  {recipient.email}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-        </BottomSheetHeader>
-
-        <View style={styles.actions}>
-          <Pressable
-            onPress={() => void handleCopy()}
-            style={({ pressed }) => [
-              styles.actionButton,
-              pressed && styles.actionButtonPressed,
-            ]}
+      <Modal
+        visible={open}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        presentationStyle="overFullScreen"
+        onRequestClose={() => setOpen(false)}
+      >
+        <View style={styles.modalRoot} pointerEvents="box-none">
+          <BottomSheet
+            visible={open}
+            onDismiss={() => setOpen(false)}
+            snapPoints={[0.4]}
           >
-            <Feather
-              name="copy"
-              size={16}
-              color={theme.colors.mutedForeground}
-            />
-            <Text style={styles.actionText}>Copy</Text>
-          </Pressable>
-          <Pressable
-            onPress={handleEmail}
-            style={({ pressed }) => [
-              styles.actionButton,
-              pressed && styles.actionButtonPressed,
-            ]}
-          >
-            <Feather
-              name="send"
-              size={16}
-              color={theme.colors.mutedForeground}
-            />
-            <Text style={styles.actionText}>Email</Text>
-          </Pressable>
+            <BottomSheetHeader>
+              <View style={styles.header}>
+                <BlobatarAvatar
+                  email={recipient.email}
+                  name={recipient.name}
+                  size={MAIL_LAYOUT.avatarSize}
+                />
+                <View style={styles.headerText}>
+                  <Text style={styles.name} numberOfLines={2}>
+                    {displayName}
+                  </Text>
+                  <Text style={styles.email} numberOfLines={2}>
+                    {recipient.email}
+                  </Text>
+                </View>
+              </View>
+            </BottomSheetHeader>
+            <MailSheetPanel bottomInset={insets.bottom}>
+              <MailSheetList>
+                <SheetRow
+                  variant="mail"
+                  icon="copy"
+                  label="Copy email"
+                  onPress={() => void handleCopy()}
+                />
+                <SheetRow
+                  variant="mail"
+                  icon="send"
+                  label="New message"
+                  onPress={handleEmail}
+                  showDivider
+                />
+              </MailSheetList>
+            </MailSheetPanel>
+          </BottomSheet>
         </View>
-      </BottomSheet>
+      </Modal>
     </>
   );
 }
@@ -206,52 +216,21 @@ function createStyles(theme: ThemeTokens) {
   const pad = mailSpacing(theme);
 
   const view = {
+    modalRoot: {
+      flex: 1,
+    },
     header: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: pad.rowGap,
     },
-    avatar: {
-      width: 40,
-      height: 40,
-      borderRadius: theme.borderRadius.full,
-      backgroundColor: theme.colors.secondary,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-    },
     headerText: {
       flex: 1,
       gap: theme.spacing["0.5"],
     },
-    actions: {
-      flexDirection: "row" as const,
-      gap: pad.chipGap,
-      paddingHorizontal: pad.rowH,
-      paddingBottom: pad.rowH,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border,
-      paddingTop: pad.section,
-    },
-    actionButton: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: pad.tight,
-      paddingHorizontal: pad.section,
-      paddingVertical: pad.section,
-      borderRadius: theme.borderRadius.md,
-    },
-    actionButtonPressed: {
-      backgroundColor: theme.colors.muted,
-    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    avatarText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.secondaryForeground,
-    },
     name: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
@@ -262,10 +241,6 @@ function createStyles(theme: ThemeTokens) {
     email: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    actionText: {
-      fontSize: theme.typography.fontSize.sm.size,
       color: theme.colors.mutedForeground,
     },
   } satisfies Record<string, TextStyle>;
