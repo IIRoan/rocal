@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, capIdentitiesForPicker, resolveMailServerPolicy, resolveReplyRecipients, validateComposeRecipients, buildOutgoingMimeMessage, prepareOutgoingAttachments, validateUploadedAttachmentSet, validateMailboxCreate, validateMailboxName, resolveMailboxMessagesPageSize, isCurrentUserMailAddress, resolveEncryptionInternalDomain, shouldEncryptOutgoingMail, type MailServerPolicy, type OutgoingMimeAttachment } from "@workspace/calendar-core";
+import { getErrorMessage, getEmailDomain, normalizeEmailAddress, parsedAddressesToEmails, capIdentitiesForPicker, resolveMailServerPolicy, resolveReplyRecipients, validateComposeRecipients, buildOutgoingMimeMessage, prepareOutgoingAttachments, validateUploadedAttachmentSet, validateMailboxCreate, validateMailboxName, resolveMailboxMessagesPageSize, isAutomatedMailAddress, isCurrentUserMailAddress, resolveEncryptionInternalDomain, shouldEncryptOutgoingMail, type MailServerPolicy, type OutgoingMimeAttachment } from "@workspace/calendar-core";
 import { toast } from "sonner";
 import PostalMime, {
   type Attachment as ParsedMailAttachment,
@@ -745,6 +745,9 @@ export function useMailApp() {
     return next;
   }, []);
   const hasAttemptedAutoOpenRef = useRef(false);
+  const [attemptedMailboxOpenEpoch, setAttemptedMailboxOpenEpoch] = useState<
+    string | null
+  >(null);
   const recordedContactMessageRef = useRef<string | null>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [cachedAuthPassword, setCachedAuthPassword] = useState<string | null>(
@@ -775,6 +778,9 @@ export function useMailApp() {
     isMailboxStatusLoadingQuery && accountStatusEnabled;
 
   const mailboxEmail = mailboxStatus?.email ?? accountEmail;
+  const mailboxOpenEpoch = `${accountUserId}:${mailboxStatus?.provisioned ? "1" : "0"}:${cachedAuthPassword ? "1" : "0"}`;
+  const hasAttemptedMailboxOpen =
+    attemptedMailboxOpenEpoch === mailboxOpenEpoch;
 
   useEffect(() => {
     activeMailboxRef.current = activeMailbox;
@@ -918,7 +924,10 @@ export function useMailApp() {
     if (!mailbox || !selectedMessage || !sender?.email) {
       return;
     }
-    if (isCurrentUserMailAddress(sender.email, mailbox.email)) {
+    if (
+      isCurrentUserMailAddress(sender.email, mailbox.email) ||
+      isAutomatedMailAddress(sender.email)
+    ) {
       return;
     }
 
@@ -1970,19 +1979,23 @@ export function useMailApp() {
 
   // Trigger sign-in automatically once mailbox status and session are ready.
   useEffect(() => {
-    if (
-      !config ||
-      !session?.user ||
-      isSessionPending ||
-      isMailboxStatusLoading ||
-      isBusy ||
-      activeMailbox ||
-      !mailboxStatus ||
-      hasAttemptedAutoOpenRef.current
-    )
+    if (!session?.user || isSessionPending || isMailboxStatusLoading) {
       return;
+    }
+    if (!config) {
+      return;
+    }
+    if (isBusy || activeMailbox || hasAttemptedAutoOpenRef.current) {
+      return;
+    }
+
     hasAttemptedAutoOpenRef.current = true;
-    void handleSignIn();
+    queueMicrotask(() => {
+      setAttemptedMailboxOpenEpoch(mailboxOpenEpoch);
+      if (mailboxStatus) {
+        void handleSignIn();
+      }
+    });
   }, [
     activeMailbox,
     config,
@@ -1990,6 +2003,7 @@ export function useMailApp() {
     isMailboxStatusLoading,
     isSessionPending,
     mailboxStatus,
+    mailboxOpenEpoch,
     session?.user,
     handleSignIn,
   ]);
@@ -3842,6 +3856,7 @@ export function useMailApp() {
     isBusy,
     mailboxStatus,
     isMailboxStatusLoading,
+    hasAttemptedMailboxOpen,
     activeMailbox,
     composeMailPolicy,
     listThreadRelatedMessages,

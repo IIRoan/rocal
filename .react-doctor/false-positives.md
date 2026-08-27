@@ -2,6 +2,17 @@
 
 Patterns that fire diagnostics but are safe to suppress.
 
+## react-doctor/only-export-components — Next.js page metadata
+
+- **Files**: `apps/web/app/calendar/page.tsx`, `apps/web/app/mail/page.tsx`
+  (same pattern as `app/login/page.tsx`, `app/home/page.tsx`,
+  `app/reset-password/page.tsx`, `app/passkey/native/page.tsx`)
+- **Why FP**: App Router pages must colocate `export const metadata` with the
+  page component. Splitting the metadata export is not supported; a parent
+  `layout.tsx` metadata export does not satisfy `nextjs-missing-metadata`
+  (the root layout already defines title/description and the page diagnostic
+  still fired). Fast Refresh is not required for this server `page.tsx`.
+
 ## react-doctor/rn-no-raw-text
 
 - **Files**: `apps/native/src/providers/E2eeProvider.test.tsx`,
@@ -45,7 +56,8 @@ Patterns that fire diagnostics but are safe to suppress.
 
 ## react-doctor/react-compiler-destructure-method — useSearchParams().get()
 
-- **File**: `apps/web/app/reset-password/_content.tsx:24,25`
+- **File**: `apps/web/app/reset-password/_content.tsx:24,25`,
+  `apps/web/app/calendar/_client.tsx:99,100`
 - **Why FP**: `useSearchParams()` returns a `ReadonlyURLSearchParams` object
   where `.get()` is a method requiring `this` context. Destructuring
   `const { get } = useSearchParams()` would produce an unbound function that
@@ -186,6 +198,15 @@ Patterns that fire diagnostics but are safe to suppress.
 - **File**: `apps/web/app/login/login-form-params.ts` (`readLoginSearchParams`)
 - **Why FP**: `ReadonlyURLSearchParams.get()` requires `this` context. Bound via
   `searchParams.get(...)` inside `readLoginSearchParams`, not destructured.
+
+## react-doctor/jsx-no-constructed-context-values — React Compiler memoization
+
+- **Files**: `apps/web/components/calendar-workspace-ready.tsx`,
+  `apps/web/app/calendar/_client.tsx` (`KeyboardPaletteContext.Provider`)
+- **Why FP**: Next.js has `reactCompiler: true`. Wrapping context `value` in
+  `useMemo`/`useCallback` re-triggers `react-compiler-no-manual-memoization`.
+  The compiler auto-memoizes the inline `{ isReady, markReady }` /
+  `{ openPalette }` objects; keeping the memos is noise, not a leak.
 
 ## react-doctor/no-event-handler + no-pass-data-to-parent — EventEditor prop sync
 

@@ -4,9 +4,8 @@ import {
   Suspense,
   createContext,
   use,
-  useCallback,
   useEffect,
-  useMemo,
+  useEffectEvent,
   useRef,
   useState,
   type ComponentProps,
@@ -39,6 +38,13 @@ interface OverlayState {
   minimumVisibleMs: number;
 }
 
+type OverlayTimerRefs = {
+  hideTimerRef: { current: number | null };
+  unmountTimerRef: { current: number | null };
+  firstFrameRef: { current: number | null };
+  secondFrameRef: { current: number | null };
+};
+
 const DEFAULT_MESSAGE_CONTEXT: RouteLoadingMessageContext = "PAGE_LOAD";
 const DEFAULT_MINIMUM_VISIBLE_MS = 140;
 const ROUTE_OVERLAY_FADE_MS = 180;
@@ -49,25 +55,6 @@ const RouteTransitionContext = createContext<
   RouteTransitionContextValue | undefined
 >(undefined);
 
-function RouteTransitionRouteTracker({
-  onRouteKeyChange,
-}: {
-  onRouteKeyChange: (routeKey: string) => void;
-}) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const routeKey = useMemo(() => {
-    const search = searchParams.toString();
-    return search ? `${pathname}?${search}` : pathname;
-  }, [pathname, searchParams]);
-
-  useEffect(() => {
-    onRouteKeyChange(routeKey);
-  }, [onRouteKeyChange, routeKey]);
-
-  return null;
-}
-
 function isPasskeyBridgeRoute(routeKey: string | null) {
   return (
     routeKey === PASSKEY_BRIDGE_ROUTE ||
@@ -75,130 +62,56 @@ function isPasskeyBridgeRoute(routeKey: string | null) {
   );
 }
 
-export function RouteTransitionProvider({ children }: { children: ReactNode }) {
-  const [routeKey, setRouteKey] = useState<string | null>(null);
+function windowRouteKey(): string {
+  return window.location.search
+    ? `${window.location.pathname}${window.location.search}`
+    : window.location.pathname;
+}
+
+function clearOverlayTimers(refs: OverlayTimerRefs) {
+  if (refs.hideTimerRef.current !== null) {
+    window.clearTimeout(refs.hideTimerRef.current);
+    refs.hideTimerRef.current = null;
+  }
+  if (refs.unmountTimerRef.current !== null) {
+    window.clearTimeout(refs.unmountTimerRef.current);
+    refs.unmountTimerRef.current = null;
+  }
+  if (refs.firstFrameRef.current !== null) {
+    window.cancelAnimationFrame(refs.firstFrameRef.current);
+    refs.firstFrameRef.current = null;
+  }
+  if (refs.secondFrameRef.current !== null) {
+    window.cancelAnimationFrame(refs.secondFrameRef.current);
+    refs.secondFrameRef.current = null;
+  }
+}
+
+function RouteTransitionRouteTracker({
+  overlayState,
+}: {
+  overlayState: OverlayState;
+}) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const path = pathname ?? "";
+  const search = searchParams.toString();
+  const routeKey = search ? `${path}?${search}` : path;
+  const isPasskeyBridge = isPasskeyBridgeRoute(routeKey);
+  const { startRouteTransition, finishRouteTransition } = useRouteTransition();
+  const startRouteTransitionEvent = useEffectEvent(startRouteTransition);
+  const finishRouteTransitionEvent = useEffectEvent(finishRouteTransition);
   const currentRouteKeyRef = useRef<string | null>(null);
   const previousRouteKeyRef = useRef<string | null>(null);
   const didHydrateRef = useRef(false);
-  const hideTimerRef = useRef<number | null>(null);
-  const unmountTimerRef = useRef<number | null>(null);
   const firstFrameRef = useRef<number | null>(null);
   const secondFrameRef = useRef<number | null>(null);
-  const [overlayState, setOverlayState] = useState<OverlayState>({
-    mounted: false,
-    active: false,
-    messageContext: DEFAULT_MESSAGE_CONTEXT,
-    startedAt: 0,
-    minimumVisibleMs: DEFAULT_MINIMUM_VISIBLE_MS,
-  });
-  const handleRouteKeyChange = useCallback((nextRouteKey: string) => {
-    setRouteKey((currentRouteKey) =>
-      currentRouteKey === nextRouteKey ? currentRouteKey : nextRouteKey,
-    );
-  }, []);
-  const isPasskeyBridge = isPasskeyBridgeRoute(routeKey);
-
-  const clearTimers = useCallback(() => {
-    if (hideTimerRef.current !== null) {
-      window.clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-    if (unmountTimerRef.current !== null) {
-      window.clearTimeout(unmountTimerRef.current);
-      unmountTimerRef.current = null;
-    }
-    if (firstFrameRef.current !== null) {
-      window.cancelAnimationFrame(firstFrameRef.current);
-      firstFrameRef.current = null;
-    }
-    if (secondFrameRef.current !== null) {
-      window.cancelAnimationFrame(secondFrameRef.current);
-      secondFrameRef.current = null;
-    }
-  }, []);
-
-  const startRouteTransition = useCallback(
-    (options: RouteTransitionOptions = {}) => {
-      clearTimers();
-
-      setOverlayState((previous) => {
-        if (options.onlyIfInactive && previous.mounted && previous.active) {
-          return previous;
-        }
-
-        return {
-          mounted: true,
-          active: true,
-          messageContext:
-            options.messageContext ??
-            (previous.active
-              ? previous.messageContext
-              : DEFAULT_MESSAGE_CONTEXT),
-          startedAt: Date.now(),
-          minimumVisibleMs:
-            options.minimumVisibleMs ?? DEFAULT_MINIMUM_VISIBLE_MS,
-        };
-      });
-    },
-    [clearTimers],
-  );
-
-  const finishRouteTransition = useCallback(() => {
-    clearTimers();
-
-    setOverlayState((previous) => {
-      if (!previous.mounted) {
-        return previous;
-      }
-
-      const elapsedMs = Date.now() - previous.startedAt;
-      const remainingMs = Math.max(previous.minimumVisibleMs - elapsedMs, 0);
-
-      if (remainingMs > 0) {
-        hideTimerRef.current = window.setTimeout(() => {
-          setOverlayState((current) =>
-            current.active ? { ...current, active: false } : current,
-          );
-        }, remainingMs);
-        return previous;
-      }
-
-      return previous.active ? { ...previous, active: false } : previous;
-    });
-  }, [clearTimers]);
 
   useEffect(() => {
-    if (routeKey === null) {
-      return;
-    }
-
     currentRouteKeyRef.current = routeKey;
   }, [routeKey]);
 
   useEffect(() => {
-    if (!overlayState.mounted || overlayState.active) {
-      return;
-    }
-
-    unmountTimerRef.current = window.setTimeout(() => {
-      setOverlayState((current) =>
-        current.active ? current : { ...current, mounted: false },
-      );
-    }, OVERLAY_EXIT_MS);
-
-    return () => {
-      if (unmountTimerRef.current !== null) {
-        window.clearTimeout(unmountTimerRef.current);
-        unmountTimerRef.current = null;
-      }
-    };
-  }, [overlayState.active, overlayState.mounted]);
-
-  useEffect(() => {
-    if (routeKey === null) {
-      return;
-    }
-
     if (!didHydrateRef.current) {
       didHydrateRef.current = true;
       previousRouteKeyRef.current = routeKey;
@@ -214,7 +127,7 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
 
     firstFrameRef.current = window.requestAnimationFrame(() => {
       secondFrameRef.current = window.requestAnimationFrame(() => {
-        finishRouteTransition();
+        finishRouteTransitionEvent();
       });
     });
 
@@ -228,7 +141,7 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
         secondFrameRef.current = null;
       }
     };
-  }, [finishRouteTransition, overlayState.mounted, routeKey]);
+  }, [overlayState.mounted, routeKey]);
 
   useEffect(() => {
     if (isPasskeyBridge) {
@@ -286,12 +199,7 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const currentRouteKey =
-        currentRouteKeyRef.current ??
-        (window.location.search
-          ? `${window.location.pathname}${window.location.search}`
-          : window.location.pathname);
-
+      const currentRouteKey = currentRouteKeyRef.current ?? windowRouteKey();
       const nextRouteKey = nextUrl.search
         ? `${nextUrl.pathname}${nextUrl.search}`
         : nextUrl.pathname;
@@ -300,24 +208,18 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      startRouteTransition({ onlyIfInactive: true });
+      startRouteTransitionEvent({ onlyIfInactive: true });
     };
 
     const handlePopState = () => {
-      const currentRouteKey =
-        currentRouteKeyRef.current ??
-        (window.location.search
-          ? `${window.location.pathname}${window.location.search}`
-          : window.location.pathname);
-      const nextRouteKey = window.location.search
-        ? `${window.location.pathname}${window.location.search}`
-        : window.location.pathname;
+      const currentRouteKey = currentRouteKeyRef.current ?? windowRouteKey();
+      const nextRouteKey = windowRouteKey();
 
       if (nextRouteKey === currentRouteKey) {
         return;
       }
 
-      startRouteTransition({ onlyIfInactive: true });
+      startRouteTransitionEvent({ onlyIfInactive: true });
     };
 
     document.addEventListener("click", handleDocumentClick, true);
@@ -327,38 +229,138 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
       document.removeEventListener("click", handleDocumentClick, true);
       window.removeEventListener("popstate", handlePopState);
     };
-  }, [isPasskeyBridge, startRouteTransition]);
+  }, [isPasskeyBridge]);
+
+  if (!overlayState.mounted || isPasskeyBridge) {
+    return null;
+  }
+
+  return (
+    <PageLoadingOverlay
+      isLoading={overlayState.active}
+      messageContext={overlayState.messageContext}
+      enableCycling={true}
+      fadeDurationMs={ROUTE_OVERLAY_FADE_MS}
+      priority
+    />
+  );
+}
+
+export function RouteTransitionProvider({ children }: { children: ReactNode }) {
+  const hideTimerRef = useRef<number | null>(null);
+  const unmountTimerRef = useRef<number | null>(null);
+  const firstFrameRef = useRef<number | null>(null);
+  const secondFrameRef = useRef<number | null>(null);
+  const [overlayState, setOverlayState] = useState<OverlayState>({
+    mounted: false,
+    active: false,
+    messageContext: DEFAULT_MESSAGE_CONTEXT,
+    startedAt: 0,
+    minimumVisibleMs: DEFAULT_MINIMUM_VISIBLE_MS,
+  });
+
+  function startRouteTransition(options: RouteTransitionOptions = {}) {
+    clearOverlayTimers({
+      hideTimerRef,
+      unmountTimerRef,
+      firstFrameRef,
+      secondFrameRef,
+    });
+    const startedAt = Date.now();
+
+    setOverlayState((previous) => {
+      if (options.onlyIfInactive && previous.mounted && previous.active) {
+        return previous;
+      }
+
+      return {
+        mounted: true,
+        active: true,
+        messageContext:
+          options.messageContext ??
+          (previous.active
+            ? previous.messageContext
+            : DEFAULT_MESSAGE_CONTEXT),
+        startedAt,
+        minimumVisibleMs:
+          options.minimumVisibleMs ?? DEFAULT_MINIMUM_VISIBLE_MS,
+      };
+    });
+  }
+
+  function finishRouteTransition() {
+    clearOverlayTimers({
+      hideTimerRef,
+      unmountTimerRef,
+      firstFrameRef,
+      secondFrameRef,
+    });
+
+    if (!overlayState.mounted) {
+      return;
+    }
+
+    const remainingMs = Math.max(
+      overlayState.minimumVisibleMs - (Date.now() - overlayState.startedAt),
+      0,
+    );
+
+    if (remainingMs > 0) {
+      hideTimerRef.current = window.setTimeout(() => {
+        setOverlayState((current) =>
+          current.active ? { ...current, active: false } : current,
+        );
+      }, remainingMs);
+      return;
+    }
+
+    setOverlayState((current) =>
+      current.active ? { ...current, active: false } : current,
+    );
+  }
+
+  useEffect(() => {
+    if (!overlayState.mounted || overlayState.active) {
+      return;
+    }
+
+    unmountTimerRef.current = window.setTimeout(() => {
+      setOverlayState((current) =>
+        current.active ? current : { ...current, mounted: false },
+      );
+    }, OVERLAY_EXIT_MS);
+
+    return () => {
+      if (unmountTimerRef.current !== null) {
+        window.clearTimeout(unmountTimerRef.current);
+        unmountTimerRef.current = null;
+      }
+    };
+  }, [overlayState.active, overlayState.mounted]);
 
   useEffect(() => {
     return () => {
-      clearTimers();
+      clearOverlayTimers({
+        hideTimerRef,
+        unmountTimerRef,
+        firstFrameRef,
+        secondFrameRef,
+      });
     };
-  }, [clearTimers]);
+  }, [firstFrameRef, hideTimerRef, secondFrameRef, unmountTimerRef]);
 
-  const contextValue = useMemo<RouteTransitionContextValue>(
-    () => ({
-      isRouteTransitionActive: overlayState.mounted,
-      startRouteTransition,
-      finishRouteTransition,
-    }),
-    [finishRouteTransition, overlayState.mounted, startRouteTransition],
-  );
+  const contextValue: RouteTransitionContextValue = {
+    isRouteTransitionActive: overlayState.mounted,
+    startRouteTransition,
+    finishRouteTransition,
+  };
 
   return (
     <RouteTransitionContext.Provider value={contextValue}>
       <Suspense fallback={null}>
-        <RouteTransitionRouteTracker onRouteKeyChange={handleRouteKeyChange} />
+        <RouteTransitionRouteTracker overlayState={overlayState} />
       </Suspense>
       {children}
-      {overlayState.mounted && !isPasskeyBridge ? (
-        <PageLoadingOverlay
-          isLoading={overlayState.active}
-          messageContext={overlayState.messageContext}
-          enableCycling={true}
-          fadeDurationMs={ROUTE_OVERLAY_FADE_MS}
-          priority
-        />
-      ) : null}
     </RouteTransitionContext.Provider>
   );
 }

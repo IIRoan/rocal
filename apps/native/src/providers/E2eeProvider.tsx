@@ -693,6 +693,9 @@ export function E2eeProvider({
     async <T,>(
       fn: (accountKey: CryptoKey, e2ee: E2eeModule) => Promise<T>,
     ): Promise<T | null> => {
+      if (pendingBootstrapRef.current) {
+        await pendingBootstrapRef.current;
+      }
       const session = sessionRef.current;
       const e2ee = await getModule();
       if (!session || !e2ee) {

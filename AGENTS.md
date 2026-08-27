@@ -54,7 +54,7 @@ apps/native/app/
 ├── event/                      # Event create, edit, detail
 ├── calendar-manage/            # Calendar CRUD
 ├── subscription/               # ICS subscription CRUD
-├── settings/                   # Settings + timezone + notifications
+├── settings/                   # Settings hub + account, appearance, calendar, mail, time-region, notifications, security
 └── +not-found.tsx
 ```
 
@@ -90,7 +90,7 @@ If only one platform changes, **say so explicitly** and why.
 | Calendar CRUD          | `apps/web/components/calendar-manager.tsx`         | `app/calendar-manage/`                                                                                                          |
 | Subscriptions (ICS)    | `apps/web/components/subscription-management.tsx`  | `app/subscription/`                                                                                                             |
 | Search / quick actions | `apps/web/components/command-palette/`             | `src/components/CommandPalette.tsx`                                                                                             |
-| Settings               | command palette + `app/settings/` (web)            | `app/settings/`                                                                                                                 |
+| Settings               | command palette (`/settings` redirects into it)    | `app/settings/` hub + sub-pages                                                                                     |
 | Auth                   | `apps/web/app/login/`                              | `app/(auth)/`                                                                                                                   |
 
 Search both codebases for domain terms (`participants`, `recurrence`, `mailbox`, etc.) before implementing.

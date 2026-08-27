@@ -148,4 +148,23 @@ describe("calendar-view-model", () => {
     expect(range.start.getHours()).toBe(0);
     expect(range.end.getHours()).toBe(23);
   });
+
+  it("does not keep the workspace overlay after an empty events fetch has settled", () => {
+    expect(
+      resolveCalendarLoadingState({
+        settingsLoading: false,
+        calendarsLoading: false,
+        calendarCount: 2,
+        categoriesLoading: false,
+        categoryCount: 1,
+        eventsLoading: false,
+        eventCount: 0,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        isAllInitialLoading: false,
+        overlayContext: undefined,
+      }),
+    );
+  });
 });

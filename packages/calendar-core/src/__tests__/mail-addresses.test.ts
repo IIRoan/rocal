@@ -9,6 +9,7 @@ import {
   resolveReplyRecipients,
   shouldEncryptOutgoingMail,
   validateComposeRecipients,
+  isAutomatedMailAddress,
 } from "../mail-addresses";
 
 describe("mail address parsing", () => {
@@ -127,5 +128,12 @@ describe("mail address parsing", () => {
       to: ["alice@solace.onl"],
       cc: ["bob@solace.onl"],
     });
+  });
+
+  it("detects automated noreply and bounce addresses", () => {
+    expect(isAutomatedMailAddress("noreply@solace.onl")).toBe(true);
+    expect(isAutomatedMailAddress("no-reply@example.com")).toBe(true);
+    expect(isAutomatedMailAddress("mailer-daemon@example.com")).toBe(true);
+    expect(isAutomatedMailAddress("alice@example.com")).toBe(false);
   });
 });

@@ -1,74 +1,13 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import type { Ref } from "react";
 
-import { EventLoadingSkeleton } from "./event-loading-skeleton";
+import { AgendaView } from "./agenda-view";
+import { DayView } from "./day-view";
+import { MobileThreeDayView } from "./mobile-three-day-view";
+import { MonthView } from "./month-view";
+import { WeekView } from "./week-view";
 import type { CalendarEvent, CalendarView } from "./types";
-
-const AgendaView = dynamic(
-  () => import("./agenda-view").then((mod) => mod.AgendaView),
-  {
-    ssr: false,
-    loading: () => (
-      <EventLoadingSkeleton
-        view="agenda"
-        compactView={false}
-        className="absolute inset-0 z-10"
-      />
-    ),
-  },
-);
-const DayView = dynamic(() => import("./day-view").then((mod) => mod.DayView), {
-  ssr: false,
-  loading: () => (
-    <EventLoadingSkeleton
-      view="day"
-      compactView={false}
-      className="absolute inset-0 z-10"
-    />
-  ),
-});
-const ThreeDayView = dynamic(
-  () =>
-    import("./mobile-three-day-view").then((mod) => mod.MobileThreeDayView),
-  {
-    ssr: false,
-    loading: () => (
-      <EventLoadingSkeleton
-        view="3day"
-        compactView={false}
-        className="absolute inset-0 z-10"
-      />
-    ),
-  },
-);
-const MonthView = dynamic(
-  () => import("./month-view").then((mod) => mod.MonthView),
-  {
-    ssr: false,
-    loading: () => (
-      <EventLoadingSkeleton
-        view="month"
-        compactView={false}
-        className="absolute inset-0 z-10"
-      />
-    ),
-  },
-);
-const WeekView = dynamic(
-  () => import("./week-view").then((mod) => mod.WeekView),
-  {
-    ssr: false,
-    loading: () => (
-      <EventLoadingSkeleton
-        view="week"
-        compactView={false}
-        className="absolute inset-0 z-10"
-      />
-    ),
-  },
-);
 
 type EventCalendarViewStageProps = {
   compactView?: boolean;
@@ -155,7 +94,7 @@ export function EventCalendarViewStage({
         {view === "day" && <DayView {...sharedViewProps} />}
         {view === "3day" && (
           <div className="absolute inset-0 min-h-0">
-            <ThreeDayView
+            <MobileThreeDayView
               currentDate={currentDate}
               events={events}
               onEventSelect={onEventSelect}

@@ -20,6 +20,7 @@ import {
   buildEventReminderMailView,
   getErrorMessage,
   isCurrentUserMailAddress,
+  isAutomatedMailAddress,
   isDecryptedEventReminderContent,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -162,7 +163,10 @@ export default function MailMessageScreen() {
     if (!message || !sender?.email || !accountEmail) {
       return;
     }
-    if (isCurrentUserMailAddress(sender.email, accountEmail)) {
+    if (
+      isCurrentUserMailAddress(sender.email, accountEmail) ||
+      isAutomatedMailAddress(sender.email)
+    ) {
       return;
     }
 
