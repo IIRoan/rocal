@@ -2,15 +2,6 @@
 
 Patterns that fire diagnostics but are safe to suppress.
 
-## react-doctor/no-cascading-set-state — PageLoadingOverlay delayed unmount
-
-- **File**: `packages/ui/src/components/ui/logo-spinner.tsx` (`PageLoadingOverlay`)
-- **Why FP**: This rule is retired (oxlint-plugin-react-doctor 0.9.3). Do not
-  change application code to satisfy it. `stayMounted` is delayed unmount so
-  the overlay can fade: `visible` is derived as `isLoading || stayMounted`, and
-  the effect's `setStayMounted` calls are mutually exclusive branches (show,
-  instant hide, or timed hide), not cascading related updates.
-
 ## react-doctor/rn-no-raw-text
 
 - **Files**: `apps/native/src/providers/E2eeProvider.test.tsx`,

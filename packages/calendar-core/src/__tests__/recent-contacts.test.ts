@@ -3,6 +3,7 @@ import {
   createEmptyRecentContactsPayload,
   filterRecentContactSuggestions,
   filterContactsList,
+  resolveRecipientSuggestions,
   formatRecentContactForField,
   insertRecipientSuggestion,
   MAX_RECENT_CONTACTS,
@@ -111,6 +112,50 @@ describe("filterRecentContactSuggestions", () => {
         excludeEmails: ["alice@example.com"],
       }).map((entry) => entry.email),
     ).toEqual(["bob@example.com"]);
+  });
+});
+
+describe("resolveRecipientSuggestions", () => {
+  const payload = recordRecentContactUsage(
+    recordRecentContactUsage(
+      null,
+      [{ email: "alice@example.com", displayName: "Alice Smith" }],
+      "mail",
+      { usedAt: "2026-01-01T00:00:00.000Z" },
+    ),
+    [{ email: "bob@example.com", displayName: "Bob" }],
+    "mail",
+    { usedAt: "2026-01-02T00:00:00.000Z" },
+  );
+
+  it("returns recents when the query is empty", () => {
+    expect(
+      resolveRecipientSuggestions(payload).map((entry) => entry.email),
+    ).toEqual(["bob@example.com", "alice@example.com"]);
+  });
+
+  it("prefers prefix matches over substring matches", () => {
+    expect(
+      resolveRecipientSuggestions(payload, { query: "bo" }).map(
+        (entry) => entry.email,
+      ),
+    ).toEqual(["bob@example.com"]);
+  });
+
+  it("falls back to substring matches in the display name", () => {
+    expect(
+      resolveRecipientSuggestions(payload, { query: "smith" }).map(
+        (entry) => entry.email,
+      ),
+    ).toEqual(["alice@example.com"]);
+  });
+
+  it("excludes already selected emails", () => {
+    expect(
+      resolveRecipientSuggestions(payload, {
+        excludeEmails: ["bob@example.com"],
+      }).map((entry) => entry.email),
+    ).toEqual(["alice@example.com"]);
   });
 });
 

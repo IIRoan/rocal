@@ -68,11 +68,9 @@ export function mailColors(theme: ThemeTokens) {
     surfaceMuted: theme.colors.muted + "22",
     unreadRow: theme.colors.primaryBase + "12",
     selectedRow: theme.colors.primaryBase + "14",
-    selectionBar: theme.colors.primaryBase + "10",
     selectIndicator: theme.colors.muted + "55",
     selectIndicatorOn: theme.colors.primaryBase,
     chipBg: theme.colors.muted + "99",
-    selectionPill: theme.colors.primaryBase + "1a",
   };
 }
 

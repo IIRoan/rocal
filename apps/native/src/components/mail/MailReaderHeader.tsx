@@ -3,29 +3,26 @@ import { Feather } from "@expo/vector-icons";
 import { NavigationHeader } from "../layout";
 
 interface MailReaderHeaderProps {
-  title: string;
   mailboxName?: string;
   mailboxIcon?: keyof typeof Feather.glyphMap;
   onBack?: () => void;
-  rightAction?: React.ReactNode;
+  trailing?: React.ReactNode;
 }
 
-/** @see NavigationHeader */
+/** Back + mailbox name, matching iOS Mail. Subject lives in the message header. */
 export function MailReaderHeader({
-  title,
-  mailboxName,
+  mailboxName = "Mail",
   mailboxIcon = "mail",
   onBack,
-  rightAction,
+  trailing,
 }: MailReaderHeaderProps) {
   return (
     <NavigationHeader
       variant="reader"
-      title={title}
-      subtitle={mailboxName}
-      subtitleIcon={mailboxName ? mailboxIcon : undefined}
+      title={mailboxName}
+      subtitleIcon={mailboxIcon}
       onBack={onBack}
-      trailing={rightAction}
+      trailing={trailing}
     />
   );
 }

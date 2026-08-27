@@ -12,6 +12,7 @@ import {
   isMessageRead,
   parseEmailList,
   formatReplyAllRecipientFields,
+  formatRecipientSummary,
   sortMailboxes,
   sortMessagesByDate,
   validateComposeInput,
@@ -82,6 +83,52 @@ describe("formatMessageDate", () => {
     expect(
       formatMessageDate("2000-01-02T03:04:05.000Z").length,
     ).toBeGreaterThan(0);
+  });
+
+  it("returns a fuller timestamp for style=full", () => {
+    const compact = formatMessageDate("2000-01-02T03:04:05.000Z");
+    const full = formatMessageDate("2000-01-02T03:04:05.000Z", {
+      style: "full",
+    });
+    expect(full.length).toBeGreaterThan(compact.length);
+  });
+});
+
+describe("formatRecipientSummary", () => {
+  it("returns an empty string when there are no recipients", () => {
+    expect(formatRecipientSummary(undefined)).toBe("");
+    expect(formatRecipientSummary([])).toBe("");
+  });
+
+  it("labels the current user as me", () => {
+    expect(
+      formatRecipientSummary(
+        [{ email: "me@solace.onl", name: "Roan" }],
+        "me@solace.onl",
+      ),
+    ).toBe("to me");
+  });
+
+  it("joins two recipients and summarizes longer lists", () => {
+    expect(
+      formatRecipientSummary(
+        [
+          { email: "me@solace.onl" },
+          { email: "a@b.com", name: "Alice" },
+        ],
+        "me@solace.onl",
+      ),
+    ).toBe("to me and Alice");
+    expect(
+      formatRecipientSummary(
+        [
+          { email: "a@b.com", name: "Alice" },
+          { email: "c@d.com", name: "Cara" },
+          { email: "e@f.com" },
+        ],
+        "me@solace.onl",
+      ),
+    ).toBe("to Alice, Cara +1");
   });
 });
 

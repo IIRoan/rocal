@@ -125,6 +125,98 @@ export function composeTextToPlain(text: string): string {
     .replace(/(^|[\s(])_([^_\n]+)_(?=$|[\s).,!?;:])/g, "$1$2");
 }
 
+const HTML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  nbsp: " ",
+  apos: "'",
+};
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) =>
+      String.fromCharCode(parseInt(String(code), 16)),
+    )
+    .replace(/&([a-z]+);/gi, (match, name: string) => {
+      return HTML_ENTITIES[name.toLowerCase()] ?? match;
+    });
+}
+
+function styleAttr(attributes: string): string {
+  const match = attributes.match(/style\s*=\s*(["'])([\s\S]*?)\1/i);
+  return match?.[2] ?? "";
+}
+
+function wrapStyledHtml(html: string): string {
+  let current = html;
+  for (let pass = 0; pass < 6; pass += 1) {
+    const next = current.replace(
+      /<(span|font)\b([^>]*)>([\s\S]*?)<\/\1>/gi,
+      (_full, _tag: string, attributes: string, inner: string) => {
+        const style = `${attributes} ${styleAttr(attributes)}`;
+        let wrapped = inner;
+        const hasBold = /font-weight\s*:\s*(bold|[6-9]00)/i.test(style);
+        const hasItalic = /font-style\s*:\s*italic/i.test(style);
+        const hasUnderline = /text-decoration[^;]*underline/i.test(style);
+        if (!hasBold && !hasItalic && !hasUnderline) {
+          return inner;
+        }
+        if (hasBold) wrapped = `**${wrapped}**`;
+        if (hasItalic) wrapped = `_${wrapped}_`;
+        if (hasUnderline) wrapped = `__${wrapped}__`;
+        return wrapped;
+      },
+    );
+    if (next === current) break;
+    current = next;
+  }
+  return current;
+}
+
+/**
+ * Convert editor / draft HTML back into native compose markdown-lite.
+ * Handles `<strong>`/`<b>`, `<em>`/`<i>`, `<u>`, lists, and execCommand spans.
+ */
+export function htmlToComposeText(html: string): string {
+  if (!html.trim()) return "";
+
+  let value = html.replace(/\r\n/g, "\n");
+  value = value.replace(/<script[\s\S]*?<\/script>/gi, "");
+  value = value.replace(/<style[\s\S]*?<\/style>/gi, "");
+  value = wrapStyledHtml(value);
+  value = value.replace(/<(strong|b)(\s[^>]*)?>/gi, "**");
+  value = value.replace(/<\/(strong|b)>/gi, "**");
+  value = value.replace(/<(em|i)(\s[^>]*)?>/gi, "_");
+  value = value.replace(/<\/(em|i)>/gi, "_");
+  value = value.replace(/<u(\s[^>]*)?>/gi, "__");
+  value = value.replace(/<\/u>/gi, "__");
+  value = value.replace(/<br\s*\/?>/gi, "\n");
+  value = value.replace(/<\/p>/gi, "\n\n");
+  value = value.replace(/<\/div>/gi, "\n");
+  value = value.replace(/<\/h[1-6]>/gi, "\n\n");
+  value = value.replace(/<li[^>]*>/gi, "- ");
+  value = value.replace(/<\/li>/gi, "\n");
+  value = value.replace(/<\/(ul|ol)>/gi, "\n");
+  value = value.replace(/<[^>]+>/g, "");
+  value = decodeHtmlEntities(value);
+  return value.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** Prefer markdown-lite text, otherwise recover formatting from HTML drafts. */
+export function messageBodiesToComposeText(bodies: {
+  text?: string | null;
+  html?: string | null;
+}): string {
+  const text = bodies.text?.trim() ?? "";
+  const html = bodies.html?.trim() ?? "";
+  if (hasComposeFormatting(text)) return text;
+  if (html) return htmlToComposeText(html);
+  return text;
+}
+
 /**
  * Resolve the plaintext + optional HTML parts native compose sends.
  * HTML is only produced when the body has formatting and the message is not encrypted.

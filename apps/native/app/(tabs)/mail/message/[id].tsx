@@ -12,14 +12,12 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AppScreen } from "../../../../src/components/layout";
+import { AppScreen, HeaderIconButton } from "../../../../src/components/layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
-import { FontAwesome } from "@expo/vector-icons";
 import {
   buildEventReminderMailView,
-  enrichSelfMailRecipient,
   getErrorMessage,
   isCurrentUserMailAddress,
   isDecryptedEventReminderContent,
@@ -35,15 +33,11 @@ import {
   useMailMutations,
   useMailRuntime,
 } from "../../../../src/lib/mail/use-mail";
-import {
-  formatMessageDate,
-  isDraftMessage,
-} from "../../../../src/lib/mail/mail-helpers";
+import { isDraftMessage } from "../../../../src/lib/mail/mail-helpers";
 import {
   classifyMessageEncryption,
   extractMessageBodies,
   resolveDisplayAttachments,
-  resolveInlinePgpArmoredCiphertext,
 } from "../../../../src/lib/mail/message-security";
 import {
   openCachedAttachment,
@@ -52,11 +46,8 @@ import {
 } from "../../../../src/lib/mail/attachment-cache";
 import { useConversationThread } from "../../../../src/lib/mail/use-conversation-thread";
 import { useConversationDecryptedPreviews } from "../../../../src/lib/mail/use-conversation-decrypted-previews";
-import {
-  decryptMailMessage,
-  decryptPgpMimeMessage,
-  type MailDecryptResult,
-} from "../../../../src/lib/mail/mail-crypto";
+import type { MailDecryptResult } from "../../../../src/lib/mail/mail-crypto";
+import { decryptEncryptedMessage } from "../../../../src/lib/mail/mail-sender-key";
 import { HtmlEmailView } from "../../../../src/components/mail/HtmlEmailView";
 import { CenteredLoader } from "../../../../src/components/ui/loading";
 import { AttachmentPreviewModal } from "../../../../src/components/mail/AttachmentPreviewModal";
@@ -65,11 +56,12 @@ import { useAuth } from "../../../../src/providers/AuthProvider";
 import { useE2ee } from "../../../../src/providers/E2eeProvider";
 import {
   BottomSheet,
+  BottomSheetFooter,
   BottomSheetHeader,
+  BottomSheetScrollView,
   BottomSheetTitle,
 } from "../../../../src/components/BottomSheet";
 import { SheetNavButton, SheetRow } from "../../../../src/components/sheet";
-import { MailSheetPanel } from "../../../../src/components/mail/MailSheetPanel";
 import { MailSheetList } from "../../../../src/components/mail/MailSheetList";
 import {
   MailBottomAction,
@@ -78,12 +70,7 @@ import {
 } from "../../../../src/components/mail/MailBottomActionBar";
 import { mailBottomBarTotalHeight } from "../../../../src/components/mail/mail-bottom-action-bar-layout";
 import { MailReaderHeader } from "../../../../src/components/mail/MailReaderHeader";
-import { MailIdentityBadge } from "../../../../src/components/mail/MailIdentityBadge";
-import {
-  RecipientLink,
-  RecipientLinkList,
-} from "../../../../src/components/mail/RecipientSheet";
-import { BlobatarAvatar } from "../../../../src/components/BlobatarAvatar";
+import { MailMessageHeader } from "../../../../src/components/mail/MailMessageHeader";
 import { mailSpacing } from "../../../../src/components/mail/mail-ui";
 import { useRecentContacts } from "../../../../src/hooks/use-recent-contacts";
 import {
@@ -99,7 +86,6 @@ import {
 import type {
   JmapAttachment,
   JmapEmailMessage,
-  LabelDef,
 } from "../../../../src/lib/mail/types";
 import {
   useLabels,
@@ -232,18 +218,7 @@ export default function MailMessageScreen() {
     queryFn: async () => {
       if (!runtime || !message)
         throw new Error("Runtime or message not available");
-      if (encryption === "inline_pgp") {
-        const armoredMessage = await resolveInlinePgpArmoredCiphertext({
-          message,
-          fetchBlob: (blobId) =>
-            runtime.client.getBlobAsText(runtime.session, blobId),
-        });
-        return decryptMailMessage(runtime, messageId, armoredMessage);
-      }
-      if (encryption === "pgp_mime") {
-        return decryptPgpMimeMessage(runtime, messageId, message.bodyStructure);
-      }
-      throw new Error(`Unsupported encryption type: ${encryption}`);
+      return decryptEncryptedMessage(runtime, message);
     },
   });
 
@@ -435,6 +410,9 @@ export default function MailMessageScreen() {
   const archiveMailboxId =
     runtime?.mailboxes.find((mailbox) => mailbox.role === "archive")?.id ??
     null;
+  const spamMailboxId =
+    runtime?.mailboxes.find((mailbox) => isSpamMailboxRole(mailbox.role))
+      ?.id ?? null;
   const moveTargets = useMemo(() => {
     if (!runtime || !message) {
       return [];
@@ -609,193 +587,84 @@ export default function MailMessageScreen() {
     handleMoveToMailbox(inboxMailboxId);
   };
 
+  const handleReportSpam = () => {
+    if (!message) return;
+    if (!spamMailboxId) {
+      toast("No spam mailbox is configured", "info");
+      return;
+    }
+    moveToMailbox.mutate(
+      { messageId: message.id, targetMailboxId: spamMailboxId },
+      {
+        onSuccess: () => {
+          setActiveSheetView(null);
+          toast("Reported as spam");
+          router.back();
+        },
+        onError: (error) =>
+          toast(getErrorMessage(error, "Failed to report spam."), "error"),
+      },
+    );
+  };
+
   const accountEmail =
     user?.email?.trim().toLowerCase() ??
     runtime?.session.username?.trim().toLowerCase() ??
     undefined;
   const accountName = user?.name?.trim() || undefined;
-  const enrichedFrom = message?.from?.[0]
-    ? enrichSelfMailRecipient(message.from[0], {
-        email: accountEmail,
-        name: accountName,
-      })
-    : null;
 
   const messageHeader = message ? (
-    <>
-      <View style={styles.subjectRow}>
-        <Text style={styles.subject}>
-          {message.subject?.trim() || "(no subject)"}
-        </Text>
-        <Pressable
-          onPress={handleToggleStar}
-          disabled={toggleFlagged.isPending}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={isFlagged ? "Unstar" : "Star"}
-        >
-          <FontAwesome
-            name={isFlagged ? "star" : "star-o"}
-            size={18}
-            color={isFlagged ? "#fbbf24" : theme.colors.mutedForeground}
-            style={!isFlagged ? { opacity: 0.4 } : undefined}
-          />
-        </Pressable>
-      </View>
-
-      {messageLabels.length > 0 ? (
-        <View style={styles.labelRow}>
-          {messageLabels.map((label) => (
-            <View
-              key={label.id}
-              style={[
-                styles.labelChip,
-                {
-                  borderColor: `${label.color}50`,
-                  backgroundColor: `${label.color}18`,
-                },
-              ]}
-            >
-              <View
-                style={[styles.labelDot, { backgroundColor: label.color }]}
-              />
-              <Text
-                style={[styles.labelText, { color: label.color }]}
-                numberOfLines={1}
-              >
-                {label.name}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
-      <View style={styles.senderBlock}>
-        {message.from?.[0] ? (
-          <BlobatarAvatar
-            email={(enrichedFrom ?? message.from[0]).email}
-            name={(enrichedFrom ?? message.from[0]).name}
-            size={28}
-          />
-        ) : null}
-        <View style={styles.metaBlock}>
-          {message.from?.[0] ? (
-            <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>From</Text>
-              <View style={styles.metaValueRow}>
-                <RecipientLink
-                  recipient={enrichedFrom ?? message.from[0]}
-                  currentUserEmail={accountEmail}
-                  currentUserName={accountName}
-                  textStyle={styles.metaLink}
-                  showInlineAddress
-                />
-                <MailIdentityBadge
-                  message={message}
-                  identities={runtime?.identities ?? []}
-                />
-              </View>
-            </View>
-          ) : (
-            <MetaRow theme={theme} label="From" value="Unknown sender" />
-          )}
-          {message.to?.length ? (
-            <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>To</Text>
-              <View style={styles.metaValueWrap}>
-                <RecipientLinkList
-                  recipients={message.to}
-                  currentUserEmail={accountEmail}
-                  currentUserName={accountName}
-                  textStyle={styles.metaLink}
-                />
-              </View>
-            </View>
-          ) : null}
-          {message.cc?.length ? (
-            <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Cc</Text>
-              <View style={styles.metaValueWrap}>
-                <RecipientLinkList
-                  recipients={message.cc}
-                  currentUserEmail={accountEmail}
-                  currentUserName={accountName}
-                  textStyle={styles.metaLink}
-                />
-              </View>
-            </View>
-          ) : null}
-          <MetaRow
-            theme={theme}
-            label="Date"
-            value={formatMessageDate(message.receivedAt)}
-          />
-        </View>
-      </View>
-
-      {displayAttachments.length > 0 ? (
-        <View style={styles.attachmentBlock}>
-          {displayAttachments.map((attachment, index) => {
-            const key = attachment.blobId ?? `inline-${index}`;
-            const isDownloading = downloadingBlobId === key;
-            const previewKind = resolveAttachmentPreviewKind({
-              name: attachment.name,
-              type: attachment.type,
-            });
-            return (
-              <Pressable
-                key={key}
-                onPress={() => handleOpenAttachment(attachment, key)}
-                disabled={isDownloading}
-                style={({ pressed }) => [
-                  styles.attachmentChip,
-                  pressed && styles.attachmentChipPressed,
-                ]}
-              >
-                {isDownloading ? (
-                  <ActivityIndicator
-                    size={13}
-                    color={theme.colors.mutedForeground}
-                  />
-                ) : (
-                  <Feather
-                    name="paperclip"
-                    size={13}
-                    color={theme.colors.mutedForeground}
-                  />
-                )}
-                <Text style={styles.attachmentName} numberOfLines={1}>
-                  {attachment.name ?? "attachment"}
-                </Text>
-                {!isDownloading && (
-                  <Feather
-                    name={previewKind ? "eye" : "download"}
-                    size={11}
-                    color={theme.colors.mutedForeground}
-                  />
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
-
-      <View style={styles.divider} />
-    </>
+    <MailMessageHeader
+      message={message}
+      accountEmail={accountEmail}
+      accountName={accountName}
+      identities={runtime?.identities ?? []}
+      labels={messageLabels}
+      attachments={displayAttachments}
+      isFlagged={isFlagged}
+      starDisabled={toggleFlagged.isPending}
+      onToggleStar={handleToggleStar}
+      downloadingBlobId={downloadingBlobId}
+      onOpenAttachment={handleOpenAttachment}
+      encryption={encryption}
+      encryptedAtRest={Boolean(runtime?.encryptedAtRest)}
+      signatureVerificationState={decryptResult?.signatureVerificationState}
+      decryptionFailed={Boolean(decryptError)}
+      timeFormat={
+        userSettings?.timeFormat === "12h" ||
+        userSettings?.timeFormat === "24h"
+          ? userSettings.timeFormat
+          : undefined
+      }
+      timezone={userSettings?.timezone}
+    />
   ) : null;
 
   return (
     <AppScreen
       header={
         <MailReaderHeader
-          title={message?.subject?.trim() || "Message"}
-          mailboxName={currentMailbox?.name}
+          mailboxName={
+            currentMailbox
+              ? getMailboxDisplayName(currentMailbox)
+              : "Mail"
+          }
           mailboxIcon={
             currentMailbox
               ? (getMailboxIcon(
                   currentMailbox,
                 ) as keyof typeof Feather.glyphMap)
               : "mail"
+          }
+          trailing={
+            message && isSeen ? (
+              <HeaderIconButton
+                name="mail"
+                accessibilityLabel="Mark as unread"
+                onPress={handleMarkUnread}
+                disabled={isActionBusy}
+              />
+            ) : undefined
           }
         />
       }
@@ -1035,8 +904,10 @@ export default function MailMessageScreen() {
           activeSheetView === "html"
             ? [0.92]
             : activeSheetView === "label"
-              ? [0.65]
-              : [0.52]
+              ? [0.7]
+              : activeSheetView === "menu"
+                ? [0.64]
+                : [0.55]
         }
       >
         <BottomSheetHeader>
@@ -1051,93 +922,125 @@ export default function MailMessageScreen() {
           </BottomSheetTitle>
         </BottomSheetHeader>
         {activeSheetView === "menu" ? (
-          <MailSheetPanel bottomInset={insets.bottom}>
-            <MailSheetList>
-              <SheetRow
-                variant="mail"
-                icon="corner-up-left"
-                label="Reply all"
-                onPress={handleReplyAll}
-              />
-              <SheetRow
-                variant="mail"
-                icon="corner-up-right"
-                label="Forward"
-                onPress={handleForward}
-              />
-              <SheetRow
-                variant="mail"
-                icon="star"
-                label={isFlagged ? "Unstar" : "Star"}
-                onPress={handleToggleStar}
-                showDivider
-              />
-              {isSeen ? (
+          <>
+            <BottomSheetScrollView
+              contentContainerStyle={{
+                paddingHorizontal: mailPad.sheetH,
+                paddingTop: 8,
+                paddingBottom: 12,
+              }}
+            >
+              <MailSheetList>
                 <SheetRow
                   variant="mail"
-                  icon="mail"
-                  label="Mark as unread"
-                  onPress={handleMarkUnread}
+                  icon="corner-up-left"
+                  label="Reply all"
+                  onPress={handleReplyAll}
+                />
+                <SheetRow
+                  variant="mail"
+                  icon="corner-up-right"
+                  label="Forward"
+                  onPress={handleForward}
+                />
+                <SheetRow
+                  variant="mail"
+                  icon="star"
+                  label={isFlagged ? "Unstar" : "Star"}
+                  onPress={handleToggleStar}
                   showDivider
                 />
-              ) : null}
-              <SheetRow
-                variant="mail"
-                icon="tag"
-                label="Labels"
-                accessory="chevron-right"
-                onPress={() => setActiveSheetView("label")}
-                showDivider
-              />
-              {(currentMailboxRole === "trash" ||
-                isSpamMailboxRole(currentMailboxRole)) &&
-              inboxMailboxId ? (
+                {isSeen ? (
+                  <SheetRow
+                    variant="mail"
+                    icon="mail"
+                    label="Mark as unread"
+                    onPress={handleMarkUnread}
+                    showDivider
+                  />
+                ) : null}
                 <SheetRow
                   variant="mail"
-                  icon="inbox"
-                  label="Restore to inbox"
-                  onPress={handleRestoreToInbox}
-                  showDivider
-                />
-              ) : null}
-              {moveTargets.length > 0 ? (
-                <SheetRow
-                  variant="mail"
-                  icon="folder"
-                  label="Move to…"
+                  icon="tag"
+                  label="Labels"
                   accessory="chevron-right"
-                  onPress={() => setActiveSheetView("move")}
+                  onPress={() => setActiveSheetView("label")}
                   showDivider
                 />
-              ) : null}
-              {rawHtmlSource ? (
+                {spamMailboxId &&
+                !isSpamMailboxRole(currentMailboxRole) &&
+                currentMailboxRole !== "trash" ? (
+                  <SheetRow
+                    variant="mail"
+                    icon="alert-octagon"
+                    label="Report spam"
+                    onPress={handleReportSpam}
+                    showDivider
+                  />
+                ) : null}
+                {(currentMailboxRole === "trash" ||
+                  isSpamMailboxRole(currentMailboxRole)) &&
+                inboxMailboxId ? (
+                  <SheetRow
+                    variant="mail"
+                    icon="inbox"
+                    label={
+                      isSpamMailboxRole(currentMailboxRole)
+                        ? "Not spam"
+                        : "Restore to inbox"
+                    }
+                    onPress={handleRestoreToInbox}
+                    showDivider
+                  />
+                ) : null}
+                {moveTargets.length > 0 ? (
+                  <SheetRow
+                    variant="mail"
+                    icon="folder"
+                    label="Move to…"
+                    accessory="chevron-right"
+                    onPress={() => setActiveSheetView("move")}
+                    showDivider
+                  />
+                ) : null}
+                {rawHtmlSource ? (
+                  <SheetRow
+                    variant="mail"
+                    icon="code"
+                    label="View HTML source"
+                    accessory="chevron-right"
+                    onPress={() => setActiveSheetView("html")}
+                    showDivider
+                  />
+                ) : null}
+              </MailSheetList>
+            </BottomSheetScrollView>
+            <BottomSheetFooter>
+              <MailSheetList>
                 <SheetRow
                   variant="mail"
-                  icon="code"
-                  label="View HTML source"
-                  accessory="chevron-right"
-                  onPress={() => setActiveSheetView("html")}
-                  showDivider
+                  icon="trash-2"
+                  label={
+                    currentMailboxRole === "trash"
+                      ? "Delete message"
+                      : "Move to trash"
+                  }
+                  destructive
+                  onPress={handleMoveToTrash}
+                  disabled={isActionBusy}
                 />
-              ) : null}
-            </MailSheetList>
-            <MailSheetList>
-              <SheetRow
-                variant="mail"
-                icon="trash-2"
-                label={
-                  currentMailboxRole === "trash"
-                    ? "Delete message"
-                    : "Move to trash"
-                }
-                destructive
-                onPress={handleMoveToTrash}
-                disabled={isActionBusy}
-              />
-            </MailSheetList>
-          </MailSheetPanel>
+              </MailSheetList>
+            </BottomSheetFooter>
+          </>
         ) : activeSheetView === "move" ? (
-          <MailSheetPanel bottomInset={insets.bottom}>
+          <BottomSheetScrollView
+            contentContainerStyle={{
+              paddingHorizontal: mailPad.sheetH,
+              paddingTop: 8,
+              paddingBottom: sheetPad,
+              gap: 8,
+            }}
+          >
             <SheetNavButton
               label="Actions"
               onPress={() => setActiveSheetView("menu")}
@@ -1154,9 +1057,15 @@ export default function MailMessageScreen() {
                 />
               ))}
             </MailSheetList>
-          </MailSheetPanel>
+          </BottomSheetScrollView>
         ) : activeSheetView === "label" ? (
-          <MailSheetPanel bottomInset={insets.bottom}>
+          <BottomSheetScrollView
+            contentContainerStyle={{
+              paddingHorizontal: mailPad.sheetH,
+              paddingTop: 8,
+              paddingBottom: sheetPad,
+            }}
+          >
             <MailLabelsSheet
               labels={labels}
               messageKeywords={message?.keywords}
@@ -1194,29 +1103,26 @@ export default function MailMessageScreen() {
                 toast(`Deleted "${label?.name ?? labelId}"`);
               }}
             />
-          </MailSheetPanel>
+          </BottomSheetScrollView>
         ) : activeSheetView === "html" ? (
-          <View style={styles.sheetView}>
+          <BottomSheetScrollView
+            contentContainerStyle={{
+              paddingHorizontal: mailPad.sheetH,
+              paddingTop: 8,
+              paddingBottom: sheetPad,
+              gap: 8,
+            }}
+          >
             <SheetNavButton
               label="Actions"
               onPress={() => setActiveSheetView("menu")}
             />
-            <ScrollView
-              style={styles.sheetScroll}
-              contentContainerStyle={{
-                paddingHorizontal: mailPad.sheetH,
-                paddingBottom: sheetPad,
-                gap: 8,
-              }}
-              keyboardShouldPersistTaps="handled"
-            >
-              <View style={styles.htmlSourceCard}>
-                <Text selectable style={styles.htmlSourceText}>
-                  {rawHtmlSource ?? ""}
-                </Text>
-              </View>
-            </ScrollView>
-          </View>
+            <View style={styles.htmlSourceCard}>
+              <Text selectable style={styles.htmlSourceText}>
+                {rawHtmlSource ?? ""}
+              </Text>
+            </View>
+          </BottomSheetScrollView>
         ) : null}
       </BottomSheet>
     </AppScreen>
@@ -1259,50 +1165,24 @@ function SignatureBadge({
   styles: ReturnType<typeof createStyles>;
   state: MailDecryptResult["signatureVerificationState"];
 }) {
-  if (state === "not_signed") return null;
+  if (state !== "verified" && state !== "failed") return null;
 
-  const icon =
-    state === "verified"
-      ? "check-circle"
-      : state === "failed"
-        ? "x-circle"
-        : "help-circle";
-  const color =
-    state === "verified"
-      ? ((theme.colors as unknown as Record<string, string>)["success"] ??
-        theme.colors.primaryBase)
-      : state === "failed"
-        ? theme.colors.destructive
-        : theme.colors.mutedForeground;
-  const label =
-    state === "verified"
-      ? "Signature verified"
-      : state === "failed"
-        ? "Signature verification failed"
-        : "Unverified signature";
+  const verified = state === "verified";
+  const color = verified
+    ? ((theme.colors as unknown as Record<string, string>)["success"] ??
+      theme.colors.primaryBase)
+    : theme.colors.destructive;
 
   return (
     <View style={styles.signatureBadge}>
-      <Feather name={icon as any} size={14} color={color} />
-      <Text style={[styles.signatureBadgeText, { color }]}>{label}</Text>
-    </View>
-  );
-}
-
-function MetaRow({
-  theme,
-  label,
-  value,
-}: {
-  theme: ThemeTokens;
-  label: string;
-  value: string;
-}) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  return (
-    <View style={styles.metaRow}>
-      <Text style={styles.metaLabel}>{label}</Text>
-      <Text style={styles.metaValue}>{value}</Text>
+      <Feather
+        name={verified ? "check-circle" : "x-circle"}
+        size={14}
+        color={color}
+      />
+      <Text style={[styles.signatureBadgeText, { color }]}>
+        {verified ? "Signature verified" : "Signature verification failed"}
+      </Text>
     </View>
   );
 }
@@ -1323,75 +1203,9 @@ function createStyles(theme: ThemeTokens) {
       paddingHorizontal: theme.spacing["6"],
     },
     body: {
-      padding: theme.spacing["4"],
+      paddingHorizontal: theme.spacing["4"],
+      paddingTop: theme.spacing["3"],
       gap: theme.spacing["3"],
-    },
-    senderBlock: {
-      flexDirection: "row" as const,
-      alignItems: "flex-start" as const,
-      gap: theme.spacing["2"],
-    },
-    metaBlock: {
-      flex: 1,
-      minWidth: 0,
-      gap: theme.spacing["1"],
-    },
-    labelRow: {
-      flexDirection: "row" as const,
-      flexWrap: "wrap" as const,
-      gap: 6,
-    },
-    labelChip: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: theme.borderRadius.full,
-      borderWidth: 1,
-    },
-    labelDot: {
-      width: 8,
-      height: 8,
-      borderRadius: theme.borderRadius.full,
-    },
-    metaRow: {
-      flexDirection: "row" as const,
-      gap: theme.spacing["2"],
-    },
-    metaValueRow: {
-      flex: 1,
-      flexDirection: "row" as const,
-      flexWrap: "wrap" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["1.5"],
-    },
-    metaValueWrap: {
-      flex: 1,
-    },
-    attachmentBlock: {
-      flexDirection: "row" as const,
-      flexWrap: "wrap" as const,
-      gap: theme.spacing["2"],
-    },
-    attachmentChip: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["1"],
-      maxWidth: 220,
-      paddingHorizontal: theme.spacing["2"],
-      paddingVertical: theme.spacing["1"],
-      borderRadius: theme.borderRadius.md,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-    },
-    attachmentChipPressed: {
-      opacity: 0.65,
-    },
-    divider: {
-      height: 1,
-      backgroundColor: theme.colors.border,
     },
     signatureBadge: {
       flexDirection: "row" as const,
@@ -1412,21 +1226,6 @@ function createStyles(theme: ThemeTokens) {
       paddingVertical: theme.spacing["2"],
       borderRadius: theme.borderRadius.md,
       backgroundColor: theme.colors.primaryBase,
-    },
-    unsupportedCard: {
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
-      padding: theme.spacing["4"],
-      borderRadius: theme.borderRadius.lg,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-    },
-    sheetView: {
-      flex: 1,
-    },
-    sheetScroll: {
-      flex: 1,
     },
     htmlSourceCard: {
       padding: theme.spacing["3"],
@@ -1449,59 +1248,13 @@ function createStyles(theme: ThemeTokens) {
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    subjectRow: {
-      flexDirection: "row" as const,
-      alignItems: "flex-start" as const,
-      gap: theme.spacing["2"],
-    },
-    subject: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.xl.size,
-      lineHeight: theme.typography.fontSize.xl.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    metaLabel: {
-      width: 44,
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    metaValue: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-    },
-    metaLink: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.primaryBase,
-      textDecorationLine: "underline" as const,
-    },
-    attachmentName: {
-      flexShrink: 1,
-      fontSize: theme.typography.fontSize.xs.size,
-      color: theme.colors.foreground,
-    },
     bodyText: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
       color: theme.colors.foreground,
     },
-    labelText: {
-      fontSize: theme.typography.fontSize.xs.size - 1,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
     mutedText: {
       textAlign: "center" as const,
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    reminderBodyPlaceholderText: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.mutedForeground,

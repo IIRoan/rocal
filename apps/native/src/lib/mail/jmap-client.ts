@@ -197,6 +197,11 @@ const EMAIL_GET_PROPERTIES = [
   "attachments",
 ] as const;
 
+const EMAIL_DETAIL_GET_PROPERTIES = [
+  ...EMAIL_GET_PROPERTIES,
+  "header:Authentication-Results",
+] as const;
+
 export type JmapPgpMimeCiphertext = {
   blobId: string;
   size: number;
@@ -1002,7 +1007,7 @@ export class StalwartJmapClient {
             {
               accountId,
               ids: chunk,
-              properties: EMAIL_GET_PROPERTIES,
+              properties: EMAIL_DETAIL_GET_PROPERTIES,
               fetchTextBodyValues: true,
               fetchHTMLBodyValues: true,
               fetchAllBodyValues: true,
