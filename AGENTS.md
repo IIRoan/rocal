@@ -205,6 +205,8 @@ Server logs must support debugging **without** storing PII, secrets, or user con
 
 When mutating mail data already in the React Query cache (star, read state, labels), **use optimistic `onMutate` + `setQueryData`** on the specific list key. Do **not** blanket-invalidate `["mail"]` — that refetches everything, shows spinners, and loses scroll position. Invalidate narrowly on destructive actions (delete, move) where items leave the list. Roll back via refetch/`invalidateMessages()` on failure.
 
+**Private title index (web + native).** Older mail and calendar search uses an on-device AES-GCM title index (`title-search-index` + `search-index-crypto` in `@workspace/calendar-core`). Hydrated event titles and mail subjects stay on the device and are not uploaded. Encrypted event ciphertext stays on the server and is still found via blind-index tokens. Do not add a server-side plaintext title catalog.
+
 ### Mail protocol: JMAP only (Required)
 
 Solace mail is **JMAP end-to-end**. Agents must use **JMAP as the only protocol** for mailbox operations — never introduce or wire up parallel mail stacks.

@@ -176,6 +176,19 @@ export type JmapAttachmentInput = {
   cid?: string;
 };
 
+const EMAIL_LIST_GET_PROPERTIES = [
+  "id",
+  "threadId",
+  "mailboxIds",
+  "keywords",
+  "receivedAt",
+  "from",
+  "to",
+  "subject",
+  "preview",
+  "hasAttachment",
+] as const;
+
 const EMAIL_GET_PROPERTIES = [
   "id",
   "threadId",
@@ -984,14 +997,73 @@ export class StalwartJmapClient {
     };
   }
 
+  async getMailboxMessageIds(
+    session: JmapSession,
+    mailboxId: string,
+    options: { limit?: number; position?: number } = {},
+  ): Promise<{ ids: string[]; total: number; queryState?: string }> {
+    const { limit = this.getDefaultMailboxPageSize(), position = 0 } = options;
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/query",
+          {
+            accountId,
+            filter: { inMailbox: mailboxId },
+            sort: [{ property: "receivedAt", isAscending: false }],
+            limit,
+            position,
+          },
+          "q1",
+        ],
+      ],
+    );
+    const result = this.getMethodResult<{
+      ids?: string[];
+      total?: number;
+      queryState?: string;
+    }>(envelope, "Email/query");
+
+    return {
+      ids: result.ids ?? [],
+      total: result.total ?? 0,
+      queryState: result.queryState,
+    };
+  }
+
+  async getMailboxMessagesForIndex(
+    session: JmapSession,
+    mailboxId: string,
+    options: { limit?: number; position?: number } = {},
+  ): Promise<{
+    messages: JmapEmailMessage[];
+    total: number;
+    queryState?: string;
+  }> {
+    const { ids, total, queryState } = await this.getMailboxMessageIds(
+      session,
+      mailboxId,
+      options,
+    );
+    const messages = await this.getMessagesByIds(session, ids, {
+      includeBodies: false,
+    });
+    return { messages, total, queryState };
+  }
+
   async getMessagesByIds(
     session: JmapSession,
     ids: string[],
+    options: { includeBodies?: boolean } = {},
   ): Promise<JmapEmailMessage[]> {
     if (ids.length === 0) {
       return [];
     }
 
+    const includeBodies = options.includeBodies ?? true;
     const accountId = this.requirePrimaryAccountId(session);
     const chunkSize = this.getEmailGetChunkSize();
     const chunks = chunkArray(ids, chunkSize);
@@ -1007,10 +1079,18 @@ export class StalwartJmapClient {
             {
               accountId,
               ids: chunk,
-              properties: EMAIL_DETAIL_GET_PROPERTIES,
-              fetchTextBodyValues: true,
-              fetchHTMLBodyValues: true,
-              fetchAllBodyValues: true,
+              properties: [
+                ...(includeBodies
+                  ? EMAIL_DETAIL_GET_PROPERTIES
+                  : EMAIL_LIST_GET_PROPERTIES),
+              ],
+              ...(includeBodies
+                ? {
+                    fetchTextBodyValues: true,
+                    fetchHTMLBodyValues: true,
+                    fetchAllBodyValues: true,
+                  }
+                : {}),
             },
             "c1",
           ],

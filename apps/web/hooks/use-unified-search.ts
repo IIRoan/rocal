@@ -6,6 +6,11 @@ import type {
   UnifiedSearchResponse,
   UnifiedSearchResult,
 } from "@workspace/calendar-core";
+import {
+  mergeUnifiedSearchResults,
+  searchTitleIndex,
+  titleHitToUnifiedResult,
+} from "@workspace/calendar-core";
 import type { CalendarEvent as UiCalendarEvent } from "@workspace/ui/components/calendar";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import type { CalendarEvent as ApiCalendarEvent } from "@/lib/types/calendar";
@@ -13,6 +18,8 @@ import { mailDemoApiService } from "@/lib/mail/api-service";
 import { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import { createMailOAuthTokenManager } from "@/lib/mail/oauth-client";
 import type { JmapEmailMessage } from "@/lib/mail/types";
+import { usePrivateTitleIndex } from "@/hooks/use-private-title-index";
+import { mailDocumentToMessageStub } from "@/lib/search/private-title-index";
 import { searchMailMessages, toCalendarSearchResult } from "@/lib/search/unified-search";
 
 const MAILBOX_PRIORITY: Record<string, number> = {
@@ -130,6 +137,7 @@ export function useUnifiedSearch({
   includeMail = true,
   includeCalendar = true,
 }: UseUnifiedSearchOptions) {
+  const titleIndex = usePrivateTitleIndex();
   const normalizedQuery = query.trim();
   const canSearch = enabled && normalizedQuery.length >= 2;
   const perSourceLimit = Math.max(limit, 1);
@@ -175,23 +183,33 @@ export function useUnifiedSearch({
           toCalendarSearchResult(event, index),
         )
       : [];
-    const results = [...mailResults, ...calendarResults]
-      .sort((left, right) => {
-        if (right.score !== left.score) return right.score - left.score;
-        return (right.timestamp ?? "").localeCompare(left.timestamp ?? "");
-      })
-      .slice(0, limit) as UnifiedSearchResult<JmapEmailMessage>[];
+    const localHits = searchTitleIndex(
+      titleIndex.documents.filter((document) => {
+        if (document.source === "mail") return includeMail;
+        return includeCalendar;
+      }),
+      normalizedQuery,
+      Math.max(limit * 2, perSourceLimit),
+    ).map((hit) =>
+      titleHitToUnifiedResult(hit, mailDocumentToMessageStub),
+    ) as UnifiedSearchResult<JmapEmailMessage>[];
+    const results = mergeUnifiedSearchResults(
+      [localHits, mailResults, calendarResults],
+      limit,
+    );
 
     return {
       results,
-      total: mailResults.length + calendarResults.length,
+      total: results.length,
       sourceTotals: {
-        mail: mailResults.length,
-        calendar: calendarResults.length,
+        mail: results.filter((result) => result.source === "mail").length,
+        calendar: results.filter((result) => result.source === "calendar").length,
       },
+      isIndexing: titleIndex.isIndexing,
       isLimited:
-        (includeMail && searchableMailMessages.length === 0) ||
-        mailQuery.isError === true,
+        !titleIndex.enabled &&
+        ((includeMail && searchableMailMessages.length === 0) ||
+          mailQuery.isError === true),
     };
   }, [
     canSearch,
@@ -204,11 +222,15 @@ export function useUnifiedSearch({
     perSourceLimit,
     calendarQuery.data,
     limit,
+    titleIndex.documents,
+    titleIndex.enabled,
+    titleIndex.isIndexing,
   ]);
 
   return {
     ...response,
-    isFetching: calendarQuery.isFetching || mailQuery.isFetching,
+    isFetching:
+      calendarQuery.isFetching || mailQuery.isFetching || titleIndex.isIndexing,
     isLoading: calendarQuery.isLoading || mailQuery.isLoading,
     error: calendarQuery.error ?? mailQuery.error,
   };

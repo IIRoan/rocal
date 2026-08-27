@@ -1,7 +1,9 @@
 import React from "react";
 import { Key, ChevronRight, ArrowLeft, Shield } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
+import { usePrivateSearchIndexControls } from "@/hooks/use-private-search-index-controls";
 import { PasswordSection } from "./password-section";
+import { PrivateSearchIndexToggle } from "./private-search-index-toggle";
 import { EVENT_ENCRYPTION_HINT } from "@workspace/calendar-core";
 
 interface SecuritySettingsProps {
@@ -35,6 +37,7 @@ export function SecuritySettings({
   handleSetPassword,
   handleResetEncryptionPassword,
 }: SecuritySettingsProps) {
+  const privateSearchIndex = usePrivateSearchIndexControls();
   const showPasswordSection = hasPasswordAccount || hasOAuthAccount;
 
   return (
@@ -67,13 +70,27 @@ export function SecuritySettings({
         </div>
 
         <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+          Search
+        </div>
+        <div className="p-1">
+          <PrivateSearchIndexToggle
+            enabled={privateSearchIndex.enabled}
+            onToggle={
+              privateSearchIndex.enabled
+                ? privateSearchIndex.disable
+                : privateSearchIndex.enable
+            }
+          />
+        </div>
+
+        <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
           Authentication
         </div>
         <div className="p-1">
           <button
             type="button"
             onClick={() => goForward("passkeys")}
-            className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+            className="flex cursor-pointer items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
           >
             <Key className="size-4 text-muted-foreground shrink-0" />
             <div className="flex-1 min-w-0">

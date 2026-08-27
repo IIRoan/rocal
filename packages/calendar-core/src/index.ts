@@ -15,6 +15,8 @@ export * from "./mail-server-limits";
 export * from "./mail-server-policy";
 export * from "./search-types";
 export * from "./mail-search-relevance";
+export * from "./search-index-crypto";
+export * from "./title-search-index";
 export * from "./color-utils";
 export * from "./date-utils";
 export * from "./timezone";
