@@ -31,6 +31,7 @@ export default tseslint.config(
     ignores: [
       "__tests__/**",
       "coverage/**",
+      "dist/**",
       "generated/**",
       "jest.config.cjs",
       "prisma/**",
