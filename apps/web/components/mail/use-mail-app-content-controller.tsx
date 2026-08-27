@@ -52,6 +52,7 @@ export function useMailAppContentController(
     session,
     isBusy,
     isMailboxStatusLoading,
+    hasAttemptedMailboxOpen,
     activeMailbox,
     composeMailPolicy,
     listThreadRelatedMessages,
@@ -407,7 +408,10 @@ export function useMailAppContentController(
     Boolean(activeMailbox) && listSettings.keyboardShortcutsEnabled,
   );
 
-  const isOverlayLoading = isMailboxStatusLoading || (isBusy && !activeMailbox);
+  const isOverlayLoading =
+    isMailboxStatusLoading ||
+    (isBusy && !activeMailbox) ||
+    Boolean(session?.user && !activeMailbox && !hasAttemptedMailboxOpen);
 
   const selectedMailbox =
     activeMailbox?.mailboxes.find(

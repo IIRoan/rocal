@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import {
   EventCalendar,
   useCalendarContext,
@@ -9,6 +9,7 @@ import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useCalendarPresentation } from "@/hooks/use-calendar-presentation";
 import { useSettings } from "@/hooks/use-settings";
 import { useCommandPalette } from "./command-palette-context";
+import { useCalendarWorkspaceReady } from "@/components/calendar-workspace-ready";
 import {
   FORCE_LOADING_DESIGN_PREVIEW,
   PageLoadingOverlay,
@@ -23,6 +24,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
   const { openEventEditor, previewEvent } = useCommandPalette();
   const calendarData = useSharedCalendarData();
+  const workspace = useCalendarWorkspaceReady();
   const {
     defaultCalendarId,
     handleSetPreview,
@@ -45,47 +47,52 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     },
   });
 
-  // No initialization effect needed — CalendarDateSync (rendered in the
-  // dashboard layout) drives the active month from currentDate in the context.
+  useEffect(() => {
+    if (FORCE_LOADING_DESIGN_PREVIEW || isAllInitialLoading) {
+      return;
+    }
+    workspace?.markReady();
+  }, [isAllInitialLoading, workspace]);
 
-  if (FORCE_LOADING_DESIGN_PREVIEW || isAllInitialLoading) {
-    return (
-      <PageLoadingOverlay
-        isLoading={true}
-        messageContext={overlayContext}
-        enableCycling={true}
-      />
-    );
-  }
-
+  // Keep the calendar mounted under the workspace overlay so the view can
+  // paint in parallel. The shell hides chrome until markReady() runs.
   return (
-    <EventCalendar
-      className={className}
-      initialView={initialView}
-      events={transformedEvents}
-      categories={calendarData.categories}
-      loading={false}
-      eventsLoading={calendarData.eventsLoading}
-      error={calendarData.error}
-      onCreateEvent={calendarData.createEvent}
-      onUpdateEvent={calendarData.updateEvent}
-      onDeleteEvent={calendarData.deleteEvent}
-      onCreateCategory={calendarData.createCategory}
-      onDateRangeChange={calendarData.setDateRange}
-      showWeekNumbers={settings?.showWeekNumbers}
-      compactView={settings?.compactView}
-      timeFormat={settings?.timeFormat}
-      defaultEventDuration={settings?.defaultEventDuration}
-      defaultCalendarId={defaultCalendarId}
-      weekStartDay={settings?.weekStartDay}
-      workingDays={workingDays}
-      timezone={settings?.timezone}
-      themeSettings={themeSettings}
-      onLoadNotifications={calendarData.loadNotifications}
-      onUpdateNotifications={calendarData.updateNotifications}
-      onEventEdit={openEventEditor}
-      onSetPreview={handleSetPreview}
-      onPrefetchRange={calendarData.prefetchRange}
-    />
+    <>
+      <EventCalendar
+        className={className}
+        initialView={initialView}
+        events={transformedEvents}
+        categories={calendarData.categories}
+        loading={false}
+        eventsLoading={calendarData.eventsLoading}
+        error={calendarData.error}
+        onCreateEvent={calendarData.createEvent}
+        onUpdateEvent={calendarData.updateEvent}
+        onDeleteEvent={calendarData.deleteEvent}
+        onCreateCategory={calendarData.createCategory}
+        onDateRangeChange={calendarData.setDateRange}
+        showWeekNumbers={settings?.showWeekNumbers}
+        compactView={settings?.compactView}
+        timeFormat={settings?.timeFormat}
+        defaultEventDuration={settings?.defaultEventDuration}
+        defaultCalendarId={defaultCalendarId}
+        weekStartDay={settings?.weekStartDay}
+        workingDays={workingDays}
+        timezone={settings?.timezone}
+        themeSettings={themeSettings}
+        onLoadNotifications={calendarData.loadNotifications}
+        onUpdateNotifications={calendarData.updateNotifications}
+        onEventEdit={openEventEditor}
+        onSetPreview={handleSetPreview}
+        onPrefetchRange={calendarData.prefetchRange}
+      />
+      {FORCE_LOADING_DESIGN_PREVIEW ? (
+        <PageLoadingOverlay
+          isLoading={true}
+          messageContext={overlayContext}
+          enableCycling={true}
+        />
+      ) : null}
+    </>
   );
 }

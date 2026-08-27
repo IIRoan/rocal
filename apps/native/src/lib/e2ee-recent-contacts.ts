@@ -1,6 +1,7 @@
 import type { E2eeModule } from "@workspace/e2ee";
 import {
   createEmptyRecentContactsPayload,
+  sanitizeRecentContactsPayload,
   type RecentContactsPayload,
 } from "@workspace/calendar-core";
 import { calendarApiService } from "./api";
@@ -24,7 +25,7 @@ function parseEncryptedPayload(encryptedContent: string) {
 export async function loadRecentContactsCrypto(
   accountKey: CryptoKey,
   e2ee: E2eeModule,
-): Promise<RecentContactsPayload | null> {
+): Promise<RecentContactsPayload> {
   const record = await calendarApiService.getRecentContacts();
   if (!record) {
     return createEmptyRecentContactsPayload();
@@ -36,11 +37,12 @@ export async function loadRecentContactsCrypto(
   }
 
   try {
-    return await e2ee.decryptJsonPayload<RecentContactsPayload>(
+    const decrypted = await e2ee.decryptJsonPayload<RecentContactsPayload>(
       accountKey,
       encryptedPayload,
       RECENT_CONTACTS_AAD,
     );
+    return sanitizeRecentContactsPayload(decrypted);
   } catch {
     return createEmptyRecentContactsPayload();
   }
@@ -53,7 +55,7 @@ export async function saveRecentContactsCrypto(
 ): Promise<boolean> {
   const encrypted = await e2ee.encryptJsonPayload(
     accountKey,
-    payload,
+    sanitizeRecentContactsPayload(payload),
     RECENT_CONTACTS_AAD,
   );
 

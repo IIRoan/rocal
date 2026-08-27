@@ -22,7 +22,7 @@ export function registerForegroundPushNotificationHandler(): void {
 
   registered = true;
   Notifications.setNotificationHandler({
-    handleNotification: () => FOREGROUND_NOTIFICATION_BEHAVIOR,
+    handleNotification: async () => FOREGROUND_NOTIFICATION_BEHAVIOR,
     handleError: (notificationId, error) => {
       if (__DEV__) {
         console.warn(

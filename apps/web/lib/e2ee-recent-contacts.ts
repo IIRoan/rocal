@@ -1,6 +1,7 @@
 import {
   createEmptyRecentContactsPayload,
   recordRecentContactUsage,
+  sanitizeRecentContactsPayload,
   type RecentContactContext,
   type RecentContactUsageInput,
   type RecentContactsPayload,
@@ -60,11 +61,12 @@ export async function loadRecentContacts(): Promise<RecentContactsPayload | null
   }
 
   try {
-    return await decryptJsonPayload<RecentContactsPayload>(
+    const decrypted = await decryptJsonPayload<RecentContactsPayload>(
       session.accountKey,
       encryptedPayload,
       RECENT_CONTACTS_AAD,
     );
+    return sanitizeRecentContactsPayload(decrypted);
   } catch {
     return createEmptyRecentContactsPayload();
   }
@@ -80,7 +82,7 @@ export async function saveRecentContacts(
 
   const encrypted = await encryptJsonPayload(
     session.accountKey,
-    payload,
+    sanitizeRecentContactsPayload(payload),
     RECENT_CONTACTS_AAD,
   );
 

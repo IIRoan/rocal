@@ -1,4 +1,7 @@
-import { normalizeEmailAddress } from "./mail-addresses";
+import {
+  isAutomatedMailAddress,
+  normalizeEmailAddress,
+} from "./mail-addresses";
 
 export type RecentContactContext = "mail" | "calendar";
 
@@ -75,10 +78,24 @@ function normalizeUsageInput(
   input: RecentContactUsageInput,
 ): RecentContactUsageInput | null {
   const email = normalizeEmailAddress(input.email);
-  if (!email) return null;
+  if (!email || isAutomatedMailAddress(email)) return null;
 
   const displayName = input.displayName?.trim();
   return displayName ? { email, displayName } : { email };
+}
+
+function peopleContacts(contacts: RecentContactEntry[]): RecentContactEntry[] {
+  return contacts.filter((entry) => !isAutomatedMailAddress(entry.email));
+}
+
+export function sanitizeRecentContactsPayload(
+  payload: RecentContactsPayload,
+): RecentContactsPayload {
+  const contacts = peopleContacts(payload.contacts);
+  if (contacts.length === payload.contacts.length) {
+    return payload;
+  }
+  return { ...payload, contacts };
 }
 
 function mergeContactEntry(
@@ -165,7 +182,7 @@ export function addManualContact(
   options?: { addedAt?: string },
 ): RecentContactsPayload | null {
   const email = normalizeEmailAddress(input.email);
-  if (!email) return payload ?? null;
+  if (!email || isAutomatedMailAddress(email)) return payload ?? null;
 
   const addedAt = options?.addedAt ?? new Date().toISOString();
   const base = payload ?? createEmptyRecentContactsPayload();
@@ -223,7 +240,7 @@ export function filterContactsList(
 ): RecentContactEntry[] {
   if (!payload?.contacts.length) return [];
 
-  return payload.contacts
+  return peopleContacts(payload.contacts)
     .filter((entry) => contactMatchesListQuery(entry, options.query ?? ""))
     .sort((a, b) => {
       const nameA = (a.displayName ?? a.email).toLowerCase();
@@ -276,7 +293,7 @@ export function recordRecentContactUsage(
     );
   }
 
-  const contacts = [...byEmail.values()].sort((a, b) =>
+  const contacts = peopleContacts([...byEmail.values()]).sort((a, b) =>
     b.lastUsedAt.localeCompare(a.lastUsedAt),
   );
 
@@ -317,7 +334,7 @@ export function filterRecentContactSuggestions(
   );
   const query = options.query ?? "";
 
-  return payload.contacts
+  return peopleContacts(payload.contacts)
     .filter((entry) => !exclude.has(entry.email))
     .filter((entry) => matchesQuery(entry, query))
     .sort((a, b) => b.lastUsedAt.localeCompare(a.lastUsedAt))

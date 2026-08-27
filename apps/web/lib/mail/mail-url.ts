@@ -129,8 +129,8 @@ export function resolveMailboxFromSegment(
   );
 }
 
-function parseMailPathSegments(pathname: string): MailUrlState {
-  if (!pathname.startsWith(MAIL_HOME_PATH)) {
+function parseMailPathSegments(pathname: string | null | undefined): MailUrlState {
+  if (!pathname?.startsWith(MAIL_HOME_PATH)) {
     return { mailboxSegment: null, messageId: null };
   }
 
@@ -176,7 +176,7 @@ export function parseMailSearchParams(
 }
 
 export function parseMailLocation(
-  pathname: string,
+  pathname: string | null | undefined,
   search: string | URLSearchParams,
 ): MailUrlState {
   const fromSearch = parseMailSearchParams(search);

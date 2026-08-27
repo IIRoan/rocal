@@ -161,6 +161,8 @@ export function resolveCalendarLoadingState(input: CalendarLoadingStateInput) {
     input.settingsLoading ||
     (input.calendarsLoading && input.calendarCount === 0) ||
     (input.categoriesLoading && input.categoryCount === 0);
+  // Callers must pass eventsLoading=true until the first events query has
+  // settled, including the window before that query is enabled.
   const isInitialEventsLoading = input.eventsLoading && input.eventCount === 0;
   const isAllInitialLoading = isStructureLoading || isInitialEventsLoading;
   const overlayContext: CalendarOverlayContext | undefined =

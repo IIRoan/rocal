@@ -416,9 +416,12 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const maxHeightSV = useSharedValue(maxHeight);
     const screenHeightSV = useSharedValue(screenHeight);
     const topGapSV = useSharedValue(topGap);
-    maxHeightSV.value = maxHeight;
-    screenHeightSV.value = screenHeight;
-    topGapSV.value = topGap;
+
+    useLayoutEffect(() => {
+      maxHeightSV.value = maxHeight;
+      screenHeightSV.value = screenHeight;
+      topGapSV.value = topGap;
+    }, [maxHeight, screenHeight, topGap, maxHeightSV, screenHeightSV, topGapSV]);
 
     const offsetsRef = useRef(offsets);
     offsetsRef.current = offsets;
