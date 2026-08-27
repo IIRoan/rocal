@@ -15,41 +15,33 @@ export const recentContactsRoutes = new Elysia({
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Recent contacts"), (app) =>
     app
-      .get(
-        "/",
-        async ({ routeUser }) => {
-          const record = await recentContactsService.get(routeUser.id);
-          if (!record) {
-            return new Response(JSON.stringify(null), {
-              status: 200,
-              headers: { "content-type": "application/json" },
-            });
-          }
-          return record;
+      .get("/", {
+        detail: {
+          summary: "Get encrypted recent contacts",
+          description:
+            "Fetches the authenticated user's encrypted recent-contacts blob",
         },
-        {
-          detail: {
-            summary: "Get encrypted recent contacts",
-            description:
-              "Fetches the authenticated user's encrypted recent-contacts blob",
-          },
-        },
-      )
-      .put(
-        "/",
-        async ({ body, routeUser }) => {
-          return recentContactsService.upsert({
-            userId: routeUser.id,
-            ...body,
+      }, async ({ routeUser }) => {
+        const record = await recentContactsService.get(routeUser.id);
+        if (!record) {
+          return new Response(JSON.stringify(null), {
+            status: 200,
+            headers: { "content-type": "application/json" },
           });
+        }
+        return record;
+      })
+      .put("/", {
+        body: RouteModel.recentContacts.putBody,
+        detail: {
+          summary: "Upsert encrypted recent contacts",
+          description:
+            "Stores or updates the authenticated user's encrypted recent-contacts blob",
         },
-        {
-          body: RouteModel.recentContacts.putBody,
-          detail: {
-            summary: "Upsert encrypted recent contacts",
-            description:
-              "Stores or updates the authenticated user's encrypted recent-contacts blob",
-          },
-        },
-      ),
+      }, async ({ body, routeUser }) => {
+        return recentContactsService.upsert({
+          userId: routeUser.id,
+          ...body,
+        });
+      }),
   );

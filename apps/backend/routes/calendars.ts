@@ -19,91 +19,75 @@ export const calendarsRoutes = new Elysia({
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Calendars"), (app) =>
     app
-      .get(
-        "/",
-        async ({ routeUser }) => {
-          return calendarService.list(routeUser.id);
+      .get("/", {
+        detail: {
+          summary: "Get user's calendars",
+          description:
+            "Fetches all calendars belonging to the authenticated user",
         },
-        {
-          detail: {
-            summary: "Get user's calendars",
-            description:
-              "Fetches all calendars belonging to the authenticated user",
-          },
-        },
-      )
+      }, async ({ routeUser }) => {
+        return calendarService.list(routeUser.id);
+      })
 
-      .post(
-        "/",
-        async ({ body, routeUser }) => {
-          return calendarService.create({
-            userId: routeUser.id,
-            name: body.name,
-            color: body.color,
-            isDefault: body.isDefault,
-            encryptedName: body.encryptedName,
-            blindIndexTokens: body.blindIndexTokens,
-            encryptionState: body.encryptionState,
-            encryptionKeyVersion: body.encryptionKeyVersion,
-            forceFullEncryption: body.forceFullEncryption,
-          });
+      .post("/", {
+        body: RouteModel.calendar.createBody,
+        detail: {
+          summary: "Create a new calendar",
+          description: "Creates a new calendar for the authenticated user",
         },
-        {
-          body: RouteModel.calendar.createBody,
-          detail: {
-            summary: "Create a new calendar",
-            description: "Creates a new calendar for the authenticated user",
-          },
-        },
-      )
+      }, async ({ body, routeUser }) => {
+        return calendarService.create({
+          userId: routeUser.id,
+          name: body.name,
+          color: body.color,
+          isDefault: body.isDefault,
+          encryptedName: body.encryptedName,
+          blindIndexTokens: body.blindIndexTokens,
+          encryptionState: body.encryptionState,
+          encryptionKeyVersion: body.encryptionKeyVersion,
+          forceFullEncryption: body.forceFullEncryption,
+        });
+      })
 
-      .put(
-        "/:id",
-        async ({ params, body, routeUser }) => {
-          return calendarService.update({
-            userId: routeUser.id,
-            calendarId: params.id,
-            name: body.name,
-            color: body.color,
-            isVisible: body.isVisible,
-            isDefault: body.isDefault,
-            encryptedName: body.encryptedName,
-            blindIndexTokens: body.blindIndexTokens,
-            encryptionState: body.encryptionState,
-            encryptionKeyVersion: body.encryptionKeyVersion,
-            forceFullEncryption: body.forceFullEncryption,
-          });
+      .put("/:id", {
+        params: RouteModel.calendar.idParams,
+        body: RouteModel.calendar.updateBody,
+        detail: {
+          summary: "Update an existing calendar",
+          description:
+            "Updates an existing calendar with ownership verification",
         },
-        {
-          params: RouteModel.calendar.idParams,
-          body: RouteModel.calendar.updateBody,
-          detail: {
-            summary: "Update an existing calendar",
-            description:
-              "Updates an existing calendar with ownership verification",
-          },
-        },
-      )
+      }, async ({ params, body, routeUser }) => {
+        return calendarService.update({
+          userId: routeUser.id,
+          calendarId: params.id,
+          name: body.name,
+          color: body.color,
+          isVisible: body.isVisible,
+          isDefault: body.isDefault,
+          encryptedName: body.encryptedName,
+          blindIndexTokens: body.blindIndexTokens,
+          encryptionState: body.encryptionState,
+          encryptionKeyVersion: body.encryptionKeyVersion,
+          forceFullEncryption: body.forceFullEncryption,
+        });
+      })
 
-      .delete(
-        "/:id",
-        async ({ params, query, routeUser }) => {
-          return calendarService.delete({
-            userId: routeUser.id,
-            calendarId: params.id,
-            action: query.action,
-            targetCalendarId: query.targetCalendarId,
-          });
+      .delete("/:id", {
+        params: RouteModel.calendar.idParams,
+        query: RouteModel.calendar.deleteQuery,
+        detail: {
+          summary: "Delete a calendar with event handling options",
+          description: `Deletes a calendar with options for handling existing events:
+      - delete_events: (default) Delete calendar and all its events
+      - move_events: Move all events to another calendar (requires targetCalendarId)`,
         },
-        {
-          params: RouteModel.calendar.idParams,
-          query: RouteModel.calendar.deleteQuery,
-          detail: {
-            summary: "Delete a calendar with event handling options",
-            description: `Deletes a calendar with options for handling existing events:
-        - delete_events: (default) Delete calendar and all its events
-        - move_events: Move all events to another calendar (requires targetCalendarId)`,
-          },
-        },
-      ),
+      }, async ({ params, query, routeUser }) => {
+        return calendarService.delete({
+          userId: routeUser.id,
+          calendarId: params.id,
+          action: query.action,
+          targetCalendarId: query.targetCalendarId,
+        });
+      }),
   );

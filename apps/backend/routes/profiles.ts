@@ -15,38 +15,30 @@ export const profilesRoutes = new Elysia({
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Profiles"), (app) =>
     app
-      .post(
-        "/lookup",
-        async ({ body }) => profileService.lookup(body.emails),
-        {
-          body: RouteModel.profiles.lookupBody,
-          detail: {
-            summary: "Look up Solace profile pictures",
-            description:
-              "Returns same-origin avatar proxy paths for Solace users matching the supplied email addresses.",
-          },
+      .post("/lookup", {
+        body: RouteModel.profiles.lookupBody,
+        detail: {
+          summary: "Look up Solace profile pictures",
+          description:
+            "Returns same-origin avatar proxy paths for Solace users matching the supplied email addresses.",
         },
-      )
-      .get(
-        "/avatar",
-        async ({ query, set }) => {
-          const avatar = await profileService.streamAvatar(query.email);
-          if (!avatar) {
-            set.status = 404;
-            return null;
-          }
-
-          set.headers["content-type"] = avatar.contentType;
-          set.headers["cache-control"] = "private, max-age=300";
-          return avatar.body;
+      }, async ({ body }) => profileService.lookup(body.emails))
+      .get("/avatar", {
+        query: RouteModel.profiles.avatarQuery,
+        detail: {
+          summary: "Stream a Solace user's profile picture",
+          description:
+            "Fetches and streams the authenticated lookup target's profile picture through the API so clients avoid third-party CORS and hotlink restrictions.",
         },
-        {
-          query: RouteModel.profiles.avatarQuery,
-          detail: {
-            summary: "Stream a Solace user's profile picture",
-            description:
-              "Fetches and streams the authenticated lookup target's profile picture through the API so clients avoid third-party CORS and hotlink restrictions.",
-          },
-        },
-      ),
+      }, async ({ query, set }) => {
+        const avatar = await profileService.streamAvatar(query.email);
+        if (!avatar) {
+          set.status = 404;
+          return null;
+        }
+      
+        set.headers["content-type"] = avatar.contentType;
+        set.headers["cache-control"] = "private, max-age=300";
+        return avatar.body;
+      }),
   );

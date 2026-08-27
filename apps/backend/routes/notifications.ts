@@ -56,72 +56,60 @@ export const notificationsRoutes = new Elysia({
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Notifications"), (app) =>
     app
-      .get(
-        "/event/:eventId",
-        async ({ params, request, routeUser }) => {
-          enforceRateLimit(
-            `${routeUser.id}:${request.url}`,
-            RATE_LIMITS.GET_NOTIFICATIONS,
-          );
+      .get("/event/:eventId", {
+        params: RouteModel.notifications.eventIdParams,
+        detail: {
+          summary: "Get notifications for an event",
+          description:
+            "Retrieves all notification settings for a specific event with enhanced validation and rate limiting",
+        },
+      }, async ({ params, request, routeUser }) => {
+        enforceRateLimit(
+          `${routeUser.id}:${request.url}`,
+          RATE_LIMITS.GET_NOTIFICATIONS,
+        );
+      
+        return notificationService.getForEvent(routeUser.id, params.eventId);
+      })
 
-          return notificationService.getForEvent(routeUser.id, params.eventId);
+      .put("/event/:eventId", {
+        params: RouteModel.notifications.eventIdParams,
+        body: RouteModel.notifications.updateBody,
+        detail: {
+          summary: "Update notifications for an event",
+          description:
+            "Updates all notification settings for a specific event using the enhanced notification service with comprehensive validation",
         },
-        {
-          params: RouteModel.notifications.eventIdParams,
-          detail: {
-            summary: "Get notifications for an event",
-            description:
-              "Retrieves all notification settings for a specific event with enhanced validation and rate limiting",
-          },
-        },
-      )
+      }, async ({ params, body, request, routeUser }) => {
+        enforceRateLimit(
+          `${routeUser.id}:${request.url}`,
+          RATE_LIMITS.UPDATE_NOTIFICATIONS,
+        );
+      
+        return notificationService.setForEvent(
+          routeUser.id,
+          params.eventId,
+          body.notifications,
+          body.displayTitle,
+        );
+      })
 
-      .put(
-        "/event/:eventId",
-        async ({ params, body, request, routeUser }) => {
-          enforceRateLimit(
-            `${routeUser.id}:${request.url}`,
-            RATE_LIMITS.UPDATE_NOTIFICATIONS,
-          );
-
-          return notificationService.setForEvent(
-            routeUser.id,
-            params.eventId,
-            body.notifications,
-            body.displayTitle,
-          );
+      .delete("/event/:eventId", {
+        params: RouteModel.notifications.eventIdParams,
+        detail: {
+          summary: "Delete all notifications for an event",
+          description:
+            "Deletes all notification settings for a specific event using the enhanced notification service",
         },
-        {
-          params: RouteModel.notifications.eventIdParams,
-          body: RouteModel.notifications.updateBody,
-          detail: {
-            summary: "Update notifications for an event",
-            description:
-              "Updates all notification settings for a specific event using the enhanced notification service with comprehensive validation",
-          },
-        },
-      )
-
-      .delete(
-        "/event/:eventId",
-        async ({ params, request, routeUser }) => {
-          enforceRateLimit(
-            `${routeUser.id}:${request.url}`,
-            RATE_LIMITS.UPDATE_NOTIFICATIONS,
-          );
-
-          return notificationService.deleteForEvent(
-            routeUser.id,
-            params.eventId,
-          );
-        },
-        {
-          params: RouteModel.notifications.eventIdParams,
-          detail: {
-            summary: "Delete all notifications for an event",
-            description:
-              "Deletes all notification settings for a specific event using the enhanced notification service",
-          },
-        },
-      ),
+      }, async ({ params, request, routeUser }) => {
+        enforceRateLimit(
+          `${routeUser.id}:${request.url}`,
+          RATE_LIMITS.UPDATE_NOTIFICATIONS,
+        );
+      
+        return notificationService.deleteForEvent(
+          routeUser.id,
+          params.eventId,
+        );
+      }),
   );
