@@ -1,6 +1,6 @@
 # Solace
 
-A monorepo application with three main services: web frontend, API backend, and notifications service.
+A calendar and mail monorepo: web frontend, native app, API backend, notifications worker, and the Stalwart mail stack.
 
 ## Project Structure
 
@@ -10,7 +10,10 @@ A monorepo application with three main services: web frontend, API backend, and 
   - `contracts/` - TypeScript interfaces and DTOs for each service
   - `services/` - Business logic (validation, database, transformations)
   - `lib/` - Shared utilities (auth, errors, Prisma, recurrence engine, etc.)
-- **apps/notifications** - Go service for scheduled email notifications
+- **apps/native** - Expo React Native app
+- **apps/notifications** - Go service for scheduled email and APNs notifications
+- **apps/stalwart** - Stalwart mail server image, JMAP config plan, VPS HAProxy/frp. See [apps/stalwart/README.md](apps/stalwart/README.md).
+- **apps/gatus** - Status page (`status.solace.onl`). See [apps/gatus/README.md](apps/gatus/README.md).
 - **packages/ui** - Shared UI component library
 - **packages/logger** - Shared logging utilities
 - **packages/eslint-config** - ESLint configurations
@@ -20,7 +23,8 @@ A monorepo application with three main services: web frontend, API backend, and 
 
 - Frontend: Next.js, React, Tailwind CSS, shadcn/ui
 - Backend: Elysia.js, Bun, Prisma, PostgreSQL
-- Notifications: Go, Resend API, HTML templates
+- Notifications: Go, Stalwart JMAP (noreply identity), APNs
+- Mail server: Stalwart (JMAP) on Railway, inbound/outbound via VPS tunnels
 - Authentication: Better Auth with passkey support
 - Database: PostgreSQL with Prisma ORM
 
