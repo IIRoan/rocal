@@ -1,7 +1,7 @@
 import {
   bucket,
+  database,
   defineRailway,
-  empty,
   github,
   group,
   postgres,
@@ -12,12 +12,25 @@ import {
 } from "railway/iac";
 
 export default defineRailway(() => {
-  const rocal = github("IIRoan/rocal", {
+  const solaceRepo = github("IIRoan/rocal", {
     branch: "master",
     checkSuites: false,
   });
+  const stalwartRepo = github("IIRoan/rocal", {
+    branch: "master",
+    rootDirectory: "apps/stalwart",
+    checkSuites: false,
+  });
+  const gatusRepo = github("IIRoan/rocal", {
+    branch: "master",
+    rootDirectory: "apps/gatus",
+    checkSuites: false,
+  });
 
-  const postgresApp = postgres("Postgres", {
+  const postgresApp = database("Postgres", "postgres", {
+    image: "ghcr.io/railwayapp-templates/postgres-ssl:17",
+    output: "DATABASE_URL",
+    defaultMountPath: "/var/lib/postgresql/data",
     region: "europe-west4-drams3a",
   });
   const postgresStalwart = postgres("Postgres-stalwart", {
@@ -45,8 +58,16 @@ export default defineRailway(() => {
   const stalwartBlobs = bucket("stalwart-blobs", { region: "ams" });
 
   const web = service("Solace NextJS", {
-    source: rocal,
-    build: "bun install && bun run build:web",
+    source: solaceRepo,
+    build: {
+      buildCommand: "bun install && bun run build:web",
+      watchPatterns: [
+        "apps/web/**",
+        "packages/**",
+        "bun.lock",
+        "package.json",
+      ],
+    },
     start: "cd apps/web && bun --bun next start -H 0.0.0.0 -p $PORT",
     healthcheck: "/",
     healthcheckTimeout: 300,
@@ -69,7 +90,7 @@ export default defineRailway(() => {
   });
 
   const api = service("Solace ElysiaJS", {
-    source: rocal,
+    source: solaceRepo,
     build: {
       buildCommand: "bun install && bun run build:backend",
       watchPatterns: [
@@ -129,10 +150,14 @@ export default defineRailway(() => {
   });
 
   const notifications = service("Solace Fiber Notification service", {
-    source: rocal,
+    source: solaceRepo,
     build: {
       buildCommand: "bun install && bun run build:notifications",
-      watchPatterns: ["apps/notifications"],
+      watchPatterns: [
+        "apps/notifications/**",
+        "bun.lock",
+        "package.json",
+      ],
     },
     start: "bun run start:notifications",
     healthcheck: "/health",
@@ -165,10 +190,12 @@ export default defineRailway(() => {
   });
 
   const stalwartMail = service("stalwart-mail", {
-    source: github("IIRoan/stalwart", { checkSuites: false }),
+    source: stalwartRepo,
     build: {
       builder: "DOCKERFILE",
       dockerfilePath: "Dockerfile",
+      buildEnvironment: "V3",
+      watchPatterns: ["apps/stalwart/**"],
     },
     healthcheck: "/healthz/ready",
     healthcheckTimeout: 300,
@@ -196,16 +223,29 @@ export default defineRailway(() => {
       PORT: preserve(),
       SLOT_MANAGER_TOKEN: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
+      STALWART_MAIL_INGEST_WEBHOOK_SECRET: preserve(),
       STALWART_RECOVERY_MODE: preserve(),
       STALWART_TOKEN: preserve(),
     },
   });
 
   const monitoring = service("Monitoring", {
-    source: empty(),
-    replicas: 0,
+    source: gatusRepo,
+    build: {
+      builder: "DOCKERFILE",
+      dockerfilePath: "Dockerfile",
+      buildEnvironment: "V3",
+      watchPatterns: ["apps/gatus/**"],
+    },
+    healthcheck: "/health",
+    healthcheckTimeout: 300,
+    replicas: { "europe-west4-drams3a": 1 },
     domains: [{ domain: "status.solace.onl", port: 8080 }],
     networking: { privateNetworkEndpoint: "monitoring" },
+    deploy: {
+      restartPolicyType: "ON_FAILURE",
+      restartPolicyMaxRetries: 3,
+    },
     volumeMounts: {
       "/data": monitoringVolume,
     },
@@ -221,13 +261,14 @@ export default defineRailway(() => {
   const solace = group("Solace", [web, api]);
   const mailServer = group("Mail server", [stalwartMail, postgresStalwart]);
   const notificationGroup = group("Notifications", [notifications]);
+  const monitoringGroup = group("Monitoring", [monitoring]);
 
-  return project("Rocal", {
+  return project("Solace", {
     resources: [
       solace,
       mailServer,
       notificationGroup,
-      monitoring,
+      monitoringGroup,
       postgresApp,
       postgresVolume,
       postgresStalwartVolume,
