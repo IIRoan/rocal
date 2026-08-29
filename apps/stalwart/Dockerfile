@@ -1,0 +1,38 @@
+FROM stalwartlabs/stalwart:v0.16.17
+
+ARG FRPC_VERSION=0.69.1
+ARG STALWART_CLI_VERSION=1.0.12
+ARG BUILD_TIMESTAMP=2026-08-26-plan-alert-metrics
+
+USER root
+
+RUN apt-get update \
+    && apt-get install -yq --no-install-recommends curl iproute2 postgresql-client python3 util-linux xz-utils \
+    && curl -fsSL "https://github.com/fatedier/frp/releases/download/v${FRPC_VERSION}/frp_${FRPC_VERSION}_linux_amd64.tar.gz" \
+        | tar xz -C /tmp \
+    && mv "/tmp/frp_${FRPC_VERSION}_linux_amd64/frpc" /usr/local/bin/frpc \
+    && chmod 755 /usr/local/bin/frpc \
+    && rm -rf /tmp/frp_* \
+    && curl -fsSL "https://github.com/stalwartlabs/cli/releases/download/v${STALWART_CLI_VERSION}/stalwart-cli-x86_64-unknown-linux-gnu.tar.xz" \
+        | tar xJ -C /tmp \
+    && mv /tmp/stalwart-cli-x86_64-unknown-linux-gnu/stalwart-cli /usr/local/bin/stalwart-cli \
+    && rm -rf /tmp/stalwart-cli-x86_64-unknown-linux-gnu \
+    && chmod 755 /usr/local/bin/stalwart-cli \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /var/log/stalwart /etc/stalwart /var/stalwart/blobs /usr/local/share/stalwart \
+    && chown -R stalwart:stalwart /var/log/stalwart /etc/stalwart /var/stalwart/blobs /usr/local/share/stalwart
+
+COPY railway-entrypoint.sh /usr/local/bin/railway-entrypoint.sh
+COPY stalwart/plan /usr/local/share/stalwart/plan
+COPY stalwart/cli-schema.json /usr/local/share/stalwart/cli-schema.json
+COPY stalwart/cli-schema.latest /usr/local/share/stalwart/cli-schema.latest
+RUN sed -i 's/\r$//' /usr/local/bin/railway-entrypoint.sh \
+    && chmod 755 /usr/local/bin/railway-entrypoint.sh \
+    && chown stalwart:stalwart /usr/local/bin/railway-entrypoint.sh \
+    && chown -R stalwart:stalwart /usr/local/share/stalwart
+
+USER root
+
+EXPOSE 25 465 587 993 443 8080 8090
+
+ENTRYPOINT ["/usr/local/bin/railway-entrypoint.sh"]

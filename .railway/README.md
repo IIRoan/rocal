@@ -1,6 +1,6 @@
 # Railway configuration
 
-The Rocal project is defined in `.railway/railway.ts`. That file is the source of truth for services, databases, volumes, buckets, domains, and variables.
+The Solace project is defined in `.railway/railway.ts`. That file is the source of truth for services, databases, volumes, buckets, domains, and variables. Mail (`apps/stalwart`) and Monitoring (`apps/gatus`) live in this repo; do not point those services at a second GitHub repository.
 
 Do not add per-service `railway.toml` or `railway.json`. Config as Code is deprecated.
 

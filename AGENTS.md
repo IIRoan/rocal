@@ -1,6 +1,6 @@
 # Agent Instructions
 
-This repository is a monorepo for **Solace** — a calendar and mail application — containing a web frontend, a native mobile app, a backend API, a notifications service, and shared packages, structured using Bun workspaces.
+This repository is a monorepo for **Solace** — a calendar and mail application — containing a web frontend, a native mobile app, a backend API, a notifications service, the Stalwart mail stack, Gatus status page, and shared packages, structured using Bun workspaces (`apps/web`, `apps/native`, `apps/backend`, `apps/notifications`, `packages/*`). `apps/stalwart` and `apps/gatus` are Docker/config apps, not Bun packages.
 
 ## High-Level Architecture
 
@@ -11,9 +11,10 @@ This repository is a monorepo for **Solace** — a calendar and mail application
   - `contracts/` — Service interfaces, DTOs, and cross-cutting policies (e.g. `logging.contract.ts` for log sanitization).
   - `services/` — Business logic, DB access, notifications. Constructor-injected `PrismaClient`.
   - `lib/` — Auth, errors, recurrence, ICS, notification calculator, etc.
-- **Mail server**: Stalwart, accessed **only via JMAP** (clients through `StalwartJmapClient` + backend JMAP proxy; provisioning via Stalwart admin JMAP).
+- **apps/stalwart**: Stalwart mail server (Docker image + `railway-entrypoint.sh`), desired-state JMAP plan (`stalwart/plan/`), and VPS HAProxy/frp/Postfix (`vps/`). Clients still access mail **only via JMAP**. Railway builds with `rootDirectory: apps/stalwart`.
+- **apps/gatus**: Status page (`status.solace.onl`). Separate Railway service from mail; built with `rootDirectory: apps/gatus`.
 - **apps/notifications**: Go dispatcher. Polls Postgres every 5s (`event_notification` schedules fan out into a `notification_job` outbox). Mail jobs are claimed even if reminder `ClaimDue` fails. **Email** is Stalwart JMAP `Email/set` + `EmailSubmission/set` as the noreply identity (Railway Hobby cannot SMTP). **Push** is APNs HTTP/2 with a 2-minute claim lease, exponential backoff, and a max of 8 attempts. Reminder alerts use `event_notification.display_title` (captured when the user sets a reminder). New-mail alerts use sender display name + subject. The worker does **not** JMAP-read user mailboxes. Inbound mail push jobs are enqueued by the backend from Stalwart telemetry webhooks (`message-ingest.ham` on `POST /api/internal/stalwart/webhook`). Local `go run ./` loads `.env` from cwd, then walks up and falls back to `apps/backend/.env` (existing process env still wins).
-- **Railway**: the Rocal project is defined in `.railway/railway.ts`. Do not add per-service `railway.toml` / `railway.json`. Preview with `railway config plan`; apply only when asked.
+- **Railway**: the Solace project is defined in `.railway/railway.ts`. Do not add per-service `railway.toml` / `railway.json`. Preview with `railway config plan`; apply only when asked.
 
 ### Shared Packages
 
@@ -229,7 +230,7 @@ Solace mail is **JMAP end-to-end**. Agents must use **JMAP as the only protocol*
 
 **Outbound app mail (noreply identity):** Better Auth mail, calendar share invites, external event-invitation fallback, and reminder mail all submit over Stalwart JMAP as a dedicated mailbox (`STALWART_JMAP_URL` / `STALWART_JMAP_USERNAME` / `STALWART_JMAP_PASSWORD` + `EMAIL_FROM`). Do **not** use Resend or SMTP from Railway or the Go worker. Internal Solace inboxes still receive invitations via JMAP import (`internal-mailbox-delivery.ts`), not a round-trip through public SMTP.
 
-**Push notifications (native iOS only):** `PushDevice` stores APNs tokens. Event reminder jobs may include a captured `title` (from `event_notification.display_title`). New-mail jobs may include JMAP `fromName` + `subject` for a single inbound message. Sending mail does not notify the sender. Web has no Web Push; `UserSettings.pushNotifications` still round-trips so iPhone delivery can be toggled from either client. Settings → Notifications lists registered devices via `GET /api/push/devices` (tokens are never returned). Inbound mail push is enqueued exclusively from Stalwart telemetry webhooks (`message-ingest.ham` → `POST /api/internal/stalwart/webhook`, HMAC-signed with `STALWART_WEBHOOK_SECRET`). Stalwart webhook config is declared in the **stalwart** repo (`scripts/apply-solace-mail-ingest-webhook.py`); the backend also upserts the webhook on startup via `x:WebHook/set` + `ReloadSettings` when both `STALWART_WEBHOOK_SECRET` and `STALWART_ADMIN_TOKEN` are configured. `MailRealtimeService` and `GET /mail/sync` remain for client mail refresh only; they do not enqueue push jobs. The Go worker does not read user mailboxes.
+**Push notifications (native iOS only):** `PushDevice` stores APNs tokens. Event reminder jobs may include a captured `title` (from `event_notification.display_title`). New-mail jobs may include JMAP `fromName` + `subject` for a single inbound message. Sending mail does not notify the sender. Web has no Web Push; `UserSettings.pushNotifications` still round-trips so iPhone delivery can be toggled from either client. Settings → Notifications lists registered devices via `GET /api/push/devices` (tokens are never returned). Inbound mail push is enqueued exclusively from Stalwart telemetry webhooks (`message-ingest.ham` → `POST /api/internal/stalwart/webhook`, HMAC-signed with `STALWART_WEBHOOK_SECRET`). Stalwart webhook config is declared in `apps/stalwart/stalwart/plan/40-integrations.ndjson` (applied on mail-server boot); the backend also upserts the webhook on startup via `x:WebHook/set` + `ReloadSettings` when both `STALWART_WEBHOOK_SECRET` and `STALWART_ADMIN_TOKEN` are configured. `MailRealtimeService` and `GET /mail/sync` remain for client mail refresh only; they do not enqueue push jobs. The Go worker does not read user mailboxes.
 
 **Not user-mailbox JMAP (allowed, separate concern):**
 
