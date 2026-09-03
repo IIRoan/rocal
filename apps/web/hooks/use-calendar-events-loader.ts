@@ -21,19 +21,7 @@ interface UseCalendarEventsLoaderOptions {
   preloadMonthsAhead?: number;
 }
 
-// ---------------------------------------------------------------------------
-// Month-based fetch strategy
-//
-// All API fetches are anchored on a calendar month.  The fetch range pads
-// the calendar month by MONTH_PADDING_DAYS on each side so that every
-// possible month-view grid (any weekStartDay 0–6) is fully covered by a
-// single request.  A week starting on any day can extend at most 6 days
-// before the 1st or after the last day of the month, so 7 days of padding
-// is always sufficient.
-//
-// Switching between day / week / month views within the same calendar month
-// never changes the query key and never triggers a new fetch.
-// ---------------------------------------------------------------------------
+// One padded month range per query key; view switches within the month don't refetch.
 
 /** Days of padding before the 1st and after the last day of the month. */
 const MONTH_PADDING_DAYS = 7;
