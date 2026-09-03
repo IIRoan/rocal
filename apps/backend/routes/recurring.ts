@@ -61,6 +61,7 @@ export const recurringRoutes = new Elysia({
       })
 
       .delete("/event/:id", {
+        parse: "none",
         params: RouteModel.recurring.eventIdParams,
         query: RouteModel.recurring.deleteQuery,
         detail: {

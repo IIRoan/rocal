@@ -169,12 +169,17 @@ export class HttpClient {
         }
       }
 
+      const rawBody = (fetchOptions as RequestInit).body;
+      const hasBody = rawBody !== undefined && rawBody !== null && rawBody !== "";
+
       const requestOptions: RequestInit = {
         ...fetchOptions,
         signal: controller.signal,
         credentials: this.credentials,
         headers: {
-          "Content-Type": "application/json",
+          // Only set JSON Content-Type when a body is present. Empty DELETE/GET
+          // with application/json makes Elysia try to parse and return 400 PARSE.
+          ...(hasBody ? { "Content-Type": "application/json" } : {}),
           ...extraHeaders,
           ...(fetchOptions as RequestInit).headers,
         },

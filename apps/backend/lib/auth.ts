@@ -250,12 +250,20 @@ async function getSuccessfulEndpointResponse<T>(
     return null;
   }
 
-  if (returned instanceof Response) {
-    if (!returned.ok) {
+  // Narrow without relying on `instanceof Response` (Vercel/Bun typecheck
+  // does not always treat the global Response constructor as a type guard).
+  if (
+    typeof returned === "object" &&
+    "ok" in returned &&
+    "clone" in returned &&
+    typeof (returned as Response).json === "function"
+  ) {
+    const response = returned as Response;
+    if (!response.ok) {
       return null;
     }
 
-    return (await returned.clone().json()) as T;
+    return (await response.clone().json()) as T;
   }
 
   return returned as T;

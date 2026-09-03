@@ -40,6 +40,7 @@ export const settingsRoutes = new Elysia({
       })
 
       .delete("/", {
+        parse: "none",
         detail: {
           summary: "Reset user settings",
           description: "Resets user settings to defaults",

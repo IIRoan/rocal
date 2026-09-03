@@ -21,6 +21,7 @@ export const accountRoutes = new Elysia({
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Account"), (app) =>
     app.delete("/", {
+      parse: "none",
       detail: {
         summary: "Delete the authenticated account",
         description:

@@ -83,6 +83,7 @@ export const calendarSharingRoutes = new Elysia({
         });
       })
       .delete("/:id/share-link", {
+        parse: "none",
         params: RouteModel.calendar.idParams,
         detail: {
           summary: "Disable calendar ICS share-link",

@@ -205,6 +205,7 @@ export const eventsRoutes = new Elysia({
       })
 
       .delete("/:id", {
+        parse: "none",
         params: RouteModel.events.idParams,
         detail: {
           summary: "Delete a calendar event",
