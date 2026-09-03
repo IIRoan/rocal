@@ -25,6 +25,7 @@ COPY --from=gatus-builder /gatus /usr/local/bin/gatus
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY stalwart-discord-bridge.py /usr/local/bin/stalwart-discord-bridge.py
 COPY config.default.yaml /etc/gatus/config.default.yaml
+COPY theme.css /etc/gatus/theme.css
 
 RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/gatus \
     && chmod 644 /usr/local/bin/stalwart-discord-bridge.py
