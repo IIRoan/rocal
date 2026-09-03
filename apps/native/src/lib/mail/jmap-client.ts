@@ -1,10 +1,5 @@
 /**
- * Portable JMAP client (Stalwart) for the native app.
- *
- * Ported verbatim from the web app's `lib/mail/jmap-client.ts`. It is a pure
- * `fetch`-based client with no browser-only dependencies, so it runs unchanged
- * in React Native. Authentication uses a bearer access token minted server-side
- * (see `oauth-token-manager.ts`).
+ * JMAP client for Stalwart (native). Same as web `lib/mail/jmap-client.ts`; bearer token from oauth-token-manager.
  */
 import type {
   JmapEmailChanges,

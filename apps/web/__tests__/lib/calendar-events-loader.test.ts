@@ -276,10 +276,7 @@ describe("buildViewPrefetchRanges", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// getDefaultCalendarDateRange (sanity checks — function is not ours but we
-// depend on its output, so we verify the contract)
-// ---------------------------------------------------------------------------
+// getDefaultCalendarDateRange — contract check
 describe("getDefaultCalendarDateRange", () => {
   const baseDate = new Date(2026, 0, 15);
 
