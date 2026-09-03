@@ -6,9 +6,11 @@ endpoint can show a **90-day** uptime bar (GitHub-style) instead of a short seco
 window. Deploy as a **separate Railway service** (root directory `apps/gatus`, volume at
 `/data`). `apps/gatus` must be on the GitHub `master` branch before Railway can build it.
 
-UI tokens and layout follow an [sts](https://github.com/sparanoid/sts)-inspired
-accordion list (see `theme.css`). Solace warm neutrals in light/dark; theme follows
-`prefers-color-scheme` (and the in-page toggle cookie).
+UI tokens and layout follow [sts](https://github.com/sparanoid/sts) (see `theme.css`):
+narrow centered column, soft accordion groups, continuous emerald/red uptime bars,
+pulsing operational indicators. Cool neutrals in light/dark; theme follows
+`prefers-color-scheme` (and the in-page toggle cookie). Empty `dashboard-heading`
+values fall back to Gatus defaults, so the config uses a space and CSS hides them.
 
 ## Railway variables
 
