@@ -1,3 +1,4 @@
+import "./prisma-engine";
 import { PrismaClient, type Prisma } from "../generated/prisma";
 import { errorLogDetails, redactPII } from "./log-sanitization";
 import { createLogger } from "@workspace/logger";

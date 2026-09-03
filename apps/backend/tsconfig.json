@@ -22,15 +22,7 @@
     "types": [
       "bun-types",
       "node"
-    ],
-    "paths": {
-      "@workspace/calendar-ics": [
-        "../../packages/calendar-ics/src/index.ts"
-      ],
-      "@workspace/calendar-ics/*": [
-        "../../packages/calendar-ics/src/*"
-      ]
-    }
+    ]
   },
   "include": [
     "**/*.ts",

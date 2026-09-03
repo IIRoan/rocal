@@ -66,6 +66,7 @@ export const categoriesRoutes = new Elysia({
       })
 
       .delete("/:id", {
+        parse: "none",
         params: RouteModel.category.idParams,
         detail: {
           summary: "Delete a category",

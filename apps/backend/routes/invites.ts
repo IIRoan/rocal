@@ -151,6 +151,7 @@ export const inviteRoutes = new Elysia({
         }
       })
       .delete("/:id", {
+        parse: "none",
         params: RouteModel.invite.revokeParams,
         detail: {
           summary: "Revoke an invite",
