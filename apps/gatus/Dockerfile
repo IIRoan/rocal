@@ -14,8 +14,12 @@ COPY assets/favicon.ico web/static/favicon.ico
 COPY assets/favicon-16x16.png web/static/favicon-16x16.png
 COPY assets/favicon-32x32.png web/static/favicon-32x32.png
 COPY assets/expand-groups.js web/static/js/expand-groups.js
-# Expand Application / Mail / Stalwart Metrics / VPS by default (before Vue boots).
-RUN sed -i 's|<script defer="defer" src="/js/app.js"></script>|<script defer="defer" src="/js/expand-groups.js"></script><script defer="defer" src="/js/app.js"></script>|' web/static/index.html
+# Load Solace theme after Gatus app.css (otherwise shadcn tokens win), and expand groups on boot.
+RUN sed -i \
+  -e 's|<link rel="stylesheet" href="/css/custom.css"/>||' \
+  -e 's|<script defer="defer" src="/js/app.js"></script>|<script defer="defer" src="/js/expand-groups.js"></script><script defer="defer" src="/js/app.js"></script>|' \
+  -e 's|<link href="/css/app.css" rel="stylesheet">|<link href="/css/app.css" rel="stylesheet"><link rel="stylesheet" href="/css/custom.css"/>|' \
+  web/static/index.html
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /gatus .
 
 FROM alpine:3.20
