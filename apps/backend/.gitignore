@@ -5,3 +5,5 @@ node_modules/
 dist/
 server
 server.exe
+.vercel
+.env*

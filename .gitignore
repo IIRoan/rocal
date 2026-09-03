@@ -27,11 +27,13 @@ coverage
 
 # Build Outputs
 .next/
+.vercel/
 out/
 build
 dist
 apps/web/output
 apps/backend/generated/
+apps/backend/server
 
 
 # Debug
@@ -52,3 +54,4 @@ apps/stalwart/.local-certs/
 
 # Local Railway CLI upload staging (not source)
 .railway-up-stage/
+.env*

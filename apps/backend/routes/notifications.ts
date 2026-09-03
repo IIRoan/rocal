@@ -95,6 +95,7 @@ export const notificationsRoutes = new Elysia({
       })
 
       .delete("/event/:eventId", {
+        parse: "none",
         params: RouteModel.notifications.eventIdParams,
         detail: {
           summary: "Delete all notifications for an event",

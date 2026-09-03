@@ -1,7 +1,7 @@
 import { aot } from "elysia/plugin/aot/bun";
 
 const backendRoot = import.meta.dir;
-const entry = `${backendRoot}/index.ts`;
+const entry = `${backendRoot}/serve.ts`;
 
 const aotResult = await Bun.build({
   entrypoints: [entry],

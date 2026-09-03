@@ -327,6 +327,8 @@ async function proxyJmapRequest(input: {
   mailService: IMailService;
   fetcher?: JmapProxyFetcher;
   retryWithFreshToken?: boolean;
+  /** Buffered body so 401 token-refresh retries can reuse it. */
+  bodyBuffer?: ArrayBuffer;
 }): Promise<Response> {
   let authorization = input.request.headers.get("authorization");
   let authSource: "session" | "client-bearer" | "missing" = authorization
@@ -390,7 +392,7 @@ async function proxyJmapRequest(input: {
   const requestBody =
     method === "GET" || method === "HEAD"
       ? undefined
-      : await input.request.arrayBuffer();
+      : (input.bodyBuffer ?? (await input.request.arrayBuffer()));
 
   let response: Response;
   try {
@@ -453,6 +455,7 @@ async function proxyJmapRequest(input: {
       );
       return proxyJmapRequest({
         ...input,
+        bodyBuffer: requestBody,
         retryWithFreshToken: true,
       });
     }

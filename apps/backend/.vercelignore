@@ -1,0 +1,10 @@
+node_modules
+.turbo
+.next
+dist
+coverage
+server
+*.log
+.env*
+!.env.example
+llms-full.txt
