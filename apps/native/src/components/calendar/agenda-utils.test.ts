@@ -3,7 +3,10 @@
   formatAgendaDate,
   formatEventTime,
 } from "./agenda-utils";
-import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import {
+  getZonedDateParts,
+  type DecoratedCalendarEvent,
+} from "@workspace/calendar-core";
 
 
 function makeEvent(
@@ -245,13 +248,19 @@ describe("timezone-aware agenda UX", () => {
   });
 
   it("labels today and tomorrow using the configured timezone", () => {
-    const today = new Date();
-    const { year, month, day } = {
-      year: today.getFullYear(),
-      month: today.getMonth() + 1,
-      day: today.getDate(),
-    };
-    const tomorrow = new Date(year, month - 1, day + 1);
+    // Calendar-day Dates in the configured zone — not the runner's local date
+    // (CI is UTC; Europe/Amsterdam can already be the next calendar day).
+    const todayParts = getZonedDateParts(new Date(), timezone);
+    const today = new Date(
+      todayParts.year,
+      todayParts.month - 1,
+      todayParts.day,
+    );
+    const tomorrow = new Date(
+      todayParts.year,
+      todayParts.month - 1,
+      todayParts.day + 1,
+    );
 
     expect(formatAgendaDate(today, timezone)).toBe("Today");
     expect(formatAgendaDate(tomorrow, timezone)).toBe("Tomorrow");
