@@ -21,10 +21,11 @@ alerting:
 
 ui:
   title: "Solace Status"
-  header: "Solace Status"
+  header: "Solace"
   description: "Uptime for Solace (solace.onl) and mail (mail.solace.onl)."
-  dashboard-heading: ""
-  dashboard-subheading: ""
+  # Non-empty (Gatus falls back to "Health Dashboard" on empty); hidden via theme.css.
+  dashboard-heading: " "
+  dashboard-subheading: " "
   logo: /solace-logo.png
   link: "https://solace.onl"
   # Default when no cookie / OS preference; prefers-color-scheme still wins.
