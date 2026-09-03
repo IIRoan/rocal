@@ -358,6 +358,23 @@ async function waitForCalendarInvitation(): Promise<void> {
   }
 }
 
+async function waitForText(
+  substring: string,
+  timeoutMs: number = 2000,
+): Promise<void> {
+  const startedAt = Date.now();
+  while (!container.textContent?.includes(substring)) {
+    if (Date.now() - startedAt >= timeoutMs) {
+      throw new Error(
+        `Timed out waiting for text "${substring}". Got: ${container.textContent?.slice(0, 400) ?? ""}`,
+      );
+    }
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+  }
+}
+
 function render(props: Partial<MessageReaderProps> = {}) {
   act(() => {
     root.render(
@@ -453,16 +470,7 @@ describe("MessageReader — linked calendar event", () => {
       );
     });
 
-    await act(async () => {
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        const state = queryClient.getQueryState(["events", "detail", "event-1"]);
-        if (state?.status === "success") {
-          break;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
-      await Promise.resolve();
-    });
+    await waitForText("Planning sync");
 
     expect(mockCalendarApiService.getEvent).toHaveBeenCalledWith("event-1");
     expect(container.textContent).toContain("Planning sync");
