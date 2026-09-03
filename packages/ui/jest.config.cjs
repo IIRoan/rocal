@@ -6,6 +6,7 @@ const repoRoot = path.join(__dirname, "../..");
 module.exports = {
   displayName: "ui",
   rootDir: ".",
+  setupFiles: ["<rootDir>/jest.setup.ts"],
   testEnvironment: "node",
   testMatch: ["<rootDir>/src/**/*.test.ts", "<rootDir>/src/**/*.test.tsx"],
   collectCoverageFrom: [
