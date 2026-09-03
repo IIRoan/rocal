@@ -35,7 +35,7 @@ All systemd units should be enabled (`systemctl enable`) for boot.
 ### HAProxy
 
 - **Role:** Public TCP/HTTP edge; TLS on :443; PROXY v2 to frps mail backends.
-- **Ports:** 25, 80 (HTTPS redirect), 465, 993, 443. Public `/admin` and `/api` return 404 except `/api/discover` and `/api/auth` (Solace mailbox login). Admin UI is on `127.0.0.1:8080` via SSH tunnel.
+- **Ports:** 25, 80 (HTTPS redirect), 465, 993, 443. Public `/admin` is allowlisted via `/etc/haproxy/admin-allow.lst` on the VPS (from GitHub Environment secret `ADMIN_ALLOW_IP`, never in git); `/api` returns 404 except `/api/discover` and `/api/auth` (Solace mailbox login). Loopback Admin UI remains on `127.0.0.1:8080` via SSH tunnel.
 - **Repo:** `vps/haproxy.cfg` → `/etc/haproxy/haproxy.cfg`
 - **Active slot:** `/etc/haproxy/stalwart-active-slot` (`blue` or `green`)
 - **TLS cert:** `/etc/haproxy/certs/mail.solace.onl.pem` (HAProxy terminates HTTPS). This file is **separate** from Stalwart’s ACME-managed certificates (used for SMTP STARTTLS on :25). Renewing Stalwart ACME does **not** update HAProxy.
@@ -107,12 +107,14 @@ deploys. See [README.md](../README.md) for the full sequence.
 
 ## Operations
 
-Admin UI (after the public `/admin` 404):
+Admin UI: from an allowlisted egress IP open `https://mail.solace.onl/admin/`. Otherwise tunnel:
 
 ```bash
 ssh -N -L 8080:127.0.0.1:8080 USER@mail.solace.onl
 # browse http://127.0.0.1:8080/admin/
 ```
+
+Allowlist updates: set Environment secret `ADMIN_ALLOW_IP` on `mail-vps`, then run workflow **Sync HAProxy config**.
 
 ```bash
 # Service status
@@ -156,15 +158,18 @@ Workflow: [`.github/workflows/sync-haproxy-cert.yml`](../.github/workflows/sync-
 | Cron (Mondays 06:17 UTC) | Sync only if live HTTPS cert expires within **14 days** |
 | `workflow_dispatch` on `main` | Defaults to `--force` (sync now) |
 
-GitHub Environment **`mail-vps`** (main branch only) holds:
+GitHub Environment **`mail-vps`** (`master`/`main` only) holds:
 
 | Secret | Purpose |
 |--------|---------|
 | `STALWART_DATABASE_URL` | Public Postgres URL (`DATABASE_PUBLIC_URL` from Railway `Postgres-stalwart`) |
-| `VPS_SSH_PRIVATE_KEY` | Private key that can SSH to the mail VPS and install the PEM |
+| `VPS_SSH_PRIVATE_KEY` | Private key for `gh-cert-sync` on the mail VPS |
 | `VPS_SSH_HOST` | default `mail.solace.onl` |
 | `VPS_SSH_USER` | default `gh-cert-sync` |
 | `VPS_SSH_PORT` | default `22` |
+| `ADMIN_ALLOW_IP` | Operator egress IP/CIDR for public `/admin` (written to `/etc/haproxy/admin-allow.lst`; never in git) |
+
+HAProxy config + allowlist deploy: [`.github/workflows/sync-haproxy-cfg.yml`](../../../.github/workflows/sync-haproxy-cfg.yml) (`workflow_dispatch`).
 
 Bootstrap on the VPS as root:
 
