@@ -1,17 +1,17 @@
 import type { Prisma, PrismaClient } from "../generated/prisma/index.js";
-import type {
-  IPushDeviceService,
-  ListPushDevicesInput,
-  ListPushDevicesResult,
-  PushDeviceRegistrationResult,
-  PushDeviceSummary,
-  PushDeviceUnregisterResult,
-  PushTestNotificationInput,
-  PushTestNotificationResult,
-  RegisterPushDeviceInput,
-  UnregisterPushDeviceInput,
+import {
+  pushDeviceSummarySchema,
+  type IPushDeviceService,
+  type ListPushDevicesInput,
+  type ListPushDevicesResult,
+  type PushDeviceRegistrationResult,
+  type PushDeviceSummary,
+  type PushDeviceUnregisterResult,
+  type PushTestNotificationInput,
+  type PushTestNotificationResult,
+  type RegisterPushDeviceInput,
+  type UnregisterPushDeviceInput,
 } from "../contracts/push-device.contract";
-import { pushDeviceSummarySchema } from "../contracts/push-device.contract";
 import { ValidationError } from "../lib/errors";
 import { eventReminderPayload } from "../lib/notification-job";
 import { hashPushToken } from "../lib/push-token";
