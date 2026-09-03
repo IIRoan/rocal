@@ -1,9 +1,5 @@
 name: Sync mail VPS
 
-# Auto-deploy allowlisted apps/stalwart/vps artifacts when master/main updates.
-# Security is merge-time (branch protection + CODEOWNERS) and runtime gates below —
-# not a manual "confirm" click. Secrets only via Environment `mail-vps`.
-
 on:
   push:
     branches: [master, main]
@@ -71,7 +67,6 @@ jobs:
           APPLY_FRP_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.apply_frp || false }}
         run: |
           set -euo pipefail
-          # Explicit allowlist — never recursive-copy the whole vps/ tree.
           STAGE="$(mktemp -d)"
           echo "STAGE=${STAGE}" >>"$GITHUB_ENV"
           allow=(
@@ -83,8 +78,6 @@ jobs:
             stalwart-slot-watcher.py
             gatus-monitor.sh
           )
-          # On push, include frp only if those files are in the commit path set
-          # (still opt-in via APPLY_FRP for install). Manual dispatch can request it.
           APPLY_FRP=0
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${APPLY_FRP_INPUT}" == "true" ]]; then
             APPLY_FRP=1

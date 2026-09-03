@@ -1,15 +1,4 @@
 #!/usr/bin/env bash
-# Apply allowlisted apps/stalwart/vps artifacts onto the mail VPS.
-# Intended to run on the VPS (via GitHub Action SSH or locally as root).
-#
-# Usage:
-#   sudo ./apply-vps-repo.sh /path/to/staged/vps
-#   sudo APPLY_ALLOWLIST=/tmp/admin-allow.lst.new ./apply-vps-repo.sh /path/to/staged/vps
-#
-# Env flags (default-denying):
-#   APPLY_ALLOWLIST  path to admin-allow.lst (optional)
-#   APPLY_FRP=1      install frps.toml / frpc-relay.toml and refresh units
-#   APPLY_SYSTEMD=1  install/restart slot-manager/watcher unit files from stage
 set -euo pipefail
 
 if [[ "$(id -u)" -ne 0 ]]; then
@@ -27,7 +16,6 @@ HAPROXY_CFG_DST=/etc/haproxy/haproxy.cfg
 ALLOW_DST=/etc/haproxy/admin-allow.lst
 ALLOW_SRC="${APPLY_ALLOWLIST:-}"
 
-# Only these basenames may be read from SRC (defense in depth vs staged junk).
 ALLOWED_FILES=(
   apply-vps-repo.sh
   haproxy.cfg
@@ -57,7 +45,6 @@ require_file() {
 }
 
 echo "==> Validating staged tree at ${SRC}"
-# Reject unexpected basenames in the stage root (files only).
 shopt -s nullglob
 for path in "${SRC}"/*; do
   [[ -f "$path" || -L "$path" ]] || continue
@@ -155,7 +142,6 @@ if [[ "$APPLY_SYSTEMD" == "1" ]]; then
   done
 else
   echo "==> Skipping systemd unit install (set APPLY_SYSTEMD=1 to enable)"
-  # Still bounce managers so new .py/.sh under /usr/local/bin are picked up
   for unit in stalwart-slot-manager stalwart-slot-watcher; do
     if systemctl is-active --quiet "$unit"; then
       systemctl restart "$unit"
