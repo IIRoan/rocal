@@ -1,0 +1,9 @@
+# Sensitive paths — changes require review from the listed owner(s).
+# Enable branch protection with “Require review from Code Owners” for this to enforce.
+
+* @IIRoan
+
+/.github/workflows/ @IIRoan
+/apps/stalwart/vps/ @IIRoan
+/apps/stalwart/stalwart/plan/ @IIRoan
+/ssh/ @IIRoan

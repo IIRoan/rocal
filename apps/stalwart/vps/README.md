@@ -35,12 +35,55 @@ All systemd units should be enabled (`systemctl enable`) for boot.
 ### HAProxy
 
 - **Role:** Public TCP/HTTP edge; TLS on :443; PROXY v2 to frps mail backends.
-- **Ports:** 25, 80 (HTTPS redirect), 465, 993, 443. WebAdmin (`/admin`, `/api`, `/login`, `/auth`, …) is allowlisted via `/etc/haproxy/admin-allow.lst` (GitHub Environment secret `ADMIN_ALLOW_IP` on `IIRoan/rocal` `mail-vps`; never in git). Mailbox `/account` portal is not public. Loopback Admin UI remains on `127.0.0.1:8080` via SSH tunnel.
+- **Ports:** 25, 80 (HTTPS redirect), 465, 993, 443.
+  - **Public mail:** `/jmap`, `/.well-known`, `/api/discover`, `/api/auth`, `/auth/*` (OIDC token exchange for Solace).
+  - **Allowlisted only:** `/admin`, `/login`, `/logo`, `/account`, `/oauth`, and other `/api/*`.
+  - Non-allowlisted hits to `/` or admin surfaces return a small **HTML 404** (not an empty body — empty 404s made browsers download a `.bin`).
+  - Allowlist file: `/etc/haproxy/admin-allow.lst` from GitHub Environment secret `ADMIN_ALLOW_IP` on `IIRoan/rocal` `mail-vps` (never in git).
+  - Loopback Admin UI remains on `127.0.0.1:8080` via SSH tunnel.
 - **Repo:** `vps/haproxy.cfg` → `/etc/haproxy/haproxy.cfg`
 - **Active slot:** `/etc/haproxy/stalwart-active-slot` (`blue` or `green`)
 - **TLS cert:** `/etc/haproxy/certs/mail.solace.onl.pem` (HAProxy terminates HTTPS). This file is **separate** from Stalwart’s ACME-managed certificates (used for SMTP STARTTLS on :25). Renewing Stalwart ACME does **not** update HAProxy.
   - One-shot: `vps/install-haproxy-cert.sh`
   - Automated: GitHub Action + [`scripts/sync-haproxy-cert.py`](../scripts/sync-haproxy-cert.py) (see [HAProxy TLS cert sync](#haproxy-tls-cert-sync))
+
+### Automated VPS deploy (protected)
+
+Merging allowlisted `apps/stalwart/vps/` files to **`master`/`main`** triggers [`.github/workflows/sync-mail-vps.yml`](../../../.github/workflows/sync-mail-vps.yml), which SSHs to the VPS and runs [`apply-vps-repo.sh`](apply-vps-repo.sh).
+
+Security model: **merge-time gates + narrow deploy**, not a manual Actions click.
+
+| Gate | Purpose |
+|------|---------|
+| Branch protection on `master` | No drive-by pushes; PR + Code Owner review required |
+| CODEOWNERS (`@IIRoan`) | `.github/workflows/` + `apps/stalwart/vps/` need owner review |
+| Environment `mail-vps` | Secrets only; deployment branches limited to `master`/`main` |
+| No `pull_request` trigger | Fork PRs never receive `mail-vps` secrets |
+| Explicit file allowlist | Only known basenames are copied (not a recursive `vps/` dump) |
+| `apply-vps-repo.sh` default-deny | Skips frp/systemd unit installs unless opted in |
+| Manual `workflow_dispatch` | Owner-only fallback (e.g. re-run without a new commit) |
+
+#### Required GitHub settings
+
+These must be on for the model to hold (script below applies them when you have admin rights):
+
+1. **Branch protection** on `master` (and `main` if used):
+   - Require a pull request before merging
+   - Require review from Code Owners
+   - Restrict who can push / dismiss reviews (you / admins)
+   - Block force pushes and deletions
+2. **Environment `mail-vps`**:
+   - Deployment branches: **Selected** → `master`, `main`
+   - Optional: required reviewers if you want a second click after merge (solo owners usually skip this so deploy stays automatic after a protected merge)
+3. Never attach `mail-vps` secrets to workflows that run on `pull_request` from forks.
+
+Local / emergency apply (bypasses GitHub; trusted shell only):
+
+```bash
+sudo APPLY_ALLOWLIST=/path/to/admin-allow.lst ./apply-vps-repo.sh .
+```
+
+Secrets: Environment **`mail-vps`** (see [HAProxy TLS cert sync](#haproxy-tls-cert-sync)). SSH user defaults to `Roan`. Long-term: least-privilege deploy user with sudo limited to `apply-vps-repo.sh` + `haproxy` reload.
 
 ### frps
 
@@ -171,7 +214,7 @@ GitHub Environment **`mail-vps`** (`master`/`main` only) holds:
 
 Public mailbox `/account` and `/login` are blocked except for the allowlisted IP (admin OAuth only). JMAP (`/jmap`) stays public for Solace clients.
 
-HAProxy config + allowlist deploy: [`.github/workflows/sync-haproxy-cfg.yml`](../../../.github/workflows/sync-haproxy-cfg.yml) (`workflow_dispatch`).
+HAProxy / VPS deploy is automated on protected `master` merges ([`.github/workflows/sync-mail-vps.yml`](../../../.github/workflows/sync-mail-vps.yml)); see [Automated VPS deploy](#automated-vps-deploy-protected). Legacy manual alias: [`.github/workflows/sync-haproxy-cfg.yml`](../../../.github/workflows/sync-haproxy-cfg.yml).
 
 Bootstrap on the VPS as root:
 
