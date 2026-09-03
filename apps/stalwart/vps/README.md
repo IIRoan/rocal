@@ -35,7 +35,7 @@ All systemd units should be enabled (`systemctl enable`) for boot.
 ### HAProxy
 
 - **Role:** Public TCP/HTTP edge; TLS on :443; PROXY v2 to frps mail backends.
-- **Ports:** 25, 80 (HTTPS redirect), 465, 993, 443. Public `/admin` is allowlisted via `/etc/haproxy/admin-allow.lst` on the VPS (from GitHub Environment secret `ADMIN_ALLOW_IP`, never in git); `/api` returns 404 except `/api/discover` and `/api/auth` (Solace mailbox login). Loopback Admin UI remains on `127.0.0.1:8080` via SSH tunnel.
+- **Ports:** 25, 80 (HTTPS redirect), 465, 993, 443. Public `/admin` and management `/api` (except `/api/discover` + `/api/auth` for mailbox login) are allowlisted via `/etc/haproxy/admin-allow.lst` on the VPS (from GitHub Environment secret `ADMIN_ALLOW_IP` on `IIRoan/rocal` `mail-vps`; never in git). Loopback Admin UI remains on `127.0.0.1:8080` via SSH tunnel.
 - **Repo:** `vps/haproxy.cfg` → `/etc/haproxy/haproxy.cfg`
 - **Active slot:** `/etc/haproxy/stalwart-active-slot` (`blue` or `green`)
 - **TLS cert:** `/etc/haproxy/certs/mail.solace.onl.pem` (HAProxy terminates HTTPS). This file is **separate** from Stalwart’s ACME-managed certificates (used for SMTP STARTTLS on :25). Renewing Stalwart ACME does **not** update HAProxy.
