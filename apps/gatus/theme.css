@@ -1,75 +1,75 @@
-/* Solace status — app palette + dense sts-style list */
+/* Solace status — match apps/web (warm ochre, cream, hairlines) */
 
 :root {
-  /* Match apps/web Solace tokens. !important so Gatus app.css cannot overwrite. */
-  --background: 0 0% 97.6% !important;
-  --foreground: 0 0% 12.5% !important;
-  --card: 0 0% 98.8% !important;
-  --card-foreground: 0 0% 12.5% !important;
-  --popover: 0 0% 98.8% !important;
-  --popover-foreground: 0 0% 12.5% !important;
-  --primary: 16.7 22% 32.2% !important;
+  /* Match apps/web globals.css (oklch → HSL components for Gatus hsl(var(--*))) */
+  --background: 0 0% 98.2% !important;
+  --foreground: 0 0% 18% !important;
+  --card: 0 0% 99% !important;
+  --card-foreground: 0 0% 18% !important;
+  --popover: 0 0% 99% !important;
+  --popover-foreground: 0 0% 18% !important;
+  --primary: 24 16% 32% !important;
   --primary-foreground: 0 0% 100% !important;
-  --secondary: 34.1 100% 85.5% !important;
-  --secondary-foreground: 16.3 50.4% 22.9% !important;
-  --muted: 0 0% 93.7% !important;
-  --muted-foreground: 0 0% 33.3% !important;
-  --accent: 0 0% 91% !important;
-  --accent-foreground: 0 0% 12.5% !important;
-  --destructive: 10.2 77.9% 53.9% !important;
+  --secondary: 42 72% 84% !important;
+  --secondary-foreground: 22 32% 24% !important;
+  --muted: 0 0% 94.5% !important;
+  --muted-foreground: 0 0% 38% !important;
+  --accent: 0 0% 92.5% !important;
+  --accent-foreground: 0 0% 18% !important;
+  --destructive: 15 72% 52% !important;
   --destructive-foreground: 0 0% 100% !important;
-  --border: 0 0% 82% !important;
-  --input: 0 0% 84.7% !important;
-  --ring: 16.7 22% 32.2% !important;
+  --border: 0 0% 84% !important;
+  --input: 0 0% 86% !important;
+  --ring: 24 16% 32% !important;
   --radius: 0.5rem !important;
 
-  --sts-up: #059669;
-  --sts-up-soft: #047857;
-  --sts-up-text: #047857;
-  --sts-down: #dc2626;
-  --sts-down-soft: #b91c1c;
-  --sts-down-text: #b91c1c;
-  --sts-partial: #b45309;
-  --sts-empty: #e7e5e4;
-  --sts-max: 42rem;
+  --sts-up: #3f7a5c;
+  --sts-up-soft: #326349;
+  --sts-up-text: #2f6148;
+  --sts-down: #c24132;
+  --sts-down-soft: #9f3428;
+  --sts-down-text: #9f3428;
+  --sts-partial: #9a6700;
+  --sts-empty: #d9d2c8;
+  --sts-max: 44rem;
 }
 
 :root.dark,
 html.dark,
 .dark {
-  --background: 0 0% 6.7% !important;
-  --foreground: 0 0% 93.3% !important;
-  --card: 0 0% 9.8% !important;
-  --card-foreground: 0 0% 93.3% !important;
-  --popover: 0 0% 9.8% !important;
-  --popover-foreground: 0 0% 93.3% !important;
-  --primary: 29.5 100% 88% !important;
-  --primary-foreground: 183.2 54.3% 6.9% !important;
-  --secondary: 28.2 17.5% 19% !important;
-  --secondary-foreground: 29.5 100% 88% !important;
-  --muted: 0 0% 13.3% !important;
-  --muted-foreground: 0 0% 62% !important;
-  --accent: 0 0% 16.5% !important;
-  --accent-foreground: 0 0% 93.3% !important;
-  --destructive: 10.2 77.9% 53.9% !important;
+  --background: 0 0% 12.2% !important;
+  --foreground: 0 0% 93.5% !important;
+  --card: 0 0% 15.5% !important;
+  --card-foreground: 0 0% 93.5% !important;
+  --popover: 0 0% 15.5% !important;
+  --popover-foreground: 0 0% 93.5% !important;
+  --primary: 42 70% 82% !important;
+  --primary-foreground: 190 40% 8% !important;
+  --secondary: 32 10% 22% !important;
+  --secondary-foreground: 42 70% 82% !important;
+  --muted: 0 0% 18% !important;
+  --muted-foreground: 0 0% 68% !important;
+  --accent: 0 0% 20% !important;
+  --accent-foreground: 0 0% 93.5% !important;
+  --destructive: 15 72% 52% !important;
   --destructive-foreground: 0 0% 100% !important;
-  --border: 40 8% 18% !important;
-  --input: 0 0% 24% !important;
-  --ring: 29.5 100% 88% !important;
+  --border: 42 8% 22% !important;
+  --input: 0 0% 26% !important;
+  --ring: 42 70% 82% !important;
 
-  --sts-up: #34d399;
-  --sts-up-soft: #10b981;
-  --sts-up-text: #6ee7b7;
-  --sts-down: #f87171;
-  --sts-down-soft: #ef4444;
-  --sts-down-text: #fca5a5;
-  --sts-partial: #fbbf24;
-  --sts-empty: #3f3f46;
+  --sts-up: #7dba96;
+  --sts-up-soft: #5ea07a;
+  --sts-up-text: #9fd4b3;
+  --sts-down: #e07a6e;
+  --sts-down-soft: #d45c4e;
+  --sts-down-text: #f0a89f;
+  --sts-partial: #e0b45c;
+  --sts-empty: #2e2c29;
 }
 
 @keyframes sts-radar {
   0% {
-    opacity: 0.7;
+    opacity: 0.65;
     transform: scale(1);
   }
   100% {
@@ -83,15 +83,73 @@ html {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html,
+body {
+  min-height: 100dvh;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
 body,
 #global,
-#app,
-.bg-background {
+#app {
   background-color: hsl(var(--background)) !important;
   color: hsl(var(--foreground)) !important;
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 15px;
+}
+
+#app {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#global {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+#global::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    165deg,
+    hsl(var(--secondary) / 0.18) 0%,
+    hsl(var(--background) / 0.55) 42%,
+    hsl(var(--background)) 100%
+  );
+}
+
+:root.dark #global::before,
+html.dark #global::before,
+.dark #global::before {
+  background: linear-gradient(
+    165deg,
+    hsl(var(--secondary) / 0.28) 0%,
+    hsl(var(--background) / 0.7) 40%,
+    hsl(var(--background)) 100%
+  );
+}
+
+#global > *,
+#app {
+  position: relative;
+  z-index: 1;
+}
+
+.bg-background {
+  background-color: transparent !important;
 }
 
 .text-foreground {
@@ -107,49 +165,51 @@ body,
   background-color: hsl(var(--card)) !important;
 }
 
-.border,
-.border-b,
-.border-t {
-  border-color: hsl(var(--border) / 0.55) !important;
-}
-
-/* ——— Header ——— */
-header {
-  border-bottom: none !important;
+/* ——— Header: same surface as the page (no frosted card bar) ——— */
+header,
+header.border-b,
+header[class*="bg-card"],
+header[class*="backdrop"] {
   background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
   backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 header .container {
   max-width: var(--sts-max);
-  padding-top: 0.5rem !important;
-  padding-bottom: 0.25rem !important;
+  padding-top: 1.25rem !important;
+  padding-bottom: 0.35rem !important;
 }
 
 header .container > div {
-  justify-content: center !important;
+  justify-content: flex-start !important;
 }
 
 header .flex.items-center.gap-4 {
-  justify-content: center;
-  gap: 0.5rem;
+  justify-content: flex-start;
+  gap: 0.625rem;
 }
 
 header .flex.items-center.gap-4 > a,
 header .flex.items-center.gap-4 > div {
-  justify-content: center;
-  gap: 0.5rem;
+  justify-content: flex-start;
+  gap: 0.625rem;
 }
 
 header .w-12.h-12 {
-  width: 1.375rem;
-  height: 1.375rem;
+  width: 1.625rem;
+  height: 1.625rem;
+  background: transparent !important;
 }
 
 header h1 {
   font-size: 0.9375rem;
-  font-weight: 550;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  letter-spacing: -0.025em;
   color: hsl(var(--foreground)) !important;
 }
 
@@ -160,35 +220,34 @@ header .md\:hidden {
 }
 
 header img {
-  border-radius: 0.25rem;
+  border-radius: 9999px;
+  outline: none;
+  box-shadow: none;
 }
 
 /* ——— Dashboard ——— */
 .dashboard-container {
+  flex: 1 1 auto;
   padding-top: 0 !important;
-  background: hsl(var(--background)) !important;
+  background: transparent !important;
 }
 
 .dashboard-container .container {
   max-width: var(--sts-max);
-  padding-top: 0.25rem !important;
-  padding-bottom: 2rem !important;
-  padding-left: 1rem !important;
-  padding-right: 1rem !important;
+  padding-top: 1.25rem !important;
+  padding-bottom: 1.25rem !important;
+  padding-left: 1.25rem !important;
+  padding-right: 1.25rem !important;
 }
 
-/* Hide Health Dashboard chrome, search, filter, sort — tools live in #settings */
 .dashboard-container .mb-6 > .flex.items-center.justify-between.mb-6,
 .dashboard-container .flex.flex-col.lg\:flex-row.gap-3,
-.dashboard-container .flex.flex-col.lg\:flex-row.gap-3.lg\:gap-4,
-.dashboard-container .rounded-lg.border.bg-card,
-.dashboard-container input[type="text"],
-.dashboard-container #search-input {
+.dashboard-container .flex.flex-col.lg\:flex-row.gap-3.lg\:gap-4 {
   display: none !important;
 }
 
-.dashboard-container .mb-6 {
-  margin-bottom: 0.35rem !important;
+html:not(.solace-details) .dashboard-container .mb-6 {
+  margin-bottom: 0.25rem !important;
 }
 
 .dashboard-container h1,
@@ -197,11 +256,11 @@ header img {
   text-wrap: balance;
 }
 
-/* ——— Groups: continuous list, no card dividers ——— */
+/* ——— Groups ——— */
 .dashboard-container .space-y-6 {
   display: flex !important;
   flex-direction: column;
-  gap: 0 !important;
+  gap: 1.35rem !important;
 }
 
 .endpoint-group {
@@ -213,15 +272,16 @@ header img {
 }
 
 .endpoint-group + .endpoint-group {
-  margin-top: 0.5rem;
+  margin-top: 0;
+  padding-top: 1.15rem;
+  border-top: 1px solid hsl(var(--border) / 0.5) !important;
 }
 
 .endpoint-group-header {
-  padding: 0.4rem 0.125rem !important;
+  padding: 0 0 0.65rem !important;
   background: transparent !important;
   border-bottom: none !important;
   border-radius: 0;
-  transition: color 0.12s ease;
 }
 
 .endpoint-group:has(.endpoint-group-content) .endpoint-group-header {
@@ -234,9 +294,9 @@ header img {
 }
 
 .endpoint-group-header h2 {
-  font-size: 0.8125rem !important;
+  font-size: 0.6875rem !important;
   font-weight: 600 !important;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: hsl(var(--muted-foreground)) !important;
 }
@@ -281,23 +341,27 @@ header img {
 }
 
 .endpoint-group-content {
-  padding: 0.25rem 0 0 !important;
+  padding: 0 !important;
   background: transparent !important;
 }
 
 .endpoint-group-content .grid {
   display: flex !important;
   flex-direction: column;
-  gap: 0.75rem !important;
+  gap: 1rem !important;
 }
 
 .endpoint-group-content h3 {
-  display: none;
+  font-size: 0.875rem !important;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  color: hsl(var(--foreground)) !important;
+  margin: 0;
 }
 
-/* ——— Endpoints ——— */
-.endpoint-group-content .endpoint,
-.endpoint {
+/* ——— Endpoints (dashboard list only) ——— */
+.endpoint-group-content .endpoint {
+  display: block !important;
   border: none !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -307,24 +371,24 @@ header img {
 }
 
 .endpoint-group-content .endpoint:hover,
-.endpoint[class*="hover:scale"]:hover,
-.endpoint:hover {
+.endpoint-group-content .endpoint[class*="hover:scale"]:hover {
   transform: none !important;
   box-shadow: none !important;
   background: transparent !important;
 }
 
 .endpoint-header {
-  padding: 0 0.125rem 0.125rem !important;
+  padding: 0 0 0.3rem !important;
 }
 
 .endpoint-content {
-  padding: 0 0.125rem 0 !important;
+  padding: 0 !important;
 }
 
 .endpoint-header [role="link"] {
-  font-size: 0.9375rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
   color: hsl(var(--foreground)) !important;
   text-decoration: none;
 }
@@ -336,8 +400,7 @@ header img {
 }
 
 .endpoint-header .text-muted-foreground {
-  font-size: 0.75rem;
-  color: hsl(var(--muted-foreground)) !important;
+  display: none !important;
 }
 
 .endpoint-header .flex-shrink-0.ml-2 {
@@ -348,16 +411,15 @@ header img {
   display: none !important;
 }
 
-/* Continuous uptime strip */
 .endpoint-content [class*="gap-0.5"] {
   gap: 1px !important;
   overflow: hidden;
-  border-radius: 0.2rem;
+  border-radius: 0.25rem;
 }
 
 .endpoint-content [class*="gap-0.5"] > div,
 .endpoint-content [class*="gap-0.5"] > .flex-1 {
-  height: 1.25rem !important;
+  height: 1.125rem !important;
   border-radius: 0 !important;
   min-width: 1px;
 }
@@ -400,12 +462,12 @@ html.dark .endpoint-content .dark\:bg-gray-700 {
 }
 
 .endpoint-content .text-xs.text-muted-foreground.mt-1 {
-  margin-top: 0.2rem !important;
+  margin-top: 0.3rem !important;
   font-size: 0.75rem;
   color: hsl(var(--muted-foreground)) !important;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Drop the dashed divider lines under bars */
 .endpoint-content .text-xs.text-muted-foreground.mt-1 .border-dashed,
 .endpoint-content .border-dashed {
   display: none !important;
@@ -418,12 +480,7 @@ html.dark .endpoint-content .dark\:bg-gray-700 {
   font-variant-numeric: tabular-nums;
 }
 
-.endpoint-content .text-yellow-500 {
-  color: var(--sts-partial) !important;
-  font-weight: 550;
-  font-variant-numeric: tabular-nums;
-}
-
+.endpoint-content .text-yellow-500,
 .endpoint-content .text-orange-500 {
   color: var(--sts-partial) !important;
   font-weight: 550;
@@ -453,17 +510,30 @@ button:disabled {
   transform: none !important;
 }
 
+#settings {
+  z-index: 40;
+}
+
 #settings > div {
   transform: none !important;
-  border-radius: var(--radius);
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--card));
-  box-shadow: 0 1px 2px hsl(0 0% 0% / 0.05);
+  border-radius: 9999px;
+  border: 1px solid hsl(var(--border) / 0.7);
+  background: hsl(var(--card) / 0.92);
+  box-shadow:
+    0 0 0 1px hsl(0 0% 0% / 0.04),
+    0 1px 2px hsl(0 0% 0% / 0.05);
+}
+
+:root.dark #settings > div,
+html.dark #settings > div,
+.dark #settings > div {
+  box-shadow:
+    0 0 0 1px hsl(0 0% 100% / 0.06),
+    0 1px 2px hsl(0 0% 0% / 0.3);
 }
 
 #settings > div:hover {
   transform: none !important;
-  box-shadow: 0 2px 8px hsl(0 0% 0% / 0.06);
 }
 
 #tooltip {
@@ -475,9 +545,39 @@ button:disabled {
   font-size: 0.8125rem;
 }
 
-footer,
+footer:not(#solace-status-footer),
 #social {
   display: none !important;
+}
+
+#solace-status-footer {
+  display: flex !important;
+  position: relative;
+  z-index: 2;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  width: 100%;
+  max-width: var(--sts-max);
+  margin: auto auto 0;
+  padding: 1.15rem 1.25rem 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  border-top: 1px solid hsl(var(--border) / 0.5);
+  background: transparent;
+}
+
+#solace-status-footer a {
+  font-weight: 550;
+  color: hsl(var(--muted-foreground));
+  text-decoration: none;
+}
+
+#solace-status-footer a:hover {
+  color: hsl(var(--foreground));
+  opacity: 1;
 }
 
 a {
@@ -491,5 +591,124 @@ a:hover {
 .dashboard-container .grid.gap-3.grid-cols-1 {
   display: flex !important;
   flex-direction: column;
-  gap: 0.75rem !important;
+  gap: 1rem !important;
+}
+
+/* ——— Endpoint details: hairline sections, no empty card stack ——— */
+html.solace-details .dashboard-container .container {
+  max-width: 48rem;
+}
+
+html.solace-details .bg-card,
+html.solace-details .bg-card\/50 {
+  background-color: transparent !important;
+}
+
+html.solace-details .dashboard-container .rounded-lg,
+html.solace-details .dashboard-container .rounded-xl {
+  border-radius: 0 !important;
+}
+
+html.solace-details .dashboard-container .shadow-sm,
+html.solace-details .dashboard-container .shadow,
+html.solace-details .dashboard-container [class*="shadow-"] {
+  box-shadow: none !important;
+}
+
+html.solace-details .dashboard-container h1 {
+  font-size: 1.5rem !important;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+html.solace-details .dashboard-container button.mb-4 {
+  margin-left: -0.4rem;
+  margin-bottom: 1rem !important;
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 0.8125rem;
+}
+
+html.solace-details .dashboard-container button.mb-4:hover {
+  color: hsl(var(--foreground)) !important;
+  background: transparent !important;
+}
+
+html.solace-details .dashboard-container .grid[class*="lg:grid-cols-4"] {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.15rem 1.35rem !important;
+  padding: 1.1rem 0 1.2rem;
+  margin: 0.15rem 0 0.35rem;
+  border-top: 1px solid hsl(var(--border) / 0.5);
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+}
+
+@media (min-width: 720px) {
+  html.solace-details .dashboard-container .grid[class*="lg:grid-cols-4"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+html.solace-details .dashboard-container .grid[class*="lg:grid-cols-4"] > * {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+html.solace-details .dashboard-container .grid[class*="lg:grid-cols-4"] [class*="p-6"],
+html.solace-details .dashboard-container .grid[class*="lg:grid-cols-4"] [class*="pt-0"],
+html.solace-details .dashboard-container .grid[class*="lg:grid-cols-4"] [class*="pb-2"] {
+  padding: 0 !important;
+}
+
+html.solace-details .dashboard-container .grid[class*="lg:grid-cols-4"] .text-sm {
+  font-size: 0.6875rem !important;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+html.solace-details .dashboard-container .grid[class*="lg:grid-cols-4"] .text-2xl {
+  margin-top: 0.35rem;
+  font-size: 1.0625rem !important;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+html.solace-details .dashboard-container .space-y-6 > .rounded-lg,
+html.solace-details .dashboard-container .space-y-6 > .rounded-xl,
+html.solace-details .dashboard-container .space-y-6 > [class*="border"] {
+  border: none !important;
+  border-top: 1px solid hsl(var(--border) / 0.5) !important;
+  background: transparent !important;
+  padding-top: 1.15rem;
+  margin-top: 0.15rem;
+}
+
+html.solace-details .dashboard-container .space-y-6 h3 {
+  font-size: 0.8125rem !important;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+html.solace-details .endpoint-header {
+  display: none !important;
+}
+
+html.solace-details select {
+  border: 1px solid hsl(var(--border) / 0.7) !important;
+  background: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+  border-radius: 0.375rem !important;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem !important;
+}
+
+html.solace-details .dashboard-container .grid:has(img[alt*="response time"]),
+html.solace-details .dashboard-container .space-y-6 > :has(img[alt*="uptime"]),
+html.solace-details .dashboard-container .space-y-6 > :has(img[alt="health badge"]) {
+  display: none !important;
 }

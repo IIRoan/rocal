@@ -31,8 +31,9 @@ _SKIP_RESPONSE_HEADERS = {
 }
 
 
-def _is_custom_css(path: str) -> bool:
-    return path.split("?", 1)[0] == "/css/custom.css"
+def _no_store_static(path: str) -> bool:
+    p = path.split("?", 1)[0]
+    return p in {"/css/custom.css", "/js/expand-groups.js"}
 
 
 def _proxy(handler: BaseHTTPRequestHandler) -> None:
@@ -64,11 +65,11 @@ def _proxy(handler: BaseHTTPRequestHandler) -> None:
             for key, value in resp.headers.items():
                 if key.lower() in _SKIP_RESPONSE_HEADERS:
                     continue
-                if _is_custom_css(handler.path) and key.lower() == "cache-control":
+                if _no_store_static(handler.path) and key.lower() == "cache-control":
                     continue
                 handler.send_header(key, value)
-            # Theme CSS changes often during iteration; don't let Cloudflare pin an old file.
-            if _is_custom_css(handler.path):
+            # Theme CSS/JS iterate often; don't let Cloudflare pin an old file.
+            if _no_store_static(handler.path):
                 handler.send_header("Cache-Control", "no-cache, max-age=0, must-revalidate")
             handler.send_header("Content-Length", str(len(payload)))
             handler.end_headers()
