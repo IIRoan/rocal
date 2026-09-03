@@ -1,0 +1,171 @@
+name: Sync mail VPS
+
+# Auto-deploy allowlisted apps/stalwart/vps artifacts when master/main updates.
+# Security is merge-time (branch protection + CODEOWNERS) and runtime gates below —
+# not a manual "confirm" click. Secrets only via Environment `mail-vps`.
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "apps/stalwart/vps/haproxy.cfg"
+      - "apps/stalwart/vps/apply-vps-repo.sh"
+      - "apps/stalwart/vps/haproxy-sync-active-slot.sh"
+      - "apps/stalwart/vps/stalwart-switch-slot.sh"
+      - "apps/stalwart/vps/stalwart-slot-manager.py"
+      - "apps/stalwart/vps/stalwart-slot-watcher.py"
+      - "apps/stalwart/vps/gatus-monitor.sh"
+      - "apps/stalwart/vps/frps.toml"
+      - "apps/stalwart/vps/frpc-relay.toml"
+      - ".github/workflows/sync-mail-vps.yml"
+  workflow_dispatch:
+    inputs:
+      apply_frp:
+        description: 'Also install frps/frpc-relay.toml (default: no)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-mail-vps-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Apply VPS repo
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: mail-vps
+    if: |
+      github.repository == 'IIRoan/rocal'
+      && github.event.repository.fork == false
+      && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+      && (
+        github.event_name == 'push'
+        || (github.event_name == 'workflow_dispatch' && github.actor == github.repository_owner)
+      )
+    steps:
+      - name: Assert trusted ref
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REPOSITORY}" = "IIRoan/rocal"
+          test "${GITHUB_REF}" = "refs/heads/master" -o "${GITHUB_REF}" = "refs/heads/main"
+          test "${GITHUB_EVENT_NAME}" = "push" -o "${GITHUB_EVENT_NAME}" = "workflow_dispatch"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            test "${GITHUB_ACTOR}" = "${GITHUB_REPOSITORY_OWNER}"
+          fi
+          echo "event=${GITHUB_EVENT_NAME} actor=${GITHUB_ACTOR} sha=${GITHUB_SHA}"
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          ref: ${{ github.sha }}
+
+      - name: Stage allowlisted artifacts only
+        env:
+          APPLY_FRP_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.apply_frp || false }}
+        run: |
+          set -euo pipefail
+          # Explicit allowlist — never recursive-copy the whole vps/ tree.
+          STAGE="$(mktemp -d)"
+          echo "STAGE=${STAGE}" >>"$GITHUB_ENV"
+          allow=(
+            apply-vps-repo.sh
+            haproxy.cfg
+            haproxy-sync-active-slot.sh
+            stalwart-switch-slot.sh
+            stalwart-slot-manager.py
+            stalwart-slot-watcher.py
+            gatus-monitor.sh
+          )
+          # On push, include frp only if those files are in the commit path set
+          # (still opt-in via APPLY_FRP for install). Manual dispatch can request it.
+          APPLY_FRP=0
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${APPLY_FRP_INPUT}" == "true" ]]; then
+            APPLY_FRP=1
+            allow+=(frps.toml frpc-relay.toml)
+          fi
+          echo "APPLY_FRP=${APPLY_FRP}" >>"$GITHUB_ENV"
+
+          for f in "${allow[@]}"; do
+            src="apps/stalwart/vps/${f}"
+            if [[ -f "$src" ]]; then
+              if [[ -L "$src" ]]; then
+                echo "refusing symlink: $src" >&2
+                exit 1
+              fi
+              install -m 644 "$src" "${STAGE}/${f}"
+              echo "staged $f"
+            elif [[ "$f" == "gatus-monitor.sh" ]]; then
+              echo "optional missing: $f"
+            else
+              echo "required missing: $src" >&2
+              exit 1
+            fi
+          done
+          chmod 755 "${STAGE}/apply-vps-repo.sh" \
+            "${STAGE}/stalwart-switch-slot.sh" \
+            "${STAGE}/haproxy-sync-active-slot.sh"
+          if [[ -f "${STAGE}/gatus-monitor.sh" ]]; then
+            chmod 755 "${STAGE}/gatus-monitor.sh"
+          fi
+
+      - name: Deploy allowlisted artifacts
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_HOST: ${{ secrets.VPS_SSH_HOST }}
+          VPS_SSH_USER: ${{ secrets.VPS_SSH_USER }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+          ADMIN_ALLOW_IP: ${{ secrets.ADMIN_ALLOW_IP }}
+        run: |
+          set -euo pipefail
+          : "${VPS_SSH_PRIVATE_KEY:?set Environment secret VPS_SSH_PRIVATE_KEY on mail-vps}"
+          : "${ADMIN_ALLOW_IP:?set Environment secret ADMIN_ALLOW_IP on mail-vps}"
+          while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            if ! printf '%s' "$line" | grep -Eq '^[0-9a-fA-F.:/]+$'; then
+              echo "ADMIN_ALLOW_IP has unexpected characters: $line" >&2
+              exit 1
+            fi
+          done <<<"$ADMIN_ALLOW_IP"
+
+          HOST="${VPS_SSH_HOST:-mail.solace.onl}"
+          USER="${VPS_SSH_USER:-Roan}"
+          PORT="${VPS_SSH_PORT:-22}"
+          echo "Deploy target: ${USER}@${HOST}:${PORT}"
+
+          KEY="$(mktemp)"
+          ALLOW="$(mktemp)"
+          trap 'rm -f "$KEY" "$ALLOW"' EXIT
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" >"$KEY"
+          printf '%s\n' "$ADMIN_ALLOW_IP" >"$ALLOW"
+          chmod 600 "$KEY" "$ALLOW"
+
+          SSH=(ssh -i "$KEY" -p "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes
+               -o PubkeyAcceptedAlgorithms=+ssh-rsa,rsa-sha2-512,rsa-sha2-256
+               -o StrictHostKeyChecking=accept-new)
+          SCP=(scp -i "$KEY" -P "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes
+               -o PubkeyAcceptedAlgorithms=+ssh-rsa,rsa-sha2-512,rsa-sha2-256
+               -o StrictHostKeyChecking=accept-new)
+
+          REMOTE_DIR="/tmp/rocal-vps-$$"
+          "${SSH[@]}" "${USER}@${HOST}" "rm -rf '$REMOTE_DIR' && mkdir -p '$REMOTE_DIR'"
+          "${SCP[@]}" -r "${STAGE}/." "${USER}@${HOST}:${REMOTE_DIR}/"
+          "${SCP[@]}" "$ALLOW" "${USER}@${HOST}:/tmp/admin-allow.lst.new"
+
+          "${SSH[@]}" "${USER}@${HOST}" bash -s <<REMOTE
+          set -euo pipefail
+          chmod +x ${REMOTE_DIR}/apply-vps-repo.sh
+          sudo -n env \
+            APPLY_ALLOWLIST=/tmp/admin-allow.lst.new \
+            APPLY_FRP=${APPLY_FRP:-0} \
+            APPLY_SYSTEMD=0 \
+            ${REMOTE_DIR}/apply-vps-repo.sh ${REMOTE_DIR}
+          rm -rf ${REMOTE_DIR} /tmp/admin-allow.lst.new
+          echo "mail VPS apply complete"
+          REMOTE
