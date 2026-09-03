@@ -26,6 +26,11 @@ jest.mock("@workspace/ui/components/ui/blobatar-avatar", () => ({
     <div data-testid="blobatar-avatar">{email}</div>
   ),
 }));
+jest.mock("@/components/solace-avatar", () => ({
+  SolaceAvatar: ({ email }: { email?: string }) => (
+    <div data-testid="solace-avatar">{email}</div>
+  ),
+}));
 jest.mock("@/hooks/use-solace-profile-image", () => ({
   useSolaceProfileImage: () => null,
 }));
@@ -233,7 +238,7 @@ describe("EventEditorBody", () => {
     expect(container.textContent).toContain("Teammate");
     expect(container.textContent).toContain("Invited");
     expect(
-      container.querySelector('div[aria-label="owner@example.com"]'),
+      container.querySelector('[data-testid="solace-avatar"]'),
     ).not.toBeNull();
   });
 
