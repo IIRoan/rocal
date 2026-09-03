@@ -17,8 +17,8 @@ COPY assets/expand-groups.js web/static/js/expand-groups.js
 # Load Solace theme after Gatus app.css (otherwise shadcn tokens win), and expand groups on boot.
 RUN sed -i \
   -e 's|<link rel="stylesheet" href="/css/custom.css"/>||' \
-  -e 's|<script defer="defer" src="/js/app.js"></script>|<script defer="defer" src="/js/expand-groups.js"></script><script defer="defer" src="/js/app.js"></script>|' \
-  -e 's|<link href="/css/app.css" rel="stylesheet">|<link href="/css/app.css" rel="stylesheet"><link rel="stylesheet" href="/css/custom.css"/>|' \
+  -e 's|<script defer="defer" src="/js/app.js"></script>|<script defer="defer" src="/js/expand-groups.js?v=20260903e"></script><script defer="defer" src="/js/app.js"></script>|' \
+  -e 's|<link href="/css/app.css" rel="stylesheet">|<link href="/css/app.css" rel="stylesheet"><link rel="stylesheet" href="/css/custom.css?v=20260903e"/>|' \
   web/static/index.html
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /gatus .
 
