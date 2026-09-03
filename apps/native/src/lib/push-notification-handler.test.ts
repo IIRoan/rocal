@@ -15,7 +15,7 @@ describe("registerForegroundPushNotificationHandler", () => {
     mockSetNotificationHandler.mockClear();
   });
 
-  it("registers a synchronous foreground presentation handler once", () => {
+  it("registers a foreground presentation handler once", async () => {
     const { registerForegroundPushNotificationHandler: register } =
       require("./push-notification-handler") as typeof import("./push-notification-handler");
 
@@ -24,7 +24,7 @@ describe("registerForegroundPushNotificationHandler", () => {
 
     expect(mockSetNotificationHandler).toHaveBeenCalledTimes(1);
     const handler = mockSetNotificationHandler.mock.calls[0]?.[0];
-    expect(handler.handleNotification()).toEqual({
+    await expect(handler.handleNotification()).resolves.toEqual({
       shouldShowBanner: true,
       shouldShowList: true,
       shouldPlaySound: true,

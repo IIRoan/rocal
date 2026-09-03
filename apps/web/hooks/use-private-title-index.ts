@@ -72,15 +72,7 @@ export function usePrivateTitleIndex() {
   }, [accountId, canIndex, refreshFromStore]);
 
   useEffect(() => {
-    if (!accountId) {
-      setDocuments([]);
-      setIndexedAt(null);
-      return;
-    }
-
-    if (!flags.enabled) {
-      setDocuments([]);
-      setIndexedAt(null);
+    if (!accountId || !flags.enabled) {
       return;
     }
 
@@ -102,10 +94,12 @@ export function usePrivateTitleIndex() {
     };
   }, [accountId, canIndex, flags.enabled, rebuild, refreshFromStore]);
 
+  const indexActive = Boolean(accountId) && flags.enabled;
+
   return {
-    documents,
+    documents: indexActive ? documents : [],
     isIndexing,
-    indexedAt,
+    indexedAt: indexActive ? indexedAt : null,
     enabled: canIndex,
     rebuild,
   };
