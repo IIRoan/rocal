@@ -8,9 +8,27 @@ import { enqueueInboundMailPush } from "../../lib/mail-push-enqueue";
 import { StalwartWebhookService } from "../../services/stalwart-webhook.service";
 
 describe("StalwartWebhookService", () => {
-  const findUnique = jest.fn();
-  const resolveIngestedJmapEmailId = jest.fn(async () => "gceaaabqr");
-  const getEmailPushMetadata = jest.fn(async () => null);
+  type DirectoryEntry = {
+    userId: string;
+    stalwartAccountId: string;
+    email: string;
+  };
+
+  type EmailPushMetadata = {
+    emailId: string;
+    subject: string;
+    fromName: string;
+  };
+
+  const findUnique = jest.fn<
+    (args: { where: Record<string, string> }) => Promise<DirectoryEntry | null>
+  >();
+  const resolveIngestedJmapEmailId = jest.fn<
+    (...args: unknown[]) => Promise<string>
+  >().mockResolvedValue("gceaaabqr");
+  const getEmailPushMetadata = jest.fn<
+    (...args: unknown[]) => Promise<EmailPushMetadata | null>
+  >().mockResolvedValue(null);
   const enqueue = enqueueInboundMailPush as jest.MockedFunction<
     typeof enqueueInboundMailPush
   >;
