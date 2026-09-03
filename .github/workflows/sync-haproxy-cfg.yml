@@ -1,7 +1,5 @@
 name: Sync HAProxy config
 
-# Legacy manual alias for Sync mail VPS. Prefer the primary workflow for automation.
-
 on:
   workflow_dispatch:
 
