@@ -65,6 +65,7 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
       })
 
       .delete("/subscriptions/:id", {
+        parse: "none",
         params: RouteModel.subscriptions.idParams,
         query: RouteModel.subscriptions.deleteQuery,
         detail: {

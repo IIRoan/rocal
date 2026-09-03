@@ -1,0 +1,26 @@
+# Keep deploys lean. Do not omit workspace package.json roots (breaks bun.lock).
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/.turbo
+**/out
+apps/backend/server
+apps/backend/dist
+apps/backend/llms-full.txt
+webmail
+**/.wrangler
+**/.vinext
+**/*.p8
+.env*
+!.env.example
+# Native app source is large; keep package.json for workspace resolution.
+apps/native/**
+!apps/native/package.json
+apps/gatus/**
+!apps/gatus/package.json
+apps/stalwart/**
+!apps/stalwart/package.json
+apps/notifications/**
+!apps/notifications/package.json
+!apps/notifications/go.mod

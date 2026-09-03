@@ -12,10 +12,8 @@ import {
 } from "railway/iac";
 
 export default defineRailway(() => {
-  const solaceRepo = github("IIRoan/rocal", {
-    branch: "master",
-    checkSuites: false,
-  });
+  // Web (Next.js) and API (Elysia) run on Vercel — see apps/web + apps/backend vercel.json.
+  // Postgres stays here so Vercel API can reach it via DATABASE_PUBLIC_URL.
   const stalwartRepo = github("IIRoan/rocal", {
     branch: "master",
     rootDirectory: "apps/stalwart",
@@ -24,6 +22,10 @@ export default defineRailway(() => {
   const gatusRepo = github("IIRoan/rocal", {
     branch: "master",
     rootDirectory: "apps/gatus",
+    checkSuites: false,
+  });
+  const solaceRepo = github("IIRoan/rocal", {
+    branch: "master",
     checkSuites: false,
   });
 
@@ -56,98 +58,6 @@ export default defineRailway(() => {
     alerts: { usage: { "80": {}, "95": {}, "100": {} } },
   });
   const stalwartBlobs = bucket("stalwart-blobs", { region: "ams" });
-
-  const web = service("Solace NextJS", {
-    source: solaceRepo,
-    build: {
-      buildCommand: "bun install && bun run build:web",
-      watchPatterns: [
-        "apps/web/**",
-        "packages/**",
-        "bun.lock",
-        "package.json",
-      ],
-    },
-    start: "cd apps/web && bun --bun next start -H 0.0.0.0 -p $PORT",
-    healthcheck: "/",
-    healthcheckTimeout: 300,
-    replicas: { "europe-west4-drams3a": 1 },
-    domains: [{ domain: "solace.onl", port: 8080 }],
-    networking: { privateNetworkEndpoint: "rocal" },
-    deploy: {
-      ipv6EgressEnabled: true,
-      sleepApplication: true,
-      restartPolicyType: "ON_FAILURE",
-      restartPolicyMaxRetries: 5,
-    },
-    env: {
-      NEXT_PUBLIC_API_URL: preserve(),
-      NEXT_PUBLIC_APP_URL: preserve(),
-      NODE_ENV: preserve(),
-      STALWART_BASE_URL: preserve(),
-      STALWART_DEFAULT_DOMAIN: preserve(),
-    },
-  });
-
-  const api = service("Solace ElysiaJS", {
-    source: solaceRepo,
-    build: {
-      buildCommand: "bun install && bun run build:backend",
-      watchPatterns: [
-        "apps/backend/**",
-        "packages/calendar-core/**",
-        "packages/calendar-ics/**",
-        "packages/logger/**",
-        "packages/runtime/**",
-        "packages/typescript-config/**",
-        "bun.lock",
-        "package.json",
-      ],
-    },
-    start: "bun run start:backend",
-    healthcheck: "/api/health",
-    healthcheckTimeout: 300,
-    replicas: { "europe-west4-drams3a": 1 },
-    domains: [{ domain: "api.solace.onl", port: 8080 }],
-    networking: { privateNetworkEndpoint: "backend" },
-    deploy: {
-      sleepApplication: true,
-      restartPolicyType: "ON_FAILURE",
-      restartPolicyMaxRetries: 5,
-    },
-    env: {
-      AUTH_COOKIE_SAME_SITE: preserve(),
-      AUTH_REDIRECT_URL: preserve(),
-      AUTH_SKIP_STATE_COOKIE_CHECK: preserve(),
-      BACKEND_URL: preserve(),
-      BETTER_AUTH_SECRET: preserve(),
-      DATABASE_URL: preserve(),
-      FRONTEND_URL: preserve(),
-      GITHUB_CLIENT_ID: preserve(),
-      GITHUB_CLIENT_SECRET: preserve(),
-      MAIL_OAUTH_AUDIENCES: preserve(),
-      MAIL_OAUTH_BROWSER_CLIENT_ID: preserve(),
-      MAIL_OAUTH_BROWSER_REDIRECT_URIS: preserve(),
-      MAIL_OAUTH_CLIENT_ID: preserve(),
-      MAIL_OAUTH_REDIRECT_URIS: preserve(),
-      MAIL_OAUTH_SCOPES: preserve(),
-      MAIL_VAULT_HMAC_KEY: preserve(),
-      MOBILE_AUTH_CALLBACK_URL: preserve(),
-      NEXT_PUBLIC_APP_URL: preserve(),
-      NODE_ENV: preserve(),
-      EMAIL_FROM: preserve(),
-      EMAIL_FROM_NAME: preserve(),
-      STALWART_ADMIN_TOKEN: preserve(),
-      STALWART_WEBHOOK_SECRET: preserve(),
-      STALWART_WEBHOOK_URL: preserve(),
-      STALWART_BASE_URL: preserve(),
-      STALWART_DEFAULT_DOMAIN: preserve(),
-      STALWART_JMAP_URL: preserve(),
-      STALWART_JMAP_USERNAME: preserve(),
-      STALWART_JMAP_PASSWORD: preserve(),
-      TRUSTED_ORIGINS: preserve(),
-    },
-  });
 
   const notifications = service("Solace Fiber Notification service", {
     source: solaceRepo,
@@ -258,14 +168,12 @@ export default defineRailway(() => {
     },
   });
 
-  const solace = group("Solace", [web, api]);
   const mailServer = group("Mail server", [stalwartMail, postgresStalwart]);
   const notificationGroup = group("Notifications", [notifications]);
   const monitoringGroup = group("Monitoring", [monitoring]);
 
   return project("Solace", {
     resources: [
-      solace,
       mailServer,
       notificationGroup,
       monitoringGroup,

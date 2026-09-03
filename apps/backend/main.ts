@@ -5,12 +5,8 @@ import {
   oauthProviderAuthServerMetadata,
   oauthProviderOpenIdConfigMetadata,
 } from "@better-auth/oauth-provider";
-import { createLogger, installGlobalConsoleLogger } from "@workspace/logger";
-import {
-  auth,
-  ensureMailOAuthClients,
-  isMailOauthEnabled,
-} from "./lib/auth";
+import { installGlobalConsoleLogger } from "@workspace/logger";
+import { auth, isMailOauthEnabled } from "./lib/auth";
 import { BETTER_AUTH_BASE_PATH } from "./lib/auth-constants";
 import { env } from "./lib/env";
 import { e2eeRoutes } from "./routes/e2ee";
@@ -36,12 +32,10 @@ import {
   realtimeMailRoutes,
 } from "./routes/realtime-mail";
 import { createStalwartWebhookRoutes } from "./routes/stalwart-webhook";
-import { createStalwartAdminClient } from "./lib/stalwart-admin";
 import { StalwartWebhookService } from "./services/stalwart-webhook.service";
 import { prisma } from "./lib/prisma";
 import { createBetterAuthPlugin } from "./lib/better-auth-plugin";
 import { handleApiError } from "./lib/errors";
-import { errorLogDetails } from "./lib/log-sanitization";
 import { requestContext } from "./lib/request-context";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
 import { sessionCookieAuthSecurity } from "./lib/openapi";
@@ -51,9 +45,7 @@ import { routeModels } from "./contracts";
 
 installGlobalConsoleLogger("backend");
 
-const logger = createLogger("backend");
-
-const { backendUrl, frontendUrl } = env;
+const { frontendUrl } = env;
 
 function normalizePath(path: string) {
   return path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
@@ -70,10 +62,6 @@ function getLocalAuthBasePath(prefix: string): string {
   return normalizePath(BETTER_AUTH_BASE_PATH);
 }
 
-if (isMailOauthEnabled && !Manifest.isCapturing()) {
-  await ensureMailOAuthClients();
-}
-
 const oauthAuthorizationServerMetadata = isMailOauthEnabled
   ? oauthProviderAuthServerMetadata(auth)
   : null;
@@ -86,7 +74,7 @@ export const createAPI = (prefix = "") => {
   const localAuthBasePath = getLocalAuthBasePath(prefix);
   const calendarSyncService = CalendarSyncService.getInstance();
 
-  if (!Manifest.isCapturing()) {
+  if (!Manifest.isCapturing() && !process.env.VERCEL) {
     calendarSyncService.start();
     defaultMailRealtimeService.start();
   }
@@ -128,7 +116,7 @@ export const createAPI = (prefix = "") => {
           message: "Mail OAuth is not enabled.",
         };
       }
-    
+
       return patchOauthMetadataResponse(
         await oauthAuthorizationServerMetadata(request),
       );
@@ -148,7 +136,7 @@ export const createAPI = (prefix = "") => {
           message: "Mail OAuth is not enabled.",
         };
       }
-    
+
       return patchOauthMetadataResponse(
         await oauthAuthorizationServerMetadata(request),
       );
@@ -168,7 +156,7 @@ export const createAPI = (prefix = "") => {
           message: "Mail OAuth is not enabled.",
         };
       }
-    
+
       return patchOauthMetadataResponse(
         await oauthOpenIdConfiguration(request),
       );
@@ -188,7 +176,7 @@ export const createAPI = (prefix = "") => {
           message: "Mail OAuth is not enabled.",
         };
       }
-    
+
       return patchOauthMetadataResponse(
         await oauthOpenIdConfiguration(request),
       );
@@ -241,11 +229,11 @@ export const createAPI = (prefix = "") => {
       const session = await auth.api.getSession({
         headers: request.headers as Headers,
       });
-    
+
       if (!session) {
         return status(401, unauthorizedBody());
       }
-    
+
       return session.user;
     })
     .get("/test", {
@@ -288,7 +276,6 @@ export const createAPI = (prefix = "") => {
     .use(inviteRoutes);
 };
 
-const port = env.port;
 export const app = createAPI("/api");
 const calendarSyncService = CalendarSyncService.getInstance();
 
@@ -313,28 +300,5 @@ app.get("/", ({ query, redirect }) => {
   return redirect(frontendUrl);
 });
 
-if (!Manifest.isCapturing() && import.meta.main) {
-  app.listen(port, () => {
-    logger.ok(`Server is running on ${backendUrl}`);
-    logger.info("Auth runtime config", {
-      backendUrl,
-      frontendUrl,
-      cookieSameSite: process.env.AUTH_COOKIE_SAME_SITE || "lax",
-      nodeEnv: process.env.NODE_ENV || "development",
-    });
-
-    if (env.stalwartWebhookSecret && env.stalwartAdminToken) {
-      void createStalwartAdminClient()
-        .ensureMailIngestWebhook({
-          url: env.stalwartWebhookUrl,
-          secret: env.stalwartWebhookSecret,
-        })
-        .catch((error) => {
-          logger.warn(
-            "Failed to ensure Stalwart mail ingest webhook",
-            errorLogDetails(error),
-          );
-        });
-    }
-  });
-}
+// Vercel / serverless: export only. Local process boot lives in `serve.ts`.
+export default app;

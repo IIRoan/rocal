@@ -74,6 +74,7 @@ export const calendarsRoutes = new Elysia({
       })
 
       .delete("/:id", {
+        parse: "none",
         params: RouteModel.calendar.idParams,
         query: RouteModel.calendar.deleteQuery,
         detail: {

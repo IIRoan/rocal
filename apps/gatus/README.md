@@ -33,30 +33,24 @@ Do not point a Stalwart WebHook at `DISCORD_WEBHOOK_URL`. Discord expects its ow
 
 ## Monitors
 
-| Group | Endpoint | What it proves |
-|-------|----------|----------------|
-| Application | `solace.onl` | Web frontend |
-| Application | `api.solace.onl/api/health` | Backend API |
-| Mail | `mail.solace.onl/jmap/session` | End-to-end mail path |
-| Mail | `mail.solace.onl/slot-manager/status` | Blue/green tunnels |
+Intervals are intentionally relaxed for **Vercel Hobby** (Application) and to avoid
+hammering Stalwart with duplicate Prometheus scrapes.
+
+| Group | Endpoint | Interval | What it proves |
+|-------|----------|----------|----------------|
+| Application | `solace.onl` | 5m | Web frontend |
+| Application | `api.solace.onl/api/health` | 5m | Backend API |
+| Mail | `mail.solace.onl/jmap/session` | 2m | End-to-end mail path |
+| Mail | `mail.solace.onl/slot-manager/status` | 2m | Blue/green tunnels |
 
 ### Stalwart Metrics group
 
-All monitors scrape `mail.solace.onl/slot-manager/metrics/prometheus` (URL hidden on the status page).
-The slot manager proxies to the **active** Railway slot directly, so deploy cutover does not
-round-robin scrapes to a warming container. Conditions use gauges and `# HELP`/`# TYPE` lines
-instead of event counters (e.g. `smtp_iprev_pass`) that disappear until traffic hits the new slot.
-Enable Prometheus in the Stalwart WebUI and set `prometheus_user` / `prometheus_password` on Gatus.
+Both monitors scrape `mail.solace.onl/slot-manager/metrics/prometheus` once each
+(every **5m**). Conditions are combined so we do not fan out 6–8 scrapes of the same URL.
 
 | Monitor | What it checks |
 |---------|----------------|
-| `stalwart-exporter` | Prometheus endpoint alive |
-| `stalwart-smtp-receive` | Inbound SMTP gauge + request-time histogram registered |
-| `stalwart-smtp-antispam` | SMTP + delivery gauge metrics registered |
-| `stalwart-delivery` | Outbound delivery connection gauge |
-| `stalwart-imap` | IMAP active connection gauge |
-| `stalwart-jmap-http` | HTTP/JMAP connection and request metrics |
-| `stalwart-store` | User/domain count gauges |
+| `stalwart-metrics` | Exporter alive + SMTP/delivery/IMAP/HTTP/store gauges registered |
 | `stalwart-error-counters` | Store I/O present; fails if unexpected/S3/SMTP-concurrency/calendar error counters appear |
 
 These verify that metric families are being exported. Counter **values** and threshold
