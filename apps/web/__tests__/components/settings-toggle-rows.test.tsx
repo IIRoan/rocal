@@ -13,11 +13,29 @@ jest.mock("lucide-react", () => {
     ChevronRight: Icon,
     Key: Icon,
     Mail: Icon,
+    Search: Icon,
     Send: Icon,
     Shield: Icon,
     Smartphone: Icon,
   };
 });
+
+jest.mock("../../hooks/use-private-search-index-controls", () => ({
+  usePrivateSearchIndexControls: () => ({
+    enabled: false,
+    paused: false,
+    consent: "undecided",
+    hasMadeChoice: false,
+    isClearing: false,
+    enable: jest.fn(),
+    disable: jest.fn(),
+    accept: jest.fn(),
+    decline: jest.fn(),
+    pause: jest.fn(),
+    resume: jest.fn(),
+    clearIndex: jest.fn(),
+  }),
+}));
 
 jest.mock("sonner", () => ({
   toast: {

@@ -1,4 +1,8 @@
 import { createLogger } from "@workspace/logger";
+import type {
+  IStalwartWebhookService,
+  StalwartWebhookHandleResult,
+} from "../contracts/stalwart-webhook.contract";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import {
   parseStalwartMailIngestEvents,
@@ -26,7 +30,7 @@ type ResolvedDirectoryEntry = {
   email: string;
 };
 
-export class StalwartWebhookService {
+export class StalwartWebhookService implements IStalwartWebhookService {
   constructor(
     private readonly input: {
       prisma: WebhookPrisma;
@@ -37,11 +41,9 @@ export class StalwartWebhookService {
     },
   ) {}
 
-  async handlePayload(payload: StalwartWebhookPayload): Promise<{
-    processedCount: number;
-    enqueuedCount: number;
-    ignoredCount: number;
-  }> {
+  async handlePayload(
+    payload: StalwartWebhookPayload,
+  ): Promise<StalwartWebhookHandleResult> {
     const ingestEvents = parseStalwartMailIngestEvents(payload);
     let enqueuedCount = 0;
 

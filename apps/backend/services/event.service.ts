@@ -363,7 +363,7 @@ export class EventService implements IEventService {
         allDay: mapped.allDay,
         timezone: mapped.timezone,
         recurrence: mapped.recurrence,
-        ...(encrypted && mapped.reminder == null
+        ...(encrypted && (mapped.reminder ?? null) === null
           ? {}
           : { reminder: mapped.reminder }),
         calendarId,

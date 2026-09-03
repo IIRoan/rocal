@@ -3,7 +3,7 @@ import { env } from "../lib/env";
 import { RateLimitError } from "../lib/errors";
 import { verifyStalwartWebhookSignature } from "../lib/stalwart-webhook-verify";
 import { stalwartWebhookPayloadSchema } from "../lib/stalwart-webhook";
-import { StalwartWebhookService } from "../services/stalwart-webhook.service";
+import type { StalwartWebhookService } from "../services/stalwart-webhook.service";
 
 export const STALWART_WEBHOOK_MAX_BODY_BYTES = 256 * 1024;
 const STALWART_WEBHOOK_RATE_LIMIT = { requests: 120, windowMs: 60_000 };

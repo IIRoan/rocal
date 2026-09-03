@@ -16,6 +16,27 @@ write_base_config() {
 	cp /etc/gatus/config.default.yaml /data/config.yaml
 }
 
+inject_theme_css() {
+	if [ ! -f /etc/gatus/theme.css ]; then
+		return 0
+	fi
+
+	python3 - <<'PY'
+import pathlib
+
+config_path = pathlib.Path("/data/config.yaml")
+theme_path = pathlib.Path("/etc/gatus/theme.css")
+marker = "__THEME_CSS_PLACEHOLDER__"
+config = config_path.read_text()
+theme = theme_path.read_text().rstrip("\n")
+if marker not in config:
+    raise SystemExit("theme placeholder missing from config")
+indented = "\n".join(f"    {line}" for line in theme.splitlines())
+config = config.replace(f"    {marker}", indented)
+config_path.write_text(config)
+PY
+}
+
 inject_basic_auth() {
 	if [ -z "${GATUS_ADMIN_USERNAME:-}" ] || [ -z "${GATUS_ADMIN_PASSWORD:-}" ]; then
 		return 0
@@ -104,6 +125,7 @@ append_vps_ssh_endpoints() {
 }
 
 write_base_config
+inject_theme_css
 inject_basic_auth
 inject_prometheus_auth
 

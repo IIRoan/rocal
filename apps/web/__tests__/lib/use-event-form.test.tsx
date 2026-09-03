@@ -273,13 +273,17 @@ describe("useEventForm reminder hydration", () => {
       reminder: 30,
       recurrence: null,
     });
-    expect(mockUpdateEventNotifications).toHaveBeenCalledWith("event-1", [
-      {
-        isEnabled: true,
-        minutesBefore: 30,
-        notificationType: "email",
-      },
-    ]);
+    expect(mockUpdateEventNotifications).toHaveBeenCalledWith(
+      "event-1",
+      [
+        {
+          isEnabled: true,
+          minutesBefore: 30,
+          notificationType: "email",
+        },
+      ],
+      { displayTitle: "Reminder reshuffle" },
+    );
   });
 
   it("clears the last reminder without requiring manual legacy reminder resets", async () => {
@@ -342,7 +346,9 @@ describe("useEventForm reminder hydration", () => {
       reminder: null,
       recurrence: null,
     });
-    expect(mockUpdateEventNotifications).toHaveBeenCalledWith("event-1", []);
+    expect(mockUpdateEventNotifications).toHaveBeenCalledWith("event-1", [], {
+      displayTitle: "Last reminder removal",
+    });
   });
 
   it("clears persisted notifications when the last reminder is removed and the event is saved", async () => {
@@ -412,7 +418,9 @@ describe("useEventForm reminder hydration", () => {
       reminder: null,
       recurrence: null,
     });
-    expect(mockUpdateEventNotifications).toHaveBeenCalledWith("event-1", []);
+    expect(mockUpdateEventNotifications).toHaveBeenCalledWith("event-1", [], {
+      displayTitle: "Manon winkel",
+    });
 
     const cachedEvents =
       queryClient.getQueryData<readonly any[]>(eventsQueryKey);
