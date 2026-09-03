@@ -12,13 +12,6 @@ import {
 import { createRoot, type Root } from "react-dom/client";
 import type { NativePasskeyBridgeActionResult } from "@/lib/native-passkey-bridge-action";
 
-const mockRunNativePasskeyBridgeAction = jest.fn(
-  async (): Promise<NativePasskeyBridgeActionResult> => ({
-    status: "error",
-    message: "not mocked",
-  }),
-);
-
 jest.mock("@workspace/logger", () => ({
   createLogger: () => ({
     debug: jest.fn(),
@@ -53,10 +46,20 @@ jest.mock("@workspace/ui/components/ui/button", () => ({
 }));
 
 jest.mock("@/lib/native-passkey-bridge-action", () => ({
-  runNativePasskeyBridgeAction: mockRunNativePasskeyBridgeAction,
+  runNativePasskeyBridgeAction: jest.fn(
+    async (): Promise<NativePasskeyBridgeActionResult> => ({
+      status: "error",
+      message: "not mocked",
+    }),
+  ),
 }));
 
+import { runNativePasskeyBridgeAction } from "@/lib/native-passkey-bridge-action";
 import NativePasskeyBridgePage from "../../app/passkey/native/page";
+
+const mockRunNativePasskeyBridgeAction = jest.mocked(
+  runNativePasskeyBridgeAction,
+);
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -64,6 +67,7 @@ import NativePasskeyBridgePage from "../../app/passkey/native/page";
 
 let container: HTMLDivElement;
 let root: Root;
+let bridgeTokenCounter = 0;
 
 function setBridgeSearch(search: string) {
   window.history.replaceState({}, "", `/passkey/native${search}`);
@@ -71,6 +75,7 @@ function setBridgeSearch(search: string) {
 
 describe("NativePasskeyBridgePage", () => {
   beforeEach(() => {
+    bridgeTokenCounter += 1;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -82,7 +87,7 @@ describe("NativePasskeyBridgePage", () => {
         }),
     );
     setBridgeSearch(
-      "?mode=sign-in&callbackURL=solace%3A%2F%2Fcalendar&bridgeToken=token-1",
+      `?mode=sign-in&callbackURL=solace%3A%2F%2Fcalendar&bridgeToken=token-${bridgeTokenCounter}`,
     );
   });
 

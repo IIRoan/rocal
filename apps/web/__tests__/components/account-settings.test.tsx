@@ -27,6 +27,12 @@ jest.mock("lucide-react", () => {
   };
 });
 
+jest.mock("@workspace/ui/components/ui/blobatar-avatar", () => ({
+  BlobatarAvatar: ({ email }: { email?: string }) => (
+    <div data-testid="blobatar-avatar">{email}</div>
+  ),
+}));
+
 import { AccountSettings } from "../../components/command-palette/account-settings";
 
 (
