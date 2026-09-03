@@ -133,4 +133,5 @@ export * from "./recurring.contract";
 export * from "./route-model-names";
 export * from "./settings.contract";
 export * from "./recent-contacts.contract";
+export * from "./stalwart-webhook.contract";
 export * from "./subscription.contract";

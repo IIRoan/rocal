@@ -6,8 +6,9 @@ endpoint can show a **90-day** uptime bar (GitHub-style) instead of a short seco
 window. Deploy as a **separate Railway service** (root directory `apps/gatus`, volume at
 `/data`). `apps/gatus` must be on the GitHub `master` branch before Railway can build it.
 
-UI tokens match Solace light (`#f9f9f9` / warm brown primary) and dark (`#111` / warm cream
-primary). Theme follows the browser `prefers-color-scheme` (and the in-page toggle cookie).
+UI tokens and layout follow an [sts](https://github.com/sparanoid/sts)-inspired
+accordion list (see `theme.css`). Solace warm neutrals in light/dark; theme follows
+`prefers-color-scheme` (and the in-page toggle cookie).
 
 ## Railway variables
 
