@@ -52,7 +52,7 @@ jobs:
             exit 1
           fi
           HOST="${VPS_SSH_HOST:-mail.solace.onl}"
-          USER="${VPS_SSH_USER:-gh-cert-sync}"
+          USER="${VPS_SSH_USER:-Roan}"
           PORT="${VPS_SSH_PORT:-22}"
           echo "Deploy target: ${USER}@${HOST}:${PORT}"
 
@@ -64,8 +64,10 @@ jobs:
           chmod 600 "$KEY" "$ALLOW"
 
           SSH=(ssh -i "$KEY" -p "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes
+               -o PubkeyAcceptedAlgorithms=+ssh-rsa,rsa-sha2-512,rsa-sha2-256
                -o StrictHostKeyChecking=accept-new)
           SCP=(scp -i "$KEY" -P "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes
+               -o PubkeyAcceptedAlgorithms=+ssh-rsa,rsa-sha2-512,rsa-sha2-256
                -o StrictHostKeyChecking=accept-new)
 
           "${SCP[@]}" apps/stalwart/vps/haproxy.cfg "${USER}@${HOST}:/tmp/haproxy.cfg.new"

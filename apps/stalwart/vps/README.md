@@ -35,7 +35,7 @@ All systemd units should be enabled (`systemctl enable`) for boot.
 ### HAProxy
 
 - **Role:** Public TCP/HTTP edge; TLS on :443; PROXY v2 to frps mail backends.
-- **Ports:** 25, 80 (HTTPS redirect), 465, 993, 443. Public `/admin` and management `/api` (except `/api/discover` + `/api/auth` for mailbox login) are allowlisted via `/etc/haproxy/admin-allow.lst` on the VPS (from GitHub Environment secret `ADMIN_ALLOW_IP` on `IIRoan/rocal` `mail-vps`; never in git). Loopback Admin UI remains on `127.0.0.1:8080` via SSH tunnel.
+- **Ports:** 25, 80 (HTTPS redirect), 465, 993, 443. WebAdmin (`/admin`, `/api`, `/login`, `/auth`, …) is allowlisted via `/etc/haproxy/admin-allow.lst` (GitHub Environment secret `ADMIN_ALLOW_IP` on `IIRoan/rocal` `mail-vps`; never in git). Mailbox `/account` portal is not public. Loopback Admin UI remains on `127.0.0.1:8080` via SSH tunnel.
 - **Repo:** `vps/haproxy.cfg` → `/etc/haproxy/haproxy.cfg`
 - **Active slot:** `/etc/haproxy/stalwart-active-slot` (`blue` or `green`)
 - **TLS cert:** `/etc/haproxy/certs/mail.solace.onl.pem` (HAProxy terminates HTTPS). This file is **separate** from Stalwart’s ACME-managed certificates (used for SMTP STARTTLS on :25). Renewing Stalwart ACME does **not** update HAProxy.
@@ -165,9 +165,11 @@ GitHub Environment **`mail-vps`** (`master`/`main` only) holds:
 | `STALWART_DATABASE_URL` | Public Postgres URL (`DATABASE_PUBLIC_URL` from Railway `Postgres-stalwart`) |
 | `VPS_SSH_PRIVATE_KEY` | Private key for `gh-cert-sync` on the mail VPS |
 | `VPS_SSH_HOST` | default `mail.solace.onl` |
-| `VPS_SSH_USER` | default `gh-cert-sync` |
+| `VPS_SSH_USER` | default `Roan` |
 | `VPS_SSH_PORT` | default `22` |
-| `ADMIN_ALLOW_IP` | Operator egress IP/CIDR for public `/admin` (written to `/etc/haproxy/admin-allow.lst`; never in git) |
+| `ADMIN_ALLOW_IP` | Operator egress IP/CIDR for public `/admin` + admin OAuth surfaces (written to `/etc/haproxy/admin-allow.lst`; never in git) |
+
+Public mailbox `/account` and `/login` are blocked except for the allowlisted IP (admin OAuth only). JMAP (`/jmap`) stays public for Solace clients.
 
 HAProxy config + allowlist deploy: [`.github/workflows/sync-haproxy-cfg.yml`](../../../.github/workflows/sync-haproxy-cfg.yml) (`workflow_dispatch`).
 
