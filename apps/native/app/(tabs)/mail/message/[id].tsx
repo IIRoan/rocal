@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useColorScheme,
@@ -50,6 +49,7 @@ import { useConversationDecryptedPreviews } from "../../../../src/lib/mail/use-c
 import type { MailDecryptResult } from "../../../../src/lib/mail/mail-crypto";
 import { decryptEncryptedMessage } from "../../../../src/lib/mail/mail-sender-key";
 import { HtmlEmailView } from "../../../../src/components/mail/HtmlEmailView";
+import { MailZoomScrollView } from "../../../../src/components/mail/MailZoomScrollView";
 import { CenteredLoader } from "../../../../src/components/ui/loading";
 import { AttachmentPreviewModal } from "../../../../src/components/mail/AttachmentPreviewModal";
 import { ConversationThreadStrip } from "../../../../src/components/mail/ConversationThreadStrip";
@@ -692,7 +692,7 @@ export default function MailMessageScreen() {
         </View>
       ) : (
         <View style={styles.messageBody}>
-          <ScrollView
+          <MailZoomScrollView
             style={styles.messageScroll}
             contentContainerStyle={[
               styles.body,
@@ -824,7 +824,7 @@ export default function MailMessageScreen() {
             ) : (
               <Text style={styles.mutedText}>This message has no content.</Text>
             )}
-          </ScrollView>
+          </MailZoomScrollView>
 
           <MailBottomActionBar bottomInset={insets.bottom}>
             {archiveMailboxId ? (
