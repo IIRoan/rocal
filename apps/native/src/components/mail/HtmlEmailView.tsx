@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -35,9 +36,11 @@ try {
  *  2. Reports the resulting visual height back via postMessage so the host View
  *     can resize to exactly match the content — enabling a single outer ScrollView
  *     with no internal WebView scroll (the Vymo/auto-height approach).
+ *  3. Re-runs after images load so height stays correct (smoother scroll).
  */
 const FIT_AND_REPORT_SCRIPT = `
 (function() {
+  var lastH = 0;
   function run() {
     var dw = window.innerWidth;
     var bw = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth);
@@ -49,10 +52,22 @@ const FIT_AND_REPORT_SCRIPT = `
     }
     var rawH = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
     var h = Math.ceil(rawH * scale);
-    window.ReactNativeWebView.postMessage('h:' + h);
+    if (h > 20 && Math.abs(h - lastH) > 1) {
+      lastH = h;
+      window.ReactNativeWebView.postMessage('h:' + h);
+    }
   }
-  if (document.readyState === 'complete') { run(); }
-  else { window.addEventListener('load', run); }
+  function bind() {
+    run();
+    var imgs = document.images;
+    for (var i = 0; i < imgs.length; i++) {
+      if (!imgs[i].complete) imgs[i].addEventListener('load', run);
+    }
+    setTimeout(run, 120);
+    setTimeout(run, 400);
+  }
+  if (document.readyState === 'complete') { bind(); }
+  else { window.addEventListener('load', bind); }
   true;
 })();
 `;
@@ -135,12 +150,24 @@ export function HtmlEmailView({
         onLoad={() => setIsLoaded(true)}
         onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
         scrollEnabled={false}
+        overScrollMode="never"
+        bounces={false}
         javaScriptEnabled
         domStorageEnabled={false}
         mixedContentMode="never"
         setSupportMultipleWindows={false}
+        // Let the outer MailZoomScrollView own pinch-zoom/pan.
+        setBuiltInZoomControls={false}
+        setDisplayZoomControls={false}
+        scalesPageToFit={false}
         style={[StyleSheet.absoluteFill, { backgroundColor: bg }]}
         backgroundColor={bg}
+        {...(Platform.OS === "ios"
+          ? {
+              // Avoid WKWebView competing for the pinch recognizer.
+              allowsLinkPreview: false,
+            }
+          : {})}
       />
       {!isLoaded && (
         <View
