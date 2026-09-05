@@ -2,6 +2,9 @@
   "plugins": {
     "pstack": {
       "enabled": true
+    },
+    "vercel": {
+      "enabled": true
     }
   }
 }

@@ -106,10 +106,13 @@ Secrets: Environment **`mail-vps`** (see [HAProxy TLS cert sync](#haproxy-tls-ce
 
 ### stalwart-slot-manager
 
-- **Role:** HTTP API for active slot; triggers HAProxy runtime reconfiguration. Also proxies `GET /metrics/prometheus` to the active slot's local HTTP port so Gatus scrapes never hit the warming slot during cutover.
+- **Role:** HTTP API for active slot; triggers HAProxy runtime reconfiguration. Also proxies `GET /metrics/prometheus` to the active slot's local HTTP port so Gatus scrapes never hit the warming slot during cutover. Tracks **slot preempt** flags so a new Railway deploy can ask the incumbent to drop its warm-standby frpc before binding the inactive slot.
 - **Port:** 127.0.0.1:9081 (public via HAProxy `/slot-manager/`)
 - **Repo:** `vps/stalwart-slot-manager.py` → `/usr/local/bin/stalwart-slot-manager.py`
 - **Invokes:** `/usr/local/bin/stalwart-switch-slot` (no `.sh` suffix — see [Blue/green cutover](#bluegreen-cutover))
+- **Auth POSTs:** `/activate`, `/preempt`, `/preempt/clear`, `/lease/claim`, `/lease/reclaim`, `/lease/renew`, `/lease/release` (Bearer `SLOT_MANAGER_TOKEN`; JSON `slot` + per-container `owner`)
+- **Status:** `GET /status` reports `protocolVersion: 2`, `blueOccupied` / `greenOccupied` (null if unknown), `bluePreempted` / `greenPreempted`, and per-slot `Owner` / `PreemptOwner`
+- **State:** atomic owner-scoped records in `/run/stalwart-slot-preempt/`. Leases expire after 30 seconds; abandoned preempt requests expire after 90 seconds. Claims require a vacant frps dashboard result and no competing lease, including pending launches. Release acknowledgement follows process termination. An expired lease does not override an online proxy.
 
 ### stalwart-switch-slot
 
@@ -133,14 +136,42 @@ Secrets: Environment **`mail-vps`** (see [HAProxy TLS cert sync](#haproxy-tls-ce
 
 Railway picks the **inactive** slot (`FRPC_SLOT=auto`), starts frpc, then calls
 `POST /slot-manager/activate` **before** opening the Railway health gate. The VPS
-switch script:
+`stalwart-switch-slot` script:
 
 1. Leaves the **incumbent** at 100% weight and warms the target at 1%.
 2. Probes JMAP directly on the target frp port (`127.0.0.1:18080` or `:19080`).
-3. Confirms the public edge (`https://mail.solace.onl/jmap/session`) still works
-   while the incumbent carries traffic.
-4. Flips to exclusive weights (target 100%, incumbent 0%) and puts the old slot
-   in HAProxy maintenance.
+3. Temporarily gives both slots 100% weight, confirms target HAProxy health,
+   then checks the public edge (`https://mail.solace.onl/jmap/session`).
+4. Flips to exclusive weights (target 100%, incumbent 0%) and keeps the old slot
+   `ready` (not `maint`) so a warm standby tunnel can health-check.
+
+After promotion and the Railway health gate, `frpc-supervisor.py` claims the
+vacated slot and starts standby (`FRPC_STANDBY_ENABLED`, default on).
+`stalwart-slot-watcher` can then fail over if the active tunnel drops. Standby
+registration and retries are nonblocking, so primary/relay recovery continues.
+
+**Deploy race (dual-slot occupancy):** the live container holds both slots. The next
+deploy's inactive slot may still be the incumbent's standby. Before binding, the new
+container `POST /preempt`s that slot with its owner ID. The incumbent stops the
+inactive slot's process and acknowledges `/lease/release`, even if that process
+was originally its primary before watcher failover. The new deploy must then
+successfully `/lease/claim` before launch. A pending standby launch already holds
+a lease, so observing empty ports alone cannot let a peer bind early. Only the
+preempt owner can clear its request; claiming retains exclusive ownership after
+clear. The primary claim deadline is 60 elapsed seconds by default.
+
+The supervisor renews leases every five seconds and stops a tunnel before its
+lease expires if coordination is unavailable. Standby retries after failed binds,
+abandoned preemption, or a peer leaving; it never preempts another owner.
+`/lease/reclaim` supports a previously owned active slot after lease expiry or a
+VPS reboot, but still requires confirmed vacancy. The manager shares the watcher's
+switch lock so two promotions cannot interleave.
+
+**Deploy VPS first:** install/restart slot-manager and install the switch script,
+verify authenticated `/status` reports `protocolVersion: 2`, then deploy the
+Railway image, then Gatus. Old entrypoints can still `/activate` a slot without a
+v2 lease during this migration. New entrypoints reject old managers and missing
+tokens; they never bind on coordination failure.
 
 This avoids `<NOSRV>` / 503 windows when the old Railway container retires mid-cutover.
 Typical cutover time is ~5s.

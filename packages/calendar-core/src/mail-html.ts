@@ -13,16 +13,19 @@ export interface BuildEmailHtmlDocumentOptions {
   mobileViewport?: boolean;
 }
 
+/**
+ * Selective dark-mode rewrite for HTML mail that lacks its own
+ * prefers-color-scheme rules. Prefer remapping known light surfaces and dark
+ * text over blanket `color: inherit` — inherit + unmapped light cards produces
+ * light-on-light (and missing dark hexes produce dark-on-dark).
+ */
 export const EMAIL_AUTO_DARK_CSS = `
   @media (prefers-color-scheme: dark) {
     html, body {
       background-color: #1a1a1a !important;
       color: #e0e0e0 !important;
     }
-    div, td, th, tr, table, p, span, li, h1, h2, h3, h4, h5, h6, blockquote, section, article, header, footer {
-      background-color: inherit;
-      color: inherit;
-    }
+    /* Light / off-white surfaces → dark (match background and background-color) */
     [style*="background-color: #fff"],
     [style*="background-color: #ffffff"],
     [style*="background-color: white"],
@@ -31,20 +34,71 @@ export const EMAIL_AUTO_DARK_CSS = `
     [style*="background: #fff"],
     [style*="background: #ffffff"],
     [style*="background-color:#fff"],
-    [style*="background-color:#ffffff"] {
+    [style*="background-color:#ffffff"],
+    [style*="background:white"],
+    [style*="background: white"] {
       background-color: #1a1a1a !important;
+      color: #e0e0e0 !important;
     }
-    [style*="background-color: #f"],
-    [style*="background-color:#f"] {
-      filter: brightness(0.25) contrast(1.1);
+    [style*="background-color: #f5f5f5"],[style*="background-color:#f5f5f5"],
+    [style*="background:#f5f5f5"],[style*="background: #f5f5f5"],
+    [style*="background-color: #f8f6f2"],[style*="background-color:#f8f6f2"],
+    [style*="background:#f8f6f2"],[style*="background: #f8f6f2"],
+    [style*="background-color: #f8f8f8"],[style*="background-color:#f8f8f8"],
+    [style*="background:#f8f8f8"],[style*="background: #f8f8f8"],
+    [style*="background-color: #fafafa"],[style*="background-color:#fafafa"],
+    [style*="background:#fafafa"],[style*="background: #fafafa"],
+    [style*="background-color: #f4f1ea"],[style*="background-color:#f4f1ea"],
+    [style*="background:#f4f1ea"],[style*="background: #f4f1ea"],
+    [style*="background-color: #ece7de"],[style*="background-color:#ece7de"],
+    [style*="background:#ece7de"],[style*="background: #ece7de"],
+    [style*="background-color: #eee"],[style*="background-color:#eee"],
+    [style*="background:#eee"],[style*="background: #eee"],
+    [style*="background-color: #e0e0e0"],[style*="background-color:#e0e0e0"],
+    [style*="background:#e0e0e0"],[style*="background: #e0e0e0"],
+    [style*="background-color: #e8e0d4"],[style*="background-color:#e8e0d4"],
+    [style*="background:#e8e0d4"],[style*="background: #e8e0d4"] {
+      background-color: #2a2a2a !important;
+      color: #e0e0e0 !important;
     }
+    [style*="background-color: #fce8e6"],[style*="background-color:#fce8e6"],
+    [style*="background:#fce8e6"],[style*="background: #fce8e6"] {
+      background-color: #442c2c !important;
+      color: #f8b4b4 !important;
+    }
+    [style*="background-color: #e8f0fe"],[style*="background-color:#e8f0fe"],
+    [style*="background:#e8f0fe"],[style*="background: #e8f0fe"] {
+      background-color: #1e2a3a !important;
+      color: #8ab4f8 !important;
+    }
+    [style*="background-color: #fff8ef"],[style*="background-color:#fff8ef"],
+    [style*="background:#fff8ef"],[style*="background: #fff8ef"] {
+      background-color: #3a2e1e !important;
+      color: #f5d9a8 !important;
+    }
+    [style*="background-color: #e6f4ea"],[style*="background-color:#e6f4ea"],
+    [style*="background:#e6f4ea"],[style*="background: #e6f4ea"] {
+      background-color: #1e3a2a !important;
+      color: #81c995 !important;
+    }
+    [style*="background-color: #fef7e0"],[style*="background-color:#fef7e0"],
+    [style*="background:#fef7e0"],[style*="background: #fef7e0"] {
+      background-color: #3a341e !important;
+      color: #fdd663 !important;
+    }
+    /* Near-black / dark gray text → light (include common marketing hexes) */
     [style*="color: #000"],[style*="color:#000"],
     [style*="color: #111"],[style*="color:#111"],
-    [style*="color: #1a1a1a"],
+    [style*="color: #1a1a1a"],[style*="color:#1a1a1a"],
+    [style*="color: #1a1410"],[style*="color:#1a1410"],
     [style*="color: #202124"],[style*="color:#202124"],
     [style*="color: #2d0c0c"],[style*="color:#2d0c0c"],
+    [style*="color: #222"],[style*="color:#222"],
+    [style*="color: #333"],[style*="color:#333"],
     [style*="color: #3c4043"],[style*="color:#3c4043"],
     [style*="color: #3c4042"],[style*="color:#3c4042"],
+    [style*="color: #444"],[style*="color:#444"],
+    [style*="color: #555"],[style*="color:#555"],
     [style*="color: black"],[style*="color:black"] {
       color: #e0e0e0 !important;
     }
@@ -53,17 +107,14 @@ export const EMAIL_AUTO_DARK_CSS = `
     [style*="color: #666"],[style*="color:#666"] {
       color: #9aa0a6 !important;
     }
-    [style*="background-color: #fce8e6"],[style*="background-color:#fce8e6"] {
-      background-color: #442c2c !important; color: #f8b4b4 !important;
+    pre, code {
+      background-color: #2a2a2a !important;
+      color: #e0e0e0 !important;
+      border-color: #3a3a3a !important;
     }
-    [style*="background-color: #e8f0fe"],[style*="background-color:#e8f0fe"] {
-      background-color: #1e2a3a !important; color: #8ab4f8 !important;
-    }
-    [style*="background-color: #e6f4ea"],[style*="background-color:#e6f4ea"] {
-      background-color: #1e3a2a !important; color: #81c995 !important;
-    }
-    [style*="background-color: #fef7e0"],[style*="background-color:#fef7e0"] {
-      background-color: #3a341e !important; color: #fdd663 !important;
+    blockquote {
+      color: #9aa0a6 !important;
+      border-left-color: #555 !important;
     }
     [style*="border"] { border-color: #3a3a3a !important; }
     img { filter: brightness(0.95) contrast(1.05); }
@@ -126,12 +177,18 @@ export function buildEmailHtmlDocument({
   const quoteBorder = isDark ? "#444" : "#d4d4d4";
   const quoteColor = isDark ? "#9aa0a6" : "#666";
   const autoDarkStyles = isDark && !hasOwnDark ? `<style>${EMAIL_AUTO_DARK_CSS}</style>` : "";
+  // Lock in-page pinch zoom on native — the message ScrollView owns zoom/pan so
+  // WKWebView/Android WebView cannot steal the gesture with scroll disabled.
   const viewport = mobileViewport
-    ? `<meta name="viewport" content="width=device-width, initial-scale=1">`
+    ? `<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">`
     : "";
+  // break-word (not anywhere / word-break:break-word): break only over-long
+  // tokens, and keep each word's min-content width so table columns are not
+  // crushed to a single character (vertical "Qty"/"Total" / stacked €960.00).
+  const layoutStyles = `table{max-width:100%;table-layout:auto}td,th{overflow-wrap:break-word;word-break:normal}pre{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%}`;
   const richTextStyles = `ul,ol{margin:0 0 1em;padding-left:1.5em}ul{list-style-type:disc}ol{list-style-type:decimal}li{margin:0.25em 0}li>p{margin:0}blockquote{margin:0 0 1em;padding-left:12px;border-left:3px solid ${quoteBorder};color:${quoteColor}}a{color:${linkColor};text-decoration:underline}u{text-decoration:underline}s,strike,del{text-decoration:line-through}strong,b{font-weight:600}em,i{font-style:italic}`;
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8">${viewport}<meta name="color-scheme" content="${scheme}">${csp}<base target="_blank"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;color-scheme:${scheme}}body{background:${bg};font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;font-size:14px;line-height:1.6;padding:16px 20px;color:${fg};word-break:break-word;overflow-wrap:anywhere;overflow-x:hidden}img{max-width:100%;height:auto}${richTextStyles}p{margin:0 0 1em}p:last-child{margin:0}</style>${autoDarkStyles}</head><body>${processedHtml}</body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">${viewport}<meta name="color-scheme" content="${scheme}">${csp}<base target="_blank"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;color-scheme:${scheme}}body{background:${bg};font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;font-size:14px;line-height:1.6;padding:16px 20px;color:${fg};overflow-wrap:break-word;overflow-x:hidden}img{max-width:100%;height:auto}${layoutStyles}${richTextStyles}p{margin:0 0 1em}p:last-child{margin:0}</style>${autoDarkStyles}</head><body>${processedHtml}</body></html>`;
 }
 
 function extractBodyHtml(html: string): string {
