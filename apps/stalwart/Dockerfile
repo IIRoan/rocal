@@ -23,6 +23,7 @@ RUN apt-get update \
     && chown -R stalwart:stalwart /var/log/stalwart /etc/stalwart /var/stalwart/blobs /usr/local/share/stalwart
 
 COPY railway-entrypoint.sh /usr/local/bin/railway-entrypoint.sh
+COPY frpc-supervisor.py /usr/local/bin/frpc-supervisor.py
 COPY stalwart/plan /usr/local/share/stalwart/plan
 COPY stalwart/cli-schema.json /usr/local/share/stalwart/cli-schema.json
 COPY stalwart/cli-schema.latest /usr/local/share/stalwart/cli-schema.latest

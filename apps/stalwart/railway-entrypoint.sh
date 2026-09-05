@@ -7,14 +7,20 @@ export HOME="${HOME:-/tmp}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${HOME}/.cache}"
 
 FRPC_LOG_FILE="${FRPC_LOG_FILE:-/tmp/frpc.log}"
+FRPC_STANDBY_LOG_FILE="${FRPC_STANDBY_LOG_FILE:-/tmp/frpc-standby.log}"
 FRPC_RELAY_LOG_FILE="${FRPC_RELAY_LOG_FILE:-/tmp/frpc-relay.log}"
 FRPC_RELAY_STCP_KEY="${FRPC_RELAY_STCP_KEY:-relay-stcp-secret}"
 FRPC_RELAY_LOCAL_PORT="${FRPC_RELAY_LOCAL_PORT:-2525}"
+FRPC_STANDBY_ENABLED="${FRPC_STANDBY_ENABLED:-true}"
 RELAY_ROUTE_ID="${RELAY_ROUTE_ID:-ivnbzc1aaba9}"
 STALWART_HTTP_PORT="${STALWART_HTTP_PORT:-8080}"
 HEALTH_PORT="${PORT:-8090}"
 HEALTH_STATE_PATH="${HEALTH_STATE_PATH:-/tmp/railway-health.json}"
 PG_POOL_MAX_CONNECTIONS="${PG_POOL_MAX_CONNECTIONS:-6}"
+FRPC_STATE_PATH="${FRPC_STATE_PATH:-/tmp/frpc-state.json}"
+FRPC_SUPERVISOR_PID=""
+FRPC_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+export FRPC_OWNER FRPC_STATE_PATH
 
 log() {
 	printf '%s [%s] %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$1" "$2" >&2
@@ -84,51 +90,6 @@ json_get() {
 	printf '%s\n' "$2" | sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p"
 }
 
-json_get_bool() {
-	printf '%s\n' "$2" | sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\\(true\\|false\\).*/\\1/p"
-}
-
-fetch_slot_status() {
-	if [ -n "${SLOT_MANAGER_TOKEN:-}" ]; then
-		curl -fsS --connect-timeout 3 --max-time 5 \
-			-H "Authorization: Bearer ${SLOT_MANAGER_TOKEN}" \
-			"${SLOT_MANAGER_URL:-https://mail.solace.onl/slot-manager}/status" \
-			2>/dev/null || true
-		return 0
-	fi
-
-	curl -fsS --connect-timeout 3 --max-time 5 \
-		"${SLOT_MANAGER_URL:-https://mail.solace.onl/slot-manager}/active" \
-		2>/dev/null || true
-}
-
-slot_occupied() {
-	slot="$1"
-	status="$2"
-	key="${slot}Occupied"
-	value="$(json_get_bool "$key" "$status")"
-	[ "$value" = "true" ]
-}
-
-wait_for_slot_vacant() {
-	slot="$1"
-	[ -n "${SLOT_MANAGER_TOKEN:-}" ] || return 0
-
-	i=0
-	max_wait="${SLOT_VACANT_TIMEOUT_SECONDS:-180}"
-	while [ "$i" -lt "$max_wait" ]; do
-		status="$(fetch_slot_status)"
-		if [ -n "$status" ] && ! slot_occupied "$slot" "$status"; then
-			log info "Slot ${slot} tunnel is vacant on VPS."
-			return 0
-		fi
-		i=$((i + 1))
-		sleep 2
-	done
-
-	log warn "Slot ${slot} still occupied after ${max_wait}s; starting frpc anyway."
-}
-
 resolve_slot() {
 	FRPC_SLOT="${FRPC_SLOT:-auto}"
 
@@ -146,9 +107,7 @@ resolve_slot() {
 		blue) FRPC_SLOT=green ;;
 		green) FRPC_SLOT=blue ;;
 		*)
-			FRPC_SLOT=blue
-			log warn "Could not read active slot; defaulting to blue."
-			return 0
+			die "Could not read active slot; refusing to guess a slot."
 			;;
 	esac
 
@@ -176,13 +135,17 @@ write_store_config() {
 EOF
 }
 
-write_frpc_config() {
-	FRPC_CONFIG="${FRPC_CONFIG:-/tmp/frpc.toml}"
-	FRPC_PROXY_SUFFIX=""
-	case "$FRPC_SLOT" in
+other_slot() {
+	case "$1" in
+		blue) printf '%s\n' green ;;
+		green) printf '%s\n' blue ;;
+		*) return 1 ;;
+	esac
+}
+
+frpc_slot_ports() {
+	case "$1" in
 		blue)
-			suffix=blue
-			FRPC_PROXY_SUFFIX=blue
 			smtp=10025
 			subs=10465
 			subm=10587
@@ -191,8 +154,6 @@ write_frpc_config() {
 			admin=18080
 			;;
 		green)
-			suffix=green
-			FRPC_PROXY_SUFFIX=green
 			smtp=11025
 			subs=11465
 			subm=11587
@@ -200,21 +161,39 @@ write_frpc_config() {
 			https=11443
 			admin=19080
 			;;
-		*) die "FRPC_SLOT must be blue or green." ;;
+		*) return 1 ;;
 	esac
+}
 
-	cat > "$FRPC_CONFIG" <<EOF
+write_frpc_config() {
+	slot="$1"
+	config_path="$2"
+	suffix="$slot"
+	frpc_slot_ports "$slot" || die "FRPC slot must be blue or green (got ${slot})."
+	case "$slot" in blue) admin_port=7400 ;; green) admin_port=7401 ;; esac
+
+	cat > "$config_path" <<EOF
 serverAddr = "${FRPS_ADDR}"
 serverPort = ${FRPS_PORT:-7000}
+loginFailExit = false
+webServer.addr = "127.0.0.1"
+webServer.port = ${admin_port}
 
 [auth]
 method = "token"
 token = "${FRPC_TOKEN}"
+
+[transport]
+poolCount = 2
+tcpMux = true
+tcpMuxKeepaliveInterval = 10
+dialServerTimeout = 10
+dialServerKeepAlive = 60
 EOF
 
 	# HAProxy already sends PROXY v2; do not add a second header here.
 	if [ "$RECOVERY_MODE" != "true" ]; then
-		cat >> "$FRPC_CONFIG" <<EOF
+		cat >> "$config_path" <<EOF
 
 [[proxies]]
 name = "smtp-${suffix}"
@@ -246,7 +225,7 @@ remotePort = ${subm}
 EOF
 	fi
 
-	cat >> "$FRPC_CONFIG" <<EOF
+	cat >> "$config_path" <<EOF
 
 [[proxies]]
 name = "https-${suffix}"
@@ -294,17 +273,13 @@ state = {
     "ready": ready,
     "recovery_mode": os.environ.get("RECOVERY_MODE") == "true",
     "stalwart_pid": int(os.environ.get("STALWART_PID", "0") or 0),
-    "frpc_pid": int(os.environ.get("FRPC_PID", "0") or 0),
-    "frpc_relay_pid": int(os.environ.get("FRPC_RELAY_PID", "0") or 0),
+    "frpc_state_path": os.environ.get("FRPC_STATE_PATH", "/tmp/frpc-state.json"),
     "http_port": int(os.environ.get("STALWART_HTTP_PORT", "8080")),
     "relay_port": int(os.environ.get("FRPC_RELAY_LOCAL_PORT", "2525")),
-    "frpc_log": os.environ.get("FRPC_LOG_FILE", "/tmp/frpc.log"),
-    "required_proxies": [
-        proxy for proxy in os.environ.get("FRPC_REQUIRED_PROXIES", "").split() if proxy
-    ],
 }
-with open(path, "w", encoding="utf-8") as handle:
+with open(path + ".tmp", "w", encoding="utf-8") as handle:
     json.dump(state, handle)
+os.replace(path + ".tmp", path)
 PY
 }
 
@@ -316,6 +291,7 @@ import json
 import os
 import socket
 import threading
+import time
 
 port = int(os.environ["HEALTH_PORT"])
 state_path = os.environ["HEALTH_STATE_PATH"]
@@ -362,39 +338,30 @@ def port_open(port):
         return sock.connect_ex(("127.0.0.1", int(port))) == 0
 
 
-def frpc_proxies_ready(state):
-    log_path = state.get("frpc_log")
-    required = state.get("required_proxies") or []
-    if not log_path or not required:
-        return False
-    try:
-        with open(log_path, encoding="utf-8") as handle:
-            content = handle.read()
-    except OSError:
-        return False
-    for proxy in required:
-        found = False
-        for line in content.splitlines():
-            if proxy in line and "start proxy success" in line:
-                found = True
-                break
-        if not found:
-            return False
-    return True
-
-
 def ready():
     state = load_state()
     if not state.get("ready"):
         return False
-    for key in ("stalwart_pid", "frpc_pid", "frpc_relay_pid"):
-        if not pid_alive(state.get(key)):
-            return False
+    if not pid_alive(state.get("stalwart_pid")):
+        return False
+    try:
+        with open(state["frpc_state_path"], encoding="utf-8") as handle:
+            tunnels = json.load(handle)
+    except (OSError, ValueError, KeyError):
+        return False
+    if time.monotonic() - tunnels.get("updated", 0) > 15:
+        return False
+    if not pid_alive(tunnels.get("supervisor_pid")):
+        return False
+    relay = tunnels.get("relay", {})
+    if not relay.get("ready") or not pid_alive(relay.get("pid")):
+        return False
+    if not any(tunnel.get("ready") and pid_alive(tunnel.get("pid"))
+               for tunnel in tunnels.get("slots", {}).values()):
+        return False
     for port in (25, state.get("http_port", 8080), state.get("relay_port", 2525)):
         if not port_open(port):
             return False
-    if not state.get("recovery_mode") and not frpc_proxies_ready(state):
-        return False
     return True
 
 
@@ -489,17 +456,6 @@ detect_container_ip() {
 	die "Could not detect container private IP for relay route."
 }
 
-wait_for_relay_port() {
-	i=0
-	while [ "$i" -lt 30 ]; do
-		if port_listening "${FRPC_RELAY_LOCAL_PORT}"; then
-			return 0
-		fi
-		i=$((i + 1))
-		sleep 1
-	done
-	die "Relay STCP visitor did not open :${FRPC_RELAY_LOCAL_PORT}."
-}
 
 stalwart_management_url() {
 	# Stalwart HTTP is on the container private IP, not loopback.
@@ -631,55 +587,19 @@ apply_stalwart_plan() {
 	die "Could not apply Stalwart config plan via ${public_url}, ${private_url}, or ${ipv4_loopback_url}."
 }
 
-wait_for_frpc_proxies() {
-	[ "$RECOVERY_MODE" = "true" ] && return 0
-
-	FRPC_REQUIRED_PROXIES="smtp-${FRPC_PROXY_SUFFIX} https-${FRPC_PROXY_SUFFIX}"
-	export FRPC_REQUIRED_PROXIES
-
-	i=0
-	max_wait="${FRPC_READY_TIMEOUT_SECONDS:-120}"
-	while [ "$i" -lt "$max_wait" ]; do
-		ready=true
-		for proxy in $FRPC_REQUIRED_PROXIES; do
-			if ! grep -q "$proxy" "$FRPC_LOG_FILE" 2>/dev/null \
-				|| ! grep "$proxy" "$FRPC_LOG_FILE" 2>/dev/null | grep -q "start proxy success"; then
-				ready=false
-				break
-			fi
-		done
-		if [ "$ready" = "true" ]; then
-			log info "frpc proxies online: ${FRPC_REQUIRED_PROXIES}."
-			return 0
-		fi
-		i=$((i + 1))
-		sleep 1
-	done
-
-	tail -n 20 "$FRPC_LOG_FILE" >&2 || true
-	die "frpc did not register required proxies within ${max_wait}s."
-}
-
 mark_health_ready() {
-	export STALWART_PID FRPC_PID FRPC_RELAY_PID STALWART_HTTP_PORT FRPC_RELAY_LOCAL_PORT
-	export FRPC_LOG_FILE FRPC_REQUIRED_PROXIES
-	export RECOVERY_MODE="${RECOVERY_MODE}"
+	export STALWART_PID STALWART_HTTP_PORT FRPC_RELAY_LOCAL_PORT RECOVERY_MODE
 	write_health_state true
 	log info "Railway health gate open (Stalwart + frpc + relay ready)."
 }
 
 activate_slot() {
-	[ -n "${SLOT_MANAGER_TOKEN:-}" ] || {
-		log warn "SLOT_MANAGER_TOKEN unset; VPS slot promotion relies on watcher failover."
-		return 0
-	}
-
 	log info "Requesting VPS promotion for slot=${FRPC_SLOT}."
 	if curl -fsS --connect-timeout 5 --max-time 90 \
 		-X POST "${SLOT_MANAGER_URL:-https://mail.solace.onl/slot-manager}/activate" \
 		-H "Authorization: Bearer ${SLOT_MANAGER_TOKEN}" \
 		-H "Content-Type: application/json" \
-		-d "{\"slot\":\"${FRPC_SLOT}\"}" >/dev/null; then
+		-d "{\"slot\":\"${FRPC_SLOT}\",\"owner\":\"${FRPC_OWNER}\"}" >/dev/null; then
 		log info "VPS promoted slot=${FRPC_SLOT}."
 		return 0
 	fi
@@ -688,24 +608,45 @@ activate_slot() {
 }
 
 start_frpc() {
-	wait_for_slot_vacant "$FRPC_SLOT"
-	write_frpc_config
-	: > "$FRPC_LOG_FILE"
-	log info "Starting frpc -> ${FRPS_ADDR}:${FRPS_PORT:-7000} slot=${FRPC_SLOT}."
-	/usr/local/bin/frpc -c "${FRPC_CONFIG:-/tmp/frpc.toml}" >>"$FRPC_LOG_FILE" 2>&1 &
-	FRPC_PID=$!
-	log info "frpc pid=${FRPC_PID}."
-
+	FRPC_CONFIG="${FRPC_CONFIG:-/tmp/frpc.toml}"
+	FRPC_STANDBY_CONFIG="${FRPC_STANDBY_CONFIG:-/tmp/frpc-standby.toml}"
+	write_frpc_config "$FRPC_SLOT" "$FRPC_CONFIG"
+	write_frpc_config "$(other_slot "$FRPC_SLOT")" "$FRPC_STANDBY_CONFIG"
 	write_frpc_relay_config
-	: > "$FRPC_RELAY_LOG_FILE"
-	log info "Starting relay STCP visitor on 0.0.0.0:${FRPC_RELAY_LOCAL_PORT}."
-	/usr/local/bin/frpc -c "${FRPC_RELAY_CONFIG:-/tmp/frpc-relay.toml}" >>"$FRPC_RELAY_LOG_FILE" 2>&1 &
-	FRPC_RELAY_PID=$!
-	log info "frpc relay visitor pid=${FRPC_RELAY_PID}."
-	wait_for_relay_port
-	wait_for_frpc_proxies
-	apply_stalwart_plan
-	update_relay_route || die "Relay route update failed; refusing to open health gate."
+	export FRPC_SLOT RECOVERY_MODE FRPC_LOG_FILE FRPC_STANDBY_LOG_FILE FRPC_RELAY_LOG_FILE
+	export FRPC_CONFIG FRPC_STANDBY_CONFIG
+	export FRPC_RELAY_CONFIG FRPC_RELAY_LOCAL_PORT FRPC_STANDBY_ENABLED HEALTH_STATE_PATH
+	python3 /usr/local/bin/frpc-supervisor.py &
+	FRPC_SUPERVISOR_PID=$!
+
+	# Leases and children remain supervised during plan apply and promotion.
+	while kill -0 "$FRPC_SUPERVISOR_PID" 2>/dev/null; do
+		if python3 - "$FRPC_STATE_PATH" "$FRPC_OWNER" <<'PY'
+import json
+import sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        state = json.load(handle)
+    sys.exit(0 if state.get("boot_ready") and state.get("owner") == sys.argv[2] else 1)
+except (OSError, ValueError):
+    sys.exit(1)
+PY
+		then
+			apply_stalwart_plan
+			update_relay_route || die "Relay route update failed; refusing to open health gate."
+			return 0
+		fi
+		sleep 1
+	done
+	die "frpc supervisor exited before boot readiness."
+}
+
+cleanup() {
+	trap - EXIT TERM INT
+	for child in "${FRPC_SUPERVISOR_PID:-}" "${STALWART_PID:-}" "${HEALTH_PID:-}"; do
+		[ -z "$child" ] || kill "$child" 2>/dev/null || true
+	done
+	[ -z "${FRPC_SUPERVISOR_PID:-}" ] || wait "$FRPC_SUPERVISOR_PID" 2>/dev/null || true
 }
 
 # --- main ---
@@ -713,6 +654,9 @@ start_frpc() {
 [ -n "$PGHOST" ] && [ -n "$PGUSER" ] && [ -n "$PGPASSWORD" ] || die "Missing PostgreSQL credentials."
 
 [ -n "${FRPS_ADDR:-}" ] && [ -n "${FRPC_TOKEN:-}" ] || die "FRPS_ADDR and FRPC_TOKEN are required."
+[ -n "${SLOT_MANAGER_TOKEN:-}" ] || die "SLOT_MANAGER_TOKEN is required for safe slot coordination."
+trap cleanup EXIT
+trap 'exit 0' TERM INT
 
 write_store_config
 prepare_blob_volume
@@ -745,15 +689,8 @@ while :; do
 	if ! kill -0 "$HEALTH_PID" 2>/dev/null; then
 		die "Health listener exited."
 	fi
-	if ! kill -0 "$FRPC_PID" 2>/dev/null; then
-		write_health_state false
-		tail -n 20 "$FRPC_LOG_FILE" >&2 || true
-		die "frpc exited."
-	fi
-	if ! kill -0 "$FRPC_RELAY_PID" 2>/dev/null; then
-		write_health_state false
-		tail -n 20 "$FRPC_RELAY_LOG_FILE" >&2 || true
-		die "frpc relay visitor exited."
+	if ! kill -0 "$FRPC_SUPERVISOR_PID" 2>/dev/null; then
+		die "frpc supervisor exited."
 	fi
 	sleep 5
 done
