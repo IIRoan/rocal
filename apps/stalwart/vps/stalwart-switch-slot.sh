@@ -221,13 +221,13 @@ rollback_finalize() {
 		blue)
 			set_exclusive_weights green
 			set_slot_state green ready
-			set_slot_state blue maint
+			set_slot_state blue ready
 			printf '%s\n' green >"$ACTIVE_SLOT_FILE"
 			;;
 		green)
 			set_exclusive_weights blue
 			set_slot_state blue ready
-			set_slot_state green maint
+			set_slot_state green ready
 			printf '%s\n' blue >"$ACTIVE_SLOT_FILE"
 			;;
 	esac
@@ -255,7 +255,7 @@ finalize_active_slot() {
 		return 1
 	fi
 
-	set_slot_state "$incumbent_slot" maint
+	set_slot_state "$incumbent_slot" ready
 	printf '%s\n' "$target_slot" | tee "$ACTIVE_SLOT_FILE" >/dev/null
 }
 

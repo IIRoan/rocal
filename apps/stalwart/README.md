@@ -89,7 +89,7 @@ sequenceDiagram
 ```
 
 HAProxy routes to **blue** or **green** frps ports based on
-`/etc/haproxy/stalwart-active-slot`. Railway's `FRPC_SLOT=auto` picks the **inactive** side so a new deploy tunnels up before the VPS switches traffic.
+`/etc/haproxy/stalwart-active-slot`. Railway's `FRPC_SLOT=auto` picks the **inactive** side so a new deploy tunnels up before the VPS switches traffic. `frpc-supervisor.py` owns both slot processes and the relay visitor. After the health gate opens it attempts a **warm standby frpc** on the vacated slot (`FRPC_STANDBY_ENABLED`, default on), without blocking crash recovery. The next deploy preempts and claims the inactive slot through slot-manager protocol v2. The incumbent stops that slot's process and acknowledges release before the peer can claim it, including after watcher failover changes which slot is active. frpc logs are mirrored to Railway stderr (`[frpc-blue]` / `[frpc-green]`).
 
 | Slot  | SMTP frps port | HTTPS frps port |
 |-------|----------------|-----------------|
@@ -128,17 +128,36 @@ sequenceDiagram
     participant V as VPS slot-manager
     participant X as HAProxy
 
-    R->>R: Start Stalwart + frpc (inactive slot)
+    R->>R: Start Stalwart + frpc supervisor
+    R->>V: POST /preempt {inactive slot, owner}
+    Note over V: Incumbent stops inactive frpc, then POSTs /lease/release
+    R->>V: POST /lease/claim {slot, owner} until reserved + vacant
+    R->>R: Start primary frpc + relay (leases renewed throughout boot)
     H-->>R: 503 until all checks pass
     R->>R: smtp + https proxies online, relay up
-    R->>V: POST /activate {slot}
-    V->>X: Warm target (1%), verify JMAP, exclusive cutover
+    R->>V: POST /preempt/clear {slot, owner}
+    R->>V: POST /activate {slot, owner}
+    V->>X: Warm target, verify JMAP, exclusive cutover
     R->>H: 200 OK
+    R->>V: Best-effort /lease/claim on vacated slot
+    R->>R: Start standby without waiting in supervise loop
     Note over R: Health gate opens only after VPS cutover succeeds
     Note over X: slot-watcher only fails over if active tunnel dies
 ```
 
 Railway probes `GET /healthz/ready` on `PORT` (8090). Healthcheck, overlap, and drain live in the repo-root [`.railway/railway.ts`](../../.railway/railway.ts).
+
+Readiness requires Stalwart, relay, and **either** live slot process with currently
+running proxies from its loopback frpc `/api/status` endpoint. The entrypoint owns
+the boot gate; the supervisor alone atomically publishes current child PIDs and
+readiness. Recovery never closes the gate solely because primary died, and late
+proxy/relay recovery is reflected automatically. Snapshots older than 15 seconds
+are unhealthy.
+
+**Rollout order:** deploy the VPS slot-manager/switch scripts first, verify
+`GET /slot-manager/status` reports `protocolVersion: 2`, then deploy the Railway
+image, then Gatus. Missing credentials, old manager versions, failed preemption,
+or unknown/occupied slots must not fall back to uncoordinated binding.
 
 ## Repository layout
 
@@ -150,6 +169,7 @@ Railway probes `GET /healthz/ready` on `PORT` (8090). Healthcheck, overlap, and 
 | `scripts/sync-haproxy-cert.py` | Export Stalwart ACME cert → HAProxy PEM |
 | `scripts/test-relay-route.sh` | Offline tests for relay-route helpers |
 | `railway-entrypoint.sh` | Stalwart + health server + frpc + plan apply + relay IP |
+| `frpc-supervisor.py` | Child processes, expiring slot leases, nonblocking standby/recovery, live health snapshot |
 | `Dockerfile` | Mail image (Railway `rootDirectory: apps/stalwart`) |
 | [`vps/README.md`](vps/README.md) | VPS services, cutover, cert sync |
 | `../../.github/workflows/sync-haproxy-cert.yml` | Weekly / on-demand HAProxy cert sync |
@@ -162,18 +182,36 @@ Railway probes `GET /healthz/ready` on `PORT` (8090). Healthcheck, overlap, and 
 | `FRPS_ADDR` | yes | VPS IP or hostname |
 | `FRPC_TOKEN` | yes | frp auth token (must match `vps/frps.toml`) |
 | `STALWART_ADMIN_TOKEN` | yes | Plan apply + relay route at startup |
-| `SLOT_MANAGER_TOKEN` | yes | Promotes this container's slot before the health gate opens |
+| `SLOT_MANAGER_TOKEN` | yes | Protocol v2 slot leases, preemption, and promotion; missing token fails boot |
 | `PORT` | yes | Set to `8090` — Railway healthcheck port |
 | `PGHOST`, `PGPASSWORD`, etc. | yes | PostgreSQL (Railway plugin) |
 | `BUCKET` / `BUCKET_*` | yes | Railway bucket refs for S3 BlobStore |
 | `STALWART_MAIL_INGEST_WEBHOOK_SECRET` | no | HMAC for Solace `message-ingest.ham` webhook (omit from plan if unset; live HMAC is kept) |
 | `FRPC_SLOT` | no | `blue`, `green`, or `auto` (default) |
+| `FRPC_STANDBY_ENABLED` | no | Also tunnel the vacated slot after promote (default `true`) |
+| `FRPC_PRIMARY_VACANT_TIMEOUT_SECONDS` | no | Elapsed-time deadline for preempt + primary claim (default `60` seconds); timeout fails boot |
+| `FRPC_STANDBY_VACANT_TIMEOUT_SECONDS` | no | Nonblocking claim window (default `300` seconds); on expiry defer for 30 seconds and retry, never force bind |
+| `FRPC_READY_TIMEOUT_SECONDS` | no | Primary boot / standby registration deadline (default `120` seconds); standby failure releases its lease and retries |
 | `STALWART_HTTP_PORT` | no | Stalwart HTTP/JMAP port (default `8080`) |
 | `RELAY_ROUTE_ID` | no | Stalwart MtaRoute id (default `ivnbzc1aaba9`) |
 | `RELAY_BIND_ADDR` | no | Override container private IP for relay route |
 | `PG_POOL_MAX_CONNECTIONS` | no | Stalwart → Postgres pool size (default `6`) |
 
 Use the **private** Postgres hostname (`*.railway.internal`). Message bodies live in the Railway bucket (`BlobStore` S3); Postgres holds metadata.
+
+## HA verification
+
+```sh
+python3 -B -m unittest discover -s apps/stalwart/tests -v
+sh apps/stalwart/scripts/test-relay-route.sh
+shellcheck apps/stalwart/railway-entrypoint.sh apps/stalwart/vps/stalwart-switch-slot.sh
+```
+
+Run these from the monorepo root. The default suite covers ownership, pending
+launches, expiry, failed coordination, standby/relay retries, failover, and health
+publication. For the optional loopback-only frp integration test, set
+`FRPC_TEST_BINARY` and `FRPS_TEST_BINARY` to existing version-matched binaries.
+It uses temporary ports/configs and dummy credentials; it does not access mail.
 
 ## Status page
 

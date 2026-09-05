@@ -28,7 +28,9 @@
       "env": {
         "APP_VARIANT": "preview",
         "EXPO_PUBLIC_API_URL": "https://api.solace.onl",
-        "EXPO_PUBLIC_APP_URL": "https://solace.onl"
+        "EXPO_PUBLIC_APP_URL": "https://solace.onl",
+        "PASSKEY_ORIGIN": "https://solace.onl",
+        "EXPO_ENABLE_IOS_ASSOCIATED_DOMAINS": "true"
       },
       "ios": {
         "image": "sdk-57"
@@ -45,7 +47,9 @@
       "env": {
         "APP_VARIANT": "production",
         "EXPO_PUBLIC_API_URL": "https://api.solace.onl",
-        "EXPO_PUBLIC_APP_URL": "https://solace.onl"
+        "EXPO_PUBLIC_APP_URL": "https://solace.onl",
+        "PASSKEY_ORIGIN": "https://solace.onl",
+        "EXPO_ENABLE_IOS_ASSOCIATED_DOMAINS": "true"
       },
       "ios": {
         "image": "sdk-57"
