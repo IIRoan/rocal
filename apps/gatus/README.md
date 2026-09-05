@@ -36,12 +36,12 @@ Do not point a Stalwart WebHook at `DISCORD_WEBHOOK_URL`. Discord expects its ow
 Intervals are intentionally relaxed for **Vercel Hobby** (Application) and to avoid
 hammering Stalwart with duplicate Prometheus scrapes.
 
-| Group | Endpoint | Interval | What it proves |
-|-------|----------|----------|----------------|
-| Application | `solace.onl` | 5m | Web frontend |
-| Application | `api.solace.onl/api/health` | 5m | Backend API |
-| Mail | `mail.solace.onl/jmap/session` | 2m | End-to-end mail path |
-| Mail | `mail.solace.onl/slot-manager/status` | 2m | Blue/green tunnels |
+| Group | Endpoint | Interval | Budget / notes | What it proves |
+|-------|----------|----------|----------------|----------------|
+| Application | `solace.onl` | 5m | `< 3000ms` | Web frontend |
+| Application | `api.solace.onl/api/health` | 5m | `< 5000ms` | Backend API |
+| Mail | `mail.solace.onl/jmap/session` | 2m | Discord after **3** fails | End-to-end mail path |
+| Mail | `mail.solace.onl/slot-manager/status` | 2m | Discord after **3** fails | Blue/green tunnels |
 
 ### Stalwart Metrics group
 

@@ -1,7 +1,7 @@
 storage:
   type: sqlite
   path: /data/gatus.db
-  maximum-number-of-results: 100
+  maximum-number-of-results: 200
 
 web:
   address: 0.0.0.0
@@ -46,6 +46,13 @@ ui:
   alerts:
     - type: discord
 
+.discord-alerts-soft: &discord-alerts-soft
+  alerts:
+    - type: discord
+      failure-threshold: 3
+      success-threshold: 2
+      send-on-resolved: true
+
 # Prometheus scrape via slot-manager so HAProxy never hits the warming slot.
 # Keep a single shared URL — do not add more endpoints that scrape this same path.
 .prometheus: &prometheus
@@ -80,14 +87,16 @@ endpoints:
     interval: 5m
     ui:
       <<: *endpoint-ui
+    client:
+      timeout: 10s
     conditions:
       - "[STATUS] == 200"
       - "[BODY].status == ok"
-      - "[RESPONSE_TIME] < 2000"
+      - "[RESPONSE_TIME] < 5000"
       - "[CERTIFICATE_EXPIRATION] > 336h"
 
   - name: jmap-session
-    <<: *discord-alerts
+    <<: *discord-alerts-soft
     group: Mail
     url: https://mail.solace.onl/jmap/session
     interval: 2m
@@ -101,12 +110,14 @@ endpoints:
       - "[CERTIFICATE_EXPIRATION] > 336h"
 
   - name: slot-blue-green
-    <<: *discord-alerts
+    <<: *discord-alerts-soft
     group: Mail
     url: https://mail.solace.onl/slot-manager/status
     interval: 2m
     ui:
       <<: *endpoint-ui
+    client:
+      timeout: 10s
     headers:
       Authorization: "Bearer ${SLOT_MANAGER_TOKEN}"
     conditions:
