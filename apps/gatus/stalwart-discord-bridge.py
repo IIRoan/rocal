@@ -160,7 +160,13 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt: str, *args: Any) -> None:
-        sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
+        try:
+            status = int(args[1])
+        except (IndexError, TypeError, ValueError):
+            status = 500
+        stream = sys.stderr if status >= 400 else sys.stdout
+        stream.write("%s - %s\n" % (self.address_string(), fmt % args))
+        stream.flush()
 
     def do_HEAD(self) -> None:  # noqa: N802
         self._dispatch()
