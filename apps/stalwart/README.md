@@ -19,7 +19,7 @@ flowchart TB
     end
 
     subgraph VPS["VPS (193.180.211.139)"]
-        HAP[HAProxy<br/>:25 :465 :993 :443]
+        HAP[HAProxy<br/>:25 :443]
         FRPS[frps :7000]
         PF[Postfix<br/>127.0.0.1:2525]
         FREL[frpc-relay<br/>STCP proxy]
@@ -31,7 +31,7 @@ flowchart TB
     end
 
     subgraph Railway["Railway container"]
-        SW[Stalwart<br/>:25 :587 :993 :8080]
+        SW[Stalwart<br/>:25 :8080]
         FRPC[frpc<br/>TCP proxies]
         REL[frpc relay visitor<br/>STCP :2525]
         HEALTH[Health server<br/>:8090]
@@ -81,11 +81,11 @@ sequenceDiagram
     participant F as frps → frpc tunnel
     participant S as Stalwart (Railway)
 
-    C->>H: SMTP :25 / IMAPS :993 / HTTPS :443
+    C->>H: SMTP :25 / HTTPS :443
     Note over H: TLS termination on :443<br/>one PROXY v2 header from HAProxy; frpc must not add another
     H->>F: Forward to localhost frps port<br/>(blue or green slot)
     F->>S: frpc TCP proxy → Stalwart listener
-    S-->>C: Mail delivery / JMAP / IMAP
+    S-->>C: Mail delivery / JMAP
 ```
 
 HAProxy routes to **blue** or **green** frps ports based on
@@ -220,4 +220,4 @@ Uptime monitoring: [`apps/gatus/`](../gatus/README.md). Discord downtime alerts 
 ## VPS
 
 Copy configs from `vps/` to the VPS, enable services, and open firewall ports
-22, 25, 80, 465, 587, 993, 443, 7000. Full reference: [vps/README.md](vps/README.md).
+22, 25, 80, 443, 7000. Full reference: [vps/README.md](vps/README.md).

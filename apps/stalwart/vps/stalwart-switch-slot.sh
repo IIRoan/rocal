@@ -33,7 +33,7 @@ TRANSITION_SECONDS="${TRANSITION_SECONDS:-}"
 TRANSITION_STEPS="${TRANSITION_STEPS:-6}"
 WARM_WEIGHT="${WARM_WEIGHT:-1}"
 
-ALL_BACKENDS="bk_smtp bk_submissions bk_imaps bk_https bk_http_admin"
+ALL_BACKENDS="bk_smtp bk_https bk_http_admin"
 
 if [ -z "$TRANSITION_SECONDS" ]; then
 	TRANSITION_SECONDS=$((OVERLAP_SECONDS - FINAL_DRAIN_SECONDS))
