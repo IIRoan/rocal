@@ -35,7 +35,7 @@ All systemd units should be enabled (`systemctl enable`) for boot.
 ### HAProxy
 
 - **Role:** Public TCP/HTTP edge; TLS on :443; PROXY v2 to frps mail backends.
-- **Ports:** 25, 80 (HTTPS redirect), 465, 993, 443.
+- **Ports:** 25, 80 (HTTPS redirect), 443.
   - **Public mail:** `/jmap`, `/.well-known`, `/api/discover`, `/api/auth`, `/auth/*` (OIDC token exchange for Solace).
   - **Allowlisted only:** `/admin`, `/login`, `/logo`, `/account`, `/oauth`, and other `/api/*`.
   - Non-allowlisted hits to `/` or admin surfaces return a small **HTML 404** (not an empty body — empty 404s made browsers download a `.bin`).
@@ -213,7 +213,7 @@ sudo postfix check && sudo systemctl reload postfix
 
 ## Firewall (UFW)
 
-Allow: 22, 25, 80, 465, 587, 993, 443, 7000 (frp control from Railway).
+Allow: 22, 25, 80, 443, 7000 (frp control from Railway).
 
 Port 80 must be open so HAProxy can 301 to HTTPS and send HSTS. Do not leave it firewalled/black-holed.
 

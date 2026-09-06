@@ -91,6 +91,11 @@ class Tunnel:
                 for line in stream:
                     output.write(line)
                     output.flush()
+                    # The supervisor polls each local status endpoint once per
+                    # second. frpc logs both sides of every successful poll at
+                    # info level; retaining them in Railway obscures real events.
+                    if "/api/status" in line:
+                        continue
                     print(f"[frpc-{self.name}] {line.rstrip()}", file=sys.stderr, flush=True)
 
         threading.Thread(target=mirror, daemon=True).start()

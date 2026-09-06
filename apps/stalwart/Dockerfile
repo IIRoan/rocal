@@ -34,6 +34,6 @@ RUN sed -i 's/\r$//' /usr/local/bin/railway-entrypoint.sh \
 
 USER root
 
-EXPOSE 25 465 587 993 443 8080 8090
+EXPOSE 25 8080 8090
 
 ENTRYPOINT ["/usr/local/bin/railway-entrypoint.sh"]

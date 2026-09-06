@@ -147,17 +147,11 @@ frpc_slot_ports() {
 	case "$1" in
 		blue)
 			smtp=10025
-			subs=10465
-			subm=10587
-			imaps=10993
 			https=10443
 			admin=18080
 			;;
 		green)
 			smtp=11025
-			subs=11465
-			subm=11587
-			imaps=11993
 			https=11443
 			admin=19080
 			;;
@@ -201,27 +195,6 @@ type = "tcp"
 localIP = "127.0.0.1"
 localPort = 25
 remotePort = ${smtp}
-
-[[proxies]]
-name = "submissions-${suffix}"
-type = "tcp"
-localIP = "127.0.0.1"
-localPort = 465
-remotePort = ${subs}
-
-[[proxies]]
-name = "imaps-${suffix}"
-type = "tcp"
-localIP = "127.0.0.1"
-localPort = 993
-remotePort = ${imaps}
-
-[[proxies]]
-name = "submission-${suffix}"
-type = "tcp"
-localIP = "127.0.0.1"
-localPort = 587
-remotePort = ${subm}
 EOF
 	fi
 

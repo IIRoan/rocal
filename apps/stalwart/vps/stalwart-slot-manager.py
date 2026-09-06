@@ -23,7 +23,7 @@ SLOT_PORTS = {
 }
 FRP_PROXIES = {
     slot: tuple(f"{name}-{slot}" for name in
-                ("smtp", "https", "http-admin", "submission", "submissions", "imaps"))
+                ("smtp", "https", "http-admin"))
     for slot in ("blue", "green")
 }
 HTTP_HEALTHCHECK_HOST = os.environ.get("HTTP_HEALTHCHECK_HOST", "mail.solace.onl")
