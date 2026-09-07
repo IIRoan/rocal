@@ -46,7 +46,14 @@ railway ssh --service errex -- errexd project add solace
 | Web (Vercel) | `@sentry/nextjs` | `NEXT_PUBLIC_SENTRY_DSN` |
 | API (Vercel) | `@sentry/bun` | `SENTRY_DSN` |
 
-Init is a no-op when the DSN is unset. Production DSN for project `solace` lives in `apps/web/.env.production` and Vercel env for the API. Keep `sendDefaultPii: false` — do not send mail bodies, tokens, or user content.
+Init is a no-op when the DSN is unset. Production DSN for project `solace`:
+
+`https://65f1ae513c4a4865bc3b3384ce746653@errors.solace.onl/solace`
+
+Official Sentry SDKs require a **numeric** DSN project id. Errex uses the string
+name `solace`, so clients init with a numeric stand-in and `tunnel` envelopes to
+`/api/solace/envelope/?sentry_key=…`. Keep `sendDefaultPii: false`.
+
 
 ## Custom domain
 
