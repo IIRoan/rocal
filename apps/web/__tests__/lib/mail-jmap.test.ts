@@ -433,6 +433,14 @@ describe("StalwartJmapClient", () => {
         redirect: "follow",
       },
     );
+
+    // Second call should reuse the cached session (no extra discovery HTTP).
+    await expect(client.discoverSession()).resolves.toEqual(
+      expect.objectContaining({
+        apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+      }),
+    );
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it("supports bearer tokens for proxied JMAP discovery", async () => {
@@ -517,6 +525,107 @@ describe("StalwartJmapClient", () => {
         redirect: "follow",
       },
     );
+  });
+
+  it("bootstraps mailbox state even when policy singletons are missing", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            methodResponses: [
+              [
+                "x:AccountSettings/get",
+                {
+                  list: [
+                    { encryptionAtRest: { "@type": "Disabled" } },
+                  ],
+                },
+                "as1",
+              ],
+              // User tokens often cannot read server policy singletons.
+              [
+                "error",
+                {
+                  type: "urn:ietf:params:jmap:error:forbidden",
+                },
+                "e1",
+              ],
+              [
+                "error",
+                {
+                  type: "urn:ietf:params:jmap:error:forbidden",
+                },
+                "j1",
+              ],
+              [
+                "Mailbox/get",
+                {
+                  list: [
+                    {
+                      id: "inbox",
+                      name: "Inbox",
+                      role: "inbox",
+                      parentId: null,
+                      sortOrder: 0,
+                    },
+                  ],
+                },
+                "m1",
+              ],
+              [
+                "Identity/get",
+                {
+                  list: [
+                    {
+                      id: "id-1",
+                      email: "alice@solace.onl",
+                      name: "Alice",
+                    },
+                  ],
+                },
+                "i1",
+              ],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+
+    await expect(
+      client.bootstrapMailboxState({
+        apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+        accounts: { account: {} },
+        primaryAccounts: { "urn:ietf:params:jmap:mail": "account" },
+      }),
+    ).resolves.toEqual({
+      accountSettings: { encryptionAtRest: { "@type": "Disabled" } },
+      emailSettings: null,
+      jmapSettings: null,
+      mailboxes: [
+        {
+          id: "inbox",
+          name: "Inbox",
+          role: "inbox",
+          parentId: null,
+          sortOrder: 0,
+        },
+      ],
+      identities: [
+        {
+          id: "id-1",
+          email: "alice@solace.onl",
+          name: "Alice",
+        },
+      ],
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it("queries paginated mailbox ids for local search indexing", async () => {

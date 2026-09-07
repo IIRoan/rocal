@@ -242,7 +242,9 @@ const EMAIL_LIST_GET_PROPERTIES = [
   "subject",
   "preview",
   "hasAttachment",
-  "bodyStructure",
+  // Intentionally omit bodyStructure: Stalwart encryption-at-rest makes
+  // MIME-tree fetches touch blobs for every list row (1–3s through the proxy).
+  // Full bodyStructure is loaded when a message is opened.
 ] as const;
 
 const EMAIL_FULL_GET_PROPERTIES = [
@@ -517,6 +519,8 @@ export class StalwartJmapClient {
   private mailServerPolicyInflight: Promise<MailServerPolicy | null> | null =
     null;
   private readonly blobUploadRegistry = new MailBlobUploadRegistry();
+  private cachedSession: JmapSession | null = null;
+  private discoverSessionInflight: Promise<JmapSession> | null = null;
 
   constructor({
     baseUrl,
@@ -732,7 +736,29 @@ export class StalwartJmapClient {
   }
 
   async discoverSession(): Promise<JmapSession> {
-    return this.discoverSessionWithRetry(true);
+    if (this.cachedSession) {
+      return this.cachedSession;
+    }
+    if (this.discoverSessionInflight) {
+      return this.discoverSessionInflight;
+    }
+
+    this.discoverSessionInflight = this.discoverSessionWithRetry(true)
+      .then((session) => {
+        this.cachedSession = session;
+        return session;
+      })
+      .finally(() => {
+        this.discoverSessionInflight = null;
+      });
+
+    return this.discoverSessionInflight;
+  }
+
+  /** Drop cached JMAP session (e.g. after auth refresh). */
+  clearCachedSession(): void {
+    this.cachedSession = null;
+    this.discoverSessionInflight = null;
   }
 
   private async discoverSessionWithRetry(
@@ -748,6 +774,7 @@ export class StalwartJmapClient {
     });
 
     if (response.status === 401 && allowRetry) {
+      this.clearCachedSession();
       await this.onUnauthorized?.();
       return this.discoverSessionWithRetry(false);
     }
@@ -933,6 +960,136 @@ export class StalwartJmapClient {
       "Identity/get",
     );
     return result.list ?? [];
+  }
+
+  /**
+   * One HTTP round-trip for the mail app bootstrap metadata that used to be
+   * four parallel POSTs (account settings, policy singletons, mailboxes,
+   * identities). Cuts open-mail latency through the Vercel→Stalwart proxy.
+   *
+   * Policy singletons (`x:Email/get`, `x:Jmap/get`) are optional — many
+   * user tokens cannot read them (same as getStalwartPolicySingletons).
+   * Missing/errored policy methods must not fail mailbox load.
+   */
+  async bootstrapMailboxState(session: JmapSession): Promise<{
+    accountSettings: Record<string, unknown>;
+    emailSettings: Record<string, unknown> | null;
+    jmapSettings: Record<string, unknown> | null;
+    mailboxes: JmapMailbox[];
+    identities: JmapIdentity[];
+  }> {
+    try {
+      return await this.bootstrapMailboxStateBatched(session);
+    } catch (error) {
+      log.warn(
+        "Batched mailbox bootstrap failed; falling back to parallel calls",
+        { error },
+      );
+      const [accountSettings, stalwartPolicy, mailboxes, identities] =
+        await Promise.all([
+          this.getAccountSettings(session),
+          this.getStalwartPolicySingletons(session),
+          this.getMailboxes(session),
+          this.getIdentities(session),
+        ]);
+      return {
+        accountSettings,
+        emailSettings: stalwartPolicy.emailSettings,
+        jmapSettings: stalwartPolicy.jmapSettings,
+        mailboxes,
+        identities,
+      };
+    }
+  }
+
+  private async bootstrapMailboxStateBatched(session: JmapSession): Promise<{
+    accountSettings: Record<string, unknown>;
+    emailSettings: Record<string, unknown> | null;
+    jmapSettings: Record<string, unknown> | null;
+    mailboxes: JmapMailbox[];
+    identities: JmapIdentity[];
+  }> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      [
+        "urn:ietf:params:jmap:core",
+        "urn:ietf:params:jmap:mail",
+        "urn:ietf:params:jmap:submission",
+        "urn:stalwart:jmap",
+      ],
+      [
+        [
+          "x:AccountSettings/get",
+          { accountId, ids: ["singleton"] },
+          "as1",
+        ],
+        [
+          "x:Email/get",
+          {
+            ids: ["singleton"],
+            properties: [...STALWART_EMAIL_POLICY_PROPERTIES],
+          },
+          "e1",
+        ],
+        [
+          "x:Jmap/get",
+          {
+            ids: ["singleton"],
+            properties: [...STALWART_JMAP_POLICY_PROPERTIES],
+          },
+          "j1",
+        ],
+        [
+          "Mailbox/get",
+          {
+            accountId,
+            properties: ["id", "name", "role", "parentId", "sortOrder"],
+          },
+          "m1",
+        ],
+        [
+          "Identity/get",
+          {
+            accountId,
+            properties: [
+              "id",
+              "email",
+              "name",
+              "textSignature",
+              "htmlSignature",
+            ],
+          },
+          "i1",
+        ],
+      ],
+    );
+
+    const accountSettings =
+      this.getMethodResult<{
+        list?: Array<Record<string, unknown>>;
+      }>(envelope, "x:AccountSettings/get").list?.[0] ?? {
+        encryptionAtRest: { "@type": "Disabled" },
+      };
+    // Soft — matches getStalwartPolicySingletons() try/catch behavior.
+    const emailSettings = this.tryGetMethodListItem(envelope, "x:Email/get");
+    const jmapSettings = this.tryGetMethodListItem(envelope, "x:Jmap/get");
+    const mailboxes =
+      this.getMethodResult<{ list?: JmapMailbox[] }>(envelope, "Mailbox/get")
+        .list ?? [];
+    const identities =
+      this.getMethodResult<{ list?: JmapIdentity[] }>(
+        envelope,
+        "Identity/get",
+      ).list ?? [];
+
+    return {
+      accountSettings,
+      emailSettings,
+      jmapSettings,
+      mailboxes,
+      identities,
+    };
   }
 
   async getMailboxMessages(
@@ -2148,5 +2305,20 @@ export class StalwartJmapClient {
     }
 
     return tuple[1] as T;
+  }
+
+  /** Soft-read a get list item; missing/errored methods return null. */
+  private tryGetMethodListItem(
+    envelope: JmapEnvelope,
+    methodName: string,
+  ): Record<string, unknown> | null {
+    try {
+      const result = this.getMethodResult<{
+        list?: Array<Record<string, unknown>>;
+      }>(envelope, methodName);
+      return result.list?.[0] ?? null;
+    } catch {
+      return null;
+    }
   }
 }

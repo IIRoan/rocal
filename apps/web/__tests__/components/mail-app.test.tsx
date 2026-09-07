@@ -207,10 +207,12 @@ jest.mock("postal-mime", () => ({
 jest.mock("../../lib/mail/vault-crypto", () => ({
   createEncryptedMailVault: jest.fn(),
   unlockEncryptedMailVault: jest.fn(),
+  unlockEncryptedMailVaultWithDerivedKey: jest.fn(),
 }));
 
 const mockJmapClient = {
   discoverSession: jest.fn<() => Promise<any>>(),
+  bootstrapMailboxState: jest.fn<() => Promise<any>>(),
   getAccountSettings: jest.fn<() => Promise<any>>(),
   getStalwartPolicySingletons: jest.fn<() => Promise<any>>(),
   getMailboxes: jest.fn<() => Promise<any>>(),
@@ -238,6 +240,7 @@ const mockJmapClient = {
     .mockResolvedValue(undefined),
   setMailServerPolicy: jest.fn(),
   syncMailServerPolicy: jest.fn<() => Promise<any>>(),
+  clearCachedSession: jest.fn(),
   searchMailboxMessages: jest.fn<() => Promise<any>>().mockResolvedValue({
     messages: [],
     total: 0,
@@ -683,6 +686,20 @@ describe("MailApp", () => {
       accounts: { b: { name: "alice@solace.onl" } },
       primaryAccounts: { "urn:ietf:params:jmap:mail": "b" },
       apiUrl: "http://192.168.2.213:8080/jmap/",
+    });
+    mockJmapClient.bootstrapMailboxState.mockResolvedValue({
+      accountSettings: {
+        encryptionAtRest: { "@type": "Aes256" },
+      },
+      emailSettings: null,
+      jmapSettings: null,
+      mailboxes: [
+        { id: "inbox-1", name: "Inbox", role: "inbox" },
+        { id: "drafts-1", name: "Drafts", role: "drafts" },
+        { id: "junk-1", name: "Junk Mail", role: "junk" },
+        { id: "sent-1", name: "Sent Items", role: "sent" },
+      ],
+      identities: [{ id: "identity-1", email: "alice@solace.onl" }],
     });
     mockJmapClient.getAccountSettings.mockResolvedValue({
       encryptionAtRest: { "@type": "Aes256" },

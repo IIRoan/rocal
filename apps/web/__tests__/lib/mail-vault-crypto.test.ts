@@ -3,7 +3,9 @@ import { describe, expect, it } from "@jest/globals";
 import {
   createEncryptedMailVault,
   unlockEncryptedMailVault,
+  unlockEncryptedMailVaultWithDerivedKey,
 } from "../../lib/mail/vault-crypto";
+import { deriveVaultKeyBytes } from "../../lib/mail/vault-kdf";
 
 const sampleVault = {
   userId: "mail-user-1",
@@ -48,6 +50,33 @@ describe("mail vault crypto", () => {
       }),
     );
     expect(encrypted.kdf).toBe("argon2id");
+  });
+
+  it("unlocks with a pre-derived AES key without re-running argon2", async () => {
+    const passphrase = "correct horse battery staple";
+    const encrypted = await createEncryptedMailVault(sampleVault, passphrase, {
+      memoryKiB: 8192,
+      iterations: 2,
+      parallelism: 1,
+    });
+    const keyBytes = await deriveVaultKeyBytes(passphrase, encrypted.kdfParams);
+    const derivedKeyB64 = Buffer.from(keyBytes)
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+
+    await expect(
+      unlockEncryptedMailVaultWithDerivedKey(
+        encrypted.encryptedVaultB64,
+        derivedKeyB64,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        email: "alice@solace.onl",
+        encryptedPrivateKeyArmored: "private-key-armored",
+      }),
+    );
   });
 
   it("rejects invalid vault passwords", async () => {

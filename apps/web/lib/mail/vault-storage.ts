@@ -1,8 +1,10 @@
 import type { MailVaultBackupRecord } from "./types";
 
 const DATABASE_NAME = "solace-mail";
-const DATABASE_VERSION = 1;
+/** Bumped to 2 so derived-vault-keys can share this DB (see derived-vault-key-storage). */
+const DATABASE_VERSION = 2;
 const STORE_NAME = "vault-backups";
+const DERIVED_KEY_STORE = "derived-vault-keys";
 
 async function openDatabase(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") {
@@ -16,6 +18,9 @@ async function openDatabase(): Promise<IDBDatabase | null> {
       const database = request.result;
       if (!database.objectStoreNames.contains(STORE_NAME)) {
         database.createObjectStore(STORE_NAME, { keyPath: "email" });
+      }
+      if (!database.objectStoreNames.contains(DERIVED_KEY_STORE)) {
+        database.createObjectStore(DERIVED_KEY_STORE, { keyPath: "userId" });
       }
     };
 
