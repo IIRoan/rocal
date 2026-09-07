@@ -6,6 +6,7 @@ import {
   oauthProviderOpenIdConfigMetadata,
 } from "@better-auth/oauth-provider";
 import { installGlobalConsoleLogger } from "@workspace/logger";
+import { initSentry } from "./lib/sentry";
 import { auth, isMailOauthEnabled } from "./lib/auth";
 import { BETTER_AUTH_BASE_PATH } from "./lib/auth-constants";
 import { env } from "./lib/env";
@@ -44,6 +45,7 @@ import { patchOauthMetadataResponse } from "./lib/oauth-metadata";
 import { routeModels } from "./contracts";
 
 installGlobalConsoleLogger("backend");
+initSentry();
 
 const { frontendUrl } = env;
 

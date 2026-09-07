@@ -26,6 +26,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@gsap/react": "^2.1.2",
     "@paper-design/shaders-react": "0.0.80",
+    "@sentry/nextjs": "^10.73.0",
     "@swc/helpers": "^0.5.17",
     "@tanstack/react-query": "^5.90.12",
     "@tanstack/react-virtual": "^3.14.2",

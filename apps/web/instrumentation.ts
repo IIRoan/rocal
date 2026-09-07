@@ -1,9 +1,12 @@
+import * as Sentry from "@sentry/nextjs";
 import { installGlobalConsoleLogger } from "@workspace/logger";
 
-export function register() {
+export async function register() {
   installGlobalConsoleLogger("next");
 
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    await import("./sentry.server.config");
+
     // Cast process to any to avoid edge runtime parsing issues in Next.js
     // where any literal process.stdout usage causes static analysis failures
     const proc = process as any;
@@ -58,4 +61,10 @@ export function register() {
       };
     }
   }
+
+  if (process.env.NEXT_RUNTIME === "edge") {
+    await import("./sentry.edge.config");
+  }
 }
+
+export const onRequestError = Sentry.captureRequestError;

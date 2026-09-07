@@ -4,6 +4,7 @@ import {
   defineRailway,
   github,
   group,
+  image,
   postgres,
   preserve,
   project,
@@ -54,6 +55,12 @@ export default defineRailway(() => {
   const monitoringVolume = volume("monitoring-volume", {
     region: "europe-west4-drams3a",
     sizeMB: 5000,
+    allowOnlineResize: true,
+    alerts: { usage: { "80": {}, "95": {}, "100": {} } },
+  });
+  const errexVolume = volume("errex-volume", {
+    region: "europe-west4-drams3a",
+    sizeMB: 1024,
     allowOnlineResize: true,
     alerts: { usage: { "80": {}, "95": {}, "100": {} } },
   });
@@ -168,19 +175,51 @@ export default defineRailway(() => {
     },
   });
 
+  // Self-hosted Sentry-compatible error tracker (https://github.com/TheHoltz/errex).
+  // Deploys the official GHCR image (apps/errex holds operator docs + optional Dockerfile).
+  // Set ERREX_ADMIN_TOKEN once after apply, then open /setup. SQLite is on /data/store.
+  const errex = service("errex", {
+    source: image("ghcr.io/theholtz/errex:latest", {
+      autoUpdates: { type: "patch" },
+    }),
+    healthcheck: "/health",
+    healthcheckTimeout: 100,
+    replicas: { "europe-west4-drams3a": 1 },
+    networking: { privateNetworkEndpoint: "errex" },
+    deploy: {
+      restartPolicyType: "ON_FAILURE",
+      restartPolicyMaxRetries: 3,
+    },
+    volumeMounts: {
+      "/data": errexVolume,
+    },
+    env: {
+      ERREX_ADMIN_TOKEN: preserve(),
+      ERREX_DATA_DIR: "/data/store",
+      ERREX_HOST: "0.0.0.0",
+      ERREX_LOG_LEVEL: "info",
+      ERREX_PUBLIC_URL: "https://errors.solace.onl",
+      ERREX_REQUIRE_AUTH: "true",
+      ERREX_RETENTION_DAYS: "30",
+    },
+  });
+
   const mailServer = group("Mail server", [stalwartMail, postgresStalwart]);
   const notificationGroup = group("Notifications", [notifications]);
   const monitoringGroup = group("Monitoring", [monitoring]);
+  const errorTrackingGroup = group("Error tracking", [errex]);
 
   return project("Solace", {
     resources: [
       mailServer,
       notificationGroup,
       monitoringGroup,
+      errorTrackingGroup,
       postgresApp,
       postgresVolume,
       postgresStalwartVolume,
       monitoringVolume,
+      errexVolume,
       stalwartBlobs,
     ],
   });

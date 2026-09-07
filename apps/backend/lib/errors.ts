@@ -10,6 +10,7 @@ import {
   errorLogDetails,
   sanitizeRequestUrl,
 } from "./log-sanitization";
+import { reportException } from "./sentry";
 
 const logger = createLogger("backend:errors");
 
@@ -178,8 +179,12 @@ function finishErrorResponse(
   statusCode: number,
   response: ApiErrorResponse,
   context: Record<string, unknown>,
+  error?: unknown,
 ): ApiErrorResponse {
   logRequestFailure(statusCode, context);
+  if (statusCode >= 500 && error !== undefined) {
+    reportException(error, context);
+  }
   return response;
 }
 
@@ -404,6 +409,7 @@ export function handleApiError({
               requestId,
             ),
             logContext,
+            error,
           );
         }
 
@@ -419,6 +425,7 @@ export function handleApiError({
               requestId,
             ),
             logContext,
+            error,
           );
         }
 
@@ -434,6 +441,7 @@ export function handleApiError({
               requestId,
             ),
             logContext,
+            error,
           );
         }
 
@@ -486,6 +494,7 @@ export function handleApiError({
             requestId,
           ),
           logContext,
+          error,
         );
     }
 }
