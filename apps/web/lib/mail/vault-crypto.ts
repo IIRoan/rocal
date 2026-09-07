@@ -36,12 +36,19 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 function base64ToBytes(value: string): Uint8Array {
+  // Accept standard base64 and base64url (server-derived AES keys are url-safe).
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded =
+    normalized.length % 4 === 0
+      ? normalized
+      : normalized + "=".repeat(4 - (normalized.length % 4));
+
   if (typeof atob === "function") {
-    const binary = atob(value);
+    const binary = atob(padded);
     return Uint8Array.from(binary, (char) => char.charCodeAt(0));
   }
 
-  return Uint8Array.from(Buffer.from(value, "base64"));
+  return Uint8Array.from(Buffer.from(padded, "base64"));
 }
 
 function encodeUtf8(value: string): Uint8Array {
@@ -132,6 +139,50 @@ export async function createEncryptedMailVault(
     kdf: "argon2id",
     kdfParams,
   };
+}
+
+/**
+ * Unlock using a pre-computed AES-GCM key (e.g. `derivedKeyB64` from
+ * `/api/mail/vault-key-material`). Skips the expensive client-side argon2id
+ * pass that otherwise blocks open-mail for 1–3s.
+ */
+export async function unlockEncryptedMailVaultWithDerivedKey(
+  encryptedVaultB64: string,
+  derivedKeyBase64: string,
+): Promise<UserKeyVault> {
+  try {
+    const cryptoRef = getCryptoRef();
+    const envelope = JSON.parse(
+      decodeUtf8(base64ToBytes(encryptedVaultB64)),
+    ) as VaultEnvelope;
+
+    if (envelope.version !== 1) {
+      throw new Error(`Unsupported vault envelope version: ${envelope.version}`);
+    }
+    if (envelope.algorithm !== "AES-GCM-256") {
+      throw new Error(`Unsupported vault algorithm: ${envelope.algorithm}`);
+    }
+
+    const key = await cryptoRef.subtle.importKey(
+      "raw",
+      toBufferSource(base64ToBytes(derivedKeyBase64)),
+      { name: "AES-GCM" },
+      false,
+      ["decrypt"],
+    );
+    const plaintext = await cryptoRef.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: toBufferSource(base64ToBytes(envelope.ivB64)),
+      },
+      key,
+      toBufferSource(base64ToBytes(envelope.ciphertextB64)),
+    );
+
+    return JSON.parse(decodeUtf8(new Uint8Array(plaintext))) as UserKeyVault;
+  } catch {
+    throw new Error("Failed to decrypt mail vault with derived key");
+  }
 }
 
 export async function unlockEncryptedMailVault(

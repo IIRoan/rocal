@@ -22,6 +22,13 @@ import { bootstrapMailboxForAccount } from "@/lib/mail/account-bootstrap";
 import { mailDemoApiService } from "@/lib/mail/api-service";
 import { createMailOAuthTokenManager } from "@/lib/mail/oauth-client";
 import {
+  clearMailOpenPrefetch,
+  ensureMailOpenPrefetch,
+  fetchVaultKeyMaterialForOpen,
+  refreshVaultKeyMaterialAfterCacheMiss,
+} from "@/lib/mail/mail-open-prefetch";
+import { deleteStoredDerivedVaultKey } from "@/lib/mail/derived-vault-key-storage";
+import {
   getPrimaryMailAccountId,
   StalwartJmapClient,
   type JmapAttachmentInput,
@@ -93,6 +100,7 @@ import {
 } from "@/lib/mail/attachment-preview";
 import {
   unlockEncryptedMailVault,
+  unlockEncryptedMailVaultWithDerivedKey,
   createEncryptedMailVault,
 } from "@/lib/mail/vault-crypto";
 import {
@@ -853,6 +861,17 @@ export function useMailApp() {
       hasAttemptedAutoOpenRef.current = false;
     }
   }, [activeMailbox, cachedAuthPassword, loginPassword]);
+
+  // Warm mail token + JMAP discovery + vault key as soon as session/config exist.
+  useEffect(() => {
+    if (isSessionPending || !session?.user?.id || !config) {
+      return;
+    }
+    ensureMailOpenPrefetch({
+      userId: session.user.id,
+      config,
+    });
+  }, [config, isSessionPending, session?.user?.id]);
 
   // Decrypt selected message
   const selectedMailboxMessage = useMemo(() => {
@@ -1745,33 +1764,52 @@ export function useMailApp() {
       try {
         let email = mailboxEmail.trim().toLowerCase();
 
-        const tokenManager = createMailOAuthTokenManager(config.oauth);
-        const client = new StalwartJmapClient({
-          baseUrl: config.discoveryBaseUrl,
-          getAccessToken: () => tokenManager.getAccessToken(),
-          onUnauthorized: async () => {
-            tokenManager.clear();
-            try {
-              await tokenManager.getAccessToken();
-            } catch (error) {
-              log.warn("Could not refresh mail token after unauthorized response", {
-                error,
-              });
-            }
-          },
-        });
+        const prefetch = accountUserId
+          ? ensureMailOpenPrefetch({
+              userId: accountUserId,
+              config,
+            })
+          : null;
+        const tokenManager =
+          prefetch?.tokenManager ?? createMailOAuthTokenManager(config.oauth);
+        const client =
+          prefetch?.client ??
+          new StalwartJmapClient({
+            baseUrl: config.discoveryBaseUrl,
+            getAccessToken: () => tokenManager.getAccessToken(),
+            onUnauthorized: async () => {
+              tokenManager.clear();
+              client.clearCachedSession();
+              try {
+                await tokenManager.getAccessToken();
+              } catch (error) {
+                log.warn("Could not refresh mail token after unauthorized response", {
+                  error,
+                });
+              }
+            },
+          });
 
         let vaultKey: string | null = null;
+        let derivedVaultKeyB64: string | null = null;
+        let usedCachedDerivedKey = false;
         let jmapSession: JmapSession;
         let backup: MailVaultBackupRecord | null = null;
         let hadRemoteBackup = false;
 
         if (!mailboxStatus.provisioned) {
           // New user: fetch key material first (needed for bootstrap passphrase)
-          vaultKey = await mailDemoApiService
-            .getVaultKeyMaterial(config.vaultKeyMaterialEndpoint)
-            .then((r) => r.keyMaterial)
-            .catch(() => null);
+          const keyResult =
+            (await (
+              prefetch?.keyMaterialPromise ??
+              fetchVaultKeyMaterialForOpen({
+                endpoint: config.vaultKeyMaterialEndpoint,
+                userId: accountUserId,
+              })
+            ).catch(() => null)) ?? null;
+          vaultKey = keyResult?.keyMaterial ?? null;
+          derivedVaultKeyB64 = keyResult?.derivedKeyB64 ?? null;
+          usedCachedDerivedKey = Boolean(keyResult?.usedCachedDerivedKey);
           const vaultPassphrase =
             vaultKey ?? passwordOverride ?? cachedAuthPassword ?? loginPassword;
           if (!vaultPassphrase) {
@@ -1794,9 +1832,23 @@ export function useMailApp() {
               },
             );
           });
+          // New vault KDF params invalidate any pre-provision derived key.
+          if (accountUserId) {
+            await deleteStoredDerivedVaultKey(accountUserId).catch(() => undefined);
+          }
+          const refreshed = await refreshVaultKeyMaterialAfterCacheMiss({
+            endpoint: config.vaultKeyMaterialEndpoint,
+            userId: accountUserId,
+          });
+          vaultKey = refreshed?.keyMaterial ?? vaultKey;
+          derivedVaultKeyB64 = refreshed?.derivedKeyB64 ?? null;
+          usedCachedDerivedKey = false;
+
           // After bootstrap, fetch JMAP + vault backup in parallel
           const [session, remoteBackup, localBackup] = await Promise.all([
-            client.discoverSession(),
+            (prefetch?.discoveryPromise ?? Promise.reject()).catch(() =>
+              client.discoverSession(),
+            ),
             mailDemoApiService.getAccountVaultBackup().catch(() => null),
             getStoredMailVault(email),
           ]);
@@ -1804,18 +1856,23 @@ export function useMailApp() {
           hadRemoteBackup = remoteBackup !== null;
           backup = remoteBackup ?? localBackup;
         } else {
-          // Provisioned: fetch key material + JMAP session + backup all in parallel
+          // Provisioned: key material (possibly cached) + JMAP session + backup
           const [keyResult, session, remoteBackup, localBackup] =
             await Promise.all([
-              mailDemoApiService
-                .getVaultKeyMaterial(config.vaultKeyMaterialEndpoint)
-                .then((r) => r.keyMaterial)
-                .catch(() => null),
-              client.discoverSession(),
+              (prefetch?.keyMaterialPromise ??
+                fetchVaultKeyMaterialForOpen({
+                  endpoint: config.vaultKeyMaterialEndpoint,
+                  userId: accountUserId,
+                })).catch(() => null),
+              (prefetch?.discoveryPromise ?? Promise.reject()).catch(() =>
+                client.discoverSession(),
+              ),
               mailDemoApiService.getAccountVaultBackup().catch(() => null),
               getStoredMailVault(email),
             ]);
-          vaultKey = keyResult;
+          vaultKey = keyResult?.keyMaterial ?? null;
+          derivedVaultKeyB64 = keyResult?.derivedKeyB64 ?? null;
+          usedCachedDerivedKey = Boolean(keyResult?.usedCachedDerivedKey);
           jmapSession = session;
           hadRemoteBackup = remoteBackup !== null;
           backup = remoteBackup ?? localBackup;
@@ -1825,74 +1882,107 @@ export function useMailApp() {
           throw new Error("No encrypted vault backup found for this mailbox.");
         if (hadRemoteBackup) await putStoredMailVault(backup);
 
-        // Unlock vault: try key material first; fall back to password for migration
-        let unlockedVault: UserKeyVault;
-        let effectivePassphrase: string;
+        // JMAP bootstrap only needs the session — overlap it with vault unlock
+        // so argon2 / AES work does not delay mailbox metadata.
+        const bootstrapPromise = client.bootstrapMailboxState(jmapSession);
 
-        if (vaultKey) {
+        // Unlock vault: prefer server-derived AES key (skips client argon2id).
+        let unlockedVault: UserKeyVault | null = null;
+        let effectivePassphrase = "";
+
+        if (derivedVaultKeyB64 && vaultKey) {
           try {
-            unlockedVault = await unlockEncryptedMailVault(
+            unlockedVault = await unlockEncryptedMailVaultWithDerivedKey(
               backup.encryptedVaultB64,
-              vaultKey,
-              backup.kdfParams,
+              derivedVaultKeyB64,
             );
             effectivePassphrase = vaultKey;
           } catch {
-            // Vault was encrypted with old password — one-time migration required
-            const migrationPassword =
-              passwordOverride ?? cachedAuthPassword ?? loginPassword;
-            if (!migrationPassword) {
-              throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
+            unlockedVault = null;
+            effectivePassphrase = "";
+            if (usedCachedDerivedKey && accountUserId) {
+              const refreshed = await refreshVaultKeyMaterialAfterCacheMiss({
+                endpoint: config.vaultKeyMaterialEndpoint,
+                userId: accountUserId,
+              });
+              vaultKey = refreshed?.keyMaterial ?? vaultKey;
+              derivedVaultKeyB64 = refreshed?.derivedKeyB64 ?? null;
+              if (derivedVaultKeyB64 && vaultKey) {
+                try {
+                  unlockedVault = await unlockEncryptedMailVaultWithDerivedKey(
+                    backup.encryptedVaultB64,
+                    derivedVaultKeyB64,
+                  );
+                  effectivePassphrase = vaultKey;
+                } catch {
+                  unlockedVault = null;
+                  effectivePassphrase = "";
+                }
+              }
             }
+          }
+        }
+
+        if (!unlockedVault || !effectivePassphrase) {
+          if (vaultKey) {
             try {
               unlockedVault = await unlockEncryptedMailVault(
                 backup.encryptedVaultB64,
-                migrationPassword,
+                vaultKey,
                 backup.kdfParams,
               );
-              effectivePassphrase = migrationPassword;
+              effectivePassphrase = vaultKey;
             } catch {
+              // Vault was encrypted with old password — one-time migration required
+              const migrationPassword =
+                passwordOverride ?? cachedAuthPassword ?? loginPassword;
+              if (!migrationPassword) {
+                throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
+              }
+              try {
+                unlockedVault = await unlockEncryptedMailVault(
+                  backup.encryptedVaultB64,
+                  migrationPassword,
+                  backup.kdfParams,
+                );
+                effectivePassphrase = migrationPassword;
+              } catch {
+                throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
+              }
+            }
+          } else {
+            const password =
+              passwordOverride ?? cachedAuthPassword ?? loginPassword;
+            if (!password) {
               throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
             }
+            unlockedVault = await unlockEncryptedMailVault(
+              backup.encryptedVaultB64,
+              password,
+              backup.kdfParams,
+            );
+            effectivePassphrase = password;
           }
-        } else {
-          const password =
-            passwordOverride ?? cachedAuthPassword ?? loginPassword;
-          if (!password) {
-            throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
-          }
-          unlockedVault = await unlockEncryptedMailVault(
-            backup.encryptedVaultB64,
-            password,
-            backup.kdfParams,
-          );
-          effectivePassphrase = password;
         }
 
-        // Worker load (CPU) + JMAP metadata + initial inbox (network) all in parallel
-        const [, [accountSettings, stalwartPolicy, mailboxes, identities, initialInboxResult]] =
-          await Promise.all([
-            mailCryptoWorkerClient.loadVault({
-              privateKeyArmored: unlockedVault.encryptedPrivateKeyArmored,
-              privateKeyPassphrase: effectivePassphrase,
-              publicKeyArmored: unlockedVault.publicKeyArmored,
-            }),
-            Promise.all([
-              client.getAccountSettings(jmapSession),
-              client.getStalwartPolicySingletons(jmapSession),
-              client.getMailboxes(jmapSession),
-              client.getIdentities(jmapSession),
-              // Pre-fetch inbox in parallel — we don't know the inbox id yet,
-              // but getMailboxMessages needs it. We'll resolve it after mailboxes load.
-              Promise.resolve(null as { messages: JmapEmailMessage[]; total: number } | null),
-            ]),
-          ]);
+        if (!unlockedVault || !effectivePassphrase) {
+          throw new Error("Failed to unlock mail vault.");
+        }
 
-        await client
-          .ensureEncryptOnAppendDisabled(jmapSession)
-          .catch((error) => {
-            log.warn("Failed to disable Stalwart encryptOnAppend on sign-in", error);
-          });
+        const bootstrap = await bootstrapPromise;
+        const {
+          accountSettings,
+          emailSettings,
+          jmapSettings,
+          mailboxes,
+          identities,
+        } = bootstrap;
+        const stalwartPolicy = { emailSettings, jmapSettings };
+
+        // Not on the critical path for showing inbox.
+        void client.ensureEncryptOnAppendDisabled(jmapSession).catch((error) => {
+          log.warn("Failed to disable Stalwart encryptOnAppend on sign-in", error);
+        });
 
         // Background migration if unlocked with old password
         if (vaultKey && effectivePassphrase !== vaultKey) {
@@ -1918,12 +2008,23 @@ export function useMailApp() {
         );
 
         const initialMailboxId = getPrimaryMailboxId(mailboxes, "inbox");
-        // Fetch the first inbox page now that we know the mailbox id
-        const { messages, total: initialTotal } = initialMailboxId
-          ? await client.getMailboxMessages(jmapSession, initialMailboxId, {
-            limit: mailboxPageSize,
-          })
-          : { messages: [], total: 0 };
+        // Crypto worker + first inbox page in parallel
+        const [, inboxResult] = await Promise.all([
+          mailCryptoWorkerClient.loadVault({
+            privateKeyArmored: unlockedVault.encryptedPrivateKeyArmored,
+            privateKeyPassphrase: effectivePassphrase,
+            publicKeyArmored: unlockedVault.publicKeyArmored,
+          }),
+          initialMailboxId
+            ? client.getMailboxMessages(jmapSession, initialMailboxId, {
+                limit: mailboxPageSize,
+              })
+            : Promise.resolve({
+                messages: [] as JmapEmailMessage[],
+                total: 0,
+              }),
+        ]);
+        const { messages, total: initialTotal } = inboxResult;
         setTotalMessages(initialTotal);
         if (initialMailboxId) {
           seedMailMessageCache(
@@ -3613,6 +3714,7 @@ export function useMailApp() {
     setSelectedMessageSignatureVerificationState("not_signed");
     setSelectedMessageDecryptError(null);
     setSelectedMessageIsDecrypting(false);
+    clearMailOpenPrefetch();
   }, []);
 
   const handleSignOut = useCallback(async () => {

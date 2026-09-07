@@ -259,10 +259,8 @@ describe("MailService", () => {
       redirectUri: "https://api.solace.test/api/mail/oauth/stalwart/callback",
       description: "Solace mail backend bridge",
     });
-    expect(mockAdminClient.setAccountPassword).toHaveBeenCalledWith({
-      accountId: "acct-1",
-      secret: expect.any(String),
-    });
+    // Successful login must not reset the account password (invalidates other isolates).
+    expect(mockAdminClient.setAccountPassword).not.toHaveBeenCalled();
     expect(mockAdminClient.issueOAuthAccessToken).toHaveBeenCalledWith(
       expect.objectContaining({
         accountName: "alice@solace.onl",
@@ -300,8 +298,36 @@ describe("MailService", () => {
       email: "alice@solace.onl",
     });
 
+    expect(mockAdminClient.setAccountPassword).not.toHaveBeenCalled();
+    expect(mockAdminClient.issueOAuthAccessToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("sets the bridge password only when Stalwart login is rejected", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValue({
+      id: "entry-1",
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      stalwartAccountId: "acct-1",
+      stalwartPublicKeyId: "pk-1",
+      publicKeyFingerprint: "ABCD1234EF567890",
+      userId: "user-1",
+    });
+    mockAdminClient.issueOAuthAccessToken
+      .mockRejectedValueOnce(new Error("Stalwart mailbox login was rejected."))
+      .mockResolvedValueOnce({
+        access_token: "stalwart-access-token-retry",
+        expires_in: 1800,
+        expires_at: 1779149999,
+      });
+
+    const result = await service.issueAccessTokenForUser({
+      userId: "user-1",
+      email: "alice@solace.onl",
+    });
+
     expect(mockAdminClient.setAccountPassword).toHaveBeenCalledTimes(1);
     expect(mockAdminClient.issueOAuthAccessToken).toHaveBeenCalledTimes(2);
+    expect(result.access_token).toBe("stalwart-access-token-retry");
   });
 
   it("returns a cached mail access token without reissuing", async () => {

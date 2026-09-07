@@ -91,6 +91,9 @@ export const createAPI = (prefix = "") => {
             request,
           ),
         credentials: true,
+        // Browser default without this is short; 5s was effectively redoing
+        // OPTIONS on nearly every JMAP call. 24h covers a full mail session.
+        maxAge: 86400,
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: [
           "Content-Type",
@@ -100,7 +103,7 @@ export const createAPI = (prefix = "") => {
           "Accept",
           "Origin",
         ],
-        exposeHeaders: ["Set-Cookie"],
+        exposeHeaders: ["Set-Cookie", "Server-Timing"],
       }),
     )
     .get("/.well-known/oauth-authorization-server", {

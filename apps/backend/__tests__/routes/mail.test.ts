@@ -194,6 +194,186 @@ describe("mailRoutes", () => {
         headers: expect.any(Headers),
       }),
     );
+    const upstreamHeaders = (proxyFetch.mock.calls[0]?.[1] as RequestInit)
+      ?.headers as Headers;
+    expect(upstreamHeaders.get("Authorization")).toBe(
+      "Bearer mail-access-token",
+    );
+    expect(mockMailService.getAccessTokenForUser).not.toHaveBeenCalled();
+    expect(mockGetSession).not.toHaveBeenCalled();
+  });
+
+  it("forwards client Bearer when a session cookie is also present", async () => {
+    const proxyFetch = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(JSON.stringify({ methodResponses: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    const response = await createApp({
+      jmapFetch: proxyFetch,
+      jmapUpstreamBaseUrl: "http://stalwart.test",
+    }).handle(
+      new Request("http://localhost/mail/jmap/jmap/", {
+        method: "POST",
+        headers: {
+          // Browser clients send both; a valid Stalwart bearer must win so we
+          // skip getSession on the hot path.
+          Authorization: "Bearer client-provided-token",
+          "Content-Type": "application/json",
+          cookie: "better-auth.session_token=session-token",
+        },
+        body: JSON.stringify({
+          using: ["urn:ietf:params:jmap:core"],
+          methodCalls: [],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockGetSession).not.toHaveBeenCalled();
+    expect(mockMailService.getAccessTokenForUser).not.toHaveBeenCalled();
+    const upstreamHeaders = (proxyFetch.mock.calls[0]?.[1] as RequestInit)
+      ?.headers as Headers;
+    expect(upstreamHeaders.get("Authorization")).toBe(
+      "Bearer client-provided-token",
+    );
+    expect(response.headers.get("server-timing")).toContain(
+      'auth_source;desc="client-bearer"',
+    );
+  });
+
+  it("forwards client Bearer when no session cookie is present", async () => {
+    const proxyFetch = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(JSON.stringify({ methodResponses: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    const response = await createApp({
+      jmapFetch: proxyFetch,
+      jmapUpstreamBaseUrl: "http://stalwart.test",
+    }).handle(
+      new Request("http://localhost/mail/jmap/jmap/", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer client-provided-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          using: ["urn:ietf:params:jmap:core"],
+          methodCalls: [],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockGetSession).not.toHaveBeenCalled();
+    expect(mockMailService.getAccessTokenForUser).not.toHaveBeenCalled();
+    const upstreamHeaders = (proxyFetch.mock.calls[0]?.[1] as RequestInit)
+      ?.headers as Headers;
+    expect(upstreamHeaders.get("Authorization")).toBe(
+      "Bearer client-provided-token",
+    );
+  });
+
+  it("does not invalidate the token cache when falling back from client Bearer", async () => {
+    mockGetSession.mockResolvedValue({
+      session: { id: "session-1", userId: "user-1" },
+      user: { id: "user-1", email: "alice@solace.onl" },
+    } as never);
+    // No session cookie → client bearer is tried first, then session fallback.
+    const proxyFetch = jest
+      .fn<(input: string, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "unauthorized" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ methodResponses: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+    const response = await createApp({
+      jmapFetch: proxyFetch,
+      jmapUpstreamBaseUrl: "http://stalwart.test",
+    }).handle(
+      new Request("http://localhost/mail/jmap/jmap/", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer stale-client-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          using: ["urn:ietf:params:jmap:core"],
+          methodCalls: [],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockMailService.invalidateAccessTokenForUser).not.toHaveBeenCalled();
+    expect(mockMailService.getAccessTokenForUser).toHaveBeenCalledWith({
+      userId: "user-1",
+      email: "alice@solace.onl",
+    });
+    expect(proxyFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("mints a session mail token when the proxy request has no Bearer", async () => {
+    mockGetSession.mockResolvedValue({
+      session: { id: "session-1", userId: "user-1" },
+      user: { id: "user-1", email: "alice@solace.onl" },
+    } as never);
+    const proxyFetch = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(JSON.stringify({ methodResponses: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    const response = await createApp({
+      jmapFetch: proxyFetch,
+      jmapUpstreamBaseUrl: "http://stalwart.test",
+    }).handle(
+      new Request("http://localhost/mail/jmap/jmap/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          cookie: "better-auth.session_token=session-token",
+        },
+        body: JSON.stringify({
+          using: ["urn:ietf:params:jmap:core"],
+          methodCalls: [],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockMailService.getAccessTokenForUser).toHaveBeenCalledWith({
+      userId: "user-1",
+      email: "alice@solace.onl",
+    });
+    const upstreamHeaders = (proxyFetch.mock.calls[0]?.[1] as RequestInit)
+      ?.headers as Headers;
+    expect(upstreamHeaders.get("Authorization")).toBe(
+      "Bearer stalwart-access-token",
+    );
   });
 
   it("proxies JMAP method calls through the backend", async () => {

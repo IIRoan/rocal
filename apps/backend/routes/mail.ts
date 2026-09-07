@@ -141,15 +141,21 @@ function summarizeJmapRequestBody(
       methodCalls?: unknown[];
       using?: string[];
     };
-    const methodCalls = (parsed.methodCalls ?? [])
+    const rawCalls = parsed.methodCalls ?? [];
+    const methodCalls = rawCalls
       .map((call) => (Array.isArray(call) ? call[0] : null))
       .filter((method): method is string => typeof method === "string");
+
+    const methodCallDetails = rawCalls
+      .map((call) => summarizeJmapMethodCall(call))
+      .filter((detail): detail is Record<string, unknown> => detail !== null);
 
     return {
       bodyPresent: true,
       bodyLength: requestBody.byteLength,
       using: parsed.using,
       methodCalls,
+      methodCallDetails,
     };
   } catch {
     return {
@@ -158,6 +164,68 @@ function summarizeJmapRequestBody(
       bodyFormat: "non-json",
     };
   }
+}
+
+/** Safe, PII-free summary of one JMAP methodCall for slow-query logs. */
+function summarizeJmapMethodCall(
+  call: unknown,
+): Record<string, unknown> | null {
+  if (!Array.isArray(call) || typeof call[0] !== "string") {
+    return null;
+  }
+  const method = call[0];
+  const args =
+    call[1] && typeof call[1] === "object"
+      ? (call[1] as Record<string, unknown>)
+      : {};
+  const properties = Array.isArray(args.properties)
+    ? args.properties.filter((value): value is string => typeof value === "string")
+    : null;
+  const ids = Array.isArray(args.ids) ? args.ids : null;
+  const detail: Record<string, unknown> = {
+    method,
+    callId: typeof call[2] === "string" ? call[2] : undefined,
+  };
+
+  if (typeof args.accountId === "string") {
+    detail.accountIdLen = args.accountId.length;
+  }
+  if (typeof args.limit === "number") {
+    detail.limit = args.limit;
+  }
+  if (ids) {
+    detail.idsCount = ids.length;
+  }
+  if (args["#ids"] && typeof args["#ids"] === "object") {
+    detail.idsFromResultOf = true;
+  }
+  if (properties) {
+    detail.propertiesCount = properties.length;
+    detail.requestsBody =
+      properties.some(
+        (property) =>
+          property === "bodyValues" ||
+          property === "textBody" ||
+          property === "htmlBody" ||
+          property === "bodyStructure" ||
+          property.startsWith("body."),
+      ) || Boolean(args.fetchTextBodyValues) || Boolean(args.fetchHTMLBodyValues) || Boolean(args.fetchAllBodyValues);
+    detail.propertySample = properties.slice(0, 8);
+  }
+  if (args.filter && typeof args.filter === "object") {
+    detail.filterKeys = Object.keys(args.filter as Record<string, unknown>).slice(
+      0,
+      8,
+    );
+  }
+  if (Array.isArray(args.sort)) {
+    detail.sortCount = args.sort.length;
+  }
+  return detail;
+}
+
+function quoteServerTimingDesc(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
 function requestIncludesSendIntent(
@@ -327,35 +395,68 @@ async function proxyJmapRequest(input: {
   mailService: IMailService;
   fetcher?: JmapProxyFetcher;
   retryWithFreshToken?: boolean;
+  /** Auth source used on the previous attempt (for invalidate policy). */
+  previousAuthSource?: "session" | "client-bearer" | "missing";
   /** Buffered body so 401 token-refresh retries can reuse it. */
   bodyBuffer?: ArrayBuffer;
 }): Promise<Response> {
-  let authorization = input.request.headers.get("authorization");
-  let authSource: "session" | "client-bearer" | "missing" = authorization
+  const timingStart = performance.now();
+  const clientAuthorization = input.request.headers.get("authorization");
+
+  let authorization = clientAuthorization;
+  let authSource: "session" | "client-bearer" | "missing" = clientAuthorization
     ? "client-bearer"
     : "missing";
 
-  try {
-    const user = await resolveSessionUserForProxy(input.request);
-    if (user) {
-      const email = user.email?.trim();
-      if (email) {
-        if (input.retryWithFreshToken) {
-          input.mailService.invalidateAccessTokenForUser(user.id);
+  // Prefer a client-supplied Stalwart Bearer when present. After we stopped
+  // resetting the bridge password on every isolate cold-start, these tokens
+  // stay valid and skipping session mint saves ~200–400ms of getSession+cache
+  // work on every JMAP call. Fall back to session mint when there is no
+  // bearer, or after an upstream 401 (retryWithFreshToken).
+  const shouldMintFromSession =
+    Boolean(input.retryWithFreshToken) || !clientAuthorization;
+
+  let authMs = 0;
+  let sessionMs = 0;
+  let tokenMs = 0;
+  if (shouldMintFromSession) {
+    const authStart = performance.now();
+    try {
+      const sessionStart = performance.now();
+      const user = await resolveSessionUserForProxy(input.request);
+      sessionMs = performance.now() - sessionStart;
+      if (user) {
+        const email = user.email?.trim();
+        if (email) {
+          // Only invalidate after a session-minted token itself 401'd.
+          // Invalidating on client-bearer fallback wiped the warm cache and
+          // forced a full Stalwart OAuth mint on every proxied call.
+          if (
+            input.retryWithFreshToken &&
+            input.previousAuthSource === "session"
+          ) {
+            input.mailService.invalidateAccessTokenForUser(user.id);
+          }
+          const tokenStart = performance.now();
+          const token = await input.mailService.getAccessTokenForUser({
+            userId: user.id,
+            email,
+          });
+          tokenMs = performance.now() - tokenStart;
+          authorization = `Bearer ${token.access_token}`;
+          authSource = "session";
         }
-        const token = await input.mailService.getAccessTokenForUser({
-          userId: user.id,
-          email,
-        });
-        authorization = `Bearer ${token.access_token}`;
-        authSource = "session";
       }
+    } catch (err) {
+      logger.debug(
+        "JMAP proxy could not resolve session user for upstream auth",
+        {
+          message: redactPII(errorMessage(err, "Unknown error")),
+          hadClientBearer: Boolean(clientAuthorization),
+        },
+      );
     }
-  } catch (err) {
-    logger.debug("JMAP proxy could not resolve session user for upstream auth", {
-      message: redactPII(errorMessage(err, "Unknown error")),
-      hadClientBearer: Boolean(input.request.headers.get("authorization")),
-    });
+    authMs = performance.now() - authStart;
   }
 
   if (!authorization) {
@@ -395,6 +496,7 @@ async function proxyJmapRequest(input: {
       : (input.bodyBuffer ?? (await input.request.arrayBuffer()));
 
   let response: Response;
+  const upstreamStart = performance.now();
   try {
     response = await (input.fetcher ?? fetch)(upstreamUrl, {
       method,
@@ -422,6 +524,60 @@ async function proxyJmapRequest(input: {
       { status: 503 },
     );
   }
+  const upstreamMs = performance.now() - upstreamStart;
+  const totalMs = performance.now() - timingStart;
+  const requestSummary = summarizeJmapRequestBody(requestBody);
+  const operation = classifyJmapProxyOperation(input.upstreamPath);
+  const methodCalls = Array.isArray(requestSummary.methodCalls)
+    ? (requestSummary.methodCalls as string[])
+    : [];
+  const opDesc =
+    methodCalls.length > 0
+      ? methodCalls.slice(0, 4).join("+")
+      : operation;
+  const responseContentLengthHeader = response.headers.get("content-length");
+  const responseContentLength = responseContentLengthHeader
+    ? Number(responseContentLengthHeader)
+    : null;
+
+  // Threshold is intentionally low so we can see the 1–3s Vercel→Stalwart
+  // outliers the browser reports even when auth is already free.
+  if (upstreamMs >= 400) {
+    const slowPayload = {
+      event: "jmap_proxy_slow_upstream",
+      operation,
+      methodCalls,
+      methodCallDetails: requestSummary.methodCallDetails ?? [],
+      requestBodyBytes:
+        typeof requestSummary.bodyLength === "number"
+          ? requestSummary.bodyLength
+          : requestBody?.byteLength ?? 0,
+      responseStatus: response.status,
+      responseContentLength: Number.isFinite(responseContentLength)
+        ? responseContentLength
+        : null,
+      responseContentType: response.headers.get("content-type"),
+      authSource,
+      retriedWithFreshToken: Boolean(input.retryWithFreshToken),
+      timingMs: {
+        auth: Math.round(authMs),
+        session: Math.round(sessionMs),
+        token: Math.round(tokenMs),
+        upstream: Math.round(upstreamMs),
+        total: Math.round(totalMs),
+      },
+      upstreamUrl: sanitizeRequestUrl(upstreamUrl),
+      proxyPath: requestUrl.pathname,
+      httpMethod: method,
+      vercelId: input.request.headers.get("x-vercel-id"),
+      vercelRegion:
+        input.request.headers.get("x-vercel-id")?.split("::")[0] ?? null,
+    };
+    // info (not debug) so it always shows in Vercel production logs.
+    logger.info("JMAP proxy slow upstream", slowPayload);
+    // Distinct single-line marker for easy `vercel logs` grepping.
+    console.info(`JMAP_SLOW_UPSTREAM ${JSON.stringify(slowPayload)}`);
+  }
 
   const responseHeaders = new Headers();
   const responseContentType = response.headers.get("content-type");
@@ -435,19 +591,28 @@ async function proxyJmapRequest(input: {
     responseHeaders.set("Cache-Control", cacheControl);
   }
 
-  if (!response.ok) {
-    const operation = classifyJmapProxyOperation(input.upstreamPath);
-    const requestSummary = summarizeJmapRequestBody(requestBody);
+  responseHeaders.set(
+    "Server-Timing",
+    [
+      `auth;dur=${authMs.toFixed(1)}`,
+      `session;dur=${sessionMs.toFixed(1)}`,
+      `token;dur=${tokenMs.toFixed(1)}`,
+      `upstream;dur=${upstreamMs.toFixed(1)}`,
+      `total;dur=${totalMs.toFixed(1)}`,
+      `auth_source;desc=${quoteServerTimingDesc(authSource)}`,
+      `retry;desc=${quoteServerTimingDesc(input.retryWithFreshToken ? "1" : "0")}`,
+      `op;desc=${quoteServerTimingDesc(opDesc.slice(0, 80) || "unknown")}`,
+    ].join(", "),
+  );
 
-    if (
-      response.status === 401 &&
-      authSource === "session" &&
-      !input.retryWithFreshToken
-    ) {
+  if (!response.ok) {
+    if (response.status === 401 && !input.retryWithFreshToken) {
       logger.debug(
-        "JMAP proxy refreshing session token after upstream 401",
+        "JMAP proxy refreshing upstream auth after 401",
         {
           operation,
+          authSource,
+          token: summarizeBearerToken(authorization),
           upstreamUrl: sanitizeRequestUrl(upstreamUrl),
           method,
           methodCalls: requestSummary.methodCalls,
@@ -457,6 +622,7 @@ async function proxyJmapRequest(input: {
         ...input,
         bodyBuffer: requestBody,
         retryWithFreshToken: true,
+        previousAuthSource: authSource,
       });
     }
 
@@ -478,6 +644,11 @@ async function proxyJmapRequest(input: {
       token: summarizeBearerToken(authorization),
       request: requestSummary,
       upstreamError: summarizeUpstreamErrorBody(upstreamBody),
+      timingMs: {
+        auth: Math.round(authMs),
+        upstream: Math.round(upstreamMs),
+        total: Math.round(performance.now() - timingStart),
+      },
     };
 
     const isSendFailure =
@@ -643,24 +814,29 @@ export function createMailRoutes(
         ...authDetail.detail,
         summary: "Get server-derived vault key material",
         description:
-          "Returns an HMAC-SHA256 derived key material unique to the authenticated user. Used client-side to derive the vault encryption key without a user-typed password.",
+          "Returns an HMAC-SHA256 derived key material unique to the authenticated user. Used client-side to derive the vault encryption key without a user-typed password. Pass includeDerived=0 to skip the expensive argon2id derived AES key when the client already has it cached.",
       },
-    }, async ({ routeUser, status }) => {
+    }, async ({ routeUser, status, request }) => {
       const userId = routeUser.id;
+      const includeDerived =
+        new URL(request.url).searchParams.get("includeDerived") !== "0";
       try {
         const keyMaterial = await deriveVaultKeyMaterial(userId);
         let derivedKeyB64: string | null = null;
-        try {
-          derivedKeyB64 = await deriveVaultKeyForNative(userId, keyMaterial);
-        } catch (derivedErr) {
-          logger.error("[vault-key-material] deriveVaultKeyForNative failed", {
-            userId,
-            ...errorLogDetails(derivedErr),
-          });
+        if (includeDerived) {
+          try {
+            derivedKeyB64 = await deriveVaultKeyForNative(userId, keyMaterial);
+          } catch (derivedErr) {
+            logger.error("[vault-key-material] deriveVaultKeyForNative failed", {
+              userId,
+              ...errorLogDetails(derivedErr),
+            });
+          }
         }
         logger.debug(
-          "[vault-key-material] responding hasDerivedKey=%s for userId=%s",
+          "[vault-key-material] responding hasDerivedKey=%s includeDerived=%s for userId=%s",
           derivedKeyB64 ? "yes" : "no",
+          includeDerived ? "yes" : "no",
           userId,
         );
         return { keyMaterial, derivedKeyB64, version: "v1" };

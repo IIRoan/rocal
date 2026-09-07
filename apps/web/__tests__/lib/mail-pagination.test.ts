@@ -131,8 +131,10 @@ describe("StalwartJmapClient.getMailboxMessages pagination", () => {
     );
     const getParams = body.methodCalls[1][1];
     expect(getParams.properties).toEqual(
-      expect.arrayContaining(["preview", "hasAttachment", "bodyStructure"]),
+      expect.arrayContaining(["preview", "hasAttachment"]),
     );
+    expect(getParams.properties).not.toContain("bodyStructure");
+    expect(getParams.properties).not.toContain("bodyValues");
     expect(getParams.fetchTextBodyValues).toBeUndefined();
     expect(getParams.fetchHTMLBodyValues).toBeUndefined();
   });
@@ -200,7 +202,7 @@ describe("StalwartJmapClient.getMessagesByIds", () => {
     );
     const getParams = body.methodCalls[0][1];
     expect(getParams.properties).toContain("preview");
-    expect(getParams.properties).toContain("bodyStructure");
+    expect(getParams.properties).not.toContain("bodyStructure");
     expect(getParams.properties).not.toContain("bodyValues");
     expect(getParams.fetchTextBodyValues).toBeUndefined();
   });

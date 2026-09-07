@@ -489,19 +489,47 @@ export class MailService implements IMailService {
       redirectUri: this.config.stalwartOauthRedirectUri,
       description: "Solace mail backend bridge",
     });
-    await this.ensureBridgeAccountPassword({
-      accountId: mailbox.stalwartAccountId,
-      secret: bridgeSecret,
-    });
 
-    const token = await this.adminClient.issueOAuthAccessToken({
-      accountName: mailbox.email,
-      accountSecret: bridgeSecret,
-      clientId: this.config.stalwartOauthClientId,
-      redirectUri: this.config.stalwartOauthRedirectUri,
-      codeVerifier,
-      codeChallenge,
-    });
+    // Do NOT reset the Stalwart account password on every mint. Each Vercel
+    // isolate used to call setAccountPassword once, which invalidated OAuth
+    // tokens held by other isolates and caused a 401→remint storm (~1–3s per
+    // JMAP call). Prefer logging in with the deterministic bridge secret and
+    // only set the password if authentication fails.
+    const mint = () =>
+      this.adminClient.issueOAuthAccessToken({
+        accountName: mailbox.email,
+        accountSecret: bridgeSecret,
+        clientId: this.config.stalwartOauthClientId,
+        redirectUri: this.config.stalwartOauthRedirectUri,
+        codeVerifier,
+        codeChallenge,
+      });
+
+    let token: Awaited<ReturnType<typeof mint>>;
+    try {
+      token = await mint();
+    } catch (error) {
+      logger.warn(
+        "Stalwart bridge login failed; configuring account password and retrying once",
+        {
+          accountId: mailbox.stalwartAccountId,
+          ...errorLogDetails(error),
+        },
+      );
+      await this.ensureBridgeAccountPassword({
+        accountId: mailbox.stalwartAccountId,
+        secret: bridgeSecret,
+      });
+      const retryPkce = await createMailBridgePkcePair();
+      token = await this.adminClient.issueOAuthAccessToken({
+        accountName: mailbox.email,
+        accountSecret: bridgeSecret,
+        clientId: this.config.stalwartOauthClientId,
+        redirectUri: this.config.stalwartOauthRedirectUri,
+        codeVerifier: retryPkce.codeVerifier,
+        codeChallenge: retryPkce.codeChallenge,
+      });
+    }
 
     const expiresIn = token.expires_in ?? 3600;
     return {
