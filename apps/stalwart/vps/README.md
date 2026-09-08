@@ -111,6 +111,7 @@ Secrets: Environment **`mail-vps`** (see [HAProxy TLS cert sync](#haproxy-tls-ce
 - **Repo:** `vps/stalwart-slot-manager.py` → `/usr/local/bin/stalwart-slot-manager.py`
 - **Invokes:** `/usr/local/bin/stalwart-switch-slot` (no `.sh` suffix — see [Blue/green cutover](#bluegreen-cutover))
 - **Auth POSTs:** `/activate`, `/preempt`, `/preempt/clear`, `/lease/claim`, `/lease/reclaim`, `/lease/renew`, `/lease/release` (Bearer `SLOT_MANAGER_TOKEN`; JSON `slot` + per-container `owner`)
+- **Prometheus proxy:** `GET /metrics/prometheus` (Bearer `SLOT_MANAGER_TOKEN` from Gatus). The manager scrapes the active slot locally with Stalwart WebUI basic auth from `/etc/stalwart-slot-manager.env`: set `PROMETHEUS_USER` + `PROMETHEUS_PASSWORD` (same values as Gatus `prometheus_user` / `prometheus_password`) or pre-encoded `PROMETHEUS_BASIC_AUTH`.
 - **Status:** `GET /status` reports `protocolVersion: 2`, `blueOccupied` / `greenOccupied` (null if unknown), `bluePreempted` / `greenPreempted`, and per-slot `Owner` / `PreemptOwner`
 - **State:** atomic owner-scoped records in `/run/stalwart-slot-preempt/`. Leases expire after 30 seconds; abandoned preempt requests expire after 90 seconds. Claims require a vacant frps dashboard result and no competing lease, including pending launches. Release acknowledgement follows process termination. An expired lease does not override an online proxy.
 

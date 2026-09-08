@@ -21,6 +21,7 @@ import {
 import { errorMessage, RateLimitError } from "../lib/errors";
 import {
   buildSafeJmapUpstreamUrl,
+  fetchJmapUpstream,
   JmapProxyPathError,
 } from "../lib/jmap-proxy-path";
 import { enforceRateLimit, getClientIp } from "../lib/rate-limit";
@@ -568,16 +569,30 @@ async function proxyJmapRequest(input: {
   let response: Response;
   const upstreamStart = performance.now();
   try {
-    response = await (input.fetcher ?? fetch)(upstreamUrl, {
-      method,
-      headers,
-      body:
-        requestBody && requestBody.byteLength > 0 ? requestBody : undefined,
-      redirect: "manual",
-    });
+    response = await fetchJmapUpstream(
+      input.fetcher ?? fetch,
+      input.upstreamBaseUrl,
+      upstreamUrl,
+      {
+        method,
+        headers,
+        body:
+          requestBody && requestBody.byteLength > 0 ? requestBody : undefined,
+      },
+    );
   } catch (err) {
-    const message =
-      errorMessage(err, "Unknown network error");
+    if (err instanceof JmapProxyPathError) {
+      return Response.json(
+        {
+          error: "Bad request",
+          message: err.message,
+          statusCode: 400,
+          timestamp: new Date().toISOString(),
+        },
+        { status: 400 },
+      );
+    }
+    const message = errorMessage(err, "Unknown network error");
     logger.error("JMAP proxy upstream request failed", {
       upstreamUrl: sanitizeRequestUrl(upstreamUrl),
       method,
@@ -887,7 +902,7 @@ export function createMailRoutes(
               ),
             );
           }
-        
+
           try {
             return await mailService.getAccessTokenForUser({
               userId,
@@ -906,66 +921,66 @@ export function createMailRoutes(
             );
           }
         })
-    .get("/vault-key-material", {
-      detail: {
-        ...authDetail.detail,
-        summary: "Get server-derived vault key material",
-        description:
-          "Returns an HMAC-SHA256 derived key material unique to the authenticated user. Used client-side to derive the vault encryption key without a user-typed password. Pass includeDerived=0 to skip the expensive argon2id derived AES key when the client already has it cached.",
-      },
-    }, async ({ routeUser, status, request }) => {
-      const userId = routeUser.id;
-      try {
-        enforceRateLimit({
-          storeId: "vault-key-material",
-          key: userId,
-          limit: VAULT_KEY_MATERIAL_RATE_LIMIT,
-        });
-      } catch (error) {
-        if (error instanceof RateLimitError) {
-          return status(429, {
-            error: "Too many requests",
-            message: error.message,
-            statusCode: 429,
-            timestamp: new Date().toISOString(),
-          });
-        }
-        throw error;
-      }
-      const includeDerived =
-        new URL(request.url).searchParams.get("includeDerived") !== "0";
-      try {
-        const keyMaterial = await deriveVaultKeyMaterial(userId);
-        let derivedKeyB64: string | null = null;
-        if (includeDerived) {
-          try {
-            derivedKeyB64 = await deriveVaultKeyForNative(userId, keyMaterial);
-          } catch (derivedErr) {
-            logger.error("[vault-key-material] deriveVaultKeyForNative failed", {
-              userId,
-              ...errorLogDetails(derivedErr),
-            });
-          }
-        }
-        logger.debug(
-          "[vault-key-material] responding hasDerivedKey=%s includeDerived=%s for userId=%s",
-          derivedKeyB64 ? "yes" : "no",
-          includeDerived ? "yes" : "no",
-          userId,
-        );
-        return { keyMaterial, derivedKeyB64, version: "v1" };
-      } catch (err) {
-        const message = errorMessage(
-          err,
-          "Could not derive vault key material.",
-        );
-        return status(
-          500,
-          createApiErrorBody(500, "vault_key_error", message),
-        );
-      }
-    }),
-    ),
+          .get("/vault-key-material", {
+            detail: {
+              ...authDetail.detail,
+              summary: "Get server-derived vault key material",
+              description:
+                "Returns an HMAC-SHA256 derived key material unique to the authenticated user. Used client-side to derive the vault encryption key without a user-typed password. Pass includeDerived=0 to skip the expensive argon2id derived AES key when the client already has it cached.",
+            },
+          }, async ({ routeUser, status, request }) => {
+            const userId = routeUser.id;
+            try {
+              enforceRateLimit({
+                storeId: "vault-key-material",
+                key: userId,
+                limit: VAULT_KEY_MATERIAL_RATE_LIMIT,
+              });
+            } catch (error) {
+              if (error instanceof RateLimitError) {
+                return status(429, {
+                  error: "Too many requests",
+                  message: error.message,
+                  statusCode: 429,
+                  timestamp: new Date().toISOString(),
+                });
+              }
+              throw error;
+            }
+            const includeDerived =
+              new URL(request.url).searchParams.get("includeDerived") !== "0";
+            try {
+              const keyMaterial = await deriveVaultKeyMaterial(userId);
+              let derivedKeyB64: string | null = null;
+              if (includeDerived) {
+                try {
+                  derivedKeyB64 = await deriveVaultKeyForNative(userId, keyMaterial);
+                } catch (derivedErr) {
+                  logger.error("[vault-key-material] deriveVaultKeyForNative failed", {
+                    userId,
+                    ...errorLogDetails(derivedErr),
+                  });
+                }
+              }
+              logger.debug(
+                "[vault-key-material] responding hasDerivedKey=%s includeDerived=%s for userId=%s",
+                derivedKeyB64 ? "yes" : "no",
+                includeDerived ? "yes" : "no",
+                userId,
+              );
+              return { keyMaterial, derivedKeyB64, version: "v1" };
+            } catch (err) {
+              const message = errorMessage(
+                err,
+                "Could not derive vault key material.",
+              );
+              return status(
+                500,
+                createApiErrorBody(500, "vault_key_error", message),
+              );
+            }
+          }),
+      ),
     );
 }
 

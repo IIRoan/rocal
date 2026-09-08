@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import base64
 import json
 import fcntl
 import os
@@ -29,6 +30,18 @@ FRP_PROXIES = {
 HTTP_HEALTHCHECK_HOST = os.environ.get("HTTP_HEALTHCHECK_HOST", "mail.solace.onl")
 FRPS_DASHBOARD = os.environ.get("FRPS_DASHBOARD_URL", "http://127.0.0.1:7500")
 PROMETHEUS_BASIC_AUTH = os.environ.get("PROMETHEUS_BASIC_AUTH", "")
+
+
+def resolve_prometheus_basic_auth() -> str | None:
+    """Base64 basic-auth token for Stalwart's /metrics/prometheus (not the slot-manager Bearer)."""
+    explicit = PROMETHEUS_BASIC_AUTH.strip()
+    if explicit:
+        return explicit
+    user = os.environ.get("PROMETHEUS_USER", "").strip()
+    password = os.environ.get("PROMETHEUS_PASSWORD", "").strip()
+    if user and password:
+        return base64.b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
+    return None
 
 
 def read_active_slot():
@@ -161,8 +174,9 @@ def fetch_active_prometheus():
         "-H",
         f"Host: {HTTP_HEALTHCHECK_HOST}",
     ]
-    if PROMETHEUS_BASIC_AUTH:
-        command.extend(["-H", f"Authorization: Basic {PROMETHEUS_BASIC_AUTH}"])
+    prometheus_auth = resolve_prometheus_basic_auth()
+    if prometheus_auth:
+        command.extend(["-H", f"Authorization: Basic {prometheus_auth}"])
     command.append(f"http://127.0.0.1:{http_port}/metrics/prometheus")
     return subprocess.run(command, capture_output=True, text=True)
 
@@ -184,7 +198,8 @@ class Handler(BaseHTTPRequestHandler):
     def _proxy_prometheus(self):
         result = fetch_active_prometheus()
         if result.returncode != 0:
-            self._send(502, {"error": "prometheus_proxy_failed"})
+            details = (result.stderr or result.stdout or "prometheus scrape failed").strip()
+            self._send(502, {"error": "prometheus_proxy_failed", "details": details})
             return
 
         body = result.stdout.encode("utf-8")
