@@ -46,10 +46,11 @@ ui:
   alerts:
     - type: discord
 
+# Mail / VPS: alert after 2 fails (≈1m at 30s interval). Soft enough to ignore blips.
 .discord-alerts-soft: &discord-alerts-soft
   alerts:
     - type: discord
-      failure-threshold: 3
+      failure-threshold: 2
       success-threshold: 2
       send-on-resolved: true
 
@@ -67,24 +68,28 @@ ui:
     hide-url: true
 
 endpoints:
-  # Vercel Hobby: keep Application checks light (invocations + Fluid CPU).
+  # Vercel: HEAD keeps Fluid bandwidth low; 2m ≈ 720 checks/day (status + TLS only).
   - name: website
     <<: *discord-alerts
     group: Application
     url: https://solace.onl/
-    interval: 5m
+    method: HEAD
+    interval: 2m
     ui:
       <<: *endpoint-ui
+    client:
+      timeout: 10s
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 3000"
       - "[CERTIFICATE_EXPIRATION] > 336h"
 
+  # Cheap JSON liveness on the API — primary backend signal; 1m ≈ 1440/day.
   - name: api-health
     <<: *discord-alerts
     group: Application
     url: https://api.solace.onl/api/health
-    interval: 5m
+    interval: 1m
     ui:
       <<: *endpoint-ui
     client:
@@ -95,11 +100,12 @@ endpoints:
       - "[RESPONSE_TIME] < 5000"
       - "[CERTIFICATE_EXPIRATION] > 336h"
 
+  # Mail path is Railway/VPS — poll often; no Vercel cost.
   - name: jmap-session
     <<: *discord-alerts-soft
     group: Mail
     url: https://mail.solace.onl/jmap/session
-    interval: 2m
+    interval: 30s
     ui:
       <<: *endpoint-ui
     client:
@@ -113,7 +119,7 @@ endpoints:
     <<: *discord-alerts-soft
     group: Mail
     url: https://mail.solace.onl/slot-manager/status
-    interval: 2m
+    interval: 30s
     ui:
       <<: *endpoint-ui
     client:
@@ -123,11 +129,11 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
 
-  # One scrape for exporter shape + core protocol gauges (was 6×60s duplicates).
+  # Combined Prometheus scrapes (not Vercel). 2m keeps exporter shape fresh without spam.
   - name: stalwart-metrics
     <<: *prometheus
     group: Stalwart Metrics
-    interval: 5m
+    interval: 2m
     conditions:
       - "[STATUS] == 200"
       - "[BODY] == pat(*# HELP server_memory*)"
@@ -149,7 +155,7 @@ endpoints:
   - name: stalwart-error-counters
     <<: *prometheus
     group: Stalwart Metrics
-    interval: 5m
+    interval: 2m
     conditions:
       # Store I/O must be present; error counters are unhealthy only when exported (>0).
       - "[STATUS] == 200"
