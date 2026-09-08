@@ -1,8 +1,9 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import { env } from "./env";
 
 export const PASSKEY_STEP_UP_COOKIE_NAME = "solace-passkey-step-up";
-const PASSKEY_STEP_UP_COOKIE_VALUE = "verified";
+const PASSKEY_STEP_UP_TTL_SECONDS = 12 * 60 * 60;
 const PASSKEY_PRESENCE_CACHE_TTL_MS = 60_000;
 
 type CachedPasskeyPresence = {
@@ -27,6 +28,12 @@ type PasskeyStepUpCookieTarget =
   | {
       headers: Headers;
     };
+
+type StepUpCookiePayload = {
+  u: string;
+  s: string;
+  e: number;
+};
 
 function normalizeCookieSameSite(
   value: string | undefined,
@@ -55,13 +62,79 @@ function getCookieDomain(baseUrl: string): string | undefined {
   }
 }
 
+function getStepUpSigningSecret(): string {
+  const secret = process.env.BETTER_AUTH_SECRET?.trim();
+  if (!secret) {
+    throw new Error("BETTER_AUTH_SECRET is required for passkey step-up cookies");
+  }
+  return secret;
+}
+
+function signStepUpPayload(encodedPayload: string): string {
+  return createHmac("sha256", getStepUpSigningSecret())
+    .update(encodedPayload)
+    .digest("base64url");
+}
+
+function encodeStepUpCookieValue(input: {
+  userId: string;
+  sessionId: string;
+}): string {
+  const payload: StepUpCookiePayload = {
+    u: input.userId,
+    s: input.sessionId,
+    e: Math.floor(Date.now() / 1000) + PASSKEY_STEP_UP_TTL_SECONDS,
+  };
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${encoded}.${signStepUpPayload(encoded)}`;
+}
+
+function parseStepUpCookieValue(raw: string): StepUpCookiePayload | null {
+  const separator = raw.lastIndexOf(".");
+  if (separator <= 0) {
+    return null;
+  }
+
+  const encoded = raw.slice(0, separator);
+  const signature = raw.slice(separator + 1);
+  const expected = signStepUpPayload(encoded);
+
+  const providedBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (
+    providedBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(providedBuffer, expectedBuffer)
+  ) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(
+      Buffer.from(encoded, "base64url").toString("utf8"),
+    ) as StepUpCookiePayload;
+    if (
+      typeof payload.u !== "string" ||
+      typeof payload.s !== "string" ||
+      typeof payload.e !== "number"
+    ) {
+      return null;
+    }
+    if (payload.e < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 export function getPasskeyStepUpCookieAttributes() {
   return {
     httpOnly: true,
     path: "/",
     sameSite: normalizeCookieSameSite(env.cookieSameSite),
     secure: env.isProduction,
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: PASSKEY_STEP_UP_TTL_SECONDS,
     ...(env.isProduction
       ? {
           domain: getCookieDomain(env.backendUrl),
@@ -118,11 +191,12 @@ function writeCookie(
 
 export function setVerifiedPasskeyStepUpCookie(
   target: PasskeyStepUpCookieTarget,
+  binding: { userId: string; sessionId: string },
 ) {
   writeCookie(
     target,
     PASSKEY_STEP_UP_COOKIE_NAME,
-    PASSKEY_STEP_UP_COOKIE_VALUE,
+    encodeStepUpCookieValue(binding),
     getPasskeyStepUpCookieAttributes(),
   );
 }
@@ -158,9 +232,22 @@ function parseCookies(cookieHeader: string | null): Record<string, string> {
   );
 }
 
-export function hasVerifiedPasskeyStepUp(request: Request): boolean {
+export function hasVerifiedPasskeyStepUp(
+  request: Request,
+  binding: { userId: string; sessionId: string },
+): boolean {
   const cookies = parseCookies(request.headers.get("cookie"));
-  return cookies[PASSKEY_STEP_UP_COOKIE_NAME] === PASSKEY_STEP_UP_COOKIE_VALUE;
+  const raw = cookies[PASSKEY_STEP_UP_COOKIE_NAME];
+  if (!raw) {
+    return false;
+  }
+
+  const payload = parseStepUpCookieValue(raw);
+  if (!payload) {
+    return false;
+  }
+
+  return payload.u === binding.userId && payload.s === binding.sessionId;
 }
 
 function readCachedPasskeyPresence(userId: string): boolean | undefined {
@@ -223,12 +310,16 @@ export async function getPasskeyStepUpStatus(input: {
   prisma: PrismaClient;
   request: Request;
   userId: string;
+  sessionId: string;
 }) {
   const hasPasskeys = await resolveHasPasskeys({
     prisma: input.prisma,
     userId: input.userId,
   });
-  const verified = hasVerifiedPasskeyStepUp(input.request);
+  const verified = hasVerifiedPasskeyStepUp(input.request, {
+    userId: input.userId,
+    sessionId: input.sessionId,
+  });
 
   return {
     hasPasskeys,

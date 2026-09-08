@@ -543,6 +543,31 @@ describe("mailRoutes", () => {
     );
   });
 
+  it("rejects path traversal attempts on nested JMAP proxy routes", async () => {
+    const proxyFetch = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () => new Response(null, { status: 200 }));
+
+    const traversalPaths = [
+      "http://localhost/mail/jmap/jmap/%2e%2e%2f%2e%2e%2fapi/store/setting",
+    ];
+
+    for (const url of traversalPaths) {
+      const response = await createApp({
+        jmapFetch: proxyFetch,
+        jmapUpstreamBaseUrl: "http://stalwart.test",
+      }).handle(
+        new Request(url, {
+          headers: { Authorization: "Bearer mail-access-token" },
+        }),
+      );
+
+      expect(response.status).toBe(400);
+      expect(proxyFetch).not.toHaveBeenCalled();
+      proxyFetch.mockClear();
+    }
+  });
+
   it("rejects proxied JMAP calls without mailbox credentials", async () => {
     const response = await createApp({
       jmapUpstreamBaseUrl: "http://stalwart.test",
@@ -643,6 +668,7 @@ describe("mailRoutes", () => {
     expect(response.status).toBe(200);
     expect(mockMailService.getDirectoryKey).toHaveBeenCalledWith(
       "bob@solace.onl",
+      { allowRemoteResolve: false },
     );
     await expect(readJson(response)).resolves.toEqual({
       email: "bob@solace.onl",

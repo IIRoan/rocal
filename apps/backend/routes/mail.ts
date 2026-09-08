@@ -18,7 +18,12 @@ import {
   buildStalwartMailBridgeRedirectUri,
   getStalwartMailBridgeClientId,
 } from "../lib/mail-bridge-auth";
-import { errorMessage } from "../lib/errors";
+import { errorMessage, RateLimitError } from "../lib/errors";
+import {
+  buildSafeJmapUpstreamUrl,
+  JmapProxyPathError,
+} from "../lib/jmap-proxy-path";
+import { enforceRateLimit, getClientIp } from "../lib/rate-limit";
 import { logRef, redactPII, sanitizeRequestUrl, errorLogDetails } from "../lib/log-sanitization";
 
 type JmapProxyFetcher = (
@@ -31,6 +36,34 @@ function normalizeBaseUrl(baseUrl: string): string {
 }
 
 const logger = createLogger("backend:mail-jmap-proxy");
+
+const MAX_VAULT_MEMORY_KIB = 131_072;
+const MAX_VAULT_ITERATIONS = 4;
+const MAX_VAULT_PARALLELISM = 4;
+const VAULT_KEY_MATERIAL_RATE_LIMIT = { requests: 10, windowMs: 60_000 };
+
+let vaultDeriveChain: Promise<void> = Promise.resolve();
+
+function withVaultDeriveMutex<T>(task: () => Promise<T>): Promise<T> {
+  const run = vaultDeriveChain.then(task, task);
+  vaultDeriveChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+function vaultKdfParamsWithinServerCap(input: {
+  kdfMemoryKiB: number;
+  kdfIterations: number;
+  kdfParallelism: number;
+}): boolean {
+  return (
+    input.kdfMemoryKiB <= MAX_VAULT_MEMORY_KIB &&
+    input.kdfIterations <= MAX_VAULT_ITERATIONS &&
+    input.kdfParallelism <= MAX_VAULT_PARALLELISM
+  );
+}
 async function deriveVaultKeyMaterial(userId: string): Promise<string> {
   const hmacKey = env.mailVaultHmacKey;
   if (!hmacKey) {
@@ -90,6 +123,21 @@ async function deriveVaultKeyForNative(
   }
 
   const { kdfSaltB64, kdfMemoryKiB, kdfIterations, kdfParallelism } = entry.vaultBackup;
+
+  if (
+    !vaultKdfParamsWithinServerCap({
+      kdfMemoryKiB,
+      kdfIterations,
+      kdfParallelism,
+    })
+  ) {
+    logger.warn(
+      "[deriveVaultKeyForNative] refusing server derive — KDF params exceed cap for userId=%s",
+      userId,
+    );
+    return null;
+  }
+
   logger.debug(
     "[deriveVaultKeyForNative] running argon2id: memoryKiB=%d iterations=%d parallelism=%d saltLen=%d",
     kdfMemoryKiB, kdfIterations, kdfParallelism, kdfSaltB64.length,
@@ -99,15 +147,17 @@ async function deriveVaultKeyForNative(
   const saltBase64 = kdfSaltB64.replace(/-/g, "+").replace(/_/g, "/");
 
   const { argon2id } = await import("hash-wasm");
-  const derived = await argon2id({
-    password: keyMaterial,
-    salt: Buffer.from(saltBase64, "base64"),
-    memorySize: kdfMemoryKiB,
-    iterations: kdfIterations,
-    parallelism: kdfParallelism,
-    hashLength: 32,
-    outputType: "binary",
-  });
+  const derived = await withVaultDeriveMutex(() =>
+    argon2id({
+      password: keyMaterial,
+      salt: Buffer.from(saltBase64, "base64"),
+      memorySize: kdfMemoryKiB,
+      iterations: kdfIterations,
+      parallelism: kdfParallelism,
+      hashLength: 32,
+      outputType: "binary",
+    }),
+  );
 
   logger.debug("[deriveVaultKeyForNative] argon2id succeeded, returning derivedKeyB64");
   return Buffer.from(derived)
@@ -474,7 +524,27 @@ async function proxyJmapRequest(input: {
   }
 
   const requestUrl = new URL(input.request.url);
-  const upstreamUrl = `${normalizeBaseUrl(input.upstreamBaseUrl)}${input.upstreamPath}${requestUrl.search}`;
+  let upstreamUrl: string;
+  try {
+    upstreamUrl = buildSafeJmapUpstreamUrl(
+      input.upstreamBaseUrl,
+      input.upstreamPath,
+      requestUrl.search,
+    );
+  } catch (error) {
+    if (error instanceof JmapProxyPathError) {
+      return Response.json(
+        {
+          error: "Bad request",
+          message: error.message,
+          statusCode: 400,
+          timestamp: new Date().toISOString(),
+        },
+        { status: 400 },
+      );
+    }
+    throw error;
+  }
   const headers = new Headers({
     Authorization: authorization,
   });
@@ -503,7 +573,7 @@ async function proxyJmapRequest(input: {
       headers,
       body:
         requestBody && requestBody.byteLength > 0 ? requestBody : undefined,
-      redirect: "follow",
+      redirect: "manual",
     });
   } catch (err) {
     const message =
@@ -699,9 +769,36 @@ export function createMailRoutes(
         description:
           "Returns the stored OpenPGP public key directory entry for an internal mailbox.",
       },
-    }, async ({ params }) => {
+    }, async ({ params, request }) => {
+      const sessionUser = await resolveSessionUserForProxy(request);
+      const rateLimitKey = sessionUser?.id
+        ? `user:${sessionUser.id}`
+        : `ip:${getClientIp(request)}`;
       try {
-        return await mailService.getDirectoryKey(params.email);
+        enforceRateLimit({
+          storeId: "mail-directory-keys",
+          key: rateLimitKey,
+          limit: { requests: 60, windowMs: 60_000 },
+        });
+      } catch (error) {
+        if (error instanceof RateLimitError) {
+          return Response.json(
+            {
+              error: "Too many requests",
+              message: error.message,
+              statusCode: 429,
+              timestamp: new Date().toISOString(),
+            },
+            { status: 429 },
+          );
+        }
+        throw error;
+      }
+
+      try {
+        return await mailService.getDirectoryKey(params.email, {
+          allowRemoteResolve: Boolean(sessionUser),
+        });
       } catch (err) {
         logger.error("Failed to look up internal recipient key", {
           recipientRef: logRef(params.email),
@@ -818,6 +915,23 @@ export function createMailRoutes(
       },
     }, async ({ routeUser, status, request }) => {
       const userId = routeUser.id;
+      try {
+        enforceRateLimit({
+          storeId: "vault-key-material",
+          key: userId,
+          limit: VAULT_KEY_MATERIAL_RATE_LIMIT,
+        });
+      } catch (error) {
+        if (error instanceof RateLimitError) {
+          return status(429, {
+            error: "Too many requests",
+            message: error.message,
+            statusCode: 429,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        throw error;
+      }
       const includeDerived =
         new URL(request.url).searchParams.get("includeDerived") !== "0";
       try {

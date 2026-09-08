@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { getDefaultCalendarDateRange } from "../date-utils";
 import type { CalendarView } from "../types";
+import { validBaseDateArb } from "./property-test-arbitraries";
 
 /**
  * Property 3: Calendar date range validity
@@ -22,25 +23,11 @@ const calendarViewArb: fc.Arbitrary<CalendarView> = fc.constantFrom(
 
 const weekStartDayArb: fc.Arbitrary<0 | 1> = fc.constantFrom(0, 1);
 
-// Generate reasonable dates (2000-01-01 to 2099-12-31) to avoid edge cases
-// with extreme dates that aren't realistic calendar usage
-const baseDateArb: fc.Arbitrary<Date> = fc
-  .date({
-    min: new Date(2000, 0, 1),
-    max: new Date(2099, 11, 31),
-  })
-  .map((d) => {
-    // Normalize to noon to avoid DST boundary issues
-    const normalized = new Date(d);
-    normalized.setHours(12, 0, 0, 0);
-    return normalized;
-  });
-
 describe("getDefaultCalendarDateRange - Property Tests", () => {
   it("should always return start <= end for any valid inputs", () => {
     fc.assert(
       fc.property(
-        baseDateArb,
+        validBaseDateArb,
         calendarViewArb,
         weekStartDayArb,
         (baseDate, view, weekStartDay) => {
@@ -59,7 +46,7 @@ describe("getDefaultCalendarDateRange - Property Tests", () => {
   it("should always contain the base date within [start, end]", () => {
     fc.assert(
       fc.property(
-        baseDateArb,
+        validBaseDateArb,
         calendarViewArb,
         weekStartDayArb,
         (baseDate, view, weekStartDay) => {
@@ -81,7 +68,7 @@ describe("getDefaultCalendarDateRange - Property Tests", () => {
   it("should be deterministic: same inputs always produce same outputs", () => {
     fc.assert(
       fc.property(
-        baseDateArb,
+        validBaseDateArb,
         calendarViewArb,
         weekStartDayArb,
         (baseDate, view, weekStartDay) => {

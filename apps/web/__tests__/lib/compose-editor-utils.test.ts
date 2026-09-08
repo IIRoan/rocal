@@ -17,9 +17,16 @@ describe("compose-editor-utils", () => {
     const sanitized = sanitizeQuotedEmailHtml(
       '<p>Hello</p><script>alert(1)</script><style>.x{}</style>',
     );
-    expect(sanitized).toContain("<p>Hello</p>");
-    expect(sanitized).not.toContain("<script");
-    expect(sanitized).not.toContain("<style");
+    expect(sanitized).toContain("Hello");
+    expect(sanitized).not.toMatch(/<script/i);
+    expect(sanitized).not.toMatch(/<style/i);
+  });
+
+  it("blocks javascript: URLs in quoted html", () => {
+    const sanitized = sanitizeQuotedEmailHtml(
+      '<a href="javascript:alert(1)">click</a>',
+    );
+    expect(sanitized.toLowerCase()).not.toContain("javascript:");
   });
 
   it("rewrites cid images for the editor", () => {

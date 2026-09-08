@@ -54,7 +54,7 @@ model User {
 
 model Invite {
   id              String    @id @default(cuid())
-  token           String    @unique @default(cuid())
+  token           String    @unique
   invitedById     String    @map("invited_by_id")
   invitedBy       User      @relation("InviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
   email           String    // external email of the person being invited

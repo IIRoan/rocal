@@ -22,30 +22,48 @@ type AuthParentContext = {
   request: Request;
 };
 
-async function resolveAuthenticatedUser(
+type AuthenticatedSession = {
+  user: AuthenticatedUser;
+  sessionId: string;
+};
+
+async function resolveAuthenticatedSession(
   ctx: AuthParentContext,
-): Promise<AuthenticatedUser | null> {
-  if (
-    hasUserId(ctx.authenticatedUser) &&
-    typeof ctx.authenticatedUser.id === "string"
-  ) {
-    return ctx.authenticatedUser;
-  }
-
-  if (hasUserId(ctx.user) && typeof ctx.user.id === "string") {
-    return ctx.user;
-  }
-
+): Promise<AuthenticatedSession | null> {
   try {
     const authData = await auth.api.getSession({
       headers: ctx.request.headers as Headers,
     });
 
-    if (hasUserId(authData?.user) && typeof authData.user.id === "string") {
-      return authData.user;
+    if (
+      hasUserId(authData?.user) &&
+      typeof authData.user.id === "string" &&
+      typeof authData.session?.id === "string"
+    ) {
+      return {
+        user: authData.user,
+        sessionId: authData.session.id,
+      };
     }
   } catch (error) {
     logger.debug("Session resolution failed", errorLogDetails(error));
+  }
+
+  if (
+    hasUserId(ctx.authenticatedUser) &&
+    typeof ctx.authenticatedUser.id === "string"
+  ) {
+    return {
+      user: ctx.authenticatedUser,
+      sessionId: "",
+    };
+  }
+
+  if (hasUserId(ctx.user) && typeof ctx.user.id === "string") {
+    return {
+      user: ctx.user,
+      sessionId: "",
+    };
   }
 
   return null;
@@ -56,17 +74,26 @@ export const requireAuth = new Elysia({ name: "require-auth" }).derive(
   "plugin",
   async (ctx) => {
     const parent = ctx as typeof ctx & AuthParentContext;
-    const routeUser = await resolveAuthenticatedUser(parent);
+    const session = await resolveAuthenticatedSession(parent);
 
-    if (!routeUser?.id) {
+    if (!session?.user?.id) {
       return status(401, unauthorizedBody());
     }
 
-    if (!hasVerifiedPasskeyStepUp(parent.request)) {
+    const { user: routeUser, sessionId } = session;
+    const stepUpVerified =
+      sessionId.length > 0 &&
+      hasVerifiedPasskeyStepUp(parent.request, {
+        userId: routeUser.id,
+        sessionId,
+      });
+
+    if (!stepUpVerified) {
       const stepUpStatus = await getPasskeyStepUpStatus({
         prisma,
         request: parent.request,
         userId: routeUser.id,
+        sessionId,
       });
 
       if (stepUpStatus.requiresPasskeyStepUp) {

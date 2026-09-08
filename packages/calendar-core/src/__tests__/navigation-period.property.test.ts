@@ -10,6 +10,7 @@ import {
 } from "date-fns";
 import { getDefaultCalendarDateRange } from "../date-utils";
 import { AgendaDaysToShow, type CalendarView } from "../types";
+import { validBaseDateArb } from "./property-test-arbitraries";
 
 /**
  * Property 5: Calendar view navigation period
@@ -32,19 +33,6 @@ const calendarViewArb: fc.Arbitrary<CalendarView> = fc.constantFrom(
 );
 
 const weekStartDayArb: fc.Arbitrary<0 | 1> = fc.constantFrom(0, 1);
-
-// Generate reasonable dates (2000-01-01 to 2099-12-31) normalized to noon
-// to avoid DST boundary issues
-const baseDateArb: fc.Arbitrary<Date> = fc
-  .date({
-    min: new Date(2000, 0, 1),
-    max: new Date(2099, 11, 31),
-  })
-  .map((d) => {
-    const normalized = new Date(d);
-    normalized.setHours(12, 0, 0, 0);
-    return normalized;
-  });
 
 /**
  * Advance a base date by one navigation period for the given view type.
@@ -86,7 +74,7 @@ describe("getDefaultCalendarDateRange - Navigation Period Properties", () => {
   it("navigating forward then backward returns to the same date range (round-trip)", () => {
     fc.assert(
       fc.property(
-        baseDateArb,
+        validBaseDateArb,
         calendarViewArb,
         weekStartDayArb,
         (baseDate, view, weekStartDay) => {
@@ -121,7 +109,7 @@ describe("getDefaultCalendarDateRange - Navigation Period Properties", () => {
   it("navigating forward advances the start date by exactly one period", () => {
     fc.assert(
       fc.property(
-        baseDateArb,
+        validBaseDateArb,
         calendarViewArb,
         weekStartDayArb,
         (baseDate, view, weekStartDay) => {
@@ -204,7 +192,7 @@ describe("getDefaultCalendarDateRange - Navigation Period Properties", () => {
   it("navigation is deterministic: same inputs always produce same outputs", () => {
     fc.assert(
       fc.property(
-        baseDateArb,
+        validBaseDateArb,
         calendarViewArb,
         weekStartDayArb,
         (baseDate, view, weekStartDay) => {

@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { createLogger } from "@workspace/logger";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import type {
@@ -149,6 +150,7 @@ export class InviteService implements IInviteService {
         email,
         expiresAt,
         status: "pending",
+        token: randomBytes(32).toString("base64url"),
       },
     });
 

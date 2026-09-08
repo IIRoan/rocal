@@ -60,7 +60,7 @@ ui:
   <<: *discord-alerts
   url: https://mail.solace.onl/slot-manager/metrics/prometheus
   headers:
-    Authorization: "Basic __PROMETHEUS_BASIC_AUTH__"
+    Authorization: "Bearer ${SLOT_MANAGER_TOKEN}"
   client:
     timeout: 15s
   ui:

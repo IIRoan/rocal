@@ -35,6 +35,7 @@ jest.mock("@workspace/logger", () => ({
     error: jest.fn(),
     warn: jest.fn(),
     info: jest.fn(),
+    debug: jest.fn(),
   }),
 }));
 
@@ -443,6 +444,7 @@ import {
   initEncPasswordFromCookie,
 } from "../../lib/enc-password-cookie";
 import { mailDemoApiService } from "../../lib/mail/api-service";
+import { clearMailOpenPrefetch } from "../../lib/mail/mail-open-prefetch";
 import {
   createEncryptedMailVault,
   unlockEncryptedMailVault,
@@ -538,6 +540,7 @@ async function waitForExpectation(
 
 describe("MailApp", () => {
   beforeEach(async () => {
+    clearMailOpenPrefetch();
     await resetMailVaultDatabase();
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -764,6 +767,7 @@ describe("MailApp", () => {
   });
 
   afterEach(async () => {
+    clearMailOpenPrefetch();
     act(() => {
       root.unmount();
     });
@@ -789,7 +793,7 @@ describe("MailApp", () => {
       displayName: "Alice Example",
       provisioned: false,
     });
-    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
 
     await renderApp();
@@ -881,7 +885,7 @@ describe("MailApp", () => {
       displayName: "Alice Example",
       provisioned: false,
     });
-    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
 
     await renderApp();
 
@@ -895,7 +899,7 @@ describe("MailApp", () => {
   });
 
   it("signs in with JMAP credentials, unlocks the vault, and renders inbox messages", async () => {
-    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
 
     await renderApp();
@@ -921,7 +925,7 @@ describe("MailApp", () => {
   });
 
   it("automatically opens a provisioned mailbox when the auth password is still cached", async () => {
-    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
 
     await renderApp();
@@ -1378,7 +1382,7 @@ describe("MailApp", () => {
 
   it("shows the loading skeleton instead of the migration prompt while auto-opening with the cached auth password", async () => {
     let resolveUnlock: ((value: any) => void) | null = null;
-    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockUnlockEncryptedMailVault.mockImplementation(
       () =>
@@ -1423,7 +1427,7 @@ describe("MailApp", () => {
   });
 
   it("loads messages for the selected mailbox folder", async () => {
-    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages.mockImplementation(
@@ -1487,7 +1491,7 @@ describe("MailApp", () => {
   });
 
   it("sends plaintext mail without looking up recipient keys", async () => {
-    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages.mockResolvedValue({
@@ -1645,7 +1649,7 @@ describe("MailApp", () => {
   });
 
   it("encrypts internal mail before sending it through the JMAP proxy", async () => {
-    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages.mockResolvedValue({
@@ -1734,7 +1738,7 @@ describe("MailApp", () => {
   });
 
   it("adds a sent quick reply into the active conversation immediately", async () => {
-    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockResolvedValue({
       messages: [
@@ -1807,7 +1811,7 @@ describe("MailApp", () => {
         autoSelectReplyIdentity: false,
       }),
     );
-    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockResolvedValue({
       messages: [

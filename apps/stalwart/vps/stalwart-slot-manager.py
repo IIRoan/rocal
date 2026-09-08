@@ -28,6 +28,7 @@ FRP_PROXIES = {
 }
 HTTP_HEALTHCHECK_HOST = os.environ.get("HTTP_HEALTHCHECK_HOST", "mail.solace.onl")
 FRPS_DASHBOARD = os.environ.get("FRPS_DASHBOARD_URL", "http://127.0.0.1:7500")
+PROMETHEUS_BASIC_AUTH = os.environ.get("PROMETHEUS_BASIC_AUTH", "")
 
 
 def read_active_slot():
@@ -147,7 +148,7 @@ def read_status():
     return result
 
 
-def fetch_active_prometheus(authorization):
+def fetch_active_prometheus():
     """Scrape Prometheus from the active slot's local HTTP port (bypasses HAProxy round-robin)."""
     slot = read_active_slot()
     http_port = SLOT_PORTS[slot][1]
@@ -160,8 +161,8 @@ def fetch_active_prometheus(authorization):
         "-H",
         f"Host: {HTTP_HEALTHCHECK_HOST}",
     ]
-    if authorization:
-        command.extend(["-H", f"Authorization: {authorization}"])
+    if PROMETHEUS_BASIC_AUTH:
+        command.extend(["-H", f"Authorization: Basic {PROMETHEUS_BASIC_AUTH}"])
     command.append(f"http://127.0.0.1:{http_port}/metrics/prometheus")
     return subprocess.run(command, capture_output=True, text=True)
 
@@ -181,10 +182,9 @@ class Handler(BaseHTTPRequestHandler):
         return self.headers.get("Authorization") == f"Bearer {AUTH_TOKEN}"
 
     def _proxy_prometheus(self):
-        result = fetch_active_prometheus(self.headers.get("Authorization", ""))
+        result = fetch_active_prometheus()
         if result.returncode != 0:
-            details = (result.stderr or result.stdout or "prometheus scrape failed").strip()
-            self._send(502, {"error": "prometheus_proxy_failed", "details": details})
+            self._send(502, {"error": "prometheus_proxy_failed"})
             return
 
         body = result.stdout.encode("utf-8")
@@ -196,6 +196,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/metrics/prometheus":
+            if not self._authorized():
+                self._send(401, {"error": "unauthorized"})
+                return
             self._proxy_prometheus()
             return
         if self.path == "/active":

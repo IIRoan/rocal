@@ -59,19 +59,10 @@ inject_basic_auth() {
 	mv /data/config.yaml.tmp /data/config.yaml
 }
 
-inject_prometheus_auth() {
-	if [ -z "${prometheus_user:-}" ] || [ -z "${prometheus_password:-}" ]; then
-		echo "prometheus_user and prometheus_password are required for Stalwart Metrics monitors." >&2
-		return 0
+inject_slot_manager_token() {
+	if [ -z "${SLOT_MANAGER_TOKEN:-}" ]; then
+		echo "SLOT_MANAGER_TOKEN is not set; slot-manager Prometheus monitor may fail auth." >&2
 	fi
-
-	PROMETHEUS_BASIC_AUTH=$(
-		printf '%s:%s' "$prometheus_user" "$prometheus_password" \
-			| base64 -w0 2>/dev/null \
-			|| printf '%s:%s' "$prometheus_user" "$prometheus_password" | base64 | tr -d '\n'
-	)
-
-	sed -i "s|__PROMETHEUS_BASIC_AUTH__|${PROMETHEUS_BASIC_AUTH}|g" /data/config.yaml
 }
 
 append_vps_ssh_endpoints() {
@@ -127,7 +118,7 @@ append_vps_ssh_endpoints() {
 write_base_config
 inject_theme_css
 inject_basic_auth
-inject_prometheus_auth
+inject_slot_manager_token
 
 if [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
 	echo "DISCORD_WEBHOOK_URL is not set; Discord downtime alerts are disabled." >&2

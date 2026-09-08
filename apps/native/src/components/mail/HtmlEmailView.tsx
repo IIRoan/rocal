@@ -13,6 +13,7 @@ import {
   buildEmailHtmlDocument,
   emailHasOwnDarkMode,
   processEmailHtml,
+  sanitizeUntrustedEmailHtml,
 } from "@workspace/calendar-core";
 
 type WebViewModule = typeof import("react-native-webview");
@@ -94,7 +95,7 @@ export function HtmlEmailView({
 
   const document = useMemo(() => {
     const processedHtml = processEmailHtml({
-      html,
+      html: sanitizeUntrustedEmailHtml(html),
       isDark,
       blockTrackingPixels,
       blockRemoteImages,
@@ -143,7 +144,7 @@ export function HtmlEmailView({
   return (
     <View style={[{ height: webViewHeight }, style]}>
       <WebView
-        originWhitelist={["*"]}
+        originWhitelist={["about:blank", "data:"]}
         source={{ html: document }}
         injectedJavaScript={FIT_AND_REPORT_SCRIPT}
         onMessage={onMessage}

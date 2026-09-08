@@ -1,47 +1,24 @@
 import { Elysia } from "elysia";
 import { env } from "../lib/env";
 import { RateLimitError } from "../lib/errors";
+import { enforceRateLimit, getClientIp } from "../lib/rate-limit";
 import { verifyStalwartWebhookSignature } from "../lib/stalwart-webhook-verify";
 import { stalwartWebhookPayloadSchema } from "../lib/stalwart-webhook";
 import type { StalwartWebhookService } from "../services/stalwart-webhook.service";
 
 export const STALWART_WEBHOOK_MAX_BODY_BYTES = 256 * 1024;
-const STALWART_WEBHOOK_RATE_LIMIT = { requests: 120, windowMs: 60_000 };
+const STALWART_WEBHOOK_SIGNED_RATE_LIMIT = { requests: 120, windowMs: 60_000 };
+const STALWART_WEBHOOK_UNSIGNED_IP_RATE_LIMIT = { requests: 30, windowMs: 60_000 };
 
-const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
-let lastRateLimitCleanup = 0;
-
-function enforceRateLimit(
-  key: string,
-  limit: { requests: number; windowMs: number },
-) {
-  const now = Date.now();
-  const windowStart = now - limit.windowMs;
-
-  if (now - lastRateLimitCleanup > limit.windowMs) {
-    for (const [storedKey, value] of rateLimitStore.entries()) {
-      if (value.resetTime < now) {
-        rateLimitStore.delete(storedKey);
-      }
-    }
-    lastRateLimitCleanup = now;
+function handleRateLimitError(error: unknown, set: { status?: number | string }) {
+  if (error instanceof RateLimitError) {
+    set.status = 429;
+    return {
+      error: "Too many requests",
+      message: error.message,
+    };
   }
-
-  const current = rateLimitStore.get(key);
-  if (!current || current.resetTime < windowStart) {
-    rateLimitStore.set(key, { count: 1, resetTime: now + limit.windowMs });
-    return;
-  }
-
-  if (current.count >= limit.requests) {
-    const retryAfterSeconds = Math.ceil((current.resetTime - now) / 1000);
-    throw new RateLimitError(
-      `Rate limit exceeded. Try again in ${retryAfterSeconds} seconds.`,
-      retryAfterSeconds,
-    );
-  }
-
-  current.count++;
+  throw error;
 }
 
 export function createStalwartWebhookRoutes(webhookService: StalwartWebhookService) {
@@ -63,20 +40,7 @@ export function createStalwartWebhookRoutes(webhookService: StalwartWebhookServi
         message: "Stalwart webhook is not configured.",
       };
     }
-  
-    try {
-      enforceRateLimit("stalwart-webhook", STALWART_WEBHOOK_RATE_LIMIT);
-    } catch (error) {
-      if (error instanceof RateLimitError) {
-        set.status = 429;
-        return {
-          error: "Too many requests",
-          message: error.message,
-        };
-      }
-      throw error;
-    }
-  
+
     const contentLength = Number(request.headers.get("content-length") ?? 0);
     if (
       Number.isFinite(contentLength) &&
@@ -88,7 +52,7 @@ export function createStalwartWebhookRoutes(webhookService: StalwartWebhookServi
         message: "Webhook body exceeds the allowed size.",
       };
     }
-  
+
     const rawBody = await request.text();
     if (Buffer.byteLength(rawBody, "utf8") > STALWART_WEBHOOK_MAX_BODY_BYTES) {
       set.status = 413;
@@ -97,22 +61,41 @@ export function createStalwartWebhookRoutes(webhookService: StalwartWebhookServi
         message: "Webhook body exceeds the allowed size.",
       };
     }
-  
+
     const signatureHeader = request.headers.get("X-Signature");
-    if (
-      !verifyStalwartWebhookSignature({
-        body: rawBody,
-        signatureHeader,
-        secret: env.stalwartWebhookSecret,
-      })
-    ) {
+    const signatureValid = verifyStalwartWebhookSignature({
+      body: rawBody,
+      signatureHeader,
+      secret: env.stalwartWebhookSecret,
+    });
+
+    if (!signatureValid) {
+      try {
+        enforceRateLimit({
+          storeId: "stalwart-webhook-unsigned",
+          key: getClientIp(request),
+          limit: STALWART_WEBHOOK_UNSIGNED_IP_RATE_LIMIT,
+        });
+      } catch (error) {
+        return handleRateLimitError(error, set);
+      }
       set.status = 401;
       return {
         error: "Unauthorized",
         message: "Invalid webhook signature.",
       };
     }
-  
+
+    try {
+      enforceRateLimit({
+        storeId: "stalwart-webhook-signed",
+        key: "stalwart-ingest",
+        limit: STALWART_WEBHOOK_SIGNED_RATE_LIMIT,
+      });
+    } catch (error) {
+      return handleRateLimitError(error, set);
+    }
+
     let parsedBody: unknown;
     try {
       parsedBody = JSON.parse(rawBody);
@@ -123,7 +106,7 @@ export function createStalwartWebhookRoutes(webhookService: StalwartWebhookServi
         message: "Webhook body must be valid JSON.",
       };
     }
-  
+
     const payload = stalwartWebhookPayloadSchema.safeParse(parsedBody);
     if (!payload.success) {
       set.status = 400;
@@ -132,7 +115,7 @@ export function createStalwartWebhookRoutes(webhookService: StalwartWebhookServi
         message: "Webhook payload is invalid.",
       };
     }
-  
+
     const result = await webhookService.handlePayload(payload.data);
     return {
       ok: true,

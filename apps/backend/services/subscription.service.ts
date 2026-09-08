@@ -25,6 +25,10 @@ import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
 import { ValidationError, NotFoundError, errorMessage } from "../lib/errors";
 import { prismaStringEquals } from "../lib/prisma-query";
 import { createLogger } from "@workspace/logger";
+import {
+  assertPublicHostnameResolves,
+  isPrivateNetworkHost,
+} from "../lib/ssrf-host-policy";
 import { EventParticipantService } from "./event-participant.service";
 
 const logger = createLogger("backend:subscription-service");
@@ -70,9 +74,9 @@ export class SubscriptionService implements ISubscriptionService {
       );
     }
 
-    const hostname = parsedUrl.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    const hostname = parsedUrl.hostname.replace(/^\[|\]$/g, "");
 
-    if (this.isPrivateHostname(hostname)) {
+    if (isPrivateNetworkHost(hostname)) {
       throw new ValidationError(
         "URLs pointing to internal or private networks are not allowed",
         "url",
@@ -82,56 +86,29 @@ export class SubscriptionService implements ISubscriptionService {
     return parsedUrl;
   }
 
-  private isPrivateHostname(hostname: string): boolean {
-    if (
-      hostname === "localhost" ||
-      hostname === "0.0.0.0" ||
-      hostname === "::" ||
-      hostname === "::1" ||
-      hostname.endsWith(".local")
-    ) {
-      return true;
+  private async ensureResolvablePublicCalendarUrl(url: string): Promise<URL> {
+    const parsedUrl = this.validateExternalCalendarUrl(url);
+    const hostname = parsedUrl.hostname.replace(/^\[|\]$/g, "");
+
+    if (!isIP(hostname)) {
+      try {
+        await assertPublicHostnameResolves(hostname);
+      } catch {
+        throw new ValidationError(
+          "URLs pointing to internal or private networks are not allowed",
+          "url",
+        );
+      }
     }
 
-    if (hostname.startsWith("::ffff:")) {
-      return this.isPrivateHostname(hostname.slice("::ffff:".length));
-    }
-
-    const ipVersion = isIP(hostname);
-
-    if (ipVersion === 4) {
-      const [firstOctet = 0, secondOctet = 0] = hostname
-        .split(".")
-        .map((octet) => Number.parseInt(octet, 10));
-
-      return (
-        firstOctet === 0 ||
-        firstOctet === 10 ||
-        firstOctet === 127 ||
-        (firstOctet === 169 && secondOctet === 254) ||
-        (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31) ||
-        (firstOctet === 192 && secondOctet === 168)
-      );
-    }
-
-    if (ipVersion === 6) {
-      return (
-        hostname === "::1" ||
-        hostname === "::" ||
-        hostname.startsWith("fc") ||
-        hostname.startsWith("fd") ||
-        /^fe[89ab]/.test(hostname)
-      );
-    }
-
-    return false;
+    return parsedUrl;
   }
 
   private async fetchCalendarResponse(
     url: string,
     extraHeaders: Record<string, string> = {},
   ): Promise<Response> {
-    let currentUrl = this.validateExternalCalendarUrl(url).toString();
+    let currentUrl = (await this.ensureResolvablePublicCalendarUrl(url)).toString();
 
     for (
       let redirectCount = 0;
@@ -171,8 +148,10 @@ export class SubscriptionService implements ISubscriptionService {
             );
           }
 
-          currentUrl = this.validateExternalCalendarUrl(
-            new URL(location, currentUrl).toString(),
+          currentUrl = (
+            await this.ensureResolvablePublicCalendarUrl(
+              new URL(location, currentUrl).toString(),
+            )
           ).toString();
           continue;
         }

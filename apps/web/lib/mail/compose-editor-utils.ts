@@ -1,4 +1,5 @@
 import { getComposeInlineImages } from "./compose-inline-images";
+import { sanitizeUntrustedEmailHtml } from "@workspace/calendar-core";
 
 export type QuotedInlineAttachment = {
   blobId?: string | null;
@@ -38,19 +39,10 @@ export function plainTextToComposerBody(text: string): string {
 
 /** Strip unsafe tags from quoted email HTML before embedding in QuotedHtml. */
 export function sanitizeQuotedEmailHtml(html: string): string {
-  if (typeof document === "undefined") return html;
-  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
-  doc
-    .querySelectorAll("script, style, iframe, object, embed, link[rel='stylesheet']")
-    .forEach((el) => el.remove());
-  doc.querySelectorAll("*").forEach((el) => {
-    for (const attr of Array.from(el.attributes)) {
-      if (/^on/i.test(attr.name)) {
-        el.removeAttribute(attr.name);
-      }
-    }
-  });
-  return doc.body.innerHTML;
+  if (typeof document === "undefined") {
+    return sanitizeUntrustedEmailHtml(html);
+  }
+  return sanitizeUntrustedEmailHtml(html);
 }
 
 export function rewriteCidImagesForEditor(html: string): string {
