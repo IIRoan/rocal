@@ -26,7 +26,8 @@ import { accountPublicRoutes } from "./routes/account-public";
 import { accountRoutes } from "./routes/account";
 import { inviteRoutes } from "./routes/invites";
 import { mailAccountRoutes } from "./routes/mail-account";
-import { mailRoutes } from "./routes/mail";
+import { mailRoutes, probeMailJmapProxyDiscovery } from "./routes/mail";
+import { isStalwartMailConfigured } from "./lib/stalwart-jmap-mailer";
 import { mailSyncRoutes, defaultMailSyncService } from "./routes/mail-sync";
 import {
   defaultMailRealtimeService,
@@ -205,6 +206,39 @@ export const createAPI = (prefix = "") => {
           "Lightweight liveness probe for uptime checks, deploy verification, and container health monitoring.",
       },
     }, () => ({ status: "ok" }))
+    .get("/health/mail-jmap", {
+      detail: {
+        tags: ["Health"],
+        summary: "Mail JMAP proxy health",
+        description:
+          "Probes JMAP discovery through the backend mail proxy (same path as web/native clients). Fails when the API can reach Stalwart but the proxy path is broken.",
+      },
+    }, async ({ status }) => {
+      const username = process.env.STALWART_JMAP_USERNAME?.trim() || "";
+      const password = process.env.STALWART_JMAP_PASSWORD || "";
+      const from =
+        process.env.EMAIL_FROM?.trim() ||
+        process.env.AUTH_EMAIL_FROM?.trim() ||
+        "";
+
+      if (!isStalwartMailConfigured({ username, password, from })) {
+        return { status: "unconfigured" };
+      }
+
+      const probe = await probeMailJmapProxyDiscovery({
+        username,
+        password,
+      });
+
+      if (!probe.ok) {
+        return status(503, {
+          status: "error",
+          upstreamStatus: probe.status,
+        });
+      }
+
+      return { status: "ok" };
+    })
     .get("/me", {
       detail: {
         tags: ["Auth"],

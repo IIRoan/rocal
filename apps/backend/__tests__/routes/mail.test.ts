@@ -126,7 +126,7 @@ const mockMailService = {
 
 import { errorHandler } from "../../lib/errors";
 import { auth } from "../../lib/auth";
-import { createMailRoutes } from "../../routes/mail";
+import { createMailRoutes, probeMailJmapProxyDiscovery } from "../../routes/mail";
 
 const mockGetSession = jest.mocked(auth.api.getSession);
 
@@ -243,6 +243,57 @@ describe("mailRoutes", () => {
     expect(proxyFetch.mock.calls[1]?.[0]).toBe(
       "http://stalwart.test/jmap/session",
     );
+  });
+
+  it("probeMailJmapProxyDiscovery fails when upstream discovery is unavailable", async () => {
+    const proxyFetch = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () => new Response(null, { status: 503 }));
+
+    const result = await probeMailJmapProxyDiscovery({
+      username: "noreply@solace.onl",
+      password: "secret",
+      mailService: mockMailService,
+      jmapFetch: proxyFetch,
+      jmapUpstreamBaseUrl: "http://stalwart.test",
+    });
+
+    expect(result).toEqual({ ok: false, status: 503 });
+  });
+
+  it("probeMailJmapProxyDiscovery succeeds when discovery returns a session", async () => {
+    const proxyFetch = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async (url) => {
+      if (url.endsWith("/.well-known/jmap")) {
+        return new Response(null, {
+          status: 307,
+          headers: { Location: "/jmap/session" },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          apiUrl: "https://mail.solace.onl/jmap/",
+          accounts: {},
+          primaryAccounts: {},
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    });
+
+    const result = await probeMailJmapProxyDiscovery({
+      username: "noreply@solace.onl",
+      password: "secret",
+      mailService: mockMailService,
+      jmapFetch: proxyFetch,
+      jmapUpstreamBaseUrl: "http://stalwart.test",
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(proxyFetch).toHaveBeenCalledTimes(2);
   });
 
   it("forwards client Bearer when a session cookie is also present", async () => {

@@ -17,8 +17,6 @@ defaults, so the config uses a space and CSS hides them.
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `PORT` | auto | Public listen port (proxy + Gatus) |
-| `prometheus_user` | VPS only | Stalwart WebUI basic auth; slot-manager forwards as `PROMETHEUS_BASIC_AUTH` on the VPS |
-| `prometheus_password` | VPS only | Paired with `prometheus_user` on the VPS |
 | `SLOT_MANAGER_TOKEN` | yes | Bearer token for `/slot-manager/status` and Prometheus proxy |
 | `DISCORD_WEBHOOK_URL` | yes | Discord webhook for Gatus downtime and scrape failures |
 
@@ -41,8 +39,9 @@ moderate on Vercel Hobby: website uses `HEAD` (no HTML body), API uses the cheap
 | Group | Endpoint | Interval | Budget / notes | What it proves |
 |-------|----------|----------|----------------|----------------|
 | Application | `solace.onl` (`HEAD`) | 2m | `< 3000ms`; ~720/day | Web frontend reachable |
-| Application | `api.solace.onl/api/health` | 1m | `< 5000ms`; ~1440/day | Backend API |
-| Mail | `mail.solace.onl/jmap/session` | 30s | Discord after **2** fails (~1m) | End-to-end mail path |
+| Application | `api.solace.onl/api/health` | 1m | `< 5000ms`; ~1440/day | Backend API process |
+| Application | `api.solace.onl/api/health/mail-jmap` | 1m | `< 10000ms`; ~1440/day | JMAP discovery via API proxy (web/native path) |
+| Mail | `mail.solace.onl/jmap/session` | 30s | Discord after **2** fails (~1m) | Stalwart JMAP on the public mail edge |
 | Mail | `mail.solace.onl/slot-manager/status` | 30s | Discord after **2** fails (~1m) | Blue/green tunnels |
 
 ### Stalwart Metrics group
@@ -68,8 +67,6 @@ cd apps/gatus
 docker build -t solace-gatus .
 docker run --rm -p 8080:8080 \
   -e PORT=8080 \
-  -e prometheus_user=prometheus \
-  -e prometheus_password=secret \
   -e SLOT_MANAGER_TOKEN=your-token \
   -e DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/... \
   solace-gatus

@@ -753,6 +753,52 @@ async function proxyJmapRequest(input: {
   });
 }
 
+export type MailJmapProxyProbeResult =
+  | { ok: true }
+  | { ok: false; status: number };
+
+/** Exercises the same JMAP discovery proxy path browser/native clients use. */
+export async function probeMailJmapProxyDiscovery(input: {
+  username: string;
+  password: string;
+  mailService?: IMailService;
+  jmapFetch?: JmapProxyFetcher;
+  jmapUpstreamBaseUrl?: string;
+}): Promise<MailJmapProxyProbeResult> {
+  const authorization = `Basic ${Buffer.from(
+    `${input.username}:${input.password}`,
+    "utf8",
+  ).toString("base64")}`;
+  const response = await proxyJmapRequest({
+    request: new Request("http://healthcheck.local/mail/jmap/.well-known/jmap", {
+      method: "GET",
+      headers: {
+        Authorization: authorization,
+        Accept: "application/json",
+      },
+    }),
+    upstreamPath: "/.well-known/jmap",
+    upstreamBaseUrl: input.jmapUpstreamBaseUrl ?? env.stalwartBaseUrl,
+    fetcher: input.jmapFetch,
+    mailService: input.mailService ?? defaultMailService,
+  });
+
+  if (!response.ok) {
+    return { ok: false, status: response.status };
+  }
+
+  try {
+    const body = (await response.json()) as { apiUrl?: string };
+    if (!body.apiUrl?.trim()) {
+      return { ok: false, status: response.status };
+    }
+  } catch {
+    return { ok: false, status: response.status };
+  }
+
+  return { ok: true };
+}
+
 export function createMailRoutes(
   mailService: IMailService = defaultMailService,
   options: {
