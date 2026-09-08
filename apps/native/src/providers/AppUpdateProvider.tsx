@@ -16,6 +16,7 @@ import {
   resolveAppUpdateAction,
   resolveAppUpdatePhase,
   resolveAppVariant,
+  type AppUpdateCheckOutcome,
   type AppUpdateCheckStatus,
   type AppUpdatePhase,
   type AppUpdateRuntimeInfo,
@@ -23,12 +24,7 @@ import {
 
 export type AppUpdateCheckOrigin = "silent" | "user";
 
-export type AppUpdateCheckOutcome =
-  | "disabled"
-  | "available"
-  | "current"
-  | "failed"
-  | "development-mode";
+export type { AppUpdateCheckOutcome };
 
 type AppUpdateValue = {
   enabled: boolean;

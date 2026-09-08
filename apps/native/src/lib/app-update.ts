@@ -95,6 +95,95 @@ export function actionLabel(
   return "Check for update";
 }
 
+export type AppUpdateCheckOutcome =
+  | "disabled"
+  | "available"
+  | "current"
+  | "failed"
+  | "development-mode";
+
+export function alertCopyForUpdateCheck(outcome: AppUpdateCheckOutcome): {
+  title: string;
+  body: string;
+} {
+  switch (outcome) {
+    case "available":
+      return {
+        title: "Update available",
+        body: "A newer Solace bundle is on this channel. Install it, then restart to apply.",
+      };
+    case "current":
+      return {
+        title: "You're up to date",
+        body: "No newer bundle is waiting on this channel.",
+      };
+    case "failed":
+      return {
+        title: "Check failed",
+        body: "The update server did not respond. Try again in a moment.",
+      };
+    case "development-mode":
+    case "disabled":
+      return {
+        title: "Updates off",
+        body: "This session is not receiving EAS Updates. Open diagnostics for details.",
+      };
+  }
+}
+
+export type UpdateAccessoryIcon =
+  | "info"
+  | "refresh-cw"
+  | "check"
+  | "alert-circle"
+  | "download";
+
+export function updateAccessoryIcon(
+  enabled: boolean,
+  action: AppUpdatePhase,
+  checkStatus: AppUpdateCheckStatus,
+): UpdateAccessoryIcon {
+  if (!enabled) return "info";
+  if (action === "ready") return "refresh-cw";
+  if (checkStatus === "current") return "check";
+  if (checkStatus === "failed") return "alert-circle";
+  return "download";
+}
+
+export function presentUpdateCheckAlert(
+  outcome: AppUpdateCheckOutcome,
+  actions: {
+    showDiagnostics: () => void;
+    install: () => void;
+    alert: (
+      title: string,
+      body: string,
+      buttons?: Array<{
+        text: string;
+        style?: "cancel" | "destructive" | "default";
+        onPress?: () => void;
+      }>,
+    ) => void;
+  },
+): void {
+  const copy = alertCopyForUpdateCheck(outcome);
+  if (outcome === "disabled" || outcome === "development-mode") {
+    actions.alert(copy.title, copy.body, [
+      { text: "Diagnostics", onPress: actions.showDiagnostics },
+      { text: "OK", style: "cancel" },
+    ]);
+    return;
+  }
+  if (outcome === "available") {
+    actions.alert(copy.title, copy.body, [
+      { text: "Later", style: "cancel" },
+      { text: "Install", onPress: actions.install },
+    ]);
+    return;
+  }
+  actions.alert(copy.title, copy.body);
+}
+
 export function checkStatusDetail(
   enabled: boolean,
   phase: AppUpdatePhase,
@@ -212,7 +301,7 @@ export function copyForPhase(
       return {
         kicker: `Channel ${channelLabel}`,
         title: "Update available",
-        body: "A newer bundle is waiting on this channel. Install it, then restart to apply.",
+        body: "A newer Solace bundle is waiting on this channel. Install it, then restart to apply.",
         primary: "Install update",
         secondary: "Later",
       };
@@ -220,7 +309,7 @@ export function copyForPhase(
       return {
         kicker: "Receiving",
         title: "Installing",
-        body: "Keep the app open until the download finishes.",
+        body: "Keep Solace open until the download finishes.",
       };
     case "ready":
       return {
@@ -234,7 +323,7 @@ export function copyForPhase(
       return {
         kicker: "Applying",
         title: "Restarting",
-        body: "Loading the new bundle.",
+        body: "Loading the new Solace bundle.",
       };
     case "error":
       return {

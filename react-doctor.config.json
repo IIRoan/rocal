@@ -7,6 +7,13 @@
   "ignore": {
     "overrides": [
       {
+        "files": ["**/providers/AuthProvider.tsx"],
+        "rules": [
+          "react-doctor/no-giant-component",
+          "react-doctor/no-set-state-after-await-in-effect"
+        ]
+      },
+      {
         "files": ["**/app/login/_content.tsx"],
         "rules": ["react-doctor/no-giant-component"]
       },

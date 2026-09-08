@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   actionLabel,
+  alertCopyForUpdateCheck,
   checkStatusDetail,
   copyForPhase,
   formatChannelLabel,
@@ -13,6 +14,7 @@ import {
   resolveAppUpdateAction,
   resolveAppUpdatePhase,
   resolveAppVariant,
+  updateAccessoryIcon,
   updateDiagnosticsBody,
   updateDiagnosticsTitle,
   type AppUpdateRuntimeInfo,
@@ -208,7 +210,7 @@ describe("copyForPhase", () => {
     expect(copyForPhase("available", "PREVIEW", null)).toEqual({
       kicker: "Channel PREVIEW",
       title: "Update available",
-      body: "A newer bundle is waiting on this channel. Install it, then restart to apply.",
+      body: "A newer Solace bundle is waiting on this channel. Install it, then restart to apply.",
       primary: "Install update",
       secondary: "Later",
     });
@@ -223,5 +225,22 @@ describe("copyForPhase", () => {
 
   it("stays empty while idle", () => {
     expect(copyForPhase("idle", "MASTER", null).title).toBe("");
+  });
+
+  it("returns alert copy for update check outcomes", () => {
+    expect(alertCopyForUpdateCheck("available")).toEqual({
+      title: "Update available",
+      body: "A newer Solace bundle is on this channel. Install it, then restart to apply.",
+    });
+    expect(alertCopyForUpdateCheck("current").title).toBe("You're up to date");
+    expect(alertCopyForUpdateCheck("failed").title).toBe("Check failed");
+  });
+
+  it("maps accessory icons for update CTA state", () => {
+    expect(updateAccessoryIcon(false, "idle", "idle")).toBe("info");
+    expect(updateAccessoryIcon(true, "ready", "idle")).toBe("refresh-cw");
+    expect(updateAccessoryIcon(true, "idle", "current")).toBe("check");
+    expect(updateAccessoryIcon(true, "idle", "failed")).toBe("alert-circle");
+    expect(updateAccessoryIcon(true, "idle", "idle")).toBe("download");
   });
 });

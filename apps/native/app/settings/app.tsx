@@ -1,8 +1,11 @@
 import React, { useMemo } from "react";
 import { ScrollView, StyleSheet, View, type ViewStyle } from "react-native";
 import type { ThemeTokens } from "@workspace/design-tokens";
-import { AppScreen, StackScreenHeader } from "../../src/components/layout";
+import { AppScreen } from "../../src/components/layout/AppScreen";
+import { StackScreenHeader } from "../../src/components/StackScreenHeader";
+import { AppDebugSettingsSection } from "../../src/components/settings/AppDebugSettingsSection";
 import { AppUpdateSettingsSection } from "../../src/components/settings/AppUpdateSettingsSection";
+import { SettingsSectionLabel } from "../../src/components/settings/SettingsRows";
 import { useTheme } from "../../src/providers/ThemeProvider";
 
 export default function AppSettingsScreen() {
@@ -16,8 +19,14 @@ export default function AppSettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        <SettingsSectionLabel text="Updates" theme={theme} />
         <View style={styles.sectionItems}>
           <AppUpdateSettingsSection />
+        </View>
+
+        <SettingsSectionLabel text="Debugging" theme={theme} isFirst={false} />
+        <View style={styles.sectionItems}>
+          <AppDebugSettingsSection />
         </View>
       </ScrollView>
     </AppScreen>

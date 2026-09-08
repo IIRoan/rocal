@@ -169,7 +169,7 @@ bun run update:testing -- --message "testing update"
 
 | Git event | EAS update branch |
 | --- | --- |
-| Push to `main` or `master` | `preview` |
+| Push to `main` or `master` (and `workflow_dispatch`) | `preview` |
 | Push to `testing` | `development` |
 | Push to `master` | `master` (production) |
 | Pull request | `testing` |
@@ -178,7 +178,13 @@ Required GitHub secret:
 
 - `EXPO_TOKEN`
 
-Required Expo EAS environment values for the `production` environment:
+The workflow bakes production API origins into published bundles:
+
+- `EXPO_PUBLIC_API_URL=https://api.solace.onl`
+- `EXPO_PUBLIC_APP_URL=https://solace.onl`
+- `PASSKEY_ORIGIN=https://solace.onl`
+
+Required Expo EAS environment values for the `production` / `preview` environments (used by `eas update --environment`):
 
 - `EXPO_PUBLIC_API_URL`
 - `PASSKEY_ORIGIN` when native passkeys are enabled

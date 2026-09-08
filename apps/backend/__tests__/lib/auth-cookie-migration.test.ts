@@ -106,4 +106,35 @@ describe("auth cookie migration", () => {
 
     expect(getSetCookies(headers)).toHaveLength(0);
   });
+
+  it("documents that Expo clients must skip legacy clears after session set", () => {
+    // Expo jar is name-keyed; Max-Age=0 clears after a set wipe the new session token.
+    const headers = new Headers();
+    headers.append(
+      "set-cookie",
+      "__Secure-better-auth.session_token=fresh; Path=/; Max-Age=2592000; Domain=solace.onl; Secure; HttpOnly",
+    );
+
+    expireLegacyHostScopedAuthCookies(
+      { headers },
+      {
+        backendUrl: "https://api.solace.onl",
+        isProduction: true,
+        cookieSameSite: "none",
+      },
+    );
+
+    const cookies = getSetCookies(headers);
+    expect(
+      cookies.filter((entry) =>
+        entry.startsWith("__Secure-better-auth.session_token="),
+      ).length,
+    ).toBeGreaterThan(1);
+    expect(
+      cookies.some(
+        (entry) =>
+          entry.includes("Max-Age=0") && entry.includes("Domain=api.solace.onl"),
+      ),
+    ).toBe(true);
+  });
 });

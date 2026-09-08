@@ -29,6 +29,7 @@ export type AppUpdateDispatchProps = {
   errorMessage?: string | null;
   onPrimary?: () => void;
   onSecondary?: () => void;
+  header?: React.ReactNode;
 };
 
 export function AppUpdateDispatch({
@@ -38,6 +39,7 @@ export function AppUpdateDispatch({
   errorMessage = null,
   onPrimary,
   onSecondary,
+  header,
 }: AppUpdateDispatchProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -56,6 +58,7 @@ export function AppUpdateDispatch({
         },
       ]}
     >
+      {header}
       <View style={styles.center}>
         <View style={styles.brand}>
           <Image
@@ -65,13 +68,16 @@ export function AppUpdateDispatch({
           />
           <Text style={styles.wordmark}>SOLACE</Text>
         </View>
-        {copy.kicker ? <Text style={styles.kicker}>{copy.kicker}</Text> : null}
-        {copy.title ? (
-          <Text style={styles.title} accessibilityRole="header">
-            {copy.title}
-          </Text>
-        ) : null}
-        {copy.body ? <Text style={styles.body}>{copy.body}</Text> : null}
+
+        <View style={styles.copyBlock}>
+          {copy.kicker ? <Text style={styles.kicker}>{copy.kicker}</Text> : null}
+          {copy.title ? (
+            <Text style={styles.title} accessibilityRole="header">
+              {copy.title}
+            </Text>
+          ) : null}
+          {copy.body ? <Text style={styles.body}>{copy.body}</Text> : null}
+        </View>
 
         {phase === "downloading" ? (
           <View
@@ -176,15 +182,15 @@ function createStyles(theme: ThemeTokens) {
     } as ViewStyle,
     center: {
       flex: 1,
+      minHeight: 0,
       alignItems: "center",
       justifyContent: "center",
-      gap: theme.spacing["3"],
+      gap: theme.spacing["6"],
     } as ViewStyle,
     brand: {
       flexDirection: "row",
       alignItems: "center",
       gap: theme.spacing["2"],
-      marginBottom: theme.spacing["3"],
     } as ViewStyle,
     logo: {
       width: 22,
@@ -198,47 +204,54 @@ function createStyles(theme: ThemeTokens) {
       letterSpacing: 5,
       opacity: 0.6,
     } as TextStyle,
+    copyBlock: {
+      width: "100%",
+      maxWidth: 400,
+      alignItems: "center",
+      gap: theme.spacing["3"],
+    } as ViewStyle,
     kicker: {
-      fontSize: 11,
+      fontFamily: theme.typography.fontFamily.mono,
+      fontSize: 12,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      letterSpacing: 1.4,
+      letterSpacing: -0.24,
       textTransform: "uppercase",
       color: theme.colors.mutedForeground,
     } as TextStyle,
     title: {
-      fontSize: theme.typography.fontSize["3xl"].size,
-      lineHeight: theme.typography.fontSize["3xl"].lineHeight,
+      fontSize: 32,
+      lineHeight: 36,
       fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
       textAlign: "center",
-      letterSpacing: -0.6,
+      letterSpacing: -0.96,
     } as TextStyle,
     body: {
       maxWidth: 360,
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
+      fontWeight: theme.typography.fontWeight.normal as TextStyle["fontWeight"],
       color: theme.colors.mutedForeground,
       textAlign: "center",
     } as TextStyle,
     progressBlock: {
       width: "100%",
-      maxWidth: 360,
+      maxWidth: 400,
       gap: theme.spacing["2"],
-      marginTop: theme.spacing["2"],
     } as ViewStyle,
     track: {
-      height: 2,
-      borderRadius: 999,
+      height: StyleSheet.hairlineWidth,
       overflow: "hidden",
       backgroundColor: theme.colors.border,
     } as ViewStyle,
     fill: {
       height: "100%",
-      backgroundColor: theme.colors.primaryBase,
-      borderRadius: 999,
+      backgroundColor: theme.colors.foreground,
     } as ViewStyle,
     percent: {
+      fontFamily: theme.typography.fontFamily.mono,
       fontSize: 12,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       fontVariant: ["tabular-nums"],
       color: theme.colors.mutedForeground,
     } as TextStyle,
@@ -246,7 +259,7 @@ function createStyles(theme: ThemeTokens) {
       width: "100%",
       maxWidth: 400,
       alignSelf: "center",
-      gap: theme.spacing["2"],
+      gap: theme.spacing["3"],
     } as ViewStyle,
     primary: {
       minHeight: 46,
@@ -267,6 +280,7 @@ function createStyles(theme: ThemeTokens) {
       minHeight: 44,
       alignItems: "center",
       justifyContent: "center",
+      paddingVertical: theme.spacing["3"],
     } as ViewStyle,
     secondaryPressed: {
       opacity: 0.7,

@@ -51,6 +51,16 @@ export function hasSessionTokenCookie(
   );
 }
 
+function getSessionTokenCookieValue(
+  raw: string | null | undefined,
+  now: Date = new Date(),
+): string | null {
+  const match = parseCookieEntries(raw, now).find(([name]) =>
+    name.includes(SESSION_TOKEN_COOKIE_PATTERN),
+  );
+  return match?.[1]?.value ?? null;
+}
+
 export function hasPasskeyStepUpCookie(
   raw: string | null | undefined,
   now: Date = new Date(),
@@ -129,4 +139,54 @@ export async function waitForSessionCookie(
   }
 
   return false;
+}
+
+function resolveSessionTokenCookieName(
+  cookies: Record<string, CookieEntry>,
+  preferSecure: boolean,
+): string {
+  const existing = Object.keys(cookies).find((name) =>
+    name.includes(SESSION_TOKEN_COOKIE_PATTERN),
+  );
+  if (existing) return existing;
+  return preferSecure
+    ? "__Secure-better-auth.session_token"
+    : "better-auth.session_token";
+}
+
+/** Persist session token into the Expo jar when Set-Cookie was lost/clobbered. */
+export async function persistSessionTokenCookie(
+  token: string,
+  options?: { preferSecure?: boolean; maxAgeMs?: number },
+): Promise<void> {
+  const trimmed = token.trim();
+  if (!trimmed) return;
+
+  const preferSecure = options?.preferSecure ?? true;
+  const maxAgeMs = options?.maxAgeMs ?? 60 * 60 * 24 * 30 * 1000;
+  const raw = (await readChunkedSecureValue(COOKIE_STORE_KEY)) ?? "{}";
+  const cookies = parseCookieStore(raw);
+  const name = resolveSessionTokenCookieName(cookies, preferSecure);
+  cookies[name] = {
+    value: trimmed,
+    expires: new Date(Date.now() + maxAgeMs).toISOString(),
+  };
+
+  await writeChunkedSecureValue(COOKIE_STORE_KEY, JSON.stringify(cookies));
+}
+
+export async function ensureSessionTokenCookie(
+  token: string | null | undefined,
+  options?: { preferSecure?: boolean; maxAgeMs?: number },
+): Promise<boolean> {
+  const trimmed = token?.trim();
+  if (!trimmed) return false;
+
+  const raw = await readChunkedSecureValue(COOKIE_STORE_KEY);
+  if (getSessionTokenCookieValue(raw) === trimmed) {
+    return true;
+  }
+
+  await persistSessionTokenCookie(trimmed, options);
+  return true;
 }

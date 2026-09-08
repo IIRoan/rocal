@@ -1,8 +1,11 @@
 import {
   PASSKEY_STEP_UP_COOKIE_NAME,
+  ensureSessionTokenCookie,
   hasPasskeyStepUpCookie,
+  hasSessionTokenCookie,
   parseSessionCookie,
   persistPasskeyStepUpCookie,
+  persistSessionTokenCookie,
 } from "./session-cookie";
 
 jest.mock("./secure-store-chunked", () => ({
@@ -66,5 +69,56 @@ describe("session cookie helpers", () => {
     ) as Record<string, { value: string }>;
 
     expect(written[PASSKEY_STEP_UP_COOKIE_NAME]?.value).toBe("verified");
+  });
+
+  it("persists a secure session token when the jar is empty", async () => {
+    await persistSessionTokenCookie("fresh-token", { preferSecure: true });
+
+    const written = JSON.parse(
+      jest.mocked(writeChunkedSecureValue).mock.calls[0]?.[1] as string,
+    ) as Record<string, { value: string }>;
+
+    expect(written["__Secure-better-auth.session_token"]?.value).toBe(
+      "fresh-token",
+    );
+    expect(
+      hasSessionTokenCookie(
+        jest.mocked(writeChunkedSecureValue).mock.calls[0]?.[1] as string,
+      ),
+    ).toBe(true);
+  });
+
+  it("skips rewriting when the jar already has the same session token", async () => {
+    jest.mocked(readChunkedSecureValue).mockResolvedValue(
+      JSON.stringify({
+        "__Secure-better-auth.session_token": {
+          value: "fresh-token",
+          expires: null,
+        },
+      }),
+    );
+
+    await expect(ensureSessionTokenCookie("fresh-token")).resolves.toBe(true);
+    expect(writeChunkedSecureValue).not.toHaveBeenCalled();
+  });
+
+  it("replaces a stale session token cookie with the auth response token", async () => {
+    jest.mocked(readChunkedSecureValue).mockResolvedValue(
+      JSON.stringify({
+        "__Secure-better-auth.session_token": {
+          value: "stale-token",
+          expires: null,
+        },
+      }),
+    );
+
+    await expect(ensureSessionTokenCookie("fresh-token")).resolves.toBe(true);
+
+    const written = JSON.parse(
+      jest.mocked(writeChunkedSecureValue).mock.calls[0]?.[1] as string,
+    ) as Record<string, { value: string }>;
+    expect(written["__Secure-better-auth.session_token"]?.value).toBe(
+      "fresh-token",
+    );
   });
 });

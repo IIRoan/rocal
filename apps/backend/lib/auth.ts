@@ -363,12 +363,16 @@ const passkeyStepUpPlugin = {
           if (ctx.context.responseHeaders) {
             const headers = ctx.context.responseHeaders as Headers;
             clearPasskeyStepUpCookie({ headers });
-            // Also expire pre-migration host-scoped session cookies
-            // (Domain=api.*) that Better Auth's eTLD+1 clear misses.
-            expireLegacyHostScopedAuthCookies(
-              { headers },
-              { request: ctx.request },
+            // Skip legacy Domain=api.* clears on Expo — name-keyed jar would wipe the new session cookie.
+            const isExpoClient = Boolean(
+              ctx.request?.headers.get("expo-origin")?.trim(),
             );
+            if (!isExpoClient) {
+              expireLegacyHostScopedAuthCookies(
+                { headers },
+                { request: ctx.request },
+              );
+            }
           }
         }),
       },
