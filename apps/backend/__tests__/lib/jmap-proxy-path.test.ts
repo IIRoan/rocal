@@ -3,6 +3,7 @@ import {
   assertAllowedJmapUpstreamPath,
   buildSafeJmapUpstreamUrl,
   JmapProxyPathError,
+  resolveAllowedJmapRedirectUrl,
 } from "../../lib/jmap-proxy-path";
 
 const base = "https://mail.solace.onl";
@@ -49,5 +50,25 @@ describe("jmap-proxy-path", () => {
     expect(
       buildSafeJmapUpstreamUrl(base, "/jmap/", "?types=Email"),
     ).toBe("https://mail.solace.onl/jmap/?types=Email");
+  });
+
+  it("allows same-origin JMAP redirects", () => {
+    expect(
+      resolveAllowedJmapRedirectUrl(
+        base,
+        "https://mail.solace.onl/.well-known/jmap",
+        "/jmap/session",
+      ),
+    ).toBe("https://mail.solace.onl/jmap/session");
+  });
+
+  it("rejects cross-origin redirects", () => {
+    expect(() =>
+      resolveAllowedJmapRedirectUrl(
+        base,
+        "https://mail.solace.onl/.well-known/jmap",
+        "https://evil.example/jmap/",
+      ),
+    ).toThrow(JmapProxyPathError);
   });
 });

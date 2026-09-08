@@ -203,6 +203,48 @@ describe("mailRoutes", () => {
     expect(mockGetSession).not.toHaveBeenCalled();
   });
 
+  it("follows same-origin JMAP discovery redirects server-side", async () => {
+    const proxyFetch = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async (url) => {
+      if (url.endsWith("/.well-known/jmap")) {
+        return new Response(null, {
+          status: 307,
+          headers: { Location: "/jmap/session" },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          apiUrl: "https://mail.solace.onl/jmap/",
+          accounts: {},
+          primaryAccounts: {},
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    });
+
+    const response = await createApp({
+      jmapFetch: proxyFetch,
+      jmapUpstreamBaseUrl: "http://stalwart.test",
+    }).handle(
+      new Request("http://localhost/mail/jmap/.well-known/jmap", {
+        headers: {
+          Authorization: "Bearer mail-access-token",
+          Accept: "application/json",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(proxyFetch).toHaveBeenCalledTimes(2);
+    expect(proxyFetch.mock.calls[1]?.[0]).toBe(
+      "http://stalwart.test/jmap/session",
+    );
+  });
+
   it("forwards client Bearer when a session cookie is also present", async () => {
     const proxyFetch = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>
