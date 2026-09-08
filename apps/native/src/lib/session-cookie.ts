@@ -1,9 +1,14 @@
-import { AUTH_STORAGE_PREFIX } from "./constants";
+import { AUTH_STORAGE_PREFIX, API_BASE_URL } from "./constants";
 import {
   getChunkedSecureValueSync,
   readChunkedSecureValue,
+  readRawSecureValue,
   writeChunkedSecureValue,
 } from "./secure-store-chunked";
+import {
+  fallbackSessionCookieHeader,
+  setFallbackSessionToken,
+} from "./session-token-fallback";
 
 type CookieEntry = { value: string; expires: string | null };
 
@@ -12,6 +17,15 @@ const SESSION_TOKEN_COOKIE_PATTERN = "session_token";
 export const PASSKEY_STEP_UP_COOKIE_NAME = "solace-passkey-step-up";
 const PASSKEY_STEP_UP_COOKIE_VALUE = "verified";
 const PASSKEY_STEP_UP_MAX_AGE_MS = 60 * 60 * 24 * 30 * 1000;
+
+function asCookieStore(
+  value: unknown,
+): Record<string, CookieEntry> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, CookieEntry>;
+}
 
 function parseCookieEntries(
   raw: string | null | undefined,
@@ -22,7 +36,10 @@ function parseCookieEntries(
   }
 
   try {
-    const parsed = JSON.parse(raw) as Record<string, CookieEntry>;
+    const parsed = asCookieStore(JSON.parse(raw));
+    if (!parsed) {
+      return [];
+    }
 
     return Object.entries(parsed).filter(([name, entry]) => {
       if (entry.expires && new Date(entry.expires) < now) return false;
@@ -37,9 +54,13 @@ export function parseSessionCookie(
   raw: string | null | undefined,
   now: Date = new Date(),
 ): string {
-  return parseCookieEntries(raw, now)
+  const fromJar = parseCookieEntries(raw, now)
     .map(([name, entry]) => `${name}=${entry.value}`)
     .join("; ");
+  if (fromJar) {
+    return fromJar;
+  }
+  return fallbackSessionCookieHeader(API_BASE_URL.startsWith("https://"));
 }
 
 export function hasSessionTokenCookie(
@@ -59,6 +80,18 @@ function getSessionTokenCookieValue(
     name.includes(SESSION_TOKEN_COOKIE_PATTERN),
   );
   return match?.[1]?.value ?? null;
+}
+
+export async function readSessionTokenFromJar(): Promise<string | null> {
+  return getSessionTokenCookieValue(await readChunkedSecureValue(COOKIE_STORE_KEY));
+}
+
+export async function rememberSessionTokenFromJar(): Promise<string | null> {
+  const fromJar = await readSessionTokenFromJar();
+  if (fromJar) {
+    setFallbackSessionToken(fromJar);
+  }
+  return fromJar;
 }
 
 export function hasPasskeyStepUpCookie(
@@ -84,10 +117,26 @@ function parseCookieStore(
   }
 
   try {
-    return JSON.parse(raw) as Record<string, CookieEntry>;
+    // Legacy chunk meta `"1"` JSON.parses to number 1 — never treat that as a jar.
+    return asCookieStore(JSON.parse(raw)) ?? {};
   } catch {
     return {};
   }
+}
+
+/**
+ * Rewrite a legacy digit chunk-meta jar (`"1"` + `_0`) into a plain JSON object
+ * so Better Auth never sees `JSON.parse("1") === 1`.
+ */
+export async function healAuthCookieJar(): Promise<void> {
+  const rawMeta = await readRawSecureValue(COOKIE_STORE_KEY);
+  if (!rawMeta || !/^\d+$/.test(rawMeta)) {
+    return;
+  }
+
+  const reassembled = await readChunkedSecureValue(COOKIE_STORE_KEY);
+  const jar = parseCookieStore(reassembled);
+  await writeChunkedSecureValue(COOKIE_STORE_KEY, JSON.stringify(jar));
 }
 
 export async function persistPasskeyStepUpCookie(): Promise<void> {
@@ -162,6 +211,8 @@ export async function persistSessionTokenCookie(
   const trimmed = token.trim();
   if (!trimmed) return;
 
+  setFallbackSessionToken(trimmed);
+
   const preferSecure = options?.preferSecure ?? true;
   const maxAgeMs = options?.maxAgeMs ?? 60 * 60 * 24 * 30 * 1000;
   const raw = (await readChunkedSecureValue(COOKIE_STORE_KEY)) ?? "{}";
@@ -183,7 +234,11 @@ export async function ensureSessionTokenCookie(
   if (!trimmed) return false;
 
   const raw = await readChunkedSecureValue(COOKIE_STORE_KEY);
-  if (getSessionTokenCookieValue(raw) === trimmed) {
+  const existing = getSessionTokenCookieValue(raw);
+  // Keep Better Auth's Set-Cookie value. The email payload `token` is not
+  // always the same string as the signed cookie, and overwriting it 401s.
+  if (existing) {
+    setFallbackSessionToken(existing);
     return true;
   }
 

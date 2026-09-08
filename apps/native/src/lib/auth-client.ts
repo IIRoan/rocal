@@ -2,7 +2,7 @@ import { createAuthClient } from "better-auth/react";
 import { expoClient } from "@better-auth/expo/client";
 import { passkeyClient } from "@better-auth/passkey/client";
 import { API_BASE_URL, APP_SCHEME, AUTH_STORAGE_PREFIX } from "./constants";
-import { chunkedSecureStore } from "./secure-store-chunked";
+import { authSecureStore } from "./secure-store-chunked";
 
 /**
  * Better Auth client configured for the native app.
@@ -18,7 +18,8 @@ export const authClient = createAuthClient({
     expoClient({
       scheme: APP_SCHEME,
       storagePrefix: AUTH_STORAGE_PREFIX,
-      storage: chunkedSecureStore,
+      // Raw store — Better Auth's expo adapter already chunks oversized values.
+      storage: authSecureStore,
     }),
     passkeyClient(),
   ],

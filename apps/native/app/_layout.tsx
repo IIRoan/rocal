@@ -27,6 +27,7 @@ import {
   shouldRenderAuthenticatedChrome,
 } from "../src/lib/auth-routing";
 import { API_BASE_URL } from "../src/lib/constants";
+import { captureException } from "../src/lib/reporting";
 import {
   prepareAuthenticatedCryptoSession,
   type StartupCryptoPhase,
@@ -106,7 +107,11 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
       queryClient.removeQueries({ queryKey: ["calendars"] });
       queryClient.removeQueries({ queryKey: ["categories"] });
     })()
-      .catch(() => {})
+      .catch((error) => {
+        captureException(error, {
+          tags: { area: "startup-crypto" },
+        });
+      })
       .finally(() => {
         if (!cancelled) {
           setIsPreparingStartupCrypto(false);
@@ -169,7 +174,7 @@ function AuthenticatedChrome() {
 // Root layout
 // ---------------------------------------------------------------------------
 
-export default function RootLayout() {
+function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryProvider>
@@ -225,3 +230,5 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+export default RootLayout;

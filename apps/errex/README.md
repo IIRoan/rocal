@@ -45,14 +45,17 @@ railway ssh --service errex -- errexd project add solace
 |---------|-----|---------|
 | Web (Vercel) | `@sentry/nextjs` | `NEXT_PUBLIC_SENTRY_DSN` |
 | API (Vercel) | `@sentry/bun` | `SENTRY_DSN` |
+| Native (Expo) | Sentry-compatible HTTP envelope (`reporting.ts`) | `EXPO_PUBLIC_SENTRY_DSN` |
 
 Init is a no-op when the DSN is unset. Production DSN for project `solace`:
 
 `https://65f1ae513c4a4865bc3b3384ce746653@errors.solace.onl/solace`
 
 Official Sentry SDKs require a **numeric** DSN project id. Errex uses the string
-name `solace`, so clients init with a numeric stand-in and `tunnel` envelopes to
-`/api/solace/envelope/?sentry_key=…`. Keep `sendDefaultPii: false`.
+name `solace`. Web and API init with a numeric stand-in and `tunnel` envelopes to
+`/api/solace/envelope/?sentry_key=…`. Native builds the same envelope format in
+`apps/native/src/lib/reporting.ts` (no `@sentry/react-native` — avoids native
+SDK startup crashes). Keep `sendDefaultPii: false`.
 
 
 ## Custom domain

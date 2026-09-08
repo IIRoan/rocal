@@ -64,6 +64,14 @@ jest.mock("../lib/session-cookie", () => ({
   getSessionCookie: jest.fn(() => "better-auth.session=token"),
   waitForSessionCookie: jest.fn(),
   ensureSessionTokenCookie: jest.fn(async () => true),
+  healAuthCookieJar: jest.fn(async () => undefined),
+  rememberSessionTokenFromJar: jest.fn(async () => "session-token"),
+}));
+
+jest.mock("../lib/session-token-fallback", () => ({
+  setFallbackSessionToken: jest.fn(),
+  getFallbackSessionToken: jest.fn(() => null),
+  fallbackSessionCookieHeader: jest.fn(() => ""),
 }));
 
 jest.mock("../lib/mail/mail-password-cache", () => ({
@@ -347,6 +355,26 @@ describe("AuthProvider", () => {
     });
     expect(getAuth().isAuthenticated).toBe(true);
     expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it("requires passkey step-up on cold start when auth status says so", async () => {
+    mockGetSession.mockResolvedValue(createAuthResult());
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        authenticated: true,
+        hasPasskeys: true,
+        requiresPasskeyStepUp: true,
+      }),
+    } as Response);
+
+    await renderProvider();
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(getAuth().user).not.toBeNull();
+    expect(getAuth().session).not.toBeNull();
+    expect(getAuth().requiresPasskeyStepUp).toBe(true);
+    expect(getAuth().isAuthenticated).toBe(false);
   });
 
   it("clears a stale pending password when passkey sign-in is used", async () => {

@@ -4,4 +4,5 @@
 // CommonJS `require` keeps that order; ESM `import` would hoist both modules.
 require("./src/lib/install-native-crypto");
 require("./src/lib/push-notification-handler").registerForegroundPushNotificationHandler();
+require("./src/lib/boot-heal").healAuthStorageAtBoot();
 require("expo-router/entry");

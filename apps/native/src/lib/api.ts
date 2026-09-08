@@ -21,10 +21,14 @@ import { API_BASE_URL, APP_SCHEME } from "./constants";
 import {
   getSessionCookie,
   getSessionCookieAsync,
+  persistSessionTokenCookie,
   waitForSessionCookie,
 } from "./session-cookie";
 import { triggerSessionClear } from "./session-clear";
 import { triggerPasskeyStepUpRequired } from "./passkey-step-up-required";
+import { getFallbackSessionToken } from "./session-token-fallback";
+import { authClient } from "./auth-client";
+import { captureException, captureMessage } from "./reporting";
 
 export function getNativeExpoOrigin() {
   return Linking.createURL("", { scheme: APP_SCHEME });
@@ -58,6 +62,59 @@ export async function getAuthHeadersAsync(): Promise<Record<string, string>> {
   };
 }
 
+let confirmingAuthError = false;
+
+async function confirmExpiredSessionThenClear() {
+  if (confirmingAuthError) {
+    return;
+  }
+  confirmingAuthError = true;
+  try {
+    const fallback = getFallbackSessionToken();
+    if (fallback) {
+      await persistSessionTokenCookie(fallback, {
+        preferSecure: API_BASE_URL.startsWith("https://"),
+      });
+    }
+
+    let sessionConfirmed = false;
+    let getSessionErrored = false;
+    try {
+      const result = await authClient.getSession({
+        query: { disableCookieCache: true },
+      });
+      if (result?.data?.user) {
+        sessionConfirmed = true;
+      }
+    } catch (error) {
+      getSessionErrored = true;
+      captureException(error, {
+        tags: { area: "auth", reason: "post-401-get-session" },
+      });
+    }
+
+    if (sessionConfirmed) {
+      return;
+    }
+
+    if (getSessionErrored && fallback) {
+      captureMessage(
+        "401 with fallback token; getSession failed, keeping session",
+        { level: "warning", tags: { area: "auth" } },
+      );
+      return;
+    }
+
+    captureMessage("Clearing session after 401", {
+      level: "warning",
+      tags: { area: "auth" },
+    });
+    triggerSessionClear();
+  } finally {
+    confirmingAuthError = false;
+  }
+}
+
 export const httpClient = new HttpClient({
   baseURL: API_BASE_URL,
   timeout: 10_000,
@@ -65,7 +122,9 @@ export const httpClient = new HttpClient({
   retryDelay: 1_000,
   credentials: "omit",
   getHeaders: getAuthHeadersAsync,
-  onAuthError: triggerSessionClear,
+  onAuthError: () => {
+    void confirmExpiredSessionThenClear();
+  },
   onPasskeyStepUpRequired: triggerPasskeyStepUpRequired,
 });
 
