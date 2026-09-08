@@ -10,4 +10,5 @@ const require = createRequire(import.meta.url);
 void require.resolve("./dist/vercel/libquery_engine-rhel-openssl-3.0.x.so.node");
 void require.resolve("./dist/vercel/libquery_engine-debian-openssl-3.0.x.so.node");
 
+// @ts-ignore — Bun bundle from build:vercel; no .d.ts on the emitted JS entry
 export { default } from "./dist/vercel/app.js";
