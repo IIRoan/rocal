@@ -63,6 +63,7 @@ jest.mock("../lib/passkey-browser-bridge", () => ({
 jest.mock("../lib/session-cookie", () => ({
   getSessionCookie: jest.fn(() => "better-auth.session=token"),
   waitForSessionCookie: jest.fn(),
+  ensureSessionTokenCookie: jest.fn(async () => true),
 }));
 
 jest.mock("../lib/mail/mail-password-cache", () => ({
@@ -123,6 +124,18 @@ function createSessionData() {
 function createAuthResult() {
   return {
     data: createSessionData(),
+    error: null,
+  };
+}
+
+/** Better Auth email sign-in body — token + user, no session object. */
+function createEmailSignInResult() {
+  return {
+    data: {
+      redirect: false,
+      token: "session-token",
+      user: createSessionData().user,
+    },
     error: null,
   };
 }
@@ -275,6 +288,22 @@ describe("AuthProvider", () => {
 
     expect(getAuth().isAuthenticated).toBe(true);
     expect(getAuth().lastAuthMethod).toBe("email-password");
+  });
+
+  it("accepts Better Auth email sign-in payloads that only include user and token", async () => {
+    mockEmailSignIn.mockResolvedValue(createEmailSignInResult());
+    mockWaitForSessionCookie.mockResolvedValue(false);
+    mockGetSession.mockResolvedValue({ data: null });
+
+    await renderProvider();
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(getAuth().session?.token).toBe("session-token");
+    expect(getAuth().user?.email).toBe("roan@example.com");
   });
 
   it("keeps a successful sign-in when auth status is temporarily unavailable", async () => {

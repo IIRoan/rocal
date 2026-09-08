@@ -22,6 +22,8 @@ import {
   formatUpdateId,
   formatUpdateStamp,
   jsSourceLabel,
+  presentUpdateCheckAlert,
+  updateAccessoryIcon,
   updateDiagnosticsBody,
   updateDiagnosticsTitle,
 } from "../../lib/app-update";
@@ -80,9 +82,11 @@ export function AppUpdateSettingsSection() {
     }
     void (async () => {
       const outcome = await check("user");
-      if (outcome === "disabled" || outcome === "development-mode") {
-        showDiagnostics();
-      }
+      presentUpdateCheckAlert(outcome, {
+        showDiagnostics,
+        install: () => void install(),
+        alert: Alert.alert,
+      });
     })();
   };
 
@@ -90,17 +94,7 @@ export function AppUpdateSettingsSection() {
     <ActivityIndicator size="small" color={theme.colors.mutedForeground} />
   ) : (
     <Feather
-      name={
-        !enabled
-          ? "info"
-          : action === "ready"
-            ? "refresh-cw"
-            : checkStatus === "current"
-              ? "check"
-              : checkStatus === "failed"
-                ? "alert-circle"
-                : "download"
-      }
+      name={updateAccessoryIcon(enabled, action, checkStatus)}
       size={16}
       color={theme.colors.mutedForeground}
     />
@@ -117,7 +111,7 @@ export function AppUpdateSettingsSection() {
         }
       >
         <View style={styles.metric}>
-          <Text style={styles.metricLabel}>Active</Text>
+          <Text style={styles.metricLabel}>Channel</Text>
           <Text style={styles.channel} numberOfLines={1}>
             {channel}
           </Text>
@@ -129,7 +123,7 @@ export function AppUpdateSettingsSection() {
         </View>
         <View style={styles.divider} />
         <View style={styles.metric}>
-          <Text style={styles.metricLabel}>Update</Text>
+          <Text style={styles.metricLabel}>Bundle</Text>
           <Text style={styles.updateId} numberOfLines={1}>
             {updateId}
           </Text>
@@ -137,21 +131,14 @@ export function AppUpdateSettingsSection() {
             {stamp}
           </Text>
         </View>
-        <View style={styles.metricsInfo}>
-          <Feather
-            name="info"
-            size={16}
-            color={theme.colors.mutedForeground}
-          />
-        </View>
       </Pressable>
 
       <Pressable
         onPress={onAction}
         disabled={busy}
         style={({ pressed }) => [
-          styles.row,
-          pressed && !busy && styles.rowPressed,
+          styles.primaryRow,
+          pressed && !busy && styles.primaryRowPressed,
           busy && styles.rowDisabled,
         ]}
         accessibilityRole="button"
@@ -160,14 +147,20 @@ export function AppUpdateSettingsSection() {
         accessibilityState={{ disabled: busy, busy }}
       >
         <View style={styles.rowText}>
-          <Text style={styles.rowLabel} numberOfLines={1}>
+          <Text style={styles.primaryLabel} numberOfLines={1}>
             {label}
           </Text>
           {detail ? (
             <Text style={styles.rowDetail} numberOfLines={2}>
               {detail}
             </Text>
-          ) : null}
+          ) : (
+            <Text style={styles.rowDetail} numberOfLines={1}>
+              {enabled
+                ? `Looks for a newer bundle on ${channel}.`
+                : "Updates are off in this session."}
+            </Text>
+          )}
         </View>
         {accessory}
       </Pressable>
@@ -208,10 +201,6 @@ function createStyles(theme: ThemeTokens) {
       flexDirection: "row",
       alignItems: "stretch",
     } as ViewStyle,
-    metricsInfo: {
-      justifyContent: "center",
-      paddingRight: theme.spacing["4"],
-    } as ViewStyle,
     metric: {
       flex: 1,
       minWidth: 0,
@@ -248,6 +237,20 @@ function createStyles(theme: ThemeTokens) {
       width: StyleSheet.hairlineWidth,
       backgroundColor: theme.colors.border,
     } as ViewStyle,
+    primaryRow: {
+      minHeight: 56,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: theme.spacing["3"],
+      paddingHorizontal: theme.spacing["4"],
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.colors.border,
+      backgroundColor: theme.colors.muted + "33",
+    } as ViewStyle,
+    primaryRowPressed: {
+      backgroundColor: theme.colors.accent,
+    } as ViewStyle,
     row: {
       minHeight: 44,
       flexDirection: "row",
@@ -269,6 +272,12 @@ function createStyles(theme: ThemeTokens) {
       marginRight: theme.spacing["3"],
       gap: 2,
     } as ViewStyle,
+    primaryLabel: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
+    } as TextStyle,
     rowLabel: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,

@@ -2,7 +2,28 @@
 
 Patterns that fire diagnostics but are safe to suppress.
 
+## react-doctor/no-giant-component — native AuthProvider
+
+- **File**: `apps/native/src/providers/AuthProvider.tsx` (`AuthProvider`)
+- **Why FP**: `AuthProvider` is a single auth context surface (session hydrate,
+  email/passkey sign-in, sign-out, step-up, header helpers). Splitting would
+  fragment tightly coupled session state transitions without a reusable seam —
+  tests target the exported provider. Same pattern as web `LoginFormBody`.
+- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+  for `**/providers/AuthProvider.tsx`.
+
+## react-doctor/no-set-state-after-await-in-effect — native AuthProvider bootstrap
+
+- **File**: `apps/native/src/providers/AuthProvider.tsx` (session `useEffect`)
+- **Why FP**: The mount effect already gates every post-`await` setter behind an
+  `ignore` flag cleared in the effect cleanup. Overlapping dependency re-runs
+  cannot commit stale session state. The static rule still matches the
+  await-then-set pattern and does not treat the ignore guard as sufficient.
+- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+  for `**/providers/AuthProvider.tsx`.
+
 ## react-doctor/only-export-components — Next.js page metadata
+
 
 - **Files**: `apps/web/app/calendar/page.tsx`, `apps/web/app/mail/page.tsx`
   (same pattern as `app/login/page.tsx`, `app/home/page.tsx`,

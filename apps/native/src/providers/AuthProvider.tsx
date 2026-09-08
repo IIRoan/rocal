@@ -22,7 +22,10 @@ import {
   resolvePasskeyBridgeBaseUrl,
   signInWithBrowserPasskey,
 } from "../lib/passkey-browser-bridge";
-import { waitForSessionCookie } from "../lib/session-cookie";
+import {
+  ensureSessionTokenCookie,
+  waitForSessionCookie,
+} from "../lib/session-cookie";
 import {
   saveMailVaultPassword,
   clearMailVaultPassword,
@@ -160,15 +163,30 @@ export function AuthProvider({
   const applySessionData = useCallback(
     (data: unknown) => {
       const typedData = data as
-        | {
+          | {
             user?: User;
             session?: Session;
+            token?: string;
           }
         | undefined;
 
-      if (!typedData?.user || !typedData.session) return false;
+      if (!typedData?.user) return false;
+
+      if (typedData.session) {
+        setUser(typedData.user);
+        setSession(typedData.session);
+        return true;
+      }
+
+      const token = typedData.token?.trim();
+      if (!token) return false;
+
       setUser(typedData.user);
-      setSession(typedData.session);
+      setSession({
+        token,
+        userId: typedData.user.id,
+        expiresAt: new Date(Date.now() + 60 * 60 * 24 * 30 * 1000),
+      });
       return true;
     },
     [setUser, setSession],
@@ -206,16 +224,34 @@ export function AuthProvider({
 
   const finalizeAuthenticatedSession = useCallback(
     async (data: unknown, errorPrefix: string) => {
-      // A successful Better Auth response already contains the authoritative
-      // session. Cookie persistence may finish just after the response on
-      // native, so it must not turn that success into a login failure.
-      if (applySessionData(data)) return;
+      const authToken =
+        typeof (data as { token?: unknown } | undefined)?.token === "string"
+          ? (data as { token: string }).token
+          : null;
+
+      // Email sign-in returns `{ user, token }` — apply it even if cookies lag.
+      if (applySessionData(data)) {
+        await ensureSessionTokenCookie(authToken, {
+          preferSecure: API_BASE_URL.startsWith("https://"),
+        });
+        return;
+      }
 
       await waitForSessionCookie();
       const sessionResult = await authClient.getSession({
         query: { disableCookieCache: true },
       });
       if (applySessionData(sessionResult?.data)) return;
+
+      if (authToken) {
+        await ensureSessionTokenCookie(authToken, {
+          preferSecure: API_BASE_URL.startsWith("https://"),
+        });
+        const recovered = await authClient.getSession({
+          query: { disableCookieCache: true },
+        });
+        if (applySessionData(recovered?.data)) return;
+      }
 
       throw new Error(
         `${errorPrefix} succeeded, but session setup did not complete. Please try again.`,
@@ -434,46 +470,45 @@ export function AuthProvider({
   }, [clearSession]);
 
   useEffect(() => {
-    let cancelled = false;
+    let ignore = false;
 
     async function loadSession() {
       try {
         const result = await authClient.getSession({
           query: { disableCookieCache: true },
         });
-        if (!cancelled && result?.data) {
+        if (ignore) return;
+
+        if (result?.data) {
           setUser(result.data.user as User);
           setSession((result.data as any).session as Session);
           try {
             const authStatus = await fetchAuthStatus();
-            if (!cancelled) {
-              if (!authStatus.authenticated) {
-                await signOut();
-              } else {
-                setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
-              }
+            if (ignore) return;
+            if (!authStatus.authenticated) {
+              await signOut();
+            } else {
+              setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
             }
           } catch {
             // Keep a session that Better Auth just validated. A temporary
             // status failure is not evidence that the user signed out.
           }
         } else {
-          if (!cancelled) {
-            await signOut();
-          }
+          await signOut();
         }
       } catch {
-        if (!cancelled) {
+        if (!ignore) {
           clearSession();
         }
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!ignore) setIsLoading(false);
       }
     }
 
-    loadSession();
+    void loadSession();
     return () => {
-      cancelled = true;
+      ignore = true;
     };
   }, [clearSession, fetchAuthStatus, signOut]);
 
