@@ -100,6 +100,22 @@ endpoints:
       - "[RESPONSE_TIME] < 5000"
       - "[CERTIFICATE_EXPIRATION] > 336h"
 
+  # Same JMAP discovery path web/native use via the API proxy (catches proxy-only outages).
+  - name: api-mail-jmap
+    <<: *discord-alerts
+    group: Application
+    url: https://api.solace.onl/api/health/mail-jmap
+    interval: 1m
+    ui:
+      <<: *endpoint-ui
+    client:
+      timeout: 15s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status == ok"
+      - "[RESPONSE_TIME] < 10000"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+
   # Mail path is Railway/VPS — poll often; no Vercel cost.
   - name: jmap-session
     <<: *discord-alerts-soft
