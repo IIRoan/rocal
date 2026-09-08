@@ -24,7 +24,21 @@ This app targets **Expo SDK 57** (React Native 0.86, React 19.2). EAS iOS builds
 | `preview`     | `preview`     | `preview`     | Internal store build, production icon |
 | `production`  | `production`  | `master`      | App Store / Play, production icon     |
 
-Runtime version uses the Expo **fingerprint** policy. OTA updates only apply when the native fingerprint matches.
+Runtime version uses the Expo **`appVersion`** policy (`1.0.0` today) so OTAs keep matching installed binaries until you intentionally bump `version` and ship a new native build.
+
+**Always publish updates via the profile helper** so `eas.json` build-profile `env` is applied and the update is pinned to the latest finished build’s runtime:
+
+```bash
+bun run update:preview      # apps/native
+bun run update:development
+bun run update:master
+```
+
+Those scripts run `scripts/publish-update.ts`, which:
+1. Mirrors the matching build profile’s `env` (`APP_VARIANT`, associated-domains flags, public URLs, Sentry DSN, …)
+2. Looks up the latest finished EAS build for that profile and pins `runtimeVersion` to it (so fingerprint drift from local `node_modules` cannot orphan OTAs)
+
+Changing native modules, Expo plugins, or app `version` requires a **new native build**, not only an OTA.
 
 ## Local env
 
@@ -178,15 +192,20 @@ Required GitHub secret:
 
 - `EXPO_TOKEN`
 
-The workflow bakes production API origins into published bundles:
+The workflow publishes through `apps/native/scripts/publish-update.ts`, which applies the matching `eas.json` build-profile `env` so the fingerprint runtimeVersion matches installed binaries. It also bakes production API origins into published bundles:
 
 - `EXPO_PUBLIC_API_URL=https://api.solace.onl`
 - `EXPO_PUBLIC_APP_URL=https://solace.onl`
 - `PASSKEY_ORIGIN=https://solace.onl`
+- `EXPO_ENABLE_IOS_ASSOCIATED_DOMAINS=true` (preview / production profiles)
+- `EXPO_PUBLIC_SENTRY_DSN` (Errex project `solace`; native reports via `reporting.ts`)
 
 Required Expo EAS environment values for the `production` / `preview` environments (used by `eas update --environment`):
 
 - `EXPO_PUBLIC_API_URL`
+- `EXPO_PUBLIC_SENTRY_DSN`
 - `PASSKEY_ORIGIN` when native passkeys are enabled
+
+Keep those aligned with `eas.json` `build.*.env`. Do not publish with a bare `eas update` that omits profile env — the OTA will not attach to existing binaries.
 
 Note: PR-triggered publishes are skipped for forked repositories because GitHub does not expose secrets to untrusted PRs.

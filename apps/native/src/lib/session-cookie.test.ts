@@ -7,15 +7,18 @@ import {
   persistPasskeyStepUpCookie,
   persistSessionTokenCookie,
 } from "./session-cookie";
+import { setFallbackSessionToken } from "./session-token-fallback";
 
 jest.mock("./secure-store-chunked", () => ({
   getChunkedSecureValueSync: jest.fn(() => "{}"),
   readChunkedSecureValue: jest.fn(async () => "{}"),
+  readRawSecureValue: jest.fn(async () => "{}"),
   writeChunkedSecureValue: jest.fn(async () => undefined),
 }));
 
 jest.mock("./constants", () => ({
   AUTH_STORAGE_PREFIX: "solace",
+  API_BASE_URL: "https://api.solace.onl",
 }));
 
 import {
@@ -25,6 +28,7 @@ import {
 
 describe("session cookie helpers", () => {
   beforeEach(() => {
+    setFallbackSessionToken(null);
     jest.mocked(readChunkedSecureValue).mockResolvedValue("{}");
     jest.mocked(writeChunkedSecureValue).mockClear();
   });
@@ -71,6 +75,18 @@ describe("session cookie helpers", () => {
     expect(written[PASSKEY_STEP_UP_COOKIE_NAME]?.value).toBe("verified");
   });
 
+  it("falls back to an in-memory session token when the jar is empty", () => {
+    setFallbackSessionToken("memory-token");
+    expect(parseSessionCookie("{}")).toBe(
+      "__Secure-better-auth.session_token=memory-token",
+    );
+  });
+
+  it("does not treat a bare digit string as a cookie jar", () => {
+    expect(parseSessionCookie("1")).toBe("");
+    expect(hasSessionTokenCookie("1")).toBe(false);
+  });
+
   it("persists a secure session token when the jar is empty", async () => {
     await persistSessionTokenCookie("fresh-token", { preferSecure: true });
 
@@ -102,23 +118,17 @@ describe("session cookie helpers", () => {
     expect(writeChunkedSecureValue).not.toHaveBeenCalled();
   });
 
-  it("replaces a stale session token cookie with the auth response token", async () => {
+  it("keeps an existing session cookie instead of overwriting it with the auth payload token", async () => {
     jest.mocked(readChunkedSecureValue).mockResolvedValue(
       JSON.stringify({
         "__Secure-better-auth.session_token": {
-          value: "stale-token",
+          value: "signed-cookie-value",
           expires: null,
         },
       }),
     );
 
     await expect(ensureSessionTokenCookie("fresh-token")).resolves.toBe(true);
-
-    const written = JSON.parse(
-      jest.mocked(writeChunkedSecureValue).mock.calls[0]?.[1] as string,
-    ) as Record<string, { value: string }>;
-    expect(written["__Secure-better-auth.session_token"]?.value).toBe(
-      "fresh-token",
-    );
+    expect(writeChunkedSecureValue).not.toHaveBeenCalled();
   });
 });

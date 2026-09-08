@@ -17,6 +17,7 @@ import { Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
 import { authClient } from "../../src/lib/auth-client";
+import { captureException } from "../../src/lib/reporting";
 import { APP_BASE_URL } from "../../src/lib/constants";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { AUTH_SIGN_UP_ROUTE } from "../../src/lib/auth-routing";
@@ -110,6 +111,7 @@ export default function SignInScreen() {
       const message =
         err?.message ?? "Sign-in failed. Please check your credentials.";
       log.error("Sign-in failed", err);
+      captureException(err, { tags: { area: "sign-in" } });
       setServerError(message);
     } finally {
       setIsSigningIn(false);

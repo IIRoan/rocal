@@ -35,9 +35,13 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Must mirror eas.json build profile `env` so fingerprint runtimeVersion
+  # matches the binary (eas update only loads EAS Environment vars, not profile env).
   EXPO_PUBLIC_API_URL: https://api.solace.onl
   EXPO_PUBLIC_APP_URL: https://solace.onl
   PASSKEY_ORIGIN: https://solace.onl
+  EXPO_ENABLE_IOS_ASSOCIATED_DOMAINS: "true"
+  EXPO_PUBLIC_SENTRY_DSN: https://65f1ae513c4a4865bc3b3384ce746653@errors.solace.onl/solace
 
 jobs:
   publish-preview-update:
@@ -78,9 +82,8 @@ jobs:
 
       - name: Publish update to preview
         env:
-          APP_VARIANT: preview
           EAS_UPDATE_MESSAGE: preview-${{ github.ref_name }}-${{ github.sha }}
-        run: eas update --branch preview --environment preview --message "$EAS_UPDATE_MESSAGE" --non-interactive
+        run: bun run ./scripts/publish-update.ts preview --message "$EAS_UPDATE_MESSAGE" --non-interactive
 
   publish-development-update:
     name: Publish Development EAS Update
@@ -120,9 +123,8 @@ jobs:
 
       - name: Publish update to development
         env:
-          APP_VARIANT: development
           EAS_UPDATE_MESSAGE: development-${{ github.sha }}
-        run: eas update --branch development --environment development --message "$EAS_UPDATE_MESSAGE" --non-interactive
+        run: bun run ./scripts/publish-update.ts development --message "$EAS_UPDATE_MESSAGE" --non-interactive
 
   publish-testing-update:
     name: Publish Testing EAS Update
@@ -164,9 +166,8 @@ jobs:
 
       - name: Publish update to testing
         env:
-          APP_VARIANT: preview
           EAS_UPDATE_MESSAGE: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-        run: eas update --branch testing --environment preview --message "$EAS_UPDATE_MESSAGE" --non-interactive
+        run: bun run ./scripts/publish-update.ts testing --message "$EAS_UPDATE_MESSAGE" --non-interactive
 
   publish-master-update:
     name: Publish Master EAS Update
@@ -206,6 +207,5 @@ jobs:
 
       - name: Publish update to master
         env:
-          APP_VARIANT: production
           EAS_UPDATE_MESSAGE: master-${{ github.sha }}
-        run: eas update --branch master --environment production --message "$EAS_UPDATE_MESSAGE" --non-interactive
+        run: bun run ./scripts/publish-update.ts production --message "$EAS_UPDATE_MESSAGE" --non-interactive

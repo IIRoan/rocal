@@ -29,6 +29,14 @@ jest.mock("expo-updates", () => ({
   reloadAsync: jest.fn(),
 }));
 
+jest.mock("./src/lib/reporting", () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+  flushReporting: jest.fn(async () => undefined),
+  getErrexReportingOptions: jest.fn(() => null),
+  parseErrexDsn: jest.fn(() => null),
+}));
+
 jest.mock("expo-notifications", () => ({
   setNotificationHandler: jest.fn(),
   getPermissionsAsync: jest.fn(async () => ({ status: "granted" })),

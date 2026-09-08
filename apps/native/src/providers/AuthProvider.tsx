@@ -24,8 +24,14 @@ import {
 } from "../lib/passkey-browser-bridge";
 import {
   ensureSessionTokenCookie,
+  healAuthCookieJar,
+  rememberSessionTokenFromJar,
   waitForSessionCookie,
 } from "../lib/session-cookie";
+import {
+  getFallbackSessionToken,
+  setFallbackSessionToken,
+} from "../lib/session-token-fallback";
 import {
   saveMailVaultPassword,
   clearMailVaultPassword,
@@ -116,6 +122,8 @@ export function AuthProvider({
   const [lastAuthMethod, setLastAuthMethod] = useState<AuthMethod>("unknown");
   const [requiresPasskeyStepUp, setRequiresPasskeyStepUp] = useState(false);
   const pendingAuthPasswordRef = useRef<string | null>(null);
+  const sessionLoadIdRef = useRef(0);
+  const hasLiveSessionRef = useRef(false);
   const authCapabilities = useMemo(() => {
     const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
 
@@ -172,15 +180,22 @@ export function AuthProvider({
 
       if (!typedData?.user) return false;
 
+      const token =
+        typedData.session?.token?.trim() || typedData.token?.trim() || "";
+      if (token && !getFallbackSessionToken()) {
+        setFallbackSessionToken(token);
+      }
+
       if (typedData.session) {
+        hasLiveSessionRef.current = true;
         setUser(typedData.user);
         setSession(typedData.session);
         return true;
       }
 
-      const token = typedData.token?.trim();
       if (!token) return false;
 
+      hasLiveSessionRef.current = true;
       setUser(typedData.user);
       setSession({
         token,
@@ -229,11 +244,15 @@ export function AuthProvider({
           ? (data as { token: string }).token
           : null;
 
-      // Email sign-in returns `{ user, token }` — apply it even if cookies lag.
-      if (applySessionData(data)) {
+      // Persist the cookie before flipping React auth state — otherwise E2EE
+      // bootstrap fires API calls without a Cookie header and 401 clears us.
+      if (authToken) {
         await ensureSessionTokenCookie(authToken, {
           preferSecure: API_BASE_URL.startsWith("https://"),
         });
+      }
+
+      if (applySessionData(data)) {
         return;
       }
 
@@ -298,6 +317,8 @@ export function AuthProvider({
   }, [fetchAuthStatus]);
 
   const clearSession = useCallback(() => {
+    hasLiveSessionRef.current = false;
+    setFallbackSessionToken(null);
     setUser(null);
     setSession(null);
     resetAuthMethodHints();
@@ -356,8 +377,10 @@ export function AuthProvider({
   const signIn = useCallback(
     async (email: string, password: string) => {
       setEmailPasswordAuthHints(password);
+      sessionLoadIdRef.current += 1;
       let authData: unknown;
       try {
+        await healAuthCookieJar();
         const result = await authClient.signIn.email({ email, password });
 
         if (result.error) {
@@ -398,7 +421,21 @@ export function AuthProvider({
         throw error;
       }
 
+      const earlyToken =
+        typeof (authData as { token?: unknown } | undefined)?.token === "string"
+          ? (authData as { token: string }).token
+          : typeof (authData as { session?: { token?: unknown } } | undefined)
+                ?.session?.token === "string"
+            ? (authData as { session: { token: string } }).session.token
+            : null;
+
       await waitForSessionCookie();
+      const fromJar = await rememberSessionTokenFromJar();
+      if (!fromJar && earlyToken) {
+        await ensureSessionTokenCookie(earlyToken, {
+          preferSecure: API_BASE_URL.startsWith("https://"),
+        });
+      }
       const requiresStepUp = await syncPasskeyStepUpAfterAuth();
       if (requiresStepUp) {
         if (!authCapabilities.supportsPasskeys) {
@@ -471,34 +508,39 @@ export function AuthProvider({
 
   useEffect(() => {
     let ignore = false;
+    const loadId = ++sessionLoadIdRef.current;
 
     async function loadSession() {
       try {
+        // Legacy jars used a bare `"1"` chunk meta; Better Auth JSON.parses that
+        // to number 1 and crashes on Set-Cookie. Flatten before any auth I/O.
+        await healAuthCookieJar();
+        if (ignore || loadId !== sessionLoadIdRef.current) return;
+
         const result = await authClient.getSession({
           query: { disableCookieCache: true },
         });
-        if (ignore) return;
+        if (ignore || loadId !== sessionLoadIdRef.current) return;
 
-        if (result?.data) {
-          setUser(result.data.user as User);
-          setSession((result.data as any).session as Session);
+        if (applySessionData(result?.data)) {
           try {
             const authStatus = await fetchAuthStatus();
-            if (ignore) return;
-            if (!authStatus.authenticated) {
-              await signOut();
-            } else {
+            if (ignore || loadId !== sessionLoadIdRef.current) return;
+            if (authStatus.authenticated) {
               setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
             }
           } catch {
-            // Keep a session that Better Auth just validated. A temporary
-            // status failure is not evidence that the user signed out.
+            // Keep a session that Better Auth just validated.
           }
-        } else {
-          await signOut();
+        } else if (
+          !ignore &&
+          loadId === sessionLoadIdRef.current &&
+          !hasLiveSessionRef.current
+        ) {
+          clearSession();
         }
       } catch {
-        if (!ignore) {
+        if (!ignore && loadId === sessionLoadIdRef.current && !hasLiveSessionRef.current) {
           clearSession();
         }
       } finally {
@@ -510,7 +552,7 @@ export function AuthProvider({
     return () => {
       ignore = true;
     };
-  }, [clearSession, fetchAuthStatus, signOut]);
+  }, [applySessionData, clearSession, fetchAuthStatus]);
 
   const signInWithPasskey = useCallback(async () => {
     if (!authCapabilities.supportsPasskeys) {
