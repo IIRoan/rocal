@@ -57,7 +57,9 @@ describe("reporting", () => {
   });
 
   it("posts captureException to the errex tunnel", async () => {
-    const fetchMock = jest.fn(async () => new Response("", { status: 200 }));
+    const fetchMock = jest.fn<
+      (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+    >(async () => new Response("", { status: 200 }));
     globalThis.fetch = fetchMock as typeof fetch;
 
     const { captureException, flushReporting } = await import("./reporting");
@@ -67,7 +69,7 @@ describe("reporting", () => {
     await flushReporting();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(url).toBe(
       "https://errors.solace.onl/api/solace/envelope/?sentry_key=65f1ae513c4a4865bc3b3384ce746653",
     );

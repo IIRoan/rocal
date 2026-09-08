@@ -78,11 +78,20 @@ export const passkeyBridgeFreshSessionPlugin = {
           });
         }
 
-        setVerifiedPasskeyStepUpCookie({
-          setCookie: (name, value, options) => {
-            ctx.setCookie(name, value, options);
+        setVerifiedPasskeyStepUpCookie(
+          {
+            setCookie: (name, value, options) => {
+              ctx.setCookie(name, value, options);
+            },
           },
-        });
+          {
+            userId: current.user.id,
+            sessionId:
+              typeof (current.session as { id?: unknown }).id === "string"
+                ? (current.session as { id: string }).id
+                : "",
+          },
+        );
 
         return ctx.json({ ok: true as const });
       },

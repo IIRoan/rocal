@@ -44,6 +44,9 @@ import { normalizeEmail, normalizeEmailOrThrow } from "../lib/email-utils";
 
 const LOCAL_PART_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/;
 const MIN_VAULT_MEMORY_KIB = 8192;
+const MAX_VAULT_MEMORY_KIB = 131_072;
+const MAX_VAULT_ITERATIONS = 4;
+const MAX_VAULT_PARALLELISM = 4;
 const MAIL_TOKEN_EXPIRY_SKEW_MS = 60_000;
 const SERVER_LIMITS_CACHE_TTL_MS = 60_000;
 const logger = createLogger("backend:mail-service");
@@ -144,6 +147,27 @@ function assertVaultParams(
     throw new ValidationError(
       `Vault memory cost must be at least ${MIN_VAULT_MEMORY_KIB} KiB.`,
       "kdfParams.memoryKiB",
+    );
+  }
+
+  if (params.memoryKiB > MAX_VAULT_MEMORY_KIB) {
+    throw new ValidationError(
+      `Vault memory cost must be at most ${MAX_VAULT_MEMORY_KIB} KiB.`,
+      "kdfParams.memoryKiB",
+    );
+  }
+
+  if (params.iterations > MAX_VAULT_ITERATIONS) {
+    throw new ValidationError(
+      `Vault iterations must be at most ${MAX_VAULT_ITERATIONS}.`,
+      "kdfParams.iterations",
+    );
+  }
+
+  if (params.parallelism > MAX_VAULT_PARALLELISM) {
+    throw new ValidationError(
+      `Vault parallelism must be at most ${MAX_VAULT_PARALLELISM}.`,
+      "kdfParams.parallelism",
     );
   }
 
@@ -1306,7 +1330,10 @@ export class MailService implements IMailService {
     });
   }
 
-  async getDirectoryKey(email: string): Promise<MailDirectoryKeyResult> {
+  async getDirectoryKey(
+    email: string,
+    options?: { allowRemoteResolve?: boolean },
+  ): Promise<MailDirectoryKeyResult> {
     const normalizedEmail = normalizeEmail(email);
     const directorySelect = {
       email: true,
@@ -1339,7 +1366,10 @@ export class MailService implements IMailService {
       }
     }
 
-    const remoteKey = await this.resolveRemoteDirectoryKey(normalizedEmail);
+    const remoteKey =
+      options?.allowRemoteResolve === true
+        ? await this.resolveRemoteDirectoryKey(normalizedEmail)
+        : null;
     if (remoteKey) {
       return remoteKey;
     }

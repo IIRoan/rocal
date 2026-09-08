@@ -956,7 +956,9 @@ describe("MailService", () => {
       stalwartDomainId: "domain-1",
     });
 
-    const result = await service.getDirectoryKey("nomnomnomnom@solace.onl");
+    const result = await service.getDirectoryKey("nomnomnomnom@solace.onl", {
+      allowRemoteResolve: true,
+    });
 
     expect(mockAdminClient.resolveMailboxPublicKey).toHaveBeenCalledWith({
       email: "nomnomnomnom@solace.onl",

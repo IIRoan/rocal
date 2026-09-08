@@ -1,5 +1,6 @@
 import { Elysia } from "elysia";
 import { RateLimitError } from "../lib/errors";
+import { enforceRateLimit } from "../lib/rate-limit";
 import { requireAuth } from "../lib/auth-guard";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { prisma } from "../lib/prisma";
@@ -12,41 +13,6 @@ const RATE_LIMITS = {
   GET_NOTIFICATIONS: { requests: 100, windowMs: 60000 },
   UPDATE_NOTIFICATIONS: { requests: 20, windowMs: 60000 },
 };
-
-const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT_CLEANUP_INTERVAL_MS = 60_000;
-let lastRateLimitCleanup = 0;
-
-function enforceRateLimit(
-  key: string,
-  limit: { requests: number; windowMs: number },
-) {
-  const now = Date.now();
-  const windowStart = now - limit.windowMs;
-
-  if (now - lastRateLimitCleanup > RATE_LIMIT_CLEANUP_INTERVAL_MS) {
-    for (const [storedKey, value] of rateLimitStore.entries()) {
-      if (value.resetTime < now) rateLimitStore.delete(storedKey);
-    }
-    lastRateLimitCleanup = now;
-  }
-
-  const current = rateLimitStore.get(key);
-  if (!current || current.resetTime < windowStart) {
-    rateLimitStore.set(key, { count: 1, resetTime: now + limit.windowMs });
-    return;
-  }
-
-  if (current.count >= limit.requests) {
-    const retryAfterSeconds = Math.ceil((current.resetTime - now) / 1000);
-    throw new RateLimitError(
-      `Rate limit exceeded. Try again in ${retryAfterSeconds} seconds.`,
-      retryAfterSeconds,
-    );
-  }
-
-  current.count++;
-}
 
 export const notificationsRoutes = new Elysia({
   prefix: "/notifications",
@@ -64,10 +30,11 @@ export const notificationsRoutes = new Elysia({
             "Retrieves all notification settings for a specific event with enhanced validation and rate limiting",
         },
       }, async ({ params, request, routeUser }) => {
-        enforceRateLimit(
-          `${routeUser.id}:${request.url}`,
-          RATE_LIMITS.GET_NOTIFICATIONS,
-        );
+        enforceRateLimit({
+          storeId: "notifications",
+          key: `${routeUser.id}:${request.url}`,
+          limit: RATE_LIMITS.GET_NOTIFICATIONS,
+        });
       
         return notificationService.getForEvent(routeUser.id, params.eventId);
       })
@@ -81,10 +48,11 @@ export const notificationsRoutes = new Elysia({
             "Updates all notification settings for a specific event using the enhanced notification service with comprehensive validation",
         },
       }, async ({ params, body, request, routeUser }) => {
-        enforceRateLimit(
-          `${routeUser.id}:${request.url}`,
-          RATE_LIMITS.UPDATE_NOTIFICATIONS,
-        );
+        enforceRateLimit({
+          storeId: "notifications",
+          key: `${routeUser.id}:${request.url}`,
+          limit: RATE_LIMITS.UPDATE_NOTIFICATIONS,
+        });
       
         return notificationService.setForEvent(
           routeUser.id,
@@ -103,10 +71,11 @@ export const notificationsRoutes = new Elysia({
             "Deletes all notification settings for a specific event using the enhanced notification service",
         },
       }, async ({ params, request, routeUser }) => {
-        enforceRateLimit(
-          `${routeUser.id}:${request.url}`,
-          RATE_LIMITS.UPDATE_NOTIFICATIONS,
-        );
+        enforceRateLimit({
+          storeId: "notifications",
+          key: `${routeUser.id}:${request.url}`,
+          limit: RATE_LIMITS.UPDATE_NOTIFICATIONS,
+        });
       
         return notificationService.deleteForEvent(
           routeUser.id,

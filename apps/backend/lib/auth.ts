@@ -387,9 +387,19 @@ const passkeyStepUpPlugin = {
             ctx.context.returned,
           );
           if (response && ctx.context.responseHeaders) {
-            setVerifiedPasskeyStepUpCookie({
-              headers: ctx.context.responseHeaders as Headers,
-            });
+            const session = ctx.context.session as
+              | { session?: { id?: string }; user?: { id?: string } }
+              | undefined;
+            const userId = session?.user?.id;
+            const sessionId = session?.session?.id;
+            if (userId && sessionId) {
+              setVerifiedPasskeyStepUpCookie(
+                {
+                  headers: ctx.context.responseHeaders as Headers,
+                },
+                { userId, sessionId },
+              );
+            }
           }
         }),
       },

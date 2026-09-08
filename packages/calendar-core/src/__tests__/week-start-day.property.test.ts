@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { differenceInCalendarDays } from "date-fns";
 import { getDefaultCalendarDateRange } from "../date-utils";
+import { validBaseDateArb } from "./property-test-arbitraries";
 
 /**
  * Property 6: Week start day in calendar grid
@@ -14,23 +15,10 @@ import { getDefaultCalendarDateRange } from "../date-utils";
 
 const weekStartDayArb: fc.Arbitrary<0 | 1> = fc.constantFrom(0, 1);
 
-// Generate reasonable dates (2000-01-01 to 2099-12-31) normalized to noon
-// to avoid DST boundary issues
-const baseDateArb: fc.Arbitrary<Date> = fc
-  .date({
-    min: new Date(2000, 0, 1),
-    max: new Date(2099, 11, 31),
-  })
-  .map((d) => {
-    const normalized = new Date(d);
-    normalized.setHours(12, 0, 0, 0);
-    return normalized;
-  });
-
 describe("getDefaultCalendarDateRange - Week Start Day Properties", () => {
   it("the start date's day of week matches the configured weekStartDay", () => {
     fc.assert(
-      fc.property(baseDateArb, weekStartDayArb, (baseDate, weekStartDay) => {
+      fc.property(validBaseDateArb, weekStartDayArb, (baseDate, weekStartDay) => {
         const { start } = getDefaultCalendarDateRange({
           baseDate,
           view: "week",
@@ -44,7 +32,7 @@ describe("getDefaultCalendarDateRange - Week Start Day Properties", () => {
 
   it("the week range covers exactly 7 consecutive days", () => {
     fc.assert(
-      fc.property(baseDateArb, weekStartDayArb, (baseDate, weekStartDay) => {
+      fc.property(validBaseDateArb, weekStartDayArb, (baseDate, weekStartDay) => {
         const { start, end } = getDefaultCalendarDateRange({
           baseDate,
           view: "week",
@@ -62,7 +50,7 @@ describe("getDefaultCalendarDateRange - Week Start Day Properties", () => {
 
   it("the target date falls within the generated week range", () => {
     fc.assert(
-      fc.property(baseDateArb, weekStartDayArb, (baseDate, weekStartDay) => {
+      fc.property(validBaseDateArb, weekStartDayArb, (baseDate, weekStartDay) => {
         const { start, end } = getDefaultCalendarDateRange({
           baseDate,
           view: "week",

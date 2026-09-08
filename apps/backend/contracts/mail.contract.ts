@@ -15,9 +15,9 @@ export type { MailDemoConfig, MailOAuthConfig, MailVaultKdfParams };
 
 export const kdfParamsSchema = strictZodObject({
   saltB64: z.string().min(1).max(512),
-  memoryKiB: z.number().int().min(8192).max(1_048_576),
-  iterations: z.number().int().min(1).max(16),
-  parallelism: z.number().int().min(1).max(32),
+  memoryKiB: z.number().int().min(8192).max(131_072),
+  iterations: z.number().int().min(1).max(4),
+  parallelism: z.number().int().min(1).max(4),
 });
 
 export const bootstrapBodySchema = strictZodObject({
@@ -120,7 +120,10 @@ export interface IMailService {
     input: GetMailAccountStatusInput,
   ): Promise<MailAccountStatusResult>;
   bootstrapForUser(input: MailBootstrapForUserInput): Promise<MailSignupResult>;
-  getDirectoryKey(email: string): Promise<MailDirectoryKeyResult>;
+  getDirectoryKey(
+    email: string,
+    options?: { allowRemoteResolve?: boolean },
+  ): Promise<MailDirectoryKeyResult>;
   getVaultBackup(email: string): Promise<MailVaultBackupResult>;
   getVaultBackupForUser(
     input: GetMailVaultBackupForUserInput,

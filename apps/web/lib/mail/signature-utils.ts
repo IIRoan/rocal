@@ -1,3 +1,5 @@
+import { sanitizeUntrustedEmailHtml } from "@workspace/calendar-core";
+
 export type SignatureSource = {
   textSignature?: string | null;
   htmlSignature?: string | null;
@@ -199,19 +201,7 @@ export function hasEmbeddedSignature(html: string): boolean {
 
 export function sanitizeSignatureHtml(html: string): string {
   if (!html.trim()) return "";
-  if (typeof document === "undefined") return html.trim();
-  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
-  doc.querySelectorAll("script, style, iframe, object, embed").forEach((el) => {
-    el.remove();
-  });
-  doc.querySelectorAll("*").forEach((el) => {
-    for (const attr of Array.from(el.attributes)) {
-      if (/^on/i.test(attr.name)) {
-        el.removeAttribute(attr.name);
-      }
-    }
-  });
-  return doc.body.innerHTML.trim();
+  return sanitizeUntrustedEmailHtml(html).trim();
 }
 
 /** Embed signature in the editor body with marker paragraphs for identity swaps. */

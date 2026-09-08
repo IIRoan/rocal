@@ -8,6 +8,7 @@ export * from "./mail-sub-addressing";
 export * from "./mail-identity-badge";
 export * from "./mail-recipient";
 export * from "./mail-html";
+export * from "./sanitize-email-html";
 export * from "./outgoing-mime";
 export * from "./mail-outgoing-attachments";
 export * from "./mail-jmap-validation";

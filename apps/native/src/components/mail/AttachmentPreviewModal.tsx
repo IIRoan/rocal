@@ -207,12 +207,11 @@ export function AttachmentPreviewModal({
             ) : kind === "pdf" && cached && WebView ? (
               <>
                 <WebView
-                  originWhitelist={["*"]}
+                  originWhitelist={["file://"]}
                   source={{ uri: cached.uri }}
                   style={styles.flex}
                   backgroundColor={isDark ? "#1a1a1a" : "#ffffff"}
                   allowFileAccess
-                  allowFileAccessFromFileURLs
                   allowingReadAccessToURL={cached.uri}
                 />
                 {onOpen ? (

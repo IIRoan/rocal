@@ -22,6 +22,7 @@ import {
   htmlToComposeText,
   toggleComposeList,
   type TextSelection,
+  sanitizeUntrustedEmailHtml,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
@@ -123,7 +124,7 @@ function buildEditorDocument(input: {
   </style>
 </head>
 <body>
-  <div id="ed" contenteditable="true" data-placeholder="${escapeHtmlAttribute(placeholder)}">${html}</div>
+  <div id="ed" contenteditable="true" data-placeholder="${escapeHtmlAttribute(placeholder)}">${sanitizeUntrustedEmailHtml(html)}</div>
   <script>
     (function() {
       var ed = document.getElementById('ed');
@@ -295,7 +296,8 @@ export const ComposeBodyEditor = forwardRef<
         onFocusChange?.(false);
         return;
       }
-      const next = htmlToComposeText(message.html);
+    const sanitizedHtml = sanitizeUntrustedEmailHtml(message.html);
+      const next = htmlToComposeText(sanitizedHtml);
       lastEmittedRef.current = next;
       if (next !== value) {
         onChangeText(next);
@@ -344,7 +346,7 @@ export const ComposeBodyEditor = forwardRef<
           injectJavaScriptRef.current =
             instance?.injectJavaScript?.bind(instance) ?? null;
         }}
-        originWhitelist={["*"]}
+        originWhitelist={["about:blank", "data:"]}
         source={{ html: document }}
         onMessage={onMessage}
         onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
