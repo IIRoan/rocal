@@ -26,27 +26,29 @@ defaults, so the config uses a space and CSS hides them.
 
 | Layer | Watches | Notifies |
 |-------|---------|----------|
-| **Gatus** | HTTP endpoints + Prometheus scrape shape | Discord (`DISCORD_WEBHOOK_URL`) after 2 failures / 2 recoveries |
+| **Gatus** | HTTP endpoints + Prometheus scrape shape | Discord (`DISCORD_WEBHOOK_URL`) after 2 failures / 2 recoveries (Application + Mail) |
 | **Stalwart Enterprise Alerts** | Live metric expressions (S3/store errors, SMTP concurrency, queue backlog, …) | Email to `admin@solace.onl` |
 
 Do not point a Stalwart WebHook at `DISCORD_WEBHOOK_URL`. Discord expects its own JSON body; Stalwart event payloads are a different shape. Discord for this stack is Gatus-only.
 
 ## Monitors
 
-Intervals are intentionally relaxed for **Vercel Hobby** (Application) and to avoid
-hammering Stalwart with duplicate Prometheus scrapes.
+**Mail** is polled aggressively (Railway/VPS — no Vercel cost). **Application** stays
+moderate on Vercel Hobby: website uses `HEAD` (no HTML body), API uses the cheap
+`/api/health` JSON probe. Default Discord alert is **2 failures** (~detection latency
+≈ 2× interval).
 
 | Group | Endpoint | Interval | Budget / notes | What it proves |
 |-------|----------|----------|----------------|----------------|
-| Application | `solace.onl` | 5m | `< 3000ms` | Web frontend |
-| Application | `api.solace.onl/api/health` | 5m | `< 5000ms` | Backend API |
-| Mail | `mail.solace.onl/jmap/session` | 2m | Discord after **3** fails | End-to-end mail path |
-| Mail | `mail.solace.onl/slot-manager/status` | 2m | Discord after **3** fails | Blue/green tunnels |
+| Application | `solace.onl` (`HEAD`) | 2m | `< 3000ms`; ~720/day | Web frontend reachable |
+| Application | `api.solace.onl/api/health` | 1m | `< 5000ms`; ~1440/day | Backend API |
+| Mail | `mail.solace.onl/jmap/session` | 30s | Discord after **2** fails (~1m) | End-to-end mail path |
+| Mail | `mail.solace.onl/slot-manager/status` | 30s | Discord after **2** fails (~1m) | Blue/green tunnels |
 
 ### Stalwart Metrics group
 
 Both monitors scrape `mail.solace.onl/slot-manager/metrics/prometheus` once each
-(every **5m**). Conditions are combined so we do not fan out 6–8 scrapes of the same URL.
+(every **2m**). Conditions are combined so we do not fan out 6–8 scrapes of the same URL.
 
 | Monitor | What it checks |
 |---------|----------------|

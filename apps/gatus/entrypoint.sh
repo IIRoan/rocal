@@ -104,7 +104,7 @@ append_vps_ssh_endpoints() {
 		echo "  - name: vps-health"
 		echo "    group: VPS"
 		echo "    url: ssh://${VPS_MONITOR_SSH_HOST}:${VPS_MONITOR_SSH_PORT}"
-		echo "    interval: 2m"
+		echo "    interval: 1m"
 		echo "    ui:"
 		echo "      period: 90d"
 		echo "    alerts:"
