@@ -61,8 +61,22 @@ inject_basic_auth() {
 
 inject_slot_manager_token() {
 	if [ -z "${SLOT_MANAGER_TOKEN:-}" ]; then
-		echo "SLOT_MANAGER_TOKEN is not set; slot-manager Prometheus monitor may fail auth." >&2
+		echo "SLOT_MANAGER_TOKEN is not set; slot-manager monitors will fail auth." >&2
+		return 0
 	fi
+
+	python3 - <<'PY'
+import os
+import pathlib
+
+config_path = pathlib.Path("/data/config.yaml")
+marker = "__SLOT_MANAGER_TOKEN__"
+config = config_path.read_text()
+if marker not in config:
+    raise SystemExit("SLOT_MANAGER_TOKEN placeholder missing from Gatus config")
+token = os.environ["SLOT_MANAGER_TOKEN"]
+config_path.write_text(config.replace(marker, token))
+PY
 }
 
 append_vps_ssh_endpoints() {

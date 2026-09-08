@@ -17,9 +17,9 @@ defaults, so the config uses a space and CSS hides them.
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `PORT` | auto | Public listen port (proxy + Gatus) |
-| `prometheus_user` | yes | Stalwart Prometheus basic auth (WebUI) |
-| `prometheus_password` | yes | Stalwart Prometheus basic auth |
-| `SLOT_MANAGER_TOKEN` | yes | Bearer token for `/slot-manager/status` |
+| `prometheus_user` | VPS only | Stalwart WebUI basic auth; slot-manager forwards as `PROMETHEUS_BASIC_AUTH` on the VPS |
+| `prometheus_password` | VPS only | Paired with `prometheus_user` on the VPS |
+| `SLOT_MANAGER_TOKEN` | yes | Bearer token for `/slot-manager/status` and Prometheus proxy |
 | `DISCORD_WEBHOOK_URL` | yes | Discord webhook for Gatus downtime and scrape failures |
 
 ## Alerting (two layers)

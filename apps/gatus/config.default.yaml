@@ -60,7 +60,7 @@ ui:
   <<: *discord-alerts
   url: https://mail.solace.onl/slot-manager/metrics/prometheus
   headers:
-    Authorization: "Bearer ${SLOT_MANAGER_TOKEN}"
+    Authorization: "Bearer __SLOT_MANAGER_TOKEN__"
   client:
     timeout: 15s
   ui:
@@ -125,7 +125,7 @@ endpoints:
     client:
       timeout: 10s
     headers:
-      Authorization: "Bearer ${SLOT_MANAGER_TOKEN}"
+      Authorization: "Bearer __SLOT_MANAGER_TOKEN__"
     conditions:
       - "[STATUS] == 200"
 
