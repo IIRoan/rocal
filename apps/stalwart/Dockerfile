@@ -1,8 +1,8 @@
-FROM stalwartlabs/stalwart:v0.16.17
+FROM stalwartlabs/stalwart:v0.16.21
 
 ARG FRPC_VERSION=0.69.1
 ARG STALWART_CLI_VERSION=1.0.12
-ARG BUILD_TIMESTAMP=2026-08-26-plan-alert-metrics
+ARG BUILD_TIMESTAMP=2026-09-08-v0.16.21
 
 USER root
 
