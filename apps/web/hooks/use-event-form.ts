@@ -32,7 +32,11 @@ import { calendarApiService } from "@/lib/calendar-api-service";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "@/lib/auth-client";
-import { isCurrentUserMailAddress } from "@workspace/calendar-core";
+import {
+  isAutomatedMailAddress,
+  isCurrentUserMailAddress,
+  isReservedSystemEmail,
+} from "@workspace/calendar-core";
 import { useRecentContacts } from "./use-recent-contacts";
 
 const log = createLogger("event-form");
@@ -773,7 +777,11 @@ export function useEventForm({
             displayName: string | null | undefined;
           }> = [];
           for (const participant of eventData.participants) {
-            if (isCurrentUserMailAddress(participant.email, accountEmail)) {
+            if (
+              isCurrentUserMailAddress(participant.email, accountEmail) ||
+              isAutomatedMailAddress(participant.email) ||
+              isReservedSystemEmail(participant.email)
+            ) {
               continue;
             }
             entries.push({

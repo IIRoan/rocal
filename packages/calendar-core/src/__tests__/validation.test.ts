@@ -47,3 +47,34 @@ describe("validateEventData timezone validation", () => {
     expect(validateEventData(buildEvent({ timezone: "" }))).toEqual([]);
   });
 });
+
+describe("validateEventData participant validation", () => {
+  it("allows normal participant emails", () => {
+    const errors = validateEventData(
+      buildEvent({
+        participants: [
+          { email: "colleague@solace.onl", displayName: "Colleague" },
+          { email: "guest@example.com", role: "attendee" },
+        ],
+      }),
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it("blocks admin@solace.onl and reserved system addresses from event participants", () => {
+    const errors = validateEventData(
+      buildEvent({
+        participants: [
+          { email: "admin@solace.onl" },
+          { email: "alert@solace.onl" },
+        ],
+      }),
+    );
+    expect(errors).toContain(
+      "Participant 1 cannot be a system or administrative address",
+    );
+    expect(errors).toContain(
+      "Participant 2 cannot be a system or administrative address",
+    );
+  });
+});

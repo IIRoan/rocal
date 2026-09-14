@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   calendarColorSchema,
+  eventParticipantInputSchema,
   optionalCalendarColorSchema,
   timezoneSchema,
 } from "../route-schemas";
@@ -41,5 +42,43 @@ describe("timezoneSchema", () => {
       /Invalid timezone identifier/,
     );
     expect(() => timezoneSchema.parse("")).toThrow(/Invalid timezone identifier/);
+  });
+});
+
+describe("eventParticipantInputSchema", () => {
+  it("accepts valid normal participant inputs", () => {
+    const valid = eventParticipantInputSchema.parse({
+      email: "colleague@solace.onl",
+      displayName: "Colleague",
+      role: "attendee",
+      status: "pending",
+    });
+    expect(valid.email).toBe("colleague@solace.onl");
+  });
+
+  it("strictly rejects admin@solace.onl and reserved system addresses", () => {
+    expect(() =>
+      eventParticipantInputSchema.parse({
+        email: "admin@solace.onl",
+      }),
+    ).toThrow(/Cannot invite system or administrative email addresses/);
+
+    expect(() =>
+      eventParticipantInputSchema.parse({
+        email: "alert@solace.onl",
+      }),
+    ).toThrow(/Cannot invite system or administrative email addresses/);
+
+    expect(() =>
+      eventParticipantInputSchema.parse({
+        email: "root@solace.onl",
+      }),
+    ).toThrow(/Cannot invite system or administrative email addresses/);
+
+    expect(() =>
+      eventParticipantInputSchema.parse({
+        email: "noreply@solace.onl",
+      }),
+    ).toThrow(/Cannot invite system or administrative email addresses/);
   });
 });

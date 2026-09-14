@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, type ViewStyle } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import {
   keepPreviousData,
   useQuery,
@@ -19,8 +17,6 @@ import {
   resolveCalendarLoadingState,
   resolveTimezone,
 } from "@workspace/calendar-core";
-import type { ThemeTokens } from "@workspace/design-tokens";
-import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useSheet } from "../../../src/providers/SheetProvider";
 import { useCalendarView } from "../../../src/providers/CalendarViewProvider";
 import { calendarApiService } from "../../../src/lib/api";
@@ -35,9 +31,10 @@ import {
   getTimezoneAwareCalendarDateRange,
   navigateCalendarDate,
 } from "../../../src/components/calendar/navigation-utils";
-import { CalendarViewSwitcher } from "../../../src/components/calendar/CalendarViewSwitcher";
+import { AppScreen } from "../../../src/components/layout";
+import { CalendarTopToolbar } from "../../../src/components/calendar/CalendarTopToolbar";
+import { CalendarBottomChrome } from "../../../src/components/calendar/CalendarBottomChrome";
 import { resolveCalendarSwitcherDate } from "../../../src/components/calendar/view-switcher-utils";
-import { CompactMonthStrip } from "../../../src/components/calendar/CompactMonthStrip";
 import { MonthGrid } from "../../../src/components/calendar/MonthGrid";
 import { SkeletonLoader } from "../../../src/components/calendar/SkeletonLoader";
 import { SwipeableCalendarView } from "../../../src/components/calendar/SwipeableCalendarView";
@@ -51,9 +48,9 @@ import {
 } from "../../../src/components/calendar/calendar-kit-adapter";
 import { AgendaList } from "../../../src/components/calendar/AgendaList";
 import { mergeMonthEventResponses } from "../../../src/components/calendar/month-events-utils";
+import { useWorkspaceTabHost } from "../../../src/providers/WorkspaceTabHostProvider";
 
-export default function CalendarScreen() {
-  const { theme } = useTheme();
+export function CalendarScreen() {
   const { openEventSheet } = useSheet();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -65,21 +62,30 @@ export default function CalendarScreen() {
     setCurrentDate,
     setSelectedDate,
   } = useCalendarView();
-  const styles = useMemo(() => createStyles(theme), [theme]);
   const timelineRef = useRef<NativeTimelineCalendarHandle>(null);
 
   const [monthStripExpanded, setMonthStripExpanded] = useState(false);
 
-  const { data: settings, isLoading: settingsLoading } = useQuery({
+  const { data: settings, isPending: settingsPending } = useQuery({
     queryKey: QUERY_KEYS.settings(),
     queryFn: () => calendarApiService.getUserSettings(),
+    placeholderData: () =>
+      queryClient.getQueryData<
+        Awaited<ReturnType<typeof calendarApiService.getUserSettings>>
+      >(QUERY_KEYS.settings()),
   });
+  const settingsLoading = settingsPending && !settings;
   const resolvedTimezone = resolveTimezone(settings?.timezone);
 
-  const { data: calendars, isLoading: calendarsLoading } = useQuery({
+  const { data: calendars, isPending: calendarsPending } = useQuery({
     queryKey: QUERY_KEYS.calendars(),
     queryFn: () => calendarApiService.getCalendars(),
+    placeholderData: () =>
+      queryClient.getQueryData<
+        Awaited<ReturnType<typeof calendarApiService.getCalendars>>
+      >(QUERY_KEYS.calendars()),
   });
+  const calendarsLoading = calendarsPending && !calendars;
 
   const detailDateRange = useMemo(() => {
     const weekStartDay = settings?.weekStartDay ?? 1;
@@ -490,39 +496,29 @@ export default function CalendarScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <CalendarViewSwitcher
-        activeView={activeView}
-        currentDate={switcherDate}
-        weekStartDay={settings?.weekStartDay ?? 1}
-        timezone={resolvedTimezone}
-        onTodayPress={handleTodayPress}
-        onForwardPress={handleNavigateForward}
-        onBackwardPress={handleNavigateBackward}
-        monthStripExpanded={monthStripExpanded}
-        onToggleMonthStrip={
-          isTimelineView ? undefined : handleToggleMonthStrip
-        }
-      />
-
-      {!isTimelineView ? (
-        <CompactMonthStrip
+    <AppScreen
+      header={<CalendarTopToolbar />}
+      footer={
+        <CalendarBottomChrome
+          activeView={activeView}
           currentDate={currentDate}
           selectedDate={selectedDate}
-          events={decoratedMonthEvents}
+          switcherDate={switcherDate}
           weekStartDay={settings?.weekStartDay ?? 1}
           timezone={resolvedTimezone}
-          expanded={monthStripExpanded}
-          externalExpandControl={monthStripExpanded}
-          swipeEnabled
-          showHandle
+          events={decoratedMonthEvents}
+          monthStripExpanded={monthStripExpanded}
+          showMonthStrip={!isTimelineView}
+          onTodayPress={handleTodayPress}
+          onForwardPress={handleNavigateForward}
+          onBackwardPress={handleNavigateBackward}
+          onToggleMonthStrip={handleToggleMonthStrip}
           onDayPress={handleDayPress}
           onMonthChange={handleMonthChange}
-          onToggleExpand={handleToggleMonthStrip}
           onExpandAnimationEnd={handleMonthStripAnimationEnd}
         />
-      ) : null}
-
+      }
+    >
       {loadingState.isAllInitialLoading && !isTimelineView ? (
         <SkeletonLoader view={activeView} />
       ) : activeView === "month" ? (
@@ -569,17 +565,14 @@ export default function CalendarScreen() {
           onEventMove={handleTimelineEventMove}
         />
       ) : null}
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
-function createStyles(theme: ThemeTokens) {
-  const view = {
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-  } satisfies Record<string, ViewStyle>;
-
-  return StyleSheet.create(view);
+export default function CalendarRoute() {
+  const { isHosted } = useWorkspaceTabHost();
+  if (isHosted) {
+    return null;
+  }
+  return <CalendarScreen />;
 }

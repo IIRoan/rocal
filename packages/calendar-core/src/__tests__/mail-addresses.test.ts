@@ -10,6 +10,7 @@ import {
   shouldEncryptOutgoingMail,
   validateComposeRecipients,
   isAutomatedMailAddress,
+  isReservedSystemEmail,
 } from "../mail-addresses";
 
 describe("mail address parsing", () => {
@@ -134,6 +135,31 @@ describe("mail address parsing", () => {
     expect(isAutomatedMailAddress("noreply@solace.onl")).toBe(true);
     expect(isAutomatedMailAddress("no-reply@example.com")).toBe(true);
     expect(isAutomatedMailAddress("mailer-daemon@example.com")).toBe(true);
+    expect(isAutomatedMailAddress("admin@solace.onl")).toBe(true);
     expect(isAutomatedMailAddress("alice@example.com")).toBe(false);
+  });
+
+  it("detects reserved system email addresses that must never be invited or used by users", () => {
+    expect(isReservedSystemEmail("admin@solace.onl")).toBe(true);
+    expect(isReservedSystemEmail("ADMIN@SOLACE.ONL")).toBe(true);
+    expect(isReservedSystemEmail("admin+tag@solace.onl")).toBe(true);
+    expect(isReservedSystemEmail("alert@solace.onl")).toBe(true);
+    expect(isReservedSystemEmail("alerts@solace.onl")).toBe(true);
+    expect(isReservedSystemEmail("noreply@solace.onl")).toBe(true);
+    expect(isReservedSystemEmail("root@solace.onl")).toBe(true);
+    expect(isReservedSystemEmail("postmaster@solace.onl")).toBe(true);
+    expect(isReservedSystemEmail("security@solace.onl")).toBe(true);
+    expect(isReservedSystemEmail("administrator@solace.onl")).toBe(true);
+    expect(isReservedSystemEmail("admin@customdomain.com", "customdomain.com")).toBe(true);
+    expect(isReservedSystemEmail("alert@customdomain.com", "customdomain.com")).toBe(true);
+    expect(isReservedSystemEmail("admin@randomcorp.com")).toBe(true);
+    expect(isReservedSystemEmail("root@external.org")).toBe(true);
+    expect(isReservedSystemEmail("postmaster@external.org")).toBe(true);
+
+    // Normal user addresses are allowed
+    expect(isReservedSystemEmail("testingproduction15@solace.onl")).toBe(false);
+    expect(isReservedSystemEmail("alice@example.com")).toBe(false);
+    expect(isReservedSystemEmail("user@solace.onl")).toBe(false);
+    expect(isReservedSystemEmail("john.doe@solace.onl")).toBe(false);
   });
 });

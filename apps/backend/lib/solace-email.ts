@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isReservedSystemEmail, RESERVED_SYSTEM_LOCAL_PARTS } from "@workspace/calendar-core";
 import { normalizeEmail } from "./email-utils";
 
 export const SOLACE_EMAIL_LOCAL_PART_PATTERN =
@@ -52,6 +53,21 @@ export function normalizeDesiredSolaceEmailInput(
   }
 
   if (!normalizedValue.includes("@")) {
+    if (
+      isReservedSystemEmail(`${normalizedValue}@${domain}`, domain) ||
+      RESERVED_SYSTEM_LOCAL_PARTS.has(normalizedValue)
+    ) {
+      return {
+        success: false,
+        error: {
+          localPart: normalizedValue,
+          normalizedEmail: buildSolaceEmailAddress(normalizedValue, domain),
+          domain,
+          message: "That email address is reserved.",
+        },
+      };
+    }
+
     if (!SOLACE_EMAIL_LOCAL_PART_PATTERN.test(normalizedValue)) {
       return {
         success: false,
@@ -112,6 +128,21 @@ export function normalizeDesiredSolaceEmailInput(
         domain,
         message:
           "Use only lowercase letters, numbers, dots, underscores, and hyphens in your Solace email.",
+      },
+    };
+  }
+
+  if (
+    isReservedSystemEmail(normalizedValue, domain) ||
+    RESERVED_SYSTEM_LOCAL_PARTS.has(localPart)
+  ) {
+    return {
+      success: false,
+      error: {
+        localPart,
+        normalizedEmail: normalizedValue,
+        domain,
+        message: "That email address is reserved.",
       },
     };
   }

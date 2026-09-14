@@ -2,10 +2,16 @@ import { z } from "zod";
 import { strictZodObject } from "../lib/validation";
 import { resourceIdParamsSchema } from "./_schemas";
 import { resourceIdSchema } from "./_zod";
-import type { WithOperationWarnings } from "@workspace/calendar-core";
+import { isReservedSystemEmail, type WithOperationWarnings } from "@workspace/calendar-core";
 
 export const createInviteBodySchema = strictZodObject({
-  email: z.string().min(1).max(320),
+  email: z
+    .string()
+    .min(1)
+    .max(320)
+    .refine((email) => !isReservedSystemEmail(email), {
+      message: "Cannot send an invite to a reserved system email address.",
+    }),
 });
 
 export const revokeInviteParamsSchema = resourceIdParamsSchema;
@@ -16,7 +22,13 @@ export const inviteTokenQuerySchema = strictZodObject({
 
 export const claimInviteBodySchema = strictZodObject({
   token: z.string().min(1).max(500),
-  chosenEmail: z.string().min(1).max(320),
+  chosenEmail: z
+    .string()
+    .min(1)
+    .max(320)
+    .refine((email) => !isReservedSystemEmail(email), {
+      message: "Cannot claim a reserved system email address.",
+    }),
 });
 
 export const createInviteInputSchema = createInviteBodySchema.extend({

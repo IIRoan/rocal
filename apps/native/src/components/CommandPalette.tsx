@@ -22,13 +22,13 @@ import { useCalendarView } from "../providers/CalendarViewProvider";
 import { useMailSelection } from "../providers/MailSelectionProvider";
 import { calendarApiService } from "../lib/api";
 import {
-  CALENDAR_TAB_ROUTE,
   MAIL_TAB_ROUTE,
   SETTINGS_ROUTE,
   SETTINGS_NOTIFICATIONS_ROUTE,
   isMailRouteSegments,
 } from "../lib/navigation-routes";
 import { useMailAccount, useMailRuntime } from "../lib/mail/use-mail";
+import { useWorkspaceTabSwitch } from "../lib/use-workspace-tab-switch";
 import { formatAddress } from "../lib/mail/mail-helpers";
 import { useNativeTitleIndex } from "../hooks/use-native-title-index";
 import {
@@ -193,9 +193,11 @@ export function CommandPalette() {
     setDebouncedQuery("");
   }, []);
 
+  const switchTab = useWorkspaceTabSwitch();
+
   const navigateToCalendar = useCallback(() => {
-    router.replace(CALENDAR_TAB_ROUTE as never);
-  }, [router]);
+    switchTab("calendar");
+  }, [switchTab]);
 
   const runAction = useCallback(
     (action: CommandAction) => {
@@ -223,7 +225,7 @@ export function CommandPalette() {
           navigateToCalendar();
           break;
         case "open-mail":
-          router.replace(MAIL_TAB_ROUTE as never);
+          switchTab("mail");
           break;
         case "compose-mail":
           router.push(`${MAIL_TAB_ROUTE}/compose` as never);
@@ -244,6 +246,7 @@ export function CommandPalette() {
       setSelectedDate,
       navigateToCalendar,
       router,
+      switchTab,
     ],
   );
 

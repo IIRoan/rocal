@@ -356,6 +356,28 @@ describe("eventsRoutes – color validation", () => {
       expect(mockPrisma.calendarEvent.create).not.toHaveBeenCalled();
     });
 
+    it("strictly rejects admin@solace.onl and reserved system addresses in participants", async () => {
+      const response = await createApp().handle(
+        new Request("http://localhost/events/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...validEventBody,
+            participants: [
+              {
+                email: "admin@solace.onl",
+                role: "attendee",
+                status: "pending",
+              },
+            ],
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(422);
+      expect(mockPrisma.calendarEvent.create).not.toHaveBeenCalled();
+    });
+
     it("persists encrypted shadow fields when provided on create", async () => {
       mockPrisma.calendarEvent.create.mockResolvedValue({
         id: "event-enc-1",

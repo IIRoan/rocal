@@ -431,4 +431,111 @@ describe("EventParticipantService", () => {
       }),
     );
   });
+
+  it("purges reserved system emails like admin@solace.onl from existing participants", async () => {
+    const prisma = {
+      user: {
+        findUnique: jest
+          .fn<(...args: unknown[]) => Promise<MockUserRecord | null>>()
+          .mockResolvedValue({
+            id: "user-1",
+            email: "owner@solace.onl",
+            name: "Owner",
+          }),
+        findMany: jest
+          .fn<(...args: unknown[]) => Promise<MockUserRecord[]>>()
+          .mockResolvedValue([
+            {
+              id: "user-1",
+              email: "owner@solace.onl",
+              name: "Owner",
+            },
+          ]),
+      },
+      mailDirectoryEntry: {
+        findMany: jest
+          .fn<(...args: unknown[]) => Promise<MockDirectoryRecord[]>>()
+          .mockResolvedValue([]),
+        findUnique: jest.fn(async () => null),
+      },
+      eventParticipant: {
+        findMany: jest
+          .fn<(...args: unknown[]) => Promise<MockParticipantRecord[]>>()
+          .mockResolvedValueOnce([
+            {
+              id: "participant-owner",
+              eventId: "event-1",
+              userId: "user-1",
+              email: "owner@solace.onl",
+              displayName: "Owner",
+              role: "organizer",
+              status: "accepted",
+              createdAt: new Date("2026-05-01T09:00:00.000Z"),
+              updatedAt: new Date("2026-05-01T09:00:00.000Z"),
+              user: {
+                id: "user-1",
+                email: "owner@solace.onl",
+                name: "Owner",
+                image: null,
+              },
+            },
+            {
+              id: "participant-admin",
+              eventId: "event-1",
+              userId: null,
+              email: "admin@solace.onl",
+              displayName: "admin@solace.onl",
+              role: "attendee",
+              status: "pending",
+              createdAt: new Date("2026-05-01T09:00:01.000Z"),
+              updatedAt: new Date("2026-05-01T09:00:01.000Z"),
+              user: null,
+            },
+          ])
+          .mockResolvedValueOnce([
+            {
+              id: "participant-owner",
+              eventId: "event-1",
+              userId: "user-1",
+              email: "owner@solace.onl",
+              displayName: "Owner",
+              role: "organizer",
+              status: "accepted",
+              createdAt: new Date("2026-05-01T09:00:00.000Z"),
+              updatedAt: new Date("2026-05-01T09:00:00.000Z"),
+              user: {
+                id: "user-1",
+                email: "owner@solace.onl",
+                name: "Owner",
+                image: null,
+              },
+            },
+          ]),
+        deleteMany: jest.fn(async () => ({ count: 1 })),
+        upsert: jest.fn(async () => null),
+      },
+    };
+
+    const service = new EventParticipantService(prisma as never);
+    const result = await service.syncParticipants({
+      eventId: "event-1",
+      ownerUserId: "user-1",
+      participants: [],
+    });
+
+    expect(prisma.eventParticipant.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ["participant-admin"] } },
+    });
+    expect(result.participants).toEqual([
+      expect.objectContaining({
+        email: "owner@solace.onl",
+        role: "organizer",
+      }),
+    ]);
+    expect(
+      result.participants.some(
+        (participant) => participant.email === "admin@solace.onl",
+      ),
+    ).toBe(false);
+  });
 });

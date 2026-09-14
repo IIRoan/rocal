@@ -18,6 +18,7 @@ import { SidebarProvider, useSidebar } from "../src/providers/SidebarProvider";
 import { MailSelectionProvider } from "../src/providers/MailSelectionProvider";
 import { CommandPaletteProvider } from "../src/providers/CommandPaletteProvider";
 import { CalendarViewProvider } from "../src/providers/CalendarViewProvider";
+import { WorkspaceTabHostProvider } from "../src/providers/WorkspaceTabHostProvider";
 import { AppSidebar } from "../src/components/AppSidebar";
 import { CommandPalette } from "../src/components/CommandPalette";
 import { WorkspaceLoadingScreen } from "../src/components/WorkspaceLoadingScreen";
@@ -191,29 +192,31 @@ function RootLayout() {
                           <ToastProvider>
                             <SheetProvider>
                               <CommandPaletteProvider>
-                                <Stack
-                                  screenOptions={NATIVE_STACK_SCREEN_OPTIONS}
-                                >
-                                  <Stack.Screen
-                                    name="index"
-                                    options={
-                                      NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
-                                    }
-                                  />
-                                  <Stack.Screen
-                                    name="(auth)"
-                                    options={
-                                      NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
-                                    }
-                                  />
-                                  <Stack.Screen
-                                    name="(tabs)"
-                                    options={
-                                      NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
-                                    }
-                                  />
-                                </Stack>
-                                <AuthenticatedChrome />
+                                <WorkspaceTabHostProvider>
+                                  <Stack
+                                    screenOptions={NATIVE_STACK_SCREEN_OPTIONS}
+                                  >
+                                    <Stack.Screen
+                                      name="index"
+                                      options={
+                                        NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
+                                      }
+                                    />
+                                    <Stack.Screen
+                                      name="(auth)"
+                                      options={
+                                        NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
+                                      }
+                                    />
+                                    <Stack.Screen
+                                      name="(tabs)"
+                                      options={
+                                        NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS
+                                      }
+                                    />
+                                  </Stack>
+                                  <AuthenticatedChrome />
+                                </WorkspaceTabHostProvider>
                               </CommandPaletteProvider>
                             </SheetProvider>
                           </ToastProvider>

@@ -5,6 +5,7 @@ import {
   type EventParticipantRole,
   type EventParticipantStatus,
   buildSolaceProfileAvatarPath,
+  isReservedSystemEmail,
   normalizeParticipantEmail,
   sanitizePublicImageUrl,
 } from "@workspace/calendar-core";
@@ -127,7 +128,7 @@ export function resolveParticipantInputs(input: {
 
   for (const participant of input.participants ?? []) {
     const email = normalizeParticipantEmail(participant.email);
-    if (!email) {
+    if (!email || isReservedSystemEmail(email)) {
       continue;
     }
 
@@ -149,6 +150,79 @@ export function resolveParticipantInputs(input: {
   }
 
   return [...deduped.values()];
+}
+
+/**
+ * Owned Solace events treat the local invite list as source of truth.
+ * Stalwart may invent principals (e.g. admin@solace.onl as owner); never adopt
+ * those as new invitees. Only refresh RSVP status for people already invited.
+ */
+export function reconcileOwnedEventParticipantsFromRemote(input: {
+  owner?:
+    | {
+        email: string;
+        name?: string | null;
+      }
+    | null
+    | undefined;
+  localParticipants?: EventParticipantInput[] | null | undefined;
+  remoteParticipants?: EventParticipantInput[] | null | undefined;
+}): EventParticipantInput[] {
+  const ownerEmail = normalizeParticipantEmail(input.owner?.email);
+  const remoteByEmail = new Map<string, EventParticipantInput>();
+
+  for (const participant of input.remoteParticipants ?? []) {
+    const email = normalizeParticipantEmail(participant.email);
+    if (!email || isReservedSystemEmail(email)) {
+      continue;
+    }
+    remoteByEmail.set(email, {
+      email,
+      displayName: participant.displayName?.trim() || undefined,
+      role: normalizeParticipantRole(participant.role),
+      status: normalizeParticipantStatus(
+        participant.status,
+        normalizeParticipantRole(participant.role),
+      ),
+    });
+  }
+
+  const merged = new Map<string, EventParticipantInput>();
+
+  if (ownerEmail) {
+    merged.set(ownerEmail, {
+      email: ownerEmail,
+      displayName: input.owner?.name?.trim() || ownerEmail,
+      role: "organizer",
+      status: "accepted",
+    });
+  }
+
+  for (const participant of input.localParticipants ?? []) {
+    const email = normalizeParticipantEmail(participant.email);
+    if (!email || isReservedSystemEmail(email)) {
+      continue;
+    }
+    if (ownerEmail && email === ownerEmail) {
+      continue;
+    }
+
+    const remote = remoteByEmail.get(email);
+    const role = normalizeParticipantRole(participant.role);
+    merged.set(email, {
+      email,
+      displayName:
+        participant.displayName?.trim() ||
+        remote?.displayName?.trim() ||
+        undefined,
+      role,
+      status: remote?.status
+        ? normalizeParticipantStatus(remote.status, role)
+        : normalizeParticipantStatus(participant.status, role),
+    });
+  }
+
+  return [...merged.values()];
 }
 
 export function mapEventParticipant(
@@ -203,6 +277,8 @@ export function mapAndSortParticipants(
   event: { participants?: EventParticipantRecord[] | null },
 ): EventParticipant[] {
   return sortEventParticipants(
-    (event.participants ?? []).map((p) => mapEventParticipant(p)),
+    (event.participants ?? [])
+      .map((p) => mapEventParticipant(p))
+      .filter((p) => !isReservedSystemEmail(p.email)),
   );
 }

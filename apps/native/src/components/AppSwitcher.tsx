@@ -8,61 +8,46 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { useRouter, useSegments } from "expo-router";
+import { useSegments } from "expo-router";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import {
-  CALENDAR_TAB_ROUTE,
-  MAIL_TAB_ROUTE,
-  isMailRouteSegments,
-} from "../lib/navigation-routes";
+  APP_SWITCH_OPTIONS,
+  type AppSwitchKey,
+} from "../lib/app-switcher-config";
+import { isMailRouteSegments } from "../lib/navigation-routes";
+import { useWorkspaceTabSwitch } from "../lib/use-workspace-tab-switch";
 import { useTheme } from "../providers/ThemeProvider";
-
-type AppKey = "calendar" | "mail";
-
-const APPS: {
-  key: AppKey;
-  label: string;
-  icon: keyof typeof Feather.glyphMap;
-  href: string;
-}[] = [
-  {
-    key: "calendar",
-    label: "Calendar",
-    icon: "calendar",
-    href: CALENDAR_TAB_ROUTE,
-  },
-  { key: "mail", label: "Mail", icon: "mail", href: MAIL_TAB_ROUTE },
-];
 
 interface AppSwitcherProps {
   /** Force the active app; otherwise derived from the current route. */
-  active?: AppKey;
+  active?: AppSwitchKey;
   /** Called after a navigation is triggered (e.g. to close a drawer). */
   onNavigate?: () => void;
 }
 
 /**
  * Full-width segmented control for switching between Calendar and Mail.
+ * @deprecated Prefer {@link SurfaceAppSwitcherTitle} in tab toolbars.
  */
 export function AppSwitcher({ active, onNavigate }: AppSwitcherProps) {
   const { theme } = useTheme();
-  const router = useRouter();
+  const switchTab = useWorkspaceTabSwitch();
   const segments = useSegments();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const activeKey: AppKey =
+  const activeKey: AppSwitchKey =
     active ?? (isMailRouteSegments(segments) ? "mail" : "calendar");
 
   return (
     <View style={styles.container} accessibilityRole="tablist">
-      {APPS.map((app) => {
+      {APP_SWITCH_OPTIONS.map((app) => {
         const isActive = app.key === activeKey;
         return (
           <Pressable
             key={app.key}
             onPress={() => {
               if (!isActive) {
-                router.replace(app.href as never);
+                switchTab(app.key);
               }
               onNavigate?.();
             }}

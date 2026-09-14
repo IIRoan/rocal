@@ -7,6 +7,7 @@ import {
 } from "./auth-email";
 import { buildMimeMessage, deliverToInternalMailbox } from "./internal-mailbox-delivery";
 import { normalizeParticipantEmail } from "./event-participants";
+import { isReservedSystemEmail } from "@workspace/calendar-core";
 import type { StalwartJmapAdminClientLike } from "./stalwart-admin";
 import { errorLogDetails, logRef } from "./log-sanitization";
 
@@ -31,6 +32,14 @@ export async function sendEventInvitationEmail(input: {
   developmentFallbackContext?: Record<string, unknown>;
 }): Promise<EventInvitationDeliveryResult> {
   const email = normalizeParticipantEmail(input.to);
+
+  if (isReservedSystemEmail(email)) {
+    input.logger.warn("Skipped event invitation to reserved system email", {
+      recipientRef: logRef(email),
+    });
+    return { delivered: false, channel: "mailbox" };
+  }
+
   const internalMailbox = await input.resolveInternalMailbox(email);
 
   if (internalMailbox && input.adminClient && input.adminToken.trim()) {

@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@workspace/logger", () => ({
   createLogger: () => ({
     error: jest.fn(),
+    warn: jest.fn(),
+    info: jest.fn(),
+    ok: jest.fn(),
+    debug: jest.fn(),
   }),
 }));
 
@@ -157,5 +161,33 @@ describe("StalwartCalendarClient", () => {
         event: { title: "Planning" },
       }),
     ).rejects.toThrow("Invalid calendarIds");
+  });
+
+  it("treats destroy notFound as success", async () => {
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [
+          [
+            "CalendarEvent/set",
+            {
+              notDestroyed: {
+                "event-missing": {
+                  type: "notFound",
+                  description: "not found",
+                },
+              },
+            },
+            "c1",
+          ],
+        ],
+      }),
+    );
+
+    await expect(
+      client.deleteEvent({
+        accountId: "acct-1",
+        eventId: "event-missing",
+      }),
+    ).resolves.toBeUndefined();
   });
 });

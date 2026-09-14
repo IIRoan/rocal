@@ -453,7 +453,7 @@ describe("EventService Stalwart integration", () => {
       event: expect.objectContaining({
         "@type": "Event",
         calendarIds: { "remote-cal-1": true },
-        title: "Planning",
+        title: "Encrypted event",
         description: null,
         start: "2026-05-26T10:00:00",
         duration: "PT1H",
@@ -472,6 +472,42 @@ describe("EventService Stalwart integration", () => {
         }),
       }),
     );
+  });
+
+  it("strictly rejects creating an event with admin@solace.onl or reserved system emails", async () => {
+    const participantService = createParticipantService();
+    const prisma = {
+      calendar: {
+        findFirst: jest.fn(async () => calendarFixture()),
+      },
+    };
+    const service = new EventService(
+      prisma as never,
+      participantService as never,
+      null,
+    );
+
+    await expect(
+      service.create({
+        userId: "user-1",
+        title: "Malicious Invite",
+        start: "2026-05-26T10:00:00.000Z",
+        end: "2026-05-26T11:00:00.000Z",
+        calendarId: "calendar-1",
+        participants: [{ email: "admin@solace.onl", role: "attendee" }],
+      }),
+    ).rejects.toThrow("Cannot invite system or administrative email addresses");
+
+    await expect(
+      service.create({
+        userId: "user-1",
+        title: "Malicious Alert Invite",
+        start: "2026-05-26T10:00:00.000Z",
+        end: "2026-05-26T11:00:00.000Z",
+        calendarId: "calendar-1",
+        participants: [{ email: "alert@solace.onl", role: "attendee" }],
+      }),
+    ).rejects.toThrow("Cannot invite system or administrative email addresses");
   });
 
   it("rolls remote events back when local event creation fails", async () => {
@@ -602,7 +638,7 @@ describe("EventService Stalwart integration", () => {
       patch: expect.objectContaining({
         calendarIds: { "remote-cal-1": true },
         uid: "event-uid@solace-calendar.local",
-        title: "Updated planning",
+        title: "Encrypted event",
         start: "2026-05-26T12:00:00",
         duration: "PT1H",
       }),
@@ -806,6 +842,10 @@ describe("EventService Stalwart integration", () => {
       },
       eventParticipant: {
         update: jest.fn(async () => undefined),
+        findMany: jest.fn(async () => [
+          organizerParticipant,
+          { ...selfParticipant, status: "accepted" },
+        ]),
       },
     });
     const service = new EventService(
@@ -840,6 +880,23 @@ describe("EventService Stalwart integration", () => {
         ]),
         tx: prisma,
       }),
+    );
+    // Owned-event reconcile must not adopt remote-only principals as new invitees.
+    const syncCalls = participantService.syncParticipants.mock.calls as unknown as Array<
+      [{ participants?: Array<{ email: string }> }]
+    >;
+    const syncCall = syncCalls.find((call) =>
+      call[0]?.participants?.some(
+        (p) => p.email === "testingprod15@solace.onl",
+      ),
+    );
+    const syncedEmails = (syncCall?.[0]?.participants ?? []).map((p) => p.email);
+    expect(syncedEmails).not.toContain("admin@solace.onl");
+    expect(syncedEmails).toEqual(
+      expect.arrayContaining([
+        "testingprod15@solace.onl",
+        "organizer@example.com",
+      ]),
     );
     expect(prisma.eventParticipant.update).not.toHaveBeenCalled();
     expect(result).toEqual(

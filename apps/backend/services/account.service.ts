@@ -38,13 +38,14 @@ export class AccountService implements IAccountService {
     );
 
     if (!desiredEmail.success) {
+      const isReserved = desiredEmail.error.message.includes("reserved");
       return {
         email: input.email,
         localPart: desiredEmail.error.localPart,
         domain: desiredEmail.error.domain,
         normalizedEmail: desiredEmail.error.normalizedEmail,
         available: false,
-        code: "invalid_email",
+        code: isReserved ? "reserved" : "invalid_email",
         message: desiredEmail.error.message,
       };
     }

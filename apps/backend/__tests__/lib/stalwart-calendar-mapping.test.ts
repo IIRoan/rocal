@@ -3,6 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   buildStalwartEventPayload,
   mapStalwartEventToSolace,
+  mapStalwartParticipantsToSolace,
 } from "../../lib/stalwart-calendar-mapping";
 
 describe("stalwart-calendar-mapping", () => {
@@ -139,6 +140,20 @@ describe("stalwart-calendar-mapping", () => {
     );
   });
 
+  it("does not persist Stalwart encrypted placeholder titles into Solace", () => {
+    const mapped = mapStalwartEventToSolace({
+      id: "remote-event-placeholder",
+      uid: "uid-placeholder",
+      calendarIds: { "remote-cal-1": true },
+      title: "Encrypted event",
+      start: "2026-05-26T10:00:00",
+      duration: "PT1H",
+      timeZone: "Etc/UTC",
+    });
+
+    expect(mapped.title).toBe("");
+  });
+
   it("keeps day-based JSCalendar durations as all-day events only", () => {
     const mapped = mapStalwartEventToSolace({
       id: "remote-event-2",
@@ -152,5 +167,140 @@ describe("stalwart-calendar-mapping", () => {
 
     expect(mapped.allDay).toBe(true);
     expect(mapped.start).toEqual(new Date("2026-05-29T00:00:00.000Z"));
+  });
+
+  it("sets owner and chair roles on the organizer when building JSCalendar participants", () => {
+    const payload = buildStalwartEventPayload({
+      calendarId: "cal-1",
+      uid: "uid-organizer",
+      title: "Sync",
+      start: new Date("2026-05-26T10:00:00.000Z"),
+      end: new Date("2026-05-26T11:00:00.000Z"),
+      allDay: false,
+      timezone: "UTC",
+      participants: [
+        {
+          email: "user@solace.onl",
+          displayName: "User",
+          role: "organizer",
+          status: "accepted",
+        },
+        {
+          email: "guest@example.com",
+          displayName: "Guest",
+          role: "attendee",
+          status: "pending",
+        },
+      ],
+    });
+
+    expect(payload.participants).toEqual({
+      p0: {
+        "@type": "Participant",
+        calendarAddress: "mailto:user@solace.onl",
+        name: "User",
+        roles: {
+          owner: true,
+          chair: true,
+        },
+        participationStatus: "accepted",
+      },
+      p1: {
+        "@type": "Participant",
+        calendarAddress: "mailto:guest@example.com",
+        name: "Guest",
+        roles: {
+          attendee: true,
+        },
+        participationStatus: "needs-action",
+      },
+    });
+  });
+
+  it("maps participant with owner role as organizer", () => {
+    const participants = mapStalwartParticipantsToSolace({
+      p0: {
+        calendarAddress: "mailto:someone@example.com",
+        name: "Someone",
+        roles: { owner: true },
+        participationStatus: "accepted",
+      },
+    });
+
+    expect(participants).toEqual([
+      {
+        email: "someone@example.com",
+        displayName: "Someone",
+        role: "organizer",
+        status: "accepted",
+      },
+    ]);
+  });
+
+  it("filters out Stalwart auto-injected admin session owner", () => {
+    const participants = mapStalwartParticipantsToSolace({
+      p0: {
+        calendarAddress: "mailto:user@solace.onl",
+        name: "User",
+        roles: { chair: true },
+        participationStatus: "accepted",
+      },
+      "stalwart-injected-admin": {
+        calendarAddress: "mailto:admin@solace.onl",
+        roles: { owner: true },
+      },
+      "stalwart-injected-alert": {
+        calendarAddress: "mailto:alert@solace.onl",
+        roles: { attendee: true },
+      },
+    });
+
+    expect(participants).toEqual([
+      {
+        email: "user@solace.onl",
+        displayName: "User",
+        role: "organizer",
+        status: "accepted",
+      },
+    ]);
+  });
+
+  it("filters out reserved system emails when building JSCalendar participants", () => {
+    const payload = buildStalwartEventPayload({
+      calendarId: "cal-1",
+      uid: "uid-test",
+      title: "Test Event",
+      start: new Date("2026-06-16T10:00:00.000Z"),
+      end: new Date("2026-06-16T11:00:00.000Z"),
+      allDay: false,
+      timezone: "UTC",
+      participants: [
+        {
+          email: "user@solace.onl",
+          displayName: "User",
+          role: "organizer",
+          status: "accepted",
+        },
+        {
+          email: "admin@solace.onl",
+          displayName: "Admin",
+          role: "attendee",
+          status: "pending",
+        },
+      ],
+    });
+
+    expect(payload.participants).toEqual({
+      p0: {
+        "@type": "Participant",
+        calendarAddress: "mailto:user@solace.onl",
+        name: "User",
+        roles: {
+          owner: true,
+          chair: true,
+        },
+        participationStatus: "accepted",
+      },
+    });
   });
 });

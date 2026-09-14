@@ -35,8 +35,8 @@ import { BlobatarAvatar } from "./BlobatarAvatar";
 import { useMailSelection } from "../providers/MailSelectionProvider";
 import { useCommandPalette } from "../providers/CommandPaletteProvider";
 import { calendarApiService } from "../lib/api";
+import { useWorkspaceTabSwitch } from "../lib/use-workspace-tab-switch";
 import {
-  CALENDAR_TAB_ROUTE,
   MAIL_TAB_ROUTE,
   SETTINGS_ROUTE,
   SETTINGS_MAILBOXES_ROUTE,
@@ -47,7 +47,6 @@ import {
 import { QUERY_KEYS } from "../lib/query-keys";
 import { buildSidebarCalendarSections } from "./app-sidebar-utils";
 import { SidebarMiniCalendar } from "./SidebarMiniCalendar";
-import { AppSwitcher } from "./AppSwitcher";
 import { CalendarViewToggle } from "./calendar/CalendarViewToggle";
 import {
   useMailAccount,
@@ -85,6 +84,7 @@ export function AppSidebar() {
   const insets = useSafeAreaInsets();
   const segments = useSegments();
   const router = useRouter();
+  const switchTab = useWorkspaceTabSwitch();
   const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [pendingVisibilityCalendarId, setPendingVisibilityCalendarId] =
@@ -280,10 +280,10 @@ export function AppSidebar() {
       void queryClient.invalidateQueries({ queryKey: ["mail", "messages"] });
       close();
       if (!isMailContext) {
-        setTimeout(() => router.replace(MAIL_TAB_ROUTE as any), 80);
+        switchTab("mail");
       }
     },
-    [close, isMailContext, queryClient, router, setSelectedMailboxId],
+    [close, isMailContext, queryClient, setSelectedMailboxId, switchTab],
   );
 
   const handleSelectCalendarDate = useCallback(
@@ -296,9 +296,9 @@ export function AppSidebar() {
         return;
       }
 
-      setTimeout(() => router.replace(CALENDAR_TAB_ROUTE as any), 80);
+      switchTab("calendar");
     },
-    [close, isCalendarContext, router, setCurrentDate, setSelectedDate],
+    [close, isCalendarContext, setCurrentDate, setSelectedDate, switchTab],
   );
 
   const handleSelectCalendarView = useCallback(
@@ -310,9 +310,9 @@ export function AppSidebar() {
         return;
       }
 
-      setTimeout(() => router.replace(CALENDAR_TAB_ROUTE as any), 80);
+      switchTab("calendar");
     },
-    [close, isCalendarContext, router, setActiveView],
+    [close, isCalendarContext, setActiveView, switchTab],
   );
 
   return (
@@ -394,7 +394,6 @@ export function AppSidebar() {
                   </Pressable>
                 </View>
               </View>
-              <AppSwitcher onNavigate={close} />
             </View>
 
             <ScrollView

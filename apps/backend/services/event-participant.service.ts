@@ -1,5 +1,6 @@
 import { createLogger } from "@workspace/logger";
 import {
+  isReservedSystemEmail,
   resolveTimezone,
   type EventParticipant,
   type EventParticipantInput,
@@ -108,7 +109,7 @@ export class EventParticipantService {
     const resolvedInputs = resolveParticipantInputs({
       owner,
       participants: input.participants,
-    });
+    }).filter((participant) => !isReservedSystemEmail(participant.email));
     const emails = resolvedInputs.map((participant) => participant.email);
     if (emails.length === 0) {
       return [];
@@ -189,10 +190,32 @@ export class EventParticipantService {
       },
     });
 
+    let changed = false;
+
+    // Hard purge: reserved system addresses must never remain on an event.
+    const reservedIds = existing
+      .filter((participant) => {
+        const email =
+          normalizeParticipantEmail(participant.email) ||
+          normalizeParticipantEmail(participant.user?.email);
+        return Boolean(email && isReservedSystemEmail(email));
+      })
+      .map((participant) => participant.id);
+    if (reservedIds.length > 0) {
+      await client.eventParticipant.deleteMany({
+        where: { id: { in: reservedIds } },
+      });
+      changed = true;
+    }
+
+    const retainedExisting = existing.filter(
+      (participant) => !reservedIds.includes(participant.id),
+    );
+
     // Build a lookup keyed by the best available email, skipping entries
     // that have neither a participant email nor a linked user email.
     const existingByEmail = new Map(
-      existing
+      retainedExisting
         .map((participant) => {
           const key =
             normalizeParticipantEmail(participant.email) ||
@@ -200,13 +223,13 @@ export class EventParticipantService {
           return key ? ([key, participant] as const) : null;
         })
         .filter(
-          (entry): entry is [string, (typeof existing)[0]] => entry !== null,
+          (entry): entry is [string, (typeof retainedExisting)[0]] =>
+            entry !== null,
         ),
     );
 
-    let changed = false;
     const removedEmails = [...existingByEmail.keys()].filter(
-      (email) => !nextByEmail.has(email),
+      (email) => !nextByEmail.has(email) || isReservedSystemEmail(email),
     );
     if (removedEmails.length > 0) {
       await client.eventParticipant.deleteMany({
@@ -273,9 +296,11 @@ export class EventParticipantService {
 
     return {
       changed,
-      participants: finalParticipants.map((participant) =>
-        mapEventParticipant(participant as EventParticipantRecord),
-      ),
+      participants: finalParticipants
+        .map((participant) =>
+          mapEventParticipant(participant as EventParticipantRecord),
+        )
+        .filter((participant) => !isReservedSystemEmail(participant.email)),
       sendPendingInvitations,
     };
   }
@@ -302,7 +327,9 @@ export class EventParticipantService {
     const owner = await this.resolveOwner(client, input.ownerUserId);
     const newInvitees = resolvedParticipants.filter(
       (participant) =>
-        participant.role !== "organizer" && !existingByEmail.has(participant.email),
+        participant.role !== "organizer" &&
+        !existingByEmail.has(participant.email) &&
+        !isReservedSystemEmail(participant.email),
     );
 
     if (!owner || newInvitees.length === 0) {

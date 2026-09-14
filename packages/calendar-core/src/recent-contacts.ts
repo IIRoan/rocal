@@ -1,5 +1,6 @@
 import {
   isAutomatedMailAddress,
+  isReservedSystemEmail,
   normalizeEmailAddress,
 } from "./mail-addresses";
 
@@ -78,14 +79,17 @@ function normalizeUsageInput(
   input: RecentContactUsageInput,
 ): RecentContactUsageInput | null {
   const email = normalizeEmailAddress(input.email);
-  if (!email || isAutomatedMailAddress(email)) return null;
+  if (!email || isAutomatedMailAddress(email) || isReservedSystemEmail(email)) return null;
 
   const displayName = input.displayName?.trim();
   return displayName ? { email, displayName } : { email };
 }
 
 function peopleContacts(contacts: RecentContactEntry[]): RecentContactEntry[] {
-  return contacts.filter((entry) => !isAutomatedMailAddress(entry.email));
+  return contacts.filter(
+    (entry) =>
+      !isAutomatedMailAddress(entry.email) && !isReservedSystemEmail(entry.email),
+  );
 }
 
 export function sanitizeRecentContactsPayload(

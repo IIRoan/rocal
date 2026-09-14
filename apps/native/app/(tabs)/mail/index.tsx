@@ -52,8 +52,6 @@ import {
 } from "../../../src/lib/mail/use-mail";
 import { useLabels } from "../../../src/lib/mail/use-labels";
 import {
-  getMailboxDisplayName,
-  getMailboxIcon,
   getPrimaryMailboxId,
   isDraftMessage,
 } from "../../../src/lib/mail/mail-helpers";
@@ -67,13 +65,14 @@ import {
   openWebMail,
 } from "../../../src/lib/mail/mail-web-bridge";
 import type { JmapEmailMessage } from "../../../src/lib/mail/types";
+import { useWorkspaceTabHost } from "../../../src/providers/WorkspaceTabHostProvider";
 
 type ListSheetView = "bulkMore" | "bulkMove" | "bulkLabel" | null;
 
 const SENDER_AS_RECIPIENT_ROLES = new Set(["sent", "drafts"]);
 const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
 
-export default function MailScreen() {
+export function MailScreen() {
   const { theme } = useTheme();
   const { toggle: toggleSidebar } = useSidebar();
   const { open: openCommandPalette } = useCommandPalette();
@@ -89,20 +88,32 @@ export default function MailScreen() {
 
   const { selectedMailboxId, setSelectedMailboxId } = useMailSelection();
 
-  useEffect(() => {
-    if (!runtime || selectedMailboxId) return;
-    const inbox =
+  const resolvedMailboxId = useMemo(() => {
+    if (selectedMailboxId) {
+      return selectedMailboxId;
+    }
+    if (!runtime) {
+      return null;
+    }
+    return (
       getPrimaryMailboxId(runtime.mailboxes, "inbox") ??
       runtime.mailboxes[0]?.id ??
-      null;
-    setSelectedMailboxId(inbox);
-  }, [runtime, selectedMailboxId, setSelectedMailboxId]);
+      null
+    );
+  }, [runtime, selectedMailboxId]);
 
-  const messagesQuery = useMailboxMessages(runtime, selectedMailboxId);
+  useEffect(() => {
+    if (!resolvedMailboxId || selectedMailboxId) {
+      return;
+    }
+    setSelectedMailboxId(resolvedMailboxId);
+  }, [resolvedMailboxId, selectedMailboxId, setSelectedMailboxId]);
+
+  const messagesQuery = useMailboxMessages(runtime, resolvedMailboxId);
   const companionMailboxId = useMemo(() => {
     const mailboxes = runtime?.mailboxes ?? [];
     const selected = mailboxes.find(
-      (mailbox) => mailbox.id === selectedMailboxId,
+      (mailbox) => mailbox.id === resolvedMailboxId,
     );
     const role = selected?.role?.toLowerCase();
     if (role === "inbox") {
@@ -112,10 +123,10 @@ export default function MailScreen() {
       return getPrimaryMailboxId(mailboxes, "inbox");
     }
     return null;
-  }, [runtime?.mailboxes, selectedMailboxId]);
+  }, [runtime?.mailboxes, resolvedMailboxId]);
   const companionMessagesQuery = useMailboxMessages(
     runtime,
-    companionMailboxId && companionMailboxId !== selectedMailboxId
+    companionMailboxId && companionMailboxId !== resolvedMailboxId
       ? companionMailboxId
       : null,
   );
@@ -134,10 +145,10 @@ export default function MailScreen() {
 
   const allowedMailboxIds = useMemo(
     () =>
-      [selectedMailboxId, companionMailboxId].filter((id): id is string =>
+      [resolvedMailboxId, companionMailboxId].filter((id): id is string =>
         Boolean(id),
       ),
-    [selectedMailboxId, companionMailboxId],
+    [resolvedMailboxId, companionMailboxId],
   );
 
   const conversationExtras = useConversationListExtras(
@@ -153,7 +164,7 @@ export default function MailScreen() {
     bulkMarkAsUnread,
     bulkMoveToTrash,
     bulkMoveToMailbox,
-  } = useMailMutations(runtime, selectedMailboxId);
+  } = useMailMutations(runtime, resolvedMailboxId);
   const { labels } = useLabels({
     runtime,
     enabled: provisioned,
@@ -173,10 +184,10 @@ export default function MailScreen() {
 
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [selectedMailboxId]);
+  }, [resolvedMailboxId]);
 
   const selectedMailbox = runtime?.mailboxes.find(
-    (m) => m.id === selectedMailboxId,
+    (m) => m.id === resolvedMailboxId,
   );
   const showRecipient = selectedMailbox?.role
     ? SENDER_AS_RECIPIENT_ROLES.has(selectedMailbox.role)
@@ -249,7 +260,7 @@ export default function MailScreen() {
   const handleOpenMessage = useCallback(
     (message: JmapEmailMessage) => {
       const mailboxes = runtime?.mailboxes ?? [];
-      if (isDraftMessage(message, selectedMailboxId, mailboxes)) {
+      if (isDraftMessage(message, resolvedMailboxId, mailboxes)) {
         router.push(
           `/(tabs)/mail/compose?mode=draft&messageId=${message.id}` as never,
         );
@@ -257,7 +268,7 @@ export default function MailScreen() {
       }
       router.push(`/(tabs)/mail/message/${message.id}` as never);
     },
-    [router, runtime?.mailboxes, selectedMailboxId],
+    [router, runtime?.mailboxes, resolvedMailboxId],
   );
 
   const toggleThreadSelection = useCallback((messageIds: string[]) => {
@@ -298,10 +309,10 @@ export default function MailScreen() {
     if (!runtime) return [];
     return runtime.mailboxes.filter(
       (mailbox) =>
-        mailbox.id !== selectedMailboxId &&
+        mailbox.id !== resolvedMailboxId &&
         !MOVE_EXCLUDED_ROLES.has(mailbox.role?.toLowerCase() ?? ""),
     );
-  }, [runtime, selectedMailboxId]);
+  }, [runtime, resolvedMailboxId]);
 
   const bulkMoveSnapPoints = useMemo(() => {
     const count = Math.max(bulkMoveTargets.length, 1);
@@ -313,7 +324,7 @@ export default function MailScreen() {
     () => runtime?.mailboxes.find((m) => m.role === "trash")?.id ?? null,
     [runtime?.mailboxes],
   );
-  const isInTrash = selectedMailboxId === trashMailboxId;
+  const isInTrash = resolvedMailboxId === trashMailboxId;
 
   const handleBulkMarkRead = useCallback(() => {
     if (unreadSelectedIds.length === 0) return;
@@ -497,12 +508,12 @@ export default function MailScreen() {
 
   const listExtraData = useMemo(
     () => ({
-      mailboxId: selectedMailboxId,
+      mailboxId: resolvedMailboxId,
       selectionActive,
       selectedKey: Array.from(selectedIds).sort().join(","),
       previewKey: Object.keys(decryptedPreviews).sort().join(","),
     }),
-    [selectedMailboxId, selectionActive, selectedIds, decryptedPreviews],
+    [resolvedMailboxId, selectionActive, selectedIds, decryptedPreviews],
   );
 
   const renderItem = useCallback(
@@ -600,26 +611,15 @@ export default function MailScreen() {
           <MailListHeader
             selectedCount={selectedIds.size}
             totalCount={selectableIds.length}
-            mailboxName={
-              selectedMailbox
-                ? getMailboxDisplayName(selectedMailbox)
-                : "Mail"
-            }
-            mailboxIcon={
-              selectedMailbox
-                ? (getMailboxIcon(
-                    selectedMailbox,
-                  ) as keyof typeof Feather.glyphMap)
-                : "mail"
-            }
             onMenu={toggleSidebar}
+            onCompose={() => router.push("/(tabs)/mail/compose" as never)}
             onSearch={openCommandPalette}
             onClearSelection={clearSelection}
             onSelectAll={handleSelectAll}
           />
         }
       >
-        {accountQuery.isLoading ? (
+        {accountQuery.isPending && !accountQuery.data ? (
           <CenteredLoader theme={theme} />
         ) : accountQuery.isError ? (
           <ErrorState
@@ -642,7 +642,7 @@ export default function MailScreen() {
             }
             onSetup={() => provisionMailbox.mutate()}
           />
-        ) : runtimeQuery.isLoading ? (
+        ) : runtimeQuery.isPending && !runtimeQuery.data ? (
           <CenteredLoader theme={theme} message="Connecting to your mailbox…" />
         ) : runtimeQuery.isError ? (
           <ErrorState
@@ -656,7 +656,7 @@ export default function MailScreen() {
         ) : (
           <View style={styles.listArea}>
             <FlatList
-              key={selectedMailboxId ?? "mailbox"}
+              key={resolvedMailboxId ?? "mailbox"}
               style={styles.listFlex}
               data={threadRows}
               keyExtractor={(item) => item.id}
@@ -687,7 +687,7 @@ export default function MailScreen() {
               }
               ListFooterComponent={listFooter}
               ListEmptyComponent={
-                messagesQuery.isLoading ? (
+                messagesQuery.isPending && !messagesQuery.data ? (
                   <CenteredLoader theme={theme} />
                 ) : (
                   <View style={styles.centered}>
@@ -767,6 +767,14 @@ export default function MailScreen() {
       </AppScreen>
     </MailSelectionAnimProvider>
   );
+}
+
+export default function MailRoute() {
+  const { isHosted } = useWorkspaceTabHost();
+  if (isHosted) {
+    return null;
+  }
+  return <MailScreen />;
 }
 
 function ErrorState({

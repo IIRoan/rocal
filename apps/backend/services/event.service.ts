@@ -1,5 +1,6 @@
 import type { PrismaClient } from "../generated/prisma/index.js";
 import {
+  isReservedSystemEmail,
   resolveTimezone,
   type EventParticipantInput,
   type EventParticipantStatus,
@@ -59,6 +60,7 @@ import { createLogger } from "@workspace/logger";
 import {
   mapEventParticipant,
   mapAndSortParticipants,
+  reconcileOwnedEventParticipantsFromRemote,
   resolveParticipantInputs,
   sortEventParticipants,
   EVENT_PARTICIPANT_USER_SELECT,
@@ -329,6 +331,11 @@ export class EventService implements IEventService {
       calendars.map((calendar) => [calendar.stalwartCalendarId!, calendar.id]),
     );
 
+    let owner:
+      | { email: string; name: string | null }
+      | null
+      | undefined;
+
     for (const remoteEvent of input.remoteEvents) {
       const mapped = mapStalwartEventToSolace(remoteEvent);
       const calendarId = mapped.stalwartCalendarId
@@ -397,12 +404,61 @@ export class EventService implements IEventService {
       }
 
       if (localEventId) {
+        const remoteParticipants = mapStalwartParticipantsToSolace(
+          remoteEvent.participants,
+        );
+
+        // Existing owned events: local invite list is source of truth. Never
+        // adopt Stalwart-invented principals (e.g. admin@solace.onl).
+        // Newly imported remote events: take the filtered remote roster.
+        let participantsToSync = remoteParticipants;
+        if (existing) {
+          if (owner === undefined) {
+            owner = await this.prisma.user.findUnique({
+              where: { id: input.userId },
+              select: { email: true, name: true },
+            });
+          }
+          const localParticipants =
+            await this.prisma.eventParticipant.findMany({
+              where: { eventId: localEventId },
+              select: {
+                email: true,
+                displayName: true,
+                role: true,
+                status: true,
+                user: { select: { email: true, name: true } },
+              },
+            });
+          participantsToSync = reconcileOwnedEventParticipantsFromRemote({
+            owner: owner?.email?.trim()
+              ? { email: owner.email, name: owner.name }
+              : null,
+            localParticipants: localParticipants.map((participant) => ({
+              email: participant.email || participant.user?.email || "",
+              displayName:
+                participant.displayName ||
+                participant.user?.name ||
+                undefined,
+              role:
+                participant.role === "organizer" ? "organizer" : "attendee",
+              status:
+                participant.status === "accepted" ||
+                participant.status === "declined" ||
+                participant.status === "tentative" ||
+                participant.status === "pending"
+                  ? participant.status
+                  : "pending",
+            })),
+            remoteParticipants,
+          });
+        }
+
         const syncedParticipants =
           await this.eventParticipantService.syncParticipants({
             eventId: localEventId,
-            participants: mapStalwartParticipantsToSolace(
-              remoteEvent.participants,
-            ),
+            participants: participantsToSync,
+            ownerUserId: input.userId,
             tx: this.prisma,
           });
         await syncedParticipants.sendPendingInvitations();
@@ -430,6 +486,10 @@ export class EventService implements IEventService {
       ReturnType<typeof mapEventParticipant>[]
     >();
     for (const participant of participants) {
+      const email = participant.email || participant.user?.email;
+      if (email && isReservedSystemEmail(email)) {
+        continue;
+      }
       const eventParticipants = participantMap.get(participant.eventId) ?? [];
       eventParticipants.push(
         mapEventParticipant(participant as EventParticipantRecord),
@@ -1437,6 +1497,17 @@ export class EventService implements IEventService {
         }
       }
 
+      if (participants) {
+        for (const p of participants) {
+          if (isReservedSystemEmail(p.email)) {
+            throw new ValidationError(
+              "Cannot invite system or administrative email addresses",
+              "participants",
+            );
+          }
+        }
+      }
+
       // Don't normalize all-day boundaries here — the client sends them in the
       // user's timezone and re-applying setHours() on the server would shift dates.
 
@@ -1552,7 +1623,9 @@ export class EventService implements IEventService {
           event: buildStalwartEventPayload({
             calendarId: stalwartCalendarId,
             uid: stalwartUid,
-            title: persistencePolicy.title || title,
+            title: hasEncryptedPayload
+              ? ""
+              : persistencePolicy.title || title,
             description: persistencePolicy.description,
             start: startDate,
             end: endDate,
@@ -1608,22 +1681,75 @@ export class EventService implements IEventService {
           },
         });
       } catch (error) {
-        if (this.stalwartClient && stalwartAccountId && stalwartEventId) {
-          try {
-            await this.stalwartClient.deleteEvent({
-              accountId: stalwartAccountId,
-              eventId: stalwartEventId,
-              sendSchedulingMessages: false,
-            });
-          } catch (cleanupError) {
-            logger.error("Failed to clean up remote event after local DB create failure", {
+        // Background Stalwart list sync can insert a plaintext shell between
+        // remote create and local insert (unique on userId+stalwartEventId).
+        // Adopt that shell instead of failing the user create.
+        const uniqueTarget =
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          (error as { code?: string }).code === "P2002" &&
+          stalwartEventId
+            ? await this.prisma.calendarEvent.findFirst({
+                where: { userId, stalwartEventId },
+                select: { id: true },
+              })
+            : null;
+
+        if (uniqueTarget) {
+          event = await this.prisma.calendarEvent.update({
+            where: { id: uniqueTarget.id },
+            data: {
+              title: persistencePolicy.title,
+              description: persistencePolicy.description,
+              ...(encryptedContent !== undefined ? { encryptedContent } : {}),
+              ...(blindIndexTokens !== undefined
+                ? { blindIndexTokens: JSON.stringify(blindIndexTokens) }
+                : {}),
+              encryptionState: persistencePolicy.encryptionState,
+              ...(encryptionKeyVersion !== undefined
+                ? { encryptionKeyVersion }
+                : {}),
+              start: startDate,
+              end: endDate,
+              timezone: eventTimezone,
+              allDay: allDay || false,
+              location: persistencePolicy.location,
+              color: color || null,
+              calendarId,
+              categoryId: categoryId || null,
+              reminder: reminder ?? null,
+              recurrence: recurrence || null,
+              externalId: stalwartUid,
+              stalwartAccountId,
+              stalwartCalendarId,
               stalwartEventId,
-              ...errorLogDetails(error),
-              cleanupError: errorLogDetails(cleanupError),
-            });
+              stalwartUid,
+              stalwartSyncedAt: new Date(),
+            },
+            include: {
+              category: true,
+              calendar: true,
+            },
+          });
+        } else {
+          if (this.stalwartClient && stalwartAccountId && stalwartEventId) {
+            try {
+              await this.stalwartClient.deleteEvent({
+                accountId: stalwartAccountId,
+                eventId: stalwartEventId,
+                sendSchedulingMessages: false,
+              });
+            } catch (cleanupError) {
+              logger.error("Failed to clean up remote event after local DB create failure", {
+                stalwartEventId,
+                ...errorLogDetails(error),
+                cleanupError: errorLogDetails(cleanupError),
+              });
+            }
           }
+          throw error;
         }
-        throw error;
       }
 
       const participantResult =
@@ -1939,6 +2065,16 @@ export class EventService implements IEventService {
       if (input.categoryId !== undefined) {
         updateData.categoryId = input.categoryId || null;
       }
+      if (input.participants) {
+        for (const p of input.participants) {
+          if (isReservedSystemEmail(p.email)) {
+            throw new ValidationError(
+              "Cannot invite system or administrative email addresses",
+              "participants",
+            );
+          }
+        }
+      }
       if (input.reminder !== undefined) {
         updateData.reminder = reminderValue ?? null;
       }
@@ -2000,7 +2136,9 @@ export class EventService implements IEventService {
             existingEvent.stalwartUid ||
             existingEvent.externalId ||
             `${existingEvent.id}@solace-calendar.local`,
-          title: persistencePolicy.title || nextTitle,
+          title: hasEncryptedPayload
+            ? ""
+            : persistencePolicy.title || nextTitle,
           description: persistencePolicy.description,
           start: finalStartDate,
           end: finalEndDate,
