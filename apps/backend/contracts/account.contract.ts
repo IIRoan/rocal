@@ -22,7 +22,8 @@ export type CheckEmailAvailabilityInput = z.infer<
 export type CheckEmailAvailabilityCode =
   | "available"
   | "invalid_email"
-  | "already_in_use";
+  | "already_in_use"
+  | "reserved";
 
 export type CheckEmailAvailabilityResult = {
   email: string;

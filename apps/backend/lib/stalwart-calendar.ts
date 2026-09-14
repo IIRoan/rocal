@@ -178,12 +178,19 @@ function assertNoSetError(
         ? result.notUpdated?.[key]
         : result.notDestroyed?.[key];
 
-  if (error) {
-    throw new Error(
-      error.description ||
-        `Stalwart calendar ${operation} failed (${error.type || "unknown"}).`,
-    );
+  if (!error) {
+    return;
   }
+
+  // Already gone remotely — local cleanup should still proceed.
+  if (operation === "destroy" && error.type === "notFound") {
+    return;
+  }
+
+  throw new Error(
+    error.description ||
+      `Stalwart calendar ${operation} failed (${error.type || "unknown"}).`,
+  );
 }
 
 export class StalwartCalendarClient implements StalwartCalendarClientLike {

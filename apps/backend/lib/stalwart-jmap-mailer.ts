@@ -109,7 +109,9 @@ export function rewriteToPublicOrigin(
     parsed.protocol = base.protocol;
     parsed.hostname = base.hostname;
     parsed.port = base.port;
-    return parsed.toString();
+    // URL#href percent-encodes `{`/`}` in JMAP templates (e.g. {accountId}).
+    // Decode them so resolveUploadUrl can still substitute placeholders.
+    return parsed.toString().replaceAll("%7B", "{").replaceAll("%7D", "}");
   } catch {
     return fallback;
   }
@@ -309,8 +311,11 @@ async function loadSendContext(
   };
 }
 
-function resolveUploadUrl(template: string, accountId: string): string {
-  return template.replaceAll("{accountId}", encodeURIComponent(accountId));
+export function resolveUploadUrl(template: string, accountId: string): string {
+  const encodedAccountId = encodeURIComponent(accountId);
+  return template
+    .replaceAll("{accountId}", encodedAccountId)
+    .replaceAll("%7BaccountId%7D", encodedAccountId);
 }
 
 async function uploadAttachment(

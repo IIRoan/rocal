@@ -23,6 +23,7 @@ import {
 } from "../lib/errors";
 import { logRef } from "../lib/log-sanitization";
 import { normalizeEmail } from "../lib/email-utils";
+import { isReservedSystemEmail } from "@workspace/calendar-core";
 
 const logger = createLogger("backend:invite-service");
 
@@ -139,6 +140,10 @@ export class InviteService implements IInviteService {
       throw new ValidationError("Please provide a valid email address.");
     }
 
+    if (isReservedSystemEmail(email)) {
+      throw new ValidationError("Cannot send an invite to a reserved system email address.");
+    }
+
     await this.ensureInviteTargetIsAvailable(input.invitedById, email);
 
     const expiresAt = new Date();
@@ -252,6 +257,13 @@ export class InviteService implements IInviteService {
       return { success: false, reason: "A Solace email is required." };
     }
 
+    if (isReservedSystemEmail(chosenEmail)) {
+      return {
+        success: false,
+        reason: "That email address is reserved.",
+      };
+    }
+
     const existingUser = await this.prisma.user.findUnique({
       where: { email: chosenEmail },
       select: { id: true },
@@ -291,6 +303,12 @@ export class InviteService implements IInviteService {
     email: string,
   ): Promise<{ allowed: boolean; reason?: string }> {
     const normalizedEmail = normalizeEmail(email);
+    if (isReservedSystemEmail(normalizedEmail)) {
+      return {
+        allowed: false,
+        reason: "That email address is reserved.",
+      };
+    }
     const invite = await this.findClaimedInviteForEmail(normalizedEmail);
 
     if (!invite) {

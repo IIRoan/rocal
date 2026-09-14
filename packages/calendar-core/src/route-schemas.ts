@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CALENDAR_COLORS, isValidCalendarColor } from "./color-utils";
+import { isReservedSystemEmail } from "./mail-addresses";
 
 const PARTICIPANT_EMAIL_REGEX =
   /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
@@ -76,7 +77,15 @@ export type RecurrenceScope = z.infer<typeof recurrenceScopeSchema>;
 
 export const eventParticipantInputSchema = z
   .object({
-    email: z.string().min(3).max(320).regex(PARTICIPANT_EMAIL_REGEX),
+    email: z
+      .string()
+      .min(3)
+      .max(320)
+      .regex(PARTICIPANT_EMAIL_REGEX)
+      .refine(
+        (email) => !isReservedSystemEmail(email),
+        { message: "Cannot invite system or administrative email addresses" },
+      ),
     displayName: z.string().max(120).optional(),
     role: eventParticipantRoleSchema.optional(),
     status: eventParticipantStatusSchema.optional(),

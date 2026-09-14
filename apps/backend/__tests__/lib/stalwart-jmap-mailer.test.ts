@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import {
   pickIdentity,
   pickMailbox,
+  resolveUploadUrl,
   rewriteToPublicOrigin,
   sendTransactionalEmailViaStalwart,
 } from "../../lib/stalwart-jmap-mailer";
@@ -32,6 +33,30 @@ describe("stalwart-jmap-mailer helpers", () => {
         "https://mail.solace.onl",
       ),
     ).toBe("https://mail.solace.onl/jmap/");
+  });
+
+  it("preserves JMAP upload template braces after origin rewrite", () => {
+    expect(
+      rewriteToPublicOrigin(
+        "http://stalwart.internal:8080/jmap/upload/{accountId}/",
+        "https://mail.solace.onl",
+      ),
+    ).toBe("https://mail.solace.onl/jmap/upload/{accountId}/");
+  });
+
+  it("resolves upload templates including percent-encoded braces", () => {
+    expect(
+      resolveUploadUrl(
+        "https://mail.solace.onl/jmap/upload/{accountId}/",
+        "9",
+      ),
+    ).toBe("https://mail.solace.onl/jmap/upload/9/");
+    expect(
+      resolveUploadUrl(
+        "https://mail.solace.onl/jmap/upload/%7BaccountId%7D/",
+        "9",
+      ),
+    ).toBe("https://mail.solace.onl/jmap/upload/9/");
   });
 });
 

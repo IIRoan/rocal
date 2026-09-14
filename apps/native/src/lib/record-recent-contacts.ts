@@ -1,6 +1,7 @@
 import {
   isAutomatedMailAddress,
   isCurrentUserMailAddress,
+  isReservedSystemEmail,
   type RecentContactUsageInput,
 } from "@workspace/calendar-core";
 
@@ -14,7 +15,8 @@ export function extractRecentContactEntries(
     .filter(
       (participant) =>
         !isCurrentUserMailAddress(participant.email, accountEmail) &&
-        !isAutomatedMailAddress(participant.email),
+        !isAutomatedMailAddress(participant.email) &&
+        !isReservedSystemEmail(participant.email),
     )
     .map((participant) => ({
       email: participant.email,

@@ -1,20 +1,18 @@
 import React from "react";
-import { Feather } from "@expo/vector-icons";
-import { useSidebar } from "../../providers/SidebarProvider";
-import { HeaderIconButton, SurfaceTitle, SurfaceToolbar } from "../layout";
+import { StyleSheet, View, type ViewStyle } from "react-native";
+import { HeaderIconButton, SurfaceToolbar } from "../layout";
+import { SurfaceAppSwitcherTitle } from "../SurfaceAppSwitcherTitle";
 
 interface MailTopToolbarProps {
   onMenu: () => void;
-  onSearch: () => void;
-  mailboxName?: string;
-  mailboxIcon?: keyof typeof Feather.glyphMap;
+  onCompose: () => void;
+  onSearch?: () => void;
 }
 
 export function MailTopToolbar({
   onMenu,
+  onCompose,
   onSearch,
-  mailboxName = "Mail",
-  mailboxIcon = "mail",
 }: MailTopToolbarProps) {
   return (
     <SurfaceToolbar
@@ -27,15 +25,32 @@ export function MailTopToolbar({
           accessibilityLabel="Open menu"
         />
       }
-      center={<SurfaceTitle title={mailboxName} icon={mailboxIcon} centered />}
+      center={<SurfaceAppSwitcherTitle activeApp="mail" />}
       trailing={
-        <HeaderIconButton
-          name="search"
-          size={20}
-          onPress={onSearch}
-          accessibilityLabel="Search mail"
-        />
+        <View style={styles.trailingGroup}>
+          {onSearch ? (
+            <HeaderIconButton
+              name="search"
+              size={20}
+              onPress={onSearch}
+              accessibilityLabel="Search mail"
+            />
+          ) : null}
+          <HeaderIconButton
+            name="edit-3"
+            size={20}
+            onPress={onCompose}
+            accessibilityLabel="Compose message"
+          />
+        </View>
       }
     />
   );
 }
+
+const styles = StyleSheet.create({
+  trailingGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+  } as ViewStyle,
+});

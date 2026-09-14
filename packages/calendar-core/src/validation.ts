@@ -7,6 +7,7 @@ import type {
 } from "./types";
 import { CALENDAR_COLORS, isValidCalendarColor } from "./color-utils";
 import { timezoneSchema } from "./route-schemas";
+import { isReservedSystemEmail } from "./mail-addresses";
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 
@@ -37,6 +38,11 @@ function validateParticipants(
 
     if (!EMAIL_REGEX.test(email)) {
       errors.push(`${label} must use a valid email address`);
+    }
+
+    if (isReservedSystemEmail(email)) {
+      errors.push(`${label} cannot be a system or administrative address`);
+      return;
     }
 
     if (participant.displayName && participant.displayName.length > 120) {

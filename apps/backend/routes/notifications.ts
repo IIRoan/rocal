@@ -1,5 +1,4 @@
 import { Elysia } from "elysia";
-import { RateLimitError } from "../lib/errors";
 import { enforceRateLimit } from "../lib/rate-limit";
 import { requireAuth } from "../lib/auth-guard";
 import { authenticatedRouteDetail } from "../lib/openapi";

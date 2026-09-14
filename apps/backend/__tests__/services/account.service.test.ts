@@ -93,6 +93,32 @@ describe("AccountService", () => {
     });
   });
 
+  it("strictly rejects reserved handles like admin and alert without querying the database", async () => {
+    const adminResult = await service.checkEmailAvailability({
+      email: "admin",
+    });
+
+    expect(mockPrisma.prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(
+      mockPrisma.prisma.mailDirectoryEntry.findUnique,
+    ).not.toHaveBeenCalled();
+    expect(adminResult).toEqual({
+      email: "admin",
+      localPart: "admin",
+      domain: "solace.onl",
+      normalizedEmail: "admin@solace.onl",
+      available: false,
+      code: "reserved",
+      message: "That email address is reserved.",
+    });
+
+    const alertResult = await service.checkEmailAvailability({
+      email: "alert@solace.onl",
+    });
+    expect(alertResult.code).toBe("reserved");
+    expect(alertResult.available).toBe(false);
+  });
+
   it("rejects invalid sign-up handles without querying the database", async () => {
     const result = await service.checkEmailAvailability({
       email: "not an email",

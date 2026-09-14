@@ -188,4 +188,55 @@ describe("InviteService", () => {
       }),
     });
   });
+
+  it("strictly rejects creating an invite for admin@solace.onl or reserved system emails", async () => {
+    await expect(
+      service.createInvite({
+        invitedById: "user-1",
+        email: "admin@solace.onl",
+      }),
+    ).rejects.toThrow("Cannot send an invite to a reserved system email address.");
+
+    await expect(
+      service.createInvite({
+        invitedById: "user-1",
+        email: "alert@solace.onl",
+      }),
+    ).rejects.toThrow("Cannot send an invite to a reserved system email address.");
+
+    expect(prisma.invite.create).not.toHaveBeenCalled();
+  });
+
+  it("strictly rejects claiming an invite with admin@solace.onl or reserved system emails", async () => {
+    prisma.invite.findUnique.mockResolvedValueOnce({
+      id: "invite-1",
+      token: "token-1",
+      email: "friend@example.com",
+      status: "pending",
+      expiresAt: new Date(Date.now() + 60_000),
+      createdAt: new Date("2026-05-15T00:00:00.000Z"),
+      invitedById: "user-1",
+      claimedAt: null,
+      claimedForEmail: null,
+    });
+
+    await expect(
+      service.claimInviteToken({
+        token: "token-1",
+        chosenEmail: "admin@solace.onl",
+      }),
+    ).resolves.toEqual({
+      success: false,
+      reason: "That email address is reserved.",
+    });
+
+    expect(prisma.invite.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("strictly rejects signup check for admin@solace.onl or reserved system emails", async () => {
+    await expect(service.checkSignupAllowed("admin@solace.onl")).resolves.toEqual({
+      allowed: false,
+      reason: "That email address is reserved.",
+    });
+  });
 });

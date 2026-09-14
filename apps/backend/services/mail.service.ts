@@ -1,4 +1,5 @@
 import { createLogger } from "@workspace/logger";
+import { isReservedSystemEmail } from "@workspace/calendar-core";
 import type { Prisma, PrismaClient } from "../generated/prisma/index.js";
 import {
   ConflictError,
@@ -915,6 +916,10 @@ export class MailService implements IMailService {
     domain: string;
     provisioning: NormalizedProvisioningInput;
   }): Promise<MailSignupResult> {
+    if (isReservedSystemEmail(input.email, input.domain)) {
+      throw new ValidationError("That mailbox address is reserved.", "email");
+    }
+
     const existingEntry = await this.prisma.mailDirectoryEntry.findUnique({
       where: { email: input.email },
       select: { id: true },

@@ -1,5 +1,14 @@
-import { useCallback, useMemo, useRef, useState } from "react";
 import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from "react";
+import {
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -17,11 +26,24 @@ import { useTheme } from "../../providers/ThemeProvider";
 import { useRecentContacts } from "../../hooks/use-recent-contacts";
 import { RecipientSuggestionList } from "./RecipientSuggestionList";
 
+const SUGGESTION_LIST_MAX_HEIGHT = 280;
+const BLUR_CLOSE_MS = 200;
+const SUPPRESS_REOPEN_MS = 400;
+
 function getActiveRecipientToken(value: string): string {
   const separatorIndex = Math.max(value.lastIndexOf(","), value.lastIndexOf(";"));
   return separatorIndex >= 0
     ? value.slice(separatorIndex + 1).trim()
     : value.trim();
+}
+
+function assignRef<T>(ref: Ref<T> | undefined, value: T | null): void {
+  if (!ref) return;
+  if (typeof ref === "function") {
+    ref(value);
+    return;
+  }
+  ref.current = value;
 }
 
 export type RecipientSuggestInputProps = {
@@ -31,8 +53,16 @@ export type RecipientSuggestInputProps = {
   mode?: "mail" | "calendar";
   onSelectSuggestion?: (entry: RecentContactEntry) => void;
   onSubmitEditing?: () => void;
+  onFocus?: () => void;
+  /** Fired when the suggestion panel opens or closes. */
+  onOpenChange?: (open: boolean) => void;
+  /** When false, force-closes the suggestion panel (e.g. another field focused). */
+  open?: boolean;
   style?: TextStyle | TextStyle[];
   containerStyle?: ViewStyle | ViewStyle[];
+  /** Renders beside the text field; suggestions always sit full-width below. */
+  trailing?: ReactNode;
+  inputRef?: Ref<TextInput>;
   autoFocus?: boolean;
   hasError?: boolean;
 };
@@ -44,15 +74,46 @@ export function RecipientSuggestInput({
   mode = "mail",
   onSelectSuggestion,
   onSubmitEditing,
+  onFocus,
+  onOpenChange,
+  open: openProp,
   style,
   containerStyle,
+  trailing,
+  inputRef,
   autoFocus,
   hasError,
 }: RecipientSuggestInputProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const fieldRef = useRef<TextInput | null>(null);
   const selectingRef = useRef(false);
-  const [open, setOpen] = useState(false);
+  const listInteractionRef = useRef(false);
+  const suppressOpenRef = useRef(false);
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : uncontrolledOpen;
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (!isControlled) {
+        setUncontrolledOpen(next);
+      }
+      onOpenChange?.(next);
+    },
+    [isControlled, onOpenChange],
+  );
+
+  const clearBlurTimer = useCallback(() => {
+    if (blurTimerRef.current) {
+      clearTimeout(blurTimerRef.current);
+      blurTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearBlurTimer(), [clearBlurTimer]);
 
   const activeToken = getActiveRecipientToken(value);
   const excludeEmails = useMemo(
@@ -71,12 +132,23 @@ export function RecipientSuggestInput({
     isAvailable &&
     (isLoading || suggestions.length > 0 || activeToken.trim().length > 0);
 
+  const closeSuggestions = useCallback(() => {
+    suppressOpenRef.current = true;
+    selectingRef.current = true;
+    listInteractionRef.current = false;
+    clearBlurTimer();
+    setOpen(false);
+    fieldRef.current?.blur();
+    setTimeout(() => {
+      suppressOpenRef.current = false;
+      selectingRef.current = false;
+    }, SUPPRESS_REOPEN_MS);
+  }, [clearBlurTimer, setOpen]);
+
   const selectSuggestion = useCallback(
     (entry: RecentContactEntry) => {
-      selectingRef.current = true;
       if (onSelectSuggestion) {
         onSelectSuggestion(entry);
-        setOpen(false);
       } else {
         const formatted = formatRecentContactForField(entry);
         const nextValue =
@@ -86,51 +158,98 @@ export function RecipientSuggestInput({
               })
             : formatted;
         onChangeText(nextValue);
-        setOpen(false);
       }
-      requestAnimationFrame(() => {
-        selectingRef.current = false;
-      });
+      closeSuggestions();
     },
-    [mode, onChangeText, onSelectSuggestion, value],
+    [closeSuggestions, mode, onChangeText, onSelectSuggestion, value],
   );
+
+  const markListInteraction = useCallback(() => {
+    if (suppressOpenRef.current || selectingRef.current) {
+      return;
+    }
+    // Keep the panel from closing on blur while the user scrolls/taps the
+    // list — do not reopen here, or a tap-to-select races setOpen(true).
+    listInteractionRef.current = true;
+    clearBlurTimer();
+  }, [clearBlurTimer]);
+
+  const releaseListInteraction = useCallback(() => {
+    requestAnimationFrame(() => {
+      listInteractionRef.current = false;
+    });
+  }, []);
 
   return (
     <View style={[styles.container, containerStyle]}>
-      <TextInput
-        style={[
-          styles.input,
-          hasError ? styles.inputError : undefined,
-          style,
-        ]}
-        value={value}
-        onChangeText={(text) => {
-          onChangeText(text);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => {
-          if (selectingRef.current) {
-            return;
-          }
-          setTimeout(() => {
-            if (!selectingRef.current) {
-              setOpen(false);
+      <View style={styles.inputRow}>
+        <TextInput
+          ref={(node) => {
+            fieldRef.current = node;
+            assignRef(inputRef, node);
+          }}
+          style={[
+            styles.input,
+            hasError ? styles.inputError : undefined,
+            style,
+          ]}
+          value={value}
+          onChangeText={(text) => {
+            onChangeText(text);
+            if (!suppressOpenRef.current) {
+              setOpen(true);
             }
-          }, 120);
-        }}
-        placeholder={placeholder}
-        placeholderTextColor={theme.colors.mutedForeground}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoFocus={autoFocus}
-        returnKeyType="done"
-        onSubmitEditing={onSubmitEditing}
-      />
+          }}
+          onFocus={() => {
+            if (suppressOpenRef.current) {
+              return;
+            }
+            clearBlurTimer();
+            setOpen(true);
+            onFocus?.();
+          }}
+          onBlur={() => {
+            if (selectingRef.current || listInteractionRef.current) {
+              return;
+            }
+            clearBlurTimer();
+            blurTimerRef.current = setTimeout(() => {
+              blurTimerRef.current = null;
+              if (selectingRef.current || listInteractionRef.current) {
+                return;
+              }
+              setOpen(false);
+            }, BLUR_CLOSE_MS);
+          }}
+          placeholder={placeholder}
+          placeholderTextColor={theme.colors.mutedForeground}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoFocus={autoFocus}
+          returnKeyType="done"
+          blurOnSubmit={false}
+          onSubmitEditing={() => {
+            closeSuggestions();
+            onSubmitEditing?.();
+          }}
+        />
+        {trailing}
+      </View>
 
       {showSuggestions ? (
-        <View style={styles.suggestions}>
+        <ScrollView
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="none"
+          nestedScrollEnabled
+          removeClippedSubviews={false}
+          style={styles.suggestionScroll}
+          onTouchStart={markListInteraction}
+          onScrollBeginDrag={markListInteraction}
+          onScrollEndDrag={releaseListInteraction}
+          onMomentumScrollEnd={releaseListInteraction}
+          onTouchEnd={releaseListInteraction}
+        >
           <RecipientSuggestionList
             rows={suggestions}
             query={activeToken}
@@ -138,7 +257,7 @@ export function RecipientSuggestInput({
             isLoading={isLoading}
             onSelect={selectSuggestion}
           />
-        </View>
+        </ScrollView>
       ) : null}
     </View>
   );
@@ -147,15 +266,21 @@ export function RecipientSuggestInput({
 function createStyles(theme: ThemeTokens) {
   const view = {
     container: {
-      flex: 1,
-      minWidth: 0,
+      width: "100%" as const,
+      gap: theme.spacing["1"],
     },
-    suggestions: {
-      marginTop: theme.spacing["1"],
+    inputRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["2"],
+      width: "100%" as const,
+    },
+    suggestionScroll: {
+      width: "100%" as const,
+      maxHeight: SUGGESTION_LIST_MAX_HEIGHT,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       borderRadius: theme.borderRadius.md,
-      overflow: "hidden" as const,
       backgroundColor: theme.colors.card,
     },
   } satisfies Record<string, ViewStyle>;

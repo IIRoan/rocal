@@ -7,6 +7,7 @@ import {
   useQuery,
   useInfiniteQuery,
   useQueryClient,
+  type InfiniteData,
 } from "@tanstack/react-query";
 import { useAuth } from "../../providers/AuthProvider";
 import { QUERY_KEYS } from "../query-keys";
@@ -30,6 +31,7 @@ import {
   patchSingleMailboxMessageCache,
   removeMessagesFromMailboxCache,
   type MailboxMessagesCacheData,
+  type MailboxMessagesPage,
 } from "./mail-message-cache";
 import type { JmapEmailMessage, LabelDef } from "./types";
 
@@ -37,12 +39,17 @@ const RUNTIME_STALE_MS = 5 * 60_000;
 
 export function useMailAccount() {
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: QUERY_KEYS.mailAccount(),
     queryFn: getMailAccountStatus,
     enabled: isAuthenticated,
     staleTime: 60_000,
     retry: 1,
+    placeholderData: () =>
+      queryClient.getQueryData<
+        Awaited<ReturnType<typeof getMailAccountStatus>>
+      >(QUERY_KEYS.mailAccount()),
   });
 }
 
@@ -58,12 +65,15 @@ export function useMailConfig() {
 }
 
 export function useMailRuntime(enabled: boolean) {
+  const queryClient = useQueryClient();
   return useQuery<MailRuntime>({
     queryKey: QUERY_KEYS.mailRuntime(),
     queryFn: buildMailRuntime,
     enabled,
     staleTime: RUNTIME_STALE_MS,
     retry: 1,
+    placeholderData: () =>
+      queryClient.getQueryData<MailRuntime>(QUERY_KEYS.mailRuntime()),
   });
 }
 
@@ -100,16 +110,29 @@ export function useMailboxMessages(
   runtime: MailRuntime | undefined,
   mailboxId: string | null,
 ) {
+  const queryClient = useQueryClient();
   const pageSize = runtime?.mailServerPolicy
     ? resolveMailboxMessagesPageSize(
-        runtime.mailServerPolicy,
-        MAILBOX_MESSAGES_PAGE_SIZE,
-      )
+      runtime.mailServerPolicy,
+      MAILBOX_MESSAGES_PAGE_SIZE,
+    )
     : MAILBOX_MESSAGES_PAGE_SIZE;
 
   return useInfiniteQuery({
     queryKey: QUERY_KEYS.mailMessages(mailboxId),
     enabled: Boolean(runtime && mailboxId),
+    placeholderData: () => {
+      const cached = queryClient.getQueryData<MailboxMessagesCacheData>(
+        QUERY_KEYS.mailMessages(mailboxId),
+      );
+      if (!cached || !("pages" in cached)) {
+        return undefined;
+      }
+      return cached as InfiniteData<
+        MailboxMessagesPage,
+        number
+      >;
+    },
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       const { messages, total } = await runtime!.client.getMailboxMessages(

@@ -12,15 +12,14 @@ import type { CreateEventRequest } from "../types";
  * **Validates: Requirements 7.3**
  */
 
+import { validBaseDateArb } from "./property-test-arbitraries";
+
 // ─── Arbitraries ─────────────────────────────────────────────────────────────
 
 /** Generate a pair of ISO date strings where start < end */
 const validDatePairArb: fc.Arbitrary<{ start: string; end: string }> = fc
   .tuple(
-    fc.date({
-      min: new Date("2000-01-01T00:00:00.000Z"),
-      max: new Date("2098-12-31T00:00:00.000Z"),
-    }),
+    validBaseDateArb,
     fc.integer({ min: 1, max: 24 * 60 }),
   )
   .map(([startDate, minutesAfter]) => {
@@ -114,10 +113,7 @@ describe("validateEventData - Property Tests", () => {
     /** Generate a pair where end <= start */
     const invalidDatePairArb: fc.Arbitrary<{ start: string; end: string }> = fc
       .tuple(
-        fc.date({
-          min: new Date("2000-01-01T00:00:00.000Z"),
-          max: new Date("2098-12-31T00:00:00.000Z"),
-        }),
+        validBaseDateArb,
         fc.integer({ min: 0, max: 24 * 60 }),
       )
       .map(([endDate, minutesBefore]) => {

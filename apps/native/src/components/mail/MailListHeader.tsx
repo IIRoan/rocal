@@ -11,18 +11,16 @@ import { useTheme } from "../../providers/ThemeProvider";
 import { MailSelectionBar } from "./MailSelectionBar";
 import { MailTopToolbar } from "./MailTopToolbar";
 import { useSelectionProgress } from "./mail-selection-anim";
-import { Feather } from "@expo/vector-icons";
-import { LAYOUT_METRICS, layoutHairlineBorder } from "../../lib/app-layout";
+import { layoutHairlineBorder } from "../../lib/app-layout";
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
 interface MailListHeaderProps {
   selectedCount: number;
   totalCount: number;
-  mailboxName?: string;
-  mailboxIcon?: keyof typeof Feather.glyphMap;
   onMenu: () => void;
-  onSearch: () => void;
+  onCompose: () => void;
+  onSearch?: () => void;
   onClearSelection: () => void;
   onSelectAll: () => void;
 }
@@ -30,9 +28,8 @@ interface MailListHeaderProps {
 export function MailListHeader({
   selectedCount,
   totalCount,
-  mailboxName,
-  mailboxIcon,
   onMenu,
+  onCompose,
   onSearch,
   onClearSelection,
   onSelectAll,
@@ -71,19 +68,16 @@ export function MailListHeader({
 
   return (
     <View style={styles.shell}>
-      <AnimatedView
-        style={[styles.layer, toolbarStyle]}
-        animatedProps={toolbarPointerProps}
-      >
+      <AnimatedView style={toolbarStyle} animatedProps={toolbarPointerProps}>
         <MailTopToolbar
           onMenu={onMenu}
+          onCompose={onCompose}
           onSearch={onSearch}
-          mailboxName={mailboxName}
-          mailboxIcon={mailboxIcon}
         />
       </AnimatedView>
+
       <AnimatedView
-        style={[styles.layer, selectionStyle]}
+        style={[styles.selectionLayer, selectionStyle]}
         animatedProps={selectionPointerProps}
       >
         <MailSelectionBar
@@ -100,14 +94,13 @@ export function MailListHeader({
 function createStyles(theme: ThemeTokens) {
   return StyleSheet.create({
     shell: {
-      minHeight: LAYOUT_METRICS.headerMinHeight,
       backgroundColor: theme.colors.background,
       ...layoutHairlineBorder(theme),
-      overflow: "hidden",
     } as ViewStyle,
-    layer: {
+    selectionLayer: {
       ...StyleSheet.absoluteFill,
       justifyContent: "center",
+      backgroundColor: theme.colors.background,
     } as ViewStyle,
   });
 }

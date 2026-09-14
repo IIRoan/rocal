@@ -1,6 +1,7 @@
 import type { PrismaClient } from "../generated/prisma/index.js";
 import {
   buildSolaceProfileAvatarPath,
+  isReservedSystemEmail,
   normalizeParticipantEmail,
   normalizeSolaceProfileLookupEmails,
   sanitizePublicImageUrl,
@@ -24,6 +25,10 @@ export class ProfileService implements IProfileService {
     const profiles: SolaceProfile[] = [];
 
     for (const email of requested) {
+      if (isReservedSystemEmail(email)) {
+        continue;
+      }
+
       const externalUrl = await this.resolveExternalImageUrl(email);
       if (!externalUrl) {
         continue;
@@ -43,6 +48,10 @@ export class ProfileService implements IProfileService {
   async streamAvatar(
     email: string,
   ): Promise<{ body: Uint8Array; contentType: string } | null> {
+    if (isReservedSystemEmail(email)) {
+      return null;
+    }
+
     const externalUrl = await this.resolveExternalImageUrl(email);
     if (!externalUrl) {
       return null;
@@ -76,7 +85,7 @@ export class ProfileService implements IProfileService {
 
   private async resolveExternalImageUrl(email: string): Promise<string | null> {
     const normalized = normalizeParticipantEmail(email);
-    if (!normalized) {
+    if (!normalized || isReservedSystemEmail(normalized)) {
       return null;
     }
 

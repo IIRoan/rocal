@@ -48,6 +48,7 @@ import {
   PARTICIPANTS_INVITE_HELP_TEXT,
   CLEARED_EVENT_OPTIONAL_FIELDS,
   hasOptionalEventParticipants,
+  isReservedSystemEmail,
   organizerOnlyParticipants,
   isMailInvitationStagingCalendar,
   resolveTimezone,
@@ -140,6 +141,8 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     const titleInputRef = useRef<TextInput>(null);
     const locationInputRef = useRef<TextInput>(null);
     const descriptionInputRef = useRef<TextInput>(null);
+    const participantInputRef = useRef<TextInput>(null);
+    const [participantSuggestOpen, setParticipantSuggestOpen] = useState(false);
 
     // ── Defaults ─────────────────────────────────────────────────────────────
 
@@ -232,23 +235,43 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     // ── Scroll-to-input on focus ─────────────────────────────────────────────
     // When a TextInput receives focus, measure its position relative to the
     // ScrollView and scroll so it's visible near the top of the viewport.
+    // Participant focus uses a tighter top inset so the suggestion list below
+    // the field stays on-screen above the keyboard.
 
-    const handleInputFocus = useCallback((ref: TextInput | null) => {
-      if (!ref || !scrollRef.current) return;
-      const scrollNativeRef = scrollRef.current.getNativeScrollRef();
-      if (!scrollNativeRef) return;
-      ref.measureLayout(
-        scrollNativeRef,
-        (_x: number, y: number) => {
-          // Scroll so the input sits ~80px from the top
-          scrollRef.current?.scrollTo({
-            y: Math.max(0, y - 80),
-            animated: true,
-          });
-        },
-        () => undefined,
-      );
+    const handleInputFocus = useCallback(
+      (ref: TextInput | null, topInset = 80) => {
+        if (!ref || !scrollRef.current) return;
+        const scrollNativeRef = scrollRef.current.getNativeScrollRef();
+        if (!scrollNativeRef) return;
+        ref.measureLayout(
+          scrollNativeRef,
+          (_x: number, y: number) => {
+            scrollRef.current?.scrollTo({
+              y: Math.max(0, y - topInset),
+              animated: true,
+            });
+          },
+          () => undefined,
+        );
+      },
+      [],
+    );
+
+    const closeParticipantSuggestions = useCallback(() => {
+      setParticipantSuggestOpen(false);
     }, []);
+
+    const handleParticipantFocus = useCallback(() => {
+      setParticipantSuggestOpen(true);
+      // Wait a frame so the suggestion panel can mount, then pin the field
+      // near the top so invitee previews below stay in view.
+      requestAnimationFrame(() => {
+        handleInputFocus(participantInputRef.current, 48);
+        setTimeout(() => {
+          handleInputFocus(participantInputRef.current, 48);
+        }, 120);
+      });
+    }, [handleInputFocus]);
 
     // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -407,6 +430,14 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
         return;
       }
 
+      if (isReservedSystemEmail(email)) {
+        setFieldErrors((current) => ({
+          ...current,
+          participants: "Cannot invite system or administrative addresses",
+        }));
+        return;
+      }
+
       if (participants.some((participant) => participant.email === email)) {
         setFieldErrors((current) => ({
           ...current,
@@ -416,6 +447,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       }
 
       setParticipantDraft("");
+      setParticipantSuggestOpen(false);
       setFieldErrors((current) => {
         const next = { ...current };
         delete next.participants;
@@ -435,7 +467,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       (entry: RecentContactEntry) => {
         const email = entry.email.trim().replace(/^mailto:/i, "").toLowerCase();
 
-        if (!email) {
+        if (!email || isReservedSystemEmail(email)) {
           return;
         }
 
@@ -456,6 +488,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
         }
 
         setParticipantDraft("");
+        setParticipantSuggestOpen(false);
         setFieldErrors((current) => {
           const next = { ...current };
           delete next.participants;
@@ -495,7 +528,9 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="always"
-            keyboardDismissMode="on-drag"
+            keyboardDismissMode={
+              participantSuggestOpen ? "none" : "on-drag"
+            }
             showsVerticalScrollIndicator={false}
             bounces={false}
             overScrollMode="never"
@@ -537,7 +572,10 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                 maxLength={255}
                 returnKeyType="done"
                 blurOnSubmit
-                onFocus={() => handleInputFocus(titleInputRef.current)}
+                onFocus={() => {
+                  closeParticipantSuggestions();
+                  handleInputFocus(titleInputRef.current);
+                }}
                 accessibilityLabel="Event title"
               />
               {renderFieldError("title")}
@@ -842,7 +880,10 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       maxLength={255}
                       returnKeyType="done"
                       blurOnSubmit
-                      onFocus={() => handleInputFocus(locationInputRef.current)}
+                      onFocus={() => {
+                        closeParticipantSuggestions();
+                        handleInputFocus(locationInputRef.current);
+                      }}
                       accessibilityLabel="Event location"
                     />
                   )}
@@ -864,9 +905,10 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       multiline
                       numberOfLines={3}
                       textAlignVertical="top"
-                      onFocus={() =>
-                        handleInputFocus(descriptionInputRef.current)
-                      }
+                      onFocus={() => {
+                        closeParticipantSuggestions();
+                        handleInputFocus(descriptionInputRef.current);
+                      }}
                       accessibilityLabel="Event description"
                     />
                   )}
@@ -947,34 +989,40 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                           />
                         </Pressable>
                       </View>
-                      <View style={styles.participantComposer}>
-                        <RecipientSuggestInput
-                          mode="calendar"
-                          value={participantDraft}
-                          onChangeText={setParticipantDraft}
-                          onSelectSuggestion={addParticipantFromSuggestion}
-                          placeholder="Add attendee by email"
-                          onSubmitEditing={addParticipant}
-                          style={[
-                            styles.expandableInput,
-                            styles.participantInput,
-                            ...(fieldErrors.participants ? [styles.inputError] : []),
-                          ]}
-                          hasError={Boolean(fieldErrors.participants)}
-                        />
-                        <Pressable
-                          style={styles.participantAddButton}
-                          onPress={addParticipant}
-                          accessibilityRole="button"
-                          accessibilityLabel="Add attendee"
-                        >
-                          <Feather
-                            name="user-plus"
-                            size={16}
-                            color={theme.colors.foreground}
-                          />
-                        </Pressable>
-                      </View>
+                      <RecipientSuggestInput
+                        mode="calendar"
+                        value={participantDraft}
+                        onChangeText={setParticipantDraft}
+                        onSelectSuggestion={addParticipantFromSuggestion}
+                        placeholder="Add attendee by email"
+                        onSubmitEditing={addParticipant}
+                        inputRef={participantInputRef}
+                        open={participantSuggestOpen}
+                        onOpenChange={setParticipantSuggestOpen}
+                        onFocus={handleParticipantFocus}
+                        style={[
+                          styles.expandableInput,
+                          styles.participantInput,
+                          ...(fieldErrors.participants
+                            ? [styles.inputError]
+                            : []),
+                        ]}
+                        hasError={Boolean(fieldErrors.participants)}
+                        trailing={
+                          <Pressable
+                            style={styles.participantAddButton}
+                            onPress={addParticipant}
+                            accessibilityRole="button"
+                            accessibilityLabel="Add attendee"
+                          >
+                            <Feather
+                              name="user-plus"
+                              size={16}
+                              color={theme.colors.foreground}
+                            />
+                          </Pressable>
+                        }
+                      />
                       {renderFieldError("participants")}
 
                       {participants.length > 0 ? (
@@ -1946,11 +1994,6 @@ function createStyles(theme: ThemeTokens) {
       minHeight: 60,
       height: undefined as unknown as number,
       textAlignVertical: "top" as const,
-    },
-    participantComposer: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
     },
     participantInput: {
       flex: 1,

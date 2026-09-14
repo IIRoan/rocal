@@ -49,7 +49,35 @@ export function isValidEmailAddress(value: string): boolean {
   return EMAIL_PATTERN.test(parseRecipientString(value).email);
 }
 
+export const RESERVED_SYSTEM_LOCAL_PARTS = new Set([
+  "admin",
+  "administrator",
+  "root",
+  "postmaster",
+  "hostmaster",
+  "abuse",
+  "noreply",
+  "no-reply",
+  "no_reply",
+  "donotreply",
+  "do-not-reply",
+  "do_not_reply",
+  "mailer-daemon",
+  "mailerdaemon",
+  "alert",
+  "alerts",
+  "system",
+  "security",
+]);
+
 const AUTOMATED_LOCAL_PARTS = new Set([
+  "admin",
+  "administrator",
+  "root",
+  "system",
+  "security",
+  "hostmaster",
+  "abuse",
   "noreply",
   "no-reply",
   "no_reply",
@@ -68,7 +96,7 @@ const AUTOMATED_LOCAL_PARTS = new Set([
   "alert",
 ]);
 
-/** Machine inboxes (noreply, bounce, mailer-daemon) — not people you contact. */
+/** Machine inboxes (noreply, bounce, mailer-daemon, admin) — not people you contact. */
 export function isAutomatedMailAddress(value: string): boolean {
   const email = normalizeEmailAddress(parseRecipientString(value).email);
   const local = email.split("@")[0] ?? "";
@@ -78,6 +106,62 @@ export function isAutomatedMailAddress(value: string): boolean {
     return true;
   }
   return base.includes("noreply") || base.includes("no-reply");
+}
+
+/**
+ * Detects administrative, system, and machine-only email addresses that must
+ * never be invited to calendar events, targeted for account creation, or used
+ * by normal users in queries (e.g. admin@solace.onl, alert@solace.onl, root@...).
+ */
+export function isReservedSystemEmail(
+  value: string,
+  systemDomain?: string | null,
+): boolean {
+  if (!value || typeof value !== "string") return false;
+  const normalized = normalizeEmailAddress(parseRecipientString(value).email);
+  if (!normalized) return false;
+
+  const atIndex = normalized.lastIndexOf("@");
+  if (atIndex <= 0) return false;
+
+  const local = normalized.slice(0, atIndex);
+  const domain = normalized.slice(atIndex + 1);
+  const baseLocal = (local.split("+")[0] ?? local).replace(/[._]/g, "-");
+
+  // Explicitly protect admin@solace.onl and administrative aliases
+  if (
+    normalized === "admin@solace.onl" ||
+    (baseLocal === "admin" && (domain === "solace.onl" || domain.endsWith(".solace.onl")))
+  ) {
+    return true;
+  }
+
+  const configuredDomain = systemDomain?.trim().toLowerCase();
+  const isSystemDomain = !configuredDomain
+    ? domain === "solace.onl" || domain.endsWith(".solace.onl")
+    : domain === configuredDomain || domain.endsWith(`.${configuredDomain}`);
+
+  if (
+    isSystemDomain &&
+    (RESERVED_SYSTEM_LOCAL_PARTS.has(baseLocal) || RESERVED_SYSTEM_LOCAL_PARTS.has(local))
+  ) {
+    return true;
+  }
+
+  // Also block machine/daemon/root accounts across any domain
+  if (
+    baseLocal === "admin" ||
+    baseLocal === "postmaster" ||
+    baseLocal === "mailer-daemon" ||
+    baseLocal === "mailerdaemon" ||
+    baseLocal === "noreply" ||
+    baseLocal === "no-reply" ||
+    baseLocal === "root"
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 export type ComposeRecipientValidation = {

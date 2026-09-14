@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@workspace/ui/components/ui/select";
 import type { RecentContactEntry } from "@workspace/calendar-core";
-import { normalizeParticipantEmail } from "@workspace/calendar-core";
+import { isReservedSystemEmail, normalizeParticipantEmail } from "@workspace/calendar-core";
 
 import {
   getEnabledEmailReminderMinutes,
@@ -102,6 +102,11 @@ export function EventEditorBody({
       return;
     }
 
+    if (isReservedSystemEmail(email)) {
+      setParticipantError("Cannot invite system or administrative addresses.");
+      return;
+    }
+
     if (participantItems.some((participant) => participant.email === email)) {
       setParticipantError("That participant is already invited.");
       return;
@@ -121,7 +126,7 @@ export function EventEditorBody({
 
   function addParticipantFromSuggestion(entry: RecentContactEntry) {
     const email = normalizeParticipantEmail(entry.email);
-    if (!email) {
+    if (!email || isReservedSystemEmail(email)) {
       return;
     }
 

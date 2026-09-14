@@ -1,8 +1,18 @@
-import type { EventParticipantInput } from "@workspace/calendar-core";
+import { isReservedSystemEmail, type EventParticipantInput } from "@workspace/calendar-core";
+import { env } from "./env";
 import { RecurrenceEngine, type RecurrenceRule } from "./recurrence";
 import type { StalwartCalendarEventRecord } from "./stalwart-calendar";
 
 const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
+
+function normalizeInboundStalwartTitle(title: unknown): string {
+  const trimmed = typeof title === "string" ? title.trim() : "";
+  if (!trimmed || trimmed === ENCRYPTED_EVENT_PLACEHOLDER_TITLE) {
+    // Never persist Stalwart's encrypted placeholder as a real Solace title.
+    return "";
+  }
+  return trimmed;
+}
 
 type DateParts = {
   year: number;
@@ -278,32 +288,42 @@ function parseRecurrenceRule(
 }
 
 function buildParticipants(participants: ResolvedStalwartParticipant[] = []) {
-  const entries = participants
-    .filter((participant) => participant.email.trim())
-    .map((participant, index) => {
-      const role = participant.role === "organizer" ? "chair" : "attendee";
-      const status =
-        participant.role === "organizer"
-          ? "accepted"
-          : participant.status === "pending"
-            ? "needs-action"
-            : participant.status || "needs-action";
+  const validParticipants = participants.filter(
+    (p) => p.email.trim() && !isReservedSystemEmail(p.email),
+  );
+  if (validParticipants.length === 0) {
+    return undefined;
+  }
 
-      return [
-        `p${index}`,
-        {
-          "@type": "Participant",
-          calendarAddress: `mailto:${participant.email.trim().toLowerCase()}`,
-          name: participant.displayName?.trim() || participant.email,
-          roles: {
-            [role]: true,
-          },
-          participationStatus: status,
-        },
-      ] as const;
-    });
+  const hasExplicitOrganizer = validParticipants.some(
+    (p) => p.role === "organizer",
+  );
 
-  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+  const entries = validParticipants.map((participant, index) => {
+    const isOrganizer =
+      participant.role === "organizer" || (!hasExplicitOrganizer && index === 0);
+    const status =
+      isOrganizer
+        ? "accepted"
+        : participant.status === "pending"
+          ? "needs-action"
+          : participant.status || "needs-action";
+
+    return [
+      `p${index}`,
+      {
+        "@type": "Participant",
+        calendarAddress: `mailto:${participant.email.trim().toLowerCase()}`,
+        name: participant.displayName?.trim() || participant.email,
+        roles: isOrganizer
+          ? { owner: true, chair: true }
+          : { attendee: true },
+        participationStatus: status,
+      },
+    ] as const;
+  });
+
+  return Object.fromEntries(entries);
 }
 
 function parseParticipantEmail(calendarAddress: unknown): string | null {
@@ -319,7 +339,11 @@ function parseParticipantEmail(calendarAddress: unknown): string | null {
 }
 
 function parseParticipantRole(roles: unknown): "organizer" | "attendee" {
-  if (roles && typeof roles === "object" && "chair" in roles) {
+  if (
+    roles &&
+    typeof roles === "object" &&
+    ("chair" in roles || "owner" in roles)
+  ) {
     return "organizer";
   }
 
@@ -463,7 +487,7 @@ export function mapStalwartEventToSolace(
     stalwartEventId: event.id,
     stalwartUid: event.uid ?? null,
     stalwartCalendarId: firstCalendarId(event.calendarIds),
-    title: event.title?.trim() || ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
+    title: normalizeInboundStalwartTitle(event.title),
     description: event.description?.trim() || null,
     start,
     end: new Date(start.getTime() + durationMs),
@@ -484,7 +508,7 @@ export function mapStalwartParticipantsToSolace(
 
   return Object.values(participants).flatMap((participant) => {
     const email = parseParticipantEmail(participant?.calendarAddress);
-    if (!email) {
+    if (!email || isReservedSystemEmail(email, env.stalwartDefaultDomain)) {
       return [];
     }
 
