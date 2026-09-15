@@ -261,3 +261,34 @@ Agents may run **verification and setup** commands only. **Do not start dev serv
 - **Typecheck**: `bun run typecheck`, `bun run typecheck:native`
 - **Tests**: `bun run test`, or scoped runs (`test:backend`, `test:native`, `test:ui`, `test:notifications`) and single-file test paths
 - **Prisma client** (after schema changes, in `apps/backend`): `bun run db:generate`
+
+---
+
+## Cursor Cloud specific instructions
+
+Cloud Agents boot from a prebuilt environment (the setup lives in the saved environment config, not in the repo). On boot the environment brings up the full local stack:
+
+- **PostgreSQL 16** on `localhost:5432` — role `solace`, password `solace`, database `solace` (`DATABASE_URL=postgresql://solace:solace@localhost:5432/solace`). Migrations are applied with `prisma migrate deploy`.
+- **backend** (Elysia API) on `http://localhost:4001` (health at `/api/health`).
+- **web** (Next.js) on `http://localhost:4000`.
+- **notifications** (Go worker) on `http://localhost:4002`.
+
+Local dev secrets live in gitignored `.env` files generated on first boot (`apps/backend/.env`, `apps/notifications/.env`, `apps/web/.env.local`) with a locally-generated `BETTER_AUTH_SECRET`. Do not commit them.
+
+### Shared test-login account
+
+Account signup is **invite-gated**, so do not try to register a fresh account when testing. Instead use the shared account that the environment seeds on boot (idempotent) from environment secrets:
+
+- `TEST_LOGIN_USERNAME` — the Solace login email (a `@solace.onl` address).
+- `TEST_LOGIN_PASSWORD` — the password (min 8 chars with upper, lower, number, special).
+- `TEST_LOGIN_NAME` — optional display name (defaults to `Solace Tester`).
+
+These are injected as environment variables. To sign in, open `http://localhost:4000/login` and use `$TEST_LOGIN_USERNAME` / `$TEST_LOGIN_PASSWORD`, or call the API directly:
+
+```bash
+curl -s -X POST http://localhost:4001/api/auth/sign-in/email \
+  -H 'Content-Type: application/json' -H 'Origin: http://localhost:4000' \
+  -d "{\"email\":\"$TEST_LOGIN_USERNAME\",\"password\":\"$TEST_LOGIN_PASSWORD\"}"
+```
+
+A successful sign-in returns a `better-auth.session_token` cookie and the user object. If the secrets are not set, the boot seed is skipped (it never fails the boot) and no shared account exists — add the secrets in the environment's Secrets panel to enable it. Never hard-code these credentials in the repo.
