@@ -85,6 +85,20 @@ export function toastEventMutationError(
   });
 }
 
+/**
+ * Moves only change timing. Omitting title/description/location keeps the
+ * stored ciphertext and avoids re-encrypting a placeholder over the real title.
+ */
+export function buildDraggedEventUpdate(
+  event: Pick<CalendarEvent, "start" | "end" | "allDay">,
+) {
+  return {
+    start: event.start.toISOString(),
+    end: event.end.toISOString(),
+    allDay: event.allDay,
+  };
+}
+
 export async function persistDraggedCalendarEvent({
   timezone,
   updateEvent,
@@ -95,15 +109,7 @@ export async function persistDraggedCalendarEvent({
   updatedEvent: CalendarEvent;
 }) {
   try {
-    await updateEvent(updatedEvent.id, {
-      title: updatedEvent.title,
-      description: updatedEvent.description,
-      start: updatedEvent.start.toISOString(),
-      end: updatedEvent.end.toISOString(),
-      allDay: updatedEvent.allDay,
-      location: updatedEvent.location,
-      color: updatedEvent.color,
-    });
+    await updateEvent(updatedEvent.id, buildDraggedEventUpdate(updatedEvent));
 
     toast.success(`Event "${updatedEvent.title}" moved`, {
       description: formatInUserTimezone(

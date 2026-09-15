@@ -75,9 +75,8 @@ export async function enqueueInboundMailPush(
     let payload;
     try {
       payload = newMailPayload(1, {
-        subject: item.subject,
-        fromName: item.fromName,
         emailId: item.emailId,
+        accountId: input.accountId,
       });
     } catch (error) {
       if (error instanceof NotificationJobPayloadError) {

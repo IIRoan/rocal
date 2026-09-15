@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import { createLogger } from "@workspace/logger";
 import { calendarApiService } from "../lib/calendar-api-service";
+import { encryptReminderTitle } from "../lib/e2ee-notification-title";
 import {
   CalendarEvent,
   Calendar,
@@ -141,7 +142,7 @@ export interface UseCalendarDataReturn {
   updateNotifications: (
     eventId: string,
     notifications: EventNotification[],
-    displayTitle?: string | null,
+    title?: string | null,
   ) => Promise<void>;
 }
 
@@ -368,7 +369,7 @@ export function useCalendarData(
     async (
       eventId: string,
       notifications: EventNotification[],
-      displayTitle?: string | null,
+      title?: string | null,
     ) => {
       try {
         const notificationData = notifications.map((n) => ({
@@ -379,7 +380,9 @@ export function useCalendarData(
         await calendarApiService.updateEventNotifications(
           eventId,
           notificationData,
-          { displayTitle },
+          {
+            encryptedDisplayTitle: await encryptReminderTitle(eventId, title),
+          },
         );
       } catch (error) {
         log.error("Failed to update event notifications:", error);

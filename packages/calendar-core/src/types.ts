@@ -85,6 +85,7 @@ import type {
   EventParticipantRole,
   EventParticipantStatus,
 } from "./route-schemas";
+import type { E2eeRolloutStage } from "./content-encryption";
 
 export type {
   EncryptionState,
@@ -546,7 +547,8 @@ export interface CreateNotificationRequest {
     minutesBefore: number;
     isEnabled: boolean;
   }>;
-  displayTitle?: string | null;
+  /** `encryptNotificationTitle` output from `@workspace/e2ee`; never plaintext. */
+  encryptedDisplayTitle?: string | null;
 }
 
 export interface NotificationTestRequest {
@@ -630,7 +632,7 @@ export interface E2eeBootstrapCalendar {
 
 export interface E2eeBootstrapResponse {
   enabled: boolean;
-  rolloutStage: "shadow_write";
+  rolloutStage: E2eeRolloutStage;
   algorithms: {
     content: "AES-GCM-256";
     blindIndex: "HMAC-SHA-256";

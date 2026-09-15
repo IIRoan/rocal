@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"notifications/internal/jobs"
 	"notifications/internal/logger"
 	"notifications/internal/push"
+	"notifications/internal/retention"
 	"notifications/internal/schedule"
 	"notifications/templates"
 )
@@ -50,17 +52,12 @@ type EmailContent struct {
 	Text string `json:"text"`
 }
 
+// EventData holds only non-content scheduling fields. Reminder mail never
+// includes the title, location, description, or calendar/category names.
 type EventData struct {
-	Title           string
-	Start           time.Time
-	End             time.Time
-	AllDay          bool
-	EncryptionState string
-	Location        string
-	CalendarName    string
-	Description     string
-	CategoryName    string
-	CategoryColor   string
+	Start  time.Time
+	End    time.Time
+	AllDay bool
 }
 
 type UserData struct {
@@ -81,6 +78,7 @@ type NotificationServer struct {
 	pusher          *push.Client
 	maxErrors       int
 	log             logger.Logger
+	cleanupRunning  atomic.Bool
 }
 
 func NewNotificationServer() *NotificationServer {
@@ -369,6 +367,17 @@ func (ns *NotificationServer) Start() error {
 		return fmt.Errorf("failed to schedule notification processor: %w", err)
 	}
 
+	// Hourly at a fixed minute offset so cleanup never coincides with startup.
+	_, err = ns.cron.AddFunc("0 17 * * * *", func() {
+		if err := ns.runRetentionCleanup(); err != nil {
+			ns.addError(err.Error())
+			ns.log.Err("Retention cleanup failed: %v", err)
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to schedule retention cleanup: %w", err)
+	}
+
 	ns.cron.Start()
 	go func() {
 		if err := ns.processScheduledNotifications(); err != nil {
@@ -483,6 +492,33 @@ func (ns *NotificationServer) processScheduledNotifications() error {
 	return dueErr
 }
 
+// runRetentionCleanup deletes expired/old ephemeral rows. Logs counts only.
+func (ns *NotificationServer) runRetentionCleanup() error {
+	if ns.db == nil {
+		return fmt.Errorf("database service not configured")
+	}
+	if !ns.cleanupRunning.CompareAndSwap(false, true) {
+		ns.log.Info("Retention cleanup still running; skipping this tick")
+		return nil
+	}
+	defer ns.cleanupRunning.Store(false)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	result, err := retention.Run(ctx, ns.db, time.Now())
+	for _, rule := range retention.Rules {
+		if count := result[rule.Name]; count > 0 {
+			ns.log.Info("Retention cleanup %s: %d row(s) deleted", rule.Name, count)
+		}
+	}
+	if err != nil {
+		return err
+	}
+	ns.log.OK("Retention cleanup complete: %d row(s) deleted", result.Total())
+	return nil
+}
+
 func (ns *NotificationServer) dispatchJob(ctx context.Context, job jobs.Job) error {
 	if job.Attempts >= jobs.MaxAttempts {
 		return ns.skipJob(ctx, job, "max delivery attempts exceeded")
@@ -518,16 +554,9 @@ func (ns *NotificationServer) dispatchEmailJob(ctx context.Context, job jobs.Job
 		return err
 	}
 	return ns.sendEmailNotification(ctx, EventData{
-		Title:           event.Title,
-		Start:           event.Start,
-		End:             event.End,
-		AllDay:          event.AllDay,
-		EncryptionState: event.EncryptionState,
-		Location:        event.Location,
-		CalendarName:    event.CalendarName,
-		Description:     event.Description,
-		CategoryName:    event.CategoryName,
-		CategoryColor:   event.CategoryColor,
+		Start:  event.Start,
+		End:    event.End,
+		AllDay: event.AllDay,
 	}, UserData{Name: user.Name, Email: user.Email, TimeZone: user.TimeZone}, job.MinutesBefore, eventID)
 }
 
@@ -558,8 +587,7 @@ func (ns *NotificationServer) dispatchPushJob(ctx context.Context, job jobs.Job)
 		if count < 1 {
 			count = 1
 		}
-		emailID := strings.TrimSpace(job.Payload.EmailID)
-		notification = push.NewMail(count, job.FromName, job.Subject, emailID)
+		notification = push.NewMail(count, job.Payload.EmailID, job.Payload.AccountID)
 		if notification.CollapseID == "mail:" || notification.CollapseID == "" {
 			notification.CollapseID = "mail:" + job.ID
 		}
@@ -568,15 +596,16 @@ func (ns *NotificationServer) dispatchPushJob(ctx context.Context, job jobs.Job)
 		if eventID == "" && job.EventID.Valid {
 			eventID = job.EventID.String
 		}
-		title := capturedReminderTitle(job.Title)
-		if title == "" && eventID != "" && eventID != "test-notification" && eventID != "manual-test" {
-			event, _, err := jobs.LoadReminder(ctx, ns.db, eventID, job.UserID)
+		encryptedTitle, startsAt := "", ""
+		if eventID != "" && eventID != "test-notification" && eventID != "manual-test" {
+			event, user, err := jobs.LoadReminder(ctx, ns.db, eventID, job.UserID)
 			if err != nil {
 				return err
 			}
-			title = capturedReminderTitle(event.Title)
+			encryptedTitle = event.EncryptedTitle
+			startsAt = jobs.StartClock(event, user)
 		}
-		notification = push.EventReminder(job.MinutesBefore, eventID, title)
+		notification = push.EventReminder(job.MinutesBefore, eventID, encryptedTitle, startsAt)
 	default:
 		return ns.skipJob(ctx, job, "unknown kind")
 	}
@@ -636,27 +665,7 @@ func nullableString(value sql.NullString) string {
 	return ""
 }
 
-func capturedReminderTitle(title string) string {
-	trimmed := strings.TrimSpace(title)
-	if trimmed == "" || strings.EqualFold(trimmed, "Encrypted event") {
-		return ""
-	}
-	return trimmed
-}
-
-func (ns *NotificationServer) shouldRedactReminderContent(event EventData) bool {
-	return strings.TrimSpace(event.EncryptionState) == "encrypted"
-}
-
-func (ns *NotificationServer) reminderDisplayTitle(event EventData) string {
-	if title := capturedReminderTitle(event.Title); title != "" {
-		return title
-	}
-	if ns.shouldRedactReminderContent(event) {
-		return "Encrypted event"
-	}
-	return ""
-}
+const reminderMailTitle = "Event reminder"
 
 func (ns *NotificationServer) generateEmailContent(event EventData, user UserData, minutesBefore int, eventID string) (*EmailContent, error) {
 	formattedDetails, err := ns.formatEventDetailsForEmail(event, user.TimeZone, minutesBefore)
@@ -664,38 +673,14 @@ func (ns *NotificationServer) generateEmailContent(event EventData, user UserDat
 		return nil, err
 	}
 
-	eventTitle := ns.reminderDisplayTitle(event)
-	if eventTitle == "" {
-		eventTitle = "Event reminder"
-	}
-	eventLocation := event.Location
-	calendarName := event.CalendarName
-	categoryName := event.CategoryName
-	categoryColor := event.CategoryColor
-	description := event.Description
-	duration := formattedDetails.Duration
-
-	if ns.shouldRedactReminderContent(event) {
-		eventLocation = ""
-		calendarName = ""
-		categoryName = ""
-		categoryColor = ""
-		description = ""
-		duration = ""
-	}
-
 	templateData := templates.EmailTemplateData{
 		EventID:        eventID,
-		EventTitle:     eventTitle,
+		EventTitle:     reminderMailTitle,
+		Summary:        ns.reminderSummary(event, user.TimeZone, formattedDetails.EventDate),
 		EventDate:      formattedDetails.EventDate,
 		EventTime:      formattedDetails.EventTime,
-		EventLocation:  eventLocation,
-		CalendarName:   calendarName,
-		CategoryName:   categoryName,
-		CategoryColor:  categoryColor,
-		Description:    description,
 		TimeUntilEvent: formattedDetails.TimeUntilEvent,
-		Duration:       duration,
+		Duration:       formattedDetails.Duration,
 		ReminderText:   formattedDetails.ReminderText,
 		UserName:       user.Name,
 		UserEmail:      user.Email,
@@ -718,6 +703,19 @@ func (ns *NotificationServer) generateEmailContent(event EventData, user UserDat
 		HTML: html,
 		Text: text,
 	}, nil
+}
+
+func (ns *NotificationServer) reminderSummary(event EventData, timezone, eventDate string) string {
+	if event.AllDay {
+		return fmt.Sprintf("You have an all-day event on %s. Open Solace to view the details.", eventDate)
+	}
+	loc := time.UTC
+	if timezone != "" {
+		if loaded, err := time.LoadLocation(timezone); err == nil {
+			loc = loaded
+		}
+	}
+	return fmt.Sprintf("You have an event at %s. Open Solace to view the details.", event.Start.In(loc).Format("3:04 PM"))
 }
 
 type formattedEventDetails struct {
@@ -805,15 +803,11 @@ func (ns *NotificationServer) formatReminderText(minutesBefore int) string {
 }
 
 func (ns *NotificationServer) generateEmailSubject(event EventData, minutesBefore int) string {
-	title := ns.reminderDisplayTitle(event)
-	if title == "" {
-		title = "Event reminder"
-	}
 	if minutesBefore <= 0 {
-		return fmt.Sprintf("%s starting now", title)
+		return fmt.Sprintf("%s starting now", reminderMailTitle)
 	}
 
-	return fmt.Sprintf("%s in %s", title, ns.formatReminderSummary(minutesBefore))
+	return fmt.Sprintf("%s in %s", reminderMailTitle, ns.formatReminderSummary(minutesBefore))
 }
 
 func (ns *NotificationServer) sendEmailNotification(ctx context.Context, event EventData, user UserData, minutesBefore int, eventID string) error {
@@ -862,16 +856,11 @@ func (ns *NotificationServer) getFromAddress(event EventData, minutesBefore int)
 }
 
 func (ns *NotificationServer) senderDisplayName(event EventData, minutesBefore int) string {
-	title := sanitizeMailFragment(ns.reminderDisplayTitle(event))
-	if title == "" {
-		title = "reminder"
-	}
-
 	if minutesBefore <= 0 {
-		return fmt.Sprintf("%s starting now", title)
+		return "Reminder starting now"
 	}
 
-	return fmt.Sprintf("%s in %s", title, ns.formatReminderSummary(minutesBefore))
+	return fmt.Sprintf("Reminder in %s", ns.formatReminderSummary(minutesBefore))
 }
 
 func (ns *NotificationServer) formatReminderSummary(minutesBefore int) string {
@@ -905,30 +894,6 @@ func (ns *NotificationServer) formatReminderSummary(minutesBefore int) string {
 	}
 
 	return fmt.Sprintf("%d hours %d %s", hours, remainingMinutes, minuteLabel)
-}
-
-func sanitizeMailFragment(value string) string {
-	value = strings.NewReplacer(
-		"<", " ",
-		">", " ",
-		"\"", " ",
-		"'", " ",
-		":", " ",
-		",", " ",
-		";", " ",
-		"(", " ",
-		")", " ",
-		"[", " ",
-		"]", " ",
-		"{", " ",
-		"}", " ",
-		"/", " ",
-		"\\", " ",
-		"|", " ",
-		"@", " ",
-	).Replace(value)
-
-	return strings.TrimSpace(strings.Join(strings.Fields(value), " "))
 }
 
 func resolveBaseFromAddress() (string, error) {
@@ -1106,7 +1071,7 @@ func (ns *NotificationServer) sendTestPush(recipient string) error {
 		return fmt.Errorf("no registered iOS devices for this account; open Solace Dev while signed in")
 	}
 
-	notification := push.EventReminder(15, "manual-test", "Solace")
+	notification := push.EventReminder(15, "manual-test", "", "")
 	notification.CollapseID = "test:" + userID
 
 	sent := 0
@@ -1144,15 +1109,9 @@ func (ns *NotificationServer) sendTestEmail(recipient string) error {
 	start := now.Add(90 * time.Minute)
 	end := start.Add(45 * time.Minute)
 	testEvent := EventData{
-		Title:         "Manual reminder test",
-		Start:         start,
-		End:           end,
-		AllDay:        false,
-		Location:      "Test location",
-		CalendarName:  "Solace test calendar",
-		Description:   "This is a manually triggered reminder email for smoke-testing the notification pipeline.",
-		CategoryName:  "Test",
-		CategoryColor: "#ff6b35",
+		Start:  start,
+		End:    end,
+		AllDay: false,
 	}
 	testUser := UserData{
 		Name:     "Test Recipient",

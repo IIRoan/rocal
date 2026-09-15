@@ -30,13 +30,22 @@ type Alert struct {
 	Body  string
 }
 
+// Notification never carries user content in the clear. The alert is generic;
+// the iOS Notification Service Extension (mutable-content) replaces it with the
+// decrypted reminder title (EncryptedTitle) or the sender/subject it fetches
+// over JMAP (EmailID + AccountID).
 type Notification struct {
-	Alert      Alert
-	CollapseID string
-	Type       string
-	EventID    string
-	EmailID    string
+	Alert          Alert
+	CollapseID     string
+	Type           string
+	EventID        string
+	EmailID        string
+	AccountID      string
+	EncryptedTitle string
 }
+
+// MaxPayloadBytes is the APNs limit for alert notifications.
+const MaxPayloadBytes = 4096
 
 type Result struct {
 	StatusCode   int
@@ -101,32 +110,74 @@ func MetadataPayload(n Notification) map[string]any {
 			"title": n.Alert.Title,
 			"body":  n.Alert.Body,
 		},
-		"sound": "default",
+		"sound":           "default",
+		"mutable-content": 1,
 	}
 	if n.CollapseID != "" {
 		aps["thread-id"] = n.CollapseID
 	}
-	// expo-notifications maps remote `content.data` from userInfo["body"] on iOS.
-	body := map[string]any{
-		"t": n.Type,
-	}
-	if n.EventID != "" {
-		body["eid"] = n.EventID
-	}
-	if n.EmailID != "" {
-		body["mid"] = n.EmailID
-	}
-	return map[string]any{
+	// expo-notifications maps remote `content.data` from userInfo["body"] on iOS;
+	// binaries without the extension route taps with these short keys.
+	body := map[string]any{}
+	payload := map[string]any{
 		"aps":  aps,
 		"body": body,
 	}
+	switch n.Type {
+	case TypeEventReminder:
+		body["t"] = "event"
+		payload["type"] = TypeEventReminder
+		if n.EventID != "" {
+			body["eid"] = n.EventID
+			payload["eventId"] = n.EventID
+		}
+		if n.EncryptedTitle != "" {
+			payload["enc"] = n.EncryptedTitle
+		}
+	case TypeNewMail:
+		body["t"] = "mail"
+		payload["type"] = TypeNewMail
+		if n.EmailID != "" {
+			body["mid"] = n.EmailID
+			payload["emailId"] = n.EmailID
+		}
+		if n.AccountID != "" {
+			payload["accountId"] = n.AccountID
+		}
+	}
+	return payload
 }
 
-func EventReminder(minutesBefore int, eventID, title string) Notification {
-	alertTitle := "Event reminder"
-	if trimmed := strings.TrimSpace(title); trimmed != "" {
-		alertTitle = trimmed
+// EncodePayload marshals the APNs body and drops the optional ciphertext when
+// the payload would exceed MaxPayloadBytes; the generic alert still delivers.
+func EncodePayload(n Notification) ([]byte, error) {
+	body, err := json.Marshal(MetadataPayload(n))
+	if err != nil {
+		return nil, err
 	}
+	if len(body) <= MaxPayloadBytes {
+		return body, nil
+	}
+	n.EncryptedTitle = ""
+	body, err = json.Marshal(MetadataPayload(n))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > MaxPayloadBytes {
+		return nil, fmt.Errorf("APNs payload exceeds %d bytes", MaxPayloadBytes)
+	}
+	return body, nil
+}
+
+const (
+	TypeEventReminder = "event_reminder"
+	TypeNewMail       = "new_mail"
+)
+
+// EventReminder builds a generic reminder alert. startsAt is a clock time
+// already formatted in the user's timezone (not PII); empty falls back to the
+// lead time.
+func EventReminder(minutesBefore int, eventID, encryptedTitle, startsAt string) Notification {
 	body := "Starting now"
 	if minutesBefore > 0 {
 		body = fmt.Sprintf("Starts in %d minutes", minutesBefore)
@@ -134,37 +185,30 @@ func EventReminder(minutesBefore int, eventID, title string) Notification {
 			body = "Starts in 1 minute"
 		}
 	}
+	if startsAt = strings.TrimSpace(startsAt); startsAt != "" {
+		body = "Starts at " + startsAt
+	}
 	return Notification{
-		Alert:      Alert{Title: alertTitle, Body: body},
-		CollapseID: collapseID("event:", eventID),
-		Type:       "event",
-		EventID:    eventID,
+		Alert:          Alert{Title: "Event reminder", Body: body},
+		CollapseID:     collapseID("event:", eventID),
+		Type:           TypeEventReminder,
+		EventID:        eventID,
+		EncryptedTitle: strings.TrimSpace(encryptedTitle),
 	}
 }
 
-func NewMail(count int, fromName, subject, emailID string) Notification {
-	fromName = strings.TrimSpace(fromName)
-	subject = strings.TrimSpace(subject)
+func NewMail(count int, emailID, accountID string) Notification {
 	emailID = strings.TrimSpace(emailID)
-	title := "New email"
 	body := "You have a new message"
 	if count > 1 {
-		body = fmt.Sprintf("%d new emails", count)
-	} else if fromName != "" {
-		title = fromName
-		if subject != "" {
-			body = subject
-		} else {
-			body = "New email"
-		}
-	} else if subject != "" {
-		body = subject
+		body = fmt.Sprintf("%d new messages", count)
 	}
 	return Notification{
-		Alert:      Alert{Title: title, Body: body},
+		Alert:      Alert{Title: "New mail", Body: body},
 		CollapseID: collapseID("mail:", emailID),
-		Type:       "mail",
+		Type:       TypeNewMail,
 		EmailID:    emailID,
+		AccountID:  strings.TrimSpace(accountID),
 	}
 }
 
@@ -180,7 +224,7 @@ func (c *Client) Send(device Device, notification Notification) (Result, error) 
 	if err != nil {
 		return Result{}, err
 	}
-	body, err := json.Marshal(MetadataPayload(notification))
+	body, err := EncodePayload(notification)
 	if err != nil {
 		return Result{}, err
 	}

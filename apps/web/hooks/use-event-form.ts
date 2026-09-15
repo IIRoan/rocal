@@ -29,6 +29,7 @@ import {
 } from "@/components/command-palette/time-utils";
 import { validateEventForm } from "@/components/command-palette/event-utils";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { encryptReminderTitle } from "@/lib/e2ee-notification-title";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "@/lib/auth-client";
@@ -294,17 +295,17 @@ export function useEventForm({
   });
 
   const updateNotificationsMutation = useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       eventId,
       data,
-      displayTitle,
+      title,
     }: {
       eventId: string;
       data: any[];
-      displayTitle?: string | null;
+      title?: string | null;
     }) =>
       calendarApiService.updateEventNotifications(eventId, data, {
-        displayTitle,
+        encryptedDisplayTitle: await encryptReminderTitle(eventId, title),
       }),
     onSuccess: (_result, variables) => {
       // Invalidate the cached notifications list so the editor shows the
@@ -707,7 +708,7 @@ export function useEventForm({
               await updateNotificationsMutation.mutateAsync({
                 eventId: savedEventId,
                 data: notificationData,
-                displayTitle: eventTitle,
+                title: eventTitle,
               });
             } catch (notifError) {
               log.warn(

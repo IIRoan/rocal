@@ -8,17 +8,15 @@ import (
 	"strings"
 )
 
-// EmailTemplateData holds the data for email templates
+// EmailTemplateData holds the data for email templates. Reminder mail is
+// generic by design: no event title, location, description, or calendar
+// names; the app renders details on-device from the event id.
 type EmailTemplateData struct {
 	EventID        string
 	EventTitle     string
+	Summary        string
 	EventDate      string
 	EventTime      string
-	EventLocation  string
-	CalendarName   string
-	CategoryName   string
-	CategoryColor  string
-	Description    string
 	TimeUntilEvent string
 	Duration       string
 	ReminderText   string
@@ -70,13 +68,12 @@ func GeneratePlainTextEmail(data EmailTemplateData) string {
 		text += fmt.Sprintf("%s\n", data.TimeUntilEvent)
 	}
 	text += fmt.Sprintf("%s\n\n", data.EventTitle)
+	if data.Summary != "" {
+		text += fmt.Sprintf("%s\n\n", data.Summary)
+	}
 	text += "Details:\n"
 	text += fmt.Sprintf("Date: %s\n", data.EventDate)
 	text += fmt.Sprintf("Time: %s\n", data.EventTime)
-
-	if data.EventLocation != "" {
-		text += fmt.Sprintf("Location: %s\n", data.EventLocation)
-	}
 
 	if data.Duration != "" {
 		text += fmt.Sprintf("Duration: %s\n", data.Duration)

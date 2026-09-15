@@ -787,33 +787,4 @@ describe("MailSyncService", () => {
       }),
     ).resolves.toBe("gceaaabqr");
   });
-
-  it("loads email metadata for push enrichment", async () => {
-    const { jmapAdminClient, service } = createHarness();
-    jmapAdminClient.callJmap.mockResolvedValue({
-      methodResponses: [
-        [
-          "Email/get",
-          {
-            list: [
-              {
-                id: "in-1",
-                subject: "54321",
-                from: [{ email: "sam@example.com" }],
-              },
-            ],
-          },
-          "c1",
-        ],
-      ],
-    });
-
-    await expect(
-      service.getEmailPushMetadata("acct-1", "in-1"),
-    ).resolves.toEqual({
-      emailId: "in-1",
-      subject: "54321",
-      fromName: "sam@example.com",
-    });
-  });
 });

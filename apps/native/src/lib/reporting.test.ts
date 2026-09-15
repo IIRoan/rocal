@@ -80,6 +80,43 @@ describe("reporting", () => {
     expect(String(init?.body)).toContain("reporting-test");
   });
 
+  it("scrubs PII from exception messages and tags before sending", async () => {
+    const fetchMock = jest.fn<
+      (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+    >(async () => new Response("", { status: 200 }));
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const { captureException, captureMessage, flushReporting } = await import(
+      "./reporting"
+    );
+    captureException(
+      new Error(
+        "sync failed for alice@example.com Bearer abc.def.ghi https://api.solace.onl/x?token=secret",
+      ),
+      { tags: { title: "Dentist appointment", area: "sync" } },
+    );
+    captureMessage("draft for bob@example.com", {
+      tags: { subject: "Quarterly salary" },
+    });
+    await flushReporting();
+
+    const bodies = fetchMock.mock.calls.map(([, init]) => String(init?.body));
+    expect(bodies).toHaveLength(2);
+    const sent = bodies.join("\n");
+    for (const secret of [
+      "alice@example.com",
+      "bob@example.com",
+      "abc.def.ghi",
+      "token=secret",
+      "Dentist appointment",
+      "Quarterly salary",
+    ]) {
+      expect(sent).not.toContain(secret);
+    }
+    expect(sent).toContain("sync failed for [email] Bearer [redacted] [url]");
+    expect(sent).toContain('"area":"sync"');
+  });
+
   it("no-ops when the DSN is unset", async () => {
     delete process.env.EXPO_PUBLIC_SENTRY_DSN;
     const fetchMock = jest.fn(async () => new Response("", { status: 200 }));

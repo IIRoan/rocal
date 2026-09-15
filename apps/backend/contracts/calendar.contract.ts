@@ -6,32 +6,37 @@ import {
 } from "@workspace/calendar-core";
 import type { Calendar } from "../generated/prisma/index.js";
 import { strictZodObject } from "../lib/validation";
-import { rowEncryptionStateSchema } from "../lib/encryption-state";
-import { resourceIdParamsSchema } from "./_schemas";
+import {
+  encryptionShadowFieldsSchema,
+  refineEncryptedNameBody,
+  resourceIdParamsSchema,
+} from "./_schemas";
 import { resourceIdSchema, userIdField, userIdSchema } from "./_zod";
 
-export const createCalendarBodySchema = strictZodObject({
-  name: z.string().min(1).max(100),
+const createCalendarBodyFieldsSchema = strictZodObject({
+  name: z.string().max(100).optional(),
   color: calendarColorSchema,
   isDefault: z.boolean().optional(),
-  encryptedName: z.string().optional(),
-  blindIndexTokens: z.array(z.string()).optional(),
-  encryptionState: rowEncryptionStateSchema.optional(),
-  encryptionKeyVersion: z.number().int().min(1).optional(),
+  ...encryptionShadowFieldsSchema.shape,
   forceFullEncryption: z.boolean().optional(),
 });
 
-export const updateCalendarBodySchema = strictZodObject({
-  name: z.string().min(1).max(100).optional(),
+const updateCalendarBodyFieldsSchema = strictZodObject({
+  name: z.string().max(100).optional(),
   color: optionalCalendarColorSchema,
   isVisible: z.boolean().optional(),
   isDefault: z.boolean().optional(),
-  encryptedName: z.string().optional(),
-  blindIndexTokens: z.array(z.string()).optional(),
-  encryptionState: rowEncryptionStateSchema.optional(),
-  encryptionKeyVersion: z.number().int().min(1).optional(),
+  ...encryptionShadowFieldsSchema.shape,
   forceFullEncryption: z.boolean().optional(),
 });
+
+export const createCalendarBodySchema = createCalendarBodyFieldsSchema.superRefine(
+  refineEncryptedNameBody({ entityLabel: "Calendar", requireName: true }),
+);
+
+export const updateCalendarBodySchema = updateCalendarBodyFieldsSchema.superRefine(
+  refineEncryptedNameBody({ entityLabel: "Calendar", requireName: false }),
+);
 
 export const deleteCalendarQuerySchema = strictZodObject({
   action: calendarDeleteActionSchema.optional(),
@@ -55,9 +60,9 @@ export const optionalShareLinkBodySchema = z.preprocess(
 );
 
 export const calendarCreateInputSchema =
-  createCalendarBodySchema.extend(userIdField);
+  createCalendarBodyFieldsSchema.extend(userIdField);
 
-export const calendarUpdateInputSchema = updateCalendarBodySchema.extend({
+export const calendarUpdateInputSchema = updateCalendarBodyFieldsSchema.extend({
   ...userIdField,
   calendarId: resourceIdSchema,
 });

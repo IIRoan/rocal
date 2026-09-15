@@ -8,11 +8,10 @@ import (
 func TestRenderEventReminderIncludesTemplateData(t *testing.T) {
 	html, err := RenderEventReminder(EmailTemplateData{
 		EventID:        "evt-1",
-		EventTitle:     "Quarterly Planning",
+		EventTitle:     "Event reminder",
+		Summary:        "You have an event at 9:00 AM. Open Solace to view the details.",
 		EventDate:      "Friday, Apr 18",
 		EventTime:      "9:00 AM - 10:00 AM",
-		EventLocation:  "Amsterdam",
-		CalendarName:   "Work",
 		TimeUntilEvent: "30 minutes",
 		Duration:       "1h",
 		UserName:       "Roan",
@@ -26,9 +25,9 @@ func TestRenderEventReminderIncludesTemplateData(t *testing.T) {
 	}
 
 	assertions := []string{
-		"Quarterly Planning",
+		"Event reminder",
+		"You have an event at 9:00 AM. Open Solace to view the details.",
 		"Friday, Apr 18",
-		"Amsterdam",
 		"evt-1",
 		"https://app.solace.test/dashboard?eventId=evt-1",
 		"https://app.solace.test/settings",
@@ -44,10 +43,10 @@ func TestRenderEventReminderIncludesTemplateData(t *testing.T) {
 func TestGeneratePlainTextEmailIncludesOptionalFields(t *testing.T) {
 	text := GeneratePlainTextEmail(EmailTemplateData{
 		EventID:        "evt-2",
-		EventTitle:     "Design Review",
+		EventTitle:     "Event reminder",
+		Summary:        "You have an event at 3:00 PM. Open Solace to view the details.",
 		EventDate:      "Saturday, Apr 19",
 		EventTime:      "3:00 PM - 4:00 PM",
-		EventLocation:  "Remote",
 		Duration:       "1h",
 		TimeUntilEvent: "1 hour",
 		EventUrl:       "https://app.solace.test/dashboard?eventId=evt-2",
@@ -58,8 +57,8 @@ func TestGeneratePlainTextEmailIncludesOptionalFields(t *testing.T) {
 
 	assertions := []string{
 		"1 hour",
-		"Design Review",
-		"Location: Remote",
+		"Event reminder",
+		"You have an event at 3:00 PM. Open Solace to view the details.",
 		"Duration: 1h",
 		"Event ID: evt-2",
 		"Open event: https://app.solace.test/dashboard?eventId=evt-2",
@@ -115,8 +114,7 @@ func TestRenderEventReminderOmitsConditionalFields(t *testing.T) {
 	if strings.Contains(html, "Location") {
 		t.Fatal("expected Location field to be omitted when empty")
 	}
-	// The word "Calendar" appears in the footer link, so count occurrences:
-	// with no CalendarName, only the footer link should contain it
+	// The word "Calendar" only appears in the footer link.
 	calendarCount := strings.Count(html, "Calendar")
 	if calendarCount != 1 {
 		t.Fatalf("expected exactly 1 'Calendar' occurrence (footer link), got %d", calendarCount)
@@ -131,8 +129,6 @@ func TestRenderEventReminderIncludesAllConditionalFields(t *testing.T) {
 		EventTitle:     "Full Event",
 		EventDate:      "Wednesday, Jul 1",
 		EventTime:      "3:00 PM - 4:30 PM",
-		EventLocation:  "Room 42",
-		CalendarName:   "Engineering",
 		Duration:       "1h 30m",
 		TimeUntilEvent: "1 hour",
 		EventUrl:       "https://app.solace.test/dashboard?eventId=full",
@@ -144,7 +140,7 @@ func TestRenderEventReminderIncludesAllConditionalFields(t *testing.T) {
 		t.Fatalf("unexpected render error: %v", err)
 	}
 
-	for _, want := range []string{"Room 42", "Engineering", "1h 30m", "1 hour"} {
+	for _, want := range []string{"1h 30m", "1 hour"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("expected rendered HTML to contain %q", want)
 		}

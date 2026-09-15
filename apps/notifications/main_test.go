@@ -80,6 +80,28 @@ func TestProcessScheduledNotificationsRequiresDatabase(t *testing.T) {
 	}
 }
 
+func TestRetentionCleanupRequiresDatabase(t *testing.T) {
+	server := newTestServer(t)
+
+	err := server.runRetentionCleanup()
+	if err == nil || !strings.Contains(err.Error(), "database service not configured") {
+		t.Fatalf("expected database error, got %v", err)
+	}
+}
+
+func TestRetentionCleanupSkipsOverlappingRuns(t *testing.T) {
+	server := newTestServer(t)
+	server.db = &sql.DB{}
+	server.cleanupRunning.Store(true)
+
+	if err := server.runRetentionCleanup(); err != nil {
+		t.Fatalf("expected overlapping run to be skipped, got %v", err)
+	}
+	if !server.cleanupRunning.Load() {
+		t.Fatal("skipped run must not clear the in-progress flag")
+	}
+}
+
 func TestCalculateEventDuration(t *testing.T) {
 	server := newTestServer(t)
 	start := time.Date(2026, time.January, 10, 9, 0, 0, 0, time.UTC)
@@ -147,7 +169,6 @@ func TestFormatEventDetailsForEmail(t *testing.T) {
 		}
 
 		details, err := server.formatEventDetailsForEmail(EventData{
-			Title:  "Project Sync",
 			Start:  start,
 			End:    end,
 			AllDay: false,
@@ -176,7 +197,6 @@ func TestFormatEventDetailsForEmail(t *testing.T) {
 
 	t.Run("all day event renders all day labels", func(t *testing.T) {
 		details, err := server.formatEventDetailsForEmail(EventData{
-			Title:  "Holiday",
 			Start:  start,
 			End:    end,
 			AllDay: true,
@@ -203,7 +223,6 @@ func TestFormatEventDetailsForEmail(t *testing.T) {
 		localEnd := time.Date(2026, time.January, 10, 23, 59, 59, 0, loc)
 
 		details, err := server.formatEventDetailsForEmail(EventData{
-			Title:  "Holiday",
 			Start:  localStart.UTC(),
 			End:    localEnd.UTC(),
 			AllDay: true,
@@ -228,17 +247,12 @@ func TestSenderDisplayAndFromAddress(t *testing.T) {
 	t.Setenv("EMAIL_FROM_ADDRESS", "Notifications <no-reply@example.com>")
 	server := newTestServer(t)
 
-	event := EventData{Title: `Quarterly <Review>@Team`}
-	if got := sanitizeMailFragment(event.Title); got != "Quarterly Review Team" {
-		t.Fatalf("expected sanitized title, got %q", got)
-	}
-
-	display := server.senderDisplayName(event, 90)
-	if display != "Quarterly Review Team in 1 hour 30 minutes" {
+	display := server.senderDisplayName(EventData{}, 90)
+	if display != "Reminder in 1 hour 30 minutes" {
 		t.Fatalf("unexpected sender display name %q", display)
 	}
 
-	from, err := server.getFromAddress(event, 90)
+	from, err := server.getFromAddress(EventData{}, 90)
 	if err != nil {
 		t.Fatalf("unexpected from-address error: %v", err)
 	}
@@ -341,25 +355,23 @@ func TestGenerateEmailContentAndSubject(t *testing.T) {
 	server := newTestServer(t)
 
 	event := EventData{
-		Title:         "Project Kickoff",
-		Start:         time.Date(2026, time.May, 12, 9, 0, 0, 0, time.UTC),
-		End:           time.Date(2026, time.May, 12, 10, 30, 0, 0, time.UTC),
-		AllDay:        false,
-		Location:      "Amsterdam",
-		CalendarName:  "Work",
-		Description:   "Discuss roadmap",
-		CategoryName:  "Meetings",
-		CategoryColor: "#ef4444",
+		Start:  time.Date(2026, time.May, 12, 9, 0, 0, 0, time.UTC),
+		End:    time.Date(2026, time.May, 12, 10, 30, 0, 0, time.UTC),
+		AllDay: false,
 	}
-	user := UserData{Name: "Roan", Email: "roan@example.com", TimeZone: "UTC"}
+	user := UserData{Name: "Roan", Email: "roan@example.com", TimeZone: "Europe/Amsterdam"}
 
 	content, err := server.generateEmailContent(event, user, 30, "evt-1")
 	if err != nil {
 		t.Fatalf("unexpected generateEmailContent error: %v", err)
 	}
 
-	if !strings.Contains(content.HTML, "Project Kickoff") {
-		t.Fatalf("expected HTML to contain event title, got %q", content.HTML)
+	summary := "You have an event at 11:00 AM. Open Solace to view the details."
+	if !strings.Contains(content.HTML, "Event reminder") || !strings.Contains(content.HTML, summary) {
+		t.Fatalf("expected generic reminder copy, got %q", content.HTML)
+	}
+	if !strings.Contains(content.Text, summary) {
+		t.Fatalf("expected text email to contain the generic summary, got %q", content.Text)
 	}
 	if !strings.Contains(content.HTML, "https://app.solace.test/calendar?eventId=evt-1") {
 		t.Fatalf("expected HTML to contain event url, got %q", content.HTML)
@@ -371,29 +383,21 @@ func TestGenerateEmailContentAndSubject(t *testing.T) {
 		t.Fatalf("expected text email to contain event ID, got %q", content.Text)
 	}
 
-	if subject := server.generateEmailSubject(event, 30); subject != "Project Kickoff in 30 minutes" {
+	if subject := server.generateEmailSubject(event, 30); subject != "Event reminder in 30 minutes" {
 		t.Fatalf("unexpected subject %q", subject)
 	}
-	if subject := server.generateEmailSubject(event, 0); subject != "Project Kickoff starting now" {
+	if subject := server.generateEmailSubject(event, 0); subject != "Event reminder starting now" {
 		t.Fatalf("unexpected immediate subject %q", subject)
 	}
 }
 
-func TestGenerateEmailContentAndSubjectForEncryptedEvent(t *testing.T) {
+func TestGenerateEmailContentForAllDayEvent(t *testing.T) {
 	t.Setenv("FRONTEND_URL", "https://app.solace.test")
-	t.Setenv("EMAIL_FROM_ADDRESS", "Notifications <no-reply@example.com>")
 	server := newTestServer(t)
-
 	event := EventData{
-		Title:           "Private Planning",
-		Start:           time.Date(2026, time.May, 12, 9, 0, 0, 0, time.UTC),
-		End:             time.Date(2026, time.May, 12, 10, 30, 0, 0, time.UTC),
-		AllDay:          false,
-		EncryptionState: "encrypted",
-		Location:        "Secret Room",
-		CalendarName:    "Board",
-		Description:     "Classified",
-		CategoryName:    "Leadership",
+		Start:  time.Date(2026, time.May, 12, 0, 0, 0, 0, time.UTC),
+		End:    time.Date(2026, time.May, 12, 23, 59, 0, 0, time.UTC),
+		AllDay: true,
 	}
 	user := UserData{Name: "Roan", Email: "roan@example.com", TimeZone: "UTC"}
 
@@ -401,78 +405,8 @@ func TestGenerateEmailContentAndSubjectForEncryptedEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected generateEmailContent error: %v", err)
 	}
-
-	if !strings.Contains(content.HTML, "Private Planning") {
-		t.Fatalf("expected HTML to contain reminder title, got %q", content.HTML)
-	}
-	if strings.Contains(content.HTML, "Secret Room") || strings.Contains(content.HTML, "Classified") || strings.Contains(content.HTML, "Board") {
-		t.Fatalf("expected HTML to redact encrypted event details, got %q", content.HTML)
-	}
-	if strings.Contains(content.Text, "Secret Room") || strings.Contains(content.Text, "Classified") {
-		t.Fatalf("expected text email to redact encrypted event details, got %q", content.Text)
-	}
-
-	if subject := server.generateEmailSubject(event, 30); subject != "Private Planning in 30 minutes" {
-		t.Fatalf("unexpected encrypted subject %q", subject)
-	}
-	if display := server.senderDisplayName(event, 30); display != "Private Planning in 30 minutes" {
-		t.Fatalf("unexpected encrypted sender display %q", display)
-	}
-
-	from, err := server.getFromAddress(event, 30)
-	if err != nil {
-		t.Fatalf("unexpected from-address error: %v", err)
-	}
-	parsed, err := mail.ParseAddress(from)
-	if err != nil {
-		t.Fatalf("expected valid mail address, got error: %v", err)
-	}
-	if parsed.Name != "Private Planning in 30 minutes" {
-		t.Fatalf("expected reminder title in sender display name, got %q", parsed.Name)
-	}
-}
-
-func TestGenerateEmailContentFallsBackWhenEncryptedTitleIsMissing(t *testing.T) {
-	t.Setenv("FRONTEND_URL", "https://app.solace.test")
-	server := newTestServer(t)
-	event := EventData{
-		Title:           "",
-		Start:           time.Date(2026, time.May, 12, 9, 0, 0, 0, time.UTC),
-		End:             time.Date(2026, time.May, 12, 10, 30, 0, 0, time.UTC),
-		EncryptionState: "encrypted",
-		Location:        "Secret Room",
-	}
-	user := UserData{Name: "Roan", Email: "roan@example.com", TimeZone: "UTC"}
-
-	content, err := server.generateEmailContent(event, user, 30, "evt-1")
-	if err != nil {
-		t.Fatalf("unexpected generateEmailContent error: %v", err)
-	}
-	if !strings.Contains(content.HTML, "Encrypted event") {
-		t.Fatalf("expected fallback encrypted title, got %q", content.HTML)
-	}
-	if strings.Contains(content.HTML, "Secret Room") {
-		t.Fatalf("expected location to stay redacted, got %q", content.HTML)
-	}
-	if subject := server.generateEmailSubject(event, 30); subject != "Encrypted event in 30 minutes" {
-		t.Fatalf("unexpected fallback subject %q", subject)
-	}
-}
-
-func TestReminderDisplayTitleIgnoresPlaceholder(t *testing.T) {
-	server := newTestServer(t)
-	event := EventData{
-		Title:           "Encrypted event",
-		EncryptionState: "encrypted",
-	}
-	if title := server.reminderDisplayTitle(event); title != "Encrypted event" {
-		t.Fatalf("expected placeholder fallback, got %q", title)
-	}
-	if title := capturedReminderTitle("Encrypted event"); title != "" {
-		t.Fatalf("expected captured title to ignore placeholder, got %q", title)
-	}
-	if title := capturedReminderTitle("Lunch with Sam"); title != "Lunch with Sam" {
-		t.Fatalf("expected captured title, got %q", title)
+	if !strings.Contains(content.Text, "You have an all-day event on Tuesday, May 12. Open Solace to view the details.") {
+		t.Fatalf("expected all-day summary, got %q", content.Text)
 	}
 }
 
@@ -540,13 +474,13 @@ func TestGetStatusAndHandlers(t *testing.T) {
 func TestSendEmailNotificationValidation(t *testing.T) {
 	server := newTestServer(t)
 
-	err := server.sendEmailNotification(nil, EventData{Title: "Test"}, UserData{Email: "user@example.com"}, 15, "evt-1")
+	err := server.sendEmailNotification(nil, EventData{}, UserData{Email: "user@example.com"}, 15, "evt-1")
 	if err == nil || !strings.Contains(err.Error(), "email service not configured") {
 		t.Fatalf("expected email configuration error, got %v", err)
 	}
 
 	server.mailer = email.NewClient(email.Config{})
-	err = server.sendEmailNotification(nil, EventData{Title: "Test"}, UserData{}, 15, "evt-1")
+	err = server.sendEmailNotification(nil, EventData{}, UserData{}, 15, "evt-1")
 	if err == nil || !strings.Contains(err.Error(), "user email is required") {
 		t.Fatalf("expected missing email validation error, got %v", err)
 	}
@@ -577,34 +511,6 @@ func TestDispatchSkipsUnconfiguredChannelsIndependently(t *testing.T) {
 	err = server.dispatchJob(context.Background(), jobs.Job{ID: "push-1", Channel: "push"})
 	if !errors.Is(err, errJobSkipped) {
 		t.Fatalf("expected push job to skip without APNs, got %v", err)
-	}
-}
-
-func TestSanitizeMailFragment(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		want  string
-	}{
-		{name: "removes angle brackets", input: `Hello <World>`, want: "Hello World"},
-		{name: "removes quotes", input: `Say "hello" now`, want: "Say hello now"},
-		{name: "removes at sign", input: `user@domain.com`, want: "user domain.com"},
-		{name: "removes slashes", input: `path/to\\file`, want: "path to file"},
-		{name: "removes braces", input: `{key}: [value]`, want: "key value"},
-		{name: "removes semicolons and pipes", input: `a; b | c`, want: "a b c"},
-		{name: "collapses whitespace", input: `  lots   of    space  `, want: "lots of space"},
-		{name: "empty input", input: "", want: ""},
-		{name: "all special chars", input: `<>()[]{}@/\|:;,"'`, want: ""},
-		{name: "preserves normal text", input: "Team standup meeting", want: "Team standup meeting"},
-		{name: "preserves hyphens and dots", input: "Q2-planning v2.0", want: "Q2-planning v2.0"},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if got := sanitizeMailFragment(test.input); got != test.want {
-				t.Fatalf("sanitizeMailFragment(%q) = %q, want %q", test.input, got, test.want)
-			}
-		})
 	}
 }
 
@@ -688,33 +594,15 @@ func TestLoadAPNsConfig(t *testing.T) {
 func TestSenderDisplayNameEdgeCases(t *testing.T) {
 	server := newTestServer(t)
 
-	t.Run("empty title falls back to reminder", func(t *testing.T) {
-		got := server.senderDisplayName(EventData{Title: ""}, 15)
-		if got != "reminder in 15 minutes" {
-			t.Fatalf("expected fallback display name, got %q", got)
-		}
-	})
-
-	t.Run("all-special-chars title falls back to reminder", func(t *testing.T) {
-		got := server.senderDisplayName(EventData{Title: "<>@:;"}, 60)
-		if got != "reminder in 1 hour" {
-			t.Fatalf("expected fallback display name, got %q", got)
-		}
-	})
-
-	t.Run("starting now variant", func(t *testing.T) {
-		got := server.senderDisplayName(EventData{Title: "Standup"}, 0)
-		if got != "Standup starting now" {
-			t.Fatalf("expected starting now display, got %q", got)
-		}
-	})
-
-	t.Run("negative minutes treated as starting now", func(t *testing.T) {
-		got := server.senderDisplayName(EventData{Title: "Late Event"}, -5)
-		if got != "Late Event starting now" {
-			t.Fatalf("expected starting now for negative minutes, got %q", got)
-		}
-	})
+	if got := server.senderDisplayName(EventData{}, 60); got != "Reminder in 1 hour" {
+		t.Fatalf("unexpected display name %q", got)
+	}
+	if got := server.senderDisplayName(EventData{}, 0); got != "Reminder starting now" {
+		t.Fatalf("expected starting now display, got %q", got)
+	}
+	if got := server.senderDisplayName(EventData{}, -5); got != "Reminder starting now" {
+		t.Fatalf("expected starting now for negative minutes, got %q", got)
+	}
 }
 
 func TestGenerateEmailSubjectEdgeCases(t *testing.T) {
@@ -722,24 +610,23 @@ func TestGenerateEmailSubjectEdgeCases(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		title   string
 		minutes int
 		want    string
 	}{
-		{name: "1 minute", title: "Sync", minutes: 1, want: "Sync in 1 minute"},
-		{name: "15 minutes", title: "Standup", minutes: 15, want: "Standup in 15 minutes"},
-		{name: "exactly 1 hour", title: "Review", minutes: 60, want: "Review in 1 hour"},
-		{name: "2 hours", title: "Workshop", minutes: 120, want: "Workshop in 2 hours"},
-		{name: "mixed hours and minutes", title: "Planning", minutes: 150, want: "Planning in 2 hours 30 minutes"},
-		{name: "starting now", title: "Urgent", minutes: 0, want: "Urgent starting now"},
-		{name: "negative", title: "Overdue", minutes: -1, want: "Overdue starting now"},
+		{name: "1 minute", minutes: 1, want: "Event reminder in 1 minute"},
+		{name: "15 minutes", minutes: 15, want: "Event reminder in 15 minutes"},
+		{name: "exactly 1 hour", minutes: 60, want: "Event reminder in 1 hour"},
+		{name: "2 hours", minutes: 120, want: "Event reminder in 2 hours"},
+		{name: "mixed hours and minutes", minutes: 150, want: "Event reminder in 2 hours 30 minutes"},
+		{name: "starting now", minutes: 0, want: "Event reminder starting now"},
+		{name: "negative", minutes: -1, want: "Event reminder starting now"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := server.generateEmailSubject(EventData{Title: test.title}, test.minutes)
+			got := server.generateEmailSubject(EventData{}, test.minutes)
 			if got != test.want {
-				t.Fatalf("generateEmailSubject(%q, %d) = %q, want %q", test.title, test.minutes, got, test.want)
+				t.Fatalf("generateEmailSubject(%d) = %q, want %q", test.minutes, got, test.want)
 			}
 		})
 	}
@@ -807,7 +694,6 @@ func TestFormatEventDetailsInvalidTimezone(t *testing.T) {
 	end := start.Add(1 * time.Hour)
 
 	details, err := server.formatEventDetailsForEmail(EventData{
-		Title:  "Meeting",
 		Start:  start,
 		End:    end,
 		AllDay: false,
@@ -831,7 +717,6 @@ func TestFormatEventDetailsEmptyTimezone(t *testing.T) {
 	end := start.Add(30 * time.Minute)
 
 	details, err := server.formatEventDetailsForEmail(EventData{
-		Title: "Standup",
 		Start: start,
 		End:   end,
 	}, "", 15)
@@ -849,7 +734,6 @@ func TestFormatEventDetailsSinglePointTime(t *testing.T) {
 	start := time.Date(2026, time.March, 1, 15, 0, 0, 0, time.UTC)
 
 	details, err := server.formatEventDetailsForEmail(EventData{
-		Title: "Deadline",
 		Start: start,
 		End:   start,
 	}, "UTC", 10)
@@ -870,7 +754,6 @@ func TestGenerateEmailContentIncludesLogoUrl(t *testing.T) {
 	server := newTestServer(t)
 
 	event := EventData{
-		Title: "Logo Check",
 		Start: time.Date(2026, time.May, 1, 10, 0, 0, 0, time.UTC),
 		End:   time.Date(2026, time.May, 1, 11, 0, 0, 0, time.UTC),
 	}
@@ -890,59 +773,30 @@ func TestGenerateEmailContentConditionalFields(t *testing.T) {
 	t.Setenv("FRONTEND_URL", "https://app.solace.test")
 	server := newTestServer(t)
 
-	t.Run("omits optional fields when empty", func(t *testing.T) {
-		event := EventData{
-			Title: "Minimal Event",
-			Start: time.Date(2026, time.April, 1, 9, 0, 0, 0, time.UTC),
-			End:   time.Date(2026, time.April, 1, 10, 0, 0, 0, time.UTC),
-		}
-		user := UserData{Name: "User", Email: "u@example.com", TimeZone: "UTC"}
+	event := EventData{
+		Start: time.Date(2026, time.April, 1, 9, 0, 0, 0, time.UTC),
+		End:   time.Date(2026, time.April, 1, 10, 30, 0, 0, time.UTC),
+	}
+	user := UserData{Name: "User", Email: "u@example.com", TimeZone: "UTC"}
 
-		content, err := server.generateEmailContent(event, user, 30, "evt-min")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+	content, err := server.generateEmailContent(event, user, 60, "evt-full")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-		if strings.Contains(content.HTML, "Location") {
-			t.Fatal("expected HTML to not contain Location when empty")
+	for _, unwanted := range []string{"Location", "Where"} {
+		if strings.Contains(content.HTML, unwanted) || strings.Contains(content.Text, unwanted) {
+			t.Fatalf("expected reminder mail to omit %q", unwanted)
 		}
-		if strings.Contains(content.Text, "Location:") {
-			t.Fatal("expected plain text to not contain Location when empty")
-		}
-	})
-
-	t.Run("includes all fields when provided", func(t *testing.T) {
-		event := EventData{
-			Title:        "Full Event",
-			Start:        time.Date(2026, time.April, 1, 9, 0, 0, 0, time.UTC),
-			End:          time.Date(2026, time.April, 1, 10, 30, 0, 0, time.UTC),
-			Location:     "Conference Room B",
-			CalendarName: "Engineering",
-		}
-		user := UserData{Name: "User", Email: "u@example.com", TimeZone: "UTC"}
-
-		content, err := server.generateEmailContent(event, user, 60, "evt-full")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		for _, want := range []string{"Conference Room B", "Engineering", "1h 30m"} {
-			if !strings.Contains(content.HTML, want) {
-				t.Fatalf("expected HTML to contain %q", want)
-			}
-		}
-		if !strings.Contains(content.Text, "Location: Conference Room B") {
-			t.Fatal("expected plain text to contain location")
-		}
-		if !strings.Contains(content.Text, "Duration: 1h 30m") {
-			t.Fatal("expected plain text to contain duration")
-		}
-	})
+	}
+	if !strings.Contains(content.HTML, "1h 30m") || !strings.Contains(content.Text, "Duration: 1h 30m") {
+		t.Fatal("expected duration in reminder mail")
+	}
 }
 
 func TestGetFromAddressErrors(t *testing.T) {
 	server := newTestServer(t)
-	event := EventData{Title: "Test"}
+	event := EventData{}
 
 	t.Run("missing from address", func(t *testing.T) {
 		t.Setenv("EMAIL_FROM", "")
@@ -983,8 +837,8 @@ func TestGetFromAddressErrors(t *testing.T) {
 		if parsed.Address != "noreply@solace.onl" {
 			t.Fatalf("expected noreply@solace.onl, got %q", parsed.Address)
 		}
-		if !strings.Contains(parsed.Name, "Test") {
-			t.Fatalf("expected display name containing event title, got %q", parsed.Name)
+		if parsed.Name != "Reminder in 30 minutes" {
+			t.Fatalf("expected generic display name, got %q", parsed.Name)
 		}
 	})
 }

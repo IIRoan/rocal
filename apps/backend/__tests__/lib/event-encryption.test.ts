@@ -1,8 +1,10 @@
 import { describe, expect, it, jest } from "@jest/globals";
 
 import {
+  assertNoPlaintextEventContentWithCiphertext,
   backfillEncryptedEventsToCiphertextOnly,
   isEventFullyEncrypted,
+  resolveInvitationContent,
   normalizeEventEncryptionMode,
   resolveEventPersistencePolicy,
 } from "../../lib/event-encryption";
@@ -166,5 +168,50 @@ describe("backfillEncryptedEventsToCiphertextOnly", () => {
         updatedAt: expect.any(Date),
       },
     });
+  });
+});
+
+describe("ciphertext-only event content", () => {
+  it("rejects plaintext fields alongside ciphertext", () => {
+    expect(() =>
+      assertNoPlaintextEventContentWithCiphertext({
+        encryptedContent: "ciphertext",
+        location: "Clinic",
+      }),
+    ).toThrow(
+      "Plaintext event content must not be sent alongside encrypted content.",
+    );
+  });
+
+  it("allows empty plaintext fields and plaintext-only bodies", () => {
+    expect(() =>
+      assertNoPlaintextEventContentWithCiphertext({
+        encryptedContent: "ciphertext",
+        title: "",
+        description: "  ",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertNoPlaintextEventContentWithCiphertext({ title: "Standup" }),
+    ).not.toThrow();
+  });
+
+  it("only mails invitations for encrypted events from the transient copy", () => {
+    expect(
+      resolveInvitationContent({ hasEncryptedPayload: true, title: "" }),
+    ).toBeNull();
+    expect(
+      resolveInvitationContent({
+        hasEncryptedPayload: true,
+        invitationContent: { title: " Planning ", location: "" },
+      }),
+    ).toEqual({ title: "Planning", description: null, location: null });
+    expect(
+      resolveInvitationContent({
+        hasEncryptedPayload: false,
+        title: "Standup",
+        description: "Daily",
+      }),
+    ).toEqual({ title: "Standup", description: "Daily", location: null });
   });
 });

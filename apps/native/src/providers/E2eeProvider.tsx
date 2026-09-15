@@ -9,13 +9,21 @@ import React, {
 import * as SecureStore from "expo-secure-store";
 import {
   createE2eeModule,
+  encryptEventContentRequest,
+  encryptNameRequest,
   hydrateEncryptedEventWithoutSession,
+  hydrateEncryptedName,
+  shouldEncryptEventContent,
   ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
   type E2eeModule,
   type E2eeProvider as IE2eeProvider,
 } from "@workspace/e2ee";
 import type {
+  Calendar,
   CalendarEvent,
+  EventCategory,
+  EventWireRequest,
+  NameWireRequest,
   CreateCalendarRequest,
   CreateCategoryRequest,
   CreateEventRequest,
@@ -28,7 +36,6 @@ import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
 import { SECURE_STORE_KEYS } from "../lib/constants";
 import { getE2eeApiUrl } from "../lib/e2ee-api-url";
 import { getAuthHeaders } from "../lib/api";
-import { shouldAttachEventContentEncryption } from "../lib/e2ee-event-shadow";
 import { readChunkedSecureValue, writeChunkedSecureValue } from "../lib/secure-store-chunked";
 import { createLogger } from "@workspace/logger";
 import { useAuth } from "./AuthProvider";
@@ -485,6 +492,13 @@ export function E2eeProvider({
 
   const provider = useMemo<IE2eeProvider>(() => {
     const getSession = (): E2eeSession | null => sessionRef.current;
+    const waitForSession = async (): Promise<E2eeSession | null> => {
+      const pendingBootstrap = pendingBootstrapRef.current;
+      if (pendingBootstrap && !getSession()) {
+        await pendingBootstrap;
+      }
+      return getSession();
+    };
     const getRequiredSession = (): E2eeSession => {
       const session = getSession();
       if (!session) {
@@ -496,13 +510,11 @@ export function E2eeProvider({
     return {
       async attachEventEncryptionShadow<
         T extends CreateEventRequest | UpdateEventRequest,
-      >(request: T): Promise<T> {
+      >(request: T): Promise<EventWireRequest<T>> {
         const session = getSession();
-        if (!session || !shouldAttachEventContentEncryption(request)) {
+        if (!session || !shouldEncryptEventContent(request)) {
           return request;
         }
-
-        const title = request.title?.trim() ?? "";
 
         try {
           const e2ee = await getModule();
@@ -510,33 +522,7 @@ export function E2eeProvider({
             return request;
           }
 
-          const description =
-            (request as { description?: string | null }).description?.trim() ||
-            null;
-          const location =
-            (request as { location?: string | null }).location?.trim() || null;
-
-          const encrypted = await e2ee.encryptJsonPayload(
-            session.accountKey,
-            {
-              title,
-              description,
-              location,
-            },
-            "event-content:v1",
-          );
-
-          const blindIndexTokens = await e2ee.createBlindIndexTokens(
-            session.blindIndexKey,
-            [title, description, location].filter(Boolean).join(" "),
-          );
-
-          return {
-            ...request,
-            encryptedContent: JSON.stringify(encrypted),
-            blindIndexTokens,
-            encryptionKeyVersion: 1,
-          } as T;
+          return await encryptEventContentRequest(e2ee, session, request);
         } catch (error) {
           log.error("Failed to encrypt event:", error);
           throw error;
@@ -545,7 +531,7 @@ export function E2eeProvider({
 
       async attachCalendarEncryptionShadow<
         T extends CreateCalendarRequest | UpdateCalendarRequest,
-      >(request: T): Promise<T> {
+      >(request: T): Promise<NameWireRequest<T>> {
         try {
           const session = getRequiredSession();
           const e2ee = await getModule();
@@ -553,25 +539,7 @@ export function E2eeProvider({
             throw new Error("Native encryption runtime is unavailable.");
           }
 
-          const encrypted = await e2ee.encryptJsonPayload(
-            session.accountKey,
-            { name: (request as { name?: string }).name },
-            "calendar-name:v1",
-          );
-
-          const blindIndexTokens = (request as { name?: string }).name
-            ? await e2ee.createBlindIndexTokens(
-                session.blindIndexKey,
-                (request as { name: string }).name,
-              )
-            : [];
-
-          return {
-            ...request,
-            encryptedName: JSON.stringify(encrypted),
-            blindIndexTokens,
-            encryptionKeyVersion: 1,
-          } as T;
+          return await encryptNameRequest(e2ee, session, "calendar", request);
         } catch (error) {
           log.error("Failed to encrypt calendar:", error);
           throw error;
@@ -580,7 +548,7 @@ export function E2eeProvider({
 
       async attachCategoryEncryptionShadow<
         T extends CreateCategoryRequest | UpdateCategoryRequest,
-      >(request: T): Promise<T> {
+      >(request: T): Promise<NameWireRequest<T>> {
         try {
           const session = getRequiredSession();
           const e2ee = await getModule();
@@ -588,29 +556,37 @@ export function E2eeProvider({
             throw new Error("Native encryption runtime is unavailable.");
           }
 
-          const encrypted = await e2ee.encryptJsonPayload(
-            session.accountKey,
-            { name: (request as { name?: string }).name },
-            "category-name:v1",
-          );
-
-          const blindIndexTokens = (request as { name?: string }).name
-            ? await e2ee.createBlindIndexTokens(
-                session.blindIndexKey,
-                (request as { name: string }).name,
-              )
-            : [];
-
-          return {
-            ...request,
-            encryptedName: JSON.stringify(encrypted),
-            blindIndexTokens,
-            encryptionKeyVersion: 1,
-          } as T;
+          return await encryptNameRequest(e2ee, session, "category", request);
         } catch (error) {
           log.error("Failed to encrypt category:", error);
           throw error;
         }
+      },
+
+      async hydrateEncryptedCalendar(calendar: Calendar): Promise<Calendar> {
+        if (!calendar.encryptedName) {
+          return calendar;
+        }
+
+        const session = await waitForSession();
+        const e2ee = session ? await getModule() : null;
+        return hydrateEncryptedName(e2ee, session, "calendar", calendar);
+      },
+
+      async hydrateEncryptedCategory(
+        category: EventCategory,
+      ): Promise<EventCategory> {
+        if (!category.encryptedName) {
+          return category;
+        }
+
+        const session = await waitForSession();
+        const e2ee = session ? await getModule() : null;
+        return hydrateEncryptedName(e2ee, session, "category", category);
+      },
+
+      async hasActiveSession(): Promise<boolean> {
+        return (await waitForSession()) !== null;
       },
 
       async hydrateEncryptedEvent(

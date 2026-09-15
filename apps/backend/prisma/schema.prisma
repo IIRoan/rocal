@@ -147,7 +147,7 @@ model Calendar {
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
-  @@unique([userId, name])
+  // No (userId, name) uniqueness: encrypted names are stored as "".
   @@unique([userId, stalwartCalendarId])
   @@index([stalwartAccountId])
   @@map("calendar")
@@ -168,7 +168,8 @@ model EventCategory {
   createdAt DateTime        @default(now()) @map("created_at")
   updatedAt DateTime        @updatedAt @map("updated_at")
 
-  @@unique([userId, name])
+  // No (userId, name) uniqueness: encrypted names are stored as "".
+  @@index([userId])
   @@map("event_category")
 }
 
@@ -329,7 +330,9 @@ model EventNotification {
   notificationTimezone  String   @default("UTC") @map("notification_timezone")
   isEnabled        Boolean       @default(true) @map("is_enabled")
   isSent           Boolean       @default(false) @map("is_sent")
-  displayTitle     String?       @map("display_title")
+  /// AES-GCM ciphertext of the reminder title under the client-derived
+  /// notification key (see @workspace/e2ee notification-title). Never plaintext.
+  encryptedDisplayTitle String?  @map("encrypted_display_title")
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
@@ -673,4 +676,16 @@ model CalendarSyncLog {
   @@index([subscriptionId, startedAt])
   @@index([status, startedAt])
   @@map("calendar_sync_log")
+}
+
+/// Better Auth rate-limit counters (custom storage in lib/auth-rate-limit.ts).
+/// `key` is an HMAC of client IP + path, never the raw IP. Rows older than the
+/// longest rule window are pruned inline by the storage.
+model RateLimit {
+  key         String @id
+  count       Int
+  lastRequest BigInt @map("last_request")
+
+  @@index([lastRequest])
+  @@map("rate_limit")
 }

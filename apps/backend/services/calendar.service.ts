@@ -10,9 +10,10 @@ import { ValidationError } from "../lib/errors";
 import { errorLogDetails } from "../lib/log-sanitization";
 import { createLogger } from "@workspace/logger";
 import {
+  assertPlaintextNameAllowed,
   assertValidEntityColor,
-  buildEncryptedNameFields,
-  normalizeEntityName,
+  externalCalendarName,
+  resolveEntityNamePersistence,
 } from "../lib/entity-metadata";
 import { ensureUserCalendars } from "../lib/user-setup";
 import type { StalwartCalendarClientLike } from "../lib/stalwart-calendar";
@@ -105,27 +106,40 @@ export class CalendarService implements ICalendarService {
       isDefault,
       encryptedName,
       blindIndexTokens,
-      encryptionState,
       encryptionKeyVersion,
       forceFullEncryption,
     } = input;
 
-    const normalizedName = normalizeEntityName(name, {
+    const namePersistence = resolveEntityNamePersistence({
       entityLabel: "Calendar",
+      name,
+      encryptedName,
+      blindIndexTokens,
+      encryptionKeyVersion,
+      requireName: true,
     });
 
     assertValidEntityColor(color);
 
-    const existingCalendar = await this.prisma.calendar.findFirst({
-      where: { userId, name: normalizedName },
-    });
+    // Duplicate names can only be detected for plaintext names; encrypted
+    // names are compared on-device.
+    if (namePersistence.kind === "plaintext") {
+      await assertPlaintextNameAllowed(this.prisma, userId, "Calendar");
 
-    if (existingCalendar) {
-      throw new ValidationError(
-        "A calendar with this name already exists",
-        "name",
-      );
+      const existingCalendar = await this.prisma.calendar.findFirst({
+        where: { userId, name: namePersistence.name },
+      });
+
+      if (existingCalendar) {
+        throw new ValidationError(
+          "A calendar with this name already exists",
+          "name",
+        );
+      }
     }
+
+    const remoteName =
+      namePersistence.kind === "plaintext" ? namePersistence.name : "";
 
     const stalwartAccountId = await this.getStalwartAccountId(userId);
     let stalwartCalendarId: string | null = null;
@@ -134,7 +148,7 @@ export class CalendarService implements ICalendarService {
       const remoteCalendar = await this.stalwartClient.createCalendar(
         stalwartAccountId,
         {
-          name: normalizedName,
+          name: externalCalendarName(remoteName),
           color,
           isVisible: true,
           isDefault: isDefault || false,
@@ -154,13 +168,7 @@ export class CalendarService implements ICalendarService {
 
         return tx.calendar.create({
           data: {
-            name: normalizedName,
-            ...buildEncryptedNameFields({
-              encryptedName,
-              blindIndexTokens,
-              encryptionState,
-              encryptionKeyVersion,
-            }),
+            ...namePersistence.data,
             forceFullEncryption: forceFullEncryption ?? true,
             color,
             kind: "owned",
@@ -200,15 +208,24 @@ export class CalendarService implements ICalendarService {
       isDefault,
       encryptedName,
       blindIndexTokens,
-      encryptionState,
       encryptionKeyVersion,
       forceFullEncryption,
     } = input;
 
+    const namePersistence = resolveEntityNamePersistence({
+      entityLabel: "Calendar",
+      name,
+      encryptedName,
+      blindIndexTokens,
+      encryptionKeyVersion,
+      requireName: false,
+    });
     const normalizedName =
-      name !== undefined
-        ? normalizeEntityName(name, { entityLabel: "Calendar" })
-        : undefined;
+      namePersistence.kind === "plaintext" ? namePersistence.name : undefined;
+    const nextRemoteName =
+      namePersistence.kind === "none"
+        ? undefined
+        : externalCalendarName(normalizedName ?? "");
 
     const existingCalendar = await this.prisma.calendar.findFirst({
       where: { id: calendarId, userId },
@@ -220,7 +237,7 @@ export class CalendarService implements ICalendarService {
 
     const isVisibilityOnlyUpdate =
       isVisible !== undefined &&
-      name === undefined &&
+      namePersistence.kind === "none" &&
       color === undefined &&
       isDefault === undefined &&
       forceFullEncryption === undefined;
@@ -232,6 +249,8 @@ export class CalendarService implements ICalendarService {
     }
 
     if (normalizedName !== undefined) {
+      await assertPlaintextNameAllowed(this.prisma, userId, "Calendar");
+
       const existingNameCalendar = await this.prisma.calendar.findFirst({
         where: {
           userId,
@@ -266,7 +285,7 @@ export class CalendarService implements ICalendarService {
       if (!stalwartCalendarId) {
         stalwartCalendarId = (
           await this.stalwartClient.createCalendar(stalwartAccountId, {
-            name: normalizedName ?? existingCalendar.name,
+            name: nextRemoteName ?? externalCalendarName(existingCalendar.name),
             color: color ?? existingCalendar.color,
             isVisible: isVisible ?? existingCalendar.isVisible,
             isDefault: isDefault ?? existingCalendar.isDefault,
@@ -275,7 +294,7 @@ export class CalendarService implements ICalendarService {
         createdRemoteCalendarId = stalwartCalendarId;
       } else {
         const remotePatch = {
-          ...(normalizedName !== undefined ? { name: normalizedName } : {}),
+          ...(nextRemoteName !== undefined ? { name: nextRemoteName } : {}),
           ...(color !== undefined ? { color } : {}),
           ...(isVisible !== undefined ? { isVisible } : {}),
           ...(isDefault !== undefined ? { isDefault } : {}),
@@ -294,18 +313,9 @@ export class CalendarService implements ICalendarService {
 
     const updateData: Prisma.CalendarUpdateInput = {};
 
-    if (normalizedName !== undefined) updateData.name = normalizedName;
+    Object.assign(updateData, namePersistence.data);
     if (color !== undefined) updateData.color = color;
     if (isVisible !== undefined) updateData.isVisible = isVisible;
-    Object.assign(
-      updateData,
-      buildEncryptedNameFields({
-        encryptedName,
-        blindIndexTokens,
-        encryptionState,
-        encryptionKeyVersion,
-      }),
-    );
     if (isDefault !== undefined) {
       updateData.isDefault = isDefault;
     }
@@ -377,7 +387,7 @@ export class CalendarService implements ICalendarService {
           accountId: stalwartAccountId,
           calendarId: existingCalendar.stalwartCalendarId,
           previous: {
-            name: existingCalendar.name,
+            name: externalCalendarName(existingCalendar.name),
             color: existingCalendar.color,
             isVisible: existingCalendar.isVisible,
             isDefault: existingCalendar.isDefault,

@@ -21,6 +21,12 @@ jest.mock("../../lib/calendar-api-service", () => ({
   },
 }));
 
+jest.mock("../../lib/e2ee-notification-title", () => ({
+  encryptReminderTitle: jest.fn(
+    async (eventId: string, title: string) => `enc:${eventId}:${title}`,
+  ),
+}));
+
 jest.mock("@workspace/logger", () => ({
   createLogger: () => ({
     debug: jest.fn(),
@@ -282,7 +288,7 @@ describe("useEventForm reminder hydration", () => {
           notificationType: "email",
         },
       ],
-      { displayTitle: "Reminder reshuffle" },
+      { encryptedDisplayTitle: "enc:event-1:Reminder reshuffle" },
     );
   });
 
@@ -347,7 +353,7 @@ describe("useEventForm reminder hydration", () => {
       recurrence: null,
     });
     expect(mockUpdateEventNotifications).toHaveBeenCalledWith("event-1", [], {
-      displayTitle: "Last reminder removal",
+      encryptedDisplayTitle: "enc:event-1:Last reminder removal",
     });
   });
 
@@ -419,7 +425,7 @@ describe("useEventForm reminder hydration", () => {
       recurrence: null,
     });
     expect(mockUpdateEventNotifications).toHaveBeenCalledWith("event-1", [], {
-      displayTitle: "Manon winkel",
+      encryptedDisplayTitle: "enc:event-1:Manon winkel",
     });
 
     const cachedEvents =

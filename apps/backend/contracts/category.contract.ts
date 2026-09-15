@@ -7,28 +7,37 @@ import type { EventCategory } from "../generated/prisma/index.js";
 import { strictZodObject } from "../lib/validation";
 import {
   encryptionShadowFieldsSchema,
+  refineEncryptedNameBody,
   resourceIdParamsSchema,
 } from "./_schemas";
 import { resourceIdSchema, userIdField } from "./_zod";
 
-export const createCategoryBodySchema = strictZodObject({
-  name: z.string().min(1),
+const createCategoryBodyFieldsSchema = strictZodObject({
+  name: z.string().optional(),
   color: calendarColorSchema,
   ...encryptionShadowFieldsSchema.shape,
 });
 
-export const updateCategoryBodySchema = strictZodObject({
+const updateCategoryBodyFieldsSchema = strictZodObject({
   name: z.string().optional(),
   color: optionalCalendarColorSchema,
   ...encryptionShadowFieldsSchema.shape,
 });
 
+export const createCategoryBodySchema = createCategoryBodyFieldsSchema.superRefine(
+  refineEncryptedNameBody({ entityLabel: "Category", requireName: true }),
+);
+
+export const updateCategoryBodySchema = updateCategoryBodyFieldsSchema.superRefine(
+  refineEncryptedNameBody({ entityLabel: "Category", requireName: false }),
+);
+
 export const categoryIdParamsSchema = resourceIdParamsSchema;
 
 export const categoryCreateInputSchema =
-  createCategoryBodySchema.extend(userIdField);
+  createCategoryBodyFieldsSchema.extend(userIdField);
 
-export const categoryUpdateInputSchema = updateCategoryBodySchema.extend({
+export const categoryUpdateInputSchema = updateCategoryBodyFieldsSchema.extend({
   ...userIdField,
   categoryId: resourceIdSchema,
 });

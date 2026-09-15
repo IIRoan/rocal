@@ -147,6 +147,17 @@ export function EventReminderEmailTemplate() {
           >
             {"{{.TimeUntilEvent}}"}
           </p>
+          <p
+            className="detail-value"
+            style={{
+              margin: "18px 0 0",
+              fontSize: "15px",
+              lineHeight: "22px",
+              color: "#1a1a1a",
+            }}
+          >
+            {"{{.Summary}}"}
+          </p>
 
           {/* Details */}
           <div style={{ marginTop: "28px" }}>
@@ -158,14 +169,6 @@ export function EventReminderEmailTemplate() {
                 </>
               }
             />
-
-            <GoTemplateTag>{"{{if .EventLocation}}"}</GoTemplateTag>
-            <DetailBlock label="Where" value={"{{.EventLocation}}"} />
-            <GoTemplateTag>{"{{end}}"}</GoTemplateTag>
-
-            <GoTemplateTag>{"{{if .CalendarName}}"}</GoTemplateTag>
-            <DetailBlock label="Calendar" value={"{{.CalendarName}}"} />
-            <GoTemplateTag>{"{{end}}"}</GoTemplateTag>
 
             <GoTemplateTag>{"{{if .Duration}}"}</GoTemplateTag>
             <DetailBlock label="Duration" value={"{{.Duration}}"} />

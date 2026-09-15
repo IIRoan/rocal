@@ -47,32 +47,17 @@ func TestClaimDueSQLUsesPrismaColumnNames(t *testing.T) {
 	if !strings.Contains(claimDueSQL, "us.push_notifications") {
 		t.Fatal("expected mapped push_notifications column")
 	}
-	if !strings.Contains(claimDueSQL, "en.display_title") {
-		t.Fatal("expected claim query to load reminder display_title")
+	if strings.Contains(claimDueSQL, "display_title") {
+		t.Fatal("claim query must not read reminder titles")
 	}
 }
 
-func TestReminderJobPayloadIncludesTitle(t *testing.T) {
+func TestReminderJobPayloadHasOpaqueRefsOnly(t *testing.T) {
 	payload := reminderJobPayload(DueSchedule{
 		EventID:       "evt-1",
 		MinutesBefore: 15,
-		DisplayTitle:  "  Lunch with Sam  ",
 	})
-	if payload["title"] != "Lunch with Sam" {
-		t.Fatalf("expected trimmed title, got %#v", payload["title"])
-	}
-	if _, ok := payload["subject"]; ok {
-		t.Fatal("event reminder payload should not include subject")
-	}
-}
-
-func TestReminderJobPayloadOmitsPlaceholderTitle(t *testing.T) {
-	payload := reminderJobPayload(DueSchedule{
-		EventID:       "evt-1",
-		MinutesBefore: 15,
-		DisplayTitle:  "Encrypted event",
-	})
-	if _, ok := payload["title"]; ok {
-		t.Fatalf("expected placeholder title to be omitted, got %#v", payload["title"])
+	if len(payload) != 3 || payload["eventId"] != "evt-1" || payload["minutesBefore"] != 15 || payload["kind"] != "event_reminder" {
+		t.Fatalf("unexpected payload %#v", payload)
 	}
 }

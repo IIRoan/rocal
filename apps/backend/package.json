@@ -12,6 +12,7 @@
     "start": "./server",
     "start:dev": "bun serve.ts",
     "test": "jest --config ./jest.config.cjs",
+    "e2e:api": "bun run e2e/api-security.e2e.ts",
     "test:coverage": "jest --config ./jest.config.cjs --coverage --runInBand",
     "typecheck": "tsc --project ./tsconfig.json --noEmit",
     "validate": "bun run lint && bun run typecheck && bun run test",

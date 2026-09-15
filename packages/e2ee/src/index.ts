@@ -23,3 +23,29 @@ export {
   ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
   hydrateEncryptedEventWithoutSession,
 } from "./hydration";
+
+export {
+  NOTIFICATION_KEY_INFO,
+  MAX_NOTIFICATION_TITLE_LENGTH,
+  notificationTitleAad,
+  normalizeNotificationTitle,
+  deriveNotificationKeyBytes,
+  importNotificationKey,
+  encryptNotificationTitle,
+  decryptNotificationTitle,
+} from "./notification-title";
+
+export {
+  decryptEntityName,
+  encryptEventContentRequest,
+  encryptNameRequest,
+  hydrateEncryptedName,
+  hydrateEncryptedNameWithoutSession,
+  shouldEncryptEventContent,
+} from "./payloads";
+export type {
+  ContentDecrypter,
+  ContentEncrypter,
+  E2eeSessionKeys,
+  EncryptedNameRecord,
+} from "./payloads";

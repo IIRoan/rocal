@@ -2,7 +2,12 @@
 
 import { useEffect, useReducer, useRef, type MutableRefObject } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  CALENDARS_QUERY_KEY,
+  CATEGORIES_QUERY_KEY,
+} from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
+import { calendarApiService } from "@/lib/calendar-api-service";
 import { useSession } from "@/lib/auth-client";
 import {
   ensureE2eeBootstrap,
@@ -39,18 +44,37 @@ function clearCalendarQueries(
   queryClient: ReturnType<typeof useQueryClient>,
 ): void {
   queryClient.removeQueries({ queryKey: ["events"] });
-  queryClient.removeQueries({ queryKey: ["calendars"] });
-  queryClient.removeQueries({ queryKey: ["categories"] });
+  queryClient.removeQueries({ queryKey: CALENDARS_QUERY_KEY });
+  queryClient.removeQueries({ queryKey: CATEGORIES_QUERY_KEY });
   queryClient.removeQueries({ queryKey: ["settings"] });
+}
+
+async function backfillEncryptedNames(
+  queryClient: ReturnType<typeof useQueryClient>,
+): Promise<void> {
+  const result = await calendarApiService.backfillEncryptedNames();
+
+  await Promise.all([
+    result.calendars > 0
+      ? queryClient.invalidateQueries({ queryKey: CALENDARS_QUERY_KEY })
+      : undefined,
+    result.categories > 0
+      ? queryClient.invalidateQueries({ queryKey: CATEGORIES_QUERY_KEY })
+      : undefined,
+  ]);
 }
 
 async function refreshEncryptedQueries(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<void> {
+  // Legacy plaintext names are encrypted in the background once keys exist;
+  // failures are silent and retried on the next bootstrap.
+  void backfillEncryptedNames(queryClient).catch(() => undefined);
+
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ["events"] }),
-    queryClient.invalidateQueries({ queryKey: ["calendars"] }),
-    queryClient.invalidateQueries({ queryKey: ["categories"] }),
+    queryClient.invalidateQueries({ queryKey: CALENDARS_QUERY_KEY }),
+    queryClient.invalidateQueries({ queryKey: CATEGORIES_QUERY_KEY }),
   ]);
 }
 

@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { notificationTypeSchema } from "@workspace/calendar-core";
+import {
+  encryptedNotificationTitleSchema,
+  notificationTypeSchema,
+} from "@workspace/calendar-core";
 import { strictZodObject } from "../lib/validation";
 import { eventIdParamsSchema } from "./_schemas";
 
@@ -11,7 +14,8 @@ export const eventNotificationSettingSchema = strictZodObject({
 
 export const updateEventNotificationsBodySchema = strictZodObject({
   notifications: z.array(eventNotificationSettingSchema).max(20),
-  displayTitle: z.string().max(500).nullable().optional(),
+  // Ciphertext only; strict object rejects a plaintext `displayTitle`.
+  encryptedDisplayTitle: encryptedNotificationTitleSchema.nullable().optional(),
 });
 
 export { eventIdParamsSchema };
@@ -102,7 +106,7 @@ export interface INotificationService {
     userId: string,
     eventId: string,
     notifications: NotificationConfigInput[],
-    displayTitle?: string | null,
+    encryptedDisplayTitle?: string | null,
   ): Promise<NotificationUpdateResult>;
   deleteForEvent(
     userId: string,

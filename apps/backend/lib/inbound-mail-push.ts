@@ -1,13 +1,11 @@
-import { sanitizeNotificationDisplayTitle } from "./notification-job";
 import type {
   MailSyncCollection,
   MailSyncResult,
 } from "../services/mail-sync.service";
 
+/** Opaque ref only; sender/subject are fetched on-device by the iOS NSE. */
 export type InboundMailPushItem = {
   emailId: string;
-  subject: string | null;
-  fromName: string | null;
 };
 
 function uniqueStrings(values: string[]): string[] {
@@ -38,24 +36,14 @@ function mergeCollection<T extends { id: string }>(
 export function mergeInboundMailPushItems(
   ...groups: InboundMailPushItem[][]
 ): InboundMailPushItem[] {
-  const byId = new Map<string, InboundMailPushItem>();
+  const ids = new Set<string>();
   for (const group of groups) {
     for (const item of group) {
       const emailId = item.emailId.trim();
-      if (!emailId) continue;
-      const existing = byId.get(emailId);
-      if (!existing) {
-        byId.set(emailId, { ...item, emailId });
-        continue;
-      }
-      byId.set(emailId, {
-        emailId,
-        subject: existing.subject ?? item.subject,
-        fromName: existing.fromName ?? item.fromName,
-      });
+      if (emailId) ids.add(emailId);
     }
   }
-  return [...byId.values()];
+  return [...ids].map((emailId) => ({ emailId }));
 }
 
 export function coalescePendingMailSync(
@@ -95,43 +83,5 @@ export function coalescePendingMailSync(
         ...next.calendarImport.errors,
       ]),
     },
-  };
-}
-
-export function isEmailAddressForPush(
-  value: string | null | undefined,
-): boolean {
-  const trimmed = value?.trim();
-  return Boolean(
-    trimmed && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed),
-  );
-}
-
-export function mergeInboundMailPushMetadata(
-  item: InboundMailPushItem,
-  metadata: InboundMailPushItem,
-): InboundMailPushItem {
-  const fromName = isEmailAddressForPush(item.fromName)
-    ? (metadata.fromName ?? item.fromName)
-    : (item.fromName ?? metadata.fromName);
-
-  return {
-    emailId: metadata.emailId,
-    subject: item.subject ?? metadata.subject,
-    fromName,
-  };
-}
-
-export function inboundPushItemFromEmailRecord(record: {
-  id: string;
-  subject?: string | null;
-  from?: Array<{ email: string; name?: string | null }>;
-}): InboundMailPushItem {
-  return {
-    emailId: record.id,
-    subject: sanitizeNotificationDisplayTitle(record.subject),
-    fromName:
-      sanitizeNotificationDisplayTitle(record.from?.[0]?.name) ??
-      sanitizeNotificationDisplayTitle(record.from?.[0]?.email),
   };
 }

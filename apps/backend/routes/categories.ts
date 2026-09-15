@@ -39,7 +39,6 @@ export const categoriesRoutes = new Elysia({
           color: body.color,
           encryptedName: body.encryptedName,
           blindIndexTokens: body.blindIndexTokens,
-          encryptionState: body.encryptionState,
           encryptionKeyVersion: body.encryptionKeyVersion,
         });
       })
@@ -60,7 +59,6 @@ export const categoriesRoutes = new Elysia({
           color: body.color,
           encryptedName: body.encryptedName,
           blindIndexTokens: body.blindIndexTokens,
-          encryptionState: body.encryptionState,
           encryptionKeyVersion: body.encryptionKeyVersion,
         });
       })

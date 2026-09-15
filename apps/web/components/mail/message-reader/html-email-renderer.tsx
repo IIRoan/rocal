@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   buildEmailHtmlDocument,
   emailHasOwnDarkMode,
@@ -16,26 +15,27 @@ export function HtmlEmailRenderer({
   blockTrackingPixels: boolean;
   isDark: boolean;
 }) {
-  const processedHtml = useMemo(() => {
-    return processEmailHtml({ html, isDark, blockTrackingPixels });
-  }, [html, isDark, blockTrackingPixels]);
-
-  const hasOwnDark = useMemo(() => emailHasOwnDarkMode(html), [html]);
-
-  const srcDoc = useMemo(() => {
-    return buildEmailHtmlDocument({
-      processedHtml,
-      blockRemoteImages,
+  const srcDoc = buildEmailHtmlDocument({
+    processedHtml: processEmailHtml({
+      html,
       isDark,
-      hasOwnDark,
-    });
-  }, [processedHtml, blockRemoteImages, isDark, hasOwnDark]);
+      blockTrackingPixels,
+      blockRemoteImages,
+    }),
+    blockRemoteImages,
+    isDark,
+    hasOwnDark: emailHasOwnDarkMode(html),
+  });
 
+  // No allow-same-origin: the frame fills its flex container and scrolls on its
+  // own, so the parent never reaches into the document (no height measuring).
+  // Scripts stay disabled; opened links escape the sandbox to behave normally.
   return (
     <iframe
       srcDoc={srcDoc}
       title="Email body"
-      sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+      sandbox="allow-popups allow-popups-to-escape-sandbox"
+      referrerPolicy="no-referrer"
       className="flex-1 min-h-0 w-full border-0 block"
     />
   );
