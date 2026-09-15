@@ -49,12 +49,12 @@ describe("resolveTimelineEventDensity", () => {
     ).toBe("stacked");
   });
 
-  it("uses stacked layout for events shorter than the kit minimum", () => {
+  it("uses compact chips for events shorter than five minutes on the grid", () => {
     expect(
       resolveTimelineEventDensity({
         durationMinutes: KIT_MIN_REGULAR_EVENT_MINUTES - 1,
       }),
-    ).toBe("stacked");
+    ).toBe("compact");
   });
 
   it("treats all-day events as compact header chips", () => {
@@ -84,12 +84,13 @@ describe("timelineEventHeight", () => {
     expect(timelineEventHeight(60, 72)).toBe(72);
   });
 
-  it("expands sub-minimum durations to the touch-target block height", () => {
-    expect(timelineEventHeight(5, 72)).toBeGreaterThanOrEqual(44);
-    expect(timelineEventHeight(30, 72)).toBeGreaterThanOrEqual(44);
+  it("expands sub-five-minute durations to the five-minute floor", () => {
+    expect(timelineEventHeight(5 / 60, 72)).toBe(6);
+    expect(timelineEventHeight(2, 72)).toBe(6);
   });
 
-  it("keeps naturally tall events proportional", () => {
+  it("keeps five-minute and longer events proportional", () => {
+    expect(timelineEventHeight(5, 72)).toBe(6);
     expect(timelineEventHeight(45, 72)).toBe(54);
   });
 });

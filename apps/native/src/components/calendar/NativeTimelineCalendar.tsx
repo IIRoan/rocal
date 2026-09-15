@@ -41,7 +41,6 @@ import {
   KIT_DRAG_STEP_MINUTES,
   KIT_HOUR_HEIGHT,
   KIT_INITIAL_HOUR,
-  KIT_MIN_REGULAR_EVENT_MINUTES,
   KIT_NUMBER_OF_DAYS,
   kitBackgroundToCreateSlot,
   kitDropToEventMove,
@@ -380,7 +379,6 @@ export const NativeTimelineCalendar = forwardRef<
         initialTimeIntervalHeight={KIT_HOUR_HEIGHT}
         minTimeIntervalHeight={KIT_HOUR_HEIGHT}
         maxTimeIntervalHeight={KIT_HOUR_HEIGHT}
-        minRegularEventMinutes={KIT_MIN_REGULAR_EVENT_MINUTES}
         useAllDayEvent
         showWeekNumber={false}
         allowHorizontalSwipe={swipeEnabled}

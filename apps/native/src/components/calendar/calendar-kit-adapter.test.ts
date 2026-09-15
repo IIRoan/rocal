@@ -3,6 +3,7 @@ import { wallClockToUtc } from "@workspace/calendar-core";
 import {
   KIT_HOUR_HEIGHT,
   KIT_MIN_REGULAR_EVENT_MINUTES,
+  KIT_MIN_TIMELINE_EVENT_HEIGHT_PX,
   KIT_NUMBER_OF_DAYS,
   fromKitPageDate,
   kitBackgroundToCreateSlot,
@@ -25,11 +26,9 @@ import {
 const TIMEZONE = "Europe/Amsterdam";
 
 describe("KIT_MIN_REGULAR_EVENT_MINUTES", () => {
-  it("matches the minimum 44px touch target at the kit hour height", () => {
-    expect(KIT_MIN_REGULAR_EVENT_MINUTES).toBe(37);
-    expect(
-      (KIT_MIN_REGULAR_EVENT_MINUTES / 60) * KIT_HOUR_HEIGHT,
-    ).toBeGreaterThanOrEqual(44);
+  it("uses a five-minute floor so short events stay proportional on the grid", () => {
+    expect(KIT_MIN_REGULAR_EVENT_MINUTES).toBe(5);
+    expect(KIT_MIN_TIMELINE_EVENT_HEIGHT_PX).toBe(6);
   });
 });
 
@@ -116,6 +115,30 @@ describe("toKitHourWidth", () => {
 });
 
 describe("toKitEvent", () => {
+  it("extends kit end times for sub-five-minute timed events only", () => {
+    const start = wallClockToUtc(new Date(2026, 7, 18), 9, 0, TIMEZONE);
+    const endFiveSeconds = new Date(start.getTime() + 5_000);
+    const kitShort = toKitEvent(
+      makeEvent({ start, end: endFiveSeconds }),
+      TIMEZONE,
+    );
+
+    expect(kitShort.end?.dateTime).toBe(
+      new Date(start.getTime() + 5 * 60 * 1000).toISOString(),
+    );
+
+    const endFiveMinutes = wallClockToUtc(new Date(2026, 7, 18), 9, 5, TIMEZONE);
+    const kitFiveMinutes = toKitEvent(
+      makeEvent({ start, end: endFiveMinutes }),
+      TIMEZONE,
+    );
+
+    expect(kitFiveMinutes.end).toEqual({
+      dateTime: endFiveMinutes.toISOString(),
+      timeZone: TIMEZONE,
+    });
+  });
+
   it("keeps a timed Amsterdam 09:00 event as UTC ISO with the user timezone", () => {
     const start = wallClockToUtc(new Date(2026, 7, 18), 9, 0, TIMEZONE);
     const end = wallClockToUtc(new Date(2026, 7, 18), 10, 0, TIMEZONE);
