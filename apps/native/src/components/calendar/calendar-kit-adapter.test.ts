@@ -1,6 +1,7 @@
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 import { wallClockToUtc } from "@workspace/calendar-core";
 import {
+  KIT_HOUR_HEIGHT,
   KIT_MIN_REGULAR_EVENT_MINUTES,
   KIT_NUMBER_OF_DAYS,
   fromKitPageDate,
@@ -26,6 +27,9 @@ const TIMEZONE = "Europe/Amsterdam";
 describe("KIT_MIN_REGULAR_EVENT_MINUTES", () => {
   it("matches the minimum 44px touch target at the kit hour height", () => {
     expect(KIT_MIN_REGULAR_EVENT_MINUTES).toBe(37);
+    expect(
+      (KIT_MIN_REGULAR_EVENT_MINUTES / 60) * KIT_HOUR_HEIGHT,
+    ).toBeGreaterThanOrEqual(44);
   });
 });
 
