@@ -3,7 +3,10 @@ import {
   getZonedDateParts,
   resolveTimezone,
 } from "@workspace/calendar-core";
-import { KIT_HOUR_HEIGHT } from "./calendar-kit-adapter";
+import {
+  KIT_HOUR_HEIGHT,
+  KIT_MIN_REGULAR_EVENT_MINUTES,
+} from "./calendar-kit-adapter";
 
 export type TimelineEventDensity = "compact" | "small" | "stacked";
 
@@ -34,7 +37,11 @@ export function timelineEventHeight(
   durationMinutes: number,
   hourHeight: number = KIT_HOUR_HEIGHT,
 ): number {
-  return (durationMinutes / 60) * hourHeight;
+  const minutes =
+    durationMinutes < KIT_MIN_REGULAR_EVENT_MINUTES
+      ? KIT_MIN_REGULAR_EVENT_MINUTES
+      : durationMinutes;
+  return (minutes / 60) * hourHeight;
 }
 
 export function resolveTimelineEventDensity(input: {

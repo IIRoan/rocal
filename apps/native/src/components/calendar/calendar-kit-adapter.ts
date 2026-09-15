@@ -24,6 +24,14 @@ export const KIT_HOUR_HEIGHT = 72;
 export const KIT_INITIAL_HOUR = 9;
 export const KIT_DRAG_STEP_MINUTES = 15;
 
+/** Minimum rendered height (px) for timed blocks — matches mobile touch targets. */
+export const KIT_MIN_TIMELINE_EVENT_HEIGHT_PX = 44;
+
+/** Calendar-kit expands shorter events to at least this many minutes on the grid. */
+export const KIT_MIN_REGULAR_EVENT_MINUTES = Math.ceil(
+  (KIT_MIN_TIMELINE_EVENT_HEIGHT_PX / KIT_HOUR_HEIGHT) * 60,
+);
+
 export type TimelineKitView = Extract<CalendarView, "day" | "3day" | "week">;
 
 export type KitWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
