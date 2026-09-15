@@ -24,13 +24,37 @@ export const KIT_HOUR_HEIGHT = 72;
 export const KIT_INITIAL_HOUR = 9;
 export const KIT_DRAG_STEP_MINUTES = 15;
 
-/** Minimum rendered height (px) for timed blocks — matches mobile touch targets. */
-export const KIT_MIN_TIMELINE_EVENT_HEIGHT_PX = 44;
+/** Shortest timed block on the grid (5 minutes at {@link KIT_HOUR_HEIGHT}). */
+export const KIT_MIN_REGULAR_EVENT_MINUTES = 5;
 
-/** Calendar-kit expands shorter events to at least this many minutes on the grid. */
-export const KIT_MIN_REGULAR_EVENT_MINUTES = Math.ceil(
-  (KIT_MIN_TIMELINE_EVENT_HEIGHT_PX / KIT_HOUR_HEIGHT) * 60,
-);
+/** Pixel height of {@link KIT_MIN_REGULAR_EVENT_MINUTES} on the timeline. */
+export const KIT_MIN_TIMELINE_EVENT_HEIGHT_PX =
+  (KIT_MIN_REGULAR_EVENT_MINUTES / 60) * KIT_HOUR_HEIGHT;
+
+const KIT_MIN_REGULAR_EVENT_MS = KIT_MIN_REGULAR_EVENT_MINUTES * 60 * 1000;
+
+/**
+ * Grid layout only: bump sub-five-minute spans to a five-minute block without
+ * changing stored event times (see {@link kitDropToEventMove}).
+ */
+export function kitTimelineDisplayEndIso(
+  start: Date | string,
+  end: Date | string,
+): string {
+  const startMs = new Date(start).getTime();
+  const endMs = new Date(end).getTime();
+  const durationMs = endMs - startMs;
+
+  if (
+    Number.isFinite(durationMs) &&
+    durationMs > 0 &&
+    durationMs < KIT_MIN_REGULAR_EVENT_MS
+  ) {
+    return new Date(startMs + KIT_MIN_REGULAR_EVENT_MS).toISOString();
+  }
+
+  return new Date(end).toISOString();
+}
 
 export type TimelineKitView = Extract<CalendarView, "day" | "3day" | "week">;
 
@@ -277,7 +301,7 @@ export function toKitEvent(
       timeZone: resolvedTimezone,
     },
     end: {
-      dateTime: new Date(event.end).toISOString(),
+      dateTime: kitTimelineDisplayEndIso(event.start, event.end),
       timeZone: resolvedTimezone,
     },
   };
