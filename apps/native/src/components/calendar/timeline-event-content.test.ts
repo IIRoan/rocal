@@ -6,6 +6,7 @@ import {
   timelineEventHeight,
   timelineEventTitleLines,
 } from "./timeline-event-content";
+import { KIT_MIN_REGULAR_EVENT_MINUTES } from "./calendar-kit-adapter";
 
 const TIMEZONE = "Europe/Amsterdam";
 
@@ -48,10 +49,12 @@ describe("resolveTimelineEventDensity", () => {
     ).toBe("stacked");
   });
 
-  it("uses compact chips for short events", () => {
+  it("uses compact chips for short events below the kit minimum", () => {
     expect(
-      resolveTimelineEventDensity({ durationMinutes: 15 }),
-    ).toBe("compact");
+      resolveTimelineEventDensity({
+        durationMinutes: KIT_MIN_REGULAR_EVENT_MINUTES - 1,
+      }),
+    ).toBe("stacked");
   });
 
   it("treats all-day events as compact header chips", () => {
@@ -79,7 +82,15 @@ describe("formatTimelineEventTime", () => {
 describe("timelineEventHeight", () => {
   it("maps 60 minutes to the kit hour height", () => {
     expect(timelineEventHeight(60, 72)).toBe(72);
-    expect(timelineEventHeight(30, 72)).toBe(36);
+  });
+
+  it("expands sub-minimum durations to the touch-target block height", () => {
+    expect(timelineEventHeight(5, 72)).toBe(44);
+    expect(timelineEventHeight(30, 72)).toBe(44);
+  });
+
+  it("keeps naturally tall events proportional", () => {
+    expect(timelineEventHeight(45, 72)).toBe(54);
   });
 });
 
