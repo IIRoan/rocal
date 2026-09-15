@@ -123,7 +123,9 @@ Verify only — **don't start dev servers, builds, tunnels, EAS builds, OTA publ
 - `bun run test` (or `test:backend|native|ui|notifications`, single file paths)
 - `bun run lint:react-doctor`; Prisma: `cd apps/backend && bun run db:generate`
 
-CI (`.github/workflows/pr-tests.yml`) runs lint, both typechecks, and tests on every PR.
+CI (`.github/workflows/pr-tests.yml`) runs lint, both typechecks, and tests on every PR. API-level e2e against a deployed or local API: `cd apps/backend && E2E_API_URL=… bun run e2e:api` (header docs in `e2e/api-security.e2e.ts`).
+
+**Cursor Cloud agents** boot a prebuilt local stack: Postgres 16 on `localhost:5432` (`postgresql://solace:solace@localhost:5432/solace`, `prisma migrate deploy` applied), API `:4001` (`/api/health`), web `:4000`, notifications `:4002`, with generated gitignored `.env` files. Signup is invite-gated — sign in with the seeded shared account from `$TEST_LOGIN_USERNAME` / `$TEST_LOGIN_PASSWORD` (`POST /api/auth/sign-in/email` with `Origin: http://localhost:4000`). Never hard-code these credentials.
 
 ## 10. Keep this file true
 
