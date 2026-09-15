@@ -20,9 +20,15 @@ const webUrl = process.env.E2E_WEB_URL?.replace(/\/$/, "");
 const cookie = process.env.E2E_COOKIE;
 const trustedOrigin = process.env.E2E_TRUSTED_ORIGIN ?? webUrl ?? "https://solace.onl";
 
-type Check = { name: string; run: () => Promise<void | "skip"> };
+type Check = { name: string; run: () => Promise<void> };
 const checks: Check[] = [];
-const check = (name: string, run: () => Promise<void | "skip">) => checks.push({ name, run });
+const check = (name: string, run: () => Promise<void>) => checks.push({ name, run });
+
+class Skip extends Error {}
+/** Marks a check as not applicable to this run (missing optional env). */
+function skip(): never {
+  throw new Skip();
+}
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -86,7 +92,7 @@ check("CORS trusts the app origin", async () => {
 });
 
 check("CORS does not trust localhost in production", async () => {
-  if (!apiUrl.startsWith("https://") && !process.env.E2E_EXPECT_PRODUCTION) return "skip";
+  if (!apiUrl.startsWith("https://") && !process.env.E2E_EXPECT_PRODUCTION) skip();
   for (const origin of ["http://localhost:4000", "https://localhost", "https://evil.example"]) {
     const response = await fetch(`${apiUrl}/api/health`, { headers: { origin } });
     const allowed = response.headers.get("access-control-allow-origin");
@@ -97,7 +103,7 @@ check("CORS does not trust localhost in production", async () => {
 // --- Auth rate limit ------------------------------------------------------------------------
 
 check("sign-in is rate limited", async () => {
-  if (!process.env.E2E_RATE_LIMIT) return "skip";
+  if (!process.env.E2E_RATE_LIMIT) skip();
   const email = `e2e-rate-limit-${crypto.randomUUID()}@example.invalid`;
   const statuses: number[] = [];
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -114,7 +120,7 @@ check("sign-in is rate limited", async () => {
 // --- Web security headers -------------------------------------------------------------------
 
 check("web sends CSP and security headers", async () => {
-  if (!webUrl) return "skip";
+  if (!webUrl) skip();
   const response = await fetch(`${webUrl}/login`, { redirect: "manual" });
   const h = response.headers;
   const csp = h.get("content-security-policy") ?? "";
@@ -138,7 +144,7 @@ check("unauthenticated writes are refused", async () => {
 });
 
 check("authenticated session resolves", async () => {
-  if (!cookie) return "skip";
+  if (!cookie) skip();
   const response = await api("/api/calendars", {}, true);
   assert(response.ok, `E2E_COOKIE does not authenticate (GET /api/calendars → ${response.status})`);
 });
@@ -152,7 +158,7 @@ async function firstCalendarId(): Promise<string> {
 }
 
 check("event plaintext alongside ciphertext is rejected", async () => {
-  if (!cookie) return "skip";
+  if (!cookie) skip();
   const calendarId = await firstCalendarId();
   const start = new Date(Date.now() + 86_400_000);
   const response = await api(
@@ -175,7 +181,7 @@ check("event plaintext alongside ciphertext is rejected", async () => {
 });
 
 check("calendar plaintext name alongside ciphertext is rejected", async () => {
-  if (!cookie) return "skip";
+  if (!cookie) skip();
   const response = await api(
     "/api/calendars",
     {
@@ -193,7 +199,7 @@ check("calendar plaintext name alongside ciphertext is rejected", async () => {
 });
 
 check("plaintext reminder displayTitle is rejected", async () => {
-  if (!cookie) return "skip";
+  if (!cookie) skip();
   const response = await api(
     `/api/notifications/event/${crypto.randomUUID()}`,
     { method: "PUT", body: JSON.stringify({ notifications: [], displayTitle: "plaintext title" }) },
@@ -203,7 +209,7 @@ check("plaintext reminder displayTitle is rejected", async () => {
 });
 
 check("ICS subscriptions to private addresses are refused", async () => {
-  if (!cookie) return "skip";
+  if (!cookie) skip();
   for (const url of [
     "http://169.254.169.254/latest/meta-data/",
     "http://127.1/calendar.ics",
@@ -220,7 +226,7 @@ check("ICS subscriptions to private addresses are refused", async () => {
 });
 
 check("session payload exposes no IP or user agent", async () => {
-  if (!cookie) return "skip";
+  if (!cookie) skip();
   const response = await api("/api/auth/get-session", {}, true);
   assert(response.ok, `get-session failed: ${response.status}`);
   const session = (await response.json()) as { session?: Record<string, unknown> } | null;
@@ -234,13 +240,14 @@ let failed = 0;
 let skipped = 0;
 for (const { name, run } of checks) {
   try {
-    if ((await run()) === "skip") {
+    await run();
+    console.log(`  ✓ ${name}`);
+  } catch (error) {
+    if (error instanceof Skip) {
       skipped += 1;
       console.log(`  - ${name} (skipped)`);
       continue;
     }
-    console.log(`  ✓ ${name}`);
-  } catch (error) {
     failed += 1;
     console.error(`  ✗ ${name}\n      ${error instanceof Error ? error.message : String(error)}`);
   }
