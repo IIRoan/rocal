@@ -1,55 +1,14 @@
 /**
  * Machine-readable log sanitization policy for ESLint and the TypeScript contract.
- * Keep arrays here — `logging.contract.ts` re-exports them as the documented API.
+ * Omit/hash key lists are shared with the web and native error reporters, so they
+ * live in `packages/calendar-core/src/redaction-policy.js` — add new sensitive
+ * keys there. `logging.contract.ts` re-exports everything as the documented API.
  */
 
-/** @type {readonly string[]} */
-export const LOG_OMIT_FIELD_KEYS = Object.freeze([
-  "body",
-  "content",
-  "html",
-  "text",
-  "subject",
-  "title",
-  "message",
-  "upstreamBody",
-  "resetUrl",
-  "signupUrl",
-  "url",
-  "image",
-  "token",
-  "invite",
-  "password",
-  "secret",
-  "encryptedVaultB64",
-  "publicKeyArmored",
-  "mime",
-  "icsContent",
-  "pushToken",
-  "deviceToken",
-  "apnsToken",
-  "bodyValues",
-  "displayTitle",
-  "display_title",
-]);
-
-/** @type {readonly string[]} */
-export const LOG_HASH_FIELD_KEYS = Object.freeze([
-  "email",
-  "to",
-  "from",
-  "inviteeEmail",
-  "requestedEmail",
-  "existingEmail",
-  "chosenEmail",
-  "recipient",
-  "displayName",
-  "name",
-  "inviterName",
-  "attendeeName",
-  "localPart",
-  "emailId",
-]);
+export {
+  LOG_HASH_FIELD_KEYS,
+  LOG_OMIT_FIELD_KEYS,
+} from "../../../packages/calendar-core/src/redaction-policy.js";
 
 /**
  * Callee names treated as safe wrappers for sensitive log field values.

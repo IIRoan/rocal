@@ -1,5 +1,9 @@
 import type {
+  Calendar,
   CalendarEvent,
+  EventCategory,
+  EventWireRequest,
+  NameWireRequest,
   CreateCalendarRequest,
   UpdateCalendarRequest,
   CreateCategoryRequest,
@@ -7,6 +11,7 @@ import type {
   CreateEventRequest,
   UpdateEventRequest,
 } from "@workspace/calendar-core";
+import { hydrateEncryptedNameWithoutSession } from "./payloads";
 
 /**
  * Platform-agnostic interface for E2EE operations.
@@ -17,33 +22,50 @@ import type {
  */
 export interface E2eeProvider {
   /**
-   * Attach encryption shadow fields to an event creation/update request.
-   * Returns the request with encrypted content, blind index tokens, and
-   * encryption state fields populated.
+   * Encrypt event content for a create/update request. With an active session
+   * the returned body carries ciphertext and blind-index tokens only; the
+   * plaintext title/description/location are removed.
    */
   attachEventEncryptionShadow<
     T extends CreateEventRequest | UpdateEventRequest,
   >(
     request: T,
-  ): Promise<T>;
+  ): Promise<EventWireRequest<T>>;
 
   /**
-   * Attach encryption shadow fields to a calendar creation/update request.
+   * Encrypt a calendar name; the plaintext `name` is removed from the body.
    */
   attachCalendarEncryptionShadow<
     T extends CreateCalendarRequest | UpdateCalendarRequest,
   >(
     request: T,
-  ): Promise<T>;
+  ): Promise<NameWireRequest<T>>;
 
   /**
-   * Attach encryption shadow fields to a category creation/update request.
+   * Encrypt a category name; the plaintext `name` is removed from the body.
    */
   attachCategoryEncryptionShadow<
     T extends CreateCategoryRequest | UpdateCategoryRequest,
   >(
     request: T,
-  ): Promise<T>;
+  ): Promise<NameWireRequest<T>>;
+
+  /**
+   * Decrypt a calendar name for display, or return a placeholder name when
+   * this device cannot decrypt it.
+   */
+  hydrateEncryptedCalendar(calendar: Calendar): Promise<Calendar>;
+
+  /**
+   * Decrypt a category name for display, or return a placeholder name.
+   */
+  hydrateEncryptedCategory(category: EventCategory): Promise<EventCategory>;
+
+  /**
+   * Resolves once any pending bootstrap settles; true when content can be
+   * encrypted on this device.
+   */
+  hasActiveSession(): Promise<boolean>;
 
   /**
    * Decrypt a single encrypted event for display.
@@ -70,20 +92,34 @@ export interface E2eeProvider {
 export class NoopE2eeProvider implements E2eeProvider {
   async attachEventEncryptionShadow<
     T extends CreateEventRequest | UpdateEventRequest,
-  >(request: T): Promise<T> {
+  >(request: T): Promise<EventWireRequest<T>> {
     return request;
   }
 
   async attachCalendarEncryptionShadow<
     T extends CreateCalendarRequest | UpdateCalendarRequest,
-  >(request: T): Promise<T> {
+  >(request: T): Promise<NameWireRequest<T>> {
     return request;
   }
 
   async attachCategoryEncryptionShadow<
     T extends CreateCategoryRequest | UpdateCategoryRequest,
-  >(request: T): Promise<T> {
+  >(request: T): Promise<NameWireRequest<T>> {
     return request;
+  }
+
+  async hydrateEncryptedCalendar(calendar: Calendar): Promise<Calendar> {
+    return hydrateEncryptedNameWithoutSession("calendar", calendar);
+  }
+
+  async hydrateEncryptedCategory(
+    category: EventCategory,
+  ): Promise<EventCategory> {
+    return hydrateEncryptedNameWithoutSession("category", category);
+  }
+
+  async hasActiveSession(): Promise<boolean> {
+    return false;
   }
 
   async hydrateEncryptedEvent(event: CalendarEvent): Promise<CalendarEvent> {

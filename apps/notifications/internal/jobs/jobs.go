@@ -22,9 +22,6 @@ type Job struct {
 	RawPayload    []byte
 	MinutesBefore int
 	InboundCount  int
-	Subject       string
-	Title         string
-	FromName      string
 	Attempts      int
 }
 
@@ -89,9 +86,6 @@ func ClaimPending(ctx context.Context, db *sql.DB, limit int) ([]Job, error) {
 		if payload.InboundCount != nil {
 			job.InboundCount = *payload.InboundCount
 		}
-		job.Subject = payload.Subject
-		job.Title = payload.Title
-		job.FromName = payload.FromName
 		claimed = append(claimed, job)
 	}
 	if err := rows.Err(); err != nil {
@@ -208,74 +202,75 @@ func ListPushDevices(ctx context.Context, db *sql.DB, userID string) ([]PushDevi
 	return devices, rows.Err()
 }
 
+// ReminderEvent deliberately excludes title, location, description, and
+// calendar/category names: reminder mail and push stay generic, and the
+// encrypted title is only forwarded to the device.
 type ReminderEvent struct {
-	Title           string
-	Start           time.Time
-	End             time.Time
-	AllDay          bool
-	EncryptionState string
-	Location        string
-	CalendarName    string
-	Description     string
-	CategoryName    string
-	CategoryColor   string
+	EncryptedTitle string
+	Start          time.Time
+	End            time.Time
+	AllDay         bool
 }
 
 type ReminderUser struct {
-	Name     string
-	Email    string
-	TimeZone string
+	Name       string
+	Email      string
+	TimeZone   string
+	TimeFormat string
 }
 
+// LoadReminderSQL reads encrypted_display_title through to_jsonb so the worker
+// also runs against a database that has not applied that migration yet.
 const LoadReminderSQL = `
 		SELECT
-			COALESCE(
-				NULLIF(btrim((
-					SELECT en.display_title
-					FROM event_notification en
-					WHERE en.event_id = ce.id
-					  AND en.display_title IS NOT NULL
-					  AND btrim(en.display_title) <> ''
-					  AND btrim(en.display_title) <> 'Encrypted event'
-					ORDER BY en.updated_at DESC
-					LIMIT 1
-				)), ''),
-				NULLIF(NULLIF(btrim(ce.title), ''), 'Encrypted event')
+			(
+				SELECT to_jsonb(en) ->> 'encrypted_display_title'
+				FROM event_notification en
+				WHERE en.event_id = ce.id
+				  AND to_jsonb(en) ->> 'encrypted_display_title' IS NOT NULL
+				ORDER BY en.updated_at DESC
+				LIMIT 1
 			),
-			ce.start, ce."end", ce.all_day, ce.encryption_state,
-			ce.location, ce.description, c.name, ec.name, ec.color,
-			u.name, u.email, COALESCE(us.timezone, 'UTC')
+			ce.start, ce."end", ce.all_day,
+			u.name, u.email, COALESCE(us.timezone, 'UTC'), COALESCE(us."timeFormat", '24h')
 		FROM calendar_event ce
-		INNER JOIN calendar c ON c.id = ce.calendar_id
 		INNER JOIN "user" u ON u.id = ce.user_id
 		LEFT JOIN user_settings us ON us.user_id = u.id
-		LEFT JOIN event_category ec ON ec.id = ce.category_id
 		WHERE ce.id = $1 AND ce.user_id = $2
 	`
 
 func LoadReminder(ctx context.Context, db *sql.DB, eventID, userID string) (ReminderEvent, ReminderUser, error) {
 	var event ReminderEvent
 	var user ReminderUser
-	var location, description, categoryName, categoryColor sql.NullString
+	var encryptedTitle sql.NullString
 	err := db.QueryRowContext(ctx, LoadReminderSQL, eventID, userID).Scan(
-		&event.Title, &event.Start, &event.End, &event.AllDay, &event.EncryptionState,
-		&location, &description, &event.CalendarName, &categoryName, &categoryColor,
-		&user.Name, &user.Email, &user.TimeZone,
+		&encryptedTitle, &event.Start, &event.End, &event.AllDay,
+		&user.Name, &user.Email, &user.TimeZone, &user.TimeFormat,
 	)
 	if err != nil {
 		return ReminderEvent{}, ReminderUser{}, err
 	}
-	if location.Valid {
-		event.Location = location.String
-	}
-	if description.Valid {
-		event.Description = description.String
-	}
-	if categoryName.Valid {
-		event.CategoryName = categoryName.String
-	}
-	if categoryColor.Valid {
-		event.CategoryColor = categoryColor.String
+	if encryptedTitle.Valid {
+		event.EncryptedTitle = strings.TrimSpace(encryptedTitle.String)
 	}
 	return event, user, nil
+}
+
+// StartClock formats the event start in the user's timezone and time format,
+// or returns "" for all-day events.
+func StartClock(event ReminderEvent, user ReminderUser) string {
+	if event.AllDay || event.Start.IsZero() {
+		return ""
+	}
+	loc := time.UTC
+	if user.TimeZone != "" {
+		if loaded, err := time.LoadLocation(user.TimeZone); err == nil {
+			loc = loaded
+		}
+	}
+	layout := "15:04"
+	if user.TimeFormat == "12h" {
+		layout = "3:04 PM"
+	}
+	return event.Start.In(loc).Format(layout)
 }

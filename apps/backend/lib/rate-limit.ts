@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { RateLimitError } from "./errors";
 
 type RateLimitEntry = { count: number; resetTime: number };
@@ -55,17 +56,21 @@ export function enforceRateLimit(input: {
   current.count += 1;
 }
 
+/**
+ * Client IP headers we trust, in priority order. The API only runs on Vercel,
+ * whose edge overwrites `x-real-ip` and `x-forwarded-for` with the connecting
+ * client's address (client-supplied values are discarded), so the first hop is
+ * trustworthy there. Better Auth's rate limiter uses the same list. Behind any
+ * other proxy these headers are spoofable — re-check before moving hosts.
+ */
+export const TRUSTED_CLIENT_IP_HEADERS = ["x-real-ip", "x-forwarded-for"];
+
 export function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) {
+  for (const header of TRUSTED_CLIENT_IP_HEADERS) {
+    const first = request.headers.get(header)?.split(",")[0]?.trim();
+    if (first && isIP(first) !== 0) {
       return first;
     }
-  }
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  if (realIp) {
-    return realIp;
   }
   return "unknown";
 }

@@ -3,59 +3,63 @@ import {
   eventReminderPayload,
   newMailPayload,
   NotificationJobPayloadError,
-  sanitizeNotificationDisplayTitle,
   sanitizeNotificationJobPayload,
   shouldScheduleEventReminder,
 } from "../../lib/notification-job";
 
 describe("notification-job payload", () => {
-  it("accepts the closed allowlist", () => {
-    expect(
-      sanitizeNotificationJobPayload({
-        kind: "event_reminder",
-        eventId: "evt-1",
-        minutesBefore: 15,
-        title: "Lunch with Sam",
-      }),
-    ).toEqual({
-      kind: "event_reminder",
-      eventId: "evt-1",
-      minutesBefore: 15,
-      title: "Lunch with Sam",
-    });
-  });
-
-  it("rejects content fields", () => {
-    expect(() =>
-      sanitizeNotificationJobPayload({
-        kind: "new_mail",
-        inboundCount: 1,
-        title: "Secret",
-      }),
-    ).toThrow(NotificationJobPayloadError);
-
-    expect(() =>
-      sanitizeNotificationJobPayload({
-        kind: "event_reminder",
-        eventId: "evt-1",
-        minutesBefore: 15,
-        subject: "Lunch",
-      }),
-    ).toThrow(NotificationJobPayloadError);
-  });
-
-  it("accepts a new-mail subject", () => {
+  it("accepts the closed allowlist of opaque refs", () => {
     expect(
       sanitizeNotificationJobPayload({
         kind: "new_mail",
         inboundCount: 1,
-        subject: "  Lunch plans  ",
+        emailId: " email-1 ",
+        accountId: "acct-1",
       }),
     ).toEqual({
       kind: "new_mail",
       inboundCount: 1,
-      subject: "Lunch plans",
+      emailId: "email-1",
+      accountId: "acct-1",
     });
+  });
+
+  it.each(["title", "subject", "fromName", "displayTitle"])(
+    "rejects the plaintext content field %s",
+    (field) => {
+      expect(() =>
+        sanitizeNotificationJobPayload({
+          kind: "new_mail",
+          inboundCount: 1,
+          [field]: "Secret",
+        }),
+      ).toThrow(NotificationJobPayloadError);
+      expect(() =>
+        sanitizeNotificationJobPayload({
+          kind: "event_reminder",
+          eventId: "evt-1",
+          minutesBefore: 15,
+          [field]: "Secret",
+        }),
+      ).toThrow(NotificationJobPayloadError);
+    },
+  );
+
+  it("rejects refs that belong to the other job kind", () => {
+    expect(() =>
+      sanitizeNotificationJobPayload({
+        kind: "event_reminder",
+        eventId: "evt-1",
+        emailId: "email-1",
+      }),
+    ).toThrow(NotificationJobPayloadError);
+    expect(() =>
+      sanitizeNotificationJobPayload({
+        kind: "new_mail",
+        inboundCount: 1,
+        eventId: "evt-1",
+      }),
+    ).toThrow(NotificationJobPayloadError);
   });
 
   it("builds event and mail payloads", () => {
@@ -70,49 +74,14 @@ describe("notification-job payload", () => {
       kind: "new_mail",
       inboundCount: 3,
     });
-    expect(newMailPayload(1, { subject: "Invoice attached" })).toEqual({
-      kind: "new_mail",
-      inboundCount: 1,
-      subject: "Invoice attached",
-    });
     expect(
-      newMailPayload(1, {
-        subject: "Invoice attached",
-        fromName: "  Sam  ",
-        emailId: "email-1",
-      }),
+      newMailPayload(1, { emailId: "email-1", accountId: " acct-1 " }),
     ).toEqual({
       kind: "new_mail",
       inboundCount: 1,
-      subject: "Invoice attached",
-      fromName: "Sam",
       emailId: "email-1",
+      accountId: "acct-1",
     });
-    expect(newMailPayload(2, { subject: "Invoice attached" })).toEqual({
-      kind: "new_mail",
-      inboundCount: 2,
-    });
-    expect(
-      eventReminderPayload({
-        eventId: "evt-1",
-        minutesBefore: 0,
-        title: " Lunch with Sam ",
-      }),
-    ).toEqual({
-      kind: "event_reminder",
-      eventId: "evt-1",
-      minutesBefore: 0,
-      title: "Lunch with Sam",
-    });
-  });
-
-  it("sanitizes reminder display titles", () => {
-    expect(sanitizeNotificationDisplayTitle("  Lunch   plans  ")).toBe(
-      "Lunch plans",
-    );
-    expect(sanitizeNotificationDisplayTitle("   ")).toBeNull();
-    expect(sanitizeNotificationDisplayTitle("Encrypted event")).toBeNull();
-    expect(sanitizeNotificationDisplayTitle(1)).toBeNull();
   });
 });
 

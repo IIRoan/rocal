@@ -1,4 +1,3 @@
-import { isIP } from "node:net";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import type {
   ISubscriptionService,
@@ -25,15 +24,13 @@ import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
 import { ValidationError, NotFoundError, errorMessage } from "../lib/errors";
 import { prismaStringEquals } from "../lib/prisma-query";
 import { createLogger } from "@workspace/logger";
-import {
-  assertPublicHostnameResolves,
-  isPrivateNetworkHost,
-} from "../lib/ssrf-host-policy";
+import { SafeFetchError, safeFetch } from "../lib/safe-fetch";
 import { EventParticipantService } from "./event-participant.service";
 
 const logger = createLogger("backend:subscription-service");
 const CALENDAR_FETCH_TIMEOUT_MS = 10_000;
 const MAX_CALENDAR_REDIRECTS = 5;
+const MAX_CALENDAR_RESPONSE_BYTES = 15 * 1024 * 1024;
 const CALENDAR_FETCH_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
@@ -41,6 +38,27 @@ const CALENDAR_FETCH_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9",
   "Cache-Control": "no-cache",
 };
+
+function calendarFetchErrorMessage(error: SafeFetchError): string {
+  switch (error.code) {
+    case "private-network-host":
+      return "URLs pointing to internal or private networks are not allowed";
+    case "unsupported-scheme":
+      return "Only HTTP, HTTPS and webcal URLs are supported";
+    case "invalid-url":
+      return "Calendar URL is invalid";
+    case "too-many-redirects":
+      return "Too many redirects while fetching calendar URL";
+    case "redirect-without-location":
+      return "Calendar server returned a redirect without a location";
+    case "timeout":
+      return `Calendar request timed out after ${CALENDAR_FETCH_TIMEOUT_MS / 1000} seconds`;
+    case "response-too-large":
+      return `Calendar is larger than ${MAX_CALENDAR_RESPONSE_BYTES / (1024 * 1024)} MB`;
+    case "request-failed":
+      return "Could not connect to the calendar server";
+  }
+}
 
 export class SubscriptionService implements ISubscriptionService {
   constructor(
@@ -64,117 +82,23 @@ export class SubscriptionService implements ISubscriptionService {
     return resolveTimezone(userSettings.timezone);
   }
 
-  private validateExternalCalendarUrl(url: string): URL {
-    const parsedUrl = new URL(url);
-
-    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-      throw new ValidationError(
-        "Only HTTP and HTTPS URLs are supported",
-        "url",
-      );
-    }
-
-    const hostname = parsedUrl.hostname.replace(/^\[|\]$/g, "");
-
-    if (isPrivateNetworkHost(hostname)) {
-      throw new ValidationError(
-        "URLs pointing to internal or private networks are not allowed",
-        "url",
-      );
-    }
-
-    return parsedUrl;
-  }
-
-  private async ensureResolvablePublicCalendarUrl(url: string): Promise<URL> {
-    const parsedUrl = this.validateExternalCalendarUrl(url);
-    const hostname = parsedUrl.hostname.replace(/^\[|\]$/g, "");
-
-    if (!isIP(hostname)) {
-      try {
-        await assertPublicHostnameResolves(hostname);
-      } catch {
-        throw new ValidationError(
-          "URLs pointing to internal or private networks are not allowed",
-          "url",
-        );
-      }
-    }
-
-    return parsedUrl;
-  }
-
   private async fetchCalendarResponse(
     url: string,
     extraHeaders: Record<string, string> = {},
   ): Promise<Response> {
-    let currentUrl = (await this.ensureResolvablePublicCalendarUrl(url)).toString();
-
-    for (
-      let redirectCount = 0;
-      redirectCount <= MAX_CALENDAR_REDIRECTS;
-      redirectCount++
-    ) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        CALENDAR_FETCH_TIMEOUT_MS,
-      );
-
-      try {
-        const response = await fetch(currentUrl, {
-          headers: {
-            ...CALENDAR_FETCH_HEADERS,
-            ...extraHeaders,
-          },
-          redirect: "manual",
-          signal: controller.signal,
-        });
-
-        if ([301, 302, 303, 307, 308].includes(response.status)) {
-          if (redirectCount === MAX_CALENDAR_REDIRECTS) {
-            throw new ValidationError(
-              "Too many redirects while fetching calendar URL",
-              "url",
-            );
-          }
-
-          const location = response.headers.get("location");
-
-          if (!location) {
-            throw new ValidationError(
-              "Calendar server returned a redirect without a location",
-              "url",
-            );
-          }
-
-          currentUrl = (
-            await this.ensureResolvablePublicCalendarUrl(
-              new URL(location, currentUrl).toString(),
-            )
-          ).toString();
-          continue;
-        }
-
-        return response;
-      } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") {
-          throw new ValidationError(
-            `Calendar request timed out after ${CALENDAR_FETCH_TIMEOUT_MS / 1000} seconds`,
-            "url",
-          );
-        }
-
+    try {
+      return await safeFetch(url, {
+        headers: { ...CALENDAR_FETCH_HEADERS, ...extraHeaders },
+        timeoutMs: CALENDAR_FETCH_TIMEOUT_MS,
+        maxBytes: MAX_CALENDAR_RESPONSE_BYTES,
+        maxRedirects: MAX_CALENDAR_REDIRECTS,
+      });
+    } catch (error) {
+      if (!(error instanceof SafeFetchError)) {
         throw error;
-      } finally {
-        clearTimeout(timeoutId);
       }
+      throw new ValidationError(calendarFetchErrorMessage(error), "url");
     }
-
-    throw new ValidationError(
-      "Too many redirects while fetching calendar URL",
-      "url",
-    );
   }
 
   async list(userId: string) {

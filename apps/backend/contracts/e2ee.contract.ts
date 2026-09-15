@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { E2EE_ROLLOUT_STAGE } from "@workspace/calendar-core";
 import { strictZodObject } from "../lib/validation";
 import { userIdField } from "./_zod";
 
@@ -112,7 +113,7 @@ export type EncryptionEventRecord = {
 
 export type E2eeBootstrapResult = {
   enabled: true;
-  rolloutStage: "shadow_write";
+  rolloutStage: typeof E2EE_ROLLOUT_STAGE;
   algorithms: {
     content: "AES-GCM-256";
     blindIndex: "HMAC-SHA-256";

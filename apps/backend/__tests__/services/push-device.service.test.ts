@@ -192,7 +192,7 @@ describe("PushDeviceService", () => {
     });
   });
 
-  it("enqueues a test push with a visible title", async () => {
+  it("enqueues a test push with opaque refs only", async () => {
     await expect(service.enqueueTest({ userId: "user-1" })).resolves.toEqual({
       success: true,
       jobId: "job-test-1",
@@ -207,7 +207,6 @@ describe("PushDeviceService", () => {
           kind: "event_reminder",
           eventId: "test-notification",
           minutesBefore: 15,
-          title: "Solace",
         },
       }),
       select: { id: true },

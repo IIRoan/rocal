@@ -42,6 +42,7 @@ import { requestContext } from "./lib/request-context";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
 import { sessionCookieAuthSecurity } from "./lib/openapi";
 import { corsOriginPolicy } from "./lib/origin-policy";
+import { createSecurityHeadersPlugin } from "./lib/security-headers";
 import { patchOauthMetadataResponse } from "./lib/oauth-metadata";
 import { routeModels } from "./contracts";
 
@@ -83,6 +84,7 @@ export const createAPI = (prefix = "") => {
   }
 
   return app
+    .use(createSecurityHeadersPlugin(env.isProduction))
     .use(routeModels)
     .use(
       cors({

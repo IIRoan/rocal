@@ -9,9 +9,9 @@ import type {
 import { ValidationError } from "../lib/errors";
 import { createLogger } from "@workspace/logger";
 import {
+  assertPlaintextNameAllowed,
   assertValidEntityColor,
-  buildEncryptedNameFields,
-  normalizeEntityName,
+  resolveEntityNamePersistence,
 } from "../lib/entity-metadata";
 
 const logger = createLogger("backend:category-service");
@@ -49,36 +49,38 @@ export class CategoryService implements ICategoryService {
       color,
       encryptedName,
       blindIndexTokens,
-      encryptionState,
       encryptionKeyVersion,
     } = input;
 
-    const normalizedName = normalizeEntityName(name, {
+    const namePersistence = resolveEntityNamePersistence({
       entityLabel: "Category",
+      name,
+      encryptedName,
+      blindIndexTokens,
+      encryptionKeyVersion,
+      requireName: true,
     });
 
     assertValidEntityColor(color);
 
-    const existingCategory = await this.prisma.eventCategory.findFirst({
-      where: { userId, name: normalizedName },
-    });
+    if (namePersistence.kind === "plaintext") {
+      await assertPlaintextNameAllowed(this.prisma, userId, "Category");
 
-    if (existingCategory) {
-      throw new ValidationError(
-        "A category with this name already exists",
-        "name",
-      );
+      const existingCategory = await this.prisma.eventCategory.findFirst({
+        where: { userId, name: namePersistence.name },
+      });
+
+      if (existingCategory) {
+        throw new ValidationError(
+          "A category with this name already exists",
+          "name",
+        );
+      }
     }
 
     return this.prisma.eventCategory.create({
       data: {
-        name: normalizedName,
-        ...buildEncryptedNameFields({
-          encryptedName,
-          blindIndexTokens,
-          encryptionState,
-          encryptionKeyVersion,
-        }),
+        ...namePersistence.data,
         color,
         userId,
       },
@@ -93,14 +95,19 @@ export class CategoryService implements ICategoryService {
       color,
       encryptedName,
       blindIndexTokens,
-      encryptionState,
       encryptionKeyVersion,
     } = input;
 
+    const namePersistence = resolveEntityNamePersistence({
+      entityLabel: "Category",
+      name,
+      encryptedName,
+      blindIndexTokens,
+      encryptionKeyVersion,
+      requireName: false,
+    });
     const normalizedName =
-      name !== undefined
-        ? normalizeEntityName(name, { entityLabel: "Category" })
-        : undefined;
+      namePersistence.kind === "plaintext" ? namePersistence.name : undefined;
 
     const existingCategory = await this.prisma.eventCategory.findFirst({
       where: { id: categoryId, userId },
@@ -115,6 +122,10 @@ export class CategoryService implements ICategoryService {
 
     if (color !== undefined) {
       assertValidEntityColor(color);
+    }
+
+    if (normalizedName !== undefined) {
+      await assertPlaintextNameAllowed(this.prisma, userId, "Category");
     }
 
     if (
@@ -140,14 +151,8 @@ export class CategoryService implements ICategoryService {
     return this.prisma.eventCategory.update({
       where: { id: categoryId },
       data: {
-        ...(normalizedName !== undefined ? { name: normalizedName } : {}),
+        ...namePersistence.data,
         ...(color !== undefined ? { color } : {}),
-        ...buildEncryptedNameFields({
-          encryptedName,
-          blindIndexTokens,
-          encryptionState,
-          encryptionKeyVersion,
-        }),
       },
     });
   }

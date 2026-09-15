@@ -13,6 +13,9 @@ jest.mock("../../lib/prisma", () => ({
     calendarEvent: {
       updateMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
     },
+    userEncryptionDevice: {
+      count: jest.fn(async (): Promise<any> => 0),
+    },
   },
 }));
 
@@ -45,6 +48,9 @@ const mockPrisma = prisma as unknown as {
   };
   calendarEvent: {
     updateMany: jest.Mock<() => Promise<any>>;
+  };
+  userEncryptionDevice: {
+    count: jest.Mock<() => Promise<any>>;
   };
 };
 
@@ -120,6 +126,9 @@ describe("categoriesRoutes", () => {
     expect(mockPrisma.eventCategory.create).toHaveBeenCalledWith({
       data: {
         name: "Work",
+        encryptedName: null,
+        blindIndexTokens: null,
+        encryptionState: "plaintext",
         color: "#123456",
         userId: "user-1",
       },
@@ -193,7 +202,7 @@ describe("categoriesRoutes", () => {
     );
 
     expect(response.status).toBe(422);
-    await expectValidationError(response, "String must contain at least 1 character");
+    await expectValidationError(response, "Category name is required.");
   });
 
   it("rejects duplicate category names on create", async () => {    mockPrisma.eventCategory.findFirst.mockResolvedValue({
@@ -251,6 +260,9 @@ describe("categoriesRoutes", () => {
       where: { id: "category-1" },
       data: {
         name: "Focus",
+        encryptedName: null,
+        blindIndexTokens: null,
+        encryptionState: "plaintext",
         color: "emerald",
       },
     });
@@ -358,5 +370,65 @@ describe("categoriesRoutes", () => {
     await expect(readText(response)).resolves.toContain(
       "Category not found or access denied",
     );
+  });
+});
+
+describe("categoriesRoutes – encrypted names", () => {
+  it("rejects a plaintext name sent alongside an encrypted name", async () => {
+    mockPrisma.eventCategory.create.mockClear();
+
+    const response = await createApp().handle(
+      new Request("http://localhost/categories/", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "Health",
+          encryptedName: "ciphertext",
+          color: "#123456",
+        }),
+      }),
+    );
+
+    await expectValidationError(
+      response,
+      "Plaintext names must not be sent alongside an encrypted name.",
+    );
+    expect(mockPrisma.eventCategory.create).not.toHaveBeenCalled();
+  });
+
+  it("blanks the stored name when ciphertext is uploaded on update", async () => {
+    mockPrisma.eventCategory.findFirst.mockResolvedValue({
+      id: "category-1",
+      name: "Health",
+      userId: "user-1",
+    });
+    mockPrisma.eventCategory.update.mockResolvedValue({
+      id: "category-1",
+      name: "",
+    });
+
+    const response = await createApp().handle(
+      new Request("http://localhost/categories/category-1", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          encryptedName: "ciphertext",
+          blindIndexTokens: ["idx"],
+          encryptionKeyVersion: 1,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockPrisma.eventCategory.update).toHaveBeenCalledWith({
+      where: { id: "category-1" },
+      data: {
+        name: "",
+        encryptedName: "ciphertext",
+        blindIndexTokens: JSON.stringify(["idx"]),
+        encryptionState: "encrypted",
+        encryptionKeyVersion: 1,
+      },
+    });
   });
 });

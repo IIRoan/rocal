@@ -4,31 +4,37 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"unicode/utf8"
 )
 
+// notification_job.payload carries opaque references only. Reminder titles and
+// mail sender/subject are decrypted or fetched on-device by the iOS
+// Notification Service Extension.
 var allowedKeys = map[string]struct{}{
 	"kind":          {},
 	"eventId":       {},
 	"minutesBefore": {},
 	"inboundCount":  {},
-	"subject":       {},
-	"title":         {},
-	"fromName":      {},
 	"emailId":       {},
+	"accountId":     {},
 }
 
-const maxSubjectLength = 200
+// Plaintext keys written by backends before encrypted reminder titles. Rows
+// that still carry them are delivered, but the values are never decoded.
+var legacyIgnoredKeys = map[string]struct{}{
+	"subject":  {},
+	"title":    {},
+	"fromName": {},
+}
+
+const maxOpaqueIDLength = 128
 
 type Payload struct {
 	Kind          string `json:"kind,omitempty"`
 	EventID       string `json:"eventId,omitempty"`
 	MinutesBefore *int   `json:"minutesBefore,omitempty"`
 	InboundCount  *int   `json:"inboundCount,omitempty"`
-	Subject       string `json:"subject,omitempty"`
-	Title         string `json:"title,omitempty"`
-	FromName      string `json:"fromName,omitempty"`
 	EmailID       string `json:"emailId,omitempty"`
+	AccountID     string `json:"accountId,omitempty"`
 }
 
 func Parse(raw []byte) (Payload, error) {
@@ -37,37 +43,32 @@ func Parse(raw []byte) (Payload, error) {
 		return Payload{}, fmt.Errorf("invalid notification job payload")
 	}
 	for key := range generic {
-		if _, ok := allowedKeys[key]; !ok {
-			return Payload{}, fmt.Errorf("notification job payload contains disallowed fields")
+		if _, ok := allowedKeys[key]; ok {
+			continue
 		}
+		if _, ok := legacyIgnoredKeys[key]; ok {
+			continue
+		}
+		return Payload{}, fmt.Errorf("notification job payload contains disallowed fields")
 	}
 	var payload Payload
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return Payload{}, fmt.Errorf("invalid notification job payload")
 	}
+	payload.EventID = strings.TrimSpace(payload.EventID)
+	payload.EmailID = strings.TrimSpace(payload.EmailID)
+	payload.AccountID = strings.TrimSpace(payload.AccountID)
 	if payload.Kind != "" && payload.Kind != "event_reminder" && payload.Kind != "new_mail" {
 		return Payload{}, fmt.Errorf("invalid notification job kind")
 	}
-	if payload.Kind == "event_reminder" && (strings.TrimSpace(payload.Subject) != "" || strings.TrimSpace(payload.FromName) != "" || strings.TrimSpace(payload.EmailID) != "") {
+	if payload.Kind == "event_reminder" && (payload.EmailID != "" || payload.AccountID != "") {
 		return Payload{}, fmt.Errorf("notification job payload contains disallowed fields")
 	}
-	if payload.Kind == "new_mail" && (strings.TrimSpace(payload.EventID) != "" || strings.TrimSpace(payload.Title) != "") {
+	if payload.Kind == "new_mail" && payload.EventID != "" {
 		return Payload{}, fmt.Errorf("notification job payload contains disallowed fields")
 	}
-	payload.Subject = SanitizeDisplayTitle(payload.Subject)
-	payload.Title = SanitizeDisplayTitle(payload.Title)
-	payload.FromName = SanitizeDisplayTitle(payload.FromName)
+	if len(payload.EventID) > maxOpaqueIDLength || len(payload.EmailID) > maxOpaqueIDLength || len(payload.AccountID) > maxOpaqueIDLength {
+		return Payload{}, fmt.Errorf("invalid notification job payload")
+	}
 	return payload, nil
-}
-
-func SanitizeDisplayTitle(value string) string {
-	trimmed := strings.TrimSpace(strings.Join(strings.Fields(value), " "))
-	if trimmed == "" {
-		return ""
-	}
-	if utf8.RuneCountInString(trimmed) <= maxSubjectLength {
-		return trimmed
-	}
-	runes := []rune(trimmed)
-	return strings.TrimSpace(string(runes[:maxSubjectLength]))
 }

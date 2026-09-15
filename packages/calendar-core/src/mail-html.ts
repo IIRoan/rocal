@@ -1,3 +1,5 @@
+import { sanitizeUntrustedEmailHtml } from "./sanitize-email-html";
+
 export interface ProcessEmailHtmlOptions {
   html: string;
   isDark: boolean;
@@ -157,7 +159,30 @@ export function processEmailHtml({
     );
   }
 
-  return processed;
+  // Always last: nothing after this point may reintroduce untrusted markup.
+  return sanitizeUntrustedEmailHtml(processed, { profile: "reader" });
+}
+
+/**
+ * CSP for the rendered mail document. Emitted unconditionally: mail never runs
+ * scripts, loads fonts/frames/objects, submits forms, or fetches; remote images
+ * are only allowed once the user opted in for this message/sender.
+ */
+export function buildEmailContentSecurityPolicy(allowRemoteImages: boolean): string {
+  const imgSrc = allowRemoteImages ? "data: blob: cid: https: http:" : "data: blob: cid:";
+  return [
+    "default-src 'none'",
+    "script-src 'none'",
+    `img-src ${imgSrc}`,
+    "style-src 'unsafe-inline'",
+    "font-src data:",
+    "connect-src 'none'",
+    "media-src 'none'",
+    "object-src 'none'",
+    "frame-src 'none'",
+    "form-action 'none'",
+    "base-uri 'none'",
+  ].join("; ");
 }
 
 export function buildEmailHtmlDocument({
@@ -167,9 +192,7 @@ export function buildEmailHtmlDocument({
   hasOwnDark,
   mobileViewport,
 }: BuildEmailHtmlDocumentOptions): string {
-  const csp = blockRemoteImages
-    ? `<meta http-equiv="Content-Security-Policy" content="img-src 'none'; connect-src 'none';">`
-    : "";
+  const csp = `<meta http-equiv="Content-Security-Policy" content="${buildEmailContentSecurityPolicy(!blockRemoteImages)}">`;
   const scheme = isDark ? "dark" : "light";
   const bg = isDark ? "#1a1a1a" : "#fff";
   const fg = isDark ? "#e0e0e0" : "#111";
@@ -188,7 +211,7 @@ export function buildEmailHtmlDocument({
   const layoutStyles = `table{max-width:100%;table-layout:auto}td,th{overflow-wrap:break-word;word-break:normal}pre{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%}`;
   const richTextStyles = `ul,ol{margin:0 0 1em;padding-left:1.5em}ul{list-style-type:disc}ol{list-style-type:decimal}li{margin:0.25em 0}li>p{margin:0}blockquote{margin:0 0 1em;padding-left:12px;border-left:3px solid ${quoteBorder};color:${quoteColor}}a{color:${linkColor};text-decoration:underline}u{text-decoration:underline}s,strike,del{text-decoration:line-through}strong,b{font-weight:600}em,i{font-style:italic}`;
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8">${viewport}<meta name="color-scheme" content="${scheme}">${csp}<base target="_blank"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;color-scheme:${scheme}}body{background:${bg};font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;font-size:14px;line-height:1.6;padding:16px 20px;color:${fg};overflow-wrap:break-word;overflow-x:hidden}img{max-width:100%;height:auto}${layoutStyles}${richTextStyles}p{margin:0 0 1em}p:last-child{margin:0}</style>${autoDarkStyles}</head><body>${processedHtml}</body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">${viewport}<meta name="color-scheme" content="${scheme}">${csp}<meta name="referrer" content="no-referrer"><base target="_blank"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;color-scheme:${scheme}}body{background:${bg};font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;font-size:14px;line-height:1.6;padding:16px 20px;color:${fg};overflow-wrap:break-word;overflow-x:hidden}img{max-width:100%;height:auto}${layoutStyles}${richTextStyles}p{margin:0 0 1em}p:last-child{margin:0}</style>${autoDarkStyles}</head><body>${processedHtml}</body></html>`;
 }
 
 function extractBodyHtml(html: string): string {

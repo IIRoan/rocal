@@ -41,16 +41,28 @@ export function buildMobileTrustedOriginVariants(
   return [...variants];
 }
 
+const LOCAL_DEVELOPMENT_ORIGINS = ["http://localhost", "https://localhost"];
+
+/** Localhost is a trusted origin only outside production. */
+export function buildStaticTrustedOrigins(
+  isProduction: boolean,
+  configuredOrigins: string[],
+): string[] {
+  return [
+    ...(isProduction ? [] : LOCAL_DEVELOPMENT_ORIGINS),
+    ...configuredOrigins,
+  ];
+}
+
 const baseOriginPolicy = createRuntimeOriginPolicy({
   backendUrl: env.backendUrl,
   frontendUrl: env.frontendUrl,
   appUrl: process.env.NEXT_PUBLIC_APP_URL || "",
   isProduction: env.isProduction,
-  trustedOrigins: [
-    "http://localhost",
-    "https://localhost",
-    ...parseCsvEnv(process.env.TRUSTED_ORIGINS),
-  ],
+  trustedOrigins: buildStaticTrustedOrigins(
+    env.isProduction,
+    parseCsvEnv(process.env.TRUSTED_ORIGINS),
+  ),
 });
 
 const mobileTrustedOrigins = Array.from(

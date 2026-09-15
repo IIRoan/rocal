@@ -19,6 +19,9 @@ jest.mock("../../lib/prisma", () => {
     calendarSubscription: {
       findFirst: jest.fn(async (): Promise<any> => null),
     },
+    userEncryptionDevice: {
+      count: jest.fn(async (): Promise<any> => 0),
+    },
   };
 
   return {
@@ -75,6 +78,9 @@ const mockPrisma = prisma as unknown as {
   };
   calendarSubscription: {
     findFirst: jest.Mock<() => Promise<any>>;
+  };
+  userEncryptionDevice: {
+    count: jest.Mock<() => Promise<any>>;
   };
 };
 
@@ -468,5 +474,107 @@ describe("calendarsRoutes – color validation", () => {
       expect(response.status).toBe(200);
       expect(mockPrisma.calendarEvent.updateMany).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("calendarsRoutes – encrypted names", () => {
+  beforeEach(() => {
+    mockPrisma.calendar.create.mockClear();
+    mockPrisma.calendar.update.mockClear();
+    mockPrisma.userEncryptionDevice.count.mockResolvedValue(0);
+  });
+
+  it("rejects a plaintext name sent alongside an encrypted name on create", async () => {
+    const response = await createApp().handle(
+      new Request("http://localhost/calendars/", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "Therapy",
+          encryptedName: "ciphertext",
+          color: "blue",
+        }),
+      }),
+    );
+
+    await expectValidationError(
+      response,
+      "Plaintext names must not be sent alongside an encrypted name.",
+    );
+    expect(mockPrisma.calendar.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a plaintext name sent alongside an encrypted name on update", async () => {
+    const response = await createApp().handle(
+      new Request("http://localhost/calendars/cal-1", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Therapy", encryptedName: "ciphertext" }),
+      }),
+    );
+
+    await expectValidationError(
+      response,
+      "Plaintext names must not be sent alongside an encrypted name.",
+    );
+    expect(mockPrisma.calendar.update).not.toHaveBeenCalled();
+  });
+
+  it("stores an empty plaintext name when ciphertext is provided", async () => {
+    mockPrisma.calendar.findFirst.mockResolvedValue(null);
+    mockPrisma.calendar.create.mockResolvedValue({ id: "cal-1", name: "" });
+
+    const response = await createApp().handle(
+      new Request("http://localhost/calendars/", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          encryptedName: "ciphertext",
+          blindIndexTokens: ["idx"],
+          encryptionState: "shadow_write",
+          color: "blue",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockPrisma.calendar.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: "",
+        encryptedName: "ciphertext",
+        blindIndexTokens: JSON.stringify(["idx"]),
+        encryptionState: "encrypted",
+      }),
+    });
+  });
+
+  it("rejects plaintext-only names for accounts with E2EE devices", async () => {
+    mockPrisma.userEncryptionDevice.count.mockResolvedValue(1);
+
+    const response = await createApp().handle(
+      new Request("http://localhost/calendars/", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Therapy", color: "blue" }),
+      }),
+    );
+
+    expect(response.status).not.toBe(200);
+    await expect(readText(response)).resolves.toContain(
+      "Calendar name encryption requires an active encryption session.",
+    );
+    expect(mockPrisma.calendar.create).not.toHaveBeenCalled();
+  });
+
+  it("requires a name or encrypted name on create", async () => {
+    const response = await createApp().handle(
+      new Request("http://localhost/calendars/", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ color: "blue" }),
+      }),
+    );
+
+    await expectValidationError(response, "Calendar name is required.");
   });
 });

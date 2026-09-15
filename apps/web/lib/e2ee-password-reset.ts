@@ -1,3 +1,13 @@
+import {
+  decryptEntityName,
+  encryptEventContentRequest,
+  encryptNameRequest,
+} from "@workspace/e2ee";
+import type {
+  EncryptedNameKind,
+  EventWireRequest,
+  NameWireRequest,
+} from "@workspace/calendar-core";
 import { e2eeApiService } from "./e2ee-api-service";
 import {
   createBlindIndexTokens,
@@ -14,11 +24,12 @@ import type {
   E2eeResetSnapshotCategory,
   E2eeResetSnapshotEvent,
   UpdateCalendarRequest,
-  UpdateCategoryRequest,
   UpdateEventRequest,
 } from "./types/calendar";
 
 const DEFAULT_ENCRYPTION_KEY_VERSION = 1;
+const contentEncrypter = { encryptJsonPayload, createBlindIndexTokens };
+const contentDecrypter = { decryptJsonPayload };
 const BATCH_SIZE = 8;
 
 type EventSensitiveFields = {
@@ -32,10 +43,6 @@ function normalizeOptionalText(
 ): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
-}
-
-function serializeOptionalText(value: string | null): string {
-  return value ?? "";
 }
 
 function resolveSnapshotKeyVersion(snapshot: {
@@ -68,58 +75,43 @@ async function runInBatches<T>(
   }
 }
 
-async function buildCalendarUpdate(
-  calendar: E2eeResetSnapshotCalendar,
+async function resolveEntityName(
+  kind: EncryptedNameKind,
+  record: E2eeResetSnapshotCalendar | E2eeResetSnapshotCategory,
   accountKey: CryptoKey,
-  blindIndexKey: CryptoKey,
-  keyVersion: number,
-): Promise<UpdateCalendarRequest> {
-  const name = calendar.name.trim();
+): Promise<string> {
+  const name =
+    record.name.trim() ||
+    (await decryptEntityName(contentDecrypter, { accountKey }, kind, record));
 
   if (!name) {
-    throw new Error(`Calendar ${calendar.id} is missing a name.`);
+    throw new Error(`${kind} ${record.id} is missing a name.`);
   }
 
-  const encryptedName = await encryptJsonPayload(
-    accountKey,
-    { name },
-    `calendar-name:v${keyVersion}`,
-  );
-
-  return {
-    name,
-    encryptedName: JSON.stringify(encryptedName),
-    blindIndexTokens: await createBlindIndexTokens(blindIndexKey, name),
-    encryptionState: "shadow_write",
-    encryptionKeyVersion: keyVersion,
-  };
+  return name;
 }
 
-async function buildCategoryUpdate(
-  category: E2eeResetSnapshotCategory,
+async function buildNameUpdate(
+  kind: EncryptedNameKind,
+  record: E2eeResetSnapshotCalendar | E2eeResetSnapshotCategory,
   accountKey: CryptoKey,
   blindIndexKey: CryptoKey,
   keyVersion: number,
-): Promise<UpdateCategoryRequest> {
-  const name = category.name.trim();
-
-  if (!name) {
-    throw new Error(`Category ${category.id} is missing a name.`);
-  }
-
-  const encryptedName = await encryptJsonPayload(
-    accountKey,
+): Promise<NameWireRequest<UpdateCalendarRequest>> {
+  const name = await resolveEntityName(kind, record, accountKey);
+  const request = await encryptNameRequest<UpdateCalendarRequest>(
+    contentEncrypter,
+    { accountKey, blindIndexKey },
+    kind,
     { name },
-    `category-name:v${keyVersion}`,
+    keyVersion,
   );
 
-  return {
-    name,
-    encryptedName: JSON.stringify(encryptedName),
-    blindIndexTokens: await createBlindIndexTokens(blindIndexKey, name),
-    encryptionState: "shadow_write",
-    encryptionKeyVersion: keyVersion,
-  };
+  if (request.name !== undefined || !request.encryptedName) {
+    throw new Error(`${kind} ${record.id} could not be encrypted.`);
+  }
+
+  return request;
 }
 
 async function resolveEventSensitiveFields(
@@ -167,32 +159,24 @@ async function buildEventUpdate(
   accountKey: CryptoKey,
   blindIndexKey: CryptoKey,
   keyVersion: number,
-): Promise<UpdateEventRequest> {
+): Promise<EventWireRequest<UpdateEventRequest>> {
   const sensitiveFields = await resolveEventSensitiveFields(event, accountKey);
-  const encryptedContent = await encryptJsonPayload(
-    accountKey,
-    sensitiveFields,
-    `event-content:v${keyVersion}`,
+  const request = await encryptEventContentRequest<UpdateEventRequest>(
+    contentEncrypter,
+    { accountKey, blindIndexKey },
+    {
+      title: sensitiveFields.title,
+      description: sensitiveFields.description ?? undefined,
+      location: sensitiveFields.location ?? undefined,
+    },
+    keyVersion,
   );
-  const blindIndexSource = [
-    sensitiveFields.title,
-    sensitiveFields.description,
-    sensitiveFields.location,
-  ]
-    .filter((value): value is string => !!value)
-    .join(" ");
 
-  return {
-    title: sensitiveFields.title,
-    description: serializeOptionalText(sensitiveFields.description),
-    location: serializeOptionalText(sensitiveFields.location),
-    encryptedContent: JSON.stringify(encryptedContent),
-    blindIndexTokens: await createBlindIndexTokens(
-      blindIndexKey,
-      blindIndexSource,
-    ),
-    encryptionKeyVersion: keyVersion,
-  };
+  if (!request.encryptedContent) {
+    throw new Error(`Event ${event.id} could not be encrypted.`);
+  }
+
+  return request;
 }
 
 export async function resetEncryptionPasswordForActiveSession(
@@ -209,7 +193,8 @@ export async function resetEncryptionPasswordForActiveSession(
   const keyVersion = resolveSnapshotKeyVersion(snapshot);
 
   await runInBatches(snapshot.calendars, async (calendar) => {
-    const request = await buildCalendarUpdate(
+    const request = await buildNameUpdate(
+      "calendar",
       calendar,
       session.accountKey,
       session.blindIndexKey,
@@ -219,7 +204,8 @@ export async function resetEncryptionPasswordForActiveSession(
   });
 
   await runInBatches(snapshot.categories, async (category) => {
-    const request = await buildCategoryUpdate(
+    const request = await buildNameUpdate(
+      "category",
       category,
       session.accountKey,
       session.blindIndexKey,

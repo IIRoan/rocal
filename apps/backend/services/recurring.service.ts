@@ -177,7 +177,7 @@ export class RecurringService implements IRecurringService {
       case "all": {
         const updatedEvent = await this.prisma.calendarEvent.update({
           where: { id: eventId },
-          data: buildRecurringEventUpdateData(updates),
+          data: buildRecurringEventUpdateData(existingEvent, updates),
           include: { category: true, calendar: true },
         });
 

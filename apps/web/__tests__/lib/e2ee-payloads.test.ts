@@ -111,7 +111,7 @@ describe("e2ee payload helpers", () => {
     expect(result.encryptedContent).toBeDefined();
   });
 
-  it("attaches encrypted event shadow fields when a session is active", async () => {
+  it("sends event ciphertext without plaintext content when a session is active", async () => {
     const request = {
       title: "  Secret event  ",
       description: "  hidden agenda  ",
@@ -137,7 +137,9 @@ describe("e2ee payload helpers", () => {
       "Secret event hidden agenda Room 7",
     );
     expect(result).toEqual({
-      ...request,
+      start: request.start,
+      end: request.end,
+      calendarId: request.calendarId,
       encryptedContent: JSON.stringify({
         version: 1,
         algorithm: "AES-GCM",
@@ -149,7 +151,7 @@ describe("e2ee payload helpers", () => {
     });
   });
 
-  it("attaches encrypted calendar name shadow fields", async () => {
+  it("sends calendar name ciphertext without the plaintext name", async () => {
     const request = { name: "  Work  ", color: "blue" };
 
     const result = await attachCalendarEncryptionShadow(request);
@@ -163,22 +165,21 @@ describe("e2ee payload helpers", () => {
       activeSession.blindIndexKey,
       "Work",
     );
-    expect(result).toEqual(
-      expect.objectContaining({
-        encryptedName: JSON.stringify({
-          version: 1,
-          algorithm: "AES-GCM",
-          iv: "iv",
-          ciphertext: "ciphertext",
-        }),
-        blindIndexTokens: ["idx-1", "idx-2"],
-        encryptionState: "shadow_write",
-        encryptionKeyVersion: 1,
+    expect(result).toEqual({
+      color: request.color,
+      encryptedName: JSON.stringify({
+        version: 1,
+        algorithm: "AES-GCM",
+        iv: "iv",
+        ciphertext: "ciphertext",
       }),
-    );
+      blindIndexTokens: ["idx-1", "idx-2"],
+      encryptionKeyVersion: 1,
+    });
+    expect(result).not.toHaveProperty("name");
   });
 
-  it("attaches encrypted category name shadow fields", async () => {
+  it("sends category name ciphertext without the plaintext name", async () => {
     const request = { name: "  Personal  ", color: "emerald" };
 
     const result = await attachCategoryEncryptionShadow(request);
@@ -192,18 +193,30 @@ describe("e2ee payload helpers", () => {
       activeSession.blindIndexKey,
       "Personal",
     );
-    expect(result).toEqual(
-      expect.objectContaining({
-        encryptedName: JSON.stringify({
-          version: 1,
-          algorithm: "AES-GCM",
-          iv: "iv",
-          ciphertext: "ciphertext",
-        }),
-        blindIndexTokens: ["idx-1", "idx-2"],
-        encryptionState: "shadow_write",
-        encryptionKeyVersion: 1,
+    expect(result).toEqual({
+      color: request.color,
+      encryptedName: JSON.stringify({
+        version: 1,
+        algorithm: "AES-GCM",
+        iv: "iv",
+        ciphertext: "ciphertext",
       }),
-    );
+      blindIndexTokens: ["idx-1", "idx-2"],
+      encryptionKeyVersion: 1,
+    });
+    expect(result).not.toHaveProperty("name");
+  });
+
+  it("adds a transient invitation copy only when attendees are invited", async () => {
+    const result = await attachEventEncryptionShadow({
+      title: "Planning",
+      start: "2026-05-01T10:00:00.000Z",
+      end: "2026-05-01T11:00:00.000Z",
+      calendarId: "cal-1",
+      participants: [{ email: "guest@example.com", role: "attendee" }],
+    });
+
+    expect(result).not.toHaveProperty("title");
+    expect(result.invitationContent).toEqual({ title: "Planning" });
   });
 });

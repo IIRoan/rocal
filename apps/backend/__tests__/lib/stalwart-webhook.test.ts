@@ -29,7 +29,6 @@ describe("parseStalwartMailIngestEvents", () => {
         recipientEmails: ["testingproduction15@solace.onl"],
         messageId: "<abc@example.com>",
         subject: "Hello",
-        fromName: "Sam",
         fromEmail: "sam@example.com",
       },
     ]);
@@ -88,7 +87,6 @@ describe("parseStalwartMailIngestEvents", () => {
         recipientEmails: ["owner@solace.onl"],
         messageId: "<abc@example.com>",
         subject: null,
-        fromName: "Sam",
         fromEmail: "sam@example.com",
       },
     ]);

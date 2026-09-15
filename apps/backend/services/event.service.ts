@@ -22,10 +22,7 @@ import type {
 import { ValidationError } from "../lib/errors";
 import { prismaStringEquals } from "../lib/prisma-query";
 import { reminderScheduleWarning } from "../lib/email-delivery";
-import {
-  firstNotificationDisplayTitle,
-  shouldScheduleEventReminder,
-} from "../lib/notification-job";
+import { shouldScheduleEventReminder } from "../lib/notification-job";
 import { errorLogDetails } from "../lib/log-sanitization";
 import {
   assertCalendarWritable,
@@ -41,6 +38,7 @@ import {
 } from "../lib/event-constraints";
 import { MS_PER_DAY, MS_PER_MINUTE } from "../lib/time-constants";
 import { ensureUserCalendars } from "../lib/user-setup";
+import { externalCalendarName } from "../lib/entity-metadata";
 import {
   resolveAcceptedInvitationTargetCalendar,
   resolveInvitationStagingCalendar,
@@ -49,7 +47,9 @@ import { RecurrenceEngine } from "../lib/recurrence";
 import { NotificationCalculator } from "../lib/notification-calculator";
 import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
 import {
+  assertNoPlaintextEventContentWithCiphertext,
   resolveEventPersistencePolicy,
+  resolveInvitationContent,
 } from "../lib/event-encryption";
 import {
   buildIcsEventFile,
@@ -105,7 +105,7 @@ export class EventService implements IEventService {
     eventStart: Date;
     minutesBefore: number;
     timezone: string;
-    displayTitle: string | null;
+    encryptedDisplayTitle: string | null;
     notificationType?: "email" | "browser";
   }): Promise<boolean> {
     const schedule = NotificationCalculator.scheduleUpcomingReminder(
@@ -127,7 +127,7 @@ export class EventService implements IEventService {
         notificationTimezone: schedule.notificationTimezone,
         isEnabled: true,
         isSent: false,
-        displayTitle: input.displayTitle,
+        encryptedDisplayTitle: input.encryptedDisplayTitle,
       },
     });
     return true;
@@ -207,7 +207,7 @@ export class EventService implements IEventService {
     }
 
     const remote = await this.stalwartClient.createCalendar(input.accountId, {
-      name: input.calendar.name,
+      name: externalCalendarName(input.calendar.name),
       color: input.calendar.color,
       isVisible: input.calendar.isVisible,
       isDefault: input.calendar.isDefault,
@@ -705,7 +705,9 @@ export class EventService implements IEventService {
         e.created_at, e.updated_at, e.encrypted_content, e.blind_index_tokens,
         e.encryption_state, e.encryption_key_version,
         c.id as "calendar.id", c.name as "calendar.name", c.color as "calendar.color",
+        c.encrypted_name as "calendar.encryptedName", c.encryption_key_version as "calendar.encryptionKeyVersion",
         cat.id as "category.id", cat.name as "category.name", cat.color as "category.color",
+        cat.encrypted_name as "category.encryptedName", cat.encryption_key_version as "category.encryptionKeyVersion",
         ${rankExpression} as rank
       FROM calendar_event e
       LEFT JOIN calendar c ON e.calendar_id = c.id
@@ -758,6 +760,8 @@ export class EventService implements IEventService {
           ? {
               id: row["calendar.id"],
               name: row["calendar.name"],
+              encryptedName: row["calendar.encryptedName"],
+              encryptionKeyVersion: row["calendar.encryptionKeyVersion"],
               color: row["calendar.color"],
             }
           : null,
@@ -765,6 +769,8 @@ export class EventService implements IEventService {
           ? {
               id: row["category.id"],
               name: row["category.name"],
+              encryptedName: row["category.encryptedName"],
+              encryptionKeyVersion: row["category.encryptionKeyVersion"],
               color: row["category.color"],
             }
           : null,
@@ -1449,10 +1455,14 @@ export class EventService implements IEventService {
         blindIndexTokens,
         encryptionKeyVersion,
         participants,
+        invitationContent,
       } = input;
       let { reminder } = input;
 
-      if (!title?.trim()) {
+      const hasEncryptedPayload = this.hasEncryptedPayload(encryptedContent);
+      assertNoPlaintextEventContentWithCiphertext(input);
+
+      if (!hasEncryptedPayload && !title?.trim()) {
         throw new ValidationError(
           "Title is required and cannot be empty",
           "title",
@@ -1554,7 +1564,7 @@ export class EventService implements IEventService {
         }
       }
 
-      if (title.trim().length > 0) {
+      if (title?.trim()) {
         validateEventTitleLength(title);
       }
 
@@ -1590,8 +1600,6 @@ export class EventService implements IEventService {
       });
       const eventTimezone = resolveTimezone(timezone ?? userSettings?.timezone);
 
-      const hasEncryptedPayload = this.hasEncryptedPayload(encryptedContent);
-
       if (isCalendarWritable(calendar) && !hasEncryptedPayload) {
         throw new ValidationError(
           "Event encryption requires an active encryption session.",
@@ -1601,7 +1609,7 @@ export class EventService implements IEventService {
 
       const persistencePolicy = resolveEventPersistencePolicy({
         hasEncryptedPayload,
-        title,
+        title: title ?? "",
         description,
         location,
       });
@@ -1623,9 +1631,7 @@ export class EventService implements IEventService {
           event: buildStalwartEventPayload({
             calendarId: stalwartCalendarId,
             uid: stalwartUid,
-            title: hasEncryptedPayload
-              ? ""
-              : persistencePolicy.title || title,
+            title: persistencePolicy.title,
             description: persistencePolicy.description,
             start: startDate,
             end: endDate,
@@ -1752,6 +1758,13 @@ export class EventService implements IEventService {
         }
       }
 
+      const invitationSource = resolveInvitationContent({
+        hasEncryptedPayload,
+        invitationContent,
+        title,
+        description,
+        location,
+      });
       const participantResult =
         await this.eventParticipantService.syncParticipants({
           eventId: event.id,
@@ -1759,20 +1772,20 @@ export class EventService implements IEventService {
           ownerUserId: userId,
           sendInvitations: true,
           calendarName: calendar.name,
-          invitationEvent: this.buildInvitationEventPayload({
-            eventId: event.id,
-            externalId: event.externalId,
-            title: title.trim(),
-            description: description?.trim() || null,
-            start: startDate,
-            end: endDate,
-            allDay: allDay || false,
-            timezone: eventTimezone,
-            location: location?.trim() || null,
-            recurrence: recurrence || null,
-            createdAt: event.createdAt,
-            updatedAt: event.updatedAt,
-          }),
+          invitationEvent: invitationSource
+            ? this.buildInvitationEventPayload({
+                eventId: event.id,
+                externalId: event.externalId,
+                ...invitationSource,
+                start: startDate,
+                end: endDate,
+                allDay: allDay || false,
+                timezone: eventTimezone,
+                recurrence: recurrence || null,
+                createdAt: event.createdAt,
+                updatedAt: event.updatedAt,
+              })
+            : undefined,
         });
       const invitationWarnings = await participantResult.sendPendingInvitations();
 
@@ -1781,13 +1794,13 @@ export class EventService implements IEventService {
       try {
         if (reminder && reminder > 0) {
           if (shouldScheduleEventReminder(userSettings)) {
-            const reminderDisplayTitle = firstNotificationDisplayTitle(title);
+            // Clients attach the encrypted title via PUT /notifications.
             const created = await this.insertUpcomingEventReminder({
               eventId: event.id,
               eventStart: startDate,
               minutesBefore: reminder,
               timezone: eventTimezone,
-              displayTitle: reminderDisplayTitle,
+              encryptedDisplayTitle: null,
             });
             if (created) {
               logger.ok(`Created notification for event ${event.id}`);
@@ -1890,7 +1903,13 @@ export class EventService implements IEventService {
         throw new ValidationError("End time must be after start time", "end");
       }
 
-      if (input.title !== undefined && !input.title?.trim()) {
+      assertNoPlaintextEventContentWithCiphertext(input);
+
+      if (
+        !this.hasEncryptedPayload(input.encryptedContent) &&
+        input.title !== undefined &&
+        !input.title?.trim()
+      ) {
         throw new ValidationError(
           "Title is required and cannot be empty",
           "title",
@@ -2136,9 +2155,7 @@ export class EventService implements IEventService {
             existingEvent.stalwartUid ||
             existingEvent.externalId ||
             `${existingEvent.id}@solace-calendar.local`,
-          title: hasEncryptedPayload
-            ? ""
-            : persistencePolicy.title || nextTitle,
+          title: persistencePolicy.title,
           description: persistencePolicy.description,
           start: finalStartDate,
           end: finalEndDate,
@@ -2206,6 +2223,13 @@ export class EventService implements IEventService {
       let invitationWarnings: OperationWarning[] = [];
 
       if (input.participants !== undefined) {
+        const invitationSource = resolveInvitationContent({
+          hasEncryptedPayload,
+          invitationContent: input.invitationContent,
+          title: nextTitle,
+          description: nextDescription,
+          location: nextLocation,
+        });
         const participantResult =
           await this.eventParticipantService.syncParticipants({
             eventId: updatedEvent.id,
@@ -2213,14 +2237,13 @@ export class EventService implements IEventService {
             ownerUserId: userId,
             sendInvitations: true,
             calendarName: finalCalendar.name,
-            // If the event is encrypted and the plaintext title isn't available in this
-            // update, skip invitation emails (invitees would receive an empty-title ICS).
-            invitationEvent: nextTitle
+            // Encrypted events only mail invitees when the client supplied the
+            // transient invitation copy; otherwise the ICS would have no title.
+            invitationEvent: invitationSource
               ? this.buildInvitationEventPayload({
                   eventId: updatedEvent.id,
                   externalId: updatedEvent.externalId,
-                  title: nextTitle,
-                  description: nextDescription,
+                  ...invitationSource,
                   start: finalStartDate,
                   end: finalEndDate,
                   allDay:
@@ -2228,7 +2251,6 @@ export class EventService implements IEventService {
                       ? input.allDay
                       : existingEvent.allDay,
                   timezone: eventTimezone,
-                  location: nextLocation,
                   recurrence:
                     input.recurrence !== undefined
                       ? input.recurrence
@@ -2254,7 +2276,7 @@ export class EventService implements IEventService {
             notificationType: "email" | "browser";
             minutesBefore: number;
             isEnabled: boolean;
-            displayTitle: string | null;
+            encryptedDisplayTitle: string | null;
           }[] = [];
 
           const existingNotifications =
@@ -2264,14 +2286,12 @@ export class EventService implements IEventService {
                 notificationType: true,
                 minutesBefore: true,
                 isEnabled: true,
-                displayTitle: true,
+                encryptedDisplayTitle: true,
               },
             });
-          const preservedDisplayTitle = firstNotificationDisplayTitle(
-            input.title,
-            nextTitle,
-            ...existingNotifications.map((n) => n.displayTitle),
-          );
+          const preservedDisplayTitle =
+            existingNotifications.find((n) => n.encryptedDisplayTitle)
+              ?.encryptedDisplayTitle ?? null;
 
           if (reminderChanged) {
             if (finalReminderValue && finalReminderValue > 0) {
@@ -2280,7 +2300,7 @@ export class EventService implements IEventService {
                   notificationType: "email",
                   minutesBefore: finalReminderValue,
                   isEnabled: true,
-                  displayTitle: preservedDisplayTitle,
+                  encryptedDisplayTitle: preservedDisplayTitle,
                 });
               }
             }
@@ -2289,10 +2309,8 @@ export class EventService implements IEventService {
               notificationType: n.notificationType as "email" | "browser",
               minutesBefore: n.minutesBefore,
               isEnabled: n.isEnabled,
-              displayTitle: firstNotificationDisplayTitle(
-                n.displayTitle,
-                preservedDisplayTitle,
-              ),
+              encryptedDisplayTitle:
+                n.encryptedDisplayTitle ?? preservedDisplayTitle,
             }));
           }
 
@@ -2309,7 +2327,7 @@ export class EventService implements IEventService {
                 eventStart: finalStartDate,
                 minutesBefore: config.minutesBefore,
                 timezone: eventTimezone,
-                displayTitle: config.displayTitle,
+                encryptedDisplayTitle: config.encryptedDisplayTitle,
                 notificationType: config.notificationType,
               }),
             );
@@ -2734,25 +2752,14 @@ export class EventService implements IEventService {
                 });
 
                 if (shouldScheduleEventReminder(userSettings)) {
-                  const sourceReminder = await this.prisma.eventNotification.findFirst(
-                    {
-                      where: {
-                        eventId: event.id,
-                        displayTitle: { not: null },
-                      },
-                      select: { displayTitle: true },
-                    },
-                  );
-                  const reminderDisplayTitle = firstNotificationDisplayTitle(
-                    sourceReminder?.displayTitle,
-                    event.title,
-                  );
+                  // The title ciphertext is bound to the source event id, so
+                  // the copy starts generic until a client re-encrypts it.
                   const created = await this.insertUpcomingEventReminder({
                     eventId: duplicated.id,
                     eventStart: duplicated.start,
                     minutesBefore: event.reminder,
                     timezone: duplicated.timezone,
-                    displayTitle: reminderDisplayTitle,
+                    encryptedDisplayTitle: null,
                   });
                   if (created) {
                     logger.ok(
@@ -2866,7 +2873,7 @@ export class EventService implements IEventService {
 
     const icsContent = buildIcsEventFile({
       calendar: {
-        name: event.calendar.name,
+        name: externalCalendarName(event.calendar.name),
         timezone: resolveTimezone(event.timezone),
       },
       event: exportedEvent,

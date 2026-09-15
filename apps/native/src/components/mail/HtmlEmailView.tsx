@@ -13,7 +13,6 @@ import {
   buildEmailHtmlDocument,
   emailHasOwnDarkMode,
   processEmailHtml,
-  sanitizeUntrustedEmailHtml,
 } from "@workspace/calendar-core";
 
 type WebViewModule = typeof import("react-native-webview");
@@ -95,7 +94,7 @@ export function HtmlEmailView({
 
   const document = useMemo(() => {
     const processedHtml = processEmailHtml({
-      html: sanitizeUntrustedEmailHtml(html),
+      html,
       isDark,
       blockTrackingPixels,
       blockRemoteImages,
@@ -129,9 +128,12 @@ export function HtmlEmailView({
     }
   };
 
+  // Only the initial about:blank document may load in place. data: navigations
+  // are refused (a data:text/html page would run with JavaScript enabled), and
+  // http(s) links open in the in-app browser instead of inside the mail view.
   const onShouldStartLoadWithRequest = (request: ShouldStartLoadRequest) => {
     const url = request.url;
-    if (url === "about:blank" || url.startsWith("data:")) return true;
+    if (url === "about:blank") return true;
     if (/^https?:/i.test(url)) {
       WebBrowser.openBrowserAsync(url).catch(() => {});
       return false;
@@ -144,7 +146,10 @@ export function HtmlEmailView({
   return (
     <View style={[{ height: webViewHeight }, style]}>
       <WebView
-        originWhitelist={["about:blank", "data:"]}
+        // Listed schemes reach onShouldStartLoadWithRequest (which refuses
+        // data: and hands http(s) to WebBrowser); anything else is dropped by
+        // the sanitizer's href allowlist before it can reach Linking.
+        originWhitelist={["about:blank", "data:", "http://*", "https://*"]}
         source={{ html: document }}
         injectedJavaScript={FIT_AND_REPORT_SCRIPT}
         onMessage={onMessage}

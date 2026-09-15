@@ -43,7 +43,6 @@ export const calendarsRoutes = new Elysia({
           isDefault: body.isDefault,
           encryptedName: body.encryptedName,
           blindIndexTokens: body.blindIndexTokens,
-          encryptionState: body.encryptionState,
           encryptionKeyVersion: body.encryptionKeyVersion,
           forceFullEncryption: body.forceFullEncryption,
         });
@@ -67,7 +66,6 @@ export const calendarsRoutes = new Elysia({
           isDefault: body.isDefault,
           encryptedName: body.encryptedName,
           blindIndexTokens: body.blindIndexTokens,
-          encryptionState: body.encryptionState,
           encryptionKeyVersion: body.encryptionKeyVersion,
           forceFullEncryption: body.forceFullEncryption,
         });

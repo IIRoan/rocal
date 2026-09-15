@@ -156,7 +156,6 @@ export class PushDeviceService implements IPushDeviceService {
     const payload = eventReminderPayload({
       eventId: TEST_NOTIFICATION_EVENT_ID,
       minutesBefore: TEST_NOTIFICATION_MINUTES_BEFORE,
-      title: "Solace",
     });
 
     const job = await this.prisma.notificationJob.create({

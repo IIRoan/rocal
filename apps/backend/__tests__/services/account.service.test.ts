@@ -10,6 +10,9 @@ function createMockPrisma() {
     notificationLog: {
       deleteMany: jest.fn(async () => ({ count: 3 })),
     },
+    invite: {
+      deleteMany: jest.fn(async () => ({ count: 1 })),
+    },
     user: {
       delete: jest.fn(async () => ({ id: "user-1" })),
     },
@@ -17,8 +20,16 @@ function createMockPrisma() {
 
   const prisma = {
     user: {
-      findUnique: jest.fn<() => Promise<{ id: string } | null>>(async () => ({
+      findUnique: jest.fn<
+        () => Promise<{
+          id: string;
+          email: string;
+          mailDirectoryEntry: { email: string } | null;
+        } | null>
+      >(async () => ({
         id: "user-1",
+        email: "Alice@solace.onl",
+        mailDirectoryEntry: { email: "alice@solace.onl" },
       })),
       delete: tx.user.delete,
     },
@@ -141,7 +152,11 @@ describe("AccountService", () => {
   });
 
   it("reports the address as unavailable when an account already exists", async () => {
-    mockPrisma.prisma.user.findUnique.mockResolvedValueOnce({ id: "user-2" });
+    mockPrisma.prisma.user.findUnique.mockResolvedValueOnce({
+      id: "user-2",
+      email: "roan@solace.onl",
+      mailDirectoryEntry: null,
+    });
 
     const result = await service.checkEmailAvailability({
       email: "roan@solace.onl",
@@ -166,7 +181,11 @@ describe("AccountService", () => {
     });
     expect(mockPrisma.prisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: "user-1" },
-      select: { id: true },
+      select: {
+        id: true,
+        email: true,
+        mailDirectoryEntry: { select: { email: true } },
+      },
     });
     expect(mockPrisma.prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(mockPrisma.tx.calendarSharing.deleteMany).toHaveBeenCalledWith({
@@ -176,6 +195,14 @@ describe("AccountService", () => {
     });
     expect(mockPrisma.tx.notificationLog.deleteMany).toHaveBeenCalledWith({
       where: { userId: "user-1" },
+    });
+    expect(mockPrisma.tx.invite.deleteMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { email: { in: ["alice@solace.onl"] } },
+          { claimedForEmail: { in: ["alice@solace.onl"] } },
+        ],
+      },
     });
     expect(mockPrisma.tx.user.delete).toHaveBeenCalledWith({
       where: { id: "user-1" },

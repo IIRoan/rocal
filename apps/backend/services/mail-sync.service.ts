@@ -2,10 +2,6 @@ import { createLogger } from "@workspace/logger";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import { ForbiddenError, ValidationError } from "../lib/errors";
 import { errorLogDetails, logRef } from "../lib/log-sanitization";
-import {
-  inboundPushItemFromEmailRecord,
-  type InboundMailPushItem,
-} from "../lib/inbound-mail-push";
 import type {
   StalwartJmapAdminClientLike,
   StalwartJmapEnvelope,
@@ -537,24 +533,6 @@ export class MailSyncService {
     }
 
     return null;
-  }
-
-  async getEmailPushMetadata(
-    accountId: string,
-    emailId: string,
-  ): Promise<InboundMailPushItem | null> {
-    const emails = await this.getEmailsWithProperties(
-      accountId,
-      [emailId],
-      EMAIL_HEADER_PROPERTIES,
-      false,
-    );
-    const record = emails[0];
-    if (!record) {
-      return null;
-    }
-
-    return inboundPushItemFromEmailRecord(record);
   }
 
   async syncKnownChangedAccounts(): Promise<MailReceiptSyncResult[]> {

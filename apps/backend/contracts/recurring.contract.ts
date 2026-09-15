@@ -6,7 +6,11 @@ import {
 } from "@workspace/calendar-core";
 import type { RecurrenceRule } from "../lib/recurrence";
 import { strictZodObject } from "../lib/validation";
-import { resourceIdParamsSchema } from "./_schemas";
+import {
+  eventContentEncryptionFieldsSchema,
+  refineEncryptedEventContentBody,
+  resourceIdParamsSchema,
+} from "./_schemas";
 import { resourceIdSchema, userIdField } from "./_zod";
 
 export const validateRecurrenceBodySchema = strictZodObject({
@@ -35,7 +39,8 @@ export const editRecurringEventBodySchema = strictZodObject({
     recurrence: z.string().optional(),
     calendarId: z.string().optional(),
     categoryId: z.string().optional(),
-  }),
+    ...eventContentEncryptionFieldsSchema.shape,
+  }).superRefine(refineEncryptedEventContentBody({ requireTitle: false })),
 });
 
 export const deleteRecurringEventQuerySchema = strictZodObject({
