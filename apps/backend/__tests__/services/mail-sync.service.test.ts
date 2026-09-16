@@ -18,7 +18,7 @@ function createHarness() {
     },
   };
 
-  const jmapAdminClient = {
+  const userJmapClient = {
     callJmap: jest.fn<
       (input: {
         methodCalls: Array<[string, Record<string, unknown>, string]>;
@@ -51,10 +51,18 @@ function createHarness() {
     ),
   };
 
+  // Default owner lookup so JMAP calls can resolve the mailbox's credentials.
+  prisma.mailDirectoryEntry.findUnique.mockResolvedValue({
+    id: "entry-1",
+    userId: "user-1",
+    email: "alice@solace.onl",
+    stalwartAccountId: "acct-1",
+  });
+
   return {
     prisma,
-    jmapAdminClient,
-    service: new MailSyncService(prisma as never, jmapAdminClient as never),
+    userJmapClient,
+    service: new MailSyncService(prisma as never, userJmapClient as never),
   };
 }
 
@@ -117,7 +125,7 @@ describe("MailSyncService", () => {
   });
 
   it("forces a full sync when Email/changes cannot be calculated", async () => {
-    const { prisma, jmapAdminClient, service } = createHarness();
+    const { prisma, userJmapClient, service } = createHarness();
     prisma.mailDirectoryEntry.findUnique.mockResolvedValue({
       id: "entry-1",
       userId: "user-1",
@@ -131,7 +139,7 @@ describe("MailSyncService", () => {
       mailboxState: "mailbox-state-1",
       threadState: "thread-state-1",
     });
-    jmapAdminClient.callJmap.mockImplementation(
+    userJmapClient.callJmap.mockImplementation(
       async ({
         methodCalls,
       }: {
@@ -171,7 +179,7 @@ describe("MailSyncService", () => {
   });
 
   it("retries Email/get without bodies when the full fetch fails", async () => {
-    const { prisma, jmapAdminClient, service } = createHarness();
+    const { prisma, userJmapClient, service } = createHarness();
     prisma.mailDirectoryEntry.findUnique.mockResolvedValue({
       id: "entry-1",
       userId: "user-1",
@@ -194,7 +202,7 @@ describe("MailSyncService", () => {
       threadState: "thread-state-1",
     });
     let fullFetches = 0;
-    jmapAdminClient.callJmap.mockImplementation(
+    userJmapClient.callJmap.mockImplementation(
       async ({
         methodCalls,
       }: {
@@ -284,7 +292,7 @@ describe("MailSyncService", () => {
   });
 
   it("passes changed email records through the calendar ICS ingestion hook", async () => {
-    const { prisma, jmapAdminClient } = createHarness();
+    const { prisma, userJmapClient } = createHarness();
     const calendarImport = {
       messagesScanned: 1,
       icsPartsFound: 1,
@@ -298,7 +306,7 @@ describe("MailSyncService", () => {
     };
     const service = new MailSyncService(
       prisma as never,
-      jmapAdminClient as never,
+      userJmapClient as never,
       mailCalendarIngestion as never,
     );
     prisma.mailDirectoryEntry.findUnique.mockResolvedValue({
@@ -322,7 +330,7 @@ describe("MailSyncService", () => {
       mailboxState: "mailbox-state-2",
       threadState: "thread-state-2",
     });
-    jmapAdminClient.callJmap.mockImplementation(
+    userJmapClient.callJmap.mockImplementation(
       async ({
         methodCalls,
       }: {
@@ -406,7 +414,7 @@ describe("MailSyncService", () => {
   });
 
   it("imports recent calendar invites when establishing the initial sync state", async () => {
-    const { prisma, jmapAdminClient } = createHarness();
+    const { prisma, userJmapClient } = createHarness();
     const calendarImport = {
       messagesScanned: 1,
       icsPartsFound: 1,
@@ -420,7 +428,7 @@ describe("MailSyncService", () => {
     };
     const service = new MailSyncService(
       prisma as never,
-      jmapAdminClient as never,
+      userJmapClient as never,
       mailCalendarIngestion as never,
     );
     prisma.mailDirectoryEntry.findUnique.mockResolvedValue({
@@ -437,7 +445,7 @@ describe("MailSyncService", () => {
       mailboxState: "mailbox-state-1",
       threadState: "thread-state-1",
     });
-    jmapAdminClient.callJmap.mockImplementation(
+    userJmapClient.callJmap.mockImplementation(
       async ({
         methodCalls,
       }: {
@@ -538,7 +546,7 @@ describe("MailSyncService", () => {
   });
 
   it("syncs all known linked mail accounts for receipt-time calendar ingestion", async () => {
-    const { prisma, jmapAdminClient } = createHarness();
+    const { prisma, userJmapClient } = createHarness();
     const calendarImport = {
       messagesScanned: 1,
       icsPartsFound: 1,
@@ -552,7 +560,7 @@ describe("MailSyncService", () => {
     };
     const service = new MailSyncService(
       prisma as never,
-      jmapAdminClient as never,
+      userJmapClient as never,
       mailCalendarIngestion as never,
     );
     prisma.mailDirectoryEntry.findMany.mockResolvedValue([
@@ -578,7 +586,7 @@ describe("MailSyncService", () => {
       mailboxState: "mailbox-state-2",
       threadState: "thread-state-2",
     });
-    jmapAdminClient.callJmap.mockImplementation(
+    userJmapClient.callJmap.mockImplementation(
       async ({
         methodCalls,
       }: {
@@ -650,6 +658,7 @@ describe("MailSyncService", () => {
       select: {
         id: true,
         userId: true,
+        email: true,
         stalwartAccountId: true,
       },
     });
@@ -673,11 +682,11 @@ describe("MailSyncService", () => {
   });
 
   it("resolves ingested telemetry document ids via recent sender match", async () => {
-    const { jmapAdminClient, service } = createHarness();
+    const { userJmapClient, service } = createHarness();
     const now = new Date();
     const recentReceivedAt = now.toISOString();
     const olderReceivedAt = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
-    jmapAdminClient.callJmap.mockImplementation(
+    userJmapClient.callJmap.mockImplementation(
       async ({
         methodCalls,
       }: {
@@ -737,8 +746,8 @@ describe("MailSyncService", () => {
   });
 
   it("resolves ingested telemetry document ids via RFC Message-ID", async () => {
-    const { jmapAdminClient, service } = createHarness();
-    jmapAdminClient.callJmap.mockImplementation(
+    const { userJmapClient, service } = createHarness();
+    userJmapClient.callJmap.mockImplementation(
       async ({
         methodCalls,
       }: {

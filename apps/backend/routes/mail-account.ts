@@ -3,7 +3,7 @@ import type { IMailService } from "../contracts/mail.contract";
 import { requireAuth } from "../lib/auth-guard";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { RouteModel, routeModels } from "../contracts";
-import { defaultMailService } from "./mail";
+import { defaultMailService } from "../lib/default-mail-service";
 
 export function createMailAccountRoutes(
   mailService: IMailService = defaultMailService,
