@@ -127,10 +127,17 @@ export const env = {
 
   /**
    * 256-bit base64-encoded HMAC master key used to derive per-user vault key
-   * material server-side.  Treat as a permanent secret — rotating it makes all
+   * material server-side. Treat as a permanent secret — rotating it makes all
    * existing vaults unreadable without a password-based re-encryption.
    */
   mailVaultHmacKey: process.env.MAIL_VAULT_HMAC_KEY?.trim() || "",
+
+  /**
+   * 256-bit base64-encoded HMAC master key used to derive each user's Stalwart
+   * bridge password. Kept separate from the vault key so leaking one does not
+   * also hand over mail at rest; rotating it self-heals on the next mint.
+   */
+  mailBridgeHmacKey: process.env.MAIL_BRIDGE_HMAC_KEY?.trim() || "",
 } as const;
 
 /** Extract the origin from a URL string, returning the input on failure. */
