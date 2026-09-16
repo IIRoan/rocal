@@ -7,6 +7,9 @@ jest.mock("../../lib/mail-key-utils", () => ({
 process.env.MAIL_VAULT_HMAC_KEY = Buffer.from(
   "0123456789abcdef0123456789abcdef",
 ).toString("base64");
+process.env.MAIL_BRIDGE_HMAC_KEY = Buffer.from(
+  "fedcba9876543210fedcba9876543210",
+).toString("base64");
 
 import { MailService } from "../../services/mail.service";
 import type { StalwartAdminClientLike } from "../../lib/stalwart-admin";
