@@ -29,6 +29,8 @@ export const bootstrapBodySchema = strictZodObject({
   encryptedVaultB64: z.string().min(1).max(500_000),
   kdf: z.string().min(1).max(32),
   kdfParams: kdfParamsSchema,
+  wrappedSecret: z.string().min(1).max(8_000).nullish(),
+  wrapAlgorithm: z.string().min(1).max(64).nullish(),
 });
 
 export const vaultBackupBodySchema = strictZodObject({
@@ -36,6 +38,8 @@ export const vaultBackupBodySchema = strictZodObject({
   encryptedVaultB64: z.string().min(1).max(500_000),
   kdf: z.string().min(1).max(32),
   kdfParams: kdfParamsSchema,
+  wrappedSecret: z.string().min(1).max(8_000).nullish(),
+  wrapAlgorithm: z.string().min(1).max(64).nullish(),
 });
 
 export const mailSyncQuerySchema = strictZodObject({
@@ -128,6 +132,11 @@ export interface IMailService {
   getVaultBackupForUser(
     input: GetMailVaultBackupForUserInput,
   ): Promise<MailVaultBackupResult>;
+  getVaultWrapProgress(): Promise<{
+    wrapped: number;
+    legacy: number;
+    total: number;
+  }>;
   upsertVaultBackup(
     input: UpsertMailVaultBackupInput,
   ): Promise<MailVaultBackupResult>;

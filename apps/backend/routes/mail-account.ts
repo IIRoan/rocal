@@ -57,6 +57,13 @@ export function createMailAccountRoutes(
             email: routeUser.email ?? "",
           });
         })
+        .get("/vault-wrap-progress", {
+          detail: {
+            summary: "Count vaults still openable by the server",
+            description:
+              "Aggregate counts only, no per-user data: how many mail vaults have been re-wrapped under their owner's E2EE key. MAIL_VAULT_HMAC_KEY can only be retired once legacy reaches zero.",
+          },
+        }, async () => mailService.getVaultWrapProgress())
         .put("/vault-backup", {
           body: RouteModel.mail.vaultBackupBody,
           detail: {

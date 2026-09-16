@@ -122,6 +122,11 @@ const mockMailService = {
     },
   })),
   deleteMailboxForUser: jest.fn(async () => undefined),
+  getVaultWrapProgress: jest.fn(async () => ({
+    wrapped: 0,
+    legacy: 0,
+    total: 0,
+  })),
 };
 
 import { errorHandler } from "../../lib/errors";

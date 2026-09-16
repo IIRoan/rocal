@@ -72,6 +72,8 @@ type NormalizedProvisioningInput = {
   encryptedVaultB64: string;
   kdf: string;
   kdfParams: MailVaultKdfParams;
+  wrappedSecret?: string | null;
+  wrapAlgorithm?: string | null;
 };
 
 type LinkedMailboxRecord = {
@@ -197,6 +199,8 @@ function normalizeProvisioningInput(input: {
   encryptedVaultB64: string;
   kdf: string;
   kdfParams: MailVaultKdfParams;
+  wrappedSecret?: string | null;
+  wrapAlgorithm?: string | null;
 }): NormalizedProvisioningInput {
   const displayName = normalizeOptionalText(input.displayName);
   const publicKeyArmored = input.publicKeyArmored.trim();
@@ -247,6 +251,8 @@ function normalizeProvisioningInput(input: {
       iterations: input.kdfParams.iterations,
       parallelism: input.kdfParams.parallelism,
     },
+    wrappedSecret: normalizeOptionalText(input.wrappedSecret),
+    wrapAlgorithm: normalizeOptionalText(input.wrapAlgorithm),
   };
 }
 
@@ -732,6 +738,8 @@ export class MailService implements IMailService {
               kdfMemoryKiB: input.provisioning.kdfParams.memoryKiB,
               kdfIterations: input.provisioning.kdfParams.iterations,
               kdfParallelism: input.provisioning.kdfParams.parallelism,
+              wrappedSecret: input.provisioning.wrappedSecret ?? null,
+              wrapAlgorithm: input.provisioning.wrapAlgorithm ?? null,
             },
             update: {
               vaultVersion: input.provisioning.vaultVersion,
@@ -741,6 +749,8 @@ export class MailService implements IMailService {
               kdfMemoryKiB: input.provisioning.kdfParams.memoryKiB,
               kdfIterations: input.provisioning.kdfParams.iterations,
               kdfParallelism: input.provisioning.kdfParams.parallelism,
+              wrappedSecret: input.provisioning.wrappedSecret ?? null,
+              wrapAlgorithm: input.provisioning.wrapAlgorithm ?? null,
             },
           },
         },
@@ -1063,6 +1073,8 @@ export class MailService implements IMailService {
                   kdfMemoryKiB: input.provisioning.kdfParams.memoryKiB,
                   kdfIterations: input.provisioning.kdfParams.iterations,
                   kdfParallelism: input.provisioning.kdfParams.parallelism,
+                  wrappedSecret: input.provisioning.wrappedSecret ?? null,
+                  wrapAlgorithm: input.provisioning.wrapAlgorithm ?? null,
                 },
               },
             },
@@ -1465,6 +1477,8 @@ export class MailService implements IMailService {
             kdfMemoryKiB: true,
             kdfIterations: true,
             kdfParallelism: true,
+            wrappedSecret: true,
+            wrapAlgorithm: true,
           },
         },
       },
@@ -1487,6 +1501,8 @@ export class MailService implements IMailService {
         iterations: entry.vaultBackup.kdfIterations,
         parallelism: entry.vaultBackup.kdfParallelism,
       },
+      wrappedSecret: entry.vaultBackup.wrappedSecret,
+      wrapAlgorithm: entry.vaultBackup.wrapAlgorithm,
     };
   }
 
@@ -1518,6 +1534,8 @@ export class MailService implements IMailService {
             kdfMemoryKiB: true,
             kdfIterations: true,
             kdfParallelism: true,
+            wrappedSecret: true,
+            wrapAlgorithm: true,
           },
         },
       },
@@ -1540,6 +1558,8 @@ export class MailService implements IMailService {
         iterations: entry.vaultBackup.kdfIterations,
         parallelism: entry.vaultBackup.kdfParallelism,
       },
+      wrappedSecret: entry.vaultBackup.wrappedSecret,
+      wrapAlgorithm: entry.vaultBackup.wrapAlgorithm,
     };
   }
 
@@ -1571,6 +1591,8 @@ export class MailService implements IMailService {
               kdfMemoryKiB: input.kdfParams.memoryKiB,
               kdfIterations: input.kdfParams.iterations,
               kdfParallelism: input.kdfParams.parallelism,
+              wrappedSecret: input.wrappedSecret ?? null,
+              wrapAlgorithm: input.wrapAlgorithm ?? null,
             },
             update: {
               vaultVersion: input.vaultVersion,
@@ -1580,6 +1602,8 @@ export class MailService implements IMailService {
               kdfMemoryKiB: input.kdfParams.memoryKiB,
               kdfIterations: input.kdfParams.iterations,
               kdfParallelism: input.kdfParams.parallelism,
+              wrappedSecret: input.wrappedSecret ?? null,
+              wrapAlgorithm: input.wrapAlgorithm ?? null,
             },
           },
         },
@@ -1595,6 +1619,8 @@ export class MailService implements IMailService {
             kdfMemoryKiB: true,
             kdfIterations: true,
             kdfParallelism: true,
+            wrappedSecret: true,
+            wrapAlgorithm: true,
           },
         },
       },
@@ -1617,7 +1643,25 @@ export class MailService implements IMailService {
         iterations: record.vaultBackup.kdfIterations,
         parallelism: record.vaultBackup.kdfParallelism,
       },
+      wrappedSecret: record.vaultBackup.wrappedSecret,
+      wrapAlgorithm: record.vaultBackup.wrapAlgorithm,
     };
+  }
+
+  /** Counts vaults still openable with the server-derived passphrase. */
+  async getVaultWrapProgress(): Promise<{
+    wrapped: number;
+    legacy: number;
+    total: number;
+  }> {
+    const [total, wrapped] = await Promise.all([
+      this.prisma.mailVaultBackup.count(),
+      this.prisma.mailVaultBackup.count({
+        where: { wrappedSecret: { not: null } },
+      }),
+    ]);
+
+    return { wrapped, legacy: total - wrapped, total };
   }
 
   async upsertVaultBackupForUser(
@@ -1640,6 +1684,8 @@ export class MailService implements IMailService {
       encryptedVaultB64: input.encryptedVaultB64,
       kdf: input.kdf,
       kdfParams: input.kdfParams,
+      wrappedSecret: input.wrappedSecret,
+      wrapAlgorithm: input.wrapAlgorithm,
     });
   }
 }
