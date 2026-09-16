@@ -40,7 +40,6 @@
   "dependencies": {
     "@better-auth/core": "^1.6.13",
     "@better-auth/expo": "^1.6.13",
-    "@better-auth/oauth-provider": "1.6.13",
     "@better-auth/passkey": "^1.6.13",
     "@better-auth/utils": "^0.4.1",
     "@better-fetch/fetch": "^1.1.21",

@@ -1,6 +1,5 @@
 import { Elysia } from "elysia";
 import type { IMailService, MailOAuthConfig } from "../contracts/mail.contract";
-import { BETTER_AUTH_BASE_PATH } from "../lib/auth-constants";
 import { createLogger } from "@workspace/logger";
 import { prisma } from "../lib/prisma";
 import { env } from "../lib/env";
@@ -393,24 +392,8 @@ function summarizeUpstreamErrorBody(
 }
 
 function buildMailOAuthConfig(): MailOAuthConfig {
-  const authBaseUrl = `${normalizeBaseUrl(env.backendUrl)}${BETTER_AUTH_BASE_PATH}`;
-  const audiences =
-    env.mailOauthAudiences.length > 0
-      ? env.mailOauthAudiences
-      : [env.stalwartBaseUrl];
-
   return {
-    issuer: authBaseUrl,
-    discoveryUrl: `${authBaseUrl}/.well-known/openid-configuration`,
-    authorizationEndpoint: `${authBaseUrl}/oauth2/authorize`,
-    tokenEndpoint: `${authBaseUrl}/oauth2/token`,
-    userinfoEndpoint: `${authBaseUrl}/oauth2/userinfo`,
-    jwksUri: `${authBaseUrl}/jwks`,
     mailTokenEndpoint: `${normalizeBaseUrl(env.backendUrl)}/api/mail/oauth/access-token`,
-    clientId: env.mailOauthBrowserClientId,
-    redirectUri: env.mailOauthBrowserRedirectUris[0] || "",
-    scopes: env.mailOauthScopes,
-    audiences,
   };
 }
 

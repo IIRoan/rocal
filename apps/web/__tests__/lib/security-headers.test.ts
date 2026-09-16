@@ -3,7 +3,6 @@ import { describe, expect, it } from "@jest/globals";
 import {
   buildContentSecurityPolicy,
   buildSecurityHeaderRoutes,
-  MAIL_OAUTH_CALLBACK_PATH,
   PERMISSIONS_POLICY,
 } from "../../lib/security-headers";
 
@@ -104,13 +103,12 @@ describe("buildSecurityHeaderRoutes", () => {
     }
   });
 
-  it("lets only the mail OAuth callback be framed by the app itself", () => {
+  it("never allows the app to be framed", () => {
     const routes = buildSecurityHeaderRoutes(PRODUCTION_ENV);
-    const callback = routes.at(-1);
-    const headers = headerMap(callback?.headers ?? []);
+    const headers = headerMap(routes.at(-1)?.headers ?? []);
 
-    expect(callback?.source).toBe(MAIL_OAUTH_CALLBACK_PATH);
-    expect(headers["X-Frame-Options"]).toBe("SAMEORIGIN");
-    expect(headers["Content-Security-Policy"]).toContain("frame-ancestors 'self'");
+    expect(routes).toHaveLength(1);
+    expect(headers["X-Frame-Options"]).toBe("DENY");
+    expect(headers["Content-Security-Policy"]).toContain("frame-ancestors 'none'");
   });
 });
