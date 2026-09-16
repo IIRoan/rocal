@@ -26,7 +26,6 @@ describe("refreshMailRuntimePolicy", () => {
         discoveryBaseUrl: "https://mail.solace.onl",
         signupEnabled: true,
         oauth: {} as MailRuntime["config"]["oauth"],
-        vaultKeyMaterialEndpoint: "https://api.solace.test/api/mail/vault-key-material",
       },
       client: {
         syncMailServerPolicy: jest.fn(),

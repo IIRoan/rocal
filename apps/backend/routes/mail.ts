@@ -45,34 +45,9 @@ function normalizeBaseUrl(baseUrl: string): string {
 
 const logger = createLogger("backend:mail-jmap-proxy");
 
-const VAULT_KEY_MATERIAL_RATE_LIMIT = { requests: 10, windowMs: 60_000 };
 // Deliberately loose: real clients are chatty, and this only has to make
 // bearer guessing against Stalwart impractical.
 const JMAP_PROXY_RATE_LIMIT = { requests: 1200, windowMs: 60_000 };
-
-async function deriveVaultKeyMaterial(userId: string): Promise<string> {
-  const hmacKey = env.mailVaultHmacKey;
-  if (!hmacKey) {
-    throw new Error(
-      "MAIL_VAULT_HMAC_KEY is not configured on this server. Set it to a permanent random base64 secret.",
-    );
-  }
-  const rawKey = Uint8Array.from(atob(hmacKey), (c) => c.charCodeAt(0));
-  const key = await crypto.subtle.importKey(
-    "raw",
-    rawKey,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const message = new TextEncoder().encode(`${userId}:vault-key:v1`);
-  const signature = await crypto.subtle.sign("HMAC", key, message);
-  return Buffer.from(signature)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
 
 function classifyJmapProxyOperation(upstreamPath: string): string {
   if (upstreamPath.includes("/upload/")) return "blob-upload";
@@ -917,46 +892,6 @@ export function createMailRoutes(
             );
           }
         })
-          .get("/vault-key-material", {
-            detail: {
-              ...authDetail.detail,
-              summary: "Get server-derived vault key material",
-              description:
-                "Returns HMAC-SHA256 key material unique to the authenticated user. The client derives the vault encryption key from it; the server never computes that key.",
-            },
-          }, async ({ routeUser, status }) => {
-            const userId = routeUser.id;
-            try {
-              enforceRateLimit({
-                storeId: "vault-key-material",
-                key: userId,
-                limit: VAULT_KEY_MATERIAL_RATE_LIMIT,
-              });
-            } catch (error) {
-              if (error instanceof RateLimitError) {
-                return status(429, {
-                  error: "Too many requests",
-                  message: error.message,
-                  statusCode: 429,
-                  timestamp: new Date().toISOString(),
-                });
-              }
-              throw error;
-            }
-            try {
-              const keyMaterial = await deriveVaultKeyMaterial(userId);
-              return { keyMaterial, version: "v1" };
-            } catch (err) {
-              const message = errorMessage(
-                err,
-                "Could not derive vault key material.",
-              );
-              return status(
-                500,
-                createApiErrorBody(500, "vault_key_error", message),
-              );
-            }
-          }),
       ),
     );
 }

@@ -27,7 +27,6 @@ export const defaultMailService = new MailService(
     defaultDomain: env.stalwartDefaultDomain,
     discoveryBaseUrl: publicJmapProxyBaseUrl,
     oauth: buildMailOAuthConfig(),
-    vaultKeyMaterialEndpoint: `${normalizeBaseUrl(env.backendUrl)}/api/mail/vault-key-material`,
     stalwartOauthClientId: getStalwartMailBridgeClientId(),
     stalwartOauthRedirectUri: buildStalwartMailBridgeRedirectUri(),
   },

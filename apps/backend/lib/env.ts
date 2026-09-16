@@ -128,12 +128,6 @@ export const env = {
     process.env.STALWART_WEBHOOK_URL?.trim() ||
     `${process.env.BACKEND_URL || DEV_BACKEND_URL}/api/internal/stalwart/webhook`,
 
-  /**
-   * 256-bit base64-encoded HMAC master key used to derive per-user vault key
-   * material server-side. Treat as a permanent secret — rotating it makes all
-   * existing vaults unreadable without a password-based re-encryption.
-   */
-  mailVaultHmacKey: process.env.MAIL_VAULT_HMAC_KEY?.trim() || "",
 
   /**
    * 256-bit base64-encoded HMAC master key used to derive each user's Stalwart

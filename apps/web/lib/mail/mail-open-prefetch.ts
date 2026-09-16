@@ -11,14 +11,6 @@ import type { JmapSession, MailDemoConfig } from "./types";
 
 const log = createLogger("mail-open-prefetch");
 
-export type MailVaultKeyMaterialResult = {
-  keyMaterial: string;
-  derivedKeyB64: string | null;
-  version: string;
-  /** True when derivedKeyB64 came from IndexedDB rather than a fresh derive. */
-  usedCachedDerivedKey: boolean;
-};
-
 export type MailOpenPrefetch = {
   key: string;
   userId: string;
@@ -26,7 +18,6 @@ export type MailOpenPrefetch = {
   tokenManager: ReturnType<typeof createMailOAuthTokenManager>;
   client: StalwartJmapClient;
   discoveryPromise: Promise<JmapSession>;
-  keyMaterialPromise: Promise<MailVaultKeyMaterialResult | null>;
 };
 
 let activePrefetch: MailOpenPrefetch | null = null;
@@ -36,58 +27,12 @@ function prefetchKey(userId: string, config: MailDemoConfig): string {
     userId,
     config.discoveryBaseUrl,
     config.oauth.mailTokenEndpoint ?? "",
-    config.vaultKeyMaterialEndpoint,
   ].join("|");
 }
 
 /**
- * Fetch vault key material, preferring a browser-cached derived AES key so the
- * client can skip the argon2id pass on repeat opens.
- */
-export async function fetchVaultKeyMaterialForOpen(input: {
-  endpoint: string;
-  userId: string;
-}): Promise<MailVaultKeyMaterialResult | null> {
-  const cachedDerivedKey = await getStoredDerivedVaultKey(input.userId).catch(
-    () => null,
-  );
-
-  const result = await mailDemoApiService.getVaultKeyMaterial(input.endpoint);
-  return {
-    keyMaterial: result.keyMaterial,
-    derivedKeyB64: cachedDerivedKey,
-    version: result.version,
-    usedCachedDerivedKey: Boolean(cachedDerivedKey),
-  };
-}
-
-/** Drop a bad cached derived key; the next unlock re-derives it locally. */
-export async function refreshVaultKeyMaterialAfterCacheMiss(input: {
-  endpoint: string;
-  userId: string;
-}): Promise<MailVaultKeyMaterialResult | null> {
-  await Promise.resolve(deleteStoredDerivedVaultKey(input.userId)).catch(
-    () => undefined,
-  );
-  try {
-    const result = await mailDemoApiService.getVaultKeyMaterial(input.endpoint);
-    return {
-      keyMaterial: result.keyMaterial,
-      derivedKeyB64: null,
-      version: result.version,
-      usedCachedDerivedKey: false,
-    };
-  } catch (error) {
-    log.warn("Failed to refresh vault key material after cache miss", {
-      error,
-    });
-    return null;
-  }
-}
-
-/**
- * Warm mail OAuth token + JMAP discovery (+ vault key material) as soon as the
- * session/config are known, so handleSignIn does not start from a cold network.
+ * Warm the mail OAuth token and JMAP discovery as soon as the session/config
+ * are known, so handleSignIn does not start from a cold network.
  */
 export function ensureMailOpenPrefetch(input: {
   userId: string;
@@ -126,14 +71,6 @@ export function ensureMailOpenPrefetch(input: {
     throw error;
   });
 
-  const keyMaterialPromise = fetchVaultKeyMaterialForOpen({
-    endpoint: input.config.vaultKeyMaterialEndpoint,
-    userId,
-  }).catch((error) => {
-    log.warn("Vault key material prefetch failed", { error });
-    return null;
-  });
-
   activePrefetch = {
     key,
     userId,
@@ -141,7 +78,6 @@ export function ensureMailOpenPrefetch(input: {
     tokenManager,
     client,
     discoveryPromise,
-    keyMaterialPromise,
   };
 
   log.debug("Started mail open prefetch", { userId });

@@ -29,6 +29,8 @@ export type MailBootstrapRequest = {
   encryptedVaultB64: string;
   kdf: string;
   kdfParams: MailVaultKdfParams;
+  wrappedSecret: string;
+  wrapAlgorithm: string;
 };
 
 export type MailAddress = {

@@ -39,8 +39,6 @@ const mockMailService = {
     discoveryBaseUrl: "http://localhost:8080",
     signupEnabled: true,
     oauth: mockMailOAuthConfig,
-    vaultKeyMaterialEndpoint:
-      "https://api.solace.test/api/mail/vault-key-material",
   })),
   issueAccessTokenForUser: jest.fn(async () => ({
     access_token: "stalwart-access-token",
@@ -760,8 +758,6 @@ describe("mailRoutes", () => {
       discoveryBaseUrl: "http://localhost:8080",
       signupEnabled: true,
       oauth: mockMailOAuthConfig,
-      vaultKeyMaterialEndpoint:
-        "https://api.solace.test/api/mail/vault-key-material",
     });
   });
 
