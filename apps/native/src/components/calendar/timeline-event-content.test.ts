@@ -3,8 +3,11 @@ import {
   formatTimelineEventTime,
   resolveTimelineEventDensity,
   shouldShowEncryptionIcon,
+  TIMELINE_MIN_EVENT_HEIGHT_PX,
+  timelineDisplayMinutes,
   timelineEventHeight,
   timelineEventTitleLines,
+  timelineMinEventMinutes,
 } from "./timeline-event-content";
 
 const TIMEZONE = "Europe/Amsterdam";
@@ -91,5 +94,26 @@ describe("timelineEventTitleLines", () => {
 
   it("lets a 45-minute event wrap instead of ellipsizing immediately", () => {
     expect(timelineEventTitleLines("stacked", 45)).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("timeline minimum event height", () => {
+  it("lays out short events tall enough to tap", () => {
+    const minutes = timelineMinEventMinutes(72);
+    expect(timelineEventHeight(minutes, 72)).toBeGreaterThanOrEqual(
+      TIMELINE_MIN_EVENT_HEIGHT_PX,
+    );
+  });
+
+  it("pads a 5-minute event to the minimum but keeps longer events intact", () => {
+    expect(timelineDisplayMinutes(5, 72)).toBe(timelineMinEventMinutes(72));
+    expect(timelineDisplayMinutes(60, 72)).toBe(60);
+  });
+
+  it("gives a padded 5-minute event a readable stacked title", () => {
+    const durationMinutes = timelineDisplayMinutes(5);
+    const density = resolveTimelineEventDensity({ durationMinutes });
+    expect(density).toBe("stacked");
+    expect(timelineEventTitleLines(density, durationMinutes)).toBeGreaterThanOrEqual(2);
   });
 });
