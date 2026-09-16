@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { MailSyncResult } from "./mail-sync.service";
 import { coalescePendingMailSync } from "../lib/inbound-mail-push";
 import { errorLogDetails } from "../lib/log-sanitization";
+import type { MailAccessTokenProvider } from "../lib/stalwart-user-jmap";
 
 export type MailChangedEvent = {
   type: "mail.changed";
@@ -125,9 +126,18 @@ async function* parseSseStream(
   }
 }
 
+type MailboxOwner = {
+  userId: string;
+  email: string;
+};
+
 type MailRealtimeSubscriber = {
   accountIds: Set<string>;
   onEvent: (event: MailChangedEvent) => void;
+};
+
+type AccountListener = {
+  abortController: AbortController;
 };
 
 type MailRealtimeSyncProvider = {
@@ -170,12 +180,12 @@ export class MailRealtimeService {
   private started = false;
   private receiptPollId: ReturnType<typeof setInterval> | null = null;
   private receiptPollRunning = false;
-  private listenerAbortController: AbortController | null = null;
+  private readonly listenersByAccountId = new Map<string, AccountListener>();
 
   constructor(
     private readonly input: {
       eventSourceUrl: string;
-      adminToken: string;
+      tokens: MailAccessTokenProvider;
       fetcher?: typeof fetch;
       reconnectDelayMs?: number;
       receiptPollIntervalMs?: number;
@@ -190,17 +200,7 @@ export class MailRealtimeService {
     }
 
     this.started = true;
-    this.listenerAbortController = new AbortController();
     this.startReceiptPolling();
-
-    if (!this.input.adminToken.trim()) {
-      logger.warn(
-        "Mail EventSource listener disabled because STALWART_ADMIN_TOKEN is missing; receipt-time JMAP polling remains active.",
-      );
-      return;
-    }
-
-    void this.listenForever();
   }
 
   stop(): void {
@@ -215,13 +215,16 @@ export class MailRealtimeService {
     this.flushTimerByAccountId.clear();
     this.pendingByAccountId.clear();
     this.syncInFlightByAccountId.clear();
-    this.listenerAbortController?.abort();
-    this.listenerAbortController = null;
+    for (const listener of this.listenersByAccountId.values()) {
+      listener.abortController.abort();
+    }
+    this.listenersByAccountId.clear();
   }
 
   subscribe(input: {
     subscriberId: string;
     accountIds: string[];
+    owner: MailboxOwner;
     onEvent: (event: MailChangedEvent) => void;
   }): () => void {
     this.unsubscribe(input.subscriberId);
@@ -233,6 +236,7 @@ export class MailRealtimeService {
       const subscribers = this.subscribersByAccountId.get(accountId) ?? new Set();
       subscribers.add(input.subscriberId);
       this.subscribersByAccountId.set(accountId, subscribers);
+      this.ensureAccountListener(accountId, input.owner);
     }
 
     return () => {
@@ -271,6 +275,8 @@ export class MailRealtimeService {
       subscribers.delete(subscriberId);
       if (subscribers.size === 0) {
         this.subscribersByAccountId.delete(accountId);
+        this.listenersByAccountId.get(accountId)?.abortController.abort();
+        this.listenersByAccountId.delete(accountId);
       }
     }
   }
@@ -462,30 +468,48 @@ export class MailRealtimeService {
     this.receiptPollId = setInterval(poll, intervalMs);
   }
 
-  private async listenForever(): Promise<void> {
-    const reconnectDelayMs = this.input.reconnectDelayMs ?? 3000;
-    const signal = this.listenerAbortController?.signal;
+  /** One EventSource per subscribed account, authorized as that account's owner. */
+  private ensureAccountListener(accountId: string, owner: MailboxOwner): void {
+    if (this.listenersByAccountId.has(accountId)) {
+      return;
+    }
 
-    while (this.started && !signal?.aborted) {
+    const abortController = new AbortController();
+    this.listenersByAccountId.set(accountId, { abortController });
+    void this.listenForever(accountId, owner, abortController.signal);
+  }
+
+  private async listenForever(
+    accountId: string,
+    owner: MailboxOwner,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const reconnectDelayMs = this.input.reconnectDelayMs ?? 3000;
+
+    while (!signal.aborted) {
       try {
-        logger.info("Connecting to Stalwart JMAP EventSource");
-        await this.consumeEventSource(signal);
-        if (!this.started || signal?.aborted) {
+        logger.info("Connecting to Stalwart JMAP EventSource", { accountId });
+        await this.consumeEventSource(accountId, owner, signal);
+        if (signal.aborted) {
           break;
         }
         logger.warn(
           "Stalwart JMAP EventSource connection closed; reconnecting.",
+          { accountId },
         );
       } catch (error) {
-        if (signal?.aborted || !this.started) {
+        if (signal.aborted) {
           break;
         }
-        logger.error("Stalwart JMAP EventSource listener failed", errorLogDetails(error));
+        logger.error("Stalwart JMAP EventSource listener failed", {
+          accountId,
+          ...errorLogDetails(error),
+        });
       }
 
       await new Promise<void>((resolve) => {
         const timeoutId = setTimeout(resolve, reconnectDelayMs);
-        signal?.addEventListener(
+        signal.addEventListener(
           "abort",
           () => {
             clearTimeout(timeoutId);
@@ -497,18 +521,30 @@ export class MailRealtimeService {
     }
   }
 
-  private async consumeEventSource(signal?: AbortSignal): Promise<void> {
-    const response = await (this.input.fetcher ?? fetch)(
-      buildSseRequestUrl(this.input.eventSourceUrl),
-      {
+  private async consumeEventSource(
+    accountId: string,
+    owner: MailboxOwner,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const fetcher = this.input.fetcher ?? fetch;
+    const url = buildSseRequestUrl(this.input.eventSourceUrl);
+    const open = async () => {
+      const token = await this.input.tokens.getAccessTokenForUser(owner);
+      return fetcher(url, {
         method: "GET",
         signal,
         headers: {
           Accept: "text/event-stream",
-          Authorization: `Bearer ${this.input.adminToken}`,
+          Authorization: `Bearer ${token.access_token}`,
         },
-      },
-    );
+      });
+    };
+
+    let response = await open();
+    if (response.status === 401) {
+      this.input.tokens.invalidateAccessTokenForUser(owner.userId);
+      response = await open();
+    }
 
     if (!response.ok || !response.body) {
       throw new Error(
@@ -516,10 +552,10 @@ export class MailRealtimeService {
       );
     }
 
-    logger.info("Connected to Stalwart JMAP EventSource");
+    logger.info("Connected to Stalwart JMAP EventSource", { accountId });
 
     for await (const frame of parseSseStream(response.body)) {
-      if (signal?.aborted || !this.started) {
+      if (signal.aborted) {
         return;
       }
 
@@ -530,9 +566,8 @@ export class MailRealtimeService {
       const payload = stalwartStateChangeSchema.parse(
         JSON.parse(frame.data),
       ) as StalwartStateChange;
-      const events = normalizeMailChangedEvents(payload);
 
-      for (const event of events) {
+      for (const event of normalizeMailChangedEvents(payload)) {
         logger.info("Received Stalwart mail state change", {
           accountId: event.accountId,
           changedTypes: event.changedTypes,

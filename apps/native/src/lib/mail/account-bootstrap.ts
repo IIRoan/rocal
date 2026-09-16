@@ -4,25 +4,19 @@ import {
   bootstrapAccountMailbox,
   getMailAccountStatus,
   getMailConfig,
-  getVaultKeyMaterial,
 } from "./mail-api";
 import {
   createEncryptedMailVault,
   type UserKeyVault,
 } from "./native-vault-crypto";
-import { loadMailVaultPassword } from "./mail-password-cache";
-import type {
-  MailSignupResponse,
-  MailVaultKdfParams,
-} from "./types";
+import {
+  generateVaultSecret,
+  VAULT_WRAP_ALGORITHM,
+  wrapVaultSecret,
+} from "./vault-secret";
+import type { MailSignupResponse } from "./types";
 
 const log = createLogger("native:mail-bootstrap");
-
-const KEY_MATERIAL_KDF: Partial<MailVaultKdfParams> = {
-  memoryKiB: 8192,
-  iterations: 1,
-  parallelism: 1,
-};
 
 function normalizeOptionalText(value?: string | null): string | null {
   const normalized = value?.trim() || "";
@@ -68,10 +62,9 @@ export async function bootstrapMailboxForAccount(input: {
 }): Promise<MailSignupResponse> {
   const email = normalizeEmail(input.email);
   const displayName = normalizeOptionalText(input.displayName);
-  const [config, status, storedPassword] = await Promise.all([
+  const [config, status] = await Promise.all([
     getMailConfig(),
     getMailAccountStatus(),
-    loadMailVaultPassword(),
   ]);
 
   if (status.provisioned) {
@@ -82,24 +75,11 @@ export async function bootstrapMailboxForAccount(input: {
     throw new Error("Mailbox setup is not enabled for this environment.");
   }
 
-  let keyMaterial: string | null = null;
-  try {
-    keyMaterial = (
-      await getVaultKeyMaterial(config.vaultKeyMaterialEndpoint)
-    ).keyMaterial;
-  } catch (error) {
-    log.warn(
-      "Could not fetch vault key material during native mailbox bootstrap",
-      {
-        error,
-      },
-    );
-  }
-
-  const vaultPassphrase = keyMaterial ?? storedPassword;
-  if (!vaultPassphrase) {
+  const vaultSecret = generateVaultSecret();
+  const wrappedSecret = await wrapVaultSecret(vaultSecret);
+  if (!wrappedSecret) {
     throw new Error(
-      "Mailbox setup needs either server vault key material or your saved sign-in password. Sign out and sign back in with your email password once, then try again.",
+      "Mailbox setup needs your encryption keys unlocked on this device. Sign in again, then retry.",
     );
   }
 
@@ -107,7 +87,7 @@ export async function bootstrapMailboxForAccount(input: {
   const generated = await generateMailboxKeyPair({
     email,
     displayName,
-    passphrase: vaultPassphrase,
+    passphrase: vaultSecret,
   });
 
   const vault: UserKeyVault = {
@@ -127,11 +107,7 @@ export async function bootstrapMailboxForAccount(input: {
     createdAt,
   };
 
-  const encryptedVault = await createEncryptedMailVault(
-    vault,
-    vaultPassphrase,
-    keyMaterial ? KEY_MATERIAL_KDF : undefined,
-  );
+  const encryptedVault = await createEncryptedMailVault(vault, vaultSecret);
 
   return bootstrapAccountMailbox({
     publicKeyArmored: generated.publicKeyArmored,
@@ -142,5 +118,7 @@ export async function bootstrapMailboxForAccount(input: {
     encryptedVaultB64: encryptedVault.encryptedVaultB64,
     kdf: encryptedVault.kdf,
     kdfParams: encryptedVault.kdfParams,
+    wrappedSecret,
+    wrapAlgorithm: VAULT_WRAP_ALGORITHM,
   });
 }

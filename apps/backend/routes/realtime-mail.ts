@@ -3,8 +3,10 @@ import { createLogger } from "@workspace/logger";
 import { Elysia } from "elysia";
 import { requireAuth } from "../lib/auth-guard";
 import { env } from "../lib/env";
+import { unauthorizedBody } from "../lib/api-error-response";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { MailRealtimeService } from "../services/mail-realtime.service";
+import { defaultMailService } from "../lib/default-mail-service";
 import type { MailSyncService } from "../services/mail-sync.service";
 import { defaultMailSyncService } from "./mail-sync";
 import { logRef } from "../lib/log-sanitization";
@@ -14,7 +16,7 @@ const encoder = new TextEncoder();
 
 export const defaultMailRealtimeService = new MailRealtimeService({
   eventSourceUrl: `${env.stalwartBaseUrl.replace(/\/+$/, "")}/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}`,
-  adminToken: env.stalwartAdminToken,
+  tokens: defaultMailService,
   syncProvider: defaultMailSyncService,
   receiptPollIntervalMs: 10_000,
 });
@@ -61,7 +63,15 @@ export function createRealtimeMailRoutes(
           description:
             "Streams mail.changed events for the authenticated user's authorized mail accounts without exposing mailbox content.",
         },
-      }, async ({ routeUser, request }) => {
+      }, async ({ routeUser, request, status }) => {
+        const email = routeUser.email?.trim();
+        if (!email) {
+          return status(
+            401,
+            unauthorizedBody("A valid session is required for mail events."),
+          );
+        }
+
         const accountIds =
           await mailSyncService.listAuthorizedAccountIdsForUser(routeUser.id);
         const stream = new TransformStream<Uint8Array, Uint8Array>();
@@ -73,6 +83,7 @@ export function createRealtimeMailRoutes(
         const unsubscribe = realtimeService.subscribe({
           subscriberId,
           accountIds,
+          owner: { userId: routeUser.id, email },
           onEvent: (event) => {
             scheduleWrite(
               writer,

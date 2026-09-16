@@ -26,6 +26,8 @@ model User {
   image          String?
   createdAt      DateTime           @default(now()) @map("created_at")
   updatedAt      DateTime           @updatedAt @map("updated_at")
+  /// Set when the backend approves this account for a mailbox; null blocks provisioning.
+  mailboxApprovedAt DateTime?       @map("mailbox_approved_at")
   sessions       Session[]
   accounts       Account[]
   // Calendar relationships
@@ -602,6 +604,9 @@ model MailVaultBackup {
   directoryEntry    MailDirectoryEntry @relation(fields: [directoryEntryId], references: [id], onDelete: Cascade)
   vaultVersion      Int               @map("vault_version")
   encryptedVaultB64 String            @map("encrypted_vault_b64")
+  /// Vault passphrase encrypted to the user's E2EE account key; null means the vault is still server-derivable.
+  wrappedSecret     String?           @map("wrapped_secret")
+  wrapAlgorithm     String?           @map("wrap_algorithm")
   kdf               String
   kdfSaltB64        String            @map("kdf_salt_b64")
   kdfMemoryKiB      Int               @map("kdf_memory_kib")

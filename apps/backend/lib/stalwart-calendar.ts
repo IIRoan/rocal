@@ -1,5 +1,11 @@
 import { createLogger } from "@workspace/logger";
 import { env } from "./env";
+import type { MailAccessTokenProvider } from "./stalwart-user-jmap";
+
+/** Calendar JMAP runs as the account owner, so each call resolves its credentials. */
+export type CalendarAccountOwnerResolver = (
+  accountId: string,
+) => Promise<{ userId: string; email: string }>;
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -195,20 +201,24 @@ function assertNoSetError(
 
 export class StalwartCalendarClient implements StalwartCalendarClientLike {
   private readonly baseUrl: string;
-  private readonly adminToken: string;
+  private readonly tokens: MailAccessTokenProvider;
+  private readonly resolveOwner: CalendarAccountOwnerResolver;
   private readonly fetcher: Fetcher;
 
   constructor({
     baseUrl,
-    adminToken,
+    tokens,
+    resolveOwner,
     fetcher = fetch,
   }: {
     baseUrl: string;
-    adminToken: string;
+    tokens: MailAccessTokenProvider;
+    resolveOwner: CalendarAccountOwnerResolver;
     fetcher?: Fetcher;
   }) {
     this.baseUrl = normalizeBaseUrl(baseUrl);
-    this.adminToken = adminToken.trim();
+    this.tokens = tokens;
+    this.resolveOwner = resolveOwner;
     this.fetcher = fetcher;
   }
 
@@ -216,18 +226,29 @@ export class StalwartCalendarClient implements StalwartCalendarClientLike {
     using: string[];
     methodCalls: StalwartJmapMethodCall[];
   }): Promise<StalwartJmapEnvelope> {
-    if (!this.adminToken) {
-      throw new Error("Stalwart calendar integration requires an admin token.");
+    const accountId = input.methodCalls[0]?.[1]?.accountId;
+    if (typeof accountId !== "string" || !accountId) {
+      throw new Error("Stalwart calendar JMAP calls require an accountId.");
     }
 
-    const response = await this.fetcher(`${this.baseUrl}/jmap/`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.adminToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(input),
-    });
+    const owner = await this.resolveOwner(accountId);
+    const send = async () => {
+      const token = await this.tokens.getAccessTokenForUser(owner);
+      return this.fetcher(`${this.baseUrl}/jmap/`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(input),
+      });
+    };
+
+    let response = await send();
+    if (response.status === 401) {
+      this.tokens.invalidateAccessTokenForUser(owner.userId);
+      response = await send();
+    }
 
     if (!response.ok) {
       const details = await response.text().catch(() => "");
@@ -611,19 +632,16 @@ export class StalwartCalendarClient implements StalwartCalendarClientLike {
   }
 }
 
-export function createStalwartCalendarClient(config?: {
+export function createStalwartCalendarClient(config: {
+  tokens: MailAccessTokenProvider;
+  resolveOwner: CalendarAccountOwnerResolver;
   baseUrl?: string;
-  adminToken?: string;
   fetcher?: Fetcher;
-}): StalwartCalendarClientLike | null {
-  const adminToken = config?.adminToken ?? env.stalwartAdminToken;
-  if (!adminToken.trim()) {
-    return null;
-  }
-
+}): StalwartCalendarClientLike {
   return new StalwartCalendarClient({
-    baseUrl: config?.baseUrl || env.stalwartBaseUrl,
-    adminToken,
-    fetcher: config?.fetcher,
+    baseUrl: config.baseUrl || env.stalwartBaseUrl,
+    tokens: config.tokens,
+    resolveOwner: config.resolveOwner,
+    fetcher: config.fetcher,
   });
 }

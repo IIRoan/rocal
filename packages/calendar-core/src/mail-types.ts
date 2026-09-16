@@ -16,17 +16,7 @@ export type MailVaultKdfParams = {
   iterations: number;
   parallelism: number;
 };export type MailOAuthConfig = {
-  issuer: string;
-  discoveryUrl: string;
-  authorizationEndpoint: string;
-  tokenEndpoint: string;
-  userinfoEndpoint: string;
-  jwksUri: string;
   mailTokenEndpoint: string;
-  clientId: string;
-  redirectUri: string;
-  scopes: string[];
-  audiences: string[];
 };
 
 export type { MailServerPolicyConfig } from "./mail-server-policy";
@@ -38,7 +28,6 @@ export type MailDemoConfig = {
   discoveryBaseUrl: string;
   signupEnabled: boolean;
   oauth: MailOAuthConfig;
-  vaultKeyMaterialEndpoint: string;
   serverLimits?: MailServerLimitsConfig | null;
 };
 
@@ -46,6 +35,8 @@ export type MailAccountStatus = {
   email: string;
   displayName: string | null;
   provisioned: boolean;
+  /** Whether the backend has approved this account for a mailbox. */
+  mailboxApproved?: boolean;
 };
 
 export type MailSignup = {
@@ -71,4 +62,7 @@ export type MailVaultBackup = {
   encryptedVaultB64: string;
   kdf: string;
   kdfParams: MailVaultKdfParams;
+  /** Vault passphrase sealed to the user's E2EE account key; null while legacy. */
+  wrappedSecret?: string | null;
+  wrapAlgorithm?: string | null;
 };

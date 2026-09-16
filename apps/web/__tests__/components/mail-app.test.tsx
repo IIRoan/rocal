@@ -160,7 +160,6 @@ jest.mock("../../lib/mail/api-service", () => ({
     getAccountStatus: jest.fn(),
     bootstrapAccountMailbox: jest.fn(),
     getAccountVaultBackup: jest.fn(),
-    getVaultKeyMaterial: jest.fn(),
     getVaultBackup: jest.fn(),
     getRecipientKey: jest.fn(),
     upsertVaultBackup: jest.fn(),
@@ -203,6 +202,14 @@ jest.mock("postal-mime", () => ({
   default: {
     parse: (jest.fn() as any).mockResolvedValue({ text: "", html: null }),
   },
+}));
+
+jest.mock("../../lib/mail/vault-secret", () => ({
+  VAULT_WRAP_ALGORITHM: "e2ee-account-key-v1",
+  generateVaultSecret: () => "sealed-secret",
+  wrapVaultSecret: async (secret: string) => `wrapped:${secret}`,
+  unwrapVaultSecret: async (wrapped: string) =>
+    typeof wrapped === "string" ? wrapped.replace(/^wrapped:/, "") : null,
 }));
 
 jest.mock("../../lib/mail/vault-crypto", () => ({
@@ -578,16 +585,11 @@ describe("MailApp", () => {
       discoveryBaseUrl: "http://192.168.2.213:8080",
       signupEnabled: true,
       oauth: mockMailOAuthConfig,
-      vaultKeyMaterialEndpoint: "https://api.solace.test/api/mail/vault-key-material",
     });
     mockApi.getAccountStatus.mockResolvedValue({
       email: "alice@solace.onl",
       displayName: "Alice Example",
       provisioned: true,
-    });
-    mockApi.getVaultKeyMaterial.mockResolvedValue({
-      keyMaterial: "server-derived-key-material",
-      version: "v1",
     });
     mockApi.getRecipientKey.mockResolvedValue({
       email: "bob@solace.onl",
@@ -654,6 +656,8 @@ describe("MailApp", () => {
       email: "alice@solace.onl",
       vaultVersion: 1,
       encryptedVaultB64: "vault-b64",
+      wrappedSecret: "wrapped:sealed-secret",
+      wrapAlgorithm: "e2ee-account-key-v1",
       kdf: "argon2id",
       kdfParams: {
         saltB64: "salt-b64",
@@ -787,13 +791,12 @@ describe("MailApp", () => {
     });
   }
 
-  it("auto-provisions and opens the mailbox on first visit using the cached auth password", async () => {
+  it("auto-provisions and opens the mailbox on first visit", async () => {
     mockApi.getAccountStatus.mockResolvedValueOnce({
       email: "alice@solace.onl",
       displayName: "Alice Example",
       provisioned: false,
     });
-    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
 
     await renderApp();
@@ -802,7 +805,7 @@ describe("MailApp", () => {
       expect(mockWorkerClient.generateKeyPair).toHaveBeenCalledWith({
         name: "Alice Example",
         email: "alice@solace.onl",
-        privateKeyPassphrase: "StrongMailboxPassword!42",
+        privateKeyPassphrase: "sealed-secret",
       });
     });
     expect(mockCreateEncryptedMailVault).toHaveBeenCalledWith(
@@ -811,8 +814,7 @@ describe("MailApp", () => {
         publicKeyArmored: "public-key-armored",
         encryptedPrivateKeyArmored: "private-key-armored",
       }),
-      "StrongMailboxPassword!42",
-      undefined,
+      "sealed-secret",
     );
     expect(mockApi.bootstrapAccountMailbox).toHaveBeenCalledWith({
       publicKeyArmored: "public-key-armored",
@@ -821,6 +823,8 @@ describe("MailApp", () => {
       createdAt: expect.any(String),
       vaultVersion: 1,
       encryptedVaultB64: "vault-b64",
+      wrappedSecret: "wrapped:sealed-secret",
+      wrapAlgorithm: "e2ee-account-key-v1",
       kdf: "argon2id",
       kdfParams: {
         saltB64: "salt-b64",
@@ -836,13 +840,14 @@ describe("MailApp", () => {
     expect(mockApi.getAccountVaultBackup).toHaveBeenCalled();
     expect(mockUnlockEncryptedMailVault).toHaveBeenCalledWith(
       "vault-b64",
-      "StrongMailboxPassword!42",
+      "sealed-secret",
       {
         saltB64: "salt-b64",
         memoryKiB: 65536,
         iterations: 3,
         parallelism: 4,
       },
+      expect.any(Function),
     );
     expect(container.textContent).toContain("Encrypted hello");
   });
@@ -879,27 +884,29 @@ describe("MailApp", () => {
     expect(mockToastError).not.toHaveBeenCalled();
   });
 
-  it("does not prompt for a mailbox password when automatic migration prerequisites are missing", async () => {
+  it("provisions a mailbox on first visit without any password", async () => {
     mockApi.getAccountStatus.mockResolvedValueOnce({
       email: "alice@solace.onl",
       displayName: "Alice Example",
       provisioned: false,
     });
-    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
+    mockPeekCachedAuthPassword.mockReturnValue(null);
 
     await renderApp();
 
     await waitForExpectation(() => {
-      expect(mockToastError).toHaveBeenCalledWith(
-        "This mailbox still needs a one-time password migration. Sign out and sign back in with your email password once to finish automatic unlocking.",
-      );
+      expect(mockApi.bootstrapAccountMailbox).toHaveBeenCalled();
     });
+    const payload = mockApi.bootstrapAccountMailbox.mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >;
+    expect(payload).not.toHaveProperty("password");
+    expect(payload.wrappedSecret).toBe("wrapped:sealed-secret");
     expect(container.textContent).not.toContain("One-time mailbox migration");
-    expect(mockApi.bootstrapAccountMailbox).not.toHaveBeenCalled();
   });
 
   it("signs in with JMAP credentials, unlocks the vault, and renders inbox messages", async () => {
-    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
 
     await renderApp();
@@ -907,17 +914,18 @@ describe("MailApp", () => {
     expect(mockApi.getAccountVaultBackup).toHaveBeenCalled();
     expect(mockUnlockEncryptedMailVault).toHaveBeenCalledWith(
       "vault-b64",
-      "StrongMailboxPassword!42",
+      "sealed-secret",
       {
         saltB64: "salt-b64",
         memoryKiB: 65536,
         iterations: 3,
         parallelism: 4,
       },
+      expect.any(Function),
     );
     expect(mockWorkerClient.loadVault).toHaveBeenCalledWith({
       privateKeyArmored: "private-key-armored",
-      privateKeyPassphrase: "StrongMailboxPassword!42",
+      privateKeyPassphrase: "sealed-secret",
       publicKeyArmored: "public-key-armored",
     });
     expect(container.textContent).toContain("Encrypted hello");
@@ -925,7 +933,6 @@ describe("MailApp", () => {
   });
 
   it("automatically opens a provisioned mailbox when the auth password is still cached", async () => {
-    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
 
     await renderApp();
@@ -934,13 +941,14 @@ describe("MailApp", () => {
       expect(mockApi.getAccountVaultBackup).toHaveBeenCalled();
       expect(mockUnlockEncryptedMailVault).toHaveBeenCalledWith(
         "vault-b64",
-        "StrongMailboxPassword!42",
+        "sealed-secret",
         {
           saltB64: "salt-b64",
           memoryKiB: 65536,
           iterations: 3,
           parallelism: 4,
         },
+        expect.any(Function),
       );
     });
     expect(container.textContent).toContain("Encrypted hello");
@@ -1382,7 +1390,6 @@ describe("MailApp", () => {
 
   it("shows the loading skeleton instead of the migration prompt while auto-opening with the cached auth password", async () => {
     let resolveUnlock: ((value: any) => void) | null = null;
-    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockUnlockEncryptedMailVault.mockImplementation(
       () =>
@@ -1427,7 +1434,6 @@ describe("MailApp", () => {
   });
 
   it("loads messages for the selected mailbox folder", async () => {
-    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages.mockImplementation(
@@ -1491,7 +1497,6 @@ describe("MailApp", () => {
   });
 
   it("sends plaintext mail without looking up recipient keys", async () => {
-    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages.mockResolvedValue({
@@ -1649,7 +1654,6 @@ describe("MailApp", () => {
   });
 
   it("encrypts internal mail before sending it through the JMAP proxy", async () => {
-    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages.mockResolvedValue({
@@ -1738,7 +1742,6 @@ describe("MailApp", () => {
   });
 
   it("adds a sent quick reply into the active conversation immediately", async () => {
-    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockResolvedValue({
       messages: [
@@ -1811,7 +1814,6 @@ describe("MailApp", () => {
         autoSelectReplyIdentity: false,
       }),
     );
-    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockResolvedValue({
       messages: [
@@ -1913,9 +1915,8 @@ describe("MailApp", () => {
     expect(mockInitEncPasswordFromCookie).toHaveBeenCalled();
   });
 
-  it("auto-opens the mailbox when the encrypted cookie restores the password after mount", async () => {
+  it("auto-opens the mailbox once async boot finishes after mount", async () => {
     let resolveCookieInit: (() => void) | null = null;
-    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockInitEncPasswordFromCookie.mockImplementation(
       () =>
         new Promise<void>((resolve) => {
@@ -1946,8 +1947,9 @@ describe("MailApp", () => {
 
     expect(mockUnlockEncryptedMailVault).toHaveBeenCalledWith(
       "vault-b64",
-      "StrongMailboxPassword!42",
+      "sealed-secret",
       expect.any(Object),
+      expect.any(Function),
     );
     expect(container.textContent).toContain("Encrypted hello");
   });

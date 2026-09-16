@@ -396,6 +396,7 @@ export async function unlockEncryptedMailVault(
   encryptedVaultB64: string,
   passphrase: string,
   kdfParams: MailVaultKdfParams,
+  onDerivedKey?: (keyB64: string) => void,
 ): Promise<UserKeyVault> {
   log.debug("[vault-crypto] unlockEncryptedMailVault: starting", {
     kdf: "argon2id",
@@ -419,6 +420,7 @@ export async function unlockEncryptedMailVault(
 
     // 2. Derive the AES-GCM key from the passphrase using pure-JS argon2id
     const keyBytes = await deriveVaultKeyBytes(passphrase, kdfParams);
+    onDerivedKey?.(bytesToBase64(keyBytes));
 
     // 3. Decode IV and ciphertext
     const ivBytes = base64ToBytes(envelope.ivB64);

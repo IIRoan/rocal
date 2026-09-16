@@ -1,9 +1,14 @@
 import { authClient } from "../auth-client";
 import { mailDemoApiService } from "./api-service";
-import type { MailSignupResponse, MailVaultKdfParams, UserKeyVault } from "./types";
+import type { MailSignupResponse, UserKeyVault } from "./types";
 import { createEncryptedMailVault } from "./vault-crypto";
 import { putStoredMailVault } from "./vault-storage";
 import { mailCryptoWorkerClient } from "./worker-client";
+import {
+  generateVaultSecret,
+  VAULT_WRAP_ALGORITHM,
+  wrapVaultSecret,
+} from "./vault-secret";
 
 const SESSION_RETRY_DELAYS_MS = [0, 75, 150, 300, 500] as const;
 const BOOTSTRAP_RETRY_DELAYS_MS = [0, 150, 300] as const;
@@ -83,20 +88,27 @@ async function waitForAuthenticatedUser(input: {
   );
 }
 
+/** Provisions the mailbox and seals its vault to the account key in one step. */
 export async function bootstrapMailboxForAccount(input: {
   email: string;
-  /** Vault passphrase — either a user-typed password or the server-derived key material. */
-  password: string;
   displayName?: string | null;
   userId?: string;
-  kdfOverrides?: Partial<MailVaultKdfParams>;
-}): Promise<MailSignupResponse> {
+}): Promise<{ mailbox: MailSignupResponse; vaultSecret: string }> {
   const authenticatedUser = await waitForAuthenticatedUser(input);
+
+  const vaultSecret = generateVaultSecret();
+  const wrappedSecret = await wrapVaultSecret(vaultSecret);
+  if (!wrappedSecret) {
+    throw new Error(
+      "Mailbox setup needs your encryption keys unlocked on this device. Sign in again, then retry.",
+    );
+  }
+
   const createdAt = new Date().toISOString();
   const generated = await mailCryptoWorkerClient.generateKeyPair({
     name: authenticatedUser.displayName || authenticatedUser.email,
     email: authenticatedUser.email,
-    privateKeyPassphrase: input.password,
+    privateKeyPassphrase: vaultSecret,
   });
   const vault: UserKeyVault = {
     userId: authenticatedUser.userId,
@@ -114,11 +126,7 @@ export async function bootstrapMailboxForAccount(input: {
     vaultVersion: 1,
     createdAt,
   };
-  const encryptedVault = await createEncryptedMailVault(
-    vault,
-    input.password,
-    input.kdfOverrides,
-  );
+  const encryptedVault = await createEncryptedMailVault(vault, vaultSecret);
 
   let provisionedMailbox: MailSignupResponse | null = null;
 
@@ -143,6 +151,8 @@ export async function bootstrapMailboxForAccount(input: {
         encryptedVaultB64: encryptedVault.encryptedVaultB64,
         kdf: encryptedVault.kdf,
         kdfParams: encryptedVault.kdfParams,
+        wrappedSecret,
+        wrapAlgorithm: VAULT_WRAP_ALGORITHM,
       });
       break;
     } catch (error) {
@@ -171,5 +181,5 @@ export async function bootstrapMailboxForAccount(input: {
     kdfParams: encryptedVault.kdfParams,
   });
 
-  return provisionedMailbox;
+  return { mailbox: provisionedMailbox, vaultSecret };
 }

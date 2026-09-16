@@ -20,7 +20,9 @@ function createMockPrisma() {
       findUnique: jest.fn<() => Promise<{ id: string } | null>>(
         async () => null,
       ),
+      updateMany: jest.fn(async () => ({ count: 1 })),
     },
+    $transaction: jest.fn(async (ops: unknown[]) => Promise.all(ops as never)),
     invite: {
       findFirst: jest.fn<() => Promise<Partial<InviteRow> | null>>(
         async () => null,
@@ -238,5 +240,33 @@ describe("InviteService", () => {
       allowed: false,
       reason: "That email address is reserved.",
     });
+  });
+
+  it("approves the account for a mailbox when its invite is accepted", async () => {
+    prisma.invite.findFirst.mockResolvedValueOnce({
+      id: "invite-1",
+      email: "friend@example.com",
+      status: "claimed",
+      claimedForEmail: "friend@solace.onl",
+    });
+
+    await service.markInviteAccepted("Friend@solace.onl");
+
+    expect(prisma.invite.update).toHaveBeenCalledWith({
+      where: { id: "invite-1" },
+      data: { status: "accepted" },
+    });
+    expect(prisma.user.updateMany).toHaveBeenCalledWith({
+      where: { email: "friend@solace.onl", mailboxApprovedAt: null },
+      data: { mailboxApprovedAt: expect.any(Date) },
+    });
+  });
+
+  it("approves nobody when there is no invite to accept", async () => {
+    prisma.invite.findFirst.mockResolvedValueOnce(null);
+
+    await service.markInviteAccepted("stranger@solace.onl");
+
+    expect(prisma.user.updateMany).not.toHaveBeenCalled();
   });
 });

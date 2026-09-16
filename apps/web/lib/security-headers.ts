@@ -10,9 +10,6 @@ type SecurityHeaderEnv = {
 
 type Header = { key: string; value: string };
 
-/** Silent mail OAuth renders this page inside a same-origin hidden iframe. */
-export const MAIL_OAUTH_CALLBACK_PATH = "/mail/oauth/callback";
-
 function toOrigin(value: string | undefined): string | null {
   if (!value?.trim()) return null;
   try {
@@ -27,10 +24,7 @@ function unique(values: Array<string | null>): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
 }
 
-export function buildContentSecurityPolicy(
-  env: SecurityHeaderEnv,
-  options: { allowSameOriginFraming?: boolean } = {},
-): string {
+export function buildContentSecurityPolicy(env: SecurityHeaderEnv): string {
   const isDev = env.NODE_ENV === "development";
   const apiOrigin = toOrigin(env.NEXT_PUBLIC_API_URL);
   const appOrigin = toOrigin(env.NEXT_PUBLIC_APP_URL);
@@ -69,7 +63,7 @@ export function buildContentSecurityPolicy(
     ["object-src", ["'none'"]],
     ["base-uri", ["'self'"]],
     ["form-action", unique(["'self'", apiOrigin])],
-    ["frame-ancestors", [options.allowSameOriginFraming ? "'self'" : "'none'"]],
+    ["frame-ancestors", ["'none'"]],
   ];
 
   const policy = directives.map(([name, sources]) => `${name} ${sources.join(" ")}`);
@@ -113,17 +107,5 @@ function buildBaseHeaders(env: SecurityHeaderEnv): Header[] {
 
 /** Entries for `headers()` in next.config.ts. Later entries override earlier keys. */
 export function buildSecurityHeaderRoutes(env: SecurityHeaderEnv) {
-  return [
-    { source: "/:path*", headers: buildBaseHeaders(env) },
-    {
-      source: MAIL_OAUTH_CALLBACK_PATH,
-      headers: [
-        { key: "X-Frame-Options", value: "SAMEORIGIN" },
-        {
-          key: "Content-Security-Policy",
-          value: buildContentSecurityPolicy(env, { allowSameOriginFraming: true }),
-        },
-      ],
-    },
-  ];
+  return [{ source: "/:path*", headers: buildBaseHeaders(env) }];
 }

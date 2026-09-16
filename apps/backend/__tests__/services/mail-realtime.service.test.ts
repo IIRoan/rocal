@@ -11,6 +11,20 @@ import {
   type MailChangedEvent,
 } from "../../services/mail-realtime.service";
 
+function createTokens() {
+  return {
+    getAccessTokenForUser: jest.fn(async () => ({ access_token: "owner-token" })),
+    invalidateAccessTokenForUser: jest.fn(),
+  };
+}
+
+/** Listeners open on subscribe, so tests that only poll still need a stub stream. */
+function idleFetcher() {
+  return jest.fn(async () => new Response(null, { status: 204 })) as unknown as typeof fetch;
+}
+
+const OWNER = { userId: "user-1", email: "alice@solace.onl" };
+
 function createSyncPayload(changedTypes: string[] = ["Email"]) {
   return {
     accountId: "acct-1",
@@ -120,7 +134,7 @@ describe("mail realtime service", () => {
     const service = new MailRealtimeService({
       eventSourceUrl:
         "https://mail.example.com/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
-      adminToken: "token-1",
+      tokens: createTokens(),
     });
     const accountOneEvents: MailChangedEvent[] = [];
     const accountTwoEvents: MailChangedEvent[] = [];
@@ -128,6 +142,7 @@ describe("mail realtime service", () => {
     service.subscribe({
       subscriberId: "sub-1",
       accountIds: ["acct-1"],
+      owner: OWNER,
       onEvent: (event) => {
         accountOneEvents.push(event);
       },
@@ -135,6 +150,7 @@ describe("mail realtime service", () => {
     service.subscribe({
       subscriberId: "sub-2",
       accountIds: ["acct-2"],
+      owner: OWNER,
       onEvent: (event) => {
         accountTwoEvents.push(event);
       },
@@ -164,7 +180,8 @@ describe("mail realtime service", () => {
     const service = new MailRealtimeService({
       eventSourceUrl:
         "https://mail.example.com/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
-      adminToken: "",
+      tokens: createTokens(),
+      fetcher: idleFetcher(),
       notificationThrottleMs: 25,
       receiptPollIntervalMs: 60_000,
       syncProvider: {
@@ -182,6 +199,7 @@ describe("mail realtime service", () => {
     service.subscribe({
       subscriberId: "sub-1",
       accountIds: ["acct-1"],
+      owner: OWNER,
       onEvent: (event) => {
         events.push(event);
       },
@@ -212,7 +230,7 @@ describe("mail realtime service", () => {
     const service = new MailRealtimeService({
       eventSourceUrl:
         "https://mail.example.com/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
-      adminToken: "token-1",
+      tokens: createTokens(),
       notificationThrottleMs: 50,
       syncProvider: {
         syncKnownChangedAccounts: jest.fn(async () => []),
@@ -225,6 +243,7 @@ describe("mail realtime service", () => {
     service.subscribe({
       subscriberId: "sub-1",
       accountIds: ["acct-1"],
+      owner: OWNER,
       onEvent: (event) => {
         firstSubscriberEvents.push(event);
       },
@@ -232,6 +251,7 @@ describe("mail realtime service", () => {
     service.subscribe({
       subscriberId: "sub-2",
       accountIds: ["acct-1"],
+      owner: OWNER,
       onEvent: (event) => {
         secondSubscriberEvents.push(event);
       },
@@ -294,7 +314,7 @@ describe("mail realtime service", () => {
     const service = new MailRealtimeService({
       eventSourceUrl:
         "https://mail.example.com/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
-      adminToken: "token-1",
+      tokens: createTokens(),
       notificationThrottleMs: 40,
       syncProvider: {
         syncKnownChangedAccounts: jest.fn(async () => []),
@@ -304,6 +324,7 @@ describe("mail realtime service", () => {
     service.subscribe({
       subscriberId: "sub-1",
       accountIds: ["acct-1"],
+      owner: OWNER,
       onEvent: () => undefined,
     });
 
@@ -350,7 +371,7 @@ describe("mail realtime service", () => {
     const events: MailChangedEvent[] = [];
     const service = new MailRealtimeService({
       eventSourceUrl: EVENT_SOURCE_URL,
-      adminToken: "token-1",
+      tokens: createTokens(),
       notificationThrottleMs: 50,
       syncProvider: {
         syncKnownChangedAccounts: jest.fn(async () => []),
@@ -360,6 +381,7 @@ describe("mail realtime service", () => {
     service.subscribe({
       subscriberId: "sub-1",
       accountIds: ["acct-1"],
+      owner: OWNER,
       onEvent: (event) => {
         events.push(event);
       },
@@ -408,7 +430,7 @@ describe("mail realtime service", () => {
     const events: MailChangedEvent[] = [];
     const service = new MailRealtimeService({
       eventSourceUrl: EVENT_SOURCE_URL,
-      adminToken: "token-1",
+      tokens: createTokens(),
       notificationThrottleMs: 50,
       syncProvider: {
         syncKnownChangedAccounts: jest.fn(async () => []),
@@ -418,6 +440,7 @@ describe("mail realtime service", () => {
     service.subscribe({
       subscriberId: "sub-1",
       accountIds: ["acct-1"],
+      owner: OWNER,
       onEvent: (event) => {
         events.push(event);
       },
@@ -466,7 +489,7 @@ describe("mail realtime service", () => {
     const events: MailChangedEvent[] = [];
     const service = new MailRealtimeService({
       eventSourceUrl: EVENT_SOURCE_URL,
-      adminToken: "token-1",
+      tokens: createTokens(),
       notificationThrottleMs: 50,
       syncProvider: {
         syncKnownChangedAccounts: jest.fn(async () => []),
@@ -476,6 +499,7 @@ describe("mail realtime service", () => {
     service.subscribe({
       subscriberId: "sub-1",
       accountIds: ["acct-1"],
+      owner: OWNER,
       onEvent: (event) => {
         events.push(event);
       },
@@ -534,12 +558,13 @@ describe("mail realtime service", () => {
     const events: MailChangedEvent[] = [];
     const service = new MailRealtimeService({
       eventSourceUrl: EVENT_SOURCE_URL,
-      adminToken: "token-1",
+      tokens: createTokens(),
       notificationThrottleMs: 50,
     });
     service.subscribe({
       subscriberId: "sub-1",
       accountIds: ["acct-1"],
+      owner: OWNER,
       onEvent: (event) => {
         events.push(event);
       },
@@ -583,7 +608,8 @@ describe("mail realtime service", () => {
     const events: MailChangedEvent[] = [];
     const service = new MailRealtimeService({
       eventSourceUrl: EVENT_SOURCE_URL,
-      adminToken: "",
+      tokens: createTokens(),
+      fetcher: idleFetcher(),
       notificationThrottleMs: 25,
       receiptPollIntervalMs: 60_000,
       syncProvider: {
@@ -599,6 +625,7 @@ describe("mail realtime service", () => {
     service.subscribe({
       subscriberId: "sub-1",
       accountIds: ["acct-1"],
+      owner: OWNER,
       onEvent: (event) => {
         events.push(event);
       },
@@ -618,7 +645,47 @@ describe("mail realtime service", () => {
     ]);
   });
 
-  it("aborts the active EventSource listener when stopped", async () => {
+  it("opens one owner-authorized EventSource per subscribed account", async () => {
+    const signals: AbortSignal[] = [];
+    const fetcher = jest.fn(
+      async (_url: string, init?: RequestInit): Promise<Response> => {
+        const signal = init?.signal as AbortSignal | undefined;
+        if (signal) signals.push(signal);
+        await new Promise<void>((resolve) => {
+          signal?.addEventListener("abort", () => resolve(), { once: true });
+        });
+        throw new Error("aborted");
+      },
+    );
+    const tokens = createTokens();
+    const service = new MailRealtimeService({
+      eventSourceUrl: EVENT_SOURCE_URL,
+      tokens,
+      fetcher: fetcher as unknown as typeof fetch,
+      reconnectDelayMs: 60_000,
+    });
+
+    const unsubscribe = service.subscribe({
+      subscriberId: "sub-1",
+      accountIds: ["acct-1"],
+      owner: OWNER,
+      onEvent: () => undefined,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(tokens.getAccessTokenForUser).toHaveBeenCalledWith(OWNER);
+    const headers = (fetcher.mock.calls[0]?.[1]?.headers ?? {}) as Record<
+      string,
+      string
+    >;
+    expect(headers.Authorization).toBe("Bearer owner-token");
+
+    unsubscribe();
+    expect(signals[0]?.aborted).toBe(true);
+  });
+
+  it("aborts active EventSource listeners when stopped", async () => {
     let capturedSignal: AbortSignal | undefined;
     const fetcher = jest.fn(
       async (_url: string, init?: RequestInit): Promise<Response> => {
@@ -632,14 +699,20 @@ describe("mail realtime service", () => {
       },
     );
     const service = new MailRealtimeService({
-      eventSourceUrl:
-        "https://mail.example.com/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
-      adminToken: "token-1",
+      eventSourceUrl: EVENT_SOURCE_URL,
+      tokens: createTokens(),
       fetcher: fetcher as unknown as typeof fetch,
       reconnectDelayMs: 60_000,
     });
 
     service.start();
+    service.subscribe({
+      subscriberId: "sub-1",
+      accountIds: ["acct-1"],
+      owner: OWNER,
+      onEvent: () => undefined,
+    });
+    await Promise.resolve();
     await Promise.resolve();
     service.stop();
     await Promise.resolve();

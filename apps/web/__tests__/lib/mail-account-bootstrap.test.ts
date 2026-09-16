@@ -6,6 +6,15 @@ jest.mock("../../lib/auth-client", () => ({
   },
 }));
 
+const mockWrapVaultSecret = jest.fn(
+  async (secret: string): Promise<string | null> => `wrapped:${secret}`,
+);
+jest.mock("../../lib/mail/vault-secret", () => ({
+  VAULT_WRAP_ALGORITHM: "e2ee-account-key-v1",
+  generateVaultSecret: () => "sealed-secret",
+  wrapVaultSecret: (secret: string) => mockWrapVaultSecret(secret),
+}));
+
 jest.mock("../../lib/mail/api-service", () => ({
   mailDemoApiService: {
     bootstrapAccountMailbox: jest.fn(),
@@ -75,13 +84,12 @@ describe("bootstrapMailboxForAccount", () => {
       userId: "user-1",
       email: "Alice@Solace.Onl",
       displayName: "  Alice Example  ",
-      password: "StrongMailboxPassword!42",
     });
 
     expect(mailCryptoWorkerClient.generateKeyPair).toHaveBeenCalledWith({
       name: "Alice Example",
       email: "alice@solace.onl",
-      privateKeyPassphrase: "StrongMailboxPassword!42",
+      privateKeyPassphrase: "sealed-secret",
     });
     expect(createEncryptedMailVault).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -93,8 +101,7 @@ describe("bootstrapMailboxForAccount", () => {
         kdf: "argon2id",
         vaultVersion: 1,
       }),
-      "StrongMailboxPassword!42",
-      undefined,
+      "sealed-secret",
     );
     expect(mockBootstrapAccountMailbox).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -128,12 +135,15 @@ describe("bootstrapMailboxForAccount", () => {
       },
     });
     expect(result).toEqual({
-      email: "alice@solace.onl",
-      displayName: "Alice Example",
-      stalwartAccountId: "acct-1",
-      stalwartPublicKeyId: "pk-1",
-      fingerprint: "ABCD1234EF567890",
-      encryptionAtRestEnabled: true,
+      mailbox: {
+        email: "alice@solace.onl",
+        displayName: "Alice Example",
+        stalwartAccountId: "acct-1",
+        stalwartPublicKeyId: "pk-1",
+        fingerprint: "ABCD1234EF567890",
+        encryptionAtRestEnabled: true,
+      },
+      vaultSecret: "sealed-secret",
     });
   });
 
@@ -155,12 +165,13 @@ describe("bootstrapMailboxForAccount", () => {
         userId: "user-1",
         email: "alice@solace.onl",
         displayName: "Alice Example",
-        password: "StrongMailboxPassword!42",
       }),
     ).resolves.toEqual(
       expect.objectContaining({
-        email: "alice@solace.onl",
-        stalwartAccountId: "acct-1",
+        mailbox: expect.objectContaining({
+          email: "alice@solace.onl",
+          stalwartAccountId: "acct-1",
+        }),
       }),
     );
 
@@ -183,12 +194,13 @@ describe("bootstrapMailboxForAccount", () => {
       bootstrapMailboxForAccount({
         email: "pending@solace.onl",
         displayName: "Fallback Name",
-        password: "StrongMailboxPassword!42",
       }),
     ).resolves.toEqual(
       expect.objectContaining({
-        email: "alice@solace.onl",
-        stalwartAccountId: "acct-1",
+        mailbox: expect.objectContaining({
+          email: "alice@solace.onl",
+          stalwartAccountId: "acct-1",
+        }),
       }),
     );
 
@@ -196,7 +208,7 @@ describe("bootstrapMailboxForAccount", () => {
     expect(mailCryptoWorkerClient.generateKeyPair).toHaveBeenCalledWith({
       name: "Bob Example",
       email: "bob@solace.onl",
-      privateKeyPassphrase: "StrongMailboxPassword!42",
+      privateKeyPassphrase: "sealed-secret",
     });
   });
 
@@ -220,12 +232,13 @@ describe("bootstrapMailboxForAccount", () => {
           userId: "user-1",
           email: "alice@solace.onl",
           displayName: "Alice Example",
-          password: "StrongMailboxPassword!42",
         }),
       ).resolves.toEqual(
         expect.objectContaining({
-          email: "alice@solace.onl",
-          stalwartAccountId: "acct-1",
+          mailbox: expect.objectContaining({
+            email: "alice@solace.onl",
+            stalwartAccountId: "acct-1",
+          }),
         }),
       );
 
@@ -248,7 +261,6 @@ describe("bootstrapMailboxForAccount", () => {
         userId: "user-1",
         email: "alice@solace.onl",
         displayName: "Alice Example",
-        password: "StrongMailboxPassword!42",
       }),
     ).rejects.toBe(error);
 
@@ -271,7 +283,6 @@ describe("bootstrapMailboxForAccount", () => {
         userId: "user-1",
         email: "alice@solace.onl",
         displayName: "Alice Example",
-        password: "StrongMailboxPassword!42",
       }),
     ).rejects.toBe(error);
 
@@ -286,7 +297,6 @@ describe("bootstrapMailboxForAccount", () => {
       bootstrapMailboxForAccount({
         email: "alice@solace.onl",
         displayName: "Alice Example",
-        password: "StrongMailboxPassword!42",
       }),
     ).rejects.toThrow(
       "Your account was created, but the authenticated session was not ready for mailbox setup.",

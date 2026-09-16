@@ -1,7 +1,6 @@
 import { betterAuth } from "better-auth";
 import { Manifest } from "elysia";
 import { expo } from "@better-auth/expo";
-import { oauthProvider } from "@better-auth/oauth-provider";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { passkey } from "@better-auth/passkey";
 import { createAuthMiddleware } from "@better-auth/core/api";
@@ -11,7 +10,6 @@ import { createLogger } from "@workspace/logger";
 import { prisma } from "./prisma";
 import {
   env,
-  getMailOauthConfigurationErrors,
   isDeployedEnvironment,
   resolveBetterAuthSecret,
 } from "./env";
@@ -29,16 +27,6 @@ import {
   setVerifiedPasskeyStepUpCookie,
 } from "./passkey-step-up";
 import { expireLegacyHostScopedAuthCookies } from "./auth-cookie-migration";
-import {
-  buildMailOauthAccessTokenClaims,
-  buildMailOauthUserInfoClaims,
-} from "./mail-oauth-claims";
-import { runMailOauthClientSeedTasks } from "./mail-oauth-bootstrap";
-import {
-  buildManagedMailOauthClientState,
-  managedMailOauthClientNeedsUpdate,
-  type ManagedMailOauthClientInput,
-} from "./mail-oauth-managed-client";
 import { inviteService } from "./invite-service";
 import { passkeyBridgeFreshSessionPlugin } from "./passkey-bridge-session";
 import {
@@ -54,25 +42,7 @@ const {
   frontendUrl,
   isProduction,
   cookieSameSite,
-  mailOauthEnabled,
-  mailOauthClientId,
-  mailOauthClientSecret,
-  mailOauthClientName,
-  mailOauthRedirectUris,
-  mailOauthBrowserClientId,
-  mailOauthBrowserClientName,
-  mailOauthBrowserRedirectUris,
-  mailOauthPostLogoutRedirectUris,
-  mailOauthScopes,
-  mailOauthAudiences,
-  mailOauthCachedTrustedClientIds,
-  mailOauthLoginPage,
-  mailOauthConsentPage,
-  mailOauthPairwiseSecret,
-  stalwartBaseUrl,
 } = env;
-
-export const isMailOauthEnabled = mailOauthEnabled;
 
 const skipStateCookieCheck =
   process.env.AUTH_SKIP_STATE_COOKIE_CHECK === "true" ||
@@ -190,72 +160,6 @@ const resolveFrontendRouteUrl = (
     input?.trim() || fallbackPath,
     frontendUrl.replace(/\/+$/, "") + "/",
   ).toString();
-
-const mailOauthTrustedClientIds = [
-  ...mailOauthCachedTrustedClientIds,
-  mailOauthClientId,
-  mailOauthBrowserClientId,
-].flatMap((value) => {
-  const trimmed = value.trim();
-  return trimmed ? [trimmed] : [];
-});
-
-const mailOauthValidAudiences =
-  mailOauthAudiences.length > 0 ? mailOauthAudiences : [stalwartBaseUrl];
-
-const mailOauthLoginPageUrl = resolveFrontendRouteUrl(
-  mailOauthLoginPage,
-  "/login",
-);
-const mailOauthConsentPageUrl = resolveFrontendRouteUrl(
-  mailOauthConsentPage,
-  "/mail/oauth/consent",
-);
-const mailOauthIssuer = `${normalizeBaseUrl(backendUrl)}${BETTER_AUTH_BASE_PATH}`;
-const mailOauthConfigurationErrors = getMailOauthConfigurationErrors({
-  clientId: mailOauthClientId,
-  redirectUris: mailOauthRedirectUris,
-  browserClientId: mailOauthBrowserClientId,
-  browserRedirectUris: mailOauthBrowserRedirectUris,
-});
-
-if (isMailOauthEnabled && mailOauthConfigurationErrors.length > 0) {
-  throw new Error(mailOauthConfigurationErrors[0]!);
-}
-
-const mailOauthProviderPlugin = isMailOauthEnabled
-  ? oauthProvider({
-    scopes: mailOauthScopes,
-    validAudiences: mailOauthValidAudiences,
-    cachedTrustedClients: new Set(mailOauthTrustedClientIds),
-    loginPage: mailOauthLoginPageUrl,
-    consentPage: mailOauthConsentPageUrl,
-    allowDynamicClientRegistration: false,
-    silenceWarnings: {
-      oauthAuthServerConfig: true,
-      openidConfig: true,
-    },
-    advertisedMetadata: {
-      scopes_supported: mailOauthScopes,
-    },
-    customAccessTokenClaims: ({ user, scopes, resource, metadata }) =>
-      buildMailOauthAccessTokenClaims({
-        user,
-        scopes,
-        resource,
-        metadata,
-      }),
-    customUserInfoClaims: ({ scopes, jwt }) =>
-      buildMailOauthUserInfoClaims({
-        defaultIssuer: mailOauthIssuer,
-        scopes,
-        jwt: jwt as Record<string, unknown>,
-      }),
-    pairwiseSecret: mailOauthPairwiseSecret || undefined,
-    generateClientId: () => crypto.randomUUID(),
-    generateClientSecret: () => crypto.randomUUID(),
-  })
-  : null;
 
 const passwordSecurityUrl = new URL(
   "/login",
@@ -520,7 +424,6 @@ const authPlugins = [
       createJwk: async (data) => createCachedJwk(data),
     },
   }),
-  ...(mailOauthProviderPlugin ? [mailOauthProviderPlugin] : []),
 ];
 
 export const auth = betterAuth({
@@ -630,126 +533,3 @@ export const auth = betterAuth({
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }) as any;
-
-async function findOAuthClientById(clientId: string) {
-  return prisma.oauthClient.findUnique({
-    where: { clientId },
-    select: {
-      clientId: true,
-      clientSecret: true,
-      name: true,
-      redirectUris: true,
-      postLogoutRedirectUris: true,
-      tokenEndpointAuthMethod: true,
-      grantTypes: true,
-      responseTypes: true,
-      type: true,
-      skipConsent: true,
-      enableEndSession: true,
-      metadata: true,
-    },
-  });
-}
-
-async function ensureManagedMailOAuthClient(input: ManagedMailOauthClientInput) {
-  const existingClient = await findOAuthClientById(input.clientId);
-  const desiredClient = buildManagedMailOauthClientState({
-    client: input,
-    audiences: mailOauthValidAudiences,
-    issuer: mailOauthIssuer,
-  });
-  const isPublicClient = desiredClient.tokenEndpointAuthMethod === "none";
-
-  if (!isPublicClient) {
-    throw new Error(
-      `Managed confidential mail OAuth client '${input.clientId}' is not supported during startup reconciliation.`,
-    );
-  }
-
-  const managedClientData = {
-    clientSecret: null,
-    disabled: false,
-    scopes: mailOauthScopes,
-    name: desiredClient.name,
-    redirectUris: desiredClient.redirectUris,
-    postLogoutRedirectUris: desiredClient.postLogoutRedirectUris,
-    tokenEndpointAuthMethod: desiredClient.tokenEndpointAuthMethod,
-    grantTypes: desiredClient.grantTypes,
-    responseTypes: desiredClient.responseTypes,
-    public: true,
-    type: desiredClient.type,
-    skipConsent: desiredClient.skipConsent,
-    enableEndSession: desiredClient.enableEndSession,
-    requirePKCE: true,
-    metadata: desiredClient.metadata,
-  } as const;
-
-  if (existingClient) {
-    if (
-      managedMailOauthClientNeedsUpdate({
-        existing: existingClient,
-        desired: desiredClient,
-      })
-    ) {
-      logger.info("Updating managed mail OAuth client", {
-        clientId: input.clientId,
-        redirectUris: input.redirectUris,
-        audiences: mailOauthValidAudiences,
-      });
-
-      await prisma.oauthClient.update({
-        where: { clientId: input.clientId },
-        data: managedClientData,
-      });
-
-      return findOAuthClientById(input.clientId);
-    }
-
-    return existingClient;
-  }
-
-  logger.info("Seeding managed mail OAuth client", {
-    clientId: input.clientId,
-    redirectUris: input.redirectUris,
-    audiences: mailOauthValidAudiences,
-  });
-
-  return prisma.oauthClient.create({
-    data: {
-      clientId: input.clientId,
-      ...managedClientData,
-    },
-  });
-}
-
-export async function ensureMailOAuthClients() {
-  if (!isMailOauthEnabled) {
-    return [];
-  }
-
-  const managedClients = [
-    {
-      clientId: mailOauthClientId,
-      clientName: mailOauthClientName,
-      redirectUris: mailOauthRedirectUris,
-      clientSecret: mailOauthClientSecret || undefined,
-      postLogoutRedirectUris: mailOauthPostLogoutRedirectUris,
-      tokenEndpointAuthMethod: mailOauthClientSecret
-        ? "client_secret_basic"
-        : "none",
-      type: mailOauthClientSecret ? "web" : "user-agent-based",
-      enableEndSession: mailOauthPostLogoutRedirectUris.length > 0,
-    },
-    {
-      clientId: mailOauthBrowserClientId,
-      clientName: mailOauthBrowserClientName,
-      redirectUris: mailOauthBrowserRedirectUris,
-      tokenEndpointAuthMethod: "none",
-      type: "user-agent-based",
-    },
-  ] as const;
-
-  return runMailOauthClientSeedTasks(
-    managedClients.map((client) => () => ensureManagedMailOAuthClient(client)),
-  );
-}
