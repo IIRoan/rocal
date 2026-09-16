@@ -16,17 +16,7 @@ export type MailVaultKdfParams = {
   iterations: number;
   parallelism: number;
 };export type MailOAuthConfig = {
-  issuer: string;
-  discoveryUrl: string;
-  authorizationEndpoint: string;
-  tokenEndpoint: string;
-  userinfoEndpoint: string;
-  jwksUri: string;
   mailTokenEndpoint: string;
-  clientId: string;
-  redirectUri: string;
-  scopes: string[];
-  audiences: string[];
 };
 
 export type { MailServerPolicyConfig } from "./mail-server-policy";
