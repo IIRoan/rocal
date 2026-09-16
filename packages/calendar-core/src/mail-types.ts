@@ -28,7 +28,6 @@ export type MailDemoConfig = {
   discoveryBaseUrl: string;
   signupEnabled: boolean;
   oauth: MailOAuthConfig;
-  vaultKeyMaterialEndpoint: string;
   serverLimits?: MailServerLimitsConfig | null;
 };
 
@@ -36,6 +35,8 @@ export type MailAccountStatus = {
   email: string;
   displayName: string | null;
   provisioned: boolean;
+  /** Whether the backend has approved this account for a mailbox. */
+  mailboxApproved?: boolean;
 };
 
 export type MailSignup = {

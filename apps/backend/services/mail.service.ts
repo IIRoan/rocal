@@ -2,6 +2,7 @@ import { createLogger } from "@workspace/logger";
 import { isReservedSystemEmail } from "@workspace/calendar-core";
 import type { Prisma, PrismaClient } from "../generated/prisma/index.js";
 import {
+  ForbiddenError,
   ConflictError,
   NotFoundError,
   UpstreamServiceError,
@@ -395,7 +396,6 @@ export class MailService implements IMailService {
       defaultDomain: string;
       discoveryBaseUrl: string;
       oauth: MailOAuthConfig;
-      vaultKeyMaterialEndpoint: string;
       stalwartOauthClientId: string;
       stalwartOauthRedirectUri: string;
     },
@@ -411,7 +411,6 @@ export class MailService implements IMailService {
       discoveryBaseUrl: this.config.discoveryBaseUrl,
       signupEnabled: true,
       oauth: this.config.oauth,
-      vaultKeyMaterialEndpoint: this.config.vaultKeyMaterialEndpoint,
     };
   }
 
@@ -1164,7 +1163,17 @@ export class MailService implements IMailService {
       displayName:
         mailbox?.displayName ?? normalizeOptionalText(input.displayName),
       provisioned: Boolean(mailbox),
+      mailboxApproved: await this.isMailboxApproved(input.userId),
     };
+  }
+
+  private async isMailboxApproved(userId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { mailboxApprovedAt: true },
+    });
+
+    return Boolean(user?.mailboxApprovedAt);
   }
 
   private async mailboxHasVaultBackup(mailboxId: string): Promise<boolean> {
@@ -1313,6 +1322,19 @@ export class MailService implements IMailService {
   async bootstrapForUser(
     input: MailBootstrapForUserInput,
   ): Promise<MailSignupResult> {
+    if (!(await this.isMailboxApproved(input.userId))) {
+      throw new ForbiddenError(
+        "This account is not approved for a mailbox yet.",
+      );
+    }
+
+    if (!normalizeOptionalText(input.wrappedSecret)) {
+      throw new ValidationError(
+        "A vault secret sealed to your account key is required.",
+        "wrappedSecret",
+      );
+    }
+
     const mailboxEmail = parseMailboxEmail(input.email);
     const existingMailbox = await this.findOrAttachMailboxForUser({
       userId: input.userId,

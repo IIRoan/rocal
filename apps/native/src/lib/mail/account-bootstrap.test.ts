@@ -11,19 +11,21 @@ jest.mock("@workspace/logger", () => ({
 
 const mockGetMailConfig = jest.fn();
 const mockGetMailAccountStatus = jest.fn();
-const mockGetVaultKeyMaterial = jest.fn();
 const mockBootstrapAccountMailbox = jest.fn();
 jest.mock("./mail-api", () => ({
   getMailConfig: () => mockGetMailConfig(),
   getMailAccountStatus: () => mockGetMailAccountStatus(),
-  getVaultKeyMaterial: (...args: unknown[]) => mockGetVaultKeyMaterial(...args),
   bootstrapAccountMailbox: (...args: unknown[]) =>
     mockBootstrapAccountMailbox(...args),
 }));
 
-const mockLoadMailVaultPassword = jest.fn();
-jest.mock("./mail-password-cache", () => ({
-  loadMailVaultPassword: () => mockLoadMailVaultPassword(),
+const mockWrapVaultSecret = jest.fn(
+  async (secret: string): Promise<string | null> => `wrapped:${secret}`,
+);
+jest.mock("./vault-secret", () => ({
+  VAULT_WRAP_ALGORITHM: "e2ee-account-key-v1",
+  generateVaultSecret: () => "sealed-secret",
+  wrapVaultSecret: (secret: string) => mockWrapVaultSecret(secret),
 }));
 
 const mockCreateEncryptedMailVault = jest.fn();
@@ -42,19 +44,20 @@ jest.mock("openpgp", () => ({
 describe("bootstrapMailboxForAccount", () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    mockWrapVaultSecret.mockImplementation(
+      async (secret: string) => `wrapped:${secret}`,
+    );
     mockGetMailConfig.mockResolvedValue({
       defaultDomain: "example.com",
       discoveryBaseUrl: "https://mail.example.com",
       signupEnabled: true,
       oauth: {},
-      vaultKeyMaterialEndpoint: "https://api.example.com/api/mail/vault-key-material",
     });
     mockGetMailAccountStatus.mockResolvedValue({
       email: "alice@example.com",
       displayName: "Alice",
       provisioned: false,
     });
-    mockLoadMailVaultPassword.mockResolvedValue("stored-password");
     mockGenerateKey.mockResolvedValue({
       privateKey: "PRIVATE_KEY",
       publicKey: "PUBLIC_KEY",
@@ -82,12 +85,7 @@ describe("bootstrapMailboxForAccount", () => {
     });
   });
 
-  it("prefers server key material and reduced KDF settings", async () => {
-    mockGetVaultKeyMaterial.mockResolvedValue({
-      keyMaterial: "server-key-material",
-      version: "v1",
-    });
-
+  it("seals a random vault secret and never uses server key material", async () => {
     await bootstrapMailboxForAccount({
       userId: "user-1",
       email: "Alice@example.com",
@@ -96,7 +94,7 @@ describe("bootstrapMailboxForAccount", () => {
 
     expect(mockGenerateKey).toHaveBeenCalledWith(
       expect.objectContaining({
-        passphrase: "server-key-material",
+        passphrase: "sealed-secret",
         userIDs: [{ name: "Alice", email: "alice@example.com" }],
       }),
     );
@@ -106,40 +104,30 @@ describe("bootstrapMailboxForAccount", () => {
         email: "alice@example.com",
         publicKeyFingerprint: "ABCD1234",
       }),
-      "server-key-material",
-      {
-        memoryKiB: 8192,
-        iterations: 1,
-        parallelism: 1,
-      },
+      "sealed-secret",
     );
     expect(mockBootstrapAccountMailbox).toHaveBeenCalledWith(
       expect.objectContaining({
         algorithm: "openpgp",
         fingerprint: "ABCD1234",
         encryptedVaultB64: "vault-b64",
+        wrappedSecret: "wrapped:sealed-secret",
+        wrapAlgorithm: "e2ee-account-key-v1",
       }),
     );
   });
 
-  it("falls back to the stored sign-in password when key material is unavailable", async () => {
-    mockGetVaultKeyMaterial.mockRejectedValue(new Error("offline"));
+  it("refuses to provision when the secret cannot be sealed", async () => {
+    mockWrapVaultSecret.mockResolvedValueOnce(null);
 
-    await bootstrapMailboxForAccount({
-      userId: "user-1",
-      email: "alice@example.com",
-      displayName: "Alice",
-    });
-
-    expect(mockGenerateKey).toHaveBeenCalledWith(
-      expect.objectContaining({
-        passphrase: "stored-password",
+    await expect(
+      bootstrapMailboxForAccount({
+        userId: "user-1",
+        email: "alice@example.com",
+        displayName: "Alice",
       }),
-    );
-    expect(mockCreateEncryptedMailVault).toHaveBeenCalledWith(
-      expect.any(Object),
-      "stored-password",
-      undefined,
-    );
+    ).rejects.toThrow("encryption keys");
+
+    expect(mockBootstrapAccountMailbox).not.toHaveBeenCalled();
   });
 });

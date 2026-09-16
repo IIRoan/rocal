@@ -59,6 +59,9 @@ function createMockPrisma() {
     },
     user: {
       findFirst: jest.fn<() => Promise<any | null>>(async () => null),
+      findUnique: jest.fn<() => Promise<any | null>>(async () => ({
+        mailboxApprovedAt: new Date("2026-01-01T00:00:00.000Z"),
+      })),
     },
     $transaction: jest.fn(async (callback: (tx: any) => Promise<any>) =>
       callback(mockPrisma),
@@ -126,8 +129,6 @@ describe("MailService", () => {
       defaultDomain: "solace.onl",
       discoveryBaseUrl: "http://192.168.2.213:8080",
       oauth: mockMailOAuthConfig,
-      vaultKeyMaterialEndpoint:
-        "https://api.solace.test/api/mail/vault-key-material",
       stalwartOauthClientId: "solace-mail-bridge",
       stalwartOauthRedirectUri:
         "https://api.solace.test/api/mail/oauth/stalwart/callback",
@@ -164,8 +165,6 @@ describe("MailService", () => {
       discoveryBaseUrl: "http://192.168.2.213:8080",
       signupEnabled: true,
       oauth: mockMailOAuthConfig,
-      vaultKeyMaterialEndpoint:
-        "https://api.solace.test/api/mail/vault-key-material",
       serverLimits: {
         maxBlobUploadBytes: 100_000_000,
         maxAttachmentSizeBytes: 100_000_000,
@@ -432,6 +431,7 @@ describe("MailService", () => {
       email: "alice@solace.onl",
       displayName: "Alice Example",
       provisioned: false,
+      mailboxApproved: true,
     });
   });
 
@@ -497,6 +497,7 @@ describe("MailService", () => {
       email: "alice@solace.onl",
       displayName: "Alice Example",
       provisioned: true,
+      mailboxApproved: true,
     });
   });
 
@@ -536,6 +537,8 @@ describe("MailService", () => {
       vaultVersion: 1,
       encryptedVaultB64: "vault-b64",
       kdf: "argon2id",
+      wrappedSecret: "wrapped:sealed-secret",
+      wrapAlgorithm: "e2ee-account-key-v1",
       kdfParams: {
         saltB64: "salt-b64",
         memoryKiB: 65536,
@@ -584,8 +587,8 @@ describe("MailService", () => {
             kdfMemoryKiB: 65536,
             kdfIterations: 3,
             kdfParallelism: 4,
-            wrappedSecret: null,
-            wrapAlgorithm: null,
+            wrappedSecret: "wrapped:sealed-secret",
+            wrapAlgorithm: "e2ee-account-key-v1",
           },
         },
       },
@@ -631,6 +634,8 @@ describe("MailService", () => {
         vaultVersion: 1,
         encryptedVaultB64: "vault-b64",
         kdf: "argon2id",
+        wrappedSecret: "wrapped:sealed-secret",
+        wrapAlgorithm: "e2ee-account-key-v1",
         kdfParams: {
           saltB64: "salt-b64",
           memoryKiB: 65536,
@@ -665,6 +670,8 @@ describe("MailService", () => {
       vaultVersion: 1,
       encryptedVaultB64: "vault-b64",
       kdf: "argon2id",
+      wrappedSecret: "wrapped:sealed-secret",
+      wrapAlgorithm: "e2ee-account-key-v1",
       kdfParams: {
         saltB64: "salt-b64",
         memoryKiB: 65536,
@@ -705,8 +712,8 @@ describe("MailService", () => {
               kdfMemoryKiB: 65536,
               kdfIterations: 3,
               kdfParallelism: 4,
-              wrappedSecret: null,
-              wrapAlgorithm: null,
+              wrappedSecret: "wrapped:sealed-secret",
+              wrapAlgorithm: "e2ee-account-key-v1",
             },
             update: {
               vaultVersion: 1,
@@ -716,8 +723,8 @@ describe("MailService", () => {
               kdfMemoryKiB: 65536,
               kdfIterations: 3,
               kdfParallelism: 4,
-              wrappedSecret: null,
-              wrapAlgorithm: null,
+              wrappedSecret: "wrapped:sealed-secret",
+              wrapAlgorithm: "e2ee-account-key-v1",
             },
           },
         },
@@ -755,6 +762,8 @@ describe("MailService", () => {
       vaultVersion: 1,
       encryptedVaultB64: "vault-b64",
       kdf: "argon2id",
+      wrappedSecret: "wrapped:sealed-secret",
+      wrapAlgorithm: "e2ee-account-key-v1",
       kdfParams: {
         saltB64: "salt-b64",
         memoryKiB: 65536,
@@ -799,8 +808,8 @@ describe("MailService", () => {
               kdfMemoryKiB: 65536,
               kdfIterations: 3,
               kdfParallelism: 4,
-              wrappedSecret: null,
-              wrapAlgorithm: null,
+              wrappedSecret: "wrapped:sealed-secret",
+              wrapAlgorithm: "e2ee-account-key-v1",
             },
             update: {
               vaultVersion: 1,
@@ -810,8 +819,8 @@ describe("MailService", () => {
               kdfMemoryKiB: 65536,
               kdfIterations: 3,
               kdfParallelism: 4,
-              wrappedSecret: null,
-              wrapAlgorithm: null,
+              wrappedSecret: "wrapped:sealed-secret",
+              wrapAlgorithm: "e2ee-account-key-v1",
             },
           },
         },
@@ -850,6 +859,8 @@ describe("MailService", () => {
         vaultVersion: 1,
         encryptedVaultB64: "vault-b64",
         kdf: "argon2id",
+        wrappedSecret: "wrapped:sealed-secret",
+        wrapAlgorithm: "e2ee-account-key-v1",
         kdfParams: {
           saltB64: "salt-b64",
           memoryKiB: 65536,
@@ -892,6 +903,8 @@ describe("MailService", () => {
         vaultVersion: 1,
         encryptedVaultB64: "vault-b64",
         kdf: "argon2id",
+        wrappedSecret: "wrapped:sealed-secret",
+        wrapAlgorithm: "e2ee-account-key-v1",
         kdfParams: {
           saltB64: "salt-b64",
           memoryKiB: 65536,
@@ -922,6 +935,8 @@ describe("MailService", () => {
         vaultVersion: 1,
         encryptedVaultB64: "vault-b64",
         kdf: "argon2id",
+        wrappedSecret: "wrapped:sealed-secret",
+        wrapAlgorithm: "e2ee-account-key-v1",
         kdfParams: {
           saltB64: "salt-b64",
           memoryKiB: 65536,
@@ -993,6 +1008,62 @@ describe("MailService", () => {
       source: "internal",
       trust: "verified",
     });
+  });
+
+  it("refuses to provision a mailbox for an unapproved account", async () => {
+    mockPrisma.user.findUnique.mockResolvedValueOnce({
+      mailboxApprovedAt: null,
+    });
+
+    await expect(
+      service.bootstrapForUser({
+        userId: "user-1",
+        email: "alice@solace.onl",
+        displayName: "Alice Example",
+        publicKeyArmored: "public-key",
+        fingerprint: "ABCD1234EF567890",
+        algorithm: "openpgp",
+        createdAt: "2026-05-06T21:00:00.000Z",
+        vaultVersion: 1,
+        encryptedVaultB64: "vault-b64",
+        wrappedSecret: "wrapped:sealed-secret",
+        wrapAlgorithm: "e2ee-account-key-v1",
+        kdf: "argon2id",
+        kdfParams: {
+          saltB64: "salt-b64",
+          memoryKiB: 65536,
+          iterations: 3,
+          parallelism: 4,
+        },
+      }),
+    ).rejects.toThrow("not approved");
+
+    expect(mockAdminClient.createAccount).not.toHaveBeenCalled();
+  });
+
+  it("refuses to provision a mailbox the server could still open", async () => {
+    await expect(
+      service.bootstrapForUser({
+        userId: "user-1",
+        email: "alice@solace.onl",
+        displayName: "Alice Example",
+        publicKeyArmored: "public-key",
+        fingerprint: "ABCD1234EF567890",
+        algorithm: "openpgp",
+        createdAt: "2026-05-06T21:00:00.000Z",
+        vaultVersion: 1,
+        encryptedVaultB64: "vault-b64",
+        kdf: "argon2id",
+        kdfParams: {
+          saltB64: "salt-b64",
+          memoryKiB: 65536,
+          iterations: 3,
+          parallelism: 4,
+        },
+      }),
+    ).rejects.toThrow("sealed to your account key");
+
+    expect(mockAdminClient.createAccount).not.toHaveBeenCalled();
   });
 
   it("upserts encrypted vault backups without touching plaintext material", async () => {
@@ -1161,6 +1232,8 @@ describe("MailService", () => {
         vaultVersion: 1,
         encryptedVaultB64: "vault-b64",
         kdf: "argon2id",
+        wrappedSecret: "wrapped:sealed-secret",
+        wrapAlgorithm: "e2ee-account-key-v1",
         kdfParams: {
           saltB64: "salt-b64",
           memoryKiB: 65536,
@@ -1199,6 +1272,8 @@ describe("MailService", () => {
         vaultVersion: 1,
         encryptedVaultB64: "vault-b64",
         kdf: "argon2id",
+        wrappedSecret: "wrapped:sealed-secret",
+        wrapAlgorithm: "e2ee-account-key-v1",
         kdfParams: {
           saltB64: "salt-b64",
           memoryKiB: 65536,
@@ -1237,6 +1312,8 @@ describe("MailService", () => {
       vaultVersion: 1,
       encryptedVaultB64: "vault-b64",
       kdf: "argon2id",
+      wrappedSecret: "wrapped:sealed-secret",
+      wrapAlgorithm: "e2ee-account-key-v1",
       kdfParams: {
         saltB64: "salt-b64",
         memoryKiB: 65536,

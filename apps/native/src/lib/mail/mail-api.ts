@@ -106,15 +106,6 @@ export async function upsertAccountVaultBackup(request: {
   return parseJson(response);
 }
 
-export async function getVaultKeyMaterial(
-  vaultKeyMaterialEndpoint: string,
-): Promise<{ keyMaterial: string; version: string }> {
-  const response = await mailFetch(vaultKeyMaterialEndpoint, {
-    method: "GET",
-  });
-  return parseJson<{ keyMaterial: string; version: string }>(response);
-}
-
 export type MailDirectoryKey = {
   email: string;
   publicKeyArmored: string;

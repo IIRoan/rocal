@@ -26,6 +26,8 @@ model User {
   image          String?
   createdAt      DateTime           @default(now()) @map("created_at")
   updatedAt      DateTime           @updatedAt @map("updated_at")
+  /// Set when the backend approves this account for a mailbox; null blocks provisioning.
+  mailboxApprovedAt DateTime?       @map("mailbox_approved_at")
   sessions       Session[]
   accounts       Account[]
   // Calendar relationships

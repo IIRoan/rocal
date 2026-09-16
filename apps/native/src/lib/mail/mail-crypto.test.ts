@@ -190,7 +190,6 @@ function buildRuntime(overrides?: Partial<MailRuntime["config"]>): MailRuntime {
       discoveryBaseUrl: "https://mail.example.com",
       signupEnabled: true,
       oauth: {} as any,
-      vaultKeyMaterialEndpoint: "https://api.example.com/api/mail/vault-key-material",
       ...overrides,
     },
     client: {
@@ -207,25 +206,29 @@ function buildRuntime(overrides?: Partial<MailRuntime["config"]>): MailRuntime {
 }
 
 function mockSuccessfulVaultLoad() {
-  // Backend: vault backup
+  // Backend: a vault sealed to the owner's account key.
   mockMailFetch.mockResolvedValueOnce({
     ok: true,
-    json: async () => MOCK_VAULT_BACKUP,
+    json: async () => ({
+      ...MOCK_VAULT_BACKUP,
+      wrappedSecret: "wrapped:sealed-secret",
+      wrapAlgorithm: "e2ee-account-key-v1",
+    }),
   });
-  // Backend: key material only — the server never derives the vault key.
-  mockMailFetch.mockResolvedValueOnce({
-    ok: true,
-    json: async () => ({ keyMaterial: MOCK_KEY_MATERIAL, version: "v1" }),
-  });
-  // Locally cached derived key (fast path, no argon2id)
-  mockLoadDerivedVaultKey.mockResolvedValue(MOCK_DERIVED_KEY_B64);
-  mockUnlockVaultWithDerivedKey.mockResolvedValueOnce(MOCK_VAULT);
+  mockUnlockVault.mockResolvedValueOnce(MOCK_VAULT);
   // PGP private key
   mockReadPrivateKey.mockResolvedValueOnce(MOCK_PRIVATE_KEY);
   mockDecryptKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY);
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
+
+/** Pre-handled so an unconsumed fixture can never surface as an unhandled rejection. */
+function rejectedSignature(message: string): Promise<boolean> {
+  const rejected = Promise.reject(new Error(message));
+  rejected.catch(() => undefined);
+  return rejected;
+}
 
 describe("mail-crypto", () => {
   beforeEach(() => {
@@ -262,180 +265,66 @@ describe("mail-crypto", () => {
   // ── ensureVaultLoaded ──────────────────────────────────────────────────────
 
   describe("ensureVaultLoaded", () => {
-    it("ignores a derived vault key offered by the backend", async () => {
-      mockMailFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => MOCK_SAFE_VAULT_BACKUP,
-      });
-      // A server that still returns one must not be trusted with the vault key.
-      mockMailFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          keyMaterial: MOCK_KEY_MATERIAL,
-          derivedKeyB64: "server-derived-key",
-          version: "v1",
-        }),
-      });
-      mockUnlockVault.mockResolvedValueOnce(MOCK_VAULT);
-      mockReadPrivateKey.mockResolvedValueOnce(MOCK_PRIVATE_KEY);
-      mockDecryptKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY);
+    it("opens a sealed vault with the unwrapped secret", async () => {
+      mockSuccessfulVaultLoad();
 
       const runtime = buildRuntime();
       await ensureVaultLoaded(runtime);
 
-      expect(mockUnlockVaultWithDerivedKey).not.toHaveBeenCalled();
+      expect(mockUnwrapVaultSecret).toHaveBeenCalledWith(
+        "wrapped:sealed-secret",
+      );
       expect(mockUnlockVault).toHaveBeenCalledWith(
-        MOCK_SAFE_VAULT_BACKUP.encryptedVaultB64,
-        MOCK_KEY_MATERIAL,
-        MOCK_SAFE_VAULT_BACKUP.kdfParams,
+        MOCK_VAULT_BACKUP.encryptedVaultB64,
+        "sealed-secret",
+        MOCK_VAULT_BACKUP.kdfParams,
         expect.any(Function),
       );
-      expect(mockSaveDerivedVaultKey).not.toHaveBeenCalledWith(
-        "server-derived-key",
-      );
+      // Only the vault backup is fetched; no server key material exists.
+      expect(mockMailFetch).toHaveBeenCalledTimes(1);
     });
 
-    it("uses cached derived key from SecureStore (skips argon2id but still fetches keyMaterial)", async () => {
-      mockLoadDerivedVaultKey.mockResolvedValueOnce(MOCK_DERIVED_KEY_B64);
-      // Two fetches: vault backup + key material (for PGP passphrase)
+    it("refuses a vault the server could still open", async () => {
       mockMailFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => MOCK_VAULT_BACKUP,
       });
-      // Key material returned without derivedKeyB64 (backend unaware of cache)
-      mockMailFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ keyMaterial: MOCK_KEY_MATERIAL, version: "v1" }),
-      });
-      mockUnlockVaultWithDerivedKey.mockResolvedValueOnce(MOCK_VAULT);
-      mockReadPrivateKey.mockResolvedValueOnce(MOCK_PRIVATE_KEY);
-      mockDecryptKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY);
 
       const runtime = buildRuntime();
-      await ensureVaultLoaded(runtime);
-
-      // Derived key from SecureStore used for AES-GCM
-      expect(mockUnlockVaultWithDerivedKey).toHaveBeenCalledWith(
-        MOCK_VAULT_BACKUP.encryptedVaultB64,
-        MOCK_DERIVED_KEY_B64,
+      await expect(ensureVaultLoaded(runtime)).rejects.toThrow(
+        "could not be unlocked",
       );
-      // argon2id NOT called
       expect(mockUnlockVault).not.toHaveBeenCalled();
-      // Both fetches happened (vault backup + key material for PGP passphrase)
-      expect(mockMailFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("refuses when the secret cannot be unsealed on this device", async () => {
+      mockMailFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ...MOCK_VAULT_BACKUP,
+          wrappedSecret: "wrapped:sealed-secret",
+        }),
+      });
+      mockUnwrapVaultSecret.mockResolvedValueOnce(null);
+
+      const runtime = buildRuntime();
+      await expect(ensureVaultLoaded(runtime)).rejects.toThrow(
+        "could not be unlocked",
+      );
+      expect(mockUnlockVault).not.toHaveBeenCalled();
     });
 
     it("skips S2K when a valid decrypted private key is found in SecureStore cache", async () => {
       mockSuccessfulVaultLoad();
-      const cachedArmored = MOCK_DECRYPTED_KEY.armor();
-      mockLoadCachedPrivateKey.mockResolvedValueOnce(cachedArmored);
-      // readPrivateKey is called twice: once for cache, once won't happen
+      mockLoadCachedPrivateKey.mockResolvedValueOnce(
+        MOCK_DECRYPTED_KEY.armor(),
+      );
       mockReadPrivateKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY);
 
       const runtime = buildRuntime();
       await ensureVaultLoaded(runtime);
 
-      // S2K decryptKey must NOT be called when cache hit
       expect(mockDecryptKey).not.toHaveBeenCalled();
-      // But unlock still happened (AES-GCM for vault)
-      expect(mockUnlockVaultWithDerivedKey).toHaveBeenCalled();
-    });
-
-    it("uses local key-material unlock when the vault KDF is migration-safe", async () => {
-      mockMailFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => MOCK_SAFE_VAULT_BACKUP,
-      });
-      mockMailFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ keyMaterial: MOCK_KEY_MATERIAL, version: "v1" }),
-      });
-      mockLoadDerivedVaultKey.mockResolvedValueOnce(null);
-      mockUnlockVault.mockResolvedValueOnce(MOCK_VAULT);
-      mockReadPrivateKey.mockResolvedValueOnce(MOCK_PRIVATE_KEY);
-      mockDecryptKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY);
-
-      const runtime = buildRuntime();
-      await expect(ensureVaultLoaded(runtime)).resolves.toMatchObject({
-        passphrase: MOCK_KEY_MATERIAL,
-        vault: MOCK_VAULT,
-      });
-      expect(mockUnlockVault).toHaveBeenCalledWith(
-        MOCK_SAFE_VAULT_BACKUP.encryptedVaultB64,
-        MOCK_KEY_MATERIAL,
-        MOCK_SAFE_VAULT_BACKUP.kdfParams,
-        expect.any(Function),
-      );
-    });
-
-    it("uses the in-memory fallback password when key-material fetch fails", async () => {
-      mockMailFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => MOCK_SAFE_VAULT_BACKUP,
-      });
-      mockMailFetch.mockRejectedValueOnce(new Error("Network error"));
-      mockLoadDerivedVaultKey.mockResolvedValueOnce(null);
-      mockUnlockVault.mockResolvedValueOnce(MOCK_VAULT);
-      mockReadPrivateKey.mockResolvedValueOnce(MOCK_PRIVATE_KEY);
-      mockDecryptKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY);
-
-      const runtime = buildRuntime();
-      await expect(
-        ensureVaultLoaded(runtime, "fallback-login-password"),
-      ).resolves.toMatchObject({
-        passphrase: "fallback-login-password",
-      });
-      expect(mockUnlockVault).toHaveBeenCalledWith(
-        MOCK_SAFE_VAULT_BACKUP.encryptedVaultB64,
-        "fallback-login-password",
-        MOCK_SAFE_VAULT_BACKUP.kdfParams,
-        expect.any(Function),
-      );
-    });
-
-    it("uses the SecureStore password when in-memory password is absent", async () => {
-      mockMailFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => MOCK_SAFE_VAULT_BACKUP,
-      });
-      mockMailFetch.mockRejectedValueOnce(new Error("Network error"));
-      mockLoadDerivedVaultKey.mockResolvedValueOnce(null);
-      mockLoadMailVaultPassword.mockResolvedValueOnce("stored-password");
-      mockUnlockVault.mockResolvedValueOnce(MOCK_VAULT);
-      mockReadPrivateKey.mockResolvedValueOnce(MOCK_PRIVATE_KEY);
-      mockDecryptKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY);
-
-      const runtime = buildRuntime();
-      await expect(ensureVaultLoaded(runtime)).resolves.toMatchObject({
-        passphrase: "stored-password",
-      });
-      expect(mockUnlockVault).toHaveBeenCalledWith(
-        MOCK_SAFE_VAULT_BACKUP.encryptedVaultB64,
-        "stored-password",
-        MOCK_SAFE_VAULT_BACKUP.kdfParams,
-        expect.any(Function),
-      );
-    });
-
-    it("throws when a high-cost vault still needs password migration", async () => {
-      mockLoadMailVaultPassword.mockResolvedValueOnce(null);
-      mockLoadDerivedVaultKey.mockResolvedValueOnce(null);
-
-      mockMailFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => MOCK_VAULT_BACKUP,
-      });
-      mockMailFetch.mockResolvedValueOnce({
-        ok: true,
-        // No derivedKeyB64 returned
-        json: async () => ({ keyMaterial: MOCK_KEY_MATERIAL, version: "v1" }),
-      });
-
-      const runtime = buildRuntime();
-      await expect(ensureVaultLoaded(runtime)).rejects.toThrow(
-        /needs a high-cost password migration/i,
-      );
-      expect(mockUnlockVault).not.toHaveBeenCalled();
     });
 
     it("throws when vault backup is unavailable", async () => {
@@ -457,23 +346,8 @@ describe("mail-crypto", () => {
       const v2 = await ensureVaultLoaded(runtime);
 
       expect(v1).toBe(v2);
-      // Only 2 fetches for the initial load (vault backup + key material)
-      expect(mockMailFetch).toHaveBeenCalledTimes(2);
-    });
-
-    it("handles missing vaultKeyMaterialEndpoint with cached derived key", async () => {
-      mockLoadDerivedVaultKey.mockResolvedValueOnce(MOCK_DERIVED_KEY_B64);
-      mockMailFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => MOCK_VAULT_BACKUP,
-      });
-      mockUnlockVaultWithDerivedKey.mockResolvedValueOnce(MOCK_VAULT);
-      mockLoadCachedPrivateKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY.armor());
-      mockReadPrivateKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY);
-      const runtime = buildRuntime({ vaultKeyMaterialEndpoint: "" });
-      await expect(ensureVaultLoaded(runtime)).resolves.toMatchObject({
-        vault: MOCK_VAULT,
-      });
+      // Only the vault backup is fetched; no server key material exists.
+      expect(mockMailFetch).toHaveBeenCalledTimes(1);
     });
 
     it("opens a sealed vault without asking the server for key material", async () => {
@@ -505,54 +379,9 @@ describe("mail-crypto", () => {
       expect(mockMailFetch).toHaveBeenCalledTimes(1);
       expect(mockUpsertAccountVaultBackup).not.toHaveBeenCalled();
     });
-
-    it("seals a legacy vault to the account key after unlocking it", async () => {
-      mockMailFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => MOCK_SAFE_VAULT_BACKUP,
-      });
-      mockMailFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ keyMaterial: MOCK_KEY_MATERIAL, version: "v1" }),
-      });
-      mockLoadMailVaultPassword.mockResolvedValueOnce("old-password");
-      mockUnlockVault
-        .mockRejectedValueOnce(new Error("wrong passphrase"))
-        .mockResolvedValueOnce(MOCK_VAULT);
-      mockReadPrivateKey.mockResolvedValueOnce(MOCK_PRIVATE_KEY);
-      mockDecryptKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY);
-      mockReadPrivateKey.mockResolvedValueOnce(MOCK_PRIVATE_KEY);
-      mockDecryptKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY);
-
-      const runtime = buildRuntime();
-      await ensureVaultLoaded(runtime);
-      await new Promise((resolve) => setImmediate(resolve));
-
-      expect(mockEncryptKey).toHaveBeenCalled();
-      expect(mockCreateEncryptedMailVault).toHaveBeenCalled();
-      // The new passphrase is the sealed random secret, never key material.
-      expect(mockCreateEncryptedMailVault).toHaveBeenCalledWith(
-        expect.anything(),
-        "sealed-secret",
-        expect.anything(),
-      );
-      expect(mockUpsertAccountVaultBackup).toHaveBeenCalledWith({
-        vaultVersion: MOCK_SAFE_VAULT_BACKUP.vaultVersion,
-        encryptedVaultB64: "migrated-vault-b64",
-        kdf: "argon2id",
-        kdfParams: {
-          saltB64: "migrated-salt",
-          memoryKiB: 8192,
-          iterations: 1,
-          parallelism: 1,
-        },
-        wrappedSecret: "wrapped:sealed-secret",
-        wrapAlgorithm: "e2ee-account-key-v1",
-      });
-    });
   });
 
-  // ── decryptMailMessage ─────────────────────────────────────────────────────
+  // ─── decryptMailMessage ────────────────────────────────────────────────────
 
   describe("decryptMailMessage", () => {
     beforeEach(() => {
@@ -646,7 +475,7 @@ describe("mail-crypto", () => {
       mockReadKey.mockResolvedValueOnce(senderKey);
       mockDecrypt.mockResolvedValueOnce({
         data: "Bad sig",
-        signatures: [{ verified: Promise.reject(new Error("sig invalid")) }],
+        signatures: [{ verified: rejectedSignature("sig invalid") }],
       });
 
       const runtime = buildRuntime();
