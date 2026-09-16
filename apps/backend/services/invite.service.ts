@@ -327,10 +327,18 @@ export class InviteService implements IInviteService {
     const invite = await this.findClaimedInviteForEmail(normalizedEmail);
 
     if (invite) {
-      await this.prisma.invite.update({
-        where: { id: invite.id },
-        data: { status: "accepted" },
-      });
+      // Accepting the invite is the approval: an invited account may provision
+      // a mailbox, an uninvited one may not.
+      await this.prisma.$transaction([
+        this.prisma.invite.update({
+          where: { id: invite.id },
+          data: { status: "accepted" },
+        }),
+        this.prisma.user.updateMany({
+          where: { email: normalizedEmail, mailboxApprovedAt: null },
+          data: { mailboxApprovedAt: new Date() },
+        }),
+      ]);
       logger.info("Invite marked accepted", {
         inviteId: invite.id,
         recipientRef: logRef(normalizedEmail),
