@@ -13,7 +13,6 @@ import {
   enqueueInboundMailPush,
   type InboundMailPushItem,
 } from "../lib/mail-push-enqueue";
-import { mergeInboundMailPushMetadata } from "../lib/inbound-mail-push";
 import type { MailSyncService } from "./mail-sync.service";
 import { errorLogDetails, logRef } from "../lib/log-sanitization";
 
@@ -36,7 +35,7 @@ export class StalwartWebhookService implements IStalwartWebhookService {
       prisma: WebhookPrisma;
       mailSyncService?: Pick<
         MailSyncService,
-        "getEmailPushMetadata" | "resolveIngestedJmapEmailId"
+        "resolveIngestedJmapEmailId"
       >;
     },
   ) {}
@@ -149,29 +148,7 @@ export class StalwartWebhookService implements IStalwartWebhookService {
       }
     }
 
-    let item: InboundMailPushItem = {
-      emailId: jmapEmailId,
-      subject: event.subject,
-      fromName: event.fromName,
-    };
-
-    if (this.input.mailSyncService && !item.subject) {
-      try {
-        const metadata = await this.input.mailSyncService.getEmailPushMetadata(
-          directoryEntry.stalwartAccountId,
-          jmapEmailId,
-        );
-        if (metadata) {
-          item = mergeInboundMailPushMetadata(item, metadata);
-        }
-      } catch (error) {
-        logger.warn("Failed to enrich Stalwart mail ingest webhook from JMAP", {
-          accountRef: logRef(directoryEntry.stalwartAccountId),
-          emailRef: logRef(jmapEmailId),
-          ...errorLogDetails(error),
-        });
-      }
-    }
+    const item: InboundMailPushItem = { emailId: jmapEmailId };
 
     await enqueueInboundMailPush(this.input.prisma, {
       accountId: directoryEntry.stalwartAccountId,

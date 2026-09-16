@@ -16,6 +16,9 @@ describe("CalendarApiService encryption wrappers", () => {
     hydrateEncryptedEvent: jest.Mock<(event: any) => Promise<any>>;
     hydrateEncryptedEvents: jest.Mock<(events: any[]) => Promise<any[]>>;
     createBlindIndexTokens: jest.Mock<(value: string) => Promise<string[]>>;
+    hydrateEncryptedCalendar: jest.Mock<(calendar: any) => Promise<any>>;
+    hydrateEncryptedCategory: jest.Mock<(category: any) => Promise<any>>;
+    hasActiveSession: jest.Mock<() => Promise<boolean>>;
   };
   let service: CalendarApiService;
 
@@ -49,6 +52,13 @@ describe("CalendarApiService encryption wrappers", () => {
       createBlindIndexTokens: jest.fn(() =>
         Promise.resolve(["idx-1", "idx-2"]),
       ),
+      hydrateEncryptedCalendar: jest.fn((calendar: any) =>
+        Promise.resolve({ ...calendar, name: "Decrypted calendar" }),
+      ),
+      hydrateEncryptedCategory: jest.fn((category: any) =>
+        Promise.resolve({ ...category, name: "Decrypted category" }),
+      ),
+      hasActiveSession: jest.fn(() => Promise.resolve(true)),
     };
     service = new CalendarApiService(
       client as any,
@@ -63,7 +73,12 @@ describe("CalendarApiService encryption wrappers", () => {
       end: "2026-05-01T11:00:00.000Z",
       calendarId: "cal-1",
     };
-    const payload = { ...request, encryptedContent: "ciphertext" };
+    const payload = {
+      start: request.start,
+      end: request.end,
+      calendarId: request.calendarId,
+      encryptedContent: "ciphertext",
+    };
     mockE2ee.attachEventEncryptionShadow.mockResolvedValue(payload);
     client.post.mockResolvedValue({ id: "event-1" } as never);
 
@@ -222,7 +237,7 @@ describe("CalendarApiService encryption wrappers", () => {
     );
   });
 
-  it("normalizes shadow-write events for UI renders", async () => {
+  it("normalizes legacy events with ciphertext for UI renders", async () => {
     // For non-encrypted events, hydrateEncryptedEvent should not be called
     // because encryptionState is not "encrypted"
     client.get.mockResolvedValue({
@@ -243,7 +258,7 @@ describe("CalendarApiService encryption wrappers", () => {
     expect(result).toEqual(
       expect.objectContaining({
         title: "Visible title",
-        encryptionState: "shadow_write",
+        encryptionState: "encrypted",
         encryptedContent: null,
         blindIndexTokens: null,
       }),
@@ -252,7 +267,7 @@ describe("CalendarApiService encryption wrappers", () => {
 
   it("posts attached calendar payloads on create", async () => {
     const request = { name: "Work", color: "blue" };
-    const payload = { ...request, encryptedName: "ciphertext" };
+    const payload = { encryptedName: "ciphertext" };
     mockE2ee.attachCalendarEncryptionShadow.mockResolvedValue(payload);
     client.post.mockResolvedValue({ id: "cal-1" } as never);
 
@@ -266,7 +281,7 @@ describe("CalendarApiService encryption wrappers", () => {
 
   it("puts attached calendar payloads on update", async () => {
     const request = { name: "Work" };
-    const payload = { ...request, encryptedName: "ciphertext" };
+    const payload = { encryptedName: "ciphertext" };
     mockE2ee.attachCalendarEncryptionShadow.mockResolvedValue(payload);
     client.put.mockResolvedValue({ id: "cal-1" } as never);
 
@@ -280,7 +295,7 @@ describe("CalendarApiService encryption wrappers", () => {
 
   it("posts attached category payloads on create", async () => {
     const request = { name: "Personal", color: "emerald" };
-    const payload = { ...request, encryptedName: "ciphertext" };
+    const payload = { encryptedName: "ciphertext" };
     mockE2ee.attachCategoryEncryptionShadow.mockResolvedValue(payload);
     client.post.mockResolvedValue({ id: "cat-1" } as never);
 
@@ -294,7 +309,7 @@ describe("CalendarApiService encryption wrappers", () => {
 
   it("puts attached category payloads on update", async () => {
     const request = { name: "Personal" };
-    const payload = { ...request, encryptedName: "ciphertext" };
+    const payload = { encryptedName: "ciphertext" };
     mockE2ee.attachCategoryEncryptionShadow.mockResolvedValue(payload);
     client.put.mockResolvedValue({ id: "cat-1" } as never);
 
@@ -332,7 +347,8 @@ describe("CalendarApiService encryption wrappers", () => {
     expect(result).toEqual([
       expect.objectContaining({
         id: "cal-1",
-        encryptionState: "shadow_write",
+        name: "Decrypted calendar",
+        encryptionState: "encrypted",
         encryptedName: null,
         blindIndexTokens: null,
       }),
@@ -361,7 +377,8 @@ describe("CalendarApiService encryption wrappers", () => {
     expect(result).toEqual([
       expect.objectContaining({
         id: "cat-1",
-        encryptionState: "shadow_write",
+        name: "Decrypted category",
+        encryptionState: "encrypted",
         encryptedName: null,
         blindIndexTokens: null,
       }),

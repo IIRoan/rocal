@@ -14,21 +14,12 @@ describe("StalwartWebhookService", () => {
     email: string;
   };
 
-  type EmailPushMetadata = {
-    emailId: string;
-    subject: string;
-    fromName: string;
-  };
-
   const findUnique = jest.fn<
     (args: { where: Record<string, string> }) => Promise<DirectoryEntry | null>
   >();
   const resolveIngestedJmapEmailId = jest.fn<
     (...args: unknown[]) => Promise<string>
   >().mockResolvedValue("gceaaabqr");
-  const getEmailPushMetadata = jest.fn<
-    (...args: unknown[]) => Promise<EmailPushMetadata | null>
-  >().mockResolvedValue(null);
   const enqueue = enqueueInboundMailPush as jest.MockedFunction<
     typeof enqueueInboundMailPush
   >;
@@ -37,7 +28,6 @@ describe("StalwartWebhookService", () => {
     findUnique.mockReset();
     enqueue.mockClear();
     resolveIngestedJmapEmailId.mockClear();
-    getEmailPushMetadata.mockClear();
   });
 
   it("resolves linked mailboxes by recipient email when telemetry accountId differs", async () => {
@@ -59,7 +49,6 @@ describe("StalwartWebhookService", () => {
       prisma: { mailDirectoryEntry: { findUnique } } as never,
       mailSyncService: {
         resolveIngestedJmapEmailId,
-        getEmailPushMetadata,
       },
     });
 
@@ -93,62 +82,7 @@ describe("StalwartWebhookService", () => {
       accountId: "n",
       userId: "user-1",
       items: [
-        {
-          emailId: "gceaaabqr",
-          subject: "54321",
-          fromName: "Roan",
-        },
-      ],
-    });
-  });
-
-  it("enriches push metadata from JMAP when the webhook omits subject", async () => {
-    findUnique.mockResolvedValue({
-      userId: "user-1",
-      stalwartAccountId: "n",
-      email: "testingproduction15@solace.onl",
-    });
-    resolveIngestedJmapEmailId.mockResolvedValue("gceaaabqr");
-    getEmailPushMetadata.mockResolvedValue({
-      emailId: "gceaaabqr",
-      subject: "Quarterly update",
-      fromName: "Roan",
-    });
-
-    const service = new StalwartWebhookService({
-      prisma: { mailDirectoryEntry: { findUnique } } as never,
-      mailSyncService: {
-        resolveIngestedJmapEmailId,
-        getEmailPushMetadata,
-      },
-    });
-
-    await service.handlePayload({
-      events: [
-        {
-          type: "message-ingest.ham",
-          data: {
-            accountId: 13,
-            documentId: 1556,
-            to: ["testingproduction15@solace.onl"],
-            from: "vanwesteropbroan@gmail.com",
-            messageId:
-              "CAHLqGQPG-ApKoiafLgteg8GOmgmLz7m3ZW9Xu-GD6Xbo-BMTTQ@mail.gmail.com",
-          },
-        },
-      ],
-    });
-
-    expect(getEmailPushMetadata).toHaveBeenCalledWith("n", "gceaaabqr");
-    expect(enqueue).toHaveBeenCalledWith(expect.anything(), {
-      accountId: "n",
-      userId: "user-1",
-      items: [
-        {
-          emailId: "gceaaabqr",
-          subject: "Quarterly update",
-          fromName: "Roan",
-        },
+        { emailId: "gceaaabqr" },
       ],
     });
   });
@@ -159,7 +93,6 @@ describe("StalwartWebhookService", () => {
       prisma: { mailDirectoryEntry: { findUnique } } as never,
       mailSyncService: {
         resolveIngestedJmapEmailId,
-        getEmailPushMetadata,
       },
     });
 
@@ -233,11 +166,7 @@ describe("StalwartWebhookService", () => {
       accountId: "n",
       userId: "user-1",
       items: [
-        {
-          emailId: "1558",
-          subject: "Hello",
-          fromName: null,
-        },
+        { emailId: "1558" },
       ],
     });
   });

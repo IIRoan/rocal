@@ -32,6 +32,7 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useAuth } from "../../providers/AuthProvider";
 import { useRecentContacts } from "../../hooks/use-recent-contacts";
+import { useReminderTitleEncryptor } from "../../hooks/use-reminder-title-encryptor";
 import { extractRecentContactEntries } from "../../lib/record-recent-contacts";
 import { useToast } from "../../providers/ToastProvider";
 import { toastOperationWarnings } from "../../lib/operation-warnings";
@@ -185,6 +186,7 @@ export function EventSheet({
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { recordUsage } = useRecentContacts();
+  const encryptReminderTitle = useReminderTitleEncryptor();
   const { toast } = useToast();
   const bottomSheetRef = useRef<BottomSheetHandle>(null);
   const createSnapshotRef = useRef<CacheSnapshot>([]);
@@ -286,7 +288,11 @@ export function EventSheet({
   const createMutation = useMutation({
     mutationFn: async (data: CreateEventRequest) => {
       const saved = await calendarApiService.createEvent(data);
-      await persistEventReminderNotifications(saved.id, data);
+      await persistEventReminderNotifications(
+        saved.id,
+        data,
+        encryptReminderTitle,
+      );
       return saved;
     },
     onMutate: async (data: CreateEventRequest) => {
@@ -331,7 +337,11 @@ export function EventSheet({
             updates: data,
           })
         : await calendarApiService.updateEvent(eventId!, data);
-      await persistEventReminderNotifications(saved.id, data);
+      await persistEventReminderNotifications(
+        saved.id,
+        data,
+        encryptReminderTitle,
+      );
       return saved;
     },
     onSuccess: (savedEvent, variables) => {

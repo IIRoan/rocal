@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { Manifest } from "elysia";
 import { expo } from "@better-auth/expo";
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { prismaAdapter } from "better-auth/adapters/prisma";
@@ -8,7 +9,12 @@ import { oneTimeToken, jwt } from "better-auth/plugins";
 import type { Jwk } from "better-auth/plugins/jwt";
 import { createLogger } from "@workspace/logger";
 import { prisma } from "./prisma";
-import { env, getMailOauthConfigurationErrors } from "./env";
+import {
+  env,
+  getMailOauthConfigurationErrors,
+  isDeployedEnvironment,
+  resolveBetterAuthSecret,
+} from "./env";
 import { BETTER_AUTH_BASE_PATH } from "./auth-constants";
 import {
   buildPasswordResetEmail,
@@ -35,6 +41,13 @@ import {
 } from "./mail-oauth-managed-client";
 import { inviteService } from "./invite-service";
 import { passkeyBridgeFreshSessionPlugin } from "./passkey-bridge-session";
+import {
+  AUTH_RATE_LIMIT_DEFAULT,
+  AUTH_RATE_LIMIT_RULES,
+  createAuthRateLimitStorage,
+} from "./auth-rate-limit";
+import { TRUSTED_CLIENT_IP_HEADERS } from "./rate-limit";
+import { stripSessionClientMetadata } from "./auth-utils";
 
 const {
   backendUrl,
@@ -70,6 +83,12 @@ const passkeyOrigin =
 
 const logger = createLogger("backend:auth");
 const JWKS_CACHE_TTL_MS = 60_000;
+
+// AOT manifest capture imports this module at build time without runtime secrets.
+const betterAuthSecret = resolveBetterAuthSecret({
+  secret: process.env.BETTER_AUTH_SECRET,
+  deployed: isDeployedEnvironment() && !Manifest.isCapturing(),
+});
 
 type RawJwtJwkRecord = Awaited<ReturnType<typeof prisma.jwks.findMany>>[number];
 type JwtJwkCreateInput = Omit<Jwk, "id">;
@@ -559,12 +578,27 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
-  secret:
-    process.env.BETTER_AUTH_SECRET || "default-dev-secret-change-in-production",
+  secret: betterAuthSecret,
   socialProviders: {},
   baseURL: backendUrl,
   basePath: BETTER_AUTH_BASE_PATH,
   trustedOrigins: getAuthTrustedOrigins,
+  rateLimit: {
+    // Postgres-backed so limits hold across Vercel instances; keys are HMACed.
+    enabled: process.env.NODE_ENV !== "test",
+    ...AUTH_RATE_LIMIT_DEFAULT,
+    customRules: AUTH_RATE_LIMIT_RULES,
+    customStorage: createAuthRateLimitStorage(prisma, betterAuthSecret),
+  },
+  databaseHooks: {
+    session: {
+      create: {
+        before: async (session) => ({
+          data: stripSessionClientMetadata(session),
+        }),
+      },
+    },
+  },
   session: {
     storeSessionInDatabase: true,
     cookieCache: {
@@ -573,6 +607,10 @@ export const auth = betterAuth({
     },
   },
   advanced: {
+    // IP tracking stays enabled only because disabling it also disables rate limiting.
+    ipAddress: {
+      ipAddressHeaders: TRUSTED_CLIENT_IP_HEADERS,
+    },
     useSecureCookies: isProduction,
     // Better Auth uses `defaultCookieAttributes` — `cookieOptions` is ignored.
     defaultCookieAttributes: {

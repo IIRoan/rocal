@@ -89,12 +89,25 @@ export class AccountService implements IAccountService {
   async deleteAccount(input: DeleteAccountInput): Promise<DeleteAccountResult> {
     const existingUser = await this.prisma.user.findUnique({
       where: { id: input.userId },
-      select: { id: true },
+      select: {
+        id: true,
+        email: true,
+        mailDirectoryEntry: { select: { email: true } },
+      },
     });
 
     if (!existingUser) {
       throw new NotFoundError("User account not found");
     }
+
+    // Read before the mailbox (and its directory entry) is removed.
+    const userEmails = [
+      ...new Set(
+        [existingUser.email, existingUser.mailDirectoryEntry?.email]
+          .filter((email): email is string => Boolean(email))
+          .map((email) => email.trim().toLowerCase()),
+      ),
+    ];
 
     if (this.mailService) {
       await this.mailService.deleteMailboxForUser({ userId: input.userId });
@@ -110,6 +123,18 @@ export class AccountService implements IAccountService {
       await tx.notificationLog.deleteMany({
         where: { userId: input.userId },
       });
+
+      // Invites addressed to or claimed for the user belong to another inviter, so they do not cascade.
+      if (userEmails.length > 0) {
+        await tx.invite.deleteMany({
+          where: {
+            OR: [
+              { email: { in: userEmails } },
+              { claimedForEmail: { in: userEmails } },
+            ],
+          },
+        });
+      }
 
       await tx.user.delete({
         where: { id: input.userId },

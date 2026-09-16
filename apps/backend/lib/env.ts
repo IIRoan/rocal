@@ -112,6 +112,43 @@ export function resolveMailOauthEnabled(
   return getMailOauthConfigurationErrors(input).length === 0;
 }
 
+export const BETTER_AUTH_SECRET_MIN_LENGTH = 32;
+const DEV_BETTER_AUTH_SECRET = "default-dev-secret-change-in-production";
+
+/** Deployed environments (including Vercel previews) must never fall back to development secrets. */
+export function isDeployedEnvironment(
+  input: { nodeEnv?: string; vercelEnv?: string } = {
+    nodeEnv: process.env.NODE_ENV,
+    vercelEnv: process.env.VERCEL_ENV,
+  },
+): boolean {
+  return (
+    input.nodeEnv === "production" ||
+    input.vercelEnv === "production" ||
+    input.vercelEnv === "preview"
+  );
+}
+
+/** Fail fast on a missing/weak BETTER_AUTH_SECRET outside local/test. */
+export function resolveBetterAuthSecret(input: {
+  secret?: string;
+  deployed: boolean;
+}): string {
+  // The raw value is returned even when padded: changing it would invalidate sessions and JWKS.
+  const secret = input.secret ?? "";
+  if (secret.trim().length >= BETTER_AUTH_SECRET_MIN_LENGTH) {
+    return secret;
+  }
+
+  if (input.deployed) {
+    throw new Error(
+      `BETTER_AUTH_SECRET must be set to at least ${BETTER_AUTH_SECRET_MIN_LENGTH} characters in production.`,
+    );
+  }
+
+  return secret.trim() ? secret : DEV_BETTER_AUTH_SECRET;
+}
+
 const resolvedFrontendUrl =
   process.env.FRONTEND_URL ||
   process.env.NEXT_PUBLIC_APP_URL ||

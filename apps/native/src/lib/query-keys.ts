@@ -4,12 +4,16 @@
  * Using a constant map avoids typos and makes cache invalidation
  * predictable across the app.
  */
-import { PUSH_DEVICES_QUERY_KEY } from "@workspace/calendar-core";
+import {
+  CALENDARS_QUERY_KEY,
+  CATEGORIES_QUERY_KEY,
+  PUSH_DEVICES_QUERY_KEY,
+} from "@workspace/calendar-core";
 
 export const QUERY_KEYS = {
   events: (start: string, end: string) => ["events", start, end] as const,
-  calendars: () => ["calendars"] as const,
-  categories: () => ["categories"] as const,
+  calendars: () => CALENDARS_QUERY_KEY,
+  categories: () => CATEGORIES_QUERY_KEY,
   settings: () => ["settings"] as const,
   subscriptions: () => ["subscriptions"] as const,
   eventDetail: (id: string) => ["event", id] as const,

@@ -156,7 +156,6 @@ async function readText(response: Response) {
 }
 
 const validEventBody = {
-  title: "Test Event",
   start: "2026-05-01T10:00:00.000Z",
   end: "2026-05-01T11:00:00.000Z",
   calendarId: "cal-1",
@@ -487,13 +486,107 @@ describe("eventsRoutes – color validation", () => {
         new Request("http://localhost/events/", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(unencryptedBody),
+          body: JSON.stringify({ ...unencryptedBody, title: "Test Event" }),
         }),
       );
 
       expect(response.status).toBe(500);
       await expect(readText(response)).resolves.toContain(
         "Event encryption requires an active encryption session.",
+      );
+    });
+
+    it.each([
+      { title: "Secret title" },
+      { description: "Secret notes" },
+      { location: "Secret place" },
+    ])(
+      "rejects plaintext content sent alongside ciphertext (%o)",
+      async (plaintext) => {
+        mockPrisma.calendarEvent.create.mockClear();
+
+        const response = await createApp().handle(
+          new Request("http://localhost/events/", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ ...validEventBody, ...plaintext }),
+          }),
+        );
+
+        await expectValidationError(
+          response,
+          "Plaintext event content must not be sent alongside encrypted content.",
+        );
+        expect(mockPrisma.calendarEvent.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it("rejects plaintext content sent alongside ciphertext on update", async () => {
+      mockPrisma.calendarEvent.update.mockClear();
+
+      const response = await createApp().handle(
+        new Request("http://localhost/events/event-1", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            encryptedContent: "ciphertext",
+            title: "Secret title",
+          }),
+        }),
+      );
+
+      await expectValidationError(
+        response,
+        "Plaintext event content must not be sent alongside encrypted content.",
+      );
+      expect(mockPrisma.calendarEvent.update).not.toHaveBeenCalled();
+    });
+
+    it("accepts empty plaintext fields alongside ciphertext", async () => {
+      mockPrisma.calendarEvent.create.mockResolvedValue({
+        id: "event-1",
+        ...validEventBody,
+        userId: "user-1",
+        category: null,
+        calendar: ownedCalendar,
+      });
+
+      const response = await createApp().handle(
+        new Request("http://localhost/events/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...validEventBody, title: "", location: "" }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.calendarEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            title: "",
+            description: null,
+            location: null,
+            encryptionState: "encrypted",
+          }),
+        }),
+      );
+    });
+
+    it("rejects invitation content without participants", async () => {
+      const response = await createApp().handle(
+        new Request("http://localhost/events/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...validEventBody,
+            invitationContent: { title: "Planning" },
+          }),
+        }),
+      );
+
+      await expectValidationError(
+        response,
+        "Invitation content is only accepted with encrypted content and participants.",
       );
     });
 

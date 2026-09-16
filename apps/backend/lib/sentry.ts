@@ -6,6 +6,14 @@
  * We init with a numeric stand-in and tunnel to `/api/<project>/envelope/`.
  */
 import * as Sentry from "@sentry/bun";
+import {
+  scrubBreadcrumb,
+  scrubErrorEvent,
+} from "@workspace/calendar-core/report-redaction";
+import {
+  BACKEND_REDACTION_OPTIONS,
+  sanitizeLogContext,
+} from "./log-sanitization";
 
 let initialized = false;
 
@@ -51,6 +59,10 @@ export function initSentry(): void {
     environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "development",
     sendDefaultPii: false,
     tracesSampleRate: 0,
+    // Last line of defence: SDK integrations attach data that never met our log sanitizers.
+    beforeSend: (event) => scrubErrorEvent(event, BACKEND_REDACTION_OPTIONS),
+    beforeBreadcrumb: (breadcrumb) =>
+      scrubBreadcrumb(breadcrumb, BACKEND_REDACTION_OPTIONS),
   });
 
   initialized = true;
@@ -68,7 +80,7 @@ export function reportException(
 
   Sentry.withScope((scope) => {
     if (context) {
-      scope.setExtras(context);
+      scope.setExtras(sanitizeLogContext(context));
       const requestId = context.requestId;
       if (typeof requestId === "string" && requestId.length > 0) {
         scope.setTag("requestId", requestId);

@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { RateLimitError } from "./errors";
 
 type RateLimitEntry = { count: number; resetTime: number };
@@ -55,17 +56,15 @@ export function enforceRateLimit(input: {
   current.count += 1;
 }
 
+/** Trustworthy only because Vercel's edge overwrites them; re-check before moving hosts. */
+export const TRUSTED_CLIENT_IP_HEADERS = ["x-real-ip", "x-forwarded-for"];
+
 export function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) {
+  for (const header of TRUSTED_CLIENT_IP_HEADERS) {
+    const first = request.headers.get(header)?.split(",")[0]?.trim();
+    if (first && isIP(first) !== 0) {
       return first;
     }
-  }
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  if (realIp) {
-    return realIp;
   }
   return "unknown";
 }

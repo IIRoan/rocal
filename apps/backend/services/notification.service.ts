@@ -10,7 +10,6 @@ import type {
 import { ValidationError, NotFoundError } from "../lib/errors";
 import { createLogger } from "@workspace/logger";
 import { NotificationCalculator } from "../lib/notification-calculator";
-import { firstNotificationDisplayTitle } from "../lib/notification-job";
 
 const logger = createLogger("backend:notification-service");
 
@@ -45,9 +44,6 @@ export class NotificationService implements INotificationService {
         id: true,
         start: true,
         timezone: true,
-        title: true,
-        description: true,
-        location: true,
         calendarId: true,
         reminder: true,
         encryptedContent: true,
@@ -146,7 +142,7 @@ export class NotificationService implements INotificationService {
     userId: string,
     eventId: string,
     notifications: NotificationConfigInput[],
-    displayTitle?: string | null,
+    encryptedDisplayTitle?: string | null,
   ): Promise<NotificationUpdateResult> {
     const event = await this.validateEventOwnership(eventId, userId);
 
@@ -207,7 +203,7 @@ export class NotificationService implements INotificationService {
       notificationTimezone: string;
       isEnabled: boolean;
       isSent: boolean;
-      displayTitle: string | null;
+      encryptedDisplayTitle: string | null;
       createdAt: Date;
       updatedAt: Date;
     }> = [];
@@ -217,16 +213,17 @@ export class NotificationService implements INotificationService {
       reason: string;
     }> = [];
 
-    const existingReminder = await this.prisma.eventNotification.findFirst({
-      where: { eventId, displayTitle: { not: null } },
-      select: { displayTitle: true },
-      orderBy: { updatedAt: "desc" },
-    });
-    const reminderDisplayTitle = firstNotificationDisplayTitle(
-      displayTitle,
-      event.title,
-      existingReminder?.displayTitle,
-    );
+    // `undefined` keeps the stored ciphertext (older clients), `null` clears it.
+    const reminderDisplayTitle =
+      encryptedDisplayTitle !== undefined
+        ? encryptedDisplayTitle
+        : ((
+            await this.prisma.eventNotification.findFirst({
+              where: { eventId, encryptedDisplayTitle: { not: null } },
+              select: { encryptedDisplayTitle: true },
+              orderBy: { updatedAt: "desc" },
+            })
+          )?.encryptedDisplayTitle ?? null);
 
     const now = new Date();
     const createdAt = now;
@@ -268,7 +265,7 @@ export class NotificationService implements INotificationService {
         notificationTimezone: schedule.notificationTimezone,
         isEnabled: true,
         isSent: false,
-        displayTitle: reminderDisplayTitle,
+        encryptedDisplayTitle: reminderDisplayTitle,
         createdAt,
         updatedAt: createdAt,
       });

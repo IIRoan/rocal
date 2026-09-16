@@ -204,34 +204,45 @@ describe("resetEncryptionPasswordForActiveSession", () => {
       expect.objectContaining({ algorithm: "AES-GCM" }),
       "event-content:v2",
     );
-    expect(mockHttpPut).toHaveBeenNthCalledWith(
-      1,
-      "/api/calendars/calendar-1",
-      expect.objectContaining({
-        name: "Work",
-        encryptionState: "shadow_write",
-        encryptionKeyVersion: 2,
-      }),
+    const newCiphertext = JSON.stringify({
+      version: 1,
+      algorithm: "AES-GCM",
+      iv: "new-iv",
+      ciphertext: "new-ciphertext",
+    });
+    expect(mockEncryptJsonPayload).toHaveBeenCalledWith(
+      expect.anything(),
+      { name: "Work" },
+      "calendar-name:v2",
     );
+    expect(mockHttpPut).toHaveBeenNthCalledWith(1, "/api/calendars/calendar-1", {
+      encryptedName: newCiphertext,
+      blindIndexTokens: ["new-index"],
+      encryptionKeyVersion: 2,
+    });
     expect(mockHttpPut).toHaveBeenNthCalledWith(
       2,
       "/api/categories/category-1",
-      expect.objectContaining({
-        name: "Focus",
-        encryptionState: "shadow_write",
+      {
+        encryptedName: newCiphertext,
+        blindIndexTokens: ["new-index"],
         encryptionKeyVersion: 2,
-      }),
+      },
     );
-    expect(mockHttpPut).toHaveBeenNthCalledWith(
-      3,
-      "/api/events/event-1",
-      expect.objectContaining({
+    expect(mockEncryptJsonPayload).toHaveBeenCalledWith(
+      expect.anything(),
+      {
         title: "Planning",
         description: "Discuss roadmap",
         location: "Room 7",
-        encryptionKeyVersion: 2,
-      }),
+      },
+      "event-content:v2",
     );
+    expect(mockHttpPut).toHaveBeenNthCalledWith(3, "/api/events/event-1", {
+      encryptedContent: newCiphertext,
+      blindIndexTokens: ["new-index"],
+      encryptionKeyVersion: 2,
+    });
     expect(mockCreatePasswordEnvelope).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
@@ -242,5 +253,53 @@ describe("resetEncryptionPasswordForActiveSession", () => {
       expect.objectContaining({ kdfSalt: "salt-1", keyVersion: 2 }),
     );
     expect(mockClearPendingAuthPassword).toHaveBeenCalled();
+  });
+
+  it("decrypts already-encrypted names instead of failing on blank plaintext", async () => {
+    mockGetResetSnapshot.mockResolvedValue({
+      calendars: [
+        {
+          id: "calendar-1",
+          name: "",
+          encryptedName: JSON.stringify({
+            version: 1,
+            algorithm: "AES-GCM",
+            iv: "iv",
+            ciphertext: "calendar-ciphertext",
+          }),
+          blindIndexTokens: ["old-index"],
+          encryptionState: "encrypted",
+          encryptionKeyVersion: 1,
+          color: "blue",
+          kind: "owned",
+          isDefault: true,
+          isVisible: true,
+          createdAt: new Date("2026-04-20T11:00:00.000Z"),
+          updatedAt: new Date("2026-04-21T12:00:00.000Z"),
+        },
+      ],
+      categories: [],
+      events: [],
+    });
+    mockDecryptJsonPayload.mockResolvedValue({ name: "Therapy" });
+
+    await expect(
+      resetEncryptionPasswordForActiveSession("user-1", "new password"),
+    ).resolves.toBe(true);
+
+    expect(mockDecryptJsonPayload).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ ciphertext: "calendar-ciphertext" }),
+      "calendar-name:v1",
+    );
+    expect(mockEncryptJsonPayload).toHaveBeenCalledWith(
+      expect.anything(),
+      { name: "Therapy" },
+      "calendar-name:v1",
+    );
+    expect(mockHttpPut).toHaveBeenCalledWith(
+      "/api/calendars/calendar-1",
+      expect.not.objectContaining({ name: expect.anything() }),
+    );
   });
 });

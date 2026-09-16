@@ -78,6 +78,9 @@ function createMockPrisma() {
         async () => null,
       ),
     },
+    userEncryptionDevice: {
+      count: jest.fn(async () => 0),
+    },
     calendarEvent: {
       count: jest.fn(async () => 0),
       findMany: jest.fn(async () => []),
@@ -119,10 +122,9 @@ describe("CalendarService", () => {
     service = new CalendarService(mockPrisma as never);
   });
 
-  it("creates calendars with normalized names and encrypted metadata", async () => {
+  it("creates encrypted calendars without persisting the plaintext name", async () => {
     const created = await service.create({
       userId: "user-1",
-      name: "  Focus  ",
       color: "#abcdef",
       encryptedName: "ciphertext",
       blindIndexTokens: ["idx-1"],
@@ -131,12 +133,10 @@ describe("CalendarService", () => {
       forceFullEncryption: true,
     });
 
-    expect(mockPrisma.calendar.findFirst).toHaveBeenCalledWith({
-      where: { userId: "user-1", name: "Focus" },
-    });
+    expect(mockPrisma.calendar.findFirst).not.toHaveBeenCalled();
     expect(mockPrisma.calendar.create).toHaveBeenCalledWith({
       data: {
-        name: "Focus",
+        name: "",
         color: "#abcdef",
         kind: "owned",
         isPublic: false,
@@ -145,17 +145,105 @@ describe("CalendarService", () => {
         userId: "user-1",
         encryptedName: "ciphertext",
         blindIndexTokens: JSON.stringify(["idx-1"]),
-        encryptionState: "shadow_write",
+        encryptionState: "encrypted",
         encryptionKeyVersion: 2,
         forceFullEncryption: true,
       },
     });
     expect(created).toEqual(
       expect.objectContaining({
-        name: "Focus",
+        name: "",
+        encryptionState: "encrypted",
         forceFullEncryption: true,
       }),
     );
+  });
+
+  it("rejects plaintext names sent alongside ciphertext", async () => {
+    await expect(
+      service.create({
+        userId: "user-1",
+        name: "Therapy",
+        color: "#abcdef",
+        encryptedName: "ciphertext",
+      }),
+    ).rejects.toMatchObject({
+      name: "ValidationError",
+      field: "name",
+    } as Partial<ValidationError>);
+    expect(mockPrisma.calendar.create).not.toHaveBeenCalled();
+  });
+
+  it("normalizes plaintext names for accounts without E2EE", async () => {
+    await service.create({
+      userId: "user-1",
+      name: "  Focus  ",
+      color: "#abcdef",
+    });
+
+    expect(mockPrisma.calendar.findFirst).toHaveBeenCalledWith({
+      where: { userId: "user-1", name: "Focus" },
+    });
+    expect(mockPrisma.calendar.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: "Focus",
+        encryptedName: null,
+        blindIndexTokens: null,
+        encryptionState: "plaintext",
+      }),
+    });
+  });
+
+  it("rejects plaintext names once the account has an E2EE device", async () => {
+    mockPrisma.userEncryptionDevice.count.mockResolvedValue(1);
+
+    await expect(
+      service.create({ userId: "user-1", name: "Therapy", color: "#abcdef" }),
+    ).rejects.toMatchObject({
+      name: "ValidationError",
+      field: "encryptedName",
+    } as Partial<ValidationError>);
+    expect(mockPrisma.calendar.create).not.toHaveBeenCalled();
+  });
+
+  it("blanks the plaintext name when a backfill uploads ciphertext", async () => {
+    const stalwartClient = createMockStalwartClient();
+    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValue({
+      stalwartAccountId: "acct-1",
+    });
+    mockPrisma.calendar.findFirst.mockResolvedValueOnce(
+      calendarFixture({
+        name: "Therapy",
+        stalwartAccountId: "acct-1",
+        stalwartCalendarId: "remote-cal-1",
+      }),
+    );
+    service = new CalendarService(mockPrisma as never, stalwartClient);
+
+    await service.update({
+      userId: "user-1",
+      calendarId: "calendar-1",
+      encryptedName: "ciphertext",
+      blindIndexTokens: ["idx-1"],
+      encryptionKeyVersion: 1,
+    });
+
+    expect(mockPrisma.userEncryptionDevice.count).not.toHaveBeenCalled();
+    expect(stalwartClient.updateCalendar).toHaveBeenCalledWith(
+      "acct-1",
+      "remote-cal-1",
+      { name: "Solace calendar" },
+    );
+    expect(mockPrisma.calendar.update).toHaveBeenCalledWith({
+      where: { id: "calendar-1" },
+      data: expect.objectContaining({
+        name: "",
+        encryptedName: "ciphertext",
+        blindIndexTokens: JSON.stringify(["idx-1"]),
+        encryptionState: "encrypted",
+        encryptionKeyVersion: 1,
+      }),
+    });
   });
 
   it("allows visibility-only updates on subscribed calendars", async () => {

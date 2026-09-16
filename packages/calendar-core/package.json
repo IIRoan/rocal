@@ -12,6 +12,7 @@
     "@workspace/calendar-ics": "workspace:*",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
+    "dompurify": "^3.4.15",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -19,6 +20,9 @@
     "typescript": "^5.9.3"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./report-redaction": "./src/report-redaction.ts",
+    "./sanitize-email-html": "./src/sanitize-email-html.ts",
+    "./mail-html": "./src/mail-html.ts"
   }
 }

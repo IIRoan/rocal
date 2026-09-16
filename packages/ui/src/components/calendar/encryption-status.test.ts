@@ -6,25 +6,25 @@ import {
 } from "./encryption-status";
 
 describe("resolveEncryptionState", () => {
-  it("infers hybrid encryption from encrypted shadows", () => {
+  it("treats ciphertext without an explicit state as encrypted", () => {
     expect(resolveEncryptionState({ encryptedName: "ciphertext" })).toBe(
-      "shadow_write",
+      "encrypted",
     );
     expect(resolveEncryptionState({ encryptedContent: "ciphertext" })).toBe(
-      "shadow_write",
+      "encrypted",
     );
   });
 });
 
 describe("getEncryptionStatusMeta", () => {
-  it("labels shadow-write items as hybrid encrypted", () => {
+  it("labels legacy shadow-write items as encryption pending", () => {
     expect(
       getEncryptionStatusMeta({ encryptionState: "shadow_write" }),
     ).toEqual(
       expect.objectContaining({
-        state: "shadow_write",
-        label: "Hybrid encrypted",
-        shortLabel: "Hybrid",
+        state: "pending",
+        label: "Encryption pending",
+        shortLabel: "Pending",
       }),
     );
   });
@@ -101,7 +101,7 @@ describe("getEncryptionStatusMeta", () => {
     ).toEqual(expect.objectContaining({ state: "force_full" }));
   });
 
-  it("force-full takes precedence over hybrid shadow_write state", () => {
+  it("force-full takes precedence over legacy shadow_write state", () => {
     expect(
       getEncryptionStatusMeta({
         forceFullEncryption: true,

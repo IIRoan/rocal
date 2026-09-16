@@ -16,6 +16,7 @@ import { toIcsBuildEvent } from "../lib/ics-export";
 
 const logger = createLogger("backend:calendar-sharing-service");
 import { backfillEncryptedEventsToCiphertextOnly } from "../lib/event-encryption";
+import { externalCalendarName } from "../lib/entity-metadata";
 
 const SHARE_TOKEN_LENGTH = 40;
 const SHARE_TOKEN_ALPHABET =
@@ -225,9 +226,10 @@ export class CalendarSharingService implements ICalendarSharingService {
       (event) => !event.allDay && !!event.timezone,
     );
 
+    const calendarName = externalCalendarName(calendar.name);
     const icsContent = buildIcsCalendar({
       calendar: {
-        name: calendar.name,
+        name: calendarName,
         description: `Shared calendar from ${calendar.user.name || calendar.user.email}`,
         timezone: resolveTimezone(timezoneSource?.timezone),
         sourceUrl,
@@ -235,6 +237,6 @@ export class CalendarSharingService implements ICalendarSharingService {
       events: calendar.events.map((event) => toIcsBuildEvent(event)),
     });
 
-    return { icsContent, calendarName: calendar.name };
+    return { icsContent, calendarName };
   }
 }

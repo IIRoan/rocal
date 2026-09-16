@@ -1,10 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   coalescePendingMailSync,
-  inboundPushItemFromEmailRecord,
-  isEmailAddressForPush,
   mergeInboundMailPushItems,
-  mergeInboundMailPushMetadata,
 } from "../../lib/inbound-mail-push";
 import type { MailSyncResult } from "../../services/mail-sync.service";
 
@@ -42,59 +39,13 @@ function sync(overrides: Partial<MailSyncResult> = {}): MailSyncResult {
 }
 
 describe("mergeInboundMailPushItems", () => {
-  it("deduplicates by email id and merges missing metadata", () => {
+  it("deduplicates by email id and keeps opaque refs only", () => {
     expect(
       mergeInboundMailPushItems(
-        [{ emailId: "in-1", subject: "Hello", fromName: null }],
-        [{ emailId: "in-1", subject: null, fromName: "Sam" }],
+        [{ emailId: "in-1" }, { emailId: " " }],
+        [{ emailId: " in-1 " }, { emailId: "in-2" }],
       ),
-    ).toEqual([{ emailId: "in-1", subject: "Hello", fromName: "Sam" }]);
-  });
-});
-
-describe("mergeInboundMailPushMetadata", () => {
-  it("prefers JMAP sender names when the webhook only has an email address", () => {
-    expect(
-      mergeInboundMailPushMetadata(
-        {
-          emailId: "1558",
-          subject: null,
-          fromName: "sam@example.com",
-        },
-        {
-          emailId: "gcqaaabqw",
-          subject: "Quarterly update",
-          fromName: "Sam",
-        },
-      ),
-    ).toEqual({
-      emailId: "gcqaaabqw",
-      subject: "Quarterly update",
-      fromName: "Sam",
-    });
-  });
-});
-
-describe("isEmailAddressForPush", () => {
-  it("detects bare email addresses", () => {
-    expect(isEmailAddressForPush("sam@example.com")).toBe(true);
-    expect(isEmailAddressForPush("Sam")).toBe(false);
-  });
-});
-
-describe("inboundPushItemFromEmailRecord", () => {
-  it("maps subject and sender display name", () => {
-    expect(
-      inboundPushItemFromEmailRecord({
-        id: "in-1",
-        subject: "Lunch",
-        from: [{ email: "sam@example.com", name: "Sam" }],
-      }),
-    ).toEqual({
-      emailId: "in-1",
-      subject: "Lunch",
-      fromName: "Sam",
-    });
+    ).toEqual([{ emailId: "in-1" }, { emailId: "in-2" }]);
   });
 });
 

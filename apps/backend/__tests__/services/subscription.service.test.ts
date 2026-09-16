@@ -1,5 +1,4 @@
 import {
-  afterAll,
   beforeEach,
   describe,
   expect,
@@ -34,9 +33,17 @@ jest.mock("../../lib/ics-parser", () => ({
   isEventModified: jest.fn(() => false),
 }));
 
+jest.mock("../../lib/safe-fetch", () => {
+  const actual = jest.requireActual<typeof import("../../lib/safe-fetch")>(
+    "../../lib/safe-fetch",
+  );
+  return { ...actual, safeFetch: jest.fn() };
+});
+
+import { SafeFetchError, safeFetch } from "../../lib/safe-fetch";
 import { SubscriptionService } from "../../services/subscription.service";
 
-const originalFetch = global.fetch;
+const mockSafeFetch = safeFetch as jest.MockedFunction<typeof safeFetch>;
 
 function createMockPrisma() {
   return {
@@ -84,13 +91,11 @@ function createMockPrisma() {
 describe("SubscriptionService", () => {
   let mockPrisma: ReturnType<typeof createMockPrisma>;
   let service: SubscriptionService;
-  let mockFetch: any;
 
   beforeEach(() => {
     mockPrisma = createMockPrisma();
     service = new SubscriptionService(mockPrisma as any);
-    mockFetch = jest.fn();
-    global.fetch = mockFetch as unknown as typeof global.fetch;
+    mockSafeFetch.mockReset();
   });
 
   it("rejects redirects to private networks when creating subscriptions", async () => {
@@ -98,13 +103,8 @@ describe("SubscriptionService", () => {
       .spyOn(service, "syncCalendarSubscription")
       .mockResolvedValue({ status: "success" } as any);
 
-    mockFetch.mockResolvedValueOnce(
-      new Response(null, {
-        status: 302,
-        headers: {
-          location: "http://127.0.0.1/private.ics",
-        },
-      }),
+    mockSafeFetch.mockRejectedValueOnce(
+      new SafeFetchError("private-network-host"),
     );
 
     await expect(
@@ -117,19 +117,18 @@ describe("SubscriptionService", () => {
       "Unable to fetch or parse calendar from URL: URLs pointing to internal or private networks are not allowed",
     );
 
-    expect(mockFetch).toHaveBeenCalledWith(
+    expect(mockSafeFetch).toHaveBeenCalledWith(
       "https://example.com/calendar.ics",
       expect.objectContaining({
-        redirect: "manual",
-        signal: expect.any(AbortSignal),
+        maxRedirects: 5,
+        timeoutMs: 10_000,
+        maxBytes: 15 * 1024 * 1024,
       }),
     );
   });
 
   it("times out sync requests and records the error", async () => {
-    const abortError = new Error("The operation was aborted");
-    abortError.name = "AbortError";
-    mockFetch.mockRejectedValueOnce(abortError);
+    mockSafeFetch.mockRejectedValueOnce(new SafeFetchError("timeout"));
 
     await expect(
       service.syncCalendarSubscription({
@@ -223,8 +222,4 @@ describe("SubscriptionService", () => {
       expect(mockPrisma.calendar.deleteMany).not.toHaveBeenCalled();
     });
   });
-});
-
-afterAll(() => {
-  global.fetch = originalFetch;
 });

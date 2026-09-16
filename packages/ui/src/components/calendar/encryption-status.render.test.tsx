@@ -148,7 +148,7 @@ describe("EncryptionStatusBadge", () => {
     ).toBeGreaterThan(1);
   });
 
-  it("renders hybrid items with the expected server-visible fields", () => {
+  it("renders legacy pending items with the expected server-visible fields", () => {
     act(() => {
       root.render(
         <EncryptionStatusBadge item={{ encryptionState: "shadow_write" }} />,
@@ -156,20 +156,16 @@ describe("EncryptionStatusBadge", () => {
     });
 
     const button = container.querySelector(
-      "button[aria-label='Hybrid encrypted']",
+      "button[aria-label='Encryption pending']",
     );
     const popover = container.querySelector("[data-testid='popover']");
 
     expect(button).not.toBeNull();
     expect(popover?.textContent).toContain(
-      "plaintext shadows are kept so reminders and sharing keep working.",
+      "The older plaintext copy is removed the next time a signed-in device syncs.",
     );
-    expect(popover?.textContent).toContain(
-      "Title (plaintext shadow for reminders)",
-    );
-    expect(popover?.textContent).toContain(
-      "Encrypted ciphertext copy stored alongside",
-    );
+    expect(popover?.textContent).toContain("Plaintext copy until sync");
+    expect(popover?.textContent).toContain("Encrypted copy");
     expect(popover?.querySelector("[data-icon='lock-open']")).not.toBeNull();
   });
 });

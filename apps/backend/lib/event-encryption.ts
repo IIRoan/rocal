@@ -1,8 +1,14 @@
-import type {
-  EventEncryptionMode,
+import {
+  PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE,
+  findPlaintextEventContentFields,
+  hasEncryptedPayloadValue,
+  type EventContentField,
+  type EventEncryptionMode,
+  type EventInvitationContent,
 } from "@workspace/calendar-core";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import type { RowEncryptionState } from "./encryption-state";
+import { ValidationError } from "./errors";
 
 export type ResolvedEventPersistencePolicy = {
   encryptionState: RowEncryptionState;
@@ -66,6 +72,59 @@ export function resolveEventPersistencePolicy(
     title: "",
     description: null,
     location: null,
+  };
+}
+
+/** Service-level mirror of the route contract guard, for callers that bypass it. */
+export function assertNoPlaintextEventContentWithCiphertext(
+  input: Partial<Record<EventContentField, string | null>> & {
+    encryptedContent?: string | null;
+  },
+): void {
+  if (!hasEncryptedPayloadValue(input.encryptedContent)) {
+    return;
+  }
+
+  const [field] = findPlaintextEventContentFields(input);
+  if (field) {
+    throw new ValidationError(
+      PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE,
+      field,
+    );
+  }
+}
+
+type InvitationContentSource = {
+  title: string;
+  description: string | null;
+  location: string | null;
+};
+
+/** Encrypted events use the transient per-request `invitationContent`, which is never persisted. */
+export function resolveInvitationContent(input: {
+  hasEncryptedPayload: boolean;
+  invitationContent?: EventInvitationContent;
+  title?: string | null;
+  description?: string | null;
+  location?: string | null;
+}): InvitationContentSource | null {
+  if (input.invitationContent) {
+    return {
+      title: input.invitationContent.title.trim(),
+      description: normalizeOptionalText(input.invitationContent.description),
+      location: normalizeOptionalText(input.invitationContent.location),
+    };
+  }
+
+  const title = input.title?.trim();
+  if (input.hasEncryptedPayload || !title) {
+    return null;
+  }
+
+  return {
+    title,
+    description: normalizeOptionalText(input.description),
+    location: normalizeOptionalText(input.location),
   };
 }
 

@@ -22,7 +22,7 @@ export interface EncryptableCalendarItem {
 
 export type EncryptionDisplayState =
   | "encrypted"
-  | "shadow_write"
+  | "pending"
   | "plaintext"
   | "force_full";
 
@@ -49,12 +49,13 @@ export function resolveEncryptionState(
     return "encrypted";
   }
 
+  // Legacy rows still carry a plaintext copy until the device backfill replaces it.
   if (item.encryptionState === "shadow_write") {
-    return "shadow_write";
+    return "pending";
   }
 
   if (item.encryptedContent || item.encryptedName) {
-    return "shadow_write";
+    return "encrypted";
   }
 
   return "plaintext";
@@ -98,20 +99,18 @@ export function getEncryptionStatusMeta(
         protectedFields: ["Title", "Description", "Location"],
         visibleFields: ["Start & end times", "All-day flag", "Recurrence rule"],
       };
-    case "shadow_write":
+    case "pending":
       return {
-        state: "shadow_write",
-        label: "Hybrid encrypted",
-        shortLabel: "Hybrid",
+        state: "pending",
+        label: "Encryption pending",
+        shortLabel: "Pending",
         description:
-          "Encrypted at rest, but plaintext shadows are kept so reminders and sharing keep working.",
+          "An encrypted copy is stored. The older plaintext copy is removed the next time a signed-in device syncs.",
         Icon: ShieldAlert,
         iconClassName: "text-foreground/55",
-        protectedFields: ["Encrypted ciphertext copy stored alongside"],
+        protectedFields: ["Encrypted copy"],
         visibleFields: [
-          "Title (plaintext shadow for reminders)",
-          "Description",
-          "Location",
+          "Plaintext copy until sync",
           "Start & end times",
           "Recurrence rule",
         ],

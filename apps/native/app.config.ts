@@ -2,6 +2,16 @@ import type { ExpoConfig } from "expo/config";
 
 const variant = process.env.APP_VARIANT ?? "production";
 const isDev = variant === "development";
+const iosBundleIdentifier = isDev ? "onl.solace.mobile.dev" : "onl.solace.mobile";
+const IOS_DEPLOYMENT_TARGET = "16.4";
+
+// The App Group id doubles as the keychain access group shared with the notification extension.
+const notificationExtension = {
+  targetName: "SolaceNotificationService",
+  bundleIdentifier: `${iosBundleIdentifier}.NotificationService`,
+  appGroup: `group.${iosBundleIdentifier}`,
+  keychainService: "onl.solace.notification-extension",
+};
 
 const baseConfig = {
   name: isDev ? "Solace Dev" : "Solace",
@@ -26,7 +36,7 @@ const baseConfig = {
   },
   ios: {
     supportsTablet: true,
-    bundleIdentifier: isDev ? "onl.solace.mobile.dev" : "onl.solace.mobile",
+    bundleIdentifier: iosBundleIdentifier,
     buildNumber: "1",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -71,6 +81,14 @@ const baseConfig = {
     "expo-sharing",
     "expo-status-bar",
     "react-native-quick-crypto",
+    [
+      "./plugins/notification-service-extension/index.js",
+      {
+        appGroup: notificationExtension.appGroup,
+        keychainService: notificationExtension.keychainService,
+        deploymentTarget: IOS_DEPLOYMENT_TARGET,
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,
@@ -79,8 +97,29 @@ const baseConfig = {
   extra: {
     eas: {
       projectId: "1047b680-b99f-4671-9824-23b9a0487125",
+      build: {
+        experimental: {
+          ios: {
+            appExtensions: [
+              {
+                targetName: notificationExtension.targetName,
+                bundleIdentifier: notificationExtension.bundleIdentifier,
+                entitlements: {
+                  "com.apple.security.application-groups": [
+                    notificationExtension.appGroup,
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      },
     },
     appVariant: variant,
+    notificationExtension: {
+      appGroup: notificationExtension.appGroup,
+      keychainService: notificationExtension.keychainService,
+    },
   },
   owner: "astralgrove",
 } as ExpoConfig;
@@ -151,7 +190,7 @@ const configuredPlugins = [
     "expo-build-properties",
     {
       ios: {
-        deploymentTarget: "16.4",
+        deploymentTarget: IOS_DEPLOYMENT_TARGET,
       },
     },
   ] as [string, { ios: { deploymentTarget: string } }],
