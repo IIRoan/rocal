@@ -8,7 +8,9 @@ import {
 import { useTheme } from "../../providers/ThemeProvider";
 import { TimelineEventContent } from "./TimelineEventContent";
 import {
+  TIMELINE_MIN_EVENT_HEIGHT_PX,
   resolveTimelineEventDensity,
+  timelineDisplayMinutes,
   timelineEventTitleLines,
 } from "./timeline-event-content";
 
@@ -33,6 +35,8 @@ export function TimelineDraggingEvent(props: DraggingEventProps) {
       borderWidth: 0,
       borderRadius: theme.borderRadius.sm,
       overflow: "visible",
+      // Kit sizes the drag preview from the real duration; match the resting block.
+      minHeight: TIMELINE_MIN_EVENT_HEIGHT_PX,
       ...Platform.select({
         ios: {
           shadowColor: "#000",
@@ -56,7 +60,9 @@ export function TimelineDraggingEvent(props: DraggingEventProps) {
       TopEdgeComponent={<View />}
       BottomEdgeComponent={<View />}
       renderEvent={(event) => {
-        const durationMinutes = durationMinutesFromKitEvent(event);
+        const durationMinutes = timelineDisplayMinutes(
+          durationMinutesFromKitEvent(event),
+        );
         const density = resolveTimelineEventDensity({
           durationMinutes,
           allDay: false,
