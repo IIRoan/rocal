@@ -2,12 +2,12 @@ package schedule
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"notifications/internal/jobs"
 )
 
 type Settings struct {
@@ -99,12 +99,6 @@ const claimDueSQL = `
 		FOR UPDATE OF en SKIP LOCKED
 	`
 
-func newID() string {
-	var buf [16]byte
-	_, _ = rand.Read(buf[:])
-	return hex.EncodeToString(buf[:])
-}
-
 func ChannelsFor(item DueSchedule) []string {
 	var channels []string
 	if item.Settings.EmailNotifications {
@@ -131,7 +125,7 @@ func insertJobs(ctx context.Context, tx *sql.Tx, item DueSchedule) error {
 		return err
 	}
 	for _, channel := range ChannelsFor(item) {
-		if _, err := tx.ExecContext(ctx, insertJobSQL, newID(), item.UserID, "event_reminder", channel, item.EventID, payload); err != nil {
+		if _, err := tx.ExecContext(ctx, insertJobSQL, jobs.NewID(), item.UserID, "event_reminder", channel, item.EventID, payload); err != nil {
 			return err
 		}
 	}

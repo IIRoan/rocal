@@ -2,7 +2,9 @@ package jobs
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -12,6 +14,13 @@ import (
 
 const MaxAttempts = 8
 
+// NewID returns a random row id; clock-based ids collided when jobs were logged in the same tick.
+func NewID() string {
+	var buf [16]byte
+	_, _ = rand.Read(buf[:])
+	return hex.EncodeToString(buf[:])
+}
+
 type Job struct {
 	ID            string
 	UserID        string
@@ -19,7 +28,6 @@ type Job struct {
 	Channel       string
 	EventID       sql.NullString
 	Payload       privacy.Payload
-	RawPayload    []byte
 	MinutesBefore int
 	InboundCount  int
 	Attempts      int
@@ -79,7 +87,6 @@ func ClaimPending(ctx context.Context, db *sql.DB, limit int) ([]Job, error) {
 			continue
 		}
 		job.Payload = payload
-		job.RawPayload = raw
 		if payload.MinutesBefore != nil {
 			job.MinutesBefore = *payload.MinutesBefore
 		}
@@ -158,7 +165,7 @@ func InsertLog(ctx context.Context, db *sql.DB, job Job, status string) error {
 		) VALUES (
 			$1, $2, $3, $4, $5, NOW(), $6, NOW()
 		)
-	`, fmt.Sprintf("%d", time.Now().UnixNano()), eventID, job.UserID, job.Channel, job.MinutesBefore, status)
+	`, NewID(), eventID, job.UserID, job.Channel, job.MinutesBefore, status)
 	return err
 }
 
