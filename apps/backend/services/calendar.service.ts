@@ -16,28 +16,13 @@ import {
   resolveEntityNamePersistence,
 } from "../lib/entity-metadata";
 import { ensureUserCalendars } from "../lib/user-setup";
-import type { StalwartCalendarClientLike } from "../lib/stalwart-calendar";
 
 const logger = createLogger("backend:calendar-service");
 
 export class CalendarService implements ICalendarService {
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly stalwartClient?: StalwartCalendarClientLike | null,
   ) {}
-
-  private async getStalwartAccountId(userId: string): Promise<string | null> {
-    if (!this.stalwartClient) {
-      return null;
-    }
-
-    const mailbox = await this.prisma.mailDirectoryEntry.findUnique({
-      where: { userId },
-      select: { stalwartAccountId: true },
-    });
-
-    return mailbox?.stalwartAccountId ?? null;
-  }
 
   async list(userId: string) {
     await ensureUserCalendars(userId);
@@ -48,54 +33,6 @@ export class CalendarService implements ICalendarService {
     });
 
     return { calendars };
-  }
-
-  private async rollbackCreatedRemoteCalendar(
-    accountId: string,
-    calendarId: string,
-  ): Promise<void> {
-    if (!this.stalwartClient) {
-      return;
-    }
-
-    try {
-      await this.stalwartClient.deleteCalendar(accountId, calendarId);
-    } catch (error) {
-      logger.warn("Failed to roll back created Stalwart calendar", {
-        accountId,
-        calendarId,
-        ...errorLogDetails(error),
-      });
-    }
-  }
-
-  private async rollbackUpdatedRemoteCalendar(input: {
-    accountId: string;
-    calendarId: string;
-    previous: {
-      name: string;
-      color: string;
-      isVisible: boolean;
-      isDefault: boolean;
-    };
-  }): Promise<void> {
-    if (!this.stalwartClient) {
-      return;
-    }
-
-    try {
-      await this.stalwartClient.updateCalendar(
-        input.accountId,
-        input.calendarId,
-        input.previous,
-      );
-    } catch (error) {
-      logger.warn("Failed to roll back updated Stalwart calendar", {
-        accountId: input.accountId,
-        calendarId: input.calendarId,
-        ...errorLogDetails(error),
-      });
-    }
   }
 
   async create(input: CalendarCreateInput) {
@@ -140,24 +77,8 @@ export class CalendarService implements ICalendarService {
     const remoteName =
       namePersistence.kind === "plaintext" ? namePersistence.name : "";
 
-    const stalwartAccountId = await this.getStalwartAccountId(userId);
-    let stalwartCalendarId: string | null = null;
 
-    if (stalwartAccountId && this.stalwartClient) {
-      const remoteCalendar = await this.stalwartClient.createCalendar(
-        stalwartAccountId,
-        {
-          name: externalCalendarName(remoteName),
-          color,
-          isVisible: true,
-          isDefault: isDefault || false,
-        },
-      );
-      stalwartCalendarId = remoteCalendar.id;
-    }
-
-    try {
-      return await this.prisma.$transaction(async (tx) => {
+    return await this.prisma.$transaction(async (tx) => {
         if (isDefault) {
           await tx.calendar.updateMany({
             where: { userId, isDefault: true },
@@ -174,27 +95,10 @@ export class CalendarService implements ICalendarService {
             isPublic: false,
             isVisible: true,
             isDefault: isDefault || false,
-            ...(stalwartAccountId && stalwartCalendarId
-              ? {
-                  stalwartAccountId,
-                  stalwartCalendarId,
-                  stalwartSyncedAt: new Date(),
-                }
-              : {}),
             userId,
           },
         });
       });
-    } catch (error) {
-      if (stalwartAccountId && stalwartCalendarId) {
-        await this.rollbackCreatedRemoteCalendar(
-          stalwartAccountId,
-          stalwartCalendarId,
-        );
-      }
-
-      throw error;
-    }
   }
 
   async update(input: CalendarUpdateInput) {
@@ -270,45 +174,6 @@ export class CalendarService implements ICalendarService {
       assertValidEntityColor(color);
     }
 
-    const stalwartAccountId = await this.getStalwartAccountId(userId);
-    let stalwartCalendarId = existingCalendar.stalwartCalendarId;
-    let createdRemoteCalendarId: string | null = null;
-    let updatedExistingRemoteCalendar = false;
-
-    if (
-      stalwartAccountId &&
-      this.stalwartClient &&
-      existingCalendar.kind === "owned" &&
-      !existingCalendar.isSyncOnly
-    ) {
-      if (!stalwartCalendarId) {
-        stalwartCalendarId = (
-          await this.stalwartClient.createCalendar(stalwartAccountId, {
-            name: nextRemoteName ?? externalCalendarName(existingCalendar.name),
-            color: color ?? existingCalendar.color,
-            isVisible: isVisible ?? existingCalendar.isVisible,
-            isDefault: isDefault ?? existingCalendar.isDefault,
-          })
-        ).id;
-        createdRemoteCalendarId = stalwartCalendarId;
-      } else {
-        const remotePatch = {
-          ...(nextRemoteName !== undefined ? { name: nextRemoteName } : {}),
-          ...(color !== undefined ? { color } : {}),
-          ...(isVisible !== undefined ? { isVisible } : {}),
-          ...(isDefault !== undefined ? { isDefault } : {}),
-        };
-
-        if (Object.keys(remotePatch).length > 0) {
-          await this.stalwartClient.updateCalendar(
-            stalwartAccountId,
-            stalwartCalendarId,
-            remotePatch,
-          );
-          updatedExistingRemoteCalendar = true;
-        }
-      }
-    }
 
     const updateData: Prisma.CalendarUpdateInput = {};
 
@@ -327,16 +192,9 @@ export class CalendarService implements ICalendarService {
       updateData.forceFullEncryption = forceFullEncryption;
     }
 
-    if (stalwartAccountId && stalwartCalendarId) {
-      updateData.stalwartAccountId = stalwartAccountId;
-      updateData.stalwartCalendarId = stalwartCalendarId;
-      updateData.stalwartSyncedAt = new Date();
-    }
-
     updateData.updatedAt = new Date();
 
-    try {
-      return await this.prisma.$transaction(async (tx) => {
+    return await this.prisma.$transaction(async (tx) => {
         if (isDefault) {
           await tx.calendar.updateMany({
             where: { userId, isDefault: true, id: { not: calendarId } },
@@ -370,32 +228,7 @@ export class CalendarService implements ICalendarService {
         }
 
         return updatedCalendar;
-      });
-    } catch (error) {
-      if (stalwartAccountId && createdRemoteCalendarId) {
-        await this.rollbackCreatedRemoteCalendar(
-          stalwartAccountId,
-          createdRemoteCalendarId,
-        );
-      } else if (
-        stalwartAccountId &&
-        updatedExistingRemoteCalendar &&
-        existingCalendar.stalwartCalendarId
-      ) {
-        await this.rollbackUpdatedRemoteCalendar({
-          accountId: stalwartAccountId,
-          calendarId: existingCalendar.stalwartCalendarId,
-          previous: {
-            name: externalCalendarName(existingCalendar.name),
-            color: existingCalendar.color,
-            isVisible: existingCalendar.isVisible,
-            isDefault: existingCalendar.isDefault,
-          },
-        });
-      }
-
-      throw error;
-    }
+    });
   }
 
   async delete(input: CalendarDeleteInput): Promise<CalendarDeleteResult> {
@@ -462,35 +295,6 @@ export class CalendarService implements ICalendarService {
           );
         }
 
-        if (
-          this.stalwartClient &&
-          existingCalendar.stalwartAccountId &&
-          existingCalendar.stalwartCalendarId &&
-          targetCalendar.stalwartCalendarId
-        ) {
-          const remoteEvents = await this.prisma.calendarEvent.findMany({
-            where: {
-              calendarId,
-              stalwartEventId: { not: null },
-            },
-            select: {
-              stalwartEventId: true,
-            },
-          });
-
-          for (const event of remoteEvents) {
-            if (!event.stalwartEventId) continue;
-            await this.stalwartClient.updateEvent({
-              accountId: existingCalendar.stalwartAccountId,
-              eventId: event.stalwartEventId,
-              patch: {
-                calendarIds: {
-                  [targetCalendar.stalwartCalendarId]: true,
-                },
-              },
-            });
-          }
-        }
 
         await this.prisma.calendarEvent.updateMany({
           where: { calendarId },
@@ -501,42 +305,12 @@ export class CalendarService implements ICalendarService {
           },
         });
 
-        if (
-          this.stalwartClient &&
-          existingCalendar.stalwartAccountId &&
-          existingCalendar.stalwartCalendarId
-        ) {
-          await this.stalwartClient.deleteCalendar(
-            existingCalendar.stalwartAccountId,
-            existingCalendar.stalwartCalendarId,
-          );
-        }
       } else {
-        if (
-          this.stalwartClient &&
-          existingCalendar.stalwartAccountId &&
-          existingCalendar.stalwartCalendarId
-        ) {
-          await this.stalwartClient.deleteCalendar(
-            existingCalendar.stalwartAccountId,
-            existingCalendar.stalwartCalendarId,
-            { removeEvents: true },
-          );
-        }
 
         await this.prisma.calendarEvent.deleteMany({
           where: { calendarId },
         });
       }
-    } else if (
-      this.stalwartClient &&
-      existingCalendar.stalwartAccountId &&
-      existingCalendar.stalwartCalendarId
-    ) {
-      await this.stalwartClient.deleteCalendar(
-        existingCalendar.stalwartAccountId,
-        existingCalendar.stalwartCalendarId,
-      );
     }
 
     if (existingCalendar.isDefault) {
