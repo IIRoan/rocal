@@ -103,6 +103,13 @@ export const bulkEventActionSchema = z.enum(["move", "delete", "duplicate"]);
 
 export const notificationTypeSchema = z.enum(["browser", "email"]);
 
+/** Wire format "v1.<iv b64url>.<ciphertext+tag b64url>"; the server stores it opaquely. */
+export const MAX_ENCRYPTED_NOTIFICATION_TITLE_LENGTH = 1200;
+export const encryptedNotificationTitleSchema = z
+  .string()
+  .max(MAX_ENCRYPTED_NOTIFICATION_TITLE_LENGTH)
+  .regex(/^v1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{23,}$/);
+
 export const themeSchema = z.enum(["light", "dark", "system"]);
 export const defaultViewSchema = z.enum(["month", "week", "day", "agenda"]);
 export const timeFormatSchema = z.enum(["12h", "24h"]);

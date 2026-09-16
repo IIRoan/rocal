@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   bulkEventActionSchema,
+  eventInvitationContentSchema,
   eventParticipantInputSchema,
   invitationImportStatusSchema,
   optionalCalendarColorSchema,
@@ -11,6 +12,7 @@ import {
 import { strictZodObject } from "../lib/validation";
 import {
   eventContentEncryptionFieldsSchema,
+  refineEncryptedEventContentBody,
   reminderFieldSchema,
   resourceIdParamsSchema,
   sealEncryptionBodySchema,
@@ -46,7 +48,7 @@ export const eventDateRangeQuerySchema = strictZodObject({
 });
 
 const eventWritableFieldsSchema = {
-  title: z.string().min(1).max(255),
+  title: z.string().max(255).optional(),
   description: z.string().max(1000).optional(),
   start: z.string(),
   end: z.string(),
@@ -60,12 +62,17 @@ const eventWritableFieldsSchema = {
   recurrence: z.string().optional(),
   ...eventContentEncryptionFieldsSchema.shape,
   participants: z.array(eventParticipantInputSchema).optional(),
+  invitationContent: eventInvitationContentSchema.optional(),
 };
 
-export const createEventBodySchema = strictZodObject(eventWritableFieldsSchema);
+const createEventBodyFieldsSchema = strictZodObject(eventWritableFieldsSchema);
 
-export const updateEventBodySchema = strictZodObject({
-  title: z.string().min(1).max(255).optional(),
+export const createEventBodySchema = createEventBodyFieldsSchema.superRefine(
+  refineEncryptedEventContentBody({ requireTitle: true }),
+);
+
+const updateEventBodyFieldsSchema = strictZodObject({
+  title: z.string().max(255).optional(),
   description: z.string().max(1000).optional(),
   start: z.string().optional(),
   end: z.string().optional(),
@@ -79,7 +86,12 @@ export const updateEventBodySchema = strictZodObject({
   recurrence: z.union([z.string(), z.null()]).optional(),
   ...eventContentEncryptionFieldsSchema.shape,
   participants: z.array(eventParticipantInputSchema).optional(),
+  invitationContent: eventInvitationContentSchema.optional(),
 });
+
+export const updateEventBodySchema = updateEventBodyFieldsSchema.superRefine(
+  refineEncryptedEventContentBody({ requireTitle: false }),
+);
 
 export const invitationByExternalIdQuerySchema = strictZodObject({
   externalId: z.string().min(1).max(512),
@@ -129,9 +141,10 @@ export const eventSearchCorpusInputSchema =
 
 export const eventListInputSchema = eventDateRangeQuerySchema.extend(userIdField);
 
-export const eventCreateInputSchema = createEventBodySchema.extend(userIdField);
+export const eventCreateInputSchema =
+  createEventBodyFieldsSchema.extend(userIdField);
 
-export const eventUpdateInputSchema = updateEventBodySchema.extend({
+export const eventUpdateInputSchema = updateEventBodyFieldsSchema.extend({
   ...userIdField,
   eventId: resourceIdSchema,
 });

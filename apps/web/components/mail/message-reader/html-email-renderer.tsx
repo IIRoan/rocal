@@ -1,9 +1,8 @@
-import { useMemo } from "react";
 import {
   buildEmailHtmlDocument,
   emailHasOwnDarkMode,
   processEmailHtml,
-} from "@workspace/calendar-core";
+} from "@workspace/calendar-core/mail-html";
 
 export function HtmlEmailRenderer({
   html,
@@ -16,26 +15,25 @@ export function HtmlEmailRenderer({
   blockTrackingPixels: boolean;
   isDark: boolean;
 }) {
-  const processedHtml = useMemo(() => {
-    return processEmailHtml({ html, isDark, blockTrackingPixels });
-  }, [html, isDark, blockTrackingPixels]);
-
-  const hasOwnDark = useMemo(() => emailHasOwnDarkMode(html), [html]);
-
-  const srcDoc = useMemo(() => {
-    return buildEmailHtmlDocument({
-      processedHtml,
-      blockRemoteImages,
+  const srcDoc = buildEmailHtmlDocument({
+    processedHtml: processEmailHtml({
+      html,
       isDark,
-      hasOwnDark,
-    });
-  }, [processedHtml, blockRemoteImages, isDark, hasOwnDark]);
+      blockTrackingPixels,
+      blockRemoteImages,
+    }),
+    blockRemoteImages,
+    isDark,
+    hasOwnDark: emailHasOwnDarkMode(html),
+  });
 
+  // No allow-same-origin: the parent never reads the frame document, so mail HTML stays isolated.
   return (
     <iframe
       srcDoc={srcDoc}
       title="Email body"
-      sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+      sandbox="allow-popups allow-popups-to-escape-sandbox"
+      referrerPolicy="no-referrer"
       className="flex-1 min-h-0 w-full border-0 block"
     />
   );

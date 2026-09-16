@@ -1,5 +1,13 @@
 import { HttpClient } from "./http-client";
-import { NoopE2eeProvider, type E2eeProvider } from "./e2ee-provider";
+import {
+  NoopE2eeProvider,
+  hydrateEncryptedNameWithoutSession,
+  type E2eeProvider,
+} from "./e2ee-provider";
+import {
+  backfillEncryptedNames,
+  type NameEncryptionBackfillResult,
+} from "./name-encryption-backfill";
 import {
   validateEventData as coreValidateEventData,
   validateCategoryData as coreValidateCategoryData,
@@ -80,6 +88,7 @@ export type InvitationImportSummary = {
 export class CalendarApiService {
   private client: HttpClient;
   private e2ee: E2eeProvider;
+  private nameBackfill: Promise<NameEncryptionBackfillResult> | null = null;
 
   constructor(client: HttpClient, e2eeProvider?: E2eeProvider) {
     this.client = client;
@@ -93,28 +102,61 @@ export class CalendarApiService {
     this.e2ee = provider;
   }
 
+  /** Safe on every launch: already-encrypted rows are skipped and failures retry next time. */
+  backfillEncryptedNames(): Promise<NameEncryptionBackfillResult> {
+    this.nameBackfill ??= backfillEncryptedNames({
+      client: this.client,
+      e2ee: this.e2ee,
+    }).finally(() => {
+      this.nameBackfill = null;
+    });
+    return this.nameBackfill;
+  }
+
   // ─── Normalization helpers ───────────────────────────────────────────────────
 
-  private normalizeCalendarForUi(calendar: Calendar): Calendar {
+  private async hydrateCalendar(calendar: Calendar): Promise<Calendar> {
+    const hydrated = await this.e2ee
+      .hydrateEncryptedCalendar(calendar)
+      .catch(() => hydrateEncryptedNameWithoutSession("calendar", calendar));
+
     return {
-      ...calendar,
+      ...hydrated,
       encryptionState:
         calendar.encryptionState ??
-        (calendar.encryptedName ? "shadow_write" : "plaintext"),
+        (calendar.encryptedName ? "encrypted" : "plaintext"),
       encryptedName: null,
       blindIndexTokens: null,
     };
   }
 
-  private normalizeCategoryForUi(category: EventCategory): EventCategory {
+  private async hydrateCategory(
+    category: EventCategory,
+  ): Promise<EventCategory> {
+    const hydrated = await this.e2ee
+      .hydrateEncryptedCategory(category)
+      .catch(() => hydrateEncryptedNameWithoutSession("category", category));
+
     return {
-      ...category,
+      ...hydrated,
       encryptionState:
         category.encryptionState ??
-        (category.encryptedName ? "shadow_write" : "plaintext"),
+        (category.encryptedName ? "encrypted" : "plaintext"),
       encryptedName: null,
       blindIndexTokens: null,
     };
+  }
+
+  private hydrateCalendars(calendars: Calendar[]): Promise<Calendar[]> {
+    return Promise.all(calendars.map((calendar) => this.hydrateCalendar(calendar)));
+  }
+
+  private hydrateCategories(
+    categories: EventCategory[],
+  ): Promise<EventCategory[]> {
+    return Promise.all(
+      categories.map((category) => this.hydrateCategory(category)),
+    );
   }
 
   private normalizeEventForUi(event: CalendarEvent): CalendarEvent {
@@ -122,7 +164,7 @@ export class CalendarApiService {
       ...event,
       encryptionState:
         event.encryptionState ??
-        (event.encryptedContent ? "shadow_write" : "plaintext"),
+        (event.encryptedContent ? "encrypted" : "plaintext"),
       encryptedContent: null,
       blindIndexTokens: null,
     };
@@ -141,6 +183,37 @@ export class CalendarApiService {
   }
 
   private async hydrateEncryptedEvent(
+    event: CalendarEvent,
+  ): Promise<CalendarEvent> {
+    return this.hydrateEventRelations(
+      await this.hydrateEncryptedEventContent(event),
+    );
+  }
+
+  private async hydrateEventRelations(
+    event: CalendarEvent,
+  ): Promise<CalendarEvent> {
+    const [calendar, category] = await Promise.all([
+      event.calendar?.encryptedName
+        ? this.hydrateCalendar(event.calendar)
+        : event.calendar,
+      event.category?.encryptedName
+        ? this.hydrateCategory(event.category)
+        : event.category,
+    ]);
+
+    if (calendar === event.calendar && category === event.category) {
+      return event;
+    }
+
+    return {
+      ...event,
+      ...(calendar !== undefined ? { calendar } : {}),
+      ...(category !== undefined ? { category } : {}),
+    };
+  }
+
+  private async hydrateEncryptedEventContent(
     event: CalendarEvent,
   ): Promise<CalendarEvent> {
     if (
@@ -232,15 +305,17 @@ export class CalendarApiService {
         return { ...event, start, end };
       });
 
+      const [hydratedEvents, calendars, categories] = await Promise.all([
+        this.hydrateEncryptedEvents(events),
+        this.hydrateCalendars(response.calendars),
+        this.hydrateCategories(response.categories),
+      ]);
+
       return {
         ...response,
-        events: await this.hydrateEncryptedEvents(events),
-        calendars: response.calendars.map((calendar) =>
-          this.normalizeCalendarForUi(calendar),
-        ),
-        categories: response.categories.map((category) =>
-          this.normalizeCategoryForUi(category),
-        ),
+        events: hydratedEvents,
+        calendars,
+        categories,
       };
     } catch (error) {
       throw this.transformError(error, "Failed to fetch events");
@@ -529,9 +604,7 @@ export class CalendarApiService {
     try {
       const response =
         await this.client.get<CalendarsResponse>("/api/calendars");
-      return response.calendars.map((calendar) =>
-        this.normalizeCalendarForUi(calendar),
-      );
+      return await this.hydrateCalendars(response.calendars);
     } catch (error) {
       throw this.transformError(error, "Failed to fetch calendars");
     }
@@ -544,7 +617,7 @@ export class CalendarApiService {
         "/api/calendars",
         payload,
       );
-      return this.normalizeCalendarForUi(response);
+      return await this.hydrateCalendar(response);
     } catch (error) {
       throw this.transformError(error, "Failed to create calendar");
     }
@@ -560,7 +633,7 @@ export class CalendarApiService {
         `/api/calendars/${id}`,
         payload,
       );
-      return this.normalizeCalendarForUi(response);
+      return await this.hydrateCalendar(response);
     } catch (error) {
       throw this.transformError(error, "Failed to update calendar");
     }
@@ -598,9 +671,7 @@ export class CalendarApiService {
     try {
       const response =
         await this.client.get<CategoriesResponse>("/api/categories");
-      return response.categories.map((category) =>
-        this.normalizeCategoryForUi(category),
-      );
+      return await this.hydrateCategories(response.categories);
     } catch (error) {
       throw this.transformError(error, "Failed to fetch categories");
     }
@@ -615,7 +686,7 @@ export class CalendarApiService {
         "/api/categories",
         payload,
       );
-      return this.normalizeCategoryForUi(response);
+      return await this.hydrateCategory(response);
     } catch (error) {
       throw this.transformError(error, "Failed to create category");
     }
@@ -631,7 +702,7 @@ export class CalendarApiService {
         `/api/categories/${id}`,
         payload,
       );
-      return this.normalizeCategoryForUi(response);
+      return await this.hydrateCategory(response);
     } catch (error) {
       throw this.transformError(error, "Failed to update category");
     }
@@ -769,10 +840,16 @@ export class CalendarApiService {
     request: EditRecurringEventRequest,
   ): Promise<CalendarEvent> {
     try {
-      return await this.client.put<CalendarEvent>(
-        `/api/recurring/event/${id}`,
-        request,
+      // Recurring edits never send invitation mail, so the transient copy is dropped.
+      const updates = await this.e2ee.attachEventEncryptionShadow(
+        request.updates,
       );
+      delete updates.invitationContent;
+      const response = await this.client.put<CalendarEvent>(
+        `/api/recurring/event/${id}`,
+        { ...request, updates },
+      );
+      return await this.hydrateEncryptedEvent(response);
     } catch (error) {
       throw this.transformError(error, "Failed to edit recurring event");
     }
@@ -979,7 +1056,7 @@ export class CalendarApiService {
   async updateEventNotifications(
     eventId: string,
     notifications: CreateNotificationRequest["notifications"],
-    options?: { displayTitle?: string | null },
+    options?: Pick<CreateNotificationRequest, "encryptedDisplayTitle">,
   ): Promise<{ success: boolean; message: string }> {
     try {
       return await this.client.put<{
@@ -987,8 +1064,8 @@ export class CalendarApiService {
         message: string;
       }>(`/api/notifications/event/${eventId}`, {
         notifications,
-        ...(options?.displayTitle !== undefined
-          ? { displayTitle: options.displayTitle }
+        ...(options?.encryptedDisplayTitle !== undefined
+          ? { encryptedDisplayTitle: options.encryptedDisplayTitle }
           : {}),
       });
     } catch (error) {

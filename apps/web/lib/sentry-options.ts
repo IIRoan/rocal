@@ -5,6 +5,11 @@
  * string project name (`solace`), so we keep the real DSN in env, feed the SDK
  * a numeric stand-in, and `tunnel` envelopes to `/api/solace/envelope/`.
  */
+import {
+  scrubBreadcrumb,
+  scrubErrorEvent,
+} from "@workspace/calendar-core/report-redaction";
+
 function parseErrexDsn(raw: string): {
   key: string;
   host: string;
@@ -60,5 +65,8 @@ export function getWebSentryOptions() {
       "AbortError",
       /Loading chunk [\d]+ failed/,
     ],
+    beforeSend: <T extends object>(event: T) => scrubErrorEvent(event),
+    beforeBreadcrumb: <T extends object>(breadcrumb: T) =>
+      scrubBreadcrumb(breadcrumb),
   };
 }

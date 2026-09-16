@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  buildEmailContentSecurityPolicy,
   buildEmailHtmlDocument,
   EMAIL_AUTO_DARK_CSS,
   processEmailHtml,
@@ -78,7 +79,63 @@ describe("buildEmailHtmlDocument", () => {
   });
 });
 
+describe("email document CSP", () => {
+  const cspOf = (doc: string) =>
+    doc.match(/<meta http-equiv="Content-Security-Policy" content="([^"]*)">/)?.[1] ?? null;
+
+  it.each([true, false])("always emits a script-free CSP (blockRemoteImages=%s)", (blockRemoteImages) => {
+    const doc = buildEmailHtmlDocument({
+      processedHtml: "<p>Hello</p>",
+      isDark: false,
+      blockRemoteImages,
+      hasOwnDark: false,
+    });
+    const csp = cspOf(doc);
+
+    expect(csp).not.toBeNull();
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("script-src 'none'");
+    expect(csp).toContain("style-src 'unsafe-inline'");
+    expect(csp).toContain("font-src data:");
+    expect(csp).toContain("form-action 'none'");
+    expect(csp).toContain("base-uri 'none'");
+    expect(csp).toContain("connect-src 'none'");
+    expect(doc.indexOf("Content-Security-Policy")).toBeLessThan(doc.indexOf("<style>"));
+    expect(doc).toContain('<meta name="referrer" content="no-referrer">');
+  });
+
+  it("allows remote images only when the user opted in", () => {
+    expect(buildEmailContentSecurityPolicy(false)).toContain("img-src data: blob: cid:;");
+    expect(buildEmailContentSecurityPolicy(false)).not.toContain("https:");
+    expect(buildEmailContentSecurityPolicy(true)).toContain("img-src data: blob: cid: https: http:;");
+  });
+});
+
 describe("processEmailHtml", () => {
+  it("always sanitizes while keeping head styles for the reader", () => {
+    const processed = processEmailHtml({
+      html: `<html><head><style>.a{color:red}</style><meta http-equiv="refresh" content="0;url=https://e.test"></head><body><p class="a" onclick="alert(1)">Hi</p><script>alert(2)</script><a href="javascript:alert(3)">x</a><form action="https://e.test"><input name="p"></form></body></html>`,
+      isDark: false,
+      blockTrackingPixels: false,
+    });
+
+    expect(processed).toContain("<style>.a{color:red}</style>");
+    expect(processed).toContain('<p class="a">Hi</p>');
+    expect(processed).not.toMatch(/onclick|<script|javascript:|<form|<input|refresh/i);
+  });
+
+  it("strips remote images when remote content is blocked", () => {
+    const processed = processEmailHtml({
+      html: `<img src="https://example.com/banner.png"><img src="cid:logo@x">`,
+      isDark: false,
+      blockTrackingPixels: false,
+      blockRemoteImages: true,
+    });
+
+    expect(processed).not.toContain("banner.png");
+    expect(processed).toContain("cid:logo@x");
+  });
+
   it("strips 1x1 tracking pixels when enabled", () => {
     const html = `<p>Hi</p><img src="https://example.com/p.gif" width="1" height="1" /><img src="https://example.com/banner.png" width="640" height="200" />`;
     const processed = processEmailHtml({

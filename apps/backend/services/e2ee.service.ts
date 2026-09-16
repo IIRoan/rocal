@@ -11,6 +11,7 @@ import type {
   UpsertEncryptionDeviceInput,
   UpsertEncryptionPasswordInput,
 } from "../contracts/e2ee.contract";
+import { E2EE_ROLLOUT_STAGE } from "@workspace/calendar-core";
 import { ValidationError } from "../lib/errors";
 import { createLogger } from "@workspace/logger";
 
@@ -163,7 +164,7 @@ export class E2eeService implements IE2eeService {
 
     return {
       enabled: true,
-      rolloutStage: "shadow_write",
+      rolloutStage: E2EE_ROLLOUT_STAGE,
       algorithms: {
         content: "AES-GCM-256",
         blindIndex: "HMAC-SHA-256",

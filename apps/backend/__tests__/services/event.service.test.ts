@@ -436,16 +436,39 @@ describe("EventService Stalwart integration", () => {
 
     await service.create({
       userId: "user-1",
-      title: "Planning",
-      description: "Discuss roadmap",
       start: "2026-05-26T10:00:00.000Z",
       end: "2026-05-26T11:00:00.000Z",
       calendarId: "calendar-1",
       timezone: "UTC",
-      location: "Room A",
       encryptedContent: "ciphertext",
       participants: [{ email: "guest@example.com", role: "attendee" }],
+      invitationContent: {
+        title: "Planning",
+        description: "Discuss roadmap",
+        location: "Room A",
+      },
     });
+
+    // Invitation mail uses the transient copy; the stored row stays ciphertext-only.
+    expect(participantService.syncParticipants).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invitationEvent: expect.objectContaining({
+          title: "Planning",
+          description: "Discuss roadmap",
+          location: "Room A",
+        }),
+      }),
+    );
+    expect(prisma.calendarEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: "",
+          description: null,
+          location: null,
+          encryptionState: "encrypted",
+        }),
+      }),
+    );
 
     expect(stalwartClient.createEvent).toHaveBeenCalledWith({
       accountId: "acct-1",
@@ -553,7 +576,6 @@ describe("EventService Stalwart integration", () => {
     await expect(
       service.create({
         userId: "user-1",
-        title: "Planning",
         start: "2026-05-26T10:00:00.000Z",
         end: "2026-05-26T11:00:00.000Z",
         calendarId: "calendar-1",
@@ -625,7 +647,6 @@ describe("EventService Stalwart integration", () => {
     await service.update({
       userId: "user-1",
       eventId: "event-1",
-      title: "Updated planning",
       start: "2026-05-26T12:00:00.000Z",
       end: "2026-05-26T13:00:00.000Z",
       encryptedContent: "ciphertext-v2",

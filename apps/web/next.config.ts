@@ -3,6 +3,8 @@ import path from "node:path";
 import { getAllowedNextDevOrigins } from "@workspace/runtime/next-dev";
 import type { NextConfig } from "next";
 
+import { buildSecurityHeaderRoutes } from "./lib/security-headers";
+
 const repoRoot = path.join(import.meta.dirname, "../..");
 
 const workspacePackages = [
@@ -20,6 +22,10 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   allowedDevOrigins: getAllowedNextDevOrigins(),
   reactCompiler: true,
+  // CSP hosts are derived from NEXT_PUBLIC_* env at build time.
+  async headers() {
+    return buildSecurityHeaderRoutes(process.env);
+  },
   compiler: {
     removeConsole:
       process.env.NODE_ENV === "production"

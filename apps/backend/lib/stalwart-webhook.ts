@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { sanitizeNotificationDisplayTitle } from "./notification-job";
 
 export const STALWART_MAIL_INGEST_EVENT = "message-ingest.ham" as const;
 
@@ -81,10 +80,15 @@ export type StalwartMailIngestEvent = {
   documentId: string;
   recipientEmails: string[];
   messageId: string | null;
+  /** Transient: only used to locate the JMAP email id, never persisted. */
   subject: string | null;
-  fromName: string | null;
   fromEmail: string | null;
 };
+
+function normalizeSubject(value: string | null | undefined): string | null {
+  const collapsed = value?.trim().replace(/\s+/g, " ");
+  return collapsed ? collapsed : null;
+}
 
 function extractMessageId(data: Record<string, unknown>): string | null {
   const candidates = [
@@ -113,25 +117,6 @@ function parseFromEmail(from: z.infer<typeof webhookFromSchema> | undefined) {
   return email && email.includes("@") ? email : null;
 }
 
-function parseFromDisplay(from: z.infer<typeof webhookFromSchema> | undefined) {
-  if (typeof from === "string") {
-    const trimmed = from.trim();
-    const displayMatch = trimmed.match(/^(.+?)\s*<[^>]+>$/);
-    const candidate = displayMatch?.[1]?.trim() || trimmed;
-    return sanitizeNotificationDisplayTitle(candidate);
-  }
-
-  const first = from?.[0];
-  if (!first) {
-    return null;
-  }
-
-  return (
-    sanitizeNotificationDisplayTitle(first.name) ??
-    sanitizeNotificationDisplayTitle(first.email)
-  );
-}
-
 export function parseStalwartMailIngestEvents(
   payload: StalwartWebhookPayload,
 ): StalwartMailIngestEvent[] {
@@ -154,8 +139,7 @@ export function parseStalwartMailIngestEvents(
       messageId:
         parsed.data.messageId?.trim() ||
         extractMessageId(parsed.data as Record<string, unknown>),
-      subject: sanitizeNotificationDisplayTitle(parsed.data.subject),
-      fromName: parseFromDisplay(parsed.data.from),
+      subject: normalizeSubject(parsed.data.subject),
       fromEmail: parseFromEmail(parsed.data.from),
     });
   }

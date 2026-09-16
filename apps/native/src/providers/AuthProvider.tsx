@@ -42,6 +42,7 @@ import { clearVaultCache } from "../lib/mail/mail-crypto";
 import { registerClearSession } from "../lib/session-clear";
 import { registerPasskeyStepUpRequired } from "../lib/passkey-step-up-required";
 import { unregisterNativePushDevice } from "../lib/push-notifications";
+import { clearNotificationExtensionSecrets } from "../lib/notification-extension-store";
 
 const AUTH_STATUS_TIMEOUT_MS = 3_000;
 const AUTH_STATUS_RETRY_DELAYS_MS = [0, 150, 400] as const;
@@ -492,7 +493,10 @@ export function AuthProvider({
   );
 
   const signOut = useCallback(async () => {
-    await unregisterNativePushDevice();
+    await Promise.all([
+      unregisterNativePushDevice(),
+      clearNotificationExtensionSecrets(),
+    ]);
     try {
       await authClient.signOut();
     } catch {

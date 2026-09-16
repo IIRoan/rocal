@@ -31,14 +31,12 @@ describe("enqueueInboundMailPush", () => {
     findFirstJob.mockResolvedValue(null);
   });
 
-  it("enqueues a new_mail push job with the inbound subject", async () => {
+  it("enqueues a new_mail push job with opaque refs only", async () => {
     await enqueueInboundMailPush(prisma as never, {
       accountId: "acct-1",
       items: [
         {
           emailId: "in-1",
-          subject: "Lunch tomorrow",
-          fromName: "Sam",
         },
       ],
     });
@@ -51,9 +49,8 @@ describe("enqueueInboundMailPush", () => {
         payload: {
           kind: "new_mail",
           inboundCount: 1,
-          subject: "Lunch tomorrow",
-          fromName: "Sam",
           emailId: "in-1",
+          accountId: "acct-1",
         },
       }),
     });
@@ -66,13 +63,9 @@ describe("enqueueInboundMailPush", () => {
       items: [
         {
           emailId: "in-1",
-          subject: "First",
-          fromName: "Sam",
         },
         {
           emailId: "in-2",
-          subject: "Second",
-          fromName: "Sam",
         },
       ],
     });
@@ -85,7 +78,7 @@ describe("enqueueInboundMailPush", () => {
     await enqueueInboundMailPush(prisma as never, {
       accountId: "acct-1",
       userId: "user-1",
-      items: [{ emailId: "in-1", subject: "Hello", fromName: null }],
+      items: [{ emailId: "in-1" }],
     });
     expect(createJob).not.toHaveBeenCalled();
   });
@@ -104,7 +97,7 @@ describe("enqueueInboundMailPush", () => {
     findUniqueDirectory.mockResolvedValueOnce(null as never);
     await enqueueInboundMailPush(prisma as never, {
       accountId: "acct-1",
-      items: [{ emailId: "in-1", subject: "Hello", fromName: null }],
+      items: [{ emailId: "in-1" }],
     });
     expect(createJob).not.toHaveBeenCalled();
   });
@@ -114,7 +107,7 @@ describe("enqueueInboundMailPush", () => {
     await enqueueInboundMailPush(prisma as never, {
       accountId: "acct-1",
       userId: "user-1",
-      items: [{ emailId: "in-1", subject: "Lunch tomorrow", fromName: "Sam" }],
+      items: [{ emailId: "in-1" }],
     });
     expect(createJob).not.toHaveBeenCalled();
   });
@@ -123,7 +116,7 @@ describe("enqueueInboundMailPush", () => {
     await enqueueInboundMailPush(prisma as never, {
       accountId: "acct-1",
       userId: "user-1",
-      items: [{ emailId: "", subject: "Hello", fromName: "Sam" }],
+      items: [{ emailId: "" }],
     });
     expect(createJob).not.toHaveBeenCalled();
   });
@@ -133,7 +126,7 @@ describe("enqueueInboundMailPush", () => {
     await enqueueInboundMailPush(prisma as never, {
       accountId: "acct-1",
       userId: "user-1",
-      items: [{ emailId: "in-1", subject: "Hello", fromName: "Sam" }],
+      items: [{ emailId: "in-1" }],
     });
     expect(createJob).toHaveBeenCalledTimes(1);
   });

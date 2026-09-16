@@ -76,6 +76,8 @@ function createHarness(
   };
 }
 
+const ENCRYPTED_TITLE = "v1.oKGio6Slpqeoqaqr.RzKqGz6RlCIjsse98Z5olLmi5f7PQ06_sfA4TvGmoA";
+
 const mockBuildNotificationSchedule =
   NotificationCalculator.buildNotificationSchedule as jest.Mock;
 const mockScheduleUpcomingReminder =
@@ -219,10 +221,8 @@ describe("NotificationService reminder field updates", () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
-  it("stores the decrypted reminder title when the client provides one", async () => {
-    const { prisma, service } = createHarness({
-      event: eventFixture({ title: "" }),
-    });
+  it("stores the reminder title ciphertext when the client provides one", async () => {
+    const { prisma, service } = createHarness();
 
     await service.setForEvent(
       "user-1",
@@ -234,25 +234,24 @@ describe("NotificationService reminder field updates", () => {
           isEnabled: true,
         },
       ],
-      "Lunch with Sam",
+      ENCRYPTED_TITLE,
     );
 
+    expect(prisma.eventNotification.findFirst).not.toHaveBeenCalled();
     expect(prisma.eventNotification.createMany).toHaveBeenCalledWith({
       data: [
         expect.objectContaining({
           eventId: "event-1",
-          displayTitle: "Lunch with Sam",
+          encryptedDisplayTitle: ENCRYPTED_TITLE,
         }),
       ],
     });
   });
 
-  it("preserves an existing reminder title when the client omits one", async () => {
-    const { prisma, service } = createHarness({
-      event: eventFixture({ title: "" }),
-    });
+  it("preserves the stored ciphertext when the client omits it", async () => {
+    const { prisma, service } = createHarness();
     prisma.eventNotification.findFirst.mockResolvedValueOnce({
-      displayTitle: "Lunch with Sam",
+      encryptedDisplayTitle: ENCRYPTED_TITLE,
     });
 
     await service.setForEvent("user-1", "event-1", [
@@ -267,7 +266,34 @@ describe("NotificationService reminder field updates", () => {
       data: [
         expect.objectContaining({
           eventId: "event-1",
-          displayTitle: "Lunch with Sam",
+          encryptedDisplayTitle: ENCRYPTED_TITLE,
+        }),
+      ],
+    });
+  });
+
+  it("never derives a reminder title from the event row", async () => {
+    const { prisma, service } = createHarness({
+      event: eventFixture({ title: "Lunch with Sam", encryptionState: "plaintext" }),
+    });
+
+    await service.setForEvent(
+      "user-1",
+      "event-1",
+      [
+        {
+          notificationType: "email",
+          minutesBefore: 15,
+          isEnabled: true,
+        },
+      ],
+      null,
+    );
+
+    expect(prisma.eventNotification.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          encryptedDisplayTitle: null,
         }),
       ],
     });

@@ -54,6 +54,9 @@ function createMockPrisma() {
     calendarEvent: {
       updateMany: jest.fn(async () => ({ count: 2 })),
     },
+    userEncryptionDevice: {
+      count: jest.fn(async () => 0),
+    },
   };
 }
 
@@ -66,15 +69,55 @@ describe("CategoryService", () => {
     service = new CategoryService(mockPrisma as never);
   });
 
-  it("creates categories with normalized names and encrypted metadata", async () => {
+  it("creates encrypted categories without persisting the plaintext name", async () => {
     const created = await service.create({
       userId: "user-1",
-      name: "  Focus  ",
       color: "#123456",
       encryptedName: "ciphertext",
       blindIndexTokens: ["idx-1", "idx-2"],
       encryptionState: "shadow_write",
       encryptionKeyVersion: 2,
+    });
+
+    expect(mockPrisma.eventCategory.findFirst).not.toHaveBeenCalled();
+    expect(mockPrisma.eventCategory.create).toHaveBeenCalledWith({
+      data: {
+        name: "",
+        color: "#123456",
+        userId: "user-1",
+        encryptedName: "ciphertext",
+        blindIndexTokens: JSON.stringify(["idx-1", "idx-2"]),
+        encryptionState: "encrypted",
+        encryptionKeyVersion: 2,
+      },
+    });
+    expect(created).toEqual(
+      expect.objectContaining({ name: "", color: "#123456" }),
+    );
+  });
+
+  it("rejects plaintext names sent alongside ciphertext", async () => {
+    mockPrisma.eventCategory.findFirst.mockResolvedValueOnce(categoryFixture());
+
+    await expect(
+      service.update({
+        userId: "user-1",
+        categoryId: "category-1",
+        name: "Health",
+        encryptedName: "ciphertext",
+      }),
+    ).rejects.toMatchObject({
+      name: "ValidationError",
+      field: "name",
+    } as Partial<ValidationError>);
+    expect(mockPrisma.eventCategory.update).not.toHaveBeenCalled();
+  });
+
+  it("normalizes plaintext names for accounts without E2EE", async () => {
+    await service.create({
+      userId: "user-1",
+      name: "  Focus  ",
+      color: "#123456",
     });
 
     expect(mockPrisma.eventCategory.findFirst).toHaveBeenCalledWith({
@@ -83,20 +126,13 @@ describe("CategoryService", () => {
     expect(mockPrisma.eventCategory.create).toHaveBeenCalledWith({
       data: {
         name: "Focus",
+        encryptedName: null,
+        blindIndexTokens: null,
+        encryptionState: "plaintext",
         color: "#123456",
         userId: "user-1",
-        encryptedName: "ciphertext",
-        blindIndexTokens: JSON.stringify(["idx-1", "idx-2"]),
-        encryptionState: "shadow_write",
-        encryptionKeyVersion: 2,
       },
     });
-    expect(created).toEqual(
-      expect.objectContaining({
-        name: "Focus",
-        color: "#123456",
-      }),
-    );
   });
 
   it.each([

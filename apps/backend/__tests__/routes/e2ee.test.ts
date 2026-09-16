@@ -119,7 +119,7 @@ describe("e2eeRoutes", () => {
     expect(response.status).toBe(200);
     await expect(readJson(response)).resolves.toEqual({
       enabled: true,
-      rolloutStage: "shadow_write",
+      rolloutStage: "encrypted",
       algorithms: {
         content: "AES-GCM-256",
         blindIndex: "HMAC-SHA-256",

@@ -1,3 +1,4 @@
+import { scrubErrorEvent } from "@workspace/calendar-core/report-redaction";
 import {
   getErrexReportingOptions,
   parseErrexDsn,
@@ -27,10 +28,12 @@ function randomEventId(): string {
     .slice(0, 32);
 }
 
+/** Every report is scrubbed here so no caller can send raw PII off-device. */
 export function buildErrexEnvelope(
   event: Record<string, unknown>,
   options: ErrexReportingOptions,
 ): string {
+  const scrubbedEvent = scrubErrorEvent(event);
   const eventId = randomEventId();
   const header = JSON.stringify({
     event_id: eventId,
@@ -41,7 +44,7 @@ export function buildErrexEnvelope(
     platform: "javascript",
     environment: options.environment,
     timestamp: Date.now() / 1000,
-    ...event,
+    ...scrubbedEvent,
   });
   const itemHeader = JSON.stringify({
     type: "event",

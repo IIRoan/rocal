@@ -5,7 +5,11 @@
  */
 import type { E2eeProvider } from "@workspace/calendar-client";
 import type {
+  Calendar,
   CalendarEvent,
+  EventCategory,
+  EventWireRequest,
+  NameWireRequest,
   CreateCalendarRequest,
   UpdateCalendarRequest,
   CreateCategoryRequest,
@@ -15,50 +19,62 @@ import type {
 } from "@workspace/calendar-core";
 import {
   hydrateEncryptedEventWithoutSession,
+  hydrateEncryptedName,
   ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
 } from "@workspace/e2ee";
-import { waitForPendingE2eeBootstrap } from "./e2ee-bootstrap";
 import { createBlindIndexTokens, decryptJsonPayload } from "./e2ee-crypto";
 import {
   attachCalendarEncryptionShadow,
   attachCategoryEncryptionShadow,
   attachEventEncryptionShadow,
+  getEncryptionSession as getE2eeSession,
 } from "./e2ee-payloads";
-import { getActiveE2eeSession } from "./e2ee-session";
 
-async function getE2eeSession() {
-  let session = getActiveE2eeSession();
-
-  if (session) {
-    return session;
-  }
-
-  const pendingBootstrap = waitForPendingE2eeBootstrap();
-  if (pendingBootstrap) {
-    await pendingBootstrap.catch(() => undefined);
-    session = getActiveE2eeSession();
-  }
-
-  return session;
-}
+const contentDecrypter = { decryptJsonPayload };
 
 export class WebE2eeProvider implements E2eeProvider {
   async attachEventEncryptionShadow<
     T extends CreateEventRequest | UpdateEventRequest,
-  >(request: T): Promise<T> {
+  >(request: T): Promise<EventWireRequest<T>> {
     return attachEventEncryptionShadow(request);
   }
 
   async attachCalendarEncryptionShadow<
     T extends CreateCalendarRequest | UpdateCalendarRequest,
-  >(request: T): Promise<T> {
+  >(request: T): Promise<NameWireRequest<T>> {
     return attachCalendarEncryptionShadow(request);
   }
 
   async attachCategoryEncryptionShadow<
     T extends CreateCategoryRequest | UpdateCategoryRequest,
-  >(request: T): Promise<T> {
+  >(request: T): Promise<NameWireRequest<T>> {
     return attachCategoryEncryptionShadow(request);
+  }
+
+  async hydrateEncryptedCalendar(calendar: Calendar): Promise<Calendar> {
+    const session = calendar.encryptedName ? await getE2eeSession() : null;
+    return hydrateEncryptedName(
+      session ? contentDecrypter : null,
+      session,
+      "calendar",
+      calendar,
+    );
+  }
+
+  async hydrateEncryptedCategory(
+    category: EventCategory,
+  ): Promise<EventCategory> {
+    const session = category.encryptedName ? await getE2eeSession() : null;
+    return hydrateEncryptedName(
+      session ? contentDecrypter : null,
+      session,
+      "category",
+      category,
+    );
+  }
+
+  async hasActiveSession(): Promise<boolean> {
+    return (await getE2eeSession()) !== null;
   }
 
   async hydrateEncryptedEvent(event: CalendarEvent): Promise<CalendarEvent> {

@@ -23,12 +23,14 @@ import { AppSidebar } from "../src/components/AppSidebar";
 import { CommandPalette } from "../src/components/CommandPalette";
 import { WorkspaceLoadingScreen } from "../src/components/WorkspaceLoadingScreen";
 import { calendarApiService } from "../src/lib/api";
+import { QUERY_KEYS } from "../src/lib/query-keys";
 import {
   getAuthRedirectPath,
   shouldRenderAuthenticatedChrome,
 } from "../src/lib/auth-routing";
 import { API_BASE_URL } from "../src/lib/constants";
 import { captureException } from "../src/lib/reporting";
+import { useNotificationExtensionSync } from "../src/hooks/use-notification-extension-sync";
 import {
   prepareAuthenticatedCryptoSession,
   type StartupCryptoPhase,
@@ -44,6 +46,7 @@ import {
 function NavigationGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const { isReady: isE2eeReady, bootstrap, clearSession, provider } = useE2ee();
+  useNotificationExtensionSync();
   const queryClient = useQueryClient();
   const segments = useSegments();
   const router = useRouter();
@@ -105,8 +108,26 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
 
       queryClient.removeQueries({ queryKey: ["events"] });
-      queryClient.removeQueries({ queryKey: ["calendars"] });
-      queryClient.removeQueries({ queryKey: ["categories"] });
+      queryClient.removeQueries({ queryKey: QUERY_KEYS.calendars() });
+      queryClient.removeQueries({ queryKey: QUERY_KEYS.categories() });
+
+      // Silent on failure; the next launch retries the remaining rows.
+      void calendarApiService
+        .backfillEncryptedNames()
+        .then((result) => {
+          if (cancelled) return;
+          if (result.calendars > 0) {
+            void queryClient.invalidateQueries({
+              queryKey: QUERY_KEYS.calendars(),
+            });
+          }
+          if (result.categories > 0) {
+            void queryClient.invalidateQueries({
+              queryKey: QUERY_KEYS.categories(),
+            });
+          }
+        })
+        .catch(() => undefined);
     })()
       .catch((error) => {
         captureException(error, {

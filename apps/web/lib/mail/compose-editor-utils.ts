@@ -1,5 +1,5 @@
 import { getComposeInlineImages } from "./compose-inline-images";
-import { sanitizeUntrustedEmailHtml } from "@workspace/calendar-core";
+import { sanitizeUntrustedEmailHtml } from "@workspace/calendar-core/sanitize-email-html";
 
 export type QuotedInlineAttachment = {
   blobId?: string | null;

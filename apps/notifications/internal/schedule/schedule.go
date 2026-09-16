@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -21,7 +20,6 @@ type DueSchedule struct {
 	EventID       string
 	UserID        string
 	MinutesBefore int
-	DisplayTitle  string
 	Settings      Settings
 	HasPushDevice bool
 }
@@ -42,21 +40,16 @@ func ClaimDue(ctx context.Context, db *sql.DB, now time.Time) ([]DueSchedule, er
 	var due []DueSchedule
 	for rows.Next() {
 		var item DueSchedule
-		var displayTitle sql.NullString
 		if err := rows.Scan(
 			&item.ID,
 			&item.EventID,
 			&item.UserID,
 			&item.MinutesBefore,
-			&displayTitle,
 			&item.Settings.EmailNotifications,
 			&item.Settings.PushNotifications,
 			&item.HasPushDevice,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan due notification: %w", err)
-		}
-		if displayTitle.Valid {
-			item.DisplayTitle = strings.TrimSpace(displayTitle.String)
 		}
 		due = append(due, item)
 	}
@@ -89,7 +82,6 @@ const claimDueSQL = `
 			en.event_id,
 			ce.user_id,
 			en.minutes_before,
-			en.display_title,
 			COALESCE(us."emailNotifications", TRUE),
 			COALESCE(us.push_notifications, TRUE),
 			EXISTS (
@@ -124,16 +116,13 @@ func ChannelsFor(item DueSchedule) []string {
 	return channels
 }
 
+// reminderJobPayload holds opaque refs only; the encrypted title is read at push time.
 func reminderJobPayload(item DueSchedule) map[string]any {
-	payload := map[string]any{
+	return map[string]any{
 		"kind":          "event_reminder",
 		"eventId":       item.EventID,
 		"minutesBefore": item.MinutesBefore,
 	}
-	if title := strings.TrimSpace(item.DisplayTitle); title != "" && title != "Encrypted event" {
-		payload["title"] = title
-	}
-	return payload
 }
 
 func insertJobs(ctx context.Context, tx *sql.Tx, item DueSchedule) error {

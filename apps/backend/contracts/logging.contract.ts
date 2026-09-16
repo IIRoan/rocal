@@ -1,8 +1,7 @@
 /**
  * Backend log sanitization policy — **single source of truth**.
  *
- * Field key lists live in `logging.policy.mjs` (shared with ESLint). This file
- * documents placeholders, types, and runtime policy metadata.
+ * Key lists live in `logging.policy.mjs`; placeholders and PII patterns in `calendar-core/report-redaction`.
  *
  * When adding new log context fields that may contain user data, update
  * `logging.policy.mjs` first, then use helpers from `lib/log-sanitization.ts`.
@@ -22,35 +21,18 @@ export {
   LOG_URL_FIELD_KEYS,
 };
 
-/** Placeholder written when a structured field is fully omitted. */
-export const LOG_OMITTED_PLACEHOLDER = "[omitted]" as const;
-
-/** Placeholder written when an email address is redacted from free-form text. */
-export const LOG_REDACTED_EMAIL_PLACEHOLDER = "[email]" as const;
-
-/** Placeholder written when a URL is redacted from free-form text. */
-export const LOG_REDACTED_URL_PLACEHOLDER = "[url]" as const;
-
-/** Placeholder written when a bearer token is redacted from free-form text. */
-export const LOG_REDACTED_BEARER_PLACEHOLDER = "Bearer [redacted]" as const;
-
-/** Placeholder written when a request URL query string is stripped. */
-export const LOG_REDACTED_QUERY_PLACEHOLDER = "?[redacted]" as const;
+export {
+  LOG_OMITTED_PLACEHOLDER,
+  LOG_REDACTED_BEARER_PLACEHOLDER,
+  LOG_REDACTED_EMAIL_PLACEHOLDER,
+  LOG_REDACTED_QUERY_PLACEHOLDER,
+  LOG_REDACTED_URL_PLACEHOLDER,
+  LOG_PII_TEXT_PATTERNS,
+} from "@workspace/calendar-core/report-redaction";
 
 export type LogOmitFieldKey = (typeof LOG_OMIT_FIELD_KEYS)[number];
 export type LogHashFieldKey = (typeof LOG_HASH_FIELD_KEYS)[number];
 export type LogUrlFieldKey = (typeof LOG_URL_FIELD_KEYS)[number];
-
-/**
- * Free-form text patterns redacted by `redactPII()` before logging.
- * Order matters: bearer tokens before URLs avoids partial leaks.
- */
-export const LOG_PII_TEXT_PATTERNS = {
-  email:
-    /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
-  bearer: /Bearer\s+[A-Za-z0-9._~+/=-]+/gi,
-  url: /https?:\/\/[^\s"'<>]+/gi,
-} as const;
 
 /** Length of the hex prefix returned by `logRef()`. */
 export const LOG_REF_HASH_LENGTH = 12;

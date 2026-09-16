@@ -13,8 +13,7 @@ import {
   buildEmailHtmlDocument,
   emailHasOwnDarkMode,
   processEmailHtml,
-  sanitizeUntrustedEmailHtml,
-} from "@workspace/calendar-core";
+} from "@workspace/calendar-core/mail-html";
 
 type WebViewModule = typeof import("react-native-webview");
 type WebViewComponent = WebViewModule["WebView"];
@@ -95,7 +94,7 @@ export function HtmlEmailView({
 
   const document = useMemo(() => {
     const processedHtml = processEmailHtml({
-      html: sanitizeUntrustedEmailHtml(html),
+      html,
       isDark,
       blockTrackingPixels,
       blockRemoteImages,
@@ -129,9 +128,10 @@ export function HtmlEmailView({
     }
   };
 
+  // data: is refused because a data:text/html page would run with JavaScript enabled.
   const onShouldStartLoadWithRequest = (request: ShouldStartLoadRequest) => {
     const url = request.url;
-    if (url === "about:blank" || url.startsWith("data:")) return true;
+    if (url === "about:blank") return true;
     if (/^https?:/i.test(url)) {
       WebBrowser.openBrowserAsync(url).catch(() => {});
       return false;
@@ -144,7 +144,8 @@ export function HtmlEmailView({
   return (
     <View style={[{ height: webViewHeight }, style]}>
       <WebView
-        originWhitelist={["about:blank", "data:"]}
+        // data: is listed only so it reaches onShouldStartLoadWithRequest and is refused there.
+        originWhitelist={["about:blank", "data:", "http://*", "https://*"]}
         source={{ html: document }}
         injectedJavaScript={FIT_AND_REPORT_SCRIPT}
         onMessage={onMessage}

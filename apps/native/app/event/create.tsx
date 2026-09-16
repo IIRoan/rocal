@@ -15,6 +15,7 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { useRecentContacts } from "../../src/hooks/use-recent-contacts";
+import { useReminderTitleEncryptor } from "../../src/hooks/use-reminder-title-encryptor";
 import { extractRecentContactEntries } from "../../src/lib/record-recent-contacts";
 import { useToast } from "../../src/providers/ToastProvider";
 import { toastOperationWarnings } from "../../src/lib/operation-warnings";
@@ -41,6 +42,7 @@ export default function EventCreateScreen() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { recordUsage } = useRecentContacts();
+  const encryptReminderTitle = useReminderTitleEncryptor();
   const { toast } = useToast();
 
   // ─── Query params (optional pre-fill from tapping a time slot) ───────────
@@ -74,7 +76,11 @@ export default function EventCreateScreen() {
   const createMutation = useMutation({
     mutationFn: async (data: CreateEventRequest) => {
       const saved = await calendarApiService.createEvent(data);
-      await persistEventReminderNotifications(saved.id, data);
+      await persistEventReminderNotifications(
+        saved.id,
+        data,
+        encryptReminderTitle,
+      );
       return saved;
     },
     onMutate: async (data: CreateEventRequest) => {

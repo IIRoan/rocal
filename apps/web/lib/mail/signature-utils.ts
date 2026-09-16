@@ -1,4 +1,4 @@
-import { sanitizeUntrustedEmailHtml } from "@workspace/calendar-core";
+import { sanitizeUntrustedEmailHtml } from "@workspace/calendar-core/sanitize-email-html";
 
 export type SignatureSource = {
   textSignature?: string | null;

@@ -4,14 +4,31 @@ import { calendarApiService } from "./api";
 
 const log = createLogger("native:event-reminders");
 
+/** Returns reminder title ciphertext, or `undefined` when E2EE is unavailable. */
+export type ReminderTitleEncryptor = (
+  eventId: string,
+  title: string,
+) => Promise<string | null | undefined>;
+
 export async function persistEventReminderNotifications(
   eventId: string,
   request: Pick<CreateEventRequest, "title" | "reminder">,
+  encryptTitle: ReminderTitleEncryptor,
 ): Promise<void> {
   const minutes =
     typeof request.reminder === "number" && request.reminder > 0
       ? request.reminder
       : 0;
+
+  const title = request.title?.trim();
+  // `null` clears the stored title; `undefined` leaves a title another device saved untouched.
+  const encryptedDisplayTitle =
+    minutes > 0 && title
+      ? await encryptTitle(eventId, title).catch((error: unknown) => {
+          log.warn("Failed to encrypt reminder title:", error);
+          return undefined;
+        })
+      : null;
 
   try {
     await calendarApiService.updateEventNotifications(
@@ -25,9 +42,9 @@ export async function persistEventReminderNotifications(
             },
           ]
         : [],
-      { displayTitle: request.title },
+      { encryptedDisplayTitle },
     );
   } catch (error) {
-    log.warn("Failed to persist event reminder title:", error);
+    log.warn("Failed to persist event reminder notifications:", error);
   }
 }

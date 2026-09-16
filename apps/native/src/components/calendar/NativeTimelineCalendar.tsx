@@ -66,7 +66,10 @@ import { TimelineEventContent } from "./TimelineEventContent";
 import {
   resolveTimelineEventDensity,
   timelineEventTitleLines,
+  timelineMinEventMinutes,
 } from "./timeline-event-content";
+
+const TIMELINE_MIN_EVENT_MINUTES = timelineMinEventMinutes();
 
 export type NativeTimelineCalendarHandle = {
   goToDate: (date: Date, options?: { animated?: boolean; hourScroll?: boolean }) => void;
@@ -379,6 +382,7 @@ export const NativeTimelineCalendar = forwardRef<
         initialTimeIntervalHeight={KIT_HOUR_HEIGHT}
         minTimeIntervalHeight={KIT_HOUR_HEIGHT}
         maxTimeIntervalHeight={KIT_HOUR_HEIGHT}
+        minRegularEventMinutes={TIMELINE_MIN_EVENT_MINUTES}
         useAllDayEvent
         showWeekNumber={false}
         allowHorizontalSwipe={swipeEnabled}

@@ -45,11 +45,20 @@ jest.mock("@workspace/logger", () => ({
   })),
 }));
 
-jest.mock("@workspace/e2ee", () => ({
-  ENCRYPTED_EVENT_PLACEHOLDER_TITLE: "Encrypted event",
-  createE2eeModule: jest.fn(),
-  hydrateEncryptedEventWithoutSession: jest.fn((event) => event),
-}));
+jest.mock("@workspace/e2ee", () => {
+  const actual = jest.requireActual<typeof import("@workspace/e2ee")>(
+    "@workspace/e2ee",
+  );
+  return {
+    ENCRYPTED_EVENT_PLACEHOLDER_TITLE: "Encrypted event",
+    createE2eeModule: jest.fn(),
+    hydrateEncryptedEventWithoutSession: jest.fn((event) => event),
+    encryptEventContentRequest: actual.encryptEventContentRequest,
+    encryptNameRequest: actual.encryptNameRequest,
+    hydrateEncryptedName: actual.hydrateEncryptedName,
+    shouldEncryptEventContent: actual.shouldEncryptEventContent,
+  };
+});
 
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -81,6 +90,9 @@ const mockE2eeModule = {
   generateAccountKey: jest.fn(),
   generateBlindIndexKey: jest.fn(),
   createPasswordEnvelope: jest.fn(),
+  encryptJsonPayload: jest.fn(),
+  decryptJsonPayload: jest.fn(),
+  createBlindIndexTokens: jest.fn(),
 };
 
 function createBootstrapResponse(
@@ -88,7 +100,7 @@ function createBootstrapResponse(
 ): E2eeBootstrapResponse {
   return {
     enabled: true,
-    rolloutStage: "shadow_write",
+    rolloutStage: "encrypted",
     algorithms: {
       content: "AES-GCM-256",
       blindIndex: "HMAC-SHA-256",
@@ -237,6 +249,9 @@ describe("E2eeProvider", () => {
     mockE2eeModule.generateAccountKey.mockReset();
     mockE2eeModule.generateBlindIndexKey.mockReset();
     mockE2eeModule.createPasswordEnvelope.mockReset();
+    mockE2eeModule.encryptJsonPayload.mockReset();
+    mockE2eeModule.decryptJsonPayload.mockReset();
+    mockE2eeModule.createBlindIndexTokens.mockReset();
 
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
@@ -561,6 +576,73 @@ describe("E2eeProvider", () => {
       "https://api.solace.test/api/e2ee/device",
       expect.objectContaining({ method: "PUT" }),
     );
+  });
+
+  it("builds ciphertext-only event and name payloads once a session exists", async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
+        return jsonResponse(createBootstrapResponse());
+      }
+
+      if (url.endsWith("/api/e2ee/device")) {
+        return jsonResponse({});
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    mockE2eeModule.encryptJsonPayload.mockResolvedValue({
+      version: 1,
+      algorithm: "AES-GCM",
+      iv: "iv",
+      ciphertext: "ciphertext",
+    });
+    mockE2eeModule.createBlindIndexTokens.mockResolvedValue(["idx"]);
+    mockE2eeModule.decryptJsonPayload.mockResolvedValue({ name: "Therapy" });
+
+    await renderProvider();
+    await act(async () => {
+      await getE2ee().bootstrap("user-1", "https://api.solace.test");
+    });
+    await flushBootstrap();
+
+    const { provider } = getE2ee();
+    const event = await provider.attachEventEncryptionShadow({
+      title: "Therapy",
+      description: "Notes",
+      location: "Clinic",
+      start: "2026-06-01T09:00:00.000Z",
+      end: "2026-06-01T10:00:00.000Z",
+      calendarId: "calendar-1",
+    });
+    const calendar = await provider.attachCalendarEncryptionShadow({
+      name: "Therapy",
+      color: "blue",
+    });
+
+    expect(event).not.toHaveProperty("title");
+    expect(event).not.toHaveProperty("description");
+    expect(event).not.toHaveProperty("location");
+    expect(event.encryptedContent).toBeDefined();
+    expect(calendar).not.toHaveProperty("name");
+    expect(calendar.encryptedName).toBeDefined();
+    expect(JSON.stringify([event, calendar])).not.toMatch(/Therapy|Notes|Clinic/);
+    await expect(provider.hasActiveSession()).resolves.toBe(true);
+    await expect(
+      provider.hydrateEncryptedCalendar({
+        id: "calendar-1",
+        name: "",
+        encryptedName: calendar.encryptedName,
+        color: "blue",
+        kind: "owned",
+        isPublic: false,
+        isVisible: true,
+        isDefault: false,
+        isSyncOnly: false,
+        userId: "user-1",
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      }),
+    ).resolves.toMatchObject({ name: "Therapy" });
   });
 
   it("starts a fresh E2EE session for passkey users when a password envelope exists", async () => {

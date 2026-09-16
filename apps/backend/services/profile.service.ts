@@ -9,9 +9,11 @@ import {
   type SolaceProfileLookupResponse,
 } from "@workspace/calendar-core";
 import type { IProfileService } from "../contracts/profiles.contract";
+import { SafeFetchError, safeFetch } from "../lib/safe-fetch";
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const AVATAR_FETCH_TIMEOUT_MS = 8_000;
+const MAX_AVATAR_REDIRECTS = 3;
 
 export class ProfileService implements IProfileService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -57,11 +59,20 @@ export class ProfileService implements IProfileService {
       return null;
     }
 
-    const response = await fetch(externalUrl, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(AVATAR_FETCH_TIMEOUT_MS),
-      headers: { "User-Agent": "Solace/1.0" },
-    });
+    let response: Response;
+    try {
+      response = await safeFetch(externalUrl, {
+        headers: { "User-Agent": "Solace/1.0", Accept: "image/*" },
+        timeoutMs: AVATAR_FETCH_TIMEOUT_MS,
+        maxBytes: MAX_AVATAR_BYTES,
+        maxRedirects: MAX_AVATAR_REDIRECTS,
+      });
+    } catch (error) {
+      if (error instanceof SafeFetchError) {
+        return null;
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       return null;
@@ -73,7 +84,7 @@ export class ProfileService implements IProfileService {
     }
 
     const buffer = await response.arrayBuffer();
-    if (buffer.byteLength === 0 || buffer.byteLength > MAX_AVATAR_BYTES) {
+    if (buffer.byteLength === 0) {
       return null;
     }
 
