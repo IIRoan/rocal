@@ -140,30 +140,15 @@ export class MailDemoApiService {
 
   async getVaultKeyMaterial(
     vaultKeyMaterialEndpoint: string,
-    options: { includeDerived?: boolean } = {},
-  ): Promise<{
-    keyMaterial: string;
-    derivedKeyB64?: string | null;
-    version: string;
-  }> {
-    const includeDerived = options.includeDerived !== false;
-    let url = vaultKeyMaterialEndpoint;
-    if (!includeDerived) {
-      url += vaultKeyMaterialEndpoint.includes("?")
-        ? "&includeDerived=0"
-        : "?includeDerived=0";
-    }
-
-    const response = await fetch(url, {
+  ): Promise<{ keyMaterial: string; version: string }> {
+    const response = await fetch(vaultKeyMaterialEndpoint, {
       method: "GET",
       credentials: "include",
     });
 
-    return parseJsonResponse<{
-      keyMaterial: string;
-      derivedKeyB64?: string | null;
-      version: string;
-    }>(response);
+    return parseJsonResponse<{ keyMaterial: string; version: string }>(
+      response,
+    );
   }
 
   async syncAccount(accountId: string): Promise<MailSyncResponse> {

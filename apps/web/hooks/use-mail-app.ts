@@ -27,7 +27,10 @@ import {
   fetchVaultKeyMaterialForOpen,
   refreshVaultKeyMaterialAfterCacheMiss,
 } from "@/lib/mail/mail-open-prefetch";
-import { deleteStoredDerivedVaultKey } from "@/lib/mail/derived-vault-key-storage";
+import {
+  deleteStoredDerivedVaultKey,
+  putStoredDerivedVaultKey,
+} from "@/lib/mail/derived-vault-key-storage";
 import {
   getPrimaryMailAccountId,
   StalwartJmapClient,
@@ -1923,6 +1926,13 @@ export function useMailApp() {
           }
         }
 
+        const cacheDerivedKey = (keyB64: string) => {
+          if (!accountUserId) return;
+          void Promise.resolve(
+            putStoredDerivedVaultKey(accountUserId, keyB64),
+          ).catch(() => undefined);
+        };
+
         if (!unlockedVault || !effectivePassphrase) {
           if (vaultKey) {
             try {
@@ -1930,6 +1940,7 @@ export function useMailApp() {
                 backup.encryptedVaultB64,
                 vaultKey,
                 backup.kdfParams,
+                cacheDerivedKey,
               );
               effectivePassphrase = vaultKey;
             } catch {

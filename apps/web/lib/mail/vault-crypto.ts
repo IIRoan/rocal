@@ -68,6 +68,7 @@ function toBufferSource(value: Uint8Array): ArrayBuffer {
 async function deriveVaultKey(
   passphrase: string,
   params: MailVaultKdfParams,
+  onDerivedKey?: (keyB64: string) => void,
 ): Promise<CryptoKey> {
   let keyBytes: Uint8Array;
 
@@ -82,6 +83,8 @@ async function deriveVaultKey(
     const { deriveVaultKeyBytes } = await import("./vault-kdf");
     keyBytes = await deriveVaultKeyBytes(passphrase, params);
   }
+
+  onDerivedKey?.(bytesToBase64(keyBytes));
 
   return getCryptoRef().subtle.importKey(
     "raw",
@@ -141,11 +144,7 @@ export async function createEncryptedMailVault(
   };
 }
 
-/**
- * Unlock using a pre-computed AES-GCM key (e.g. `derivedKeyB64` from
- * `/api/mail/vault-key-material`). Skips the expensive client-side argon2id
- * pass that otherwise blocks open-mail for 1–3s.
- */
+/** Unlock with a locally cached AES key, skipping the argon2id pass. */
 export async function unlockEncryptedMailVaultWithDerivedKey(
   encryptedVaultB64: string,
   derivedKeyBase64: string,
@@ -189,13 +188,14 @@ export async function unlockEncryptedMailVault(
   encryptedVaultB64: string,
   passphrase: string,
   kdfParams: MailVaultKdfParams,
+  onDerivedKey?: (keyB64: string) => void,
 ): Promise<UserKeyVault> {
   try {
     const cryptoRef = getCryptoRef();
     const envelope = JSON.parse(
       decodeUtf8(base64ToBytes(encryptedVaultB64)),
     ) as VaultEnvelope;
-    const key = await deriveVaultKey(passphrase, kdfParams);
+    const key = await deriveVaultKey(passphrase, kdfParams, onDerivedKey);
     const plaintext = await cryptoRef.subtle.decrypt(
       {
         name: "AES-GCM",

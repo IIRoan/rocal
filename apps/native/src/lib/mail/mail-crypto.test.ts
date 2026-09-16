@@ -197,12 +197,13 @@ function mockSuccessfulVaultLoad() {
     ok: true,
     json: async () => MOCK_VAULT_BACKUP,
   });
-  // Backend: key material WITH pre-computed derived key (fast path)
+  // Backend: key material only — the server never derives the vault key.
   mockMailFetch.mockResolvedValueOnce({
     ok: true,
-    json: async () => ({ keyMaterial: MOCK_KEY_MATERIAL, derivedKeyB64: MOCK_DERIVED_KEY_B64, version: "v1" }),
+    json: async () => ({ keyMaterial: MOCK_KEY_MATERIAL, version: "v1" }),
   });
-  // Derived key vault unlock (fast path, no argon2id)
+  // Locally cached derived key (fast path, no argon2id)
+  mockLoadDerivedVaultKey.mockResolvedValue(MOCK_DERIVED_KEY_B64);
   mockUnlockVaultWithDerivedKey.mockResolvedValueOnce(MOCK_VAULT);
   // PGP private key
   mockReadPrivateKey.mockResolvedValueOnce(MOCK_PRIVATE_KEY);
@@ -242,20 +243,37 @@ describe("mail-crypto", () => {
   // ── ensureVaultLoaded ──────────────────────────────────────────────────────
 
   describe("ensureVaultLoaded", () => {
-    it("uses the backend-provided derived key (fast path, no argon2id)", async () => {
-      mockSuccessfulVaultLoad();
+    it("ignores a derived vault key offered by the backend", async () => {
+      mockMailFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => MOCK_SAFE_VAULT_BACKUP,
+      });
+      // A server that still returns one must not be trusted with the vault key.
+      mockMailFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          keyMaterial: MOCK_KEY_MATERIAL,
+          derivedKeyB64: "server-derived-key",
+          version: "v1",
+        }),
+      });
+      mockUnlockVault.mockResolvedValueOnce(MOCK_VAULT);
+      mockReadPrivateKey.mockResolvedValueOnce(MOCK_PRIVATE_KEY);
+      mockDecryptKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY);
+
       const runtime = buildRuntime();
       await ensureVaultLoaded(runtime);
 
-      // Derived key path should be taken — unlockEncryptedMailVaultWithDerivedKey called
-      expect(mockUnlockVaultWithDerivedKey).toHaveBeenCalledWith(
-        MOCK_VAULT_BACKUP.encryptedVaultB64,
-        MOCK_DERIVED_KEY_B64,
+      expect(mockUnlockVaultWithDerivedKey).not.toHaveBeenCalled();
+      expect(mockUnlockVault).toHaveBeenCalledWith(
+        MOCK_SAFE_VAULT_BACKUP.encryptedVaultB64,
+        MOCK_KEY_MATERIAL,
+        MOCK_SAFE_VAULT_BACKUP.kdfParams,
+        expect.any(Function),
       );
-      // argon2id path should NOT be taken
-      expect(mockUnlockVault).not.toHaveBeenCalled();
-      // Should cache the derived key to SecureStore
-      expect(mockSaveDerivedVaultKey).toHaveBeenCalledWith(MOCK_DERIVED_KEY_B64);
+      expect(mockSaveDerivedVaultKey).not.toHaveBeenCalledWith(
+        "server-derived-key",
+      );
     });
 
     it("uses cached derived key from SecureStore (skips argon2id but still fetches keyMaterial)", async () => {
@@ -327,6 +345,7 @@ describe("mail-crypto", () => {
         MOCK_SAFE_VAULT_BACKUP.encryptedVaultB64,
         MOCK_KEY_MATERIAL,
         MOCK_SAFE_VAULT_BACKUP.kdfParams,
+        expect.any(Function),
       );
     });
 
@@ -351,6 +370,7 @@ describe("mail-crypto", () => {
         MOCK_SAFE_VAULT_BACKUP.encryptedVaultB64,
         "fallback-login-password",
         MOCK_SAFE_VAULT_BACKUP.kdfParams,
+        expect.any(Function),
       );
     });
 
@@ -374,6 +394,7 @@ describe("mail-crypto", () => {
         MOCK_SAFE_VAULT_BACKUP.encryptedVaultB64,
         "stored-password",
         MOCK_SAFE_VAULT_BACKUP.kdfParams,
+        expect.any(Function),
       );
     });
 

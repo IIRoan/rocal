@@ -15,7 +15,7 @@ export type MailVaultKeyMaterialResult = {
   keyMaterial: string;
   derivedKeyB64: string | null;
   version: string;
-  /** True when derivedKeyB64 came from IndexedDB (server skipped argon2). */
+  /** True when derivedKeyB64 came from IndexedDB rather than a fresh derive. */
   usedCachedDerivedKey: boolean;
 };
 
@@ -42,7 +42,7 @@ function prefetchKey(userId: string, config: MailDemoConfig): string {
 
 /**
  * Fetch vault key material, preferring a browser-cached derived AES key so the
- * API can skip server-side argon2 on repeat opens.
+ * client can skip the argon2id pass on repeat opens.
  */
 export async function fetchVaultKeyMaterialForOpen(input: {
   endpoint: string;
@@ -52,44 +52,16 @@ export async function fetchVaultKeyMaterialForOpen(input: {
     () => null,
   );
 
-  if (cachedDerivedKey) {
-    try {
-      const result = await mailDemoApiService.getVaultKeyMaterial(
-        input.endpoint,
-        { includeDerived: false },
-      );
-      return {
-        keyMaterial: result.keyMaterial,
-        derivedKeyB64: cachedDerivedKey,
-        version: result.version,
-        usedCachedDerivedKey: true,
-      };
-    } catch (error) {
-      log.warn("Cached-derived key-material fetch failed; retrying full", {
-        error,
-      });
-    }
-  }
-
-  const result = await mailDemoApiService.getVaultKeyMaterial(input.endpoint, {
-    includeDerived: true,
-  });
-  if (result.derivedKeyB64) {
-    void Promise.resolve(
-      putStoredDerivedVaultKey(input.userId, result.derivedKeyB64),
-    ).catch((error) => {
-      log.warn("Failed to persist derived vault key", { error });
-    });
-  }
+  const result = await mailDemoApiService.getVaultKeyMaterial(input.endpoint);
   return {
     keyMaterial: result.keyMaterial,
-    derivedKeyB64: result.derivedKeyB64 ?? null,
+    derivedKeyB64: cachedDerivedKey,
     version: result.version,
-    usedCachedDerivedKey: false,
+    usedCachedDerivedKey: Boolean(cachedDerivedKey),
   };
 }
 
-/** Drop a bad cached derived key and mint a fresh one from the server. */
+/** Drop a bad cached derived key; the next unlock re-derives it locally. */
 export async function refreshVaultKeyMaterialAfterCacheMiss(input: {
   endpoint: string;
   userId: string;
@@ -98,17 +70,10 @@ export async function refreshVaultKeyMaterialAfterCacheMiss(input: {
     () => undefined,
   );
   try {
-    const result = await mailDemoApiService.getVaultKeyMaterial(input.endpoint, {
-      includeDerived: true,
-    });
-    if (result.derivedKeyB64) {
-      void Promise.resolve(
-        putStoredDerivedVaultKey(input.userId, result.derivedKeyB64),
-      ).catch(() => undefined);
-    }
+    const result = await mailDemoApiService.getVaultKeyMaterial(input.endpoint);
     return {
       keyMaterial: result.keyMaterial,
-      derivedKeyB64: result.derivedKeyB64 ?? null,
+      derivedKeyB64: null,
       version: result.version,
       usedCachedDerivedKey: false,
     };

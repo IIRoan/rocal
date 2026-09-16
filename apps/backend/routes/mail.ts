@@ -45,36 +45,11 @@ function normalizeBaseUrl(baseUrl: string): string {
 
 const logger = createLogger("backend:mail-jmap-proxy");
 
-const MAX_VAULT_MEMORY_KIB = 131_072;
-const MAX_VAULT_ITERATIONS = 4;
-const MAX_VAULT_PARALLELISM = 4;
 const VAULT_KEY_MATERIAL_RATE_LIMIT = { requests: 10, windowMs: 60_000 };
 // Deliberately loose: real clients are chatty, and this only has to make
 // bearer guessing against Stalwart impractical.
 const JMAP_PROXY_RATE_LIMIT = { requests: 1200, windowMs: 60_000 };
 
-let vaultDeriveChain: Promise<void> = Promise.resolve();
-
-function withVaultDeriveMutex<T>(task: () => Promise<T>): Promise<T> {
-  const run = vaultDeriveChain.then(task, task);
-  vaultDeriveChain = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
-}
-
-function vaultKdfParamsWithinServerCap(input: {
-  kdfMemoryKiB: number;
-  kdfIterations: number;
-  kdfParallelism: number;
-}): boolean {
-  return (
-    input.kdfMemoryKiB <= MAX_VAULT_MEMORY_KIB &&
-    input.kdfIterations <= MAX_VAULT_ITERATIONS &&
-    input.kdfParallelism <= MAX_VAULT_PARALLELISM
-  );
-}
 async function deriveVaultKeyMaterial(userId: string): Promise<string> {
   const hmacKey = env.mailVaultHmacKey;
   if (!hmacKey) {
@@ -93,85 +68,6 @@ async function deriveVaultKeyMaterial(userId: string): Promise<string> {
   const message = new TextEncoder().encode(`${userId}:vault-key:v1`);
   const signature = await crypto.subtle.sign("HMAC", key, message);
   return Buffer.from(signature)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-/**
- * Pre-computes the argon2id-derived vault decryption key for native clients.
- *
- * Native apps (Hermes JS engine) cannot run argon2id efficiently — the
- * pure-JS implementation blocks the main thread and may crash due to
- * memory pressure. The backend has WASM-backed hash-wasm and can compute
- * argon2id(keyMaterial, vaultSalt, kdfParams) server-side, returning the
- * 32-byte AES-GCM key as base64. The native app then uses this key directly.
- *
- * Returns null if the user has no vault backup yet.
- */
-async function deriveVaultKeyForNative(
-  userId: string,
-  keyMaterial: string,
-): Promise<string | null> {
-  const entry = await prisma.mailDirectoryEntry.findUnique({
-    where: { userId },
-    select: {
-      vaultBackup: {
-        select: {
-          kdfSaltB64: true,
-          kdfMemoryKiB: true,
-          kdfIterations: true,
-          kdfParallelism: true,
-        },
-      },
-    },
-  });
-
-  if (!entry?.vaultBackup) {
-    logger.warn("[deriveVaultKeyForNative] no vault backup found for userId=%s", userId);
-    return null;
-  }
-
-  const { kdfSaltB64, kdfMemoryKiB, kdfIterations, kdfParallelism } = entry.vaultBackup;
-
-  if (
-    !vaultKdfParamsWithinServerCap({
-      kdfMemoryKiB,
-      kdfIterations,
-      kdfParallelism,
-    })
-  ) {
-    logger.warn(
-      "[deriveVaultKeyForNative] refusing server derive — KDF params exceed cap for userId=%s",
-      userId,
-    );
-    return null;
-  }
-
-  logger.debug(
-    "[deriveVaultKeyForNative] running argon2id: memoryKiB=%d iterations=%d parallelism=%d saltLen=%d",
-    kdfMemoryKiB, kdfIterations, kdfParallelism, kdfSaltB64.length,
-  );
-
-  // kdfSaltB64 may be standard base64 or base64url — normalize to standard before decode.
-  const saltBase64 = kdfSaltB64.replace(/-/g, "+").replace(/_/g, "/");
-
-  const { argon2id } = await import("hash-wasm");
-  const derived = await withVaultDeriveMutex(() =>
-    argon2id({
-      password: keyMaterial,
-      salt: Buffer.from(saltBase64, "base64"),
-      memorySize: kdfMemoryKiB,
-      iterations: kdfIterations,
-      parallelism: kdfParallelism,
-      hashLength: 32,
-      outputType: "binary",
-    }),
-  );
-
-  logger.debug("[deriveVaultKeyForNative] argon2id succeeded, returning derivedKeyB64");
-  return Buffer.from(derived)
     .toString("base64")
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
@@ -1026,9 +922,9 @@ export function createMailRoutes(
               ...authDetail.detail,
               summary: "Get server-derived vault key material",
               description:
-                "Returns an HMAC-SHA256 derived key material unique to the authenticated user. Used client-side to derive the vault encryption key without a user-typed password. Pass includeDerived=0 to skip the expensive argon2id derived AES key when the client already has it cached.",
+                "Returns HMAC-SHA256 key material unique to the authenticated user. The client derives the vault encryption key from it; the server never computes that key.",
             },
-          }, async ({ routeUser, status, request }) => {
+          }, async ({ routeUser, status }) => {
             const userId = routeUser.id;
             try {
               enforceRateLimit({
@@ -1047,28 +943,9 @@ export function createMailRoutes(
               }
               throw error;
             }
-            const includeDerived =
-              new URL(request.url).searchParams.get("includeDerived") !== "0";
             try {
               const keyMaterial = await deriveVaultKeyMaterial(userId);
-              let derivedKeyB64: string | null = null;
-              if (includeDerived) {
-                try {
-                  derivedKeyB64 = await deriveVaultKeyForNative(userId, keyMaterial);
-                } catch (derivedErr) {
-                  logger.error("[vault-key-material] deriveVaultKeyForNative failed", {
-                    userId,
-                    ...errorLogDetails(derivedErr),
-                  });
-                }
-              }
-              logger.debug(
-                "[vault-key-material] responding hasDerivedKey=%s includeDerived=%s for userId=%s",
-                derivedKeyB64 ? "yes" : "no",
-                includeDerived ? "yes" : "no",
-                userId,
-              );
-              return { keyMaterial, derivedKeyB64, version: "v1" };
+              return { keyMaterial, version: "v1" };
             } catch (err) {
               const message = errorMessage(
                 err,
