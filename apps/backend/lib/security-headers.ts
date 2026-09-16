@@ -6,22 +6,10 @@ const JSON_API_CSP = "default-src 'none'; frame-ancestors 'none'";
 const AUTH_ERROR_PAGE_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'";
 const AUTH_ERROR_PAGE_PATH = `${BETTER_AUTH_BASE_PATH}/error`;
-/**
- * The avatar proxy is loaded as a no-cors `<img>` subresource. `same-site`
- * would block it wherever the web origin is not same-site with the API — Vercel
- * preview deployments (*.vercel.app) and any future split domain — so this one
- * route opts into `cross-origin`. It streams a profile picture the client
- * already asked for by address and carries no other data.
- */
+/** Loaded as a no-cors `<img>`, which `same-site` would block on *.vercel.app previews. */
 const AVATAR_PATH_SUFFIX = "/profiles/avatar";
 
-/**
- * Headers applied to every API response.
- *
- * CORP is `same-site`: web (app.*) and API (api.*) share a registrable domain,
- * and native fetches are not subject to CORP. It only blocks other sites from
- * embedding API responses as no-cors resources.
- */
+/** CORP can be `same-site` because web and API share a registrable domain and native ignores CORP. */
 export function buildSecurityHeaders(input: {
   isProduction: boolean;
   pathname: string;

@@ -52,8 +52,7 @@ type EmailContent struct {
 	Text string `json:"text"`
 }
 
-// EventData holds only non-content scheduling fields. Reminder mail never
-// includes the title, location, description, or calendar/category names.
+// EventData holds only non-content scheduling fields; reminder mail never includes user content.
 type EventData struct {
 	Start  time.Time
 	End    time.Time

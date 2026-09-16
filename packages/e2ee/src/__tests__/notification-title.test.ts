@@ -14,9 +14,7 @@ import {
   normalizeNotificationTitle,
 } from "../notification-title";
 
-// Fixed vector shared with apps/native/plugins/notification-service-extension/
-// NotificationService.swift. Produced independently with node:crypto
-// (hkdfSync + createCipheriv("aes-256-gcm")); change both sides together.
+// Fixed vector shared with the Swift NSE (NotificationService.swift); change both sides together.
 const VECTOR = {
   accountKey: Uint8Array.from({ length: 32 }, (_, i) => i),
   iv: Uint8Array.from({ length: 12 }, (_, i) => 0xa0 + i),

@@ -1,10 +1,4 @@
-/**
- * Platform-agnostic redaction for logs and error reports (backend, web, native).
- *
- * Key lists come from `redaction-policy.js` (also consumed by the backend
- * safe-logging ESLint rules). No Node or DOM APIs so it runs in Bun, the
- * browser, the Next.js edge runtime, and Hermes.
- */
+/** No Node or DOM APIs: this runs in Bun, the browser, the Next.js edge runtime, and Hermes. */
 import {
   LOG_HASH_FIELD_KEYS,
   LOG_OMIT_FIELD_KEYS,
@@ -27,10 +21,7 @@ export const LOG_REDACTED_BEARER_PLACEHOLDER = "Bearer [redacted]" as const;
 /** Placeholder written when a request URL query string is stripped. */
 export const LOG_REDACTED_QUERY_PLACEHOLDER = "?[redacted]" as const;
 
-/**
- * Free-form text patterns redacted by `redactPII()`.
- * Order matters: bearer tokens before URLs avoids partial leaks.
- */
+/** Order matters: bearer tokens before URLs avoids partial leaks. */
 export const LOG_PII_TEXT_PATTERNS = {
   email: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
   bearer: /Bearer\s+[A-Za-z0-9._~+/=-]+/gi,
@@ -38,10 +29,7 @@ export const LOG_PII_TEXT_PATTERNS = {
 } as const;
 
 export type RedactionOptions = {
-  /**
-   * Stable one-way hash for identifier keys (`LOG_HASH_FIELD_KEYS`). When
-   * omitted (clients without a sync hash), those values are dropped instead.
-   */
+  /** When omitted (clients without a sync hash), identifier values are dropped instead of hashed. */
   hashValue?: (value: string) => string;
 };
 
@@ -143,10 +131,6 @@ function sanitizeContextAtDepth(
   return sanitized;
 }
 
-/**
- * Sanitize a structured context object: omit content/secret keys, hash (or
- * drop) identifier keys, redact PII from strings, summarize arrays.
- */
 export function sanitizeContext(
   context: UnknownRecord,
   options: RedactionOptions = {},
@@ -164,19 +148,15 @@ const PROJECT_PATH_MARKERS = [
   "build/",
 ];
 
-/**
- * Keep the part of a frame path that source maps are keyed by, drop the rest:
- * absolute prefixes can carry usernames or device ids.
- *
- * Bundle URLs (`https://app/_next/static/chunks/x.js`) are public and are what
- * Sentry/Errex match uploaded artifacts against, so they survive intact minus
- * any query string. Filesystem paths keep only the project-relative tail. A
- * path with no recognizable root falls back to the bare file name.
- */
+/** Bundle URLs stay intact so source maps still resolve; absolute paths can carry usernames. */
 function sanitizeFramePath(path: string): string {
   const withoutQuery = path.split(/[?#]/)[0] ?? "";
   if (/^https?:\/\//i.test(withoutQuery)) {
-    return withoutQuery;
+    // Only the email pattern: redactPII would replace the whole URL and break the source-map lookup.
+    return withoutQuery.replace(
+      LOG_PII_TEXT_PATTERNS.email,
+      LOG_REDACTED_EMAIL_PLACEHOLDER,
+    );
   }
   const normalized = withoutQuery.replace(/\\/g, "/");
   for (const marker of PROJECT_PATH_MARKERS) {
@@ -295,10 +275,7 @@ function setOrDelete(target: UnknownRecord, key: string, value: unknown) {
 
 const HTTP_BREADCRUMB_CATEGORIES = new Set(["fetch", "xhr", "http"]);
 
-/**
- * Scrub a Sentry-compatible breadcrumb. Console breadcrumbs are dropped (they
- * echo arbitrary log arguments); UI breadcrumbs lose their DOM-derived message.
- */
+/** Console breadcrumbs are dropped: they echo arbitrary log arguments. */
 export function scrubBreadcrumb<T extends object>(
   breadcrumb: T,
   options: RedactionOptions = {},
@@ -341,11 +318,6 @@ export function scrubBreadcrumb<T extends object>(
   return scrubbed as T;
 }
 
-/**
- * Scrub a Sentry-compatible event before it leaves the process/device:
- * exception messages and stack frames, message/logentry, request, user,
- * extras, contexts, tags and breadcrumbs.
- */
 export function scrubErrorEvent<T extends object>(
   event: T,
   options: RedactionOptions = {},

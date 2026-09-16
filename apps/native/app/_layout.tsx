@@ -111,7 +111,6 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
       queryClient.removeQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.removeQueries({ queryKey: QUERY_KEYS.categories() });
 
-      // Encrypt legacy plaintext calendar/category names in the background.
       // Silent on failure; the next launch retries the remaining rows.
       void calendarApiService
         .backfillEncryptedNames()

@@ -124,8 +124,7 @@ export class AccountService implements IAccountService {
         where: { userId: input.userId },
       });
 
-      // Invites sent by the user cascade; invites addressed to or claimed for
-      // them belong to another inviter and keep their email, so remove them.
+      // Invites addressed to or claimed for the user belong to another inviter, so they do not cascade.
       if (userEmails.length > 0) {
         await tx.invite.deleteMany({
           where: {

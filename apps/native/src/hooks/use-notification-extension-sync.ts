@@ -24,12 +24,7 @@ async function syncMailAuth(): Promise<void> {
   });
 }
 
-/**
- * Keeps the iOS Notification Service Extension's shared-keychain secrets in
- * step with the session: the derived notification key once E2EE is unlocked,
- * the session cookie while signed in (refreshed on foreground), and nothing
- * after sign-out.
- */
+/** Keeps the notification extension's shared-keychain secrets in step with the session, cleared on sign-out. */
 export function useNotificationExtensionSync(): void {
   const { isAuthenticated, isLoading } = useAuth();
   const { isEnabled, isReady, runWithAccountKey } = useE2ee();

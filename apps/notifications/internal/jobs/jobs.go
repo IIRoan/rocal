@@ -202,9 +202,7 @@ func ListPushDevices(ctx context.Context, db *sql.DB, userID string) ([]PushDevi
 	return devices, rows.Err()
 }
 
-// ReminderEvent deliberately excludes title, location, description, and
-// calendar/category names: reminder mail and push stay generic, and the
-// encrypted title is only forwarded to the device.
+// ReminderEvent deliberately excludes title, location, description and names: reminders stay generic.
 type ReminderEvent struct {
 	EncryptedTitle string
 	Start          time.Time
@@ -219,8 +217,7 @@ type ReminderUser struct {
 	TimeFormat string
 }
 
-// LoadReminderSQL reads encrypted_display_title through to_jsonb so the worker
-// also runs against a database that has not applied that migration yet.
+// LoadReminderSQL reads encrypted_display_title via to_jsonb so it also runs pre-migration.
 const LoadReminderSQL = `
 		SELECT
 			(
@@ -256,8 +253,7 @@ func LoadReminder(ctx context.Context, db *sql.DB, eventID, userID string) (Remi
 	return event, user, nil
 }
 
-// StartClock formats the event start in the user's timezone and time format,
-// or returns "" for all-day events.
+// StartClock formats the event start in the user's timezone, or "" for all-day events.
 func StartClock(event ReminderEvent, user ReminderUser) string {
 	if event.AllDay || event.Start.IsZero() {
 		return ""

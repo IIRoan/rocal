@@ -1,6 +1,4 @@
-/**
- * @jest-environment jsdom
- */
+/** @jest-environment jsdom */
 import { describe, expect, it } from "@jest/globals";
 import { sanitizeUntrustedEmailHtml } from "../sanitize-email-html";
 import { BYPASS_CASES, expectBypassNeutralized, READER_KEEPS } from "./sanitize-email-html.cases";

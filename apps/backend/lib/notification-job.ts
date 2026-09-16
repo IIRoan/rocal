@@ -1,8 +1,4 @@
-/**
- * `notification_job.payload` holds opaque references only. Reminder titles and
- * mail sender/subject never enter the outbox: the iOS Notification Service
- * Extension decrypts or fetches them on-device.
- */
+/** The outbox payload holds opaque references only; the iOS NSE resolves content on-device. */
 const ALLOWED_PAYLOAD_KEYS = new Set([
   "kind",
   "eventId",

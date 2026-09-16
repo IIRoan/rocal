@@ -62,12 +62,7 @@ async function runInBatches(
   return { succeeded, failed };
 }
 
-/**
- * Uploads ciphertext for calendars/categories that still have a plaintext name
- * on the server. Idempotent: the server blanks the plaintext once ciphertext is
- * stored, so those rows are no longer candidates on the next run. Errors are
- * swallowed; remaining rows are retried on the next launch.
- */
+/** Idempotent: the server blanks plaintext once ciphertext is stored; failures retry next launch. */
 export async function backfillEncryptedNames({
   client,
   e2ee,

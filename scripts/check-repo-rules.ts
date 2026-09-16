@@ -1,7 +1,4 @@
-/**
- * Mechanical enforcement of the repo rules in AGENTS.md / CLAUDE.md.
- * Runs as part of `bun run lint` (and therefore CI). Scans tracked files only.
- */
+/** Mechanical enforcement of the AGENTS.md rules, run by `bun run lint`; scans tracked files only. */
 import { execFileSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";

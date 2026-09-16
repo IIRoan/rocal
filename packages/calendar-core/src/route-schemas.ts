@@ -103,11 +103,7 @@ export const bulkEventActionSchema = z.enum(["move", "delete", "duplicate"]);
 
 export const notificationTypeSchema = z.enum(["browser", "email"]);
 
-/**
- * Reminder title ciphertext produced by `encryptNotificationTitle` in
- * `@workspace/e2ee`: "v1.<iv b64url>.<ciphertext+tag b64url>". The server
- * stores it opaquely and never receives the plaintext title.
- */
+/** Wire format "v1.<iv b64url>.<ciphertext+tag b64url>"; the server stores it opaquely. */
 export const MAX_ENCRYPTED_NOTIFICATION_TITLE_LENGTH = 1200;
 export const encryptedNotificationTitleSchema = z
   .string()

@@ -330,8 +330,7 @@ model EventNotification {
   notificationTimezone  String   @default("UTC") @map("notification_timezone")
   isEnabled        Boolean       @default(true) @map("is_enabled")
   isSent           Boolean       @default(false) @map("is_sent")
-  /// AES-GCM ciphertext of the reminder title under the client-derived
-  /// notification key (see @workspace/e2ee notification-title). Never plaintext.
+  /// Ciphertext under the client-derived notification key (@workspace/e2ee notification-title).
   encryptedDisplayTitle String?  @map("encrypted_display_title")
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
@@ -678,9 +677,7 @@ model CalendarSyncLog {
   @@map("calendar_sync_log")
 }
 
-/// Better Auth rate-limit counters (custom storage in lib/auth-rate-limit.ts).
-/// `key` is an HMAC of client IP + path, never the raw IP. Rows older than the
-/// longest rule window are pruned inline by the storage.
+/// Better Auth rate-limit counters; `key` is an HMAC of client IP + path, never the raw IP.
 model RateLimit {
   key         String @id
   count       Int

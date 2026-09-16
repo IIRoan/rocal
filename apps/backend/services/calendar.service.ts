@@ -121,8 +121,7 @@ export class CalendarService implements ICalendarService {
 
     assertValidEntityColor(color);
 
-    // Duplicate names can only be detected for plaintext names; encrypted
-    // names are compared on-device.
+    // Encrypted names are compared on-device, so duplicates are only detectable for plaintext.
     if (namePersistence.kind === "plaintext") {
       await assertPlaintextNameAllowed(this.prisma, userId, "Calendar");
 

@@ -10,10 +10,7 @@ export type TimelineEventDensity = "compact" | "small" | "stacked";
 const COMPACT_HEIGHT_PX = 22;
 const TIME_VISIBLE_HEIGHT_PX = 28;
 
-/**
- * Smallest on-screen height for a timed event. At 1.2px/minute a 5-minute
- * event would be a 6px sliver — too thin to read or tap on a phone.
- */
+/** Smallest on-screen height for a timed event; at 1.2px/minute a 5-minute one would be a 6px sliver. */
 export const TIMELINE_MIN_EVENT_HEIGHT_PX = 30;
 
 /** Minimum minutes calendar-kit lays a timed event out with. */

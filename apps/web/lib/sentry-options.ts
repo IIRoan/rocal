@@ -65,8 +65,6 @@ export function getWebSentryOptions() {
       "AbortError",
       /Loading chunk [\d]+ failed/,
     ],
-    // Scrub PII (emails, tokens, query strings, content keys) on every
-    // runtime before events leave the browser/server.
     beforeSend: <T extends object>(event: T) => scrubErrorEvent(event),
     beforeBreadcrumb: <T extends object>(breadcrumb: T) =>
       scrubBreadcrumb(breadcrumb),

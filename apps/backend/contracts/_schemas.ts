@@ -17,10 +17,7 @@ export const eventIdParamsSchema = strictZodObject({
   eventId: z.string().min(1),
 });
 
-/**
- * Name ciphertext fields. `encryptionState` is still accepted from older
- * clients but ignored: the server derives it from the presence of ciphertext.
- */
+/** `encryptionState` is still accepted from older clients but ignored; ciphertext presence decides. */
 export const encryptionShadowFieldsSchema = strictZodObject({
   encryptedName: z.string().optional(),
   blindIndexTokens: z.array(z.string()).optional(),

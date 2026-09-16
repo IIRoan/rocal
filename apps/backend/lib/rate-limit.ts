@@ -56,13 +56,7 @@ export function enforceRateLimit(input: {
   current.count += 1;
 }
 
-/**
- * Client IP headers we trust, in priority order. The API only runs on Vercel,
- * whose edge overwrites `x-real-ip` and `x-forwarded-for` with the connecting
- * client's address (client-supplied values are discarded), so the first hop is
- * trustworthy there. Better Auth's rate limiter uses the same list. Behind any
- * other proxy these headers are spoofable — re-check before moving hosts.
- */
+/** Trustworthy only because Vercel's edge overwrites them; re-check before moving hosts. */
 export const TRUSTED_CLIENT_IP_HEADERS = ["x-real-ip", "x-forwarded-for"];
 
 export function getClientIp(request: Request): string {

@@ -1,21 +1,7 @@
 import type { CryptoProvider } from "./crypto-provider";
 import { base64UrlToArrayBuffer, bytesToBase64Url } from "./e2ee-module";
 
-/**
- * Reminder titles shown on the lock screen are encrypted under a key derived
- * from the account key, so the server only stores ciphertext and the iOS
- * Notification Service Extension only holds a key that can read notification
- * titles (not event content).
- *
- * Wire format (also implemented in the Swift NSE):
- *   "v1." + base64url(iv, 12 bytes) + "." + base64url(ciphertext || 16-byte GCM tag)
- * base64url is unpadded (validated by `encryptedNotificationTitleSchema` in
- * calendar-core). AAD is `notification-title:v1:<eventId>` (UTF-8).
- *
- * Notification key: HKDF-SHA-256 (RFC 5869) with IKM = raw account key,
- * salt = 32 zero bytes, info = NOTIFICATION_KEY_INFO, L = 32. Implemented with
- * HMAC so every CryptoProvider (including the JS fallback) supports it.
- */
+/** Wire format "v1.<iv>.<ct+tag>" (unpadded base64url) and HKDF derivation are mirrored in the Swift NSE. */
 
 export const NOTIFICATION_KEY_INFO = "solace/notification-key/v1";
 export const NOTIFICATION_TITLE_PREFIX = "v1";

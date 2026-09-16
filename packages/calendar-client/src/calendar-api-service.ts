@@ -102,11 +102,7 @@ export class CalendarApiService {
     this.e2ee = provider;
   }
 
-  /**
-   * Encrypts legacy plaintext calendar/category names with this device's
-   * account key and uploads the ciphertext. Safe to call on every launch:
-   * rows that are already encrypted are skipped and failures retry next time.
-   */
+  /** Safe on every launch: already-encrypted rows are skipped and failures retry next time. */
   backfillEncryptedNames(): Promise<NameEncryptionBackfillResult> {
     this.nameBackfill ??= backfillEncryptedNames({
       client: this.client,
@@ -844,8 +840,7 @@ export class CalendarApiService {
     request: EditRecurringEventRequest,
   ): Promise<CalendarEvent> {
     try {
-      // Recurring edits never send invitation mail, so the transient
-      // invitation copy of the content is not uploaded.
+      // Recurring edits never send invitation mail, so the transient copy is dropped.
       const updates = await this.e2ee.attachEventEncryptionShadow(
         request.updates,
       );

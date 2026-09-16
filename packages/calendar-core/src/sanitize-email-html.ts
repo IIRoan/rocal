@@ -1,20 +1,11 @@
 import DOMPurify from "dompurify";
 
 export interface SanitizeEmailHtmlOptions {
-  /**
-   * Keep `<style>` blocks (with dangerous CSS removed) and force links to open
-   * in a new browsing context. Only for the mail reader, which renders inside a
-   * script-less sandboxed frame carrying its own CSP. Compose/signature HTML is
-   * injected into the app document, so it never keeps `<style>`.
-   */
+  /** "reader" keeps `<style>` only because it renders in a script-less sandboxed frame. */
   profile?: "compose" | "reader";
 }
 
-/**
- * Allowlist shared by the DOM (DOMPurify) and non-DOM (React Native) paths so
- * both platforms keep exactly the same markup. Anything not listed is dropped:
- * scripts, forms, embeds, frames, meta/base/link, svg/math, templates.
- */
+/** Shared by the DOM and non-DOM paths so both drop everything unlisted identically. */
 const ALLOWED_TAGS = [
   "a", "abbr", "address", "article", "aside", "b", "bdi", "bdo", "big",
   "blockquote", "br", "caption", "center", "cite", "code", "col", "colgroup",
@@ -77,11 +68,7 @@ function decodeHtmlEntities(value: string): string {
   );
 }
 
-/**
- * Decide whether a URL attribute survives. Browsers ignore ASCII whitespace
- * and control characters inside schemes (`java\tscript:`), so they are removed
- * before inspecting the scheme. Relative URLs have no scheme and are allowed.
- */
+/** Browsers ignore whitespace/control chars inside schemes (`java\tscript:`), so strip them first. */
 export function isSafeEmailUrl(tag: string, attr: string, rawValue: string): boolean {
   // eslint-disable-next-line no-control-regex
   const value = rawValue.replace(/[\x00- \x7f-\x9f\s]+/g, "").toLowerCase();
@@ -203,11 +190,7 @@ function serializeAttributes(tag: string, attrs: Array<[string, string]>, reader
   return out;
 }
 
-/**
- * Allowlist tokenizer for runtimes without a DOM (React Native / Hermes).
- * Every emitted tag is re-serialized from parsed parts, so malformed input
- * cannot smuggle attributes or handlers through.
- */
+/** Every emitted tag is re-serialized from parsed parts, so malformed input cannot smuggle handlers. */
 function sanitizeWithoutDom(input: string, reader: boolean): string {
   // eslint-disable-next-line no-control-regex
   const html = input.replace(/\x00/g, "");
@@ -311,12 +294,7 @@ function getDomPurify(): DomPurifyInstance | null {
   return instance;
 }
 
-/**
- * Sanitize untrusted mail HTML. Used for the mail reader (profile "reader")
- * and for quoted replies/signatures inserted into compose (default).
- * Uses DOMPurify when a DOM is available (web) and an equivalent allowlist
- * tokenizer otherwise (native), with the same tag/attribute/URL policy.
- */
+/** DOMPurify when a DOM exists, else the tokenizer below, with the same tag/attribute/URL policy. */
 export function sanitizeUntrustedEmailHtml(
   html: string,
   options: SanitizeEmailHtmlOptions = {},

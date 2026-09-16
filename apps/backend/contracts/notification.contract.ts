@@ -15,12 +15,7 @@ export const eventNotificationSettingSchema = strictZodObject({
 export const updateEventNotificationsBodySchema = strictZodObject({
   notifications: z.array(eventNotificationSettingSchema).max(20),
   encryptedDisplayTitle: encryptedNotificationTitleSchema.nullable().optional(),
-  /**
-   * Accepted only so reminders keep saving for already-shipped binaries that
-   * still send the plaintext title (AGENTS.md §3). It is dropped here and never
-   * reaches the service, the database or a log; those clients simply get the
-   * generic lock-screen copy until they update.
-   */
+  /** Accepted so shipped binaries' reminders still save, then dropped; never stored or logged. */
   displayTitle: z
     .string()
     .max(255)

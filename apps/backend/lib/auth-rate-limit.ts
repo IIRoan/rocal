@@ -12,13 +12,9 @@ type RateLimitRecord = { key: string; count: number; lastRequest: number };
 /** Default limit for every Better Auth endpoint without a stricter rule. */
 export const AUTH_RATE_LIMIT_DEFAULT: RateLimitRule = { window: 60, max: 100 };
 
-/**
- * Per-path limits (paths relative to the Better Auth base path, per client IP).
- * Credential, enumeration and mail-sending endpoints get tight budgets.
- */
+/** Per-path limits, relative to the Better Auth base path and keyed per client IP. */
 export const AUTH_RATE_LIMIT_RULES: Record<string, RateLimitRule | false> = {
-  // Hot path polled by every client; the session token is not guessable, and
-  // skipping it avoids a database write per session check.
+  // The session token is not guessable, and skipping avoids a database write per session check.
   "/get-session": false,
   "/sign-in/*": { window: 60, max: 5 },
   "/sign-up/*": { window: 3600, max: 5 },
@@ -48,19 +44,12 @@ const PRUNE_INTERVAL_MS = 5 * 60_000;
 
 type RateLimitPrisma = Pick<PrismaClient, "$queryRaw" | "$executeRaw">;
 
-/**
- * Better Auth keys contain the client IP. Store only an HMAC so the table
- * never holds IP addresses (and cannot be brute-forced without the secret).
- */
+/** Better Auth keys contain the client IP, so the table stores only a keyed HMAC of them. */
 export function hashRateLimitKey(key: string, secret: string): string {
   return createHmac("sha256", secret).update(key).digest("hex");
 }
 
-/**
- * Postgres-backed Better Auth rate-limit storage shared by all serverless
- * instances. `consume` is a single atomic upsert: `count` goes past `max`
- * only on denial, and `last_request` advances only for allowed requests.
- */
+/** Postgres-backed so limits hold across serverless instances; `consume` is one atomic upsert. */
 export function createAuthRateLimitStorage(
   prisma: RateLimitPrisma,
   secret: string,

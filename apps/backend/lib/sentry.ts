@@ -59,8 +59,7 @@ export function initSentry(): void {
     environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "development",
     sendDefaultPii: false,
     tracesSampleRate: 0,
-    // Last line of defence: SDK integrations attach request headers, console
-    // breadcrumbs and raw messages that never went through our log sanitizers.
+    // Last line of defence: SDK integrations attach data that never met our log sanitizers.
     beforeSend: (event) => scrubErrorEvent(event, BACKEND_REDACTION_OPTIONS),
     beforeBreadcrumb: (breadcrumb) =>
       scrubBreadcrumb(breadcrumb, BACKEND_REDACTION_OPTIONS),

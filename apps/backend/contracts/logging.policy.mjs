@@ -1,8 +1,6 @@
 /**
  * Machine-readable log sanitization policy for ESLint and the TypeScript contract.
- * Omit/hash key lists are shared with the web and native error reporters, so they
- * live in `packages/calendar-core/src/redaction-policy.js` — add new sensitive
- * keys there. `logging.contract.ts` re-exports everything as the documented API.
+ * Key lists live in `packages/calendar-core/src/redaction-policy.js` — add new sensitive keys there.
  */
 
 export {
