@@ -13,7 +13,7 @@ const logger = createLogger("backend");
 const { backendUrl, frontendUrl, port } = env;
 
 async function ensureStalwartWebhookOnBoot() {
-  if (!env.stalwartWebhookSecret || !env.stalwartAdminToken) {
+  if (!env.stalwartWebhookSecret || !env.stalwartProvisionToken) {
     return;
   }
 
