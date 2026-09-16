@@ -115,10 +115,7 @@ export function resolveMailOauthEnabled(
 export const BETTER_AUTH_SECRET_MIN_LENGTH = 32;
 const DEV_BETTER_AUTH_SECRET = "default-dev-secret-change-in-production";
 
-/**
- * Deployed environments (NODE_ENV=production, or any Vercel production/preview
- * deployment) must never fall back to development secrets.
- */
+/** Deployed environments (including Vercel previews) must never fall back to development secrets. */
 export function isDeployedEnvironment(
   input: { nodeEnv?: string; vercelEnv?: string } = {
     nodeEnv: process.env.NODE_ENV,
@@ -137,8 +134,7 @@ export function resolveBetterAuthSecret(input: {
   secret?: string;
   deployed: boolean;
 }): string {
-  // Length is checked on the trimmed value, but the raw value is returned:
-  // changing an existing secret would invalidate sessions and encrypted JWKS.
+  // The raw value is returned even when padded: changing it would invalidate sessions and JWKS.
   const secret = input.secret ?? "";
   if (secret.trim().length >= BETTER_AUTH_SECRET_MIN_LENGTH) {
     return secret;

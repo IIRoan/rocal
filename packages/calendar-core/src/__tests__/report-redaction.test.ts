@@ -94,6 +94,7 @@ describe("scrubErrorEvent", () => {
             stacktrace: {
               frames: [
                 { filename: "https://solace.onl/_next/static/chunks/a1b2.js?v=3" },
+                { filename: "https://solace.onl/u/alice@example.com/app.js" },
                 { filename: "/Users/alice/solace/apps/web/lib/mail/jmap-client.ts" },
                 { filename: "/var/task/node_modules/elysia/dist/index.js" },
                 { filename: "/private/var/containers/ABC-123/main.jsbundle" },
@@ -111,6 +112,8 @@ describe("scrubErrorEvent", () => {
     ).toEqual([
       // Public bundle URL: kept (minus the query) so the uploaded map matches.
       "https://solace.onl/_next/static/chunks/a1b2.js",
+      // Still redacted inside the path, just not replaced wholesale.
+      "https://solace.onl/u/[email]/app.js",
       // Absolute prefixes with a username are dropped, the project tail stays.
       "apps/web/lib/mail/jmap-client.ts",
       "node_modules/elysia/dist/index.js",

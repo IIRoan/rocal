@@ -30,10 +30,7 @@ type Alert struct {
 	Body  string
 }
 
-// Notification never carries user content in the clear. The alert is generic;
-// the iOS Notification Service Extension (mutable-content) replaces it with the
-// decrypted reminder title (EncryptedTitle) or the sender/subject it fetches
-// over JMAP (EmailID + AccountID).
+// Notification carries no user content in the clear; the mutable-content NSE fills the alert in.
 type Notification struct {
 	Alert          Alert
 	CollapseID     string
@@ -116,8 +113,7 @@ func MetadataPayload(n Notification) map[string]any {
 	if n.CollapseID != "" {
 		aps["thread-id"] = n.CollapseID
 	}
-	// expo-notifications maps remote `content.data` from userInfo["body"] on iOS;
-	// binaries without the extension route taps with these short keys.
+	// expo-notifications maps `content.data` from userInfo["body"] on iOS; taps route on these keys.
 	body := map[string]any{}
 	payload := map[string]any{
 		"aps":  aps,
@@ -148,8 +144,7 @@ func MetadataPayload(n Notification) map[string]any {
 	return payload
 }
 
-// EncodePayload marshals the APNs body and drops the optional ciphertext when
-// the payload would exceed MaxPayloadBytes; the generic alert still delivers.
+// EncodePayload marshals the APNs body, dropping the ciphertext when it would exceed MaxPayloadBytes.
 func EncodePayload(n Notification) ([]byte, error) {
 	body, err := json.Marshal(MetadataPayload(n))
 	if err != nil {
@@ -174,9 +169,7 @@ const (
 	TypeNewMail       = "new_mail"
 )
 
-// EventReminder builds a generic reminder alert. startsAt is a clock time
-// already formatted in the user's timezone (not PII); empty falls back to the
-// lead time.
+// EventReminder builds a generic reminder alert; startsAt is a preformatted clock time, not PII.
 func EventReminder(minutesBefore int, eventID, encryptedTitle, startsAt string) Notification {
 	body := "Starting now"
 	if minutesBefore > 0 {

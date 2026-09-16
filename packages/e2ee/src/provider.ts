@@ -21,50 +21,33 @@ import { hydrateEncryptedNameWithoutSession } from "./payloads";
  * provide their own crypto backend.
  */
 export interface E2eeProvider {
-  /**
-   * Encrypt event content for a create/update request. With an active session
-   * the returned body carries ciphertext and blind-index tokens only; the
-   * plaintext title/description/location are removed.
-   */
+  /** With an active session the body carries ciphertext only; plaintext content is removed. */
   attachEventEncryptionShadow<
     T extends CreateEventRequest | UpdateEventRequest,
   >(
     request: T,
   ): Promise<EventWireRequest<T>>;
 
-  /**
-   * Encrypt a calendar name; the plaintext `name` is removed from the body.
-   */
+  /** Encrypt a calendar name; the plaintext `name` is removed from the body. */
   attachCalendarEncryptionShadow<
     T extends CreateCalendarRequest | UpdateCalendarRequest,
   >(
     request: T,
   ): Promise<NameWireRequest<T>>;
 
-  /**
-   * Encrypt a category name; the plaintext `name` is removed from the body.
-   */
+  /** Encrypt a category name; the plaintext `name` is removed from the body. */
   attachCategoryEncryptionShadow<
     T extends CreateCategoryRequest | UpdateCategoryRequest,
   >(
     request: T,
   ): Promise<NameWireRequest<T>>;
 
-  /**
-   * Decrypt a calendar name for display, or return a placeholder name when
-   * this device cannot decrypt it.
-   */
+  /** Returns a placeholder name when this device cannot decrypt it. */
   hydrateEncryptedCalendar(calendar: Calendar): Promise<Calendar>;
 
-  /**
-   * Decrypt a category name for display, or return a placeholder name.
-   */
   hydrateEncryptedCategory(category: EventCategory): Promise<EventCategory>;
 
-  /**
-   * Resolves once any pending bootstrap settles; true when content can be
-   * encrypted on this device.
-   */
+  /** Resolves once any pending bootstrap settles. */
   hasActiveSession(): Promise<boolean>;
 
   /**

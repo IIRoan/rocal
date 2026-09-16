@@ -1,6 +1,4 @@
-// Package retention deletes ephemeral rows that would otherwise grow without
-// bound. Deletes run in small batches (`id IN (SELECT ... LIMIT n FOR UPDATE
-// SKIP LOCKED)`) so they never hold long locks or block the job claimer.
+// Package retention deletes ephemeral rows in bounded batches that never block the job claimer.
 package retention
 
 import (
@@ -28,8 +26,7 @@ const (
 	VerificationGrace = 1 * day
 	// OAuthTokenGrace: expired OAuth access and refresh tokens.
 	OAuthTokenGrace = 1 * day
-	// InviteInactiveRetention: pending-but-expired, revoked, and abandoned claimed
-	// invites stay visible to the inviter for this long.
+	// InviteInactiveRetention: how long expired, revoked and abandoned invites stay visible.
 	InviteInactiveRetention = 30 * day
 	// NotificationJobSentRetention: delivered jobs (also the new-mail push dedupe window).
 	NotificationJobSentRetention = 7 * day
@@ -55,8 +52,7 @@ func batchDelete(table, where string) string {
 	)
 }
 
-// Rules lists every cleanup. Table/column names follow schema.prisma @@map/@map.
-// Pending notification jobs (including leased ones) are never selected.
+// Rules lists every cleanup; pending notification jobs (including leased ones) are never selected.
 var Rules = []Rule{
 	{"session", SessionGrace, batchDelete("session", "expires_at < $1")},
 	{"verification", VerificationGrace, batchDelete("verification", "expires_at < $1")},
@@ -88,8 +84,7 @@ func (r Result) Total() int64 {
 	return total
 }
 
-// Run executes every rule. A failing rule does not stop the others; all
-// errors are joined. Errors carry only the rule name, never row data.
+// Run executes every rule; a failing rule does not stop the others and errors carry only rule names.
 func Run(ctx context.Context, db Execer, now time.Time) (Result, error) {
 	return RunRules(ctx, db, now, Rules, BatchSize, MaxBatchesPerRule)
 }

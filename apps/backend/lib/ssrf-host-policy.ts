@@ -1,10 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
-/**
- * Parse inet_aton-style IPv4 literals (`2130706433`, `0177.0.0.1`, `0x7f.1`)
- * into dotted-quad. Returns null when the input is not a numeric IPv4 form.
- */
+/** Parse inet_aton-style IPv4 literals (`2130706433`, `0177.0.0.1`, `0x7f.1`) into dotted-quad. */
 export function normalizeIpv4Literal(value: string): string | null {
   const parts = value.split(".");
   if (parts.length === 0 || parts.length > 4) {
@@ -104,13 +101,7 @@ const BLOCKED_IPV4_CIDRS: ReadonlyArray<readonly [number[], number]> = [
   [[240, 0, 0, 0], 4],
 ];
 
-/**
- * Non-public IPv6 ranges inside 2000::/3. Everything outside 2000::/3
- * (::, ::1, IPv4-mapped/compatible, fc00::/7, fe80::/10, ff00::/8, ...) is
- * rejected before this list is consulted. Ranges that embed IPv4 addresses
- * (NAT64, 6to4, Teredo) are blocked outright because they can tunnel to
- * private IPv4 targets.
- */
+/** Only consulted for 2000::/3; IPv4-embedding ranges (NAT64, 6to4, Teredo) are blocked outright. */
 const BLOCKED_IPV6_GLOBAL_CIDRS: ReadonlyArray<readonly [number[], number]> = [
   [[0x20, 0x01, 0x00, 0x00], 32],
   [[0x20, 0x01, 0x00, 0x02], 48],
@@ -154,11 +145,7 @@ export function canonicalizeHostForSsrfCheck(hostname: string): string {
   return normalizeIpv4Literal(stripped) ?? stripped;
 }
 
-/**
- * True when the host must never be fetched: loopback/private/link-local/
- * CGNAT/metadata/multicast/reserved addresses, local-only names, or
- * anything that is not a plain public IP or DNS name.
- */
+/** True unless the host is a plain public IP or DNS name; anything unrecognised is refused. */
 export function isPrivateNetworkHost(hostname: string): boolean {
   const canonical = canonicalizeHostForSsrfCheck(hostname);
 
@@ -183,8 +170,7 @@ export function isPrivateNetworkHost(hostname: string): boolean {
     return true;
   }
 
-  // Numeric-looking hosts that did not normalize to a valid IPv4 are ambiguous
-  // across resolvers; refuse rather than guess.
+  // Numeric hosts that did not normalize are resolver-dependent; refuse rather than guess.
   return /^[0-9.]+$/.test(canonical) || /^0x/i.test(canonical);
 }
 

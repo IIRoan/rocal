@@ -27,9 +27,7 @@ export function HtmlEmailRenderer({
     hasOwnDark: emailHasOwnDarkMode(html),
   });
 
-  // No allow-same-origin: the frame fills its flex container and scrolls on its
-  // own, so the parent never reaches into the document (no height measuring).
-  // Scripts stay disabled; opened links escape the sandbox to behave normally.
+  // No allow-same-origin: the parent never reads the frame document, so mail HTML stays isolated.
   return (
     <iframe
       srcDoc={srcDoc}

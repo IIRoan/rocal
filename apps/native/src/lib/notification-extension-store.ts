@@ -1,12 +1,4 @@
-/**
- * Secrets the iOS Notification Service Extension needs, written to the keychain
- * access group shared with the extension (the App Group id). Nothing else is
- * shared: every other SecureStore item stays in the app's default group.
- *
- * Items use AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY because pushes are usually
- * handled while the device is locked; they never sync to other devices and are
- * cleared on sign-out.
- */
+/** Only these secrets go in the keychain access group shared with the notification extension. */
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
 import { Platform } from "react-native";

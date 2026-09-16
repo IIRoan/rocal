@@ -1,10 +1,7 @@
 /**
  * Backend log sanitization policy — **single source of truth**.
  *
- * Field key lists live in `logging.policy.mjs` (shared with ESLint, sourced from
- * `@workspace/calendar-core`); placeholders and PII patterns come from
- * `@workspace/calendar-core/report-redaction` so error reporters on every
- * platform redact identically. This file documents types and policy metadata.
+ * Key lists live in `logging.policy.mjs`; placeholders and PII patterns in `calendar-core/report-redaction`.
  *
  * When adding new log context fields that may contain user data, update
  * `logging.policy.mjs` first, then use helpers from `lib/log-sanitization.ts`.

@@ -163,11 +163,7 @@ export function processEmailHtml({
   return sanitizeUntrustedEmailHtml(processed, { profile: "reader" });
 }
 
-/**
- * CSP for the rendered mail document. Emitted unconditionally: mail never runs
- * scripts, loads fonts/frames/objects, submits forms, or fetches; remote images
- * are only allowed once the user opted in for this message/sender.
- */
+/** Remote images are allowed only once the user opted in for this message or sender. */
 export function buildEmailContentSecurityPolicy(allowRemoteImages: boolean): string {
   const imgSrc = allowRemoteImages ? "data: blob: cid: https: http:" : "data: blob: cid:";
   return [

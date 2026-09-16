@@ -8,9 +8,7 @@ import (
 	"strings"
 )
 
-// EmailTemplateData holds the data for email templates. Reminder mail is
-// generic by design: no event title, location, description, or calendar
-// names; the app renders details on-device from the event id.
+// EmailTemplateData is generic by design; the app renders event details on-device from the id.
 type EmailTemplateData struct {
 	EventID        string
 	EventTitle     string

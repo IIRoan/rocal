@@ -1,11 +1,4 @@
-/**
- * Response security headers for the web app, applied from next.config.ts.
- *
- * No nonces: Cache Components / Partial Prefetching serve static shells that
- * cannot carry a per-request nonce (see Next's CSP guide), and App Router
- * streams its RSC payload through inline scripts. script-src therefore keeps
- * 'unsafe-inline' and relies on React escaping + sanitized mail HTML.
- */
+/** No nonces: static Cache Components shells cannot carry one and App Router streams RSC inline. */
 
 export type SecurityHeaderEnv = {
   NODE_ENV?: string;
@@ -51,11 +44,9 @@ export function buildContentSecurityPolicy(
       // wasm-unsafe-eval: hash-wasm (argon2id vault KDF). unsafe-eval only for React dev tooling.
       ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", ...(isDev ? ["'unsafe-eval'"] : [])],
     ],
-    // Inline style attributes/elements from React, next/font, and mail HTML in the
-    // srcdoc reader frame (which inherits this policy on top of its own).
+    // Inline styles come from React, next/font, and mail HTML in the srcdoc reader frame.
     ["style-src", ["'self'", "'unsafe-inline'"]],
-    // https: covers user-chosen avatar URLs and remote mail images after the
-    // user allows them; the reader frame's own CSP still blocks them by default.
+    // https: covers avatar URLs and opted-in mail images; the reader frame's CSP still blocks them.
     ["img-src", ["'self'", "data:", "blob:", "https:"]],
     ["font-src", ["'self'", "data:"]],
     [

@@ -67,8 +67,7 @@ async function backfillEncryptedNames(
 async function refreshEncryptedQueries(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<void> {
-  // Legacy plaintext names are encrypted in the background once keys exist;
-  // failures are silent and retried on the next bootstrap.
+  // Failures are swallowed on purpose: the backfill retries on the next bootstrap.
   void backfillEncryptedNames(queryClient).catch(() => undefined);
 
   await Promise.all([

@@ -8,16 +8,7 @@ import {
   isPrivateNetworkHost,
 } from "./ssrf-host-policy";
 
-/**
- * Outbound HTTP for user-supplied URLs.
- *
- * DNS-rebinding safe: the address check runs inside the socket `lookup` hook,
- * so the IP that was validated is the IP the socket connects to, for every hop.
- * `fetch` cannot do this (it re-resolves after any pre-check, and Bun's fetch
- * has no lookup/dispatcher hook), so this uses `node:http(s).request`, which
- * Bun implements with `lookup` support. Host header and TLS SNI/certificate
- * verification stay bound to the original hostname.
- */
+/** Uses `node:http(s).request` because only its `lookup` hook makes the address check rebinding-safe. */
 
 export type SafeFetchErrorCode =
   | "invalid-url"
@@ -104,10 +95,7 @@ export function parseSafeFetchUrl(
   return url;
 }
 
-/**
- * Builds a `net` lookup hook that resolves, rejects when any returned address
- * is blocked, and hands only validated addresses to the socket.
- */
+/** Hands the socket only addresses that passed the policy, so the checked IP is the connected IP. */
 export function createValidatingLookup(
   resolve: SafeFetchResolver,
   isBlockedAddress: (address: string) => boolean,
@@ -317,11 +305,7 @@ function requestOnce(
   });
 }
 
-/**
- * GET a user-supplied URL with SSRF protection, manual redirects (each hop
- * re-validated), an overall timeout and a decoded response size cap.
- * Returns a fully buffered `Response`.
- */
+/** GET a user URL with SSRF protection; every redirect hop is re-validated. */
 export async function safeFetch(
   rawUrl: string,
   options: SafeFetchOptions,

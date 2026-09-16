@@ -78,11 +78,7 @@ export function assertValidEntityColor(color: string, field: string = "color") {
   }
 }
 
-/**
- * Mirrors `resolveEventPersistencePolicy` for calendar/category names: when a
- * client sends ciphertext the plaintext column is blanked; plaintext alongside
- * ciphertext is rejected. Client-supplied `encryptionState` is ignored.
- */
+/** Ciphertext blanks the plaintext column; plaintext alongside ciphertext is rejected. */
 export function resolveEntityNamePersistence(
   input: EntityNamePersistenceInput & { requireName: true },
 ): Exclude<EntityNamePersistence, { kind: "none" }>;
@@ -136,10 +132,7 @@ export function resolveEntityNamePersistence(
   };
 }
 
-/**
- * Accounts with an E2EE device must send encrypted names; a plaintext name
- * means the client lost its session or predates encrypted-only names.
- */
+/** Accounts with an E2EE device must send encrypted names. */
 export async function assertPlaintextNameAllowed(
   prisma: Pick<PrismaClient, "userEncryptionDevice">,
   userId: string,

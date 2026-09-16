@@ -1,10 +1,4 @@
-/**
- * Sensitive structured-field keys — **single source of truth** for backend log
- * sanitization (`apps/backend/contracts/logging.policy.mjs` re-exports these
- * for the safe-logging ESLint rules) and for every error-report scrubber
- * (backend, web, native). Plain ESM so ESLint can load it without a TS loader;
- * types live in `redaction-policy.d.ts`.
- */
+/** Single source of truth for log/report redaction keys; plain ESM so ESLint can load it. */
 
 /** @type {readonly string[]} */
 export const LOG_OMIT_FIELD_KEYS = Object.freeze([

@@ -4,12 +4,7 @@ import Security
 import UserNotifications
 import os.log
 
-// Replaces the generic APNs alert with content resolved on-device:
-//  - event_reminder: decrypts `enc` with the notification key from the shared
-//    keychain (title only; the time-based body from the server is kept).
-//  - new_mail: fetches sender/subject with JMAP Email/get through the backend
-//    proxy using the session credential from the shared keychain.
-// Any failure keeps the generic alert. Never log notification content.
+// Any failure keeps the generic server alert; never log resolved notification content.
 final class NotificationService: UNNotificationServiceExtension {
   private let lock = NSLock()
   private var contentHandler: ((UNNotificationContent) -> Void)?
@@ -62,8 +57,6 @@ final class NotificationService: UNNotificationServiceExtension {
     handler(content)
   }
 
-  // MARK: - Event reminder
-
   private func resolveEventReminder(userInfo: [AnyHashable: Any]) {
     guard
       let eventId = userInfo["eventId"] as? String,
@@ -87,8 +80,6 @@ final class NotificationService: UNNotificationServiceExtension {
       complete(nil)
     }
   }
-
-  // MARK: - New mail
 
   private func resolveNewMail(userInfo: [AnyHashable: Any]) {
     guard
@@ -139,19 +130,7 @@ final class NotificationService: UNNotificationServiceExtension {
   }
 }
 
-// MARK: - Wire format (keep in sync with packages/e2ee/src/notification-title.ts)
-
-/// "v1." + base64url(12-byte IV) + "." + base64url(ciphertext || 16-byte tag),
-/// AES-256-GCM, AAD = UTF-8 "notification-title:v1:<eventId>".
-///
-/// Fixed vector (packages/e2ee/src/__tests__/notification-title.test.ts):
-///   account key      = 00 01 02 ... 1f
-///   notification key = HKDF-SHA256(account key, salt 32×00,
-///                        info "solace/notification-key/v1", 32)
-///                    = base64url "cNL8JZgoDs-eREw6AXrJgoOK9W5TprVEGl7ciJ7hTGg"
-///   eventId          = "evt_123"
-///   wire             = "v1.oKGio6Slpqeoqaqr.RzKqGz6RlCIjsse98Z5olLmi5f7PQ06_sfA4TvGmoA"
-///   plaintext        = "Dentist — 3pm"
+/// Mirrors packages/e2ee/src/notification-title.ts: "v1."+b64url(iv12)+"."+b64url(ct||tag), AES-256-GCM.
 enum NotificationTitleCipher {
   enum Failure: Error {
     case malformed
@@ -192,14 +171,11 @@ enum Base64URL {
   }
 }
 
-// MARK: - Shared keychain (written by expo-secure-store in the app)
-
 enum SharedKeychain {
   static let notificationKey = "notification_key"
   static let mailAuth = "mail_auth"
 
-  /// Mirrors expo-secure-store's query: service "<service>:no-auth", account
-  /// and generic attributes are the UTF-8 key bytes, access group = App Group.
+  /// Mirrors expo-secure-store: service "<service>:no-auth", account = key bytes, access group = App Group.
   static func read(_ key: String) -> String? {
     guard
       let group = Bundle.main.object(forInfoDictionaryKey: "SolaceAppGroup") as? String,
@@ -226,8 +202,6 @@ enum SharedKeychain {
     return String(data: data, encoding: .utf8)
   }
 }
-
-// MARK: - JMAP
 
 struct MailAuth {
   let apiBaseUrl: String

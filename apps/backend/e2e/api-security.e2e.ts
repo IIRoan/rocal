@@ -1,15 +1,4 @@
-/**
- * API-level end-to-end checks for the security & privacy guarantees in AGENTS.md §2.
- * Runs against a deployed (or locally served) API — never mocks.
- *
- *   E2E_API_URL=https://api.solace.onl \
- *   E2E_WEB_URL=https://solace.onl \            # optional: web security headers
- *   E2E_COOKIE="<session cookie header>" \       # optional: authenticated checks
- *   E2E_RATE_LIMIT=1 \                           # optional: burns the sign-in limit for this IP
- *   bun run e2e:api
- *
- * Authenticated checks only send requests the API must reject, so they write nothing when the API is correct.
- */
+/** Live-API security checks; env: E2E_API_URL (required), E2E_WEB_URL, E2E_COOKIE, E2E_RATE_LIMIT. */
 import {
   PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE,
   PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE,
@@ -60,8 +49,6 @@ async function expectRejected(response: Response, expectedText?: string) {
   }
 }
 
-// --- API security headers -------------------------------------------------------------------
-
 check("API sends strict security headers", async () => {
   const response = await api("/api/health");
   const h = response.headers;
@@ -81,8 +68,6 @@ check("API errors carry a requestId and no internals", async () => {
   assert(!/stack|prisma|at \w+ \(/i.test(body), "error body leaks internals");
 });
 
-// --- CORS / origin policy -------------------------------------------------------------------
-
 check("CORS trusts the app origin", async () => {
   const response = await fetch(`${apiUrl}/api/health`, { headers: { origin: trustedOrigin } });
   assert(
@@ -100,8 +85,6 @@ check("CORS does not trust localhost in production", async () => {
   }
 });
 
-// --- Auth rate limit ------------------------------------------------------------------------
-
 check("sign-in is rate limited", async () => {
   if (!process.env.E2E_RATE_LIMIT) skip();
   const email = `e2e-rate-limit-${crypto.randomUUID()}@example.invalid`;
@@ -117,8 +100,6 @@ check("sign-in is rate limited", async () => {
   throw new Error(`no 429 after 8 sign-in attempts: ${statuses.join(",")}`);
 });
 
-// --- Web security headers -------------------------------------------------------------------
-
 check("web sends CSP and security headers", async () => {
   if (!webUrl) skip();
   const response = await fetch(`${webUrl}/login`, { redirect: "manual" });
@@ -132,8 +113,6 @@ check("web sends CSP and security headers", async () => {
   assert(h.get("x-content-type-options") === "nosniff", "web missing nosniff");
   assert(h.get("permissions-policy")?.includes("publickey-credentials-get"), "passkeys not allowed");
 });
-
-// --- Authenticated privacy contract (reject-only, no writes) -------------------------------
 
 check("unauthenticated writes are refused", async () => {
   const response = await api("/api/calendars", {
@@ -200,8 +179,7 @@ check("calendar plaintext name alongside ciphertext is rejected", async () => {
 
 check("legacy plaintext displayTitle is accepted but never stored", async () => {
   if (!cookie) skip();
-  // Shipped binaries still send it: the reminder must save (AGENTS.md §3) while
-  // the plaintext title is dropped. A 400 would mean the whole update failed.
+  // Shipped binaries still send it, so a 400 here would mean the whole reminder update failed.
   const response = await api(
     `/api/notifications/event/${crypto.randomUUID()}`,
     { method: "PUT", body: JSON.stringify({ notifications: [], displayTitle: "plaintext title" }) },
@@ -247,8 +225,6 @@ check("session payload exposes no IP or user agent", async () => {
   assert(session?.session, "cookie did not resolve to a session");
   assert(!session.session.ipAddress && !session.session.userAgent, "session stores IP/user agent");
 });
-
-// --- Runner ---------------------------------------------------------------------------------
 
 let failed = 0;
 let skipped = 0;

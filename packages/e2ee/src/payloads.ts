@@ -48,11 +48,7 @@ function hasOwn(value: object, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
-/**
- * Event ciphertext always covers title, description, and location together.
- * Requests without a title (time-only moves, visibility tweaks) carry no
- * content and are returned unchanged so the stored ciphertext is kept.
- */
+/** Ciphertext covers all three fields, so a request without a title must keep the stored one. */
 export function shouldEncryptEventContent(request: object): boolean {
   if (!hasOwn(request, "title")) {
     return false;
@@ -61,11 +57,7 @@ export function shouldEncryptEventContent(request: object): boolean {
   return Boolean(trimToNull((request as { title?: string | null }).title));
 }
 
-/**
- * Encrypts event content and strips the plaintext fields from the request.
- * When the request invites attendees, a transient `invitationContent` copy is
- * attached because invitation mail goes to people who cannot decrypt it.
- */
+/** A transient `invitationContent` copy is attached because invitees cannot decrypt the ciphertext. */
 export async function encryptEventContentRequest<
   T extends CreateEventRequest | UpdateEventRequest,
 >(
@@ -120,10 +112,7 @@ export async function encryptEventContentRequest<
   };
 }
 
-/**
- * Encrypts a calendar/category name and strips the plaintext `name`. Requests
- * that do not rename (visibility, color) are returned unchanged.
- */
+/** Requests that do not rename (visibility, color) are returned unchanged. */
 export async function encryptNameRequest<T extends NameRequest>(
   e2ee: ContentEncrypter,
   keys: E2eeSessionKeys,

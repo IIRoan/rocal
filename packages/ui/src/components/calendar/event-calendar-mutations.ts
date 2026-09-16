@@ -85,10 +85,7 @@ export function toastEventMutationError(
   });
 }
 
-/**
- * Moves only change timing. Omitting title/description/location keeps the
- * stored ciphertext and avoids re-encrypting a placeholder over the real title.
- */
+/** Omitting content keeps the stored ciphertext instead of re-encrypting a placeholder title. */
 export function buildDraggedEventUpdate(
   event: Pick<CalendarEvent, "start" | "end" | "allDay">,
 ) {

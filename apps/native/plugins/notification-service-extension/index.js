@@ -1,14 +1,4 @@
-/**
- * Adds the iOS Notification Service Extension that decrypts reminder titles and
- * fetches new-mail sender/subject on-device, so APNs payloads and the server
- * only ever carry generic copy plus opaque ids/ciphertext.
- *
- * Sharing model: the app and the extension share one App Group. The App Group
- * id doubles as the keychain access group (no `keychain-access-groups`
- * entitlement, so the default group for every other expo-secure-store item is
- * unchanged). The app writes only the notification key and the mail
- * credential into that group (see src/lib/notification-extension-store.ts).
- */
+/** Adds the iOS Notification Service Extension; the App Group id doubles as its keychain access group. */
 const fs = require("fs");
 const path = require("path");
 const {
@@ -189,10 +179,6 @@ function withExtensionTarget(config, props) {
   });
 }
 
-/**
- * @param {import("expo/config").ExpoConfig} config
- * @param {{ appGroup: string; keychainService: string; deploymentTarget: string }} props
- */
 function withNotificationServiceExtension(config, props) {
   if (!props?.appGroup || !props?.keychainService || !props?.deploymentTarget) {
     throw new Error(

@@ -49,8 +49,7 @@ export function resolveEncryptionState(
     return "encrypted";
   }
 
-  // Legacy rows written before encrypted-only storage still carry a plaintext
-  // copy until the device backfill replaces it.
+  // Legacy rows still carry a plaintext copy until the device backfill replaces it.
   if (item.encryptionState === "shadow_write") {
     return "pending";
   }

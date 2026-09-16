@@ -381,8 +381,7 @@ export function useCalendarData(
           eventId,
           notificationData,
           {
-            // No title argument means "only the schedule changed" — leave the
-            // stored ciphertext alone instead of clearing it.
+            // undefined keeps the stored ciphertext, null clears it.
             encryptedDisplayTitle:
               title === undefined
                 ? undefined

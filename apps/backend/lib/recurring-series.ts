@@ -76,12 +76,7 @@ export function splitRecurringSeriesRule(
   return RecurrenceEngine.createRecurrenceRule(originalRule);
 }
 
-/**
- * Content columns for a recurring edit. New ciphertext blanks the plaintext
- * columns; otherwise the stored ciphertext is carried over so modified
- * occurrences of encrypted series stay encrypted. Plaintext edits of an
- * encrypted series are rejected.
- */
+/** Stored ciphertext is carried over so modified occurrences of encrypted series stay encrypted. */
 function resolveRecurringContentData(
   existingEvent: RecurringEventSnapshot,
   updates: RecurringUpdates,

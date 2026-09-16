@@ -116,8 +116,7 @@ func ChannelsFor(item DueSchedule) []string {
 	return channels
 }
 
-// reminderJobPayload holds opaque refs only; the encrypted title is read from
-// event_notification at push time.
+// reminderJobPayload holds opaque refs only; the encrypted title is read at push time.
 func reminderJobPayload(item DueSchedule) map[string]any {
 	return map[string]any{
 		"kind":          "event_reminder",

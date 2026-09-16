@@ -13,11 +13,7 @@ import type {
 } from "./types";
 import { isMailInvitationStagingCalendar } from "./mail-invitation-staging";
 
-/**
- * Rollout stage reported by `GET /api/e2ee/bootstrap`. Servers now store user
- * content as ciphertext only. `"shadow_write"` is kept so clients can still
- * read responses from servers that predate the encrypted-only migration.
- */
+/** `"shadow_write"` is kept only to read responses from servers predating encrypted-only storage. */
 export const E2EE_ROLLOUT_STAGE = "encrypted" as const;
 export type E2eeRolloutStage = typeof E2EE_ROLLOUT_STAGE | "shadow_write";
 
@@ -73,10 +69,7 @@ export function hasEncryptedPayloadValue(value: unknown): value is string {
   return hasText(value);
 }
 
-/**
- * Plaintext copy of event content used only to render invitation mail for
- * participants who cannot decrypt Solace ciphertext. The server never persists it.
- */
+/** Transient plaintext for invitation mail to non-Solace participants; the server never persists it. */
 export const eventInvitationContentSchema = z
   .object({
     title: z.string().min(1).max(255),
@@ -103,11 +96,7 @@ export type NameWireRequest<
     | UpdateCategoryRequest,
 > = Omit<T, "name"> & { name?: string } & NameEncryptionShadowRequest;
 
-/**
- * Owned, user-named calendars that still carry a plaintext name on the server.
- * Subscription calendars keep their feed name (the server needs it to sync) and
- * the hidden invitation staging calendar is located by its well-known label.
- */
+/** Subscription feed names and the invitation staging calendar stay plaintext by design. */
 export function isCalendarNameBackfillCandidate(
   calendar: Pick<Calendar, "name" | "kind" | "isVisible" | "isSyncOnly">,
 ): boolean {

@@ -6,9 +6,7 @@ import (
 	"strings"
 )
 
-// notification_job.payload carries opaque references only. Reminder titles and
-// mail sender/subject are decrypted or fetched on-device by the iOS
-// Notification Service Extension.
+// The job payload carries opaque references only; the iOS NSE resolves content on-device.
 var allowedKeys = map[string]struct{}{
 	"kind":          {},
 	"eventId":       {},
@@ -18,8 +16,7 @@ var allowedKeys = map[string]struct{}{
 	"accountId":     {},
 }
 
-// Plaintext keys written by backends before encrypted reminder titles. Rows
-// that still carry them are delivered, but the values are never decoded.
+// Legacy plaintext keys: rows that still carry them are delivered, but the values are never decoded.
 var legacyIgnoredKeys = map[string]struct{}{
 	"subject":  {},
 	"title":    {},

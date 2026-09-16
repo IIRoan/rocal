@@ -8,9 +8,7 @@ export function useReminderTitleEncryptor(): ReminderTitleEncryptor {
   const { runWithAccountKey } = useE2ee();
   return useCallback(
     async (eventId, title) => {
-      // runWithAccountKey yields null when there is no account key yet. Wrap the
-      // result so that case stays distinct from "empty title" (also null): no
-      // key means undefined, which leaves the stored ciphertext alone.
+      // Wrapped so "no account key" (undefined, leaves the stored title alone) stays distinct from empty title.
       const encrypted = await runWithAccountKey(async (accountKey) => ({
         value: await encryptReminderTitle(accountKey, eventId, title),
       }));

@@ -75,10 +75,7 @@ export function resolveEventPersistencePolicy(
   };
 }
 
-/**
- * Service-level guard matching the route contract: ciphertext requests must not
- * also carry plaintext title/description/location.
- */
+/** Service-level mirror of the route contract guard, for callers that bypass it. */
 export function assertNoPlaintextEventContentWithCiphertext(
   input: Partial<Record<EventContentField, string | null>> & {
     encryptedContent?: string | null;
@@ -103,11 +100,7 @@ type InvitationContentSource = {
   location: string | null;
 };
 
-/**
- * Content for outgoing invitation mail. Encrypted events only use the
- * transient `invitationContent` a client sent for this request; it is never
- * persisted. Plaintext events use their stored fields.
- */
+/** Encrypted events use the transient per-request `invitationContent`, which is never persisted. */
 export function resolveInvitationContent(input: {
   hasEncryptedPayload: boolean;
   invitationContent?: EventInvitationContent;

@@ -2237,8 +2237,7 @@ export class EventService implements IEventService {
             ownerUserId: userId,
             sendInvitations: true,
             calendarName: finalCalendar.name,
-            // Encrypted events only mail invitees when the client supplied the
-            // transient invitation copy; otherwise the ICS would have no title.
+            // Without the transient invitation copy the ICS would have no title, so no mail is sent.
             invitationEvent: invitationSource
               ? this.buildInvitationEventPayload({
                   eventId: updatedEvent.id,
@@ -2752,8 +2751,7 @@ export class EventService implements IEventService {
                 });
 
                 if (shouldScheduleEventReminder(userSettings)) {
-                  // The title ciphertext is bound to the source event id, so
-                  // the copy starts generic until a client re-encrypts it.
+                  // The title ciphertext is bound to the source event id, so the copy starts generic.
                   const created = await this.insertUpcomingEventReminder({
                     eventId: duplicated.id,
                     eventStart: duplicated.start,

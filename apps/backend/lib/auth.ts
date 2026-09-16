@@ -607,8 +607,7 @@ export const auth = betterAuth({
     },
   },
   advanced: {
-    // Used only to key rate limits (see TRUSTED_CLIENT_IP_HEADERS); IP tracking
-    // stays enabled because disabling it also disables rate limiting.
+    // IP tracking stays enabled only because disabling it also disables rate limiting.
     ipAddress: {
       ipAddressHeaders: TRUSTED_CLIENT_IP_HEADERS,
     },

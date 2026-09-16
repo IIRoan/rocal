@@ -13,8 +13,7 @@ import {
 } from "../../lib/safe-fetch";
 import { isPrivateNetworkHost } from "../../lib/ssrf-host-policy";
 
-// The test server listens on 127.0.0.1, which the real policy blocks. Treat
-// exactly that address as "public" so the private-address paths stay real.
+// Only 127.0.0.1 (the test server) is treated as public, so the real private-address paths stay exercised.
 const TEST_PUBLIC_ADDRESS = "127.0.0.1";
 const isBlockedAddress = (address: string) =>
   address !== TEST_PUBLIC_ADDRESS && isPrivateNetworkHost(address);

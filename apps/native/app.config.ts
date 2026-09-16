@@ -5,9 +5,7 @@ const isDev = variant === "development";
 const iosBundleIdentifier = isDev ? "onl.solace.mobile.dev" : "onl.solace.mobile";
 const IOS_DEPLOYMENT_TARGET = "16.4";
 
-// iOS Notification Service Extension: decrypts reminder titles and fetches
-// new-mail sender/subject on-device. The App Group doubles as the shared
-// keychain access group (see plugins/notification-service-extension).
+// The App Group id doubles as the keychain access group shared with the notification extension.
 const notificationExtension = {
   targetName: "SolaceNotificationService",
   bundleIdentifier: `${iosBundleIdentifier}.NotificationService`,

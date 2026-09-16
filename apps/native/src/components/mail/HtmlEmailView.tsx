@@ -128,9 +128,7 @@ export function HtmlEmailView({
     }
   };
 
-  // Only the initial about:blank document may load in place. data: navigations
-  // are refused (a data:text/html page would run with JavaScript enabled), and
-  // http(s) links open in the in-app browser instead of inside the mail view.
+  // data: is refused because a data:text/html page would run with JavaScript enabled.
   const onShouldStartLoadWithRequest = (request: ShouldStartLoadRequest) => {
     const url = request.url;
     if (url === "about:blank") return true;
@@ -146,9 +144,7 @@ export function HtmlEmailView({
   return (
     <View style={[{ height: webViewHeight }, style]}>
       <WebView
-        // Listed schemes reach onShouldStartLoadWithRequest (which refuses
-        // data: and hands http(s) to WebBrowser); anything else is dropped by
-        // the sanitizer's href allowlist before it can reach Linking.
+        // data: is listed only so it reaches onShouldStartLoadWithRequest and is refused there.
         originWhitelist={["about:blank", "data:", "http://*", "https://*"]}
         source={{ html: document }}
         injectedJavaScript={FIT_AND_REPORT_SCRIPT}

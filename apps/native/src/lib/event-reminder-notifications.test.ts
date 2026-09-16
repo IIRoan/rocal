@@ -75,8 +75,7 @@ describe("persistEventReminderNotifications", () => {
       encryptTitle,
     );
 
-    // undefined, not null: a locked session must not wipe a title another
-    // device saved. The reminder itself still saves.
+    // undefined, not null: a locked session must not wipe a title another device saved.
     expect(updateEventNotifications).toHaveBeenCalledWith(
       "evt-1",
       expect.any(Array),
