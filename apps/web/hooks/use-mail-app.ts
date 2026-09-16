@@ -24,10 +24,18 @@ import { createMailOAuthTokenManager } from "@/lib/mail/oauth-client";
 import {
   clearMailOpenPrefetch,
   ensureMailOpenPrefetch,
-  fetchVaultKeyMaterialForOpen,
-  refreshVaultKeyMaterialAfterCacheMiss,
 } from "@/lib/mail/mail-open-prefetch";
-import { deleteStoredDerivedVaultKey } from "@/lib/mail/derived-vault-key-storage";
+import {
+  deleteStoredDerivedVaultKey,
+  getStoredDerivedVaultKey,
+  putStoredDerivedVaultKey,
+} from "@/lib/mail/derived-vault-key-storage";
+import {
+  generateVaultSecret,
+  unwrapVaultSecret,
+  VAULT_WRAP_ALGORITHM,
+  wrapVaultSecret,
+} from "@/lib/mail/vault-secret";
 import {
   getPrimaryMailAccountId,
   StalwartJmapClient,
@@ -460,16 +468,16 @@ async function resolveOutgoingMessageBody(input: {
 }
 
 /**
- * Background migration: re-encrypt the vault (both the AES-GCM wrapper and
- * the inner PGP private key) using the server-derived key material so future
- * sign-ins are fully automatic.
+ * Re-encrypt the vault (AES-GCM wrapper and inner PGP private key) under a new
+ * passphrase, sealing it to the user's E2EE key when one is supplied.
  */
-async function migrateVaultToKeyMaterial(input: {
+async function rekeyVault(input: {
   unlockedVault: UserKeyVault;
   oldPassphrase: string;
   newPassphrase: string;
   email: string;
   vaultVersion: number;
+  wrappedSecret?: string | null;
 }): Promise<void> {
   try {
     const { privateKeyArmored } =
@@ -499,9 +507,46 @@ async function migrateVaultToKeyMaterial(input: {
       encryptedVaultB64: encrypted.encryptedVaultB64,
       kdf: encrypted.kdf,
       kdfParams: encrypted.kdfParams,
+      ...(input.wrappedSecret
+        ? {
+            wrappedSecret: input.wrappedSecret,
+            wrapAlgorithm: VAULT_WRAP_ALGORITHM,
+          }
+        : {}),
     });
   } catch (err) {
-    log.error("Background vault migration to server key material failed.", err);
+    log.error("Vault re-key failed.", err);
+  }
+}
+
+/**
+ * Move a legacy vault off the server-derived passphrase onto a random secret
+ * sealed to the user's E2EE key, so the server can no longer open it.
+ */
+async function sealVaultToAccountKey(input: {
+  unlockedVault: UserKeyVault;
+  currentPassphrase: string;
+  email: string;
+  vaultVersion: number;
+}): Promise<void> {
+  try {
+    const secret = generateVaultSecret();
+    const wrappedSecret = await wrapVaultSecret(secret);
+    if (!wrappedSecret) {
+      // No E2EE session on this device yet; the next open retries.
+      return;
+    }
+
+    await rekeyVault({
+      unlockedVault: input.unlockedVault,
+      oldPassphrase: input.currentPassphrase,
+      newPassphrase: secret,
+      email: input.email,
+      vaultVersion: input.vaultVersion,
+      wrappedSecret,
+    });
+  } catch (error) {
+    log.warn("Sealing the mail vault to the account key failed", { error });
   }
 }
 
@@ -1798,51 +1843,27 @@ export function useMailApp() {
         let hadRemoteBackup = false;
 
         if (!mailboxStatus.provisioned) {
-          // New user: fetch key material first (needed for bootstrap passphrase)
-          const keyResult =
-            (await (
-              prefetch?.keyMaterialPromise ??
-              fetchVaultKeyMaterialForOpen({
-                endpoint: config.vaultKeyMaterialEndpoint,
-                userId: accountUserId,
-              })
-            ).catch(() => null)) ?? null;
-          vaultKey = keyResult?.keyMaterial ?? null;
-          derivedVaultKeyB64 = keyResult?.derivedKeyB64 ?? null;
-          usedCachedDerivedKey = Boolean(keyResult?.usedCachedDerivedKey);
-          const vaultPassphrase =
-            vaultKey ?? passwordOverride ?? cachedAuthPassword ?? loginPassword;
-          if (!vaultPassphrase) {
-            throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
-          }
-          await bootstrapMailboxForAccount({
+          // Provisioning mints and seals the vault secret itself, so a new
+          // mailbox is never readable by the server, not even briefly.
+          const provisioned = await bootstrapMailboxForAccount({
             email: accountEmail,
-            password: vaultPassphrase,
             displayName: accountDisplayName,
             userId: accountUserId,
-            kdfOverrides: vaultKey ? KEY_MATERIAL_KDF : undefined,
-          }).then((provisioned) => {
-            email = provisioned.email.trim().toLowerCase();
-            queryClient.setQueryData(
-              mailQueryKeys.accountStatus(accountUserId),
-              {
-                email: provisioned.email,
-                displayName: provisioned.displayName,
-                provisioned: true,
-              },
-            );
           });
-          // New vault KDF params invalidate any pre-provision derived key.
+          email = provisioned.mailbox.email.trim().toLowerCase();
+          vaultKey = provisioned.vaultSecret;
+          queryClient.setQueryData(
+            mailQueryKeys.accountStatus(accountUserId),
+            {
+              email: provisioned.mailbox.email,
+              displayName: provisioned.mailbox.displayName,
+              provisioned: true,
+            },
+          );
+          // Fresh vault KDF params invalidate any pre-provision derived key.
           if (accountUserId) {
             await deleteStoredDerivedVaultKey(accountUserId).catch(() => undefined);
           }
-          const refreshed = await refreshVaultKeyMaterialAfterCacheMiss({
-            endpoint: config.vaultKeyMaterialEndpoint,
-            userId: accountUserId,
-          });
-          vaultKey = refreshed?.keyMaterial ?? vaultKey;
-          derivedVaultKeyB64 = refreshed?.derivedKeyB64 ?? null;
-          usedCachedDerivedKey = false;
 
           // After bootstrap, fetch JMAP + vault backup in parallel
           const [session, remoteBackup, localBackup] = await Promise.all([
@@ -1856,23 +1877,13 @@ export function useMailApp() {
           hadRemoteBackup = remoteBackup !== null;
           backup = remoteBackup ?? localBackup;
         } else {
-          // Provisioned: key material (possibly cached) + JMAP session + backup
-          const [keyResult, session, remoteBackup, localBackup] =
-            await Promise.all([
-              (prefetch?.keyMaterialPromise ??
-                fetchVaultKeyMaterialForOpen({
-                  endpoint: config.vaultKeyMaterialEndpoint,
-                  userId: accountUserId,
-                })).catch(() => null),
-              (prefetch?.discoveryPromise ?? Promise.reject()).catch(() =>
-                client.discoverSession(),
-              ),
-              mailDemoApiService.getAccountVaultBackup().catch(() => null),
-              getStoredMailVault(email),
-            ]);
-          vaultKey = keyResult?.keyMaterial ?? null;
-          derivedVaultKeyB64 = keyResult?.derivedKeyB64 ?? null;
-          usedCachedDerivedKey = Boolean(keyResult?.usedCachedDerivedKey);
+          const [session, remoteBackup, localBackup] = await Promise.all([
+            (prefetch?.discoveryPromise ?? Promise.reject()).catch(() =>
+              client.discoverSession(),
+            ),
+            mailDemoApiService.getAccountVaultBackup().catch(() => null),
+            getStoredMailVault(email),
+          ]);
           jmapSession = session;
           hadRemoteBackup = remoteBackup !== null;
           backup = remoteBackup ?? localBackup;
@@ -1886,83 +1897,51 @@ export function useMailApp() {
         // so argon2 / AES work does not delay mailbox metadata.
         const bootstrapPromise = client.bootstrapMailboxState(jmapSession);
 
-        // Unlock vault: prefer server-derived AES key (skips client argon2id).
+        // The vault passphrase is sealed to this user's E2EE account key, so
+        // only a signed-in device of theirs can open it.
         let unlockedVault: UserKeyVault | null = null;
         let effectivePassphrase = "";
 
-        if (derivedVaultKeyB64 && vaultKey) {
+        if (!backup.wrappedSecret) {
+          throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
+        }
+
+        const sealedSecret = await unwrapVaultSecret(backup.wrappedSecret);
+        if (!sealedSecret) {
+          throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
+        }
+
+        const cacheDerivedKey = (keyB64: string) => {
+          if (!accountUserId) return;
+          void Promise.resolve(
+            putStoredDerivedVaultKey(accountUserId, keyB64),
+          ).catch(() => undefined);
+        };
+
+        const cachedDerivedKey = accountUserId
+          ? await getStoredDerivedVaultKey(accountUserId).catch(() => null)
+          : null;
+
+        if (cachedDerivedKey) {
           try {
             unlockedVault = await unlockEncryptedMailVaultWithDerivedKey(
               backup.encryptedVaultB64,
-              derivedVaultKeyB64,
+              cachedDerivedKey,
             );
-            effectivePassphrase = vaultKey;
+            effectivePassphrase = sealedSecret;
           } catch {
             unlockedVault = null;
-            effectivePassphrase = "";
-            if (usedCachedDerivedKey && accountUserId) {
-              const refreshed = await refreshVaultKeyMaterialAfterCacheMiss({
-                endpoint: config.vaultKeyMaterialEndpoint,
-                userId: accountUserId,
-              });
-              vaultKey = refreshed?.keyMaterial ?? vaultKey;
-              derivedVaultKeyB64 = refreshed?.derivedKeyB64 ?? null;
-              if (derivedVaultKeyB64 && vaultKey) {
-                try {
-                  unlockedVault = await unlockEncryptedMailVaultWithDerivedKey(
-                    backup.encryptedVaultB64,
-                    derivedVaultKeyB64,
-                  );
-                  effectivePassphrase = vaultKey;
-                } catch {
-                  unlockedVault = null;
-                  effectivePassphrase = "";
-                }
-              }
-            }
           }
         }
 
-        if (!unlockedVault || !effectivePassphrase) {
-          if (vaultKey) {
-            try {
-              unlockedVault = await unlockEncryptedMailVault(
-                backup.encryptedVaultB64,
-                vaultKey,
-                backup.kdfParams,
-              );
-              effectivePassphrase = vaultKey;
-            } catch {
-              // Vault was encrypted with old password — one-time migration required
-              const migrationPassword =
-                passwordOverride ?? cachedAuthPassword ?? loginPassword;
-              if (!migrationPassword) {
-                throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
-              }
-              try {
-                unlockedVault = await unlockEncryptedMailVault(
-                  backup.encryptedVaultB64,
-                  migrationPassword,
-                  backup.kdfParams,
-                );
-                effectivePassphrase = migrationPassword;
-              } catch {
-                throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
-              }
-            }
-          } else {
-            const password =
-              passwordOverride ?? cachedAuthPassword ?? loginPassword;
-            if (!password) {
-              throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
-            }
-            unlockedVault = await unlockEncryptedMailVault(
-              backup.encryptedVaultB64,
-              password,
-              backup.kdfParams,
-            );
-            effectivePassphrase = password;
-          }
+        if (!unlockedVault) {
+          unlockedVault = await unlockEncryptedMailVault(
+            backup.encryptedVaultB64,
+            sealedSecret,
+            backup.kdfParams,
+            cacheDerivedKey,
+          );
+          effectivePassphrase = sealedSecret;
         }
 
         if (!unlockedVault || !effectivePassphrase) {
@@ -1984,15 +1963,14 @@ export function useMailApp() {
           log.warn("Failed to disable Stalwart encryptOnAppend on sign-in", error);
         });
 
-        // Background migration if unlocked with old password
-        if (vaultKey && effectivePassphrase !== vaultKey) {
-          void migrateVaultToKeyMaterial({
+        // Seal a legacy vault to the account key; the server keeps no copy.
+        if (!backup.wrappedSecret) {
+          void sealVaultToAccountKey({
             unlockedVault,
-            oldPassphrase: effectivePassphrase,
-            newPassphrase: vaultKey,
+            currentPassphrase: effectivePassphrase,
             email,
             vaultVersion: backup.vaultVersion,
-          });
+          }).catch(() => undefined);
         }
 
         const mailServerPolicy = resolveMailServerPolicy({

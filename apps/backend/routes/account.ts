@@ -4,7 +4,7 @@ import { authenticatedRouteDetail } from "../lib/openapi";
 import { prisma } from "../lib/prisma";
 import { env } from "../lib/env";
 import { AccountService } from "../services/account.service";
-import { defaultMailService } from "./mail";
+import { defaultMailService } from "../lib/default-mail-service";
 
 const accountService = new AccountService(
   prisma,

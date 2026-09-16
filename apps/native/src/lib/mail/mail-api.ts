@@ -93,6 +93,8 @@ export async function upsertAccountVaultBackup(request: {
   encryptedVaultB64: string;
   kdf: string;
   kdfParams: MailVaultKdfParams;
+  wrappedSecret?: string | null;
+  wrapAlgorithm?: string | null;
 }) {
   const response = await mailFetch(`${backendBaseUrl}/api/mail/account/vault-backup`, {
     method: "PUT",
@@ -102,17 +104,6 @@ export async function upsertAccountVaultBackup(request: {
     body: JSON.stringify(request),
   });
   return parseJson(response);
-}
-
-export async function getVaultKeyMaterial(
-  vaultKeyMaterialEndpoint: string,
-): Promise<{ keyMaterial: string; derivedKeyB64?: string | null; version: string }> {
-  const response = await mailFetch(vaultKeyMaterialEndpoint, {
-    method: "GET",
-  });
-  return parseJson<{ keyMaterial: string; derivedKeyB64?: string | null; version: string }>(
-    response,
-  );
 }
 
 export type MailDirectoryKey = {

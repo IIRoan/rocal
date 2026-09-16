@@ -16,16 +16,18 @@ export async function deriveMailBridgeSecret(input: {
   userId: string;
   email: string;
 }): Promise<string> {
-  const hmacKey = process.env.MAIL_VAULT_HMAC_KEY?.trim() || env.mailVaultHmacKey;
+  // Read at call time: serverless isolates import this before env is bound.
+  const hmacKey =
+    process.env.MAIL_BRIDGE_HMAC_KEY?.trim() || env.mailBridgeHmacKey;
   if (!hmacKey) {
     throw new Error(
-      "MAIL_VAULT_HMAC_KEY is not configured on this server. Set it to a permanent random base64 secret.",
+      "MAIL_BRIDGE_HMAC_KEY is not configured on this server. Set it to a permanent random base64 secret.",
     );
   }
 
   const rawKey = Buffer.from(hmacKey, "base64");
   if (rawKey.length === 0) {
-    throw new Error("MAIL_VAULT_HMAC_KEY is not a valid base64 secret.");
+    throw new Error("MAIL_BRIDGE_HMAC_KEY is not a valid base64 secret.");
   }
 
   const key = await crypto.subtle.importKey(

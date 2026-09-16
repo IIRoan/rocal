@@ -4,13 +4,9 @@
  * This module handles the full lifecycle of the mail vault on native:
  *
  *   1. Fetch the encrypted vault backup from the backend.
- *   2. Fetch server-side key material from `vaultKeyMaterialEndpoint`.
- *   3. Try server key-material first, then fall back to saved passwords when
- *      the vault KDF is safe enough to run on Hermes.
- *   4. Migrate older password-based vaults to server key-material in the
- *      background when native unlock succeeds.
- *   5. Decrypt PGP-encrypted mail messages in-process using openpgp.js.
- *   6. For PGP/MIME messages, parse the decrypted MIME body with postal-mime.
+ *   2. Unseal its passphrase with the user's E2EE account key.
+ *   3. Decrypt PGP-encrypted mail messages in-process using openpgp.js.
+ *   4. For PGP/MIME messages, parse the decrypted MIME body with postal-mime.
  *
  * The web app performs the same steps in a Web Worker; we replicate the logic
  * here so the native app never opens a webview for crypto operations.
@@ -25,16 +21,20 @@ import {
   createEncryptedMailVault,
   unlockEncryptedMailVault,
   unlockEncryptedMailVaultWithDerivedKey,
-  isArgon2SafeToRunLocally,
   type UserKeyVault,
 } from "./native-vault-crypto";
 import {
-  loadMailVaultPassword,
   loadDerivedVaultKey,
   saveDerivedVaultKey,
   loadCachedPrivateKey,
   saveCachedPrivateKey,
 } from "./mail-password-cache";
+import {
+  generateVaultSecret,
+  unwrapVaultSecret,
+  VAULT_WRAP_ALGORITHM,
+  wrapVaultSecret,
+} from "./vault-secret";
 import { extractPgpMimeCiphertextBlobId } from "./message-security";
 import {
   containsArmoredPgpMessage,
@@ -85,6 +85,9 @@ type VaultBackupRecord = {
   encryptedVaultB64: string;
   kdf: string;
   kdfParams: MailVaultKdfParams;
+  /** Vault passphrase sealed to the E2EE account key; null while legacy. */
+  wrappedSecret?: string | null;
+  wrapAlgorithm?: string | null;
 };
 
 type UnlockedVault = {
@@ -140,67 +143,12 @@ async function fetchVaultBackup(): Promise<VaultBackupRecord> {
   return record;
 }
 
-type KeyMaterialResult = {
-  keyMaterial: string;
-  /** Pre-computed argon2id output from the backend (32 bytes, base64url).
-   *  Present when the backend's vault key material endpoint supports the
-   *  native-optimised response. Null if no vault backup exists yet or the
-   *  endpoint is an older version. */
-  derivedKeyB64: string | null;
-};
-
-async function fetchKeyMaterial(endpoint: string): Promise<KeyMaterialResult> {
-  log.debug("[mail-crypto] fetchKeyMaterial: GET %s", endpoint);
-
-  const response = await mailFetch(endpoint, { method: "GET" });
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    log.debug("[mail-crypto] fetchKeyMaterial: HTTP %d — %s", response.status, body);
-    throw new Error(
-      `Failed to fetch vault key material (HTTP ${response.status}): ${body}`,
-    );
-  }
-
-  const data = (await response.json()) as {
-    keyMaterial: string;
-    derivedKeyB64?: string | null;
-    version: string;
-  };
-  log.debug(
-    "[mail-crypto] fetchKeyMaterial: received keyMaterial (length=%d version=%s hasDerivedKey=%s)",
-    data.keyMaterial?.length ?? 0,
-    data.version,
-    data.derivedKeyB64 ? "yes" : "no",
-  );
-  return {
-    keyMaterial: data.keyMaterial,
-    derivedKeyB64: data.derivedKeyB64 ?? null,
-  };
-}
-
-function canAttemptLocalVaultUnlock(kdfParams: MailVaultKdfParams): boolean {
-  return isArgon2SafeToRunLocally(kdfParams);
-}
-
-function getPassphraseCandidates(input: {
-  keyMaterial?: string | null;
-  fallbackPassword?: string | null;
-  storedPassword?: string | null;
-}): string[] {
-  return Array.from(
-    new Set(
-      [input.keyMaterial, input.fallbackPassword, input.storedPassword].filter(
-        (value): value is string => Boolean(value),
-      ),
-    ),
-  );
-}
-
-async function migrateVaultToKeyMaterial(input: {
+async function rekeyVault(input: {
   unlockedVault: UserKeyVault;
   oldPassphrase: string;
   newPassphrase: string;
   vaultVersion: number;
+  wrappedSecret: string;
 }): Promise<void> {
   try {
     const decryptedPrivateKey = await openpgp.decryptKey({
@@ -228,9 +176,40 @@ async function migrateVaultToKeyMaterial(input: {
       encryptedVaultB64: encrypted.encryptedVaultB64,
       kdf: encrypted.kdf,
       kdfParams: encrypted.kdfParams,
+      wrappedSecret: input.wrappedSecret,
+      wrapAlgorithm: VAULT_WRAP_ALGORITHM,
     });
   } catch (error) {
-    log.warn("Background vault migration to key material failed", { error });
+    log.warn("Vault re-key failed", { error });
+  }
+}
+
+/**
+ * Move a legacy vault off the server-derived passphrase onto a random secret
+ * sealed to the user's E2EE key, so the server can no longer open it.
+ */
+async function sealVaultToAccountKey(input: {
+  unlockedVault: UserKeyVault;
+  currentPassphrase: string;
+  vaultVersion: number;
+}): Promise<void> {
+  try {
+    const secret = generateVaultSecret();
+    const wrappedSecret = await wrapVaultSecret(secret);
+    if (!wrappedSecret) {
+      // No E2EE session on this device yet; the next open retries.
+      return;
+    }
+
+    await rekeyVault({
+      unlockedVault: input.unlockedVault,
+      oldPassphrase: input.currentPassphrase,
+      newPassphrase: secret,
+      vaultVersion: input.vaultVersion,
+      wrappedSecret,
+    });
+  } catch (error) {
+    log.warn("Sealing the mail vault to the account key failed", { error });
   }
 }
 
@@ -241,8 +220,7 @@ async function migrateVaultToKeyMaterial(input: {
 /**
  * Decrypts the PGP private key stored inside the vault.
  *
- * The private key is itself protected by keyMaterial (the HMAC-derived key
- * from the server — NOT the argon2id derived key used for AES-GCM).
+ * The private key is protected by the vault secret sealed to the account key.
  *
  * After a successful S2K decryption the unprotected armored key is written to
  * SecureStore so subsequent app sessions can bypass the expensive (~14 s on
@@ -327,12 +305,8 @@ async function loadCachedPrivateKeyForVault(
  * Ensures the mail vault is loaded and the PGP private key is ready for
  * decryption. Results are cached in memory for the app session.
  *
- * Resolution order for the passphrase:
- *   1. Server-provided key material (`vaultKeyMaterialEndpoint`)
- *   2. The `fallbackPassword` argument (caller-supplied, e.g. from in-memory ref)
- *   3. Password persisted in expo-secure-store (survives app restarts)
- *
- * Throws if none of the candidates can unlock the vault.
+ * The passphrase is a random secret sealed to the user's E2EE account key, so
+ * this only succeeds on a signed-in device. Throws otherwise.
  */
 export async function ensureVaultLoaded(
   runtime: MailRuntime,
@@ -397,159 +371,38 @@ async function doLoadVault(
     backup.kdfParams.parallelism,
   );
 
-  log.debug("[mail-crypto] doLoadVault: step 2 — fetching key material from server");
-  const keyMaterialEndpoint = runtime.config.vaultKeyMaterialEndpoint;
-  let keyMaterial: string | null = null;
-  let derivedKeyB64: string | null = null;
-
-  if (keyMaterialEndpoint) {
-    log.debug(
-      "[mail-crypto] doLoadVault: fetching key material from %s",
-      keyMaterialEndpoint,
-    );
-    try {
-      const result = await fetchKeyMaterial(keyMaterialEndpoint);
-      keyMaterial = result.keyMaterial;
-      derivedKeyB64 = result.derivedKeyB64 ?? null;
-      log.debug(
-        "[mail-crypto] doLoadVault: key material received (length=%d hasDerivedKey=%s)",
-        keyMaterial?.length ?? 0,
-        derivedKeyB64 ? "YES" : "NO",
-      );
-    } catch (err) {
-      log.warn(
-        "[mail-crypto] doLoadVault: could not fetch key material: %s",
-        err instanceof Error ? err.message : String(err),
-      );
-    }
-  } else {
-    log.debug(
-      "[mail-crypto] doLoadVault: no vaultKeyMaterialEndpoint configured, skipping key-material",
-    );
-  }
-
-  log.debug("[mail-crypto] doLoadVault: step 3 — trying derived-key fast path");
-  if (!derivedKeyB64) {
-    const cachedDerivedKey = await loadDerivedVaultKey();
-    if (cachedDerivedKey) {
-      log.debug(
-        "[mail-crypto] doLoadVault: no server derived key — using SecureStore cached key",
-      );
-      derivedKeyB64 = cachedDerivedKey;
-    } else {
-      log.debug("[mail-crypto] doLoadVault: no derived key in SecureStore either");
-    }
-  }
-
-  if (derivedKeyB64) {
-    log.debug("[mail-crypto] doLoadVault: attempting vault decrypt with derived key");
-    let unlockedVault: UserKeyVault | null = null;
-    try {
-      unlockedVault = await unlockEncryptedMailVaultWithDerivedKey(
-        backup.encryptedVaultB64,
-        derivedKeyB64,
-      );
-      log.debug(
-        "[mail-crypto] doLoadVault: derived key vault decrypt SUCCEEDED — saving to cache",
-      );
-      await saveDerivedVaultKey(derivedKeyB64);
-    } catch (err) {
-      log.warn(
-        "[mail-crypto] doLoadVault: derived key vault decrypt FAILED (key may be stale): %s",
-        err instanceof Error ? err.message : String(err),
-      );
-    }
-
-    if (unlockedVault) {
-      const cachedPrivateKey =
-        await loadCachedPrivateKeyForVault(unlockedVault);
-      if (cachedPrivateKey) {
-        log.debug(
-          "[mail-crypto] doLoadVault: SUCCESS via derived-key fast path with cached private key",
+  // Preferred path: the passphrase is sealed to this user's E2EE key, so only
+  // a signed-in device can open the vault.
+  if (backup.wrappedSecret) {
+    const sealedSecret = await unwrapVaultSecret(backup.wrappedSecret);
+    if (sealedSecret) {
+      try {
+        const unlockedVault = await unlockEncryptedMailVault(
+          backup.encryptedVaultB64,
+          sealedSecret,
+          backup.kdfParams,
+          (keyB64) => {
+            void saveDerivedVaultKey(keyB64).catch(() => undefined);
+          },
         );
-        return {
-          vault: unlockedVault,
-          passphrase: keyMaterial ?? "",
-          privateKey: cachedPrivateKey,
-        };
-      }
+        const privateKey =
+          (await loadCachedPrivateKeyForVault(unlockedVault)) ??
+          (await decryptVaultPrivateKey(unlockedVault, sealedSecret));
 
-      if (!keyMaterial) {
-        throw new Error(
-          "keyMaterial unavailable — vault was decrypted but the PGP private-key passphrase could not be fetched. Check your network connection and try again.",
+        log.debug("[mail-crypto] doLoadVault: SUCCESS via sealed vault secret");
+        return { vault: unlockedVault, passphrase: sealedSecret, privateKey };
+      } catch (err) {
+        log.warn(
+          "[mail-crypto] doLoadVault: sealed-secret unlock failed: %s",
+          err instanceof Error ? err.message : String(err),
         );
+        throw err;
       }
-
-      const privateKey = await decryptVaultPrivateKey(unlockedVault, keyMaterial);
-
-      log.debug("[mail-crypto] doLoadVault: SUCCESS via derived-key fast path");
-      return { vault: unlockedVault, passphrase: keyMaterial, privateKey };
-    }
-  }
-
-  const storedPassword = await loadMailVaultPassword();
-  const passphraseCandidates = getPassphraseCandidates({
-    keyMaterial,
-    fallbackPassword,
-    storedPassword,
-  });
-
-  if (passphraseCandidates.length === 0) {
-    throw new Error(
-      "Mail vault could not be unlocked because no server key material or saved sign-in password is available on this device.",
-    );
-  }
-
-  if (!canAttemptLocalVaultUnlock(backup.kdfParams)) {
-    log.error(
-      "[mail-crypto] doLoadVault: ABORTING — local argon2id params exceed this device's safe limits (memoryKiB=%d iterations=%d parallelism=%d)",
-      backup.kdfParams.memoryKiB,
-      backup.kdfParams.iterations,
-      backup.kdfParams.parallelism,
-    );
-    throw new Error(
-      "Mail vault could not be unlocked on this device because it still needs a high-cost password migration. Open secure web mail once to migrate the vault, then try again here.",
-    );
-  }
-
-  log.debug(
-    "[mail-crypto] doLoadVault: step 3b — trying local passphrase candidates",
-  );
-
-  for (const passphrase of passphraseCandidates) {
-    try {
-      const unlockedVault = await unlockEncryptedMailVault(
-        backup.encryptedVaultB64,
-        passphrase,
-        backup.kdfParams,
-      );
-      const privateKey =
-        (await loadCachedPrivateKeyForVault(unlockedVault)) ??
-        (await decryptVaultPrivateKey(unlockedVault, passphrase));
-
-      if (keyMaterial && passphrase !== keyMaterial) {
-        void migrateVaultToKeyMaterial({
-          unlockedVault,
-          oldPassphrase: passphrase,
-          newPassphrase: keyMaterial,
-          vaultVersion: backup.vaultVersion,
-        });
-      }
-
-      log.debug(
-        "[mail-crypto] doLoadVault: SUCCESS via local passphrase candidate",
-      );
-      return { vault: unlockedVault, passphrase, privateKey };
-    } catch (err) {
-      log.warn(
-        "[mail-crypto] doLoadVault: local passphrase candidate failed: %s",
-        err instanceof Error ? err.message : String(err),
-      );
     }
   }
 
   throw new Error(
-    "Mail vault could not be unlocked with the available server key material or saved passwords. Sign out and sign back in with your email password once, or open secure web mail to finish migration.",
+    "Mail vault could not be unlocked on this device. Make sure you are signed in so your encryption keys are available, then try again.",
   );
 }
 

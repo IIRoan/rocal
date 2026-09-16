@@ -9,6 +9,19 @@ Desired state for Stalwart objects lives in [`stalwart/plan/`](stalwart/plan/).
 WebUI edits are overwritten on the next Railway boot. This tree lives in the Solace
 monorepo at `apps/stalwart` (not a nested git repo).
 
+## Backend provisioning principal
+
+The Solace API must **not** hold an admin token. It reads mailbox, calendar and
+contact data as the account owner (per-user OAuth bearers) and needs elevated
+rights only to provision. `stalwart/plan/16-provisioner-role.ndjson` defines the
+`solace-provisioner` role with exactly those permissions.
+
+After applying the plan, create a dedicated account bound to that role and issue
+it an API token, then set `STALWART_PROVISION_TOKEN` on the API. This step is
+manual because the account secret must never live in the repo. Until it is done
+the API falls back to the deprecated `STALWART_ADMIN_TOKEN`; retire that token
+once the scoped one works.
+
 ## System overview
 
 ```mermaid

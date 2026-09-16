@@ -1363,7 +1363,7 @@ export function createStalwartAdminClient(config?: {
 }) {
   return new StalwartAdminClient({
     baseUrl: config?.baseUrl || env.stalwartBaseUrl,
-    adminToken: config?.adminToken || env.stalwartAdminToken,
+    adminToken: config?.adminToken || env.stalwartProvisionToken,
     fetcher: config?.fetcher,
   });
 }

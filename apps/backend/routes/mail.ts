@@ -1,6 +1,5 @@
 import { Elysia } from "elysia";
-import type { IMailService, MailOAuthConfig } from "../contracts/mail.contract";
-import { BETTER_AUTH_BASE_PATH } from "../lib/auth-constants";
+import type { IMailService } from "../contracts/mail.contract";
 import { createLogger } from "@workspace/logger";
 import { prisma } from "../lib/prisma";
 import { env } from "../lib/env";
@@ -12,10 +11,14 @@ import {
 import { hasUserId, type AuthenticatedUser } from "../lib/auth-utils";
 import { auth } from "../lib/auth";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import { MailService } from "../services/mail.service";
-import { createStalwartAdminClient } from "../lib/stalwart-admin";
+import { defaultMailService } from "../lib/default-mail-service";
+import {
+  createStalwartAdminClient,
+  type StalwartAdminClient,
+} from "../lib/stalwart-admin";
 import {
   buildStalwartMailBridgeRedirectUri,
+  createMailBridgePkcePair,
   getStalwartMailBridgeClientId,
 } from "../lib/mail-bridge-auth";
 import { errorMessage, RateLimitError } from "../lib/errors";
@@ -24,7 +27,11 @@ import {
   fetchJmapUpstream,
   JmapProxyPathError,
 } from "../lib/jmap-proxy-path";
-import { enforceRateLimit, getClientIp } from "../lib/rate-limit";
+import {
+  enforceRateLimit,
+  getClientIp,
+  type RateLimitConfig,
+} from "../lib/rate-limit";
 import { logRef, redactPII, sanitizeRequestUrl, errorLogDetails } from "../lib/log-sanitization";
 
 type JmapProxyFetcher = (
@@ -38,137 +45,9 @@ function normalizeBaseUrl(baseUrl: string): string {
 
 const logger = createLogger("backend:mail-jmap-proxy");
 
-const MAX_VAULT_MEMORY_KIB = 131_072;
-const MAX_VAULT_ITERATIONS = 4;
-const MAX_VAULT_PARALLELISM = 4;
-const VAULT_KEY_MATERIAL_RATE_LIMIT = { requests: 10, windowMs: 60_000 };
-
-let vaultDeriveChain: Promise<void> = Promise.resolve();
-
-function withVaultDeriveMutex<T>(task: () => Promise<T>): Promise<T> {
-  const run = vaultDeriveChain.then(task, task);
-  vaultDeriveChain = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
-}
-
-function vaultKdfParamsWithinServerCap(input: {
-  kdfMemoryKiB: number;
-  kdfIterations: number;
-  kdfParallelism: number;
-}): boolean {
-  return (
-    input.kdfMemoryKiB <= MAX_VAULT_MEMORY_KIB &&
-    input.kdfIterations <= MAX_VAULT_ITERATIONS &&
-    input.kdfParallelism <= MAX_VAULT_PARALLELISM
-  );
-}
-async function deriveVaultKeyMaterial(userId: string): Promise<string> {
-  const hmacKey = env.mailVaultHmacKey;
-  if (!hmacKey) {
-    throw new Error(
-      "MAIL_VAULT_HMAC_KEY is not configured on this server. Set it to a permanent random base64 secret.",
-    );
-  }
-  const rawKey = Uint8Array.from(atob(hmacKey), (c) => c.charCodeAt(0));
-  const key = await crypto.subtle.importKey(
-    "raw",
-    rawKey,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const message = new TextEncoder().encode(`${userId}:vault-key:v1`);
-  const signature = await crypto.subtle.sign("HMAC", key, message);
-  return Buffer.from(signature)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-/**
- * Pre-computes the argon2id-derived vault decryption key for native clients.
- *
- * Native apps (Hermes JS engine) cannot run argon2id efficiently — the
- * pure-JS implementation blocks the main thread and may crash due to
- * memory pressure. The backend has WASM-backed hash-wasm and can compute
- * argon2id(keyMaterial, vaultSalt, kdfParams) server-side, returning the
- * 32-byte AES-GCM key as base64. The native app then uses this key directly.
- *
- * Returns null if the user has no vault backup yet.
- */
-async function deriveVaultKeyForNative(
-  userId: string,
-  keyMaterial: string,
-): Promise<string | null> {
-  const entry = await prisma.mailDirectoryEntry.findUnique({
-    where: { userId },
-    select: {
-      vaultBackup: {
-        select: {
-          kdfSaltB64: true,
-          kdfMemoryKiB: true,
-          kdfIterations: true,
-          kdfParallelism: true,
-        },
-      },
-    },
-  });
-
-  if (!entry?.vaultBackup) {
-    logger.warn("[deriveVaultKeyForNative] no vault backup found for userId=%s", userId);
-    return null;
-  }
-
-  const { kdfSaltB64, kdfMemoryKiB, kdfIterations, kdfParallelism } = entry.vaultBackup;
-
-  if (
-    !vaultKdfParamsWithinServerCap({
-      kdfMemoryKiB,
-      kdfIterations,
-      kdfParallelism,
-    })
-  ) {
-    logger.warn(
-      "[deriveVaultKeyForNative] refusing server derive — KDF params exceed cap for userId=%s",
-      userId,
-    );
-    return null;
-  }
-
-  logger.debug(
-    "[deriveVaultKeyForNative] running argon2id: memoryKiB=%d iterations=%d parallelism=%d saltLen=%d",
-    kdfMemoryKiB, kdfIterations, kdfParallelism, kdfSaltB64.length,
-  );
-
-  // kdfSaltB64 may be standard base64 or base64url — normalize to standard before decode.
-  const saltBase64 = kdfSaltB64.replace(/-/g, "+").replace(/_/g, "/");
-
-  const { argon2id } = await import("hash-wasm");
-  const derived = await withVaultDeriveMutex(() =>
-    argon2id({
-      password: keyMaterial,
-      salt: Buffer.from(saltBase64, "base64"),
-      memorySize: kdfMemoryKiB,
-      iterations: kdfIterations,
-      parallelism: kdfParallelism,
-      hashLength: 32,
-      outputType: "binary",
-    }),
-  );
-
-  logger.debug("[deriveVaultKeyForNative] argon2id succeeded, returning derivedKeyB64");
-  return Buffer.from(derived)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-const publicJmapProxyBaseUrl = `${normalizeBaseUrl(env.backendUrl)}/api/mail/jmap`;
+// Deliberately loose: real clients are chatty, and this only has to make
+// bearer guessing against Stalwart impractical.
+const JMAP_PROXY_RATE_LIMIT = { requests: 1200, windowMs: 60_000 };
 
 function classifyJmapProxyOperation(upstreamPath: string): string {
   if (upstreamPath.includes("/upload/")) return "blob-upload";
@@ -381,41 +260,6 @@ function summarizeUpstreamErrorBody(
   }
 }
 
-function buildMailOAuthConfig(): MailOAuthConfig {
-  const authBaseUrl = `${normalizeBaseUrl(env.backendUrl)}${BETTER_AUTH_BASE_PATH}`;
-  const audiences =
-    env.mailOauthAudiences.length > 0
-      ? env.mailOauthAudiences
-      : [env.stalwartBaseUrl];
-
-  return {
-    issuer: authBaseUrl,
-    discoveryUrl: `${authBaseUrl}/.well-known/openid-configuration`,
-    authorizationEndpoint: `${authBaseUrl}/oauth2/authorize`,
-    tokenEndpoint: `${authBaseUrl}/oauth2/token`,
-    userinfoEndpoint: `${authBaseUrl}/oauth2/userinfo`,
-    jwksUri: `${authBaseUrl}/jwks`,
-    mailTokenEndpoint: `${normalizeBaseUrl(env.backendUrl)}/api/mail/oauth/access-token`,
-    clientId: env.mailOauthBrowserClientId,
-    redirectUri: env.mailOauthBrowserRedirectUris[0] || "",
-    scopes: env.mailOauthScopes,
-    audiences,
-  };
-}
-
-export const defaultMailService = new MailService(
-  prisma,
-  createStalwartAdminClient(),
-  {
-    defaultDomain: env.stalwartDefaultDomain,
-    discoveryBaseUrl: publicJmapProxyBaseUrl,
-    oauth: buildMailOAuthConfig(),
-    vaultKeyMaterialEndpoint: `${normalizeBaseUrl(env.backendUrl)}/api/mail/vault-key-material`,
-    stalwartOauthClientId: getStalwartMailBridgeClientId(),
-    stalwartOauthRedirectUri: buildStalwartMailBridgeRedirectUri(),
-  },
-);
-
 async function resolveSessionUserForProxy(
   request: Request,
 ): Promise<AuthenticatedUser | null> {
@@ -453,6 +297,20 @@ async function proxyJmapRequest(input: {
 }): Promise<Response> {
   const timingStart = performance.now();
   const clientAuthorization = input.request.headers.get("authorization");
+
+  // Only Stalwart bearers may be relayed; forwarding Basic would turn the
+  // proxy into a credential-stuffing oracle against the mail server.
+  if (clientAuthorization && !/^Bearer\s/i.test(clientAuthorization)) {
+    return Response.json(
+      {
+        error: "Bad request",
+        message: "Mailbox authorization must use a Bearer token.",
+        statusCode: 400,
+        timestamp: new Date().toISOString(),
+      },
+      { status: 400 },
+    );
+  }
 
   let authorization = clientAuthorization;
   let authSource: "session" | "client-bearer" | "missing" = clientAuthorization
@@ -753,22 +611,83 @@ async function proxyJmapRequest(input: {
   });
 }
 
+/** Per-IP ceiling on the unauthenticated proxy routes; null means allowed. */
+function guardJmapProxyRate(
+  request: Request,
+  limit: RateLimitConfig,
+): Response | null {
+  try {
+    enforceRateLimit({
+      storeId: "mail-jmap-proxy",
+      key: getClientIp(request),
+      limit,
+    });
+    return null;
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      return Response.json(
+        {
+          error: "Too many requests",
+          message: error.message,
+          statusCode: 429,
+          timestamp: new Date().toISOString(),
+        },
+        { status: 429 },
+      );
+    }
+    throw error;
+  }
+}
+
 export type MailJmapProxyProbeResult =
   | { ok: true }
   | { ok: false; status: number };
+
+/** The health probe holds a password, but the proxy only relays bearers. */
+async function mintProbeBearer(input: {
+  username: string;
+  password: string;
+  adminClient: Pick<
+    StalwartAdminClient,
+    "ensureOAuthClient" | "issueOAuthAccessToken"
+  >;
+}): Promise<string> {
+  const clientId = getStalwartMailBridgeClientId();
+  const redirectUri = buildStalwartMailBridgeRedirectUri();
+  await input.adminClient.ensureOAuthClient({
+    clientId,
+    redirectUri,
+    description: "Solace mail backend bridge",
+  });
+  const { codeVerifier, codeChallenge } = await createMailBridgePkcePair();
+  const token = await input.adminClient.issueOAuthAccessToken({
+    accountName: input.username,
+    accountSecret: input.password,
+    clientId,
+    redirectUri,
+    codeVerifier,
+    codeChallenge,
+  });
+  return `Bearer ${token.access_token}`;
+}
 
 /** Exercises the same JMAP discovery proxy path browser/native clients use. */
 export async function probeMailJmapProxyDiscovery(input: {
   username: string;
   password: string;
   mailService?: IMailService;
+  adminClient?: Pick<
+    StalwartAdminClient,
+    "ensureOAuthClient" | "issueOAuthAccessToken"
+  >;
   jmapFetch?: JmapProxyFetcher;
   jmapUpstreamBaseUrl?: string;
 }): Promise<MailJmapProxyProbeResult> {
-  const authorization = `Basic ${Buffer.from(
-    `${input.username}:${input.password}`,
-    "utf8",
-  ).toString("base64")}`;
+  const authorization = await mintProbeBearer({
+    username: input.username,
+    password: input.password,
+    adminClient: input.adminClient ?? createStalwartAdminClient(),
+  });
   const response = await proxyJmapRequest({
     request: new Request("http://healthcheck.local/mail/jmap/.well-known/jmap", {
       method: "GET",
@@ -804,9 +723,11 @@ export function createMailRoutes(
   options: {
     jmapFetch?: JmapProxyFetcher;
     jmapUpstreamBaseUrl?: string;
+    jmapRateLimit?: RateLimitConfig;
   } = {},
 ) {
   const jmapFetch = options.jmapFetch ?? fetch;
+  const jmapRateLimit = options.jmapRateLimit ?? JMAP_PROXY_RATE_LIMIT;
   const jmapUpstreamBaseUrl =
     options.jmapUpstreamBaseUrl ?? env.stalwartBaseUrl;
   const authDetail = authenticatedRouteDetail("Mail");
@@ -876,6 +797,7 @@ export function createMailRoutes(
           "Forwards JMAP discovery to the configured Stalwart instance so browser clients can operate without direct cross-origin access.",
       },
     }, ({ request }) =>
+      guardJmapProxyRate(request, jmapRateLimit) ??
       proxyJmapRequest({
         request,
         upstreamPath: "/.well-known/jmap",
@@ -891,6 +813,7 @@ export function createMailRoutes(
           "Forwards authenticated JMAP calls to Stalwart while keeping private-key operations in the browser.",
       },
     }, ({ request }) =>
+      guardJmapProxyRate(request, jmapRateLimit) ??
       proxyJmapRequest({
         request,
         upstreamPath: "/jmap/",
@@ -906,6 +829,7 @@ export function createMailRoutes(
           "Forwards authenticated JMAP calls to Stalwart while keeping private-key operations in the browser.",
       },
     }, ({ request }) =>
+      guardJmapProxyRate(request, jmapRateLimit) ??
       proxyJmapRequest({
         request,
         upstreamPath: "/jmap/",
@@ -921,6 +845,7 @@ export function createMailRoutes(
           "Forwards nested JMAP download, upload, and event-source requests to Stalwart through the backend proxy.",
       },
     }, ({ params, request }) =>
+      guardJmapProxyRate(request, jmapRateLimit) ??
       proxyJmapRequest({
         request,
         upstreamPath: `/jmap/${params["*"]}`,
@@ -967,65 +892,6 @@ export function createMailRoutes(
             );
           }
         })
-          .get("/vault-key-material", {
-            detail: {
-              ...authDetail.detail,
-              summary: "Get server-derived vault key material",
-              description:
-                "Returns an HMAC-SHA256 derived key material unique to the authenticated user. Used client-side to derive the vault encryption key without a user-typed password. Pass includeDerived=0 to skip the expensive argon2id derived AES key when the client already has it cached.",
-            },
-          }, async ({ routeUser, status, request }) => {
-            const userId = routeUser.id;
-            try {
-              enforceRateLimit({
-                storeId: "vault-key-material",
-                key: userId,
-                limit: VAULT_KEY_MATERIAL_RATE_LIMIT,
-              });
-            } catch (error) {
-              if (error instanceof RateLimitError) {
-                return status(429, {
-                  error: "Too many requests",
-                  message: error.message,
-                  statusCode: 429,
-                  timestamp: new Date().toISOString(),
-                });
-              }
-              throw error;
-            }
-            const includeDerived =
-              new URL(request.url).searchParams.get("includeDerived") !== "0";
-            try {
-              const keyMaterial = await deriveVaultKeyMaterial(userId);
-              let derivedKeyB64: string | null = null;
-              if (includeDerived) {
-                try {
-                  derivedKeyB64 = await deriveVaultKeyForNative(userId, keyMaterial);
-                } catch (derivedErr) {
-                  logger.error("[vault-key-material] deriveVaultKeyForNative failed", {
-                    userId,
-                    ...errorLogDetails(derivedErr),
-                  });
-                }
-              }
-              logger.debug(
-                "[vault-key-material] responding hasDerivedKey=%s includeDerived=%s for userId=%s",
-                derivedKeyB64 ? "yes" : "no",
-                includeDerived ? "yes" : "no",
-                userId,
-              );
-              return { keyMaterial, derivedKeyB64, version: "v1" };
-            } catch (err) {
-              const message = errorMessage(
-                err,
-                "Could not derive vault key material.",
-              );
-              return status(
-                500,
-                createApiErrorBody(500, "vault_key_error", message),
-              );
-            }
-          }),
       ),
     );
 }

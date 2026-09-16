@@ -1,13 +1,9 @@
 import { Elysia, Manifest } from "elysia";
 import { unauthorizedBody } from "./lib/api-error-response";
 import { cors } from "@elysia/cors";
-import {
-  oauthProviderAuthServerMetadata,
-  oauthProviderOpenIdConfigMetadata,
-} from "@better-auth/oauth-provider";
 import { installGlobalConsoleLogger } from "@workspace/logger";
 import { initSentry } from "./lib/sentry";
-import { auth, isMailOauthEnabled } from "./lib/auth";
+import { auth } from "./lib/auth";
 import { BETTER_AUTH_BASE_PATH } from "./lib/auth-constants";
 import { env } from "./lib/env";
 import { e2eeRoutes } from "./routes/e2ee";
@@ -43,7 +39,6 @@ import { CalendarSyncService } from "./lib/calendar-sync-service";
 import { sessionCookieAuthSecurity } from "./lib/openapi";
 import { corsOriginPolicy } from "./lib/origin-policy";
 import { createSecurityHeadersPlugin } from "./lib/security-headers";
-import { patchOauthMetadataResponse } from "./lib/oauth-metadata";
 import { routeModels } from "./contracts";
 
 installGlobalConsoleLogger("backend");
@@ -65,13 +60,6 @@ function getLocalAuthBasePath(prefix: string): string {
 
   return normalizePath(BETTER_AUTH_BASE_PATH);
 }
-
-const oauthAuthorizationServerMetadata = isMailOauthEnabled
-  ? oauthProviderAuthServerMetadata(auth)
-  : null;
-const oauthOpenIdConfiguration = isMailOauthEnabled
-  ? oauthProviderOpenIdConfigMetadata(auth)
-  : null;
 
 export const createAPI = (prefix = "") => {
   const app = new Elysia({ prefix, normalize: false });
@@ -109,86 +97,6 @@ export const createAPI = (prefix = "") => {
         exposeHeaders: ["Set-Cookie", "Server-Timing"],
       }),
     )
-    .get("/.well-known/oauth-authorization-server", {
-      detail: {
-        tags: ["Auth"],
-        summary: "Get OAuth 2.0 authorization server metadata",
-        description:
-          "Returns authorization-server metadata for the Solace mail OAuth issuer when mail OAuth is enabled.",
-      },
-    }, async ({ request, set }) => {
-      if (!oauthAuthorizationServerMetadata) {
-        set.status = 404;
-        return {
-          error: "Not found",
-          message: "Mail OAuth is not enabled.",
-        };
-      }
-
-      return patchOauthMetadataResponse(
-        await oauthAuthorizationServerMetadata(request),
-      );
-    })
-    .get(`${localAuthBasePath}/.well-known/oauth-authorization-server`, {
-      detail: {
-        tags: ["Auth"],
-        summary: "Get OAuth 2.0 authorization server metadata",
-        description:
-          "Returns authorization-server metadata on the issuer-relative path expected by OIDC clients.",
-      },
-    }, async ({ request, set }) => {
-      if (!oauthAuthorizationServerMetadata) {
-        set.status = 404;
-        return {
-          error: "Not found",
-          message: "Mail OAuth is not enabled.",
-        };
-      }
-
-      return patchOauthMetadataResponse(
-        await oauthAuthorizationServerMetadata(request),
-      );
-    })
-    .get("/.well-known/openid-configuration", {
-      detail: {
-        tags: ["Auth"],
-        summary: "Get OpenID Connect discovery metadata",
-        description:
-          "Returns OpenID Connect discovery metadata for the Solace mail OAuth issuer when mail OAuth is enabled.",
-      },
-    }, async ({ request, set }) => {
-      if (!oauthOpenIdConfiguration) {
-        set.status = 404;
-        return {
-          error: "Not found",
-          message: "Mail OAuth is not enabled.",
-        };
-      }
-
-      return patchOauthMetadataResponse(
-        await oauthOpenIdConfiguration(request),
-      );
-    })
-    .get(`${localAuthBasePath}/.well-known/openid-configuration`, {
-      detail: {
-        tags: ["Auth"],
-        summary: "Get OpenID Connect discovery metadata",
-        description:
-          "Returns OIDC discovery metadata on the issuer-relative path expected by external clients such as Stalwart.",
-      },
-    }, async ({ request, set }) => {
-      if (!oauthOpenIdConfiguration) {
-        set.status = 404;
-        return {
-          error: "Not found",
-          message: "Mail OAuth is not enabled.",
-        };
-      }
-
-      return patchOauthMetadataResponse(
-        await oauthOpenIdConfiguration(request),
-      );
-    })
     .use(requestContext)
     .error("global", handleApiError)
     .use(createBetterAuthPlugin(localAuthBasePath))

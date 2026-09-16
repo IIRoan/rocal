@@ -83,7 +83,7 @@ describe("mailRoutes passkey step-up", () => {
     });
   });
 
-  it("blocks vault-key-material when passkey step-up is required", async () => {
+  it("blocks the mail token when passkey step-up is required", async () => {
     mockGetPasskeyStepUpStatus.mockResolvedValue({
       hasPasskeys: true,
       isPasskeyStepUpVerified: false,
@@ -91,7 +91,7 @@ describe("mailRoutes passkey step-up", () => {
     });
 
     const response = await createApp().handle(
-      new Request("http://localhost/mail/vault-key-material", {
+      new Request("http://localhost/mail/oauth/access-token", {
         headers: {
           cookie: "better-auth.session_token=session-token",
         },
