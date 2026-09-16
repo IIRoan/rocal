@@ -142,11 +142,6 @@ async function fetchVaultBackup(): Promise<VaultBackupRecord> {
 
 type KeyMaterialResult = {
   keyMaterial: string;
-  /** Pre-computed argon2id output from the backend (32 bytes, base64url).
-   *  Present when the backend's vault key material endpoint supports the
-   *  native-optimised response. Null if no vault backup exists yet or the
-   *  endpoint is an older version. */
-  derivedKeyB64: string | null;
 };
 
 async function fetchKeyMaterial(endpoint: string): Promise<KeyMaterialResult> {
@@ -163,19 +158,14 @@ async function fetchKeyMaterial(endpoint: string): Promise<KeyMaterialResult> {
 
   const data = (await response.json()) as {
     keyMaterial: string;
-    derivedKeyB64?: string | null;
     version: string;
   };
   log.debug(
-    "[mail-crypto] fetchKeyMaterial: received keyMaterial (length=%d version=%s hasDerivedKey=%s)",
+    "[mail-crypto] fetchKeyMaterial: received keyMaterial (length=%d version=%s)",
     data.keyMaterial?.length ?? 0,
     data.version,
-    data.derivedKeyB64 ? "yes" : "no",
   );
-  return {
-    keyMaterial: data.keyMaterial,
-    derivedKeyB64: data.derivedKeyB64 ?? null,
-  };
+  return { keyMaterial: data.keyMaterial };
 }
 
 function canAttemptLocalVaultUnlock(kdfParams: MailVaultKdfParams): boolean {
@@ -410,11 +400,9 @@ async function doLoadVault(
     try {
       const result = await fetchKeyMaterial(keyMaterialEndpoint);
       keyMaterial = result.keyMaterial;
-      derivedKeyB64 = result.derivedKeyB64 ?? null;
       log.debug(
-        "[mail-crypto] doLoadVault: key material received (length=%d hasDerivedKey=%s)",
+        "[mail-crypto] doLoadVault: key material received (length=%d)",
         keyMaterial?.length ?? 0,
-        derivedKeyB64 ? "YES" : "NO",
       );
     } catch (err) {
       log.warn(
@@ -522,6 +510,9 @@ async function doLoadVault(
         backup.encryptedVaultB64,
         passphrase,
         backup.kdfParams,
+        (keyB64) => {
+          void saveDerivedVaultKey(keyB64).catch(() => undefined);
+        },
       );
       const privateKey =
         (await loadCachedPrivateKeyForVault(unlockedVault)) ??

@@ -35,11 +35,10 @@ describe("fetchVaultKeyMaterialForOpen", () => {
     jest.clearAllMocks();
   });
 
-  it("uses a cached derived key and asks the API to skip argon2", async () => {
+  it("reuses a locally cached derived key", async () => {
     mockGetStored.mockResolvedValue("cached-derived-key");
     mockGetVaultKeyMaterial.mockResolvedValue({
       keyMaterial: "km",
-      derivedKeyB64: null,
       version: "v1",
     });
 
@@ -57,18 +56,18 @@ describe("fetchVaultKeyMaterialForOpen", () => {
 
     expect(mockGetVaultKeyMaterial).toHaveBeenCalledWith(
       "https://api.test/api/mail/vault-key-material",
-      { includeDerived: false },
     );
     expect(mockPutStored).not.toHaveBeenCalled();
   });
 
-  it("fetches and stores a derived key when cache is empty", async () => {
+  it("never takes a derived key from the server", async () => {
     mockGetStored.mockResolvedValue(null);
     mockGetVaultKeyMaterial.mockResolvedValue({
       keyMaterial: "km",
-      derivedKeyB64: "fresh-derived-key",
+      // A server that still returned one must not be trusted with it.
+      derivedKeyB64: "server-derived-key",
       version: "v1",
-    });
+    } as never);
 
     await expect(
       fetchVaultKeyMaterialForOpen({
@@ -77,22 +76,17 @@ describe("fetchVaultKeyMaterialForOpen", () => {
       }),
     ).resolves.toEqual({
       keyMaterial: "km",
-      derivedKeyB64: "fresh-derived-key",
+      derivedKeyB64: null,
       version: "v1",
       usedCachedDerivedKey: false,
     });
 
-    expect(mockGetVaultKeyMaterial).toHaveBeenCalledWith(
-      "https://api.test/api/mail/vault-key-material",
-      { includeDerived: true },
-    );
-    expect(mockPutStored).toHaveBeenCalledWith("user-1", "fresh-derived-key");
+    expect(mockPutStored).not.toHaveBeenCalled();
   });
 
-  it("clears cache and refreshes after a derived-key miss", async () => {
+  it("clears the cached key after a derived-key miss", async () => {
     mockGetVaultKeyMaterial.mockResolvedValue({
       keyMaterial: "km",
-      derivedKeyB64: "new-derived-key",
       version: "v1",
     });
 
@@ -103,15 +97,11 @@ describe("fetchVaultKeyMaterialForOpen", () => {
       }),
     ).resolves.toEqual({
       keyMaterial: "km",
-      derivedKeyB64: "new-derived-key",
+      derivedKeyB64: null,
       version: "v1",
       usedCachedDerivedKey: false,
     });
 
     expect(mockDeleteStored).toHaveBeenCalledWith("user-1");
-    expect(mockGetVaultKeyMaterial).toHaveBeenCalledWith(
-      "https://api.test/api/mail/vault-key-material",
-      { includeDerived: true },
-    );
   });
 });

@@ -106,13 +106,11 @@ export async function upsertAccountVaultBackup(request: {
 
 export async function getVaultKeyMaterial(
   vaultKeyMaterialEndpoint: string,
-): Promise<{ keyMaterial: string; derivedKeyB64?: string | null; version: string }> {
+): Promise<{ keyMaterial: string; version: string }> {
   const response = await mailFetch(vaultKeyMaterialEndpoint, {
     method: "GET",
   });
-  return parseJson<{ keyMaterial: string; derivedKeyB64?: string | null; version: string }>(
-    response,
-  );
+  return parseJson<{ keyMaterial: string; version: string }>(response);
 }
 
 export type MailDirectoryKey = {
