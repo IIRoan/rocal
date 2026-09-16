@@ -93,6 +93,8 @@ export async function upsertAccountVaultBackup(request: {
   encryptedVaultB64: string;
   kdf: string;
   kdfParams: MailVaultKdfParams;
+  wrappedSecret?: string | null;
+  wrapAlgorithm?: string | null;
 }) {
   const response = await mailFetch(`${backendBaseUrl}/api/mail/account/vault-backup`, {
     method: "PUT",

@@ -35,6 +35,12 @@ import {
   loadCachedPrivateKey,
   saveCachedPrivateKey,
 } from "./mail-password-cache";
+import {
+  generateVaultSecret,
+  unwrapVaultSecret,
+  VAULT_WRAP_ALGORITHM,
+  wrapVaultSecret,
+} from "./vault-secret";
 import { extractPgpMimeCiphertextBlobId } from "./message-security";
 import {
   containsArmoredPgpMessage,
@@ -85,6 +91,9 @@ type VaultBackupRecord = {
   encryptedVaultB64: string;
   kdf: string;
   kdfParams: MailVaultKdfParams;
+  /** Vault passphrase sealed to the E2EE account key; null while legacy. */
+  wrappedSecret?: string | null;
+  wrapAlgorithm?: string | null;
 };
 
 type UnlockedVault = {
@@ -186,11 +195,12 @@ function getPassphraseCandidates(input: {
   );
 }
 
-async function migrateVaultToKeyMaterial(input: {
+async function rekeyVault(input: {
   unlockedVault: UserKeyVault;
   oldPassphrase: string;
   newPassphrase: string;
   vaultVersion: number;
+  wrappedSecret: string;
 }): Promise<void> {
   try {
     const decryptedPrivateKey = await openpgp.decryptKey({
@@ -218,9 +228,40 @@ async function migrateVaultToKeyMaterial(input: {
       encryptedVaultB64: encrypted.encryptedVaultB64,
       kdf: encrypted.kdf,
       kdfParams: encrypted.kdfParams,
+      wrappedSecret: input.wrappedSecret,
+      wrapAlgorithm: VAULT_WRAP_ALGORITHM,
     });
   } catch (error) {
-    log.warn("Background vault migration to key material failed", { error });
+    log.warn("Vault re-key failed", { error });
+  }
+}
+
+/**
+ * Move a legacy vault off the server-derived passphrase onto a random secret
+ * sealed to the user's E2EE key, so the server can no longer open it.
+ */
+async function sealVaultToAccountKey(input: {
+  unlockedVault: UserKeyVault;
+  currentPassphrase: string;
+  vaultVersion: number;
+}): Promise<void> {
+  try {
+    const secret = generateVaultSecret();
+    const wrappedSecret = await wrapVaultSecret(secret);
+    if (!wrappedSecret) {
+      // No E2EE session on this device yet; the next open retries.
+      return;
+    }
+
+    await rekeyVault({
+      unlockedVault: input.unlockedVault,
+      oldPassphrase: input.currentPassphrase,
+      newPassphrase: secret,
+      vaultVersion: input.vaultVersion,
+      wrappedSecret,
+    });
+  } catch (error) {
+    log.warn("Sealing the mail vault to the account key failed", { error });
   }
 }
 
@@ -387,6 +428,35 @@ async function doLoadVault(
     backup.kdfParams.parallelism,
   );
 
+  // Preferred path: the passphrase is sealed to this user's E2EE key, so only
+  // a signed-in device can open the vault.
+  if (backup.wrappedSecret) {
+    const sealedSecret = await unwrapVaultSecret(backup.wrappedSecret);
+    if (sealedSecret) {
+      try {
+        const unlockedVault = await unlockEncryptedMailVault(
+          backup.encryptedVaultB64,
+          sealedSecret,
+          backup.kdfParams,
+          (keyB64) => {
+            void saveDerivedVaultKey(keyB64).catch(() => undefined);
+          },
+        );
+        const privateKey =
+          (await loadCachedPrivateKeyForVault(unlockedVault)) ??
+          (await decryptVaultPrivateKey(unlockedVault, sealedSecret));
+
+        log.debug("[mail-crypto] doLoadVault: SUCCESS via sealed vault secret");
+        return { vault: unlockedVault, passphrase: sealedSecret, privateKey };
+      } catch (err) {
+        log.warn(
+          "[mail-crypto] doLoadVault: sealed-secret unlock failed: %s",
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
+  }
+
   log.debug("[mail-crypto] doLoadVault: step 2 — fetching key material from server");
   const keyMaterialEndpoint = runtime.config.vaultKeyMaterialEndpoint;
   let keyMaterial: string | null = null;
@@ -518,13 +588,12 @@ async function doLoadVault(
         (await loadCachedPrivateKeyForVault(unlockedVault)) ??
         (await decryptVaultPrivateKey(unlockedVault, passphrase));
 
-      if (keyMaterial && passphrase !== keyMaterial) {
-        void migrateVaultToKeyMaterial({
+      if (!backup.wrappedSecret) {
+        void sealVaultToAccountKey({
           unlockedVault,
-          oldPassphrase: passphrase,
-          newPassphrase: keyMaterial,
+          currentPassphrase: passphrase,
           vaultVersion: backup.vaultVersion,
-        });
+        }).catch(() => undefined);
       }
 
       log.debug(

@@ -39,6 +39,7 @@ import { getAuthHeaders } from "../lib/api";
 import { readChunkedSecureValue, writeChunkedSecureValue } from "../lib/secure-store-chunked";
 import { createLogger } from "@workspace/logger";
 import { useAuth } from "./AuthProvider";
+import { setActiveE2eeSession } from "../lib/e2ee-session";
 
 const log = createLogger("native:e2ee");
 
@@ -237,6 +238,7 @@ export function E2eeProvider({
         bootstrapGenerationRef.current === generation;
 
       sessionRef.current = null;
+      setActiveE2eeSession(null);
       setIsEnabled(false);
       setIsReady(false);
       beginPendingBootstrap();
@@ -335,6 +337,7 @@ export function E2eeProvider({
             userId,
             apiBaseUrl,
           };
+          setActiveE2eeSession(sessionRef.current);
           clearPendingAuthPassword();
           log.info("Restored native E2EE session from existing device", {
             userId,
@@ -368,6 +371,7 @@ export function E2eeProvider({
             }
 
             sessionRef.current = nextSession;
+            setActiveE2eeSession(nextSession);
             clearPendingAuthPassword();
             log.info("Unlocked native E2EE with pending auth password", {
               userId,
@@ -459,6 +463,7 @@ export function E2eeProvider({
   const clearSession = useCallback(() => {
     bootstrapGenerationRef.current += 1;
     sessionRef.current = null;
+    setActiveE2eeSession(null);
     finishPendingBootstrap();
     setIsEnabled(false);
     setIsReady(false);
