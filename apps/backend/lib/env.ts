@@ -114,8 +114,11 @@ export const env = {
   /** Default email domain used by the mail demo when provisioning new mailboxes. */
   stalwartDefaultDomain: process.env.STALWART_DEFAULT_DOMAIN || "solace.onl",
 
-  /** Admin token used for Stalwart provisioning via JMAP registry methods. */
-  stalwartAdminToken: process.env.STALWART_ADMIN_TOKEN || "",
+  /** Provisioning token for Stalwart registry methods; no mailbox data access. */
+  stalwartProvisionToken:
+    process.env.STALWART_PROVISION_TOKEN?.trim() ||
+    process.env.STALWART_ADMIN_TOKEN ||
+    "",
 
   /** Shared secret used to verify Stalwart telemetry webhook signatures. */
   stalwartWebhookSecret: process.env.STALWART_WEBHOOK_SECRET?.trim() || "",
