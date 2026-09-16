@@ -133,10 +133,21 @@ const mockGetSession = jest.mocked(auth.api.getSession);
 function createApp(options?: {
   jmapFetch?: (input: string, init?: RequestInit) => Promise<Response>;
   jmapUpstreamBaseUrl?: string;
+  jmapRateLimit?: { requests: number; windowMs: number };
 }) {
   return new Elysia({ normalize: false })
     .use(errorHandler)
     .use(createMailRoutes(mockMailService, options));
+}
+
+function createProbeAdminClient() {
+  return {
+    ensureOAuthClient: jest.fn(async () => undefined),
+    issueOAuthAccessToken: jest.fn(async () => ({
+      access_token: "probe-access-token",
+      expires_in: 1800,
+    })),
+  };
 }
 
 async function readJson(response: Response) {
@@ -245,6 +256,60 @@ describe("mailRoutes", () => {
     );
   });
 
+  it("rejects Basic credentials instead of relaying them to Stalwart", async () => {
+    const proxyFetch = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () => new Response(null, { status: 200 }));
+
+    const response = await createApp({
+      jmapFetch: proxyFetch,
+      jmapUpstreamBaseUrl: "http://stalwart.test",
+    }).handle(
+      new Request("http://localhost/mail/jmap/.well-known/jmap", {
+        headers: {
+          Authorization: `Basic ${Buffer.from("alice:hunter2").toString("base64")}`,
+          "x-real-ip": "203.0.113.10",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(proxyFetch).not.toHaveBeenCalled();
+    mockGetSession.mockClear();
+    expect(mockGetSession).not.toHaveBeenCalled();
+  });
+
+  it("rate-limits the JMAP proxy per client IP", async () => {
+    const proxyFetch = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () => new Response(null, { status: 200 }));
+
+    const app = createApp({
+      jmapFetch: proxyFetch,
+      jmapUpstreamBaseUrl: "http://stalwart.test",
+      jmapRateLimit: { requests: 2, windowMs: 60_000 },
+    });
+    const send = () =>
+      app.handle(
+        new Request("http://localhost/mail/jmap/jmap/", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer mail-access-token",
+            "Content-Type": "application/json",
+            "x-real-ip": "203.0.113.11",
+          },
+          body: JSON.stringify({ using: [], methodCalls: [] }),
+        }),
+      );
+
+    expect((await send()).status).toBe(200);
+    expect((await send()).status).toBe(200);
+    const limited = await send();
+
+    expect(limited.status).toBe(429);
+    expect(proxyFetch).toHaveBeenCalledTimes(2);
+  });
+
   it("probeMailJmapProxyDiscovery fails when upstream discovery is unavailable", async () => {
     const proxyFetch = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>
@@ -253,6 +318,7 @@ describe("mailRoutes", () => {
     const result = await probeMailJmapProxyDiscovery({
       username: "noreply@solace.onl",
       password: "secret",
+      adminClient: createProbeAdminClient(),
       mailService: mockMailService,
       jmapFetch: proxyFetch,
       jmapUpstreamBaseUrl: "http://stalwart.test",
@@ -287,6 +353,7 @@ describe("mailRoutes", () => {
     const result = await probeMailJmapProxyDiscovery({
       username: "noreply@solace.onl",
       password: "secret",
+      adminClient: createProbeAdminClient(),
       mailService: mockMailService,
       jmapFetch: proxyFetch,
       jmapUpstreamBaseUrl: "http://stalwart.test",
@@ -294,6 +361,9 @@ describe("mailRoutes", () => {
 
     expect(result).toEqual({ ok: true });
     expect(proxyFetch).toHaveBeenCalledTimes(2);
+    const probeHeaders = (proxyFetch.mock.calls[0]?.[1] as RequestInit)
+      ?.headers as Headers;
+    expect(probeHeaders.get("Authorization")).toBe("Bearer probe-access-token");
   });
 
   it("forwards client Bearer when a session cookie is also present", async () => {
