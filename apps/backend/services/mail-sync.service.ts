@@ -3,10 +3,10 @@ import type { PrismaClient } from "../generated/prisma/index.js";
 import { ForbiddenError, ValidationError } from "../lib/errors";
 import { errorLogDetails, logRef } from "../lib/log-sanitization";
 import type {
-  StalwartJmapAdminClientLike,
   StalwartJmapEnvelope,
   StalwartJmapMethodCall,
 } from "../lib/stalwart-admin";
+import type { StalwartUserJmapClientLike } from "../lib/stalwart-user-jmap";
 import {
   createEmptyMailCalendarImportSummary,
   MailCalendarIngestionService,
@@ -131,6 +131,11 @@ type AuthorizedDirectoryEntry = {
   stalwartAccountId: string;
 };
 
+type MailboxOwner = {
+  userId: string;
+  email: string;
+};
+
 type MailSyncStateRecord = {
   id: string;
   directoryEntryId: string;
@@ -218,10 +223,11 @@ export class MailSyncService {
     string,
     CacheEntry<MailSyncStateRecord | null>
   >();
+  private readonly mailboxOwnerCache = new Map<string, CacheEntry<MailboxOwner>>();
 
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly jmapAdminClient: StalwartJmapAdminClientLike,
+    private readonly userJmapClient: StalwartUserJmapClientLike,
     private readonly mailCalendarIngestion: MailCalendarIngestionService = new MailCalendarIngestionService(
       prisma,
     ),
@@ -545,6 +551,7 @@ export class MailSyncService {
       select: {
         id: true,
         userId: true,
+        email: true,
         stalwartAccountId: true,
       },
     });
@@ -556,6 +563,10 @@ export class MailSyncService {
       }
 
       try {
+        this.cacheMailboxOwner(entry.stalwartAccountId, {
+          userId: entry.userId,
+          email: entry.email,
+        });
         this.cacheAuthorizedDirectoryEntry(entry.userId, entry);
         const { hasChanges, changedTypes } = await this.detectChanges({
           userId: entry.userId,
@@ -605,6 +616,7 @@ export class MailSyncService {
       select: {
         id: true,
         userId: true,
+        email: true,
         stalwartAccountId: true,
       },
     });
@@ -613,6 +625,10 @@ export class MailSyncService {
       return null;
     }
 
+    this.cacheMailboxOwner(entry.stalwartAccountId, {
+      userId: entry.userId,
+      email: entry.email,
+    });
     this.cacheAuthorizedDirectoryEntry(entry.userId, {
       id: entry.id,
       stalwartAccountId: entry.stalwartAccountId,
@@ -873,6 +889,7 @@ export class MailSyncService {
       select: {
         id: true,
         userId: true,
+        email: true,
         stalwartAccountId: true,
       },
     });
@@ -880,6 +897,11 @@ export class MailSyncService {
     if (!entry || entry.userId !== userId) {
       throw new ForbiddenError("You are not authorized to sync that mailbox.");
     }
+
+    this.cacheMailboxOwner(entry.stalwartAccountId, {
+      userId: entry.userId,
+      email: entry.email,
+    });
 
     return this.cacheAuthorizedDirectoryEntry(userId, {
       id: entry.id,
@@ -1165,17 +1187,54 @@ export class MailSyncService {
     methodName: string,
     argumentsObject: Record<string, unknown>,
   ): Promise<T> {
+    const accountId = argumentsObject.accountId;
+    if (typeof accountId !== "string" || !accountId) {
+      throw new ValidationError(
+        "A mail accountId is required.",
+        "accountId",
+      );
+    }
+
+    const owner = await this.getMailboxOwner(accountId);
     const methodCall: StalwartJmapMethodCall = [
       methodName,
       argumentsObject,
       "c1",
     ];
-    const envelope = await this.jmapAdminClient.callJmap({
+    const envelope = await this.userJmapClient.callJmap({
+      userId: owner.userId,
+      email: owner.email,
       using: [...CORE_MAIL_CAPABILITIES],
       methodCalls: [methodCall],
     });
 
     return this.getMethodResult<T>(envelope, methodName);
+  }
+
+  private cacheMailboxOwner(accountId: string, owner: MailboxOwner): MailboxOwner {
+    return this.writeCached(this.mailboxOwnerCache, accountId, owner);
+  }
+
+  /** JMAP runs as the mailbox owner, so every call resolves its own credentials. */
+  private async getMailboxOwner(accountId: string): Promise<MailboxOwner> {
+    const cached = this.readCached(this.mailboxOwnerCache, accountId);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const entry = await this.prisma.mailDirectoryEntry.findUnique({
+      where: { stalwartAccountId: accountId },
+      select: { userId: true, email: true },
+    });
+
+    if (!entry?.userId) {
+      throw new ForbiddenError("That mailbox is not linked to a Solace account.");
+    }
+
+    return this.cacheMailboxOwner(accountId, {
+      userId: entry.userId,
+      email: entry.email,
+    });
   }
 
   private getMethodResult<T>(

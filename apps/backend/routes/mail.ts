@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import type { IMailService, MailOAuthConfig } from "../contracts/mail.contract";
+import type { IMailService } from "../contracts/mail.contract";
 import { createLogger } from "@workspace/logger";
 import { prisma } from "../lib/prisma";
 import { env } from "../lib/env";
@@ -11,7 +11,7 @@ import {
 import { hasUserId, type AuthenticatedUser } from "../lib/auth-utils";
 import { auth } from "../lib/auth";
 import { authenticatedRouteDetail } from "../lib/openapi";
-import { MailService } from "../services/mail.service";
+import { defaultMailService } from "../lib/default-mail-service";
 import {
   createStalwartAdminClient,
   type StalwartAdminClient,
@@ -177,8 +177,6 @@ async function deriveVaultKeyForNative(
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
 }
-
-const publicJmapProxyBaseUrl = `${normalizeBaseUrl(env.backendUrl)}/api/mail/jmap`;
 
 function classifyJmapProxyOperation(upstreamPath: string): string {
   if (upstreamPath.includes("/upload/")) return "blob-upload";
@@ -390,25 +388,6 @@ function summarizeUpstreamErrorBody(
     };
   }
 }
-
-function buildMailOAuthConfig(): MailOAuthConfig {
-  return {
-    mailTokenEndpoint: `${normalizeBaseUrl(env.backendUrl)}/api/mail/oauth/access-token`,
-  };
-}
-
-export const defaultMailService = new MailService(
-  prisma,
-  createStalwartAdminClient(),
-  {
-    defaultDomain: env.stalwartDefaultDomain,
-    discoveryBaseUrl: publicJmapProxyBaseUrl,
-    oauth: buildMailOAuthConfig(),
-    vaultKeyMaterialEndpoint: `${normalizeBaseUrl(env.backendUrl)}/api/mail/vault-key-material`,
-    stalwartOauthClientId: getStalwartMailBridgeClientId(),
-    stalwartOauthRedirectUri: buildStalwartMailBridgeRedirectUri(),
-  },
-);
 
 async function resolveSessionUserForProxy(
   request: Request,
