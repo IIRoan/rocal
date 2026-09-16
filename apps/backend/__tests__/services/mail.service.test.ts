@@ -45,12 +45,17 @@ function createMockPrisma() {
           kdfMemoryKiB: 131072,
           kdfIterations: 4,
           kdfParallelism: 2,
+          wrappedSecret: null,
+          wrapAlgorithm: null,
         },
       })),
       delete: jest.fn(async () => ({ id: "entry-1" })),
     },
     mailJmapSyncState: {
       deleteMany: jest.fn(async () => ({ count: 0 })),
+    },
+    mailVaultBackup: {
+      count: jest.fn<(args?: unknown) => Promise<number>>(async () => 0),
     },
     user: {
       findFirst: jest.fn<() => Promise<any | null>>(async () => null),
@@ -458,6 +463,8 @@ describe("MailService", () => {
         kdfMemoryKiB: 131072,
         kdfIterations: 4,
         kdfParallelism: 2,
+        wrappedSecret: null,
+        wrapAlgorithm: null,
       },
     });
 
@@ -577,6 +584,8 @@ describe("MailService", () => {
             kdfMemoryKiB: 65536,
             kdfIterations: 3,
             kdfParallelism: 4,
+            wrappedSecret: null,
+            wrapAlgorithm: null,
           },
         },
       },
@@ -696,6 +705,8 @@ describe("MailService", () => {
               kdfMemoryKiB: 65536,
               kdfIterations: 3,
               kdfParallelism: 4,
+              wrappedSecret: null,
+              wrapAlgorithm: null,
             },
             update: {
               vaultVersion: 1,
@@ -705,6 +716,8 @@ describe("MailService", () => {
               kdfMemoryKiB: 65536,
               kdfIterations: 3,
               kdfParallelism: 4,
+              wrappedSecret: null,
+              wrapAlgorithm: null,
             },
           },
         },
@@ -786,6 +799,8 @@ describe("MailService", () => {
               kdfMemoryKiB: 65536,
               kdfIterations: 3,
               kdfParallelism: 4,
+              wrappedSecret: null,
+              wrapAlgorithm: null,
             },
             update: {
               vaultVersion: 1,
@@ -795,6 +810,8 @@ describe("MailService", () => {
               kdfMemoryKiB: 65536,
               kdfIterations: 3,
               kdfParallelism: 4,
+              wrappedSecret: null,
+              wrapAlgorithm: null,
             },
           },
         },
@@ -1005,6 +1022,8 @@ describe("MailService", () => {
               kdfMemoryKiB: 131072,
               kdfIterations: 4,
               kdfParallelism: 2,
+              wrappedSecret: null,
+              wrapAlgorithm: null,
             },
             update: {
               vaultVersion: 2,
@@ -1014,6 +1033,8 @@ describe("MailService", () => {
               kdfMemoryKiB: 131072,
               kdfIterations: 4,
               kdfParallelism: 2,
+              wrappedSecret: null,
+              wrapAlgorithm: null,
             },
           },
         },
@@ -1029,6 +1050,8 @@ describe("MailService", () => {
             kdfMemoryKiB: true,
             kdfIterations: true,
             kdfParallelism: true,
+            wrappedSecret: true,
+            wrapAlgorithm: true,
           },
         },
       },
@@ -1044,6 +1067,20 @@ describe("MailService", () => {
         iterations: 4,
         parallelism: 2,
       },
+      wrappedSecret: null,
+      wrapAlgorithm: null,
+    });
+  });
+
+  it("counts vaults the server can still open", async () => {
+    mockPrisma.mailVaultBackup.count
+      .mockResolvedValueOnce(5)
+      .mockResolvedValueOnce(2);
+
+    await expect(service.getVaultWrapProgress()).resolves.toEqual({
+      wrapped: 2,
+      legacy: 3,
+      total: 5,
     });
   });
 
