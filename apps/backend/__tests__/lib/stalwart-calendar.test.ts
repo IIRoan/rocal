@@ -26,16 +26,50 @@ describe("StalwartCalendarClient", () => {
     (input: string, init?: RequestInit) => Promise<Response>
   >;
   let client: StalwartCalendarClient;
+  let tokens: {
+    getAccessTokenForUser: jest.Mock<() => Promise<{ access_token: string }>>;
+    invalidateAccessTokenForUser: jest.Mock<() => void>;
+  };
 
   beforeEach(() => {
     fetcher = jest.fn() as jest.MockedFunction<
       (input: string, init?: RequestInit) => Promise<Response>
     >;
+    tokens = {
+      getAccessTokenForUser: jest.fn(async () => ({
+        access_token: "owner-token",
+      })),
+      invalidateAccessTokenForUser: jest.fn(),
+    };
     client = new StalwartCalendarClient({
       baseUrl: "https://mail.solace.test/",
-      adminToken: "token-1",
+      tokens,
+      resolveOwner: async () => ({
+        userId: "user-1",
+        email: "alice@solace.onl",
+      }),
       fetcher,
     });
+  });
+
+  it("authorizes calendar JMAP as the account owner", async () => {
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [["Calendar/get", { list: [] }, "c1"]],
+      }),
+    );
+
+    await client.listCalendars("acct-1");
+
+    expect(tokens.getAccessTokenForUser).toHaveBeenCalledWith({
+      userId: "user-1",
+      email: "alice@solace.onl",
+    });
+    const headers = (fetcher.mock.calls[0]?.[1]?.headers ?? {}) as Record<
+      string,
+      string
+    >;
+    expect(headers.Authorization).toBe("Bearer owner-token");
   });
 
   it("creates calendars through Stalwart JMAP", async () => {
@@ -68,7 +102,7 @@ describe("StalwartCalendarClient", () => {
     expect(fetcher.mock.calls[0]?.[0]).toBe("https://mail.solace.test/jmap/");
     expect(fetcher.mock.calls[0]?.[1]?.headers).toEqual(
       expect.objectContaining({
-        Authorization: "Bearer token-1",
+        Authorization: "Bearer owner-token",
         "Content-Type": "application/json",
       }),
     );

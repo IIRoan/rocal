@@ -3,11 +3,11 @@ import { requireAuth } from "../lib/auth-guard";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { prisma } from "../lib/prisma";
 import { EventService } from "../services/event.service";
-import { createStalwartCalendarClient } from "../lib/stalwart-calendar";
+import { getDefaultStalwartCalendarClient } from "../lib/default-stalwart-calendar";
 import { MailCalendarIngestionService } from "../services/mail-calendar-ingestion.service";
 import { RouteModel, routeModels } from "../contracts";
 
-const stalwartClient = createStalwartCalendarClient();
+const stalwartClient = getDefaultStalwartCalendarClient();
 const eventService = new EventService(prisma, undefined, stalwartClient);
 const mailCalendarIngestionService = new MailCalendarIngestionService(
   prisma,
