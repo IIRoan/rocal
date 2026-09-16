@@ -69,16 +69,12 @@ import {
   type EventParticipantRecord,
 } from "../lib/event-participants";
 import { EventParticipantService } from "./event-participant.service";
-import type {
-  StalwartCalendarClientLike,
-  StalwartCalendarEventRecord,
-} from "../lib/stalwart-calendar";
-import {
-  buildStalwartEventPayload,
-  mapStalwartParticipantsToSolace,
-  mapStalwartEventToSolace,
-  type ResolvedStalwartParticipant,
-} from "../lib/stalwart-calendar-mapping";
+import { authEmailFrom, mailer } from "../lib/email-client";
+import { env } from "../lib/env";
+import { sendEventRsvpReply } from "../lib/event-rsvp-reply";
+
+/** Organizers match replies by UID, so a sealed event needs no real title. */
+const ENCRYPTED_EVENT_REPLY_TITLE = "Invitation";
 
 const logger = createLogger("backend:event-service");
 
@@ -93,7 +89,6 @@ export class EventService implements IEventService {
     private readonly eventParticipantService: EventParticipantService = new EventParticipantService(
       prisma,
     ),
-    private readonly stalwartClient?: StalwartCalendarClientLike | null,
   ) {}
 
   private hasEncryptedPayload(value?: string | null): boolean {
@@ -147,323 +142,6 @@ export class EventService implements IEventService {
     });
 
     return resolveTimezone(userSettings?.timezone);
-  }
-
-  private async getStalwartAccountId(userId: string): Promise<string | null> {
-    if (!this.stalwartClient) {
-      return null;
-    }
-
-    const mailbox = await this.prisma.mailDirectoryEntry.findUnique({
-      where: { userId },
-      select: { stalwartAccountId: true },
-    });
-
-    return mailbox?.stalwartAccountId ?? null;
-  }
-
-  private async resolveStalwartParticipants(
-    userId: string,
-    participants: EventParticipantInput[] = [],
-  ): Promise<ResolvedStalwartParticipant[]> {
-    const owner = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true, name: true },
-    });
-    return resolveParticipantInputs({
-      owner: owner?.email?.trim()
-        ? {
-            email: owner.email,
-            name: owner.name,
-          }
-        : null,
-      participants,
-    });
-  }
-
-  private async ensureRemoteCalendar(input: {
-    accountId: string;
-    calendar: {
-      id: string;
-      name: string;
-      color: string;
-      isVisible: boolean;
-      isDefault: boolean;
-      stalwartCalendarId?: string | null;
-      kind: string;
-      isSyncOnly: boolean;
-    };
-  }): Promise<string | null> {
-    if (
-      !this.stalwartClient ||
-      input.calendar.kind !== "owned" ||
-      input.calendar.isSyncOnly
-    ) {
-      return null;
-    }
-
-    if (input.calendar.stalwartCalendarId) {
-      return input.calendar.stalwartCalendarId;
-    }
-
-    const remote = await this.stalwartClient.createCalendar(input.accountId, {
-      name: externalCalendarName(input.calendar.name),
-      color: input.calendar.color,
-      isVisible: input.calendar.isVisible,
-      isDefault: input.calendar.isDefault,
-    });
-    await this.prisma.calendar.update({
-      where: { id: input.calendar.id },
-      data: {
-        stalwartAccountId: input.accountId,
-        stalwartCalendarId: remote.id,
-        stalwartSyncedAt: new Date(),
-      },
-    });
-
-    return remote.id;
-  }
-
-  private scheduleStalwartEventsSync(input: {
-    userId: string;
-    accountId: string;
-    startDate: Date;
-    endDate: Date;
-  }): void {
-    if (this.stalwartListSyncInFlight.has(input.userId)) {
-      return;
-    }
-
-    const syncPromise = this.syncStalwartEvents(input)
-      .catch((error) => {
-        logger.error("Stalwart list sync failed", errorLogDetails(error));
-      })
-      .finally(() => {
-        this.stalwartListSyncInFlight.delete(input.userId);
-      });
-
-    this.stalwartListSyncInFlight.set(input.userId, syncPromise);
-  }
-
-  private async syncStalwartEvents(input: {
-    userId: string;
-    accountId: string;
-    startDate: Date;
-    endDate: Date;
-  }): Promise<void> {
-    if (!this.stalwartClient) return;
-
-    const ids = await this.stalwartClient.queryEventIds({
-      accountId: input.accountId,
-      filter: {
-        after: input.startDate.toISOString(),
-        before: input.endDate.toISOString(),
-      },
-      limit: 500,
-    });
-    await this.syncStalwartEventsByIds({
-      userId: input.userId,
-      accountId: input.accountId,
-      eventIds: ids,
-    });
-  }
-
-  private async syncStalwartEventsByIds(input: {
-    userId: string;
-    accountId: string;
-    eventIds: string[];
-  }): Promise<void> {
-    if (!this.stalwartClient || input.eventIds.length === 0) {
-      return;
-    }
-
-    const remoteEvents = await this.stalwartClient.getEvents({
-      accountId: input.accountId,
-      ids: input.eventIds,
-    });
-    await this.upsertStalwartEventsFromRemote({
-      userId: input.userId,
-      accountId: input.accountId,
-      remoteEvents,
-    });
-  }
-
-  private async syncStalwartEventByUid(input: {
-    userId: string;
-    accountId: string;
-    uid: string;
-  }): Promise<void> {
-    if (!this.stalwartClient || !input.uid.trim()) {
-      return;
-    }
-
-    const ids = await this.stalwartClient.queryEventIds({
-      accountId: input.accountId,
-      filter: {
-        uid: input.uid.trim(),
-      },
-      limit: 10,
-    });
-    await this.syncStalwartEventsByIds({
-      userId: input.userId,
-      accountId: input.accountId,
-      eventIds: ids,
-    });
-  }
-
-  private async upsertStalwartEventsFromRemote(input: {
-    userId: string;
-    accountId: string;
-    remoteEvents: StalwartCalendarEventRecord[];
-  }): Promise<void> {
-    if (input.remoteEvents.length === 0) {
-      return;
-    }
-
-    const calendars = await this.prisma.calendar.findMany({
-      where: { userId: input.userId, stalwartCalendarId: { not: null } },
-      select: {
-        id: true,
-        stalwartCalendarId: true,
-      },
-    });
-    const calendarByRemoteId = new Map(
-      calendars.map((calendar) => [calendar.stalwartCalendarId!, calendar.id]),
-    );
-
-    let owner:
-      | { email: string; name: string | null }
-      | null
-      | undefined;
-
-    for (const remoteEvent of input.remoteEvents) {
-      const mapped = mapStalwartEventToSolace(remoteEvent);
-      const calendarId = mapped.stalwartCalendarId
-        ? calendarByRemoteId.get(mapped.stalwartCalendarId)
-        : null;
-      if (!calendarId) continue;
-
-      const existing = await this.prisma.calendarEvent.findFirst({
-        where: {
-          userId: input.userId,
-          OR: [
-            { stalwartEventId: mapped.stalwartEventId },
-            ...(mapped.stalwartUid ? [{ externalId: mapped.stalwartUid }] : []),
-          ],
-        },
-        select: {
-          id: true,
-          encryptionState: true,
-        },
-      });
-      const encrypted = existing?.encryptionState === "encrypted";
-      const data = {
-        ...(encrypted
-          ? {}
-          : {
-              title: mapped.title,
-              description: mapped.description,
-              location: mapped.location,
-            }),
-        start: mapped.start,
-        end: mapped.end,
-        allDay: mapped.allDay,
-        timezone: mapped.timezone,
-        recurrence: mapped.recurrence,
-        ...(encrypted && (mapped.reminder ?? null) === null
-          ? {}
-          : { reminder: mapped.reminder }),
-        calendarId,
-        externalId: mapped.stalwartUid,
-        stalwartAccountId: input.accountId,
-        stalwartCalendarId: mapped.stalwartCalendarId,
-        stalwartEventId: mapped.stalwartEventId,
-        stalwartUid: mapped.stalwartUid,
-        stalwartSyncedAt: new Date(),
-      };
-
-      let localEventId = existing?.id;
-      if (existing) {
-        await this.prisma.calendarEvent.update({
-          where: { id: existing.id },
-          data,
-        });
-      } else {
-        const createdEvent = await this.prisma.calendarEvent.create({
-          data: {
-            ...data,
-            title: mapped.title,
-            description: mapped.description,
-            location: mapped.location,
-            color: null,
-            categoryId: null,
-            userId: input.userId,
-          },
-        });
-        localEventId = createdEvent.id;
-      }
-
-      if (localEventId) {
-        const remoteParticipants = mapStalwartParticipantsToSolace(
-          remoteEvent.participants,
-        );
-
-        // Existing owned events: local invite list is source of truth. Never
-        // adopt Stalwart-invented principals (e.g. admin@solace.onl).
-        // Newly imported remote events: take the filtered remote roster.
-        let participantsToSync = remoteParticipants;
-        if (existing) {
-          if (owner === undefined) {
-            owner = await this.prisma.user.findUnique({
-              where: { id: input.userId },
-              select: { email: true, name: true },
-            });
-          }
-          const localParticipants =
-            await this.prisma.eventParticipant.findMany({
-              where: { eventId: localEventId },
-              select: {
-                email: true,
-                displayName: true,
-                role: true,
-                status: true,
-                user: { select: { email: true, name: true } },
-              },
-            });
-          participantsToSync = reconcileOwnedEventParticipantsFromRemote({
-            owner: owner?.email?.trim()
-              ? { email: owner.email, name: owner.name }
-              : null,
-            localParticipants: localParticipants.map((participant) => ({
-              email: participant.email || participant.user?.email || "",
-              displayName:
-                participant.displayName ||
-                participant.user?.name ||
-                undefined,
-              role:
-                participant.role === "organizer" ? "organizer" : "attendee",
-              status:
-                participant.status === "accepted" ||
-                participant.status === "declined" ||
-                participant.status === "tentative" ||
-                participant.status === "pending"
-                  ? participant.status
-                  : "pending",
-            })),
-            remoteParticipants,
-          });
-        }
-
-        const syncedParticipants =
-          await this.eventParticipantService.syncParticipants({
-            eventId: localEventId,
-            participants: participantsToSync,
-            ownerUserId: input.userId,
-            tx: this.prisma,
-          });
-        await syncedParticipants.sendPendingInvitations();
-      }
-    }
   }
 
   private async buildParticipantMap(eventIds: string[]) {
@@ -880,16 +558,6 @@ export class EventService implements IEventService {
       throw new ValidationError("End date must be after start date");
     }
 
-    const stalwartAccountId = await this.getStalwartAccountId(userId);
-    if (stalwartAccountId) {
-      this.scheduleStalwartEventsSync({
-        userId,
-        accountId: stalwartAccountId,
-        startDate,
-        endDate,
-      });
-    }
-
     const [regularEvents, recurringEvents] = await Promise.all([
       this.prisma.calendarEvent.findMany({
         where: {
@@ -1078,24 +746,6 @@ export class EventService implements IEventService {
         throw new ValidationError("Event not found or access denied");
       }
 
-      if (
-        this.stalwartClient &&
-        event.stalwartAccountId &&
-        event.stalwartEventId
-      ) {
-        await this.syncStalwartEventsByIds({
-          userId,
-          accountId: event.stalwartAccountId,
-          eventIds: [event.stalwartEventId],
-        });
-        event = await this.prisma.calendarEvent.findFirst({
-          where: {
-            id: event.id,
-            userId,
-          },
-          include,
-        });
-      }
 
       if (!event) {
         throw new ValidationError("Event not found or access denied");
@@ -1119,16 +769,6 @@ export class EventService implements IEventService {
     const normalizedExternalId = externalId.trim();
     if (!normalizedExternalId) {
       throw new ValidationError("External event id is required", "externalId");
-    }
-
-    const syncRemote = options.syncRemote ?? true;
-    const stalwartAccountId = await this.getStalwartAccountId(userId);
-    if (syncRemote && stalwartAccountId) {
-      await this.syncStalwartEventByUid({
-        userId,
-        accountId: stalwartAccountId,
-        uid: normalizedExternalId,
-      });
     }
 
     const event = await this.prisma.calendarEvent.findFirst({
@@ -1281,109 +921,35 @@ export class EventService implements IEventService {
     if (shouldMoveToTargetCalendar && targetCalendar) {
       await this.prisma.calendarEvent.update({
         where: { id: event.id },
-        data: {
-          calendarId: targetCalendar.id,
-          stalwartAccountId:
-            targetCalendar.stalwartAccountId ?? event.stalwartAccountId,
-          stalwartCalendarId:
-            targetCalendar.stalwartCalendarId ?? event.stalwartCalendarId,
-        },
+        data: { calendarId: targetCalendar.id },
       });
     }
 
-    const stalwartCalendarId =
-      targetCalendar?.stalwartCalendarId ?? event.stalwartCalendarId;
-    const stalwartAccountId =
-      targetCalendar?.stalwartAccountId ??
-      event.stalwartAccountId ??
-      (await this.getStalwartAccountId(input.userId));
-    const eventUid =
-      event.stalwartUid ||
-      event.externalId ||
-      `${event.id}@solace-calendar.local`;
-    const remotePayload = buildStalwartEventPayload({
-      calendarId: stalwartCalendarId ?? "",
-      uid: eventUid,
-      title: event.title,
-      description: event.description,
-      start: event.start,
-      end: event.end,
-      allDay: event.allDay,
-      timezone: resolveTimezone(event.timezone),
-      location: event.location,
-      recurrence: event.recurrence,
-      reminder: event.reminder,
-      participants: nextParticipants,
+    const eventUid = event.externalId || `${event.id}@solace-calendar.local`;
+    await this.prisma.eventParticipant.update({
+      where: { id: attendee.id },
+      data: { status: input.status },
     });
 
-    if (
-      this.stalwartClient &&
-      stalwartAccountId &&
-      stalwartCalendarId &&
-      event.stalwartEventId
-    ) {
-      await this.stalwartClient.updateEvent({
-        accountId: stalwartAccountId,
-        eventId: event.stalwartEventId,
-        patch: remotePayload,
-        sendSchedulingMessages: true,
-      });
-
-      if (input.status === "declined") {
-        // Remove the event from the Stalwart calendar after sending the DECLINED iTIP reply
-        await this.stalwartClient.deleteEvent({
-          accountId: stalwartAccountId,
-          eventId: event.stalwartEventId,
-        });
-      } else {
-        await this.syncStalwartEventsByIds({
-          userId: input.userId,
-          accountId: stalwartAccountId,
-          eventIds: [event.stalwartEventId],
-        });
-      }
-    } else if (this.stalwartClient && stalwartAccountId && stalwartCalendarId) {
-      const remoteEvent = await this.stalwartClient.createEvent({
-        accountId: stalwartAccountId,
-        event: remotePayload,
-        sendSchedulingMessages: true,
-      });
-
-      if (input.status === "declined") {
-        try {
-          await this.stalwartClient.deleteEvent({
-            accountId: stalwartAccountId,
-            eventId: remoteEvent.id,
-            sendSchedulingMessages: false,
-          });
-        } catch (error) {
-          logger.warn("Failed to clean up temporary decline event in Stalwart", {
-            userId: input.userId,
-            remoteEventId: remoteEvent.id,
-            ...errorLogDetails(error),
-          });
-        }
-      } else {
-        await this.prisma.calendarEvent.update({
-          where: { id: event.id },
-          data: {
-            stalwartAccountId,
-            stalwartCalendarId,
-            stalwartEventId: remoteEvent.id,
-            stalwartUid: eventUid,
-            stalwartSyncedAt: new Date(),
-          },
-        });
-        await this.syncStalwartEventsByIds({
-          userId: input.userId,
-          accountId: stalwartAccountId,
-          eventIds: [remoteEvent.id],
-        });
-      }
-    } else {
-      await this.prisma.eventParticipant.update({
-        where: { id: attendee.id },
-        data: { status: input.status },
+    const organizer = event.participants.find(
+      (participant) => participant.role === "organizer",
+    );
+    if (organizer?.email && userEmail) {
+      await sendEventRsvpReply({
+        organizerEmail: organizer.email,
+        attendeeEmail: userEmail,
+        attendeeDisplayName: attendee.displayName,
+        from: authEmailFrom,
+        title: event.title || ENCRYPTED_EVENT_REPLY_TITLE,
+        uid: eventUid,
+        start: event.start,
+        end: event.end,
+        allDay: event.allDay,
+        timezone: event.timezone,
+        status: input.status,
+        mailerClient: mailer,
+        logger,
+        isProduction: env.isProduction,
       });
     }
 
@@ -1614,40 +1180,9 @@ export class EventService implements IEventService {
         location,
       });
 
-      const stalwartAccountId = await this.getStalwartAccountId(userId);
-      const stalwartCalendarId = stalwartAccountId
-        ? await this.ensureRemoteCalendar({
-            accountId: stalwartAccountId,
-            calendar,
-          })
-        : null;
       const stalwartUid = `${crypto.randomUUID()}@solace-calendar.local`;
       let stalwartEventId: string | null = null;
 
-      if (this.stalwartClient && stalwartAccountId && stalwartCalendarId) {
-        const remoteEvent = await this.stalwartClient.createEvent({
-          accountId: stalwartAccountId,
-          sendSchedulingMessages: false,
-          event: buildStalwartEventPayload({
-            calendarId: stalwartCalendarId,
-            uid: stalwartUid,
-            title: persistencePolicy.title,
-            description: persistencePolicy.description,
-            start: startDate,
-            end: endDate,
-            allDay: allDay || false,
-            timezone: eventTimezone,
-            location: persistencePolicy.location,
-            recurrence: recurrence || null,
-            reminder: reminder ?? null,
-            participants: await this.resolveStalwartParticipants(
-              userId,
-              participants ?? [],
-            ),
-          }),
-        });
-        stalwartEventId = remoteEvent.id;
-      }
 
       let event;
       try {
@@ -1675,8 +1210,6 @@ export class EventService implements IEventService {
             recurrence: recurrence || null,
             userId,
             externalId: stalwartUid,
-            stalwartAccountId,
-            stalwartCalendarId,
             stalwartEventId,
             stalwartUid,
             stalwartSyncedAt: stalwartEventId ? new Date() : null,
@@ -1727,8 +1260,6 @@ export class EventService implements IEventService {
               reminder: reminder ?? null,
               recurrence: recurrence || null,
               externalId: stalwartUid,
-              stalwartAccountId,
-              stalwartCalendarId,
               stalwartEventId,
               stalwartUid,
               stalwartSyncedAt: new Date(),
@@ -1739,21 +1270,6 @@ export class EventService implements IEventService {
             },
           });
         } else {
-          if (this.stalwartClient && stalwartAccountId && stalwartEventId) {
-            try {
-              await this.stalwartClient.deleteEvent({
-                accountId: stalwartAccountId,
-                eventId: stalwartEventId,
-                sendSchedulingMessages: false,
-              });
-            } catch (cleanupError) {
-              logger.error("Failed to clean up remote event after local DB create failure", {
-                stalwartEventId,
-                ...errorLogDetails(error),
-                cleanupError: errorLogDetails(cleanupError),
-              });
-            }
-          }
           throw error;
         }
       }
@@ -2137,74 +1653,7 @@ export class EventService implements IEventService {
         updateData.encryptionKeyVersion = input.encryptionKeyVersion;
       }
 
-      const stalwartAccountId =
-        existingEvent.stalwartAccountId ??
-        (await this.getStalwartAccountId(userId));
-      const stalwartCalendarId = stalwartAccountId
-        ? await this.ensureRemoteCalendar({
-            accountId: stalwartAccountId,
-            calendar: finalCalendar,
-          })
-        : null;
-      let stalwartEventId = existingEvent.stalwartEventId;
 
-      if (this.stalwartClient && stalwartAccountId && stalwartCalendarId) {
-        const remotePayload = buildStalwartEventPayload({
-          calendarId: stalwartCalendarId,
-          uid:
-            existingEvent.stalwartUid ||
-            existingEvent.externalId ||
-            `${existingEvent.id}@solace-calendar.local`,
-          title: persistencePolicy.title,
-          description: persistencePolicy.description,
-          start: finalStartDate,
-          end: finalEndDate,
-          allDay:
-            input.allDay !== undefined ? input.allDay : existingEvent.allDay,
-          timezone: eventTimezone,
-          location: persistencePolicy.location,
-          recurrence:
-            input.recurrence !== undefined
-              ? input.recurrence
-              : existingEvent.recurrence,
-          reminder: finalReminderValue,
-          participants:
-            input.participants !== undefined
-              ? await this.resolveStalwartParticipants(
-                  userId,
-                  input.participants,
-                )
-              : undefined,
-        });
-
-        if (stalwartEventId) {
-          await this.stalwartClient.updateEvent({
-            accountId: stalwartAccountId,
-            eventId: stalwartEventId,
-            sendSchedulingMessages: false,
-            patch: remotePayload,
-          });
-        } else {
-          const remoteEvent = await this.stalwartClient.createEvent({
-            accountId: stalwartAccountId,
-            sendSchedulingMessages: false,
-            event: remotePayload,
-          });
-          stalwartEventId = remoteEvent.id;
-        }
-      }
-
-      if (stalwartAccountId && stalwartCalendarId && stalwartEventId) {
-        updateData.externalId =
-          existingEvent.stalwartUid ||
-          existingEvent.externalId ||
-          `${existingEvent.id}@solace-calendar.local`;
-        updateData.stalwartAccountId = stalwartAccountId;
-        updateData.stalwartCalendarId = stalwartCalendarId;
-        updateData.stalwartEventId = stalwartEventId;
-        updateData.stalwartUid = updateData.externalId;
-        updateData.stalwartSyncedAt = new Date();
-      }
 
       updateData.updatedAt = new Date();
 
@@ -2423,16 +1872,6 @@ export class EventService implements IEventService {
         }
       }
 
-      if (
-        this.stalwartClient &&
-        existingEvent.stalwartAccountId &&
-        existingEvent.stalwartEventId
-      ) {
-        await this.stalwartClient.deleteEvent({
-          accountId: existingEvent.stalwartAccountId,
-          eventId: existingEvent.stalwartEventId,
-        });
-      }
 
       const [deletedNotifications] = await this.prisma.$transaction([
         this.prisma.eventNotification.deleteMany({
@@ -2551,36 +1990,7 @@ export class EventService implements IEventService {
             );
           }
 
-          const stalwartAccountId = await this.getStalwartAccountId(userId);
-          const targetStalwartCalendarId = stalwartAccountId
-            ? await this.ensureRemoteCalendar({
-                accountId: stalwartAccountId,
-                calendar: targetCalendar,
-              })
-            : null;
 
-          if (
-            this.stalwartClient &&
-            stalwartAccountId &&
-            targetStalwartCalendarId
-          ) {
-            const moveUpdates = [];
-            for (const event of events) {
-              if (!event.stalwartEventId) continue;
-              moveUpdates.push(
-                this.stalwartClient.updateEvent({
-                  accountId: event.stalwartAccountId ?? stalwartAccountId,
-                  eventId: event.stalwartEventId,
-                  patch: {
-                    calendarIds: {
-                      [targetStalwartCalendarId]: true,
-                    },
-                  },
-                }),
-              );
-            }
-            await Promise.all(moveUpdates);
-          }
 
           result = await this.prisma.calendarEvent.updateMany({
             where: {
@@ -2589,7 +1999,6 @@ export class EventService implements IEventService {
             },
             data: {
               calendarId: targetCalendarId,
-              stalwartCalendarId: targetStalwartCalendarId,
               updatedAt: new Date(),
             },
           });
@@ -2630,24 +2039,6 @@ export class EventService implements IEventService {
             ...regularEvents,
             ...cancelledAttendeeInvitationEvents,
           ];
-
-          const remoteDeletes = [];
-          for (const event of eventsToDeleteLocally) {
-            if (
-              !this.stalwartClient ||
-              !event.stalwartAccountId ||
-              !event.stalwartEventId
-            ) {
-              continue;
-            }
-            remoteDeletes.push(
-              this.stalwartClient.deleteEvent({
-                accountId: event.stalwartAccountId,
-                eventId: event.stalwartEventId,
-              }),
-            );
-          }
-          await Promise.all(remoteDeletes);
 
           const localDeleteEventIds = eventsToDeleteLocally.map(
             (event) => event.id,

@@ -218,7 +218,7 @@ describe("CalendarService", () => {
         stalwartCalendarId: "remote-cal-1",
       }),
     );
-    service = new CalendarService(mockPrisma as never, stalwartClient);
+    service = new CalendarService(mockPrisma as never);
 
     await service.update({
       userId: "user-1",
@@ -229,11 +229,6 @@ describe("CalendarService", () => {
     });
 
     expect(mockPrisma.userEncryptionDevice.count).not.toHaveBeenCalled();
-    expect(stalwartClient.updateCalendar).toHaveBeenCalledWith(
-      "acct-1",
-      "remote-cal-1",
-      { name: "Solace calendar" },
-    );
     expect(mockPrisma.calendar.update).toHaveBeenCalledWith({
       where: { id: "calendar-1" },
       data: expect.objectContaining({
@@ -319,211 +314,6 @@ describe("CalendarService", () => {
     expect(mockPrisma.calendar.delete).not.toHaveBeenCalled();
   });
 
-  it("creates Stalwart calendars for users with linked mailboxes", async () => {
-    const stalwartClient = createMockStalwartClient();
-    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValue({
-      stalwartAccountId: "acct-1",
-    });
-    service = new CalendarService(mockPrisma as never, stalwartClient);
-
-    await service.create({
-      userId: "user-1",
-      name: "Shared",
-      color: "#10b981",
-      isDefault: true,
-    });
-
-    expect(stalwartClient.createCalendar).toHaveBeenCalledWith("acct-1", {
-      name: "Shared",
-      color: "#10b981",
-      isVisible: true,
-      isDefault: true,
-    });
-    expect(mockPrisma.calendar.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        name: "Shared",
-        stalwartAccountId: "acct-1",
-        stalwartCalendarId: "stalwart-calendar-1",
-        stalwartSyncedAt: expect.any(Date),
-      }),
-    });
-  });
-
-  it("rolls back created Stalwart calendars when local creation fails", async () => {
-    const stalwartClient = createMockStalwartClient();
-    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValue({
-      stalwartAccountId: "acct-1",
-    });
-    mockPrisma.calendar.create.mockRejectedValueOnce(new Error("db down"));
-    service = new CalendarService(mockPrisma as never, stalwartClient);
-
-    await expect(
-      service.create({
-        userId: "user-1",
-        name: "Shared",
-        color: "#10b981",
-      }),
-    ).rejects.toThrow("db down");
-
-    expect(stalwartClient.deleteCalendar).toHaveBeenCalledWith(
-      "acct-1",
-      "stalwart-calendar-1",
-    );
-  });
-
-  it("updates linked Stalwart calendars when owned calendars change", async () => {
-    const stalwartClient = createMockStalwartClient();
-    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValue({
-      stalwartAccountId: "acct-1",
-    });
-    mockPrisma.calendar.findFirst
-      .mockResolvedValueOnce(
-        calendarFixture({
-          stalwartAccountId: "acct-1",
-          stalwartCalendarId: "remote-cal-1",
-        }),
-      )
-      .mockResolvedValueOnce(null);
-    service = new CalendarService(mockPrisma as never, stalwartClient);
-
-    await service.update({
-      userId: "user-1",
-      calendarId: "calendar-1",
-      name: "Renamed",
-      color: "#ef4444",
-      isVisible: false,
-    });
-
-    expect(stalwartClient.updateCalendar).toHaveBeenCalledWith(
-      "acct-1",
-      "remote-cal-1",
-      {
-        name: "Renamed",
-        color: "#ef4444",
-        isVisible: false,
-      },
-    );
-    expect(mockPrisma.calendar.update).toHaveBeenCalledWith({
-      where: { id: "calendar-1" },
-      data: expect.objectContaining({
-        name: "Renamed",
-        color: "#ef4444",
-        isVisible: false,
-        stalwartAccountId: "acct-1",
-        stalwartCalendarId: "remote-cal-1",
-      }),
-    });
-  });
-
-  it("rolls back newly created Stalwart calendars when local updates fail", async () => {
-    const stalwartClient = createMockStalwartClient();
-    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValue({
-      stalwartAccountId: "acct-1",
-    });
-    mockPrisma.calendar.findFirst
-      .mockResolvedValueOnce(
-        calendarFixture({
-          stalwartAccountId: "acct-1",
-          stalwartCalendarId: null,
-        }),
-      )
-      .mockResolvedValueOnce(null);
-    mockPrisma.calendar.update.mockRejectedValueOnce(new Error("db down"));
-    service = new CalendarService(mockPrisma as never, stalwartClient);
-
-    await expect(
-      service.update({
-        userId: "user-1",
-        calendarId: "calendar-1",
-        name: "Renamed",
-      }),
-    ).rejects.toThrow("db down");
-
-    expect(stalwartClient.deleteCalendar).toHaveBeenCalledWith(
-      "acct-1",
-      "stalwart-calendar-1",
-    );
-  });
-
-  it("restores updated Stalwart calendars when local updates fail", async () => {
-    const stalwartClient = createMockStalwartClient();
-    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValue({
-      stalwartAccountId: "acct-1",
-    });
-    mockPrisma.calendar.findFirst
-      .mockResolvedValueOnce(
-        calendarFixture({
-          name: "Work",
-          color: "#10b981",
-          isVisible: true,
-          isDefault: false,
-          stalwartAccountId: "acct-1",
-          stalwartCalendarId: "remote-cal-1",
-        }),
-      )
-      .mockResolvedValueOnce(null);
-    mockPrisma.calendar.update.mockRejectedValueOnce(new Error("db down"));
-    service = new CalendarService(mockPrisma as never, stalwartClient);
-
-    await expect(
-      service.update({
-        userId: "user-1",
-        calendarId: "calendar-1",
-        name: "Renamed",
-        color: "#ef4444",
-        isVisible: false,
-      }),
-    ).rejects.toThrow("db down");
-
-    expect(stalwartClient.updateCalendar).toHaveBeenNthCalledWith(
-      1,
-      "acct-1",
-      "remote-cal-1",
-      {
-        name: "Renamed",
-        color: "#ef4444",
-        isVisible: false,
-      },
-    );
-    expect(stalwartClient.updateCalendar).toHaveBeenNthCalledWith(
-      2,
-      "acct-1",
-      "remote-cal-1",
-      {
-        name: "Work",
-        color: "#10b981",
-        isVisible: true,
-        isDefault: false,
-      },
-    );
-  });
-
-  it("deletes linked Stalwart calendars when local calendars are deleted", async () => {
-    const stalwartClient = createMockStalwartClient();
-    mockPrisma.calendar.findFirst.mockResolvedValue(
-      calendarFixture({
-        stalwartAccountId: "acct-1",
-        stalwartCalendarId: "remote-cal-1",
-      }),
-    );
-    mockPrisma.calendar.count.mockResolvedValue(2);
-    mockPrisma.calendarEvent.count.mockResolvedValue(0);
-    service = new CalendarService(mockPrisma as never, stalwartClient);
-
-    await service.delete({
-      userId: "user-1",
-      calendarId: "calendar-1",
-    });
-
-    expect(stalwartClient.deleteCalendar).toHaveBeenCalledWith(
-      "acct-1",
-      "remote-cal-1",
-    );
-    expect(mockPrisma.calendar.delete).toHaveBeenCalledWith({
-      where: { id: "calendar-1" },
-    });
-  });
-
   it("lists local calendars without syncing remote Stalwart calendars", async () => {
     const stalwartClient = createMockStalwartClient();
     const localCalendar = calendarFixture({
@@ -533,7 +323,7 @@ describe("CalendarService", () => {
     mockPrisma.calendar.findMany.mockResolvedValueOnce([
       localCalendar,
     ] as never);
-    service = new CalendarService(mockPrisma as never, stalwartClient);
+    service = new CalendarService(mockPrisma as never);
 
     const result = await service.list("user-1");
 
