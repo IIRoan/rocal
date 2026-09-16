@@ -381,7 +381,12 @@ export function useCalendarData(
           eventId,
           notificationData,
           {
-            encryptedDisplayTitle: await encryptReminderTitle(eventId, title),
+            // No title argument means "only the schedule changed" — leave the
+            // stored ciphertext alone instead of clearing it.
+            encryptedDisplayTitle:
+              title === undefined
+                ? undefined
+                : await encryptReminderTitle(eventId, title),
           },
         );
       } catch (error) {

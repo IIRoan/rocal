@@ -14,8 +14,18 @@ export const eventNotificationSettingSchema = strictZodObject({
 
 export const updateEventNotificationsBodySchema = strictZodObject({
   notifications: z.array(eventNotificationSettingSchema).max(20),
-  // Ciphertext only; strict object rejects a plaintext `displayTitle`.
   encryptedDisplayTitle: encryptedNotificationTitleSchema.nullable().optional(),
+  /**
+   * Accepted only so reminders keep saving for already-shipped binaries that
+   * still send the plaintext title (AGENTS.md §3). It is dropped here and never
+   * reaches the service, the database or a log; those clients simply get the
+   * generic lock-screen copy until they update.
+   */
+  displayTitle: z
+    .string()
+    .max(255)
+    .nullish()
+    .transform(() => undefined),
 });
 
 export { eventIdParamsSchema };

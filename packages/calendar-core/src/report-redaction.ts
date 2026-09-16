@@ -154,14 +154,38 @@ export function sanitizeContext(
   return sanitizeContextAtDepth(context, options, 0);
 }
 
-/** Keep only the file name; directories can include usernames or device ids. */
+/** Path prefixes that mark the start of a project-relative frame path. */
+const PROJECT_PATH_MARKERS = [
+  "node_modules/",
+  "apps/",
+  "packages/",
+  "src/",
+  "dist/",
+  "build/",
+];
+
+/**
+ * Keep the part of a frame path that source maps are keyed by, drop the rest:
+ * absolute prefixes can carry usernames or device ids.
+ *
+ * Bundle URLs (`https://app/_next/static/chunks/x.js`) are public and are what
+ * Sentry/Errex match uploaded artifacts against, so they survive intact minus
+ * any query string. Filesystem paths keep only the project-relative tail. A
+ * path with no recognizable root falls back to the bare file name.
+ */
 function sanitizeFramePath(path: string): string {
   const withoutQuery = path.split(/[?#]/)[0] ?? "";
-  const nodeModulesIndex = withoutQuery.lastIndexOf("node_modules/");
-  if (nodeModulesIndex !== -1) {
-    return withoutQuery.slice(nodeModulesIndex);
+  if (/^https?:\/\//i.test(withoutQuery)) {
+    return withoutQuery;
   }
-  const segments = withoutQuery.split(/[\\/]/);
+  const normalized = withoutQuery.replace(/\\/g, "/");
+  for (const marker of PROJECT_PATH_MARKERS) {
+    const index = normalized.lastIndexOf(marker);
+    if (index !== -1) {
+      return redactPII(normalized.slice(index));
+    }
+  }
+  const segments = normalized.split("/");
   return redactPII(segments[segments.length - 1] ?? "");
 }
 
