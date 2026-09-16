@@ -13,9 +13,13 @@ import { hasUserId, type AuthenticatedUser } from "../lib/auth-utils";
 import { auth } from "../lib/auth";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { MailService } from "../services/mail.service";
-import { createStalwartAdminClient } from "../lib/stalwart-admin";
+import {
+  createStalwartAdminClient,
+  type StalwartAdminClient,
+} from "../lib/stalwart-admin";
 import {
   buildStalwartMailBridgeRedirectUri,
+  createMailBridgePkcePair,
   getStalwartMailBridgeClientId,
 } from "../lib/mail-bridge-auth";
 import { errorMessage, RateLimitError } from "../lib/errors";
@@ -24,7 +28,11 @@ import {
   fetchJmapUpstream,
   JmapProxyPathError,
 } from "../lib/jmap-proxy-path";
-import { enforceRateLimit, getClientIp } from "../lib/rate-limit";
+import {
+  enforceRateLimit,
+  getClientIp,
+  type RateLimitConfig,
+} from "../lib/rate-limit";
 import { logRef, redactPII, sanitizeRequestUrl, errorLogDetails } from "../lib/log-sanitization";
 
 type JmapProxyFetcher = (
@@ -42,6 +50,9 @@ const MAX_VAULT_MEMORY_KIB = 131_072;
 const MAX_VAULT_ITERATIONS = 4;
 const MAX_VAULT_PARALLELISM = 4;
 const VAULT_KEY_MATERIAL_RATE_LIMIT = { requests: 10, windowMs: 60_000 };
+// Deliberately loose: real clients are chatty, and this only has to make
+// bearer guessing against Stalwart impractical.
+const JMAP_PROXY_RATE_LIMIT = { requests: 1200, windowMs: 60_000 };
 
 let vaultDeriveChain: Promise<void> = Promise.resolve();
 
@@ -454,6 +465,20 @@ async function proxyJmapRequest(input: {
   const timingStart = performance.now();
   const clientAuthorization = input.request.headers.get("authorization");
 
+  // Only Stalwart bearers may be relayed; forwarding Basic would turn the
+  // proxy into a credential-stuffing oracle against the mail server.
+  if (clientAuthorization && !/^Bearer\s/i.test(clientAuthorization)) {
+    return Response.json(
+      {
+        error: "Bad request",
+        message: "Mailbox authorization must use a Bearer token.",
+        statusCode: 400,
+        timestamp: new Date().toISOString(),
+      },
+      { status: 400 },
+    );
+  }
+
   let authorization = clientAuthorization;
   let authSource: "session" | "client-bearer" | "missing" = clientAuthorization
     ? "client-bearer"
@@ -753,22 +778,83 @@ async function proxyJmapRequest(input: {
   });
 }
 
+/** Per-IP ceiling on the unauthenticated proxy routes; null means allowed. */
+function guardJmapProxyRate(
+  request: Request,
+  limit: RateLimitConfig,
+): Response | null {
+  try {
+    enforceRateLimit({
+      storeId: "mail-jmap-proxy",
+      key: getClientIp(request),
+      limit,
+    });
+    return null;
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      return Response.json(
+        {
+          error: "Too many requests",
+          message: error.message,
+          statusCode: 429,
+          timestamp: new Date().toISOString(),
+        },
+        { status: 429 },
+      );
+    }
+    throw error;
+  }
+}
+
 export type MailJmapProxyProbeResult =
   | { ok: true }
   | { ok: false; status: number };
+
+/** The health probe holds a password, but the proxy only relays bearers. */
+async function mintProbeBearer(input: {
+  username: string;
+  password: string;
+  adminClient: Pick<
+    StalwartAdminClient,
+    "ensureOAuthClient" | "issueOAuthAccessToken"
+  >;
+}): Promise<string> {
+  const clientId = getStalwartMailBridgeClientId();
+  const redirectUri = buildStalwartMailBridgeRedirectUri();
+  await input.adminClient.ensureOAuthClient({
+    clientId,
+    redirectUri,
+    description: "Solace mail backend bridge",
+  });
+  const { codeVerifier, codeChallenge } = await createMailBridgePkcePair();
+  const token = await input.adminClient.issueOAuthAccessToken({
+    accountName: input.username,
+    accountSecret: input.password,
+    clientId,
+    redirectUri,
+    codeVerifier,
+    codeChallenge,
+  });
+  return `Bearer ${token.access_token}`;
+}
 
 /** Exercises the same JMAP discovery proxy path browser/native clients use. */
 export async function probeMailJmapProxyDiscovery(input: {
   username: string;
   password: string;
   mailService?: IMailService;
+  adminClient?: Pick<
+    StalwartAdminClient,
+    "ensureOAuthClient" | "issueOAuthAccessToken"
+  >;
   jmapFetch?: JmapProxyFetcher;
   jmapUpstreamBaseUrl?: string;
 }): Promise<MailJmapProxyProbeResult> {
-  const authorization = `Basic ${Buffer.from(
-    `${input.username}:${input.password}`,
-    "utf8",
-  ).toString("base64")}`;
+  const authorization = await mintProbeBearer({
+    username: input.username,
+    password: input.password,
+    adminClient: input.adminClient ?? createStalwartAdminClient(),
+  });
   const response = await proxyJmapRequest({
     request: new Request("http://healthcheck.local/mail/jmap/.well-known/jmap", {
       method: "GET",
@@ -804,9 +890,11 @@ export function createMailRoutes(
   options: {
     jmapFetch?: JmapProxyFetcher;
     jmapUpstreamBaseUrl?: string;
+    jmapRateLimit?: RateLimitConfig;
   } = {},
 ) {
   const jmapFetch = options.jmapFetch ?? fetch;
+  const jmapRateLimit = options.jmapRateLimit ?? JMAP_PROXY_RATE_LIMIT;
   const jmapUpstreamBaseUrl =
     options.jmapUpstreamBaseUrl ?? env.stalwartBaseUrl;
   const authDetail = authenticatedRouteDetail("Mail");
@@ -876,6 +964,7 @@ export function createMailRoutes(
           "Forwards JMAP discovery to the configured Stalwart instance so browser clients can operate without direct cross-origin access.",
       },
     }, ({ request }) =>
+      guardJmapProxyRate(request, jmapRateLimit) ??
       proxyJmapRequest({
         request,
         upstreamPath: "/.well-known/jmap",
@@ -891,6 +980,7 @@ export function createMailRoutes(
           "Forwards authenticated JMAP calls to Stalwart while keeping private-key operations in the browser.",
       },
     }, ({ request }) =>
+      guardJmapProxyRate(request, jmapRateLimit) ??
       proxyJmapRequest({
         request,
         upstreamPath: "/jmap/",
@@ -906,6 +996,7 @@ export function createMailRoutes(
           "Forwards authenticated JMAP calls to Stalwart while keeping private-key operations in the browser.",
       },
     }, ({ request }) =>
+      guardJmapProxyRate(request, jmapRateLimit) ??
       proxyJmapRequest({
         request,
         upstreamPath: "/jmap/",
@@ -921,6 +1012,7 @@ export function createMailRoutes(
           "Forwards nested JMAP download, upload, and event-source requests to Stalwart through the backend proxy.",
       },
     }, ({ params, request }) =>
+      guardJmapProxyRate(request, jmapRateLimit) ??
       proxyJmapRequest({
         request,
         upstreamPath: `/jmap/${params["*"]}`,
