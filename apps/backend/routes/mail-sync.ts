@@ -5,7 +5,6 @@ import { createStalwartUserJmapClient } from "../lib/stalwart-user-jmap";
 import { defaultMailService } from "../lib/default-mail-service";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { MailSyncService } from "../services/mail-sync.service";
-import { getDefaultStalwartCalendarClient } from "../lib/default-stalwart-calendar";
 import { MailCalendarIngestionService } from "../services/mail-calendar-ingestion.service";
 import { RouteModel, routeModels } from "../contracts";
 
@@ -14,8 +13,7 @@ export const defaultMailSyncService = new MailSyncService(
   createStalwartUserJmapClient({ tokens: defaultMailService }),
   new MailCalendarIngestionService(
     prisma,
-    undefined,
-    getDefaultStalwartCalendarClient(),
+    undefined
   ),
 );
 
