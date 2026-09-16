@@ -7,10 +7,15 @@ import { encryptReminderTitle } from "../lib/notification-title-crypto";
 export function useReminderTitleEncryptor(): ReminderTitleEncryptor {
   const { runWithAccountKey } = useE2ee();
   return useCallback(
-    (eventId, title) =>
-      runWithAccountKey((accountKey) =>
-        encryptReminderTitle(accountKey, eventId, title),
-      ),
+    async (eventId, title) => {
+      // runWithAccountKey yields null when there is no account key yet. Wrap the
+      // result so that case stays distinct from "empty title" (also null): no
+      // key means undefined, which leaves the stored ciphertext alone.
+      const encrypted = await runWithAccountKey(async (accountKey) => ({
+        value: await encryptReminderTitle(accountKey, eventId, title),
+      }));
+      return encrypted ? encrypted.value : undefined;
+    },
     [runWithAccountKey],
   );
 }

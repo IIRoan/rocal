@@ -45,6 +45,21 @@ describe("security headers", () => {
     );
   });
 
+  it("lets the avatar proxy load cross-origin as an <img>", () => {
+    // Previews serve web from *.vercel.app while the API stays on api.solace.onl,
+    // so same-site would block avatars there.
+    expect(
+      buildSecurityHeaders({ isProduction: true, pathname: "/api/profiles/avatar" })[
+        "Cross-Origin-Resource-Policy"
+      ],
+    ).toBe("cross-origin");
+    expect(
+      buildSecurityHeaders({ isProduction: true, pathname: "/api/events" })[
+        "Cross-Origin-Resource-Policy"
+      ],
+    ).toBe("same-site");
+  });
+
   it("omits HSTS outside production", () => {
     expect(
       buildSecurityHeaders({ isProduction: false, pathname: "/api/json" }),

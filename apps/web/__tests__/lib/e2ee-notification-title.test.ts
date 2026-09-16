@@ -56,9 +56,12 @@ describe("encryptReminderTitle", () => {
     ).resolves.toBe("Lunch with Sam");
   });
 
-  it("returns null without a session or title", async () => {
+  it("clears the title when there is none, and keeps it when locked", async () => {
     mockGetActiveE2eeSession.mockReturnValue(null);
-    await expect(encryptReminderTitle("evt-1", "Lunch")).resolves.toBeNull();
+    // No session: undefined leaves whatever ciphertext is stored alone.
+    await expect(encryptReminderTitle("evt-1", "Lunch")).resolves.toBeUndefined();
+    // No title: null tells the API to clear it.
     await expect(encryptReminderTitle("evt-1", "  ")).resolves.toBeNull();
+    await expect(encryptReminderTitle("evt-1", null)).resolves.toBeNull();
   });
 });

@@ -66,7 +66,7 @@ describe("persistEventReminderNotifications", () => {
     });
   });
 
-  it("still saves the reminder when title encryption fails", async () => {
+  it("keeps the stored title when encryption fails", async () => {
     encryptTitle.mockRejectedValueOnce(new Error("no key"));
 
     await persistEventReminderNotifications(
@@ -75,10 +75,12 @@ describe("persistEventReminderNotifications", () => {
       encryptTitle,
     );
 
+    // undefined, not null: a locked session must not wipe a title another
+    // device saved. The reminder itself still saves.
     expect(updateEventNotifications).toHaveBeenCalledWith(
       "evt-1",
       expect.any(Array),
-      { encryptedDisplayTitle: null },
+      { encryptedDisplayTitle: undefined },
     );
   });
 });

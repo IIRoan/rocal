@@ -39,20 +39,23 @@ function notificationKeyFor(accountKey: CryptoKey): Promise<CryptoKey> {
 }
 
 /**
- * Encrypts a reminder title for `PUT /notifications/event/:id`. Returns null
- * (generic lock-screen copy) when there is no title or no E2EE session; the
- * plaintext title never leaves the browser.
+ * Encrypts a reminder title for `PUT /notifications/event/:id`; the plaintext
+ * title never leaves the browser. The API reads the three states differently,
+ * so keep them distinct: ciphertext replaces the stored title, `null` clears it
+ * (no title), and `undefined` leaves whatever is stored alone — used when this
+ * device cannot encrypt right now, so a locked session never wipes a title that
+ * another device saved.
  */
 export async function encryptReminderTitle(
   eventId: string,
   title: string | null | undefined,
-): Promise<string | null> {
+): Promise<string | null | undefined> {
   if (!title?.trim()) {
     return null;
   }
   const session = await getEncryptionSession();
   if (!session) {
-    return null;
+    return undefined;
   }
   return encryptNotificationTitle(
     webCrypto(),

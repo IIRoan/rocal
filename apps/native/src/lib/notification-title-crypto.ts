@@ -33,6 +33,7 @@ export async function exportNotificationKey(
   return bytesToBase64Url((await notificationKeyFor(accountKey)).bytes);
 }
 
+/** Ciphertext for the reminder title, or null when the title is empty. */
 export async function encryptReminderTitle(
   accountKey: CryptoKey,
   eventId: string,

@@ -86,6 +86,39 @@ describe("sanitizeContext", () => {
 });
 
 describe("scrubErrorEvent", () => {
+  it("keeps frame paths source maps are keyed by", () => {
+    const scrubbed = scrubErrorEvent({
+      exception: {
+        values: [
+          {
+            stacktrace: {
+              frames: [
+                { filename: "https://solace.onl/_next/static/chunks/a1b2.js?v=3" },
+                { filename: "/Users/alice/solace/apps/web/lib/mail/jmap-client.ts" },
+                { filename: "/var/task/node_modules/elysia/dist/index.js" },
+                { filename: "/private/var/containers/ABC-123/main.jsbundle" },
+              ],
+            },
+          },
+        ],
+      },
+    }) as {
+      exception: { values: Array<{ stacktrace: { frames: Array<{ filename: string }> } }> };
+    };
+
+    expect(
+      scrubbed.exception.values[0].stacktrace.frames.map((frame) => frame.filename),
+    ).toEqual([
+      // Public bundle URL: kept (minus the query) so the uploaded map matches.
+      "https://solace.onl/_next/static/chunks/a1b2.js",
+      // Absolute prefixes with a username are dropped, the project tail stays.
+      "apps/web/lib/mail/jmap-client.ts",
+      "node_modules/elysia/dist/index.js",
+      // No recognizable project root: bare file name, as before.
+      "main.jsbundle",
+    ]);
+  });
+
   it("scrubs every PII-bearing part of a Sentry event", () => {
     const event = {
       event_id: "abc",
@@ -142,7 +175,14 @@ describe("scrubErrorEvent", () => {
       type: "Error",
       value: "JMAP failed for [email]: [url]",
       stacktrace: {
-        frames: [{ filename: "auth.ts", function: "handler", lineno: 10, colno: 2 }],
+        frames: [
+          {
+            filename: "apps/backend/lib/auth.ts",
+            function: "handler",
+            lineno: 10,
+            colno: 2,
+          },
+        ],
       },
     });
     expect(scrubbed.extra).toEqual({ subject: "[omitted]", requestId: "req-1" });

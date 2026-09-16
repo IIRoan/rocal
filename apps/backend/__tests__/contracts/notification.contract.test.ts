@@ -23,13 +23,19 @@ describe("updateEventNotificationsBodySchema", () => {
     ).toBe(true);
   });
 
-  it("rejects a plaintext reminder title", () => {
-    expect(
-      updateEventNotificationsBodySchema.safeParse({
-        notifications,
-        displayTitle: "Lunch with Sam",
-      }).success,
-    ).toBe(false);
+  it("drops a plaintext reminder title from shipped clients", () => {
+    const parsed = updateEventNotificationsBodySchema.safeParse({
+      notifications,
+      displayTitle: "Lunch with Sam",
+    });
+
+    // Accepted so the reminder still saves, but the title never gets through.
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.displayTitle).toBeUndefined();
+    expect(JSON.stringify(parsed.success && parsed.data)).not.toContain("Lunch");
+  });
+
+  it("rejects a plaintext title in the ciphertext field", () => {
     expect(
       updateEventNotificationsBodySchema.safeParse({
         notifications,
