@@ -132,11 +132,6 @@ export interface IMailService {
   getVaultBackupForUser(
     input: GetMailVaultBackupForUserInput,
   ): Promise<MailVaultBackupResult>;
-  getVaultWrapProgress(): Promise<{
-    wrapped: number;
-    legacy: number;
-    total: number;
-  }>;
   upsertVaultBackup(
     input: UpsertMailVaultBackupInput,
   ): Promise<MailVaultBackupResult>;

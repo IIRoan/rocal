@@ -4,9 +4,6 @@ jest.mock("../../lib/mail-key-utils", () => ({
   getOpenPgpPublicKeyFingerprint: jest.fn(async () => "ABCD1234EF567890"),
 }));
 
-process.env.MAIL_VAULT_HMAC_KEY = Buffer.from(
-  "0123456789abcdef0123456789abcdef",
-).toString("base64");
 process.env.MAIL_BRIDGE_HMAC_KEY = Buffer.from(
   "fedcba9876543210fedcba9876543210",
 ).toString("base64");
@@ -53,9 +50,6 @@ function createMockPrisma() {
     },
     mailJmapSyncState: {
       deleteMany: jest.fn(async () => ({ count: 0 })),
-    },
-    mailVaultBackup: {
-      count: jest.fn<(args?: unknown) => Promise<number>>(async () => 0),
     },
     user: {
       findFirst: jest.fn<() => Promise<any | null>>(async () => null),
@@ -1140,18 +1134,6 @@ describe("MailService", () => {
       },
       wrappedSecret: null,
       wrapAlgorithm: null,
-    });
-  });
-
-  it("counts vaults the server can still open", async () => {
-    mockPrisma.mailVaultBackup.count
-      .mockResolvedValueOnce(5)
-      .mockResolvedValueOnce(2);
-
-    await expect(service.getVaultWrapProgress()).resolves.toEqual({
-      wrapped: 2,
-      legacy: 3,
-      total: 5,
     });
   });
 
