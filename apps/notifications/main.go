@@ -14,7 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"syscall"
 	"time"
 
@@ -77,12 +77,12 @@ type NotificationServer struct {
 	pusher          *push.Client
 	maxErrors       int
 	log             logger.Logger
-	cleanupRunning  atomic.Bool
+	mu              sync.Mutex
 }
 
 func NewNotificationServer() *NotificationServer {
 	return &NotificationServer{
-		cron:      cron.New(cron.WithSeconds()),
+		cron:      cron.New(cron.WithSeconds(), cron.WithChain(cron.SkipIfStillRunning(cron.DiscardLogger))),
 		maxErrors: 50,
 		errors:    make([]NotificationError, 0),
 		log:       logger.New("notifications"),
@@ -274,7 +274,7 @@ func loadAPNsConfig() (apnsConfig, []string, error) {
 	if cfg.teamID == "" {
 		missing = append(missing, "APNS_TEAM_ID")
 	}
-	if len(bytesTrimSpace(cfg.pem)) == 0 {
+	if len(cfg.pem) == 0 {
 		if strings.TrimSpace(os.Getenv("APNS_AUTH_KEY_FILE")) != "" {
 			missing = append(missing, "APNS_AUTH_KEY_FILE")
 		} else {
@@ -310,10 +310,6 @@ func normalizeAPNsPEM(raw []byte) []byte {
 	return []byte("-----BEGIN PRIVATE KEY-----\n" + s + "\n-----END PRIVATE KEY-----")
 }
 
-func bytesTrimSpace(value []byte) []byte {
-	return []byte(strings.TrimSpace(string(value)))
-}
-
 func (ns *NotificationServer) initDB() error {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -343,7 +339,10 @@ func (ns *NotificationServer) initDB() error {
 }
 
 func (ns *NotificationServer) Start() error {
-	if ns.isRunning {
+	ns.mu.Lock()
+	running := ns.isRunning
+	ns.mu.Unlock()
+	if running {
 		return nil
 	}
 
@@ -351,14 +350,15 @@ func (ns *NotificationServer) Start() error {
 		return err
 	}
 
+	ns.mu.Lock()
 	ns.isRunning = true
+	ns.mu.Unlock()
 	ns.initMailer()
 	ns.initPush()
 
 	_, err := ns.cron.AddFunc("*/5 * * * * *", func() {
 		if err := ns.processScheduledNotifications(); err != nil {
-			ns.failedCount++
-			ns.addError(err.Error())
+			ns.noteFailure(err)
 			ns.log.Err("Scheduled processing failed: %v", err)
 		}
 	})
@@ -380,8 +380,7 @@ func (ns *NotificationServer) Start() error {
 	ns.cron.Start()
 	go func() {
 		if err := ns.processScheduledNotifications(); err != nil {
-			ns.failedCount++
-			ns.addError(err.Error())
+			ns.noteFailure(err)
 			ns.log.Err("Startup notification processing failed: %v", err)
 		}
 	}()
@@ -390,11 +389,14 @@ func (ns *NotificationServer) Start() error {
 }
 
 func (ns *NotificationServer) Stop() {
-	if !ns.isRunning {
+	ns.mu.Lock()
+	running := ns.isRunning
+	ns.isRunning = false
+	ns.mu.Unlock()
+	if !running {
 		return
 	}
 
-	ns.isRunning = false
 	ctx := ns.cron.Stop()
 	<-ctx.Done()
 	if ns.db != nil {
@@ -411,7 +413,16 @@ func (ns *NotificationServer) Shutdown() {
 	ns.Stop()
 }
 
+func (ns *NotificationServer) noteFailure(err error) {
+	ns.mu.Lock()
+	ns.failedCount++
+	ns.mu.Unlock()
+	ns.addError(err.Error())
+}
+
 func (ns *NotificationServer) addError(message string) {
+	ns.mu.Lock()
+	defer ns.mu.Unlock()
 	ns.errors = append(ns.errors, NotificationError{
 		Error:     message,
 		Timestamp: time.Now(),
@@ -424,7 +435,9 @@ func (ns *NotificationServer) addError(message string) {
 
 func (ns *NotificationServer) processScheduledNotifications() error {
 	now := time.Now()
+	ns.mu.Lock()
 	ns.lastProcessedAt = &now
+	ns.mu.Unlock()
 
 	if ns.db == nil {
 		return fmt.Errorf("database service not configured")
@@ -435,8 +448,7 @@ func (ns *NotificationServer) processScheduledNotifications() error {
 
 	due, dueErr := schedule.ClaimDue(ctx, ns.db, now)
 	if dueErr != nil {
-		ns.failedCount++
-		ns.addError(dueErr.Error())
+		ns.noteFailure(dueErr)
 		ns.log.Err("Failed to claim due reminder schedules: %v", dueErr)
 	} else if len(due) > 0 {
 		ns.log.Info("Claimed %d due reminder schedule(s)", len(due))
@@ -469,8 +481,7 @@ func (ns *NotificationServer) processScheduledNotifications() error {
 				continue
 			}
 			failed++
-			ns.failedCount++
-			ns.addError(err.Error())
+			ns.noteFailure(err)
 			ns.log.Err("Failed to send %s %s job: %v", job.Kind, job.Channel, err)
 			if logErr := jobs.InsertLog(ctx, ns.db, job, "failed"); logErr != nil {
 				ns.log.Warn("Failed to write notification failure log for %s: %v", job.ID, logErr)
@@ -496,12 +507,6 @@ func (ns *NotificationServer) runRetentionCleanup() error {
 	if ns.db == nil {
 		return fmt.Errorf("database service not configured")
 	}
-	if !ns.cleanupRunning.CompareAndSwap(false, true) {
-		ns.log.Info("Retention cleanup still running; skipping this tick")
-		return nil
-	}
-	defer ns.cleanupRunning.Store(false)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
@@ -620,12 +625,15 @@ func (ns *NotificationServer) dispatchPushJob(ctx context.Context, job jobs.Job)
 		}
 		sent++
 	}
-	if sent < len(devices) {
+	if sent == 0 {
 		if lastErr == nil {
-			lastErr = fmt.Errorf("APNs delivered to %d/%d devices", sent, len(devices))
+			lastErr = fmt.Errorf("APNs accepted none of %d device(s)", len(devices))
 		}
-		ns.log.Warn("Delivered %s push to %d/%d device(s)", kind, sent, len(devices))
 		return lastErr
+	}
+	if sent < len(devices) {
+		ns.log.Warn("Delivered %s push to %d/%d device(s)", kind, sent, len(devices))
+		return nil
 	}
 	ns.log.Info("Delivered %s push to %d/%d device(s)", kind, sent, len(devices))
 	return nil
@@ -657,21 +665,10 @@ func (ns *NotificationServer) sendPushToDevice(ctx context.Context, device jobs.
 	return nil
 }
 
-func nullableString(value sql.NullString) string {
-	if value.Valid {
-		return value.String
-	}
-	return ""
-}
-
 const reminderMailTitle = "Event reminder"
 
 func (ns *NotificationServer) generateEmailContent(event EventData, user UserData, minutesBefore int, eventID string) (*EmailContent, error) {
-	formattedDetails, err := ns.formatEventDetailsForEmail(event, user.TimeZone, minutesBefore)
-	if err != nil {
-		return nil, err
-	}
-
+	formattedDetails := ns.formatEventDetailsForEmail(event, user.TimeZone, minutesBefore)
 	templateData := templates.EmailTemplateData{
 		EventID:        eventID,
 		EventTitle:     reminderMailTitle,
@@ -704,16 +701,21 @@ func (ns *NotificationServer) generateEmailContent(event EventData, user UserDat
 	}, nil
 }
 
+// locationFor falls back to UTC for an unset or unknown timezone.
+func locationFor(timezone string) *time.Location {
+	if timezone != "" {
+		if loaded, err := time.LoadLocation(timezone); err == nil {
+			return loaded
+		}
+	}
+	return time.UTC
+}
+
 func (ns *NotificationServer) reminderSummary(event EventData, timezone, eventDate string) string {
 	if event.AllDay {
 		return fmt.Sprintf("You have an all-day event on %s. Open Solace to view the details.", eventDate)
 	}
-	loc := time.UTC
-	if timezone != "" {
-		if loaded, err := time.LoadLocation(timezone); err == nil {
-			loc = loaded
-		}
-	}
+	loc := locationFor(timezone)
 	return fmt.Sprintf("You have an event at %s. Open Solace to view the details.", event.Start.In(loc).Format("3:04 PM"))
 }
 
@@ -725,14 +727,8 @@ type formattedEventDetails struct {
 	Duration       string
 }
 
-func (ns *NotificationServer) formatEventDetailsForEmail(event EventData, timezone string, minutesBefore int) (*formattedEventDetails, error) {
-	loc := time.UTC
-	if timezone != "" {
-		if loaded, err := time.LoadLocation(timezone); err == nil {
-			loc = loaded
-		}
-	}
-
+func (ns *NotificationServer) formatEventDetailsForEmail(event EventData, timezone string, minutesBefore int) formattedEventDetails {
+	loc := locationFor(timezone)
 	start := event.Start.In(loc)
 	end := event.End.In(loc)
 	eventTime := "All day"
@@ -744,13 +740,18 @@ func (ns *NotificationServer) formatEventDetailsForEmail(event EventData, timezo
 		}
 	}
 
-	return &formattedEventDetails{
+	timeUntil := "Your event is starting now"
+	if minutesBefore > 0 {
+		timeUntil = compactReminderDelay(minutesBefore)
+	}
+
+	return formattedEventDetails{
 		EventDate:      start.Format("Monday, Jan 2"),
 		EventTime:      eventTime,
-		TimeUntilEvent: strings.TrimPrefix(ns.formatReminderText(minutesBefore), "Your event starts in "),
+		TimeUntilEvent: timeUntil,
 		ReminderText:   ns.formatReminderText(minutesBefore),
 		Duration:       ns.calculateEventDuration(event.Start, event.End, event.AllDay),
-	}, nil
+	}
 }
 
 func (ns *NotificationServer) calculateEventDuration(start, end time.Time, allDay bool) string {
@@ -782,23 +783,25 @@ func (ns *NotificationServer) formatReminderText(minutesBefore int) string {
 	if minutesBefore <= 0 {
 		return "Your event is starting now"
 	}
+	return "Your event starts in " + compactReminderDelay(minutesBefore)
+}
+
+// compactReminderDelay renders a positive lead time as "45 minutes", "2 hours" or "1h 30m".
+func compactReminderDelay(minutesBefore int) string {
 	if minutesBefore < 60 {
 		if minutesBefore == 1 {
-			return "Your event starts in 1 minute"
+			return "1 minute"
 		}
-		return fmt.Sprintf("Your event starts in %d minutes", minutesBefore)
+		return fmt.Sprintf("%d minutes", minutesBefore)
 	}
-
-	hours := minutesBefore / 60
-	remainingMinutes := minutesBefore % 60
-	if remainingMinutes == 0 {
-		if hours == 1 {
-			return "Your event starts in 1 hour"
-		}
-		return fmt.Sprintf("Your event starts in %d hours", hours)
+	hours, minutes := minutesBefore/60, minutesBefore%60
+	if minutes > 0 {
+		return fmt.Sprintf("%dh %dm", hours, minutes)
 	}
-
-	return fmt.Sprintf("Your event starts in %dh %dm", hours, remainingMinutes)
+	if hours == 1 {
+		return "1 hour"
+	}
+	return fmt.Sprintf("%d hours", hours)
 }
 
 func (ns *NotificationServer) generateEmailSubject(event EventData, minutesBefore int) string {
@@ -833,33 +836,10 @@ func (ns *NotificationServer) sendEmailNotification(ctx context.Context, event E
 	}
 
 	ns.log.OK("Email queued successfully: %s", id)
+	ns.mu.Lock()
 	ns.processedCount++
+	ns.mu.Unlock()
 	return nil
-}
-
-func (ns *NotificationServer) getFromAddress(event EventData, minutesBefore int) (string, error) {
-	from, err := resolveBaseFromAddress()
-	if err != nil {
-		return "", err
-	}
-	if from == "" {
-		return "", fmt.Errorf("EMAIL_FROM is not configured; set it to the Stalwart Identity address")
-	}
-
-	displayName := ns.senderDisplayName(event, minutesBefore)
-	if displayName == "" {
-		return from, nil
-	}
-
-	return (&mail.Address{Name: displayName, Address: from}).String(), nil
-}
-
-func (ns *NotificationServer) senderDisplayName(event EventData, minutesBefore int) string {
-	if minutesBefore <= 0 {
-		return "Reminder starting now"
-	}
-
-	return fmt.Sprintf("Reminder in %s", ns.formatReminderSummary(minutesBefore))
 }
 
 func (ns *NotificationServer) formatReminderSummary(minutesBefore int) string {
@@ -947,6 +927,7 @@ func buildFrontendURL(path string, query map[string]string) string {
 
 func (ns *NotificationServer) GetStatus() *NotificationStatus {
 	pendingCount := 0
+
 	if ns.db != nil {
 		count, err := ns.countPendingNotifications()
 		if err != nil {
@@ -956,13 +937,15 @@ func (ns *NotificationServer) GetStatus() *NotificationStatus {
 		}
 	}
 
+	ns.mu.Lock()
+	defer ns.mu.Unlock()
 	return &NotificationStatus{
 		IsRunning:            ns.isRunning,
 		PendingNotifications: pendingCount,
 		LastProcessedAt:      ns.lastProcessedAt,
 		ProcessedCount:       ns.processedCount,
 		FailedCount:          ns.failedCount,
-		Errors:               ns.errors,
+		Errors:               append([]NotificationError(nil), ns.errors...),
 	}
 }
 
@@ -991,9 +974,13 @@ func (ns *NotificationServer) statusHandler(w http.ResponseWriter, r *http.Reque
 func (ns *NotificationServer) healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	ns.mu.Lock()
+	running := ns.isRunning
+	ns.mu.Unlock()
+
 	statusCode := http.StatusOK
 	status := "healthy"
-	if !ns.isRunning {
+	if !running {
 		statusCode = http.StatusServiceUnavailable
 		status = "stopped"
 	}

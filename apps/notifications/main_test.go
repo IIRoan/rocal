@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"net/mail"
 	"notifications/internal/email"
 	"notifications/internal/jobs"
 	"notifications/internal/logger"
@@ -15,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -89,19 +88,6 @@ func TestRetentionCleanupRequiresDatabase(t *testing.T) {
 	}
 }
 
-func TestRetentionCleanupSkipsOverlappingRuns(t *testing.T) {
-	server := newTestServer(t)
-	server.db = &sql.DB{}
-	server.cleanupRunning.Store(true)
-
-	if err := server.runRetentionCleanup(); err != nil {
-		t.Fatalf("expected overlapping run to be skipped, got %v", err)
-	}
-	if !server.cleanupRunning.Load() {
-		t.Fatal("skipped run must not clear the in-progress flag")
-	}
-}
-
 func TestCalculateEventDuration(t *testing.T) {
 	server := newTestServer(t)
 	start := time.Date(2026, time.January, 10, 9, 0, 0, 0, time.UTC)
@@ -168,14 +154,11 @@ func TestFormatEventDetailsForEmail(t *testing.T) {
 			t.Fatalf("failed to load timezone: %v", err)
 		}
 
-		details, err := server.formatEventDetailsForEmail(EventData{
+		details := server.formatEventDetailsForEmail(EventData{
 			Start:  start,
 			End:    end,
 			AllDay: false,
 		}, "Europe/Amsterdam", 90)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
 
 		if details.EventDate != start.In(loc).Format("Monday, Jan 2") {
 			t.Fatalf("expected EventDate to use user timezone, got %q", details.EventDate)
@@ -196,14 +179,11 @@ func TestFormatEventDetailsForEmail(t *testing.T) {
 	})
 
 	t.Run("all day event renders all day labels", func(t *testing.T) {
-		details, err := server.formatEventDetailsForEmail(EventData{
+		details := server.formatEventDetailsForEmail(EventData{
 			Start:  start,
 			End:    end,
 			AllDay: true,
 		}, "", 0)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
 
 		if details.EventTime != "All day" {
 			t.Fatalf("expected all-day EventTime, got %q", details.EventTime)
@@ -222,14 +202,11 @@ func TestFormatEventDetailsForEmail(t *testing.T) {
 		localStart := time.Date(2026, time.January, 10, 0, 0, 0, 0, loc)
 		localEnd := time.Date(2026, time.January, 10, 23, 59, 59, 0, loc)
 
-		details, err := server.formatEventDetailsForEmail(EventData{
+		details := server.formatEventDetailsForEmail(EventData{
 			Start:  localStart.UTC(),
 			End:    localEnd.UTC(),
 			AllDay: true,
 		}, "Europe/Amsterdam", 0)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
 
 		if details.EventDate != localStart.Format("Monday, Jan 2") {
 			t.Fatalf("expected EventDate %q, got %q", localStart.Format("Monday, Jan 2"), details.EventDate)
@@ -241,32 +218,6 @@ func TestFormatEventDetailsForEmail(t *testing.T) {
 			t.Fatalf("expected all-day Duration, got %q", details.Duration)
 		}
 	})
-}
-
-func TestSenderDisplayAndFromAddress(t *testing.T) {
-	t.Setenv("EMAIL_FROM_ADDRESS", "Notifications <no-reply@example.com>")
-	server := newTestServer(t)
-
-	display := server.senderDisplayName(EventData{}, 90)
-	if display != "Reminder in 1 hour 30 minutes" {
-		t.Fatalf("unexpected sender display name %q", display)
-	}
-
-	from, err := server.getFromAddress(EventData{}, 90)
-	if err != nil {
-		t.Fatalf("unexpected from-address error: %v", err)
-	}
-
-	parsed, err := mail.ParseAddress(from)
-	if err != nil {
-		t.Fatalf("expected valid mail address, got error: %v", err)
-	}
-	if parsed.Address != "no-reply@example.com" {
-		t.Fatalf("expected sender address to be preserved, got %q", parsed.Address)
-	}
-	if parsed.Name != display {
-		t.Fatalf("expected sender display name %q, got %q", display, parsed.Name)
-	}
 }
 
 func TestResolveBaseFromAddress(t *testing.T) {
@@ -514,18 +465,6 @@ func TestDispatchSkipsUnconfiguredChannelsIndependently(t *testing.T) {
 	}
 }
 
-func TestNullableString(t *testing.T) {
-	if got := nullableString(sql.NullString{String: "hello", Valid: true}); got != "hello" {
-		t.Fatalf("expected 'hello', got %q", got)
-	}
-	if got := nullableString(sql.NullString{String: "ghost", Valid: false}); got != "" {
-		t.Fatalf("expected empty for invalid NullString, got %q", got)
-	}
-	if got := nullableString(sql.NullString{}); got != "" {
-		t.Fatalf("expected empty for zero NullString, got %q", got)
-	}
-}
-
 func TestGetPort(t *testing.T) {
 	t.Run("defaults to 4002", func(t *testing.T) {
 		t.Setenv("PORT", "")
@@ -589,20 +528,6 @@ func TestLoadAPNsConfig(t *testing.T) {
 			t.Fatalf("expected wrapped PEM, got %q", got)
 		}
 	})
-}
-
-func TestSenderDisplayNameEdgeCases(t *testing.T) {
-	server := newTestServer(t)
-
-	if got := server.senderDisplayName(EventData{}, 60); got != "Reminder in 1 hour" {
-		t.Fatalf("unexpected display name %q", got)
-	}
-	if got := server.senderDisplayName(EventData{}, 0); got != "Reminder starting now" {
-		t.Fatalf("expected starting now display, got %q", got)
-	}
-	if got := server.senderDisplayName(EventData{}, -5); got != "Reminder starting now" {
-		t.Fatalf("expected starting now for negative minutes, got %q", got)
-	}
 }
 
 func TestGenerateEmailSubjectEdgeCases(t *testing.T) {
@@ -693,15 +618,11 @@ func TestFormatEventDetailsInvalidTimezone(t *testing.T) {
 	start := time.Date(2026, time.June, 1, 12, 0, 0, 0, time.UTC)
 	end := start.Add(1 * time.Hour)
 
-	details, err := server.formatEventDetailsForEmail(EventData{
+	details := server.formatEventDetailsForEmail(EventData{
 		Start:  start,
 		End:    end,
 		AllDay: false,
 	}, "Invalid/Timezone", 30)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
 
 	if details.EventDate != start.Format("Monday, Jan 2") {
 		t.Fatalf("expected UTC fallback date, got %q", details.EventDate)
@@ -716,14 +637,10 @@ func TestFormatEventDetailsEmptyTimezone(t *testing.T) {
 	start := time.Date(2026, time.June, 1, 8, 0, 0, 0, time.UTC)
 	end := start.Add(30 * time.Minute)
 
-	details, err := server.formatEventDetailsForEmail(EventData{
+	details := server.formatEventDetailsForEmail(EventData{
 		Start: start,
 		End:   end,
 	}, "", 15)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
 	if details.EventTime != "8:00 AM - 8:30 AM" {
 		t.Fatalf("expected UTC time with empty tz, got %q", details.EventTime)
 	}
@@ -733,14 +650,10 @@ func TestFormatEventDetailsSinglePointTime(t *testing.T) {
 	server := newTestServer(t)
 	start := time.Date(2026, time.March, 1, 15, 0, 0, 0, time.UTC)
 
-	details, err := server.formatEventDetailsForEmail(EventData{
+	details := server.formatEventDetailsForEmail(EventData{
 		Start: start,
 		End:   start,
 	}, "UTC", 10)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
 	if details.EventTime != "3:00 PM" {
 		t.Fatalf("expected single time point, got %q", details.EventTime)
 	}
@@ -792,55 +705,6 @@ func TestGenerateEmailContentConditionalFields(t *testing.T) {
 	if !strings.Contains(content.HTML, "1h 30m") || !strings.Contains(content.Text, "Duration: 1h 30m") {
 		t.Fatal("expected duration in reminder mail")
 	}
-}
-
-func TestGetFromAddressErrors(t *testing.T) {
-	server := newTestServer(t)
-	event := EventData{}
-
-	t.Run("missing from address", func(t *testing.T) {
-		t.Setenv("EMAIL_FROM", "")
-		t.Setenv("EMAIL_FROM_ADDRESS", "")
-		t.Setenv("FROM_EMAIL", "")
-
-		_, err := server.getFromAddress(event, 15)
-		if err == nil || !strings.Contains(err.Error(), "not configured") {
-			t.Fatalf("expected not-configured error, got %v", err)
-		}
-	})
-
-	t.Run("invalid from address", func(t *testing.T) {
-		t.Setenv("EMAIL_FROM", "not-an-email")
-		t.Setenv("EMAIL_FROM_ADDRESS", "")
-		t.Setenv("FROM_EMAIL", "")
-
-		_, err := server.getFromAddress(event, 15)
-		if err == nil {
-			t.Fatal("expected error for invalid email address")
-		}
-	})
-
-	t.Run("valid from address includes display name", func(t *testing.T) {
-		t.Setenv("EMAIL_FROM", "noreply@solace.onl")
-		t.Setenv("EMAIL_FROM_ADDRESS", "")
-		t.Setenv("FROM_EMAIL", "")
-
-		from, err := server.getFromAddress(event, 30)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		parsed, err := mail.ParseAddress(from)
-		if err != nil {
-			t.Fatalf("expected valid address, got error: %v", err)
-		}
-		if parsed.Address != "noreply@solace.onl" {
-			t.Fatalf("expected noreply@solace.onl, got %q", parsed.Address)
-		}
-		if parsed.Name != "Reminder in 30 minutes" {
-			t.Fatalf("expected generic display name, got %q", parsed.Name)
-		}
-	})
 }
 
 func TestAddErrorConcurrency(t *testing.T) {
@@ -1100,5 +964,28 @@ func TestApplyEnvFileSkipsBackendPort(t *testing.T) {
 	}
 	if got := os.Getenv("DATABASE_URL"); got != "postgres://from-backend" {
 		t.Fatalf("expected DATABASE_URL from backend env, got %q", got)
+	}
+}
+
+func TestStatusIsRaceFreeUnderConcurrentUpdates(t *testing.T) {
+	server := newTestServer(t)
+	server.maxErrors = 5
+
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 50; j++ {
+				server.noteFailure(errors.New("boom"))
+				server.healthHandler(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/health", nil))
+				_ = server.GetStatus()
+			}
+		}()
+	}
+	wg.Wait()
+
+	if status := server.GetStatus(); status.FailedCount != 400 || len(status.Errors) != 5 {
+		t.Fatalf("unexpected status after concurrent updates: %+v", status)
 	}
 }
