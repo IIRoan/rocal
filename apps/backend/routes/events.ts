@@ -3,16 +3,13 @@ import { requireAuth } from "../lib/auth-guard";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { prisma } from "../lib/prisma";
 import { EventService } from "../services/event.service";
-import { getDefaultStalwartCalendarClient } from "../lib/default-stalwart-calendar";
 import { MailCalendarIngestionService } from "../services/mail-calendar-ingestion.service";
 import { RouteModel, routeModels } from "../contracts";
 
-const stalwartClient = getDefaultStalwartCalendarClient();
-const eventService = new EventService(prisma, undefined, stalwartClient);
+const eventService = new EventService(prisma, undefined);
 const mailCalendarIngestionService = new MailCalendarIngestionService(
   prisma,
-  undefined,
-  stalwartClient,
+  undefined
 );
 
 export const eventsRoutes = new Elysia({

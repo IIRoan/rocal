@@ -356,7 +356,6 @@ describe("MailCalendarIngestionService", () => {
     const service = new MailCalendarIngestionService(
       prisma as never,
       undefined,
-      stalwartClient,
     );
 
     await service.ingestIcsContent({
@@ -365,8 +364,6 @@ describe("MailCalendarIngestionService", () => {
         attendees: ["testingprod15@solace.onl"],
       }),
     });
-
-    expect(stalwartClient.createEvent).not.toHaveBeenCalled();
     expect(prisma.calendarEvent.create).toHaveBeenCalled();
   });
 
@@ -385,7 +382,6 @@ describe("MailCalendarIngestionService", () => {
     const service = new MailCalendarIngestionService(
       prisma as never,
       undefined,
-      stalwartClient,
     );
 
     await service.ingestIcsContent({
@@ -394,22 +390,6 @@ describe("MailCalendarIngestionService", () => {
         attendees: ["guest@solace.onl"],
       }),
       attendeeStatus: "accepted",
-    });
-
-    expect(stalwartClient.createEvent).toHaveBeenCalledWith({
-      accountId: "acct-1",
-      event: expect.objectContaining({
-        calendarIds: { "remote-cal-1": true },
-        uid: "invite-1@example.com",
-        title: "Planning sync",
-        participants: expect.objectContaining({
-          p0: expect.objectContaining({
-            participationStatus: "accepted",
-            calendarAddress: "mailto:guest@solace.onl",
-          }),
-        }),
-      }),
-      sendSchedulingMessages: true,
     });
   });
 
@@ -428,7 +408,6 @@ describe("MailCalendarIngestionService", () => {
     const service = new MailCalendarIngestionService(
       prisma as never,
       undefined,
-      stalwartClient,
     );
 
     await expect(
@@ -441,11 +420,5 @@ describe("MailCalendarIngestionService", () => {
     ).resolves.toEqual({ declined: true });
 
     expect(prisma.calendarEvent.create).toHaveBeenCalled();
-    expect(stalwartClient.createEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sendSchedulingMessages: true,
-      }),
-    );
-    expect(stalwartClient.deleteEvent).toHaveBeenCalled();
   });
 });

@@ -3,12 +3,10 @@ import { requireAuth } from "../lib/auth-guard";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { prisma } from "../lib/prisma";
 import { CalendarService } from "../services/calendar.service";
-import { getDefaultStalwartCalendarClient } from "../lib/default-stalwart-calendar";
 import { RouteModel, routeModels } from "../contracts";
 
 const calendarService = new CalendarService(
-  prisma,
-  getDefaultStalwartCalendarClient(),
+  prisma
 );
 
 export const calendarsRoutes = new Elysia({
