@@ -21,8 +21,8 @@ export const CONTENT_ENCRYPTION_KEY_VERSION = 1;
 
 export type EncryptedNameKind = "calendar" | "category";
 
-export const ENCRYPTED_CALENDAR_NAME_PLACEHOLDER = "Encrypted calendar";
-export const ENCRYPTED_CATEGORY_NAME_PLACEHOLDER = "Encrypted category";
+const ENCRYPTED_CALENDAR_NAME_PLACEHOLDER = "Encrypted calendar";
+const ENCRYPTED_CATEGORY_NAME_PLACEHOLDER = "Encrypted category";
 
 /** Non-sensitive label used where a calendar name must leave the device (ICS, CalDAV). */
 export const ENCRYPTED_CALENDAR_EXTERNAL_LABEL = "Solace calendar";
@@ -51,7 +51,7 @@ export const PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE =
 export const PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE =
   "Plaintext event content must not be sent alongside encrypted content.";
 
-export const EVENT_CONTENT_FIELDS = ["title", "description", "location"] as const;
+const EVENT_CONTENT_FIELDS = ["title", "description", "location"] as const;
 export type EventContentField = (typeof EVENT_CONTENT_FIELDS)[number];
 
 function hasText(value: unknown): boolean {

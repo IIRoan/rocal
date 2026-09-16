@@ -10,7 +10,7 @@ import {
 
 /** Uses `node:http(s).request` because only its `lookup` hook makes the address check rebinding-safe. */
 
-export type SafeFetchErrorCode =
+type SafeFetchErrorCode =
   | "invalid-url"
   | "unsupported-scheme"
   | "private-network-host"
