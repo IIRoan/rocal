@@ -4,27 +4,12 @@ jest.mock("../../lib/auth-email", () => ({
   sendAuthEmail: jest.fn(async () => ({ delivered: true, channel: "stalwart" })),
 }));
 
-jest.mock("../../lib/internal-mailbox-delivery", () => ({
-  buildMimeMessage: jest.fn(() => "MIME"),
-  deliverToInternalMailbox: jest.fn(async () => ({ emailId: "email-internal-1" })),
-}));
-
 import { sendAuthEmail } from "../../lib/auth-email";
-import {
-  buildMimeMessage,
-  deliverToInternalMailbox,
-} from "../../lib/internal-mailbox-delivery";
 import { sendEventInvitationEmail } from "../../lib/event-invitation-delivery";
 import type { AuthEmailClient } from "../../lib/auth-email";
 
 const mockSendAuthEmail = sendAuthEmail as jest.MockedFunction<
   typeof sendAuthEmail
->;
-const mockDeliverToInternalMailbox = deliverToInternalMailbox as jest.MockedFunction<
-  typeof deliverToInternalMailbox
->;
-const mockBuildMimeMessage = buildMimeMessage as jest.MockedFunction<
-  typeof buildMimeMessage
 >;
 
 const logger = {
@@ -47,18 +32,11 @@ function createMockMailerClient(): AuthEmailClient {
 describe("sendEventInvitationEmail", () => {
   beforeEach(() => {
     mockSendAuthEmail.mockClear();
-    mockDeliverToInternalMailbox.mockClear();
-    mockBuildMimeMessage.mockClear();
     logger.info.mockClear();
     logger.warn.mockClear();
   });
 
-  it("delivers internal mailbox invitations directly into Stalwart", async () => {
-    const adminClient = {
-      getSession: jest.fn(),
-      callJmap: jest.fn(),
-    };
-
+  it("submits internal recipients as noreply, not by importing into their mailbox", async () => {
     const result = await sendEventInvitationEmail({
       to: "roan@solace.onl",
       from: "Solace <notifications@example.com>",
@@ -75,31 +53,20 @@ describe("sendEventInvitationEmail", () => {
         ],
       },
       logger,
-      mailerClient: null,
-      adminClient: adminClient as never,
-      adminToken: "admin-token",
-      resolveInternalMailbox: async () => ({
-        stalwartAccountId: "acct-roan",
-      }),
+      mailerClient: createMockMailerClient(),
       isProduction: false,
     });
 
-    expect(result).toEqual({ delivered: true, channel: "mailbox" });
-    expect(mockBuildMimeMessage).toHaveBeenCalledWith(
+    expect(result).toEqual({ delivered: true, channel: "stalwart" });
+    expect(mockSendAuthEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "roan@solace.onl",
+        label: "event invitation",
       }),
     );
-    expect(mockDeliverToInternalMailbox).toHaveBeenCalledWith(
-      expect.objectContaining({
-        accountId: "acct-roan",
-        mime: "MIME",
-      }),
-    );
-    expect(mockSendAuthEmail).not.toHaveBeenCalled();
   });
 
-  it("uses Stalwart submission for recipients without an internal mailbox", async () => {
+  it("uses Stalwart submission for external recipients", async () => {
     const result = await sendEventInvitationEmail({
       to: "friend@gmail.com",
       from: "Solace <notifications@example.com>",
@@ -110,14 +77,10 @@ describe("sendEventInvitationEmail", () => {
       },
       logger,
       mailerClient: createMockMailerClient(),
-      adminClient: null,
-      adminToken: "",
-      resolveInternalMailbox: async () => null,
       isProduction: false,
     });
 
     expect(result).toEqual({ delivered: true, channel: "stalwart" });
-    expect(mockDeliverToInternalMailbox).not.toHaveBeenCalled();
     expect(mockSendAuthEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "friend@gmail.com",
@@ -126,13 +89,9 @@ describe("sendEventInvitationEmail", () => {
     );
   });
 
-  it("falls back to Stalwart submission when mailbox delivery fails", async () => {
-    mockDeliverToInternalMailbox.mockRejectedValueOnce(
-      new Error("Stalwart import failed"),
-    );
-
+  it("never invites a reserved system address", async () => {
     const result = await sendEventInvitationEmail({
-      to: "roan@solace.onl",
+      to: "noreply@solace.onl",
       from: "Solace <notifications@example.com>",
       message: {
         subject: "Invite",
@@ -141,16 +100,10 @@ describe("sendEventInvitationEmail", () => {
       },
       logger,
       mailerClient: createMockMailerClient(),
-      adminClient: { getSession: jest.fn(), callJmap: jest.fn() } as never,
-      adminToken: "admin-token",
-      resolveInternalMailbox: async () => ({
-        stalwartAccountId: "acct-roan",
-      }),
       isProduction: false,
     });
 
-    expect(result).toEqual({ delivered: true, channel: "stalwart" });
-    expect(logger.warn).toHaveBeenCalled();
-    expect(mockSendAuthEmail).toHaveBeenCalled();
+    expect(result).toEqual({ delivered: false, channel: "stalwart" });
+    expect(mockSendAuthEmail).not.toHaveBeenCalled();
   });
 });

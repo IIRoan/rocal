@@ -24,7 +24,6 @@ import {
 import { buildEventInvitationEmail } from "../lib/auth-email";
 import { authEmailFrom, mailer } from "../lib/email-client";
 import { sendEventInvitationEmail } from "../lib/event-invitation-delivery";
-import { createStalwartAdminClient } from "../lib/stalwart-admin";
 import { env } from "../lib/env";
 import { emailDeliveryWarning } from "../lib/email-delivery";
 import { errorLogDetails, logRef } from "../lib/log-sanitization";
@@ -353,11 +352,6 @@ export class EventParticipantService {
       },
     });
 
-    const adminClient =
-      env.stalwartAdminToken.trim().length > 0
-        ? createStalwartAdminClient()
-        : null;
-
     return async () => {
       const warnings: OperationWarning[] = [];
 
@@ -393,17 +387,6 @@ export class EventParticipantService {
             message: invitationMessage,
             logger,
             mailerClient: mailer,
-            adminClient,
-            adminToken: env.stalwartAdminToken,
-            resolveInternalMailbox: async (email) => {
-              const entry = await client.mailDirectoryEntry.findUnique({
-                where: { email },
-                select: { stalwartAccountId: true },
-              });
-              return entry
-                ? { stalwartAccountId: entry.stalwartAccountId }
-                : null;
-            },
             isProduction: env.isProduction,
             developmentFallbackContext: {
               eventId: input.eventId,
