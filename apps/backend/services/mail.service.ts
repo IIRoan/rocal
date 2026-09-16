@@ -1670,22 +1670,6 @@ export class MailService implements IMailService {
     };
   }
 
-  /** Counts vaults still openable with the server-derived passphrase. */
-  async getVaultWrapProgress(): Promise<{
-    wrapped: number;
-    legacy: number;
-    total: number;
-  }> {
-    const [total, wrapped] = await Promise.all([
-      this.prisma.mailVaultBackup.count(),
-      this.prisma.mailVaultBackup.count({
-        where: { wrappedSecret: { not: null } },
-      }),
-    ]);
-
-    return { wrapped, legacy: total - wrapped, total };
-  }
-
   async upsertVaultBackupForUser(
     input: UpsertMailVaultBackupForUserInput,
   ): Promise<MailVaultBackupResult> {
