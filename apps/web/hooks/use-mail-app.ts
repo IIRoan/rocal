@@ -32,6 +32,12 @@ import {
   putStoredDerivedVaultKey,
 } from "@/lib/mail/derived-vault-key-storage";
 import {
+  generateVaultSecret,
+  unwrapVaultSecret,
+  VAULT_WRAP_ALGORITHM,
+  wrapVaultSecret,
+} from "@/lib/mail/vault-secret";
+import {
   getPrimaryMailAccountId,
   StalwartJmapClient,
   type JmapAttachmentInput,
@@ -463,16 +469,16 @@ async function resolveOutgoingMessageBody(input: {
 }
 
 /**
- * Background migration: re-encrypt the vault (both the AES-GCM wrapper and
- * the inner PGP private key) using the server-derived key material so future
- * sign-ins are fully automatic.
+ * Re-encrypt the vault (AES-GCM wrapper and inner PGP private key) under a new
+ * passphrase, sealing it to the user's E2EE key when one is supplied.
  */
-async function migrateVaultToKeyMaterial(input: {
+async function rekeyVault(input: {
   unlockedVault: UserKeyVault;
   oldPassphrase: string;
   newPassphrase: string;
   email: string;
   vaultVersion: number;
+  wrappedSecret?: string | null;
 }): Promise<void> {
   try {
     const { privateKeyArmored } =
@@ -502,9 +508,46 @@ async function migrateVaultToKeyMaterial(input: {
       encryptedVaultB64: encrypted.encryptedVaultB64,
       kdf: encrypted.kdf,
       kdfParams: encrypted.kdfParams,
+      ...(input.wrappedSecret
+        ? {
+            wrappedSecret: input.wrappedSecret,
+            wrapAlgorithm: VAULT_WRAP_ALGORITHM,
+          }
+        : {}),
     });
   } catch (err) {
-    log.error("Background vault migration to server key material failed.", err);
+    log.error("Vault re-key failed.", err);
+  }
+}
+
+/**
+ * Move a legacy vault off the server-derived passphrase onto a random secret
+ * sealed to the user's E2EE key, so the server can no longer open it.
+ */
+async function sealVaultToAccountKey(input: {
+  unlockedVault: UserKeyVault;
+  currentPassphrase: string;
+  email: string;
+  vaultVersion: number;
+}): Promise<void> {
+  try {
+    const secret = generateVaultSecret();
+    const wrappedSecret = await wrapVaultSecret(secret);
+    if (!wrappedSecret) {
+      // No E2EE session on this device yet; the next open retries.
+      return;
+    }
+
+    await rekeyVault({
+      unlockedVault: input.unlockedVault,
+      oldPassphrase: input.currentPassphrase,
+      newPassphrase: secret,
+      email: input.email,
+      vaultVersion: input.vaultVersion,
+      wrappedSecret,
+    });
+  } catch (error) {
+    log.warn("Sealing the mail vault to the account key failed", { error });
   }
 }
 
@@ -1926,6 +1969,25 @@ export function useMailApp() {
           }
         }
 
+        // Preferred path: the passphrase is sealed to this user's E2EE key, so
+        // only a signed-in device can open the vault.
+        if (!unlockedVault && backup.wrappedSecret) {
+          const sealedSecret = await unwrapVaultSecret(backup.wrappedSecret);
+          if (sealedSecret) {
+            try {
+              unlockedVault = await unlockEncryptedMailVault(
+                backup.encryptedVaultB64,
+                sealedSecret,
+                backup.kdfParams,
+              );
+              effectivePassphrase = sealedSecret;
+            } catch {
+              unlockedVault = null;
+              effectivePassphrase = "";
+            }
+          }
+        }
+
         const cacheDerivedKey = (keyB64: string) => {
           if (!accountUserId) return;
           void Promise.resolve(
@@ -1995,15 +2057,14 @@ export function useMailApp() {
           log.warn("Failed to disable Stalwart encryptOnAppend on sign-in", error);
         });
 
-        // Background migration if unlocked with old password
-        if (vaultKey && effectivePassphrase !== vaultKey) {
-          void migrateVaultToKeyMaterial({
+        // Seal a legacy vault to the account key; the server keeps no copy.
+        if (!backup.wrappedSecret) {
+          void sealVaultToAccountKey({
             unlockedVault,
-            oldPassphrase: effectivePassphrase,
-            newPassphrase: vaultKey,
+            currentPassphrase: effectivePassphrase,
             email,
             vaultVersion: backup.vaultVersion,
-          });
+          }).catch(() => undefined);
         }
 
         const mailServerPolicy = resolveMailServerPolicy({

@@ -55,6 +55,21 @@ jest.mock("../constants", () => ({
 const mockUnlockVault = jest.fn();
 const mockUnlockVaultWithDerivedKey = jest.fn();
 const mockCreateEncryptedMailVault = jest.fn();
+const mockWrapVaultSecret = jest.fn(
+  async (secret: string): Promise<string | null> => `wrapped:${secret}`,
+);
+const mockUnwrapVaultSecret = jest.fn(
+  async (wrapped: string): Promise<string | null> =>
+    wrapped.replace(/^wrapped:/, ""),
+);
+
+jest.mock("./vault-secret", () => ({
+  VAULT_WRAP_ALGORITHM: "e2ee-account-key-v1",
+  generateVaultSecret: () => "sealed-secret",
+  wrapVaultSecret: (secret: string) => mockWrapVaultSecret(secret),
+  unwrapVaultSecret: (wrapped: string) => mockUnwrapVaultSecret(wrapped),
+}));
+
 jest.mock("./native-vault-crypto", () => {
   const actual = jest.requireActual("./native-vault-crypto") as typeof import("./native-vault-crypto");
   return {
@@ -217,6 +232,10 @@ describe("mail-crypto", () => {
     clearVaultCache();
     // resetAllMocks clears mock implementations AND the once-queue
     jest.resetAllMocks();
+    mockWrapVaultSecret.mockImplementation(async (secret) => `wrapped:${secret}`);
+    mockUnwrapVaultSecret.mockImplementation(async (wrapped) =>
+      wrapped.replace(/^wrapped:/, ""),
+    );
     mockLoadMailVaultPassword.mockResolvedValue(null);
     mockLoadDerivedVaultKey.mockResolvedValue(null);
     mockSaveDerivedVaultKey.mockResolvedValue(undefined);
@@ -457,7 +476,37 @@ describe("mail-crypto", () => {
       });
     });
 
-    it("kicks off background migration when password unlock succeeds before key material", async () => {
+    it("opens a sealed vault without asking the server for key material", async () => {
+      mockMailFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ...MOCK_SAFE_VAULT_BACKUP,
+          wrappedSecret: "wrapped:sealed-secret",
+          wrapAlgorithm: "e2ee-account-key-v1",
+        }),
+      });
+      mockUnlockVault.mockResolvedValueOnce(MOCK_VAULT);
+      mockReadPrivateKey.mockResolvedValueOnce(MOCK_PRIVATE_KEY);
+      mockDecryptKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY);
+
+      const runtime = buildRuntime();
+      await ensureVaultLoaded(runtime);
+
+      expect(mockUnwrapVaultSecret).toHaveBeenCalledWith(
+        "wrapped:sealed-secret",
+      );
+      expect(mockUnlockVault).toHaveBeenCalledWith(
+        MOCK_SAFE_VAULT_BACKUP.encryptedVaultB64,
+        "sealed-secret",
+        MOCK_SAFE_VAULT_BACKUP.kdfParams,
+        expect.any(Function),
+      );
+      // Only the vault backup was fetched — no key-material request at all.
+      expect(mockMailFetch).toHaveBeenCalledTimes(1);
+      expect(mockUpsertAccountVaultBackup).not.toHaveBeenCalled();
+    });
+
+    it("seals a legacy vault to the account key after unlocking it", async () => {
       mockMailFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => MOCK_SAFE_VAULT_BACKUP,
@@ -477,11 +526,16 @@ describe("mail-crypto", () => {
 
       const runtime = buildRuntime();
       await ensureVaultLoaded(runtime);
-      await Promise.resolve();
-      await Promise.resolve();
+      await new Promise((resolve) => setImmediate(resolve));
 
       expect(mockEncryptKey).toHaveBeenCalled();
       expect(mockCreateEncryptedMailVault).toHaveBeenCalled();
+      // The new passphrase is the sealed random secret, never key material.
+      expect(mockCreateEncryptedMailVault).toHaveBeenCalledWith(
+        expect.anything(),
+        "sealed-secret",
+        expect.anything(),
+      );
       expect(mockUpsertAccountVaultBackup).toHaveBeenCalledWith({
         vaultVersion: MOCK_SAFE_VAULT_BACKUP.vaultVersion,
         encryptedVaultB64: "migrated-vault-b64",
@@ -492,6 +546,8 @@ describe("mail-crypto", () => {
           iterations: 1,
           parallelism: 1,
         },
+        wrappedSecret: "wrapped:sealed-secret",
+        wrapAlgorithm: "e2ee-account-key-v1",
       });
     });
   });
@@ -659,7 +715,11 @@ describe("mail-crypto", () => {
     it("throws and propagates errors from ensureVaultLoaded", async () => {
       // Override beforeEach setup — test a failure path
       jest.resetAllMocks();
-      mockLoadMailVaultPassword.mockResolvedValue(null);
+      mockWrapVaultSecret.mockImplementation(async (secret) => `wrapped:${secret}`);
+    mockUnwrapVaultSecret.mockImplementation(async (wrapped) =>
+      wrapped.replace(/^wrapped:/, ""),
+    );
+    mockLoadMailVaultPassword.mockResolvedValue(null);
       mockLoadDerivedVaultKey.mockResolvedValue(null);
       mockSaveDerivedVaultKey.mockResolvedValue(undefined);
 
