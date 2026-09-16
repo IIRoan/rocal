@@ -144,9 +144,9 @@ func (c *Client) discoverSession(ctx context.Context, base, authorization string
 			continue
 		}
 		var parsed struct {
-			APIURL           string            `json:"apiUrl"`
-			PrimaryAccounts  map[string]string `json:"primaryAccounts"`
-			Accounts         map[string]any    `json:"accounts"`
+			APIURL          string            `json:"apiUrl"`
+			PrimaryAccounts map[string]string `json:"primaryAccounts"`
+			Accounts        map[string]any    `json:"accounts"`
 		}
 		if err := json.Unmarshal(body, &parsed); err != nil {
 			return nil, fmt.Errorf("Stalwart JMAP returned a non-JSON response (%s)", resp.Header.Get("Content-Type"))

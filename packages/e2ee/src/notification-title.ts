@@ -4,7 +4,7 @@ import { base64UrlToArrayBuffer, bytesToBase64Url } from "./e2ee-module";
 /** Wire format "v1.<iv>.<ct+tag>" (unpadded base64url) and HKDF derivation are mirrored in the Swift NSE. */
 
 export const NOTIFICATION_KEY_INFO = "solace/notification-key/v1";
-export const NOTIFICATION_TITLE_PREFIX = "v1";
+const NOTIFICATION_TITLE_PREFIX = "v1";
 export const MAX_NOTIFICATION_TITLE_LENGTH = 200;
 
 const GCM_IV_BYTES = 12;

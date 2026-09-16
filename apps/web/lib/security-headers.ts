@@ -1,6 +1,6 @@
 /** No nonces: static Cache Components shells cannot carry one and App Router streams RSC inline. */
 
-export type SecurityHeaderEnv = {
+type SecurityHeaderEnv = {
   NODE_ENV?: string;
   NEXT_PUBLIC_API_URL?: string;
   NEXT_PUBLIC_APP_URL?: string;

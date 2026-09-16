@@ -28,7 +28,7 @@ export const LOG_PII_TEXT_PATTERNS = {
   url: /https?:\/\/[^\s"'<>]+/gi,
 } as const;
 
-export type RedactionOptions = {
+type RedactionOptions = {
   /** When omitted (clients without a sync hash), identifier values are dropped instead of hashed. */
   hashValue?: (value: string) => string;
 };
