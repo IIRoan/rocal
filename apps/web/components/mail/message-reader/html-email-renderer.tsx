@@ -2,7 +2,7 @@ import {
   buildEmailHtmlDocument,
   emailHasOwnDarkMode,
   processEmailHtml,
-} from "@workspace/calendar-core";
+} from "@workspace/calendar-core/mail-html";
 
 export function HtmlEmailRenderer({
   html,

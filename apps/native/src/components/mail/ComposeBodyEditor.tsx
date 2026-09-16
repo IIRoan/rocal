@@ -22,8 +22,8 @@ import {
   htmlToComposeText,
   toggleComposeList,
   type TextSelection,
-  sanitizeUntrustedEmailHtml,
 } from "@workspace/calendar-core";
+import { sanitizeUntrustedEmailHtml } from "@workspace/calendar-core/sanitize-email-html";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 

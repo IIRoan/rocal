@@ -13,7 +13,7 @@ import {
   buildEmailHtmlDocument,
   emailHasOwnDarkMode,
   processEmailHtml,
-} from "@workspace/calendar-core";
+} from "@workspace/calendar-core/mail-html";
 
 type WebViewModule = typeof import("react-native-webview");
 type WebViewComponent = WebViewModule["WebView"];
