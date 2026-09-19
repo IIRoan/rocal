@@ -23,6 +23,7 @@
     ".": "./src/index.ts",
     "./report-redaction": "./src/report-redaction.ts",
     "./sanitize-email-html": "./src/sanitize-email-html.ts",
-    "./mail-html": "./src/mail-html.ts"
+    "./mail-html": "./src/mail-html.ts",
+    "./mail-pgp-layers": "./src/mail-pgp-layers.ts"
   }
 }

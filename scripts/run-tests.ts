@@ -26,38 +26,22 @@ const summaryPath = process.argv
   .find((a) => a.startsWith("--summary="))
   ?.split("=")[1];
 
-const suites: TestSuite[] = [
-  {
-    name: "backend",
-    cwd: path.join(rootDir, "apps", "backend"),
-    command: "bun",
-    args: useCoverage ? ["run", "test:coverage"] : ["run", "test"],
-  },
-  {
-    name: "web",
-    cwd: path.join(rootDir, "apps", "web"),
-    command: "bun",
-    args: useCoverage ? ["run", "test:coverage"] : ["run", "test"],
-  },
-  {
-    name: "ui",
-    cwd: path.join(rootDir, "packages", "ui"),
-    command: "bun",
-    args: useCoverage ? ["run", "test:coverage"] : ["run", "test"],
-  },
-  {
-    name: "notifications",
-    cwd: path.join(rootDir, "apps", "notifications"),
-    command: "bun",
-    args: useCoverage ? ["run", "test:coverage"] : ["run", "test"],
-  },
-  {
-    name: "native",
-    cwd: path.join(rootDir, "apps", "native"),
-    command: "bun",
-    args: useCoverage ? ["run", "test:coverage"] : ["run", "test"],
-  },
-];
+const testArgs = useCoverage ? ["run", "test:coverage"] : ["run", "test"];
+
+const suites: TestSuite[] = ["apps", "packages"]
+  .flatMap((group) =>
+    fs
+      .readdirSync(path.join(rootDir, group))
+      .map((dir) => path.join(rootDir, group, dir)),
+  )
+  .filter((cwd) => {
+    const manifest = path.join(cwd, "package.json");
+    return (
+      fs.existsSync(manifest) &&
+      Boolean(JSON.parse(fs.readFileSync(manifest, "utf8")).scripts?.test)
+    );
+  })
+  .map((cwd) => ({ name: path.basename(cwd), cwd, command: "bun", args: testArgs }));
 
 function parseTestCounts(output: string): {
   passed: number;

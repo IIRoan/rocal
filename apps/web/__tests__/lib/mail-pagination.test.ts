@@ -3,8 +3,8 @@ import { StalwartJmapClient } from "../../lib/mail/jmap-client";
 import {
   appendMailboxMessages,
   hasMoreMailboxMessages,
-  MAILBOX_MESSAGES_PAGE_SIZE,
-} from "../../lib/mail/mail-pagination";
+} from "@workspace/calendar-core";
+import { MAILBOX_MESSAGES_PAGE_SIZE } from "../../lib/mail/mail-pagination";
 import type { JmapSession } from "../../lib/mail/types";
 
 const mockSession: JmapSession = {
@@ -210,13 +210,13 @@ describe("StalwartJmapClient.getMessagesByIds", () => {
 
 describe("mail pagination helpers", () => {
   it("uses total count when the server reports one", () => {
-    expect(hasMoreMailboxMessages(25, 120)).toBe(true);
-    expect(hasMoreMailboxMessages(120, 120)).toBe(false);
+    expect(hasMoreMailboxMessages(25, 120, 25)).toBe(true);
+    expect(hasMoreMailboxMessages(120, 120, 25)).toBe(false);
   });
 
   it("falls back to full-page heuristics when total is unknown", () => {
-    expect(hasMoreMailboxMessages(25, 0)).toBe(true);
-    expect(hasMoreMailboxMessages(23, 0)).toBe(false);
+    expect(hasMoreMailboxMessages(25, 0, 25)).toBe(true);
+    expect(hasMoreMailboxMessages(23, 0, 25)).toBe(false);
   });
 
   it("deduplicates appended mailbox pages", () => {
