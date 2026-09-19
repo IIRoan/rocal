@@ -25,6 +25,16 @@ function idleFetcher() {
 
 const OWNER = { userId: "user-1", email: "alice@solace.onl" };
 
+/** Every service is stopped after each test so no EventSource reconnect loop outlives it. */
+const createdServices: MailRealtimeService[] = [];
+function createService(
+  input: ConstructorParameters<typeof MailRealtimeService>[0],
+): MailRealtimeService {
+  const service = new MailRealtimeService(input);
+  createdServices.push(service);
+  return service;
+}
+
 function createSyncPayload(changedTypes: string[] = ["Email"]) {
   return {
     accountId: "acct-1",
@@ -98,6 +108,9 @@ async function flushMicrotasks() {
 
 describe("mail realtime service", () => {
   afterEach(() => {
+    for (const service of createdServices.splice(0)) {
+      service.stop();
+    }
     jest.useRealTimers();
   });
 
@@ -131,10 +144,11 @@ describe("mail realtime service", () => {
   });
 
   it("publishes events only to subscribers authorized for the account", () => {
-    const service = new MailRealtimeService({
+    const service = createService({
       eventSourceUrl:
         "https://mail.example.com/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
       tokens: createTokens(),
+      fetcher: idleFetcher(),
     });
     const accountOneEvents: MailChangedEvent[] = [];
     const accountTwoEvents: MailChangedEvent[] = [];
@@ -177,7 +191,7 @@ describe("mail realtime service", () => {
   it("polls linked accounts and publishes fetched sync payloads for receipt-time mail", async () => {
     jest.useFakeTimers();
     const syncPayload = createSyncPayload();
-    const service = new MailRealtimeService({
+    const service = createService({
       eventSourceUrl:
         "https://mail.example.com/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
       tokens: createTokens(),
@@ -227,10 +241,11 @@ describe("mail realtime service", () => {
       changedTypes: ["Email", "Mailbox"],
       sync: createSyncPayload(["Email", "Mailbox"]),
     }));
-    const service = new MailRealtimeService({
+    const service = createService({
       eventSourceUrl:
         "https://mail.example.com/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
       tokens: createTokens(),
+      fetcher: idleFetcher(),
       notificationThrottleMs: 50,
       syncProvider: {
         syncKnownChangedAccounts: jest.fn(async () => []),
@@ -311,10 +326,11 @@ describe("mail realtime service", () => {
         changedTypes: ["Mailbox"],
         sync: createSyncPayload(["Mailbox"]),
       }));
-    const service = new MailRealtimeService({
+    const service = createService({
       eventSourceUrl:
         "https://mail.example.com/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
       tokens: createTokens(),
+      fetcher: idleFetcher(),
       notificationThrottleMs: 40,
       syncProvider: {
         syncKnownChangedAccounts: jest.fn(async () => []),
@@ -369,9 +385,10 @@ describe("mail realtime service", () => {
       sync: emptySync,
     }));
     const events: MailChangedEvent[] = [];
-    const service = new MailRealtimeService({
+    const service = createService({
       eventSourceUrl: EVENT_SOURCE_URL,
       tokens: createTokens(),
+      fetcher: idleFetcher(),
       notificationThrottleMs: 50,
       syncProvider: {
         syncKnownChangedAccounts: jest.fn(async () => []),
@@ -428,9 +445,10 @@ describe("mail realtime service", () => {
       sync: emptySync,
     }));
     const events: MailChangedEvent[] = [];
-    const service = new MailRealtimeService({
+    const service = createService({
       eventSourceUrl: EVENT_SOURCE_URL,
       tokens: createTokens(),
+      fetcher: idleFetcher(),
       notificationThrottleMs: 50,
       syncProvider: {
         syncKnownChangedAccounts: jest.fn(async () => []),
@@ -487,9 +505,10 @@ describe("mail realtime service", () => {
       sync: emptySync,
     }));
     const events: MailChangedEvent[] = [];
-    const service = new MailRealtimeService({
+    const service = createService({
       eventSourceUrl: EVENT_SOURCE_URL,
       tokens: createTokens(),
+      fetcher: idleFetcher(),
       notificationThrottleMs: 50,
       syncProvider: {
         syncKnownChangedAccounts: jest.fn(async () => []),
@@ -556,9 +575,10 @@ describe("mail realtime service", () => {
       },
     };
     const events: MailChangedEvent[] = [];
-    const service = new MailRealtimeService({
+    const service = createService({
       eventSourceUrl: EVENT_SOURCE_URL,
       tokens: createTokens(),
+      fetcher: idleFetcher(),
       notificationThrottleMs: 50,
     });
     service.subscribe({
@@ -606,7 +626,7 @@ describe("mail realtime service", () => {
     jest.useFakeTimers();
     const inboundSync = createInboundSyncPayload();
     const events: MailChangedEvent[] = [];
-    const service = new MailRealtimeService({
+    const service = createService({
       eventSourceUrl: EVENT_SOURCE_URL,
       tokens: createTokens(),
       fetcher: idleFetcher(),
@@ -658,7 +678,7 @@ describe("mail realtime service", () => {
       },
     );
     const tokens = createTokens();
-    const service = new MailRealtimeService({
+    const service = createService({
       eventSourceUrl: EVENT_SOURCE_URL,
       tokens,
       fetcher: fetcher as unknown as typeof fetch,
@@ -698,7 +718,7 @@ describe("mail realtime service", () => {
         throw new Error("aborted");
       },
     );
-    const service = new MailRealtimeService({
+    const service = createService({
       eventSourceUrl: EVENT_SOURCE_URL,
       tokens: createTokens(),
       fetcher: fetcher as unknown as typeof fetch,
