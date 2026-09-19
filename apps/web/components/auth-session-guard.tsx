@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import { reconcileAuthSession } from "@/lib/auth-local-state";
-import { accountApiService } from "@/lib/account-api-service";
+import { accountApiService } from "@/lib/api-clients";
 import {
   isPasskeyStepUpExemptPath,
   redirectToPasskeyStepUpLogin,

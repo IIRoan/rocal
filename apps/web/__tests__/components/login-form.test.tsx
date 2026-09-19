@@ -150,15 +150,12 @@ jest.mock("@/lib/calendar-api-service", () => ({
   },
 }));
 
-jest.mock("@/lib/account-api-service", () => ({
+jest.mock("@/lib/api-clients", () => ({
   accountApiService: {
     getSignupConfig: jest.fn(),
     checkEmailAvailability: jest.fn(),
     getAuthStatus: jest.fn(),
   },
-}));
-
-jest.mock("@/lib/invite-api-service", () => ({
   inviteApiService: {
     validateInviteToken: jest.fn(),
     claimInviteToken: jest.fn(),
@@ -199,8 +196,7 @@ jest.mock("@/lib/auth-client", () => ({
 }));
 
 import { LoginForm } from "../../app/login/login-form-entry";
-import { accountApiService } from "@/lib/account-api-service";
-import { inviteApiService } from "@/lib/invite-api-service";
+import { accountApiService, inviteApiService } from "@/lib/api-clients";
 import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import {

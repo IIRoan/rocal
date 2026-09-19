@@ -17,8 +17,7 @@ import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
 import { calendarApiService } from "@/lib/calendar-api-service";
-import { accountApiService } from "@/lib/account-api-service";
-import { inviteApiService } from "@/lib/invite-api-service";
+import { accountApiService, inviteApiService } from "@/lib/api-clients";
 import {
   clearPendingAuthPassword,
   storePendingAuthPassword,

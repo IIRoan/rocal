@@ -23,10 +23,10 @@ export type {
   ClaimInviteResponse,
 } from "./invite-api-service";
 
-export { NoopE2eeProvider } from "./e2ee-provider";
+export { NoopE2eeProvider } from "@workspace/e2ee";
 export {
   backfillEncryptedNames,
   NAME_BACKFILL_BATCH_SIZE,
 } from "./name-encryption-backfill";
 export type { NameEncryptionBackfillResult } from "./name-encryption-backfill";
-export type { E2eeProvider } from "./e2ee-provider";
+export type { E2eeProvider } from "@workspace/e2ee";

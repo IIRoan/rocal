@@ -13,14 +13,13 @@ import {
   type ImportIcsResponse,
   findNationalHolidayCalendarByUrl,
 } from "@workspace/calendar-ics";
-import { resolveTimezone } from "@workspace/calendar-core";
+import { resolveTimezone, CALENDAR_COLORS, isValidCalendarColor } from "@workspace/calendar-core";
 import {
   areParsedEventParticipantsDifferent,
   parseICSFile,
   convertParsedEventToCalendarEvent,
   isEventModified,
 } from "../lib/ics-parser";
-import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
 import { ValidationError, NotFoundError, errorMessage } from "../lib/errors";
 import { prismaStringEquals } from "../lib/prisma-query";
 import { createLogger } from "@workspace/logger";
@@ -257,7 +256,7 @@ export class SubscriptionService implements ISubscriptionService {
 
     if (color !== undefined && !isValidCalendarColor(color)) {
       throw new ValidationError(
-        `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g. #FF0000)`,
+        `Color must be one of: ${CALENDAR_COLORS.join(", ")} or a valid hex color (e.g. #FF0000)`,
         "color",
       );
     }

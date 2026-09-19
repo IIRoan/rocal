@@ -22,7 +22,7 @@ jest.mock("../../lib/e2ee-password-cache", () => ({
   clearPendingAuthPassword: jest.fn(),
 }));
 
-jest.mock("../../lib/http-client", () => ({
+jest.mock("../../lib/api-clients", () => ({
   httpClient: {
     put: jest.fn(),
   },
@@ -37,7 +37,7 @@ import {
 } from "../../lib/e2ee-crypto";
 import { clearPendingAuthPassword } from "../../lib/e2ee-password-cache";
 import { getActiveE2eeSession } from "../../lib/e2ee-session";
-import { httpClient } from "../../lib/http-client";
+import { httpClient } from "../../lib/api-clients";
 import { resetEncryptionPasswordForActiveSession } from "../../lib/e2ee-password-reset";
 
 const mockGetResetSnapshot =

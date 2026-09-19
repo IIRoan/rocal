@@ -6,7 +6,7 @@ import {
   type CategoriesResponse,
   type EventCategory,
 } from "@workspace/calendar-core";
-import type { E2eeProvider } from "./e2ee-provider";
+import type { E2eeProvider } from "@workspace/e2ee";
 import type { HttpClient } from "./http-client";
 
 export const NAME_BACKFILL_BATCH_SIZE = 5;

@@ -5,6 +5,8 @@ import {
   type EventParticipantInput,
   type EventParticipantStatus,
   type OperationWarning,
+  CALENDAR_COLORS,
+  isValidCalendarColor,
 } from "@workspace/calendar-core";
 import type {
   IEventService,
@@ -45,7 +47,6 @@ import {
 } from "../lib/mail-invitation-calendar";
 import { RecurrenceEngine } from "../lib/recurrence";
 import { NotificationCalculator } from "../lib/notification-calculator";
-import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
 import {
   assertNoPlaintextEventContentWithCiphertext,
   resolveEventPersistencePolicy,
@@ -1067,7 +1068,7 @@ export class EventService implements IEventService {
       if (color) {
         if (!isValidCalendarColor(color)) {
           throw new ValidationError(
-            `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
+            `Color must be one of: ${CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
             "color",
           );
         }
@@ -1442,7 +1443,7 @@ export class EventService implements IEventService {
       if (input.color !== undefined && input.color) {
         if (!isValidCalendarColor(input.color)) {
           throw new ValidationError(
-            `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
+            `Color must be one of: ${CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
             "color",
           );
         }

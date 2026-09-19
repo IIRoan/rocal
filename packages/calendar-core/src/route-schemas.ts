@@ -121,3 +121,20 @@ export const calendarColorSchema = z
   .refine(isValidCalendarColor, { message: calendarColorMessage });
 
 export const optionalCalendarColorSchema = calendarColorSchema.optional();
+
+export const putRecentContactsBodySchema = z
+  .object({
+    encryptedContent: z.string().min(1).max(65_536),
+    encryptionKeyVersion: z.number().int().min(1).max(1000).optional(),
+  })
+  .strict();
+export type PutRecentContactsRequest = z.infer<typeof putRecentContactsBodySchema>;
+
+export const bulkEventBodySchema = z
+  .object({
+    action: bulkEventActionSchema,
+    eventIds: z.array(z.string()).min(1),
+    targetCalendarId: z.string().optional(),
+  })
+  .strict();
+export type BulkEventRequest = z.infer<typeof bulkEventBodySchema>;

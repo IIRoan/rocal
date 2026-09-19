@@ -1,3 +1,4 @@
+import { CALENDAR_COLORS } from "@workspace/calendar-core";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { Elysia } from "elysia";
 
@@ -56,7 +57,6 @@ jest.mock("../../lib/user-setup", () => ({
 import { errorHandler } from "../../lib/errors";
 import { prisma } from "../../lib/prisma";
 import { calendarsRoutes } from "../../routes/calendars";
-import { ALLOWED_CALENDAR_COLORS } from "../../lib/colors";
 import { expectValidationError } from "../helpers/validation-assertions";
 
 const mockPrisma = prisma as unknown as {
@@ -102,7 +102,7 @@ describe("calendarsRoutes – color validation", () => {
   beforeEach(() => {  });
 
   describe("POST /calendars – create", () => {
-    it.each(ALLOWED_CALENDAR_COLORS)(
+    it.each(CALENDAR_COLORS)(
       "accepts named color '%s'",
       async (color) => {
         const created = {
@@ -214,7 +214,7 @@ describe("calendarsRoutes – color validation", () => {
       );
 
       const text = await readText(response);
-      for (const color of ALLOWED_CALENDAR_COLORS) {
+      for (const color of CALENDAR_COLORS) {
         expect(text).toContain(color);
       }
     });
@@ -247,7 +247,7 @@ describe("calendarsRoutes – color validation", () => {
       userId: "user-1",
     };
 
-    it.each(ALLOWED_CALENDAR_COLORS)(
+    it.each(CALENDAR_COLORS)(
       "accepts named color '%s' on update",
       async (color) => {
         mockPrisma.calendar.findFirst.mockResolvedValue(existingCalendar);
