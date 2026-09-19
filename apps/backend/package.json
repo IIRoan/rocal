@@ -29,6 +29,7 @@
     "eslint-config-prettier": "^9.1.2",
     "eslint-plugin-sonarjs": "^3.0.5",
     "globals": "^16.4.0",
+    "openapi-types": "^12.1.3",
     "prisma": "^6.12.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.24.1"
@@ -37,6 +38,8 @@
     "@better-auth/core": "^1.6.13",
     "@better-auth/expo": "^1.6.13",
     "@better-auth/passkey": "^1.6.13",
+    "@better-auth/utils": "^0.4.1",
+    "@better-fetch/fetch": "^1.1.21",
     "@elysia/cors": "2.0.0-beta.1",
     "@prisma/client": "^6.12.0",
     "@sentry/bun": "^10.73.0",
@@ -45,7 +48,9 @@
     "@workspace/logger": "0.10.0",
     "@workspace/runtime": "workspace:*",
     "better-auth": "^1.6.13",
+    "better-call": "^2.0.2",
     "elysia": "2.0.0-beta.10",
+    "exact-mirror": "^1.2.2",
     "openpgp": "^6.3.0",
     "zod": "^3.25.76"
   }
