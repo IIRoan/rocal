@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { FontAwesome } from "@expo/vector-icons";
-import { enrichSelfMailRecipient } from "@workspace/calendar-core";
+import { enrichSelfMailRecipient, resolveAttachmentPreviewKind } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { formatAttachmentSize } from "../../lib/mail/compose-attachments";
@@ -21,7 +21,6 @@ import {
   formatMessageDate,
   formatRecipientSummary,
 } from "../../lib/mail/mail-helpers";
-import { resolveAttachmentPreviewKind } from "../../lib/mail/attachment-preview";
 import type { MailSignatureVerificationState } from "../../lib/mail/mail-crypto";
 import type {
   JmapAttachment,

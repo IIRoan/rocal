@@ -21,6 +21,8 @@ import {
   isCurrentUserMailAddress,
   isAutomatedMailAddress,
   isDecryptedEventReminderContent,
+  resolveAttachmentPreviewKind,
+  type MailAttachmentPreviewKind,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../../src/providers/ThemeProvider";
@@ -80,10 +82,6 @@ import {
   isSpamMailboxRole,
 } from "../../../../src/lib/mail/mail-helpers";
 
-import {
-  resolveAttachmentPreviewKind,
-  type MailAttachmentPreviewKind,
-} from "../../../../src/lib/mail/attachment-preview";
 import type {
   JmapAttachment,
   JmapEmailMessage,

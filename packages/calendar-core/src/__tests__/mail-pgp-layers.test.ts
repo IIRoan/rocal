@@ -8,7 +8,7 @@ import {
   PGP_MESSAGE_BEGIN,
   PGP_MESSAGE_END,
   resolveLayerSignatureVerificationState,
-} from "../../lib/mail/pgp-layers";
+} from "../mail-pgp-layers";
 
 describe("mail pgp layer helpers", () => {
   it("detects armored PGP envelopes", () => {

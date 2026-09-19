@@ -36,12 +36,6 @@ import {
   wrapVaultSecret,
 } from "./vault-secret";
 import { extractPgpMimeCiphertextBlobId } from "./message-security";
-import {
-  containsArmoredPgpMessage,
-  MAX_PGP_DECRYPT_LAYERS,
-  mergeSignatureVerificationState,
-  resolveLayerSignatureVerificationState,
-} from "./pgp-layers";
 import { parseMimeBody } from "./mail-mime-parser";
 import type {
   JmapAttachment,
@@ -49,7 +43,7 @@ import type {
   LabelDef,
   MailVaultKdfParams,
 } from "./types";
-import { looksLikeMimeMessage } from "@workspace/calendar-core";
+import { looksLikeMimeMessage, containsArmoredPgpMessage, MAX_PGP_DECRYPT_LAYERS, mergeSignatureVerificationState, resolveLayerSignatureVerificationState } from "@workspace/calendar-core";
 import type { MailRuntime } from "./mail-runtime";
 
 const log = createLogger("mail-crypto");

@@ -1,7 +1,4 @@
-import {
-  containsArmoredPgpMessage,
-  isCompleteArmoredPgpMessage,
-} from "./pgp-layers";
+import { containsArmoredPgpMessage, isCompleteArmoredPgpMessage } from "@workspace/calendar-core";
 import type {
   JmapBodyStructure,
   JmapBodyValue,

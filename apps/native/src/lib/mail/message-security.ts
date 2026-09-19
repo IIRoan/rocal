@@ -6,10 +6,7 @@
  * (plaintext / encrypted-at-rest) or must be opened in the secure web client
  * (PGP end-to-end encrypted).
  */
-import {
-  containsArmoredPgpMessage,
-  isCompleteArmoredPgpMessage,
-} from "./pgp-layers";
+import { containsArmoredPgpMessage, isCompleteArmoredPgpMessage } from "@workspace/calendar-core";
 import type {
   JmapAttachment,
   JmapBodyStructure,

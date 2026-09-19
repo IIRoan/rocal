@@ -67,10 +67,11 @@ describe("calendar ICS participants", () => {
       },
     });
 
-    expect(ics).toContain(
+    const unfolded = ics.replace(/\r?\n[ \t]/g, "");
+    expect(unfolded).toContain(
       "ORGANIZER;CN=Owner:mailto:owner@example.com",
     );
-    expect(ics).toContain(
+    expect(unfolded).toContain(
       "ATTENDEE;CN=Teammate;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:teammate@example.com",
     );
   });

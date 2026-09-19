@@ -15,7 +15,7 @@ import {
 } from "@workspace/ui/components/ui/collapsible";
 import { Button } from "@workspace/ui/components/ui/button";
 import { cn } from "@workspace/ui/lib/utils";
-import { resolveAttachmentPreviewKind } from "@/lib/mail/attachment-preview";
+import { resolveAttachmentPreviewKind } from "@workspace/calendar-core";
 import { PdfAttachmentThumbnail } from "../attachment-preview-dialog";
 import type {
   MessageReaderController,
