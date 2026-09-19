@@ -132,7 +132,7 @@ http://192.168.88.246:4001/api/auth/callback/github
 
 - Native WebCrypto comes from `react-native-quick-crypto`, installed at the Expo entry (`index.js`) before Expo Router loads any route. OpenPGP.js 6 requires `globalThis.crypto.subtle` while the module evaluates.
 - Calendar E2EE uses that native `SubtleCrypto` via `createNativeCryptoProvider`. `expo-crypto` still supplies the CSPRNG (`getRandomValues`, `randomUUID`).
-- Mail vault Argon2id and AES-GCM use the same native module, with `@noble/hashes` / `node-forge` only as a Jest / missing-module fallback.
+- Mail vault Argon2id and AES-GCM use the same native module, with `@noble/hashes` as the Jest / missing-module fallback for Argon2id only (AES-GCM has no JS fallback).
 - Rebuild the development client after adding or upgrading `react-native-quick-crypto` so the Nitro module is linked.
 
 ## Build commands

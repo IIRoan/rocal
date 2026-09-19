@@ -51,12 +51,10 @@ const nextConfig: NextConfig = {
     optimizePackageImports: [
       "lucide-react",
       "date-fns",
-      "date-fns-tz",
       "@tiptap/react",
       "@tiptap/core",
       "@tiptap/starter-kit",
       "radix-ui",
-      "@phosphor-icons/react",
       "@dnd-kit/core",
       "@dnd-kit/sortable",
       "@dnd-kit/utilities",

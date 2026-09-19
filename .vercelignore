@@ -7,7 +7,6 @@
 **/out
 apps/backend/server
 apps/backend/dist
-apps/backend/llms-full.txt
 webmail
 **/.wrangler
 **/.vinext

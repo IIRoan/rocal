@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "../ui/button";
-import { DotsThreeIcon } from "@phosphor-icons/react";
+import { Ellipsis } from "lucide-react";
 
 export function Participants() {
   return (
@@ -40,7 +40,7 @@ export function Participants() {
         size="icon"
       >
         <span className="size-4">
-          <DotsThreeIcon size={16} />
+          <Ellipsis size={16} />
         </span>
       </Button>
     </div>

@@ -1,4 +1,4 @@
-import { CaretDownIcon, GearSixIcon, SignOutIcon } from "@phosphor-icons/react";
+import { ChevronDown, LogOut, Settings } from "lucide-react";
 
 import { BlobatarAvatar } from "../ui/blobatar-avatar";
 import {
@@ -48,7 +48,7 @@ export function NavUser({
                 <span className="truncate font-medium">{user.name}</span>
               </div>
               <span className="ml-auto size-5 text-muted-foreground/80 transition-transform duration-200 group-data-[state=open]:rotate-180">
-                <CaretDownIcon size={20} />
+                <ChevronDown size={20} />
               </span>
             </SidebarMenuButton>
           </DropdownMenuTrigger>
@@ -64,7 +64,7 @@ export function NavUser({
                 onClick={onOpenSettings}
               >
                 <span className="size-5 text-muted-foreground/80">
-                  <GearSixIcon size={20} />
+                  <Settings size={20} />
                 </span>
                 Settings
                 <DropdownMenuShortcut>⌘+S</DropdownMenuShortcut>
@@ -74,7 +74,7 @@ export function NavUser({
                 onClick={onLogout}
               >
                 <span className="size-5 text-muted-foreground/80">
-                  <SignOutIcon size={20} />
+                  <LogOut size={20} />
                 </span>
                 Logout
                 <DropdownMenuShortcut>⌘+L</DropdownMenuShortcut>

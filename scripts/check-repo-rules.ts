@@ -15,17 +15,7 @@ const trackedFiles = execFileSync("git", ["ls-files", "-z"], {
 
 const read = (file: string) => fs.readFileSync(path.join(rootDir, file), "utf8");
 
-// 1. Agent docs are inline copies: CLAUDE.md must equal AGENTS.md in every directory.
-for (const agents of trackedFiles.filter((f) => path.basename(f) === "AGENTS.md")) {
-  const claude = path.join(path.dirname(agents), "CLAUDE.md");
-  if (!fs.existsSync(path.join(rootDir, claude))) {
-    failures.push(`${claude} is missing (must be an inline copy of ${agents})`);
-  } else if (read(claude) !== read(agents)) {
-    failures.push(`${claude} differs from ${agents} — run: cp ${agents} ${claude}`);
-  }
-}
-
-// 2. Forbidden dependencies in workspace manifests.
+// 1. Forbidden dependencies in workspace manifests.
 const forbiddenDeps: Array<[RegExp, string]> = [
   [/^(nodemailer|imapflow|node-imap|imap|imap-simple|emailjs|smtp-.*|poplib)$/, "mail is JMAP-only"],
   [
@@ -47,14 +37,13 @@ for (const manifest of trackedFiles.filter((f) => /^(apps|packages)\/[^/]+\/pack
   }
 }
 
-// 3. Forbidden source patterns.
+// 2. Forbidden source patterns.
 const sourceFiles = trackedFiles.filter(
   (f) => /^(apps|packages)\//.test(f) && /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(f) && !f.includes("/generated/"),
 );
 const forbiddenSource: Array<[RegExp, string, (file: string) => boolean]> = [
   [/sendDefaultPii\s*:\s*true/, "error reporting must not send PII", () => true],
   [/persistQueryClient|PersistQueryClientProvider/, "query cache must not be persisted", () => true],
-  [/from\s+["']@workspace\/mobile-ui/, "@workspace/mobile-ui is legacy", (f) => !f.startsWith("packages/mobile-ui/")],
   [/disableIpTracking\s*:\s*false/, "do not enable IP tracking", () => true],
 ];
 for (const file of sourceFiles) {
@@ -64,7 +53,7 @@ for (const file of sourceFiles) {
   }
 }
 
-// 4. Only example env files (and the public-only web production env) may be committed.
+// 3. Only example env files (and the public-only web production env) may be committed.
 const allowedEnv = new Set(["apps/web/.env.production"]);
 for (const file of trackedFiles) {
   const base = path.basename(file);

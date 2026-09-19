@@ -1,14 +1,4 @@
-/**
- * Mobile CryptoProvider implementation for native iOS/Android builds.
- *
- * `react-native-quick-crypto` is installed at the Expo entry (`index.js`) so
- * `globalThis.crypto.subtle` is the native SubtleCrypto implementation.
- * Calendar E2EE uses that backend. `expo-crypto` still supplies the CSPRNG
- * (`getRandomValues`, `randomUUID`).
- *
- * The pure-JavaScript `node-forge` provider remains as a fallback for Jest
- * and any runtime that still lacks `crypto.subtle`.
- */
+/** Native CryptoProvider over react-native-quick-crypto's SubtleCrypto; expo-crypto supplies the CSPRNG. */
 import type { CryptoProvider } from "@workspace/e2ee";
 import * as ExpoCrypto from "expo-crypto";
 import { Platform } from "react-native";
@@ -18,7 +8,6 @@ import {
   getRuntimeDisplayName,
   supportsSubtleCrypto,
 } from "@workspace/runtime";
-import { createJsCryptoProvider } from "./js-crypto-provider";
 
 const log = createLogger("native:crypto");
 const runtime = detectRuntime({ platformOs: Platform.OS });
@@ -31,22 +20,11 @@ function logBackendOnce(level: "info" | "warn", message: string) {
   log[level](message);
 }
 
-function buildFallbackMessage() {
+function missingSubtleMessage() {
   const runtimeName = getRuntimeDisplayName(runtime);
-
-  if (runtime.isExpoGo) {
-    return (
-      `Using the JavaScript crypto fallback for calendar E2EE on ${runtimeName} because Expo Go does not expose crypto.subtle. ` +
-      "Mail OpenPGP still uses the native mail vault path, but first-time calendar key setup is slower. " +
-      "Use a rebuilt development client with native WebCrypto support to remove this warning."
-    );
-  }
-
-  return (
-    `Using the JavaScript crypto fallback for calendar E2EE on ${runtimeName} because this runtime does not expose a usable crypto.subtle implementation. ` +
-    "Mail OpenPGP and the mail vault expect react-native-quick-crypto to be installed at app entry. " +
-    "Rebuild the development client so the native module is linked."
-  );
+  return runtime.isExpoGo
+    ? `crypto.subtle is unavailable on ${runtimeName}: Expo Go is not supported, use a development client built with react-native-quick-crypto.`
+    : `crypto.subtle is unavailable on ${runtimeName}: rebuild the development client so react-native-quick-crypto is linked at app entry.`;
 }
 
 /**
@@ -153,12 +131,7 @@ function createSubtleCryptoProvider(subtle: SubtleCrypto): CryptoProvider {
   };
 }
 
-/**
- * Build a {@link CryptoProvider} for the current native runtime.
- *
- * Prefers a real native `crypto.subtle` when one is available; otherwise falls
- * back to the pure-JavaScript provider so E2EE keeps working on Hermes.
- */
+/** Build the CryptoProvider for this runtime; throws when no native crypto.subtle is linked. */
 export function createNativeCryptoProvider(): CryptoProvider {
   const subtle = resolveSubtleCrypto();
 
@@ -170,6 +143,5 @@ export function createNativeCryptoProvider(): CryptoProvider {
     return createSubtleCryptoProvider(subtle);
   }
 
-  logBackendOnce("warn", buildFallbackMessage());
-  return createJsCryptoProvider();
+  throw new Error(missingSubtleMessage());
 }

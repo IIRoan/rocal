@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { GearSixIcon } from "@phosphor-icons/react";
-import { Check, Plus, Search, Settings2 } from "lucide-react";
+import { Check, Plus, Search, Settings, Settings2 } from "lucide-react";
 import {
   listSidebarCalendars,
   partitionCalendarsByKind,
@@ -132,7 +131,7 @@ export function AppSidebar({
                     className="gap-2.5 cursor-pointer"
                     onClick={onOpenSettings}
                   >
-                    <GearSixIcon size={16} />
+                    <Settings size={16} />
                     Settings
                   </DropdownMenuItem>
                 </SheetClose>

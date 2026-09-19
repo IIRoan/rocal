@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { CalendarBlankIcon } from "@phosphor-icons/react";
+import { Calendar as CalendarIcon } from "lucide-react";
 import { addDays, format } from "date-fns";
 import { isTodayInTimezone, resolveTimezone } from "@workspace/calendar-core";
 
@@ -57,7 +57,7 @@ export function AgendaView({
       {!hasEvents ? (
         <div className="flex min-h-[70svh] flex-col items-center justify-center py-16 text-center">
           <span className="text-muted-foreground/50 mb-2">
-            <CalendarBlankIcon size={32} />
+            <CalendarIcon size={32} />
           </span>
           <h3 className="text-lg font-medium">No events found</h3>
           <p className="text-muted-foreground">

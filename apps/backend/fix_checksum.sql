@@ -1,4 +1,0 @@
--- Intentionally non-executable.
--- Do not modify Prisma's internal migration table from a checked-in script.
--- If migration history needs repair, use Prisma's documented migration workflow
--- or handle the one-off fix out-of-band.

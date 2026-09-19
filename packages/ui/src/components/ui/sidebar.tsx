@@ -7,7 +7,7 @@ import { VariantProps, cva } from "class-variance-authority";
 
 // Slot from radix-ui is a namespace, extract the component
 const SlotComponent = Slot.Slot;
-import { ArrowLineLeftIcon, ArrowLineRightIcon } from "@phosphor-icons/react";
+import { ArrowLeftToLine, ArrowRightToLine } from "lucide-react";
 
 import { useIsMobile } from "../../hooks/use-mobile";
 import { cn } from "@workspace/ui/lib/utils";
@@ -294,11 +294,11 @@ function SidebarTrigger({
     >
       {!isOutsideSidebar ? (
         <span className="size-5">
-          <ArrowLineRightIcon size={20} />
+          <ArrowRightToLine size={20} />
         </span>
       ) : (
         <span className="size-5">
-          <ArrowLineLeftIcon size={20} />
+          <ArrowLeftToLine size={20} />
         </span>
       )}
       <span className="sr-only">
