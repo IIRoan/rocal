@@ -3,7 +3,7 @@ import {
   NoopE2eeProvider,
   hydrateEncryptedNameWithoutSession,
   type E2eeProvider,
-} from "./e2ee-provider";
+} from "@workspace/e2ee";
 import {
   backfillEncryptedNames,
   type NameEncryptionBackfillResult,

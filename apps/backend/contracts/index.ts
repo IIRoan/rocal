@@ -65,7 +65,7 @@ import {
   updateSubscriptionBodySchema,
 } from "./subscription.contract";
 
-export const routeModels = new Elysia({ name: "route-models" }).model({
+const routeModelSchemas = {
   "account.emailAvailabilityQuery": emailAvailabilityQuerySchema,
   "invite.tokenQuery": inviteTokenQuerySchema,
   "invite.claimBody": claimInviteBodySchema,
@@ -115,7 +115,26 @@ export const routeModels = new Elysia({ name: "route-models" }).model({
   "subscriptions.deleteQuery": deleteSubscriptionQuerySchema,
   "subscriptions.importIcsBody": importIcsSubscriptionBodySchema,
   "subscriptions.idParams": subscriptionIdParamsSchema,
-});
+};
+
+export const routeModels = new Elysia({ name: "route-models" }).model(routeModelSchemas);
+
+type RouteModelName = keyof typeof routeModelSchemas;
+type RouteModelGroup<N> = N extends `${infer G}.${string}` ? G : never;
+type RouteModelKey<N, G extends string> = N extends `${G}.${infer K}` ? K : never;
+
+/** `RouteModel.events.createBody` is `"events.createBody"`, derived from `routeModelSchemas` so names cannot drift. */
+export const RouteModel = Object.keys(routeModelSchemas).reduce<
+  Record<string, Record<string, string>>
+>((groups, name) => {
+  const [group, key] = name.split(".") as [string, string];
+  (groups[group] ??= {})[key] = name;
+  return groups;
+}, {}) as {
+  [G in RouteModelGroup<RouteModelName>]: {
+    [K in RouteModelKey<RouteModelName, G>]: `${G}.${K}`;
+  };
+};
 
 export * from "./account.contract";
 export * from "./calendar.contract";
@@ -130,7 +149,6 @@ export * from "./notification.contract";
 export * from "./push-device.contract";
 export * from "./profiles.contract";
 export * from "./recurring.contract";
-export * from "./route-model-names";
 export * from "./settings.contract";
 export * from "./recent-contacts.contract";
 export * from "./stalwart-webhook.contract";

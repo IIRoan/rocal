@@ -1,4 +1,5 @@
-import { httpClient, HttpClient } from "./http-client";
+import { HttpClient } from "@workspace/calendar-client";
+import { httpClient } from "./api-clients";
 import type {
   E2eeBootstrapResponse,
   E2eeDeviceRecord,

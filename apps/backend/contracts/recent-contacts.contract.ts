@@ -1,11 +1,8 @@
-import { z } from "zod";
-import { strictZodObject } from "../lib/validation";
+import type { z } from "zod";
+import { putRecentContactsBodySchema } from "@workspace/calendar-core";
 import { userIdField } from "./_zod";
 
-export const putRecentContactsBodySchema = strictZodObject({
-  encryptedContent: z.string().min(1).max(65_536),
-  encryptionKeyVersion: z.number().int().min(1).max(1000).optional(),
-});
+export { putRecentContactsBodySchema };
 
 export const recentContactsUpsertInputSchema =
   putRecentContactsBodySchema.extend(userIdField);

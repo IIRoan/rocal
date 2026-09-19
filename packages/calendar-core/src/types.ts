@@ -344,6 +344,7 @@ export interface CategoriesResponse {
   categories: EventCategory[];
 }
 
+/** Client shape before encryption; the wire schema in backend contracts accepts ciphertext-only bodies, so title/name are optional there. */
 export interface CreateEventRequest extends EventContentEncryptionShadowRequest {
   title: string;
   description?: string;
@@ -446,11 +447,6 @@ export interface RecentContactsRecord {
   updatedAt: string;
 }
 
-export interface PutRecentContactsRequest {
-  encryptedContent: string;
-  encryptionKeyVersion?: number;
-}
-
 // ─── Recurring Events Types ──────────────────────────────────────────────────
 
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
@@ -489,19 +485,9 @@ export interface EditRecurringEventRequest {
   updates: UpdateEventRequest;
 }
 
-export interface DeleteRecurringEventRequest {
-  deleteScope: RecurrenceDeleteScope;
-  occurrenceDate?: string;
-}
-
 // ─── Calendar Deletion Types ─────────────────────────────────────────────────
 
 export type CalendarDeleteAction = "delete_events" | "move_events";
-
-export interface DeleteCalendarRequest {
-  action?: CalendarDeleteAction;
-  targetCalendarId?: string;
-}
 
 export interface CalendarDeleteResponse {
   success: boolean;
@@ -514,12 +500,6 @@ export interface CalendarDeleteResponse {
 // ─── Bulk Operations Types ───────────────────────────────────────────────────
 
 export type BulkEventAction = "move" | "delete" | "duplicate";
-
-export interface BulkEventRequest {
-  action: BulkEventAction;
-  eventIds: string[];
-  targetCalendarId?: string;
-}
 
 export interface BulkEventResponse {
   success: boolean;
