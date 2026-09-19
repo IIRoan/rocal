@@ -1,4 +1,4 @@
-import { containsArmoredPgpMessage } from "./pgp-layers";
+import { containsArmoredPgpMessage } from "@workspace/calendar-core";
 import {
   classifyMessageEncryption,
   extractMessageBodies,

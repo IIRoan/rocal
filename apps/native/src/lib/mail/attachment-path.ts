@@ -1,4 +1,4 @@
-import { resolveAttachmentPreviewKind } from "./attachment-preview";
+import { resolveAttachmentPreviewKind } from "@workspace/calendar-core";
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   avif: "image/avif",

@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { differenceInMinutes, format, getMinutes, isPast } from "date-fns";
-import { MapPinIcon } from "@phosphor-icons/react";
+import { MapPin as MapPinIcon } from "lucide-react";
 import {
   isAwaitingUserInvitationResponse,
   isCancelledCalendarEvent,
@@ -459,7 +459,6 @@ export function EventItem({
               <div className="flex items-center gap-1 text-[12px] text-muted-foreground min-w-0">
                 <MapPinIcon
                   size={12}
-                  weight="fill"
                   className="shrink-0 opacity-70"
                 />
                 <span className="truncate">{event.location}</span>

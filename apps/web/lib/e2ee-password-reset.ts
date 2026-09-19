@@ -18,7 +18,7 @@ import {
 } from "./e2ee-crypto";
 import { clearPendingAuthPassword } from "./e2ee-password-cache";
 import { getActiveE2eeSession } from "./e2ee-session";
-import { httpClient } from "./http-client";
+import { httpClient } from "./api-clients";
 import type {
   E2eeResetSnapshotCalendar,
   E2eeResetSnapshotCategory,

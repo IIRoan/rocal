@@ -13,8 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import type { ThemeTokens } from "@workspace/design-tokens";
-import { getErrorMessage } from "@workspace/calendar-core";
-import type { MailAttachmentPreviewKind } from "../../lib/mail/attachment-preview";
+import { getErrorMessage, type MailAttachmentPreviewKind } from "@workspace/calendar-core";
 import type { CachedAttachment } from "../../lib/mail/attachment-cache";
 import { CenteredLoader } from "../ui/loading";
 

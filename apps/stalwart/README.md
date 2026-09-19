@@ -178,7 +178,6 @@ or unknown/occupied slots must not fall back to uncoordinated binding.
 |------|---------|
 | `stalwart/plan/` | Desired-state NDJSON (`stalwart-cli apply` on boot) |
 | `scripts/stalwart-plan.sh` | apply / dry-run / snapshot / drift / dns-publish |
-| `scripts/diag/` | JMAP profile, tracer, log analyze |
 | `scripts/sync-haproxy-cert.py` | Export Stalwart ACME cert → HAProxy PEM |
 | `scripts/test-relay-route.sh` | Offline tests for relay-route helpers |
 | `railway-entrypoint.sh` | Stalwart + health server + frpc + plan apply + relay IP |

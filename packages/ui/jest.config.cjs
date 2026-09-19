@@ -32,6 +32,8 @@ module.exports = {
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   moduleNameMapper: {
     ...createReactDedupeMapper(repoRoot),
+    // jsdom tests resolve the "browser" export condition, which is lucide's untransformed ESM build.
+    "^lucide-react$": path.join(repoRoot, "node_modules/lucide-react/dist/cjs/lucide-react.js"),
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
 };

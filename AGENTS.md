@@ -1,6 +1,6 @@
 # Solace — Agent Rules
 
-`AGENTS.md` and `CLAUDE.md` are **identical inline copies** (same in `apps/web/`). Edit one, copy it to the other; `bun run lint` fails if they drift. Rules marked **MUST** are non-negotiable; `scripts/check-repo-rules.ts` enforces the mechanical ones.
+`CLAUDE.md` is a symlink to `AGENTS.md` (same in `apps/web/`); edit `AGENTS.md`. Rules marked **MUST** are non-negotiable; `scripts/check-repo-rules.ts` enforces the mechanical ones.
 
 Solace is a privacy-first calendar + mail app. Bun workspaces monorepo.
 
@@ -19,7 +19,6 @@ Solace is a privacy-first calendar + mail app. Bun workspaces monorepo.
 | `packages/e2ee`            | E2EE primitives (AES-GCM-256, RSA-OAEP-4096, HMAC-SHA-256) with platform crypto providers.                                        |
 | `packages/ui`, `design-tokens` | Shared web UI (shadcn + calendar views); tokens for web CSS vars and native `ThemeProvider`.                                  |
 | `packages/calendar-ics`, `logger`, `eslint-config`, `typescript-config`, `runtime` | ICS/recurrence, logging, lint rules, TS configs, runtime helpers.                     |
-| `packages/mobile-ui`       | **Legacy, unused.** Never import (enforced). Delete rather than extend.                                                           |
 | `webmail/`                 | Untracked third-party Bulwark (AGPL) reference. Never copy code from it, never commit it.                                         |
 
 ## 2. Privacy & security by design (MUST)
@@ -120,7 +119,7 @@ Verify only — **don't start dev servers, builds, tunnels, EAS builds, OTA publ
 
 - `bun run lint` — repo rules + backend, web, native, notifications lint
 - `bun run typecheck` / `bun run typecheck:native`
-- `bun run test` (or `test:backend|native|ui|notifications`, single file paths)
+- `bun run test` runs every workspace with a `test` script, packages included (or `test:backend|native|ui|notifications`, single file paths)
 - `bun run lint:react-doctor`; Prisma: `cd apps/backend && bun run db:generate`
 
 CI (`.github/workflows/pr-tests.yml`) runs lint, both typechecks, and tests on every PR. API-level e2e against a deployed or local API: `cd apps/backend && E2E_API_URL=https://api.solace.onl bun run e2e:api`. Optional env: `E2E_WEB_URL` (web header checks), `E2E_COOKIE` (signed-in checks; reject-only, writes nothing), `E2E_RATE_LIMIT=1` (burns this IP's sign-in budget).

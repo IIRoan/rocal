@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  bulkEventActionSchema,
+  bulkEventBodySchema,
   eventInvitationContentSchema,
   eventParticipantInputSchema,
   invitationImportStatusSchema,
@@ -120,13 +120,7 @@ export const rsvpBodySchema = strictZodObject({
   status: rsvpStatusSchema,
 });
 
-export const bulkEventBodySchema = strictZodObject({
-  action: bulkEventActionSchema,
-  eventIds: z.array(z.string()).min(1),
-  targetCalendarId: z.string().optional(),
-});
-
-export { sealEncryptionBodySchema };
+export { bulkEventBodySchema, sealEncryptionBodySchema };
 
 export const eventSearchInputSchema = eventSearchQuerySchema
   .omit({ q: true, blindIndexTokens: true })

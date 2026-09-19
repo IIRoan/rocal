@@ -33,7 +33,7 @@ A calendar and mail monorepo: web frontend, native app, API backend, notificatio
 Install dependencies for all apps:
 
 ```bash
-bun run install:all
+bun install
 ```
 
 Start all services in development:
@@ -45,7 +45,7 @@ bun run dev
 Start individual services:
 
 ```bash
-bun run dev:frontend
+bun run dev:web
 bun run dev:backend
 bun run dev:notifications
 ```

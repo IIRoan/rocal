@@ -19,7 +19,7 @@ jest.mock("@/lib/auth-client", () => ({
   useSession: jest.fn(),
 }));
 
-jest.mock("@/lib/account-api-service", () => ({
+jest.mock("@/lib/api-clients", () => ({
   accountApiService: {
     getAuthStatus: jest.fn(),
   },
@@ -39,7 +39,7 @@ jest.mock("@workspace/ui/components/ui", () => ({
 }));
 
 import { useSession } from "@/lib/auth-client";
-import { accountApiService } from "@/lib/account-api-service";
+import { accountApiService } from "@/lib/api-clients";
 import { reconcileAuthSession } from "@/lib/auth-local-state";
 import { redirectToPasskeyStepUpLogin } from "@/lib/auth-navigation";
 import { AuthSessionGuard } from "../../components/auth-session-guard";

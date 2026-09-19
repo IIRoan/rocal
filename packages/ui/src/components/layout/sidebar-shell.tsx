@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { GearSixIcon } from "@phosphor-icons/react";
-import { Plus, Search, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Plus, Search, PanelLeftClose, PanelLeftOpen, Settings } from "lucide-react";
 
 import { type User } from "../calendar/types";
 import LogoSvg from "./logo";
@@ -218,7 +217,7 @@ export function SidebarShell({
                 className="rounded-lg h-9 text-[13px] font-medium text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-colors"
                 onClick={onOpenSettings}
               >
-                <GearSixIcon size={16} weight="regular" />
+                <Settings size={16} />
                 Settings
               </SidebarMenuButton>
             </SidebarMenuItem>

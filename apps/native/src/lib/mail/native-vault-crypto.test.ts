@@ -244,7 +244,7 @@ describe("native-vault-crypto", () => {
       decryptSpy.mockRestore();
     }, 30_000);
 
-    it("falls back to node-forge when subtle is missing", async () => {
+    it("throws when subtle is missing", async () => {
       const original = Object.getOwnPropertyDescriptor(globalThis, "crypto");
       Object.defineProperty(globalThis, "crypto", {
         value: { getRandomValues: globalThis.crypto.getRandomValues.bind(globalThis.crypto) },
@@ -253,13 +253,12 @@ describe("native-vault-crypto", () => {
       });
 
       try {
-        const key = new Uint8Array(32).fill(7);
-        const iv = new Uint8Array(12).fill(3);
-        const plaintext = new TextEncoder().encode("forge-fallback");
-        const ciphertext = await aesGcmEncrypt(key, iv, plaintext);
-        await expect(aesGcmDecrypt(key, iv, ciphertext)).resolves.toBe(
-          "forge-fallback",
-        );
+        await expect(
+          aesGcmEncrypt(new Uint8Array(32), new Uint8Array(12), new Uint8Array(4)),
+        ).rejects.toThrow(/crypto\.subtle is unavailable/);
+        await expect(
+          aesGcmDecrypt(new Uint8Array(32), new Uint8Array(12), new Uint8Array(20)),
+        ).rejects.toThrow(/crypto\.subtle is unavailable/);
       } finally {
         if (original) {
           Object.defineProperty(globalThis, "crypto", original);

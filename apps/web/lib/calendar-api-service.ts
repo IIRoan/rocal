@@ -5,7 +5,7 @@
 export { CalendarApiService } from "@workspace/calendar-client";
 
 import { CalendarApiService } from "@workspace/calendar-client";
-import { httpClient } from "./http-client";
+import { httpClient } from "./api-clients";
 import { WebE2eeProvider } from "./web-e2ee-provider";
 import { getApiBaseUrl } from "./api-url";
 import type { ApiError } from "./types/calendar";

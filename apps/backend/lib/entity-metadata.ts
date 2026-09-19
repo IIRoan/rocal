@@ -2,9 +2,10 @@ import {
   ENCRYPTED_CALENDAR_EXTERNAL_LABEL,
   PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE,
   hasEncryptedPayloadValue,
+  CALENDAR_COLORS,
+  isValidCalendarColor,
 } from "@workspace/calendar-core";
 import type { PrismaClient } from "../generated/prisma/index.js";
-import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "./colors";
 import { ValidationError } from "./errors";
 
 type NormalizeEntityNameOptions = {
@@ -72,7 +73,7 @@ export function normalizeEntityName(
 export function assertValidEntityColor(color: string, field: string = "color") {
   if (!isValidCalendarColor(color)) {
     throw new ValidationError(
-      `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
+      `Color must be one of: ${CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
       field,
     );
   }

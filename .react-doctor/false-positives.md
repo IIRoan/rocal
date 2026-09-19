@@ -36,8 +36,7 @@ Patterns that fire diagnostics but are safe to suppress.
 
 ## react-doctor/rn-no-raw-text
 
-- **Files**: `apps/native/src/providers/E2eeProvider.test.tsx`,
-  `packages/mobile-ui/src/MobilePage.test.tsx`
+- **Files**: `apps/native/src/providers/E2eeProvider.test.tsx`
 - **Why FP**: Test files use a JSDOM/jest environment with `react-test-renderer`
   rather than mounting on a real React Native host. Raw strings inside JSX in
   tests do not crash because no native `<Text>` component is rendered.

@@ -5,7 +5,7 @@ import {
   MAX_PGP_DECRYPT_LAYERS,
   mergeSignatureVerificationState,
   resolveLayerSignatureVerificationState,
-} from "../lib/mail/pgp-layers";
+} from "@workspace/calendar-core/mail-pgp-layers";
 import type {
   MailDecryptResult,
   MailSignatureVerificationState,

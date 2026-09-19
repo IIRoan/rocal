@@ -16,7 +16,7 @@ import { getErrorMessage, getInviteCreateFeedback } from "@workspace/calendar-co
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
-import { inviteApiService } from "@/lib/invite-api-service";
+import { inviteApiService } from "@/lib/api-clients";
 import type { InviteRecord } from "@workspace/calendar-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -221,6 +221,7 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
         <button
+          type="button"
           onClick={goBack}
           className="p-1 rounded hover:bg-muted/50 transition-colors"
         >
@@ -229,6 +230,7 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
         <Users className="size-4 text-muted-foreground" />
         <span className="text-sm font-medium">Invites</span>
         <button
+          type="button"
           onClick={() => refetch()}
           className="ml-auto p-1 rounded hover:bg-muted/50 transition-colors"
           title="Refresh invites"
