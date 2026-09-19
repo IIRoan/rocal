@@ -1,14 +1,6 @@
-/**
- * Native-compatible mail vault crypto.
- *
- * Prefers `react-native-quick-crypto` (native Argon2id + WebCrypto AES-GCM)
- * now that the app ships as a development/production client. Jest and any
- * runtime without those native modules fall back to `@noble/hashes/argon2`
- * and `node-forge`, which stay byte-compatible with the web vault format.
- */
+/** Native mail vault crypto: quick-crypto Argon2id + WebCrypto AES-GCM, byte-compatible with the web vault; @noble/hashes covers Argon2id under Jest. */
 import { argon2id as nobleArgon2id } from "@noble/hashes/argon2.js";
 import * as ExpoCrypto from "expo-crypto";
-import forge from "node-forge";
 import { createLogger } from "@workspace/logger";
 import { loadQuickCrypto } from "../load-quick-crypto";
 import type { MailVaultKdfParams } from "./types";
@@ -87,17 +79,6 @@ function decodeUtf8(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes);
 }
 
-/**
- * Converts a Uint8Array to a node-forge binary string (Latin-1 encoded,
- * one char per byte).
- */
-function toForgeBinary(bytes: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return binary;
-}
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(
@@ -220,64 +201,14 @@ async function deriveVaultKeyBytes(
   return derived;
 }
 
-// ---------------------------------------------------------------------------
-// AES-GCM via WebCrypto, with node-forge fallback
-// ---------------------------------------------------------------------------
-
-function forgeAesGcmDecrypt(
-  keyBinary: string,
-  ivBytes: Uint8Array,
-  ciphertextWithTag: Uint8Array,
-): string {
-  const tagLengthBytes = 16; // 128-bit GCM authentication tag
-  if (ciphertextWithTag.length < tagLengthBytes) {
-    throw new Error("Ciphertext too short to contain AES-GCM tag.");
-  }
-
-  const ciphertext = ciphertextWithTag.slice(0, -tagLengthBytes);
-  const tag = ciphertextWithTag.slice(-tagLengthBytes);
-
-  const decipher = forge.cipher.createDecipher("AES-GCM", keyBinary);
-  decipher.start({
-    iv: forge.util.createBuffer(toForgeBinary(ivBytes)),
-    tag: forge.util.createBuffer(toForgeBinary(tag)),
-    tagLength: 128,
-  });
-  decipher.update(forge.util.createBuffer(toForgeBinary(ciphertext)));
-
-  if (!decipher.finish()) {
+function requireSubtle(): SubtleCrypto {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
     throw new Error(
-      "AES-GCM decryption failed: authentication tag mismatch. " +
-      "The passphrase or ciphertext is incorrect.",
+      "crypto.subtle is unavailable: rebuild the development client so react-native-quick-crypto is linked.",
     );
   }
-
-  return decipher.output.toString();
-}
-
-function forgeAesGcmEncrypt(
-  keyBinary: string,
-  ivBytes: Uint8Array,
-  plaintextBinary: string,
-): Uint8Array {
-  const cipher = forge.cipher.createCipher("AES-GCM", keyBinary);
-  cipher.start({ iv: forge.util.createBuffer(toForgeBinary(ivBytes)), tagLength: 128 });
-  cipher.update(forge.util.createBuffer(plaintextBinary));
-
-  if (!cipher.finish()) {
-    throw new Error("AES-GCM encryption failed.");
-  }
-
-  const ciphertextBinary = cipher.output.getBytes();
-  const tagBinary = (cipher.mode as { tag: { getBytes: () => string } }).tag.getBytes();
-  const combined = new Uint8Array(ciphertextBinary.length + tagBinary.length);
-  for (let i = 0; i < ciphertextBinary.length; i++) {
-    combined[i] = ciphertextBinary.charCodeAt(i);
-  }
-  for (let i = 0; i < tagBinary.length; i++) {
-    combined[ciphertextBinary.length + i] = tagBinary.charCodeAt(i);
-  }
-  return combined;
+  return subtle;
 }
 
 export async function aesGcmDecrypt(
@@ -285,24 +216,20 @@ export async function aesGcmDecrypt(
   ivBytes: Uint8Array,
   ciphertextWithTag: Uint8Array,
 ): Promise<string> {
-  const subtle = globalThis.crypto?.subtle;
-  if (subtle) {
-    const key = await subtle.importKey(
-      "raw",
-      toArrayBuffer(keyBytes),
-      { name: "AES-GCM" },
-      false,
-      ["decrypt"],
-    );
-    const plaintext = await subtle.decrypt(
-      { name: "AES-GCM", iv: toArrayBuffer(ivBytes), tagLength: 128 },
-      key,
-      toArrayBuffer(ciphertextWithTag),
-    );
-    return decodeUtf8(new Uint8Array(plaintext));
-  }
-
-  return forgeAesGcmDecrypt(toForgeBinary(keyBytes), ivBytes, ciphertextWithTag);
+  const subtle = requireSubtle();
+  const key = await subtle.importKey(
+    "raw",
+    toArrayBuffer(keyBytes),
+    { name: "AES-GCM" },
+    false,
+    ["decrypt"],
+  );
+  const plaintext = await subtle.decrypt(
+    { name: "AES-GCM", iv: toArrayBuffer(ivBytes), tagLength: 128 },
+    key,
+    toArrayBuffer(ciphertextWithTag),
+  );
+  return decodeUtf8(new Uint8Array(plaintext));
 }
 
 export async function aesGcmEncrypt(
@@ -310,28 +237,20 @@ export async function aesGcmEncrypt(
   ivBytes: Uint8Array,
   plaintextBytes: Uint8Array,
 ): Promise<Uint8Array> {
-  const subtle = globalThis.crypto?.subtle;
-  if (subtle) {
-    const key = await subtle.importKey(
-      "raw",
-      toArrayBuffer(keyBytes),
-      { name: "AES-GCM" },
-      false,
-      ["encrypt"],
-    );
-    const ciphertext = await subtle.encrypt(
-      { name: "AES-GCM", iv: toArrayBuffer(ivBytes), tagLength: 128 },
-      key,
-      toArrayBuffer(plaintextBytes),
-    );
-    return new Uint8Array(ciphertext);
-  }
-
-  return forgeAesGcmEncrypt(
-    toForgeBinary(keyBytes),
-    ivBytes,
-    toForgeBinary(plaintextBytes),
+  const subtle = requireSubtle();
+  const key = await subtle.importKey(
+    "raw",
+    toArrayBuffer(keyBytes),
+    { name: "AES-GCM" },
+    false,
+    ["encrypt"],
   );
+  const ciphertext = await subtle.encrypt(
+    { name: "AES-GCM", iv: toArrayBuffer(ivBytes), tagLength: 128 },
+    key,
+    toArrayBuffer(plaintextBytes),
+  );
+  return new Uint8Array(ciphertext);
 }
 
 // ---------------------------------------------------------------------------

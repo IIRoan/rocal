@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useSyncExternalStore } from "react";
 import {
   isCancelledCalendarEvent,
   isSameCalendarDayInTimezone,
@@ -9,7 +9,6 @@ import {
   wallClockToUtc,
 } from "@workspace/calendar-core";
 import { cn } from "../../lib/utils";
-import { useDidMount } from "rooks";
 import {
   addDays,
   eachDayOfInterval,
@@ -52,6 +51,8 @@ interface MonthViewProps {
   onEventDelete?: (event: CalendarEvent) => void;
   onEventView?: (event: CalendarEvent) => void;
 }
+
+const subscribeToNothing = () => () => {};
 
 export function MonthView({
   currentDate,
@@ -114,14 +115,10 @@ export function MonthView({
     onEventSelect(event);
   };
 
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useSyncExternalStore(subscribeToNothing, () => true, () => false);
   const { contentRef, getVisibleEventCount } = useEventVisibility({
     eventHeight: compactView ? Math.round(EventHeight * 0.75) : EventHeight,
     eventGap: compactView ? Math.round(EventGap * 0.5) : EventGap,
-  });
-
-  useDidMount(() => {
-    setIsMounted(true);
   });
 
   type DayBuckets = {
@@ -338,6 +335,7 @@ export function MonthView({
                         <Popover modal>
                           <PopoverTrigger asChild>
                             <button
+                              type="button"
                               className="focus-visible:border-ring focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-[1.02] mt-[var(--event-gap)] flex h-[var(--event-height)] w-full items-center overflow-hidden px-1 text-left text-[10px] backdrop-blur-md transition-all duration-200 outline-none select-none focus-visible:ring-[3px] sm:px-2 sm:text-xs animate-fade-in"
                               onClick={(e) => e.stopPropagation()}
                             >

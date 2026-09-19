@@ -4,8 +4,8 @@ import {
   Columns3,
   LayoutGrid,
   Square,
+  List as ListIcon,
 } from "lucide-react";
-import { ListIcon } from "@phosphor-icons/react";
 
 import { AppLoadingState } from "../ui/app-loading-state";
 import { Button } from "../ui/button";
