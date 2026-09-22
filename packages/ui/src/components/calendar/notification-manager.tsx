@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, Plus, X, ChevronDown } from "lucide-react";
+import { Plus, X, ChevronDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {
   Drawer,
@@ -49,20 +49,29 @@ interface NotificationManagerProps {
   notifications: EventNotification[];
   onChange: (notifications: EventNotification[]) => void;
   loading?: boolean;
+  size?: "sm" | "md";
 }
 
-function ReminderRow({
+const CHIP_CLASS =
+  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-accent/60 text-sm text-foreground transition-colors cursor-pointer outline-none hover:bg-accent data-[state=open]:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50";
+
+function ReminderChip({
   value,
+  takenValues,
   onSelect,
   onRemove,
   isMobile,
+  size,
 }: {
   value: number;
+  takenValues: number[];
   onSelect: (value: number) => void;
-  onRemove?: () => void;
+  onRemove: () => void;
   isMobile: boolean;
+  size: "sm" | "md";
 }) {
   const [open, setOpen] = useState(false);
+  const height = size === "sm" ? "h-8" : "h-11";
 
   const content = (
     <div className="grid grid-cols-2 gap-1 p-2">
@@ -70,15 +79,16 @@ function ReminderRow({
         <button
           key={option.value}
           type="button"
+          disabled={takenValues.includes(option.value)}
           onClick={() => {
             onSelect(option.value);
             setOpen(false);
           }}
           className={cn(
-            "flex items-center justify-center h-9 rounded-lg text-sm font-medium transition-colors",
+            "flex items-center justify-center h-9 rounded-md text-sm transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",
             option.value === value
               ? "bg-primary text-primary-foreground"
-              : "bg-muted/50 hover:bg-muted active:bg-muted/80",
+              : "hover:bg-accent",
           )}
         >
           {option.label}
@@ -87,75 +97,52 @@ function ReminderRow({
     </div>
   );
 
-  if (isMobile) {
-    return (
-      <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerTrigger asChild>
-          <div className="flex items-center gap-2 w-full cursor-pointer group">
-            <div className="flex items-center justify-center h-9 w-9 shrink-0 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
-              <Bell className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="flex-1 inline-flex items-center justify-between gap-1 px-3 h-9 rounded-lg bg-muted/30 group-hover:bg-muted/50 text-sm font-medium text-foreground transition-colors">
-              <span>{formatTimeShort(value)} before</span>
-              {onRemove ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove();
-                  }}
-                  className="flex items-center justify-center h-6 w-6 -mr-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              ) : (
-                <ChevronDown className="h-4 w-4 opacity-50" />
-              )}
-            </div>
-          </div>
-        </DrawerTrigger>
-        <DrawerContent
-          responsive
-          responsiveHeight="60dvh"
-          className="max-h-[60dvh]"
-        >
-          <DrawerTitle className="sr-only">Select reminder time</DrawerTitle>
-          {content}
-        </DrawerContent>
-      </Drawer>
-    );
-  }
+  const trigger = (
+    <button
+      type="button"
+      aria-label={`Reminder ${formatTimeShort(value)} before, change time`}
+      className={cn(CHIP_CLASS, height, "pl-2.5 pr-1.5")}
+    >
+      {formatTimeShort(value)} before
+      <ChevronDown className="size-3.5 opacity-60" />
+    </button>
+  );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <div className="flex items-center gap-2 w-full cursor-pointer group">
-          <div className="flex items-center justify-center h-9 w-9 shrink-0 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
-            <Bell className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <div className="flex-1 inline-flex items-center justify-between gap-1 px-3 h-9 rounded-lg bg-muted/30 group-hover:bg-muted/50 text-sm font-medium text-foreground transition-colors">
-            <span>{formatTimeShort(value)} before</span>
-            {onRemove ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemove();
-                }}
-                className="flex items-center justify-center h-6 w-6 -mr-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            ) : (
-              <ChevronDown className="h-4 w-4 opacity-50" />
-            )}
-          </div>
-        </div>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-0" align="start">
-        {content}
-      </PopoverContent>
-    </Popover>
+    <div className="inline-flex items-center">
+      {isMobile ? (
+        <Drawer open={open} onOpenChange={setOpen}>
+          <DrawerTrigger asChild>{trigger}</DrawerTrigger>
+          <DrawerContent
+            responsive
+            responsiveHeight="60dvh"
+            className="max-h-[60dvh]"
+          >
+            <DrawerTitle className="sr-only">Select reminder time</DrawerTitle>
+            {content}
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+          <PopoverContent className="w-64 p-0" align="start">
+            {content}
+          </PopoverContent>
+        </Popover>
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${formatTimeShort(value)} reminder`}
+        title="Remove reminder"
+        className={cn(
+          "tap-target ml-0.5 flex aspect-square items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50",
+          height,
+        )}
+      >
+        <X className="size-3.5" />
+      </button>
+    </div>
   );
 }
 
@@ -163,58 +150,54 @@ export function NotificationManager({
   notifications,
   onChange,
   loading = false,
+  size = "md",
 }: NotificationManagerProps) {
   const isMobile = useIsMobile();
 
+  const usedValues = notifications.map((n) => n.minutesBefore);
+  const nextValue = [15, ...TIME_OPTIONS.map((option) => option.value)].find(
+    (value) => !usedValues.includes(value),
+  );
+
   const handleAdd = () => {
+    if (nextValue === undefined) return;
     onChange([
       ...notifications,
-      { notificationType: "email", minutesBefore: 15, isEnabled: true },
+      { notificationType: "email", minutesBefore: nextValue, isEnabled: true },
     ]);
   };
 
-  const handleRemove = (index: number) => {
-    onChange(notifications.filter((_, i) => i !== index));
-  };
-
-  const handleSelect = (index: number, value: number) => {
-    onChange(
-      notifications.map((n, i) =>
-        i === index ? { ...n, minutesBefore: value } : n,
-      ),
-    );
-  };
-
   return (
-    <div className="space-y-1">
+    <div className="flex flex-wrap items-center gap-1">
       {notifications.map((notification, index) => (
-        <ReminderRow
-          key={index}
+        <ReminderChip
+          key={notification.minutesBefore}
           value={notification.minutesBefore}
-          onSelect={(value) => handleSelect(index, value)}
-          onRemove={() => handleRemove(index)}
+          takenValues={usedValues.filter((_, i) => i !== index)}
+          onSelect={(value) =>
+            onChange(
+              notifications.map((n, i) =>
+                i === index ? { ...n, minutesBefore: value } : n,
+              ),
+            )
+          }
+          onRemove={() => onChange(notifications.filter((_, i) => i !== index))}
           isMobile={isMobile}
+          size={size}
         />
       ))}
-
-      {/* Add button */}
       <button
         type="button"
         onClick={handleAdd}
-        disabled={loading}
+        disabled={loading || nextValue === undefined}
         className={cn(
-          "flex items-center gap-2 w-full text-left group cursor-pointer",
-          "disabled:opacity-50 disabled:cursor-not-allowed",
+          CHIP_CLASS,
+          size === "sm" ? "h-8" : "h-11",
+          "px-2.5 bg-transparent text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50",
         )}
       >
-        <div className="flex items-center justify-center h-9 w-9 shrink-0 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
-          <Plus className="h-4 w-4 text-muted-foreground" />
-        </div>
-        <div className="flex-1 flex items-center px-3 h-9 rounded-lg bg-muted/30 group-hover:bg-muted/50 transition-colors">
-          <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-            Add reminder
-          </span>
-        </div>
+        <Plus className="size-3.5" />
+        {notifications.length === 0 ? "Add reminder" : "Add"}
       </button>
     </div>
   );

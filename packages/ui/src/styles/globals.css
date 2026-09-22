@@ -1368,3 +1368,30 @@
   color: var(--muted-foreground);
   opacity: 0.5;
 }
+
+/* Dropdown surfaces: a quick fade with a 2px nudge away from the trigger, no scale pop. */
+@keyframes surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--surface-nudge, -2px));
+  }
+}
+
+[data-surface-motion][data-state="open"] {
+  animation: surface-in 120ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+[data-surface-motion][data-side="top"] {
+  --surface-nudge: 2px;
+}
+
+[data-surface-motion][data-side="left"],
+[data-surface-motion][data-side="right"] {
+  --surface-nudge: 0px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-surface-motion][data-state="open"] {
+    animation: none;
+  }
+}

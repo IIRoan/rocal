@@ -4,11 +4,11 @@ import { useEffect, useMemo, useRef } from "react";
 import { format } from "date-fns";
 import { XIcon } from "lucide-react";
 import {
-  isSameCalendarDayInTimezone,
   resolveTimezone,
 } from "@workspace/calendar-core";
 
 import { EventItem } from "./event-item";
+import { getEventSegmentForCalendarDay } from "./utils";
 import { CalendarEvent } from "./types";
 
 interface EventsPopupProps {
@@ -116,15 +116,8 @@ export function EventsPopup({
           <div className="text-muted-foreground py-2 text-sm">No events</div>
         ) : (
           events.map((event) => {
-            const eventStart = new Date(event.start);
-            const eventEnd = new Date(event.end);
-            const isFirstDay = isSameCalendarDayInTimezone(
-              eventStart,
-              date,
-              resolvedTimezone,
-            );
-            const isLastDay = isSameCalendarDayInTimezone(
-              eventEnd,
+            const { isFirstDay, isLastDay } = getEventSegmentForCalendarDay(
+              event,
               date,
               resolvedTimezone,
             );

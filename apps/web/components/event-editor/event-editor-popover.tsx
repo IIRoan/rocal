@@ -3,82 +3,30 @@ import { createPortal } from "react-dom";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { gsap } from "@workspace/ui/lib/gsap";
 
-import { EventEditorBody } from "./event-editor-body";
-import { EventEditorFooter } from "./event-editor-footer";
-import { EventEditorDesktopHeader } from "./event-editor-header";
 import { useEffectEvent } from "./use-effect-event";
 import { useEventEditorPopoverPosition } from "./use-event-editor-popover-position";
-import type {
-  EventEditorBadgeItem,
-  EventEditorFormState,
-  EventEditorInvitationResponseStatus,
-  EventEditorViewFlags,
-  EventEditorVisibleSections,
-} from "./types";
-import type { Calendar } from "@workspace/ui/components/calendar";
-import type { UserSettings } from "@/lib/types/calendar";
 
 type EventEditorPopoverProps = {
   anchorPosition: { x: number; y: number };
-  badgeItem: EventEditorBadgeItem;
-  calendars: Calendar[];
-  dialogTitle: string;
-  eventForm: EventEditorFormState;
-  flags: Pick<EventEditorViewFlags, "canEdit" | "isViewMode">;
-  handleEventDelete: () => void;
-  handleEventDownloadIcs: () => void;
-  handleEventSave: () => void;
-  invitationResponsePending: EventEditorInvitationResponseStatus | null;
-  invitationStatus: EventEditorInvitationResponseStatus | null;
-  leadingSlot: React.ReactNode;
-  localSettings: UserSettings;
-  onInvitationResponse: (
-    status: EventEditorInvitationResponseStatus,
-  ) => void | Promise<void>;
+  ariaLabel: string;
+  children: React.ReactNode;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   recurringModal: React.ReactNode;
-  setShowDescription: (value: boolean) => void;
-  setShowLocation: (value: boolean) => void;
-  setShowParticipants: (value: boolean) => void;
-  visibleSections: Pick<
-    EventEditorVisibleSections,
-    "description" | "location" | "participants"
-  >;
 };
 
 export function EventEditorPopover({
   anchorPosition,
-  badgeItem,
-  calendars,
-  dialogTitle,
-  eventForm,
-  flags,
-  handleEventDelete,
-  handleEventDownloadIcs,
-  handleEventSave,
-  invitationResponsePending,
-  invitationStatus,
-  leadingSlot,
-  localSettings,
-  onInvitationResponse,
+  ariaLabel,
+  children,
   onOpenChange,
   open,
   recurringModal,
-  setShowDescription,
-  setShowLocation,
-  setShowParticipants,
-  visibleSections,
 }: EventEditorPopoverProps) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const { popoverRef, position } = useEventEditorPopoverPosition({
     anchorPosition,
     open,
-    sectionKey: [
-      visibleSections.description,
-      visibleSections.location,
-      visibleSections.participants,
-    ].join(":"),
   });
   const appliedPositionRef = React.useRef<{
     top: number;
@@ -167,6 +115,11 @@ export function EventEditorPopover({
         return;
       }
 
+      // Nested pickers and menus dismiss themselves first.
+      if (document.querySelector("[data-radix-popper-content-wrapper]")) {
+        return;
+      }
+
       event.preventDefault();
       event.stopPropagation();
       closePopover();
@@ -221,64 +174,19 @@ export function EventEditorPopover({
         className="fixed inset-0 z-50 appearance-none"
         onClick={() => onOpenChange(false)}
       />
-      <div
+      <dialog
+        open
         ref={popoverRef}
-        className="fixed z-50 w-[420px] bg-popover border border-border shadow-xl rounded-lg flex flex-col overflow-hidden"
+        aria-label={ariaLabel}
+        className="fixed z-50 m-0 p-0 w-[440px] bg-popover text-popover-foreground border border-border shadow-lg rounded-xl flex flex-col overflow-hidden"
         style={{
           top: position.top,
           left: position.left,
           maxHeight: position.maxHeight,
         }}
       >
-        <EventEditorDesktopHeader
-          badgeItem={badgeItem}
-          dialogTitle={dialogTitle}
-          isRecurring={eventForm.isRecurring}
-          isViewMode={flags.isViewMode}
-          leadingSlot={leadingSlot}
-          onToggleDescription={() =>
-            setShowDescription(!visibleSections.description)
-          }
-          onToggleLocation={() => setShowLocation(!visibleSections.location)}
-          onToggleNotifications={() =>
-            eventForm.setShowNotifications(!eventForm.showNotifications)
-          }
-          onToggleParticipants={() =>
-            setShowParticipants(!visibleSections.participants)
-          }
-          onToggleRecurring={() =>
-            eventForm.setIsRecurring(!eventForm.isRecurring)
-          }
-          showDescription={visibleSections.description}
-          showLocation={visibleSections.location}
-          showNotifications={eventForm.showNotifications}
-          showParticipants={visibleSections.participants}
-        />
-        <EventEditorBody
-          eventForm={eventForm}
-          isViewMode={flags.isViewMode}
-          visibleSections={visibleSections}
-          setShowLocation={setShowLocation}
-          setShowDescription={setShowDescription}
-          setShowParticipants={setShowParticipants}
-          localSettings={localSettings}
-          calendars={calendars}
-          desktop
-        />
-        <EventEditorFooter
-          canEditEvent={flags.canEdit}
-          isViewMode={flags.isViewMode}
-          eventForm={eventForm}
-          handleEventSave={handleEventSave}
-          handleEventDelete={handleEventDelete}
-          handleEventDownloadIcs={handleEventDownloadIcs}
-          invitationResponsePending={invitationResponsePending}
-          invitationStatus={invitationStatus}
-          onInvitationResponse={onInvitationResponse}
-          desktop
-          onClose={() => onOpenChange(false)}
-        />
-      </div>
+        {children}
+      </dialog>
       {recurringModal}
     </>,
     document.body,
