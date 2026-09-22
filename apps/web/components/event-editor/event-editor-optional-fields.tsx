@@ -1,18 +1,75 @@
 import { NotificationManager } from "@workspace/ui/components/calendar";
-import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
-import { Label } from "@workspace/ui/components/ui/label";
 import { Textarea } from "@workspace/ui/components/ui/textarea";
-import { Mail, UserPlus, Users, X } from "lucide-react";
+import { cn } from "@workspace/ui/lib/utils";
+import { AlignLeft, Bell, MapPin, Users, X } from "lucide-react";
 import type { EventParticipantInput, RecentContactEntry } from "@workspace/calendar-core";
 
-import { RecurringEventForm } from "../command-palette/recurring-event-form";
 import { RecipientSuggestInput } from "../mail/recipient-suggest-input";
 import { SolaceAvatar } from "../solace-avatar";
+import { formatParticipantStatus } from "./event-editor-participant-utils";
+import { EventEditorRow } from "./event-editor-row";
+import { fieldClass } from "./event-editor-styles";
 import { ParticipantsInviteInfo } from "./participants-invite-info";
 import type { EventEditorFormState } from "./types";
 
-const OPTIONAL_SECTION_ENTER = "animate-fade-in";
+type ParticipantItem = EventParticipantInput & { image?: string | null };
+
+function ParticipantList({
+  desktop,
+  onRemove,
+  participants,
+}: {
+  desktop?: boolean;
+  onRemove: (email: string) => void;
+  participants: ParticipantItem[];
+}) {
+  return (
+    <ul className="mt-1.5 space-y-0.5">
+      {participants.map((participant) => {
+        const name = participant.displayName || participant.email;
+        return (
+          <li
+            key={participant.email}
+            className="group/participant flex items-center gap-2.5 rounded-md px-1.5 py-1 transition-colors hover:bg-accent/40"
+          >
+            <SolaceAvatar
+              email={participant.email}
+              name={participant.displayName}
+              src={participant.image}
+              className="size-7"
+              title={name}
+            />
+            <div className="min-w-0 flex-1 leading-tight">
+              <div className="truncate text-sm text-foreground">{name}</div>
+              <div className="truncate text-xs text-muted-foreground">
+                {participant.role === "organizer"
+                  ? "Organizer"
+                  : participant.displayName
+                    ? participant.email
+                    : formatParticipantStatus(participant.status)}
+              </div>
+            </div>
+            {participant.role !== "organizer" && (
+              <button
+                type="button"
+                aria-label={`Remove ${name}`}
+                title={`Remove ${name}`}
+                onClick={() => onRemove(participant.email)}
+                className={cn(
+                  "tap-target flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color,opacity] cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/50",
+                  desktop && "opacity-0 group-hover/participant:opacity-100",
+                )}
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 export function EventEditorOptionalFields({
   desktop,
@@ -24,9 +81,6 @@ export function EventEditorOptionalFields({
   participantDraft,
   participantError,
   participantItems,
-  showDescription,
-  showLocation,
-  showParticipants,
 }: {
   desktop?: boolean;
   eventForm: EventEditorFormState;
@@ -36,158 +90,79 @@ export function EventEditorOptionalFields({
   onRemoveParticipant: (email: string) => void;
   participantDraft: string;
   participantError: string | null;
-  participantItems: Array<EventParticipantInput & { image?: string | null }>;
-  showDescription: boolean;
-  showLocation: boolean;
-  showParticipants: boolean;
+  participantItems: ParticipantItem[];
 }) {
-  if (
-    !showLocation &&
-    !showDescription &&
-    !eventForm.isRecurring &&
-    !eventForm.showNotifications &&
-    !showParticipants
-  ) {
-    return null;
-  }
-
   return (
-    <div className="space-y-3 pt-3 mt-3 border-t border-border/50">
-      {showLocation && (
-        <div className={OPTIONAL_SECTION_ENTER}>
-          <Input
-            value={eventForm.eventLocation}
-            onChange={(event) => eventForm.setEventLocation(event.target.value)}
-            placeholder="Location"
-            className={`${desktop ? "h-9 text-sm" : "h-10"}`}
+    <>
+      <EventEditorRow desktop={desktop} icon={Users} label="Participants">
+        <div className="flex items-center gap-1">
+          <RecipientSuggestInput
+            appearance="field"
+            mode="calendar"
+            value={participantDraft}
+            onChange={onParticipantDraftChange}
+            onSelectSuggestion={onAddParticipantFromSuggestion}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onAddParticipant();
+              }
+            }}
+            placeholder="Add participants"
+            className="flex-1"
+            inputClassName={fieldClass(desktop)}
           />
+          <ParticipantsInviteInfo />
         </div>
-      )}
-
-      {showDescription && (
-        <div className={OPTIONAL_SECTION_ENTER}>
-          <Textarea
-            value={eventForm.eventDescription}
-            onChange={(event) =>
-              eventForm.setEventDescription(event.target.value)
-            }
-            placeholder="Description..."
-            className={`min-h-[60px] text-sm resize-none ${desktop ? "h-9" : ""}`}
+        {participantError && (
+          <p role="alert" className="px-1 pt-1 text-xs text-destructive">
+            {participantError}
+          </p>
+        )}
+        {participantItems.length > 0 && (
+          <ParticipantList
+            desktop={desktop}
+            onRemove={onRemoveParticipant}
+            participants={participantItems}
           />
-        </div>
-      )}
+        )}
+      </EventEditorRow>
 
-      {eventForm.isRecurring && (
-        <div className={OPTIONAL_SECTION_ENTER}>
-          <RecurringEventForm
-            isRecurring={eventForm.isRecurring}
-            onIsRecurringChange={eventForm.setIsRecurring}
-            recurrenceRule={eventForm.recurrenceRule}
-            onRecurrenceRuleChange={eventForm.setRecurrenceRule}
-            eventStartDate={eventForm.eventStartDate}
-            eventEndDate={eventForm.eventEndDate}
-          />
-        </div>
-      )}
+      <EventEditorRow desktop={desktop} icon={MapPin} label="Location">
+        <Input
+          value={eventForm.eventLocation}
+          onChange={(event) => eventForm.setEventLocation(event.target.value)}
+          placeholder="Add location"
+          aria-label="Location"
+          className={fieldClass(desktop)}
+        />
+      </EventEditorRow>
 
-      {eventForm.showNotifications && (
-        <div className={OPTIONAL_SECTION_ENTER}>
-          <div className="p-3 rounded-lg border bg-muted/30">
-            <NotificationManager
-              eventId={eventForm.selectedEvent?.id}
-              notifications={eventForm.eventNotifications}
-              onChange={eventForm.handleNotificationChange}
-              loading={eventForm.notificationsLoading}
-            />
-          </div>
-        </div>
-      )}
+      <EventEditorRow desktop={desktop} icon={Bell} label="Reminders">
+        <NotificationManager
+          eventId={eventForm.selectedEvent?.id}
+          notifications={eventForm.eventNotifications}
+          onChange={(notifications) => {
+            eventForm.handleNotificationChange(notifications);
+            eventForm.setShowNotifications(notifications.length > 0);
+          }}
+          loading={eventForm.notificationsLoading}
+          size={desktop ? "sm" : "md"}
+        />
+      </EventEditorRow>
 
-      {showParticipants && (
-        <div className={`${OPTIONAL_SECTION_ENTER} space-y-2`}>
-          <div className="flex items-center gap-2">
-            <Users className="size-4 text-muted-foreground" />
-            <Label className="text-sm">Participants</Label>
-            <ParticipantsInviteInfo />
-          </div>
-
-          <div className="flex gap-2">
-            <RecipientSuggestInput
-              appearance="field"
-              mode="calendar"
-              value={participantDraft}
-              onChange={onParticipantDraftChange}
-              onSelectSuggestion={onAddParticipantFromSuggestion}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  onAddParticipant();
-                }
-              }}
-              placeholder="Add attendee by email"
-              className="flex-1"
-              inputClassName={desktop ? "h-9 text-sm" : "h-10"}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              className="shrink-0"
-              onClick={onAddParticipant}
-            >
-              <UserPlus className="size-4" />
-            </Button>
-          </div>
-
-          {participantError && (
-            <p className="text-xs text-destructive">{participantError}</p>
-          )}
-
-          {participantItems.length > 0 ? (
-            <div className="rounded-lg border divide-y">
-              {participantItems.map((participant) => (
-                <div
-                  key={participant.email}
-                  className="flex items-center gap-3 px-3 py-2.5"
-                >
-                  <SolaceAvatar
-                    email={participant.email}
-                    name={participant.displayName}
-                    src={participant.image}
-                    className="size-9 border border-border/60"
-                    title={participant.displayName || participant.email}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm truncate">
-                      {participant.displayName || participant.email}
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {participant.role === "organizer" ? (
-                        "Organizer"
-                      ) : (
-                        <>
-                          <Mail className="inline size-3 mr-1" />
-                          {participant.email}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {participant.role !== "organizer" && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 shrink-0"
-                      onClick={() => onRemoveParticipant(participant.email)}
-                    >
-                      <X className="size-4" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      )}
-    </div>
+      <EventEditorRow desktop={desktop} icon={AlignLeft} label="Description">
+        <Textarea
+          value={eventForm.eventDescription}
+          onChange={(event) =>
+            eventForm.setEventDescription(event.target.value)
+          }
+          placeholder="Add description"
+          aria-label="Description"
+          rows={3}
+          className={cn(fieldClass(desktop), "h-auto min-h-20 resize-y py-2")}
+        />
+      </EventEditorRow>
+    </>
   );
 }

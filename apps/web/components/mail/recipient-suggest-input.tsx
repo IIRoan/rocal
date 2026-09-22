@@ -56,7 +56,7 @@ function RecipientSuggestionsList({
     >
       <div
         id={headingId}
-        className="px-2 pt-1.5 pb-1 text-[13px] font-[470] text-[var(--text-tertiary)]"
+        className="px-2 pt-1.5 pb-1 text-[13px] font-[470] text-[var(--text-tertiary,var(--muted-foreground))]"
       >
         {heading}
       </div>
@@ -74,8 +74,8 @@ function RecipientSuggestionsList({
             className={cn(
               "flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors",
               index === highlightedIndex
-                ? "bg-[var(--bg-cell-hover)]"
-                : "hover:bg-[var(--bg-cell-hover)]",
+                ? "bg-[var(--bg-cell-hover,var(--accent))]"
+                : "hover:bg-[var(--bg-cell-hover,var(--accent))]",
             )}
           >
             <SenderAvatar
@@ -84,11 +84,11 @@ function RecipientSuggestionsList({
               className="size-7 shrink-0"
             />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[15px] leading-[130%] text-[var(--text-primary)]">
+              <span className="block truncate text-[15px] leading-[130%] text-[var(--text-primary,var(--foreground))]">
                 {label}
               </span>
               {entry.displayName ? (
-                <span className="block truncate text-[13px] leading-[130%] text-[var(--text-secondary)]">
+                <span className="block truncate text-[13px] leading-[130%] text-[var(--text-secondary,var(--muted-foreground))]">
                   {entry.email}
                 </span>
               ) : null}
@@ -106,6 +106,7 @@ export type RecipientSuggestInputProps = {
   onBlur?: () => void;
   placeholder?: string;
   disabled?: boolean;
+  autoFocus?: boolean;
   className?: string;
   inputClassName?: string;
   /** Bare inline input for mail compose rows; styled field for forms. */
@@ -121,6 +122,7 @@ export function RecipientSuggestInput({
   onBlur,
   placeholder,
   disabled,
+  autoFocus,
   className,
   inputClassName,
   appearance = "compose",
@@ -256,6 +258,7 @@ export function RecipientSuggestInput({
 
   const sharedInputProps = {
     value,
+    autoFocus,
     onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
       onChange(event.target.value);
       setOpen(true);
@@ -318,7 +321,7 @@ export function RecipientSuggestInput({
       </PopoverAnchor>
 
       <PopoverContent
-        className="w-[var(--radix-popover-anchor-width)] min-w-[16rem] max-w-[min(24rem,calc(100dvw-2rem))] overflow-hidden rounded-xl border-[var(--border-secondary)] bg-[var(--bg-l3-solid)] p-1 shadow-[var(--shadow-l2)]"
+        className="w-[var(--radix-popover-anchor-width)] min-w-[16rem] max-w-[min(24rem,calc(100dvw-2rem))] overflow-hidden rounded-xl border-[var(--border-secondary,var(--border))] bg-[var(--bg-l3-solid,var(--popover))] p-1 shadow-[var(--shadow-l2,0_8px_24px_rgb(0_0_0/0.24))]"
         align="start"
         sideOffset={4}
         onOpenAutoFocus={(event) => event.preventDefault()}

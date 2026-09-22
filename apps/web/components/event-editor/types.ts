@@ -20,13 +20,7 @@ export type EventEditorBodyProps = {
   eventForm: EventEditorFormState;
   isViewMode: boolean;
   localSettings: UserSettings | null | undefined;
-  setShowDescription: (value: boolean) => void;
-  setShowLocation: (value: boolean) => void;
-  setShowParticipants: (value: boolean) => void;
-  visibleSections: Pick<
-    EventEditorVisibleSections,
-    "description" | "location" | "participants"
-  >;
+  onSubmit: () => void;
 };
 
 export type EventEditorFooterProps = {
@@ -49,18 +43,8 @@ export type EventEditorFooterProps = {
 export type EventEditorDesktopHeaderProps = {
   badgeItem: EventEditorBadgeItem;
   dialogTitle: string;
-  isRecurring: boolean;
-  isViewMode: boolean;
   leadingSlot: ReactNode;
-  onToggleDescription: () => void;
-  onToggleLocation: () => void;
-  onToggleNotifications: () => void;
-  onToggleParticipants: () => void;
-  onToggleRecurring: () => void;
-  showDescription: boolean;
-  showLocation: boolean;
-  showNotifications: boolean;
-  showParticipants: boolean;
+  onClose?: () => void;
 };
 
 export type EventEditorViewLayout =
@@ -73,13 +57,6 @@ export type EventEditorViewFlags = {
   canEdit: boolean;
   isRecurring: boolean;
   isViewMode: boolean;
-};
-
-export type EventEditorVisibleSections = {
-  description: boolean;
-  location: boolean;
-  notifications: boolean;
-  participants: boolean;
 };
 
 export type EventEditorViewProps = {
@@ -95,11 +72,6 @@ export type EventEditorViewProps = {
   handleInvitationResponse: (
     status: EventEditorInvitationResponseStatus,
   ) => void;
-  handleToggleDescription: () => void;
-  handleToggleLocation: () => void;
-  handleToggleNotifications: () => void;
-  handleToggleParticipants: () => void;
-  handleToggleRecurring: () => void;
   invitationResponsePending: EventEditorInvitationResponseStatus | null;
   invitationStatus: EventEditorInvitationResponseStatus | null;
   layout: EventEditorViewLayout;
@@ -108,8 +80,4 @@ export type EventEditorViewProps = {
   onOpenChange: (open: boolean) => void;
   open: boolean;
   recurringModal: ReactNode;
-  setShowDescription: (value: boolean) => void;
-  setShowLocation: (value: boolean) => void;
-  setShowParticipants: (value: boolean) => void;
-  visibleSections: EventEditorVisibleSections;
 };

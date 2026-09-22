@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { CalendarDays } from "lucide-react";
 import { isMailInvitationStagingCalendar } from "@workspace/calendar-core";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import { Input } from "@workspace/ui/components/ui/input";
-import { Label } from "@workspace/ui/components/ui/label";
+import { cn } from "@workspace/ui/lib/utils";
 import {
   Select,
   SelectContent,
@@ -19,9 +20,10 @@ import {
   getRecurringRuleSummary,
 } from "@/lib/event-editor-view-model";
 import { EventEditorDateTimeFields } from "./event-editor-datetime-fields";
-import { EventEditorFieldToggles } from "./event-editor-field-toggles";
 import { EventEditorOptionalFields } from "./event-editor-optional-fields";
 import { EventEditorReadView } from "./event-editor-read-view";
+import { EventEditorRow } from "./event-editor-row";
+import { chipClass } from "./event-editor-styles";
 import type { EventEditorBodyProps } from "./types";
 
 export function EventEditorBody({
@@ -30,16 +32,10 @@ export function EventEditorBody({
   eventForm,
   isViewMode,
   localSettings,
-  setShowDescription,
-  setShowLocation,
-  setShowParticipants,
-  visibleSections,
+  onSubmit,
 }: EventEditorBodyProps) {
   const [participantDraft, setParticipantDraft] = useState("");
   const [participantError, setParticipantError] = useState<string | null>(null);
-  const showDescription = visibleSections.description;
-  const showLocation = visibleSections.location;
-  const showParticipants = visibleSections.participants;
   const selectedCalendar = calendars.find(
     (calendar) => calendar.id === eventForm.eventCalendarId,
   );
@@ -61,8 +57,8 @@ export function EventEditorBody({
     ? getRecurringRuleSummary(eventForm.recurrenceRule)
     : "";
   const bodyClass = desktop
-    ? "px-3 py-2 space-y-3 flex-1 overflow-y-auto min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0"
-    : "p-4 space-y-4 flex-1 min-h-0 overflow-y-auto custom-scrollbar";
+    ? "px-4 pt-1 pb-3 flex-1 overflow-y-auto min-h-0 [scrollbar-width:thin]"
+    : "px-4 py-4 flex-1 min-h-0 overflow-y-auto custom-scrollbar";
   const participantProfileByEmail = new Map(
     (eventForm.selectedEvent?.participants ?? []).map((participant) => [
       participant.email,
@@ -171,75 +167,57 @@ export function EventEditorBody({
           selectedCalendar={selectedCalendar}
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           <Input
             value={eventForm.eventTitle}
             onChange={(event) => eventForm.setEventTitle(event.target.value)}
-            placeholder="Event title"
-            className={`${desktop ? "h-9 text-sm" : "text-lg font-semibold h-10"}`}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                onSubmit();
+              }
+            }}
+            placeholder="Add title"
+            aria-label="Event title"
+            autoFocus={desktop && !eventForm.selectedEvent?.id}
+            className="-mx-2 h-11 w-[calc(100%+1rem)] rounded-md border-0 bg-transparent px-2 text-xl font-semibold text-foreground shadow-none placeholder:text-muted-foreground/70 hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:ring-0"
           />
 
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label className="text-sm">Calendar</Label>
-              <Select
-                value={eventForm.eventCalendarId}
-                onValueChange={eventForm.setEventCalendarId}
+          <EventEditorDateTimeFields
+            desktop={desktop}
+            eventForm={eventForm}
+            localSettings={localSettings}
+          />
+
+          <EventEditorRow desktop={desktop} icon={CalendarDays} label="Calendar">
+            <Select
+              value={eventForm.eventCalendarId}
+              onValueChange={eventForm.setEventCalendarId}
+            >
+              <SelectTrigger
+                aria-label="Calendar"
+                className={cn(chipClass(desktop), "w-auto max-w-full gap-2 [&>svg]:opacity-60")}
               >
-                <SelectTrigger className="h-9 w-full text-sm">
-                  <SelectValue placeholder="Select calendar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectableCalendars.map((calendar) => (
-                    <SelectItem key={calendar.id} value={calendar.id}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="size-2.5 rounded-full"
-                          style={{
-                            backgroundColor: getColorSwatchValue(
-                              calendar.color,
-                            ),
-                          }}
-                        />
-                        <span>{calendar.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <EventEditorDateTimeFields
-              desktop={desktop}
-              eventForm={eventForm}
-              localSettings={localSettings}
-            />
-          </div>
-
-          {!desktop && (
-            <div className="space-y-1.5">
-              <Label className="text-sm">Options</Label>
-              <EventEditorFieldToggles
-                className="flex flex-wrap items-center gap-2"
-                isRecurring={eventForm.isRecurring}
-                onToggleDescription={() => setShowDescription(!showDescription)}
-                onToggleLocation={() => setShowLocation(!showLocation)}
-                onToggleNotifications={() =>
-                  eventForm.setShowNotifications(!eventForm.showNotifications)
-                }
-                onToggleParticipants={() =>
-                  setShowParticipants(!showParticipants)
-                }
-                onToggleRecurring={() =>
-                  eventForm.setIsRecurring(!eventForm.isRecurring)
-                }
-                showDescription={showDescription}
-                showLocation={showLocation}
-                showNotifications={eventForm.showNotifications}
-                showParticipants={showParticipants}
-              />
-            </div>
-          )}
+                <SelectValue placeholder="Select calendar" />
+              </SelectTrigger>
+              <SelectContent>
+                {selectableCalendars.map((calendar) => (
+                  <SelectItem key={calendar.id} value={calendar.id}>
+                    <div className="flex items-center gap-2">
+                      <span
+                        aria-hidden
+                        className="size-2.5 rounded-full"
+                        style={{
+                          backgroundColor: getColorSwatchValue(calendar.color),
+                        }}
+                      />
+                      <span>{calendar.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </EventEditorRow>
 
           <EventEditorOptionalFields
             desktop={desktop}
@@ -256,9 +234,6 @@ export function EventEditorBody({
             participantDraft={participantDraft}
             participantError={participantError}
             participantItems={participantItems}
-            showDescription={showDescription}
-            showLocation={showLocation}
-            showParticipants={showParticipants}
           />
         </div>
       )}

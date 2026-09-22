@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect, useCallback, useId } from "react";
+import { useState, useRef, useEffect, useCallback, useId, useMemo } from "react";
 import { Clock } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "./button";
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from "./drawer";
+import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
 import { useAutocompleteTimepicker } from "@workspace/ui/hooks/use-autocomplete-timepicker";
 
@@ -102,12 +103,64 @@ function TimeGrid({
             >
               {timeString}
               {isCurrentTime && !isSelected && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
+                <span className="absolute -top-1 -right-1 size-2 bg-primary rounded-full" />
               )}
             </button>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function TimeList({
+  selectedTime,
+  timeOptions,
+  formatTime,
+  handleSelect,
+  scrollToIndex,
+  open,
+}: Omit<TimeGridProps, "compact">) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => {
+      containerRef.current
+        ?.querySelector<HTMLElement>(`[data-time-index="${scrollToIndex}"]`)
+        ?.scrollIntoView({ block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, scrollToIndex]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="max-h-64 overflow-y-auto overscroll-contain p-1"
+    >
+      {timeOptions.map((time, index) => {
+        const timeString = formatTime(time);
+        const isSelected =
+          time.getHours() === selectedTime.getHours() &&
+          time.getMinutes() === selectedTime.getMinutes();
+        return (
+          <button
+            key={timeString}
+            type="button"
+            data-time-index={index}
+            aria-pressed={isSelected}
+            onClick={() => handleSelect(time)}
+            className={cn(
+              "flex h-8 w-full items-center rounded-md px-2.5 text-sm tabular-nums transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+              isSelected
+                ? "bg-primary text-primary-foreground"
+                : "text-popover-foreground hover:bg-accent",
+            )}
+          >
+            {timeString}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -183,6 +236,7 @@ function TimeInput({
         type="text"
         inputMode="numeric"
         placeholder="HH"
+        aria-label="Hours"
         value={hours}
         onChange={handleHoursChange}
         className={cn(INPUT_STYLES, "focus:text-primary")}
@@ -195,6 +249,7 @@ function TimeInput({
         type="text"
         inputMode="numeric"
         placeholder="MM"
+        aria-label="Minutes"
         value={minutes}
         onChange={handleMinutesChange}
         onKeyDown={handleKeyDown}
@@ -232,7 +287,7 @@ export function ShadcnAutocomleteTimePicker({
     timeZone,
   });
 
-  const selectedTime = value || new Date();
+  const selectedTime = useMemo(() => value ?? new Date(), [value]);
 
   const selectedIndex = timeOptions.findIndex(
     (time) =>
@@ -287,6 +342,7 @@ export function ShadcnAutocomleteTimePicker({
 
   const triggerButton = inline ? (
     <button
+      type="button"
       role="combobox"
       aria-expanded={open}
       aria-controls={timePickerContentId}
@@ -308,7 +364,7 @@ export function ShadcnAutocomleteTimePicker({
         className,
       )}
     >
-      <Clock className="mr-2 h-4 w-4 flex-shrink-0" data-testid="ClockIcon" />
+      <Clock className="mr-2 size-4 flex-shrink-0" data-testid="ClockIcon" />
       {currentTimeString}
     </Button>
   );
@@ -367,27 +423,14 @@ export function ShadcnAutocomleteTimePicker({
   }
 
   return (
-    <Drawer open={open} onOpenChange={setOpen} direction="bottom">
-      <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
-      <DrawerContent
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
+      <PopoverContent
         id={timePickerContentId}
-        responsive
-        responsiveHeight="400px"
-        className="max-h-[400px]"
+        align="start"
+        className="w-44 p-0"
       >
-        <DrawerTitle className="sr-only">Select time</DrawerTitle>
-        <div className="flex flex-col items-center flex-1 overflow-y-auto pt-4">
-          <TimeGrid
-            selectedTime={selectedTime}
-            timeOptions={timeOptions}
-            formatTime={formatTime}
-            handleSelect={handleSelect}
-            scrollToIndex={getScrollToIndex()}
-            compact
-            open={open}
-          />
-        </div>
-        <div className="w-full px-3 pt-3 pb-4 border-t flex justify-center gap-2">
+        <div className="flex items-center gap-1 border-b border-border p-1.5">
           <TimeInput
             value={customTimeInput}
             onChange={setCustomTimeInput}
@@ -403,17 +446,20 @@ export function ShadcnAutocomleteTimePicker({
               }
             }}
             disabled={customTimeInput.length !== 5}
-            className={cn(
-              "h-11 min-w-[80px] flex items-center justify-center rounded-lg text-sm font-medium transition-colors",
-              customTimeInput.length === 5
-                ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                : "bg-muted/30 text-muted-foreground",
-            )}
+            className="h-8 flex-1 rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground transition-colors cursor-pointer hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-accent disabled:text-muted-foreground"
           >
-            Apply
+            Set
           </button>
         </div>
-      </DrawerContent>
-    </Drawer>
+        <TimeList
+          selectedTime={selectedTime}
+          timeOptions={timeOptions}
+          formatTime={formatTime}
+          handleSelect={handleSelect}
+          scrollToIndex={getScrollToIndex()}
+          open={open}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }

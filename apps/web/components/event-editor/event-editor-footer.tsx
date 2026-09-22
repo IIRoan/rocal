@@ -170,21 +170,27 @@ export function EventEditorFooter({
   ) : null;
 
   if (desktop) {
+    const canOpenEditor =
+      Boolean(eventForm.selectedEvent?.id) &&
+      !eventForm.selectedEvent?.isSynced &&
+      canEditEvent &&
+      !isCancelledEvent;
+
     return (
-      <div className="px-3 py-2 border-t border-border/50 flex flex-row items-center gap-2 shrink-0">
+      <div className="flex shrink-0 flex-row items-center gap-1.5 border-t border-border px-3 py-2.5"
+      >
         {isViewMode ? (
           <>
-            {eventForm.selectedEvent?.id &&
-              canDeleteEvent && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDelete}
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                >
-                  <Trash2 className="size-4" /> {deleteLabel}
-                </Button>
-              )}
+            {canDeleteEvent && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDelete}
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="size-4" /> {deleteLabel}
+              </Button>
+            )}
             {invitationActions}
             <div className="flex-1" />
             {eventForm.selectedEvent?.id && (
@@ -192,29 +198,28 @@ export function EventEditorFooter({
                 variant="ghost"
                 size="sm"
                 onClick={handleEventDownloadIcs}
+                title="Download .ics"
               >
-                <Download className="size-4" /> ICS
+                <Download className="size-4" /> Export
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              Close
-            </Button>
-            {eventForm.selectedEvent?.id &&
-              !eventForm.selectedEvent.isSynced &&
-              canEditEvent &&
-              !isCancelledEvent && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => eventForm.setEventViewMode("edit")}
-                  className="text-primary hover:bg-primary/10"
-                >
-                  <Edit3 className="size-4" /> Edit
-                </Button>
-              )}
+            {canOpenEditor && (
+              <Button
+                size="sm"
+                onClick={() => eventForm.setEventViewMode("edit")}
+              >
+                <Edit3 className="size-4" /> Edit
+              </Button>
+            )}
           </>
         ) : (
           <>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <kbd className="rounded bg-accent px-1.5 py-0.5 font-mono text-[10px] text-foreground/80">
+                ⌘↵
+              </kbd>
+              to save
+            </span>
             <div className="flex-1" />
             <Button variant="ghost" size="sm" onClick={onClose}>
               Cancel
@@ -223,6 +228,7 @@ export function EventEditorFooter({
               size="sm"
               onClick={handleEventSave}
               disabled={!canEditEvent || !canSave}
+              title={!eventForm.eventTitle.trim() ? "Add a title to save" : undefined}
             >
               {eventForm.eventSaving ? (
                 <>
@@ -230,10 +236,7 @@ export function EventEditorFooter({
                   Saving…
                 </>
               ) : (
-                <>
-                  <Save className="size-4" />
-                  Save
-                </>
+                "Save"
               )}
             </Button>
           </>
