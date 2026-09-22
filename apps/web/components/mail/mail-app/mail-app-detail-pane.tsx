@@ -1,5 +1,6 @@
 "use client";
 
+import { Typography, TypographySize } from "@workspace/ui/solace";
 import { ComposeForm } from "../compose-dialog";
 import { MessageReader } from "../message-reader";
 import type { MailAppContentController } from "../use-mail-app-content-controller";
@@ -68,14 +69,19 @@ export function MailAppDetailPane({
     return null;
   }
 
+  const readerOpen =
+    isMobile
+      ? showMobileDetailPane
+      : Boolean((selectedMessage && !selectedIsDraft) || isFullCompose);
+
   return (
     <div
       className={
-        isMobile
-          ? showMobileDetailPane
-            ? "flex flex-col w-full min-h-0 overflow-hidden relative"
-            : "hidden"
-          : "flex h-full min-h-0 min-w-0 flex-1 overflow-hidden relative"
+        !readerOpen
+          ? "hidden"
+          : isMobile
+            ? "relative flex w-full min-h-0 flex-col overflow-hidden"
+            : "relative flex h-full min-h-0 min-w-0 w-[42%] shrink-0 overflow-hidden bg-[var(--bg-l2-solid)]"
       }
     >
       {selectedMessage && !selectedIsDraft ? (
@@ -158,10 +164,13 @@ export function MailAppDetailPane({
           />
         </div>
       ) : !isFullCompose ? (
-        <div className="absolute inset-0 flex items-center justify-center p-8">
-          <p className="text-sm text-muted-foreground">
-            Select a message to read
-          </p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-8">
+          <Typography color="disabled" size={TypographySize.H4}>
+            Select a conversation
+          </Typography>
+          <Typography color="disabled" size={TypographySize.SMALL}>
+            Choose a message from the list to read it
+          </Typography>
         </div>
       ) : null}
 

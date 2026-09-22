@@ -17,7 +17,7 @@ Solace is a privacy-first calendar + mail app. Bun workspaces monorepo.
 | `packages/calendar-core`   | Shared types, Zod schemas, date/timezone helpers, search index, sanitizers — **all logic both apps need goes here**.               |
 | `packages/calendar-client` | Typed HTTP client for the backend (used by web and native).                                                                       |
 | `packages/e2ee`            | E2EE primitives (AES-GCM-256, RSA-OAEP-4096, HMAC-SHA-256) with platform crypto providers.                                        |
-| `packages/ui`, `design-tokens` | Shared web UI (shadcn + calendar views); tokens for web CSS vars and native `ThemeProvider`.                                  |
+| `packages/ui`, `design-tokens` | Shared web UI (shadcn + calendar views); mail uses a Nightwatch reimplementation in `packages/ui/src/solace` (`data-solace` only). Tokens for web CSS vars and native `ThemeProvider`. |
 | `packages/calendar-ics`, `logger`, `eslint-config`, `typescript-config`, `runtime` | ICS/recurrence, logging, lint rules, TS configs, runtime helpers.                     |
 | `webmail/`                 | Untracked third-party Bulwark (AGPL) reference. Never copy code from it, never commit it.                                         |
 

@@ -18,8 +18,9 @@ import { SecuritySettings } from "./security-settings";
 import { InviteSettings } from "./invite-settings";
 import type { PaletteView } from "./constants";
 import { CommandPaletteMainSearchView } from "./main-search-view";
-import { Settings, ArrowLeft } from "lucide-react";
+import { Settings } from "lucide-react";
 import type { EventEditorMode } from "../command-palette-context";
+import { PaletteViewHeader } from "./palette-ui";
 
 type CommandPaletteViewContentProps = {
   open: boolean;
@@ -280,17 +281,7 @@ export function CommandPaletteViewContent({
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-        <button
-          type="button"
-          onClick={() => goBack()}
-          className="p-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
-          aria-label="Back"
-        >
-          <ArrowLeft className="size-4 text-muted-foreground" />
-        </button>
-        <span className="text-sm font-medium">Settings</span>
-      </div>
+      <PaletteViewHeader title="Settings" onBack={goBack} />
       <div className="flex-1 overflow-y-auto p-1">
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-md opacity-50">
           <Settings className="size-4 text-muted-foreground shrink-0" />

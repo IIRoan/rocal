@@ -6,7 +6,6 @@ import { useComposeDraftAutosave } from "@/hooks/use-compose-draft-autosave";
 import {
   MailComposeProvider,
 } from "./mail-compose-context";
-import { ComposeCloseConfirmDialog } from "./compose-close-confirm-dialog";
 import { useMailAppContentController } from "./use-mail-app-content-controller";
 import { MailAppMainLayout } from "./mail-app/mail-app-main-layout";
 import { MailAppOverlays } from "./mail-app/mail-app-overlays";
@@ -70,7 +69,6 @@ export function MailApp() {
         accountEmail={mail.accountEmail}
         onDraftSaved={mail.handleDraftSaved}
       />
-      <ComposeCloseConfirmDialog />
       <MailAppContent mail={mail} />
     </MailComposeProvider>
   );

@@ -1060,7 +1060,7 @@ describe("MailService", () => {
     expect(mockAdminClient.createAccount).not.toHaveBeenCalled();
   });
 
-  it("upserts encrypted vault backups without touching plaintext material", async () => {
+  it("upserts encrypted vault backups and keeps the seal when an update omits it", async () => {
     const result = await service.upsertVaultBackup({
       email: "  Alice@Solace.Onl  ",
       vaultVersion: 2,
@@ -1098,8 +1098,8 @@ describe("MailService", () => {
               kdfMemoryKiB: 131072,
               kdfIterations: 4,
               kdfParallelism: 2,
-              wrappedSecret: null,
-              wrapAlgorithm: null,
+              wrappedSecret: undefined,
+              wrapAlgorithm: undefined,
             },
           },
         },

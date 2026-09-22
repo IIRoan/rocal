@@ -16,6 +16,10 @@ import {
   initialMessageListState,
   messageListReducer,
 } from "./message-list/message-list-state";
+import type {
+  MessageListRowInteraction,
+  MessageListRowPresentation,
+} from "./message-list/message-list-types";
 import { buildMessageListThreadRows } from "./message-list/message-list-utils";
 
 const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
@@ -113,8 +117,16 @@ export function MessageList({
       !MOVE_EXCLUDED_ROLES.has(mailbox.role?.toLowerCase() ?? ""),
   );
 
-  const hasBulkSelection = state.selectedIds.size > 0;
-  const bulkIds = Array.from(state.selectedIds);
+  const threadRows = buildMessageListThreadRows(
+    messages,
+    relatedMessages,
+    preserveMessageOrder,
+  );
+  const visibleIds = new Set(threadRows.flatMap((row) => row.messageIds));
+  // Filters, labels and search hide rows without clearing selection; bulk actions must only hit shown messages.
+  const bulkIds = Array.from(state.selectedIds).filter((id) => visibleIds.has(id));
+  const selectedIds = new Set(bulkIds);
+  const hasBulkSelection = bulkIds.length > 0;
 
   useGSAP(() => {
     const bar = barRef.current;
@@ -136,11 +148,6 @@ export function MessageList({
     }
   }, [hasBulkSelection, state.isBarVisible]);
 
-  const threadRows = buildMessageListThreadRows(
-    messages,
-    relatedMessages,
-    preserveMessageOrder,
-  );
   const primaryIds = new Set(messages.map((message) => message.id));
 
   const handleToggleSelect = (event: React.MouseEvent, ids: string[]) => {
@@ -176,7 +183,7 @@ export function MessageList({
     }
   };
 
-  if (messages.length === 0) {
+  if (messages.length === 0 && !hasMore) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
         <p className="text-sm text-muted-foreground">No messages</p>
@@ -184,13 +191,49 @@ export function MessageList({
     );
   }
 
+  const interaction: MessageListRowInteraction = {
+    selectedMessageId,
+    selectedIds,
+    onSelect,
+    onToggleSelect: handleToggleSelect,
+    onToggleThreadExpand: handleToggleThreadExpand,
+  };
+  const presentation: MessageListRowPresentation = {
+    labels,
+    moveTargets,
+    spamActions: { canReportSpam, canNotSpam },
+    display: { isMobile, density, showLabelChips, threadExpandEnabled },
+    threadUi: {
+      expandedThreads: state.expandedThreads,
+      expandedThreadMessages: state.expandedThreadMessages,
+      loadingThreadIds: state.isLoadingThread,
+    },
+    timeFormat,
+    timezone,
+    mailboxActions: {
+      onDelete,
+      onMove,
+      onMarkAsUnread,
+      onMarkAsRead,
+      onBulkDelete,
+      onBulkMove,
+      onBulkMarkAsUnread,
+      onBulkMarkAsRead,
+      onToggleFlagged,
+      onReportSpam,
+      onNotSpam,
+      onSetLabel,
+    },
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {state.isBarVisible && (
         <MessageListBulkBar
           barRef={barRef}
-          selectedCount={state.selectedIds.size}
+          selectedCount={bulkIds.length}
           messageIds={bulkIds}
+          allMessageIds={messages.map((message) => message.id)}
           moveTargets={moveTargets}
           canReportSpam={canReportSpam && Boolean(onBulkReportSpam)}
           bulkActionsOpen={state.bulkActionsOpen}
@@ -214,39 +257,9 @@ export function MessageList({
       <MessageListVirtualized
         threadRows={threadRows}
         primaryIds={primaryIds}
-        selectedMessageId={selectedMessageId}
-        selectedIds={state.selectedIds}
-        expandedThreads={state.expandedThreads}
-        expandedThreadMessages={state.expandedThreadMessages}
-        isLoadingThread={state.isLoadingThread}
-        labels={labels}
-        moveTargets={moveTargets}
-        canReportSpam={canReportSpam}
-        canNotSpam={canNotSpam}
-        isMobile={isMobile}
-        density={density}
-        showLabelChips={showLabelChips}
-        threadExpandEnabled={threadExpandEnabled}
-        timeFormat={timeFormat}
-        timezone={timezone}
-        hasMore={hasMore}
-        isLoadingMore={isLoadingMore}
-        onLoadMore={onLoadMore}
-        onSelect={onSelect}
-        onToggleSelect={handleToggleSelect}
-        onToggleThreadExpand={handleToggleThreadExpand}
-        onDelete={onDelete}
-        onMove={onMove}
-        onMarkAsUnread={onMarkAsUnread}
-        onMarkAsRead={onMarkAsRead}
-        onBulkDelete={onBulkDelete}
-        onBulkMove={onBulkMove}
-        onBulkMarkAsUnread={onBulkMarkAsUnread}
-        onBulkMarkAsRead={onBulkMarkAsRead}
-        onToggleFlagged={onToggleFlagged}
-        onReportSpam={onReportSpam}
-        onNotSpam={onNotSpam}
-        onSetLabel={onSetLabel}
+        interaction={interaction}
+        presentation={presentation}
+        pagination={{ hasMore, isLoadingMore, onLoadMore }}
       />
     </div>
   );

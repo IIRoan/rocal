@@ -1,15 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useReducer } from "react";
 import { Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import type { LabelDef } from "@/lib/mail/types";
 import {
-  isValidLabelHex,
-  MAIL_LABEL_PRESET_COLORS,
   normalizeLabelColorInput,
   resolveLabelDisplayColor,
 } from "@/lib/mail/mail-label-colors";
+import { LabelColorPicker } from "./label-color-picker";
+
+const DEFAULT_LABEL_COLOR = "#6366f1";
+
+const initialLabelPickerState = {
+  newLabelName: "",
+  newLabelColor: DEFAULT_LABEL_COLOR,
+  isSavingLabel: false,
+  editingLabelId: null as string | null,
+  editName: "",
+  editColor: DEFAULT_LABEL_COLOR,
+  isSavingEdit: false,
+};
+
+type LabelPickerState = typeof initialLabelPickerState;
+
+function labelPickerReducer(
+  state: LabelPickerState,
+  patch: Partial<LabelPickerState>,
+): LabelPickerState {
+  return { ...state, ...patch };
+}
 
 interface LabelPickerPanelProps {
   labels: LabelDef[];
@@ -24,71 +44,6 @@ interface LabelPickerPanelProps {
   className?: string;
 }
 
-function LabelColorPicker({
-  color,
-  onChange,
-  disabled,
-}: {
-  color: string;
-  onChange: (color: string) => void;
-  disabled?: boolean;
-}) {
-  const [hexInput, setHexInput] = useState("");
-  const preview = normalizeLabelColorInput(color);
-
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {MAIL_LABEL_PRESET_COLORS.map((entry) => (
-        <button
-          key={entry.value}
-          type="button"
-          disabled={disabled}
-          onClick={() => {
-            onChange(entry.hex);
-            setHexInput("");
-          }}
-          style={{ backgroundColor: entry.hex }}
-          className={cn(
-            "size-4 rounded-full transition-transform disabled:opacity-50",
-            color === entry.hex || color === entry.value
-              ? "ring-2 ring-ring ring-offset-1 ring-offset-popover scale-110"
-              : "hover:scale-105",
-          )}
-          aria-label={entry.label}
-          title={entry.label}
-        />
-      ))}
-      <div className="flex items-center gap-1 ml-0.5">
-        <input
-          type="color"
-          value={isValidLabelHex(preview) ? preview : "#6366f1"}
-          onChange={(e) => {
-            onChange(e.target.value);
-            setHexInput("");
-          }}
-          disabled={disabled}
-          className="size-4 rounded cursor-pointer border-0 p-0 bg-transparent disabled:opacity-50"
-          title="Custom color"
-          aria-label="Custom label color"
-        />
-        <input
-          type="text"
-          value={hexInput}
-          onChange={(e) => {
-            const value = e.target.value;
-            setHexInput(value);
-            if (isValidLabelHex(value)) onChange(value);
-          }}
-          placeholder="#hex"
-          disabled={disabled}
-          className="h-6 w-[4.5rem] rounded bg-muted/60 px-1.5 text-[10px] font-mono text-foreground outline-none placeholder:text-muted-foreground/50 focus:ring-1 focus:ring-ring/40 disabled:opacity-50"
-          aria-label="Label hex color"
-        />
-      </div>
-    </div>
-  );
-}
-
 export function LabelPickerPanel({
   labels,
   messageKeywords,
@@ -98,59 +53,62 @@ export function LabelPickerPanel({
   onDeleteLabel,
   className,
 }: LabelPickerPanelProps) {
-  const [newLabelName, setNewLabelName] = useState("");
-  const [newLabelColor, setNewLabelColor] = useState("#6366f1");
-  const [isSavingLabel, setIsSavingLabel] = useState(false);
-  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editColor, setEditColor] = useState("#6366f1");
-  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [state, patch] = useReducer(
+    labelPickerReducer,
+    initialLabelPickerState,
+  );
+  const {
+    newLabelName,
+    newLabelColor,
+    isSavingLabel,
+    editingLabelId,
+    editName,
+    editColor,
+    isSavingEdit,
+  } = state;
 
   const startEditing = (label: LabelDef) => {
-    setEditingLabelId(label.id);
-    setEditName(label.name);
-    setEditColor(resolveLabelDisplayColor(label.color));
+    patch({
+      editingLabelId: label.id,
+      editName: label.name,
+      editColor: resolveLabelDisplayColor(label.color),
+    });
   };
 
   const cancelEditing = () => {
-    setEditingLabelId(null);
-    setEditName("");
-    setEditColor("#6366f1");
+    patch({
+      editingLabelId: null,
+      editName: "",
+      editColor: DEFAULT_LABEL_COLOR,
+    });
   };
 
   const handleCreate = async () => {
     if (!onCreateLabel || !newLabelName.trim()) return;
-    setIsSavingLabel(true);
-    try {
-      await onCreateLabel(
-        newLabelName.trim(),
-        normalizeLabelColorInput(newLabelColor),
-      );
-      setNewLabelName("");
-      setNewLabelColor("#6366f1");
-    } finally {
-      setIsSavingLabel(false);
-    }
+    patch({ isSavingLabel: true });
+    await onCreateLabel(
+      newLabelName.trim(),
+      normalizeLabelColorInput(newLabelColor),
+    ).finally(() => patch({ isSavingLabel: false }));
+    patch({ newLabelName: "", newLabelColor: DEFAULT_LABEL_COLOR });
   };
 
   const handleSaveEdit = async () => {
     if (!onUpdateLabel || !editingLabelId || !editName.trim()) return;
-    setIsSavingEdit(true);
-    try {
-      await onUpdateLabel(editingLabelId, {
+    patch({ isSavingEdit: true });
+    await Promise.resolve(
+      onUpdateLabel(editingLabelId, {
         name: editName.trim(),
         color: normalizeLabelColorInput(editColor),
-      });
-      cancelEditing();
-    } finally {
-      setIsSavingEdit(false);
-    }
+      }),
+    ).finally(() => patch({ isSavingEdit: false }));
+    cancelEditing();
   };
 
   return (
     <div className={cn("overflow-hidden", className)}>
       {labels.length > 0 ? (
-        <div className="p-1 border-b border-border/40 max-h-52 overflow-y-auto">
+        <div className="p-1 max-h-52 overflow-y-auto">
           {labels.map((label) => {
             const assigned = messageKeywords?.[`label:${label.id}`] === true;
             const displayColor = resolveLabelDisplayColor(label.color);
@@ -160,23 +118,23 @@ export function LabelPickerPanel({
               return (
                 <div
                   key={label.id}
-                  className="rounded-md border border-border/50 bg-muted/30 p-2 space-y-2"
+                  className="rounded-lg bg-muted p-2 space-y-2"
                 >
                   <input
                     type="text"
                     value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
+                    onChange={(e) => patch({ editName: e.target.value })}
                     disabled={isSavingEdit}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void handleSaveEdit();
                       if (e.key === "Escape") cancelEditing();
                     }}
-                    className="h-7 w-full rounded bg-background px-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring/40 disabled:opacity-50"
+                    className="h-7 w-full rounded bg-background px-2 text-[15px] text-foreground outline-none focus:ring-2 focus:ring-ring/40 disabled:opacity-50"
                     aria-label="Edit label name"
                   />
                   <LabelColorPicker
                     color={editColor}
-                    onChange={setEditColor}
+                    onChange={(color) => patch({ editColor: color })}
                     disabled={isSavingEdit}
                   />
                   <div className="flex items-center gap-1">
@@ -184,7 +142,7 @@ export function LabelPickerPanel({
                       type="button"
                       disabled={isSavingEdit || !editName.trim()}
                       onClick={() => void handleSaveEdit()}
-                      className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                      className="inline-flex h-7 items-center gap-1 rounded-md bg-foreground px-2 text-xs font-medium text-background disabled:opacity-50"
                     >
                       {isSavingEdit ? (
                         <Loader2 className="size-3 animate-spin" />
@@ -197,7 +155,7 @@ export function LabelPickerPanel({
                       type="button"
                       disabled={isSavingEdit}
                       onClick={cancelEditing}
-                      className="inline-flex h-7 items-center rounded-md px-2 text-xs text-muted-foreground hover:bg-accent/50"
+                      className="inline-flex h-7 items-center rounded-md px-2 text-[13px] text-muted-foreground hover:bg-muted"
                     >
                       Cancel
                     </button>
@@ -209,13 +167,13 @@ export function LabelPickerPanel({
             return (
               <div
                 key={label.id}
-                className="group flex items-center rounded hover:bg-accent/50 transition-colors"
+                className="group flex items-center rounded hover:bg-muted transition-colors"
               >
                 {onToggleLabel ? (
                   <button
                     type="button"
                     onClick={() => onToggleLabel(label.id, !assigned)}
-                    className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-sm text-left cursor-pointer select-none"
+                    className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-[15px] text-left cursor-pointer select-none"
                   >
                     <span
                       className="size-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover"
@@ -237,7 +195,7 @@ export function LabelPickerPanel({
                     ) : null}
                   </button>
                 ) : (
-                  <div className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-sm">
+                  <div className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-[15px]">
                     <span
                       className="size-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: displayColor }}
@@ -274,20 +232,20 @@ export function LabelPickerPanel({
           })}
         </div>
       ) : (
-        <div className="px-3 py-4 text-center text-xs text-muted-foreground border-b border-border/40">
+        <div className="px-3 py-4 text-center text-[13px] text-muted-foreground">
           No labels yet
         </div>
       )}
 
       {onCreateLabel ? (
         <div className="p-2 space-y-2">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">
+          <div className="text-[13px] font-[470] text-muted-foreground/80 px-1">
             New label
           </div>
           <input
             type="text"
             value={newLabelName}
-            onChange={(e) => setNewLabelName(e.target.value)}
+            onChange={(e) => patch({ newLabelName: e.target.value })}
             aria-label="New label name"
             onKeyDown={(e) => {
               if (e.key === "Enter" && newLabelName.trim()) {
@@ -296,18 +254,18 @@ export function LabelPickerPanel({
             }}
             placeholder="Label name…"
             disabled={isSavingLabel}
-            className="h-7 w-full text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-1 focus:ring-ring/50 placeholder:text-muted-foreground/40 disabled:opacity-50"
+            className="h-7 w-full text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-2 focus:ring-ring/50 placeholder:text-muted-foreground/40 disabled:opacity-50"
           />
           <LabelColorPicker
             color={newLabelColor}
-            onChange={setNewLabelColor}
+            onChange={(color) => patch({ newLabelColor: color })}
             disabled={isSavingLabel}
           />
           <button
             type="button"
             disabled={!newLabelName.trim() || isSavingLabel}
             onClick={() => void handleCreate()}
-            className="inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-md bg-muted/80 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+            className="inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg bg-muted/80 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40 transition-colors"
           >
             {isSavingLabel ? (
               <Loader2 className="size-3.5 animate-spin" />

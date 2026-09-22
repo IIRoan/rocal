@@ -234,7 +234,7 @@ export function useMailCommandPaletteController({
 
   const showUnifiedSearch =
     currentView === "main" && chrome.debouncedSearchQuery.trim().length >= 2;
-  const { results: unifiedResults, isFetching: unifiedSearchLoading } =
+  const { results: rawUnifiedResults, isFetching: unifiedSearchLoading } =
     useUnifiedSearch({
       query: chrome.debouncedSearchQuery,
       enabled: open && showUnifiedSearch,
@@ -243,10 +243,11 @@ export function useMailCommandPaletteController({
       limit: 15,
     });
 
-  const hasBothResults =
-    showUnifiedSearch &&
-    unifiedResults.some((result) => result.source === "mail") &&
-    unifiedResults.some((result) => result.source === "calendar");
+  // Palette renders messages before events; keyboard indices must follow that order.
+  const unifiedResults = [
+    ...rawUnifiedResults.filter((result) => result.source === "mail"),
+    ...rawUnifiedResults.filter((result) => result.source === "calendar"),
+  ];
 
   const handleSelect = (item: (typeof mainListItems)[number]) => {
     selectMailPaletteItem({
@@ -313,7 +314,6 @@ export function useMailCommandPaletteController({
     showUnifiedSearch,
     unifiedResults,
     unifiedSearchLoading,
-    hasBothResults,
     handleSelect,
     handleUnifiedResultSelect,
     handleKeyDown,

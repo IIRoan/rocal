@@ -3,11 +3,7 @@ import {
   ShieldAlert,
   Lock,
 } from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@workspace/ui/components/ui/popover";
+import { DropdownPanel } from "@workspace/ui/solace";
 import type {
   MailSignatureVerificationState,
   MessageEncryptionState,
@@ -142,101 +138,103 @@ export function MailSecurityBadge({
   const { Icon } = meta;
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
+    <DropdownPanel
+      width={296}
+      trigger={
         <button
           type="button"
           aria-label={meta.label}
-          className="inline-flex items-center justify-center shrink-0 size-7 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring/60 transition-colors hover:bg-accent/40"
+          className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded outline-none transition-colors hover:bg-[var(--bg-overlay-tertiary)] focus-visible:ring-2 focus-visible:ring-ring/60"
         >
           <Icon
             className={`size-4 ${meta.iconClassName}`}
             aria-hidden
-            strokeWidth={2.25}
+            strokeWidth={2}
           />
         </button>
-      </PopoverTrigger>
-      <PopoverContent
-        side="bottom"
-        align="end"
-        sideOffset={6}
-        className="w-72 p-0 overflow-hidden"
-      >
-        <div className="flex items-start gap-2.5 px-3 pt-3 pb-2 border-b border-border/50">
-          <div className="flex items-center justify-center size-7 rounded-md shrink-0 bg-muted/50">
-            <Icon
-              className={`size-4 ${meta.iconClassName}`}
-              strokeWidth={2.25}
+      }
+    >
+      <div className="flex items-start gap-2.5 border-b border-[var(--border-tertiary)] p-3">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-overlay-tertiary)]">
+          <Icon
+            className={`size-4 ${meta.iconClassName}`}
+            strokeWidth={2}
+            aria-hidden
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="text-[15px] leading-[130%] font-[470] text-[var(--text-primary)]">
+            {meta.label}
+          </div>
+          <p className="mt-1 text-[13px] leading-[130%] text-[var(--text-secondary)]">
+            {meta.description}
+            {meta.learnMoreHref && (
+              <a
+                href={meta.learnMoreHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 text-[var(--text-link)] underline-offset-2 hover:underline"
+              >
+                Full details
+              </a>
+            )}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 p-1.5 pb-2">
+        {meta.protectedFields.length > 0 && (
+          <SecurityFieldList
+            title="Encrypted on server"
+            fields={meta.protectedFields}
+            encrypted
+          />
+        )}
+        {meta.visibleFields.length > 0 && (
+          <SecurityFieldList title="Visible to server" fields={meta.visibleFields} />
+        )}
+      </div>
+    </DropdownPanel>
+  );
+}
+
+function SecurityFieldList({
+  title,
+  fields,
+  encrypted = false,
+}: {
+  title: string;
+  fields: string[];
+  encrypted?: boolean;
+}) {
+  const FieldIcon = encrypted ? ShieldCheck : Lock;
+  return (
+    <div>
+      <div className="px-1.5 pt-1 pb-1 text-[13px] font-[470] text-[var(--text-tertiary)]">
+        {title}
+      </div>
+      <ul>
+        {fields.map((field) => (
+          <li
+            key={field}
+            className={`flex h-6 items-center gap-2 px-1.5 text-[13px] ${
+              encrypted
+                ? "text-[var(--text-primary)]"
+                : "text-[var(--text-secondary)]"
+            }`}
+          >
+            <FieldIcon
+              className={`size-3.5 shrink-0 ${
+                encrypted
+                  ? "text-[var(--accent-green-primary)]"
+                  : "text-[var(--icon-disabled)]"
+              }`}
+              strokeWidth={2}
               aria-hidden
             />
-          </div>
-          <div className="min-w-0">
-            <div className="text-sm font-medium leading-tight">
-              {meta.label}
-            </div>
-            <div className="text-[11px] text-muted-foreground leading-snug mt-0.5">
-              {meta.description}
-              {meta.learnMoreHref && (
-                <a
-                  href={meta.learnMoreHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-1 text-primary/70 hover:text-primary underline underline-offset-2 transition-colors"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Full details
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="px-3 py-2.5 space-y-2.5">
-          {meta.protectedFields.length > 0 && (
-            <div>
-              <div className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase mb-1">
-                Encrypted on server
-              </div>
-              <ul className="space-y-0.5">
-                {meta.protectedFields.map((field) => (
-                  <li
-                    key={`enc-${field}`}
-                    className="text-xs flex items-center gap-1.5"
-                  >
-                    <ShieldCheck
-                      className="size-3 text-primary shrink-0"
-                      strokeWidth={2.25}
-                      aria-hidden
-                    />
-                    <span className="truncate">{field}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {meta.visibleFields.length > 0 && (
-            <div>
-              <div className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase mb-1">
-                Visible to server
-              </div>
-              <ul className="space-y-0.5">
-                {meta.visibleFields.map((field) => (
-                  <li
-                    key={`plain-${field}`}
-                    className="text-xs flex items-center gap-1.5 text-muted-foreground"
-                  >
-                    <Lock
-                      className="size-3 opacity-40 shrink-0"
-                      strokeWidth={2.25}
-                      aria-hidden
-                    />
-                    <span className="truncate">{field}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+            <span className="truncate">{field}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

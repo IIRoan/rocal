@@ -14,6 +14,7 @@ export * from "./mail-identity-badge";
 export * from "./mail-recipient";
 export * from "./outgoing-mime";
 export * from "./mail-outgoing-attachments";
+export * from "./mail-hidden-mailboxes";
 export * from "./mail-jmap-validation";
 export * from "./mail-server-limits";
 export * from "./mail-server-policy";

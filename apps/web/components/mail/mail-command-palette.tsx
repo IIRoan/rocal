@@ -1,14 +1,11 @@
 "use client";
 
-import { useRef } from "react";
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
-import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
-import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { PrivateSearchIndexPrompt } from "../command-palette/private-search-index-prompt";
 import { TransitionContainer } from "../command-palette/transition-container";
 import { MailCommandPaletteViewContent } from "./mail-command-palette-view-content";
@@ -68,31 +65,6 @@ export function MailCommandPalette({
     initialView,
     onSelectMessage,
   });
-  const dialogInnerRef = useRef<HTMLDivElement>(null);
-  const prefersReducedMotion = usePrefersReducedMotion();
-
-  useGSAP(
-    () => {
-      const inner = dialogInnerRef.current;
-      if (!inner) return;
-      const dialogEl = inner.closest<HTMLElement>(
-        '[data-slot="dialog-content"]',
-      );
-      if (!dialogEl) return;
-      const targetW = c.hasBothResults ? 760 : 560;
-      if (prefersReducedMotion) {
-        gsap.set(dialogEl, { width: targetW });
-        return;
-      }
-      gsap.to(dialogEl, {
-        width: targetW,
-        duration: 0.22,
-        ease: "power2.inOut",
-      });
-    },
-    { dependencies: [c.hasBothResults, prefersReducedMotion] },
-  );
-
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -100,10 +72,10 @@ export function MailCommandPalette({
           variant="spotlight"
           showClose={false}
           aria-describedby={undefined}
-          className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl flex flex-col"
+          className="flex w-[640px] flex-col overflow-hidden rounded-xl border-[var(--border-secondary)] bg-[var(--bg-l3-solid)] p-0 shadow-[var(--shadow-l3)]"
           onKeyDown={c.handleKeyDown}
         >
-          <div ref={dialogInnerRef} style={{ display: "contents" }}>
+          <div style={{ display: "contents" }}>
             <VisuallyHidden>
               <DialogTitle>Mail</DialogTitle>
             </VisuallyHidden>
@@ -152,19 +124,6 @@ export function MailCommandPalette({
                 onDeleteLabel={c.onDeleteLabel}
               />
             </TransitionContainer>
-            <div className="px-3 py-2 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between shrink-0">
-              <span />
-              <span className="hidden sm:flex items-center gap-2">
-                <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-                  ↑↓
-                </kbd>{" "}
-                to navigate
-                <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-                  ↵
-                </kbd>{" "}
-                to select
-              </span>
-            </div>
           </div>
         </DialogContent>
       </Dialog>

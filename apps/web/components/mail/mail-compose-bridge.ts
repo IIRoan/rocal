@@ -9,6 +9,7 @@ export type ComposeDraftSaver = {
 export type ComposeCloseActions = {
   dismiss: () => void;
   discardDraft?: (draftId: string) => void;
+  openDraft?: (draftId: string) => void;
 };
 
 export const composeBridgeRef: { current: MailComposeBridge | null } = {

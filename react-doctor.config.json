@@ -14,6 +14,14 @@
         ]
       },
       {
+        "files": ["**/providers/E2eeProvider.tsx"],
+        "rules": ["react-doctor/no-giant-component"]
+      },
+      {
+        "files": ["**/components/mail/AttachmentPreviewModal.tsx"],
+        "rules": ["react-doctor/rn-prefer-expo-image"]
+      },
+      {
         "files": ["**/app/login/_content.tsx"],
         "rules": ["react-doctor/no-giant-component"]
       },
@@ -67,6 +75,17 @@
           "**/services/mail-sync.service.ts"
         ],
         "rules": ["react-doctor/async-await-in-loop"]
+      },
+      {
+        "files": ["**/components/mail/message-list/message-list-virtualized.tsx"],
+        "rules": [
+          "react-hooks-js/incompatible-library",
+          "react-doctor/no-event-handler"
+        ]
+      },
+      {
+        "files": ["**/components/mail/message-list/message-list-row.tsx"],
+        "rules": ["react-doctor/prefer-tag-over-role"]
       }
     ]
   }

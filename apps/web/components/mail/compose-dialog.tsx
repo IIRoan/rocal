@@ -11,6 +11,7 @@ import {
   Check,
   AlertCircle,
   AlignLeft,
+  Type,
 } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
 import type { Editor } from "@tiptap/react";
@@ -41,6 +42,7 @@ import {
   pickOutgoingAttachmentFiles,
 } from "@workspace/calendar-core";
 import { RichTextEditor, type InlineImageUpload } from "./rich-text-editor";
+import { RichTextEditorToolbar } from "./rich-text-editor-toolbar";
 import { RecipientSuggestInput } from "./recipient-suggest-input";
 import {
   appendHtmlSignature,
@@ -116,6 +118,25 @@ function DraftSaveIndicator({
   );
 }
 
+function useFormatBar() {
+  const [formatBar, setFormatBar] = useState<{
+    editor: Editor | null;
+    open: boolean;
+  }>({ editor: null, open: false });
+
+  return {
+    editor: formatBar.editor,
+    open: formatBar.open,
+    setEditor: (editor: Editor | null) =>
+      setFormatBar((current) => ({ ...current, editor })),
+    setOpen: (open: boolean | ((current: boolean) => boolean)) =>
+      setFormatBar((current) => ({
+        ...current,
+        open: typeof open === "function" ? open(current.open) : open,
+      })),
+  };
+}
+
 export function ComposeForm({
   identities,
   fallbackFromEmail,
@@ -160,6 +181,12 @@ export function ComposeForm({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<Editor | null>(null);
+  const {
+    editor: formatEditor,
+    setEditor: setFormatEditor,
+    open: formatOpen,
+    setOpen: setFormatOpen,
+  } = useFormatBar();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const prevSignatureIdentityIdRef = useRef<string | null>(null);
   const prevPlainTextModeRef = useRef(plainTextMode);
@@ -702,7 +729,7 @@ export function ComposeForm({
             placeholder="Write your message…"
             disabled={isBusy}
             aria-label="Message body"
-            className="min-h-0 flex-1 resize-none bg-transparent px-2 py-2 font-mono text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/40"
+            className="min-h-0 flex-1 resize-none bg-transparent p-2 font-mono text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/40"
           />
         ) : (
           <RichTextEditor
@@ -711,8 +738,9 @@ export function ComposeForm({
             onImageUpload={onImageUpload}
             disabled={isBusy}
             className="min-h-0 flex-1"
-            onEditorReady={(editor) => {
-              editorRef.current = editor;
+            onEditorReady={(nextEditor) => {
+              editorRef.current = nextEditor;
+              setFormatEditor(nextEditor);
             }}
           />
         )}
@@ -771,12 +799,35 @@ export function ComposeForm({
         </div>
       )}
 
+      {formatOpen && formatEditor && !plainTextMode ? (
+        <RichTextEditorToolbar
+          editor={formatEditor}
+          disabled={isBusy}
+          onClose={() => setFormatOpen(false)}
+        />
+      ) : null}
+
       <div
-        className={`flex items-center justify-between border-t border-border/50 shrink-0 ${
-          isMobile ? "px-3 py-1.5" : "px-4 py-2"
-        }`}
+        className={`flex items-center justify-between shrink-0 ${
+          formatOpen && !plainTextMode ? "" : "border-t border-[var(--border-tertiary)]"
+        } ${isMobile ? "px-3 py-1.5" : "px-2 py-1.5"}`}
       >
         <div className="flex items-center gap-1">
+          {!plainTextMode ? (
+            <button
+              type="button"
+              aria-label="Formatting options"
+              aria-pressed={formatOpen}
+              disabled={isBusy}
+              onClick={() => setFormatOpen((open) => !open)}
+              className={cn(
+                "inline-flex size-[30px] cursor-pointer items-center justify-center rounded-md text-[var(--icon-secondary)] hover:bg-[var(--bg-overlay-tertiary)] disabled:opacity-40",
+                formatOpen && "bg-[var(--bg-overlay-tertiary)] text-[var(--icon-primary)]",
+              )}
+            >
+              <Type className="size-4" strokeWidth={2} />
+            </button>
+          ) : null}
           <input
             ref={fileInputRef}
             type="file"
@@ -932,17 +983,19 @@ export function ComposeDialog({
   return (
     <Dialog
       open={open}
+      modal={false}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) handleDismissRequest();
       }}
     >
       <DialogContent
-        variant="spotlight"
+        variant="bottom"
         showClose={false}
+        showOverlay={false}
         aria-describedby={undefined}
-        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl flex flex-col min-h-[360px] max-h-[min(720px,calc(90dvh-2rem))]"
-        onPointerDownOutside={handleDismissRequest}
-        onInteractOutside={handleDismissRequest}
+        className="left-auto right-2 bottom-2 translate-x-0 overflow-hidden p-0 flex flex-col min-h-[360px] w-[min(45vw,720px)] min-w-[min(100%,624px)] max-h-[min(780px,calc(100dvh-16px))] rounded-[20px] bg-[var(--bg-l2-solid)] border-[var(--border-secondary)] shadow-[var(--shadow-l3)]"
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={handleDismissRequest}
       >
         <VisuallyHidden>

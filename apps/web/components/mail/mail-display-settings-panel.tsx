@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ChevronRight, Image, Paperclip, ShieldCheck } from "lucide-react";
+import { ChevronRight, Image, Paperclip, ShieldCheck } from "lucide-react";
 import { SettingToggleRow } from "../command-palette/setting-toggle-row";
 import {
   useMailDisplaySettings,
@@ -9,6 +9,13 @@ import {
   type EmailAppearance,
 } from "@/lib/mail/mail-display-settings";
 import { TrustedSendersDialog } from "./trusted-senders-dialog";
+import {
+  PaletteField,
+  PaletteNavRow,
+  PaletteSection,
+  PaletteView,
+} from "../command-palette/palette-ui";
+import { PALETTE_INPUT_CLASS } from "../command-palette/palette-styles";
 
 export function MailDisplaySettingsPanel({ goBack }: { goBack: () => void }) {
   const { settings, updateSettings } = useMailDisplaySettings();
@@ -24,33 +31,15 @@ export function MailDisplaySettingsPanel({ goBack }: { goBack: () => void }) {
 
   return (
     <>
-      <div
-        className="flex flex-col"
-        style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
-      >
-        <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-          <button
-            type="button"
-            onClick={goBack}
-            className="p-1 rounded hover:bg-muted/50 transition-colors"
+      <PaletteView title="Content & display" onBack={goBack}>
+        <PaletteSection label="External content">
+          <PaletteField
+            label="Remote images"
+            htmlFor="mail-remote-images"
+            hint="How to handle images and other remote content in email bodies"
           >
-            <ArrowLeft className="size-4 text-muted-foreground" />
-          </button>
-          <span className="text-sm font-medium">Content &amp; display</span>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          <div className="px-3 py-2">
-            <div className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-              External content
-            </div>
-          </div>
-
-          <div className="px-3 py-3 border-t border-border/40">
-            <label className="text-sm font-medium">Remote images</label>
-            <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-              How to handle images and other remote content in email bodies
-            </p>
             <select
+              id="mail-remote-images"
               value={settings.externalContentPolicy}
               onChange={(event) =>
                 updateSettings({
@@ -58,60 +47,50 @@ export function MailDisplaySettingsPanel({ goBack }: { goBack: () => void }) {
                     .value as ExternalContentPolicy,
                 })
               }
-              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              className={PALETTE_INPUT_CLASS}
             >
               <option value="ask">Ask before loading</option>
               <option value="block">Always block</option>
               <option value="allow">Always allow</option>
             </select>
-          </div>
+          </PaletteField>
 
-          <div className="px-3 py-3 border-t border-border/40">
-            <div className="flex items-center gap-3">
-              <ShieldCheck className="size-4 text-muted-foreground shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm">Trusted senders</div>
-                <div className="text-xs text-muted-foreground">
-                  Senders who can load remote content automatically
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTrustedOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-muted hover:bg-accent rounded-md transition-colors shrink-0"
-              >
-                <span className="text-sm text-foreground">{trustedLabel}</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-          </div>
+          <PaletteNavRow
+            icon={ShieldCheck}
+            label="Trusted senders"
+            description="Senders who can load remote content automatically"
+            onClick={() => setTrustedOpen(true)}
+            trailing={
+              <span className="flex shrink-0 items-center gap-1 text-[13px] text-muted-foreground">
+                {trustedLabel}
+                <ChevronRight className="size-4 text-muted-foreground/50" />
+              </span>
+            }
+          />
 
-          <div className="px-3 py-3 border-t border-border/40">
-            <label className="text-sm font-medium">Email appearance</label>
-            <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-              How HTML messages are rendered in the reader
-            </p>
+          <PaletteField
+            label="Email appearance"
+            htmlFor="mail-email-appearance"
+            hint="How HTML messages are rendered in the reader"
+          >
             <select
+              id="mail-email-appearance"
               value={settings.emailAppearance}
               onChange={(event) =>
                 updateSettings({
                   emailAppearance: event.target.value as EmailAppearance,
                 })
               }
-              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              className={PALETTE_INPUT_CLASS}
             >
               <option value="dark">Dark (adapt colors)</option>
               <option value="light">Light</option>
               <option value="original">Original (as sent)</option>
             </select>
-          </div>
+          </PaletteField>
+        </PaletteSection>
 
-          <div className="px-3 py-2 mt-2 border-t border-border/40">
-            <div className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-              Privacy
-            </div>
-          </div>
-
+        <PaletteSection label="Privacy">
           <SettingToggleRow
             icon={Image}
             label="Block tracking pixels"
@@ -123,13 +102,9 @@ export function MailDisplaySettingsPanel({ goBack }: { goBack: () => void }) {
               })
             }
           />
+        </PaletteSection>
 
-          <div className="px-3 py-2 mt-2 border-t border-border/40">
-            <div className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-              Attachments
-            </div>
-          </div>
-
+        <PaletteSection label="Attachments">
           <SettingToggleRow
             icon={Paperclip}
             label="Hide inline image attachments"
@@ -154,8 +129,8 @@ export function MailDisplaySettingsPanel({ goBack }: { goBack: () => void }) {
               })
             }
           />
-        </div>
-      </div>
+        </PaletteSection>
+      </PaletteView>
 
       <TrustedSendersDialog open={trustedOpen} onOpenChange={setTrustedOpen} />
     </>

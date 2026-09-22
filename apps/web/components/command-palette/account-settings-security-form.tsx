@@ -1,15 +1,28 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import type { Dispatch } from "react";
 
-import { AnimatedCollapse, FieldInput, InlineMessage } from "./account-settings-shared";
+import {
+  AnimatedCollapse,
+  FieldInput,
+  InlineMessage,
+} from "./account-settings-shared";
 import { submitAccountSecurityPassword } from "./account-settings-security-submit";
-import type { SecurityForm, SecurityUiAction, SecurityUiState } from "./account-settings-ui-state";
+import type {
+  SecurityForm,
+  SecurityUiAction,
+  SecurityUiState,
+} from "./account-settings-ui-state";
+import { PaletteButton, PaletteFormActions } from "./palette-ui";
 
 const FORM_COPY: Record<
   NonNullable<SecurityForm>,
-  { helper: string; newLabel: string; confirmLabel: string; submitLabel: string }
+  {
+    helper: string;
+    newLabel: string;
+    confirmLabel: string;
+    submitLabel: string;
+  }
 > = {
   "change-password": {
     helper:
@@ -63,7 +76,6 @@ export function AccountSecurityForm({
   return (
     <AnimatedCollapse isOpen>
       <form
-        className="mx-1 my-1 rounded-lg border border-border/50 bg-muted/20 p-4 space-y-3"
         action={async () => {
           await submitAccountSecurityPassword({
             security,
@@ -73,8 +85,12 @@ export function AccountSecurityForm({
           });
         }}
       >
-        <InlineMessage msg={security.message} />
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        {security.message ? (
+          <div className="px-2 py-1">
+            <InlineMessage msg={security.message} />
+          </div>
+        ) : null}
+        <p className="p-2 text-[13px] leading-[130%] text-muted-foreground">
           {copy.helper}
         </p>
         {activeForm === "change-password" ? (
@@ -109,30 +125,22 @@ export function AccountSecurityForm({
           autoComplete="new-password"
           disabled={submission.busy}
         />
-        <div className="flex gap-2 pt-1">
-          <button
-            type="submit"
-            disabled={submission.busy}
-            className="inline-flex h-8 items-center gap-2 rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-          >
-            {submission.busy ? (
-              <>
-                <Loader2 className="size-3 animate-spin" />
-                Saving…
-              </>
-            ) : (
-              copy.submitLabel
-            )}
-          </button>
-          <button
-            type="button"
+        <PaletteFormActions>
+          <PaletteButton
+            variant="ghost"
             onClick={() => dispatch({ type: "cancelForm" })}
             disabled={submission.busy}
-            className="inline-flex h-8 items-center rounded-md border border-border bg-background px-4 text-xs font-medium text-foreground transition-colors hover:bg-accent/40 disabled:opacity-60"
           >
             Cancel
-          </button>
-        </div>
+          </PaletteButton>
+          <PaletteButton
+            type="submit"
+            variant="primary"
+            loading={submission.busy}
+          >
+            {submission.busy ? "Saving…" : copy.submitLabel}
+          </PaletteButton>
+        </PaletteFormActions>
       </form>
     </AnimatedCollapse>
   );

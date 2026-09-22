@@ -1,8 +1,9 @@
+import { describe, expect, it } from "@jest/globals";
 import {
   parseHiddenMailboxIds,
   serializeHiddenMailboxIds,
   toggleHiddenMailboxId,
-} from "./hidden-mailboxes";
+} from "../mail-hidden-mailboxes";
 
 describe("hidden mailbox persistence", () => {
   it("parses a JSON string array and ignores invalid payloads", () => {

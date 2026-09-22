@@ -1,11 +1,15 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useId, useRef, useState } from "react";
 import { BlobatarAvatar } from "@workspace/ui/components/ui/blobatar-avatar";
 import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 
 import type { SectionMessage } from "./account-settings-types";
+import {
+  PaletteField,
+} from "./palette-ui";
+import { PALETTE_INPUT_CLASS } from "./palette-styles";
 
 export function AnimatedCollapse({
   isOpen,
@@ -132,19 +136,21 @@ export function FieldInput({
   placeholder?: string;
   disabled?: boolean;
 }) {
+  const id = useId();
   return (
-    <label className="block space-y-1">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+    <PaletteField label={label} htmlFor={id}>
       <input
+        id={id}
+        aria-label={label}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         autoComplete={autoComplete}
         placeholder={placeholder}
         disabled={disabled}
-        className="flex h-9 w-full rounded-md bg-input px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50"
+        className={PALETTE_INPUT_CLASS}
       />
-    </label>
+    </PaletteField>
   );
 }
 
@@ -152,7 +158,7 @@ export function InlineMessage({ msg }: { msg: SectionMessage }) {
   if (!msg) return null;
   return (
     <div
-      className={`rounded-md px-3 py-2 text-xs ${
+      className={`rounded-lg px-3 py-2 text-[13px] ${
         msg.kind === "success"
           ? "bg-secondary/10 text-secondary-foreground"
           : "bg-destructive/10 text-destructive"

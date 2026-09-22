@@ -6,13 +6,11 @@ const BODY_LINE_WIDTHS = [100, 94, 82, 90, 68, 76, 58] as const;
 
 type MessageDecryptingSkeletonProps = {
   isDark?: boolean;
-  attachedAbove?: boolean;
   className?: string;
 };
 
 export function MessageDecryptingSkeleton({
   isDark = false,
-  attachedAbove = false,
   className,
 }: MessageDecryptingSkeletonProps) {
   const bar = isDark ? "bg-white/10" : "bg-black/[0.06]";
@@ -20,8 +18,7 @@ export function MessageDecryptingSkeleton({
   return (
     <div
       className={cn(
-        "mx-4 mb-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/50",
-        attachedAbove && "rounded-t-none border-t-0",
+        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--border-secondary)]",
         className,
       )}
       aria-busy

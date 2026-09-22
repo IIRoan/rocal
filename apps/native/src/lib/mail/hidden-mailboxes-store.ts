@@ -3,7 +3,7 @@ import { SECURE_STORE_KEYS } from "../constants";
 import {
   parseHiddenMailboxIds,
   serializeHiddenMailboxIds,
-} from "./hidden-mailboxes";
+} from "@workspace/calendar-core";
 
 export async function loadHiddenMailboxIds(): Promise<string[]> {
   const raw = await SecureStore.getItemAsync(
