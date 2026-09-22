@@ -1,16 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Send } from "lucide-react";
 import {
   enrichSelfMailRecipient,
   isCurrentUserMailAddress,
 } from "@workspace/calendar-core";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@workspace/ui/components/ui/popover";
+  DROPDOWN_PANEL_ROW_CLASS,
+  DropdownPanel,
+  Icon,
+  Icons,
+} from "@workspace/ui/solace";
 import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "sonner";
 import { getMailComposeBridge } from "./mail-compose-bridge";
@@ -56,8 +56,12 @@ export function RecipientPopover({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <DropdownPanel
+      open={open}
+      onOpenChange={setOpen}
+      align="start"
+      width={300}
+      trigger={
         <button
           type="button"
           className={cn(
@@ -81,45 +85,40 @@ export function RecipientPopover({
             </span>
           )}
         </button>
-      </PopoverTrigger>
-      <PopoverContent
-        side="bottom"
-        align="start"
-        sideOffset={6}
-        className="w-[300px] p-0 overflow-hidden"
-      >
-        <div className="flex items-center gap-3 px-4 pt-4 pb-3">
-          <SenderAvatar email={email} name={name ?? undefined} />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold">{displayName}</div>
-            {displayName !== email ? (
-              <div className="truncate text-xs text-muted-foreground">
-                {email}
-              </div>
-            ) : null}
+      }
+    >
+      <div className="flex items-center gap-3 p-3">
+        <SenderAvatar email={email} name={name ?? undefined} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[15px] font-[470] text-[var(--text-primary)]">
+            {displayName}
           </div>
+          {displayName !== email ? (
+            <div className="truncate text-[13px] text-[var(--text-secondary)]">
+              {email}
+            </div>
+          ) : null}
         </div>
-
-        <div className="flex items-center gap-1 border-t border-border px-2 py-2">
-          <button
-            type="button"
-            onClick={() => void handleCopy()}
-            className="inline-flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Copy className="size-3.5" strokeWidth={2.25} />
-            Copy
-          </button>
-          <button
-            type="button"
-            onClick={handleCompose}
-            className="inline-flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Send className="size-3.5" strokeWidth={2.25} />
-            Email
-          </button>
-        </div>
-      </PopoverContent>
-    </Popover>
+      </div>
+      <div className="flex flex-col border-t border-[var(--border-tertiary)] p-1">
+        <button
+          type="button"
+          onClick={() => void handleCopy()}
+          className={DROPDOWN_PANEL_ROW_CLASS}
+        >
+          <Icons icon={Icon.Copy} color="secondary" />
+          Copy address
+        </button>
+        <button
+          type="button"
+          onClick={handleCompose}
+          className={DROPDOWN_PANEL_ROW_CLASS}
+        >
+          <Icons icon={Icon.Send} color="secondary" />
+          Send email
+        </button>
+      </div>
+    </DropdownPanel>
   );
 }
 

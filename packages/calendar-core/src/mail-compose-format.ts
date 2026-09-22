@@ -236,3 +236,25 @@ export function resolveComposeSendBodies(input: {
       : undefined;
   return htmlBody ? { plaintext, htmlBody } : { plaintext };
 }
+
+export type ComposeTextFields = {
+  to: string;
+  cc: string;
+  bcc: string;
+  subject: string;
+  body: string;
+};
+
+function normalizeComposeText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+/** True when the user typed something beyond the prefilled seed (signature, reply quote), so closing should keep a draft. */
+export function hasComposeUserContent(
+  current: ComposeTextFields,
+  seed: ComposeTextFields,
+): boolean {
+  return (Object.keys(current) as Array<keyof ComposeTextFields>).some(
+    (key) => normalizeComposeText(current[key]) !== normalizeComposeText(seed[key]),
+  );
+}

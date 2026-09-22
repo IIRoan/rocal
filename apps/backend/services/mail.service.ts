@@ -1624,8 +1624,9 @@ export class MailService implements IMailService {
               kdfMemoryKiB: input.kdfParams.memoryKiB,
               kdfIterations: input.kdfParams.iterations,
               kdfParallelism: input.kdfParams.parallelism,
-              wrappedSecret: input.wrappedSecret ?? null,
-              wrapAlgorithm: input.wrapAlgorithm ?? null,
+              // Omitting the seal keeps it: a write must never make a vault server-openable again.
+              wrappedSecret: input.wrappedSecret ?? undefined,
+              wrapAlgorithm: input.wrapAlgorithm ?? undefined,
             },
           },
         },

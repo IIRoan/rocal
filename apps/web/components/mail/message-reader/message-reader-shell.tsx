@@ -8,6 +8,7 @@ import {
 } from "@workspace/ui/components/ui/dialog";
 import type { MessageReaderController, MessageReaderViewModel } from "../use-message-reader-controller";
 import { MessageReaderToolbar } from "./message-reader-toolbar";
+import { MessageReaderTitle } from "./message-reader-title";
 import { MessageReaderHeader } from "./message-reader-header";
 import { MessageReaderConversationStrip } from "./message-reader-conversation-strip";
 import { MessageReaderCalendarCards } from "./message-reader-calendar-cards";
@@ -30,21 +31,22 @@ export function MessageReaderShell({
     "";
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-[var(--bg-l2-solid)]">
       <MessageReaderToolbar controller={controller} view={view} />
-      <div className="shrink min-h-0 overflow-y-auto">
+      <MessageReaderTitle controller={controller} view={view} />
+      <MessageReaderConversationStrip
+        key={conversationThreadKey}
+        controller={controller}
+        view={view}
+      />
+      <article className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         <MessageReaderHeader controller={controller} view={view} />
-        <MessageReaderConversationStrip
-          key={conversationThreadKey}
-          controller={controller}
-          view={view}
-        />
         <MessageReaderCalendarCards controller={controller} view={view} />
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col">
-        <MessageReaderBody controller={controller} view={view} />
-      </div>
-      <MessageReaderReplyBar controller={controller} view={view} />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <MessageReaderBody controller={controller} view={view} />
+        </div>
+        <MessageReaderReplyBar controller={controller} view={view} />
+      </article>
       <Dialog
         open={showRawHtmlDialog}
         onOpenChange={(open) =>

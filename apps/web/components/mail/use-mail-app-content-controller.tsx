@@ -31,6 +31,7 @@ import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
 import { isDraftMessage } from "@/lib/mail/draft-utils";
 import { canEmptyMailboxRole, getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
 import {
+  applyMailListViewFilter,
   initialMailAppListChromeState,
   mailAppListChromeReducer,
   type MailAppListChromeAction,
@@ -138,6 +139,9 @@ export function useMailAppContentController(
     advancedFilters,
     filterPanelExpanded,
     emptyFolderOpen,
+    searchBarOpen,
+    listViewFilter,
+    activeLabelId,
   } = listChrome;
   const isMobile = useIsMobile();
   const editingDraftIdRef = useRef<string | null>(null);
@@ -227,7 +231,7 @@ export function useMailAppContentController(
         isSearching &&
         serverSearchResults === undefined));
 
-  const filteredListMessages: JmapEmailMessage[] =
+  const listSourceMessages: JmapEmailMessage[] =
     searchUiActive || searchActive
       ? isSearchError && searchActive && !isSearchDebouncing
         ? (activeMailbox?.messages ?? [])
@@ -242,6 +246,12 @@ export function useMailAppContentController(
             : serverSearchResults
       : (activeMailbox?.messages ?? []);
 
+  const filteredListMessages = applyMailListViewFilter(
+    listSourceMessages,
+    listViewFilter,
+    activeLabelId,
+  );
+
   const messages: JmapEmailMessage[] = activeMailbox?.messages ?? [];
 
   const selectedIsDraft = Boolean(
@@ -255,20 +265,6 @@ export function useMailAppContentController(
     editingDraftIdRef.current = null;
     setSelectedMessageId(null);
   };
-
-  useEffect(() => {
-    registerComposeCloseActions({
-      dismiss: () => {
-        dismissCompose();
-        editingDraftIdRef.current = null;
-        setSelectedMessageId(null);
-      },
-      discardDraft: (draftId) => {
-        void handleDiscardDraft(draftId);
-      },
-    });
-    return () => registerComposeCloseActions(null);
-  }, [dismissCompose, handleDiscardDraft, setSelectedMessageId]);
 
   const closeComposeThen = (action: () => void) => {
     if (!composeActive) {
@@ -314,8 +310,29 @@ export function useMailAppContentController(
     closeComposeThen(() => performSelectMessage(id));
   };
 
+  useEffect(() => {
+    registerComposeCloseActions({
+      dismiss: () => {
+        dismissCompose();
+        editingDraftIdRef.current = null;
+        setSelectedMessageId(null);
+      },
+      discardDraft: (draftId) => {
+        void handleDiscardDraft(draftId);
+      },
+      openDraft: (draftId) => {
+        closeComposeThen(() => {
+          editingDraftIdRef.current = draftId;
+          void handleEditDraft({ id: draftId });
+        });
+      },
+    });
+    return () => registerComposeCloseActions(null);
+  });
+
   const handleSelectMailbox = (mailboxIdToSelect: string) => {
     closeComposeThen(() => {
+      patchListChrome({ activeLabelId: null });
       void refreshMailboxMessages(mailboxIdToSelect);
     });
   };
@@ -324,15 +341,18 @@ export function useMailAppContentController(
     closeComposeThen(() => openNewCompose());
   };
 
-  const selectedIndex = messages.findIndex((m) => m.id === selectedMessageId);
+  const selectedIndex = filteredListMessages.findIndex(
+    (m) => m.id === selectedMessageId,
+  );
   const hasPrev = selectedIndex > 0;
-  const hasNext = selectedIndex >= 0 && selectedIndex < messages.length - 1;
+  const hasNext =
+    selectedIndex >= 0 && selectedIndex < filteredListMessages.length - 1;
 
   const handleNavigatePrev = () => {
-    if (hasPrev) handleSelectMessage(messages[selectedIndex - 1].id);
+    if (hasPrev) handleSelectMessage(filteredListMessages[selectedIndex - 1].id);
   };
   const handleNavigateNext = () => {
-    if (hasNext) handleSelectMessage(messages[selectedIndex + 1].id);
+    if (hasNext) handleSelectMessage(filteredListMessages[selectedIndex + 1].id);
   };
   const handleCloseMessage = () => {
     if (selectedIsDraft) {
@@ -395,6 +415,7 @@ export function useMailAppContentController(
       closeMessage: handleCloseMessage,
       focusSearch: () => {
         if (!isMobile) {
+          patchListChrome({ searchBarOpen: true });
           suppressSearchShortcutInputRef.current = true;
           requestAnimationFrame(() => {
             searchInputRef.current?.focus({ preventScroll: true });
@@ -433,7 +454,13 @@ export function useMailAppContentController(
     : "Inbox";
 
   const clearListSearch = () => {
-    dispatchListChrome({ type: "resetMailboxFilters" });
+    patchListChrome({
+      mailListSearch: "",
+      debouncedMailListSearch: "",
+      advancedFilters: { text: undefined, conditions: [] },
+      filterPanelExpanded: false,
+      searchBarOpen: false,
+    });
   };
 
   const handlePaletteOpenChange = (open: boolean) => {
@@ -448,6 +475,17 @@ export function useMailAppContentController(
     setIsPaletteOpen(true);
   };
 
+  const handleOpenLabelsPalette = () => {
+    patchListChrome({ paletteInitialView: "labels" });
+    setIsPaletteOpen(true);
+  };
+
+  const handleSelectLabel = (labelId: string) => {
+    patchListChrome({
+      activeLabelId: activeLabelId === labelId ? null : labelId,
+    });
+  };
+
   const handleSearchEnter = () => {
     dispatchListChrome({
       type: "patch",
@@ -460,7 +498,10 @@ export function useMailAppContentController(
       return;
     }
     if (value.trim() === "") {
-      dispatchListChrome({ type: "resetMailboxFilters" });
+      patchListChrome({
+        mailListSearch: "",
+        debouncedMailListSearch: "",
+      });
       return;
     }
     patchListChrome({ mailListSearch: value });
@@ -532,6 +573,9 @@ export function useMailAppContentController(
     advancedFilters,
     filterPanelExpanded,
     emptyFolderOpen,
+    searchBarOpen,
+    listViewFilter,
+    activeLabelId,
     searchInputRef: searchInputRef as RefObject<HTMLInputElement>,
     dispatchListChrome: dispatchListChrome as (
       action: MailAppListChromeAction,
@@ -545,6 +589,7 @@ export function useMailAppContentController(
     hasNext,
     handleArchive,
     handleSelectMailbox,
+    handleSelectLabel,
     handleOpenCompose,
     handleSelectMessage,
     handleDismissCompose,
@@ -553,6 +598,7 @@ export function useMailAppContentController(
     handleReorderMailboxes,
     handlePaletteOpenChange,
     handleOpenMailboxesPalette,
+    handleOpenLabelsPalette,
     setIsPaletteOpen,
     clearListSearch,
     handleSearchEnter,

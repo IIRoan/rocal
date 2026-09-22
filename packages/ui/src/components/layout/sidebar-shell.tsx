@@ -1,19 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, PanelLeftClose, PanelLeftOpen, Settings } from "lucide-react";
+import Link from "next/link";
+import { Search, PanelLeftClose, PanelLeftOpen, Settings } from "lucide-react";
 
 import { type User } from "../calendar/types";
 import LogoSvg from "./logo";
 import { SidebarAppSwitcher } from "./sidebar-app-switcher";
+import { SidebarIconButton } from "./sidebar-icon-button";
 import { NavUser } from "../navigation/nav-user";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarGroup,
-  SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -21,116 +21,21 @@ import {
   useSidebar,
 } from "../ui/sidebar";
 import { Button } from "../ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-
-/**
- * Collapsed-state icon button with a right-aligned tooltip. Shared by every
- * sidebar so collapsed sizing/spacing stays identical across apps.
- */
-export function SidebarIconButton({
-  label,
-  onClick,
-  className,
-  children,
-}: {
-  label: string;
-  onClick?: () => void;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={`size-9 rounded-lg transition-colors hover:bg-muted/80 hover:text-foreground ${className ?? "text-muted-foreground/70"}`}
-          onClick={onClick}
-          aria-label={label}
-        >
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="right" align="center">
-        {label}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-export interface SidebarPrimaryActionProps {
-  label: string;
-  onClick?: () => void;
-  /** Icon shown in the collapsed rail. Defaults to a plus glyph. */
-  icon?: React.ReactNode;
-  /** Tailwind classes applied to the collapsed icon button. */
-  collapsedClassName?: string;
-}
-
-/**
- * The "New event" / "Compose" call-to-action. Renders as a full-width outline
- * button when expanded and a centred icon button when collapsed.
- */
-export function SidebarPrimaryAction({
-  label,
-  onClick,
-  icon,
-  collapsedClassName,
-}: SidebarPrimaryActionProps) {
-  const { state } = useSidebar();
-  const isCollapsed = state === "collapsed";
-
-  return (
-    <SidebarGroup className={`px-2 shrink-0 ${isCollapsed ? "pt-2" : "pt-1"}`}>
-      {isCollapsed ? (
-        <SidebarGroupContent className="flex flex-col items-center">
-          <SidebarIconButton
-            label={label}
-            onClick={onClick}
-            className={collapsedClassName}
-          >
-            {icon ?? <Plus size={18} strokeWidth={2.5} className="text-primary" />}
-          </SidebarIconButton>
-        </SidebarGroupContent>
-      ) : (
-        <SidebarGroupContent>
-          <Button
-            onClick={onClick}
-            variant="outline"
-            className="w-full h-9 rounded-xl border-border/60 text-foreground/80 font-medium text-[13px] hover:bg-muted/60 hover:text-foreground transition-colors"
-            style={{ fontWeight: 470 }}
-          >
-            <Plus size={15} strokeWidth={2} />
-            {label}
-          </Button>
-        </SidebarGroupContent>
-      )}
-    </SidebarGroup>
-  );
-}
 
 export interface SidebarShellProps
   extends Omit<React.ComponentProps<typeof Sidebar>, "children"> {
-  /** Highlights the active app in the header switcher. */
+  /** Names the app in the header and highlights it in the switcher. */
   activeApp?: "calendar" | "mail";
   onOpenSearch?: () => void;
-  /** Footer user. When omitted a Settings fallback is shown (expanded only). */
+  /** Header profile selector. When omitted a Settings footer is shown (expanded only). */
   user?: User;
   onLogout?: () => void;
   onOpenSettings?: () => void;
-  /**
-   * Scrollable body content. Receives the collapsed state so consumers can
-   * render compact rail variants without re-deriving it.
-   */
+  /** Scrollable body; receives collapsed state for compact rail variants. */
   children: (opts: { isCollapsed: boolean }) => React.ReactNode;
 }
 
-/**
- * Shared sidebar chrome: a fixed-width inset `Sidebar` with a consistent
- * header (app switcher + search + collapse toggle), footer (user menu) and
- * rail. App-specific content is supplied via `children`, keeping width and
- * collapse behaviour identical between Calendar and Mail.
- */
+/** Shared sidebar chrome for Calendar and Mail. */
 export function SidebarShell({
   activeApp = "calendar",
   onOpenSearch,
@@ -143,18 +48,41 @@ export function SidebarShell({
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
 
+  const appName = activeApp === "mail" ? "Solace Mail" : "Solace Calendar";
+  const brand = user ? (
+    <NavUser
+      user={user}
+      appName={appName}
+      isCollapsed={isCollapsed}
+      onLogout={onLogout}
+      onOpenSettings={onOpenSettings}
+    />
+  ) : (
+    <Link className="inline-flex items-center gap-2 p-1" href="/">
+      <LogoSvg width="26" height="26" className="shrink-0 text-primary" />
+      {isCollapsed ? null : (
+        <span className="text-[15px] tracking-[-0.04em] text-foreground">
+          {appName}
+        </span>
+      )}
+    </Link>
+  );
+  const headerButtonClassName =
+    "size-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground";
+
   return (
     <Sidebar variant="inset" collapsible="icon" {...props}>
       <SidebarHeader
         className={
-          isCollapsed ? "items-center pt-4 px-2 pb-3" : "pt-4 px-4 pb-3"
+          isCollapsed
+            ? "items-center gap-1 px-2 pt-3 pb-2"
+            : "px-3 pt-3 pb-2"
         }
       >
         {isCollapsed ? (
           <>
-            <a className="inline-flex justify-center" href="/">
-              <LogoSvg width="28" height="28" className="text-primary" />
-            </a>
+            {brand}
+            <SidebarAppSwitcher activeApp={activeApp} />
             {onOpenSearch && (
               <SidebarIconButton label="Search" onClick={onOpenSearch}>
                 <Search size={15} strokeWidth={2} />
@@ -163,7 +91,7 @@ export function SidebarShell({
             <Button
               variant="ghost"
               size="icon"
-              className="size-8 rounded-lg text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground"
+              className={headerButtonClassName}
               onClick={toggleSidebar}
               aria-label="Expand sidebar"
             >
@@ -171,24 +99,25 @@ export function SidebarShell({
             </Button>
           </>
         ) : (
-          <div className="flex items-center justify-between">
-            <SidebarAppSwitcher activeApp={activeApp} />
-            <div className="flex items-center gap-0.5">
+          <div className="flex items-center justify-between gap-1">
+            {brand}
+            <div className="flex shrink-0 items-center">
               {onOpenSearch && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-8 rounded-lg text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground"
+                  className={headerButtonClassName}
                   onClick={onOpenSearch}
                   aria-label="Search"
                 >
                   <Search size={15} strokeWidth={2} />
                 </Button>
               )}
+              <SidebarAppSwitcher activeApp={activeApp} />
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8 rounded-lg text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground"
+                className={headerButtonClassName}
                 onClick={toggleSidebar}
                 aria-label="Collapse sidebar"
               >
@@ -203,14 +132,8 @@ export function SidebarShell({
         {children({ isCollapsed })}
       </SidebarContent>
 
-      <SidebarFooter className="p-2 border-t border-border/40">
-        {user ? (
-          <NavUser
-            user={user}
-            onLogout={onLogout}
-            onOpenSettings={onOpenSettings}
-          />
-        ) : isCollapsed ? null : (
+      {user || isCollapsed ? null : (
+        <SidebarFooter className="p-2 border-t border-border/40">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -222,8 +145,8 @@ export function SidebarShell({
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
-        )}
-      </SidebarFooter>
+        </SidebarFooter>
+      )}
 
       <SidebarRail />
     </Sidebar>

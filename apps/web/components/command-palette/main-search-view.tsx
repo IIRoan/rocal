@@ -58,7 +58,7 @@ function NavigationResultButton({
         isSelected ? "bg-accent/50" : "hover:bg-accent/50"
       }`}
     >
-      <div className="flex items-center justify-center size-8 sm:w-6 sm:h-6 shrink-0">
+      <div className="flex size-5 shrink-0 items-center justify-center text-muted-foreground">
         <Icon className="h-[18px] w-[18px] sm:h-4 sm:w-4 text-muted-foreground" />
       </div>
       <span className="text-sm flex-1 truncate">{label}</span>

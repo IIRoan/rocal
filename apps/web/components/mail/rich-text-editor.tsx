@@ -1,16 +1,10 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useReducer,
-  useRef,
-} from "react";
+import { useEffect, useRef } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import { serializeEditorContent } from "./quoted-html";
 import { cn } from "@workspace/ui/lib/utils";
 import { richTextEditorExtensions } from "./rich-text-editor-extensions";
-import { RichTextEditorToolbar } from "./rich-text-editor-toolbar";
 
 export interface InlineImageUpload {
   src: string;
@@ -45,36 +39,31 @@ export function RichTextEditor({
     onEditorReadyRef.current = onEditorReady;
     onChangeRef.current = onChange;
   }, [onImageUpload, onEditorReady, onChange]);
-  const [, rerenderToolbar] = useReducer((version: number) => version + 1, 0);
-
-  const insertUploadedImage = useCallback(
-    (result: InlineImageUpload, file: File, position?: number) => {
-      const currentEditor = editorRef.current;
-      if (!currentEditor) return;
-      requestAnimationFrame(() => {
-        if (currentEditor.isDestroyed) return;
-        const attrs = {
-          src: result.src,
-          alt: file.name,
-          cid: result.cid,
-        };
-        if (typeof position === "number") {
-          currentEditor
-            .chain()
-            .focus()
-            .insertContentAt(position, { type: "image", attrs })
-            .run();
-          return;
-        }
+  const insertUploadedImage = (
+    result: InlineImageUpload,
+    file: File,
+    position?: number,
+  ) => {
+    const currentEditor = editorRef.current;
+    if (!currentEditor) return;
+    requestAnimationFrame(() => {
+      if (currentEditor.isDestroyed) return;
+      const attrs = {
+        src: result.src,
+        alt: file.name,
+        cid: result.cid,
+      };
+      if (typeof position === "number") {
         currentEditor
           .chain()
           .focus()
-          .insertContent({ type: "image", attrs })
+          .insertContentAt(position, { type: "image", attrs })
           .run();
-      });
-    },
-    [],
-  );
+        return;
+      }
+      currentEditor.chain().focus().insertContent({ type: "image", attrs }).run();
+    });
+  };
 
   const editor = useEditor({
     extensions: richTextEditorExtensions,
@@ -136,19 +125,6 @@ export function RichTextEditor({
 
   useEffect(() => {
     if (!editor) return;
-    const refreshToolbar = () => {
-      rerenderToolbar();
-    };
-    editor.on("selectionUpdate", refreshToolbar);
-    editor.on("transaction", refreshToolbar);
-    return () => {
-      editor.off("selectionUpdate", refreshToolbar);
-      editor.off("transaction", refreshToolbar);
-    };
-  }, [editor]);
-
-  useEffect(() => {
-    if (!editor) return;
     if (content === lastEmittedHtmlRef.current) return;
 
     const frame = requestAnimationFrame(() => {
@@ -176,52 +152,12 @@ export function RichTextEditor({
     if (editor) onEditorReadyRef.current?.(editor);
   }, [editor]);
 
-  const addLink = useCallback(() => {
-    if (!editor) return;
-    const { from, to } = editor.state.selection;
-    if (from === to) return;
-    const previousUrl = editor.getAttributes("link").href as string | undefined;
-    const url = window.prompt("URL", previousUrl ?? "");
-    if (url === null) return;
-    const trimmed = url.trim();
-    if (!trimmed) {
-      editor.chain().focus().extendMarkRange("link").unsetLink().run();
-      return;
-    }
-    editor.chain().focus().setLink({ href: trimmed }).run();
-  }, [editor]);
-
-  const applyHeading = useCallback(
-    (level: 1 | 2) => {
-      if (!editor) return;
-      const { empty } = editor.state.selection;
-      const chain = editor.chain().focus();
-      if (empty) {
-        chain.setHeading({ level }).run();
-      } else {
-        chain.toggleHeading({ level }).run();
-      }
-    },
-    [editor],
-  );
-
   if (!editor) {
     return <div className={cn("min-h-32", className)} />;
   }
 
   return (
-    <div
-      className={cn(
-        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border/50 bg-background",
-        className,
-      )}
-    >
-      <RichTextEditorToolbar
-        editor={editor}
-        disabled={disabled}
-        applyHeading={applyHeading}
-        addLink={addLink}
-      />
+    <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", className)}>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <EditorContent editor={editor} />
       </div>

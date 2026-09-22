@@ -99,9 +99,8 @@ export type MessageReaderViewModel = {
   shouldReplaceBodyWithEventReminder: boolean;
   isReminderEventLoading: boolean;
   eventReminderView: ReturnType<typeof buildEventReminderMailView> | null;
-  bodyAttachedAbove: boolean;
   mailCalendarInviteMeta:
-    | Array<{ icon: typeof Clock; children: string }>
+    | Array<{ id: string; icon: typeof Clock; children: string }>
     | undefined;
 };
 
@@ -163,7 +162,6 @@ export function useMessageReaderController(props: MessageReaderProps) {
     labelPopoverOpen,
     moreActionsOpen,
     morePopoverOpen,
-    moveToExpanded,
     isBodyExpanded,
     showOwnMessages,
     showRawHtmlDialog,
@@ -186,7 +184,6 @@ export function useMessageReaderController(props: MessageReaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const expandedWrapRef = useRef<HTMLDivElement>(null);
-  const replyHasInit = useRef(false);
   const conversationListRef = useRef<HTMLUListElement>(null);
   const isMobile = useIsMobile();
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -272,6 +269,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
     const items = [];
     if (mailCalendarInvite.start) {
       items.push({
+        id: "time",
         icon: Clock,
         children: mailCalendarInvite.start.toLocaleString(undefined, {
           dateStyle: "medium",
@@ -288,6 +286,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
     }
     if (mailCalendarInvite.location) {
       items.push({
+        id: "location",
         icon: MapPin,
         children: mailCalendarInvite.location,
       });
@@ -431,51 +430,15 @@ export function useMessageReaderController(props: MessageReaderProps) {
   useGSAP(
     () => {
       const wrap = expandedWrapRef.current;
-      if (!wrap) return;
-
-      if (!replyHasInit.current) {
-        replyHasInit.current = true;
-        if (isReplyExpanded) {
-          gsap.set(wrap, { height: "auto", autoAlpha: 1, overflow: "visible" });
-        } else {
-          gsap.set(wrap, { height: 0, autoAlpha: 0, overflow: "hidden" });
-        }
-        return;
-      }
-
-      gsap.killTweensOf(wrap);
-
-      if (prefersReducedMotion) {
-        gsap.set(
-          wrap,
-          isReplyExpanded
-            ? { height: "auto", autoAlpha: 1, overflow: "visible" }
-            : { height: 0, autoAlpha: 0, overflow: "hidden" },
-        );
-        return;
-      }
-
-      if (isReplyExpanded) {
-        gsap.set(wrap, { overflow: "hidden" });
-        gsap.to(wrap, {
-          height: "auto",
-          autoAlpha: 1,
-          duration: 0.28,
-          ease: "power2.out",
-          onComplete: () => {
-            gsap.set(wrap, { overflow: "visible" });
-            textareaRef.current?.focus();
-          },
-        });
-      } else {
-        gsap.set(wrap, { overflow: "hidden" });
-        gsap.to(wrap, {
-          autoAlpha: 0,
-          height: 0,
-          duration: 0.22,
-          ease: "power2.in",
-        });
-      }
+      if (!isReplyExpanded || !wrap) return;
+      textareaRef.current?.focus();
+      if (prefersReducedMotion) return;
+      // Fade only: tweening height would re-lay out the mail iframe every frame.
+      gsap.fromTo(
+        wrap,
+        { autoAlpha: 0, y: 4 },
+        { autoAlpha: 1, y: 0, duration: 0.16, ease: "power3.out", clearProps: "transform" },
+      );
     },
     { dependencies: [isReplyExpanded] },
   );
@@ -509,8 +472,8 @@ export function useMessageReaderController(props: MessageReaderProps) {
   }, [conversationMessages.length]);
 
   const earlyReturn: ReactNode | null = !message ? (
-    <div className="flex h-full min-h-0 items-center justify-center p-8">
-      <p className="text-sm text-muted-foreground">Select a message to read</p>
+    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-1 p-8">
+      <p className="text-sm text-muted-foreground">Select a conversation</p>
     </div>
   ) : isMessageBodyLoading && !messageHasLoadedBody(message) ? (
     <div className="flex h-full min-h-0 items-center justify-center p-8">
@@ -566,12 +529,6 @@ export function useMessageReaderController(props: MessageReaderProps) {
     const canReportSpam = Boolean(onReportSpam) && !isInSpam && !isInTrash;
     const canNotSpam = Boolean(onNotSpam) && isInSpam;
 
-    const hasCardAboveBody =
-      mailCalendarInvite?.method === "REQUEST" ||
-      mailCalendarInvite?.method === "CANCEL";
-    const hasReminderBannerAbove =
-      isEventReminderEmail && Boolean(linkedCalendarEvent);
-    const bodyAttachedAbove = hasCardAboveBody || hasReminderBannerAbove;
 
     return {
       message,
@@ -601,7 +558,6 @@ export function useMessageReaderController(props: MessageReaderProps) {
       shouldReplaceBodyWithEventReminder,
       isReminderEventLoading,
       eventReminderView,
-      bodyAttachedAbove,
       mailCalendarInviteMeta,
     };
   })();
@@ -641,7 +597,6 @@ export function useMessageReaderController(props: MessageReaderProps) {
     labelPopoverOpen,
     moreActionsOpen,
     morePopoverOpen,
-    moveToExpanded,
     isBodyExpanded,
     showOwnMessages,
     showRawHtmlDialog,

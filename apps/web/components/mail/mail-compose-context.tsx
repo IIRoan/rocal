@@ -3,7 +3,6 @@
 import { use } from "react";
 import {
   MailComposeChromeContext,
-  MailComposeClosePromptContext,
   MailComposeFieldsContext,
 } from "./mail-compose-contexts";
 
@@ -34,16 +33,6 @@ export function useMailComposeChrome() {
   if (!context) {
     throw new Error(
       "useMailComposeChrome must be used within MailComposeProvider",
-    );
-  }
-  return context;
-}
-
-export function useMailComposeClosePrompt() {
-  const context = use(MailComposeClosePromptContext);
-  if (!context) {
-    throw new Error(
-      "useMailComposeClosePrompt must be used within MailComposeProvider",
     );
   }
   return context;

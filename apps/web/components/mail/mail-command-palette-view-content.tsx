@@ -1,18 +1,7 @@
 "use client";
 
-import {
-  ArrowLeft,
-  Check,
-  ChevronRight,
-  Monitor,
-  Moon,
-  Search,
-  Shield,
-  Sun,
-} from "lucide-react";
+import { Check, Monitor, Moon, Shield, Sun } from "lucide-react";
 import type { UnifiedSearchResult } from "@workspace/calendar-core";
-import { Button } from "@workspace/ui/components/ui/button";
-import { Input } from "@workspace/ui/components/ui/input";
 import type { UserSettings } from "@/lib/types/calendar";
 import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import { AccountSettings } from "../command-palette/account-settings";
@@ -21,7 +10,6 @@ import { NotificationSettings } from "../command-palette/notification-settings";
 import { PasswordSection } from "../command-palette/password-section";
 import { PrivateSearchIndexToggle } from "../command-palette/private-search-index-toggle";
 import { TimeRegionSettings } from "../command-palette/time-region-settings";
-import { UnifiedSearchResults } from "../command-palette/unified-search-results";
 import { PasskeySettings } from "@/components/passkey-settings";
 import { ComposeSettingsPanel } from "./compose-settings-panel";
 import { ContactsSettingsPanel } from "./contacts-settings-panel";
@@ -31,7 +19,13 @@ import { MailDisplaySettingsPanel } from "./mail-display-settings-panel";
 import { MailListSettingsPanel } from "./mail-list-settings-panel";
 import { MailSettingsHub } from "./mail-settings-hub";
 import { MailboxManager } from "./mailbox-manager";
-import { LabelPickerPanel } from "./label-picker-panel";
+import { LabelManager } from "./label-manager";
+import { MailCommandPaletteMainView } from "./mail-command-palette-main-view";
+import {
+  PaletteNavRow,
+  PaletteSection,
+  PaletteView,
+} from "../command-palette/palette-ui";
 
 type PrivateSearchIndexControls = {
   enabled: boolean;
@@ -106,56 +100,6 @@ export type MailCommandPaletteViewContentProps = {
   onDeleteLabel?: (id: string) => Promise<void>;
 };
 
-function LabelsView({
-  goBack,
-  labels,
-  onCreateLabel,
-  onUpdateLabel,
-  onDeleteLabel,
-}: {
-  goBack: () => void;
-  labels: LabelDef[];
-  onCreateLabel?: (name: string, color: string) => Promise<LabelDef | null>;
-  onUpdateLabel?: (
-    labelId: string,
-    updates: { name: string; color: string },
-  ) => Promise<void>;
-  onDeleteLabel?: (id: string) => Promise<void>;
-}) {
-  return (
-    <div
-      className="flex flex-col"
-      style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
-    >
-      <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-        <button
-          type="button"
-          onClick={goBack}
-          className="cursor-pointer p-1 rounded hover:bg-muted/50 transition-colors"
-          aria-label="Back"
-        >
-          <ArrowLeft className="size-4 text-muted-foreground" />
-        </button>
-        <span className="text-sm font-medium flex-1">Labels</span>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        <LabelPickerPanel
-          labels={labels}
-          onCreateLabel={onCreateLabel}
-          onUpdateLabel={onUpdateLabel}
-          onDeleteLabel={
-            onDeleteLabel
-              ? (id) => {
-                  void onDeleteLabel(id);
-                }
-              : undefined
-          }
-        />
-      </div>
-    </div>
-  );
-}
-
 function MailAppearanceView({
   goBack,
   localSettings,
@@ -169,55 +113,29 @@ function MailAppearanceView({
   ) => Promise<void>;
 }) {
   const themeOptions = [
-    { value: "light" as const, icon: Sun, label: "Light", color: "text-amber-500" },
-    { value: "dark" as const, icon: Moon, label: "Dark", color: "text-muted-foreground" },
-    {
-      value: "system" as const,
-      icon: Monitor,
-      label: "System",
-      color: "text-muted-foreground",
-    },
+    { value: "light" as const, icon: Sun, label: "Light" },
+    { value: "dark" as const, icon: Moon, label: "Dark" },
+    { value: "system" as const, icon: Monitor, label: "System" },
   ];
 
   return (
-    <div
-      className="flex flex-col"
-      style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
-    >
-      <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-        <button
-          type="button"
-          onClick={goBack}
-          className="cursor-pointer p-1 rounded hover:bg-muted/50 transition-colors"
-        >
-          <ArrowLeft className="size-4 text-muted-foreground" />
-        </button>
-        <span className="text-sm font-medium">Appearance</span>
-      </div>
-      <div className="flex-1 overflow-y-auto p-2">
-        <div className="px-1 pb-1">
-          <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
-            Theme
-          </span>
-        </div>
+    <PaletteView title="Appearance" onBack={goBack}>
+      <PaletteSection label="Theme">
         {themeOptions.map((item) => (
-          <button
+          <PaletteNavRow
             key={item.value}
-            type="button"
+            icon={item.icon}
+            label={item.label}
             onClick={() => void updateSetting("theme", item.value)}
-            className="flex cursor-pointer items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors"
-          >
-            <div className="flex items-center justify-center size-6 shrink-0">
-              <item.icon className={`size-4 ${item.color}`} />
-            </div>
-            <span className="text-sm flex-1">{item.label}</span>
-            {localSettings?.theme === item.value && (
-              <Check className="size-4 text-primary shrink-0" />
-            )}
-          </button>
+            trailing={
+              localSettings?.theme === item.value ? (
+                <Check className="size-4 shrink-0 text-foreground" />
+              ) : null
+            }
+          />
         ))}
-      </div>
-    </div>
+      </PaletteSection>
+    </PaletteView>
   );
 }
 
@@ -250,47 +168,16 @@ function MailSecurityView({
   handleResetEncryptionPassword: (values: NewPasswordValues) => Promise<void>;
 }) {
   return (
-    <div
-      className="flex flex-col"
-      style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
-    >
-      <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-        <button
-          type="button"
-          onClick={goBack}
-          className="cursor-pointer p-1 rounded hover:bg-muted/50 transition-colors"
-        >
-          <ArrowLeft className="size-4 text-muted-foreground" />
-        </button>
-        <span className="text-sm font-medium">Security</span>
-      </div>
-      <div className="flex-1 overflow-y-auto p-2">
-        <div className="px-1 pb-1">
-          <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
-            Authentication
-          </span>
-        </div>
-        <button
-          type="button"
+    <PaletteView title="Security" onBack={goBack}>
+      <PaletteSection label="Authentication">
+        <PaletteNavRow
+          icon={Shield}
+          label="Passkeys"
+          description="Manage passwordless authentication"
           onClick={() => goForward("passkeys", { passkeyAddMode: false })}
-          className="flex cursor-pointer items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors group"
-        >
-          <div className="flex items-center justify-center size-6 shrink-0">
-            <Shield className="size-4 text-muted-foreground" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm">Passkeys</div>
-            <div className="text-xs text-muted-foreground">
-              Manage passwordless authentication
-            </div>
-          </div>
-          <ChevronRight className="size-4 text-muted-foreground/40 shrink-0" />
-        </button>
-        <div className="px-1 pb-1 pt-3 border-t border-border/40 mt-1">
-          <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
-            Search
-          </span>
-        </div>
+        />
+      </PaletteSection>
+      <PaletteSection label="Search">
         <PrivateSearchIndexToggle
           enabled={privateSearchIndex.enabled}
           onToggle={
@@ -299,11 +186,8 @@ function MailSecurityView({
               : privateSearchIndex.enable
           }
         />
-        <div className="px-1 pb-1 pt-3 border-t border-border/40 mt-1">
-          <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
-            Password
-          </span>
-        </div>
+      </PaletteSection>
+      <PaletteSection label="Password">
         <PasswordSection
           hasPasswordAccount={hasPasswordAccount}
           hasOAuthAccount={hasOAuthAccount}
@@ -314,114 +198,8 @@ function MailSecurityView({
           handleSetPassword={handleSetPassword}
           handleResetEncryptionPassword={handleResetEncryptionPassword}
         />
-      </div>
-    </div>
-  );
-}
-
-function MailMainView({
-  query,
-  onQueryChange,
-  selectedIndex,
-  showUnifiedSearch,
-  unifiedResults,
-  unifiedSearchLoading,
-  mainListItems,
-  onSelectItem,
-  onSelectUnifiedResult,
-}: {
-  query: string;
-  onQueryChange: (query: string) => void;
-  selectedIndex: number;
-  showUnifiedSearch: boolean;
-  unifiedResults: UnifiedSearchResult<JmapEmailMessage>[];
-  unifiedSearchLoading: boolean;
-  mainListItems: MailPaletteItem[];
-  onSelectItem: (item: MailPaletteItem) => void;
-  onSelectUnifiedResult: (
-    result: UnifiedSearchResult<JmapEmailMessage>,
-  ) => void;
-}) {
-  return (
-    <div
-      className="flex flex-col"
-      style={{
-        minHeight: "clamp(280px, 50svh, 420px)",
-        maxHeight: "calc(100dvh - 80px)",
-      }}
-    >
-      <div className="flex items-center gap-2 p-3 sm:py-2 border-b border-border/50">
-        <Search className="size-4 text-muted-foreground shrink-0" />
-        <Input
-          type="text"
-          placeholder="Search or jump to…"
-          value={query}
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          onChange={(e) => onQueryChange(e.target.value)}
-          className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:border-0 focus:outline-none rounded-none px-0 text-sm placeholder:text-muted-foreground/60"
-        />
-        {query && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onQueryChange("")}
-            className="p-1 h-auto"
-          >
-            <svg
-              className="size-4 text-muted-foreground"
-              viewBox="0 0 16 16"
-              fill="currentColor"
-            >
-              <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z" />
-            </svg>
-          </Button>
-        )}
-      </div>
-      <div className="flex-1 overflow-y-auto py-2">
-        {showUnifiedSearch && (
-          <UnifiedSearchResults
-            results={unifiedResults}
-            isLoading={unifiedSearchLoading}
-            selectedIndex={selectedIndex}
-            onSelect={onSelectUnifiedResult}
-          />
-        )}
-        {mainListItems.length === 0 && unifiedResults.length === 0 ? (
-          <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No results found.
-          </div>
-        ) : (
-          <div className="px-2">
-            {mainListItems.map((item, index) => {
-              const globalIndex =
-                (showUnifiedSearch ? unifiedResults.length : 0) + index;
-
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => onSelectItem(item)}
-                  data-index={globalIndex}
-                  className={`flex cursor-pointer items-center gap-3 p-2 sm:py-1.5 min-h-[44px] w-full rounded-md text-left focus:outline-none transition-colors group ${globalIndex === selectedIndex ? "bg-accent/50" : "hover:bg-accent/50"}`}
-                >
-                  <div className="flex items-center justify-center size-8 sm:w-6 sm:h-6 shrink-0">
-                    <item.icon className="h-[18px] w-[18px] sm:h-4 sm:w-4 text-muted-foreground" />
-                  </div>
-                  <span className="text-sm flex-1 truncate">{item.label}</span>
-                  <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
-                    {item.description}
-                  </span>
-                  <ChevronRight className="size-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
+      </PaletteSection>
+    </PaletteView>
   );
 }
 
@@ -439,7 +217,7 @@ export function MailCommandPaletteViewContent(
 
   if (currentView === "main") {
     return (
-      <MailMainView
+      <MailCommandPaletteMainView
         query={props.query}
         onQueryChange={props.onQueryChange}
         selectedIndex={props.selectedIndex}
@@ -466,34 +244,24 @@ export function MailCommandPaletteViewContent(
   if (currentView === "time-region" || currentView === "timezone") {
     if (!localSettings) return null;
     return (
-      <div
-        className="flex flex-col"
-        style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
-      >
-        <TimeRegionSettings
-          localSettings={localSettings}
-          updateSetting={updateSetting}
-          goBack={goBack}
-          goForward={(view) => goForward(view as MailPaletteView)}
-          currentView={currentView}
-        />
-      </div>
+      <TimeRegionSettings
+        localSettings={localSettings}
+        updateSetting={updateSetting}
+        goBack={goBack}
+        goForward={(view) => goForward(view as MailPaletteView)}
+        currentView={currentView}
+      />
     );
   }
 
   if (currentView === "notifications") {
     if (!localSettings) return null;
     return (
-      <div
-        className="flex flex-col"
-        style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
-      >
-        <NotificationSettings
-          localSettings={localSettings}
-          updateSetting={updateSetting}
-          goBack={goBack}
-        />
-      </div>
+      <NotificationSettings
+        localSettings={localSettings}
+        updateSetting={updateSetting}
+        goBack={goBack}
+      />
     );
   }
 
@@ -517,16 +285,11 @@ export function MailCommandPaletteViewContent(
 
   if (currentView === "passkeys") {
     return (
-      <div
-        className="flex flex-col"
-        style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
-      >
-        <PasskeySettings
-          open={open}
-          onBack={goBack}
-          startInAddMode={props.passkeyAddMode}
-        />
-      </div>
+      <PasskeySettings
+        open={open}
+        onBack={goBack}
+        startInAddMode={props.passkeyAddMode}
+      />
     );
   }
 
@@ -545,20 +308,15 @@ export function MailCommandPaletteViewContent(
     currentView === "mailbox-edit"
   ) {
     return (
-      <div
-        className="flex flex-col"
-        style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
-      >
-        <MailboxManager
-          mailboxes={props.mailboxes}
-          currentView={currentView}
-          onBack={goBack}
-          onNavigateTo={(view) => goForward(view as MailPaletteView)}
-          onCreateMailbox={props.onCreateMailbox ?? (() => Promise.resolve())}
-          onDeleteMailbox={props.onDeleteMailbox ?? (() => Promise.resolve())}
-          onRenameMailbox={props.onRenameMailbox}
-        />
-      </div>
+      <MailboxManager
+        mailboxes={props.mailboxes}
+        currentView={currentView}
+        onBack={goBack}
+        onNavigateTo={(view) => goForward(view as MailPaletteView)}
+        onCreateMailbox={props.onCreateMailbox ?? (() => Promise.resolve())}
+        onDeleteMailbox={props.onDeleteMailbox ?? (() => Promise.resolve())}
+        onRenameMailbox={props.onRenameMailbox}
+      />
     );
   }
 
@@ -594,11 +352,17 @@ export function MailCommandPaletteViewContent(
     return <InviteSettings goBack={goBack} />;
   }
 
-  if (currentView === "labels") {
+  if (
+    currentView === "labels" ||
+    currentView === "label-create" ||
+    currentView === "label-edit"
+  ) {
     return (
-      <LabelsView
-        goBack={goBack}
+      <LabelManager
         labels={props.labels}
+        currentView={currentView}
+        onBack={goBack}
+        onNavigateTo={goForward}
         onCreateLabel={props.onCreateLabel}
         onUpdateLabel={props.onUpdateLabel}
         onDeleteLabel={props.onDeleteLabel}

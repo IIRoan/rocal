@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Keyboard, ListFilter, Undo2 } from "lucide-react";
+import { Keyboard, ListFilter } from "lucide-react";
 import { SettingToggleRow } from "../command-palette/setting-toggle-row";
 import {
   useMailListSettings,
@@ -8,49 +8,41 @@ import {
   type MarkAsReadDelay,
 } from "@/lib/mail/mail-list-settings";
 import { getMailShortcutHelpItems } from "@/hooks/use-mail-keyboard-shortcuts";
+import {
+  PaletteField,
+  PaletteSection,
+  PaletteSectionLabel,
+  PaletteView,
+} from "../command-palette/palette-ui";
+import { PALETTE_INPUT_CLASS } from "../command-palette/palette-styles";
+
+const KEY_CAP_CLASS =
+  "rounded bg-muted px-1.5 font-mono text-[11px] text-muted-foreground";
 
 export function MailListSettingsPanel({ goBack }: { goBack: () => void }) {
   const { settings, updateSettings } = useMailListSettings();
   const shortcuts = getMailShortcutHelpItems();
 
   return (
-    <div
-      className="flex flex-col"
-      style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
-    >
-      <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-        <button
-          type="button"
-          onClick={goBack}
-          className="p-1 rounded hover:bg-muted/50 transition-colors"
+    <PaletteView title="List & shortcuts" onBack={goBack}>
+      <PaletteSection label="List density">
+        <PaletteField
+          label="Row density"
+          htmlFor="mail-row-density"
+          hint="How much space each message row takes in the list"
         >
-          <ArrowLeft className="size-4 text-muted-foreground" />
-        </button>
-        <span className="text-sm font-medium">List &amp; shortcuts</span>
-      </div>
-      <div className="flex-1 overflow-y-auto p-2">
-        <div className="px-3 py-2">
-          <div className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-            List density
-          </div>
-        </div>
-
-        <div className="px-3 py-3 border-t border-border/40">
-          <label className="text-sm font-medium">Row density</label>
-          <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-            How much space each message row takes in the list
-          </p>
           <select
+            id="mail-row-density"
             value={settings.density}
             onChange={(event) =>
               updateSettings({ density: event.target.value as ListDensity })
             }
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            className={PALETTE_INPUT_CLASS}
           >
             <option value="compact">Compact (more messages per screen)</option>
             <option value="comfortable">Comfortable (more breathing room)</option>
           </select>
-        </div>
+        </PaletteField>
 
         <SettingToggleRow
           icon={ListFilter}
@@ -71,66 +63,56 @@ export function MailListSettingsPanel({ goBack }: { goBack: () => void }) {
             updateSettings({ threadExpandInList: !settings.threadExpandInList })
           }
         />
+      </PaletteSection>
 
-        <div className="px-3 py-2 mt-2 border-t border-border/40">
-          <div className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-            Reading
-          </div>
-        </div>
-
-        <div className="px-3 py-3 border-t border-border/40">
-          <label className="text-sm font-medium">Mark as read delay</label>
-          <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-            When a message is opened, how long before it&apos;s marked as read
-          </p>
+      <PaletteSection label="Reading">
+        <PaletteField
+          label="Mark as read delay"
+          htmlFor="mail-mark-as-read-delay"
+          hint="When a message is opened, how long before it's marked as read"
+        >
           <select
+            id="mail-mark-as-read-delay"
             value={settings.markAsReadDelay}
             onChange={(event) =>
               updateSettings({
                 markAsReadDelay: event.target.value as MarkAsReadDelay,
               })
             }
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            className={PALETTE_INPUT_CLASS}
           >
             <option value="instant">Instantly</option>
             <option value="delayed">After 3 seconds</option>
             <option value="never">Never (manual only)</option>
           </select>
-        </div>
+        </PaletteField>
+      </PaletteSection>
 
-        <div className="px-3 py-2 mt-2 border-t border-border/40">
-          <div className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-            Actions
-          </div>
-        </div>
-
-        <div className="px-3 py-3 border-t border-border/40">
-          <label className="text-sm font-medium">Undo toast duration</label>
-          <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-            How long the undo button stays after deleting or archiving
-          </p>
+      <PaletteSection label="Actions">
+        <PaletteField
+          label="Undo toast duration"
+          htmlFor="mail-undo-toast-duration"
+          hint="How long the undo button stays after deleting or archiving"
+        >
           <select
+            id="mail-undo-toast-duration"
             value={String(settings.undoToastDurationMs)}
             onChange={(event) =>
               updateSettings({
                 undoToastDurationMs: Number(event.target.value),
               })
             }
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            className={PALETTE_INPUT_CLASS}
           >
             <option value="3000">3 seconds</option>
             <option value="5000">5 seconds</option>
             <option value="10000">10 seconds</option>
             <option value="15000">15 seconds</option>
           </select>
-        </div>
+        </PaletteField>
+      </PaletteSection>
 
-        <div className="px-3 py-2 mt-2 border-t border-border/40">
-          <div className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-            Keyboard
-          </div>
-        </div>
-
+      <PaletteSection label="Keyboard">
         <SettingToggleRow
           icon={Keyboard}
           label="Keyboard shortcuts"
@@ -144,32 +126,26 @@ export function MailListSettingsPanel({ goBack }: { goBack: () => void }) {
         />
 
         {settings.keyboardShortcutsEnabled && (
-          <div className="px-3 py-3 border-t border-border/40">
-            <div className="text-xs text-muted-foreground mb-2">
-              Available shortcuts
-            </div>
-            <div className="space-y-1">
+          <>
+            <PaletteSectionLabel>Available shortcuts</PaletteSectionLabel>
+            <div className="flex flex-col gap-1 p-2">
               {shortcuts.map(({ key, label }) => (
                 <div
                   key={key}
-                  className="flex items-center justify-between text-xs"
+                  className="flex items-center justify-between text-[13px]"
                 >
-                  <span className="text-foreground/70">{label}</span>
-                  <kbd className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                    {key === " " ? "Space" : key}
-                  </kbd>
+                  <span className="text-muted-foreground">{label}</span>
+                  <kbd className={KEY_CAP_CLASS}>{key === " " ? "Space" : key}</kbd>
                 </div>
               ))}
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-foreground/70">Show this help</span>
-                <kbd className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                  ?
-                </kbd>
+              <div className="flex items-center justify-between text-[13px]">
+                <span className="text-muted-foreground">Show this help</span>
+                <kbd className={KEY_CAP_CLASS}>?</kbd>
               </div>
             </div>
-          </div>
+          </>
         )}
-      </div>
-    </div>
+      </PaletteSection>
+    </PaletteView>
   );
 }

@@ -29,8 +29,8 @@ export const MAIL_SETTINGS_NAV_ITEMS: MailSettingsNavItem[] = [
     id: "mailboxes",
     label: "Mailboxes",
     icon: Inbox,
-    description: "Create, edit, and delete mailboxes",
-    keywords: ["mailbox", "folder", "inbox", "archive"],
+    description: "Create, edit, hide, and delete mailboxes",
+    keywords: ["mailbox", "folder", "inbox", "archive", "hide", "show", "hidden"],
   },
   {
     id: "labels",

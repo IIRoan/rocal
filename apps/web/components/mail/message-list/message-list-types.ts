@@ -15,6 +15,7 @@ export type MessageListDisplayOptions = {
 export type MessageListPaginationState = {
   hasMore?: boolean;
   isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 };
 
 export type MessageListThreadUiState = {

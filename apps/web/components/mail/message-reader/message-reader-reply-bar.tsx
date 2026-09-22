@@ -1,18 +1,16 @@
 "use client";
 
-import {
-  Paperclip,
-  Reply,
-  Send,
-  Smile,
-  X,
-} from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@workspace/ui/components/ui/popover";
+import { Paperclip, Reply, Smile, X } from "lucide-react";
 import { Button } from "@workspace/ui/components/ui/button";
+import {
+  Button as SolaceButton,
+  DropdownPanel,
+  FilledVariant,
+  Icon,
+  IconText,
+  Size,
+  TypographyWeight,
+} from "@workspace/ui/solace";
 import type {
   MessageReaderController,
   MessageReaderViewModel,
@@ -42,11 +40,11 @@ export function MessageReaderReplyBar({
     isBusy,
     props,
   } = controller;
-  const { onSendReply } = props;
+  const { onSendReply, onForward } = props;
   const { senderEmail, senderName } = view;
 
   return (
-    <div className="shrink-0 px-3 pb-2">
+    <div className="shrink-0">
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -58,57 +56,32 @@ export function MessageReaderReplyBar({
         aria-hidden="true"
       />
 
-      {/* Collapsed pill — only rendered when not expanded */}
-      {!isReplyExpanded && (
-        <button
-          type="button"
-          onClick={() =>
-            dispatchMessageUi({ type: "patch", patch: { isReplyExpanded: true } })
-          }
-          className="w-full flex items-center gap-2 rounded-lg border border-input bg-muted/30 px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:border-ring/50 transition-colors text-left"
-          aria-label={`Reply to ${senderName || senderEmail}`}
-        >
-          <Reply className="size-3.5 shrink-0" />
-          <span>
-            Reply to{" "}
-            <span className="font-medium text-foreground/70">
-              {senderName || senderEmail}
-            </span>
-            …
-          </span>
-        </button>
-      )}
-
-      {/* Expanded card wrapper — always in DOM; GSAP controls height/opacity */}
-      <div
-        ref={expandedWrapRef}
-        style={{ height: 0, overflow: "hidden" }}
-        onBlur={(e) => {
-          // Guard: don't collapse if emoji picker is open (it's a portal outside this container)
-          if (emojiPickerOpen) return;
-          // Collapse only if focus truly left this container
-          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-            if (!replyText && attachedFiles.length === 0) {
-              dispatchMessageUi({
-                type: "patch",
-                patch: { isReplyExpanded: false },
-              });
+      {isReplyExpanded ? (
+        <div
+          ref={expandedWrapRef}
+          className="flex flex-col rounded-xl border border-[var(--border-secondary)] px-3 pt-2.5 pb-2 focus-within:border-[var(--border-primary)]"
+          onBlur={(e) => {
+            // Emoji picker is portalled outside this container.
+            if (emojiPickerOpen) return;
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+              if (!replyText && attachedFiles.length === 0) {
+                dispatchMessageUi({
+                  type: "patch",
+                  patch: { isReplyExpanded: false },
+                });
+              }
             }
-          }
-        }}
-      >
-        <div className="rounded-lg border border-input bg-background shadow-sm transition-colors focus-within:border-ring focus-within:shadow-[0_0_0_3px_hsl(var(--ring)/0.15)]">
-          {/* Card header */}
-          <div className="flex items-center gap-1.5 px-3 pt-1.5 pb-1">
-            <Reply className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">
+          }}
+        >
+          <div className="flex items-center gap-1.5 pb-1">
+            <Reply className="size-3.5 shrink-0 text-[var(--icon-secondary)]" />
+            <span className="text-xs text-[var(--text-secondary)]">
               Reply to{" "}
-              <span className="font-medium text-foreground">
+              <span className="font-medium text-[var(--text-primary)]">
                 {senderName || senderEmail}
               </span>
             </span>
           </div>
-          {/* Textarea — no browser outline; parent card provides focus ring */}
           <textarea
             ref={textareaRef}
             value={replyText}
@@ -131,13 +104,13 @@ export function MessageReaderReplyBar({
             placeholder="Write your reply…"
             rows={3}
             style={{ minHeight: "4.5rem" }}
-            className="w-full resize-none appearance-none bg-transparent px-3 py-1 text-sm border-0 border-none ring-0 outline-none focus:outline-none focus:ring-0 focus:border-0 [&:focus-visible]:outline-none placeholder:text-muted-foreground"
+            className="w-full resize-none appearance-none border-0 bg-transparent py-1 text-sm text-[var(--text-primary)] outline-none ring-0 placeholder:text-[var(--text-disabled)] focus:border-0 focus:outline-none focus:ring-0"
             aria-label={`Reply to ${senderName || senderEmail}`}
             disabled={isBusy || isSendingReply}
           />
           {/* Attached file chips */}
           {attachedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 px-3 pb-1.5">
+            <div className="flex flex-wrap gap-1.5 pb-1.5">
               {attachedFiles.map((file) => (
                 <span
                   key={`${file.name}-${file.size}-${file.lastModified}`}
@@ -166,15 +139,17 @@ export function MessageReaderReplyBar({
               ))}
             </div>
           )}
-          {/* Footer toolbar */}
-          <div className="flex items-center gap-0.5 px-2 pb-1.5 pt-0.5 border-t border-border/40">
-            <Popover
+          <div className="-ml-1.5 flex items-center gap-0.5 pt-1">
+            <DropdownPanel
               open={emojiPickerOpen}
               onOpenChange={(open) =>
                 dispatchMessageUi({ type: "patch", patch: { emojiPickerOpen: open } })
               }
-            >
-              <PopoverTrigger asChild>
+              side="top"
+              align="start"
+              width={272}
+              className="p-1.5"
+              trigger={
                 <Button
                   variant="ghost"
                   size="icon-xs"
@@ -184,24 +159,14 @@ export function MessageReaderReplyBar({
                 >
                   <Smile />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                side="top"
-                align="start"
-                className="w-64 p-2"
-                onInteractOutside={() =>
-                  dispatchMessageUi({
-                    type: "patch",
-                    patch: { emojiPickerOpen: false },
-                  })
-                }
-              >
+              }
+            >
                 <div className="grid grid-cols-10 gap-0.5">
                   {COMMON_EMOJI.map((emoji) => (
                     <button
                       key={emoji}
                       type="button"
-                      className="flex items-center justify-center rounded p-0.5 text-base hover:bg-accent transition-colors"
+                      className="flex items-center justify-center cursor-pointer rounded-md p-0.5 text-base hover:bg-[var(--bg-cell-hover)] transition-colors"
                       onClick={() => {
                         dispatchMessageUi({ type: "appendReplyText", value: emoji });
                         dispatchMessageUi({
@@ -215,8 +180,7 @@ export function MessageReaderReplyBar({
                     </button>
                   ))}
                 </div>
-              </PopoverContent>
-            </Popover>
+            </DropdownPanel>
             <Button
               variant="ghost"
               size="icon-xs"
@@ -227,26 +191,45 @@ export function MessageReaderReplyBar({
             >
               <Paperclip />
             </Button>
-            <div className="ml-auto flex items-center gap-1.5">
-              <Button
-                size="sm"
-                type="button"
-                aria-label="Send reply"
-                disabled={
-                  isBusy ||
-                  isSendingReply ||
-                  (Boolean(onSendReply) && !replyText.trim())
-                }
-                onClick={() => void handleSendReply()}
-                className="h-7 gap-1.5 px-3 text-xs"
-              >
-                <Send className="size-3.5" />
-                Send
-              </Button>
-            </div>
+            <SolaceButton
+              aria-label="Send reply"
+              className="ml-auto"
+              disabled={
+                isBusy ||
+                isSendingReply ||
+                (Boolean(onSendReply) && !replyText.trim())
+              }
+              icon={Icon.Send}
+              onClick={() => void handleSendReply()}
+              size={Size.SMALL}
+            >
+              Send
+            </SolaceButton>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <IconText
+            dataTest="message-reply"
+            label="Reply"
+            onClick={() =>
+              dispatchMessageUi({ type: "patch", patch: { isReplyExpanded: true } })
+            }
+            size={Size.SMALL}
+            startIcon={Icon.Reply}
+            variant={FilledVariant.FILLED}
+            weight={TypographyWeight.REGULAR}
+          />
+          <IconText
+            label="Forward"
+            onClick={onForward}
+            size={Size.SMALL}
+            startIcon={Icon.Forward}
+            variant={FilledVariant.FILLED}
+            weight={TypographyWeight.REGULAR}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -1,21 +1,27 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { Input } from "@workspace/ui/components/ui/input";
-import {
-  Globe,
-  Clock,
-  Check,
-  ArrowLeft,
-  ChevronRight,
-  Search,
-} from "lucide-react";
+import React, { useState } from "react";
+import { Globe, Clock, Check, Search } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
 import { stopEventPropagation } from "@/lib/event-propagation";
 import {
-  SETTINGS_PANEL_STYLE,
   getAllTimezonePickerOptions,
   getTimezonePickerGroups,
   getTimezonePickerLabel,
 } from "./constants";
+import {
+  PaletteEmptyState,
+  PaletteNavRow,
+  PaletteSection,
+  PaletteView,
+  PaletteViewHeader,
+} from "./palette-ui";
+import { PALETTE_VIEW_STYLE } from "./palette-styles";
+
+const TIME_FORMAT_OPTIONS = [
+  { value: "12h", label: "12 Hour (1:00 PM)" },
+  { value: "24h", label: "24 Hour (13:00)" },
+] as const;
+
+const selectedCheck = <Check className="size-4 shrink-0 text-foreground" />;
 
 interface TimeRegionSettingsProps {
   localSettings: UserSettings;
@@ -33,184 +39,105 @@ export function TimeRegionSettings({
   currentView,
 }: TimeRegionSettingsProps) {
   const [timezoneSearch, setTimezoneSearch] = useState("");
-  const timezoneGroups = useMemo(() => getTimezonePickerGroups(), []);
-  const allTimezones = useMemo(() => getAllTimezonePickerOptions(), []);
-  const selectedTimezoneLabel = useMemo(
-    () => getTimezonePickerLabel(localSettings.timezone),
-    [localSettings.timezone],
-  );
+  const timezoneGroups = getTimezonePickerGroups();
+  const allTimezones = getAllTimezonePickerOptions();
+  const selectedTimezoneLabel = getTimezonePickerLabel(localSettings.timezone);
+  const normalizedQuery = timezoneSearch.trim().toLowerCase();
+  const filteredTimezones = normalizedQuery
+    ? allTimezones
+        .filter((timezone) => timezone.searchText.includes(normalizedQuery))
+        .slice(0, 50)
+    : [];
 
-  const filteredTimezones = useMemo(() => {
-    if (!timezoneSearch.trim()) {
-      return [];
+  const handleTimezoneSelect = (
+    timezone: string,
+    options?: { clearSearch?: boolean },
+  ) => {
+    updateSetting("timezone", timezone);
+
+    if (options?.clearSearch) {
+      setTimezoneSearch("");
     }
 
-    const normalizedQuery = timezoneSearch.trim().toLowerCase();
-
-    return allTimezones
-      .filter((timezone) => timezone.searchText.includes(normalizedQuery))
-      .slice(0, 50);
-  }, [allTimezones, timezoneSearch]);
-
-  const handleTimezoneSelect = useCallback(
-    (timezone: string, options?: { clearSearch?: boolean }) => {
-      updateSetting("timezone", timezone);
-
-      if (options?.clearSearch) {
-        setTimezoneSearch("");
-      }
-
-      goBack();
-    },
-    [updateSetting, goBack],
-  );
+    goBack();
+  };
 
   if (currentView === "time-region") {
     return (
-      <div className="flex flex-col" style={SETTINGS_PANEL_STYLE}>
-        <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-          <button
-            onClick={() => goBack()}
-            className="p-1 rounded hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="size-4 text-muted-foreground" />
-          </button>
-          <span className="text-sm font-medium">Time & Region</span>
-        </div>
-        <div className="flex-1 overflow-y-auto min-h-0">
-          <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
-            Timezone
-          </div>
-          <div className="p-1">
-            <button
-              type="button"
-              onClick={() => goForward("timezone")}
-              className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
-            >
-              <Globe className="size-4 text-muted-foreground shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm">Timezone</div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {selectedTimezoneLabel}
-                </div>
-              </div>
-              <ChevronRight className="size-3.5 text-muted-foreground/40 shrink-0" />
-            </button>
-          </div>
-
-          <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
-            Time Format
-          </div>
-          <div className="p-1">
-            {[
-              { value: "12h", label: "12 Hour (1:00 PM)" },
-              { value: "24h", label: "24 Hour (13:00)" },
-            ].map((format) => (
-              <button
-                key={format.value}
-                type="button"
-                onClick={() => updateSetting("timeFormat", format.value)}
-                className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
-              >
-                <Clock className="size-4 text-muted-foreground shrink-0" />
-                <span className="text-sm flex-1">{format.label}</span>
-                {localSettings.timeFormat === format.value && (
-                  <Check className="size-4 text-primary shrink-0" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      <PaletteView title="Time & Region" onBack={goBack}>
+        <PaletteSection label="Timezone">
+          <PaletteNavRow
+            icon={Globe}
+            label="Timezone"
+            description={selectedTimezoneLabel}
+            onClick={() => goForward("timezone")}
+          />
+        </PaletteSection>
+        <PaletteSection label="Time Format">
+          {TIME_FORMAT_OPTIONS.map((format) => (
+            <PaletteNavRow
+              key={format.value}
+              icon={Clock}
+              label={format.label}
+              onClick={() => updateSetting("timeFormat", format.value)}
+              trailing={
+                localSettings.timeFormat === format.value ? selectedCheck : null
+              }
+            />
+          ))}
+        </PaletteSection>
+      </PaletteView>
     );
   }
 
   if (currentView === "timezone") {
+    const renderTimezoneRow = (
+      tz: (typeof allTimezones)[number],
+      options?: { clearSearch?: boolean },
+    ) => (
+      <PaletteNavRow
+        key={tz.value}
+        icon={Globe}
+        label={tz.label}
+        description={tz.value}
+        onClick={() => handleTimezoneSelect(tz.value, options)}
+        trailing={localSettings.timezone === tz.value ? selectedCheck : null}
+      />
+    );
+
     return (
-      <div className="flex flex-col" style={SETTINGS_PANEL_STYLE}>
-        <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-          <button
-            onClick={() => goBack()}
-            className="p-1 rounded hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="size-4 text-muted-foreground" />
-          </button>
-          <span className="text-sm font-medium">Timezone</span>
-        </div>
-        <div className="flex items-center gap-3 px-4 border-b border-border/50 shrink-0">
-          <Search className="size-4 text-muted-foreground shrink-0" />
-          <Input
+      <div className="flex flex-col" style={PALETTE_VIEW_STYLE}>
+        <PaletteViewHeader title="Timezone" onBack={goBack} />
+        <div className="flex h-11 shrink-0 items-center gap-3 border-b border-border/50 px-4">
+          <Search className="size-4 shrink-0 text-muted-foreground" />
+          <input
             type="text"
             placeholder="Search timezones..."
+            aria-label="Search timezones"
             value={timezoneSearch}
             onChange={(e) => setTimezoneSearch(e.target.value)}
             onKeyDown={stopEventPropagation}
-            className="flex-1 h-auto py-3 bg-transparent border-0 ring-0 focus:ring-0 focus:border-0 focus:outline-none rounded-none px-0"
+            className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 text-[15px] text-foreground shadow-none outline-none placeholder:text-muted-foreground/60 focus:border-0 focus:shadow-none focus:ring-0"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck="false"
           />
         </div>
-        <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5">
           {timezoneSearch ? (
-            <div className="p-1">
-              {filteredTimezones.length === 0 ? (
-                <div className="px-3 py-8 text-center text-sm text-muted-foreground">
-                  No timezones found
-                </div>
-              ) : (
-                filteredTimezones.map((tz) => (
-                  <button
-                    key={tz.value}
-                    type="button"
-                    onClick={() =>
-                      handleTimezoneSelect(tz.value, { clearSearch: true })
-                    }
-                    className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
-                  >
-                    <Globe className="size-4 text-muted-foreground shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm truncate">{tz.label}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {tz.value}
-                      </div>
-                    </div>
-                    {localSettings.timezone === tz.value && (
-                      <Check className="size-4 text-primary shrink-0" />
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
+            filteredTimezones.length === 0 ? (
+              <PaletteEmptyState>No timezones found</PaletteEmptyState>
+            ) : (
+              filteredTimezones.map((tz) =>
+                renderTimezoneRow(tz, { clearSearch: true }),
+              )
+            )
           ) : (
             Object.entries(timezoneGroups).map(([groupName, timezones]) => (
-              <div key={groupName}>
-                <div className="px-4 py-1.5 text-xs font-medium text-muted-foreground">
-                  {groupName}
-                </div>
-                <div className="p-1">
-                  {timezones.map((tz) => (
-                    <button
-                      key={tz.value}
-                      type="button"
-                      onClick={() => handleTimezoneSelect(tz.value)}
-                      className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
-                    >
-                      <Globe className="size-4 text-muted-foreground shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm truncate">{tz.label}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {tz.value}
-                        </div>
-                      </div>
-                      {localSettings.timezone === tz.value && (
-                        <Check className="size-4 text-primary shrink-0" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <PaletteSection key={groupName} label={groupName}>
+                {timezones.map((tz) => renderTimezoneRow(tz))}
+              </PaletteSection>
             ))
           )}
         </div>

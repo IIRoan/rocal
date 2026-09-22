@@ -98,12 +98,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     });
     const htmlForDraft = composeSettings.plainTextMode ? undefined : htmlBody;
 
-    if (
-      !toAddresses.length &&
-      !draft.subject.trim() &&
-      !plainBody &&
-      !htmlForDraft
-    ) {
+    if (!bridge.hasUserContent()) {
       return bridge.getDraftIdRef();
     }
 
@@ -280,6 +275,8 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
 
     const hasContent =
       composeTo.trim() ||
+      composeCc.trim() ||
+      composeBcc.trim() ||
       composeSubject.trim() ||
       composeBody.trim() ||
       composeHtmlBody.trim();
@@ -311,7 +308,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
   useEffect(() => {
     const handleBeforeUnload = () => {
       const bridge = getMailComposeBridge();
-      if (!bridge?.isComposeDirty()) return;
+      if (!bridge?.isComposeDirty() || !bridge.hasUserContent()) return;
       void flushDraftSave();
     };
     window.addEventListener("beforeunload", handleBeforeUnload);

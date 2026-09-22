@@ -17,7 +17,7 @@ import { Feather } from "@expo/vector-icons";
 import { AppScreen, HeaderIconButton, NavigationHeader } from "../../../src/components/layout";
 import { LAYOUT_METRICS } from "../../../src/lib/app-layout";
 import { useQuery } from "@tanstack/react-query";
-import { getErrorMessage, resolveReplyRecipients, validateComposeRecipients, resolveComposeSendBodies, messageBodiesToComposeText } from "@workspace/calendar-core";
+import { getErrorMessage, hasComposeUserContent, resolveReplyRecipients, validateComposeRecipients, resolveComposeSendBodies, messageBodiesToComposeText, type ComposeTextFields } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useToast } from "../../../src/providers/ToastProvider";
@@ -104,8 +104,7 @@ export default function ComposeScreen() {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [hasInitializedFromParams, setHasInitializedFromParams] =
-    useState(false);
+  const [seedFields, setSeedFields] = useState<ComposeTextFields | null>(null);
   const [selectedIdentityId, setSelectedIdentityId] = useState<string | null>(
     null,
   );
@@ -132,9 +131,14 @@ export default function ComposeScreen() {
     }
   }, [identities, selectedIdentityId]);
 
+  const hasUserContent = hasComposeUserContent(
+    { to, cc, bcc, subject, body },
+    seedFields ?? EMPTY_COMPOSE_FIELDS,
+  );
+
   const { saveDraft } = useComposeDraftAutosave({
     runtime,
-    enabled: Boolean(composeContext),
+    enabled: Boolean(composeContext) && hasUserContent,
     to,
     cc,
     bcc,
@@ -321,15 +325,7 @@ export default function ComposeScreen() {
     }
   }, []);
 
-  const isDirty = Boolean(
-    to.trim() ||
-      cc.trim() ||
-      bcc.trim() ||
-      subject.trim() ||
-      body.trim() ||
-      attachments.length > 0 ||
-      draftId,
-  );
+  const isDirty = hasUserContent || attachments.length > 0;
 
   const leaveCompose = useCallback(() => {
     router.back();
@@ -343,12 +339,22 @@ export default function ComposeScreen() {
   }, [draftId, leaveCompose, moveToTrash, runtime]);
 
   const handleSaveAndLeave = useCallback(async () => {
-    await saveDraft();
+    const savedDraftId = await saveDraft();
+    if (!savedDraftId && hasUserContent) {
+      // Stay open so a failed save never silently drops the message.
+      toast("Couldn't save draft", "error");
+      return;
+    }
+    if (savedDraftId) toast("Draft saved", "success");
     leaveCompose();
-  }, [leaveCompose, saveDraft]);
+  }, [hasUserContent, leaveCompose, saveDraft, toast]);
 
   const handleCancel = useCallback(() => {
     if (!isDirty) {
+      // Drop a draft autosaved earlier in this session once its content was removed again.
+      if (draftId && params.mode !== "draft" && runtime) {
+        moveToTrash.mutate(draftId);
+      }
       leaveCompose();
       return;
     }
@@ -367,7 +373,16 @@ export default function ComposeScreen() {
         },
       },
     ]);
-  }, [handleDiscard, handleSaveAndLeave, isDirty, leaveCompose]);
+  }, [
+    draftId,
+    handleDiscard,
+    handleSaveAndLeave,
+    isDirty,
+    leaveCompose,
+    moveToTrash,
+    params.mode,
+    runtime,
+  ]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
@@ -387,9 +402,22 @@ export default function ComposeScreen() {
     to.trim().length > 0;
 
   useEffect(() => {
-    if (hasInitializedFromParams) {
+    if (seedFields) {
       return;
     }
+
+    // The seeded fields are the baseline: closing without edits never saves or prompts.
+    const seedCompose = (fields: ComposeTextFields) => {
+      setTo(fields.to);
+      setCc(fields.cc);
+      setBcc(fields.bcc);
+      setSubject(fields.subject);
+      setBody(fields.body);
+      if (fields.cc || fields.bcc) {
+        setShowCcBcc(true);
+      }
+      setSeedFields(fields);
+    };
 
     const toParam = Array.isArray(params.to) ? params.to[0] : params.to;
     if (toParam) {
@@ -397,12 +425,13 @@ export default function ComposeScreen() {
         ? params.toName[0]
         : params.toName;
       const trimmedName = toName?.trim();
-      setTo(
-        trimmedName && trimmedName.toLowerCase() !== toParam.toLowerCase()
-          ? `${trimmedName} <${toParam}>`
-          : toParam,
-      );
-      setHasInitializedFromParams(true);
+      seedCompose({
+        ...EMPTY_COMPOSE_FIELDS,
+        to:
+          trimmedName && trimmedName.toLowerCase() !== toParam.toLowerCase()
+            ? `${trimmedName} <${toParam}>`
+            : toParam,
+      });
       return;
     }
 
@@ -410,39 +439,38 @@ export default function ComposeScreen() {
       return;
     }
 
+    const fromEmail =
+      composeContext?.fromEmail ?? runtime?.session.username ?? null;
     if (params.mode === "reply") {
-      setTo(
-        getReplyRecipients(
-          sourceMessage,
-          composeContext?.fromEmail ?? runtime?.session.username ?? null,
-        ),
-      );
-      setSubject(prefixSubject(sourceMessage.subject, "Re:"));
-      setBody(buildReplyBody(sourceMessage));
+      seedCompose({
+        ...EMPTY_COMPOSE_FIELDS,
+        to: getReplyRecipients(sourceMessage, fromEmail),
+        subject: prefixSubject(sourceMessage.subject, "Re:"),
+        body: buildReplyBody(sourceMessage),
+      });
     } else if (params.mode === "reply-all") {
-      const fields = formatReplyAllRecipientFields(
-        sourceMessage,
-        composeContext?.fromEmail ?? runtime?.session.username ?? null,
-      );
-      setTo(fields.to);
-      setCc(fields.cc);
-      if (fields.cc) {
-        setShowCcBcc(true);
-      }
-      setSubject(prefixSubject(sourceMessage.subject, "Re:"));
-      setBody(buildReplyBody(sourceMessage));
+      const fields = formatReplyAllRecipientFields(sourceMessage, fromEmail);
+      seedCompose({
+        ...EMPTY_COMPOSE_FIELDS,
+        to: fields.to,
+        cc: fields.cc,
+        subject: prefixSubject(sourceMessage.subject, "Re:"),
+        body: buildReplyBody(sourceMessage),
+      });
     } else if (params.mode === "forward") {
-      setSubject(prefixSubject(sourceMessage.subject, "Fwd:"));
-      setBody(buildForwardBody(sourceMessage));
+      seedCompose({
+        ...EMPTY_COMPOSE_FIELDS,
+        subject: prefixSubject(sourceMessage.subject, "Fwd:"),
+        body: buildForwardBody(sourceMessage),
+      });
     } else if (params.mode === "draft") {
-      setTo(formatAddressList(sourceMessage.to));
-      setCc(formatAddressList(sourceMessage.cc));
-      setBcc(formatAddressList(sourceMessage.bcc));
-      setSubject(sourceMessage.subject ?? "");
+      const headers = {
+        to: formatAddressList(sourceMessage.to),
+        cc: formatAddressList(sourceMessage.cc),
+        bcc: formatAddressList(sourceMessage.bcc),
+        subject: sourceMessage.subject ?? "",
+      };
       setDraftId(sourceMessage.id);
-      if (sourceMessage.cc?.length || sourceMessage.bcc?.length) {
-        setShowCcBcc(true);
-      }
 
       const encryption = classifyMessageEncryption(sourceMessage);
       if (encryption === "inline_pgp" || encryption === "pgp_mime") {
@@ -453,8 +481,8 @@ export default function ComposeScreen() {
         let cancelled = false;
         setIsDraftDecrypting(true);
         void (async () => {
+          let plaintext = "";
           try {
-            let plaintext = "";
             if (encryption === "inline_pgp") {
               const armoredMessage = await resolveInlinePgpArmoredCiphertext({
                 message: sourceMessage,
@@ -475,20 +503,16 @@ export default function ComposeScreen() {
               );
               plaintext = decrypted.plaintext;
             }
-            if (!cancelled) {
-              setBody(plaintext);
-            }
           } catch (err) {
             if (!cancelled) {
               setError(
                 getErrorMessage(err, "Could not decrypt this draft."),
               );
-              setBody("");
             }
           } finally {
             if (!cancelled) {
               setIsDraftDecrypting(false);
-              setHasInitializedFromParams(true);
+              seedCompose({ ...headers, body: plaintext });
             }
           }
         })();
@@ -498,18 +522,20 @@ export default function ComposeScreen() {
         };
       }
 
-      const bodies = extractMessageBodies(sourceMessage);
-      setBody(messageBodiesToComposeText(bodies));
+      seedCompose({
+        ...headers,
+        body: messageBodiesToComposeText(extractMessageBodies(sourceMessage)),
+      });
+    } else {
+      setSeedFields(EMPTY_COMPOSE_FIELDS);
     }
-
-    setHasInitializedFromParams(true);
   }, [
     composeContext?.fromEmail,
-    hasInitializedFromParams,
     params.mode,
     params.to,
     params.toName,
     runtime,
+    seedFields,
     sourceMessage,
   ]);
 
@@ -764,6 +790,14 @@ export default function ComposeScreen() {
     </AppScreen>
   );
 }
+
+const EMPTY_COMPOSE_FIELDS: ComposeTextFields = {
+  to: "",
+  cc: "",
+  bcc: "",
+  subject: "",
+  body: "",
+};
 
 function prefixSubject(
   value: string | null | undefined,

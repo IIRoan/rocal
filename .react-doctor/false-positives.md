@@ -22,6 +22,27 @@ Patterns that fire diagnostics but are safe to suppress.
 - **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
   for `**/providers/AuthProvider.tsx`.
 
+## react-doctor/no-giant-component — native E2eeProvider
+
+- **File**: `apps/native/src/providers/E2eeProvider.tsx` (`E2eeProvider`)
+- **Why FP**: Network/crypto helpers and the `IE2eeProvider` implementation
+  live in `src/lib/native-e2ee-provider.ts`; what remains (~350 lines) is the
+  bootstrap state machine (generation guard, pending-bootstrap promise, session
+  ref, pending sign-in password). Splitting it further would spread one race
+  guard across files. Same reasoning as `AuthProvider`.
+- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+  for `**/providers/E2eeProvider.tsx`.
+
+## react-doctor/rn-prefer-expo-image — AttachmentPreviewModal
+
+- **File**: `apps/native/src/components/mail/AttachmentPreviewModal.tsx`
+- **Why FP**: `expo-image` is not a dependency and we avoid new deps. The image
+  is a single local `file://` URI from the attachment cache shown once in a
+  preview modal, so expo-image's disk/memory caching and placeholders add
+  nothing.
+- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+  for `**/components/mail/AttachmentPreviewModal.tsx`.
+
 ## react-doctor/only-export-components — Next.js page metadata
 
 
@@ -378,7 +399,10 @@ Patterns that fire diagnostics but are safe to suppress.
 - **File**: `apps/web/components/mail/message-list/message-list-virtualized.tsx`
 - **Why FP**: `useVirtualizer` is incompatible with React Compiler memoization.
   Virtualization is isolated in `MessageListVirtualized` with the `"use no memo"`
-  directive so the rest of the list tree remains compiler-friendly.
+  directive (file + component) so the rest of the list tree remains
+  compiler-friendly. No memo-safe TanStack Virtual replacement exists.
+- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+  for `**/components/mail/message-list/message-list-virtualized.tsx`.
 
 ## react-doctor/prefer-tag-over-role — MessageList row shell
 
@@ -387,13 +411,20 @@ Patterns that fire diagnostics but are safe to suppress.
   nests the avatar selection `<button>`. HTML forbids nested buttons; the row
   uses `role="button"` + keyboard handlers instead. Expanded thread children use
   native `<button>` elements where no nesting occurs.
+- **Config**: Suppressed via `ignore.overrides` for
+  `**/components/mail/message-list/message-list-row.tsx`.
 
-## react-doctor/no-event-handler — MessageList infinite scroll
+## react-doctor/no-event-handler — MessageList virtualizer + infinite scroll
 
 - **File**: `apps/web/components/mail/message-list/message-list-virtualized.tsx`
-- **Why FP**: Scroll/resize listeners and virtual-window proximity checks react
-  to layout and viewport position. They are not parent event callbacks; refs
-  hold the latest `onLoadMore` state so subscriptions stay stable.
+- **Why FP**: `useVirtualizer` option callbacks (`estimateSize`, `getScrollElement`,
+  `getItemKey`) measure layout; they are not parent click handlers. Scroll/resize
+  listeners and virtual-window proximity checks react to viewport position. The
+  `selectedMessageId` effect calls `scrollToIndex` because selection can change
+  outside this list (search, keyboard, route) and the parent does not own the
+  virtualizer. Refs hold the latest `onLoadMore` so subscriptions stay stable.
+- **Config**: Suppressed via `ignore.overrides` for
+  `**/components/mail/message-list/message-list-virtualized.tsx`.
 
 ## react-doctor/no-pass-data-to-parent — MessageList virtual proximity load
 

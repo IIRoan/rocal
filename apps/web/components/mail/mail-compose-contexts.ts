@@ -34,14 +34,6 @@ export type MailComposeFieldsContextValue = {
   requestComposeClose: (afterClose?: () => void) => boolean;
 };
 
-export type MailComposeClosePromptContextValue = {
-  composeClosePromptOpen: boolean;
-  setComposeClosePromptOpen: (open: boolean) => void;
-  keepEditing: () => void;
-  saveDraftAndClose: () => Promise<void>;
-  discardAndClose: () => void;
-};
-
 export type MailComposeChromeContextValue = {
   isComposeOpen: boolean;
   setIsComposeOpen: (open: boolean) => void;
@@ -56,8 +48,4 @@ export const MailComposeFieldsContext = createContext<
 
 export const MailComposeChromeContext = createContext<
   MailComposeChromeContextValue | undefined
->(undefined);
-
-export const MailComposeClosePromptContext = createContext<
-  MailComposeClosePromptContextValue | undefined
 >(undefined);

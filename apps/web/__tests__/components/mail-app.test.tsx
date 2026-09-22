@@ -51,9 +51,9 @@ jest.mock("@workspace/ui/components/ui/dropdown-menu", () => {
   );
   const PassthroughAsButton = ({
     children,
-    asChild: _asChild,
+    asChild,
     ...props
-  }: any) => <button {...props}>{children}</button>;
+  }: any) => (asChild ? children : <button {...props}>{children}</button>);
   return {
     DropdownMenu: Passthrough,
     DropdownMenuContent: Passthrough,
@@ -107,10 +107,11 @@ jest.mock("@workspace/ui/components/ui/app-skeletons", () => ({
 
 jest.mock("lucide-react", () => {
   const Icon = () => null;
-  return {
+  const named: Record<string, () => null> = {
     ArrowLeft: Icon,
     ChevronDown: Icon,
     ChevronRight: Icon,
+    Circle: Icon,
     Ellipsis: Icon,
     Filter: Icon,
     Inbox: Icon,
@@ -123,14 +124,20 @@ jest.mock("lucide-react", () => {
     Pencil: Icon,
     Plus: Icon,
     RefreshCcw: Icon,
+    RefreshCw: Icon,
     RotateCcw: Icon,
     Search: Icon,
     Send: Icon,
     ShieldCheck: Icon,
     Star: Icon,
+    Trash2: Icon,
     UserRoundPlus: Icon,
     X: Icon,
   };
+  return new Proxy(named, {
+    get: (target, prop) =>
+      typeof prop === "string" ? (target[prop] ?? Icon) : Icon,
+  });
 });
 
 jest.mock("@workspace/ui/components/ui/input", () => ({
@@ -503,6 +510,21 @@ function setInputValue(input: HTMLInputElement, value: string) {
     descriptor?.set?.call(input, value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
+}
+
+async function openMailboxSearch() {
+  const trigger = container.querySelector<HTMLElement>(
+    '[data-test="mailbox-search"]',
+  );
+  expect(trigger).not.toBeNull();
+  await act(async () => {
+    trigger!.click();
+  });
+  const searchInput = container.querySelector<HTMLInputElement>(
+    'input[placeholder*="Search all messages"]',
+  );
+  expect(searchInput).not.toBeNull();
+  return searchInput!;
 }
 
 async function resetMailVaultDatabase() {
@@ -961,11 +983,6 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Encrypted hello");
     });
 
-    const searchInput = container.querySelector<HTMLInputElement>(
-      'input[placeholder*="Search all messages"]',
-    );
-    expect(searchInput).not.toBeNull();
-
     await act(async () => {
       document.body.dispatchEvent(
         new KeyboardEvent("keydown", {
@@ -977,6 +994,11 @@ describe("MailApp", () => {
       await new Promise((resolve) => requestAnimationFrame(resolve));
       await new Promise((resolve) => requestAnimationFrame(resolve));
     });
+
+    const searchInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder*="Search all messages"]',
+    );
+    expect(searchInput).not.toBeNull();
 
     await waitForExpectation(() => {
       expect(document.activeElement).toBe(searchInput);
@@ -1004,10 +1026,7 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Encrypted hello");
     });
 
-    const searchInput = container.querySelector<HTMLInputElement>(
-      'input[placeholder*="Search all messages"]',
-    );
-    expect(searchInput).not.toBeNull();
+    const searchInput = await openMailboxSearch();
 
     await act(async () => {
       setInputValue(searchInput!, "hello");
@@ -1076,10 +1095,7 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("hi me!");
     });
 
-    const searchInput = container.querySelector<HTMLInputElement>(
-      'input[placeholder*="Search all messages"]',
-    );
-    expect(searchInput).not.toBeNull();
+    const searchInput = await openMailboxSearch();
 
     await act(async () => {
       setInputValue(searchInput!, "hi me");
@@ -1114,10 +1130,7 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Encrypted hello");
     });
 
-    const searchInput = container.querySelector<HTMLInputElement>(
-      'input[placeholder*="Search all messages"]',
-    );
-    expect(searchInput).not.toBeNull();
+    const searchInput = await openMailboxSearch();
 
     await act(async () => {
       setInputValue(searchInput!, "hello");
@@ -1174,10 +1187,7 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Encrypted hello");
     });
 
-    const searchInput = container.querySelector<HTMLInputElement>(
-      'input[placeholder*="Search all messages"]',
-    );
-    expect(searchInput).not.toBeNull();
+    const searchInput = await openMailboxSearch();
 
     await act(async () => {
       setInputValue(searchInput!, "hello");
@@ -1216,10 +1226,7 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Encrypted hello");
     });
 
-    const searchInput = container.querySelector<HTMLInputElement>(
-      'input[placeholder*="Search all messages"]',
-    );
-    expect(searchInput).not.toBeNull();
+    const searchInput = await openMailboxSearch();
 
     await act(async () => {
       setInputValue(searchInput!, "enter");
@@ -1248,10 +1255,7 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Encrypted hello");
     });
 
-    const searchInput = container.querySelector<HTMLInputElement>(
-      'input[placeholder*="Search all messages"]',
-    );
-    expect(searchInput).not.toBeNull();
+    const searchInput = await openMailboxSearch();
 
     await act(async () => {
       setInputValue(searchInput!, "   ");
@@ -1278,10 +1282,7 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Encrypted hello");
     });
 
-    const searchInput = container.querySelector<HTMLInputElement>(
-      'input[placeholder*="Search all messages"]',
-    );
-    expect(searchInput).not.toBeNull();
+    const searchInput = await openMailboxSearch();
 
     await act(async () => {
       setInputValue(searchInput!, "nomatch");
@@ -1334,10 +1335,7 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Encrypted hello");
     });
 
-    const searchInput = container.querySelector<HTMLInputElement>(
-      'input[placeholder*="Search all messages"]',
-    );
-    expect(searchInput).not.toBeNull();
+    const searchInput = await openMailboxSearch();
 
     await act(async () => {
       setInputValue(searchInput!, "hello");
@@ -1360,7 +1358,9 @@ describe("MailApp", () => {
     });
 
     await waitForExpectation(() => {
-      expect(searchInput?.value).toBe("");
+      expect(
+        container.querySelector('input[placeholder*="Search all messages"]'),
+      ).toBeNull();
       expect(container.textContent).toContain("Sent item");
       expect(container.textContent).not.toContain("Encrypted hello");
     });

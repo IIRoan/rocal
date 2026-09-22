@@ -1,0 +1,344 @@
+/* Nightwatch tokens, scoped to the mail route via [data-solace]. Portals inherit from html:has(). */
+
+html:has([data-solace]),
+[data-solace] {
+  --orange-400: 255, 142, 120;
+  --orange-500: 239, 90, 60;
+  --orange-600: 199, 64, 37;
+  --red-400: 255, 143, 143;
+  --red-600: 215, 40, 40;
+  --green-400: 25, 199, 127;
+  --green-500: 0, 160, 94;
+  --pink-400: 239, 149, 194;
+  --pink-600: 175, 88, 131;
+  --yellow-400: 223, 171, 14;
+  --yellow-500: 183, 137, 0;
+  --blue-400: 74, 183, 238;
+  --blue-600: 11, 121, 175;
+  --dark-blue-400: 135, 175, 255;
+  --dark-blue-700: 13, 72, 191;
+
+  --text-primary: rgb(0, 0, 0);
+  --text-secondary: rgba(0, 0, 0, 0.56);
+  --text-tertiary: rgba(0, 0, 0, 0.44);
+  --text-disabled: rgba(0, 0, 0, 0.32);
+  --text-always-white: rgb(255, 255, 255);
+  --text-always-black: rgb(0, 0, 0);
+  --text-link: rgb(239, 90, 60);
+  --text-destructive: rgb(215, 40, 40);
+  --text-inverse: rgb(255, 255, 255);
+
+  --icon-primary: rgb(0, 0, 0);
+  --icon-secondary: rgba(0, 0, 0, 0.56);
+  --icon-tertiary: rgba(0, 0, 0, 0.44);
+  --icon-disabled: rgba(0, 0, 0, 0.32);
+  --icon-always-white: rgb(255, 255, 255);
+  --icon-always-black: rgb(0, 0, 0);
+  --icon-link: rgb(239, 90, 60);
+  --icon-destructive: rgb(215, 40, 40);
+  --icon-inverse: rgb(255, 255, 255);
+
+  --cta-primary-default: rgb(0, 0, 0);
+  --cta-primary-hover: #292929;
+  --cta-primary-active: #3d3d3d;
+  --cta-primary-disabled: rgba(0, 0, 0, 0.12);
+  --cta-secondary-default: rgb(255, 255, 255);
+  --cta-secondary-hover: rgba(0, 0, 0, 0.06);
+  --cta-secondary-active: rgba(0, 0, 0, 0.08);
+  --cta-secondary-disabled: transparent;
+  --cta-tertiary-default: transparent;
+  --cta-tertiary-hover: rgba(0, 0, 0, 0.08);
+  --cta-tertiary-active: rgba(0, 0, 0, 0.08);
+  --cta-tertiary-disabled: transparent;
+  --cta-destructive-default: transparent;
+  --cta-destructive-hover: rgba(215, 40, 40, 0.08);
+  --cta-destructive-active: rgba(215, 40, 40, 0.12);
+  --cta-destructive-disabled: transparent;
+
+  --border-primary: rgba(0, 0, 0, 0.12);
+  --border-secondary: rgba(0, 0, 0, 0.08);
+  --border-tertiary: rgba(0, 0, 0, 0.04);
+  --border-hover: rgba(0, 0, 0, 0.48);
+  --border-active: rgb(0, 0, 0);
+  --border-destructive: rgba(215, 40, 40, 0.12);
+
+  --bg-main-container: #fafafa;
+  --bg-sidepanel: #f5f5f5;
+  --bg-l1-solid: #fafafa;
+  --bg-l2-solid: #ffffff;
+  --bg-l3-solid: #ffffff;
+  --bg-emphasis: #292929;
+  --bg-scrim: rgba(255, 255, 255, 0.8);
+  --bg-cell-hover: rgba(0, 0, 0, 0.06);
+  --bg-cell-active: rgba(0, 0, 0, 0.08);
+  --bg-cell-unread: #ffffff;
+  --bg-field-default: rgba(0, 0, 0, 0.06);
+  --bg-overlay-primary: rgba(0, 0, 0, 0.1);
+  --bg-overlay-secondary: rgba(0, 0, 0, 0.08);
+  --bg-overlay-tertiary: rgba(0, 0, 0, 0.04);
+  --bg-overlay-destructive: rgba(255, 143, 143, 0.24);
+
+  --accent-orange-primary: rgb(199, 64, 37);
+  --accent-orange-secondary: rgba(255, 142, 120, 0.36);
+  --accent-green-primary: rgb(0, 160, 94);
+  --accent-green-secondary: rgba(25, 199, 127, 0.28);
+  --accent-pink-primary: rgb(175, 88, 131);
+  --accent-pink-secondary: rgba(239, 149, 194, 0.36);
+  --accent-yellow-primary: rgb(183, 137, 0);
+  --accent-yellow-secondary: rgba(223, 171, 14, 0.48);
+  --accent-blue-primary: rgb(11, 121, 175);
+  --accent-blue-secondary: rgba(74, 183, 238, 0.36);
+  --accent-red-primary: rgb(215, 40, 40);
+  --accent-red-secondary: rgba(255, 143, 143, 0.36);
+  --accent-dark-blue-primary: rgb(13, 72, 191);
+  --accent-dark-blue-secondary: rgba(135, 175, 255, 0.36);
+
+  --shadow-l1: 0px 1px 3px rgba(0, 0, 0, 0.1), 0px 0px 2px rgba(0, 0, 0, 0.06);
+  --shadow-l2: 0px 10px 15px -3px rgba(0, 0, 0, 0.1), 0px 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-l3: 0px 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-primary-action: var(--shadow-l1);
+  --shadow-primary-action-hover: 0px 3px 6px rgba(0, 0, 0, 0.24);
+
+  --background: var(--bg-main-container);
+  --foreground: var(--text-primary);
+  --card: var(--bg-l2-solid);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-l2-solid);
+  --popover-foreground: var(--text-primary);
+  --muted: var(--bg-overlay-tertiary);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--bg-overlay-tertiary);
+  --accent-foreground: var(--text-primary);
+  --border: var(--border-secondary);
+  --input: var(--border-secondary);
+  --sidebar: var(--bg-sidepanel);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-accent: var(--bg-overlay-tertiary);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border-tertiary);
+  --radius: 8px;
+
+  background: var(--bg-main-container);
+  color: var(--text-primary);
+}
+
+.dark html:has([data-solace]),
+html.dark:has([data-solace]),
+.dark [data-solace] {
+  --text-primary: rgb(255, 255, 255);
+  --text-secondary: rgba(255, 255, 255, 0.54);
+  --text-tertiary: rgba(255, 255, 255, 0.42);
+  --text-disabled: rgba(255, 255, 255, 0.28);
+  --text-link: rgb(255, 142, 120);
+  --text-destructive: rgb(255, 143, 143);
+  --text-inverse: rgb(0, 0, 0);
+
+  --icon-primary: rgb(255, 255, 255);
+  --icon-secondary: rgba(255, 255, 255, 0.54);
+  --icon-tertiary: rgba(255, 255, 255, 0.42);
+  --icon-disabled: rgba(255, 255, 255, 0.28);
+  --icon-link: rgb(255, 142, 120);
+  --icon-destructive: rgb(255, 143, 143);
+  --icon-inverse: rgb(0, 0, 0);
+
+  --cta-primary-default: rgb(255, 255, 255);
+  --cta-primary-hover: #e6e6e6;
+  --cta-primary-active: #d6d6d6;
+  --cta-primary-disabled: rgba(255, 255, 255, 0.12);
+  --cta-secondary-default: rgba(255, 255, 255, 0.04);
+  --cta-secondary-hover: rgba(255, 255, 255, 0.08);
+  --cta-secondary-active: rgba(255, 255, 255, 0.12);
+  --cta-tertiary-hover: rgba(255, 255, 255, 0.08);
+  --cta-tertiary-active: rgba(255, 255, 255, 0.08);
+  --cta-destructive-default: rgba(255, 255, 255, 0.04);
+  --cta-destructive-hover: rgba(255, 143, 143, 0.12);
+  --cta-destructive-active: rgba(255, 143, 143, 0.12);
+
+  --border-primary: rgba(255, 255, 255, 0.12);
+  --border-secondary: rgba(255, 255, 255, 0.08);
+  --border-tertiary: rgba(255, 255, 255, 0.04);
+  --border-hover: rgba(255, 255, 255, 0.48);
+  --border-active: rgb(255, 255, 255);
+  --border-destructive: rgba(255, 143, 143, 0.12);
+
+  --bg-main-container: #1f1f1f;
+  --bg-sidepanel: #1a1a1a;
+  --bg-l1-solid: #1a1a1a;
+  --bg-l2-solid: #1f1f1f;
+  --bg-l3-solid: #242424;
+  --bg-emphasis: #303030;
+  --bg-scrim: rgba(0, 0, 0, 0.42);
+  --bg-cell-hover: rgba(255, 255, 255, 0.06);
+  --bg-cell-active: rgba(255, 255, 255, 0.08);
+  --bg-cell-unread: #242424;
+  --bg-field-default: rgba(255, 255, 255, 0.08);
+  --bg-overlay-primary: rgba(255, 255, 255, 0.1);
+  --bg-overlay-secondary: rgba(255, 255, 255, 0.08);
+  --bg-overlay-tertiary: rgba(255, 255, 255, 0.04);
+  --bg-overlay-destructive: rgba(255, 143, 143, 0.24);
+
+  --accent-orange-primary: rgba(255, 142, 120, 0.88);
+  --accent-green-primary: rgba(25, 199, 127, 0.88);
+  --accent-pink-primary: rgba(239, 149, 194, 0.88);
+  --accent-yellow-primary: rgba(223, 171, 14, 0.88);
+  --accent-blue-primary: rgba(74, 183, 238, 0.88);
+  --accent-red-primary: rgba(255, 143, 143, 0.88);
+  --accent-dark-blue-primary: rgba(135, 175, 255, 0.88);
+
+  --shadow-l1: 0px 1px 3px rgba(0, 0, 0, 0.3), 0px 1px 2px rgba(0, 0, 0, 0.26);
+  --shadow-l2: 0px 10px 15px -3px rgba(0, 0, 0, 0.3), 0px 4px 6px -2px rgba(0, 0, 0, 0.25);
+  --shadow-l3: 0px 25px 50px -12px rgba(0, 0, 0, 0.55);
+  --shadow-primary-action: 1px 2px 0px rgba(255, 255, 255, 0.07), inset 1px 1px 0px rgba(255, 255, 255, 0.07);
+
+  --background: var(--bg-main-container);
+  --foreground: var(--text-primary);
+  --card: var(--bg-l2-solid);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-l2-solid);
+  --popover-foreground: var(--text-primary);
+  --muted: var(--bg-overlay-tertiary);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--bg-overlay-tertiary);
+  --accent-foreground: var(--text-primary);
+  --border: var(--border-secondary);
+  --input: var(--border-secondary);
+  --sidebar: var(--bg-sidepanel);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-accent: var(--bg-overlay-tertiary);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border-tertiary);
+}
+
+/* Fallback Nightwatch chrome for shared shadcn menus in mail (e.g. NavUser); mail menus use solace/dropdown. */
+html:has([data-solace]) :is(
+    [data-slot="dropdown-menu-content"],
+    [data-slot="dropdown-menu-sub-content"],
+    [data-slot="context-menu-content"],
+    [data-slot="context-menu-sub-content"],
+    [data-slot="select-content"],
+    [data-slot="popover-content"]
+  ) {
+  background: var(--bg-l3-solid);
+  border-color: var(--border-secondary);
+  border-radius: 12px;
+  box-shadow: var(--shadow-l2);
+}
+
+html:has([data-solace]) :is(
+    [data-slot="dropdown-menu-content"],
+    [data-slot="dropdown-menu-sub-content"],
+    [data-slot="context-menu-content"],
+    [data-slot="context-menu-sub-content"]
+  ) {
+  padding: 4px;
+}
+
+html:has([data-solace]) :is(
+    [data-slot="dropdown-menu-item"],
+    [data-slot="dropdown-menu-checkbox-item"],
+    [data-slot="dropdown-menu-radio-item"],
+    [data-slot="dropdown-menu-sub-trigger"],
+    [data-slot="context-menu-item"],
+    [data-slot="context-menu-checkbox-item"],
+    [data-slot="context-menu-radio-item"],
+    [data-slot="context-menu-sub-trigger"],
+    [data-slot="select-item"]
+  ) {
+  min-height: 32px;
+  gap: 8px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 380;
+}
+
+html:has([data-solace]) :is(
+    [data-slot$="-item"],
+    [data-slot$="-sub-trigger"]
+  ):is([data-slot^="dropdown-menu"], [data-slot^="context-menu"], [data-slot^="select"]):not(
+    [data-variant="destructive"],
+    [class*="text-destructive"]
+  ) {
+  color: var(--text-primary);
+}
+
+html:has([data-solace]) :is(
+    [data-slot$="-item"],
+    [data-slot$="-sub-trigger"]
+  ):is([data-slot^="dropdown-menu"], [data-slot^="context-menu"], [data-slot^="select"]):is(
+    [data-highlighted],
+    [data-state="open"]
+  ) {
+  background: var(--bg-cell-hover);
+}
+
+html:has([data-solace]) :is(
+    [data-slot="dropdown-menu-separator"],
+    [data-slot="context-menu-separator"],
+    [data-slot="select-separator"]
+  ) {
+  margin: 4px -4px;
+  background: var(--border-tertiary);
+}
+
+html:has([data-solace]) :is(
+    [data-slot="dropdown-menu-label"],
+    [data-slot="context-menu-label"],
+    [data-slot="select-label"]
+  ) {
+  font-size: 13px;
+  font-weight: 380;
+  color: var(--text-tertiary);
+}
+
+html:has([data-solace]) :is(
+    [data-slot="dropdown-menu-shortcut"],
+    [data-slot="context-menu-shortcut"]
+  ) {
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-disabled);
+}
+
+/* Skiff sidebar rows; unlayered so they win over shadcn sidebar utilities. */
+[data-solace] [data-sidebar="menu-button"] {
+  height: 32px;
+  gap: 8px;
+  padding-left: 8px;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 380;
+  color: var(--text-secondary);
+  background: transparent;
+  transition: background-color 120ms, color 120ms;
+}
+
+[data-solace] [data-sidebar="menu-button"] > svg {
+  color: var(--icon-secondary);
+}
+
+[data-solace] [data-sidebar="menu-button"]:hover {
+  background: var(--bg-cell-hover);
+  color: var(--text-primary);
+}
+
+[data-solace] [data-sidebar="menu-button"][data-active="true"] {
+  background: var(--bg-cell-active);
+  color: var(--text-primary);
+  font-weight: 380;
+}
+
+[data-solace] [data-sidebar="menu-button"]:is(:hover, [data-active="true"]) > svg {
+  color: var(--icon-primary);
+}
+
+[data-solace] [data-sidebar-heading] {
+  display: flex;
+  height: 28px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 0 8px;
+  font-size: 13px;
+  font-weight: 470;
+  color: var(--text-secondary);
+}

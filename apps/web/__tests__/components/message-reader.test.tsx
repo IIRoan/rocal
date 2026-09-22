@@ -173,7 +173,7 @@ jest.mock("lucide-react", () => {
   const Icon = ({ "aria-hidden": _h, ...props }: any) => (
     <svg data-testid={props["data-testid"]} {...props} />
   );
-  return {
+  const icons: Record<string, typeof Icon> = {
     Archive: Icon,
     Bell: Icon,
     ChevronDown: Icon,
@@ -210,6 +210,10 @@ jest.mock("lucide-react", () => {
     Trash2: Icon,
     X: Icon,
   };
+  return new Proxy(icons, {
+    get: (target, prop) =>
+      typeof prop === "string" ? (target[prop] ?? Icon) : Icon,
+  });
 });
 
 jest.mock("../../components/mail/mail-avatar", () => ({
@@ -388,7 +392,7 @@ function render(props: Partial<MessageReaderProps> = {}) {
 describe("MessageReader — empty state", () => {
   it("shows placeholder when no message is selected", () => {
     render({ message: null });
-    expect(container.textContent).toContain("Select a message to read");
+    expect(container.textContent).toContain("Select a conversation");
   });
 });
 
@@ -1026,7 +1030,7 @@ describe("MessageReader — close button", () => {
 describe("MessageReader — archive button", () => {
   it("renders Archive button when onArchive is provided", () => {
     render({ onArchive: jest.fn() });
-    const btn = container.querySelector("[aria-label='Archive message']");
+    const btn = container.querySelector("[aria-label='Archive']");
     expect(btn).not.toBeNull();
   });
 
@@ -1034,7 +1038,7 @@ describe("MessageReader — archive button", () => {
     const onArchive = jest.fn();
     render({ onArchive });
     const btn = container.querySelector(
-      "[aria-label='Archive message']",
+      "[aria-label='Archive']",
     ) as HTMLButtonElement;
     act(() => {
       btn.click();
@@ -1045,7 +1049,7 @@ describe("MessageReader — archive button", () => {
   it("does not render Archive button when onArchive is not provided", () => {
     render({ onArchive: undefined });
     expect(
-      container.querySelector("[aria-label='Archive message']"),
+      container.querySelector("[aria-label='Archive']"),
     ).toBeNull();
   });
 });
@@ -1091,6 +1095,24 @@ describe("MessageReader — delete dropdown", () => {
   });
 });
 
+function openMoreActions() {
+  const trigger = container.querySelector(
+    '[aria-label="More actions"]',
+  ) as HTMLElement | null;
+  expect(trigger).not.toBeNull();
+  act(() => {
+    trigger!.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
+  });
+}
+
+function findMenuItem(text: string) {
+  return Array.from(
+    document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+  ).find((item) => item.textContent?.includes(text));
+}
+
 describe("MessageReader — more actions dropdown", () => {
   it("renders More actions button", () => {
     render();
@@ -1114,14 +1136,11 @@ describe("MessageReader — more actions dropdown", () => {
   it("calls onMarkAsUnread when Mark as unread is clicked", () => {
     const onMarkAsUnread = jest.fn();
     render({ onMarkAsUnread });
-    const buttons = Array.from(container.querySelectorAll("button")).filter(
-      (b) =>
-        b.textContent?.includes("Unread") ||
-        b.textContent?.includes("Mark as unread"),
-    );
-    expect(buttons.length).toBeGreaterThan(0);
+    openMoreActions();
+    const item = findMenuItem("Mark as unread");
+    expect(item).toBeDefined();
     act(() => {
-      buttons[0].click();
+      item!.click();
     });
     expect(onMarkAsUnread).toHaveBeenCalledTimes(1);
   });
@@ -1134,22 +1153,13 @@ describe("MessageReader — more actions dropdown", () => {
       ],
       currentMailboxId: "inbox",
     });
-    // Open the "More actions" popover
-    const moreBtn = container.querySelector(
-      '[aria-label="More actions"]',
-    ) as HTMLElement | null;
-    expect(moreBtn).not.toBeNull();
+    openMoreActions();
+    const moveTo = findMenuItem("Move to");
+    expect(moveTo).toBeDefined();
     act(() => {
-      moreBtn!.click();
-    });
-
-    // Expand the "Move to" section
-    const moveToBtn = Array.from(document.body.querySelectorAll("button")).find(
-      (b) => b.textContent?.includes("Move to"),
-    ) as HTMLElement | undefined;
-    expect(moveToBtn).toBeDefined();
-    act(() => {
-      moveToBtn!.click();
+      moveTo!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+      );
     });
 
     expect(document.body.textContent).toContain("Archive");
@@ -1301,10 +1311,8 @@ describe("MessageReader — attachments", () => {
 describe("MessageReader — reply bar", () => {
   /** Helper: expand the reply bar by clicking the collapsed pill. */
   function expandReplyBar() {
-    // Find the pill button (always in DOM in new implementation)
-    // The pill button has aria-label starting with "Reply to"
     const pillBtn = container.querySelector(
-      "button[aria-label*='Reply to']",
+      "button[data-test='message-reply']",
     ) as HTMLButtonElement | null;
     if (pillBtn) {
       act(() => {
@@ -1313,10 +1321,9 @@ describe("MessageReader — reply bar", () => {
     }
   }
 
-  it("renders collapsed reply pill when a message is selected", () => {
+  it("renders collapsed reply button when a message is selected", () => {
     render();
-    // Pill is always in DOM — find by aria-label
-    const pillBtn = container.querySelector("button[aria-label*='Reply to']");
+    const pillBtn = container.querySelector("button[data-test='message-reply']");
     expect(pillBtn).not.toBeNull();
   });
 
@@ -1447,6 +1454,7 @@ describe("MessageReader — reply bar", () => {
         from: [{ name: "Carol Example", email: "carol@example.com" }],
       } as any,
     });
+    expandReplyBar();
 
     const nextTextarea = container.querySelector(
       "textarea[aria-label*='Reply to Carol Example']",
@@ -1550,7 +1558,8 @@ describe("MessageReader — untrash / restore", () => {
       currentMailboxId: "trash",
       onUntrash: jest.fn(),
     });
-    expect(container.textContent).toContain("Restore to inbox");
+    openMoreActions();
+    expect(findMenuItem("Restore to inbox")).toBeDefined();
   });
 
   it("shows 'Not spam' in dropdown when in spam folder", () => {
@@ -1559,7 +1568,8 @@ describe("MessageReader — untrash / restore", () => {
       currentMailboxId: "junk",
       onUntrash: jest.fn(),
     });
-    expect(container.textContent).toContain("Not spam");
+    openMoreActions();
+    expect(findMenuItem("Not spam")).toBeDefined();
   });
 
   it("calls onUntrash when 'Restore to inbox' is clicked", () => {
@@ -1569,12 +1579,11 @@ describe("MessageReader — untrash / restore", () => {
       currentMailboxId: "trash",
       onUntrash,
     });
-    const btn = Array.from(container.querySelectorAll("button")).find((b) =>
-      b.textContent?.includes("Restore to inbox"),
-    ) as HTMLButtonElement;
+    openMoreActions();
+    const btn = findMenuItem("Restore to inbox");
     expect(btn).not.toBeUndefined();
     act(() => {
-      btn.click();
+      btn!.click();
     });
     expect(onUntrash).toHaveBeenCalledTimes(1);
   });

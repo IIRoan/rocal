@@ -52,11 +52,11 @@ function RecipientSuggestionsList({
     <div
       id={listboxId}
       aria-labelledby={headingId}
-      className="max-h-64 overflow-y-auto overscroll-contain py-1"
+      className="max-h-64 overflow-y-auto overscroll-contain"
     >
       <div
         id={headingId}
-        className="px-2.5 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+        className="px-2 pt-1.5 pb-1 text-[13px] font-[470] text-[var(--text-tertiary)]"
       >
         {heading}
       </div>
@@ -72,8 +72,10 @@ function RecipientSuggestionsList({
               onSelect(entry);
             }}
             className={cn(
-              "flex w-full items-center gap-2.5 px-2.5 py-2 text-left text-sm transition-colors",
-              index === highlightedIndex ? "bg-accent/60" : "hover:bg-accent/40",
+              "flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors",
+              index === highlightedIndex
+                ? "bg-[var(--bg-cell-hover)]"
+                : "hover:bg-[var(--bg-cell-hover)]",
             )}
           >
             <SenderAvatar
@@ -82,11 +84,11 @@ function RecipientSuggestionsList({
               className="size-7 shrink-0"
             />
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium text-foreground">
+              <span className="block truncate text-[15px] leading-[130%] text-[var(--text-primary)]">
                 {label}
               </span>
               {entry.displayName ? (
-                <span className="block truncate text-xs text-muted-foreground">
+                <span className="block truncate text-[13px] leading-[130%] text-[var(--text-secondary)]">
                   {entry.email}
                 </span>
               ) : null}
@@ -316,7 +318,7 @@ export function RecipientSuggestInput({
       </PopoverAnchor>
 
       <PopoverContent
-        className="w-[var(--radix-popover-anchor-width)] min-w-[16rem] max-w-[min(24rem,calc(100dvw-2rem))] p-0 border-border/60 shadow-lg"
+        className="w-[var(--radix-popover-anchor-width)] min-w-[16rem] max-w-[min(24rem,calc(100dvw-2rem))] overflow-hidden rounded-xl border-[var(--border-secondary)] bg-[var(--bg-l3-solid)] p-1 shadow-[var(--shadow-l2)]"
         align="start"
         sideOffset={4}
         onOpenAutoFocus={(event) => event.preventDefault()}

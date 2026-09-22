@@ -1,9 +1,8 @@
-import { ArrowLeft } from "lucide-react";
-
 import { AccountDangerZone } from "./account-settings-danger-zone";
 import { AccountMoreLinks } from "./account-settings-more-links";
 import { AccountProfileSection } from "./account-settings-profile-section";
 import { AccountSecuritySection } from "./account-settings-security-section";
+import { PaletteView } from "./palette-ui";
 
 interface ChangePasswordValues {
   currentPassword: string;
@@ -78,59 +77,42 @@ export function AccountSettings({
   const displayEmail = accountEmail?.trim() || null;
 
   return (
-    <div
-      className="flex flex-col"
-      style={{ minHeight: "320px", maxHeight: "calc(100dvh - 200px)" }}
-    >
-      <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border/50 px-4">
-        <button
-          type="button"
-          onClick={goBack}
-          className="rounded p-1 transition-colors hover:bg-muted/50"
-          aria-label="Back"
-        >
-          <ArrowLeft className="size-4 text-muted-foreground" />
-        </button>
-        <span className="text-sm font-medium">Account</span>
-      </div>
+    <PaletteView title="Account" onBack={goBack}>
+      <AccountProfileSection
+        displayName={displayName}
+        displayEmail={displayEmail}
+        accountImage={accountImage}
+        sessionLoading={sessionLoading}
+        updatingProfile={updatingProfile}
+        handleUpdateProfile={handleUpdateProfile}
+      />
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <AccountProfileSection
-          displayName={displayName}
-          displayEmail={displayEmail}
-          accountImage={accountImage}
-          sessionLoading={sessionLoading}
-          updatingProfile={updatingProfile}
-          handleUpdateProfile={handleUpdateProfile}
-        />
-
-        {!onOpenSecurity ? (
-          <AccountSecuritySection
-            isBusy={isBusy}
-            hasPasswordAccount={hasPasswordAccount}
-            hasOAuthAccount={hasOAuthAccount}
-            changingPassword={changingPassword}
-            settingPassword={settingPassword}
-            resettingEncryptionPassword={resettingEncryptionPassword}
-            handleChangePassword={handleChangePassword}
-            handleSetPassword={handleSetPassword}
-            handleResetEncryptionPassword={handleResetEncryptionPassword}
-          />
-        ) : null}
-
-        <AccountMoreLinks
+      {!onOpenSecurity ? (
+        <AccountSecuritySection
           isBusy={isBusy}
-          onOpenSecurity={onOpenSecurity}
-          onOpenInvites={onOpenInvites}
+          hasPasswordAccount={hasPasswordAccount}
+          hasOAuthAccount={hasOAuthAccount}
+          changingPassword={changingPassword}
+          settingPassword={settingPassword}
+          resettingEncryptionPassword={resettingEncryptionPassword}
+          handleChangePassword={handleChangePassword}
+          handleSetPassword={handleSetPassword}
+          handleResetEncryptionPassword={handleResetEncryptionPassword}
         />
+      ) : null}
 
-        <AccountDangerZone
-          isBusy={isBusy}
-          deletingAccount={deletingAccount}
-          handleReset={handleReset}
-          handleDeleteAccount={handleDeleteAccount}
-        />
-      </div>
-    </div>
+      <AccountMoreLinks
+        isBusy={isBusy}
+        onOpenSecurity={onOpenSecurity}
+        onOpenInvites={onOpenInvites}
+      />
+
+      <AccountDangerZone
+        isBusy={isBusy}
+        deletingAccount={deletingAccount}
+        handleReset={handleReset}
+        handleDeleteAccount={handleDeleteAccount}
+      />
+    </PaletteView>
   );
 }

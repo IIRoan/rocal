@@ -11,14 +11,12 @@ import { cn } from "@workspace/ui/lib/utils";
 
 type EventReminderBodyShellProps = {
   isDark?: boolean;
-  attachedAbove?: boolean;
   className?: string;
   children: ReactNode;
 } & ComponentPropsWithoutRef<"div">;
 
 function EventReminderBodyShell({
   isDark = false,
-  attachedAbove = false,
   className,
   children,
   ...props
@@ -27,10 +25,9 @@ function EventReminderBodyShell({
     <div
       {...props}
       className={cn(
-        "mx-4 mb-2 flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/50",
+        "flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--border-secondary)]",
         "min-h-[max(var(--event-reminder-min-fill),calc(min(100cqw,var(--event-reminder-max-width))*var(--event-reminder-height-ratio)))]",
         isDark ? "bg-[#1a1a1a] [color-scheme:dark]" : "bg-white [color-scheme:light]",
-        attachedAbove && "rounded-t-none border-t-0",
         className,
       )}
       style={{
@@ -52,21 +49,18 @@ type EventReminderMessageBodyProps = {
   reminder: EventReminderMailView;
   className?: string;
   isDark?: boolean;
-  attachedAbove?: boolean;
 };
 
 export function EventReminderMessageBody({
   reminder,
   className,
   isDark = false,
-  attachedAbove = false,
 }: EventReminderMessageBodyProps) {
   const eventUrl = `/calendar?eventId=${encodeURIComponent(reminder.eventId)}`;
 
   return (
     <EventReminderBodyShell
       isDark={isDark}
-      attachedAbove={attachedAbove}
       className={className}
     >
       <Link href="/calendar" className="mb-7 inline-block outline-none">
@@ -206,13 +200,11 @@ export function EventReminderMessageBody({
 
 type EventReminderMessageBodyLoadingProps = {
   isDark?: boolean;
-  attachedAbove?: boolean;
   className?: string;
 };
 
 export function EventReminderMessageBodyLoading({
   isDark = false,
-  attachedAbove = false,
   className,
 }: EventReminderMessageBodyLoadingProps) {
   const skeleton = isDark ? "bg-white/10" : "bg-black/[0.06]";
@@ -220,7 +212,6 @@ export function EventReminderMessageBodyLoading({
   return (
     <EventReminderBodyShell
       isDark={isDark}
-      attachedAbove={attachedAbove}
       className={className}
       aria-busy
       aria-label="Loading event reminder"

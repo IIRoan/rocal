@@ -1,25 +1,34 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import {
-  ArrowLeft,
-  Plus,
-  Inbox,
-  Send,
-  FileText,
-  Trash2,
-  OctagonAlert,
-  Folder,
   ChevronRight,
-  Loader2,
+  Eye,
+  EyeOff,
+  FileText,
+  Folder,
+  Inbox,
+  OctagonAlert,
+  Plus,
+  Send,
+  Trash2,
 } from "lucide-react";
+import { cn } from "@workspace/ui/lib/utils";
 import type { JmapMailbox } from "@/lib/mail/types";
 import { getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
+import { useHiddenMailboxIds } from "@/hooks/use-hidden-mailbox-ids";
+import {
+  PaletteButton,
+  PaletteField,
+  PaletteFormActions,
+  PaletteIconBox,
+  PaletteNavRow,
+  PaletteSection,
+  PaletteView,
+} from "../command-palette/palette-ui";
+import { PALETTE_INPUT_CLASS } from "../command-palette/palette-styles";
 
-const ROLE_ICONS: Record<
-  string,
-  React.ComponentType<{ className?: string }>
-> = {
+const ROLE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   inbox: Inbox,
   sent: Send,
   drafts: FileText,
@@ -28,14 +37,176 @@ const ROLE_ICONS: Record<
   spam: OctagonAlert,
 };
 
-const PROTECTED_ROLES = new Set([
-  "inbox",
-  "sent",
-  "drafts",
-  "trash",
-  "junk",
-  "spam",
-]);
+const PROTECTED_ROLES = new Set(["inbox", "sent", "drafts", "trash", "junk", "spam"]);
+
+function VisibilityToggle({
+  name,
+  isHidden,
+  onToggle,
+}: {
+  name: string;
+  isHidden: boolean;
+  onToggle: () => void;
+}) {
+  const Icon = isHidden ? EyeOff : Eye;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={!isHidden}
+      aria-label={isHidden ? `Show ${name} in sidebar` : `Hide ${name} from sidebar`}
+      title={isHidden ? "Show in sidebar" : "Hide from sidebar"}
+      className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
+    >
+      <Icon className="size-4" />
+    </button>
+  );
+}
+
+function MailboxRow({
+  icon: Icon,
+  name,
+  isHidden,
+  onToggleHidden,
+  onOpen,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  name: string;
+  isHidden: boolean;
+  onToggleHidden?: () => void;
+  onOpen?: () => void;
+}) {
+  const content = (
+    <>
+      <PaletteIconBox>
+        <Icon className="size-4" />
+      </PaletteIconBox>
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate text-[15px] leading-[130%]",
+          isHidden ? "text-muted-foreground" : "text-foreground",
+        )}
+      >
+        {name}
+      </span>
+      {onOpen ? (
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" />
+      ) : null}
+    </>
+  );
+  const bodyClass =
+    "flex min-h-11 min-w-0 flex-1 items-center gap-3 py-1.5 pl-2 text-left sm:min-h-9";
+
+  return (
+    <div className="flex items-center gap-1 rounded-lg pr-1 transition-colors hover:bg-muted">
+      {onOpen ? (
+        <button type="button" onClick={onOpen} className={cn(bodyClass, "cursor-pointer outline-none")}>
+          {content}
+        </button>
+      ) : (
+        <div className={bodyClass}>{content}</div>
+      )}
+      {onToggleHidden ? (
+        <VisibilityToggle name={name} isHidden={isHidden} onToggle={onToggleHidden} />
+      ) : (
+        <span className="size-7 shrink-0" />
+      )}
+    </div>
+  );
+}
+
+function MailboxForm({
+  title,
+  initialName,
+  submitLabel,
+  onBack,
+  onSubmit,
+  onDelete,
+}: {
+  title: string;
+  initialName: string;
+  submitLabel: string;
+  onBack: () => void;
+  onSubmit?: (name: string) => Promise<void>;
+  onDelete?: () => Promise<void>;
+}) {
+  const [name, setName] = useState(initialName);
+  const [status, setStatus] = useState<"idle" | "saving" | "failed">("idle");
+  const saving = status === "saving";
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const trimmed = name.trim();
+  const canSave = Boolean(onSubmit) && trimmed.length > 0 && trimmed !== initialName && !saving;
+
+  const run = (action: () => Promise<void>) => {
+    setStatus("saving");
+    return action()
+      .then(() => {
+        setStatus("idle");
+        onBack();
+      })
+      .catch(() => setStatus("failed"));
+  };
+
+  const submit = () => {
+    if (canSave && onSubmit) void run(() => onSubmit(trimmed));
+  };
+
+  return (
+    <PaletteView title={title} onBack={onBack}>
+      {onSubmit ? (
+        <PaletteField label="Name" htmlFor="mailbox-name">
+          <input
+            id="mailbox-name"
+            type="text"
+            value={name}
+            autoComplete="off"
+            placeholder="Mailbox name"
+            aria-label="Mailbox name"
+            disabled={saving}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            className={PALETTE_INPUT_CLASS}
+          />
+        </PaletteField>
+      ) : null}
+      {confirmDelete ? (
+        <p className="px-2 pt-2 text-[13px] leading-[130%] text-destructive">
+          All messages inside {initialName} will be permanently removed.
+        </p>
+      ) : null}
+      {status === "failed" ? (
+        <p className="px-2 pt-2 text-[13px] leading-[130%] text-destructive" role="alert">
+          Something went wrong. Please try again.
+        </p>
+      ) : null}
+      <PaletteFormActions>
+        {onDelete ? (
+          <PaletteButton
+            variant={confirmDelete ? "destructive" : "ghost"}
+            className="mr-auto"
+            disabled={saving}
+            onClick={() => (confirmDelete ? void run(onDelete) : setConfirmDelete(true))}
+          >
+            {confirmDelete ? "Confirm delete" : "Delete mailbox"}
+          </PaletteButton>
+        ) : null}
+        <PaletteButton variant="ghost" onClick={onBack} disabled={saving}>
+          Cancel
+        </PaletteButton>
+        {onSubmit ? (
+          <PaletteButton variant="primary" loading={saving} disabled={!canSave} onClick={submit}>
+            {submitLabel}
+          </PaletteButton>
+        ) : null}
+      </PaletteFormActions>
+    </PaletteView>
+  );
+}
 
 interface MailboxManagerProps {
   mailboxes: JmapMailbox[];
@@ -56,334 +227,89 @@ export function MailboxManager({
   onDeleteMailbox,
   onRenameMailbox,
 }: MailboxManagerProps) {
-  const [editingMailbox, setEditingMailbox] = useState<JmapMailbox | null>(
-    null,
-  );
-  const [newName, setNewName] = useState("");
-  const [createName, setCreateName] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const createInputRef = useRef<HTMLInputElement>(null);
-  const editInputRef = useRef<HTMLInputElement>(null);
-
-  const systemMailboxes = mailboxes.filter((m) =>
-    PROTECTED_ROLES.has(m.role?.toLowerCase() ?? ""),
-  );
-  const customMailboxes = mailboxes.filter(
-    (m) => !PROTECTED_ROLES.has(m.role?.toLowerCase() ?? ""),
-  );
-
-  if (currentView === "mailboxes") {
-    return (
-      <div className="flex flex-col">
-        <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-          <button
-            type="button"
-            onClick={onBack}
-            className="p-1 rounded hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="size-4 text-muted-foreground" />
-          </button>
-          <span className="text-sm font-medium">Mailboxes</span>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          <div className="p-1 mb-1">
-            <button
-              type="button"
-              onClick={() => {
-                setCreateName("");
-                onNavigateTo("mailbox-create");
-              }}
-              className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors"
-            >
-              <div className="flex items-center justify-center size-6 shrink-0">
-                <Plus className="size-4 text-primary" />
-              </div>
-              <span className="text-sm text-primary font-medium flex-1">
-                Create New Mailbox
-              </span>
-            </button>
-          </div>
-
-          {systemMailboxes.length > 0 && (
-            <>
-              <div className="px-1 pb-1 pt-2 border-t border-border/40">
-                <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
-                  System
-                </span>
-              </div>
-              <div className="p-1">
-                {systemMailboxes.map((mailbox) => {
-                  const role = mailbox.role?.toLowerCase() ?? "";
-                  const Icon = ROLE_ICONS[role] ?? Folder;
-                  return (
-                    <div
-                      key={mailbox.id}
-                      className="flex items-center gap-3 p-2 w-full rounded-md text-left opacity-60 cursor-default"
-                    >
-                      <div className="flex items-center justify-center size-6 shrink-0">
-                        <Icon className="size-4 text-muted-foreground" />
-                      </div>
-                      <span className="text-sm flex-1">{getMailboxDisplayName(mailbox)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {customMailboxes.length > 0 && (
-            <>
-              <div className="px-1 pb-1 pt-2 border-t border-border/40">
-                <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
-                  Custom
-                </span>
-              </div>
-              <div className="p-1">
-                {customMailboxes.map((mailbox) => (
-                  <button
-                    key={mailbox.id}
-                    type="button"
-                    onClick={() => {
-                      setEditingMailbox(mailbox);
-                      setNewName(mailbox.name);
-                      setConfirmDelete(false);
-                      onNavigateTo("mailbox-edit");
-                    }}
-                    className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors group"
-                  >
-                    <div className="flex items-center justify-center size-6 shrink-0">
-                      <Folder className="size-4 text-muted-foreground" />
-                    </div>
-                    <span className="text-sm flex-1">{mailbox.name}</span>
-                    <ChevronRight className="size-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const [editingMailboxId, setEditingMailboxId] = useState<string | null>(null);
+  const { hiddenIds, toggleHidden } = useHiddenMailboxIds();
+  const editingMailbox = mailboxes.find((m) => m.id === editingMailboxId);
 
   if (currentView === "mailbox-create") {
-    const canSave = createName.trim().length > 0 && !saving;
     return (
-      <div className="flex flex-col">
-        <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-          <button
-            type="button"
-            onClick={onBack}
-            className="p-1 rounded hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="size-4 text-muted-foreground" />
-          </button>
-          <span className="text-sm font-medium">New Mailbox</span>
-        </div>
-        <div className="flex-1 overflow-y-auto py-3 px-4">
-          <div className="mb-3">
-            <label
-              htmlFor="create-mailbox-name"
-              className="text-xs font-medium text-muted-foreground block mb-1.5"
-            >
-              Name
-            </label>
-            <input
-              id="create-mailbox-name"
-              ref={createInputRef}
-              type="text"
-              value={createName}
-              onChange={(e) => setCreateName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && canSave) {
-                  e.preventDefault();
-                  void (async () => {
-                    setSaving(true);
-                    try {
-                      await onCreateMailbox(createName.trim());
-                      setCreateName("");
-                      onBack();
-                    } finally {
-                      setSaving(false);
-                    }
-                  })();
-                }
-              }}
-              placeholder="Mailbox name"
-              className="w-full rounded-md bg-muted/50 border border-border/50 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
-            />
-          </div>
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={onBack}
-              className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={!canSave}
-              onClick={async () => {
-                setSaving(true);
-                try {
-                  await onCreateMailbox(createName.trim());
-                  setCreateName("");
-                  onBack();
-                } finally {
-                  setSaving(false);
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
-            >
-              {saving && <Loader2 className="size-3.5 animate-spin" />}
-              Create
-            </button>
-          </div>
-        </div>
-      </div>
+      <MailboxForm
+        title="New mailbox"
+        initialName=""
+        submitLabel="Create"
+        onBack={onBack}
+        onSubmit={onCreateMailbox}
+      />
     );
   }
 
   if (currentView === "mailbox-edit" && editingMailbox) {
-    const canSave =
-      newName.trim().length > 0 &&
-      newName.trim() !== editingMailbox.name &&
-      !saving;
     return (
-      <div className="flex flex-col">
-        <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              setConfirmDelete(false);
-              onBack();
-            }}
-            className="p-1 rounded hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="size-4 text-muted-foreground" />
-          </button>
-          <span className="text-sm font-medium truncate">
-            {editingMailbox.name}
-          </span>
-        </div>
-        <div className="flex-1 overflow-y-auto py-3 px-4">
-          {onRenameMailbox && (
-            <div className="mb-3">
-              <label
-                htmlFor="edit-mailbox-name"
-                className="text-xs font-medium text-muted-foreground block mb-1.5"
-              >
-                Name
-              </label>
-              <input
-                id="edit-mailbox-name"
-                ref={editInputRef}
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && canSave) {
-                    e.preventDefault();
-                    void (async () => {
-                      setSaving(true);
-                      try {
-                        await onRenameMailbox(
-                          editingMailbox.id,
-                          newName.trim(),
-                        );
-                        onBack();
-                      } finally {
-                        setSaving(false);
-                      }
-                    })();
-                  }
-                }}
-                className="w-full rounded-md bg-muted/50 border border-border/50 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
-              />
-            </div>
-          )}
-          {onRenameMailbox && (
-            <div className="flex items-center justify-end gap-2 mb-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmDelete(false);
-                  onBack();
-                }}
-                className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!canSave}
-                onClick={async () => {
-                  setSaving(true);
-                  try {
-                    await onRenameMailbox(editingMailbox.id, newName.trim());
-                    onBack();
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
-              >
-                {saving && <Loader2 className="size-3.5 animate-spin" />}
-                Save
-              </button>
-            </div>
-          )}
-          <div className="border-t border-border/40 pt-3">
-            {!confirmDelete ? (
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(true)}
-                className="flex items-center gap-2 px-3 py-2 w-full rounded-md text-left text-destructive hover:bg-destructive/10 focus:outline-none transition-colors text-sm"
-              >
-                <Trash2 className="size-4 shrink-0" />
-                Delete mailbox
-              </button>
-            ) : (
-              <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
-                <p className="text-sm text-destructive mb-3">
-                  Delete <strong>{editingMailbox.name}</strong>? All messages
-                  inside will be permanently removed.
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(false)}
-                    className="flex-1 px-3 py-1.5 text-sm text-muted-foreground rounded-md border border-border/50 hover:bg-muted/50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setSaving(true);
-                      try {
-                        await onDeleteMailbox(editingMailbox.id);
-                        setConfirmDelete(false);
-                        onBack();
-                      } finally {
-                        setSaving(false);
-                      }
-                    }}
-                    className="flex items-center gap-1.5 flex-1 justify-center px-3 py-1.5 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50 transition-colors"
-                  >
-                    {saving && <Loader2 className="size-3.5 animate-spin" />}
-                    Delete
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <MailboxForm
+        key={editingMailbox.id}
+        title={editingMailbox.name}
+        initialName={editingMailbox.name}
+        submitLabel="Save"
+        onBack={onBack}
+        onSubmit={
+          onRenameMailbox
+            ? (name) => onRenameMailbox(editingMailbox.id, name)
+            : undefined
+        }
+        onDelete={() => onDeleteMailbox(editingMailbox.id)}
+      />
     );
   }
 
-  return null;
+  if (currentView !== "mailboxes") return null;
+
+  const isProtected = (m: JmapMailbox) => PROTECTED_ROLES.has(m.role?.toLowerCase() ?? "");
+  const systemMailboxes = mailboxes.filter(isProtected);
+  const customMailboxes = mailboxes.filter((m) => !isProtected(m));
+
+  return (
+    <PaletteView title="Mailboxes" onBack={onBack}>
+      <PaletteSection>
+        <PaletteNavRow
+          icon={Plus}
+          label="New mailbox"
+          trailing={null}
+          onClick={() => onNavigateTo("mailbox-create")}
+        />
+      </PaletteSection>
+      {systemMailboxes.length > 0 ? (
+        <PaletteSection label="System">
+          {systemMailboxes.map((mailbox) => {
+            const role = mailbox.role?.toLowerCase() ?? "";
+            return (
+              <MailboxRow
+                key={mailbox.id}
+                icon={ROLE_ICONS[role] ?? Folder}
+                name={getMailboxDisplayName(mailbox)}
+                isHidden={hiddenIds.includes(mailbox.id)}
+                onToggleHidden={role === "inbox" ? undefined : () => toggleHidden(mailbox.id)}
+              />
+            );
+          })}
+        </PaletteSection>
+      ) : null}
+      {customMailboxes.length > 0 ? (
+        <PaletteSection label="Custom">
+          {customMailboxes.map((mailbox) => (
+            <MailboxRow
+              key={mailbox.id}
+              icon={Folder}
+              name={mailbox.name}
+              isHidden={hiddenIds.includes(mailbox.id)}
+              onToggleHidden={() => toggleHidden(mailbox.id)}
+              onOpen={() => {
+                setEditingMailboxId(mailbox.id);
+                onNavigateTo("mailbox-edit");
+              }}
+            />
+          ))}
+        </PaletteSection>
+      ) : null}
+    </PaletteView>
+  );
 }

@@ -10,6 +10,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 
 export type MailNotificationMetaItem = {
+  id: string;
   icon?: LucideIcon;
   children: React.ReactNode;
 };
@@ -41,7 +42,7 @@ export function MailNotificationBanner({
     <InvitationBanner
       variant={variant}
       inactive={inactive}
-      className={cn("mb-0 rounded-b-none", className)}
+      className={cn("mx-0 mb-0", className)}
     >
       <InvitationBannerHeader
         title={title}
@@ -50,8 +51,8 @@ export function MailNotificationBanner({
       />
       {hasMeta ? (
         <InvitationBannerMeta>
-          {meta?.map((item, index) => (
-            <InvitationBannerMetaItem key={index} icon={item.icon}>
+          {meta?.map((item) => (
+            <InvitationBannerMetaItem key={item.id} icon={item.icon}>
               {item.children}
             </InvitationBannerMetaItem>
           ))}

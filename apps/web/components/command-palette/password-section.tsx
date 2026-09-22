@@ -1,8 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useReducer } from "react";
 import { getErrorMessage } from "@workspace/calendar-core";
-import { Lock, RotateCcw, Loader2 } from "lucide-react";
+import { Lock, RotateCcw } from "lucide-react";
+import { InlineMessage } from "./account-settings-shared";
+import {
+  initialSecurityUiState,
+  securityUiReducer,
+} from "./account-settings-ui-state";
+import {
+  PaletteButton,
+  PaletteField,
+  PaletteFormActions,
+  PaletteNavRow,
+} from "./palette-ui";
+import { PALETTE_INPUT_CLASS } from "./palette-styles";
 
 interface PasswordSectionProps {
   hasPasswordAccount: boolean;
@@ -28,28 +40,25 @@ export function PasswordSection({
   handleSetPassword,
   handleResetEncryptionPassword,
 }: PasswordSectionProps) {
-  const [activeForm, setActiveForm] = useState<
-    "change" | "set" | "reset" | null
-  >(null);
-  const [currentPwd, setCurrentPwd] = useState("");
-  const [newPwd, setNewPwd] = useState("");
-  const [confirmPwd, setConfirmPwd] = useState("");
-  const [msg, setMsg] = useState<{
-    kind: "success" | "error";
-    text: string;
-  } | null>(null);
+  const fieldId = useId();
+  const [security, dispatch] = useReducer(
+    securityUiReducer,
+    initialSecurityUiState,
+  );
+  const {
+    activeForm,
+    currentPassword: currentPwd,
+    newPassword: newPwd,
+    confirmPassword: confirmPwd,
+    message: msg,
+  } = security;
+  const setMsg = (message: typeof msg) =>
+    dispatch({ type: "setMessage", message });
 
   const hasOAuthOnlyAccess = hasOAuthAccount && !hasPasswordAccount;
   const isBusy =
     changingPassword || settingPassword || resettingEncryptionPassword;
   const isFormOpen = activeForm !== null;
-
-  const reset = () => {
-    setCurrentPwd("");
-    setNewPwd("");
-    setConfirmPwd("");
-    setMsg(null);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +67,7 @@ export function PasswordSection({
       setMsg({ kind: "error", text: "Enter a new password." });
       return;
     }
-    if (activeForm === "change" && !currentPwd.trim()) {
+    if (activeForm === "change-password" && !currentPwd.trim()) {
       setMsg({ kind: "error", text: "Enter your current password." });
       return;
     }
@@ -66,18 +75,20 @@ export function PasswordSection({
       setMsg({ kind: "error", text: "Passwords do not match." });
       return;
     }
+    const submit =
+      (activeForm === "change-password"
+        ? () =>
+            handleChangePassword({
+              currentPassword: currentPwd,
+              newPassword: newPwd,
+            })
+        : activeForm === "set-password"
+          ? handleSetPassword
+          : handleResetEncryptionPassword) ?? (async () => {});
     try {
-      if (activeForm === "change")
-        await handleChangePassword({
-          currentPassword: currentPwd,
-          newPassword: newPwd,
-        });
-      else if (activeForm === "set")
-        await handleSetPassword?.({ newPassword: newPwd });
-      else await handleResetEncryptionPassword?.({ newPassword: newPwd });
+      await submit({ newPassword: newPwd });
       setMsg({ kind: "success", text: "Password updated." });
-      reset();
-      setActiveForm(null);
+      dispatch({ type: "finishForm" });
     } catch (err) {
       setMsg({
         kind: "error",
@@ -89,164 +100,143 @@ export function PasswordSection({
   if (!hasPasswordAccount && !hasOAuthOnlyAccess && !hasOAuthAccount)
     return null;
 
+  const newLabel =
+    activeForm === "reset-encryption"
+      ? "New encryption password"
+      : "New password";
+  const confirmLabel =
+    activeForm === "reset-encryption"
+      ? "Confirm new encryption password"
+      : "Confirm new password";
+
   return (
     <div>
       {msg && !isFormOpen ? (
-        <div
-          className={`mx-2 mb-1 rounded-md px-3 py-2 text-xs ${msg.kind === "success" ? "bg-secondary/10 text-secondary-foreground" : "bg-destructive/10 text-destructive"}`}
-          role={msg.kind === "error" ? "alert" : "status"}
-        >
-          {msg.text}
+        <div className="px-2 py-1">
+          <InlineMessage msg={msg} />
         </div>
       ) : null}
       {!isFormOpen ? (
         <>
           {hasPasswordAccount ? (
-            <button
-              type="button"
-              onClick={() => {
-                setActiveForm("change");
-                setMsg(null);
-              }}
+            <PaletteNavRow
+              icon={Lock}
+              label="Change Password"
+              description="Update your email sign-in password"
+              trailing={null}
+              onClick={() =>
+                dispatch({ type: "openForm", form: "change-password" })
+              }
               disabled={isBusy}
-              className="flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors disabled:opacity-60"
-            >
-              <div className="flex items-center justify-center size-6 shrink-0">
-                <Lock className="size-4 text-muted-foreground" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm">Change Password</div>
-                <div className="text-xs text-muted-foreground">
-                  Update your email sign-in password
-                </div>
-              </div>
-            </button>
+            />
           ) : null}
           {hasOAuthOnlyAccess ? (
-            <button
-              type="button"
-              onClick={() => {
-                setActiveForm("set");
-                setMsg(null);
-              }}
+            <PaletteNavRow
+              icon={Lock}
+              label="Set Email Password"
+              description="Add an email sign-in password"
+              trailing={null}
+              onClick={() =>
+                dispatch({ type: "openForm", form: "set-password" })
+              }
               disabled={isBusy}
-              className="flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors disabled:opacity-60"
-            >
-              <div className="flex items-center justify-center size-6 shrink-0">
-                <Lock className="size-4 text-muted-foreground" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm">Set Email Password</div>
-                <div className="text-xs text-muted-foreground">
-                  Add an email sign-in password
-                </div>
-              </div>
-            </button>
+            />
           ) : null}
           {hasOAuthAccount ? (
-            <button
-              type="button"
-              onClick={() => {
-                setActiveForm("reset");
-                setMsg(null);
-              }}
+            <PaletteNavRow
+              icon={RotateCcw}
+              label="Reset Encryption Password"
+              description="Replace the password for OAuth / passkey sign-in keys"
+              trailing={null}
+              onClick={() =>
+                dispatch({ type: "openForm", form: "reset-encryption" })
+              }
               disabled={isBusy}
-              className="flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors disabled:opacity-60"
-            >
-              <div className="flex items-center justify-center size-6 shrink-0">
-                <RotateCcw className="size-4 text-muted-foreground" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm">Reset Encryption Password</div>
-                <div className="text-xs text-muted-foreground">
-                  Replace the password for OAuth / passkey sign-in keys
-                </div>
-              </div>
-            </button>
+            />
           ) : null}
         </>
       ) : (
-        <form
-          className="mx-1 my-1 rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2.5"
-          onSubmit={(e) => void handleSubmit(e)}
-        >
+        <form onSubmit={(e) => void handleSubmit(e)}>
           {msg ? (
-            <div
-              className={`rounded-md px-3 py-2 text-xs ${msg.kind === "success" ? "bg-secondary/10 text-secondary-foreground" : "bg-destructive/10 text-destructive"}`}
-            >
-              {msg.text}
+            <div className="px-2 py-1">
+              <InlineMessage msg={msg} />
             </div>
           ) : null}
-          {activeForm === "change" ? (
-            <label className="block space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">
-                Current password
-              </span>
+          {activeForm === "change-password" ? (
+            <PaletteField
+              label="Current password"
+              htmlFor={`${fieldId}-current`}
+            >
               <input
+                id={`${fieldId}-current`}
+                aria-label="Current password"
                 type="password"
                 value={currentPwd}
-                onChange={(e) => setCurrentPwd(e.target.value)}
+                onChange={(e) =>
+                  dispatch({
+                    type: "setField",
+                    field: "currentPassword",
+                    value: e.target.value,
+                  })
+                }
                 autoComplete="current-password"
                 disabled={isBusy}
-                className="flex h-9 w-full rounded-md bg-input px-3 text-sm outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
+                className={PALETTE_INPUT_CLASS}
               />
-            </label>
+            </PaletteField>
           ) : null}
-          <label className="block space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              {activeForm === "reset"
-                ? "New encryption password"
-                : "New password"}
-            </span>
+          <PaletteField label={newLabel} htmlFor={`${fieldId}-new`}>
             <input
+              id={`${fieldId}-new`}
+              aria-label={newLabel}
               type="password"
               value={newPwd}
-              onChange={(e) => setNewPwd(e.target.value)}
+              onChange={(e) =>
+                dispatch({
+                  type: "setField",
+                  field: "newPassword",
+                  value: e.target.value,
+                })
+              }
               autoComplete="new-password"
               disabled={isBusy}
-              className="flex h-9 w-full rounded-md bg-input px-3 text-sm outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
+              className={PALETTE_INPUT_CLASS}
             />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              {activeForm === "reset"
-                ? "Confirm new encryption password"
-                : "Confirm new password"}
-            </span>
+          </PaletteField>
+          <PaletteField label={confirmLabel} htmlFor={`${fieldId}-confirm`}>
             <input
+              id={`${fieldId}-confirm`}
+              aria-label={confirmLabel}
               type="password"
               value={confirmPwd}
-              onChange={(e) => setConfirmPwd(e.target.value)}
+              onChange={(e) =>
+                dispatch({
+                  type: "setField",
+                  field: "confirmPassword",
+                  value: e.target.value,
+                })
+              }
               autoComplete="new-password"
               disabled={isBusy}
-              className="flex h-9 w-full rounded-md bg-input px-3 text-sm outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
+              className={PALETTE_INPUT_CLASS}
             />
-          </label>
-          <div className="flex gap-2 pt-1">
-            <button
-              type="submit"
+          </PaletteField>
+          <PaletteFormActions>
+            <PaletteButton
+              variant="ghost"
+              onClick={() => dispatch({ type: "cancelForm" })}
               disabled={isBusy}
-              className="inline-flex h-8 items-center gap-2 rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
-            >
-              {isBusy ? <Loader2 className="size-3 animate-spin" /> : null}
-              {activeForm === "change"
-                ? "Update Password"
-                : activeForm === "set"
-                  ? "Set Password"
-                  : "Reset Password"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveForm(null);
-                reset();
-              }}
-              disabled={isBusy}
-              className="inline-flex h-8 items-center rounded-md border border-border bg-background px-4 text-xs font-medium text-foreground hover:bg-accent/40 disabled:opacity-60"
             >
               Cancel
-            </button>
-          </div>
+            </PaletteButton>
+            <PaletteButton type="submit" variant="primary" loading={isBusy}>
+              {activeForm === "change-password"
+                ? "Update Password"
+                : activeForm === "set-password"
+                  ? "Set Password"
+                  : "Reset Password"}
+            </PaletteButton>
+          </PaletteFormActions>
         </form>
       )}
     </div>

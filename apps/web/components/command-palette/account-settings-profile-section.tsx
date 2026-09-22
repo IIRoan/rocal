@@ -1,7 +1,7 @@
 "use client";
 
 import { useReducer } from "react";
-import { Check, ImageIcon, Loader2, Pencil, X } from "lucide-react";
+import { Check, ImageIcon, Pencil, X } from "lucide-react";
 
 import {
   AccountAvatar,
@@ -13,6 +13,10 @@ import {
   createInitialProfileUiState,
   profileUiReducer,
 } from "./account-settings-ui-state";
+import {
+  PaletteButton,
+} from "./palette-ui";
+import { PALETTE_INPUT_CLASS } from "./palette-styles";
 
 export function AccountProfileSection({
   displayName,
@@ -54,8 +58,8 @@ export function AccountProfileSection({
   };
 
   return (
-    <div className="px-4 pt-3 pb-1">
-      <div className="flex items-center gap-3 py-1">
+    <div className="pb-2">
+      <div className="flex items-center gap-3 p-2">
         <div className="relative shrink-0">
           <AccountAvatar
             name={displayName}
@@ -87,11 +91,11 @@ export function AccountProfileSection({
             </div>
           ) : (
             <>
-              <p className="truncate text-sm font-medium text-foreground">
+              <p className="truncate text-[15px] font-[470] text-foreground">
                 {displayName ?? displayEmail ?? "Solace account"}
               </p>
               {displayEmail ? (
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
                   {displayEmail}
                 </p>
               ) : null}
@@ -101,14 +105,16 @@ export function AccountProfileSection({
       </div>
 
       {profile.message && !profile.showAvatarForm ? (
-        <div className="mt-2">
+        <div className="px-2 py-1">
           <InlineMessage msg={profile.message} />
         </div>
       ) : null}
 
-      <AnimatedCollapse isOpen={profile.showAvatarForm && !!handleUpdateProfile}>
-        <div className="mt-2 mb-1 rounded-lg border border-border/50 bg-muted/30 p-3">
-          <p className="mb-2 text-xs text-muted-foreground">
+      <AnimatedCollapse
+        isOpen={profile.showAvatarForm && !!handleUpdateProfile}
+      >
+        <div className="p-2">
+          <p className="mb-2 text-[13px] leading-[130%] text-muted-foreground">
             Paste the URL of any publicly accessible image.
           </p>
           <div className="flex items-center gap-2">
@@ -123,34 +129,30 @@ export function AccountProfileSection({
                 placeholder="https://example.com/avatar.png"
                 aria-label="Avatar URL"
                 disabled={updatingProfile}
-                className="flex h-9 w-full rounded-md bg-input pl-8 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50"
+                className={`${PALETTE_INPUT_CLASS} pl-8`}
               />
             </div>
-            <button
-              type="button"
+            <PaletteButton
+              variant="primary"
               onClick={() => void handleAvatarSave()}
-              disabled={updatingProfile}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+              loading={updatingProfile}
+              className="h-9"
             >
-              {updatingProfile ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <Check className="size-3" />
-              )}
+              {updatingProfile ? null : <Check className="size-3.5" />}
               Save
-            </button>
-            <button
-              type="button"
+            </PaletteButton>
+            <PaletteButton
+              variant="ghost"
               onClick={() => dispatch({ type: "closeAvatarForm" })}
               disabled={updatingProfile}
-              className="inline-flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent/50 disabled:opacity-60"
+              className="size-9 px-0"
               aria-label="Cancel"
             >
               <X className="size-3.5" />
-            </button>
+            </PaletteButton>
           </div>
           {profile.message?.kind === "error" ? (
-            <p className="mt-2 text-xs text-destructive" role="alert">
+            <p className="mt-2 text-[13px] text-destructive" role="alert">
               {profile.message.text}
             </p>
           ) : null}

@@ -44,11 +44,12 @@ export function EventReminderBanner({
     !loading && !error && reminder
       ? [
           {
+            id: "time",
             icon: Clock,
             children: `${reminder.eventDate} · ${reminder.eventTime}`,
           },
           ...(reminder.location
-            ? [{ icon: MapPin, children: reminder.location }]
+            ? [{ id: "location", icon: MapPin, children: reminder.location }]
             : []),
         ]
       : undefined;

@@ -1,7 +1,13 @@
-import { beforeEach, describe, expect, it } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { webcrypto } from "node:crypto";
 
 import { createE2eeModule } from "@workspace/e2ee";
+
+jest.mock("@/lib/e2ee-bootstrap", () => ({
+  waitForPendingE2eeBootstrap: jest.fn(),
+}));
+
+import { waitForPendingE2eeBootstrap } from "@/lib/e2ee-bootstrap";
 import { setActiveE2eeSession, clearActiveE2eeSession } from "@/lib/e2ee-session";
 import {
   generateVaultSecret,
@@ -10,23 +16,28 @@ import {
 } from "@/lib/mail/vault-secret";
 
 const e2ee = createE2eeModule(webcrypto as never);
+const mockWaitForPendingE2eeBootstrap =
+  waitForPendingE2eeBootstrap as jest.MockedFunction<
+    typeof waitForPendingE2eeBootstrap
+  >;
 
 async function activateSession() {
-  const accountKey = await e2ee.generateAccountKey();
-  const blindIndexKey = await e2ee.generateBlindIndexKey();
-  setActiveE2eeSession({
+  const session = {
     userId: "user-1",
     deviceId: "device-1",
-    accountKey,
-    blindIndexKey,
+    accountKey: await e2ee.generateAccountKey(),
+    blindIndexKey: await e2ee.generateBlindIndexKey(),
     activatedAt: new Date(),
-  });
-  return accountKey;
+  };
+  setActiveE2eeSession(session);
+  return session;
 }
 
 describe("mail vault secret", () => {
   beforeEach(() => {
     clearActiveE2eeSession();
+    mockWaitForPendingE2eeBootstrap.mockReset();
+    mockWaitForPendingE2eeBootstrap.mockReturnValue(null);
   });
 
   it("generates a distinct high-entropy secret each time", () => {
@@ -68,5 +79,18 @@ describe("mail vault secret", () => {
 
     await expect(wrapVaultSecret("secret")).resolves.toBeNull();
     await expect(unwrapVaultSecret(wrapped!)).resolves.toBeNull();
+  });
+
+  it("waits for an in-flight E2EE bootstrap before unwrapping", async () => {
+    const session = await activateSession();
+    const secret = generateVaultSecret();
+    const wrapped = await wrapVaultSecret(secret);
+
+    clearActiveE2eeSession();
+    mockWaitForPendingE2eeBootstrap.mockReturnValue(
+      Promise.resolve().then(() => setActiveE2eeSession(session)),
+    );
+
+    await expect(unwrapVaultSecret(wrapped!)).resolves.toBe(secret);
   });
 });

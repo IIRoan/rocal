@@ -240,11 +240,6 @@ export const TIMEZONE_GROUPS = getTimezonePickerGroups();
 
 export const ALL_TIMEZONES = getAllTimezonePickerOptions();
 
-export const SETTINGS_PANEL_STYLE = {
-  minHeight: "320px",
-  maxHeight: "calc(100dvh - 200px)",
-} as const;
-
 export const WORKING_DAYS = [
   { value: 0, label: "Sunday" },
   { value: 1, label: "Monday" },

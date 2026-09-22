@@ -5,7 +5,6 @@ import type { MailServerLimits } from "@workspace/calendar-core";
 import type { JmapIdentity } from "@/lib/mail/types";
 import {
   MailComposeChromeContext,
-  MailComposeClosePromptContext,
   MailComposeFieldsContext,
 } from "./mail-compose-contexts";
 import { useMailComposeController } from "./use-mail-compose-controller";
@@ -21,18 +20,15 @@ export function MailComposeProvider({
   identities?: JmapIdentity[];
   mailServerLimits: MailServerLimits;
 }) {
-  const { fieldsValue, chromeValue, closePromptValue } =
-    useMailComposeController({
-      identities,
-      mailServerLimits,
-    });
+  const { fieldsValue, chromeValue } = useMailComposeController({
+    identities,
+    mailServerLimits,
+  });
 
   return (
     <MailComposeChromeContext.Provider value={chromeValue}>
       <MailComposeFieldsContext.Provider value={fieldsValue}>
-        <MailComposeClosePromptContext.Provider value={closePromptValue}>
-          {children}
-        </MailComposeClosePromptContext.Provider>
+        {children}
       </MailComposeFieldsContext.Provider>
     </MailComposeChromeContext.Provider>
   );

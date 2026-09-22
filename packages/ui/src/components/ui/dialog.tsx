@@ -55,6 +55,7 @@ type DialogContentProps = React.ComponentProps<
 > & {
   variant?: DialogVariant;
   showClose?: boolean;
+  showOverlay?: boolean;
 };
 
 function DialogContent({
@@ -62,6 +63,7 @@ function DialogContent({
   children,
   variant = "center",
   showClose = true,
+  showOverlay = true,
   ...props
 }: DialogContentProps) {
   // NOTE: spotlight intentionally sits in the upper viewport (top-[15%]) and
@@ -105,7 +107,7 @@ function DialogContent({
 
   return (
     <DialogPortal>
-      <DialogOverlay />
+      {showOverlay ? <DialogOverlay /> : null}
       <DialogPrimitive.Content
         forceMount
         data-slot="dialog-content"
