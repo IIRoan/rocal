@@ -165,18 +165,20 @@ export function MobileThreeDayView({
       data-slot="three-day-view"
       className="flex h-full min-h-0 flex-col overflow-hidden bg-background animate-fade-in"
     >
-      <ThreeDayViewDayHeaders
-        currentDate={currentDate}
-        days={days}
-        timezone={resolvedTimezone}
-      />
-      <AllDayEventRow
-        columnTemplate="3rem repeat(3, minmax(0, 1fr))"
-        days={days}
-        events={events}
-        handlers={allDayHandlers}
-        timezone={resolvedTimezone}
-      />
+      <div className="shrink-0 overflow-hidden [scrollbar-gutter:stable]">
+        <ThreeDayViewDayHeaders
+          currentDate={currentDate}
+          days={days}
+          timezone={resolvedTimezone}
+        />
+        <AllDayEventRow
+          columnTemplate="3rem repeat(3, minmax(0, 1fr))"
+          days={days}
+          events={events}
+          handlers={allDayHandlers}
+          timezone={resolvedTimezone}
+        />
+      </div>
       <ThreeDayViewTimeGrid
         currentTimePosition={currentTimePosition}
         currentTimeVisible={currentTimeVisible}

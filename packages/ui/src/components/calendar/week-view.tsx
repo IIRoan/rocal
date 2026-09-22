@@ -110,18 +110,20 @@ export const WeekView = React.memo(function WeekView({
       data-slot="week-view"
       className="absolute inset-0 flex flex-col bg-background animate-fade-in"
     >
-      <WeekViewDayHeaders
-        currentDate={currentDate}
-        days={days}
-        timezone={resolvedTimezone}
-      />
-      <AllDayEventRow
-        columnTemplate="3rem repeat(7, minmax(0, 1fr))"
-        days={days}
-        events={events}
-        handlers={handlers}
-        timezone={resolvedTimezone}
-      />
+      <div className="shrink-0 overflow-hidden [scrollbar-gutter:stable]">
+        <WeekViewDayHeaders
+          currentDate={currentDate}
+          days={days}
+          timezone={resolvedTimezone}
+        />
+        <AllDayEventRow
+          columnTemplate="3rem repeat(7, minmax(0, 1fr))"
+          days={days}
+          events={events}
+          handlers={handlers}
+          timezone={resolvedTimezone}
+        />
+      </div>
       <WeekViewTimeGrid
         currentTimePosition={currentTimePosition}
         currentTimeVisible={currentTimeVisible}
