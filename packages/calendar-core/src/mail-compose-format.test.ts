@@ -7,6 +7,7 @@ import {
   composeTextToHtml,
   composeTextToPlain,
   hasComposeFormatting,
+  hasComposeUserContent,
   htmlToComposeText,
   messageBodiesToComposeText,
   resolveComposeSendBodies,
@@ -121,5 +122,23 @@ describe("mail compose formatting", () => {
       }),
     ).toBe("Hello **world**");
     expect(messageBodiesToComposeText({ text: "Just text" })).toBe("Just text");
+  });
+});
+
+describe("hasComposeUserContent", () => {
+  const empty = { to: "", cc: "", bcc: "", subject: "", body: "" };
+
+  it("ignores untouched seeds and whitespace-only edits", () => {
+    const seed = { ...empty, body: "\n-- \nRoan" };
+    expect(hasComposeUserContent(seed, seed)).toBe(false);
+    expect(hasComposeUserContent({ ...seed, body: "  \n-- \n Roan \n" }, seed)).toBe(false);
+    expect(hasComposeUserContent(empty, empty)).toBe(false);
+  });
+
+  it("detects typed recipients, subject, or body text", () => {
+    const seed = { ...empty, to: "a@x.com", subject: "Re: hi", body: "> quoted" };
+    expect(hasComposeUserContent({ ...seed, body: "Thanks\n> quoted" }, seed)).toBe(true);
+    expect(hasComposeUserContent({ ...seed, subject: "Re: hi!" }, seed)).toBe(true);
+    expect(hasComposeUserContent({ ...empty, cc: "b@x.com" }, empty)).toBe(true);
   });
 });

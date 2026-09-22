@@ -266,20 +266,6 @@ export function useMailAppContentController(
     setSelectedMessageId(null);
   };
 
-  useEffect(() => {
-    registerComposeCloseActions({
-      dismiss: () => {
-        dismissCompose();
-        editingDraftIdRef.current = null;
-        setSelectedMessageId(null);
-      },
-      discardDraft: (draftId) => {
-        void handleDiscardDraft(draftId);
-      },
-    });
-    return () => registerComposeCloseActions(null);
-  }, [dismissCompose, handleDiscardDraft, setSelectedMessageId]);
-
   const closeComposeThen = (action: () => void) => {
     if (!composeActive) {
       action();
@@ -323,6 +309,26 @@ export function useMailAppContentController(
   const handleSelectMessage = (id: string | null) => {
     closeComposeThen(() => performSelectMessage(id));
   };
+
+  useEffect(() => {
+    registerComposeCloseActions({
+      dismiss: () => {
+        dismissCompose();
+        editingDraftIdRef.current = null;
+        setSelectedMessageId(null);
+      },
+      discardDraft: (draftId) => {
+        void handleDiscardDraft(draftId);
+      },
+      openDraft: (draftId) => {
+        closeComposeThen(() => {
+          editingDraftIdRef.current = draftId;
+          void handleEditDraft({ id: draftId });
+        });
+      },
+    });
+    return () => registerComposeCloseActions(null);
+  });
 
   const handleSelectMailbox = (mailboxIdToSelect: string) => {
     closeComposeThen(() => {

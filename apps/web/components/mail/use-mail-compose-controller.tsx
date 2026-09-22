@@ -8,12 +8,17 @@ import {
   type SetStateAction,
 } from "react";
 import { toast } from "sonner";
-import type { MailServerLimits } from "@workspace/calendar-core";
+import {
+  hasComposeUserContent,
+  type ComposeTextFields,
+  type MailServerLimits,
+} from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { htmlToPlainText } from "@/lib/mail/signature-utils";
 import { resetComposeInlineImages } from "@/lib/mail/compose-inline-images";
 import type { QuotedInlineAttachment } from "@/lib/mail/compose-editor-utils";
 import {
+  cancelComposeDraftSave,
   composeBridgeRef,
   flushComposeDraftSave,
   getComposeCloseActionsRef,
@@ -43,7 +48,7 @@ import {
   type ComposeSnapshot,
 } from "./mail-compose-utils";
 
-/** Mirrors the autosave rule for when a draft is worth saving. */
+/** Fallback content check for reopened drafts and unseeded composes. */
 function hasSavableContent(draft: ComposeDraft): boolean {
   return Boolean(
     draft.to.trim() ||
@@ -53,6 +58,16 @@ function hasSavableContent(draft: ComposeDraft): boolean {
       draft.body.trim() ||
       draft.htmlBody.trim(),
   );
+}
+
+function toComposeTextFields(draft: ComposeDraft): ComposeTextFields {
+  return {
+    to: draft.to,
+    cc: draft.cc,
+    bcc: draft.bcc,
+    subject: draft.subject,
+    body: draft.htmlBody ? htmlToPlainText(draft.htmlBody) : draft.body,
+  };
 }
 
 function patchAttachments(
@@ -86,6 +101,7 @@ export function useMailComposeController({
   );
   const draftIdRef = useRef<string | null>(null);
   const baselineRef = useRef<ComposeSnapshot | null>(null);
+  const seedTextRef = useRef<ComposeTextFields | null>(null);
   const explicitCloseRef = useRef(false);
   const closingRef = useRef(false);
 
@@ -139,6 +155,16 @@ export function useMailComposeController({
     );
   };
 
+  const hasUserContent = () => {
+    const current = draftRef.current;
+    const seed = seedTextRef.current;
+    // A reopened draft already holds user content; only fresh composes compare against their seed.
+    if (!seed || current.composeMode === "draft") {
+      return hasSavableContent(current);
+    }
+    return hasComposeUserContent(toComposeTextFields(current), seed);
+  };
+
   const bumpComposeSessionId = () => {
     dispatch({ type: "incrementSession" });
   };
@@ -155,13 +181,17 @@ export function useMailComposeController({
   const notifyDraftSaved = (draftId: string) => {
     toast("Draft saved", {
       id: "compose-draft-saved",
-      action: { label: "Discard", onClick: () => discardDraft(draftId) },
+      action: {
+        label: "Open",
+        onClick: () => getComposeCloseActionsRef().current?.openDraft?.(draftId),
+      },
+      cancel: { label: "Discard", onClick: () => discardDraft(draftId) },
     });
   };
 
   const saveDraftAndClose = async (afterClose?: () => void) => {
     const savedDraftId = await flushComposeDraftSave();
-    if (!savedDraftId && hasSavableContent(draftRef.current)) {
+    if (!savedDraftId && hasUserContent()) {
       // Keep compose open so a failed save never silently drops the message.
       toast.error("Couldn't save draft", {
         id: "compose-draft-saved",
@@ -191,6 +221,14 @@ export function useMailComposeController({
   };
 
   const requestComposeClose = (afterClose?: () => void) => {
+    if (!hasUserContent() && draftRef.current.attachments.length === 0) {
+      cancelComposeDraftSave();
+      // Drop a draft autosaved earlier in this session once its content was removed again.
+      if (draftIdRef.current && draftRef.current.composeMode !== "draft") {
+        discardDraft(draftIdRef.current);
+      }
+      return true;
+    }
     if (!isComposeDirty() && draftRef.current.attachments.length === 0) {
       if (draftIdRef.current) notifyDraftSaved(draftIdRef.current);
       return true;
@@ -207,6 +245,7 @@ export function useMailComposeController({
   const resetDraftRefs = () => {
     draftIdRef.current = null;
     baselineRef.current = null;
+    seedTextRef.current = null;
     explicitCloseRef.current = false;
   };
 
@@ -216,14 +255,14 @@ export function useMailComposeController({
   }) => {
     resetComposeInlineImages();
     resetDraftRefs();
-    // Baseline is the seeded state so an untouched reply/forward closes without saving a draft.
-    baselineRef.current = buildComposeSnapshot(
-      toComposeDraft(
-        { ...state, ...seed.patch },
-        seed.identityId ?? resolvedIdentityId,
-        null,
-      ),
+    const seededDraft = toComposeDraft(
+      { ...state, ...seed.patch },
+      seed.identityId ?? resolvedIdentityId,
+      null,
     );
+    // Baseline is the seeded state so an untouched reply/forward closes without saving a draft.
+    baselineRef.current = buildComposeSnapshot(seededDraft);
+    seedTextRef.current = toComposeTextFields(seededDraft);
     dispatch({
       type: "patch",
       patch: {
@@ -372,6 +411,7 @@ export function useMailComposeController({
       openDraftEditor,
       markDirty,
       isComposeDirty,
+      hasUserContent,
       acknowledgeSavedDraft,
       bumpComposeSessionId,
       getDraftIdRef: () => draftIdRef.current,

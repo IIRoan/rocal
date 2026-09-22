@@ -86,6 +86,13 @@ describe("useMailCompose", () => {
     return options?.action;
   }
 
+  function toastCancelAction(mock: { mock: { calls: unknown[][] } }) {
+    const options = mock.mock.calls.at(-1)?.[1] as
+      | { cancel?: { label: string; onClick: () => void } }
+      | undefined;
+    return options?.cancel;
+  }
+
   it("updates draft fields and exposes them via the bridge", async () => {
     let latest: ReturnType<typeof useMailCompose> | null = null;
 
@@ -252,7 +259,8 @@ describe("useMailCompose", () => {
 
     expect(allowed).toBe(true);
     expect(mockToast).toHaveBeenCalledWith("Draft saved", expect.anything());
-    const action = toastDiscardAction(mockToast);
+    expect(toastDiscardAction(mockToast)?.label).toBe("Open");
+    const action = toastCancelAction(mockToast);
     expect(action?.label).toBe("Discard");
     action?.onClick();
     expect(closeActions.discardDraft).toHaveBeenCalledWith("draft-1");
@@ -284,6 +292,69 @@ describe("useMailCompose", () => {
     expect(closeActions.dismiss).toHaveBeenCalledTimes(1);
     expect(afterClose).toHaveBeenCalledTimes(1);
     expect(mockToast).toHaveBeenCalledWith("Draft saved", expect.anything());
+  });
+
+  it("closes an untouched new compose without saving a draft", async () => {
+    let latest: ReturnType<typeof useMailCompose> | null = null;
+    const closeActions = registerCloseHarness("draft-9");
+
+    await act(async () => {
+      root.render(
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+          <ComposeProbe onReady={(value) => { latest = value; }} />
+        </MailComposeProvider>,
+      );
+    });
+
+    await act(async () => {
+      latest!.openNewCompose();
+    });
+    // The editor re-serializes the seeded body on mount, which must not count as content.
+    await act(async () => {
+      latest!.setComposeHtmlBody("<p></p><p> </p>");
+    });
+
+    let allowed = false;
+    await act(async () => {
+      allowed = latest!.requestComposeClose();
+    });
+
+    expect(allowed).toBe(true);
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(closeActions.discardDraft).not.toHaveBeenCalled();
+  });
+
+  it("discards an autosaved draft once its content is cleared", async () => {
+    let latest: ReturnType<typeof useMailCompose> | null = null;
+    const closeActions = registerCloseHarness("draft-9");
+
+    await act(async () => {
+      root.render(
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+          <ComposeProbe onReady={(value) => { latest = value; }} />
+        </MailComposeProvider>,
+      );
+    });
+
+    await act(async () => {
+      latest!.openNewCompose();
+    });
+    await act(async () => {
+      latest!.setComposeSubject("Temp");
+      getMailComposeBridge()?.setDraftId("draft-5");
+    });
+    await act(async () => {
+      latest!.setComposeSubject("");
+    });
+
+    let allowed = false;
+    await act(async () => {
+      allowed = latest!.requestComposeClose();
+    });
+
+    expect(allowed).toBe(true);
+    expect(closeActions.discardDraft).toHaveBeenCalledWith("draft-5");
+    expect(mockToast).not.toHaveBeenCalled();
   });
 
   it("keeps compose open when the draft save fails", async () => {

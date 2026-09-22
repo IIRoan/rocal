@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { composeTextToHtml, hasComposeFormatting } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import { getPrimaryMailboxId } from "../lib/mail/mail-helpers";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
+import { QUERY_KEYS } from "../lib/query-keys";
 
 const log = createLogger("native-compose-draft-autosave");
 const AUTOSAVE_DEBOUNCE_MS = 2000;
@@ -34,6 +36,8 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
   const inflightSaveRef = useRef<Promise<string | null> | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedDataRef = useRef<string>("");
+  const savedDraftsMailboxIdRef = useRef<string | null>(null);
+  const queryClient = useQueryClient();
 
   const saveDraftOnce = useCallback(async (): Promise<string | null> => {
     if (!input.runtime) return input.draftId;
@@ -97,6 +101,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
 
       input.setDraftId(savedDraftId);
       lastSavedDataRef.current = payloadKey;
+      savedDraftsMailboxIdRef.current = draftsMailboxId;
       input.setDraftSaveStatus("saved");
       setTimeout(() => input.setDraftSaveStatus("idle"), 2000);
       return savedDraftId;
@@ -179,6 +184,23 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     input.to,
     saveDraft,
   ]);
+
+  // Each save replaces the draft id, so refresh the Drafts list once compose unmounts to reopen the latest copy.
+  useEffect(
+    () => () => {
+      const refreshDrafts = () => {
+        const draftsMailboxId = savedDraftsMailboxIdRef.current;
+        if (!draftsMailboxId) return;
+        void queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.mailMessages(draftsMailboxId),
+        });
+      };
+      const inflight = inflightSaveRef.current;
+      if (inflight) void inflight.finally(refreshDrafts);
+      else refreshDrafts();
+    },
+    [queryClient],
+  );
 
   return { saveDraft, inflightSaveRef };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, Plus, Tag } from "lucide-react";
+import { ChevronRight, CirclePlus, Plus, Tag } from "lucide-react";
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -10,9 +10,6 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import type { LabelDef } from "@/lib/mail/types";
 import { resolveLabelDisplayColor } from "@/lib/mail/mail-label-colors";
-
-const ROW_CLASS =
-  "h-8 rounded-md pl-2 text-[15px] font-[380] transition-colors";
 
 export function MailSidebarLabels({
   labels,
@@ -30,13 +27,13 @@ export function MailSidebarLabels({
   const [expanded, setExpanded] = useState(true);
 
   return (
-    <div className="group/labels mt-4">
-      <div className="mb-0.5 flex h-7 items-center gap-1 pr-1 pl-1">
+    <div className="mt-4">
+      <div data-sidebar-heading className="pl-1">
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
           aria-expanded={expanded}
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded px-1 py-0.5 text-[13px] font-[470] text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-secondary)]"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded px-1 py-0.5 transition-colors hover:text-[var(--text-primary)]"
         >
           <ChevronRight
             size={12}
@@ -52,25 +49,20 @@ export function MailSidebarLabels({
             disabled={isBusy}
             aria-label="Manage labels"
             title="Manage labels"
-            className="flex size-6 cursor-pointer items-center justify-center rounded-md text-[var(--icon-tertiary)] opacity-0 transition-[opacity,color,background-color] hover:bg-[var(--bg-overlay-tertiary)] hover:text-[var(--icon-primary)] focus-visible:opacity-100 group-hover/labels:opacity-100 disabled:opacity-30"
+            className="flex size-6 cursor-pointer items-center justify-center rounded-md text-[var(--icon-tertiary)] transition-colors hover:bg-[var(--bg-cell-hover)] hover:text-[var(--icon-primary)] disabled:opacity-30"
           >
-            <Plus size={14} strokeWidth={2.25} />
+            <CirclePlus size={14} strokeWidth={2} />
           </button>
         ) : null}
       </div>
       {expanded ? (
-        <SidebarMenu className="gap-0.5">
+        <SidebarMenu className="gap-1">
           {labels.map((label) => {
             const isSelected = activeLabelId === label.id;
             return (
               <SidebarMenuItem key={label.id}>
                 <SidebarMenuButton
-                  className={cn(
-                    ROW_CLASS,
-                    isSelected
-                      ? "bg-[var(--bg-overlay-tertiary)] text-[var(--text-primary)]"
-                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-overlay-tertiary)] hover:text-[var(--text-primary)]",
-                  )}
+                  isActive={isSelected}
                   onClick={() => onSelectLabel(label.id)}
                 >
                   <Tag
@@ -86,10 +78,6 @@ export function MailSidebarLabels({
           {labels.length === 0 && onOpenLabels ? (
             <SidebarMenuItem>
               <SidebarMenuButton
-                className={cn(
-                  ROW_CLASS,
-                  "text-[var(--text-tertiary)] hover:bg-[var(--bg-overlay-tertiary)] hover:text-[var(--text-primary)]",
-                )}
                 onClick={onOpenLabels}
                 disabled={isBusy}
               >

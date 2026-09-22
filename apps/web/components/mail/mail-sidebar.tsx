@@ -144,14 +144,7 @@ function SortableMailboxItem({
         <GripVertical size={12} strokeWidth={2} />
       </button>
 
-      <SidebarMenuButton
-        className={`rounded-md h-8 text-[15px] font-[380] transition-colors pl-2 ${
-          isSelected
-            ? "text-[var(--text-primary)] bg-[var(--bg-overlay-tertiary)]"
-            : "text-[var(--text-secondary)] hover:bg-[var(--bg-overlay-tertiary)] hover:text-[var(--text-primary)]"
-        }`}
-        onClick={onSelect}
-      >
+      <SidebarMenuButton isActive={isSelected} onClick={onSelect}>
         <MailboxIcon role={mailbox.role} isSelected={isSelected} />
         <span className="truncate">{getMailboxDisplayName(mailbox)}</span>
       </SidebarMenuButton>
@@ -187,10 +180,8 @@ function ExpandedMailboxNav({
 }) {
   return (
     <>
-      <div className="px-2 mb-1.5 flex items-center justify-between">
-        <span className="text-[13px] font-[470] text-[var(--text-tertiary)]">
-          Mail
-        </span>
+      <div data-sidebar-heading className="justify-between">
+        <span>General</span>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -198,9 +189,9 @@ function ExpandedMailboxNav({
               onClick={onOpenMailboxes}
               disabled={isBusy}
               aria-label="Mailbox settings"
-              className="size-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-40"
+              className="flex size-6 cursor-pointer items-center justify-center rounded-md text-[var(--icon-tertiary)] transition-colors hover:bg-[var(--bg-cell-hover)] hover:text-[var(--icon-primary)] disabled:opacity-40"
             >
-              <Settings2 size={13} strokeWidth={2.25} />
+              <Settings2 size={14} strokeWidth={2} />
             </button>
           </TooltipTrigger>
           <TooltipContent side="right">Mailbox settings</TooltipContent>
@@ -217,7 +208,7 @@ function ExpandedMailboxNav({
             items={visibleItems.map((m) => m.id)}
             strategy={verticalListSortingStrategy}
           >
-            <SidebarMenu className="gap-0.5">
+            <SidebarMenu className="gap-1">
               {visibleItems.map((mailbox) => (
                 <SortableMailboxItem
                   key={mailbox.id}
@@ -260,11 +251,7 @@ function MailPrimaryActions({
   if (isCollapsed) {
     return (
       <SidebarGroup className="shrink-0 items-center gap-1 px-2 pt-2">
-        <SidebarIconButton
-          label="Compose"
-          onClick={onCompose}
-          className="bg-[var(--bg-l3-solid)] text-[var(--icon-primary)] shadow-[var(--shadow-primary-action)] hover:bg-[var(--bg-l3-solid)] hover:shadow-[var(--shadow-primary-action-hover)]"
-        >
+        <SidebarIconButton label="Compose" onClick={onCompose}>
           <SquarePen size={16} strokeWidth={2} />
         </SidebarIconButton>
         {onOpenSearch ? (
@@ -276,31 +263,25 @@ function MailPrimaryActions({
     );
   }
 
-  const rowClassName =
-    "h-8 rounded-md pl-2 text-[15px] font-[380] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-cell-hover)] hover:text-[var(--text-primary)]";
-
   return (
-    <SidebarGroup className="shrink-0 border-b border-[var(--border-tertiary)] px-1.5 pt-1 pb-3">
+    <SidebarGroup className="shrink-0 px-2 pt-1">
       <SidebarMenu className="gap-1">
         <SidebarMenuItem>
-          <SidebarMenuButton
-            onClick={onCompose}
-            className="h-9 rounded-md bg-[var(--bg-l3-solid)] pl-2 text-[15px] font-[380] text-[var(--text-primary)] shadow-[var(--shadow-primary-action)] transition-shadow hover:bg-[var(--bg-l3-solid)] hover:text-[var(--text-primary)] hover:shadow-[var(--shadow-primary-action-hover)] active:bg-[var(--bg-l3-solid)]"
-          >
+          <SidebarMenuButton onClick={onCompose}>
             <SquarePen size={16} strokeWidth={2} />
             <span>Compose</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
         {onOpenSearch ? (
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={onOpenSearch} className={rowClassName}>
+            <SidebarMenuButton onClick={onOpenSearch}>
               <Search size={16} strokeWidth={2} />
               <span>Search</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         ) : null}
         <SidebarMenuItem>
-          <SidebarMenuButton onClick={onOpenSettings} className={rowClassName}>
+          <SidebarMenuButton onClick={onOpenSettings}>
             <Settings size={16} strokeWidth={2} />
             <span>Settings</span>
           </SidebarMenuButton>
@@ -391,7 +372,7 @@ export function MailSidebar({
 
           {activeMailbox && (
             <SidebarGroup
-              className={`px-2 flex-1 overflow-y-auto ${isCollapsed ? "pt-2" : "pt-3"}`}
+              className={`px-2 flex-1 overflow-y-auto ${isCollapsed ? "pt-2" : "pt-4"}`}
             >
             {isCollapsed ? (
               <SidebarGroupContent className="flex flex-col items-center gap-1">

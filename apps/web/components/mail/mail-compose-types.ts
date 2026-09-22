@@ -52,6 +52,8 @@ export type MailComposeBridge = {
   ) => void;
   markDirty: () => void;
   isComposeDirty: () => boolean;
+  /** True once the user typed beyond the seeded signature/quote; empty composes never become drafts. */
+  hasUserContent: () => boolean;
   acknowledgeSavedDraft: () => void;
   getDraftIdRef: () => string | null;
   setDraftId: (id: string | null) => void;
