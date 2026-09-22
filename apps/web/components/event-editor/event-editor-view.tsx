@@ -1,4 +1,4 @@
-import { ArrowLeft, Plus, X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ import { EventEditorFooter } from "./event-editor-footer";
 import { EventEditorDesktopHeader } from "./event-editor-header";
 import { EventEditorPopover } from "./event-editor-popover";
 import type { EventEditorViewProps } from "./types";
+import { useSaveShortcut } from "./use-save-shortcut";
 
 export function EventEditorView({
   anchorPosition,
@@ -31,11 +32,6 @@ export function EventEditorView({
   handleEventDownloadIcs,
   handleEventSave,
   handleInvitationResponse,
-  handleToggleDescription,
-  handleToggleLocation,
-  handleToggleNotifications,
-  handleToggleParticipants,
-  handleToggleRecurring,
   invitationResponsePending,
   invitationStatus,
   layout,
@@ -44,32 +40,17 @@ export function EventEditorView({
   onOpenChange,
   open,
   recurringModal,
-  setShowDescription,
-  setShowLocation,
-  setShowParticipants,
-  visibleSections,
 }: EventEditorViewProps) {
-  const selectedEvent = eventForm.selectedEvent;
-  const standardLeadingSlot = selectedEvent?.id ? (
-    <button
-      type="button"
-      onClick={() => onOpenChange(false)}
-      aria-label="Back"
-      className="p-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
-    >
-      <ArrowLeft className="size-4 text-muted-foreground" />
-    </button>
-  ) : (
-    <Plus className="size-4 text-muted-foreground ml-1" />
-  );
+  const close = () => onOpenChange(false);
+  useSaveShortcut(open && !flags.isViewMode, handleEventSave);
   const embeddedLeadingSlot = (
     <button
       type="button"
       onClick={onBack}
       aria-label="Back"
-      className="p-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
+      className="-ml-1 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
     >
-      <ArrowLeft className="size-4 text-muted-foreground" />
+      <ArrowLeft className="size-4" />
     </button>
   );
 
@@ -78,30 +59,15 @@ export function EventEditorView({
       <EventEditorDesktopHeader
         badgeItem={badgeItem}
         dialogTitle={dialogTitle}
-        isRecurring={flags.isRecurring}
-        isViewMode={flags.isViewMode}
-        leadingSlot={
-          layout === "embedded" ? embeddedLeadingSlot : standardLeadingSlot
-        }
-        onToggleDescription={handleToggleDescription}
-        onToggleLocation={handleToggleLocation}
-        onToggleNotifications={handleToggleNotifications}
-        onToggleParticipants={handleToggleParticipants}
-        onToggleRecurring={handleToggleRecurring}
-        showDescription={visibleSections.description}
-        showLocation={visibleSections.location}
-        showNotifications={visibleSections.notifications}
-        showParticipants={visibleSections.participants}
+        leadingSlot={layout === "embedded" ? embeddedLeadingSlot : null}
+        onClose={layout === "embedded" ? undefined : close}
       />
       <EventEditorBody
         eventForm={eventForm}
         isViewMode={flags.isViewMode}
-        visibleSections={visibleSections}
-        setShowLocation={setShowLocation}
-        setShowDescription={setShowDescription}
-        setShowParticipants={setShowParticipants}
         localSettings={localSettings}
         calendars={calendars}
+        onSubmit={handleEventSave}
         desktop
       />
       <EventEditorFooter
@@ -115,7 +81,7 @@ export function EventEditorView({
         invitationStatus={invitationStatus}
         onInvitationResponse={handleInvitationResponse}
         desktop
-        onClose={() => onOpenChange(false)}
+        onClose={layout === "embedded" ? onBack : close}
       />
     </>
   );
@@ -132,24 +98,23 @@ export function EventEditorView({
           <DrawerContent
             responsive
             responsiveHeight="92dvh"
-            className="rounded-t-[20px] bg-card/95 backdrop-blur-xl border-none flex flex-col gap-0 overflow-hidden pb-0 transition-[max-height,bottom] duration-200 ease-out"
+            className="rounded-t-[20px] bg-popover border-none flex flex-col gap-0 overflow-hidden pb-0 transition-[max-height,bottom] duration-200 ease-out"
           >
             <DrawerTitle className="sr-only">{dialogTitle}</DrawerTitle>
             <DrawerShell
               data-testid="mobile-event-editor-shell"
               header={
-                <div className="px-5 py-3 border-b border-border/40 flex flex-row items-center gap-2 shrink-0">
-                  <h2 className="inline-flex min-w-0 flex-1 items-center h-5 text-base font-semibold leading-none">
+                <div className="px-4 py-2 flex flex-row items-center gap-1.5 shrink-0">
+                  <h2 className="inline-flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium text-muted-foreground">
                     {dialogTitle}
                     <EncryptionStatusBadge
                       item={badgeItem}
-                      className="ml-1"
                       hidePlaintext={false}
                       iconSize="sm"
                     />
                   </h2>
-                  <DrawerClose className="flex size-10 shrink-0 items-center justify-center rounded-md text-foreground opacity-70 transition-opacity hover:opacity-100">
-                    <X size={20} />
+                  <DrawerClose className="flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                    <X className="size-5" />
                     <span className="sr-only">Close</span>
                   </DrawerClose>
                 </div>
@@ -177,12 +142,9 @@ export function EventEditorView({
                 <EventEditorBody
                   eventForm={eventForm}
                   isViewMode={flags.isViewMode}
-                  visibleSections={visibleSections}
-                  setShowLocation={setShowLocation}
-                  setShowDescription={setShowDescription}
-                  setShowParticipants={setShowParticipants}
                   localSettings={localSettings}
                   calendars={calendars}
+                  onSubmit={handleEventSave}
                 />
               </div>
             </DrawerShell>
@@ -199,25 +161,11 @@ export function EventEditorView({
         open={open}
         onOpenChange={onOpenChange}
         anchorPosition={anchorPosition}
-        badgeItem={badgeItem}
-        calendars={calendars}
-        dialogTitle={dialogTitle}
-        eventForm={eventForm}
-        handleEventSave={handleEventSave}
-        handleEventDelete={handleEventDelete}
-        handleEventDownloadIcs={handleEventDownloadIcs}
-        flags={flags}
-        invitationResponsePending={invitationResponsePending}
-        invitationStatus={invitationStatus}
-        leadingSlot={standardLeadingSlot}
-        localSettings={localSettings}
-        onInvitationResponse={handleInvitationResponse}
+        ariaLabel={dialogTitle}
         recurringModal={recurringModal}
-        setShowLocation={setShowLocation}
-        setShowDescription={setShowDescription}
-        setShowParticipants={setShowParticipants}
-        visibleSections={visibleSections}
-      />
+      >
+        {desktopContent}
+      </EventEditorPopover>
     );
   }
 
@@ -236,7 +184,7 @@ export function EventEditorView({
         variant="spotlight"
         showClose={false}
         aria-describedby={undefined}
-        className="overflow-hidden p-0 bg-popover border-border shadow-xl min-w-[420px] max-h-[750px] flex flex-col"
+        className="overflow-hidden p-0 bg-popover border-border shadow-lg rounded-xl w-[460px] max-w-[calc(100vw-2rem)] max-h-[min(750px,calc(100dvh-4rem))] flex flex-col"
       >
         <VisuallyHidden>
           <DialogTitle>{dialogTitle}</DialogTitle>

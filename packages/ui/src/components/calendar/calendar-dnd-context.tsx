@@ -25,7 +25,10 @@ import {
 import { addMinutes, differenceInMinutes } from "date-fns";
 import { createLogger } from "@workspace/logger";
 import {
+  getEventCalendarDayRange,
   getZonedDateParts,
+  isSamePickerDay,
+  moveAllDayEventToDay,
   resolveTimezone,
   wallClockToUtc,
 } from "@workspace/calendar-core";
@@ -270,6 +273,21 @@ export function CalendarDndProvider({
       const date = overData.date;
       const time = overData.time;
 
+      if (calendarEvent.allDay && time === undefined) {
+        const { firstDay } = getEventCalendarDayRange(
+          calendarEvent,
+          resolvedTimezone,
+        );
+        if (!isSamePickerDay(firstDay, date)) {
+          onEventUpdate({
+            ...calendarEvent,
+            ...moveAllDayEventToDay(calendarEvent, date, resolvedTimezone),
+            timezone: resolvedTimezone,
+          });
+        }
+        return;
+      }
+
       // Calculate new start time
       let newStart: Date;
 
@@ -315,6 +333,7 @@ export function CalendarDndProvider({
           ...calendarEvent,
           start: newStart,
           end: newEnd,
+          timezone: resolvedTimezone,
         });
       }
     } catch (error) {

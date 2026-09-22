@@ -95,13 +95,25 @@ jest.mock("@workspace/ui/components/ui/textarea", () => ({
 jest.mock("@workspace/ui/components/ui/autocompletetimepicker", () => ({
   ShadcnAutocomleteTimePicker: () => null,
 }));
+jest.mock("@workspace/ui/components/ui/dropdown-menu", () => ({
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DropdownMenuContent: () => null,
+  DropdownMenuItem: () => null,
+  DropdownMenuSeparator: () => null,
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+jest.mock("../../components/mail/recipient-suggest-input", () => ({
+  RecipientSuggestInput: ({ placeholder }: { placeholder?: string }) => (
+    <input placeholder={placeholder} />
+  ),
+}));
+jest.mock("@workspace/ui/hooks/use-mobile", () => ({
+  useIsMobile: () => false,
+}));
 jest.mock("lucide-react", () => new Proxy({}, { get: () => () => null }));
 
 jest.mock("../../components/command-palette/recurring-event-form", () => ({
   RecurringEventForm: () => null,
-}));
-jest.mock("../../components/event-editor/event-editor-field-toggles", () => ({
-  EventEditorFieldToggles: () => null,
 }));
 jest.mock("../../lib/event-propagation", () => ({
   stopEventPropagation: () => undefined,
@@ -159,14 +171,7 @@ describe("EventEditorBody", () => {
           desktop={true}
           isViewMode={true}
           localSettings={{ timeFormat: "24h" } as any}
-          setShowDescription={() => {}}
-          setShowLocation={() => {}}
-          setShowParticipants={() => {}}
-          visibleSections={{
-            description: true,
-            location: true,
-            participants: true,
-          }}
+          onSubmit={() => {}}
           eventForm={
             {
               eventAllDay: false,
@@ -264,14 +269,7 @@ describe("EventEditorBody", () => {
           desktop={true}
           isViewMode={true}
           localSettings={{ timeFormat: "24h" } as any}
-          setShowDescription={() => {}}
-          setShowLocation={() => {}}
-          setShowParticipants={() => {}}
-          visibleSections={{
-            description: true,
-            location: true,
-            participants: true,
-          }}
+          onSubmit={() => {}}
           eventForm={
             {
               eventAllDay: false,
@@ -311,5 +309,54 @@ describe("EventEditorBody", () => {
     expect(container.textContent).toContain(
       "It stays on your calendar until you remove it.",
     );
+  });
+  it("shows every edit field up front and submits on Enter in the title", async () => {
+    const onSubmit = jest.fn();
+    await act(async () => {
+      root.render(
+        <EventEditorBody
+          calendars={[]}
+          desktop={true}
+          isViewMode={false}
+          localSettings={{ timeFormat: "24h" } as any}
+          onSubmit={onSubmit}
+          eventForm={
+            {
+              eventAllDay: false,
+              eventCalendarId: "cal-1",
+              eventDescription: "",
+              eventEndDate: new Date(2026, 4, 27),
+              eventEndTime: "11:00",
+              eventLocation: "",
+              eventNotifications: [],
+              eventParticipants: [],
+              eventStartDate: new Date(2026, 4, 27),
+              eventStartTime: "10:00",
+              eventTitle: "Planning sync",
+              isRecurring: false,
+              notificationsLoading: false,
+              recurrenceRule: null,
+              selectedEvent: null,
+              setEventTitle: () => {},
+            } as any
+          }
+        />,
+      );
+    });
+
+    expect(container.querySelector('input[placeholder="Add location"]')).not.toBeNull();
+    expect(container.querySelector('textarea[placeholder="Add description"]')).not.toBeNull();
+    expect(container.querySelector('input[placeholder="Add participants"]')).not.toBeNull();
+    expect(container.textContent).toContain("Does not repeat");
+
+    const title = container.querySelector(
+      'input[aria-label="Event title"]',
+    ) as HTMLInputElement;
+    await act(async () => {
+      title.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+    });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 });

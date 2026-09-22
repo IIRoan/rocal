@@ -1,9 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Label } from "@workspace/ui/components/ui/label";
 import { Input } from "@workspace/ui/components/ui/input";
-import { Checkbox } from "@workspace/ui/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -11,95 +8,162 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/ui/select";
-import { RotateCcw } from "lucide-react";
+import { cn } from "@workspace/ui/lib/utils";
+import { format } from "date-fns";
 import type { RecurrenceRule, RecurrenceFrequency } from "@/lib/types/calendar";
 
-interface RecurringEventFormProps {
-  isRecurring: boolean;
-  onIsRecurringChange: (isRecurring: boolean) => void;
-  recurrenceRule: RecurrenceRule | null;
-  onRecurrenceRuleChange: (rule: RecurrenceRule | null) => void;
-  eventStartDate: Date;
-  eventEndDate: Date;
+import { chipClass, fieldClass } from "../event-editor/event-editor-styles";
+
+const WEEKDAYS = [
+  { index: 1, short: "M", long: "Monday" },
+  { index: 2, short: "T", long: "Tuesday" },
+  { index: 3, short: "W", long: "Wednesday" },
+  { index: 4, short: "T", long: "Thursday" },
+  { index: 5, short: "F", long: "Friday" },
+  { index: 6, short: "S", long: "Saturday" },
+  { index: 0, short: "S", long: "Sunday" },
+];
+
+const UNIT_LABELS: Record<RecurrenceFrequency, [string, string]> = {
+  daily: ["day", "days"],
+  weekly: ["week", "weeks"],
+  monthly: ["month", "months"],
+  yearly: ["year", "years"],
+};
+
+const MONTHS = Array.from({ length: 12 }, (_, index) =>
+  new Date(2024, index, 1).toLocaleDateString("default", { month: "long" }),
+);
+
+function parseBounded(value: string, min: number, max: number) {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, parsed));
 }
 
-const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-export function RecurringEventForm({
-  isRecurring,
-  onIsRecurringChange,
-  recurrenceRule,
-  onRecurrenceRuleChange,
-  eventStartDate: _eventStartDate,
-  eventEndDate: _eventEndDate,
-}: RecurringEventFormProps) {
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [customRule, setCustomRule] = useState<RecurrenceRule>({
-    frequency: "weekly",
-    interval: 1,
-  });
-
-  // Initialize custom rule when recurring is enabled
-  useEffect(() => {
-    if (isRecurring && !recurrenceRule) {
-      onRecurrenceRuleChange(customRule);
-    }
-  }, [isRecurring, recurrenceRule, customRule, onRecurrenceRuleChange]);
-
-  const handleCustomRuleUpdate = (updates: Partial<RecurrenceRule>) => {
-    const newRule = { ...customRule, ...updates };
-    setCustomRule(newRule);
-    onRecurrenceRuleChange(newRule);
-  };
-
-  const handleWeekdayToggle = (day: number) => {
-    const currentDays = customRule.byWeekDay || [];
-    const newDays = currentDays.includes(day)
-      ? currentDays.filter((d) => d !== day)
-      : [...currentDays, day].sort();
-
-    handleCustomRuleUpdate({
-      byWeekDay: newDays.length > 0 ? newDays : undefined,
-    });
-  };
-
-  const handleCountSet = (count: number | undefined) => {
-    handleCustomRuleUpdate({
-      count,
-      until: undefined, // Clear until if setting count
-    });
-  };
-
-  if (!isRecurring) {
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="recurring"
-            checked={isRecurring}
-            onCheckedChange={(checked) => onIsRecurringChange(checked === true)}
-            className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-          />
-          <Label
-            htmlFor="recurring"
-            className="text-sm font-medium cursor-pointer flex items-center gap-2"
+function WeekdayPicker({
+  selected,
+  onToggle,
+}: {
+  selected: number[];
+  onToggle: (day: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      {WEEKDAYS.map((day) => {
+        const active = selected.includes(day.index);
+        return (
+          <button
+            key={day.index}
+            type="button"
+            aria-pressed={active}
+            aria-label={day.long}
+            title={day.long}
+            onClick={() => onToggle(day.index)}
+            className={cn(
+              "inline-flex size-8 items-center justify-center rounded-full text-xs font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+              active
+                ? "bg-primary text-primary-foreground"
+                : "bg-accent/60 text-foreground hover:bg-accent",
+            )}
           >
-            <RotateCcw className="size-4 text-muted-foreground" />
-            Make this a recurring event
-          </Label>
-        </div>
-      </div>
-    );
-  }
+            {day.short}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function RepeatEnds({
+  rule,
+  onChange,
+}: {
+  rule: RecurrenceRule;
+  onChange: (updates: Partial<RecurrenceRule>) => void;
+}) {
+  const mode = rule.count ? "after" : rule.until ? "until" : "never";
 
   return (
-    <div className="space-y-3">
-      {/* Frequency and Interval in one row */}
-      <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="w-12 text-sm text-muted-foreground">Ends</span>
+      <Select
+        value={mode}
+        onValueChange={(value) => {
+          if (value === "after") {
+            onChange({ count: 10, until: undefined });
+          } else if (value === "never") {
+            onChange({ count: undefined, until: undefined });
+          }
+        }}
+      >
+        <SelectTrigger aria-label="Ends" className={cn(chipClass(true), "w-auto")}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="never">Never</SelectItem>
+          <SelectItem value="after">After</SelectItem>
+          {rule.until && (
+            <SelectItem value="until">
+              On {format(new Date(rule.until), "MMM d, yyyy")}
+            </SelectItem>
+          )}
+        </SelectContent>
+      </Select>
+      {mode === "after" && (
+        <>
+          <Input
+            type="number"
+            min={1}
+            max={999}
+            aria-label="Number of occurrences"
+            value={rule.count}
+            onChange={(event) =>
+              onChange({ count: parseBounded(event.target.value, 1, 999) })
+            }
+            className={cn(fieldClass(true), "h-8 w-16 px-2")}
+          />
+          <span className="text-sm text-muted-foreground">
+            {rule.count === 1 ? "time" : "times"}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function RecurringEventForm({
+  rule,
+  onChange,
+}: {
+  rule: RecurrenceRule;
+  onChange: (rule: RecurrenceRule) => void;
+}) {
+  const update = (updates: Partial<RecurrenceRule>) =>
+    onChange({ ...rule, ...updates });
+  const selectedWeekdays = rule.byWeekDay ?? [];
+
+  return (
+    <div className="space-y-1.5 pt-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="w-12 text-sm text-muted-foreground">Every</span>
+        <Input
+          type="number"
+          min={1}
+          max={99}
+          aria-label="Repeat interval"
+          value={rule.interval}
+          onChange={(event) =>
+            update({ interval: parseBounded(event.target.value, 1, 99) })
+          }
+          className={cn(fieldClass(true), "h-8 w-14 px-2")}
+        />
         <Select
-          value={customRule.frequency}
+          value={rule.frequency}
           onValueChange={(value: RecurrenceFrequency) =>
-            handleCustomRuleUpdate({
+            update({
               frequency: value,
               byWeekDay: undefined,
               byMonthDay: undefined,
@@ -107,226 +171,87 @@ export function RecurringEventForm({
             })
           }
         >
-          <SelectTrigger className="w-[110px] h-9">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="daily">Daily</SelectItem>
-            <SelectItem value="weekly">Weekly</SelectItem>
-            <SelectItem value="monthly">Monthly</SelectItem>
-            <SelectItem value="yearly">Yearly</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {customRule.interval === 1 ? (
-          <span className="text-sm text-muted-foreground">
-            {customRule.frequency === "daily" && "every day"}
-            {customRule.frequency === "weekly" && "every week"}
-            {customRule.frequency === "monthly" && "every month"}
-            {customRule.frequency === "yearly" && "every year"}
-          </span>
-        ) : (
-          <>
-            <span className="text-sm text-muted-foreground">every</span>
-            <Input
-              type="number"
-              min="2"
-              max="99"
-              value={customRule.interval}
-              onChange={(e) =>
-                handleCustomRuleUpdate({
-                  interval: parseInt(e.target.value) || 2,
-                })
-              }
-              className="w-16 h-9"
-            />
-            <span className="text-sm text-muted-foreground">
-              {customRule.frequency === "daily" && "days"}
-              {customRule.frequency === "weekly" && "weeks"}
-              {customRule.frequency === "monthly" && "months"}
-              {customRule.frequency === "yearly" && "years"}
-            </span>
-          </>
-        )}
-      </div>
-
-      {/* Weekly - Days of week */}
-      {customRule.frequency === "weekly" && (
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm text-muted-foreground">on</span>
-          {WEEKDAY_SHORT.map((day, index) => (
-            <button
-              key={day}
-              type="button"
-              onClick={() => handleWeekdayToggle(index)}
-              className={`inline-flex items-center justify-center size-7 text-xs rounded-md transition-colors ${
-                customRule.byWeekDay?.includes(index)
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted hover:bg-muted/80"
-              }`}
-            >
-              {day.slice(0, 1)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* End condition */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">ends</span>
-        <Select
-          value={customRule.count ? "after" : "never"}
-          onValueChange={(value) => {
-            if (value === "never") {
-              handleCustomRuleUpdate({ until: undefined, count: undefined });
-            } else {
-              handleCustomRuleUpdate({ until: undefined, count: 10 });
-            }
-          }}
-        >
-          <SelectTrigger className="w-[100px] h-9">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="never">never</SelectItem>
-            <SelectItem value="after">after</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {customRule.count !== undefined && (
-          <>
-            <Input
-              type="number"
-              min="1"
-              max="999"
-              value={customRule.count}
-              onChange={(e) =>
-                handleCountSet(parseInt(e.target.value) || undefined)
-              }
-              className="w-16 h-9"
-            />
-            <span className="text-sm text-muted-foreground">times</span>
-          </>
-        )}
-      </div>
-
-      {/* Advanced toggle */}
-      {!showAdvanced && (
-        <button
-          type="button"
-          onClick={() => setShowAdvanced(true)}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          More options…
-        </button>
-      )}
-
-      {showAdvanced && (
-        <div className="space-y-3 pt-2 border-t">
-          {/* Interval override */}
-          <div className="flex items-center gap-2">
-            <Label className="text-sm">Repeat every</Label>
-            <Input
-              type="number"
-              min="1"
-              max="99"
-              value={customRule.interval}
-              onChange={(e) =>
-                handleCustomRuleUpdate({
-                  interval: parseInt(e.target.value) || 1,
-                })
-              }
-              className="w-16 h-9"
-            />
-            <span className="text-sm text-muted-foreground">
-              {customRule.frequency === "daily" &&
-                (customRule.interval === 1 ? "day" : "days")}
-              {customRule.frequency === "weekly" &&
-                (customRule.interval === 1 ? "week" : "weeks")}
-              {customRule.frequency === "monthly" &&
-                (customRule.interval === 1 ? "month" : "months")}
-              {customRule.frequency === "yearly" &&
-                (customRule.interval === 1 ? "year" : "years")}
-            </span>
-          </div>
-
-          {/* Monthly - Day of month */}
-          {customRule.frequency === "monthly" && (
-            <div className="flex items-center gap-2">
-              <Label className="text-sm">On day</Label>
-              <Input
-                type="number"
-                min="1"
-                max="31"
-                value={customRule.byMonthDay?.[0] || ""}
-                onChange={(e) => {
-                  const day = parseInt(e.target.value);
-                  handleCustomRuleUpdate({
-                    byMonthDay:
-                      day && day >= 1 && day <= 31 ? [day] : undefined,
-                  });
-                }}
-                placeholder="15"
-                className="w-16 h-9"
-              />
-              <span className="text-sm text-muted-foreground">
-                of the month
-              </span>
-            </div>
-          )}
-
-          {/* Yearly - Month and day */}
-          {customRule.frequency === "yearly" && (
-            <div className="flex items-center gap-2">
-              <Label className="text-sm">On</Label>
-              <Select
-                value={customRule.byMonth?.[0]?.toString() || ""}
-                onValueChange={(value) =>
-                  handleCustomRuleUpdate({
-                    byMonth: value ? [parseInt(value)] : undefined,
-                  })
-                }
-              >
-                <SelectTrigger className="w-[120px] h-9">
-                  <SelectValue placeholder="Month" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 12 }, (_, i) => (
-                    <SelectItem key={i + 1} value={(i + 1).toString()}>
-                      {new Date(2024, i, 1).toLocaleDateString("default", {
-                        month: "long",
-                      })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                min="1"
-                max="31"
-                value={customRule.byMonthDay?.[0] || ""}
-                onChange={(e) => {
-                  const day = parseInt(e.target.value);
-                  handleCustomRuleUpdate({
-                    byMonthDay:
-                      day && day >= 1 && day <= 31 ? [day] : undefined,
-                  });
-                }}
-                placeholder="Day"
-                className="w-16 h-9"
-              />
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setShowAdvanced(false)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          <SelectTrigger
+            aria-label="Repeat unit"
+            className={cn(chipClass(true), "w-auto")}
           >
-            Hide options
-          </button>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(UNIT_LABELS) as RecurrenceFrequency[]).map(
+              (frequency) => (
+                <SelectItem key={frequency} value={frequency}>
+                  {UNIT_LABELS[frequency][rule.interval === 1 ? 0 : 1]}
+                </SelectItem>
+              ),
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {rule.frequency === "weekly" && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="w-12 text-sm text-muted-foreground">On</span>
+          <WeekdayPicker
+            selected={selectedWeekdays}
+            onToggle={(day) => {
+              const next = selectedWeekdays.includes(day)
+                ? selectedWeekdays.filter((value) => value !== day)
+                : [...selectedWeekdays, day].sort();
+              update({ byWeekDay: next.length > 0 ? next : undefined });
+            }}
+          />
         </div>
       )}
+
+      {(rule.frequency === "monthly" || rule.frequency === "yearly") && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="w-12 text-sm text-muted-foreground">On</span>
+          {rule.frequency === "yearly" && (
+            <Select
+              value={rule.byMonth?.[0]?.toString() ?? ""}
+              onValueChange={(value) =>
+                update({ byMonth: value ? [Number(value)] : undefined })
+              }
+            >
+              <SelectTrigger
+                aria-label="Month"
+                className={cn(chipClass(true), "w-auto")}
+              >
+                <SelectValue placeholder="Same month" />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((month, index) => (
+                  <SelectItem key={month} value={(index + 1).toString()}>
+                    {month}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Input
+            type="number"
+            min={1}
+            max={31}
+            aria-label="Day of month"
+            placeholder="Day"
+            value={rule.byMonthDay?.[0] ?? ""}
+            onChange={(event) =>
+              update({
+                byMonthDay: event.target.value
+                  ? [parseBounded(event.target.value, 1, 31)]
+                  : undefined,
+              })
+            }
+            className={cn(fieldClass(true), "h-8 w-16 px-2")}
+          />
+          {rule.frequency === "monthly" && (
+            <span className="text-sm text-muted-foreground">of the month</span>
+          )}
+        </div>
+      )}
+
+      <RepeatEnds rule={rule} onChange={update} />
     </div>
   );
 }

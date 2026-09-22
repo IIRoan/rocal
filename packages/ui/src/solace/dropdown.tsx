@@ -22,7 +22,7 @@ const PRIMITIVES = {
 } as const;
 
 const SURFACE_CLASS =
-  "z-50 overflow-hidden rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-l3-solid)] text-[var(--text-primary)] shadow-[var(--shadow-l2)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.98] duration-150";
+  "z-50 overflow-hidden rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-l3-solid)] text-[var(--text-primary)] shadow-[var(--shadow-l2)] outline-none";
 
 const MENU_SURFACE_CLASS = cn(
   SURFACE_CLASS,
@@ -83,6 +83,7 @@ export function Dropdown({
         <DropdownMenuPrimitive.Trigger asChild>{trigger}</DropdownMenuPrimitive.Trigger>
         <DropdownMenuPrimitive.Portal>
           <DropdownMenuPrimitive.Content
+            data-surface-motion=""
             align={align}
             side={side}
             sideOffset={sideOffset}
@@ -121,6 +122,7 @@ export function ContextDropdown({
         <ContextMenuPrimitive.Trigger asChild>{trigger}</ContextMenuPrimitive.Trigger>
         <ContextMenuPrimitive.Portal>
           <ContextMenuPrimitive.Content
+            data-surface-motion=""
             collisionPadding={8}
             className={MENU_SURFACE_CLASS}
             style={style}
@@ -210,6 +212,7 @@ export function DropdownSubmenu({
       </Primitive.SubTrigger>
       <Primitive.Portal>
         <Primitive.SubContent
+          data-surface-motion=""
           sideOffset={6}
           collisionPadding={8}
           className={MENU_SURFACE_CLASS}
@@ -279,6 +282,7 @@ export function DropdownPanel({
       <PopoverPrimitive.Trigger asChild>{trigger}</PopoverPrimitive.Trigger>
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
+          data-surface-motion=""
           align={align}
           side={side}
           sideOffset={sideOffset}

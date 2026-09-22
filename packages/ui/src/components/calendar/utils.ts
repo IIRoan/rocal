@@ -9,13 +9,13 @@ import {
 } from "date-fns";
 import {
   eventOverlapsCalendarDay,
-  getInclusiveCalendarDayRange,
+  eventSpansMultipleCalendarDays,
+  getEventCalendarDayRange,
   getTimedTimelineEventsForDay,
   getZonedDayUtcBounds,
   isSameCalendarDayInTimezone,
   isSamePickerDay,
   resolveTimezone,
-  spansMultipleCalendarDays,
 } from "@workspace/calendar-core";
 
 import type { CalendarEvent } from "./types";
@@ -78,12 +78,7 @@ export function getEventSegmentForCalendarDay(
   calendarDay: Date,
   timezone: string,
 ): { isFirstDay: boolean; isLastDay: boolean } {
-  const { firstDay, lastDay } = getInclusiveCalendarDayRange(
-    new Date(event.start),
-    new Date(event.end),
-    timezone,
-    { allDay: event.allDay },
-  );
+  const { firstDay, lastDay } = getEventCalendarDayRange(event, timezone);
 
   return {
     isFirstDay: isSamePickerDay(calendarDay, firstDay),
@@ -99,12 +94,7 @@ export function isMultiDayEvent(
   timezone?: string,
 ): boolean {
   if (timezone) {
-    return spansMultipleCalendarDays(
-      new Date(event.start),
-      new Date(event.end),
-      timezone,
-      { allDay: event.allDay },
-    );
+    return eventSpansMultipleCalendarDays(event, timezone);
   }
 
   const rawStart = new Date(event.start);
@@ -140,12 +130,7 @@ export function getEventInterval(
   }
 
   if (timezone) {
-    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
-      rawStart,
-      rawEnd,
-      timezone,
-      { allDay: event.allDay },
-    );
+    const { firstDay, lastDay } = getEventCalendarDayRange(event, timezone);
 
     if (!event.allDay && isSamePickerDay(firstDay, lastDay)) {
       return { start: rawStart, end: rawEnd };
@@ -220,6 +205,12 @@ export function getEventsForDay(
   return events
     .filter((event) => {
       const eventStart = new Date(event.start);
+      if (timezone && event.allDay) {
+        return isSamePickerDay(
+          getEventCalendarDayRange(event, timezone).firstDay,
+          day,
+        );
+      }
       if (timezone) {
         return isSameCalendarDayInTimezone(eventStart, day, timezone);
       }
@@ -260,11 +251,9 @@ export function getSpanningEventsForDay(
 
   return events.filter((event) => {
     if (!isMultiDayEvent(event, timezone)) return false;
-    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
-      new Date(event.start),
-      new Date(event.end),
+    const { firstDay, lastDay } = getEventCalendarDayRange(
+      event,
       timezone ?? resolveTimezone(),
-      { allDay: event.allDay },
     );
     const { start: dayStart, end: dayEnd } = timezone
       ? getZonedDayUtcBounds(day, timezone)

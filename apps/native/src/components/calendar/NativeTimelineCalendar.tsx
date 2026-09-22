@@ -33,7 +33,7 @@ import {
   formatEventSpanLabel,
   isCancelledCalendarEvent,
   resolveTimezone,
-  spansMultipleCalendarDays,
+  eventSpansMultipleCalendarDays,
 } from "@workspace/calendar-core";
 import { useTheme } from "../../providers/ThemeProvider";
 import { resolveEventBlockColor } from "../../lib/calendar-color-utils";
@@ -252,12 +252,7 @@ export const NativeTimelineCalendar = forwardRef<
       const spanLabel =
         options.allDay &&
         source &&
-        spansMultipleCalendarDays(
-          new Date(source.start),
-          new Date(source.end),
-          resolvedTimezone,
-          { allDay: Boolean(source.allDay) },
-        )
+        eventSpansMultipleCalendarDays(source, resolvedTimezone)
           ? formatEventSpanLabel(source, resolvedTimezone)
           : null;
 

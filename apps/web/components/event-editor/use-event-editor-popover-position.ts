@@ -9,16 +9,14 @@ type PopoverPosition = {
 export function useEventEditorPopoverPosition({
   anchorPosition,
   open,
-  sectionKey,
 }: {
   anchorPosition: { x: number; y: number };
   open: boolean;
-  sectionKey: string;
 }): {
-  popoverRef: RefObject<HTMLDivElement | null>;
+  popoverRef: RefObject<HTMLDialogElement | null>;
   position: PopoverPosition | null;
 } {
-  const popoverRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDialogElement>(null);
   const [position, setPosition] = useState<PopoverPosition | null>(null);
   const positionRef = useRef<PopoverPosition | null>(null);
 
@@ -32,7 +30,7 @@ export function useEventEditorPopoverPosition({
       return;
     }
 
-    const POPOVER_WIDTH = 420;
+    const POPOVER_WIDTH = 440;
     const POPOVER_MAX_HEIGHT = 750;
     const POPOVER_MIN_HEIGHT = 320;
     const VIEWPORT_PADDING = 16;
@@ -175,7 +173,7 @@ export function useEventEditorPopoverPosition({
       resizeObserver?.disconnect();
       mutationObserver?.disconnect();
     };
-  }, [anchorPosition, open, sectionKey]);
+  }, [anchorPosition, open]);
 
   return { popoverRef, position };
 }

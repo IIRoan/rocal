@@ -15,6 +15,7 @@ import {
   getOperationWarningMessages,
   pickerDateAndTimeToUtc,
   pickerDateToAllDayUtcRange,
+  resolveTimezone,
 } from "@workspace/calendar-core";
 import { RecurrenceEngine } from "@workspace/calendar-core";
 import type { RecurrenceRule } from "@/lib/types/calendar";
@@ -587,7 +588,7 @@ export function useEventForm({
         return;
       }
 
-      const timezone = localSettings.timezone;
+      const timezone = resolveTimezone(localSettings.timezone);
       let start: Date;
       let end: Date;
 
@@ -617,7 +618,7 @@ export function useEventForm({
         description: eventDescription.trim(),
         start,
         end,
-        timezone: localSettings.timezone,
+        timezone,
         allDay: eventAllDay,
         location: eventLocation.trim(),
         color: calendarColor as any,
