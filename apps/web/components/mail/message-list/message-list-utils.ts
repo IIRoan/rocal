@@ -4,12 +4,12 @@ import { getAllMessageLabels } from "@/lib/mail/mail-labels";
 import type { LabelDef } from "@/lib/mail/types";
 import { formatAddress } from "../mail-helpers";
 
-export const ROW_HEIGHT_MOBILE = 60;
-export const ROW_HEIGHT_DESKTOP = 68;
-export const ROW_HEIGHT_DESKTOP_COMFORTABLE = 84;
-export const ROW_HEIGHT_MOBILE_COMFORTABLE = 76;
-export const ROW_HEIGHT_WITH_LABELS = 80;
-export const ROW_HEIGHT_WITH_LABELS_COMFORTABLE = 96;
+export const ROW_HEIGHT_MOBILE = 101;
+export const ROW_HEIGHT_DESKTOP = 56;
+export const ROW_HEIGHT_DESKTOP_COMFORTABLE = 72;
+export const ROW_HEIGHT_MOBILE_COMFORTABLE = 101;
+export const ROW_HEIGHT_WITH_LABELS = 56;
+export const ROW_HEIGHT_WITH_LABELS_COMFORTABLE = 72;
 export const SCROLL_LOAD_THRESHOLD = 62;
 
 export type MessageListThreadRow = {
@@ -26,16 +26,19 @@ export function getRowHeight(
   density: "compact" | "comfortable" = "compact",
   showLabelChips: boolean = true,
 ): number {
+  if (isMobile) {
+    return density === "comfortable"
+      ? ROW_HEIGHT_MOBILE_COMFORTABLE
+      : ROW_HEIGHT_MOBILE;
+  }
   const hasLabels =
     showLabelChips && getAllMessageLabels(message, labels).length > 0;
   if (density === "comfortable") {
-    if (hasLabels) return ROW_HEIGHT_WITH_LABELS_COMFORTABLE;
-    return isMobile
-      ? ROW_HEIGHT_MOBILE_COMFORTABLE
+    return hasLabels
+      ? ROW_HEIGHT_WITH_LABELS_COMFORTABLE
       : ROW_HEIGHT_DESKTOP_COMFORTABLE;
   }
-  if (hasLabels) return ROW_HEIGHT_WITH_LABELS;
-  return isMobile ? ROW_HEIGHT_MOBILE : ROW_HEIGHT_DESKTOP;
+  return hasLabels ? ROW_HEIGHT_WITH_LABELS : ROW_HEIGHT_DESKTOP;
 }
 
 export function formatThreadSenders(messages: JmapEmailMessage[]): string {

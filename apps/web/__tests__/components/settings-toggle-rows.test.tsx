@@ -9,8 +9,9 @@ jest.mock("lucide-react", () => {
 
   return {
     ArrowLeft: Icon,
-    Bell: Icon,
+    ChevronLeft: Icon,
     ChevronRight: Icon,
+    Bell: Icon,
     Key: Icon,
     Mail: Icon,
     Search: Icon,

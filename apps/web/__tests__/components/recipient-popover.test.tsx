@@ -37,22 +37,6 @@ jest.mock("@workspace/calendar-core", () => ({
   isCurrentUserMailAddress: () => false,
 }));
 
-jest.mock("@workspace/ui/components/ui/popover", () => ({
-  Popover: ({
-    children,
-    open,
-  }: {
-    children: React.ReactNode;
-    open: boolean;
-  }) => <div data-open={open}>{children}</div>,
-  PopoverTrigger: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  PopoverContent: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="popover-content">{children}</div>
-  ),
-}));
-
 jest.mock("../../components/mail/mail-avatar", () => ({
   SenderAvatar: () => <span>avatar</span>,
 }));
@@ -93,6 +77,18 @@ afterEach(() => {
   container.remove();
 });
 
+function openPopover() {
+  act(() => {
+    container.querySelector("button")!.click();
+  });
+}
+
+function findButton(text: string) {
+  return Array.from(document.body.querySelectorAll("button")).find((button) =>
+    button.textContent?.includes(text),
+  );
+}
+
 describe("RecipientPopover", () => {
   it("starts a new compose to the recipient", () => {
     act(() => {
@@ -101,9 +97,8 @@ describe("RecipientPopover", () => {
       );
     });
 
-    const composeButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("Email"),
-    );
+    openPopover();
+    const composeButton = findButton("Send email");
 
     act(() => {
       composeButton!.click();
@@ -120,9 +115,8 @@ describe("RecipientPopover", () => {
       root.render(<RecipientPopover email="alice@example.com" />);
     });
 
-    const copyButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("Copy"),
-    );
+    openPopover();
+    const copyButton = findButton("Copy address");
 
     await act(async () => {
       copyButton!.click();

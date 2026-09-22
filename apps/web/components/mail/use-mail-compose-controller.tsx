@@ -1,14 +1,13 @@
 "use client";
 
 import {
-  useCallback,
   useEffect,
-  useMemo,
   useReducer,
   useRef,
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { toast } from "sonner";
 import type { MailServerLimits } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { htmlToPlainText } from "@/lib/mail/signature-utils";
@@ -32,7 +31,11 @@ import {
   type MailComposeAction,
   type MailComposeState,
 } from "./mail-compose-state";
-import type { ComposeMode, DraftSaveStatus } from "./mail-compose-types";
+import type {
+  ComposeDraft,
+  ComposeMode,
+  DraftSaveStatus,
+} from "./mail-compose-types";
 import {
   buildComposeSnapshot,
   buildNewComposeBodies,
@@ -40,9 +43,17 @@ import {
   type ComposeSnapshot,
 } from "./mail-compose-utils";
 
-const pendingCloseActionRef: { current: (() => void) | null } = {
-  current: null,
-};
+/** Mirrors the autosave rule for when a draft is worth saving. */
+function hasSavableContent(draft: ComposeDraft): boolean {
+  return Boolean(
+    draft.to.trim() ||
+      draft.cc.trim() ||
+      draft.bcc.trim() ||
+      draft.subject.trim() ||
+      draft.body.trim() ||
+      draft.htmlBody.trim(),
+  );
+}
 
 function patchAttachments(
   dispatch: Dispatch<MailComposeAction>,
@@ -76,6 +87,7 @@ export function useMailComposeController({
   const draftIdRef = useRef<string | null>(null);
   const baselineRef = useRef<ComposeSnapshot | null>(null);
   const explicitCloseRef = useRef(false);
+  const closingRef = useRef(false);
 
   const resolvedIdentityId =
     state.selectedIdentityId &&
@@ -87,40 +99,22 @@ export function useMailComposeController({
     draftIdRef.current = state.draftId;
   }, [state.draftId]);
 
-  const draft = useMemo(
-    () =>
-      toComposeDraft(
-        {
-          composeTo: state.composeTo,
-          composeCc: state.composeCc,
-          composeBcc: state.composeBcc,
-          composeSubject: state.composeSubject,
-          composeBody: state.composeBody,
-          composeHtmlBody: state.composeHtmlBody,
-          composeAttachments: state.composeAttachments,
-          composeMode: state.composeMode,
-          quotedAttachments: state.quotedAttachments,
-          signatureAlreadyEmbedded: state.signatureAlreadyEmbedded,
-          composeReplyContext: state.composeReplyContext,
-        },
-        resolvedIdentityId,
-        state.draftId,
-      ),
-    [
-      state.composeTo,
-      state.composeCc,
-      state.composeBcc,
-      state.composeSubject,
-      state.composeBody,
-      state.composeHtmlBody,
-      state.composeAttachments,
-      state.composeMode,
-      state.quotedAttachments,
-      state.signatureAlreadyEmbedded,
-      state.composeReplyContext,
-      resolvedIdentityId,
-      state.draftId,
-    ],
+  const draft = toComposeDraft(
+    {
+      composeTo: state.composeTo,
+      composeCc: state.composeCc,
+      composeBcc: state.composeBcc,
+      composeSubject: state.composeSubject,
+      composeBody: state.composeBody,
+      composeHtmlBody: state.composeHtmlBody,
+      composeAttachments: state.composeAttachments,
+      composeMode: state.composeMode,
+      quotedAttachments: state.quotedAttachments,
+      signatureAlreadyEmbedded: state.signatureAlreadyEmbedded,
+      composeReplyContext: state.composeReplyContext,
+    },
+    resolvedIdentityId,
+    state.draftId,
   );
 
   const draftRef = useRef(draft);
@@ -128,130 +122,145 @@ export function useMailComposeController({
     draftRef.current = draft;
   }, [draft]);
 
-  const markDirty = useCallback(() => {
+  const markDirty = () => {
     /* baseline comparison handles dirty detection */
-  }, []);
+  };
 
-  const captureComposeBaseline = useCallback(() => {
+  const acknowledgeSavedDraft = () => {
     baselineRef.current = buildComposeSnapshot(draftRef.current);
-  }, []);
+  };
 
-  const acknowledgeSavedDraft = useCallback(() => {
-    baselineRef.current = buildComposeSnapshot(draftRef.current);
-  }, []);
-
-  const isComposeDirty = useCallback(() => {
+  const isComposeDirty = () => {
     const baseline = baselineRef.current;
     if (!baseline) return true;
     return (
       JSON.stringify(buildComposeSnapshot(draftRef.current)) !==
       JSON.stringify(baseline)
     );
-  }, []);
+  };
 
-  const shouldConfirmComposeClose = useCallback(() => {
-    if (isComposeDirty()) return true;
-    if (draftIdRef.current) return true;
-    return false;
-  }, [isComposeDirty]);
-
-  const runPendingCloseAction = useCallback(() => {
-    const action = pendingCloseActionRef.current;
-    pendingCloseActionRef.current = null;
-    action?.();
-  }, []);
-
-  const bumpComposeSessionId = useCallback(() => {
+  const bumpComposeSessionId = () => {
     dispatch({ type: "incrementSession" });
-  }, []);
+  };
 
-  const requestComposeClose = useCallback(
-    (afterClose?: () => void) => {
-      if (!shouldConfirmComposeClose()) {
-        pendingCloseActionRef.current = null;
-        return true;
-      }
-      pendingCloseActionRef.current = afterClose ?? null;
-      dispatch({ type: "patch", patch: { composeClosePromptOpen: true } });
-      return false;
-    },
-    [shouldConfirmComposeClose],
-  );
-
-  const handleKeepEditing = useCallback(() => {
-    pendingCloseActionRef.current = null;
-    dispatch({ type: "patch", patch: { composeClosePromptOpen: false } });
-  }, []);
-
-  const handleSaveDraftAndClose = useCallback(async () => {
-    dispatch({ type: "patch", patch: { composeClosePromptOpen: false } });
-    await flushComposeDraftSave();
+  const closeCompose = (afterClose?: () => void) => {
     getComposeCloseActionsRef().current?.dismiss();
-    runPendingCloseAction();
-  }, [runPendingCloseAction]);
+    afterClose?.();
+  };
 
-  const handleDiscardAndClose = useCallback(() => {
-    dispatch({ type: "patch", patch: { composeClosePromptOpen: false } });
-    const currentDraftId = draftIdRef.current;
-    if (currentDraftId) {
-      getComposeCloseActionsRef().current?.discardDraft?.(currentDraftId);
+  const discardDraft = (draftId: string | null) => {
+    if (draftId) getComposeCloseActionsRef().current?.discardDraft?.(draftId);
+  };
+
+  const notifyDraftSaved = (draftId: string) => {
+    toast("Draft saved", {
+      id: "compose-draft-saved",
+      action: { label: "Discard", onClick: () => discardDraft(draftId) },
+    });
+  };
+
+  const saveDraftAndClose = async (afterClose?: () => void) => {
+    const savedDraftId = await flushComposeDraftSave();
+    if (!savedDraftId && hasSavableContent(draftRef.current)) {
+      // Keep compose open so a failed save never silently drops the message.
+      toast.error("Couldn't save draft", {
+        id: "compose-draft-saved",
+        action: {
+          label: "Discard",
+          onClick: () => {
+            discardDraft(draftIdRef.current);
+            closeCompose(afterClose);
+          },
+        },
+      });
+      return;
     }
-    getComposeCloseActionsRef().current?.dismiss();
-    runPendingCloseAction();
-  }, [runPendingCloseAction]);
+    const finishClose = () => {
+      closeCompose(afterClose);
+      if (savedDraftId) notifyDraftSaved(savedDraftId);
+    };
+    // Drafts are saved without file attachments, so dropping them needs explicit consent.
+    if (draftRef.current.attachments.length > 0) {
+      toast.error("Attachments aren't saved with drafts", {
+        id: "compose-draft-saved",
+        action: { label: "Close anyway", onClick: finishClose },
+      });
+      return;
+    }
+    finishClose();
+  };
 
-  const resetDraftRefs = useCallback(() => {
+  const requestComposeClose = (afterClose?: () => void) => {
+    if (!isComposeDirty() && draftRef.current.attachments.length === 0) {
+      if (draftIdRef.current) notifyDraftSaved(draftIdRef.current);
+      return true;
+    }
+    if (!closingRef.current) {
+      closingRef.current = true;
+      void saveDraftAndClose(afterClose).finally(() => {
+        closingRef.current = false;
+      });
+    }
+    return false;
+  };
+
+  const resetDraftRefs = () => {
     draftIdRef.current = null;
     baselineRef.current = null;
     explicitCloseRef.current = false;
-  }, []);
+  };
 
-  const applySeed = useCallback(
-    (seed: {
-      patch: Partial<MailComposeState>;
-      identityId?: string | null;
-    }) => {
-      resetComposeInlineImages();
-      resetDraftRefs();
-      dispatch({
-        type: "patch",
-        patch: {
-          ...seed.patch,
-          ...(seed.identityId !== undefined
-            ? { selectedIdentityId: seed.identityId }
-            : {}),
-        },
-      });
-    },
-    [resetDraftRefs],
-  );
+  const applySeed = (seed: {
+    patch: Partial<MailComposeState>;
+    identityId?: string | null;
+  }) => {
+    resetComposeInlineImages();
+    resetDraftRefs();
+    // Baseline is the seeded state so an untouched reply/forward closes without saving a draft.
+    baselineRef.current = buildComposeSnapshot(
+      toComposeDraft(
+        { ...state, ...seed.patch },
+        seed.identityId ?? resolvedIdentityId,
+        null,
+      ),
+    );
+    dispatch({
+      type: "patch",
+      patch: {
+        ...seed.patch,
+        ...(seed.identityId !== undefined
+          ? { selectedIdentityId: seed.identityId }
+          : {}),
+      },
+    });
+  };
 
-  const resetDraft = useCallback(() => {
+  const resetDraft = () => {
     resetDraftRefs();
     dispatch({
       type: "resetDraft",
       selectedIdentityId: identities[0]?.id ?? null,
     });
-  }, [identities, resetDraftRefs]);
+  };
 
-  const clearCompose = useCallback(() => {
+  const clearCompose = () => {
     resetDraftRefs();
     resetComposeInlineImages();
     dispatch({
       type: "clearComposeFields",
       selectedIdentityId: identities[0]?.id ?? null,
     });
-  }, [identities, resetDraftRefs]);
+  };
 
-  const dismissCompose = useCallback(() => {
+  const dismissCompose = () => {
     clearCompose();
     dispatch({
       type: "patch",
       patch: { isComposeOpen: false, isFullCompose: false },
     });
-  }, [clearCompose]);
+  };
 
-  const openNewCompose = useCallback(() => {
+  const openNewCompose = () => {
     const seed = buildOpenNewComposeSeed(identities, resolvedIdentityId);
     applySeed(seed);
     const identity =
@@ -278,90 +287,77 @@ export function useMailComposeController({
         null,
       ),
     });
-  }, [applySeed, identities, resolvedIdentityId]);
+  };
 
-  const seedReply = useCallback(
-    (message: JmapEmailMessage, plaintext: string | null) => {
-      applySeed(
-        buildReplySeed(message, plaintext, identities, resolvedIdentityId),
-      );
-    },
-    [applySeed, identities, resolvedIdentityId],
-  );
+  const seedReply = (message: JmapEmailMessage, plaintext: string | null) => {
+    applySeed(
+      buildReplySeed(message, plaintext, identities, resolvedIdentityId),
+    );
+  };
 
-  const seedForward = useCallback(
-    (message: JmapEmailMessage, plaintext: string | null) => {
-      applySeed(
-        buildForwardSeed(message, plaintext, identities, resolvedIdentityId),
-      );
-    },
-    [applySeed, identities, resolvedIdentityId],
-  );
+  const seedForward = (message: JmapEmailMessage, plaintext: string | null) => {
+    applySeed(
+      buildForwardSeed(message, plaintext, identities, resolvedIdentityId),
+    );
+  };
 
-  const seedNewMessage = useCallback(
-    (recipient: { email: string; name?: string | null }) => {
-      applySeed(
-        buildNewMessageSeed(recipient, identities, resolvedIdentityId),
-      );
-    },
-    [applySeed, identities, resolvedIdentityId],
-  );
+  const seedNewMessage = (recipient: {
+    email: string;
+    name?: string | null;
+  }) => {
+    applySeed(buildNewMessageSeed(recipient, identities, resolvedIdentityId));
+  };
 
-  const seedDraft = useCallback(
-    (
-      message: JmapEmailMessage,
-      overrides?: {
-        plaintext?: string | null;
-        html?: string | null;
-      },
-    ) => {
-      const seed = buildDraftSeed(
-        message,
-        identities,
-        resolvedIdentityId,
-        overrides,
-      );
-      applySeed(seed);
-      if (seed.identityId) {
-        draftIdRef.current = message.id;
-      }
-      baselineRef.current = buildComposeSnapshot(
-        toComposeDraft(
-          {
-            composeTo: seed.patch.composeTo ?? "",
-            composeCc: seed.patch.composeCc ?? "",
-            composeBcc: seed.patch.composeBcc ?? "",
-            composeSubject: seed.patch.composeSubject ?? "",
-            composeBody: seed.patch.composeBody ?? "",
-            composeHtmlBody: seed.patch.composeHtmlBody ?? "",
-            composeAttachments: [],
-            composeMode: (seed.patch.composeMode ?? "draft") as ComposeMode,
-            quotedAttachments:
-              (seed.patch.quotedAttachments as QuotedInlineAttachment[]) ?? [],
-            signatureAlreadyEmbedded: seed.patch.signatureAlreadyEmbedded ?? false,
-            composeReplyContext: seed.patch.composeReplyContext ?? null,
-          },
-          seed.identityId ?? null,
-          message.id,
-        ),
-      );
+  const seedDraft = (
+    message: JmapEmailMessage,
+    overrides?: {
+      plaintext?: string | null;
+      html?: string | null;
     },
-    [applySeed, identities, resolvedIdentityId],
-  );
+  ) => {
+    const seed = buildDraftSeed(
+      message,
+      identities,
+      resolvedIdentityId,
+      overrides,
+    );
+    applySeed(seed);
+    if (seed.identityId) {
+      draftIdRef.current = message.id;
+    }
+    baselineRef.current = buildComposeSnapshot(
+      toComposeDraft(
+        {
+          composeTo: seed.patch.composeTo ?? "",
+          composeCc: seed.patch.composeCc ?? "",
+          composeBcc: seed.patch.composeBcc ?? "",
+          composeSubject: seed.patch.composeSubject ?? "",
+          composeBody: seed.patch.composeBody ?? "",
+          composeHtmlBody: seed.patch.composeHtmlBody ?? "",
+          composeAttachments: [],
+          composeMode: (seed.patch.composeMode ?? "draft") as ComposeMode,
+          quotedAttachments:
+            (seed.patch.quotedAttachments as QuotedInlineAttachment[]) ?? [],
+          signatureAlreadyEmbedded:
+            seed.patch.signatureAlreadyEmbedded ?? false,
+          composeReplyContext: seed.patch.composeReplyContext ?? null,
+        },
+        seed.identityId ?? null,
+        message.id,
+      ),
+    );
+  };
 
-  const openDraftEditor = useCallback(
-    (
-      message: JmapEmailMessage,
-      overrides?: {
-        plaintext?: string | null;
-        html?: string | null;
-      },
-    ) => {
-      bumpComposeSessionId();
-      seedDraft(message, overrides);
+  const openDraftEditor = (
+    message: JmapEmailMessage,
+    overrides?: {
+      plaintext?: string | null;
+      html?: string | null;
     },
-    [bumpComposeSessionId, seedDraft],
-  );
+  ) => {
+    bumpComposeSessionId();
+    seedDraft(message, overrides);
+  };
 
   useEffect(() => {
     composeBridgeRef.current = {
@@ -376,7 +372,6 @@ export function useMailComposeController({
       openDraftEditor,
       markDirty,
       isComposeDirty,
-      captureComposeBaseline,
       acknowledgeSavedDraft,
       bumpComposeSessionId,
       getDraftIdRef: () => draftIdRef.current,
@@ -388,133 +383,91 @@ export function useMailComposeController({
         dispatch({ type: "patch", patch: { draftSaveStatus: status } });
       },
     };
-    return () => {
+  });
+
+  // Clear only on unmount: a per-render cleanup would null the bridge while child autosave effects run.
+  useEffect(
+    () => () => {
       composeBridgeRef.current = null;
-    };
-  }, [
-    resetDraft,
+    },
+    [],
+  );
+
+  const fieldsValue = {
+    composeTo: state.composeTo,
+    setComposeTo: (value: string) => {
+      markDirty();
+      dispatch({ type: "patch", patch: { composeTo: value } });
+    },
+    composeCc: state.composeCc,
+    setComposeCc: (value: string) => {
+      markDirty();
+      dispatch({ type: "patch", patch: { composeCc: value } });
+    },
+    composeBcc: state.composeBcc,
+    setComposeBcc: (value: string) => {
+      markDirty();
+      dispatch({ type: "patch", patch: { composeBcc: value } });
+    },
+    composeSubject: state.composeSubject,
+    setComposeSubject: (value: string) => {
+      markDirty();
+      dispatch({ type: "patch", patch: { composeSubject: value } });
+    },
+    composeBody: state.composeBody,
+    setComposeBody: (value: string) => {
+      markDirty();
+      dispatch({ type: "patch", patch: { composeBody: value } });
+    },
+    composeHtmlBody: state.composeHtmlBody,
+    setComposeHtmlBody: (value: string) => {
+      markDirty();
+      dispatch({
+        type: "patch",
+        patch: {
+          composeHtmlBody: value,
+          composeBody: htmlToPlainText(value),
+        },
+      });
+    },
+    composeAttachments: state.composeAttachments,
+    setComposeAttachments: (value: SetStateAction<File[]>) => {
+      markDirty();
+      patchAttachments(dispatch, value, state.composeAttachments);
+    },
+    mailServerLimits,
+    selectedIdentityId: resolvedIdentityId,
+    setSelectedIdentityId: (id: string | null) => {
+      markDirty();
+      dispatch({ type: "patch", patch: { selectedIdentityId: id } });
+    },
+    draftSaveStatus: state.draftSaveStatus,
+    setDraftSaveStatus: (status: DraftSaveStatus) => {
+      dispatch({ type: "patch", patch: { draftSaveStatus: status } });
+    },
+    composeDraftId: state.draftId,
     clearCompose,
+    composeMode: state.composeMode,
+    quotedAttachments: state.quotedAttachments,
     openNewCompose,
-    seedReply,
-    seedForward,
-    seedNewMessage,
-    seedDraft,
-    openDraftEditor,
-    markDirty,
-    isComposeDirty,
-    captureComposeBaseline,
-    acknowledgeSavedDraft,
-    bumpComposeSessionId,
-  ]);
+    composeSessionId: state.composeSessionId,
+    requestComposeClose,
+  };
 
-  const fieldsValue = useMemo(
-    () => ({
-      composeTo: state.composeTo,
-      setComposeTo: (value: string) => {
-        markDirty();
-        dispatch({ type: "patch", patch: { composeTo: value } });
-      },
-      composeCc: state.composeCc,
-      setComposeCc: (value: string) => {
-        markDirty();
-        dispatch({ type: "patch", patch: { composeCc: value } });
-      },
-      composeBcc: state.composeBcc,
-      setComposeBcc: (value: string) => {
-        markDirty();
-        dispatch({ type: "patch", patch: { composeBcc: value } });
-      },
-      composeSubject: state.composeSubject,
-      setComposeSubject: (value: string) => {
-        markDirty();
-        dispatch({ type: "patch", patch: { composeSubject: value } });
-      },
-      composeBody: state.composeBody,
-      setComposeBody: (value: string) => {
-        markDirty();
-        dispatch({ type: "patch", patch: { composeBody: value } });
-      },
-      composeHtmlBody: state.composeHtmlBody,
-      setComposeHtmlBody: (value: string) => {
-        markDirty();
-        dispatch({
-          type: "patch",
-          patch: {
-            composeHtmlBody: value,
-            composeBody: htmlToPlainText(value),
-          },
-        });
-      },
-      composeAttachments: state.composeAttachments,
-      setComposeAttachments: (value: SetStateAction<File[]>) => {
-        markDirty();
-        patchAttachments(dispatch, value, state.composeAttachments);
-      },
-      mailServerLimits,
-      selectedIdentityId: resolvedIdentityId,
-      setSelectedIdentityId: (id: string | null) => {
-        markDirty();
-        dispatch({ type: "patch", patch: { selectedIdentityId: id } });
-      },
-      draftSaveStatus: state.draftSaveStatus,
-      setDraftSaveStatus: (status: DraftSaveStatus) => {
-        dispatch({ type: "patch", patch: { draftSaveStatus: status } });
-      },
-      composeDraftId: state.draftId,
-      clearCompose,
-      composeMode: state.composeMode,
-      quotedAttachments: state.quotedAttachments,
-      openNewCompose,
-      composeSessionId: state.composeSessionId,
-      requestComposeClose,
-    }),
-    [
-      state,
-      mailServerLimits,
-      resolvedIdentityId,
-      markDirty,
-      clearCompose,
-      openNewCompose,
-      requestComposeClose,
-    ],
-  );
-
-  const chromeValue = useMemo(
-    () => ({
-      isComposeOpen: state.isComposeOpen,
-      setIsComposeOpen: (open: boolean) => {
-        dispatch({ type: "patch", patch: { isComposeOpen: open } });
-      },
-      isFullCompose: state.isFullCompose,
-      setIsFullCompose: (open: boolean) => {
-        dispatch({ type: "patch", patch: { isFullCompose: open } });
-      },
-      dismissCompose,
-    }),
-    [state.isComposeOpen, state.isFullCompose, dismissCompose],
-  );
-
-  const closePromptValue = useMemo(
-    () => ({
-      composeClosePromptOpen: state.composeClosePromptOpen,
-      setComposeClosePromptOpen: (open: boolean) => {
-        dispatch({ type: "patch", patch: { composeClosePromptOpen: open } });
-      },
-      keepEditing: handleKeepEditing,
-      saveDraftAndClose: handleSaveDraftAndClose,
-      discardAndClose: handleDiscardAndClose,
-    }),
-    [
-      state.composeClosePromptOpen,
-      handleKeepEditing,
-      handleSaveDraftAndClose,
-      handleDiscardAndClose,
-    ],
-  );
+  const chromeValue = {
+    isComposeOpen: state.isComposeOpen,
+    setIsComposeOpen: (open: boolean) => {
+      dispatch({ type: "patch", patch: { isComposeOpen: open } });
+    },
+    isFullCompose: state.isFullCompose,
+    setIsFullCompose: (open: boolean) => {
+      dispatch({ type: "patch", patch: { isFullCompose: open } });
+    },
+    dismissCompose,
+  };
 
   return {
     fieldsValue,
     chromeValue,
-    closePromptValue,
   };
 }

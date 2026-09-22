@@ -4,6 +4,7 @@ import {
   SidebarProvider,
   SidebarInset,
 } from "@workspace/ui/components/ui/sidebar";
+import { SolaceTheme } from "@workspace/ui/solace";
 import { MailSidebar } from "../mail-sidebar";
 import { MobileMailHeader } from "../mail-app-mobile-header";
 import { MailAppListColumn } from "./mail-app-list-column";
@@ -19,9 +20,11 @@ export function MailAppMainLayout({
     user,
     activeMailbox,
     handleSelectMailbox,
+    handleSelectLabel,
     handleOpenCompose,
     setIsPaletteOpen,
     handleOpenMailboxesPalette,
+    handleOpenLabelsPalette,
     handleSignOut,
     handleReorderMailboxes,
     isBusy,
@@ -31,9 +34,12 @@ export function MailAppMainLayout({
     accountEmail,
     isRefreshing,
     handleManualRefresh,
+    labels,
+    activeLabelId,
   } = controller;
 
   return (
+    <SolaceTheme className="h-svh max-h-svh overflow-hidden">
     <SidebarProvider className="h-svh max-h-svh min-h-0 overflow-hidden">
       <MailSidebar
         user={user ?? { name: "User", email: "" }}
@@ -46,10 +52,14 @@ export function MailAppMainLayout({
         onSignOut={() => void handleSignOut()}
         onReorderMailboxes={(reordered) => void handleReorderMailboxes(reordered)}
         isBusy={isBusy}
+        labels={labels}
+        activeLabelId={activeLabelId}
+        onSelectLabel={handleSelectLabel}
+        onOpenLabels={handleOpenLabelsPalette}
       />
-      <SidebarInset className="min-h-0 overflow-hidden">
+      <SidebarInset className="min-h-0 overflow-hidden border border-[var(--border-secondary)] bg-[var(--bg-l1-solid)] shadow-[var(--shadow-l1)] lg:peer-data-[variant=inset]:rounded-xl">
         {activeMailbox ? (
-          <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--bg-l1-solid)]">
             {isMobile && !showMobileDetailPane && (
               <MobileMailHeader
                 selectedMailboxName={selectedMailboxName}
@@ -71,5 +81,6 @@ export function MailAppMainLayout({
         ) : null}
       </SidebarInset>
     </SidebarProvider>
+    </SolaceTheme>
   );
 }

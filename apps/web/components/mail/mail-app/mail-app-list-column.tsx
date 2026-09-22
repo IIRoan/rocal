@@ -1,15 +1,8 @@
 "use client";
 
-import { RotateCcw, Search, X } from "lucide-react";
-import { Button } from "@workspace/ui/components/ui/button";
-import { Input } from "@workspace/ui/components/ui/input";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@workspace/ui/components/ui/tooltip";
-import { AdvancedSearchPanel, AdvancedSearchToggle, countActiveFilters } from "../advanced-search-panel";
 import { MessageList } from "../message-list";
+import { MailMailboxHeader } from "../mail-mailbox-header";
+import { applyMailListViewFilter } from "../mail-app-list-chrome-state";
 import type { MailAppContentController } from "../use-mail-app-content-controller";
 
 export function MailAppListColumn({
@@ -29,8 +22,10 @@ export function MailAppListColumn({
     mailListSearch,
     advancedFilters,
     filterPanelExpanded,
+    searchBarOpen,
+    listViewFilter,
+    activeLabelId,
     isSearching,
-    searchUiActive,
     isSearchDebouncing,
     searchActive,
     showSearchLoadingState,
@@ -70,6 +65,13 @@ export function MailAppListColumn({
     return null;
   }
 
+  const activeLabel = labels.find((label) => label.id === activeLabelId);
+  const unreadCount = applyMailListViewFilter(
+    activeMailbox.messages,
+    "all",
+    activeLabelId,
+  ).filter((message) => !message.keywords?.["$seen"]).length;
+
   return (
     <div
       className={
@@ -77,107 +79,51 @@ export function MailAppListColumn({
           ? showMobileDetailPane
             ? "hidden"
             : "flex h-full min-h-0 flex-1 flex-col overflow-hidden"
-          : "flex h-full min-h-0 w-72 shrink-0 flex-col overflow-hidden border-r border-border/40"
+          : "flex h-full min-h-0 min-w-[280px] flex-1 flex-col overflow-hidden border-r border-[var(--border-secondary)] bg-[var(--bg-l2-solid)]"
       }
     >
       {!isMobile && (
-        <header className="flex h-11 shrink-0 items-center border-b border-border/40 px-3 gap-2">
-          <h1 className="text-sm font-semibold flex-1 min-w-0 truncate">
-            {selectedMailboxName}
-          </h1>
-          <div className="flex items-center gap-0.5 shrink-0">
-            {canEmptyFolder ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                    disabled={isBusy || isRefreshing}
-                    onClick={() => patchListChrome({ emptyFolderOpen: true })}
-                  >
-                    {emptyFolderLabel}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Permanently delete all messages in this folder
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="rounded-[min(var(--radius-md),12px)] disabled:opacity-40"
-              disabled={isRefreshing || isBusy}
-              onClick={() => void handleManualRefresh()}
-              aria-label="Refresh mail"
-              title="Refresh mail"
-            >
-              <RotateCcw
-                size={15}
-                strokeWidth={2}
-                className={
-                  isRefreshing ? "animate-spin" : "transition-transform"
+        <MailMailboxHeader
+          title={activeLabel?.name ?? selectedMailboxName}
+          unreadCount={unreadCount}
+          filter={{
+            value: listViewFilter,
+            onChange: (value) => patchListChrome({ listViewFilter: value }),
+          }}
+          searchInputRef={searchInputRef}
+          search={{
+            open: searchBarOpen,
+            value: mailListSearch,
+            busy: Boolean(
+              (isSearching || isSearchDebouncing) && mailListSearch.trim(),
+            ),
+            onOpenChange: (open) => patchListChrome({ searchBarOpen: open }),
+            onChange: handleSearchInputChange,
+            onKeyDown: handleSearchInputKeyDown,
+            onClear: clearListSearch,
+          }}
+          advanced={{
+            filters: advancedFilters,
+            expanded: filterPanelExpanded,
+            onFiltersChange: (filters) =>
+              patchListChrome({ advancedFilters: filters }),
+            onExpandedChange: (expanded) =>
+              patchListChrome({ filterPanelExpanded: expanded }),
+          }}
+          refresh={{
+            spinning: isRefreshing,
+            disabled: isRefreshing || isBusy,
+            onClick: () => void handleManualRefresh(),
+          }}
+          emptyFolder={
+            canEmptyFolder
+              ? {
+                  label: emptyFolderLabel,
+                  onClick: () => patchListChrome({ emptyFolderOpen: true }),
                 }
-              />
-            </Button>
-          </div>
-        </header>
-      )}
-      {!isMobile && (
-        <div className="px-3 py-2 border-b border-border/40 shrink-0">
-          <div className="flex items-center gap-1.5">
-            <div className="relative flex min-w-0 flex-1 items-center">
-              <Search
-                size={13}
-                strokeWidth={2}
-                className="absolute left-2.5 text-muted-foreground/50 pointer-events-none"
-              />
-              <Input
-                ref={searchInputRef}
-                value={mailListSearch}
-                onChange={(e) => handleSearchInputChange(e.target.value)}
-                onKeyDown={handleSearchInputKeyDown}
-                placeholder="Search all messages… (press / to focus)"
-                className="h-7 w-full pl-7 pr-7 text-xs bg-muted/40 border-0 shadow-none rounded-md focus-visible:ring-1 focus-visible:ring-ring/40 placeholder:text-muted-foreground/40"
-              />
-              {(isSearching || isSearchDebouncing) && searchUiActive && (
-                <RotateCcw
-                  size={11}
-                  strokeWidth={2}
-                  className="absolute right-2 text-muted-foreground/40 animate-spin pointer-events-none"
-                />
-              )}
-              {mailListSearch && !isSearching && !isSearchDebouncing && (
-                <button
-                  type="button"
-                  onClick={clearListSearch}
-                  className="absolute right-2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                  aria-label="Clear search"
-                >
-                  <X size={12} strokeWidth={2.5} />
-                </button>
-              )}
-            </div>
-            <AdvancedSearchToggle
-              expanded={filterPanelExpanded}
-              onExpandedChange={(expanded) =>
-                patchListChrome({ filterPanelExpanded: expanded })
-              }
-              activeCount={countActiveFilters(advancedFilters)}
-            />
-          </div>
-          <AdvancedSearchPanel
-            filters={advancedFilters}
-            onFiltersChange={(filters) =>
-              patchListChrome({ advancedFilters: filters })
-            }
-            expanded={filterPanelExpanded}
-            onExpandedChange={(expanded) =>
-              patchListChrome({ filterPanelExpanded: expanded })
-            }
-          />
-        </div>
+              : undefined
+          }
+        />
       )}
       <div className="flex min-h-0 flex-1 flex-col">
         {showSearchLoadingState ? (

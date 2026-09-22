@@ -68,11 +68,11 @@ export function MessageReaderConversationStrip({
   }
 
   return (
-    <div className="mx-4 mb-2 shrink-0 rounded-lg border border-border/50">
+    <div className="shrink-0 border-b border-[var(--border-tertiary)]">
       <div
         className={cn(
-          "flex items-stretch bg-muted/40",
-          expanded && "border-b border-border/40",
+          "flex items-stretch",
+          expanded && "border-b border-[var(--border-tertiary)]",
         )}
       >
         <button
@@ -82,9 +82,9 @@ export function MessageReaderConversationStrip({
           onPointerDown={toggleExpandedFromPointer}
           onKeyDown={toggleExpandedFromKeyboard}
           className={cn(
-            "flex min-h-9 min-w-0 flex-1 items-center gap-1.5 px-3 py-1.5 text-left",
+            "flex min-h-9 min-w-0 flex-1 items-center gap-1.5 px-4 py-1.5 text-left",
             "cursor-pointer select-none touch-manipulation",
-            "hover:bg-accent/60",
+            "hover:bg-[var(--bg-cell-hover)]",
           )}
         >
           <ChevronDown
@@ -129,7 +129,7 @@ export function MessageReaderConversationStrip({
             conversationListRef.current = node;
             if (node) node.scrollTop = node.scrollHeight;
           }}
-          className="m-0 max-h-36 list-none divide-y divide-border/30 overflow-y-auto p-0"
+          className="m-0 max-h-36 list-none divide-y divide-[var(--border-tertiary)] overflow-y-auto p-0"
         >
           {visibleConversationMessages.map((threadMessage) => (
             <ThreadMessageRow
@@ -209,7 +209,7 @@ function ThreadMessageRow({
     <li
       className={cn(
         "relative flex items-stretch",
-        isActive ? "bg-primary/5" : "hover:bg-accent/40",
+        isActive ? "bg-[var(--bg-cell-active)]" : "hover:bg-[var(--bg-cell-hover)]",
       )}
     >
       {isActive ? (
@@ -223,7 +223,7 @@ function ThreadMessageRow({
         aria-current={isActive ? "true" : undefined}
         aria-label={`Open message from ${label}`}
         className={cn(
-          "flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left",
+          "flex min-w-0 flex-1 items-center gap-2 px-4 py-1.5 text-left",
           "cursor-pointer select-none touch-manipulation",
         )}
       >

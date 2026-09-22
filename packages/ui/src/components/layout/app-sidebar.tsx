@@ -35,11 +35,9 @@ import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { Button } from "../ui/button";
 import { LogOut } from "lucide-react";
 import { getColorSwatchValue } from "../calendar/utils";
-import {
-  SidebarShell,
-  SidebarPrimaryAction,
-  SidebarIconButton,
-} from "./sidebar-shell";
+import { SidebarShell } from "./sidebar-shell";
+import { SidebarPrimaryAction } from "./sidebar-primary-action";
+import { SidebarIconButton } from "./sidebar-icon-button";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: User;

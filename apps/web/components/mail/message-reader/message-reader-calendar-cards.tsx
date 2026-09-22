@@ -9,12 +9,10 @@ import {
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@workspace/ui/components/ui/dropdown-menu";
+  Dropdown,
+  DropdownDivider,
+  DropdownItem,
+} from "@workspace/ui/solace";
 import { cn } from "@workspace/ui/lib/utils";
 import { MailNotificationBanner } from "../mail-notification-banner";
 import type {
@@ -113,8 +111,9 @@ export function MessageReaderCalendarCards({
                   </Button>
                 </>
               ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                <Dropdown
+                  width={160}
+                  trigger={
                     <Button
                       size="xs"
                       variant="secondary"
@@ -127,46 +126,25 @@ export function MessageReaderCalendarCards({
                       {invitationStatus === "tentative" ? "Maybe" : "Accepted"}
                       <ChevronDown className="size-3 opacity-50" />
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-28">
-                    <DropdownMenuItem
-                      onClick={() => void handleInvitationResponse("accepted")}
-                      className={cn(
-                        invitationStatus === "accepted" && "font-medium",
-                      )}
-                    >
-                      <Check
-                        className={cn(
-                          "size-4",
-                          invitationStatus !== "accepted" && "opacity-0",
-                        )}
-                      />
-                      Accept
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => void handleInvitationResponse("tentative")}
-                      className={cn(
-                        invitationStatus === "tentative" && "font-medium",
-                      )}
-                    >
-                      <Check
-                        className={cn(
-                          "size-4",
-                          invitationStatus !== "tentative" && "opacity-0",
-                        )}
-                      />
-                      Maybe
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={() => void handleInvitationResponse("declined")}
-                    >
-                      <Check className="size-4 opacity-0" />
-                      Decline
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  }
+                >
+                  <DropdownItem
+                    label="Accept"
+                    active={invitationStatus === "accepted"}
+                    onSelect={() => void handleInvitationResponse("accepted")}
+                  />
+                  <DropdownItem
+                    label="Maybe"
+                    active={invitationStatus === "tentative"}
+                    onSelect={() => void handleInvitationResponse("tentative")}
+                  />
+                  <DropdownDivider />
+                  <DropdownItem
+                    label="Decline"
+                    destructive
+                    onSelect={() => void handleInvitationResponse("declined")}
+                  />
+                </Dropdown>
               )}
               {currentCalendarInviteEvent?.event &&
                 !invitationRemovedFromCalendar && (

@@ -1,17 +1,26 @@
 /** @jest-environment jsdom */
 
 import React, { act } from "react";
-import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
+import { toast } from "sonner";
 import {
   MailComposeProvider,
   useMailCompose,
   useMailComposeChrome,
-  useMailComposeClosePrompt,
 } from "@/components/mail/mail-compose-context";
-import { getMailComposeBridge } from "@/components/mail/mail-compose-bridge";
+import {
+  getMailComposeBridge,
+  registerComposeCloseActions,
+  registerComposeDraftSaver,
+} from "@/components/mail/mail-compose-bridge";
 import { resolveMailServerLimits } from "@workspace/calendar-core";
 
+jest.mock("sonner", () => ({
+  toast: Object.assign(jest.fn(), { error: jest.fn() }),
+}));
+
+const mockToast = jest.mocked(toast);
 const fallbackMailServerLimits = resolveMailServerLimits({});
 
 function ComposeProbe({
@@ -38,18 +47,6 @@ function ChromeProbe({
   return null;
 }
 
-function ClosePromptProbe({
-  onReady,
-}: {
-  onReady: (value: ReturnType<typeof useMailComposeClosePrompt>) => void;
-}) {
-  const prompt = useMailComposeClosePrompt();
-  React.useEffect(() => {
-    onReady(prompt);
-  }, [prompt, onReady]);
-  return null;
-}
-
 describe("useMailCompose", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -65,7 +62,29 @@ describe("useMailCompose", () => {
       root.unmount();
     });
     container.remove();
+    registerComposeDraftSaver(null);
+    registerComposeCloseActions(null);
+    mockToast.mockClear();
+    mockToast.error.mockClear();
   });
+
+  function registerCloseHarness(flushResult: string | null) {
+    const closeActions = { dismiss: jest.fn(), discardDraft: jest.fn() };
+    registerComposeCloseActions(closeActions);
+    registerComposeDraftSaver({
+      save: async () => flushResult,
+      flush: async () => flushResult,
+      cancelPending: () => {},
+    });
+    return closeActions;
+  }
+
+  function toastDiscardAction(mock: { mock: { calls: unknown[][] } }) {
+    const options = mock.mock.calls.at(-1)?.[1] as
+      | { action: { label: string; onClick: () => void } }
+      | undefined;
+    return options?.action;
+  }
 
   it("updates draft fields and exposes them via the bridge", async () => {
     let latest: ReturnType<typeof useMailCompose> | null = null;
@@ -195,15 +214,14 @@ describe("useMailCompose", () => {
     expect(getMailComposeBridge()?.getDraftIdRef()).toBe("draft-1");
   });
 
-  it("prompts before closing a saved draft even when not dirty", async () => {
+  it("closes a clean saved draft immediately and offers discard", async () => {
     let latest: ReturnType<typeof useMailCompose> | null = null;
-    let prompt: ReturnType<typeof useMailComposeClosePrompt> | null = null;
+    const closeActions = registerCloseHarness("draft-1");
 
     await act(async () => {
       root.render(
         <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
           <ComposeProbe onReady={(value) => { latest = value; }} />
-          <ClosePromptProbe onReady={(value) => { prompt = value; }} />
         </MailComposeProvider>,
       );
     });
@@ -227,13 +245,101 @@ describe("useMailCompose", () => {
 
     expect(getMailComposeBridge()?.isComposeDirty()).toBe(false);
 
-    let allowed = true;
+    let allowed = false;
     await act(async () => {
       allowed = latest!.requestComposeClose();
     });
 
+    expect(allowed).toBe(true);
+    expect(mockToast).toHaveBeenCalledWith("Draft saved", expect.anything());
+    const action = toastDiscardAction(mockToast);
+    expect(action?.label).toBe("Discard");
+    action?.onClick();
+    expect(closeActions.discardDraft).toHaveBeenCalledWith("draft-1");
+  });
+
+  it("saves a dirty draft before closing", async () => {
+    let latest: ReturnType<typeof useMailCompose> | null = null;
+    const closeActions = registerCloseHarness("draft-9");
+    const afterClose = jest.fn();
+
+    await act(async () => {
+      root.render(
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+          <ComposeProbe onReady={(value) => { latest = value; }} />
+        </MailComposeProvider>,
+      );
+    });
+
+    await act(async () => {
+      latest!.setComposeSubject("Unsaved");
+    });
+
+    let allowed = true;
+    await act(async () => {
+      allowed = latest!.requestComposeClose(afterClose);
+    });
+
     expect(allowed).toBe(false);
-    expect(prompt?.composeClosePromptOpen).toBe(true);
+    expect(closeActions.dismiss).toHaveBeenCalledTimes(1);
+    expect(afterClose).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledWith("Draft saved", expect.anything());
+  });
+
+  it("keeps compose open when the draft save fails", async () => {
+    let latest: ReturnType<typeof useMailCompose> | null = null;
+    const closeActions = registerCloseHarness(null);
+
+    await act(async () => {
+      root.render(
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+          <ComposeProbe onReady={(value) => { latest = value; }} />
+        </MailComposeProvider>,
+      );
+    });
+
+    await act(async () => {
+      latest!.setComposeBody("Do not lose me");
+    });
+
+    await act(async () => {
+      latest!.requestComposeClose();
+    });
+
+    expect(closeActions.dismiss).not.toHaveBeenCalled();
+    expect(mockToast.error).toHaveBeenCalledWith(
+      "Couldn't save draft",
+      expect.anything(),
+    );
+    toastDiscardAction(mockToast.error)?.onClick();
+    expect(closeActions.dismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps an attachment-only draft open until closing is confirmed", async () => {
+    let latest: ReturnType<typeof useMailCompose> | null = null;
+    const closeActions = registerCloseHarness(null);
+
+    await act(async () => {
+      root.render(
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+          <ComposeProbe onReady={(value) => { latest = value; }} />
+        </MailComposeProvider>,
+      );
+    });
+
+    await act(async () => {
+      latest!.setComposeAttachments([new File(["x"], "a.txt")]);
+    });
+
+    await act(async () => {
+      latest!.requestComposeClose();
+    });
+
+    expect(closeActions.dismiss).not.toHaveBeenCalled();
+    const action = toastDiscardAction(mockToast.error);
+    expect(action?.label).toBe("Close anyway");
+    action?.onClick();
+    expect(closeActions.dismiss).toHaveBeenCalledTimes(1);
   });
 
   it("seedReply sets reply mode and threading context", async () => {
@@ -268,5 +374,31 @@ describe("useMailCompose", () => {
     expect(draft?.replyContext).toEqual(
       expect.objectContaining({ threadId: null }),
     );
+  });
+
+  it("treats an untouched reply as clean so closing it saves no draft", async () => {
+    await act(async () => {
+      root.render(
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+          <ComposeProbe onReady={() => {}} />
+        </MailComposeProvider>,
+      );
+    });
+
+    const message = {
+      id: "msg-1",
+      subject: "Question",
+      from: [{ email: "bob@solace.onl" }],
+      to: [{ email: "alice@solace.onl" }],
+      receivedAt: "2026-06-19T10:00:00.000Z",
+      textBody: [{ partId: "1", type: "text/plain" }],
+      bodyValues: { "1": { value: "Hello?" } },
+    } as const;
+
+    await act(async () => {
+      getMailComposeBridge()?.seedReply(message as never, null);
+    });
+
+    expect(getMailComposeBridge()?.isComposeDirty()).toBe(false);
   });
 });

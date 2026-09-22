@@ -10,6 +10,7 @@ import {
   initialSecurityUiState,
   securityUiReducer,
 } from "./account-settings-ui-state";
+import { PaletteSection } from "./palette-ui";
 
 export function AccountSecuritySection({
   isBusy,
@@ -33,7 +34,9 @@ export function AccountSecuritySection({
     newPassword: string;
   }) => Promise<void>;
   handleSetPassword?: (values: { newPassword: string }) => Promise<void>;
-  handleResetEncryptionPassword?: (values: { newPassword: string }) => Promise<void>;
+  handleResetEncryptionPassword?: (values: {
+    newPassword: string;
+  }) => Promise<void>;
 }) {
   const [security, dispatch] = useReducer(
     securityUiReducer,
@@ -53,34 +56,29 @@ export function AccountSecuritySection({
           : "none";
 
   return (
-    <>
-      <div className="px-4 pb-1 pt-2 text-xs font-medium text-muted-foreground">
-        Security
-      </div>
+    <PaletteSection label="Security">
       {security.message && !isAnySecurityFormOpen ? (
-        <div className="mx-3 mb-1">
+        <div className="px-2 py-1">
           <InlineMessage msg={security.message} />
         </div>
       ) : null}
-      <div className="px-2 pb-1">
-        <AccountSecurityActions
-          accessKind={accessKind}
-          busy={isBusy}
-          formOpen={isAnySecurityFormOpen}
-          onOpenForm={(form) => dispatch({ type: "openForm", form })}
-        />
-        <AccountSecurityForm
-          security={security}
-          dispatch={dispatch}
-          activeForm={security.activeForm}
-          submission={{ busy: securityFormBusy }}
-          handlers={{
-            handleChangePassword,
-            handleSetPassword,
-            handleResetEncryptionPassword,
-          }}
-        />
-      </div>
-    </>
+      <AccountSecurityActions
+        accessKind={accessKind}
+        busy={isBusy}
+        formOpen={isAnySecurityFormOpen}
+        onOpenForm={(form) => dispatch({ type: "openForm", form })}
+      />
+      <AccountSecurityForm
+        security={security}
+        dispatch={dispatch}
+        activeForm={security.activeForm}
+        submission={{ busy: securityFormBusy }}
+        handlers={{
+          handleChangePassword,
+          handleSetPassword,
+          handleResetEncryptionPassword,
+        }}
+      />
+    </PaletteSection>
   );
 }

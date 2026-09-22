@@ -97,7 +97,6 @@ export type MessageReaderChromeState = {
   labelPopoverOpen: boolean;
   moreActionsOpen: boolean;
   morePopoverOpen: boolean;
-  moveToExpanded: boolean;
   isBodyExpanded: boolean;
   showOwnMessages: boolean;
   showRawHtmlDialog: boolean;
@@ -107,7 +106,6 @@ export const initialMessageReaderChromeState: MessageReaderChromeState = {
   labelPopoverOpen: false,
   moreActionsOpen: false,
   morePopoverOpen: false,
-  moveToExpanded: false,
   isBodyExpanded: false,
   showOwnMessages: false,
   showRawHtmlDialog: false,
@@ -115,7 +113,7 @@ export const initialMessageReaderChromeState: MessageReaderChromeState = {
 
 export type MessageReaderChromeAction =
   | { type: "patch"; patch: Partial<MessageReaderChromeState> }
-  | { type: "toggle"; field: "moveToExpanded" | "isBodyExpanded" | "showOwnMessages" };
+  | { type: "toggle"; field: "isBodyExpanded" | "showOwnMessages" };
 
 export function messageReaderChromeReducer(
   state: MessageReaderChromeState,

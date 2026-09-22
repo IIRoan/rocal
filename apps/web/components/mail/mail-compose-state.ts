@@ -19,7 +19,6 @@ export type MailComposeState = {
   isComposeOpen: boolean;
   isFullCompose: boolean;
   composeSessionId: number;
-  composeClosePromptOpen: boolean;
 };
 
 export const initialMailComposeState: MailComposeState = {
@@ -40,7 +39,6 @@ export const initialMailComposeState: MailComposeState = {
   isComposeOpen: false,
   isFullCompose: false,
   composeSessionId: 0,
-  composeClosePromptOpen: false,
 };
 
 export type MailComposeAction =

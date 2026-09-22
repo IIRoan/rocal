@@ -100,6 +100,8 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
 
     if (
       !toAddresses.length &&
+      !ccAddresses.length &&
+      !bccAddresses.length &&
       !draft.subject.trim() &&
       !plainBody &&
       !htmlForDraft
@@ -280,6 +282,8 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
 
     const hasContent =
       composeTo.trim() ||
+      composeCc.trim() ||
+      composeBcc.trim() ||
       composeSubject.trim() ||
       composeBody.trim() ||
       composeHtmlBody.trim();

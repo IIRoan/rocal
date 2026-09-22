@@ -10,6 +10,7 @@ export const mailQueryKeys = {
     [...mailQueryKeys.all, "message", messageId] as const,
   inlineSearch: (mailboxId: string | null, query: string) =>
     [...mailQueryKeys.all, "inline-search", mailboxId, query] as const,
+  hiddenMailboxIds: () => [...mailQueryKeys.all, "hiddenMailboxIds"] as const,
 } as const;
 
 export type MailMailboxMessagesCache = {

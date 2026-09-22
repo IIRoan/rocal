@@ -1,6 +1,6 @@
 import type { EncryptedJsonPayload } from "@workspace/e2ee";
 import { decryptJsonPayload, encryptJsonPayload } from "@/lib/e2ee-crypto";
-import { getActiveE2eeSession } from "@/lib/e2ee-session";
+import { getEncryptionSession } from "@/lib/e2ee-payloads";
 
 /** Binds the sealed secret to its purpose so it cannot be replayed elsewhere. */
 export const VAULT_SECRET_AAD = "mail-vault-secret";
@@ -27,7 +27,7 @@ export function generateVaultSecret(): string {
 }
 
 export async function wrapVaultSecret(secret: string): Promise<string | null> {
-  const session = getActiveE2eeSession();
+  const session = await getEncryptionSession();
   if (!session) {
     return null;
   }
@@ -43,7 +43,7 @@ export async function wrapVaultSecret(secret: string): Promise<string | null> {
 export async function unwrapVaultSecret(
   wrappedSecret: string,
 ): Promise<string | null> {
-  const session = getActiveE2eeSession();
+  const session = await getEncryptionSession();
   if (!session) {
     return null;
   }

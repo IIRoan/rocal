@@ -112,20 +112,25 @@ jest.mock("../../components/mail/mail-avatar", () => ({
 
 jest.mock("lucide-react", () => {
   const Icon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} />;
-
-  return {
+  const named: Record<string, typeof Icon> = {
     Trash2: Icon,
     FolderInput: Icon,
+    Mail: Icon,
     MailOpen: Icon,
     MailCheck: Icon,
     CheckSquare: Icon,
     Square: Icon,
+    Flag: Icon,
     MoreHorizontal: Icon,
     Search: Icon,
     Star: Icon,
     Paperclip: Icon,
     MessageSquare: Icon,
   };
+  return new Proxy(named, {
+    get: (target, prop) =>
+      typeof prop === "string" ? (target[prop] ?? Icon) : Icon,
+  });
 });
 
 describe("MessageList", () => {
@@ -221,5 +226,31 @@ describe("MessageList", () => {
     });
 
     expect(onSelect).toHaveBeenCalledWith("message-1");
+  });
+
+  it("drops selected messages that a filter hides", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const renderedContainer = container;
+    const renderedRoot = root;
+    const other: JmapEmailMessage = { ...message, id: "message-2", threadId: "thread-2" };
+    const render = (messages: JmapEmailMessage[]) =>
+      act(() => {
+        renderedRoot.render(
+          <MessageList messages={messages} selectedMessageId={null} onSelect={jest.fn()} />,
+        );
+      });
+
+    render([message, other]);
+    act(() => {
+      renderedContainer
+        .querySelector('button[aria-label="Select message"]')
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(renderedContainer.textContent).toContain("1 selected");
+
+    render([other]);
+    expect(renderedContainer.textContent).not.toContain("1 selected");
   });
 });

@@ -1,12 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useReducer, useState, type ReactNode } from "react";
 import type { Editor } from "@tiptap/react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@workspace/ui/components/ui/popover";
+import { DROPDOWN_PANEL_ROW_CLASS, DropdownPanel } from "@workspace/ui/solace";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   Bold,
@@ -30,6 +26,7 @@ import {
   Trash2,
   Rows3,
   Columns3,
+  X,
 } from "lucide-react";
 import { TableSizePicker } from "./rich-text-editor-table-picker";
 
@@ -53,8 +50,8 @@ function ToolbarButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-40",
-        active && "bg-muted text-foreground",
+        "inline-flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--icon-secondary)] hover:bg-[var(--bg-overlay-secondary)] disabled:opacity-40",
+        active && "bg-[var(--bg-overlay-secondary)] text-[var(--icon-primary)]",
       )}
     >
       {children}
@@ -63,26 +60,192 @@ function ToolbarButton({
 }
 
 function ToolbarSeparator() {
-  return <span className="mx-1 h-4 w-px bg-border/60" />;
+  return <span className="mx-1 h-6 w-px shrink-0 bg-[var(--border-primary)]" />;
+}
+
+function TableMenu({
+  editor,
+  disabled,
+  open,
+  onOpenChange,
+}: {
+  editor: Editor;
+  disabled: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const close = () => onOpenChange(false);
+  return (
+    <DropdownPanel
+      open={open}
+      onOpenChange={onOpenChange}
+      align="start"
+      className="z-[100] p-1"
+      onOpenAutoFocus={(event) => event.preventDefault()}
+      trigger={
+        <button
+          type="button"
+          title="Table"
+          disabled={disabled}
+          className={cn(
+            "inline-flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--icon-secondary)] hover:bg-[var(--bg-overlay-secondary)] disabled:opacity-40",
+            editor.isActive("table") &&
+              "bg-[var(--bg-overlay-secondary)] text-[var(--icon-primary)]",
+          )}
+        >
+          <TableIcon className="size-3.5" strokeWidth={2.25} />
+        </button>
+      }
+    >
+        {editor.isActive("table") ? (
+          <div className="flex flex-col gap-0.5">
+            <button
+              type="button"
+              className={DROPDOWN_PANEL_ROW_CLASS}
+              onClick={() => {
+                editor.chain().focus().addRowBefore().run();
+                close();
+              }}
+            >
+              <Rows3 className="size-4 text-[var(--icon-secondary)]" /> Add row above
+            </button>
+            <button
+              type="button"
+              className={DROPDOWN_PANEL_ROW_CLASS}
+              onClick={() => {
+                editor.chain().focus().addRowAfter().run();
+                close();
+              }}
+            >
+              <Rows3 className="size-4 text-[var(--icon-secondary)]" /> Add row below
+            </button>
+            <button
+              type="button"
+              className={DROPDOWN_PANEL_ROW_CLASS}
+              onClick={() => {
+                editor.chain().focus().addColumnBefore().run();
+                close();
+              }}
+            >
+              <Columns3 className="size-4 text-[var(--icon-secondary)]" /> Add column before
+            </button>
+            <button
+              type="button"
+              className={DROPDOWN_PANEL_ROW_CLASS}
+              onClick={() => {
+                editor.chain().focus().addColumnAfter().run();
+                close();
+              }}
+            >
+              <Columns3 className="size-4 text-[var(--icon-secondary)]" /> Add column after
+            </button>
+            <div className="-mx-1 my-1 h-px bg-[var(--border-tertiary)]" />
+            <button
+              type="button"
+              className={DROPDOWN_PANEL_ROW_CLASS}
+              onClick={() => {
+                editor.chain().focus().deleteRow().run();
+                close();
+              }}
+            >
+              <Trash2 className="size-4 text-[var(--icon-secondary)]" /> Delete row
+            </button>
+            <button
+              type="button"
+              className={DROPDOWN_PANEL_ROW_CLASS}
+              onClick={() => {
+                editor.chain().focus().deleteColumn().run();
+                close();
+              }}
+            >
+              <Trash2 className="size-4 text-[var(--icon-secondary)]" /> Delete column
+            </button>
+            <button
+              type="button"
+              className={DROPDOWN_PANEL_ROW_CLASS}
+              onClick={() => {
+                editor.chain().focus().toggleHeaderRow().run();
+                close();
+              }}
+            >
+              <Rows3 className="size-4 text-[var(--icon-secondary)]" /> Toggle header row
+            </button>
+            <div className="-mx-1 my-1 h-px bg-[var(--border-tertiary)]" />
+            <button
+              type="button"
+              className={cn(DROPDOWN_PANEL_ROW_CLASS, "text-[var(--text-destructive)]")}
+              onClick={() => {
+                editor.chain().focus().deleteTable().run();
+                close();
+              }}
+            >
+              <Trash2 className="size-4 text-[var(--icon-secondary)]" /> Delete table
+            </button>
+          </div>
+        ) : (
+          <TableSizePicker
+            onPick={(rows, cols) => {
+              editor
+                .chain()
+                .focus()
+                .insertTable({ rows, cols, withHeaderRow: true })
+                .run();
+              close();
+            }}
+          />
+        )}
+    </DropdownPanel>
+  );
 }
 
 type RichTextEditorToolbarProps = {
   editor: Editor;
   disabled: boolean;
-  applyHeading: (level: 1 | 2) => void;
-  addLink: () => void;
+  onClose: () => void;
 };
 
 export function RichTextEditorToolbar({
   editor,
   disabled,
-  applyHeading,
-  addLink,
+  onClose,
 }: RichTextEditorToolbarProps) {
   const [tableMenuOpen, setTableMenuOpen] = useState(false);
+  const [, refreshMarks] = useReducer((version: number) => version + 1, 0);
+
+  useEffect(() => {
+    const refresh = () => refreshMarks();
+    editor.on("selectionUpdate", refresh);
+    editor.on("transaction", refresh);
+    return () => {
+      editor.off("selectionUpdate", refresh);
+      editor.off("transaction", refresh);
+    };
+  }, [editor]);
+
+  const applyHeading = (level: 1 | 2) => {
+    const { empty } = editor.state.selection;
+    const chain = editor.chain().focus();
+    if (empty) chain.setHeading({ level }).run();
+    else chain.toggleHeading({ level }).run();
+  };
+
+  const addLink = () => {
+    const { from, to } = editor.state.selection;
+    if (from === to) return;
+    const previousUrl = editor.getAttributes("link").href as string | undefined;
+    const url = window.prompt("URL", previousUrl ?? "");
+    if (url === null) return;
+    const trimmed = url.trim();
+    if (!trimmed) {
+      editor.chain().focus().extendMarkRange("link").unsetLink().run();
+      return;
+    }
+    editor.chain().focus().setLink({ href: trimmed }).run();
+  };
 
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-border/50 bg-muted/30 px-2 py-1.5">
+    <div className="flex h-11 w-full shrink-0 items-center border-t border-[var(--border-tertiary)] bg-[var(--bg-overlay-tertiary)] pl-4 pr-2">
+      <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
       <ToolbarButton
         title="Bold"
         disabled={disabled}
@@ -208,124 +371,12 @@ export function RichTextEditorToolbar({
         <LinkIcon className="size-3.5" strokeWidth={2.25} />
       </ToolbarButton>
 
-      <Popover open={tableMenuOpen} onOpenChange={setTableMenuOpen} modal={false}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            title="Table"
-            disabled={disabled}
-            className={cn(
-              "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-40",
-              editor.isActive("table") && "bg-muted text-foreground",
-            )}
-          >
-            <TableIcon className="size-3.5" strokeWidth={2.25} />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          className="z-[100] w-auto min-w-[200px] p-2"
-          onOpenAutoFocus={(event) => event.preventDefault()}
-        >
-          {editor.isActive("table") ? (
-            <div className="flex flex-col gap-0.5">
-              <button
-                type="button"
-                className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60"
-                onClick={() => {
-                  editor.chain().focus().addRowBefore().run();
-                  setTableMenuOpen(false);
-                }}
-              >
-                <Rows3 className="size-4" /> Add row above
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60"
-                onClick={() => {
-                  editor.chain().focus().addRowAfter().run();
-                  setTableMenuOpen(false);
-                }}
-              >
-                <Rows3 className="size-4" /> Add row below
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60"
-                onClick={() => {
-                  editor.chain().focus().addColumnBefore().run();
-                  setTableMenuOpen(false);
-                }}
-              >
-                <Columns3 className="size-4" /> Add column before
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60"
-                onClick={() => {
-                  editor.chain().focus().addColumnAfter().run();
-                  setTableMenuOpen(false);
-                }}
-              >
-                <Columns3 className="size-4" /> Add column after
-              </button>
-              <div className="my-1 h-px bg-border" />
-              <button
-                type="button"
-                className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60"
-                onClick={() => {
-                  editor.chain().focus().deleteRow().run();
-                  setTableMenuOpen(false);
-                }}
-              >
-                <Trash2 className="size-4" /> Delete row
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60"
-                onClick={() => {
-                  editor.chain().focus().deleteColumn().run();
-                  setTableMenuOpen(false);
-                }}
-              >
-                <Trash2 className="size-4" /> Delete column
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60"
-                onClick={() => {
-                  editor.chain().focus().toggleHeaderRow().run();
-                  setTableMenuOpen(false);
-                }}
-              >
-                <Rows3 className="size-4" /> Toggle header row
-              </button>
-              <div className="my-1 h-px bg-border" />
-              <button
-                type="button"
-                className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-destructive hover:bg-muted/60"
-                onClick={() => {
-                  editor.chain().focus().deleteTable().run();
-                  setTableMenuOpen(false);
-                }}
-              >
-                <Trash2 className="size-4" /> Delete table
-              </button>
-            </div>
-          ) : (
-            <TableSizePicker
-              onPick={(rows, cols) => {
-                editor
-                  .chain()
-                  .focus()
-                  .insertTable({ rows, cols, withHeaderRow: true })
-                  .run();
-                setTableMenuOpen(false);
-              }}
-            />
-          )}
-        </PopoverContent>
-      </Popover>
+      <TableMenu
+        editor={editor}
+        disabled={disabled}
+        open={tableMenuOpen}
+        onOpenChange={setTableMenuOpen}
+      />
 
       <ToolbarSeparator />
 
@@ -355,6 +406,15 @@ export function RichTextEditorToolbar({
       >
         <Redo className="size-3.5" strokeWidth={2.25} />
       </ToolbarButton>
+      </div>
+      <button
+        type="button"
+        aria-label="Close formatting"
+        onClick={onClose}
+        className="ml-1 inline-flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--icon-secondary)] hover:bg-[var(--bg-overlay-secondary)]"
+      >
+        <X className="size-3.5" strokeWidth={2.25} />
+      </button>
     </div>
   );
 }

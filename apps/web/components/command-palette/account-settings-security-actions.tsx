@@ -2,20 +2,22 @@ import { Lock, RotateCcw, type LucideIcon } from "lucide-react";
 
 import type { SecurityAccessKind } from "./account-settings-types";
 import type { SecurityForm } from "./account-settings-ui-state";
+import {
+  PaletteIconBox,
+} from "./palette-ui";
+import { PALETTE_ROW_CLASS } from "./palette-styles";
 
 function SecurityActionButton({
-  title,
+  label,
   description,
   icon: Icon,
   disabled,
-  hidden,
   onClick,
 }: {
-  title: string;
+  label: string;
   description: string;
   icon: LucideIcon;
   disabled: boolean;
-  hidden: boolean;
   onClick: () => void;
 }) {
   return (
@@ -23,16 +25,19 @@ function SecurityActionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex w-full items-center gap-3 rounded-md p-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-      style={{ display: hidden ? "none" : undefined }}
+      className={PALETTE_ROW_CLASS}
     >
-      <div className="flex size-6 shrink-0 items-center justify-center">
-        <Icon className="size-4 text-muted-foreground" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-sm">{title}</div>
-        <div className="text-xs text-muted-foreground">{description}</div>
-      </div>
+      <PaletteIconBox>
+        <Icon className="size-4" />
+      </PaletteIconBox>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-[15px] leading-[130%] text-foreground">
+          {label}
+        </span>
+        <span className="text-[13px] leading-[130%] text-muted-foreground">
+          {description}
+        </span>
+      </span>
     </button>
   );
 }
@@ -57,7 +62,7 @@ export function AccountSecurityActions({
   return (
     <>
       {hasOAuthAccess ? (
-        <div className="mx-1 mb-2 rounded-lg border border-border/50 bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground">
+        <div className="p-2 text-[13px] leading-[130%] text-muted-foreground">
           OAuth and passkey sign-in use a separate encryption password.
           {accessKind === "oauth-only"
             ? " Setting an email password adds email sign-in to this account."
@@ -68,35 +73,32 @@ export function AccountSecurityActions({
         </div>
       ) : null}
 
-      {hasPasswordAccess ? (
+      {hasPasswordAccess && !formOpen ? (
         <SecurityActionButton
-          title="Change Password"
+          label="Change Password"
           description="Update your email sign-in password. Solace also uses it for encryption after email sign-in."
           icon={Lock}
           disabled={disabled}
-          hidden={formOpen}
           onClick={() => onOpenForm("change-password")}
         />
       ) : null}
 
-      {accessKind === "oauth-only" ? (
+      {accessKind === "oauth-only" && !formOpen ? (
         <SecurityActionButton
-          title="Set Email Password"
+          label="Set Email Password"
           description="Add an email sign-in password to this account. This does not change the separate encryption password used by OAuth or passkey sign-in."
           icon={Lock}
           disabled={disabled}
-          hidden={formOpen}
           onClick={() => onOpenForm("set-password")}
         />
       ) : null}
 
-      {hasOAuthAccess ? (
+      {hasOAuthAccess && !formOpen ? (
         <SecurityActionButton
-          title="Reset Encryption Password"
+          label="Reset Encryption Password"
           description="Choose a new encryption password for OAuth or passkey sign-in. This keeps your encrypted data intact and only replaces the password used to unlock your keys on new devices."
           icon={RotateCcw}
           disabled={disabled}
-          hidden={formOpen}
           onClick={() => onOpenForm("reset-encryption")}
         />
       ) : null}

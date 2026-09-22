@@ -5,7 +5,6 @@ import {
   Lock,
   ShieldCheck,
 } from "lucide-react";
-import { cn } from "@workspace/ui/lib/utils";
 import {
   addTrustedSender,
 } from "@/lib/mail/mail-display-settings";
@@ -56,39 +55,23 @@ export function MessageReaderBody({
     shouldReplaceBodyWithEventReminder,
     isReminderEventLoading,
     eventReminderView,
-    bodyAttachedAbove,
     plaintextBody,
     plaintextQuote,
   } = view;
 
   const standardBodyContent = isDecrypting ? (
-    <MessageDecryptingSkeleton
-      isDark={isDark}
-      attachedAbove={bodyAttachedAbove}
-    />
+    <MessageDecryptingSkeleton isDark={isDark} />
   ) : shouldReplaceBodyWithEventReminder &&
   eventReminderView ? (
-    <EventReminderMessageBody
-      reminder={eventReminderView}
-      isDark={isDark}
-      attachedAbove={bodyAttachedAbove}
-    />
+    <EventReminderMessageBody reminder={eventReminderView} isDark={isDark} />
   ) : isReminderEventLoading ? (
-    <EventReminderMessageBodyLoading
-      isDark={isDark}
-      attachedAbove={bodyAttachedAbove}
-    />
+    <EventReminderMessageBodyLoading isDark={isDark} />
   ) : renderAsHtml ? (
-    <div
-      className={cn(
-        "flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col",
-        bodyAttachedAbove && "rounded-t-none border-t-0",
-      )}
-    >
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--border-secondary)]">
       {blockRemoteImages &&
         displaySettings.externalContentPolicy !== "allow" &&
         hasRemoteContent && (
-        <div className="shrink-0 border-b border-border/30 bg-muted/30 px-4 py-2">
+        <div className="shrink-0 border-b border-[var(--border-tertiary)] bg-[var(--bg-overlay-tertiary)] px-4 py-2">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
               <Lock className="mt-0.5 size-3 shrink-0" strokeWidth={2.25} />
@@ -129,7 +112,7 @@ export function MessageReaderBody({
         isDark={isDark}
       />
       {htmlHasQuote && (
-        <div className="shrink-0 border-t border-border/40 px-3 py-1.5 bg-muted/20">
+        <div className="shrink-0 border-t border-[var(--border-tertiary)] px-4 py-2">
           <button
             type="button"
             onClick={() =>
@@ -147,22 +130,11 @@ export function MessageReaderBody({
       )}
     </div>
   ) : (
-    <div
-      className={cn(
-        "flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col",
-        bodyAttachedAbove && "rounded-t-none border-t-0",
-      )}
-    >
-      <div className={cn(
-        "flex-1 min-h-0 overflow-y-auto px-5 py-4",
-        isDark ? "bg-[#1a1a1a] [color-scheme:dark]" : "bg-white [color-scheme:light]",
-      )}>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--border-secondary)]">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {displayText ? (
           <>
-            <div className={cn(
-              "text-sm leading-relaxed whitespace-pre-wrap",
-              isDark ? "text-[#e0e0e0]" : "text-[#111]",
-            )}>
+            <div className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-primary)]">
               {(() => {
                 const activeText = showQuote ? displayText : plaintextBody;
                 if (
@@ -193,12 +165,12 @@ export function MessageReaderBody({
             )}
           </>
         ) : (
-          <span className={cn("text-sm italic", isDark ? "text-[#888]" : "text-[#666]")}>No message body</span>
+          <span className="text-sm italic text-[var(--text-disabled)]">No message body</span>
         )}
       </div>
       {/* Quoted chain toggle — pinned outside the scroll, same style as HTML version */}
       {plaintextQuote && (
-        <div className="shrink-0 border-t border-border/40 px-3 py-1.5 bg-muted/20">
+        <div className="shrink-0 border-t border-[var(--border-tertiary)] px-4 py-2">
           <button
             type="button"
             onClick={() =>
@@ -225,7 +197,7 @@ export function MessageReaderBody({
           loading={linkedCalendarEvent.loading}
           error={linkedCalendarEvent.error}
           reminder={eventReminderView}
-          className="mb-0 shrink-0 rounded-b-none"
+          className="mb-3 shrink-0"
         />
         <div className="flex min-h-0 flex-1 flex-col">{standardBodyContent}</div>
       </div>

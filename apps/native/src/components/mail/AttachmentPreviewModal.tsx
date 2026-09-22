@@ -30,6 +30,31 @@ try {
   WebView = null;
 }
 
+interface LoadedPreview {
+  cached: CachedAttachment | null;
+  textContent: string | null;
+  error: string | null;
+}
+
+async function loadPreview(
+  kind: MailAttachmentPreviewKind,
+  loadCached: () => Promise<CachedAttachment>,
+): Promise<LoadedPreview> {
+  let cached: CachedAttachment | null = null;
+  try {
+    cached = await loadCached();
+    const textContent =
+      kind === "text" ? await FileSystem.readAsStringAsync(cached.uri) : null;
+    return { cached, textContent, error: null };
+  } catch (err) {
+    return {
+      cached,
+      textContent: null,
+      error: getErrorMessage(err, "Could not load attachment."),
+    };
+  }
+}
+
 interface AttachmentPreviewModalProps {
   visible: boolean;
   name: string;
@@ -57,39 +82,19 @@ export function AttachmentPreviewModal({
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
   const sheetHeight = screenHeight * SHEET_HEIGHT_FRACTION;
-  const [cached, setCached] = useState<CachedAttachment | null>(null);
-  const [textContent, setTextContent] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loaded, setLoaded] = useState<LoadedPreview | null>(null);
+  const cached = loaded?.cached ?? null;
+  const textContent = loaded?.textContent ?? null;
+  const error = loaded?.error ?? null;
+  const isLoading = loaded === null;
   const canOpenExternally = kind === "image" || kind === "pdf";
 
   useEffect(() => {
-    if (!visible) {
-      setCached(null);
-      setTextContent(null);
-      setError(null);
-      setIsLoading(true);
-      return;
-    }
+    if (!visible) return;
     let cancelled = false;
-    (async () => {
-      try {
-        setIsLoading(true);
-        const result = await loadCached();
-        if (cancelled) return;
-        setCached(result);
-        if (kind === "text") {
-          const content = await FileSystem.readAsStringAsync(result.uri);
-          if (!cancelled) setTextContent(content);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(getErrorMessage(err, "Could not load attachment."));
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
+    void loadPreview(kind, loadCached).then((result) => {
+      if (!cancelled) setLoaded(result);
+    });
     return () => {
       cancelled = true;
     };

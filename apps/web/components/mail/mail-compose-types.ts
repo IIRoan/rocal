@@ -52,7 +52,6 @@ export type MailComposeBridge = {
   ) => void;
   markDirty: () => void;
   isComposeDirty: () => boolean;
-  captureComposeBaseline: () => void;
   acknowledgeSavedDraft: () => void;
   getDraftIdRef: () => string | null;
   setDraftId: (id: string | null) => void;

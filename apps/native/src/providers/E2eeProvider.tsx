@@ -1,55 +1,32 @@
 import React, {
   createContext,
+  use,
   useCallback,
-  useContext,
   useMemo,
   useRef,
   useState,
 } from "react";
-import * as SecureStore from "expo-secure-store";
 import {
   createE2eeModule,
-  encryptEventContentRequest,
-  encryptNameRequest,
-  hydrateEncryptedEventWithoutSession,
-  hydrateEncryptedName,
-  shouldEncryptEventContent,
-  ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
   type E2eeModule,
   type E2eeProvider as IE2eeProvider,
 } from "@workspace/e2ee";
-import type {
-  Calendar,
-  CalendarEvent,
-  EventCategory,
-  EventWireRequest,
-  NameWireRequest,
-  CreateCalendarRequest,
-  CreateCategoryRequest,
-  CreateEventRequest,
-  E2eeBootstrapResponse,
-  UpdateCalendarRequest,
-  UpdateCategoryRequest,
-  UpdateEventRequest,
-} from "@workspace/calendar-core";
 import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
-import { SECURE_STORE_KEYS } from "../lib/constants";
-import { getE2eeApiUrl } from "../lib/e2ee-api-url";
-import { getAuthHeaders } from "../lib/api";
-import { readChunkedSecureValue, writeChunkedSecureValue } from "../lib/secure-store-chunked";
+import {
+  createNativeE2eeProvider,
+  fetchE2eeBootstrap,
+  putPasswordEnvelope,
+  readStoredDevice,
+  registerDeviceForSession,
+  unwrapStoredDeviceKeys,
+  type E2eeSession,
+} from "../lib/native-e2ee-provider";
 import { createLogger } from "@workspace/logger";
 import { useAuth } from "./AuthProvider";
 import { setActiveE2eeSession } from "../lib/e2ee-session";
 
 const log = createLogger("native:e2ee");
 
-interface E2eeSession {
-  accountKey: CryptoKey;
-  blindIndexKey: CryptoKey;
-  deviceId: string;
-  userId: string;
-  apiBaseUrl: string;
-}
 
 export interface E2eeContextValue {
   isReady: boolean;
@@ -108,80 +85,6 @@ export function E2eeProvider({
     return moduleRef.current;
   }, []);
 
-  const registerDeviceForSession = useCallback(
-    async ({
-      e2ee,
-      userId,
-      apiBaseUrl,
-      accountKey,
-      blindIndexKey,
-    }: {
-      e2ee: E2eeModule;
-      userId: string;
-      apiBaseUrl: string;
-      accountKey: CryptoKey;
-      blindIndexKey: CryptoKey;
-    }): Promise<E2eeSession> => {
-      const keyPair = await e2ee.generateWrappingKeyPair();
-      const [publicKey, wrappedAccountKey, wrappedSearchKey] = await Promise.all([
-        e2ee.exportWrappingPublicKey(keyPair.publicKey),
-        e2ee.wrapSymmetricKey(accountKey, keyPair.publicKey),
-        e2ee.wrapSymmetricKey(blindIndexKey, keyPair.publicKey),
-      ]);
-      const deviceId = e2ee.generateDeviceId();
-
-      const crypto = createNativeCryptoProvider();
-      if (!crypto) {
-        throw new Error("Native crypto is unavailable for E2EE device export.");
-      }
-
-      const exportedPrivateKey = await crypto.subtle.exportKey(
-        "jwk",
-        keyPair.privateKey,
-      );
-      const exportedPrivateKeyJson = JSON.stringify(exportedPrivateKey);
-
-      const deviceResponse = await fetch(getE2eeApiUrl(apiBaseUrl, "/device"), {
-        method: "PUT",
-        credentials: "omit",
-        headers: {
-          "Content-Type": "application/json",
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify({
-          deviceId,
-          publicKey,
-          wrappedAccountKey,
-          wrappedSearchKey,
-        }),
-      });
-
-      if (!deviceResponse.ok) {
-        throw new Error(
-          `E2EE device registration returned ${deviceResponse.status}.`,
-        );
-      }
-
-      await SecureStore.setItemAsync(
-        SECURE_STORE_KEYS.E2EE_DEVICE_ID,
-        deviceId,
-      );
-      await writeChunkedSecureValue(
-        SECURE_STORE_KEYS.E2EE_PRIVATE_KEY,
-        exportedPrivateKeyJson,
-      );
-
-      return {
-        accountKey,
-        blindIndexKey,
-        deviceId,
-        userId,
-        apiBaseUrl,
-      };
-    },
-    [],
-  );
-
   const storePasswordEnvelopeForActiveSession = useCallback(
     async ({
       e2ee,
@@ -200,27 +103,7 @@ export function E2eeProvider({
         throw new Error("E2EE session is not ready on this device.");
       }
 
-      const envelope = await e2ee.createPasswordEnvelope(
-        session.accountKey,
-        session.blindIndexKey,
-        password,
-      );
-
-      const response = await fetch(getE2eeApiUrl(apiBaseUrl, "/password"), {
-        method: "PUT",
-        credentials: "omit",
-        headers: {
-          "Content-Type": "application/json",
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify(envelope),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `E2EE password registration returned ${response.status}.`,
-        );
-      }
+      await putPasswordEnvelope({ e2ee, session, apiBaseUrl, password });
 
       clearPendingAuthPassword();
       log.info("Stored native E2EE password envelope for active session", {
@@ -234,8 +117,7 @@ export function E2eeProvider({
     async (userId: string, apiBaseUrl: string) => {
       const generation = bootstrapGenerationRef.current + 1;
       bootstrapGenerationRef.current = generation;
-      const isCurrentBootstrap = () =>
-        bootstrapGenerationRef.current === generation;
+      const isStale = () => bootstrapGenerationRef.current !== generation;
 
       sessionRef.current = null;
       setActiveE2eeSession(null);
@@ -250,83 +132,46 @@ export function E2eeProvider({
           log.warn(
             "E2EE is unavailable in the current runtime. Encryption is disabled for this session.",
           );
-          if (isCurrentBootstrap()) {
+          if (!isStale()) {
             setIsReady(true);
           }
           return;
         }
 
-        const bootstrapUrl = getE2eeApiUrl(apiBaseUrl, "/bootstrap");
-        const response = await fetch(bootstrapUrl, {
-          credentials: "omit",
-          headers: getAuthHeaders(),
-        });
+        const bootstrapData = await fetchE2eeBootstrap(apiBaseUrl);
 
-        if (!response.ok) {
-          log.warn(
-            "E2EE bootstrap endpoint returned a non-OK response",
-            {
-              status: response.status,
-              url: bootstrapUrl,
-            },
-          );
-          if (isCurrentBootstrap()) {
+        if (!bootstrapData) {
+          if (!isStale()) {
             setIsReady(true);
           }
           return;
         }
-
-        const bootstrapData = (await response.json()) as E2eeBootstrapResponse;
 
         if (!bootstrapData.enabled) {
           log.info("E2EE is not enabled for this user");
-          if (isCurrentBootstrap()) {
+          if (!isStale()) {
             setIsReady(true);
           }
           return;
         }
 
-        if (!isCurrentBootstrap()) {
+        if (isStale()) {
           return;
         }
 
         setIsEnabled(true);
 
-        const deviceId = await SecureStore.getItemAsync(
-          SECURE_STORE_KEYS.E2EE_DEVICE_ID,
-        );
-        const privateKeyJwk = await readChunkedSecureValue(
-          SECURE_STORE_KEYS.E2EE_PRIVATE_KEY,
-        );
-
-        const existingDevice = bootstrapData.devices.find(
-          (device) => device.deviceId === deviceId,
-        );
+        const { existingDevice, privateKeyJwk } =
+          await readStoredDevice(bootstrapData);
 
         if (existingDevice && privateKeyJwk) {
-          const crypto = createNativeCryptoProvider();
-          if (!crypto) {
-            throw new Error("Native crypto is unavailable for E2EE unwrap.");
-          }
-
-          const privateKey = await crypto.subtle.importKey(
-            "jwk",
-            JSON.parse(privateKeyJwk),
-            { name: "RSA-OAEP", hash: "SHA-256" },
-            false,
-            ["unwrapKey"],
+          const { accountKey, blindIndexKey } = await unwrapStoredDeviceKeys(
+            e2ee,
+            privateKeyJwk,
+            existingDevice,
           );
 
-          const accountKey = await e2ee.unwrapAccountKey(
-            existingDevice.wrappedAccountKey,
-            privateKey,
-          );
-          const blindIndexKey = await e2ee.unwrapBlindIndexKey(
-            existingDevice.wrappedSearchKey,
-            privateKey,
-          );
-
-          if (!isCurrentBootstrap()) {
+          if (isStale()) {
             return;
           }
 
@@ -348,9 +193,7 @@ export function E2eeProvider({
 
         const pendingPassword = peekPendingAuthPassword();
 
-        // If a password envelope exists, try to unlock it with the auth
-        // password that was captured at sign-in time. This covers email/
-        // password users on a new device.
+        // New-device email/password users unlock the envelope with the password captured at sign-in.
         if (bootstrapData.passwordEnvelope && pendingPassword) {
           try {
             const { accountKey, blindIndexKey } =
@@ -366,7 +209,7 @@ export function E2eeProvider({
               blindIndexKey,
             });
 
-            if (!isCurrentBootstrap()) {
+            if (isStale()) {
               return;
             }
 
@@ -386,14 +229,11 @@ export function E2eeProvider({
           }
         }
 
-        if (!isCurrentBootstrap()) {
+        if (isStale()) {
           return;
         }
 
-        // No envelope, couldn't unlock it, or passkey user — start a fresh
-        // E2EE session on this device. Encrypted content from other devices
-        // will show as placeholders until the user signs in from an existing
-        // device or re-registers.
+        // Otherwise start a fresh device session; other devices' content stays a placeholder until re-keyed.
         if (bootstrapData.passwordEnvelope && !pendingPassword) {
           log.warn(
             "Password envelope exists but no auth password is available; starting fresh E2EE session",
@@ -411,7 +251,7 @@ export function E2eeProvider({
           blindIndexKey,
         });
 
-        if (!isCurrentBootstrap()) {
+        if (isStale()) {
           return;
         }
 
@@ -431,19 +271,18 @@ export function E2eeProvider({
               error,
             });
           } finally {
-            // Drop the sign-in password once this bootstrap is done with it,
-            // including failed envelope writes (the unlock path already clears).
+            // Drop the sign-in password even when the envelope write failed.
             clearPendingAuthPassword();
           }
         }
 
         return;
       } catch (error) {
-        if (isCurrentBootstrap()) {
+        if (!isStale()) {
           log.error("E2EE bootstrap failed:", error);
         }
       } finally {
-        if (isCurrentBootstrap()) {
+        if (!isStale()) {
           finishPendingBootstrap();
           setIsReady(true);
         }
@@ -453,7 +292,6 @@ export function E2eeProvider({
       peekPendingAuthPassword,
       clearPendingAuthPassword,
       getModule,
-      registerDeviceForSession,
       storePasswordEnvelopeForActiveSession,
       beginPendingBootstrap,
       finishPendingBootstrap,
@@ -495,180 +333,15 @@ export function E2eeProvider({
     [getModule, storePasswordEnvelopeForActiveSession],
   );
 
-  const provider = useMemo<IE2eeProvider>(() => {
-    const getSession = (): E2eeSession | null => sessionRef.current;
-    const waitForSession = async (): Promise<E2eeSession | null> => {
-      const pendingBootstrap = pendingBootstrapRef.current;
-      if (pendingBootstrap && !getSession()) {
-        await pendingBootstrap;
-      }
-      return getSession();
-    };
-    const getRequiredSession = (): E2eeSession => {
-      const session = getSession();
-      if (!session) {
-        throw new Error("Encryption setup has not completed on this device.");
-      }
-      return session;
-    };
-
-    return {
-      async attachEventEncryptionShadow<
-        T extends CreateEventRequest | UpdateEventRequest,
-      >(request: T): Promise<EventWireRequest<T>> {
-        const session = getSession();
-        if (!session || !shouldEncryptEventContent(request)) {
-          return request;
-        }
-
-        try {
-          const e2ee = await getModule();
-          if (!e2ee) {
-            return request;
-          }
-
-          return await encryptEventContentRequest(e2ee, session, request);
-        } catch (error) {
-          log.error("Failed to encrypt event:", error);
-          throw error;
-        }
-      },
-
-      async attachCalendarEncryptionShadow<
-        T extends CreateCalendarRequest | UpdateCalendarRequest,
-      >(request: T): Promise<NameWireRequest<T>> {
-        try {
-          const session = getRequiredSession();
-          const e2ee = await getModule();
-          if (!e2ee) {
-            throw new Error("Native encryption runtime is unavailable.");
-          }
-
-          return await encryptNameRequest(e2ee, session, "calendar", request);
-        } catch (error) {
-          log.error("Failed to encrypt calendar:", error);
-          throw error;
-        }
-      },
-
-      async attachCategoryEncryptionShadow<
-        T extends CreateCategoryRequest | UpdateCategoryRequest,
-      >(request: T): Promise<NameWireRequest<T>> {
-        try {
-          const session = getRequiredSession();
-          const e2ee = await getModule();
-          if (!e2ee) {
-            throw new Error("Native encryption runtime is unavailable.");
-          }
-
-          return await encryptNameRequest(e2ee, session, "category", request);
-        } catch (error) {
-          log.error("Failed to encrypt category:", error);
-          throw error;
-        }
-      },
-
-      async hydrateEncryptedCalendar(calendar: Calendar): Promise<Calendar> {
-        if (!calendar.encryptedName) {
-          return calendar;
-        }
-
-        const session = await waitForSession();
-        const e2ee = session ? await getModule() : null;
-        return hydrateEncryptedName(e2ee, session, "calendar", calendar);
-      },
-
-      async hydrateEncryptedCategory(
-        category: EventCategory,
-      ): Promise<EventCategory> {
-        if (!category.encryptedName) {
-          return category;
-        }
-
-        const session = await waitForSession();
-        const e2ee = session ? await getModule() : null;
-        return hydrateEncryptedName(e2ee, session, "category", category);
-      },
-
-      async hasActiveSession(): Promise<boolean> {
-        return (await waitForSession()) !== null;
-      },
-
-      async hydrateEncryptedEvent(
-        event: CalendarEvent,
-      ): Promise<CalendarEvent> {
-        if (
-          event.encryptionState !== "encrypted" ||
-          !event.encryptedContent ||
-          typeof event.encryptedContent !== "string"
-        ) {
-          return event;
-        }
-
-        const pendingBootstrap = pendingBootstrapRef.current;
-        if (pendingBootstrap && !getSession()) {
-          await pendingBootstrap;
-        }
-
-        const session = getSession();
-        if (!session) {
-          return hydrateEncryptedEventWithoutSession(event);
-        }
-
-        try {
-          const e2ee = await getModule();
-          if (!e2ee) {
-            return hydrateEncryptedEventWithoutSession(event);
-          }
-
-          const payload = JSON.parse(event.encryptedContent);
-          const decrypted = await e2ee.decryptJsonPayload<{
-            title: string;
-            description?: string | null;
-            location?: string | null;
-          }>(session.accountKey, payload, "event-content:v1");
-
-          return {
-            ...event,
-            title:
-              decrypted.title?.trim() ||
-              event.title?.trim() ||
-              ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
-            description: decrypted.description ?? null,
-            location: decrypted.location ?? null,
-          };
-        } catch {
-          return hydrateEncryptedEventWithoutSession(event);
-        }
-      },
-
-      async hydrateEncryptedEvents(
-        events: CalendarEvent[],
-      ): Promise<CalendarEvent[]> {
-        return Promise.all(
-          events.map((event) => provider.hydrateEncryptedEvent(event)),
-        );
-      },
-
-      async createBlindIndexTokens(value: string): Promise<string[]> {
-        const session = getSession();
-        if (!session) {
-          return [];
-        }
-
-        try {
-          const e2ee = await getModule();
-          if (!e2ee) {
-            return [];
-          }
-
-          return e2ee.createBlindIndexTokens(session.blindIndexKey, value);
-        } catch {
-          return [];
-        }
-      },
-    };
-  }, [getModule]);
+  const provider = useMemo<IE2eeProvider>(
+    () =>
+      createNativeE2eeProvider({
+        getSession: () => sessionRef.current,
+        getPendingBootstrap: () => pendingBootstrapRef.current,
+        getModule,
+      }),
+    [getModule],
+  );
 
   const runWithAccountKey = useCallback(
     async <T,>(
@@ -718,7 +391,7 @@ export function E2eeProvider({
 
 
 export function useE2ee(): E2eeContextValue {
-  const ctx = useContext(E2eeContext);
+  const ctx = use(E2eeContext);
   if (!ctx) {
     throw new Error("useE2ee must be used within an E2eeProvider");
   }

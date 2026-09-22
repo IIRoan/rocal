@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState } from "react";
 import {
-  ArrowLeft,
   UserPlus,
   X,
   Copy,
@@ -12,14 +11,22 @@ import {
   Users,
   RotateCcw,
 } from "lucide-react";
-import { getErrorMessage, getInviteCreateFeedback } from "@workspace/calendar-core";
-import { Button } from "@workspace/ui/components/ui/button";
-import { Input } from "@workspace/ui/components/ui/input";
-import { Label } from "@workspace/ui/components/ui/label";
+import {
+  getErrorMessage,
+  getInviteCreateFeedback,
+} from "@workspace/calendar-core";
 import { inviteApiService } from "@/lib/api-clients";
 import type { InviteRecord } from "@workspace/calendar-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import {
+  PaletteButton,
+  PaletteEmptyState,
+  PaletteIconBox,
+  PaletteSection,
+  PaletteView,
+} from "./palette-ui";
+import { PALETTE_INPUT_CLASS } from "./palette-styles";
 
 interface InviteSettingsProps {
   goBack: () => void;
@@ -66,50 +73,50 @@ function InviteRow({
   const isActive = isInviteActive(invite);
   const isExpired = isActive && isInviteExpired(invite);
 
-  const copyToken = useCallback(async () => {
+  async function copyToken() {
     await navigator.clipboard.writeText(invite.token);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [invite.token]);
+  }
 
   return (
     <div
-      className={`flex items-start gap-3 px-4 py-3 border-b border-border/40 last:border-0 ${
+      className={`flex items-start gap-3 p-2 ${
         invite.status === "revoked" || isExpired ? "opacity-50" : ""
       }`}
     >
-      <div className="flex items-center justify-center size-8 rounded-full bg-muted shrink-0 mt-0.5">
-        <Mail className="size-4 text-muted-foreground" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{invite.email}</p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span
-            className={`text-xs font-medium ${STATUS_COLORS[invite.status]}`}
-          >
+      <PaletteIconBox>
+        <Mail className="size-4" />
+      </PaletteIconBox>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] leading-[130%] text-foreground">
+          {invite.email}
+        </p>
+        <div className="mt-0.5 flex items-center gap-2 text-[13px] leading-[130%]">
+          <span className={STATUS_COLORS[invite.status]}>
             {STATUS_LABELS[invite.status]}
             {isExpired ? " (expired)" : ""}
           </span>
-          <span className="text-xs text-muted-foreground/60">·</span>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-muted-foreground/60">·</span>
+          <span className="text-muted-foreground">
             {format(new Date(invite.createdAt), "MMM d, yyyy")}
           </span>
         </div>
         {isActive && !isExpired && (
-          <div className="flex items-center gap-1 mt-1.5">
-            <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono truncate max-w-[180px]">
+          <div className="mt-1.5 flex items-center gap-1">
+            <code className="max-w-[180px] truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
               {invite.token}
             </code>
             <button
               type="button"
               onClick={copyToken}
-              className="p-1 rounded hover:bg-muted/80 transition-colors shrink-0"
+              className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               title="Copy invite token"
             >
               {copied ? (
                 <Check className="size-3.5 text-success" />
               ) : (
-                <Copy className="size-3.5 text-muted-foreground" />
+                <Copy className="size-3.5" />
               )}
             </button>
           </div>
@@ -120,7 +127,7 @@ function InviteRow({
           type="button"
           onClick={() => onRevoke(invite.id)}
           disabled={revoking}
-          className="p-1.5 rounded hover:bg-destructive/10 transition-colors shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-50"
+          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
           title="Revoke invite"
         >
           {revoking ? (
@@ -182,28 +189,22 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
     },
   });
 
-  const handleCreate = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      const trimmed = email.trim();
-      if (!trimmed) {
-        setMessage({ kind: "error", text: "Please enter an email address." });
-        return;
-      }
-      setMessage(null);
-      createMutation.mutate(trimmed);
-    },
-    [email, createMutation],
-  );
+  function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setMessage({ kind: "error", text: "Please enter an email address." });
+      return;
+    }
+    setMessage(null);
+    createMutation.mutate(trimmed);
+  }
 
-  const handleRevoke = useCallback(
-    (id: string) => {
-      setRevokingId(id);
-      setMessage(null);
-      revokeMutation.mutate(id);
-    },
-    [revokeMutation],
-  );
+  function handleRevoke(id: string) {
+    setRevokingId(id);
+    setMessage(null);
+    revokeMutation.mutate(id);
+  }
 
   const invites = data?.invites ?? [];
   const activeInvites = invites.filter(
@@ -214,142 +215,117 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
   );
 
   return (
-    <div
-      className="flex flex-col"
-      style={{ minHeight: "clamp(300px, 55svh, 480px)" }}
-    >
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-        <button
-          type="button"
-          onClick={goBack}
-          className="p-1 rounded hover:bg-muted/50 transition-colors"
-        >
-          <ArrowLeft className="size-4 text-muted-foreground" />
-        </button>
-        <Users className="size-4 text-muted-foreground" />
-        <span className="text-sm font-medium">Invites</span>
+    <PaletteView
+      title="Invites"
+      onBack={goBack}
+      actions={
         <button
           type="button"
           onClick={() => refetch()}
-          className="ml-auto p-1 rounded hover:bg-muted/50 transition-colors"
+          aria-label="Refresh invites"
           title="Refresh invites"
+          className="flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          <RotateCcw className="size-3.5 text-muted-foreground" />
+          <RotateCcw className="size-3.5" />
         </button>
-      </div>
+      }
+    >
+      <p className="p-2 text-[13px] leading-[130%] text-muted-foreground">
+        Invite someone to join Solace. They&apos;ll receive a token to use at
+        sign-up.
+      </p>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        {/* Create invite form */}
-        <div className="px-4 pt-4 pb-3">
-          <p className="text-xs text-muted-foreground mb-3">
-            Invite someone to join Solace. They&apos;ll receive a token to use
-            at sign-up.
-          </p>
+      {message && (
+        <div className="px-2 py-1">
+          <div
+            className={`rounded-lg px-3 py-2 text-[13px] ${
+              message.kind === "success"
+                ? "bg-success/10 text-success"
+                : message.kind === "warning"
+                  ? "bg-warning/10 text-warning"
+                  : "bg-destructive/10 text-destructive"
+            }`}
+          >
+            {message.text}
+          </div>
+        </div>
+      )}
 
-          {message && (
-            <div
-              className={`mb-3 rounded-lg px-3 py-2 text-xs ${
-                message.kind === "success"
-                  ? "bg-success/10 text-success border border-success/20"
-                  : message.kind === "warning"
-                    ? "bg-warning/10 text-warning border border-warning/20"
-                    : "bg-destructive/10 text-destructive border border-destructive/20"
-              }`}
-            >
-              {message.text}
-            </div>
+      <form onSubmit={handleCreate} className="flex gap-2 px-2 pt-2 pb-3">
+        <div className="flex-1">
+          <input
+            id="invite-email"
+            aria-label="Email address to invite"
+            type="email"
+            placeholder="friend@example.com"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setMessage(null);
+            }}
+            disabled={createMutation.isPending}
+            className={PALETTE_INPUT_CLASS}
+            autoComplete="off"
+          />
+        </div>
+        <PaletteButton
+          type="submit"
+          variant="primary"
+          loading={createMutation.isPending}
+          disabled={!email.trim()}
+          className="h-9 shrink-0"
+        >
+          {createMutation.isPending ? null : (
+            <>
+              <UserPlus className="size-4" />
+              Invite
+            </>
+          )}
+        </PaletteButton>
+      </form>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <>
+          {activeInvites.length > 0 && (
+            <PaletteSection label="Active Invites">
+              {activeInvites.map((invite) => (
+                <InviteRow
+                  key={invite.id}
+                  invite={invite}
+                  onRevoke={handleRevoke}
+                  revoking={revokingId === invite.id}
+                />
+              ))}
+            </PaletteSection>
           )}
 
-          <form onSubmit={handleCreate} className="flex gap-2">
-            <div className="flex-1">
-              <Label htmlFor="invite-email" className="sr-only">
-                Email address to invite
-              </Label>
-              <Input
-                id="invite-email"
-                type="email"
-                placeholder="friend@example.com"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setMessage(null);
-                }}
-                disabled={createMutation.isPending}
-                className="h-9 text-sm"
-                autoComplete="off"
-              />
-            </div>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={createMutation.isPending || !email.trim()}
-              className="h-9 px-3 shrink-0"
-            >
-              {createMutation.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <>
-                  <UserPlus className="size-4 mr-1.5" />
-                  Invite
-                </>
-              )}
-            </Button>
-          </form>
-        </div>
+          {inactiveInvites.length > 0 && (
+            <PaletteSection label="Past Invites">
+              {inactiveInvites.map((invite) => (
+                <InviteRow
+                  key={invite.id}
+                  invite={invite}
+                  onRevoke={handleRevoke}
+                  revoking={revokingId === invite.id}
+                />
+              ))}
+            </PaletteSection>
+          )}
 
-        {/* Active invites */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <>
-            {activeInvites.length > 0 && (
-              <div>
-                <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/40">
-                  Active Invites
-                </div>
-                {activeInvites.map((invite) => (
-                  <InviteRow
-                    key={invite.id}
-                    invite={invite}
-                    onRevoke={handleRevoke}
-                    revoking={revokingId === invite.id}
-                  />
-                ))}
-              </div>
-            )}
-
-            {inactiveInvites.length > 0 && (
-              <div>
-                <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/40">
-                  Past Invites
-                </div>
-                {inactiveInvites.map((invite) => (
-                  <InviteRow
-                    key={invite.id}
-                    invite={invite}
-                    onRevoke={handleRevoke}
-                    revoking={revokingId === invite.id}
-                  />
-                ))}
-              </div>
-            )}
-
-            {invites.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
-                <UserPlus className="size-8 text-muted-foreground/20" />
-                <p className="text-sm text-muted-foreground">No invites yet</p>
-                <p className="text-xs text-muted-foreground/70">
-                  Invite someone above to get started
-                </p>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+          {invites.length === 0 && (
+            <PaletteEmptyState>
+              <span className="block text-[15px]">No invites yet</span>
+              <span className="block text-muted-foreground/70">
+                Invite someone above to get started
+              </span>
+            </PaletteEmptyState>
+          )}
+        </>
+      )}
+    </PaletteView>
   );
 }

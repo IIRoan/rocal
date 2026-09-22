@@ -4,8 +4,12 @@
 import { useEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { AppLoadingState } from "@workspace/ui/components/ui";
-import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import { MessageListRow } from "./message-list-row";
+import type {
+  MessageListPaginationState,
+  MessageListRowInteraction,
+  MessageListRowPresentation,
+} from "./message-list-types";
 import {
   getRowHeight,
   ROW_HEIGHT_DESKTOP,
@@ -14,95 +18,33 @@ import {
   type MessageListThreadRow,
 } from "./message-list-utils";
 
-type LoadMoreState = {
-  hasMore?: boolean;
-  isLoadingMore?: boolean;
-  onLoadMore?: () => void;
-};
-
 export type MessageListVirtualizedProps = {
   threadRows: MessageListThreadRow[];
   primaryIds: Set<string>;
-  selectedMessageId: string | null;
-  selectedIds: Set<string>;
-  expandedThreads: Set<string>;
-  expandedThreadMessages: Record<string, JmapEmailMessage[]>;
-  isLoadingThread: Set<string>;
-  labels: LabelDef[];
-  moveTargets: JmapMailbox[];
-  canReportSpam: boolean;
-  canNotSpam: boolean;
-  isMobile: boolean;
-  density: "compact" | "comfortable";
-  showLabelChips: boolean;
-  threadExpandEnabled: boolean;
-  timeFormat?: "12h" | "24h";
-  timezone?: string;
-  hasMore?: boolean;
-  isLoadingMore?: boolean;
-  onLoadMore?: () => void;
-  onSelect: (id: string) => void;
-  onToggleSelect: (event: React.MouseEvent, ids: string[]) => void;
-  onToggleThreadExpand: (threadId: string) => void;
-  onDelete?: (id: string) => void;
-  onMove?: (id: string, targetMailboxId: string) => void;
-  onMarkAsUnread?: (id: string) => void;
-  onMarkAsRead?: (id: string) => void;
-  onBulkDelete?: (ids: string[]) => void;
-  onBulkMove?: (ids: string[], targetMailboxId: string) => void;
-  onBulkMarkAsUnread?: (ids: string[]) => void;
-  onBulkMarkAsRead?: (ids: string[]) => void;
-  onToggleFlagged?: (id: string) => void;
-  onReportSpam?: (id: string) => void;
-  onNotSpam?: (id: string) => void;
-  onSetLabel?: (messageId: string, labelId: string, assigned: boolean) => void;
+  interaction: MessageListRowInteraction;
+  presentation: MessageListRowPresentation;
+  pagination: MessageListPaginationState;
 };
 
 export function MessageListVirtualized({
   threadRows,
   primaryIds,
-  selectedMessageId,
-  selectedIds,
-  expandedThreads,
-  expandedThreadMessages,
-  isLoadingThread,
-  labels,
-  moveTargets,
-  canReportSpam,
-  canNotSpam,
-  isMobile,
-  density,
-  showLabelChips,
-  threadExpandEnabled,
-  timeFormat,
-  timezone,
-  hasMore,
-  isLoadingMore,
-  onLoadMore,
-  onSelect,
-  onToggleSelect,
-  onToggleThreadExpand,
-  onDelete,
-  onMove,
-  onMarkAsUnread,
-  onMarkAsRead,
-  onBulkDelete,
-  onBulkMove,
-  onBulkMarkAsUnread,
-  onBulkMarkAsRead,
-  onToggleFlagged,
-  onReportSpam,
-  onNotSpam,
-  onSetLabel,
+  interaction,
+  presentation,
+  pagination,
 }: MessageListVirtualizedProps) {
+  "use no memo";
+  const { selectedMessageId } = interaction;
+  const { labels, display } = presentation;
+  const { isMobile, density, showLabelChips } = display;
+  const { hasMore, isLoadingMore, onLoadMore } = pagination;
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadMoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const loadMoreStateRef = useRef<LoadMoreState>({
-    hasMore,
-    isLoadingMore,
-    onLoadMore,
+  const loadMoreStateRef = useRef<MessageListPaginationState>(pagination);
+
+  useEffect(() => {
+    loadMoreStateRef.current = pagination;
   });
-  loadMoreStateRef.current = { hasMore, isLoadingMore, onLoadMore };
 
   const estimateRowSize = (index: number) => {
     const row = threadRows[index];
@@ -155,6 +97,7 @@ export function MessageListVirtualized({
     }
   }, [lastVirtualItemIndex, threadRows.length]);
 
+  // Re-check after each page: a list filter can leave loaded rows short of the viewport.
   useEffect(() => {
     const element = scrollRef.current;
     if (!element) return;
@@ -166,17 +109,18 @@ export function MessageListVirtualized({
 
     const resizeObserver = new ResizeObserver(checkScrollForLoadMore);
     resizeObserver.observe(element);
+    const loadMoreTimer = loadMoreTimerRef;
 
     return () => {
       element.removeEventListener("scroll", checkScrollForLoadMore);
       resizeObserver.disconnect();
-      const timer = loadMoreTimerRef.current;
+      const timer = loadMoreTimer.current;
       if (timer) {
         clearTimeout(timer);
-        loadMoreTimerRef.current = null;
+        loadMoreTimer.current = null;
       }
     };
-  }, [threadRows.length]);
+  }, [threadRows.length, isLoadingMore]);
 
   useEffect(() => {
     if (!selectedMessageId) return;
@@ -217,36 +161,8 @@ export function MessageListVirtualized({
               <MessageListRow
                 row={row}
                 primaryIds={primaryIds}
-                selectedMessageId={selectedMessageId}
-                selectedIds={selectedIds}
-                expandedThreads={expandedThreads}
-                expandedThreadMessages={expandedThreadMessages}
-                isLoadingThread={isLoadingThread}
-                labels={labels}
-                moveTargets={moveTargets}
-                canReportSpam={canReportSpam}
-                canNotSpam={canNotSpam}
-                isMobile={isMobile}
-                density={density}
-                showLabelChips={showLabelChips}
-                threadExpandEnabled={threadExpandEnabled}
-                timeFormat={timeFormat}
-                timezone={timezone}
-                onSelect={onSelect}
-                onToggleSelect={onToggleSelect}
-                onToggleThreadExpand={onToggleThreadExpand}
-                onDelete={onDelete}
-                onMove={onMove}
-                onMarkAsUnread={onMarkAsUnread}
-                onMarkAsRead={onMarkAsRead}
-                onBulkDelete={onBulkDelete}
-                onBulkMove={onBulkMove}
-                onBulkMarkAsUnread={onBulkMarkAsUnread}
-                onBulkMarkAsRead={onBulkMarkAsRead}
-                onToggleFlagged={onToggleFlagged}
-                onReportSpam={onReportSpam}
-                onNotSpam={onNotSpam}
-                onSetLabel={onSetLabel}
+                interaction={interaction}
+                presentation={presentation}
               />
             </div>
           );

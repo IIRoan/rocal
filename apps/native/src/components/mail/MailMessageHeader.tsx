@@ -1,18 +1,15 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
-  LayoutAnimation,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
-  UIManager,
   View,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
-import { FontAwesome } from "@expo/vector-icons";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import { Feather, FontAwesome } from "@expo/vector-icons";
 import { enrichSelfMailRecipient, resolveAttachmentPreviewKind } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
@@ -36,13 +33,6 @@ import { MailSecurityIndicator } from "./MailSecurityIndicator";
 import { RecipientLinkList, RecipientSheet } from "./RecipientSheet";
 import { MAIL_LAYOUT, mailColors, mailSpacing } from "./mail-ui";
 
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
 export type MailMessageHeaderProps = {
   message: JmapEmailMessage;
   accountEmail?: string;
@@ -63,20 +53,9 @@ export type MailMessageHeaderProps = {
   timezone?: string;
 };
 
-function animateLayout() {
-  LayoutAnimation.configureNext({
-    duration: 200,
-    update: { type: LayoutAnimation.Types.easeInEaseOut },
-    create: {
-      type: LayoutAnimation.Types.easeInEaseOut,
-      property: LayoutAnimation.Properties.opacity,
-    },
-    delete: {
-      type: LayoutAnimation.Types.easeInEaseOut,
-      property: LayoutAnimation.Properties.opacity,
-    },
-  });
-}
+const DETAILS_ANIMATION_MS = 200;
+const detailsEntering = FadeIn.duration(DETAILS_ANIMATION_MS);
+const detailsExiting = FadeOut.duration(DETAILS_ANIMATION_MS);
 
 export function MailMessageHeader({
   message,
@@ -239,10 +218,7 @@ export function MailMessageHeader({
             </Text>
             {hasExpandableDetails ? (
               <Pressable
-                onPress={() => {
-                  animateLayout();
-                  setDetailsOpen((open) => !open);
-                }}
+                onPress={() => setDetailsOpen((open) => !open)}
                 hitSlop={8}
                 style={styles.detailsButton}
                 accessibilityRole="button"
@@ -265,7 +241,11 @@ export function MailMessageHeader({
         ) : null}
 
         {detailsOpen ? (
-          <View style={styles.detailsBlock}>
+          <Animated.View
+            entering={detailsEntering}
+            exiting={detailsExiting}
+            style={styles.detailsBlock}
+          >
             {message.to?.length ? (
               <DetailsRow theme={theme} label="To">
                 <RecipientLinkList
@@ -301,7 +281,7 @@ export function MailMessageHeader({
                 <Text style={styles.detailsValue}>{fullDate}</Text>
               </DetailsRow>
             ) : null}
-          </View>
+          </Animated.View>
         ) : null}
       </View>
 

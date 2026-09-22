@@ -12,6 +12,8 @@ export type MailPaletteView =
   | "mailbox-edit"
   | "invites"
   | "labels"
+  | "label-create"
+  | "label-edit"
   | "composing"
   | "mail-display"
   | "mail-list"

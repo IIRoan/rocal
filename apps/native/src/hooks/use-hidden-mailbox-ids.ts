@@ -5,7 +5,7 @@ import {
   loadHiddenMailboxIds,
   saveHiddenMailboxIds,
 } from "../lib/mail/hidden-mailboxes-store";
-import { toggleHiddenMailboxId } from "../lib/mail/hidden-mailboxes";
+import { toggleHiddenMailboxId } from "@workspace/calendar-core";
 
 export function useHiddenMailboxIds() {
   const queryClient = useQueryClient();
