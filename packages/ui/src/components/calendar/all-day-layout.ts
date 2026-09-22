@@ -1,6 +1,6 @@
 import {
   comparePickerDays,
-  getInclusiveCalendarDayRange,
+  getEventCalendarDayRange,
 } from "@workspace/calendar-core";
 
 import type { CalendarEvent } from "./types";
@@ -29,12 +29,7 @@ function clipEventToVisibleDays(
 
   const firstVisible = days[0]!;
   const lastVisible = days[days.length - 1]!;
-  const { firstDay, lastDay } = getInclusiveCalendarDayRange(
-    new Date(event.start),
-    new Date(event.end),
-    timezone,
-    { allDay: event.allDay },
-  );
+  const { firstDay, lastDay } = getEventCalendarDayRange(event, timezone);
 
   let startIndex = 0;
   while (

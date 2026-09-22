@@ -1,10 +1,12 @@
-import { format } from "date-fns";
+import { addDays, differenceInCalendarDays, format } from "date-fns";
 
 import type { CalendarEvent } from "./types";
 import {
   eventOverlapsZonedCalendarDay,
   formatInUserTimezone,
   getInclusiveCalendarDayRange,
+  isSamePickerDay,
+  pickerDateToAllDayUtcRange,
   resolveTimezone,
   spansMultipleCalendarDays,
   utcToPickerDate,
@@ -26,6 +28,43 @@ export function formatPickerDate(pickerDate: Date, pattern: string): string {
   return format(pickerDate, pattern);
 }
 
+/** Inclusive picker days covered by an event; all-day dates stay in the timezone they were saved in. */
+export function getEventCalendarDayRange(
+  event: EventDateInput,
+  timezone?: string | null,
+): { firstDay: Date; lastDay: Date } {
+  return getInclusiveCalendarDayRange(
+    new Date(event.start),
+    new Date(event.end),
+    resolveTimezone(timezone ?? event.timezone),
+    { allDay: event.allDay === true, eventTimezone: event.timezone },
+  );
+}
+
+export function eventSpansMultipleCalendarDays(
+  event: EventDateInput,
+  timezone?: string | null,
+): boolean {
+  const { firstDay, lastDay } = getEventCalendarDayRange(event, timezone);
+  return !isSamePickerDay(firstDay, lastDay);
+}
+
+/** Re-encodes an all-day event to start on `targetDay`, keeping its day count, in the viewer's timezone. */
+export function moveAllDayEventToDay(
+  event: EventDateInput,
+  targetDay: Date,
+  timezone?: string | null,
+): { start: Date; end: Date } {
+  const { firstDay, lastDay } = getEventCalendarDayRange(event, timezone);
+  const dayCount = differenceInCalendarDays(lastDay, firstDay);
+
+  return pickerDateToAllDayUtcRange(
+    targetDay,
+    addDays(targetDay, dayCount),
+    resolveTimezone(timezone ?? event.timezone),
+  );
+}
+
 /** Map stored UTC instants to picker days for editor forms. */
 export function getEventPickerDateRange(
   event: EventDateInput,
@@ -36,11 +75,9 @@ export function getEventPickerDateRange(
   const end = new Date(event.end);
 
   if (event.allDay) {
-    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
-      start,
-      end,
+    const { firstDay, lastDay } = getEventCalendarDayRange(
+      event,
       resolvedTimezone,
-      { allDay: true },
     );
     return { startDate: firstDay, endDate: lastDay };
   }
@@ -104,17 +141,13 @@ export function formatEventCalendarDate(
   pattern = "EEEE, MMMM d, yyyy",
 ): string {
   const resolvedTimezone = resolveTimezone(timezone ?? event.timezone);
-  const start = new Date(event.start);
-  const end = new Date(event.end);
 
   if (event.allDay) {
-    const { firstDay } = getInclusiveCalendarDayRange(start, end, resolvedTimezone, {
-      allDay: true,
-    });
+    const { firstDay } = getEventCalendarDayRange(event, resolvedTimezone);
     return formatPickerDate(firstDay, pattern);
   }
 
-  return formatInUserTimezone(start, resolvedTimezone, pattern);
+  return formatInUserTimezone(new Date(event.start), resolvedTimezone, pattern);
 }
 
 export function eventOverlapsCalendarDay(
@@ -129,7 +162,7 @@ export function eventOverlapsCalendarDay(
     new Date(event.end),
     calendarDay,
     resolvedTimezone,
-    { allDay: event.allDay === true },
+    { allDay: event.allDay === true, eventTimezone: event.timezone },
   );
 }
 
