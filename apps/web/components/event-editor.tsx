@@ -5,8 +5,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   canCurrentUserDeleteEvent,
   canCurrentUserEditEvent,
-  hasOptionalEventParticipants,
-  organizerOnlyParticipants,
 } from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
@@ -15,7 +13,10 @@ import { toast } from "sonner";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { RecurringDeleteModal } from "@/components/command-palette/recurring-delete-modal";
 import { useEventForm } from "@/hooks/use-event-form";
-import { buildEventEditorEncryptionPreview } from "@/lib/event-editor-view-model";
+import {
+  buildEventEditorEncryptionPreview,
+  canSaveEventEditor,
+} from "@/lib/event-editor-view-model";
 import { getActiveE2eeSession } from "@/lib/e2ee-session";
 import type { UserSettings } from "@/lib/types/calendar";
 
@@ -42,18 +43,6 @@ interface EventEditorProps {
   updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
   showBackButton?: boolean;
 }
-
-type SectionVisibility = {
-  description: boolean;
-  location: boolean;
-  participants: boolean;
-};
-
-const HIDDEN_SECTIONS: SectionVisibility = {
-  description: false,
-  location: false,
-  participants: false,
-};
 
 export function EventEditor({
   open,
@@ -97,17 +86,10 @@ export function EventEditor({
     resetForm,
     selectedEvent,
     setEventViewMode,
-    setEventLocation,
-    setEventDescription,
-    setEventParticipants,
-    setIsRecurring,
-    setShowNotifications,
     setShowRecurringDeleteModal,
-    showNotifications,
     showRecurringDeleteModal,
     eventSaving,
   } = eventForm;
-  const [sections, setSections] = useState<SectionVisibility>(HIDDEN_SECTIONS);
   const [inviteResponsePending, setInviteResponsePending] =
     useState<EventEditorInvitationResponseStatus | null>(null);
   const isMobile = useIsMobile();
@@ -131,9 +113,6 @@ export function EventEditor({
   useEffect(() => {
     if (!open) {
       resetForm();
-      requestAnimationFrame(() => {
-        setSections(HIDDEN_SECTIONS);
-      });
     }
   }, [open, resetForm]);
 
@@ -152,14 +131,6 @@ export function EventEditor({
     ) {
       setEventViewMode("edit");
     }
-
-    requestAnimationFrame(() => {
-      setSections({
-        description: Boolean(eventToEdit.description),
-        location: Boolean(eventToEdit.location),
-        participants: hasOptionalEventParticipants(eventToEdit.participants),
-      });
-    });
   }, [
     eventToEdit,
     initialEventViewMode,
@@ -171,6 +142,9 @@ export function EventEditor({
   function handleEventSave() {
     if (selectedEvent && !canCurrentUserEditEvent(selectedEvent)) {
       toast.error("Imported invitation events are read-only for attendees.");
+      return;
+    }
+    if (!canSaveEventEditor({ eventCalendarId, eventSaving, eventTitle })) {
       return;
     }
     void saveEvent(calendarData);
@@ -203,29 +177,6 @@ export function EventEditor({
       onClose: () => onOpenChange(false),
       setPending: setInviteResponsePending,
     });
-  }
-
-  function setDescriptionVisible(value: boolean) {
-    setSections((current) => ({ ...current, description: value }));
-    if (!value) {
-      setEventDescription("");
-    }
-  }
-
-  function setLocationVisible(value: boolean) {
-    setSections((current) => ({ ...current, location: value }));
-    if (!value) {
-      setEventLocation("");
-    }
-  }
-
-  function setParticipantsVisible(value: boolean) {
-    setSections((current) => ({ ...current, participants: value }));
-    if (!value) {
-      setEventParticipants(
-        organizerOnlyParticipants(eventForm.eventParticipants),
-      );
-    }
   }
 
   const canEditSelectedEvent = selectedEvent
@@ -267,15 +218,6 @@ export function EventEditor({
       }}
       handleEventSave={handleEventSave}
       handleInvitationResponse={handleInvitationResponse}
-      handleToggleDescription={() =>
-        setDescriptionVisible(!sections.description)
-      }
-      handleToggleLocation={() => setLocationVisible(!sections.location)}
-      handleToggleNotifications={() => setShowNotifications(!showNotifications)}
-      handleToggleParticipants={() =>
-        setParticipantsVisible(!sections.participants)
-      }
-      handleToggleRecurring={() => setIsRecurring(!isRecurring)}
       invitationResponsePending={inviteResponsePending}
       invitationStatus={invitationStatus}
       layout={
@@ -303,15 +245,6 @@ export function EventEditor({
           />
         ) : null
       }
-      setShowDescription={setDescriptionVisible}
-      setShowLocation={setLocationVisible}
-      setShowParticipants={setParticipantsVisible}
-      visibleSections={{
-        description: sections.description,
-        location: sections.location,
-        notifications: showNotifications,
-        participants: sections.participants,
-      }}
     />
   );
 }

@@ -15,24 +15,25 @@ import {
   PopoverTrigger,
 } from "@workspace/ui/components/ui/popover";
 import {
+  AlertTriangle,
+  AlignLeft,
   Bell,
-  CalendarIcon,
+  CalendarDays,
   Clock,
   CloudDownload,
-  FileText,
   MapPin,
-  AlertTriangle,
   RefreshCw,
-  RotateCcw,
   Server,
   Users,
 } from "lucide-react";
+import { cn } from "@workspace/ui/lib/utils";
 
 import { SolaceAvatar } from "../solace-avatar";
 import { stopEventPropagation } from "@/lib/event-propagation";
 import { formatReminderMinutes } from "@/lib/event-editor-view-model";
 import type { EventEditorFormState } from "./types";
 import { formatParticipantStatus } from "./event-editor-participant-utils";
+import { EventEditorRow } from "./event-editor-row";
 import type { EventParticipantInput } from "@workspace/calendar-core";
 import type { PickerDateRangeDisplay } from "@workspace/calendar-core";
 
@@ -126,177 +127,147 @@ export function EventEditorReadView({
     ? isCancelledCalendarEvent(eventForm.selectedEvent)
     : false;
 
+  const swatch = getColorSwatchValue(selectedCalendar?.color || "blue");
+
   return (
-    <div className="py-1.5">
+    <div className="space-y-3 py-1">
       {isCancelledEvent && (
-        <div className="px-2 pb-2">
-          <Alert className="border-destructive/25 bg-destructive/[0.05]">
-            <AlertTriangle className="text-destructive" />
-            <AlertTitle className="text-destructive">Cancelled event</AlertTitle>
-            <AlertDescription>
-              <p>
-                The organiser cancelled this event. It stays on your calendar
-                until you remove it.
-              </p>
-              <p className="text-xs">
-                You can still review the original details below.
-              </p>
-            </AlertDescription>
-          </Alert>
-        </div>
+        <Alert className="border-destructive/25 bg-destructive/[0.05]">
+          <AlertTriangle className="text-destructive" />
+          <AlertTitle className="text-destructive">Cancelled event</AlertTitle>
+          <AlertDescription>
+            <p>
+              The organiser cancelled this event. It stays on your calendar
+              until you remove it.
+            </p>
+            <p className="text-xs">
+              You can still review the original details below.
+            </p>
+          </AlertDescription>
+        </Alert>
       )}
-      <div className="px-2">
-        <div className="flex items-center gap-3 p-2.5">
-          <div className="flex items-center justify-center size-6 shrink-0">
-            <CalendarIcon className="size-4 text-muted-foreground" />
-          </div>
-          <span
-            className={
-              isCancelledEvent
-                ? "text-sm font-medium truncate flex-1 min-w-0 line-through text-muted-foreground"
-                : "text-sm font-medium truncate flex-1 min-w-0"
-            }
-          >
-            {eventForm.eventTitle || "Untitled Event"}
-          </span>
-          {eventForm.selectedEvent?.id && eventForm.selectedEvent.isSynced && (
-            <div className="flex items-center gap-1 shrink-0">
-              <SyncedEventInfoBadge />
-            </div>
+
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden
+          className="mt-1.5 h-5 w-1 shrink-0 rounded-full"
+          style={{ backgroundColor: swatch }}
+        />
+        <h3
+          className={cn(
+            "min-w-0 flex-1 break-words text-xl font-semibold leading-snug text-foreground",
+            isCancelledEvent && "line-through text-muted-foreground",
           )}
-        </div>
+        >
+          {eventForm.eventTitle || "Untitled event"}
+        </h3>
+        {eventForm.selectedEvent?.id && eventForm.selectedEvent.isSynced && (
+          <div className="flex h-8 items-center shrink-0">
+            <SyncedEventInfoBadge />
+          </div>
+        )}
       </div>
 
-      <div className="border-t border-border/50 mx-4 my-0.5" />
-
-      <div className="px-2 py-1 space-y-0.5">
-        <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30">
-          <div className="flex items-center justify-center size-6 shrink-0">
-            <Clock className="size-4 text-muted-foreground" />
-          </div>
-          <div className="flex-1 min-w-0 leading-tight">
-            <div className="text-sm">
+      <div className="space-y-1">
+        <EventEditorRow desktop icon={Clock} label="Date and time">
+          <div className="py-2 text-sm leading-snug">
+            <div className="text-foreground">
               {eventDateDisplay.isSameDay ? (
                 eventDateDisplay.label
               ) : (
                 <>
                   {eventDateDisplay.startLabel}
-                  <span className="text-muted-foreground mx-1">→</span>
+                  <span className="mx-1 text-muted-foreground">–</span>
                   {eventDateDisplay.endLabel}
                 </>
               )}
             </div>
-            <div className="text-xs text-muted-foreground mt-0.5">
-              {!eventForm.eventAllDay
-                ? `${eventForm.eventStartTime} – ${eventForm.eventEndTime}`
-                : "All day"}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30">
-          <div className="flex items-center justify-center size-6 shrink-0">
-            <span
-              className="size-3 rounded-full ring-1 ring-border/60"
-              style={{
-                backgroundColor: getColorSwatchValue(
-                  selectedCalendar?.color || "blue",
-                ),
-              }}
-              aria-hidden
-            />
-          </div>
-          <span className="text-sm truncate flex-1 min-w-0">
-            {selectedCalendar?.name || "Unknown Calendar"}
-          </span>
-        </div>
-
-        {(eventForm.notificationsLoading || reminderMinutes.length > 0) && (
-          <div className="flex items-start gap-3 p-2 rounded-md hover:bg-accent/30">
-            <div className="flex items-center justify-center size-6 shrink-0 mt-0.5">
-              <Bell className="size-4 text-muted-foreground" />
-            </div>
-            <div className="flex-1 min-w-0 space-y-1">
-              {reminderMinutes.map((minutes) => (
-                <div
-                  key={`email-reminder-${minutes}`}
-                  className="flex items-baseline gap-2 text-sm leading-tight"
-                >
-                  <span>{formatReminderMinutes(minutes)} before</span>
-                  <span className="text-xs text-muted-foreground">email</span>
-                </div>
-              ))}
-              {eventForm.notificationsLoading && reminderMinutes.length === 0 && (
-                <span className="text-xs text-muted-foreground">
-                  Loading reminders…
-                </span>
+            <div className="text-muted-foreground">
+              {eventForm.eventAllDay
+                ? "All day"
+                : `${eventForm.eventStartTime} – ${eventForm.eventEndTime}`}
+              {eventForm.isRecurring && eventForm.recurrenceRule && (
+                <> · {recurrenceSummary}</>
               )}
             </div>
           </div>
-        )}
+        </EventEditorRow>
 
-        {eventForm.eventLocation && (
-          <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30">
-            <div className="flex items-center justify-center size-6 shrink-0">
-              <MapPin className="size-4 text-muted-foreground" />
-            </div>
-            <span className="text-sm truncate">{eventForm.eventLocation}</span>
-          </div>
-        )}
-
-        {eventForm.eventDescription && (
-          <div className="flex items-start gap-3 p-2 rounded-md hover:bg-accent/30">
-            <div className="flex items-center justify-center size-6 shrink-0 mt-0.5">
-              <FileText className="size-4 text-muted-foreground" />
-            </div>
-            <span className="text-sm whitespace-pre-wrap flex-1 min-w-0">
-              {formatEventDescription(eventForm.eventDescription)}
+        <EventEditorRow desktop icon={CalendarDays} label="Calendar">
+          <div className="flex min-h-9 items-center gap-2 text-sm text-foreground">
+            <span
+              aria-hidden
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: swatch }}
+            />
+            <span className="truncate">
+              {selectedCalendar?.name || "Unknown calendar"}
             </span>
           </div>
-        )}
-
-        {eventForm.isRecurring && eventForm.recurrenceRule && (
-          <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30">
-            <div className="flex items-center justify-center size-6 shrink-0">
-              <RotateCcw className="size-4 text-muted-foreground" />
-            </div>
-            <span className="text-sm">{recurrenceSummary}</span>
-          </div>
-        )}
+        </EventEditorRow>
 
         {hasOptionalEventParticipants(participantItems) && (
-          <div className="flex items-start gap-3 p-2 rounded-md hover:bg-accent/30">
-            <div className="flex items-center justify-center size-6 shrink-0 mt-0.5">
-              <Users className="size-4 text-muted-foreground" />
+          <EventEditorRow desktop icon={Users} label="Participants">
+            <div className="flex min-h-9 items-center text-sm text-muted-foreground">
+              {participantItems.length}{" "}
+              {participantItems.length === 1 ? "participant" : "participants"}
             </div>
-            <div className="flex-1 min-w-0 space-y-2">
+            <ul className="space-y-1.5 pb-1">
               {participantItems.map((participant) => (
-                <div
+                <li
                   key={participant.email}
-                  className="flex items-center gap-3 min-w-0"
+                  className="flex items-center gap-2.5 min-w-0"
                 >
                   <SolaceAvatar
                     email={participant.email}
                     name={participant.displayName}
                     src={participant.image}
-                    className="size-8 border border-border/60"
+                    className="size-7"
                     title={participant.displayName || participant.email}
                   />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm truncate">
+                  <div className="min-w-0 flex-1 leading-tight">
+                    <div className="truncate text-sm text-foreground">
                       {participant.displayName || participant.email}
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">
+                    <div className="truncate text-xs text-muted-foreground">
                       {participant.role === "organizer"
                         ? "Organizer"
                         : formatParticipantStatus(participant.status)}
                       {participant.displayName ? ` · ${participant.email}` : ""}
                     </div>
                   </div>
-                </div>
+                </li>
               ))}
+            </ul>
+          </EventEditorRow>
+        )}
+
+        {eventForm.eventLocation && (
+          <EventEditorRow desktop icon={MapPin} label="Location">
+            <div className="py-2 text-sm leading-snug text-foreground break-words">
+              {eventForm.eventLocation}
             </div>
-          </div>
+          </EventEditorRow>
+        )}
+
+        {(eventForm.notificationsLoading || reminderMinutes.length > 0) && (
+          <EventEditorRow desktop icon={Bell} label="Reminders">
+            <div className="py-2 text-sm leading-snug text-foreground">
+              {reminderMinutes.length > 0
+                ? reminderMinutes
+                    .map((minutes) => `${formatReminderMinutes(minutes)} before`)
+                    .join(", ")
+                : <span className="text-muted-foreground">Loading reminders…</span>}
+            </div>
+          </EventEditorRow>
+        )}
+
+        {eventForm.eventDescription && (
+          <EventEditorRow desktop icon={AlignLeft} label="Description">
+            <div className="py-2 text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground">
+              {formatEventDescription(eventForm.eventDescription)}
+            </div>
+          </EventEditorRow>
         )}
       </div>
     </div>
