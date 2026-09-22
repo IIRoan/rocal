@@ -9,6 +9,9 @@ import { createStalwartAdminClient } from "./lib/stalwart-admin";
 import { errorLogDetails } from "./lib/log-sanitization";
 import app from "./main";
 
+// Elysia AOT capture requires the entrypoint's default export to be the app
+export default app;
+
 const logger = createLogger("backend");
 const { backendUrl, frontendUrl, port } = env;
 

@@ -19,7 +19,7 @@ import type { JmapEmailMessage } from "@/lib/mail/types";
 import { formatAddress, formatMessageDate } from "../mail-helpers";
 import { SenderAvatar } from "../mail-avatar";
 import { getAllMessageLabels } from "@/lib/mail/mail-labels";
-import { resolveLabelDisplayColor } from "@/lib/mail/mail-label-colors";
+import { resolveLabelDisplayColor } from "@workspace/calendar-core";
 import { buildMailPreviewSnippet } from "@/lib/mail/mail-preview";
 import {
   formatThreadSenders,

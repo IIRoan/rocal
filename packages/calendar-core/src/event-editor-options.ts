@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import type { RecurrenceRule } from "@/lib/types/calendar";
+import type { RecurrenceRule } from "./types";
 
 export type RepeatPreset = {
   key: string;
@@ -62,4 +62,20 @@ export function findRepeatPreset(
   }
   const signature = ruleSignature(rule);
   return presets.find((preset) => ruleSignature(preset.rule) === signature) ?? null;
+}
+
+export const REMINDER_MINUTE_OPTIONS = [
+  5, 10, 15, 30, 60, 120, 360, 720, 1440, 2880, 4320, 10080,
+] as const;
+
+function pluralUnit(value: number, unit: string) {
+  return `${value} ${unit}${value === 1 ? "" : "s"}`;
+}
+
+/** Short reminder copy shared by the reminder chips, e.g. "15 min" or "2 hours". */
+export function formatReminderShort(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 1440) return pluralUnit(minutes / 60, "hour");
+  if (minutes % 10080 === 0) return pluralUnit(minutes / 10080, "week");
+  return pluralUnit(minutes / 1440, "day");
 }

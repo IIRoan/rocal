@@ -6,7 +6,6 @@ import {
   mapErrorToField,
   buildEventRequest,
   validateForm,
-  REMINDER_OPTIONS,
 } from "./event-form-utils";
 
 // ─── roundToNextHour ─────────────────────────────────────────────────────────
@@ -401,13 +400,5 @@ describe("validateForm", () => {
     });
     expect(fieldErrors.description).toBeUndefined();
     expect(generalErrors).toHaveLength(0);
-  });
-});
-
-// ─── REMINDER_OPTIONS ────────────────────────────────────────────────────────
-
-describe("REMINDER_OPTIONS", () => {
-  it("contains expected values", () => {
-    expect(REMINDER_OPTIONS).toEqual([0, 5, 10, 15, 30, 60]);
   });
 });

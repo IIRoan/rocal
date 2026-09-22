@@ -56,10 +56,3 @@ export function isCalendarRouteSegments(segments: Segments): boolean {
 export function isMailRouteSegments(segments: Segments): boolean {
   return segments[0] === "(tabs)" && segments[1] === "mail";
 }
-
-export function isSidebarGestureRootSegments(segments: Segments): boolean {
-  return (
-    (isCalendarRouteSegments(segments) || isMailRouteSegments(segments)) &&
-    segments.length === 2
-  );
-}

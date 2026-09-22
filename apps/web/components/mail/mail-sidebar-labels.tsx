@@ -9,7 +9,7 @@ import {
 } from "@workspace/ui/components/ui/sidebar";
 import { cn } from "@workspace/ui/lib/utils";
 import type { LabelDef } from "@/lib/mail/types";
-import { resolveLabelDisplayColor } from "@/lib/mail/mail-label-colors";
+import { resolveLabelDisplayColor } from "@workspace/calendar-core";
 
 export function MailSidebarLabels({
   labels,

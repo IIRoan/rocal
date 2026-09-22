@@ -24,7 +24,7 @@ import {
 } from "../lib/workspace-tab-transition";
 import { useReduceMotion } from "../lib/use-reduce-motion";
 import { useWorkspaceTabHost } from "../providers/WorkspaceTabHostProvider";
-import { useTheme } from "../providers/ThemeProvider";
+import { WorkspaceThemeScope, useTheme } from "../providers/ThemeProvider";
 import type { AppSwitchKey } from "../lib/app-switcher-config";
 
 /**
@@ -32,6 +32,14 @@ import type { AppSwitchKey } from "../lib/app-switcher-config";
  * (incoming covers from the right, outgoing peeks 30%) and the app's native stack.
  */
 export function WorkspacePrimaryTabSurfaces() {
+  return (
+    <WorkspaceThemeScope>
+      <WorkspacePrimaryTabHost />
+    </WorkspaceThemeScope>
+  );
+}
+
+function WorkspacePrimaryTabHost() {
   const { theme } = useTheme();
   const { width } = useWindowDimensions();
   const reduceMotion = useReduceMotion();

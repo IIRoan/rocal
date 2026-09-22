@@ -1,6 +1,13 @@
+import { useMemo } from "react";
 import { StyleSheet, type TextStyle, type ViewStyle } from "react-native";
-import type { ThemeTokens } from "@workspace/design-tokens";
+import {
+  mailDarkPalette,
+  mailLightPalette,
+  type MailPaletteTokens,
+  type ThemeTokens,
+} from "@workspace/design-tokens";
 import { LAYOUT_ICON } from "../../lib/app-layout";
+import { useTheme } from "../../providers/ThemeProvider";
 
 /** Shared icon sizes across the native mail experience. */
 export const MAIL_ICON = {
@@ -12,8 +19,6 @@ export const MAIL_ICON = {
   sheetAccessory: 18,
   rowMeta: 14,
   rowSelect: 20,
-  /** Compose FAB — matches sidebar `edit` action scale. */
-  fab: 20,
   emptyState: 36,
 } as const;
 
@@ -27,12 +32,10 @@ export const MAIL_LAYOUT = {
   bottomBarPaddingTop: 8,
   /** Selection checkbox size (bulk select). */
   selectBoxSize: 22,
-  /** Matches sidebar primary button height (44). */
-  composeFabSize: 44,
-  composeFabInset: 12,
-  composeListExtra: 44 + 12,
   sheetSectionGap: 8,
   unreadDotSize: 8,
+  /** Sender avatar in list rows; tapping it toggles selection. */
+  rowAvatarSize: 32,
 } as const;
 
 export function mailRadii(theme: ThemeTokens) {
@@ -62,16 +65,72 @@ export function mailColors(theme: ThemeTokens) {
   return {
     border: theme.colors.border + "80",
     borderSubtle: theme.colors.border + "50",
-    pressed: theme.colors.muted + "66",
+    pressed: theme.colors.foreground + "0f",
     pressedStrong: theme.colors.muted + "44",
     surface: theme.colors.muted + "33",
     surfaceMuted: theme.colors.muted + "22",
-    unreadRow: theme.colors.primaryBase + "12",
-    selectedRow: theme.colors.primaryBase + "14",
+    unreadRow: theme.colors.card,
+    selectedRow: theme.colors.foreground + "14",
     selectIndicator: theme.colors.muted + "55",
-    selectIndicatorOn: theme.colors.primaryBase,
+    selectIndicatorOn: theme.colors.foreground,
     chipBg: theme.colors.muted + "99",
   };
+}
+
+/** Nightwatch tokens that have no ThemeTokens slot (unread accent, disabled text, cell states). */
+export function useMailPalette(): MailPaletteTokens {
+  const { isDark } = useTheme();
+  return isDark ? mailDarkPalette : mailLightPalette;
+}
+
+/** Skiff-style mail skin: accent, CTA, and the text/border steps the list, reader, and compose share. */
+export function mailSkin(theme: ThemeTokens, palette: MailPaletteTokens) {
+  return {
+    accent: palette.textLink,
+    unreadDot: palette.unreadDot,
+    cta: palette.ctaPrimary,
+    ctaForeground: palette.ctaPrimaryForeground,
+    textSecondary: theme.colors.mutedForeground,
+    textTertiary: palette.textTertiary,
+    borderPrimary: palette.borderPrimary,
+    borderTertiary: palette.borderTertiary,
+    surface: palette.surface,
+    field: theme.colors.muted,
+    pressed: palette.cellHover,
+    selected: palette.cellActive,
+    largeTitle: {
+      fontSize: 28,
+      lineHeight: 34,
+      fontWeight: "700" as TextStyle["fontWeight"],
+      letterSpacing: -0.4,
+      color: theme.colors.foreground,
+    },
+    title: {
+      fontSize: 22,
+      lineHeight: 28,
+      fontWeight: "700" as TextStyle["fontWeight"],
+      letterSpacing: -0.2,
+      color: theme.colors.foreground,
+    },
+    body: {
+      fontSize: 15,
+      lineHeight: 21,
+      color: theme.colors.foreground,
+    },
+    meta: {
+      fontSize: 13,
+      lineHeight: 17,
+      color: palette.textTertiary,
+    },
+  };
+}
+
+export type MailSkin = ReturnType<typeof mailSkin>;
+
+export function useMailSkin(): MailSkin {
+  const { theme } = useTheme();
+  const palette = useMailPalette();
+  return useMemo(() => mailSkin(theme, palette), [palette, theme]);
 }
 
 export function mailTypography(theme: ThemeTokens) {
@@ -101,10 +160,10 @@ export function mailTypography(theme: ThemeTokens) {
   };
 }
 
-/** Inset for list row separators (avatar + gaps). */
+/** Inset for list row separators so they start under the sender text. */
 export function mailListSeparatorInset(theme: ThemeTokens): number {
   const s = mailSpacing(theme);
-  return s.rowH + MAIL_LAYOUT.avatarSize + s.rowGap;
+  return s.rowH + MAIL_LAYOUT.rowAvatarSize + s.rowGap;
 }
 
 export function createMailHairlineBorder(theme: ThemeTokens): ViewStyle {

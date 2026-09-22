@@ -4,7 +4,7 @@ import {
   formatInUserTimezone,
   resolveTimezone,
 } from "@workspace/calendar-core";
-import type { CalendarEvent } from "@workspace/calendar-core";
+import type { CalendarEvent, RecurrenceRule } from "@workspace/calendar-core";
 import { parseRRule, type ParsedRule } from "./recurrence-picker-utils";
 
 /**
@@ -164,6 +164,17 @@ function summarizeRecurrence(rule: ParsedRule): string {
   }
 
   return description;
+}
+
+export function summarizeRecurrenceRule(rule: RecurrenceRule): string {
+  return summarizeRecurrence({
+    frequency: rule.frequency,
+    interval: rule.interval,
+    byDay: rule.byWeekDay ?? [],
+    endCondition: rule.count ? "count" : rule.until ? "until" : "never",
+    count: rule.count ?? 0,
+    until: rule.until ? new Date(rule.until).toISOString() : "",
+  });
 }
 
 /**

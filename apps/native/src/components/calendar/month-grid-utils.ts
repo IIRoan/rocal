@@ -2,7 +2,6 @@ import {
   startOfMonth,
   startOfWeek,
   addDays,
-  format,
   isSameMonth,
 } from "date-fns";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
@@ -11,28 +10,13 @@ import {
   formatInstantCalendarDayKey,
   resolveTimezone,
 } from "@workspace/calendar-core";
-import type { CalendarColor, ThemeTokens } from "@workspace/design-tokens";
+import type { ThemeTokens } from "@workspace/design-tokens";
+import { resolveCalendarSwatchColor } from "../../lib/calendar-color-utils";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DAYS_IN_GRID = 42; // 6 rows × 7 columns
 export const MAX_DOTS = 3;
-
-export const KNOWN_CALENDAR_COLORS: ReadonlySet<string> =
-  new Set<CalendarColor>([
-    "blue",
-    "orange",
-    "violet",
-    "rose",
-    "emerald",
-    "red",
-    "cyan",
-    "lime",
-    "amber",
-    "indigo",
-    "pink",
-    "teal",
-  ]);
 
 // ─── Day-of-week header labels ──────────────────────────────────────────────
 
@@ -143,22 +127,12 @@ export function getMonthDayEvents(
   return eventsByDay.get(formatCalendarDayKey(date)) ?? [];
 }
 
-/**
- * Resolve the dot color for an event. If the event's color matches a known
- * CalendarColor, use the theme's calendar palette bg. Otherwise use the raw
- * color string, falling back to mutedForeground.
- */
+/** Dot color for an event, matching the web swatch (named palette bg, raw hex, sky fallback). */
 export function resolveEventDotColor(
   eventColor: string | undefined,
   theme: ThemeTokens,
 ): string {
-  if (!eventColor) {
-    return theme.colors.mutedForeground;
-  }
-  if (KNOWN_CALENDAR_COLORS.has(eventColor)) {
-    return theme.colors.calendar[eventColor as CalendarColor].bg;
-  }
-  return eventColor;
+  return resolveCalendarSwatchColor(eventColor, theme);
 }
 
 // ─── CompactMonthStrip height helpers ────────────────────────────────────────

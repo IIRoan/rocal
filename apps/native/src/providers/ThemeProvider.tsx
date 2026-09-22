@@ -10,6 +10,8 @@ import { useColorScheme } from "react-native";
 import {
   nativeLightTheme,
   nativeDarkTheme,
+  nativeMailDarkTheme,
+  nativeMailLightTheme,
   type ThemeTokens,
 } from "@workspace/design-tokens";
 
@@ -148,6 +150,25 @@ export function ThemeProvider({
   // there is no flash of the wrong theme.
   if (!isReady) return <></>;
 
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
+}
+
+/** Re-themes calendar and mail with the Solace palette, like `[data-solace]` scopes web mail. */
+export function WorkspaceThemeScope({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactNode {
+  const parent = useTheme();
+  const value = useMemo<ThemeContextValue>(
+    () => ({
+      ...parent,
+      theme: parent.isDark ? nativeMailDarkTheme : nativeMailLightTheme,
+    }),
+    [parent],
+  );
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
   );

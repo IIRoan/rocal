@@ -11,6 +11,7 @@ import {
 } from "@workspace/calendar-core";
 
 export const QUERY_KEYS = {
+  eventsRoot: () => ["events"] as const,
   events: (start: string, end: string) => ["events", start, end] as const,
   calendars: () => CALENDARS_QUERY_KEY,
   categories: () => CATEGORIES_QUERY_KEY,

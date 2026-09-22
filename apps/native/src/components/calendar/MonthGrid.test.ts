@@ -169,9 +169,15 @@ describe("resolveEventDotColor", () => {
     expect(result).toBe("#ff00ff");
   });
 
-  it("returns mutedForeground when color is undefined", () => {
+  it("falls back to the blue swatch when color is undefined, like web", () => {
     const result = resolveEventDotColor(undefined, theme);
-    expect(result).toBe(theme.colors.mutedForeground);
+    expect(result).toBe(theme.colors.calendar.blue.bg);
+  });
+
+  it("maps the web sky alias to blue", () => {
+    expect(resolveEventDotColor("sky", theme)).toBe(
+      theme.colors.calendar.blue.bg,
+    );
   });
 
   it("works with all 12 known calendar colors", () => {

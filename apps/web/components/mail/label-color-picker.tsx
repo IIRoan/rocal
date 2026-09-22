@@ -5,7 +5,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import {
   MAIL_LABEL_PRESET_COLORS,
   resolveLabelDisplayColor,
-} from "@/lib/mail/mail-label-colors";
+} from "@workspace/calendar-core";
 
 const DEFAULT_CUSTOM_COLOR = "#6366f1";
 

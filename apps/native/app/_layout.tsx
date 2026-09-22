@@ -14,12 +14,10 @@ import { AppUpdateScreen } from "../src/components/settings/AppUpdateScreen";
 import { E2eeProvider, useE2ee } from "../src/providers/E2eeProvider";
 import { SheetProvider } from "../src/providers/SheetProvider";
 import { ToastProvider } from "../src/providers/ToastProvider";
-import { SidebarProvider, useSidebar } from "../src/providers/SidebarProvider";
 import { MailSelectionProvider } from "../src/providers/MailSelectionProvider";
 import { CommandPaletteProvider } from "../src/providers/CommandPaletteProvider";
 import { CalendarViewProvider } from "../src/providers/CalendarViewProvider";
 import { WorkspaceTabHostProvider } from "../src/providers/WorkspaceTabHostProvider";
-import { AppSidebar } from "../src/components/AppSidebar";
 import { CommandPalette } from "../src/components/CommandPalette";
 import { WorkspaceLoadingScreen } from "../src/components/WorkspaceLoadingScreen";
 import { calendarApiService } from "../src/lib/api";
@@ -166,7 +164,6 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
 
 function AuthenticatedChrome() {
   const { isAuthenticated, isLoading } = useAuth();
-  const { isOpen, close } = useSidebar();
   const segments = useSegments();
   const showChrome = shouldRenderAuthenticatedChrome({
     isAuthenticated,
@@ -174,22 +171,11 @@ function AuthenticatedChrome() {
     segments,
   });
 
-  useEffect(() => {
-    if (!showChrome && isOpen) {
-      close();
-    }
-  }, [close, isOpen, showChrome]);
-
   if (!showChrome) {
     return null;
   }
 
-  return (
-    <>
-      <AppSidebar />
-      <CommandPalette />
-    </>
-  );
+  return <CommandPalette />;
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +192,6 @@ function RootLayout() {
               <AppUpdateProvider>
                 <AppUpdateScreen />
                 <E2eeProvider>
-                  <SidebarProvider>
                     <MailSelectionProvider>
                       <CalendarViewProvider>
                         <NavigationGuard>
@@ -244,7 +229,6 @@ function RootLayout() {
                         </NavigationGuard>
                       </CalendarViewProvider>
                     </MailSelectionProvider>
-                  </SidebarProvider>
                 </E2eeProvider>
               </AppUpdateProvider>
             </ThemeProvider>

@@ -5,6 +5,7 @@ import {
   formatCalendarDayKey,
   getEventCalendarDayRange,
   getThreeDayCalendarDays,
+  getWorkingDayShade,
   getZonedDateParts,
   resolveTimezone,
   spansMultipleCalendarDays,
@@ -168,6 +169,34 @@ export function isTimelineKitView(view: CalendarView): view is TimelineKitView {
 export function toKitFirstDay(weekStartDay: number): KitWeekday {
   const normalized = ((weekStartDay % 7) + 7) % 7;
   return (normalized === 0 ? 7 : normalized) as KitWeekday;
+}
+
+export type KitDayShadeRegion = {
+  start: number;
+  end: number;
+  backgroundColor: string;
+  enableBackgroundInteraction: true;
+};
+
+/** Full-day kit `unavailableHours` regions keyed by kit weekday, tinting columns like the web month grid. */
+export function toKitDayShadeRegions(
+  workingDays: readonly number[],
+  colors: { workday: string; weekend: string },
+): Record<string, KitDayShadeRegion[]> {
+  const regions: Record<string, KitDayShadeRegion[]> = {};
+  for (let day = 0; day < 7; day++) {
+    const shade = getWorkingDayShade(day, workingDays);
+    if (!shade) continue;
+    regions[String(toKitFirstDay(day))] = [
+      {
+        start: 0,
+        end: 1440,
+        backgroundColor: colors[shade],
+        enableBackgroundInteraction: true,
+      },
+    ];
+  }
+  return regions;
 }
 
 export function toKitHourFormat(timeFormat: "12h" | "24h"): string {

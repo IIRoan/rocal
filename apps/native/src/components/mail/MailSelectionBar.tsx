@@ -6,9 +6,8 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import type { ThemeTokens } from "@workspace/design-tokens";
-import { useTheme } from "../../providers/ThemeProvider";
-import { HeaderIconButton, SurfaceTitle, SurfaceToolbar } from "../layout";
+import { SurfaceTitle, SurfaceToolbar } from "../layout";
+import { useMailSkin, type MailSkin } from "./mail-ui";
 
 interface MailSelectionBarProps {
   selectedCount: number;
@@ -23,57 +22,79 @@ export function MailSelectionBar({
   onClear,
   onSelectAll,
 }: MailSelectionBarProps) {
-  const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const skin = useMailSkin();
+  const styles = useMemo(() => createStyles(skin), [skin]);
   const allSelected = totalCount > 0 && selectedCount >= totalCount;
   const title =
-    selectedCount === 1 ? "1 selected" : `${selectedCount} selected`;
+    selectedCount === 0
+      ? "Select messages"
+      : selectedCount === 1
+        ? "1 selected"
+        : `${selectedCount} selected`;
 
   return (
     <SurfaceToolbar
       bordered={false}
       leading={
-        <HeaderIconButton
-          name="x"
-          size={22}
-          onPress={onClear}
-          accessibilityLabel="Clear selection"
-        />
+        <Pressable
+          onPress={onSelectAll}
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.textButton,
+            styles.leading,
+            pressed && styles.pressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={allSelected ? "Deselect all" : "Select all"}
+        >
+          <Text style={styles.textButtonLabel} numberOfLines={1}>
+            {allSelected ? "Deselect all" : "Select all"}
+          </Text>
+        </Pressable>
       }
       center={<SurfaceTitle title={title} centered />}
       trailing={
         <Pressable
-          onPress={onSelectAll}
+          onPress={onClear}
           hitSlop={8}
-          style={({ pressed }) => [styles.trailing, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.textButton,
+            styles.trailing,
+            pressed && styles.pressed,
+          ]}
           accessibilityRole="button"
-          accessibilityLabel={allSelected ? "Deselect all" : "Select all"}
+          accessibilityLabel="Done selecting"
         >
-          <Text style={styles.trailingText} numberOfLines={1}>
-            {allSelected ? "Deselect" : "Select all"}
-          </Text>
+          <Text style={[styles.textButtonLabel, styles.done]}>Done</Text>
         </Pressable>
       }
     />
   );
 }
 
-function createStyles(theme: ThemeTokens) {
+function createStyles(skin: MailSkin) {
   return StyleSheet.create({
-    trailing: {
+    textButton: {
       minHeight: 44,
       justifyContent: "center",
-      alignItems: "flex-end",
-      paddingVertical: theme.spacing["1"],
     } as ViewStyle,
-    trailingText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.primaryBase,
+    leading: {
+      alignItems: "flex-start",
+    } as ViewStyle,
+    trailing: {
+      alignItems: "flex-end",
+    } as ViewStyle,
+    textButtonLabel: {
+      fontSize: 16,
+      lineHeight: 21,
+      fontWeight: "500",
+      color: skin.accent,
+    } as TextStyle,
+    done: {
+      fontWeight: "600",
     } as TextStyle,
     pressed: {
-      opacity: 0.65,
+      opacity: 0.6,
     } as ViewStyle,
   });
 }

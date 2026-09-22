@@ -9,7 +9,7 @@ import {
   TypographyWeight,
 } from "@workspace/ui/solace";
 import { LabelPickerPanel } from "../label-picker-panel";
-import { resolveLabelDisplayColor } from "@/lib/mail/mail-label-colors";
+import { resolveLabelDisplayColor } from "@workspace/calendar-core";
 import { MailSecurityBadge } from "./mail-security-badge";
 import type {
   MessageReaderController,

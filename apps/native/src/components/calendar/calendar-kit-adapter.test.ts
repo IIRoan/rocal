@@ -15,6 +15,7 @@ import {
   resolveKitRecurrenceEdit,
   shouldCommitDragVisibleDate,
   shouldSyncTimelineDate,
+  toKitDayShadeRegions,
   toKitEvent,
   toKitFirstDay,
   toKitHourFormat,
@@ -491,5 +492,34 @@ describe("parseKitVisibleDate", () => {
     const start = wallClockToUtc(new Date(2026, 7, 18), 9, 0, TIMEZONE);
     const date = parseKitVisibleDate(start.toISOString(), TIMEZONE);
     expect(toKitInitialDate(date)).toBe("2026-08-18");
+  });
+});
+
+describe("toKitDayShadeRegions", () => {
+  const colors = { workday: "workday-color", weekend: "weekend-color" };
+
+  it("maps working days and Sat/Sun off days to full-day kit weekday regions", () => {
+    const regions = toKitDayShadeRegions([1, 2, 3, 4, 5], colors);
+
+    expect(Object.keys(regions).sort()).toEqual(["1", "2", "3", "4", "5", "6", "7"]);
+    expect(regions["1"]).toEqual([
+      {
+        start: 0,
+        end: 1440,
+        backgroundColor: "workday-color",
+        enableBackgroundInteraction: true,
+      },
+    ]);
+    expect(regions["6"]?.[0]?.backgroundColor).toBe("weekend-color");
+    expect(regions["7"]?.[0]?.backgroundColor).toBe("weekend-color");
+  });
+
+  it("leaves non-working weekdays unshaded and shades a working Sunday as workday", () => {
+    const regions = toKitDayShadeRegions([0, 1, 2, 4], colors);
+
+    expect(regions["3"]).toBeUndefined();
+    expect(regions["5"]).toBeUndefined();
+    expect(regions["7"]?.[0]?.backgroundColor).toBe("workday-color");
+    expect(regions["6"]?.[0]?.backgroundColor).toBe("weekend-color");
   });
 });

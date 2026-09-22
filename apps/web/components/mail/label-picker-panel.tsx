@@ -7,7 +7,7 @@ import type { LabelDef } from "@/lib/mail/types";
 import {
   normalizeLabelColorInput,
   resolveLabelDisplayColor,
-} from "@/lib/mail/mail-label-colors";
+} from "@workspace/calendar-core";
 import { LabelColorPicker } from "./label-color-picker";
 
 const DEFAULT_LABEL_COLOR = "#6366f1";

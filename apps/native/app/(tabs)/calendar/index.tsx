@@ -11,6 +11,7 @@ import {
   type DecoratedCalendarEvent,
   getErrorMessage,
   getPaddedCalendarMonthRange,
+  parseWorkingDays,
   createCalendarMap,
   createVisibleCalendarIdSet,
   transformCalendarEvents,
@@ -33,6 +34,8 @@ import {
 } from "../../../src/components/calendar/navigation-utils";
 import { AppScreen } from "../../../src/components/layout";
 import { CalendarTopToolbar } from "../../../src/components/calendar/CalendarTopToolbar";
+import { CalendarDrawerSheet } from "../../../src/components/calendar/CalendarDrawerSheet";
+import { AccountSheet } from "../../../src/components/AccountSheet";
 import { CalendarBottomChrome } from "../../../src/components/calendar/CalendarBottomChrome";
 import { resolveCalendarSwitcherDate } from "../../../src/components/calendar/view-switcher-utils";
 import { MonthGrid } from "../../../src/components/calendar/MonthGrid";
@@ -65,6 +68,12 @@ export function CalendarScreen() {
   const timelineRef = useRef<NativeTimelineCalendarHandle>(null);
 
   const [monthStripExpanded, setMonthStripExpanded] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const openDrawer = useCallback(() => setDrawerOpen(true), []);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const openAccount = useCallback(() => setAccountOpen(true), []);
+  const closeAccount = useCallback(() => setAccountOpen(false), []);
 
   const { data: settings, isPending: settingsPending } = useQuery({
     queryKey: QUERY_KEYS.settings(),
@@ -76,6 +85,10 @@ export function CalendarScreen() {
   });
   const settingsLoading = settingsPending && !settings;
   const resolvedTimezone = resolveTimezone(settings?.timezone);
+  const workingDays = useMemo(
+    () => parseWorkingDays(settings?.workingDays),
+    [settings?.workingDays],
+  );
 
   const { data: calendars, isPending: calendarsPending } = useQuery({
     queryKey: QUERY_KEYS.calendars(),
@@ -123,7 +136,8 @@ export function CalendarScreen() {
     [monthEventsCenter],
   );
   const previousMonthRange = useMemo(
-    () => getPaddedCalendarMonthRange(previousMonth, undefined, resolvedTimezone),
+    () =>
+      getPaddedCalendarMonthRange(previousMonth, undefined, resolvedTimezone),
     [previousMonth, resolvedTimezone],
   );
   const currentMonthRange = useMemo(
@@ -172,51 +186,47 @@ export function CalendarScreen() {
     }
   }, [monthEventsCenter, queryClient, resolvedTimezone]);
 
-  const { data: previousMonthEventsData } =
-    useQuery({
-      queryKey: QUERY_KEYS.events(
-        previousMonthRange.start.toISOString(),
-        previousMonthRange.end.toISOString(),
+  const { data: previousMonthEventsData } = useQuery({
+    queryKey: QUERY_KEYS.events(
+      previousMonthRange.start.toISOString(),
+      previousMonthRange.end.toISOString(),
+    ),
+    queryFn: () =>
+      calendarApiService.getEvents(
+        previousMonthRange.start,
+        previousMonthRange.end,
       ),
-      queryFn: () =>
-        calendarApiService.getEvents(
-          previousMonthRange.start,
-          previousMonthRange.end,
-        ),
-      enabled: !settingsLoading,
-      staleTime: 120_000,
-      placeholderData: keepPreviousData,
-    });
+    enabled: !settingsLoading,
+    staleTime: 120_000,
+    placeholderData: keepPreviousData,
+  });
 
-  const { data: currentMonthEventsData } =
-    useQuery({
-      queryKey: QUERY_KEYS.events(
-        currentMonthRange.start.toISOString(),
-        currentMonthRange.end.toISOString(),
+  const { data: currentMonthEventsData } = useQuery({
+    queryKey: QUERY_KEYS.events(
+      currentMonthRange.start.toISOString(),
+      currentMonthRange.end.toISOString(),
+    ),
+    queryFn: () =>
+      calendarApiService.getEvents(
+        currentMonthRange.start,
+        currentMonthRange.end,
       ),
-      queryFn: () =>
-        calendarApiService.getEvents(
-          currentMonthRange.start,
-          currentMonthRange.end,
-        ),
-      enabled: !settingsLoading,
-      staleTime: 120_000,
-      placeholderData: keepPreviousData,
-    });
+    enabled: !settingsLoading,
+    staleTime: 120_000,
+    placeholderData: keepPreviousData,
+  });
 
-  const { data: nextMonthEventsData } = useQuery(
-    {
-      queryKey: QUERY_KEYS.events(
-        nextMonthRange.start.toISOString(),
-        nextMonthRange.end.toISOString(),
-      ),
-      queryFn: () =>
-        calendarApiService.getEvents(nextMonthRange.start, nextMonthRange.end),
-      enabled: !settingsLoading,
-      staleTime: 120_000,
-      placeholderData: keepPreviousData,
-    },
-  );
+  const { data: nextMonthEventsData } = useQuery({
+    queryKey: QUERY_KEYS.events(
+      nextMonthRange.start.toISOString(),
+      nextMonthRange.end.toISOString(),
+    ),
+    queryFn: () =>
+      calendarApiService.getEvents(nextMonthRange.start, nextMonthRange.end),
+    enabled: !settingsLoading,
+    staleTime: 120_000,
+    placeholderData: keepPreviousData,
+  });
 
   useEffect(() => {
     if (settings?.defaultView) {
@@ -360,12 +370,7 @@ export function CalendarScreen() {
         return next;
       });
     },
-    [
-      activeView,
-      isTimelineView,
-      setCurrentDate,
-      setSelectedDate,
-    ],
+    [activeView, isTimelineView, setCurrentDate, setSelectedDate],
   );
 
   const handleNavigateForward = useCallback(() => {
@@ -374,12 +379,7 @@ export function CalendarScreen() {
       return;
     }
     navigateMonth(1, !monthStripExpanded);
-  }, [
-    handleDetailNavigate,
-    isTimelineView,
-    monthStripExpanded,
-    navigateMonth,
-  ]);
+  }, [handleDetailNavigate, isTimelineView, monthStripExpanded, navigateMonth]);
 
   const handleNavigateBackward = useCallback(() => {
     if (isTimelineView) {
@@ -387,12 +387,7 @@ export function CalendarScreen() {
       return;
     }
     navigateMonth(-1, !monthStripExpanded);
-  }, [
-    handleDetailNavigate,
-    isTimelineView,
-    monthStripExpanded,
-    navigateMonth,
-  ]);
+  }, [handleDetailNavigate, isTimelineView, monthStripExpanded, navigateMonth]);
 
   const handleMonthChange = useCallback(
     (direction: 1 | -1) => {
@@ -496,76 +491,93 @@ export function CalendarScreen() {
   });
 
   return (
-    <AppScreen
-      header={<CalendarTopToolbar />}
-      footer={
-        <CalendarBottomChrome
-          activeView={activeView}
-          currentDate={currentDate}
-          selectedDate={selectedDate}
-          switcherDate={switcherDate}
-          weekStartDay={settings?.weekStartDay ?? 1}
-          timezone={resolvedTimezone}
-          events={decoratedMonthEvents}
-          monthStripExpanded={monthStripExpanded}
-          showMonthStrip={!isTimelineView}
-          onTodayPress={handleTodayPress}
-          onForwardPress={handleNavigateForward}
-          onBackwardPress={handleNavigateBackward}
-          onToggleMonthStrip={handleToggleMonthStrip}
-          onDayPress={handleDayPress}
-          onMonthChange={handleMonthChange}
-          onExpandAnimationEnd={handleMonthStripAnimationEnd}
-        />
-      }
-    >
-      {loadingState.isAllInitialLoading && !isTimelineView ? (
-        <SkeletonLoader view={activeView} />
-      ) : activeView === "month" ? (
-        !monthStripExpanded || monthGridVisible ? (
-          <MonthGrid
+    <>
+      <AppScreen
+        header={
+          <CalendarTopToolbar
+            currentDate={switcherDate}
+            timezone={resolvedTimezone}
+            onOpenDrawer={openDrawer}
+            onOpenAccount={openAccount}
+          />
+        }
+        footer={
+          <CalendarBottomChrome
+            activeView={activeView}
             currentDate={currentDate}
             selectedDate={selectedDate}
-            events={decoratedDetailEvents}
+            switcherDate={switcherDate}
             weekStartDay={settings?.weekStartDay ?? 1}
             timezone={resolvedTimezone}
+            events={decoratedMonthEvents}
+            monthStripExpanded={monthStripExpanded}
+            showMonthStrip={!isTimelineView}
+            onTodayPress={handleTodayPress}
+            onForwardPress={handleNavigateForward}
+            onBackwardPress={handleNavigateBackward}
+            onToggleMonthStrip={handleToggleMonthStrip}
             onDayPress={handleDayPress}
+            onMonthChange={handleMonthChange}
+            onExpandAnimationEnd={handleMonthStripAnimationEnd}
           />
-        ) : null
-      ) : activeView === "agenda" ? (
-        <SwipeableCalendarView
-          onSwipeLeft={() => handleDetailNavigate(1)}
-          onSwipeRight={() => handleDetailNavigate(-1)}
-        >
-          <AgendaList
-            key={selectedDate.toISOString()}
+        }
+      >
+        {loadingState.isAllInitialLoading && !isTimelineView ? (
+          <SkeletonLoader view={activeView} />
+        ) : activeView === "month" ? (
+          !monthStripExpanded || monthGridVisible ? (
+            <MonthGrid
+              currentDate={currentDate}
+              selectedDate={selectedDate}
+              events={decoratedDetailEvents}
+              weekStartDay={settings?.weekStartDay ?? 1}
+              workingDays={workingDays}
+              timezone={resolvedTimezone}
+              onDayPress={handleDayPress}
+            />
+          ) : null
+        ) : activeView === "agenda" ? (
+          <SwipeableCalendarView
+            onSwipeLeft={() => handleDetailNavigate(1)}
+            onSwipeRight={() => handleDetailNavigate(-1)}
+          >
+            <AgendaList
+              key={selectedDate.toISOString()}
+              events={decoratedDetailEvents}
+              timeFormat={settings?.timeFormat ?? "12h"}
+              timezone={resolvedTimezone}
+              refreshing={detailEventsLoading}
+              onRefresh={() => refetchDetailEvents()}
+              onEventPress={handleEventPress}
+              onEventDelete={handleEventDelete}
+            />
+          </SwipeableCalendarView>
+        ) : isTimelineKitView(activeView) ? (
+          <NativeTimelineCalendar
+            ref={timelineRef}
+            view={activeView}
+            selectedDate={selectedDate}
             events={decoratedDetailEvents}
-            timeFormat={settings?.timeFormat ?? "12h"}
             timezone={resolvedTimezone}
-            refreshing={detailEventsLoading}
-            onRefresh={() => refetchDetailEvents()}
-            onEventPress={handleEventPress}
-            onEventDelete={handleEventDelete}
+            weekStartDay={settings?.weekStartDay ?? 1}
+            workingDays={workingDays}
+            timeFormat={settings?.timeFormat ?? "12h"}
+            swipeEnabled
+            isLoading={detailEventsLoading}
+            onEventPress={handleTimelineEventPress}
+            onTimeSlotPress={handleTimeSlotPress}
+            onDateChange={handleTimelineDateChange}
+            onEventMove={handleTimelineEventMove}
           />
-        </SwipeableCalendarView>
-      ) : isTimelineKitView(activeView) ? (
-        <NativeTimelineCalendar
-          ref={timelineRef}
-          view={activeView}
-          selectedDate={selectedDate}
-          events={decoratedDetailEvents}
-          timezone={resolvedTimezone}
-          weekStartDay={settings?.weekStartDay ?? 1}
-          timeFormat={settings?.timeFormat ?? "12h"}
-          swipeEnabled
-          isLoading={detailEventsLoading}
-          onEventPress={handleTimelineEventPress}
-          onTimeSlotPress={handleTimeSlotPress}
-          onDateChange={handleTimelineDateChange}
-          onEventMove={handleTimelineEventMove}
-        />
-      ) : null}
-    </AppScreen>
+        ) : null}
+      </AppScreen>
+      <CalendarDrawerSheet visible={drawerOpen} onDismiss={closeDrawer} />
+      <AccountSheet
+        visible={accountOpen}
+        activeApp="calendar"
+        onDismiss={closeAccount}
+      />
+    </>
   );
 }
 

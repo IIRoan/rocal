@@ -2,6 +2,7 @@
 
 import React from "react";
 import {
+  getWorkingDayShade,
   isCancelledCalendarEvent,
   isTodayInTimezone,
   wallClockToUtc,
@@ -23,6 +24,12 @@ type DayBuckets = {
   allEvents: CalendarEvent[];
   sortedAllDay: CalendarEvent[];
 };
+
+const DAY_SHADE_CLASS = {
+  workday: "bg-[var(--calendar-workday)]",
+  weekend: "bg-[var(--calendar-weekend)]",
+  none: "",
+} as const;
 
 type MonthDayCellProps = {
   day: Date;
@@ -67,6 +74,7 @@ export function MonthDayCell({
 }: MonthDayCellProps) {
   const { dayEvents, spanningEvents, allEvents, sortedAllDay } = buckets;
   const isCurrentMonth = isSameMonth(day, currentDate);
+  const shade = getWorkingDayShade(day.getDay(), workingDays);
   const cellId = `month-cell-${day.toISOString()}`;
   const allDayEvents = [...spanningEvents, ...dayEvents];
   const isReferenceCell = weekIndex === 0 && dayIndex === 0;
@@ -85,13 +93,7 @@ export function MonthDayCell({
   return (
     <div
       className={`group border-border/70 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground/70 border-r border-b last:border-r-0 transition-all duration-200 hover:bg-accent/5 hover:shadow-sm ${
-        workingDays.includes(day.getDay()) && isCurrentMonth
-          ? "bg-[var(--calendar-workday)]"
-          : !workingDays.includes(day.getDay()) &&
-              [0, 6].includes(day.getDay()) &&
-              isCurrentMonth
-            ? "bg-[var(--calendar-weekend)]"
-            : ""
+        isCurrentMonth ? DAY_SHADE_CLASS[shade ?? "none"] : ""
       }`}
       data-today={isTodayInTimezone(day, resolvedTimezone) || undefined}
       data-outside-cell={!isCurrentMonth || undefined}

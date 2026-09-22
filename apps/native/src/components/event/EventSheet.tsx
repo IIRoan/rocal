@@ -10,11 +10,6 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { ScrollView } from "react-native-gesture-handler";
-import Animated, {
-  useAnimatedScrollHandler,
-  useSharedValue,
-} from "react-native-reanimated";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   CalendarEvent,
@@ -23,8 +18,10 @@ import type {
   RecurrenceEditScope,
 } from "@workspace/calendar-core";
 import {
+  formatReminderShort,
   getErrorMessage,
   hasOptionalEventParticipants,
+  isCancelledCalendarEvent,
   resolveTimezone,
   wallClockToUtc,
 } from "@workspace/calendar-core";
@@ -52,11 +49,10 @@ import {
   BottomSheet,
   BottomSheetFooter,
   BottomSheetHeader,
+  BottomSheetScrollView,
   BottomSheetTitle,
   type BottomSheetHandle,
 } from "../BottomSheet";
-
-const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 import { CenteredLoader } from "../ui/loading";
 import {
   SheetActions,
@@ -66,16 +62,17 @@ import {
 
 import { EventForm } from "./EventForm";
 import { BlobatarAvatar } from "../BlobatarAvatar";
+import { EventEditorRow } from "./EventEditorPrimitives";
 import { toTimezonePickerISOString, parseCreateEventCalendarDay } from "./event-form-utils";
 import {
   formatEventDate,
   formatEventTime,
   formatRecurrenceLabel,
-  formatReminderLabel,
 } from "./event-detail-utils";
 import { EncryptionStatusIcon } from "../calendar/EncryptionStatusIcon";
 import { shouldShowEncryptionIcon } from "../calendar/timeline-event-content";
 import { resolveEventSheetViewActions } from "./event-sheet-view-actions";
+
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -133,33 +130,6 @@ const SCOPE_OPTIONS: {
   { label: "All occurrences", scope: "all" },
 ];
 
-// ─── Icon wrapper (matches web: w-6 h-6 centered) ───────────────────────────
-
-function IconBox({
-  name,
-  color,
-  bg = "transparent",
-}: {
-  name: React.ComponentProps<typeof Feather>["name"];
-  color: string;
-  bg?: string;
-}) {
-  return (
-    <View
-      style={{
-        width: 32,
-        height: 32,
-        borderRadius: 9,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: bg,
-      }}
-    >
-      <Feather name={name} size={16} color={color} />
-    </View>
-  );
-}
-
 function formatParticipantStatus(status?: string) {
   switch (status) {
     case "accepted":
@@ -200,7 +170,6 @@ export function EventSheet({
   >();
   const [scopeModalVisible, setScopeModalVisible] = useState(false);
   const [scopeAction, setScopeAction] = useState<"edit" | "delete">("edit");
-  const viewScrollAtTop = useSharedValue(false);
 
   const isCreate = mode?.type === "create";
   const isViewOrEdit = mode?.type === "view" || mode?.type === "edit";
@@ -227,21 +196,7 @@ export function EventSheet({
       setEditOccurrenceDate(mode.occurrenceDate);
     }
     setServerErrors([]);
-    viewScrollAtTop.value = mode?.type === "view";
-  }, [mode, viewScrollAtTop]);
-
-  useEffect(() => {
-    viewScrollAtTop.value = viewMode === "view";
-  }, [viewMode, viewScrollAtTop]);
-
-  const viewScrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      const atTop = event.contentOffset.y <= 0.5;
-      if (viewScrollAtTop.value !== atTop) {
-        viewScrollAtTop.value = atTop;
-      }
-    },
-  });
+  }, [mode]);
 
   const handleSheetDismissRequest = useCallback(() => {
     setServerErrors([]);
@@ -569,13 +524,15 @@ export function EventSheet({
     updateMutation.isPending ||
     deleteMutation.isPending ||
     rsvpMutation.isPending;
-  const iconColor = theme.colors.mutedForeground;
-  const iconBg = theme.colors.mutedForeground + "18";
-
   const calendarInfo = useMemo(() => {
     if (!event || !calendars) return null;
     return calendars.find((c) => c.id === event.calendarId) ?? null;
   }, [event, calendars]);
+  const calendarSwatch = calendarInfo
+    ? (theme.colors.calendar[
+        calendarInfo.color as keyof typeof theme.colors.calendar
+      ]?.bg ?? calendarInfo.color)
+    : theme.colors.calendar.blue.bg;
   const viewActions = resolveEventSheetViewActions(event);
   const sheetTitle = isCreate
     ? "New event"
@@ -592,7 +549,6 @@ export function EventSheet({
         visible={visible}
         onDismiss={handleSheetDismissRequest}
         onCloseComplete={onCloseComplete}
-        swipeContentToDismissAtTop={viewScrollAtTop}
       >
         <BottomSheetHeader>
           <BottomSheetTitle>{sheetTitle}</BottomSheetTitle>
@@ -602,25 +558,49 @@ export function EventSheet({
         ) : viewMode === "view" && event ? (
           <>
             {/* ── View mode body ─────────────────────────────────── */}
-            <AnimatedScrollView
+            <BottomSheetScrollView
               style={styles.viewScroll}
               contentContainerStyle={styles.viewBody}
               showsVerticalScrollIndicator={false}
               bounces={false}
               overScrollMode="never"
-              scrollEventThrottle={16}
-              onScroll={viewScrollHandler}
             >
-              {/* Event title */}
+              {isCancelledCalendarEvent(event) ? (
+                <View style={styles.cancelledBanner}>
+                  <Feather
+                    name="alert-triangle"
+                    size={16}
+                    color={theme.colors.destructive}
+                  />
+                  <View style={styles.viewRowContent}>
+                    <Text style={styles.cancelledTitle}>Cancelled event</Text>
+                    <Text style={styles.viewSubtext}>
+                      The organiser cancelled this event. It stays on your
+                      calendar until you remove it.
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
               <View style={styles.viewTitleRow}>
-                <EncryptionStatusIcon
-                  encrypted={shouldShowEncryptionIcon(event)}
-                  color={theme.colors.foreground}
-                  size={18}
+                <View
+                  style={[styles.titleBar, { backgroundColor: calendarSwatch }]}
                 />
-                <Text style={styles.viewEventTitle} numberOfLines={2}>
-                  {event.title || "Untitled Event"}
+                <Text
+                  style={[
+                    styles.viewEventTitle,
+                    isCancelledCalendarEvent(event) && styles.viewEventTitleCancelled,
+                  ]}
+                >
+                  {event.title || "Untitled event"}
                 </Text>
+                <View style={styles.titleIcon}>
+                  <EncryptionStatusIcon
+                    encrypted={shouldShowEncryptionIcon(event)}
+                    color={theme.colors.mutedForeground}
+                    size={16}
+                  />
+                </View>
               </View>
               {event.isSynced ? (
                 <Text style={styles.viewSyncedHint}>
@@ -628,133 +608,97 @@ export function EventSheet({
                 </Text>
               ) : null}
 
-              {/* Primary section: date/time + calendar + reminder + recurrence */}
-              <View style={styles.sectionCard}>
-                <View style={styles.sectionRow}>
-                  <IconBox name="clock" color={iconColor} bg={iconBg} />
-                  <View style={styles.viewRowContent}>
+              <View style={styles.viewRows}>
+                <EventEditorRow icon="clock" label="Date and time">
+                  <View style={styles.viewRowText}>
                     <Text style={styles.viewText}>
                       {formatEventDate(event, resolvedTimezone)}
                     </Text>
                     <Text style={styles.viewSubtext}>
                       {formatEventTime(event, resolvedTimezone)}
+                      {recurrenceLabel ? ` · ${recurrenceLabel}` : ""}
                     </Text>
                   </View>
-                </View>
+                </EventEditorRow>
 
-                {calendarInfo && (
-                  <>
-                    <View style={styles.sectionDivider} />
-                    <View style={styles.sectionRow}>
-                      <View style={styles.iconBoxWrapper}>
-                        <View
-                          style={[
-                            styles.calendarDot,
-                            {
-                              backgroundColor:
-                                theme.colors.calendar[
-                                  calendarInfo.color as keyof typeof theme.colors.calendar
-                                ]?.bg ?? calendarInfo.color,
-                            },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.viewText}>{calendarInfo.name}</Text>
-                    </View>
-                  </>
-                )}
-
-                {event.reminder != null && event.reminder >= 0 ? (
-                  <>
-                    <View style={styles.sectionDivider} />
-                    <View style={styles.sectionRow}>
-                      <IconBox name="bell" color={iconColor} bg={iconBg} />
-                      <Text style={styles.viewText}>
-                        {formatReminderLabel(event.reminder)}
+                {calendarInfo ? (
+                  <EventEditorRow icon="calendar" label="Calendar">
+                    <View style={styles.viewInlineRow}>
+                      <View
+                        style={[
+                          styles.calendarDot,
+                          { backgroundColor: calendarSwatch },
+                        ]}
+                      />
+                      <Text style={styles.viewText} numberOfLines={1}>
+                        {calendarInfo.name}
                       </Text>
                     </View>
-                  </>
-                ) : null}
-
-                {recurrenceLabel ? (
-                  <>
-                    <View style={styles.sectionDivider} />
-                    <View
-                      style={[styles.sectionRow, { alignItems: "flex-start" }]}
-                    >
-                      <View style={{ marginTop: 2 }}>
-                        <IconBox name="repeat" color={iconColor} bg={iconBg} />
-                      </View>
-                      <Text style={styles.viewText}>{recurrenceLabel}</Text>
-                    </View>
-                  </>
+                  </EventEditorRow>
                 ) : null}
 
                 {hasOptionalEventParticipants(event.participants) ? (
-                  <>
-                    <View style={styles.sectionDivider} />
-                    <View
-                      style={[styles.sectionRow, styles.participantSectionRow]}
-                    >
-                      <IconBox name="users" color={iconColor} bg={iconBg} />
-                      <View style={styles.participantList}>
-                        {(event.participants ?? []).map((participant) => (
-                          <View
-                            key={participant.id}
-                            style={styles.participantRow}
-                          >
-                            <BlobatarAvatar
-                              email={participant.email}
-                              name={participant.displayName}
-                              src={participant.image}
-                              size={32}
-                            />
-                            <View style={styles.participantMeta}>
-                              <Text style={styles.viewText}>
-                                {participant.displayName || participant.email}
-                              </Text>
-                              <Text style={styles.viewSubtext}>
-                                {participant.role === "organizer"
-                                  ? "Organizer"
-                                  : formatParticipantStatus(participant.status)}
-                                {participant.displayName
-                                  ? ` · ${participant.email}`
-                                  : ""}
-                              </Text>
-                            </View>
+                  <EventEditorRow icon="users" label="Participants">
+                    <View style={styles.viewInlineRow}>
+                      <Text style={styles.viewMutedText}>
+                        {event.participants?.length ?? 0}{" "}
+                        {event.participants?.length === 1
+                          ? "participant"
+                          : "participants"}
+                      </Text>
+                    </View>
+                    <View style={styles.participantList}>
+                      {(event.participants ?? []).map((participant) => (
+                        <View key={participant.id} style={styles.participantRow}>
+                          <BlobatarAvatar
+                            email={participant.email}
+                            name={participant.displayName}
+                            src={participant.image}
+                            size={28}
+                          />
+                          <View style={styles.participantMeta}>
+                            <Text style={styles.viewText} numberOfLines={1}>
+                              {participant.displayName || participant.email}
+                            </Text>
+                            <Text style={styles.viewSubtext} numberOfLines={1}>
+                              {participant.role === "organizer"
+                                ? "Organizer"
+                                : formatParticipantStatus(participant.status)}
+                              {participant.displayName
+                                ? ` · ${participant.email}`
+                                : ""}
+                            </Text>
                           </View>
-                        ))}
-                      </View>
+                        </View>
+                      ))}
                     </View>
-                  </>
+                  </EventEditorRow>
                 ) : null}
-              </View>
 
-              {/* Location */}
-              {event.location ? (
-                <View style={styles.sectionCard}>
-                  <View style={styles.sectionRow}>
-                    <IconBox name="map-pin" color={iconColor} bg={iconBg} />
-                    <Text style={styles.viewText}>{event.location}</Text>
-                  </View>
-                </View>
-              ) : null}
+                {event.location ? (
+                  <EventEditorRow icon="map-pin" label="Location">
+                    <Text style={[styles.viewText, styles.viewRowText]}>
+                      {event.location}
+                    </Text>
+                  </EventEditorRow>
+                ) : null}
 
-              {/* Description */}
-              {event.description ? (
-                <View style={styles.sectionCard}>
-                  <View
-                    style={[styles.sectionRow, { alignItems: "flex-start" }]}
-                  >
-                    <View style={{ marginTop: 2 }}>
-                      <IconBox name="file-text" color={iconColor} bg={iconBg} />
-                    </View>
-                    <Text style={styles.viewDescription}>
+                {event.reminder != null && event.reminder > 0 ? (
+                  <EventEditorRow icon="bell" label="Reminders">
+                    <Text style={[styles.viewText, styles.viewRowText]}>
+                      {formatReminderShort(event.reminder)} before
+                    </Text>
+                  </EventEditorRow>
+                ) : null}
+
+                {event.description ? (
+                  <EventEditorRow icon="align-left" label="Description">
+                    <Text style={[styles.viewDescription, styles.viewRowText]}>
                       {event.description}
                     </Text>
-                  </View>
-                </View>
-              ) : null}
+                  </EventEditorRow>
+                ) : null}
+              </View>
 
               {/* Errors */}
               {serverErrors.length > 0 && (
@@ -766,7 +710,7 @@ export function EventSheet({
                   ))}
                 </View>
               )}
-            </AnimatedScrollView>
+            </BottomSheetScrollView>
             <BottomSheetFooter>
               {viewActions.showInvitationActions ? (
                 <View style={styles.rsvpRow}>
@@ -941,79 +885,66 @@ function createStyles(theme: ThemeTokens) {
     viewTitleRow: {
       flexDirection: "row" as const,
       alignItems: "flex-start" as const,
+      gap: 12,
+      marginBottom: 12,
+    },
+    titleBar: {
+      width: 4,
+      height: 20,
+      marginTop: 5,
+      borderRadius: theme.borderRadius.full,
+    },
+    titleIcon: {
+      height: 30,
+      justifyContent: "center" as const,
+    },
+    cancelledBanner: {
+      flexDirection: "row" as const,
+      alignItems: "flex-start" as const,
+      gap: 10,
+      padding: 12,
+      marginBottom: 12,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.destructive + "40",
+      backgroundColor: theme.colors.destructive + "0D",
+    },
+    viewRows: {
+      gap: 4,
+    },
+    viewRowText: {
+      paddingVertical: 12,
+    },
+    viewInlineRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
       gap: 8,
-      marginBottom: 10,
-      paddingHorizontal: 4,
+      minHeight: 44,
     },
 
     editBody: {
       flex: 1,
       minHeight: 0,
     },
-    // Card section
-    sectionCard: {
-      backgroundColor: theme.colors.muted + "28",
-      borderRadius: theme.borderRadius.lg,
-      marginBottom: 8,
-      overflow: "hidden" as const,
-    },
-    sectionRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-    },
-    participantSectionRow: {
-      alignItems: "flex-start" as const,
-    },
-    sectionDivider: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: theme.colors.border + "60",
-      marginLeft: 14 + 32 + 12,
-    },
     viewRowContent: {
       flex: 1,
     },
-    iconBoxWrapper: {
-      width: 32,
-      height: 32,
-      borderRadius: 9,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      backgroundColor: theme.colors.mutedForeground + "18",
-    },
     participantList: {
-      flex: 1,
-      gap: 10,
+      gap: 8,
+      paddingBottom: 4,
     },
     participantRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: 10,
     },
-    participantAvatarImage: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-    },
-    participantAvatarFallback: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      backgroundColor: theme.colors.muted,
-    },
     participantMeta: {
       flex: 1,
     },
     calendarDot: {
-      width: 12,
-      height: 12,
-      borderRadius: 9999,
-      borderWidth: 1,
-      borderColor: theme.colors.border + "99",
+      width: 10,
+      height: 10,
+      borderRadius: theme.borderRadius.full,
     },
     errorContainer: {
       backgroundColor: theme.colors.destructive + "18",
@@ -1064,12 +995,25 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.foreground,
       lineHeight: theme.typography.fontSize.xl.lineHeight,
     },
+    viewEventTitleCancelled: {
+      color: theme.colors.mutedForeground,
+      textDecorationLine: "line-through" as const,
+    },
     viewSyncedHint: {
       fontSize: theme.typography.fontSize.xs.size,
       color: theme.colors.mutedForeground,
       marginTop: -6,
       marginBottom: 10,
-      paddingHorizontal: 4,
+      paddingLeft: 16,
+    },
+    viewMutedText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      color: theme.colors.mutedForeground,
+    },
+    cancelledTitle: {
+      fontSize: theme.typography.fontSize.sm.size,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      color: theme.colors.destructive,
     },
     viewText: {
       flex: 1,
@@ -1086,11 +1030,6 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       color: theme.colors.foreground,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-    },
-    participantAvatarFallbackText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
     },
     errorText: {
       fontSize: theme.typography.fontSize.sm.size,

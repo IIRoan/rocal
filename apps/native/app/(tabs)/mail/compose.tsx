@@ -14,18 +14,13 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { AppScreen, HeaderIconButton, NavigationHeader } from "../../../src/components/layout";
+import { AppScreen } from "../../../src/components/layout";
 import { LAYOUT_METRICS } from "../../../src/lib/app-layout";
 import { useQuery } from "@tanstack/react-query";
 import { getErrorMessage, hasComposeUserContent, resolveReplyRecipients, validateComposeRecipients, resolveComposeSendBodies, messageBodiesToComposeText, type ComposeTextFields } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useToast } from "../../../src/providers/ToastProvider";
-import {
-  BottomSheet,
-  BottomSheetHeader,
-  BottomSheetTitle,
-} from "../../../src/components/BottomSheet";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import {
   useCachedMessage,
@@ -41,7 +36,6 @@ import {
 } from "../../../src/lib/mail/mail-helpers";
 import {
   createPendingComposeAttachment,
-  formatAttachmentSize,
   toJmapAttachmentInput,
   type PendingComposeAttachment,
 } from "../../../src/lib/mail/compose-attachments";
@@ -73,6 +67,16 @@ import { useRecentContacts } from "../../../src/hooks/use-recent-contacts";
 import { extractRecentContactEntries } from "../../../src/lib/record-recent-contacts";
 import { collectCommittedEmails } from "../../../src/lib/mail/compose-recipients";
 import { useKeyboardInset } from "../../../src/hooks/use-keyboard-inset";
+import { ComposeHeader } from "../../../src/components/mail/ComposeHeader";
+import {
+  ComposeMoreSheet,
+  type ComposeMoreAction,
+} from "../../../src/components/mail/ComposeMoreSheet";
+import { ComposeFormatBar } from "../../../src/components/mail/ComposeFormatBar";
+import { ComposeAttachmentList } from "../../../src/components/mail/ComposeAttachmentList";
+import { ComposeIdentitySheet } from "../../../src/components/mail/ComposeIdentitySheet";
+import { useMailSkin, type MailSkin } from "../../../src/components/mail/mail-ui";
+import { composeTitle } from "../../../src/lib/mail/compose-display";
 
 export default function ComposeScreen() {
   const { theme } = useTheme();
@@ -85,7 +89,8 @@ export default function ComposeScreen() {
     to?: string;
     toName?: string;
   }>();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const skin = useMailSkin();
+  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
   const { toast } = useToast();
 
   const accountQuery = useMailAccount();
@@ -109,6 +114,8 @@ export default function ComposeScreen() {
     null,
   );
   const [identityPickerOpen, setIdentityPickerOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const pendingMoreActionRef = useRef<ComposeMoreAction | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draftSaveStatus, setDraftSaveStatus] =
     useState<DraftSaveStatus>("idle");
@@ -123,7 +130,7 @@ export default function ComposeScreen() {
     runtime,
     selectedIdentityId ?? undefined,
   );
-  const identities = runtime?.pickerIdentities ?? [];
+  const identities = runtime?.pickerIdentities ?? NO_IDENTITIES;
 
   useEffect(() => {
     if (!selectedIdentityId && identities[0]?.id) {
@@ -543,61 +550,52 @@ export default function ComposeScreen() {
   const toExcludeEmails = useMemo(() => collectCommittedEmails(cc, bcc), [bcc, cc]);
   const ccExcludeEmails = useMemo(() => collectCommittedEmails(to, bcc), [bcc, to]);
   const bccExcludeEmails = useMemo(() => collectCommittedEmails(to, cc), [cc, to]);
-  const showFormatBar = bodyFocused;
-  const formatBar = (
-    <ComposeFormatBar
-      theme={theme}
-      styles={styles}
-      draftSaveStatus={draftSaveStatus}
-      hasSignature={hasSignature}
-      onBold={() => bodyEditorRef.current?.applyBold()}
-      onItalic={() => bodyEditorRef.current?.applyItalic()}
-      onUnderline={() => bodyEditorRef.current?.applyUnderline()}
-      onList={() => bodyEditorRef.current?.applyList()}
-      onInsertSignature={handleInsertSignature}
-    />
+  const canChooseIdentity = Boolean(composeContext) && identities.length > 1;
+
+  const confirmDeleteDraft = useCallback(() => {
+    Alert.alert("Delete draft?", undefined, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete Draft", style: "destructive", onPress: handleDiscard },
+    ]);
+  }, [handleDiscard]);
+
+  const runMoreAction = useCallback(
+    (action: ComposeMoreAction) => {
+      if (action === "toggle-cc-bcc") setShowCcBcc((prev) => !prev);
+      else if (action === "choose-identity") setIdentityPickerOpen(true);
+      else if (action === "insert-signature") handleInsertSignature();
+      else confirmDeleteDraft();
+    },
+    [confirmDeleteDraft, handleInsertSignature],
   );
+
+  const handleMoreSelect = useCallback((action: ComposeMoreAction) => {
+    pendingMoreActionRef.current = action;
+    setMoreOpen(false);
+  }, []);
+
+  // Follow-up sheets and alerts wait for the options sheet to finish closing.
+  const handleMoreCloseComplete = useCallback(() => {
+    const action = pendingMoreActionRef.current;
+    pendingMoreActionRef.current = null;
+    if (action) runMoreAction(action);
+  }, [runMoreAction]);
 
   return (
     <AppScreen
       header={
-        <NavigationHeader
-          variant="compose"
-          title={draftId ? "Draft" : "New Message"}
-          onBack={handleCancel}
-          trailing={
-            <View style={styles.headerTrailing}>
-              <HeaderIconButton
-                name="paperclip"
-                onPress={() => {
-                  void handleAttach();
-                }}
-                accessibilityLabel="Attach file"
-              />
-              {sendMessage.isPending ? (
-                <View style={styles.sendPending}>
-                  <ActivityIndicator
-                    size="small"
-                    color={theme.colors.primaryBase}
-                  />
-                </View>
-              ) : (
-                <HeaderIconButton
-                  name="send"
-                  onPress={() => {
-                    void handleSend();
-                  }}
-                  disabled={!canSend}
-                  color={
-                    canSend
-                      ? theme.colors.primaryBase
-                      : theme.colors.mutedForeground
-                  }
-                  accessibilityLabel="Send"
-                />
-              )}
-            </View>
-          }
+        <ComposeHeader
+          title={composeTitle(subject)}
+          canSend={canSend}
+          sending={sendMessage.isPending}
+          onClose={handleCancel}
+          onAttach={() => {
+            void handleAttach();
+          }}
+          onMore={() => setMoreOpen(true)}
+          onSend={() => {
+            void handleSend();
+          }}
         />
       }
     >
@@ -608,188 +606,180 @@ export default function ComposeScreen() {
         ]}
       >
         <View style={styles.flex}>
-        <View style={styles.headerFields}>
-          {runtimeQuery.isLoading && !composeContext ? (
-            <View style={styles.fromRow}>
-              <ActivityIndicator
-                size="small"
-                color={theme.colors.mutedForeground}
-              />
-              <Text style={styles.fromValue}>Preparing your mailbox…</Text>
-            </View>
-          ) : null}
+          <View style={styles.headerFields}>
+            {runtimeQuery.isLoading && !composeContext ? (
+              <View style={styles.fieldRow}>
+                <ActivityIndicator size="small" color={skin.textTertiary} />
+                <Text style={styles.noticeInline}>Preparing your mailbox…</Text>
+              </View>
+            ) : null}
 
-          {!runtimeQuery.isLoading && !composeContext ? (
-            <Text style={styles.noticeText}>
-              Your mailbox cannot send messages right now.
-            </Text>
-          ) : null}
+            {!runtimeQuery.isLoading && !composeContext ? (
+              <Text style={styles.noticeText}>
+                Your mailbox cannot send messages right now.
+              </Text>
+            ) : null}
 
-          <ComposeRecipientField
-            value={to}
-            onChangeText={setTo}
-            placeholder="To"
-            excludeEmails={toExcludeEmails}
-            trailing={
-              <Pressable
-                onPress={() => setShowCcBcc((prev) => !prev)}
-                hitSlop={8}
-                style={styles.ccToggleHit}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  showCcBcc ? "Hide Cc, Bcc, and From" : "Show Cc, Bcc, and From"
-                }
-              >
-                <Feather
-                  name={showCcBcc ? "chevron-up" : "chevron-down"}
-                  size={18}
-                  color={theme.colors.mutedForeground}
-                />
-              </Pressable>
-            }
-          />
-
-          {showCcBcc ? (
-            <>
-              <ComposeRecipientField
-                value={cc}
-                onChangeText={setCc}
-                placeholder="Cc"
-                excludeEmails={ccExcludeEmails}
-              />
-              <ComposeRecipientField
-                value={bcc}
-                onChangeText={setBcc}
-                placeholder="Bcc"
-                excludeEmails={bccExcludeEmails}
-              />
-              {composeContext ? (
+            <ComposeRecipientField
+              value={to}
+              onChangeText={setTo}
+              label="To"
+              excludeEmails={toExcludeEmails}
+              trailing={
                 <Pressable
-                  style={styles.fromRow}
-                  onPress={
-                    identities.length > 1
-                      ? () => setIdentityPickerOpen(true)
-                      : undefined
-                  }
+                  onPress={() => setShowCcBcc((prev) => !prev)}
+                  style={({ pressed }) => [
+                    styles.ccToggleHit,
+                    pressed && styles.pressed,
+                  ]}
                   accessibilityRole="button"
-                  accessibilityLabel="Choose sending identity"
+                  accessibilityLabel={
+                    showCcBcc ? "Hide Cc, Bcc, and From" : "Show Cc, Bcc, and From"
+                  }
                 >
-                  <Text style={styles.fromLabel}>From</Text>
-                  <Text style={styles.fromValue} numberOfLines={1}>
-                    {composeContext.fromName
-                      ? `${composeContext.fromName}`
-                      : composeContext.fromEmail}
-                  </Text>
-                  {identities.length > 1 ? (
-                    <Feather
-                      name="chevron-down"
-                      size={16}
-                      color={theme.colors.mutedForeground}
-                    />
-                  ) : null}
-                </Pressable>
-              ) : null}
-            </>
-          ) : null}
-
-          <TextInput
-            style={styles.subjectInput}
-            value={subject}
-            onChangeText={setSubject}
-            onFocus={() => setBodyFocused(false)}
-            placeholder="Subject"
-            placeholderTextColor={theme.colors.mutedForeground}
-            autoCapitalize="sentences"
-            autoCorrect
-            autoFocus={false}
-            accessibilityLabel="Subject"
-          />
-
-          {attachments.length > 0 ? (
-            <View style={styles.attachmentList}>
-              {attachments.map((attachment) => (
-                <View key={attachment.id} style={styles.attachmentChip}>
                   <Feather
-                    name="paperclip"
-                    size={12}
-                    color={theme.colors.mutedForeground}
+                    name={showCcBcc ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color={skin.textTertiary}
                   />
-                  <Text style={styles.attachmentName} numberOfLines={1}>
-                    {attachment.name} ({formatAttachmentSize(attachment.size)})
-                  </Text>
-                  <Pressable
-                    onPress={() =>
-                      setAttachments((current) =>
-                        current.filter((item) => item.id !== attachment.id),
-                      )
-                    }
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove ${attachment.name}`}
-                  >
-                    <Feather
-                      name="x"
-                      size={14}
-                      color={theme.colors.mutedForeground}
-                    />
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        </View>
-
-        {isDraftDecrypting ? (
-          <View style={styles.bodyLoading}>
-            <ActivityIndicator
-              size="small"
-              color={theme.colors.mutedForeground}
+                </Pressable>
+              }
             />
-            <Text style={styles.draftStatus}>Decrypting draft…</Text>
+
+            {showCcBcc ? (
+              <>
+                <ComposeRecipientField
+                  value={cc}
+                  onChangeText={setCc}
+                  label="Cc"
+                  excludeEmails={ccExcludeEmails}
+                />
+                <ComposeRecipientField
+                  value={bcc}
+                  onChangeText={setBcc}
+                  label="Bcc"
+                  excludeEmails={bccExcludeEmails}
+                />
+                {composeContext ? (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.fieldRow,
+                      pressed && canChooseIdentity && styles.pressed,
+                    ]}
+                    onPress={
+                      canChooseIdentity
+                        ? () => setIdentityPickerOpen(true)
+                        : undefined
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose sending identity"
+                  >
+                    <Text style={styles.fieldLabel}>From</Text>
+                    <Text style={styles.fieldValue} numberOfLines={1}>
+                      {composeContext.fromName
+                        ? `${composeContext.fromName}`
+                        : composeContext.fromEmail}
+                    </Text>
+                    {canChooseIdentity ? (
+                      <Feather
+                        name="chevron-down"
+                        size={16}
+                        color={skin.textTertiary}
+                      />
+                    ) : null}
+                  </Pressable>
+                ) : null}
+              </>
+            ) : null}
+
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Subject</Text>
+              <TextInput
+                style={styles.subjectInput}
+                value={subject}
+                onChangeText={setSubject}
+                onFocus={() => setBodyFocused(false)}
+                placeholderTextColor={skin.textTertiary}
+                selectionColor={skin.accent}
+                autoCapitalize="sentences"
+                autoCorrect
+                autoFocus={false}
+                accessibilityLabel="Subject"
+              />
+            </View>
+
+            {attachments.length > 0 ? (
+              <ComposeAttachmentList
+                attachments={attachments}
+                onRemove={(id) =>
+                  setAttachments((current) =>
+                    current.filter((item) => item.id !== id),
+                  )
+                }
+              />
+            ) : null}
+
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
           </View>
-        ) : (
-          <ComposeBodyEditor
-            ref={bodyEditorRef}
-            value={body}
-            onChangeText={setBody}
-            onFocusChange={setBodyFocused}
-            placeholder="Message"
-          />
-        )}
+
+          {isDraftDecrypting ? (
+            <View style={styles.bodyLoading}>
+              <ActivityIndicator size="small" color={skin.textTertiary} />
+              <Text style={styles.noticeInline}>Decrypting draft…</Text>
+            </View>
+          ) : (
+            <ComposeBodyEditor
+              ref={bodyEditorRef}
+              value={body}
+              onChangeText={setBody}
+              onFocusChange={setBodyFocused}
+              placeholder="Message"
+            />
+          )}
         </View>
 
-        {showFormatBar ? formatBar : null}
+        {bodyFocused ? (
+          <ComposeFormatBar
+            draftSaveStatus={draftSaveStatus}
+            hasSignature={hasSignature}
+            onBold={() => bodyEditorRef.current?.applyBold()}
+            onItalic={() => bodyEditorRef.current?.applyItalic()}
+            onUnderline={() => bodyEditorRef.current?.applyUnderline()}
+            onList={() => bodyEditorRef.current?.applyList()}
+            onInsertSignature={handleInsertSignature}
+          />
+        ) : null}
         {keyboardHeight > 0 ? (
           <View style={{ height: keyboardHeight }} />
         ) : null}
       </View>
 
-      <BottomSheet
+      <ComposeMoreSheet
+        visible={moreOpen}
+        showCcBcc={showCcBcc}
+        canChooseIdentity={canChooseIdentity}
+        canInsertSignature={hasSignature}
+        canDeleteDraft={isDirty || Boolean(draftId)}
+        onSelect={handleMoreSelect}
+        onDismiss={() => setMoreOpen(false)}
+        onCloseComplete={handleMoreCloseComplete}
+      />
+
+      <ComposeIdentitySheet
         visible={identityPickerOpen}
+        identities={identities}
+        selectedIdentityId={selectedIdentityId}
+        onSelect={(id) => {
+          setSelectedIdentityId(id);
+          setIdentityPickerOpen(false);
+        }}
         onDismiss={() => setIdentityPickerOpen(false)}
-        snapPoints={[0.45]}
-      >
-        <BottomSheetHeader>
-          <BottomSheetTitle>Send from</BottomSheetTitle>
-        </BottomSheetHeader>
-        {identities.map((identity) => (
-          <IdentityPickerRow
-            key={identity.id}
-            identity={identity}
-            selected={identity.id === selectedIdentityId}
-            theme={theme}
-            onSelect={() => {
-              setSelectedIdentityId(identity.id);
-              setIdentityPickerOpen(false);
-            }}
-          />
-        ))}
-      </BottomSheet>
+      />
     </AppScreen>
   );
 }
+
+const NO_IDENTITIES: JmapIdentity[] = [];
 
 const EMPTY_COMPOSE_FIELDS: ComposeTextFields = {
   to: "",
@@ -887,119 +877,7 @@ function stripHtmlToText(html: string | null | undefined): string {
     .trim();
 }
 
-function ComposeFormatBar({
-  theme,
-  styles,
-  draftSaveStatus,
-  hasSignature,
-  onBold,
-  onItalic,
-  onUnderline,
-  onList,
-  onInsertSignature,
-}: {
-  theme: ThemeTokens;
-  styles: ReturnType<typeof createStyles>;
-  draftSaveStatus: DraftSaveStatus;
-  hasSignature: boolean;
-  onBold: () => void;
-  onItalic: () => void;
-  onUnderline: () => void;
-  onList: () => void;
-  onInsertSignature: () => void;
-}) {
-  return (
-    <View style={styles.formatBar}>
-      <View style={styles.formatToolbar}>
-        <Pressable
-          onPressIn={onBold}
-          accessibilityRole="button"
-          accessibilityLabel="Bold"
-          style={styles.formatButton}
-        >
-          <Text style={styles.formatButtonText}>B</Text>
-        </Pressable>
-        <Pressable
-          onPressIn={onItalic}
-          accessibilityRole="button"
-          accessibilityLabel="Italic"
-          style={styles.formatButton}
-        >
-          <Text style={[styles.formatButtonText, styles.formatItalic]}>I</Text>
-        </Pressable>
-        <Pressable
-          onPressIn={onUnderline}
-          accessibilityRole="button"
-          accessibilityLabel="Underline"
-          style={styles.formatButton}
-        >
-          <Text style={[styles.formatButtonText, styles.formatUnderline]}>
-            U
-          </Text>
-        </Pressable>
-        <Pressable
-          onPressIn={onList}
-          accessibilityRole="button"
-          accessibilityLabel="List"
-          style={styles.formatButton}
-        >
-          <Feather name="list" size={16} color={theme.colors.mutedForeground} />
-        </Pressable>
-        {hasSignature ? (
-          <Pressable
-            onPress={onInsertSignature}
-            accessibilityRole="button"
-            accessibilityLabel="Insert signature"
-            style={styles.formatButton}
-          >
-            <Text style={styles.formatSigText}>Sig</Text>
-          </Pressable>
-        ) : null}
-      </View>
-      {draftSaveStatus === "saving" ? (
-        <Text style={styles.draftStatus}>Saving…</Text>
-      ) : draftSaveStatus === "saved" ? (
-        <Text style={styles.draftStatus}>Saved</Text>
-      ) : draftSaveStatus === "error" ? (
-        <Text style={styles.draftStatusError}>Save failed</Text>
-      ) : null}
-    </View>
-  );
-}
-
-function IdentityPickerRow({
-  identity,
-  selected,
-  theme,
-  onSelect,
-}: {
-  identity: JmapIdentity;
-  selected: boolean;
-  theme: ThemeTokens;
-  onSelect: () => void;
-}) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  const label = identity.name?.trim()
-    ? `${identity.name} <${identity.email}>`
-    : identity.email;
-  return (
-    <Pressable
-      onPress={onSelect}
-      style={[styles.identityRow, selected && styles.identityRowSelected]}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-    >
-      <Text style={styles.identityLabel} numberOfLines={2}>
-        {label}
-      </Text>
-      {selected ? (
-        <Feather name="check" size={16} color={theme.colors.primaryBase} />
-      ) : null}
-    </Pressable>
-  );
-}
-
-function createStyles(theme: ThemeTokens) {
+function createStyles(theme: ThemeTokens, skin: MailSkin) {
   const view = {
     flex: {
       flex: 1,
@@ -1009,28 +887,21 @@ function createStyles(theme: ThemeTokens) {
       flex: 1,
       minHeight: 0,
       overflow: "hidden" as const,
-    },
-    headerTrailing: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-    },
-    sendPending: {
-      width: LAYOUT_METRICS.sideSlot,
-      height: LAYOUT_METRICS.sideSlot,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
+      backgroundColor: theme.colors.background,
     },
     headerFields: {
       flexShrink: 0,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: skin.borderTertiary,
     },
-    fromRow: {
+    fieldRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: theme.spacing["2"],
-      minHeight: LAYOUT_METRICS.hitSize,
+      minHeight: LAYOUT_METRICS.hitSize + theme.spacing["1"],
       paddingHorizontal: theme.spacing["4"],
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
+      borderBottomColor: skin.borderTertiary,
     },
     ccToggleHit: {
       width: LAYOUT_METRICS.hitSize,
@@ -1039,56 +910,8 @@ function createStyles(theme: ThemeTokens) {
       justifyContent: "center" as const,
       flexShrink: 0,
     },
-    formatBar: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "space-between" as const,
-      flexShrink: 0,
-      minHeight: LAYOUT_METRICS.hitSize,
-      paddingHorizontal: theme.spacing["2"],
-      backgroundColor: theme.colors.card,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border,
-    },
-    formatToolbar: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 2,
-    },
-    formatButton: {
-      minWidth: LAYOUT_METRICS.hitSize,
-      height: LAYOUT_METRICS.hitSize,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-    },
-    attachmentList: {
-      gap: theme.spacing["1"],
-      paddingHorizontal: theme.spacing["4"],
-      paddingVertical: theme.spacing["2"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
-    },
-    attachmentChip: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 6,
-      minHeight: 36,
-      paddingHorizontal: theme.spacing["2"],
-      borderRadius: theme.borderRadius.md,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-    },
-    identityRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "space-between" as const,
-      paddingVertical: theme.spacing["3"],
-      paddingHorizontal: theme.spacing["4"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
-    },
-    identityRowSelected: {
-      backgroundColor: theme.colors.muted,
+    pressed: {
+      backgroundColor: skin.pressed,
     },
     bodyLoading: {
       flex: 1,
@@ -1099,71 +922,36 @@ function createStyles(theme: ThemeTokens) {
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    formatButtonText: {
-      fontSize: theme.typography.fontSize.base.size,
-      fontWeight: theme.typography.fontWeight.bold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
+    fieldLabel: {
+      ...skin.meta,
     },
-    formatItalic: {
-      fontStyle: "italic" as const,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
-    formatUnderline: {
-      textDecorationLine: "underline" as const,
-    },
-    formatSigText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.mutedForeground,
-    },
-    attachmentName: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.xs.size,
-      color: theme.colors.foreground,
-    },
-    fromLabel: {
-      fontSize: theme.typography.fontSize.base.size,
-      color: theme.colors.mutedForeground,
-    },
-    fromValue: {
+    fieldValue: {
       flex: 1,
       minWidth: 0,
-      fontSize: theme.typography.fontSize.base.size,
+      fontSize: skin.body.fontSize,
       color: theme.colors.foreground,
     },
     subjectInput: {
-      minHeight: LAYOUT_METRICS.hitSize,
-      paddingHorizontal: theme.spacing["4"],
-      paddingVertical: theme.spacing["3"],
-      fontSize: theme.typography.fontSize.base.size,
-      color: theme.colors.foreground,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
-    },
-    draftStatus: {
-      fontSize: theme.typography.fontSize.xs.size,
-      color: theme.colors.mutedForeground,
-      paddingRight: theme.spacing["2"],
-    },
-    draftStatusError: {
-      fontSize: theme.typography.fontSize.xs.size,
-      color: theme.colors.destructive,
-      paddingRight: theme.spacing["2"],
-    },
-    identityLabel: {
       flex: 1,
-      fontSize: theme.typography.fontSize.sm.size,
+      minWidth: 0,
+      minHeight: LAYOUT_METRICS.hitSize,
+      paddingVertical: theme.spacing["2"],
+      fontSize: skin.body.fontSize,
       color: theme.colors.foreground,
+    },
+    noticeInline: {
+      ...skin.meta,
     },
     noticeText: {
+      ...skin.meta,
       paddingHorizontal: theme.spacing["4"],
       paddingVertical: theme.spacing["2"],
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.mutedForeground,
     },
     errorText: {
       paddingHorizontal: theme.spacing["4"],
       paddingVertical: theme.spacing["2"],
-      fontSize: theme.typography.fontSize.sm.size,
+      fontSize: 13,
+      lineHeight: 17,
       color: theme.colors.destructive,
     },
   } satisfies Record<string, TextStyle>;

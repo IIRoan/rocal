@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppScreen } from "../../../../src/components/layout/AppScreen";
-import { HeaderIconButton } from "../../../../src/components/layout/HeaderIconButton";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import {
@@ -36,11 +35,10 @@ import { AttachmentPreviewModal } from "../../../../src/components/mail/Attachme
 import { ConversationThreadStrip } from "../../../../src/components/mail/ConversationThreadStrip";
 import { useAuth } from "../../../../src/providers/AuthProvider";
 import {
-  MailBottomAction,
-  MailBottomActionBar,
-  MailBottomActionDivider,
-} from "../../../../src/components/mail/MailBottomActionBar";
-import { mailBottomBarTotalHeight } from "../../../../src/components/mail/mail-bottom-action-bar-layout";
+  MAIL_REPLY_FAB_SIZE,
+  MailReplyFab,
+} from "../../../../src/components/mail/MailReplyFab";
+import { MailAttachmentCards } from "../../../../src/components/mail/MailAttachmentCards";
 import { MailReaderHeader } from "../../../../src/components/mail/MailReaderHeader";
 import { MailMessageHeader } from "../../../../src/components/mail/MailMessageHeader";
 import { MailMessageBody } from "../../../../src/components/mail/MailMessageBody";
@@ -61,7 +59,7 @@ export default function MailMessageScreen() {
   const { replace, push } = useRouter();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const scrollBottomPad =
-    theme.spacing["6"] + mailBottomBarTotalHeight(insets.bottom);
+    theme.spacing["8"] + MAIL_REPLY_FAB_SIZE + insets.bottom;
   const { toast } = useToast();
   const { user } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -147,16 +145,10 @@ export default function MailMessageScreen() {
                 ) as keyof typeof Feather.glyphMap)
               : "mail"
           }
-          trailingAction={
-            message && actions.isSeen ? (
-              <HeaderIconButton
-                name="mail"
-                accessibilityLabel="Mark as unread"
-                onPress={actions.handleMarkUnread}
-                disabled={actions.isActionBusy}
-              />
-            ) : undefined
+          onMore={
+            message ? () => actions.setActiveSheetView("menu") : undefined
           }
+          moreDisabled={actions.isActionBusy}
         />
       }
     >
@@ -192,12 +184,9 @@ export default function MailMessageScreen() {
               accountName={user?.name?.trim() || undefined}
               identities={runtime?.identities ?? []}
               labels={getAllMessageLabels(message, labels)}
-              attachments={content.displayAttachments}
               isFlagged={actions.isFlagged}
               starDisabled={actions.isStarPending}
               onToggleStar={actions.handleToggleStar}
-              downloadingBlobId={actions.downloadingBlobId}
-              onOpenAttachment={actions.handleOpenAttachment}
               encryption={content.encryption}
               encryptedAtRest={Boolean(runtime?.encryptedAtRest)}
               signatureVerificationState={
@@ -239,42 +228,19 @@ export default function MailMessageScreen() {
               calendar={calendar}
               onOpenEvent={openEvent}
             />
+
+            <MailAttachmentCards
+              attachments={content.displayAttachments}
+              downloadingBlobId={actions.downloadingBlobId}
+              onOpenAttachment={actions.handleOpenAttachment}
+            />
           </MailZoomScrollView>
 
-          <MailBottomActionBar bottomInset={insets.bottom}>
-            {actions.archiveMailboxId ? (
-              <>
-                <MailBottomAction
-                  icon="archive"
-                  label="Archive"
-                  disabled={actions.isActionBusy}
-                  onPress={actions.handleArchive}
-                />
-                <MailBottomActionDivider />
-              </>
-            ) : null}
-            <MailBottomAction
-              icon="corner-up-left"
-              label="Reply"
-              disabled={actions.isActionBusy}
-              onPress={actions.handleReply}
-            />
-            <MailBottomActionDivider />
-            <MailBottomAction
-              icon="trash-2"
-              label={actions.currentMailboxRole === "trash" ? "Delete" : "Trash"}
-              disabled={actions.isActionBusy}
-              destructive
-              onPress={actions.handleMoveToTrash}
-            />
-            <MailBottomActionDivider />
-            <MailBottomAction
-              icon="more-horizontal"
-              label="More"
-              disabled={actions.isActionBusy}
-              onPress={() => actions.setActiveSheetView("menu")}
-            />
-          </MailBottomActionBar>
+          <MailReplyFab
+            bottomInset={insets.bottom}
+            disabled={actions.isActionBusy}
+            onPress={actions.handleReply}
+          />
         </View>
       )}
 
@@ -339,8 +305,8 @@ function createStyles(theme: ThemeTokens) {
     },
     body: {
       paddingHorizontal: theme.spacing["4"],
-      paddingTop: theme.spacing["3"],
-      gap: theme.spacing["3"],
+      paddingTop: theme.spacing["2"],
+      gap: theme.spacing["4"],
     },
   } satisfies Record<string, ViewStyle>;
 

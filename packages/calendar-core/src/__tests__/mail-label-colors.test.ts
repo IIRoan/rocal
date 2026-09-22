@@ -3,7 +3,7 @@ import {
   isValidLabelHex,
   normalizeLabelColorInput,
   resolveLabelDisplayColor,
-} from "@/lib/mail/mail-label-colors";
+} from "../mail-label-colors";
 
 describe("mail-label-colors", () => {
   it("resolves preset color names to hex", () => {

@@ -63,6 +63,8 @@ export interface ThemeTokens {
     border: string;
     input: string;
     ring: string;
+    calendarWorkday: string;
+    calendarWeekend: string;
     calendar: Record<CalendarColor, CalendarColorValue>;
   };
   spacing: Record<string, number>;
@@ -225,6 +227,8 @@ export const lightTheme: ThemeTokens = {
     border: "oklch(0.86 0 0)",
     input: "oklch(0.8822 0 0)",
     ring: "oklch(0.4341 0.0392 41.9938)",
+    calendarWorkday: "oklch(0.975 0.005 42)",
+    calendarWeekend: "oklch(0.96 0.005 42)",
     calendar: {
       blue: { bg: "oklch(0.86 0.09 250)", fg: "oklch(0.28 0.12 250)" },
       orange: { bg: "oklch(0.86 0.09 65)", fg: "oklch(0.28 0.12 65)" },
@@ -282,6 +286,8 @@ export const darkTheme: ThemeTokens = {
     border: "oklch(0.3 0.0115 91.7467)",
     input: "oklch(0.4017 0 0)",
     ring: "oklch(0.9247 0.0524 66.1732)",
+    calendarWorkday: "oklch(0.185 0.005 0)",
+    calendarWeekend: "oklch(0.16 0.008 0)",
     calendar: {
       blue: { bg: "oklch(0.45 0.18 250)", fg: "oklch(0.92 0.04 250)" },
       orange: { bg: "oklch(0.45 0.18 65)", fg: "oklch(0.92 0.04 65)" },
@@ -388,6 +394,109 @@ export function toNativeTheme(tokens: ThemeTokens): ThemeTokens {
  */
 export const nativeLightTheme: ThemeTokens = toNativeTheme(lightTheme);
 export const nativeDarkTheme: ThemeTokens = toNativeTheme(darkTheme);
+
+// ─── Mail (Nightwatch) Palette ───────────────────────────────────────────────
+
+/** Mail-only tokens beyond ThemeTokens, mirroring `packages/ui/src/solace/theme.css`. */
+export interface MailPaletteTokens {
+  textTertiary: string;
+  textDisabled: string;
+  textLink: string;
+  borderPrimary: string;
+  borderTertiary: string;
+  cellHover: string;
+  cellActive: string;
+  cellUnread: string;
+  surface: string;
+  unreadDot: string;
+  success: string;
+  warning: string;
+  star: string;
+  ctaPrimary: string;
+  ctaPrimaryForeground: string;
+}
+
+// Solace alpha tokens are pre-blended onto the mail background so native code can append hex alpha.
+export const mailLightPalette: MailPaletteTokens = {
+  textTertiary: "#8f8f8f",
+  textDisabled: "#adadad",
+  textLink: "#ef5a3c",
+  borderPrimary: "#e0e0e0",
+  borderTertiary: "#f5f5f5",
+  cellHover: "#f0f0f0",
+  cellActive: "#ebebeb",
+  cellUnread: "#ffffff",
+  surface: "#ffffff",
+  unreadDot: "#ef5a3c",
+  success: "#00a05e",
+  warning: "#f59e0b",
+  star: "#fbbf24",
+  ctaPrimary: "#000000",
+  ctaPrimaryForeground: "#ffffff",
+};
+
+export const mailDarkPalette: MailPaletteTokens = {
+  textTertiary: "#7d7d7d",
+  textDisabled: "#5e5e5e",
+  textLink: "#ff8e78",
+  borderPrimary: "#3a3a3a",
+  borderTertiary: "#282828",
+  cellHover: "#2c2c2c",
+  cellActive: "#313131",
+  cellUnread: "#242424",
+  surface: "#1f1f1f",
+  unreadDot: "#ef5a3c",
+  success: "#19c77f",
+  warning: "#f59e0b",
+  star: "#fbbf24",
+  ctaPrimary: "#ffffff",
+  ctaPrimaryForeground: "#000000",
+};
+
+/** App theme with the semantic colors remapped the way `[data-solace]` remaps them on web. */
+export const nativeMailLightTheme: ThemeTokens = {
+  ...nativeLightTheme,
+  colors: {
+    ...nativeLightTheme.colors,
+    background: "#fafafa",
+    foreground: "#000000",
+    card: "#ffffff",
+    cardForeground: "#000000",
+    popover: "#ffffff",
+    popoverForeground: "#000000",
+    muted: "#f5f5f5",
+    mutedForeground: "#707070",
+    accent: "#f5f5f5",
+    accentForeground: "#000000",
+    destructive: "#d72828",
+    border: "#ebebeb",
+    input: "#ebebeb",
+    calendarWorkday: "#faf6f4",
+    calendarWeekend: "#f5f1ef",
+  },
+};
+
+export const nativeMailDarkTheme: ThemeTokens = {
+  ...nativeDarkTheme,
+  colors: {
+    ...nativeDarkTheme.colors,
+    background: "#1f1f1f",
+    foreground: "#ffffff",
+    card: "#1f1f1f",
+    cardForeground: "#ffffff",
+    popover: "#242424",
+    popoverForeground: "#ffffff",
+    muted: "#282828",
+    mutedForeground: "#989898",
+    accent: "#282828",
+    accentForeground: "#ffffff",
+    destructive: "#ff8f8f",
+    border: "#313131",
+    input: "#313131",
+    calendarWorkday: "#1d1b1c",
+    calendarWeekend: "#171415",
+  },
+};
 
 // ─── Tailwind Adapter ────────────────────────────────────────────────────────
 

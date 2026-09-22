@@ -92,6 +92,18 @@ export function parseWorkingDays(
   return [1, 2, 3, 4, 5];
 }
 
+export type WorkingDayShade = "workday" | "weekend";
+
+/** Working days get the workday tint; Sat/Sun off days the weekend tint; other off days none. */
+export function getWorkingDayShade(
+  dayOfWeek: number,
+  workingDays: readonly number[],
+): WorkingDayShade | null {
+  if (workingDays.includes(dayOfWeek)) return "workday";
+  if (dayOfWeek === 0 || dayOfWeek === 6) return "weekend";
+  return null;
+}
+
 /** Round a date up to the next full hour without mutating the input. */
 export function roundToNextHour(date: Date): Date {
   const d = new Date(date);

@@ -22,14 +22,11 @@ import { ShadcnAutocomleteTimePicker } from "@workspace/ui/components/ui/autocom
 import { cn } from "@workspace/ui/lib/utils";
 import { format } from "date-fns";
 import { Check, ChevronDown, Clock, Repeat } from "lucide-react";
+import { findRepeatPreset, getRepeatPresets } from "@workspace/calendar-core";
 
 import { getRecurringRuleSummary } from "@/lib/event-editor-view-model";
 import type { RecurrenceRule, UserSettings } from "@/lib/types/calendar";
 import { RecurringEventForm } from "../command-palette/recurring-event-form";
-import {
-  findRepeatPreset,
-  getRepeatPresets,
-} from "./event-editor-repeat-presets";
 import { EventEditorRow } from "./event-editor-row";
 import { chipClass } from "./event-editor-styles";
 import type { EventEditorFormState } from "./types";

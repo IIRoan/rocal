@@ -10,10 +10,6 @@ import {
   validateEventData,
 } from "@workspace/calendar-core";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-export const REMINDER_OPTIONS = [0, 5, 10, 15, 30, 60] as const;
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Round a date up to the next full hour. */
@@ -71,6 +67,14 @@ export function pickerISOStringToUtc(value: string, timezone?: string): Date {
     timePart,
     resolvedTimezone,
   );
+}
+
+/** Wall-clock date and time of a picker string as a local Date, for display and pickers only. */
+export function pickerISOStringToWallClock(value: string): Date {
+  const [datePart = "", timePart = "00:00"] = value.split("T");
+  const [year = 0, month = 1, day = 1] = datePart.split("-").map(Number);
+  const [hours = 0, minutes = 0] = timePart.split(":").map(Number);
+  return new Date(year, month - 1, day, hours, minutes);
 }
 
 function pickerISOStringToCalendarDay(value: string): Date {

@@ -1,45 +1,12 @@
-import type { RecurrenceFrequency } from "@workspace/calendar-core";
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-export const FREQUENCY_OPTIONS: readonly {
-  value: RecurrenceFrequency | "none";
-  label: string;
-}[] = [
-  { value: "none", label: "None" },
-  { value: "daily", label: "Daily" },
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Monthly" },
-  { value: "yearly", label: "Yearly" },
-];
-
-export const WEEKDAYS: readonly {
-  value: number;
-  label: string;
-  short: string;
-}[] = [
-  { value: 0, label: "Sunday", short: "Su" },
-  { value: 1, label: "Monday", short: "Mo" },
-  { value: 2, label: "Tuesday", short: "Tu" },
-  { value: 3, label: "Wednesday", short: "We" },
-  { value: 4, label: "Thursday", short: "Th" },
-  { value: 5, label: "Friday", short: "Fr" },
-  { value: 6, label: "Saturday", short: "Sa" },
-];
+import {
+  RecurrenceEngine,
+  type RecurrenceFrequency,
+  type RecurrenceRule,
+} from "@workspace/calendar-core";
 
 export type EndCondition = "never" | "count" | "until";
 
 // ─── RRULE Helpers ───────────────────────────────────────────────────────────
-
-const BYDAY_MAP: Record<number, string> = {
-  0: "SU",
-  1: "MO",
-  2: "TU",
-  3: "WE",
-  4: "TH",
-  5: "FR",
-  6: "SA",
-};
 
 const BYDAY_REVERSE: Record<string, number> = {
   SU: 0,
@@ -110,31 +77,31 @@ export function parseRRule(rrule: string | null): ParsedRule | null {
   return { frequency, interval, byDay, endCondition, count, until };
 }
 
-/**
- * Build an RRULE string from a structured object.
- */
-export function buildRRule(parsed: ParsedRule): string {
-  const parts: string[] = [`FREQ=${parsed.frequency.toUpperCase()}`];
+function parseRRuleUntil(until: string): Date | undefined {
+  const match = until.match(/^(\d{4})(\d{2})(\d{2})/);
+  if (!match) return undefined;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
 
-  if (parsed.interval > 1) {
-    parts.push(`INTERVAL=${parsed.interval}`);
+/** Read a stored recurrence (JSON rule, or a legacy RRULE string written by older native builds). */
+export function parseStoredRecurrence(
+  raw: string | null | undefined,
+): RecurrenceRule | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("{")) {
+    return RecurrenceEngine.parseRecurrenceRule(trimmed);
   }
 
-  if (parsed.frequency === "weekly" && parsed.byDay.length > 0) {
-    const days = parsed.byDay
-      .sort((a, b) => a - b)
-      .map((d) => BYDAY_MAP[d])
-      .filter(Boolean);
-    if (days.length > 0) {
-      parts.push(`BYDAY=${days.join(",")}`);
-    }
-  }
-
-  if (parsed.endCondition === "count" && parsed.count > 0) {
-    parts.push(`COUNT=${parsed.count}`);
-  } else if (parsed.endCondition === "until" && parsed.until) {
-    parts.push(`UNTIL=${parsed.until}`);
-  }
-
-  return parts.join(";");
+  const legacy = parseRRule(trimmed);
+  if (!legacy) return null;
+  const until =
+    legacy.endCondition === "until" ? parseRRuleUntil(legacy.until) : undefined;
+  return {
+    frequency: legacy.frequency,
+    interval: legacy.interval,
+    ...(legacy.byDay.length > 0 ? { byWeekDay: legacy.byDay } : {}),
+    ...(legacy.endCondition === "count" ? { count: legacy.count } : {}),
+    ...(until ? { until } : {}),
+  };
 }

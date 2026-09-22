@@ -50,6 +50,7 @@ import {
   shouldCommitDragVisibleDate,
   shouldSyncTimelineDate,
   fromKitPageDate,
+  toKitDayShadeRegions,
   toKitEvent,
   toKitFirstDay,
   toKitHourFormat,
@@ -83,6 +84,7 @@ interface NativeTimelineCalendarProps {
   events: DecoratedCalendarEvent[];
   timezone: string;
   weekStartDay: number;
+  workingDays: readonly number[];
   timeFormat?: "12h" | "24h";
   swipeEnabled?: boolean;
   isLoading?: boolean;
@@ -102,6 +104,7 @@ export const NativeTimelineCalendar = forwardRef<
     events,
     timezone,
     weekStartDay,
+    workingDays,
     timeFormat = "12h",
     swipeEnabled = true,
     isLoading = false,
@@ -118,6 +121,14 @@ export const NativeTimelineCalendar = forwardRef<
   const dragOriginalRef = useRef<DecoratedCalendarEvent | null>(null);
   const resolvedTimezone = resolveTimezone(timezone);
   const kitTheme = useMemo(() => toKitTheme(theme), [theme]);
+  const dayShadeRegions = useMemo(
+    () =>
+      toKitDayShadeRegions(workingDays, {
+        workday: theme.colors.calendarWorkday,
+        weekend: theme.colors.calendarWeekend,
+      }),
+    [workingDays, theme.colors.calendarWorkday, theme.colors.calendarWeekend],
+  );
   const initialDate = toKitInitialDate(toKitPageDate(view, selectedDate));
   const lastDateKeyRef = useRef(initialDate);
 
@@ -369,6 +380,7 @@ export const NativeTimelineCalendar = forwardRef<
         timeZone={resolvedTimezone}
         initialDate={initialDate}
         theme={kitTheme}
+        unavailableHours={dayShadeRegions}
         hourWidth={toKitHourWidth(timeFormat)}
         start={0}
         end={1440}

@@ -10,6 +10,8 @@ export const MAIL_LABEL_PRESET_COLORS = [
   { value: "indigo", hex: "#6366f1", label: "Indigo" },
 ] as const;
 
+export const MAIL_LABEL_CUSTOM_DEFAULT_COLOR = "#6366f1";
+
 export function isValidLabelHex(value: string): boolean {
   return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value);
 }

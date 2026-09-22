@@ -54,6 +54,8 @@ const SEMANTIC_COLOR_KEYS = [
   "border",
   "input",
   "ring",
+  "calendarWorkday",
+  "calendarWeekend",
 ] as const;
 
 const COLOR_SCALE_STEPS = [

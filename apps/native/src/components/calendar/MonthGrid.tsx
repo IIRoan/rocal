@@ -12,6 +12,7 @@ import { useTheme } from "../../providers/ThemeProvider";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 import {
   formatCalendarDayKey,
+  getWorkingDayShade,
   isTodayInTimezone,
   resolveTimezone,
 } from "@workspace/calendar-core";
@@ -36,6 +37,8 @@ interface MonthGridProps {
   events: DecoratedCalendarEvent[];
   /** Week start day: 0 = Sunday, 1 = Monday */
   weekStartDay: number;
+  /** Working weekdays (0 = Sunday … 6 = Saturday) */
+  workingDays: readonly number[];
   timezone?: string;
   /** Callback when a day cell is tapped */
   onDayPress?: (date: Date) => void;
@@ -48,6 +51,7 @@ export function MonthGrid({
   selectedDate,
   events,
   weekStartDay,
+  workingDays,
   timezone,
   onDayPress,
 }: MonthGridProps) {
@@ -100,11 +104,18 @@ export function MonthGrid({
               isCurrentMonth,
             );
             const extraCount = dayEvents.length - MAX_DOTS;
+            const shade = isCurrentMonth
+              ? getWorkingDayShade(date.getDay(), workingDays)
+              : null;
 
             return (
               <Pressable
                 key={dateKey}
-                style={styles.dayCell}
+                style={[
+                  styles.dayCell,
+                  shade === "workday" && styles.workdayCell,
+                  shade === "weekend" && styles.weekendCell,
+                ]}
                 onPress={() => onDayPress?.(date)}
                 accessibilityRole="button"
                 accessibilityLabel={`${format(date, "MMMM d, yyyy")}${isToday ? ", today" : ""}${dayEvents.length > 0 ? `, ${dayEvents.length} event${dayEvents.length > 1 ? "s" : ""}` : ""}`}
@@ -184,6 +195,12 @@ function createStyles(theme: ThemeTokens) {
       alignItems: "center" as const,
       paddingVertical: theme.spacing["1"],
       minHeight: 48,
+    },
+    workdayCell: {
+      backgroundColor: theme.colors.calendarWorkday,
+    },
+    weekendCell: {
+      backgroundColor: theme.colors.calendarWeekend,
     },
     dayNumberContainer: {
       width: 32,
