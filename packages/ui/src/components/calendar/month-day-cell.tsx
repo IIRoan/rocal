@@ -3,7 +3,6 @@
 import React from "react";
 import {
   isCancelledCalendarEvent,
-  isSameCalendarDayInTimezone,
   isTodayInTimezone,
   wallClockToUtc,
 } from "@workspace/calendar-core";
@@ -14,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
-import { sortEvents } from "./utils";
+import { getEventSegmentForCalendarDay, sortEvents } from "./utils";
 import { EventHeight, DefaultStartHour } from "./constants";
 import { CalendarEvent } from "./types";
 
@@ -118,15 +117,8 @@ export function MonthDayCell({
           }`}
         >
           {sortedAllDay.map((event, index) => {
-            const eventStart = new Date(event.start);
-            const eventEnd = new Date(event.end);
-            const isFirstDay = isSameCalendarDayInTimezone(
-              eventStart,
-              day,
-              resolvedTimezone,
-            );
-            const isLastDay = isSameCalendarDayInTimezone(
-              eventEnd,
+            const { isFirstDay, isLastDay } = getEventSegmentForCalendarDay(
+              event,
               day,
               resolvedTimezone,
             );
@@ -221,15 +213,8 @@ export function MonthDayCell({
                   <div className="text-sm font-medium">{format(day, "EEE d")}</div>
                   <div className="space-y-1">
                     {sortEvents(allEvents, resolvedTimezone).map((event) => {
-                      const eventStart = new Date(event.start);
-                      const eventEnd = new Date(event.end);
-                      const isFirstDay = isSameCalendarDayInTimezone(
-                        eventStart,
-                        day,
-                        resolvedTimezone,
-                      );
-                      const isLastDay = isSameCalendarDayInTimezone(
-                        eventEnd,
+                      const { isFirstDay, isLastDay } = getEventSegmentForCalendarDay(
+                        event,
                         day,
                         resolvedTimezone,
                       );

@@ -88,11 +88,13 @@ export function toastEventMutationError(
 /** Omitting content keeps the stored ciphertext instead of re-encrypting a placeholder title. */
 export function buildDraggedEventUpdate(
   event: Pick<CalendarEvent, "start" | "end" | "allDay">,
+  timezone: string,
 ) {
   return {
     start: event.start.toISOString(),
     end: event.end.toISOString(),
     allDay: event.allDay,
+    timezone,
   };
 }
 
@@ -106,7 +108,10 @@ export async function persistDraggedCalendarEvent({
   updatedEvent: CalendarEvent;
 }) {
   try {
-    await updateEvent(updatedEvent.id, buildDraggedEventUpdate(updatedEvent));
+    await updateEvent(
+      updatedEvent.id,
+      buildDraggedEventUpdate(updatedEvent, timezone),
+    );
 
     toast.success(`Event "${updatedEvent.title}" moved`, {
       description: formatInUserTimezone(

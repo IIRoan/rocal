@@ -3,7 +3,7 @@ import type { CalendarView, DecoratedCalendarEvent } from "@workspace/calendar-c
 import {
   canCurrentUserModifyEvent,
   formatCalendarDayKey,
-  getInclusiveCalendarDayRange,
+  getEventCalendarDayRange,
   getThreeDayCalendarDays,
   getZonedDateParts,
   resolveTimezone,
@@ -238,11 +238,9 @@ export function toKitEvent(
   const resolvedTimezone = resolveTimezone(timezone);
 
   if (shouldUseKitAllDayDate(event, resolvedTimezone)) {
-    const { firstDay, lastDay } = getInclusiveCalendarDayRange(
-      new Date(event.start),
-      new Date(event.end),
+    const { firstDay, lastDay } = getEventCalendarDayRange(
+      event,
       resolvedTimezone,
-      { allDay: Boolean(event.allDay) },
     );
 
     return {

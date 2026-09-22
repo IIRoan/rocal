@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
-  eventOverlapsZonedCalendarDay,
+  eventOverlapsCalendarDay,
   formatEventSpanLabel,
   resolveTimezone,
   utcToPickerDate,
@@ -58,12 +58,7 @@ export function DayView({
   const dayEvents = useMemo(() => {
     return events
       .filter((event) =>
-        eventOverlapsZonedCalendarDay(
-          new Date(event.start),
-          new Date(event.end),
-          calendarDay,
-          resolvedTimezone,
-        ),
+        eventOverlapsCalendarDay(event, calendarDay, resolvedTimezone),
       )
       .sort(
         (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
@@ -112,14 +107,14 @@ export function DayView({
       className="absolute inset-0 flex flex-col bg-background animate-fade-in"
     >
       {showAllDaySection && (
-        <div className="border-border/70 bg-muted/50 border-t shrink-0">
+        <div className="border-border/70 bg-muted/50 border-t shrink-0 overflow-hidden [scrollbar-gutter:stable]">
           <div className="grid grid-cols-[3rem_1fr] sm:grid-cols-[4rem_1fr]">
             <div className="relative">
               <span className="text-muted-foreground/70 absolute bottom-0 left-0 h-6 w-16 max-w-full pe-2 text-right text-[10px] sm:pe-4 sm:text-xs">
                 All day
               </span>
             </div>
-            <div className="border-border/70 relative border-r p-1 last:border-r-0">
+            <div className="relative px-0.5 py-1">
               {allDayEvents.map((event) => {
                 const { isFirstDay, isLastDay } = getEventSegmentForCalendarDay(
                   event,
@@ -169,7 +164,7 @@ export function DayView({
         </div>
       )}
 
-      <div className="border-border/70 grid flex-1 grid-cols-[3rem_1fr] border-t sm:grid-cols-[4rem_1fr] overflow-y-auto relative min-h-0">
+      <div className="border-border/70 grid flex-1 grid-cols-[3rem_1fr] border-t sm:grid-cols-[4rem_1fr] overflow-y-auto [scrollbar-gutter:stable] relative min-h-0">
         <div>
           {WEEK_HOUR_VALUES.map((hourValue) => (
             <div

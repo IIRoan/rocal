@@ -1,5 +1,8 @@
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
-import { wallClockToUtc } from "@workspace/calendar-core";
+import {
+  pickerDateToAllDayUtcRange,
+  wallClockToUtc,
+} from "@workspace/calendar-core";
 import {
   KIT_NUMBER_OF_DAYS,
   fromKitPageDate,
@@ -145,6 +148,45 @@ describe("toKitEvent", () => {
 
     expect(kit.start).toEqual({ date: "2026-08-18" });
     expect(kit.end).toEqual({ date: "2026-08-20" });
+  });
+
+  it.each([
+    "America/Los_Angeles",
+    "America/New_York",
+    "UTC",
+    "Asia/Tokyo",
+    "Pacific/Kiritimati",
+  ])(
+    "keeps an all-day event saved in Amsterdam on its saved day when viewed in %s",
+    (viewerTimezone) => {
+      const { start, end } = pickerDateToAllDayUtcRange(
+        new Date(2026, 7, 18),
+        new Date(2026, 7, 18),
+        TIMEZONE,
+      );
+      const kit = toKitEvent(
+        makeEvent({ start, end, allDay: true, timezone: TIMEZONE }),
+        viewerTimezone,
+      );
+
+      expect(kit.start).toEqual({ date: "2026-08-18" });
+      expect(kit.end).toEqual({ date: "2026-08-18" });
+    },
+  );
+
+  it("keeps a multi-day all-day event's span when viewed in another timezone", () => {
+    const { start, end } = pickerDateToAllDayUtcRange(
+      new Date(2026, 9, 24),
+      new Date(2026, 9, 26),
+      TIMEZONE,
+    );
+    const kit = toKitEvent(
+      makeEvent({ start, end, allDay: true, timezone: TIMEZONE }),
+      "America/Los_Angeles",
+    );
+
+    expect(kit.start).toEqual({ date: "2026-10-24" });
+    expect(kit.end).toEqual({ date: "2026-10-26" });
   });
 
   it("puts timed events that cross a zoned calendar day on the all-day row", () => {
