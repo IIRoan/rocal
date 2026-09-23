@@ -18,8 +18,8 @@ describe("QUERY_KEYS", () => {
 
   it("builds id-scoped detail keys", () => {
     expect(QUERY_KEYS.eventDetail("evt-1")).toEqual(["event", "evt-1"]);
-    expect(QUERY_KEYS.notifications("evt-1")).toEqual([
-      "notifications",
+    expect(QUERY_KEYS.eventNotifications("evt-1")).toEqual([
+      "eventNotifications",
       "evt-1",
     ]);
     expect(QUERY_KEYS.calendarShareLink("cal-1")).toEqual([

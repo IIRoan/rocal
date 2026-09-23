@@ -8,14 +8,14 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import type { CalendarView } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import type { NativeCalendarView } from "../../lib/calendar-views";
 import { useTheme } from "../../providers/ThemeProvider";
 import { SIDEBAR_VIEW_OPTIONS } from "../app-sidebar-utils";
 
 interface CalendarViewToggleProps {
-  activeView: CalendarView;
-  onViewChange: (view: CalendarView) => void;
+  activeView: NativeCalendarView;
+  onViewChange: (view: NativeCalendarView) => void;
 }
 
 export function CalendarViewToggle({

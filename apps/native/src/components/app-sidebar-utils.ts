@@ -6,6 +6,7 @@ import {
   SETTINGS_ROUTE,
 } from "../lib/navigation-routes";
 import { resolveCalendarSwatchColor } from "../lib/calendar-color-utils";
+import type { NativeCalendarView } from "../lib/calendar-views";
 
 export type SidebarIconName =
   | "calendar"
@@ -110,16 +111,15 @@ export function buildSidebarCalendarSections(
 // ─── View switcher ─────────────────────────────────────────────────────────────
 
 export interface SidebarViewOption {
-  view: CalendarView;
+  view: NativeCalendarView;
   label: string;
-  icon: "square" | "columns" | "grid" | "calendar" | "list";
+  icon: "square" | "columns" | "grid" | "list";
 }
 
 export const SIDEBAR_VIEW_OPTIONS: SidebarViewOption[] = [
   { view: "day", label: "Day", icon: "square" },
   { view: "3day", label: "3 Day", icon: "columns" },
   { view: "week", label: "Week", icon: "grid" },
-  { view: "month", label: "Month", icon: "calendar" },
   { view: "agenda", label: "Agenda", icon: "list" },
 ];
 

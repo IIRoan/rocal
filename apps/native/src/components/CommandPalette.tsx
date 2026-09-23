@@ -213,7 +213,6 @@ export function CommandPalette() {
           navigateToCalendar();
           break;
         }
-        case "view-month":
         case "view-week":
         case "view-day":
         case "view-3day":

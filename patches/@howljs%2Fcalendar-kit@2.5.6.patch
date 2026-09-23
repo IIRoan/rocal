@@ -1,0 +1,41 @@
+diff --git a/src/components/MultiDayBarItem.tsx b/src/components/MultiDayBarItem.tsx
+index 12cc627c2ff6db487487f2cef53d1816dcd925cc..8df6a8982b1d632b3996365e864acc2da8ba4d50 100644
+--- a/src/components/MultiDayBarItem.tsx
++++ b/src/components/MultiDayBarItem.tsx
+@@ -282,12 +282,12 @@ const EventItem = ({
+     return _internal.rowIndex * height.value;
+   }, [_internal.rowIndex]);
+ 
++  // Layout props like position/top in an animated style are dropped on RN 0.85+, collapsing the event to its padding.
+   const eventContainerStyle = useAnimatedStyle(() => {
+     return {
+-      position: 'absolute',
+-      top: top.value,
+       height: eventHeight.value,
+       opacity: isShow.value ? 1 : 0,
++      transform: [{ translateY: top.value }],
+     };
+   });
+ 
+@@ -298,7 +298,12 @@ const EventItem = ({
+   };
+ 
+   return (
+-    <Animated.View style={[{ left, width: eventWidth }, eventContainerStyle]}>
++    <Animated.View
++      style={[
++        styles.eventContainer,
++        { left, width: eventWidth },
++        eventContainerStyle,
++      ]}>
+       <TouchableOpacity
+         activeOpacity={0.6}
+         disabled={!onPressEvent}
+@@ -330,6 +335,7 @@ const EventItem = ({
+ 
+ const styles = StyleSheet.create({
+   container: { flexDirection: 'row', alignItems: 'center' },
++  eventContainer: { position: 'absolute', top: 0 },
+   eventContent: {
+     ...StyleSheet.absoluteFillObject,
+     overflow: 'hidden',

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -30,6 +31,7 @@ import { useTheme } from "../../providers/ThemeProvider";
 import { useAuth } from "../../providers/AuthProvider";
 import { useRecentContacts } from "../../hooks/use-recent-contacts";
 import { useReminderTitleEncryptor } from "../../hooks/use-reminder-title-encryptor";
+import { useEventReminders } from "../../hooks/use-event-reminders";
 import { extractRecentContactEntries } from "../../lib/record-recent-contacts";
 import { useToast } from "../../providers/ToastProvider";
 import { toastOperationWarnings } from "../../lib/operation-warnings";
@@ -47,6 +49,7 @@ import {
 } from "../../lib/optimistic-events";
 import {
   BottomSheet,
+  BottomSheetClose,
   BottomSheetFooter,
   BottomSheetHeader,
   BottomSheetScrollView,
@@ -60,7 +63,11 @@ import {
   SheetSecondaryButton,
 } from "../sheet/SheetActions";
 
-import { EventForm } from "./EventForm";
+import {
+  EventForm,
+  type EventFormHandle,
+  type EventFormSubmission,
+} from "./EventForm";
 import { BlobatarAvatar } from "../BlobatarAvatar";
 import { EventEditorRow } from "./EventEditorPrimitives";
 import { toTimezonePickerISOString, parseCreateEventCalendarDay } from "./event-form-utils";
@@ -89,6 +96,7 @@ export type EventSheetMode =
 export interface EventSheetProps {
   visible: boolean;
   mode: EventSheetMode | null;
+  presentKey?: number;
   onDismiss: () => void;
   onCloseComplete?: () => void;
 }
@@ -121,6 +129,8 @@ function eventToInitialValues(
   };
 }
 
+const BODY_MOUNT_FALLBACK_MS = 250;
+
 const SCOPE_OPTIONS: {
   label: string;
   scope: RecurrenceEditScope & RecurrenceDeleteScope;
@@ -148,6 +158,7 @@ function formatParticipantStatus(status?: string) {
 export function EventSheet({
   visible,
   mode,
+  presentKey,
   onDismiss,
   onCloseComplete,
 }: EventSheetProps) {
@@ -159,10 +170,16 @@ export function EventSheet({
   const encryptReminderTitle = useReminderTitleEncryptor();
   const { toast } = useToast();
   const bottomSheetRef = useRef<BottomSheetHandle>(null);
+  const formRef = useRef<EventFormHandle>(null);
   const createSnapshotRef = useRef<CacheSnapshot>([]);
   const deleteSnapshotRef = useRef<CacheSnapshot>([]);
 
   const [viewMode, setViewMode] = useState<"view" | "edit">("view");
+  // The body mounts once the open animation runs so rendering the form never delays the tap response.
+  const [bodyReady, setBodyReady] = useState(false);
+  if (!visible && bodyReady) {
+    setBodyReady(false);
+  }
   const [serverErrors, setServerErrors] = useState<string[]>([]);
   const [editScope, setEditScope] = useState<RecurrenceEditScope | undefined>();
   const [editOccurrenceDate, setEditOccurrenceDate] = useState<
@@ -197,6 +214,14 @@ export function EventSheet({
     }
     setServerErrors([]);
   }, [mode]);
+
+  const markBodyReady = useCallback(() => setBodyReady(true), []);
+
+  useEffect(() => {
+    if (!visible || bodyReady) return;
+    const timer = setTimeout(markBodyReady, BODY_MOUNT_FALLBACK_MS);
+    return () => clearTimeout(timer);
+  }, [visible, bodyReady, markBodyReady]);
 
   const handleSheetDismissRequest = useCallback(() => {
     setServerErrors([]);
@@ -237,23 +262,26 @@ export function EventSheet({
     enabled: visible,
   });
   const resolvedTimezone = resolveTimezone(settings?.timezone);
+  const { reminders: eventReminders, isLoading: remindersLoading } =
+    useEventReminders(eventId, event?.reminder, visible && !isCreate);
 
   // ─── Mutations ─────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
-    mutationFn: async (data: CreateEventRequest) => {
-      const saved = await calendarApiService.createEvent(data);
+    mutationFn: async ({ request, reminders }: EventFormSubmission) => {
+      const saved = await calendarApiService.createEvent(request);
       await persistEventReminderNotifications(
         saved.id,
-        data,
+        request.title,
+        reminders,
         encryptReminderTitle,
       );
       return saved;
     },
-    onMutate: async (data: CreateEventRequest) => {
+    onMutate: async ({ request }: EventFormSubmission) => {
       const tempId = generateOptimisticId();
       const optimisticEvent = buildOptimisticEvent(
-        data,
+        request,
         user?.id ?? "",
         tempId,
       );
@@ -265,10 +293,10 @@ export function EventSheet({
       dismissSheet();
       return { tempId };
     },
-    onSuccess: (savedEvent, variables) => {
+    onSuccess: (savedEvent, { request }) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       const entries = extractRecentContactEntries(
-        variables.participants,
+        request.participants,
         user?.email,
       );
       if (entries.length > 0) {
@@ -284,30 +312,34 @@ export function EventSheet({
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: CreateEventRequest) => {
+    mutationFn: async ({ request, reminders }: EventFormSubmission) => {
       const saved = editScope
         ? await calendarApiService.editRecurringEvent(eventId!, {
             editScope,
             occurrenceDate: editOccurrenceDate,
-            updates: data,
+            updates: request,
           })
-        : await calendarApiService.updateEvent(eventId!, data);
+        : await calendarApiService.updateEvent(eventId!, request);
       await persistEventReminderNotifications(
         saved.id,
-        data,
+        request.title,
+        reminders,
         encryptReminderTitle,
       );
       return saved;
     },
-    onSuccess: (savedEvent, variables) => {
+    onSuccess: (savedEvent, { request }) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       if (eventId) {
         queryClient.invalidateQueries({
           queryKey: QUERY_KEYS.eventDetail(eventId),
         });
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.eventNotifications(eventId),
+        });
       }
       const entries = extractRecentContactEntries(
-        variables.participants,
+        request.participants,
         user?.email,
       );
       if (entries.length > 0) {
@@ -395,10 +427,10 @@ export function EventSheet({
   // ─── Handlers ──────────────────────────────────────────────────────────
 
   const handleSubmit = useCallback(
-    (data: CreateEventRequest) => {
+    (submission: EventFormSubmission) => {
       setServerErrors([]);
-      if (isCreate) createMutation.mutate(data);
-      else updateMutation.mutate(data);
+      if (isCreate) createMutation.mutate(submission);
+      else updateMutation.mutate(submission);
     },
     [isCreate, createMutation, updateMutation],
   );
@@ -517,8 +549,15 @@ export function EventSheet({
 
   // ─── Derived ───────────────────────────────────────────────────────────
 
+  // A new event needs no server data to start typing; the calendar chip fills in when calendars arrive.
+  // The mode-reset effect runs after the first render, so derive create's mode to avoid a stale view frame.
+  const sheetViewMode = isCreate ? "edit" : viewMode;
+  // The form seeds its reminder list once, so editing waits for the saved reminders.
   const isLoading =
-    calendarsLoading || (isViewOrEdit && eventLoading && !event);
+    !isCreate &&
+    (calendarsLoading ||
+      (eventLoading && !event) ||
+      (sheetViewMode === "edit" && remindersLoading));
   const isPending =
     createMutation.isPending ||
     updateMutation.isPending ||
@@ -534,11 +573,8 @@ export function EventSheet({
       ]?.bg ?? calendarInfo.color)
     : theme.colors.calendar.blue.bg;
   const viewActions = resolveEventSheetViewActions(event);
-  const sheetTitle = isCreate
-    ? "New event"
-    : viewMode === "edit"
-      ? "Edit event"
-      : "Event";
+  const showFormHeader = !isLoading && sheetViewMode === "edit";
+  const sheetTitle = viewMode === "edit" ? "Edit event" : "Event";
 
   // ─── Render ────────────────────────────────────────────────────────────
 
@@ -547,15 +583,51 @@ export function EventSheet({
       <BottomSheet
         ref={bottomSheetRef}
         visible={visible}
+        presentKey={presentKey}
         onDismiss={handleSheetDismissRequest}
         onCloseComplete={onCloseComplete}
+        onOpenAnimationStart={markBodyReady}
       >
-        <BottomSheetHeader>
-          <BottomSheetTitle>{sheetTitle}</BottomSheetTitle>
-        </BottomSheetHeader>
-        {isLoading ? (
+        {showFormHeader ? (
+          <BottomSheetHeader showClose={false} style={styles.formHeader}>
+            <View style={styles.formHeaderRow}>
+              <BottomSheetClose
+                onPress={handleCancel}
+                accessibilityLabel={isCreate ? "Discard event" : "Cancel editing"}
+              />
+              <Pressable
+                onPress={() => formRef.current?.submit()}
+                disabled={isPending}
+                hitSlop={4}
+                style={({ pressed }) => [
+                  styles.savePill,
+                  (pressed || isPending) && styles.savePillPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Save"
+                accessibilityState={{ disabled: isPending }}
+              >
+                {isPending ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.colors.primaryForeground}
+                  />
+                ) : (
+                  <Text style={styles.savePillText}>Save</Text>
+                )}
+              </Pressable>
+            </View>
+          </BottomSheetHeader>
+        ) : (
+          <BottomSheetHeader>
+            <BottomSheetTitle>{sheetTitle}</BottomSheetTitle>
+          </BottomSheetHeader>
+        )}
+        {!bodyReady ? (
+          <View style={styles.editBody} />
+        ) : isLoading ? (
           <CenteredLoader theme={theme} message="Loading…" />
-        ) : viewMode === "view" && event ? (
+        ) : sheetViewMode === "view" && event ? (
           <>
             {/* ── View mode body ─────────────────────────────────── */}
             <BottomSheetScrollView
@@ -683,10 +755,12 @@ export function EventSheet({
                   </EventEditorRow>
                 ) : null}
 
-                {event.reminder != null && event.reminder > 0 ? (
+                {eventReminders.length > 0 ? (
                   <EventEditorRow icon="bell" label="Reminders">
                     <Text style={[styles.viewText, styles.viewRowText]}>
-                      {formatReminderShort(event.reminder)} before
+                      {eventReminders
+                        .map((minutes) => `${formatReminderShort(minutes)} before`)
+                        .join(", ")}
                     </Text>
                   </EventEditorRow>
                 ) : null}
@@ -770,7 +844,7 @@ export function EventSheet({
               </SheetActions>
             </BottomSheetFooter>
           </>
-        ) : viewMode === "view" ? (
+        ) : sheetViewMode === "view" ? (
           <>
             <View style={styles.viewBody}>
               <Text style={styles.viewText}>Couldn't load this event.</Text>
@@ -785,6 +859,8 @@ export function EventSheet({
           /* ── Edit / Create mode ──────────────────────────────── */
           <View style={styles.editBody}>
             <EventForm
+              ref={formRef}
+              actionsPlacement="external"
               key={
                 isCreate ? "create" : `edit-${eventId}-${editScope ?? "none"}`
               }
@@ -794,7 +870,9 @@ export function EventSheet({
               onSubmit={handleSubmit}
               onCancel={handleCancel}
               initialValues={initialValues}
+              initialReminders={isCreate ? undefined : eventReminders}
               timezone={resolvedTimezone}
+              timeFormat={settings?.timeFormat === "24h" ? "24h" : "12h"}
             />
           </View>
         )}
@@ -926,6 +1004,27 @@ function createStyles(theme: ThemeTokens) {
       flex: 1,
       minHeight: 0,
     },
+    formHeader: {
+      paddingVertical: theme.spacing["2"],
+      borderBottomWidth: 0,
+    },
+    formHeaderRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+    },
+    savePill: {
+      minWidth: 72,
+      height: 36,
+      paddingHorizontal: theme.spacing["4"],
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      borderRadius: theme.borderRadius.full,
+      backgroundColor: theme.colors.primaryBase,
+    },
+    savePillPressed: {
+      opacity: 0.8,
+    },
     viewRowContent: {
       flex: 1,
     },
@@ -983,6 +1082,12 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
+    },
+    savePillText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
+      color: theme.colors.primaryForeground,
     },
     rsvpButtonTextSelected: {
       color: theme.colors.primaryBase,

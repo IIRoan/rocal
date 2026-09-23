@@ -343,6 +343,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "@howljs/calendar-kit@2.5.6": "patches/@howljs%2Fcalendar-kit@2.5.6.patch",
+  },
   "overrides": {
     "esbuild": "0.28.1",
     "expo-constants": "~57.0.11",

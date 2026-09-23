@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  KeyboardAvoidingView,
   Modal,
   Pressable,
   ScrollView,
@@ -24,157 +25,10 @@ import { scheduleOnRN } from "react-native-worklets";
 import { format } from "date-fns";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
-function generateTimeOptions(): Date[] {
-  const options: Date[] = [];
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      const d = new Date(2000, 0, 1, h, m, 0, 0);
-      options.push(d);
-    }
-  }
-  return options;
-}
-
-const TIME_OPTIONS = generateTimeOptions();
-
 const PICKER_SPRING = { damping: 28, stiffness: 280, mass: 0.8 };
 const PICKER_CLOSE_DURATION = 180;
 const PICKER_DISMISS_DISTANCE = 64;
 const PICKER_DISMISS_VELOCITY = 650;
-
-export function formatTime12(date: Date): string {
-  let h = date.getHours();
-  const m = date.getMinutes();
-  const ampm = h >= 12 ? "PM" : "AM";
-  h = h % 12 || 12;
-  return `${h}:${String(m).padStart(2, "0")} ${ampm}`;
-}
-
-// ─── Time Picker Modal ───────────────────────────────────────────────────────
-// Refactored to use a plain ScrollView grid instead of FlatList. The FlatList
-// approach was broken because getItemLayout couldn't account for gaps between
-// rows, causing initialScrollIndex to land in the wrong place and the grid to
-// render incorrectly. A ScrollView with a simple map is more reliable here
-// since we only have 96 items (24h × 4 per hour).
-
-export function TimePickerModal({
-  visible,
-  onClose,
-  selectedTime,
-  onSelect,
-  title: titleText,
-  theme,
-  bottomInset,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  selectedTime: Date;
-  onSelect: (time: Date) => void;
-  title?: string;
-  theme: ThemeTokens;
-  bottomInset: number;
-}) {
-  const timeScrollRef = useRef<ScrollView>(null);
-  const selectedH = selectedTime.getHours();
-  const selectedM = selectedTime.getMinutes();
-
-  // Each row is 44px tall + 8px gap = 52px. 4 items per row.
-  const selectedIndex = TIME_OPTIONS.findIndex(
-    (t) => t.getHours() === selectedH && t.getMinutes() === selectedM,
-  );
-  const selectedRow = selectedIndex >= 0 ? Math.floor(selectedIndex / 4) : 0;
-  const targetOffset = Math.max(0, selectedRow * 52 - 104);
-
-  // Chunk the options into rows of 4
-  const rows: Date[][] = useMemo(() => {
-    const r: Date[][] = [];
-    for (let i = 0; i < TIME_OPTIONS.length; i += 4) {
-      r.push(TIME_OPTIONS.slice(i, i + 4));
-    }
-    return r;
-  }, []);
-
-  const modalStyles = useMemo(() => createModalStyles(theme), [theme]);
-
-  // Scroll to the selected time after the ScrollView content is measured.
-  // contentOffset is unreliable with animationType="slide" so we use
-  // onContentSizeChange which fires once the content is laid out.
-  const hasScrolled = useRef(false);
-
-  // Reset scroll flag when modal closes
-  if (!visible) {
-    hasScrolled.current = false;
-  }
-
-  const handleContentSizeChange = useCallback(() => {
-    if (!hasScrolled.current && targetOffset > 0) {
-      hasScrolled.current = true;
-      setTimeout(() => {
-        timeScrollRef.current?.scrollTo({ y: targetOffset, animated: false });
-      }, 50);
-    }
-  }, [targetOffset]);
-
-  return (
-    <PickerSheet
-      visible={visible}
-      onClose={onClose}
-      title={titleText ?? "Select time"}
-      theme={theme}
-      bottomInset={bottomInset}
-      maxHeightRatio={0.56}
-    >
-      <ScrollView
-        ref={timeScrollRef}
-        style={modalStyles.scrollArea}
-        contentContainerStyle={modalStyles.grid}
-        showsVerticalScrollIndicator={false}
-        onContentSizeChange={handleContentSizeChange}
-      >
-        {rows.map((row, ri) => (
-          <View key={ri} style={modalStyles.gridRow}>
-            {row.map((time) => {
-              const isSelected =
-                time.getHours() === selectedH &&
-                time.getMinutes() === selectedM;
-              const now = new Date();
-              const isCurrent =
-                time.getHours() === now.getHours() &&
-                time.getMinutes() === now.getMinutes();
-              return (
-                <Pressable
-                  key={`${time.getHours()}-${time.getMinutes()}`}
-                  style={[
-                    modalStyles.cell,
-                    isSelected && { backgroundColor: theme.colors.primaryBase },
-                    !isSelected &&
-                      isCurrent && {
-                        backgroundColor: theme.colors.primaryBase + "33",
-                        borderWidth: 2,
-                        borderColor: theme.colors.primaryBase,
-                      },
-                  ]}
-                  onPress={() => onSelect(time)}
-                >
-                  <Text
-                    style={[
-                      modalStyles.cellText,
-                      isSelected && { color: theme.colors.primaryForeground },
-                      !isSelected &&
-                        isCurrent && { color: theme.colors.primaryBase },
-                    ]}
-                  >
-                    {formatTime12(time)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        ))}
-      </ScrollView>
-    </PickerSheet>
-  );
-}
 
 export function PickerSheet({
   visible,
@@ -183,6 +37,7 @@ export function PickerSheet({
   theme,
   bottomInset,
   maxHeightRatio,
+  avoidKeyboard = false,
   children,
 }: {
   visible: boolean;
@@ -191,6 +46,7 @@ export function PickerSheet({
   theme: ThemeTokens;
   bottomInset: number;
   maxHeightRatio: number;
+  avoidKeyboard?: boolean;
   children: React.ReactNode;
 }) {
   const { height } = useWindowDimensions();
@@ -338,7 +194,11 @@ export function PickerSheet({
       onRequestClose={requestClose}
       statusBarTranslucent
     >
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior="padding"
+        enabled={avoidKeyboard}
+      >
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
@@ -370,12 +230,12 @@ export function PickerSheet({
           <Text style={styles.title}>{title}</Text>
           {children}
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
-/** Shared modal styles for time and date pickers. */
+/** Shared picker sheet chrome styles. */
 function createModalStyles(theme: ThemeTokens) {
   return StyleSheet.create({
     overlay: {
@@ -408,88 +268,12 @@ function createModalStyles(theme: ThemeTokens) {
       marginBottom: 10,
       paddingHorizontal: 16,
     },
-    scrollArea: {
-      flexGrow: 0,
-    },
-    grid: {
-      paddingHorizontal: 12,
-      paddingBottom: 16,
-    },
-    gridRow: {
-      flexDirection: "row",
-      gap: 8,
-      marginBottom: 8,
-    },
-    calendarContent: {
-      paddingHorizontal: 16,
-      paddingBottom: 8,
-    },
-    cell: {
-      flex: 1,
-      height: 44,
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: 12,
-      backgroundColor: theme.colors.muted,
-    },
-    cellText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
   });
 }
 
-// ─── Date Picker Modal ───────────────────────────────────────────────────────
-
-export function DatePickerModal({
-  visible,
-  onClose,
-  selectedDate,
-  onSelect,
-  minDate,
-  title: titleText,
-  theme,
-  bottomInset,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  selectedDate: Date;
-  onSelect: (date: Date) => void;
-  minDate?: Date;
-  title?: string;
-  theme: ThemeTokens;
-  bottomInset: number;
-}) {
-  const dpStyles = useMemo(() => createModalStyles(theme), [theme]);
-  return (
-    <PickerSheet
-      visible={visible}
-      onClose={onClose}
-      title={titleText ?? "Select date"}
-      theme={theme}
-      bottomInset={bottomInset}
-      maxHeightRatio={0.7}
-    >
-      <View style={dpStyles.calendarContent}>
-        <CalendarGrid
-          selectedDate={selectedDate}
-          onSelect={onSelect}
-          minDate={minDate}
-          theme={theme}
-        />
-      </View>
-    </PickerSheet>
-  );
-}
-
-
-// ─── Calendar Grid ───────────────────────────────────────────────────────────
-
 const CALENDAR_DAY_HEADERS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 
-function CalendarGrid({
+export function CalendarGrid({
   selectedDate,
   onSelect,
   minDate,

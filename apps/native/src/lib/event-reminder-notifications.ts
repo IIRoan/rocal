@@ -1,4 +1,4 @@
-import type { CreateEventRequest } from "@workspace/calendar-core";
+import { normalizeReminderMinutes } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import { calendarApiService } from "./api";
 
@@ -12,19 +12,16 @@ export type ReminderTitleEncryptor = (
 
 export async function persistEventReminderNotifications(
   eventId: string,
-  request: Pick<CreateEventRequest, "title" | "reminder">,
+  title: string | undefined,
+  reminderMinutes: readonly number[],
   encryptTitle: ReminderTitleEncryptor,
 ): Promise<void> {
-  const minutes =
-    typeof request.reminder === "number" && request.reminder > 0
-      ? request.reminder
-      : 0;
-
-  const title = request.title?.trim();
+  const minutes = normalizeReminderMinutes(reminderMinutes);
+  const trimmedTitle = title?.trim();
   // `null` clears the stored title; `undefined` leaves a title another device saved untouched.
   const encryptedDisplayTitle =
-    minutes > 0 && title
-      ? await encryptTitle(eventId, title).catch((error: unknown) => {
+    minutes.length > 0 && trimmedTitle
+      ? await encryptTitle(eventId, trimmedTitle).catch((error: unknown) => {
           log.warn("Failed to encrypt reminder title:", error);
           return undefined;
         })
@@ -33,15 +30,11 @@ export async function persistEventReminderNotifications(
   try {
     await calendarApiService.updateEventNotifications(
       eventId,
-      minutes > 0
-        ? [
-            {
-              notificationType: "email",
-              minutesBefore: minutes,
-              isEnabled: true,
-            },
-          ]
-        : [],
+      minutes.map((minutesBefore) => ({
+        notificationType: "email",
+        minutesBefore,
+        isEnabled: true,
+      })),
       { encryptedDisplayTitle },
     );
   } catch (error) {

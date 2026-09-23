@@ -17,6 +17,7 @@ import { SheetPortal } from "../../SheetPortal";
 import { CenteredLoader } from "../../ui/loading";
 import { useNativeUserSettings } from "../../../hooks/use-native-user-settings";
 import { useTheme, type ThemePreference } from "../../../providers/ThemeProvider";
+import { toNativeCalendarView } from "../../../lib/calendar-views";
 import { THEME_OPTIONS, VIEW_OPTIONS } from "../../../lib/settings-options";
 
 type PickerKey = "theme" | "defaultView";
@@ -32,10 +33,10 @@ export function AppearanceSettingsContent() {
   const themeLabel =
     THEME_OPTIONS.find((option) => option.value === themePreference)?.label ??
     "System";
+  const defaultView = toNativeCalendarView(settings?.defaultView ?? "month");
   const viewLabel =
-    VIEW_OPTIONS.find(
-      (option) => option.value === (settings?.defaultView ?? "month"),
-    )?.label ?? "Month View";
+    VIEW_OPTIONS.find((option) => option.value === defaultView)?.label ??
+    "Week View";
 
   const handleThemeChange = useCallback(
     (pref: ThemePreference) => {
@@ -112,9 +113,7 @@ export function AppearanceSettingsContent() {
                     key={option.value}
                     icon={option.icon}
                     label={option.label}
-                    isSelected={
-                      (settings?.defaultView ?? "month") === option.value
-                    }
+                    isSelected={defaultView === option.value}
                     onPress={() => {
                       updateSetting({ defaultView: option.value });
                       setActivePicker(null);

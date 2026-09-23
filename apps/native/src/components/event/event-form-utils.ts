@@ -100,6 +100,41 @@ export function setPickerTimePart(value: string, time: Date): string {
   return `${datePart}T${hours}:${minutes}`;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_DURATION_MS = 60 * 60 * 1000;
+
+function pickerDayNumber(value: string): number {
+  const [year = 0, month = 1, day = 1] = (value.split("T")[0] ?? "")
+    .split("-")
+    .map(Number);
+  return Date.UTC(year, month - 1, day) / DAY_MS;
+}
+
+/** Move the end so the event keeps its length when the start changes; all-day events keep their day span. */
+export function shiftEndWithStart(
+  previousStart: string,
+  nextStart: string,
+  end: string,
+  allDay: boolean,
+  timezone?: string,
+): string {
+  if (allDay) {
+    const span = Math.max(0, pickerDayNumber(end) - pickerDayNumber(previousStart));
+    const endDay = new Date((pickerDayNumber(nextStart) + span) * DAY_MS);
+    const datePart = endDay.toISOString().slice(0, 10);
+    return `${datePart}T${end.split("T")[1] ?? "00:00"}`;
+  }
+  const resolvedTimezone = resolveTimezone(timezone);
+  const duration =
+    pickerISOStringToUtc(end, resolvedTimezone).getTime() -
+    pickerISOStringToUtc(previousStart, resolvedTimezone).getTime();
+  const nextEnd = new Date(
+    pickerISOStringToUtc(nextStart, resolvedTimezone).getTime() +
+      (duration > 0 ? duration : DEFAULT_DURATION_MS),
+  );
+  return toTimezonePickerISOString(nextEnd, resolvedTimezone);
+}
+
 /** Set a date to the start of day (00:00). */
 export function startOfDay(date: Date): Date {
   const d = new Date(date);

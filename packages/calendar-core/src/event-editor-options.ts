@@ -68,6 +68,32 @@ export const REMINDER_MINUTE_OPTIONS = [
   5, 10, 15, 30, 60, 120, 360, 720, 1440, 2880, 4320, 10080,
 ] as const;
 
+export function normalizeReminderMinutes(minutes: readonly number[]): number[] {
+  return [...new Set(minutes.filter((value) => value > 0))].sort(
+    (left, right) => left - right,
+  );
+}
+
+/** Enabled email reminders are what the worker delivers; the legacy single reminder covers events saved before the list existed. */
+export function getReminderMinutes(
+  notifications: ReadonlyArray<{
+    notificationType: string;
+    minutesBefore: number;
+    isEnabled: boolean;
+  }>,
+  fallbackReminder?: number | null,
+): number[] {
+  const minutes = normalizeReminderMinutes(
+    notifications.flatMap((notification) =>
+      notification.isEnabled && notification.notificationType === "email"
+        ? [Number(notification.minutesBefore) || 0]
+        : [],
+    ),
+  );
+  if (minutes.length > 0) return minutes;
+  return fallbackReminder && fallbackReminder > 0 ? [fallbackReminder] : [];
+}
+
 function pluralUnit(value: number, unit: string) {
   return `${value} ${unit}${value === 1 ? "" : "s"}`;
 }

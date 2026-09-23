@@ -11,12 +11,13 @@ import {
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import type { CalendarView } from "@workspace/calendar-core";
 import { resolveTimezone } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import type { NativeCalendarView } from "../../lib/calendar-views";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useAuth } from "../../providers/AuthProvider";
 import { useCalendarView } from "../../providers/CalendarViewProvider";
+import { useSheet } from "../../providers/SheetProvider";
 import { calendarApiService } from "../../lib/api";
 import { QUERY_KEYS } from "../../lib/query-keys";
 import type { AppSwitchKey } from "../../lib/app-switcher-config";
@@ -45,6 +46,7 @@ export function CalendarDrawerSheet({ visible, onDismiss }: CalendarDrawerSheetP
   const { activeView, selectedDate, setActiveView, setCurrentDate, setSelectedDate } =
     useCalendarView();
   const { runAfterClose, onCloseComplete } = useDeferredSheetAction(onDismiss);
+  const { openEventSheet } = useSheet();
   const { toggle: toggleVisibility, pendingCalendarId } = useToggleCalendarVisibility();
 
   const { data: calendars = [], isLoading: calendarsLoading } = useQuery({
@@ -76,6 +78,11 @@ export function CalendarDrawerSheet({ visible, onDismiss }: CalendarDrawerSheetP
     [router, runAfterClose],
   );
 
+  const handleNewEvent = useCallback(
+    () => runAfterClose(() => openEventSheet({ type: "create" })),
+    [openEventSheet, runAfterClose],
+  );
+
   const handleSwitchApp = useCallback(
     (app: AppSwitchKey) => runAfterClose(() => switchTab(app)),
     [runAfterClose, switchTab],
@@ -91,7 +98,7 @@ export function CalendarDrawerSheet({ visible, onDismiss }: CalendarDrawerSheetP
   );
 
   const handleViewChange = useCallback(
-    (view: CalendarView) => {
+    (view: NativeCalendarView) => {
       setActiveView(view);
       onDismiss();
     },
@@ -116,7 +123,7 @@ export function CalendarDrawerSheet({ visible, onDismiss }: CalendarDrawerSheetP
         />
 
         <Pressable
-          onPress={() => navigate("/event/create")}
+          onPress={handleNewEvent}
           style={({ pressed }) => [styles.newEvent, pressed && styles.rowPressed]}
           accessibilityRole="button"
           accessibilityLabel="Create new event"

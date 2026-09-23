@@ -19,6 +19,7 @@ import {
   resolveTimezone,
 } from "@workspace/calendar-core";
 import { useSheet } from "../../../src/providers/SheetProvider";
+import { toNativeCalendarView } from "../../../src/lib/calendar-views";
 import { useCalendarView } from "../../../src/providers/CalendarViewProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
@@ -38,7 +39,6 @@ import { CalendarDrawerSheet } from "../../../src/components/calendar/CalendarDr
 import { AccountSheet } from "../../../src/components/AccountSheet";
 import { CalendarBottomChrome } from "../../../src/components/calendar/CalendarBottomChrome";
 import { resolveCalendarSwitcherDate } from "../../../src/components/calendar/view-switcher-utils";
-import { MonthGrid } from "../../../src/components/calendar/MonthGrid";
 import { SkeletonLoader } from "../../../src/components/calendar/SkeletonLoader";
 import { SwipeableCalendarView } from "../../../src/components/calendar/SwipeableCalendarView";
 import {
@@ -67,7 +67,9 @@ export function CalendarScreen() {
   } = useCalendarView();
   const timelineRef = useRef<NativeTimelineCalendarHandle>(null);
 
-  const [monthStripExpanded, setMonthStripExpanded] = useState(false);
+  const [monthStripState, setMonthStripExpanded] = useState(false);
+  const showMonthStrip = activeView === "agenda";
+  const monthStripExpanded = showMonthStrip && monthStripState;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
@@ -166,8 +168,7 @@ export function CalendarScreen() {
     queryFn: () =>
       calendarApiService.getEvents(detailDateRange.start, detailDateRange.end),
     enabled: !settingsLoading,
-    placeholderData:
-      activeView === "month" ? undefined : (previousData) => previousData,
+    placeholderData: keepPreviousData,
   });
 
   useEffect(() => {
@@ -230,7 +231,7 @@ export function CalendarScreen() {
 
   useEffect(() => {
     if (settings?.defaultView) {
-      setActiveView(settings.defaultView);
+      setActiveView(toNativeCalendarView(settings.defaultView));
     }
   }, [settings?.defaultView, setActiveView]);
 
@@ -396,6 +397,7 @@ export function CalendarScreen() {
     [navigateMonth],
   );
 
+
   const handleTodayPress = useCallback(() => {
     const now = new Date();
     setCurrentDate(now);
@@ -421,20 +423,6 @@ export function CalendarScreen() {
     setMonthStripExpanded((prev) => !prev);
   }, []);
 
-  const handleMonthStripAnimationEnd = useCallback((expanded: boolean) => {
-    if (expanded) {
-      setMonthGridVisible(false);
-    }
-  }, []);
-
-  const [monthGridVisible, setMonthGridVisible] = useState(true);
-
-  useEffect(() => {
-    if (!monthStripExpanded) {
-      setMonthGridVisible(true);
-    }
-  }, [monthStripExpanded]);
-
   const handleEventPress = useCallback(
     (event: DecoratedCalendarEvent) => {
       openEventSheet({ type: "view", eventId: event.id });
@@ -459,6 +447,10 @@ export function CalendarScreen() {
     },
     [openEventSheet],
   );
+
+  const handleNewEvent = useCallback(() => {
+    openEventSheet({ type: "create" });
+  }, [openEventSheet]);
 
   const handleTimelineDateChange = useCallback(
     (date: Date, committed: boolean) => {
@@ -499,6 +491,7 @@ export function CalendarScreen() {
             timezone={resolvedTimezone}
             onOpenDrawer={openDrawer}
             onOpenAccount={openAccount}
+            onNewEvent={handleNewEvent}
           />
         }
         footer={
@@ -511,31 +504,18 @@ export function CalendarScreen() {
             timezone={resolvedTimezone}
             events={decoratedMonthEvents}
             monthStripExpanded={monthStripExpanded}
-            showMonthStrip={!isTimelineView}
+            showMonthStrip={showMonthStrip}
             onTodayPress={handleTodayPress}
             onForwardPress={handleNavigateForward}
             onBackwardPress={handleNavigateBackward}
             onToggleMonthStrip={handleToggleMonthStrip}
             onDayPress={handleDayPress}
             onMonthChange={handleMonthChange}
-            onExpandAnimationEnd={handleMonthStripAnimationEnd}
           />
         }
       >
         {loadingState.isAllInitialLoading && !isTimelineView ? (
           <SkeletonLoader view={activeView} />
-        ) : activeView === "month" ? (
-          !monthStripExpanded || monthGridVisible ? (
-            <MonthGrid
-              currentDate={currentDate}
-              selectedDate={selectedDate}
-              events={decoratedDetailEvents}
-              weekStartDay={settings?.weekStartDay ?? 1}
-              workingDays={workingDays}
-              timezone={resolvedTimezone}
-              onDayPress={handleDayPress}
-            />
-          ) : null
         ) : activeView === "agenda" ? (
           <SwipeableCalendarView
             onSwipeLeft={() => handleDetailNavigate(1)}

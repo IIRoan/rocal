@@ -1,5 +1,5 @@
 import type { Feather } from "@expo/vector-icons";
-import type { CalendarView } from "@workspace/calendar-core";
+import type { NativeCalendarView } from "../../lib/calendar-views";
 
 export type CommandPaletteScope = "calendar" | "mail";
 
@@ -7,7 +7,6 @@ export type CommandPaletteScope = "calendar" | "mail";
 export type CommandActionId =
   | "new-event"
   | "go-today"
-  | "view-month"
   | "view-week"
   | "view-day"
   | "view-3day"
@@ -28,7 +27,7 @@ export interface CommandAction {
   /** Extra terms (besides the label) matched against the search query. */
   keywords: string[];
   /** When set, the action switches the calendar to this view. */
-  view?: CalendarView;
+  view?: NativeCalendarView;
 }
 
 export function buildCommandActions(
@@ -85,14 +84,6 @@ function buildCalendarCommandActions(): CommandAction[] {
       group: "Calendar",
       icon: "calendar",
       keywords: ["now", "current", "date"],
-    },
-    {
-      id: "view-month",
-      label: "Month view",
-      group: "Calendar",
-      icon: "grid",
-      keywords: ["month", "switch view"],
-      view: "month",
     },
     {
       id: "view-week",

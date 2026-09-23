@@ -5,8 +5,73 @@ import {
   endOfDay,
   mapErrorToField,
   buildEventRequest,
+  shiftEndWithStart,
   validateForm,
 } from "./event-form-utils";
+
+describe("shiftEndWithStart", () => {
+  const timezone = "Europe/Amsterdam";
+
+  it("keeps the event length when the start time moves", () => {
+    expect(
+      shiftEndWithStart(
+        "2025-06-15T09:00",
+        "2025-06-15T10:30",
+        "2025-06-15T09:45",
+        false,
+        timezone,
+      ),
+    ).toBe("2025-06-15T11:15");
+  });
+
+  it("carries the end over midnight when needed", () => {
+    expect(
+      shiftEndWithStart(
+        "2025-06-15T09:00",
+        "2025-06-15T23:30",
+        "2025-06-15T10:00",
+        false,
+        timezone,
+      ),
+    ).toBe("2025-06-16T00:30");
+  });
+
+  it("keeps the real duration across a DST change", () => {
+    expect(
+      shiftEndWithStart(
+        "2025-03-29T23:00",
+        "2025-03-30T01:00",
+        "2025-03-30T01:00",
+        false,
+        timezone,
+      ),
+    ).toBe("2025-03-30T04:00");
+  });
+
+  it("falls back to one hour when the end was not after the start", () => {
+    expect(
+      shiftEndWithStart(
+        "2025-06-15T10:00",
+        "2025-06-15T11:00",
+        "2025-06-15T09:00",
+        false,
+        timezone,
+      ),
+    ).toBe("2025-06-15T12:00");
+  });
+
+  it("keeps the day span for all-day events", () => {
+    expect(
+      shiftEndWithStart(
+        "2025-03-28T00:00",
+        "2025-03-29T00:00",
+        "2025-03-30T23:59",
+        true,
+        timezone,
+      ),
+    ).toBe("2025-03-31T23:59");
+  });
+});
 
 // ─── roundToNextHour ─────────────────────────────────────────────────────────
 

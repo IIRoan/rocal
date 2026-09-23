@@ -145,19 +145,18 @@ describe("AppSidebar screen model", () => {
 });
 
 describe("View switcher options", () => {
-  it("exposes all 5 calendar views in logical order", () => {
+  it("exposes the native calendar views in logical order, without month", () => {
     expect(SIDEBAR_VIEW_OPTIONS.map((o) => o.view)).toEqual([
       "day",
       "3day",
       "week",
-      "month",
       "agenda",
     ]);
   });
 
   it("provides a human-readable label for every view", () => {
     const labels = SIDEBAR_VIEW_OPTIONS.map((o) => o.label);
-    expect(labels).toEqual(["Day", "3 Day", "Week", "Month", "Agenda"]);
+    expect(labels).toEqual(["Day", "3 Day", "Week", "Agenda"]);
     // All labels must be non-empty strings
     expect(labels.every((l) => typeof l === "string" && l.length > 0)).toBe(
       true,
@@ -175,8 +174,11 @@ describe("View switcher options", () => {
     expect(getViewLabel("day")).toBe("Day");
     expect(getViewLabel("3day")).toBe("3 Day");
     expect(getViewLabel("week")).toBe("Week");
-    expect(getViewLabel("month")).toBe("Month");
     expect(getViewLabel("agenda")).toBe("Agenda");
+  });
+
+  it("getViewLabel falls back to Day for the web-only month view", () => {
+    expect(getViewLabel("month")).toBe("Day");
   });
 
   it("getViewLabel falls back to Day for an unknown view", () => {

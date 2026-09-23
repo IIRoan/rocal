@@ -7,7 +7,6 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
@@ -19,7 +18,7 @@ interface CalendarTopToolbarProps {
   timezone?: string | null;
   onOpenDrawer: () => void;
   onOpenAccount: () => void;
-  onNewEvent?: () => void;
+  onNewEvent: () => void;
 }
 
 export function CalendarTopToolbar({
@@ -30,20 +29,11 @@ export function CalendarTopToolbar({
   onNewEvent,
 }: CalendarTopToolbarProps) {
   const { theme } = useTheme();
-  const router = useRouter();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { month, year } = useMemo(
     () => formatCalendarHeaderTitle(currentDate, timezone),
     [currentDate, timezone],
   );
-
-  const handleNewEvent = () => {
-    if (onNewEvent) {
-      onNewEvent();
-      return;
-    }
-    router.push("/event/create" as never);
-  };
 
   return (
     <View style={styles.shell}>
@@ -65,15 +55,8 @@ export function CalendarTopToolbar({
       </Pressable>
       <View style={styles.actions}>
         <ToolbarIconButton
-          name="calendar"
-          onPress={onOpenDrawer}
-          accessibilityLabel="Calendars and views"
-          styles={styles}
-          color={theme.colors.foreground}
-        />
-        <ToolbarIconButton
           name="plus"
-          onPress={handleNewEvent}
+          onPress={onNewEvent}
           accessibilityLabel="Create new event"
           styles={styles}
           color={theme.colors.foreground}

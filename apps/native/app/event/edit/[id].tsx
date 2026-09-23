@@ -20,13 +20,17 @@ import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useAuth } from "../../../src/providers/AuthProvider";
 import { useRecentContacts } from "../../../src/hooks/use-recent-contacts";
 import { useReminderTitleEncryptor } from "../../../src/hooks/use-reminder-title-encryptor";
+import { useEventReminders } from "../../../src/hooks/use-event-reminders";
 import { extractRecentContactEntries } from "../../../src/lib/record-recent-contacts";
 import { useToast } from "../../../src/providers/ToastProvider";
 import { toastOperationWarnings } from "../../../src/lib/operation-warnings";
 import { persistEventReminderNotifications } from "../../../src/lib/event-reminder-notifications";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
-import { EventForm } from "../../../src/components/event/EventForm";
+import {
+  EventForm,
+  type EventFormSubmission,
+} from "../../../src/components/event/EventForm";
 import { LoadingScreen } from "../../../src/components/ui/loading";
 import { toTimezonePickerISOString } from "../../../src/components/event/event-form-utils";
 
@@ -99,32 +103,40 @@ export default function EventEditScreen() {
     queryFn: () => calendarApiService.getUserSettings(),
   });
   const resolvedTimezone = resolveTimezone(settings?.timezone);
+  const { reminders, isLoading: remindersLoading } = useEventReminders(
+    id,
+    event?.reminder,
+  );
 
   // ─── Update mutation ───────────────────────────────────────────────────────
 
   const updateMutation = useMutation({
-    mutationFn: async (data: CreateEventRequest) => {
+    mutationFn: async ({ request, reminders }: EventFormSubmission) => {
       const saved = scope
         ? await calendarApiService.editRecurringEvent(id!, {
             editScope: scope,
             occurrenceDate,
-            updates: data,
+            updates: request,
           })
-        : await calendarApiService.updateEvent(id!, data);
+        : await calendarApiService.updateEvent(id!, request);
       await persistEventReminderNotifications(
         saved.id,
-        data,
+        request.title,
+        reminders,
         encryptReminderTitle,
       );
       return saved;
     },
-    onSuccess: (savedEvent, variables) => {
+    onSuccess: (savedEvent, { request }) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.eventDetail(id!),
       });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.eventNotifications(id!),
+      });
       const entries = extractRecentContactEntries(
-        variables.participants,
+        request.participants,
         user?.email,
       );
       if (entries.length > 0) {
@@ -146,9 +158,9 @@ export default function EventEditScreen() {
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
   const handleSubmit = useCallback(
-    (data: CreateEventRequest) => {
+    (submission: EventFormSubmission) => {
       setServerErrors([]);
-      updateMutation.mutate(data);
+      updateMutation.mutate(submission);
     },
     [updateMutation],
   );
@@ -166,7 +178,7 @@ export default function EventEditScreen() {
 
   // ─── Loading state ─────────────────────────────────────────────────────────
 
-  if (eventLoading || calendarsLoading) {
+  if (eventLoading || calendarsLoading || remindersLoading) {
     return <LoadingScreen theme={theme} message="Loading…" />;
   }
 
@@ -184,6 +196,7 @@ export default function EventEditScreen() {
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         initialValues={initialValues}
+        initialReminders={reminders}
       />
     </AppScreen>
   );

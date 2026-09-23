@@ -13,6 +13,8 @@ import type {
 import {
   getEventPickerDateRange,
   getOperationWarningMessages,
+  eventNotificationsQueryKey,
+  getReminderMinutes,
   pickerDateAndTimeToUtc,
   pickerDateToAllDayUtcRange,
   resolveTimezone,
@@ -67,16 +69,7 @@ function getFallbackNotifications(
 function getReminderFromNotifications(
   notifications: NotificationPayload[],
 ): number | null {
-  const reminderMinutes = notifications.flatMap((notification) => {
-    if (!notification.isEnabled || notification.notificationType !== "email") {
-      return [];
-    }
-
-    const minutes = Number(notification.minutesBefore) || 0;
-    return minutes > 0 ? [minutes] : [];
-  });
-
-  return reminderMinutes.length > 0 ? Math.min(...reminderMinutes) : null;
+  return getReminderMinutes(notifications)[0] ?? null;
 }
 
 function getDuplicateNotificationTimes(
@@ -312,7 +305,7 @@ export function useEventForm({
       // Invalidate the cached notifications list so the editor shows the
       // freshly saved entries instead of the stale 5-minute cache.
       queryClient.invalidateQueries({
-        queryKey: ["eventNotifications", variables.eventId],
+        queryKey: eventNotificationsQueryKey(variables.eventId),
       });
     },
   });
@@ -395,7 +388,7 @@ export function useEventForm({
         setNotificationsLoading(true);
         try {
           const response = await queryClient.fetchQuery({
-            queryKey: ["eventNotifications", event.id],
+            queryKey: eventNotificationsQueryKey(event.id),
             queryFn: () => calendarApiService.getEventNotifications(event.id),
             staleTime: 1000 * 60 * 5, // 5 minutes
           });

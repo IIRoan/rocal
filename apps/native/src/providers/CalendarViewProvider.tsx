@@ -5,9 +5,9 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import type { CalendarView } from "@workspace/calendar-core";
+import type { NativeCalendarView } from "../lib/calendar-views";
 
-export type DetailCalendarView = CalendarView;
+export type DetailCalendarView = NativeCalendarView;
 
 interface CalendarViewContextValue {
   activeView: DetailCalendarView;

@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { Animated, StyleSheet, View, type ViewStyle } from "react-native";
 import { useTheme } from "../../providers/ThemeProvider";
-import type { CalendarView } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import type { NativeCalendarView } from "../../lib/calendar-views";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface SkeletonLoaderProps {
   /** The view type to show skeleton for */
-  view: CalendarView;
+  view: NativeCalendarView;
 }
 
 // ─── Skeleton Pulse Hook ─────────────────────────────────────────────────────
@@ -39,26 +39,6 @@ function useSkeletonPulse() {
 }
 
 // ─── Skeleton Sub-Components ─────────────────────────────────────────────────
-
-function MonthSkeleton({
-  styles,
-  opacity,
-}: {
-  styles: ReturnType<typeof createStyles>;
-  opacity: Animated.Value;
-}) {
-  return (
-    <View style={styles.monthContainer}>
-      {Array.from({ length: 6 }, (_, row) => (
-        <View key={row} style={styles.monthRow}>
-          {Array.from({ length: 7 }, (_, col) => (
-            <Animated.View key={col} style={[styles.monthCell, { opacity }]} />
-          ))}
-        </View>
-      ))}
-    </View>
-  );
-}
 
 function TimelineSkeleton({
   styles,
@@ -142,8 +122,6 @@ export function SkeletonLoader({ view }: SkeletonLoaderProps) {
   const opacity = useSkeletonPulse();
 
   switch (view) {
-    case "month":
-      return <MonthSkeleton styles={styles} opacity={opacity} />;
     case "week":
       return <TimelineSkeleton styles={styles} opacity={opacity} columns={7} />;
     case "day":
@@ -152,8 +130,6 @@ export function SkeletonLoader({ view }: SkeletonLoaderProps) {
       return <TimelineSkeleton styles={styles} opacity={opacity} columns={3} />;
     case "agenda":
       return <AgendaSkeleton styles={styles} opacity={opacity} />;
-    default:
-      return <MonthSkeleton styles={styles} opacity={opacity} />;
   }
 }
 
@@ -163,22 +139,6 @@ function createStyles(theme: ThemeTokens) {
   const skeletonBg = theme.colors.muted;
 
   const view = {
-    // Month skeleton
-    monthContainer: {
-      padding: theme.spacing["3"],
-    },
-    monthRow: {
-      flexDirection: "row" as const,
-      justifyContent: "space-around" as const,
-      marginBottom: theme.spacing["2"],
-    },
-    monthCell: {
-      width: 32,
-      height: 32,
-      borderRadius: theme.borderRadius.full,
-      backgroundColor: skeletonBg,
-    },
-
     // Timeline skeleton (week/day/3day)
     timelineContainer: {
       flex: 1,

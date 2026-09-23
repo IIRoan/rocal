@@ -7,11 +7,11 @@ import {
   useState,
 } from "react";
 import {
-  Alert,
   Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -29,35 +29,39 @@ import {
   SheetSecondaryButton,
 } from "../sheet";
 import {
-  PARTICIPANTS_INVITE_HELP_TEXT,
   REMINDER_MINUTE_OPTIONS,
   findRepeatPreset,
   formatReminderShort,
   getRepeatPresets,
   isReservedSystemEmail,
   isMailInvitationStagingCalendar,
+  normalizeReminderMinutes,
   resolveTimezone,
   type Calendar,
   type CreateEventRequest,
   type EventParticipantInput,
-  type RecentContactEntry,
   type RecurrenceRule,
 } from "@workspace/calendar-core";
 import { RecurrencePicker } from "./RecurrencePicker";
-import { RecipientSuggestInput } from "../mail/RecipientSuggestInput";
-import { BlobatarAvatar } from "../BlobatarAvatar";
 import {
-  EventEditorChip,
-  EventEditorRow,
+  EventEditorField,
+  EventEditorFieldButton,
+  EventEditorListRow,
   createEditorFieldStyle,
+  createEditorInputStyle,
 } from "./EventEditorPrimitives";
 import {
-  DatePickerModal,
+  EventParticipantList,
+  ParticipantPickerSheet,
+} from "./ParticipantPickerSheet";
+import {
+  CalendarGrid,
   OptionSheet,
-  TimePickerModal,
-  formatTime12,
+  PickerSheet,
   type OptionSheetItem,
 } from "./EventPickerSheets";
+import { TimeWheelPicker } from "./TimeWheelPicker";
+import { formatPickerTime, type TimeFormat } from "./time-wheel-utils";
 import { parseStoredRecurrence } from "./recurrence-picker-utils";
 import { summarizeRecurrenceRule } from "./event-detail-utils";
 import {
@@ -67,21 +71,37 @@ import {
   pickerISOStringToWallClock,
   setPickerDatePart,
   setPickerTimePart,
+  shiftEndWithStart,
   toTimezonePickerISOString,
   validateForm,
 } from "./event-form-utils";
 
 const DEFAULT_REMINDER_MINUTES = 15;
 
-type OpenSheet = "calendar" | "repeat" | "reminder" | null;
+type OpenSheet = "calendar" | "repeat" | "reminder" | "participants" | null;
+type DateTimeTarget = "start-date" | "start-time" | "end-date" | "end-time";
+
+const DATE_TIME_TITLES: Record<DateTimeTarget, string> = {
+  "start-date": "Start date",
+  "start-time": "Start time",
+  "end-date": "End date",
+  "end-time": "End time",
+};
+
+export interface EventFormSubmission {
+  request: CreateEventRequest;
+  reminders: number[];
+}
 
 interface EventFormProps {
   initialValues?: Partial<CreateEventRequest>;
+  initialReminders?: number[];
   timezone?: string;
+  timeFormat?: TimeFormat;
   calendars: Calendar[];
   serverErrors?: string[];
   isSubmitting?: boolean;
-  onSubmit: (data: CreateEventRequest) => void;
+  onSubmit: (submission: EventFormSubmission) => void;
   onCancel?: () => void;
   actionsPlacement?: "footer" | "external";
 }
@@ -90,24 +110,24 @@ export interface EventFormHandle {
   submit: () => void;
 }
 
-function formatParticipantStatus(status?: string) {
-  switch (status) {
-    case "accepted":
-      return "Accepted";
-    case "declined":
-      return "Declined";
-    case "tentative":
-      return "Tentative";
-    default:
-      return "Invited";
-  }
+function PairArrow({ color }: { color: string }) {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Feather name="arrow-right" size={16} color={color} />
+    </View>
+  );
 }
 
 export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
   function EventForm(
     {
       initialValues,
+      initialReminders,
       timezone,
+      timeFormat = "12h",
       calendars,
       serverErrors,
       isSubmitting = false,
@@ -125,15 +145,12 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     const titleInputRef = useRef<TextInput>(null);
     const locationInputRef = useRef<TextInput>(null);
     const descriptionInputRef = useRef<TextInput>(null);
-    const participantInputRef = useRef<TextInput>(null);
-    const [participantSuggestOpen, setParticipantSuggestOpen] = useState(false);
 
     const defaultStart = useMemo(() => roundToNextHour(new Date()), []);
     const defaultEnd = useMemo(
       () => new Date(defaultStart.getTime() + 60 * 60 * 1000),
       [defaultStart],
     );
-    const defaultCalendarId = calendars[0]?.id ?? "";
 
     const [title, setTitle] = useState(initialValues?.title ?? "");
     const [allDay, setAllDay] = useState(initialValues?.allDay ?? false);
@@ -144,8 +161,8 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     const [end, setEnd] = useState(
       initialValues?.end ?? toTimezonePickerISOString(defaultEnd, resolvedTimezone),
     );
-    const [calendarId, setCalendarId] = useState(
-      initialValues?.calendarId ?? defaultCalendarId,
+    const [pickedCalendarId, setCalendarId] = useState(
+      initialValues?.calendarId ?? "",
     );
     const [location, setLocation] = useState(initialValues?.location ?? "");
     const [description, setDescription] = useState(
@@ -156,29 +173,37 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       () => parseStoredRecurrence(initialValues?.recurrence),
     );
     const [customRepeatOpen, setCustomRepeatOpen] = useState(false);
-    // Existing events carry an explicit reminder key; new events default to 15 minutes.
-    const [reminder, setReminder] = useState<number>(
-      initialValues != null && "reminder" in initialValues
-        ? (initialValues.reminder ?? 0)
-        : DEFAULT_REMINDER_MINUTES,
+    // Existing events carry reminders or an explicit legacy reminder key; new events default to 15 minutes.
+    const [reminders, setReminders] = useState<number[]>(() =>
+      normalizeReminderMinutes(
+        initialReminders ??
+          (initialValues != null && "reminder" in initialValues
+            ? [initialValues.reminder ?? 0]
+            : [DEFAULT_REMINDER_MINUTES]),
+      ),
+    );
+    // null adds a reminder; an index replaces that reminder.
+    const [reminderEditIndex, setReminderEditIndex] = useState<number | null>(
+      null,
     );
     const [participants, setParticipants] = useState<EventParticipantInput[]>(
       initialValues?.participants ?? [],
     );
-    const [participantDraft, setParticipantDraft] = useState("");
 
     const [openSheet, setOpenSheet] = useState<OpenSheet>(null);
-    const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-    const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-    const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-    const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+    // The target outlives the open flag so the sheet keeps its content while it animates closed.
+    const [dateTimeTarget, setDateTimeTarget] =
+      useState<DateTimeTarget>("start-time");
+    const [dateTimePickerOpen, setDateTimePickerOpen] = useState(false);
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [generalErrors, setGeneralErrors] = useState<string[]>([]);
 
     const startWallClock = useMemo(() => pickerISOStringToWallClock(start), [start]);
     const endWallClock = useMemo(() => pickerISOStringToWallClock(end), [end]);
-    const sameDay = start.slice(0, 10) === end.slice(0, 10);
-    const selectedCalendar = calendars.find((c) => c.id === calendarId);
+    const endBeforeStart = allDay
+      ? end.slice(0, 10) < start.slice(0, 10)
+      : pickerISOStringToUtc(end, resolvedTimezone) <=
+        pickerISOStringToUtc(start, resolvedTimezone);
     const selectableCalendars = useMemo(
       () =>
         calendars.filter(
@@ -188,6 +213,9 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
         ),
       [calendars],
     );
+    // Calendars can arrive after the form opens, so the default is derived instead of stored.
+    const calendarId = pickedCalendarId || (selectableCalendars[0]?.id ?? "");
+    const selectedCalendar = calendars.find((c) => c.id === calendarId);
     const calendarSwatch = useCallback(
       (calendar: Calendar) =>
         theme.colors.calendar[
@@ -207,7 +235,6 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     const showCustomRepeat =
       recurrenceRule !== null && (customRepeatOpen || activePreset === null);
 
-    // Scroll a focused field near the top; participants use a tighter inset so suggestions stay above the keyboard.
     const handleInputFocus = useCallback(
       (input: TextInput | null, topInset = 80) => {
         if (!input || !scrollRef.current) return;
@@ -227,72 +254,62 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       [],
     );
 
-    const closeParticipantSuggestions = useCallback(() => {
-      setParticipantSuggestOpen(false);
-    }, []);
-
-    const handleParticipantFocus = useCallback(() => {
-      setParticipantSuggestOpen(true);
-      // Re-measure after the suggestion panel mounts so it stays in view.
-      requestAnimationFrame(() => {
-        handleInputFocus(participantInputRef.current, 48);
-        setTimeout(() => {
-          handleInputFocus(participantInputRef.current, 48);
-        }, 120);
-      });
-    }, [handleInputFocus]);
-
     const openPicker = useCallback((open: () => void) => {
       Keyboard.dismiss();
-      closeParticipantSuggestions();
       open();
-    }, [closeParticipantSuggestions]);
+    }, []);
 
+    const openDateTimePicker = useCallback(
+      (target: DateTimeTarget) => {
+        openPicker(() => {
+          setDateTimeTarget(target);
+          setDateTimePickerOpen(true);
+        });
+      },
+      [openPicker],
+    );
+
+    const closeDateTimePicker = useCallback(
+      () => setDateTimePickerOpen(false),
+      [],
+    );
+
+    // Times are kept while all-day is on so switching it off restores them; all-day saves only the dates.
     const handleAllDayToggle = useCallback(() => {
-      const next = !allDay;
-      setAllDay(next);
-      if (next) {
-        setStart(setPickerTimePart(start, new Date(2000, 0, 1, 0, 0)));
-        setEnd(setPickerTimePart(end, new Date(2000, 0, 1, 23, 59)));
-      }
-    }, [allDay, end, start]);
+      setAllDay((current) => !current);
+    }, []);
+
+    const updateStart = useCallback(
+      (nextStart: string) => {
+        setStart(nextStart);
+        setEnd(shiftEndWithStart(start, nextStart, end, allDay, resolvedTimezone));
+      },
+      [allDay, end, resolvedTimezone, start],
+    );
 
     const handleStartDateSelect = useCallback(
       (date: Date) => {
-        const nextStart = setPickerDatePart(start, date, resolvedTimezone);
-        setStart(nextStart);
-        if (
-          pickerISOStringToUtc(nextStart, resolvedTimezone) >
-          pickerISOStringToUtc(end, resolvedTimezone)
-        ) {
-          setEnd(setPickerDatePart(end, date, resolvedTimezone));
-        }
-        setShowStartDatePicker(false);
+        updateStart(setPickerDatePart(start, date, resolvedTimezone));
+        setDateTimePickerOpen(false);
       },
-      [end, resolvedTimezone, start],
+      [resolvedTimezone, start, updateStart],
     );
 
     const handleEndDateSelect = useCallback(
       (date: Date) => {
         setEnd(setPickerDatePart(end, date, resolvedTimezone));
-        setShowEndDatePicker(false);
+        setDateTimePickerOpen(false);
       },
       [end, resolvedTimezone],
     );
 
-    const handleStartTimeSelect = useCallback(
-      (time: Date) => {
-        setStart(setPickerTimePart(start, time));
-        setShowStartTimePicker(false);
-      },
-      [start],
+    const handleStartTimeChange = useCallback(
+      (time: Date) => updateStart(setPickerTimePart(start, time)),
+      [start, updateStart],
     );
 
-    const handleEndTimeSelect = useCallback(
-      (time: Date) => {
-        setEnd(setPickerTimePart(end, time));
-        setShowEndTimePicker(false);
-      },
+    const handleEndTimeChange = useCallback(
+      (time: Date) => setEnd(setPickerTimePart(end, time)),
       [end],
     );
 
@@ -309,7 +326,8 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
         color,
         categoryId: undefined,
         recurrence: recurrenceRule ? JSON.stringify(recurrenceRule) : null,
-        reminder,
+        // The legacy single field mirrors the earliest reminder for older clients.
+        reminder: reminders[0] ?? 0,
         timezone: resolvedTimezone,
         participants: participants.map((participant) => ({
           email: participant.email.trim().toLowerCase(),
@@ -333,7 +351,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
 
       setFieldErrors({});
       setGeneralErrors([]);
-      onSubmit(data);
+      onSubmit({ request: data, reminders });
     }, [
       title,
       start,
@@ -344,7 +362,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       description,
       color,
       recurrenceRule,
-      reminder,
+      reminders,
       resolvedTimezone,
       onSubmit,
       participants,
@@ -376,23 +394,21 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
 
         if (!email) {
           setParticipantError("Enter an email address first.");
-          return;
+          return false;
         }
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
           setParticipantError("Enter a valid email address.");
-          return;
+          return false;
         }
         if (isReservedSystemEmail(email)) {
           setParticipantError("Cannot invite system or administrative addresses.");
-          return;
+          return false;
         }
         if (participants.some((participant) => participant.email === email)) {
           setParticipantError("That participant is already invited.");
-          return;
+          return false;
         }
 
-        setParticipantDraft("");
-        setParticipantSuggestOpen(false);
         setParticipantError(null);
         setParticipants((current) => [
           ...current,
@@ -403,29 +419,20 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
             status: "pending",
           },
         ]);
+        return true;
       },
       [participants, setParticipantError],
     );
 
-    const addParticipantFromSuggestion = useCallback(
-      (entry: RecentContactEntry) => {
-        if (isReservedSystemEmail(entry.email.trim().toLowerCase())) {
-          return;
-        }
-        inviteParticipant(entry.email, entry.displayName?.trim() || undefined);
-      },
-      [inviteParticipant],
+    const clearParticipantError = useCallback(
+      () => setParticipantError(null),
+      [setParticipantError],
     );
 
     const removeParticipant = useCallback((email: string) => {
       setParticipants((current) =>
         current.filter((participant) => participant.email !== email),
       );
-    }, []);
-
-    const showParticipantsInviteHelp = useCallback(() => {
-      Keyboard.dismiss();
-      Alert.alert("Participants", PARTICIPANTS_INVITE_HELP_TEXT);
     }, []);
 
     const sortedParticipants = useMemo(
@@ -498,17 +505,43 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       },
     ];
 
-    const reminderItems: OptionSheetItem[] = REMINDER_MINUTE_OPTIONS.map(
-      (minutes) => ({
-        key: String(minutes),
-        label: `${formatReminderShort(minutes)} before`,
-        selected: reminder === minutes,
-        onSelect: () => {
-          setReminder(minutes);
-          closeSheet();
-        },
-      }),
+    const editedReminder =
+      reminderEditIndex === null ? undefined : reminders[reminderEditIndex];
+    const canAddReminder = REMINDER_MINUTE_OPTIONS.some(
+      (minutes) => !reminders.includes(minutes),
     );
+
+    const openReminderSheet = useCallback(
+      (index: number | null) => {
+        openPicker(() => {
+          setReminderEditIndex(index);
+          setOpenSheet("reminder");
+        });
+      },
+      [openPicker],
+    );
+
+    const removeReminder = useCallback((minutes: number) => {
+      setReminders((current) => current.filter((value) => value !== minutes));
+    }, []);
+
+    const reminderItems: OptionSheetItem[] = REMINDER_MINUTE_OPTIONS.filter(
+      (minutes) => minutes === editedReminder || !reminders.includes(minutes),
+    ).map((minutes) => ({
+      key: String(minutes),
+      label: `${formatReminderShort(minutes)} before`,
+      selected: minutes === editedReminder,
+      onSelect: () => {
+        setReminders((current) =>
+          normalizeReminderMinutes(
+            editedReminder === undefined
+              ? [...current, minutes]
+              : current.map((value) => (value === editedReminder ? minutes : value)),
+          ),
+        );
+        closeSheet();
+      },
+    }));
 
     return (
       <>
@@ -518,9 +551,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="always"
-            keyboardDismissMode={
-              participantSuggestOpen ? "none" : "on-drag"
-            }
+            keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
             bounces={false}
             overScrollMode="never"
@@ -552,273 +583,209 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                   style={styles.titleInput}
                   value={title}
                   onChangeText={setTitle}
-                  placeholder="Add title"
-                  placeholderTextColor={theme.colors.mutedForeground + "B3"}
+                  placeholder="Title"
+                  placeholderTextColor={theme.colors.mutedForeground}
                   maxLength={255}
                   returnKeyType="done"
                   blurOnSubmit
-                  onFocus={() => {
-                    closeParticipantSuggestions();
-                    handleInputFocus(titleInputRef.current);
-                  }}
+                  onFocus={() => handleInputFocus(titleInputRef.current)}
                   accessibilityLabel="Event title"
                 />
                 {renderFieldError("title")}
               </View>
 
-              <EventEditorRow icon="clock" label="Date and time">
-                <View style={styles.chipRow}>
-                  <EventEditorChip
-                    label={format(startWallClock, "EEE, MMM d")}
-                    accessibilityLabel={`Start date: ${format(startWallClock, "EEEE, MMMM d")}`}
-                    onPress={() =>
-                      openPicker(() => {
-                        setShowEndDatePicker(false);
-                        setShowStartDatePicker(true);
-                      })
-                    }
+              <View style={styles.pairRow}>
+                <EventEditorFieldButton
+                  icon="calendar"
+                  label={format(startWallClock, "EEE, MMM d")}
+                  accessibilityLabel={`Start date: ${format(startWallClock, "EEEE, MMMM d")}`}
+                  onPress={() => openDateTimePicker("start-date")}
+                  style={styles.pairItem}
+                />
+                <PairArrow color={theme.colors.mutedForeground} />
+                <EventEditorFieldButton
+                  label={format(endWallClock, "EEE, MMM d")}
+                  accessibilityLabel={`End date: ${format(endWallClock, "EEEE, MMMM d")}`}
+                  invalid={endBeforeStart}
+                  onPress={() => openDateTimePicker("end-date")}
+                  style={styles.pairItem}
+                />
+              </View>
+
+              {!allDay ? (
+                <View style={styles.pairRow}>
+                  <EventEditorFieldButton
+                    icon="clock"
+                    label={formatPickerTime(startWallClock, timeFormat)}
+                    accessibilityLabel={`Start time: ${formatPickerTime(startWallClock, timeFormat)}`}
+                    onPress={() => openDateTimePicker("start-time")}
+                    style={styles.pairItem}
                   />
-                  {!allDay && (
-                    <EventEditorChip
-                      label={formatTime12(startWallClock)}
-                      accessibilityLabel={`Start time: ${formatTime12(startWallClock)}`}
-                      onPress={() =>
-                        openPicker(() => {
-                          setShowEndTimePicker(false);
-                          setShowStartTimePicker(true);
-                        })
-                      }
-                    />
-                  )}
-                  <Text style={styles.rangeDash} accessibilityElementsHidden>
-                    –
-                  </Text>
-                  {!allDay && (
-                    <EventEditorChip
-                      label={formatTime12(endWallClock)}
-                      accessibilityLabel={`End time: ${formatTime12(endWallClock)}`}
-                      onPress={() =>
-                        openPicker(() => {
-                          setShowStartTimePicker(false);
-                          setShowEndTimePicker(true);
-                        })
-                      }
-                    />
-                  )}
-                  <EventEditorChip
-                    label={format(endWallClock, "EEE, MMM d")}
-                    accessibilityLabel={`End date: ${format(endWallClock, "EEEE, MMMM d")}`}
-                    muted={sameDay && !allDay}
-                    onPress={() =>
-                      openPicker(() => {
-                        setShowStartDatePicker(false);
-                        setShowEndDatePicker(true);
-                      })
-                    }
+                  <PairArrow color={theme.colors.mutedForeground} />
+                  <EventEditorFieldButton
+                    label={formatPickerTime(endWallClock, timeFormat)}
+                    accessibilityLabel={`End time: ${formatPickerTime(endWallClock, timeFormat)}`}
+                    invalid={endBeforeStart}
+                    onPress={() => openDateTimePicker("end-time")}
+                    style={styles.pairItem}
                   />
                 </View>
-                {renderFieldError("end")}
+              ) : null}
+              {renderFieldError("end")}
 
-                <View style={[styles.chipRow, styles.chipRowSpaced]}>
-                  <EventEditorChip
-                    label="All day"
-                    leadingIcon={allDay ? "check" : undefined}
-                    active={allDay}
-                    muted={!allDay}
-                    accessibilityLabel="All day event"
-                    onPress={() => openPicker(handleAllDayToggle)}
-                  />
-                  <EventEditorChip
-                    label={repeatLabel}
-                    leadingIcon="repeat"
-                    trailingIcon="chevron-down"
-                    muted={!recurrenceRule}
-                    accessibilityLabel={`Repeat: ${repeatLabel}`}
-                    style={styles.shrinkChip}
-                    onPress={() => openPicker(() => setOpenSheet("repeat"))}
-                  />
-                </View>
-
-                {showCustomRepeat && recurrenceRule && (
-                  <RecurrencePicker
-                    rule={recurrenceRule}
-                    onChange={setRecurrenceRule}
-                  />
-                )}
-              </EventEditorRow>
-
-              <EventEditorRow icon="calendar" label="Calendar">
-                <EventEditorChip
-                  label={selectedCalendar?.name ?? "Select calendar"}
-                  swatch={
-                    selectedCalendar ? calendarSwatch(selectedCalendar) : undefined
+              <View>
+                <EventEditorListRow
+                  icon="sun"
+                  label="All day"
+                  onPress={() => openPicker(handleAllDayToggle)}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: allDay }}
+                  trailing={
+                    <Switch
+                      value={allDay}
+                      pointerEvents="none"
+                      trackColor={{
+                        false: theme.colors.input,
+                        true: theme.colors.primaryBase,
+                      }}
+                    />
                   }
+                />
+                <EventEditorListRow
+                  icon="repeat"
+                  label={repeatLabel}
+                  muted={!recurrenceRule}
+                  accessibilityLabel={`Repeat: ${repeatLabel}`}
+                  onPress={() => openPicker(() => setOpenSheet("repeat"))}
+                />
+              </View>
+
+              {showCustomRepeat && recurrenceRule && (
+                <RecurrencePicker
+                  rule={recurrenceRule}
+                  onChange={setRecurrenceRule}
+                />
+              )}
+
+              <View style={styles.divider} />
+
+              <View style={styles.participantSection}>
+                <EventEditorFieldButton
+                  icon="user-plus"
+                  label="Add participant"
+                  muted
+                  onPress={() => openPicker(() => setOpenSheet("participants"))}
+                />
+                {renderFieldError("participants")}
+                <EventParticipantList
+                  participants={sortedParticipants}
+                  onRemove={removeParticipant}
+                />
+              </View>
+
+              <View style={styles.divider} />
+
+              <View>
+                <EventEditorListRow
+                  leading={
+                    <View
+                      style={[
+                        styles.calendarSwatch,
+                        {
+                          backgroundColor: selectedCalendar
+                            ? calendarSwatch(selectedCalendar)
+                            : theme.colors.mutedForeground,
+                        },
+                      ]}
+                    />
+                  }
+                  label={selectedCalendar?.name ?? "Select calendar"}
                   muted={!selectedCalendar}
-                  trailingIcon="chevron-down"
                   accessibilityLabel={`Calendar: ${selectedCalendar?.name ?? "Select calendar"}`}
-                  style={styles.shrinkChip}
                   onPress={() => openPicker(() => setOpenSheet("calendar"))}
                 />
                 {renderFieldError("calendarId")}
-              </EventEditorRow>
-
-              <EventEditorRow icon="users" label="Participants">
-                <RecipientSuggestInput
-                  mode="calendar"
-                  value={participantDraft}
-                  onChangeText={(text) => {
-                    setParticipantDraft(text);
-                    if (fieldErrors.participants) setParticipantError(null);
-                  }}
-                  onSelectSuggestion={addParticipantFromSuggestion}
-                  placeholder="Add participants"
-                  onSubmitEditing={() => inviteParticipant(participantDraft)}
-                  inputRef={participantInputRef}
-                  open={participantSuggestOpen}
-                  onOpenChange={setParticipantSuggestOpen}
-                  onFocus={handleParticipantFocus}
-                  style={styles.participantInput}
-                  hasError={Boolean(fieldErrors.participants)}
-                  trailing={
-                    <Pressable
-                      style={styles.iconButton}
-                      onPress={showParticipantsInviteHelp}
-                      accessibilityRole="button"
-                      accessibilityLabel="About participant invitations"
-                    >
-                      <Feather
-                        name="info"
-                        size={16}
-                        color={theme.colors.mutedForeground}
-                      />
-                    </Pressable>
-                  }
-                />
-                {renderFieldError("participants")}
-                {sortedParticipants.length > 0 ? (
-                  <View style={styles.participantList}>
-                    {sortedParticipants.map((participant) => {
-                      const name = participant.displayName || participant.email;
-                      return (
-                        <View key={participant.email} style={styles.participantRow}>
-                          <BlobatarAvatar
-                            email={participant.email}
-                            name={participant.displayName}
-                            size={28}
+                {reminders.map((minutes, index) => {
+                  const label = `${formatReminderShort(minutes)} before`;
+                  return (
+                    <EventEditorListRow
+                      key={minutes}
+                      icon={index === 0 ? "bell" : undefined}
+                      label={label}
+                      accessibilityLabel={`Reminder: ${label}`}
+                      onPress={() => openReminderSheet(index)}
+                      trailing={
+                        <Pressable
+                          onPress={() => removeReminder(minutes)}
+                          hitSlop={8}
+                          style={({ pressed }) => [
+                            styles.reminderRemove,
+                            pressed && styles.reminderRemovePressed,
+                          ]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove reminder ${label}`}
+                        >
+                          <Feather
+                            name="x"
+                            size={16}
+                            color={theme.colors.mutedForeground}
                           />
-                          <View style={styles.participantMeta}>
-                            <Text style={styles.participantName} numberOfLines={1}>
-                              {name}
-                            </Text>
-                            <Text style={styles.participantSubtitle} numberOfLines={1}>
-                              {participant.role === "organizer"
-                                ? "Organizer"
-                                : participant.displayName
-                                  ? participant.email
-                                  : formatParticipantStatus(participant.status)}
-                            </Text>
-                          </View>
-                          {participant.role !== "organizer" && (
-                            <Pressable
-                              style={styles.iconButton}
-                              onPress={() => removeParticipant(participant.email)}
-                              accessibilityRole="button"
-                              accessibilityLabel={`Remove ${name}`}
-                            >
-                              <Feather
-                                name="x"
-                                size={14}
-                                color={theme.colors.mutedForeground}
-                              />
-                            </Pressable>
-                          )}
-                        </View>
-                      );
-                    })}
-                  </View>
+                        </Pressable>
+                      }
+                    />
+                  );
+                })}
+                {canAddReminder ? (
+                  <EventEditorListRow
+                    icon={reminders.length === 0 ? "bell" : "plus"}
+                    label={
+                      reminders.length === 0 ? "Add reminder" : "Add another reminder"
+                    }
+                    muted
+                    onPress={() => openReminderSheet(null)}
+                  />
                 ) : null}
-              </EventEditorRow>
+              </View>
 
-              <EventEditorRow icon="map-pin" label="Location">
-                <TextInput
-                  ref={locationInputRef}
-                  style={styles.field}
-                  value={location}
-                  onChangeText={setLocation}
-                  placeholder="Add location"
-                  placeholderTextColor={theme.colors.mutedForeground}
-                  maxLength={255}
-                  returnKeyType="done"
-                  blurOnSubmit
-                  onFocus={() => {
-                    closeParticipantSuggestions();
-                    handleInputFocus(locationInputRef.current);
-                  }}
-                  accessibilityLabel="Location"
-                />
+              <View style={styles.divider} />
+
+              <View>
+                <EventEditorField icon="map-pin">
+                  <TextInput
+                    ref={locationInputRef}
+                    style={styles.input}
+                    value={location}
+                    onChangeText={setLocation}
+                    placeholder="Location"
+                    placeholderTextColor={theme.colors.mutedForeground}
+                    maxLength={255}
+                    returnKeyType="done"
+                    blurOnSubmit
+                    onFocus={() => handleInputFocus(locationInputRef.current)}
+                    accessibilityLabel="Location"
+                  />
+                </EventEditorField>
                 {renderFieldError("location")}
-              </EventEditorRow>
+              </View>
 
-              <EventEditorRow icon="bell" label="Reminders">
-                <View style={styles.chipRow}>
-                  {reminder > 0 ? (
-                    <View style={styles.reminderChip}>
-                      <EventEditorChip
-                        label={`${formatReminderShort(reminder)} before`}
-                        trailingIcon="chevron-down"
-                        accessibilityLabel={`Reminder ${formatReminderShort(reminder)} before, change time`}
-                        onPress={() => openPicker(() => setOpenSheet("reminder"))}
-                      />
-                      <Pressable
-                        style={styles.iconButton}
-                        onPress={() => setReminder(0)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Remove ${formatReminderShort(reminder)} reminder`}
-                      >
-                        <Feather
-                          name="x"
-                          size={14}
-                          color={theme.colors.mutedForeground}
-                        />
-                      </Pressable>
-                    </View>
-                  ) : (
-                    <Pressable
-                      style={styles.addChip}
-                      onPress={() => setReminder(DEFAULT_REMINDER_MINUTES)}
-                      accessibilityRole="button"
-                      accessibilityLabel="Add reminder"
-                    >
-                      <Feather
-                        name="plus"
-                        size={14}
-                        color={theme.colors.mutedForeground}
-                      />
-                      <Text style={styles.addChipText}>Add reminder</Text>
-                    </Pressable>
-                  )}
-                </View>
-              </EventEditorRow>
-
-              <EventEditorRow icon="align-left" label="Description">
-                <TextInput
-                  ref={descriptionInputRef}
-                  style={[styles.field, styles.textarea]}
-                  value={description}
-                  onChangeText={setDescription}
-                  placeholder="Add description"
-                  placeholderTextColor={theme.colors.mutedForeground}
-                  maxLength={1000}
-                  multiline
-                  textAlignVertical="top"
-                  onFocus={() => {
-                    closeParticipantSuggestions();
-                    handleInputFocus(descriptionInputRef.current);
-                  }}
-                  accessibilityLabel="Description"
-                />
+              <View>
+                <EventEditorField icon="edit-2" multiline>
+                  <TextInput
+                    ref={descriptionInputRef}
+                    style={[styles.input, styles.textarea]}
+                    value={description}
+                    onChangeText={setDescription}
+                    placeholder="Description"
+                    placeholderTextColor={theme.colors.mutedForeground}
+                    maxLength={1000}
+                    multiline
+                    textAlignVertical="top"
+                    onFocus={() => handleInputFocus(descriptionInputRef.current)}
+                    accessibilityLabel="Description"
+                  />
+                </EventEditorField>
                 {renderFieldError("description")}
-              </EventEditorRow>
+              </View>
             </View>
           </ScrollView>
 
@@ -838,41 +805,64 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
           ) : null}
         </View>
 
-        <DatePickerModal
-          visible={showStartDatePicker}
-          onClose={() => setShowStartDatePicker(false)}
-          selectedDate={startWallClock}
-          onSelect={handleStartDateSelect}
-          title="Start date"
+        <PickerSheet
+          visible={dateTimePickerOpen}
+          onClose={closeDateTimePicker}
+          title={DATE_TIME_TITLES[dateTimeTarget]}
           theme={theme}
           bottomInset={insets.bottom}
-        />
-        <DatePickerModal
-          visible={showEndDatePicker}
-          onClose={() => setShowEndDatePicker(false)}
-          selectedDate={endWallClock}
-          onSelect={handleEndDateSelect}
-          minDate={startWallClock}
-          title="End date"
-          theme={theme}
-          bottomInset={insets.bottom}
-        />
-        <TimePickerModal
-          visible={showStartTimePicker}
-          onClose={() => setShowStartTimePicker(false)}
-          selectedTime={startWallClock}
-          onSelect={handleStartTimeSelect}
-          title="Start time"
-          theme={theme}
-          bottomInset={insets.bottom}
-        />
-        <TimePickerModal
-          visible={showEndTimePicker}
-          onClose={() => setShowEndTimePicker(false)}
-          selectedTime={endWallClock}
-          onSelect={handleEndTimeSelect}
-          title="End time"
-          theme={theme}
+          maxHeightRatio={0.7}
+        >
+          <View style={styles.dateTimeSheetBody}>
+            {dateTimeTarget === "start-date" || dateTimeTarget === "end-date" ? (
+              <CalendarGrid
+                key={dateTimeTarget}
+                selectedDate={
+                  dateTimeTarget === "start-date" ? startWallClock : endWallClock
+                }
+                onSelect={
+                  dateTimeTarget === "start-date"
+                    ? handleStartDateSelect
+                    : handleEndDateSelect
+                }
+                minDate={dateTimeTarget === "end-date" ? startWallClock : undefined}
+                theme={theme}
+              />
+            ) : (
+              <>
+                <TimeWheelPicker
+                  key={dateTimeTarget}
+                  value={
+                    dateTimeTarget === "start-time" ? startWallClock : endWallClock
+                  }
+                  onChange={
+                    dateTimeTarget === "start-time"
+                      ? handleStartTimeChange
+                      : handleEndTimeChange
+                  }
+                  timeFormat={timeFormat}
+                  accessibilityLabel={DATE_TIME_TITLES[dateTimeTarget]}
+                />
+                <View style={styles.dateTimeSheetActions}>
+                  <SheetActions chrome={false}>
+                    <SheetPrimaryButton
+                      label="Done"
+                      onPress={closeDateTimePicker}
+                    />
+                  </SheetActions>
+                </View>
+              </>
+            )}
+          </View>
+        </PickerSheet>
+        <ParticipantPickerSheet
+          visible={openSheet === "participants"}
+          onClose={closeSheet}
+          participants={sortedParticipants}
+          onInvite={inviteParticipant}
+          onRemove={removeParticipant}
+          error={fieldErrors.participants}
+          onClearError={clearParticipantError}
           bottomInset={insets.bottom}
         />
         <OptionSheet
@@ -894,7 +884,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
         <OptionSheet
           visible={openSheet === "reminder"}
           onClose={closeSheet}
-          title="Reminder"
+          title={editedReminder === undefined ? "Add reminder" : "Reminder"}
           items={reminderItems}
           theme={theme}
           bottomInset={insets.bottom}
@@ -924,7 +914,7 @@ function createStyles(theme: ThemeTokens) {
     formInner: {
       paddingHorizontal: theme.spacing["4"],
       paddingTop: theme.spacing["2"],
-      gap: 10,
+      gap: theme.spacing["2"],
     },
     errorContainer: {
       backgroundColor: theme.colors.destructive + "18",
@@ -932,92 +922,60 @@ function createStyles(theme: ThemeTokens) {
       padding: theme.spacing["3"],
       gap: theme.spacing["1"],
     },
-    chipRow: {
-      flexDirection: "row" as const,
-      flexWrap: "wrap" as const,
-      alignItems: "center" as const,
-      gap: 4,
-    },
-    chipRowSpaced: {
-      marginTop: 6,
-    },
-    shrinkChip: {
-      flexShrink: 1,
-    },
-    reminderChip: {
+    pairRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: 2,
+      gap: theme.spacing["3"],
     },
-    addChip: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 6,
-      height: 44,
-      paddingHorizontal: 10,
-      borderRadius: theme.borderRadius.md,
-    },
-    iconButton: {
-      width: 44,
-      height: 44,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      borderRadius: theme.borderRadius.md,
-    },
-    participantList: {
-      marginTop: 6,
-      gap: 2,
-    },
-    participantRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 10,
-      paddingLeft: 6,
-      borderRadius: theme.borderRadius.md,
-    },
-    participantMeta: {
+    pairItem: {
       flex: 1,
       minWidth: 0,
+    },
+    divider: {
+      height: StyleSheet.hairlineWidth,
+      marginVertical: theme.spacing["1"],
+      backgroundColor: theme.colors.border,
+    },
+    calendarSwatch: {
+      width: 10,
+      height: 10,
+      borderRadius: theme.borderRadius.full,
+    },
+    dateTimeSheetBody: {
+      paddingHorizontal: theme.spacing["4"],
+      paddingBottom: theme.spacing["2"],
+    },
+    dateTimeSheetActions: {
+      marginTop: theme.spacing["4"],
+    },
+    participantSection: {
+      gap: theme.spacing["2"],
+    },
+    reminderRemove: {
+      width: 28,
+      height: 28,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      borderRadius: theme.borderRadius.full,
+    },
+    reminderRemovePressed: {
+      backgroundColor: theme.colors.accent,
     },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
     titleInput: {
-      height: 48,
-      marginHorizontal: -theme.spacing["2"],
-      paddingHorizontal: theme.spacing["2"],
-      borderRadius: theme.borderRadius.md,
-      fontSize: theme.typography.fontSize.xl.size,
+      ...field,
+      minHeight: 48,
+      fontSize: theme.typography.fontSize.lg.size,
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
     },
-    field,
+    input: createEditorInputStyle(theme),
     textarea: {
-      minHeight: 88,
-      paddingTop: 10,
+      minHeight: 120,
+      paddingTop: 13,
       paddingBottom: 10,
-    },
-    participantInput: {
-      ...field,
-      flex: 1,
-    },
-    rangeDash: {
-      paddingHorizontal: 2,
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.mutedForeground,
-    },
-    addChipText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.mutedForeground,
-    },
-    participantName: {
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.foreground,
-    },
-    participantSubtitle: {
-      fontSize: theme.typography.fontSize.xs.size,
-      color: theme.colors.mutedForeground,
     },
     fieldError: {
       paddingTop: 4,

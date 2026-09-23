@@ -1,8 +1,10 @@
 import React, { useMemo } from "react";
 import { StyleSheet, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { CalendarView } from "@workspace/calendar-core";
-import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import type {
+  CalendarView,
+  DecoratedCalendarEvent,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { CompactMonthStrip } from "./CompactMonthStrip";
@@ -24,7 +26,6 @@ interface CalendarBottomChromeProps {
   onToggleMonthStrip?: () => void;
   onDayPress: (date: Date) => void;
   onMonthChange: (direction: 1 | -1) => void;
-  onExpandAnimationEnd: (expanded: boolean) => void;
 }
 
 export function CalendarBottomChrome({
@@ -43,7 +44,6 @@ export function CalendarBottomChrome({
   onToggleMonthStrip,
   onDayPress,
   onMonthChange,
-  onExpandAnimationEnd,
 }: CalendarBottomChromeProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -68,7 +68,6 @@ export function CalendarBottomChrome({
           onDayPress={onDayPress}
           onMonthChange={onMonthChange}
           onToggleExpand={onToggleMonthStrip ?? (() => {})}
-          onExpandAnimationEnd={onExpandAnimationEnd}
         />
       ) : null}
 

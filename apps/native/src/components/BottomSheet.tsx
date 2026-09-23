@@ -19,6 +19,7 @@ import {
   useContext,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -102,6 +103,10 @@ export interface BottomSheetProps {
   visible: boolean;
   onDismiss: () => void;
   onCloseComplete?: () => void;
+  /** Fires once the open animation is running on the UI thread, so heavy content can mount without delaying it. */
+  onOpenAnimationStart?: () => void;
+  /** Changing this while visible replaces the sheet with a fresh one (e.g. a tap during a swipe-close). */
+  presentKey?: number;
   children: ReactNode;
   /** Snap points as fractions of screen height (default [0.92]), capped just below the status bar. */
   snapPoints?: number[];
@@ -323,6 +328,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       visible,
       onDismiss,
       onCloseComplete,
+      onOpenAnimationStart,
+      presentKey,
       children,
       snapPoints: snapPointsProp = [0.92],
       initialSnapIndex,
@@ -335,15 +342,41 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const { height: screenHeight } = useWindowDimensions();
     const reduceMotion = useReduceMotion();
     const sheetRef = useRef<GorhomBottomSheet>(null);
+    // Every open is a fresh Gorhom sheet keyed by session; closing unmounts it at once so nothing lingers to block the next open.
+    const [session, setSession] = useState(visible ? 1 : 0);
     const [mounted, setMounted] = useState(visible);
+    const [closing, setClosing] = useState(false);
+    const [presented, setPresented] = useState({ visible, presentKey });
     const keyboardVisibleRef = useRef(false);
     const visibleRef = useRef(visible);
     visibleRef.current = visible;
+    const sessionRef = useRef(session);
+    sessionRef.current = session;
+    const onCloseCompleteRef = useRef(onCloseComplete);
+    onCloseCompleteRef.current = onCloseComplete;
     const overlayMaxOpacity = isDark ? OVERLAY_DARK : OVERLAY_LIGHT;
 
-    if (visible && !mounted) {
-      setMounted(true);
+    if (
+      presented.visible !== visible ||
+      (visible && presented.presentKey !== presentKey)
+    ) {
+      setPresented({ visible, presentKey });
+      setClosing(false);
+      setMounted(visible);
+      if (visible) {
+        setSession((current) => current + 1);
+      }
     }
+
+    const wasMountedRef = useRef(mounted);
+    useEffect(() => {
+      const wasMounted = wasMountedRef.current;
+      wasMountedRef.current = mounted;
+      if (wasMounted && !mounted) {
+        Keyboard.dismiss();
+        onCloseCompleteRef.current?.();
+      }
+    }, [mounted]);
 
     const topInset = insets.top + SHEET_TOP_GAP;
     const maxSnapFraction =
@@ -363,8 +396,6 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       initialSnapIndex !== undefined
         ? Math.min(initialSnapIndex, lastIndex)
         : lastIndex;
-    const openIndexRef = useRef(openIndex);
-    openIndexRef.current = openIndex;
 
     const requestClose = useCallback(() => {
       Keyboard.dismiss();
@@ -387,16 +418,6 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       (): BottomSheetContextValue => ({ dismiss: requestClose }),
       [requestClose],
     );
-
-    useEffect(() => {
-      if (!mounted) return;
-      if (visible) {
-        sheetRef.current?.snapToIndex(openIndexRef.current);
-      } else {
-        Keyboard.dismiss();
-        sheetRef.current?.close();
-      }
-    }, [visible, mounted]);
 
     // Grow to the tallest snap when the snap list itself changes (e.g. bulk mail more → move).
     const snapKey = snapPoints.join(",");
@@ -450,13 +471,25 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       return () => subscription.remove();
     }, [visible, requestClose]);
 
-    const handleClosed = useCallback(() => {
-      if (visibleRef.current) {
-        onDismiss();
-      }
-      setMounted(false);
-      onCloseComplete?.();
-    }, [onDismiss, onCloseComplete]);
+    // Callbacks from a replaced session can land after it unmounts; only the current session counts.
+    const sessionCallbacks = useMemo(() => {
+      const isCurrent = () => sessionRef.current === session;
+      return {
+        onAnimate: (fromIndex: number, toIndex: number) => {
+          if (!isCurrent()) return;
+          // Gorhom reports a close target on swipe release; taps pass through while the spring settles.
+          setClosing(toIndex < 0);
+          if (fromIndex < 0 && toIndex >= 0) {
+            onOpenAnimationStart?.();
+          }
+        },
+        onClose: () => {
+          if (isCurrent() && visibleRef.current) {
+            requestClose();
+          }
+        },
+      };
+    }, [session, onOpenAnimationStart, requestClose]);
 
     const handleOverlayPress = useCallback(() => {
       if (keyboardVisibleRef.current) {
@@ -466,15 +499,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       requestClose();
     }, [requestClose]);
 
-    // Keep the last open content while the close animation runs, even if the parent clears it.
-    const lastChildrenRef = useRef<ReactNode>(null);
-    if (visible) {
-      lastChildrenRef.current = children;
-    }
-    const renderedChildren = visible ? children : lastChildrenRef.current;
     const { body, footer, header } = useMemo(
-      () => splitSheetChildren(renderedChildren),
-      [renderedChildren],
+      () => splitSheetChildren(children),
+      [children],
     );
     const handleDivider = header == null;
 
@@ -511,8 +538,12 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
 
     return (
       <BottomSheetContext.Provider value={contextValue}>
-        <View style={styles.wrapper} pointerEvents="box-none">
+        <View
+          style={styles.wrapper}
+          pointerEvents={closing ? "none" : "box-none"}
+        >
           <GorhomBottomSheet
+            key={session}
             ref={sheetRef}
             index={openIndex}
             snapPoints={snapPoints}
@@ -530,10 +561,15 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
             backdropComponent={renderBackdrop}
             backgroundComponent={renderBackground}
             handleComponent={renderHandle}
-            onClose={handleClosed}
+            onClose={sessionCallbacks.onClose}
+            onAnimate={sessionCallbacks.onAnimate}
             style={styles.sheetShadow}
           >
-            <BottomSheetView style={styles.contentWrapper}>
+            {/* Layout effect runs before children's passive effects, so a mounted BottomSheetScrollView keeps the scrollable slot instead of being overwritten as a plain view. */}
+            <BottomSheetView
+              style={styles.contentWrapper}
+              focusHook={useLayoutEffect}
+            >
               {header}
               <View style={styles.bodySlot}>{body}</View>
               {footer}
