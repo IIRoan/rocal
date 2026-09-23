@@ -1,27 +1,18 @@
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  Pressable,
-  SectionList,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type TextStyle,
-  type ViewStyle,
-} from "react-native";
-import { Feather } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   UserSettings,
   UpdateSettingsRequest,
 } from "@workspace/calendar-core";
-import type { ThemeTokens } from "@workspace/design-tokens";
+import { SettingsPage, useSettingsBack } from "../SettingsPage";
 import {
-  SettingsPage,
-  SettingsScrollView,
-  useSettingsBack,
-} from "../SettingsPage";
-import { useTheme } from "../../../providers/ThemeProvider";
+  SheetGroup,
+  SheetItem,
+  SheetMessage,
+  SheetScroll,
+  SheetSearchField,
+  SheetSection,
+} from "../../sheet/SheetSections";
 import { calendarApiService } from "../../../lib/api";
 import { QUERY_KEYS } from "../../../lib/query-keys";
 
@@ -105,8 +96,6 @@ const SECTION_DATA = Object.entries(TIMEZONE_GROUPS).map(([title, data]) => ({
 }));
 
 export function TimezoneSettingsContent() {
-  const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
   const goBack = useSettingsBack();
   const queryClient = useQueryClient();
 
@@ -165,189 +154,49 @@ export function TimezoneSettingsContent() {
     );
   }, [search]);
 
+  const renderRow = (tz: TimezoneEntry) => {
+    const selected = currentTimezone === tz.value;
+    return (
+      <SheetItem
+        key={tz.value}
+        icon="globe"
+        label={tz.label}
+        detail={tz.value}
+        checked={selected}
+        onPress={() => handleSelect(tz.value)}
+        accessibilityRole="radio"
+        accessibilityState={{ selected }}
+        accessibilityLabel={`${tz.label} (${tz.value})`}
+      />
+    );
+  };
+
   return (
     <SettingsPage title="Timezone">
-      <View style={styles.searchRow}>
-        <Feather name="search" size={16} color={theme.colors.mutedForeground} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search timezones…"
-          placeholderTextColor={theme.colors.mutedForeground}
+      <SheetScroll>
+        <SheetSearchField
           value={search}
           onChangeText={setSearch}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="off"
-          returnKeyType="search"
-          clearButtonMode="while-editing"
+          placeholder="Search timezones…"
+          accessibilityLabel="Search timezones"
         />
-      </View>
 
-      {filteredTimezones !== null ? (
-        <SettingsScrollView
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-        >
-          {filteredTimezones.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Feather
-                name="search"
-                size={32}
-                color={theme.colors.mutedForeground}
-                style={{ opacity: 0.2 }}
-              />
-              <Text style={styles.emptyText}>No timezones found</Text>
-            </View>
+        {filteredTimezones !== null ? (
+          filteredTimezones.length === 0 ? (
+            <SheetMessage text="No timezones found" />
           ) : (
-            filteredTimezones.map((tz) => (
-              <TimezoneRow
-                key={tz.value}
-                tz={tz}
-                isSelected={currentTimezone === tz.value}
-                onPress={() => handleSelect(tz.value)}
-                theme={theme}
-              />
-            ))
-          )}
-        </SettingsScrollView>
-      ) : (
-        <SectionList
-          sections={SECTION_DATA}
-          keyExtractor={(item) => item.value}
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          stickySectionHeadersEnabled={false}
-          renderSectionHeader={({ section: { title } }) => (
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionHeaderText}>{title}</Text>
-            </View>
-          )}
-          renderItem={({ item }) => (
-            <TimezoneRow
-              tz={item}
-              isSelected={currentTimezone === item.value}
-              onPress={() => handleSelect(item.value)}
-              theme={theme}
-            />
-          )}
-        />
-      )}
+            <SheetSection title="Results">
+              <SheetGroup>{filteredTimezones.map(renderRow)}</SheetGroup>
+            </SheetSection>
+          )
+        ) : (
+          SECTION_DATA.map((section) => (
+            <SheetSection key={section.title} title={section.title}>
+              <SheetGroup>{section.data.map(renderRow)}</SheetGroup>
+            </SheetSection>
+          ))
+        )}
+      </SheetScroll>
     </SettingsPage>
   );
-}
-
-function TimezoneRow({
-  tz,
-  isSelected,
-  onPress,
-  theme,
-}: {
-  tz: TimezoneEntry;
-  isSelected: boolean;
-  onPress: () => void;
-  theme: ThemeTokens;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        {
-          flexDirection: "row" as const,
-          alignItems: "center" as const,
-          gap: theme.spacing["3"],
-          paddingHorizontal: theme.spacing["3"],
-          paddingVertical: theme.spacing["2"],
-          borderRadius: theme.borderRadius.md,
-          marginHorizontal: theme.spacing["1"],
-        },
-        pressed && { backgroundColor: theme.colors.accent },
-      ]}
-      accessibilityRole="button"
-      accessibilityState={{ selected: isSelected }}
-      accessibilityLabel={`${tz.label} (${tz.value})`}
-    >
-      <Feather name="globe" size={16} color={theme.colors.mutedForeground} />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.sm.size,
-            lineHeight: theme.typography.fontSize.sm.lineHeight,
-            color: theme.colors.foreground,
-          }}
-          numberOfLines={1}
-        >
-          {tz.label}
-        </Text>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.xs.size,
-            lineHeight: theme.typography.fontSize.xs.lineHeight,
-            color: theme.colors.mutedForeground,
-          }}
-          numberOfLines={1}
-        >
-          {tz.value}
-        </Text>
-      </View>
-      {isSelected && (
-        <Feather name="check" size={16} color={theme.colors.primaryBase} />
-      )}
-    </Pressable>
-  );
-}
-
-function createStyles(theme: ThemeTokens) {
-  const view = {
-    searchRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["3"],
-      paddingHorizontal: theme.spacing["4"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
-    },
-    searchInput: {
-      flex: 1,
-      height: 44,
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.foreground,
-    } as ViewStyle & TextStyle,
-    list: {
-      flex: 1,
-    },
-    listContent: {
-      paddingBottom: theme.spacing["8"],
-    },
-    sectionHeader: {
-      paddingHorizontal: theme.spacing["4"],
-      paddingTop: theme.spacing["3"],
-      paddingBottom: theme.spacing["1"],
-    },
-    emptyState: {
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      paddingVertical: theme.spacing["10"],
-      gap: theme.spacing["2"],
-    },
-  } satisfies Record<string, ViewStyle>;
-
-  const text = {
-    sectionHeaderText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.mutedForeground,
-    },
-    emptyText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-  } satisfies Record<string, TextStyle>;
-
-  return { ...StyleSheet.create(view), ...StyleSheet.create(text) };
 }

@@ -93,7 +93,7 @@ Every user-facing feature ships on **web and native in the same change** with th
 | Calendar views       | `app/calendar/`, `@workspace/ui` calendar        | `app/(tabs)/calendar/`, `src/components/calendar/`  |
 | Event create/edit    | `components/event-editor/`                       | `src/components/event/`, `app/event/`               |
 | Mail                 | `components/mail/`, `app/mail/`                  | `app/(tabs)/mail/`, `src/components/mail/`          |
-| Calendars / ICS subs | `components/calendar-manager.tsx`, `subscription-management.tsx` | `app/calendar-manage/`, `app/subscription/` |
+| Calendars / ICS subs | `components/calendar-manager.tsx`, `subscription-management.tsx` | `src/components/calendars/` (`CalendarsSheet`) |
 | Search / actions     | `components/command-palette/`                    | `src/components/CommandPalette.tsx`                 |
 | Settings             | command palette                                  | `app/settings/`                                     |
 | Auth                 | `app/login/`                                     | `app/(auth)/`                                       |
@@ -104,7 +104,8 @@ Checklist: web updated · native updated · shared logic in `packages/*` · clie
 
 Look like Solace: quiet, warm, dense, utilitarian. Copy the nearest existing screen before building.
 - Tokens only: web semantic Tailwind (`bg-background`, `text-muted-foreground`, `border-border`) from `globals.css`; native `theme.colors/spacing/typography/borderRadius`. No hex, no raw color scales, no gradients, glassmorphism, neon, nested cards, heavy shadows.
-- Components: web `@workspace/ui` (extend variants, no raw-div buttons); native `AppScreen`, `NavigationHeader`, `SheetRow`, `BottomSheet`, `createStyles(theme)` at file bottom.
+- Components: web `@workspace/ui` (extend variants, no raw-div buttons); native `AppScreen`, `NavigationHeader`, `SheetRow`, `BottomSheet`, `createStyles(theme)` at file bottom. Drawer lists and forms use the grouped Skiff-style primitives in `src/components/sheet/SheetSections.tsx`.
+- **Native: drawers, not pages (MUST).** Secondary UI (management lists, create/edit forms, pickers) opens in a `BottomSheet` drawer; nested screens slide in-sheet with `SheetPageStack`/`SheetSubPage` (`src/components/sheet/`), like `AccountSheet` settings and `CalendarsSheet`. Never add an Expo Router route for it; routes are for tabs, auth, and deep-linked content.
 - Icons: web `lucide-react`, native Feather. No emoji icons, no mixed sets.
 - No press-scale/dent (`active:scale-*`, `whileTap`); feedback via color/opacity. `cursor-pointer` on web clickables. 44px touch targets, tap equivalents for hover affordances.
 - Subtle motion only; real product copy; no new UI/CSS-in-JS libraries.

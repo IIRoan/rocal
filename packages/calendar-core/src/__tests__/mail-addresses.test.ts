@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 
 import {
+  canSendCompose,
   normalizeEmailAddress,
   parseAddressList,
   parseRecipientString,
@@ -61,6 +62,28 @@ describe("mail address parsing", () => {
       { name: "Friend", email: "friend@example.com" },
     ]);
     expect(result.cc).toEqual([{ email: "cc@solace.onl" }]);
+  });
+
+  it("only allows sending complete messages", () => {
+    const ready = {
+      to: "user2@solace.onl",
+      subject: "Hello",
+      bodyText: "Hi there",
+      attachmentCount: 0,
+    };
+
+    expect(canSendCompose(ready)).toBe(true);
+    expect(canSendCompose({ ...ready, to: "" })).toBe(false);
+    expect(canSendCompose({ ...ready, to: "user2@solace" })).toBe(false);
+    expect(canSendCompose({ ...ready, to: "user2@solace.onl, jo" })).toBe(
+      false,
+    );
+    expect(canSendCompose({ ...ready, cc: "nope" })).toBe(false);
+    expect(canSendCompose({ ...ready, subject: "  " })).toBe(false);
+    expect(canSendCompose({ ...ready, bodyText: " \n " })).toBe(false);
+    expect(
+      canSendCompose({ ...ready, bodyText: "", attachmentCount: 1 }),
+    ).toBe(true);
   });
 
   it("prefers sender for standard replies", () => {

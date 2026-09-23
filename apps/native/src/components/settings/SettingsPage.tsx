@@ -5,11 +5,9 @@ import React, {
   useMemo,
   type ReactNode,
 } from "react";
-import { StyleSheet, View, type ViewStyle } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
-import type { ThemeTokens } from "@workspace/design-tokens";
 import { AppScreen, StackScreenHeader } from "../layout";
-import { BottomSheetScrollView } from "../BottomSheet";
 
 interface SettingsPageContextValue {
   /** True when the page renders inside the account drawer instead of a route. */
@@ -42,6 +40,11 @@ export function SettingsSheetPageProvider({
       {children}
     </SettingsPageContext.Provider>
   );
+}
+
+/** True when settings content renders inside a drawer page stack. */
+export function useInSettingsSheet(): boolean {
+  return useContext(SettingsPageContext)?.inSheet ?? false;
 }
 
 /** Navigates to another settings page: in-sheet when available, otherwise router push. */
@@ -89,7 +92,7 @@ export function SettingsPage({
   rightAction,
   children,
 }: SettingsPageProps) {
-  const inSheet = useContext(SettingsPageContext)?.inSheet ?? false;
+  const inSheet = useInSettingsSheet();
 
   if (inSheet) {
     return <View style={styles.sheetBody}>{children}</View>;
@@ -108,17 +111,6 @@ export function SettingsPage({
       {children}
     </AppScreen>
   );
-}
-
-/** Sheet-friendly scroll view (gesture-handler based); safe on standalone routes too. */
-export const SettingsScrollView = BottomSheetScrollView;
-
-export function settingsPageStyles(theme: ThemeTokens) {
-  return StyleSheet.create({
-    scrollView: { flex: 1 },
-    scrollContent: { paddingBottom: theme.spacing["8"] },
-    sectionItems: { paddingVertical: theme.spacing["1"] },
-  } satisfies Record<string, ViewStyle>);
 }
 
 const styles = StyleSheet.create({

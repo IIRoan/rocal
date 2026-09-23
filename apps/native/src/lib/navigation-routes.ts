@@ -11,7 +11,6 @@ export const SETTINGS_TIMEZONE_ROUTE = "/settings/timezone";
 export const SETTINGS_TIME_REGION_ROUTE = "/settings/time-region";
 export const SETTINGS_CONTACTS_ROUTE = "/settings/contacts";
 export const SETTINGS_INVITES_ROUTE = "/settings/invites";
-export const SETTINGS_MAILBOXES_ROUTE = "/settings/mailboxes";
 export const SETTINGS_LABELS_ROUTE = "/settings/labels";
 export const SETTINGS_NOTIFICATIONS_ROUTE = "/settings/notifications";
 export const SETTINGS_SECURITY_ROUTE = "/settings/security";

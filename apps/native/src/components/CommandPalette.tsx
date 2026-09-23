@@ -18,11 +18,11 @@ import { useTheme } from "../providers/ThemeProvider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCommandPalette } from "../providers/CommandPaletteProvider";
 import { useSheet } from "../providers/SheetProvider";
+import { useMailCompose } from "../providers/MailComposeProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
 import { useMailSelection } from "../providers/MailSelectionProvider";
 import { calendarApiService } from "../lib/api";
 import {
-  MAIL_TAB_ROUTE,
   SETTINGS_ROUTE,
   SETTINGS_NOTIFICATIONS_ROUTE,
   isMailRouteSegments,
@@ -89,6 +89,7 @@ export function CommandPalette() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { isOpen, close } = useCommandPalette();
   const { openEventSheet } = useSheet();
+  const { openCompose } = useMailCompose();
   const { setActiveView, setCurrentDate, setSelectedDate } = useCalendarView();
   const router = useRouter();
   const segments = useSegments();
@@ -183,7 +184,9 @@ export function CommandPalette() {
       trimmedQuery,
     ],
   );
-  const mailResults = searchResults.filter((result) => result.source === "mail");
+  const mailResults = searchResults.filter(
+    (result) => result.source === "mail",
+  );
   const calendarResults = searchResults.filter(
     (result) => result.source === "calendar",
   );
@@ -216,7 +219,6 @@ export function CommandPalette() {
         case "view-week":
         case "view-day":
         case "view-3day":
-        case "view-agenda":
           if (action.view) setActiveView(action.view);
           navigateToCalendar();
           break;
@@ -227,7 +229,7 @@ export function CommandPalette() {
           switchTab("mail");
           break;
         case "compose-mail":
-          router.push(`${MAIL_TAB_ROUTE}/compose` as never);
+          openCompose();
           break;
         case "open-settings":
           router.push(SETTINGS_ROUTE as never);
@@ -240,6 +242,7 @@ export function CommandPalette() {
     [
       close,
       openEventSheet,
+      openCompose,
       setActiveView,
       setCurrentDate,
       setSelectedDate,
@@ -265,7 +268,14 @@ export function CommandPalette() {
       openEventSheet({ type: "view", eventId: result.eventId });
       navigateToCalendar();
     },
-    [close, navigateToCalendar, openEventSheet, router, setCurrentDate, setSelectedDate],
+    [
+      close,
+      navigateToCalendar,
+      openEventSheet,
+      router,
+      setCurrentDate,
+      setSelectedDate,
+    ],
   );
 
   const showSearchResults = trimmedQuery.length >= SEARCH_MIN_LENGTH;
@@ -452,7 +462,10 @@ function ActionRow({
     <View>
       {showDivider ? <View style={styles.sectionDivider} /> : null}
       <Pressable
-        style={({ pressed }) => [styles.sectionRow, pressed && styles.rowPressed]}
+        style={({ pressed }) => [
+          styles.sectionRow,
+          pressed && styles.rowPressed,
+        ]}
         onPress={() => onPress(action)}
         accessibilityRole="button"
         accessibilityLabel={action.label}
@@ -489,7 +502,10 @@ function SearchResultRow({
     <View>
       {showDivider ? <View style={styles.sectionDivider} /> : null}
       <Pressable
-        style={({ pressed }) => [styles.sectionRow, pressed && styles.rowPressed]}
+        style={({ pressed }) => [
+          styles.sectionRow,
+          pressed && styles.rowPressed,
+        ]}
         onPress={() => onPress(result)}
         accessibilityRole="button"
         accessibilityLabel={result.title}
@@ -510,7 +526,9 @@ function SearchResultRow({
   );
 }
 
-function formatSearchSubtitle(result: NativePaletteSearchResult): string | null {
+function formatSearchSubtitle(
+  result: NativePaletteSearchResult,
+): string | null {
   if (result.source === "mail") {
     const from =
       result.from ??

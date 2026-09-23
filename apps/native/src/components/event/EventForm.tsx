@@ -11,7 +11,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -60,6 +59,7 @@ import {
   PickerSheet,
   type OptionSheetItem,
 } from "./EventPickerSheets";
+import { Switch } from "../ui/Switch";
 import { TimeWheelPicker } from "./TimeWheelPicker";
 import { formatPickerTime, type TimeFormat } from "./time-wheel-utils";
 import { parseStoredRecurrence } from "./recurrence-picker-utils";
@@ -640,16 +640,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                   onPress={() => openPicker(handleAllDayToggle)}
                   accessibilityRole="switch"
                   accessibilityState={{ checked: allDay }}
-                  trailing={
-                    <Switch
-                      value={allDay}
-                      pointerEvents="none"
-                      trackColor={{
-                        false: theme.colors.input,
-                        true: theme.colors.primaryBase,
-                      }}
-                    />
-                  }
+                  trailing={<Switch value={allDay} />}
                 />
                 <EventEditorListRow
                   icon="repeat"

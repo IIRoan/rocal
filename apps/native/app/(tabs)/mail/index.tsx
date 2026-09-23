@@ -24,6 +24,7 @@ import {
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useToast } from "../../../src/providers/ToastProvider";
+import { useMailCompose } from "../../../src/providers/MailComposeProvider";
 import { useMailSelection } from "../../../src/providers/MailSelectionProvider";
 import { useCommandPalette } from "../../../src/providers/CommandPaletteProvider";
 import { CenteredLoader } from "../../../src/components/ui/loading";
@@ -91,6 +92,7 @@ export function MailScreen() {
   const queryClient = useQueryClient();
   const { open: openCommandPalette } = useCommandPalette();
   const router = useRouter();
+  const { openCompose } = useMailCompose();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const accountQuery = useMailAccount();
@@ -317,14 +319,12 @@ export function MailScreen() {
     (message: JmapEmailMessage) => {
       const mailboxes = runtime?.mailboxes ?? [];
       if (isDraftMessage(message, resolvedMailboxId, mailboxes)) {
-        router.push(
-          `/(tabs)/mail/compose?mode=draft&messageId=${message.id}` as never,
-        );
+        openCompose({ mode: "draft", messageId: message.id });
         return;
       }
       router.push(`/(tabs)/mail/message/${message.id}` as never);
     },
-    [router, runtime?.mailboxes, resolvedMailboxId],
+    [openCompose, router, runtime?.mailboxes, resolvedMailboxId],
   );
 
   const toggleThreadSelection = useCallback((messageIds: string[]) => {
@@ -733,7 +733,7 @@ export function MailScreen() {
               unreadCount: unreadThreadCount,
               filterActive: listFilterActive,
               onSearch: openCommandPalette,
-              onCompose: () => router.push("/(tabs)/mail/compose" as never),
+              onCompose: () => openCompose(),
               onOpenMailboxes: () => setDrawerOpen(true),
               onOpenFilter: () => setFilterOpen(true),
               onOpenAccount: () => setAccountOpen(true),

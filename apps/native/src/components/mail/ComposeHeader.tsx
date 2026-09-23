@@ -14,7 +14,7 @@ import { useTheme } from "../../providers/ThemeProvider";
 import { LAYOUT_ICON } from "../../lib/app-layout";
 import { MAIL_LAYOUT, useMailSkin, type MailSkin } from "./mail-ui";
 
-const SEND_HEIGHT = 32;
+const SEND_HEIGHT = 36;
 const SEND_HIT_SLOP = (MAIL_LAYOUT.hitSize - SEND_HEIGHT) / 2;
 
 type ComposeHeaderProps = {
@@ -23,7 +23,6 @@ type ComposeHeaderProps = {
   sending: boolean;
   onClose: () => void;
   onAttach: () => void;
-  onMore: () => void;
   onSend: () => void;
 };
 
@@ -33,7 +32,6 @@ export function ComposeHeader({
   sending,
   onClose,
   onAttach,
-  onMore,
   onSend,
 }: ComposeHeaderProps) {
   const { theme } = useTheme();
@@ -60,13 +58,6 @@ export function ComposeHeader({
             color={theme.colors.foreground}
             styles={styles}
           />
-          <ComposeIconButton
-            icon="more-horizontal"
-            label="More options"
-            onPress={onMore}
-            color={theme.colors.foreground}
-            styles={styles}
-          />
           <Pressable
             onPress={onSend}
             disabled={sendDisabled}
@@ -81,7 +72,10 @@ export function ComposeHeader({
             accessibilityState={{ disabled: sendDisabled, busy: sending }}
           >
             {sending ? (
-              <ActivityIndicator size="small" color={skin.ctaForeground} />
+              <ActivityIndicator
+                size="small"
+                color={theme.colors.primaryForeground}
+              />
             ) : (
               <Text style={styles.sendText}>Send</Text>
             )}
@@ -125,20 +119,19 @@ function ComposeIconButton({
 function createStyles(theme: ThemeTokens, skin: MailSkin) {
   const view = {
     shell: {
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.card,
     },
     bar: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       justifyContent: "space-between" as const,
-      minHeight: MAIL_LAYOUT.hitSize + theme.spacing["1"],
-      paddingHorizontal: theme.spacing["1"],
+      minHeight: MAIL_LAYOUT.hitSize + theme.spacing["2"],
+      paddingLeft: theme.spacing["1"],
+      paddingRight: theme.spacing["4"],
     },
     trailing: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: theme.spacing["1"],
-      paddingRight: theme.spacing["3"],
     },
     iconButton: {
       width: MAIL_LAYOUT.hitSize,
@@ -148,11 +141,11 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
     },
     send: {
       height: SEND_HEIGHT,
-      minWidth: 64,
-      marginLeft: theme.spacing["1"],
-      paddingHorizontal: 14,
+      minWidth: 72,
+      marginLeft: theme.spacing["2"],
+      paddingHorizontal: theme.spacing["4"],
       borderRadius: theme.borderRadius.full,
-      backgroundColor: skin.cta,
+      backgroundColor: theme.colors.primaryBase,
       alignItems: "center" as const,
       justifyContent: "center" as const,
     },
@@ -168,13 +161,13 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
     sendText: {
       fontSize: 15,
       fontWeight: "600" as TextStyle["fontWeight"],
-      color: skin.ctaForeground,
+      color: theme.colors.primaryForeground,
     },
     title: {
       ...skin.title,
       paddingHorizontal: theme.spacing["4"],
-      paddingTop: theme.spacing["1"],
-      paddingBottom: theme.spacing["3"],
+      paddingTop: theme.spacing["2"],
+      paddingBottom: theme.spacing["4"],
     },
   } satisfies Record<string, TextStyle>;
 

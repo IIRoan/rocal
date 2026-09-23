@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { getSettingsNavItem } from "@workspace/calendar-core";
+import { accountSheetLabel } from "../../../lib/account-sheet-model";
 import { AccountSettingsContent } from "./AccountSettingsContent";
 import { AppearanceSettingsContent } from "./AppearanceSettingsContent";
 import { AppSettingsContent } from "./AppSettingsContent";
@@ -35,5 +36,5 @@ export function settingsSheetPageTitle(page: string): string {
   if (page === "timezone") {
     return "Timezone";
   }
-  return getSettingsNavItem(page)?.label ?? "Settings";
+  return accountSheetLabel(page) ?? getSettingsNavItem(page)?.label ?? "Settings";
 }

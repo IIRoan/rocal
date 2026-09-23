@@ -2,7 +2,6 @@ import React, { useMemo } from "react";
 import {
   Pressable,
   StyleSheet,
-  Switch,
   Text,
   View,
   type TextStyle,
@@ -27,6 +26,7 @@ import {
   BottomSheetTitle,
 } from "../BottomSheet";
 import { MAIL_ICON, mailSpacing, useMailSkin, type MailSkin } from "./mail-ui";
+import { Switch } from "../ui/Switch";
 
 interface MailFilterSheetProps {
   visible: boolean;
@@ -252,12 +252,8 @@ function ToggleRow({
         <Feather name={icon} size={MAIL_ICON.sheet} color={theme.colors.mutedForeground} />
       </View>
       <Text style={styles.rowLabel}>{label}</Text>
-      <View style={styles.switchSlot} pointerEvents="none">
-        <Switch
-          value={value}
-          trackColor={{ false: theme.colors.input, true: theme.colors.primaryBase }}
-          thumbColor="#ffffff"
-        />
+      <View style={styles.switchSlot}>
+        <Switch value={value} />
       </View>
     </Pressable>
   );

@@ -1,15 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type TextStyle,
-  type ViewStyle,
-} from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -19,7 +9,18 @@ import {
   validateMailboxName,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
-import { SettingsPage, SettingsScrollView } from "../SettingsPage";
+import { SettingsPage } from "../SettingsPage";
+import { MAIL_ICON, useMailSkin, type MailSkin } from "../../mail/mail-ui";
+import {
+  SheetButton,
+  SheetCenteredState,
+  SheetGroup,
+  SheetItem,
+  SheetMessage,
+  SheetScroll,
+  SheetSection,
+  SheetTextField,
+} from "../../sheet/SheetSections";
 import { useTheme } from "../../../providers/ThemeProvider";
 import { useToast } from "../../../providers/ToastProvider";
 import { useHiddenMailboxIds } from "../../../hooks/use-hidden-mailbox-ids";
@@ -38,9 +39,9 @@ import {
 } from "../../../lib/mail/mailbox-management";
 import type { JmapMailbox } from "../../../lib/mail/types";
 
+type FeatherName = keyof typeof Feather.glyphMap;
+
 export function MailboxesSettingsContent() {
-  const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
@@ -192,182 +193,195 @@ export function MailboxesSettingsContent() {
 
   return (
     <SettingsPage title="Mailboxes">
-      <View style={styles.addForm}>
-        <Text style={styles.addHint}>
-          Create folders, hide them from the mail drawer, or reorder them.
-          Inbox cannot be hidden. System folders cannot be renamed or deleted.
-        </Text>
-        {error ? (
-          <View style={[styles.feedback, styles.feedbackError]}>
-            <Text style={[styles.feedbackText, styles.feedbackTextError]}>
-              {error}
-            </Text>
-          </View>
-        ) : null}
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder="New mailbox name"
-          placeholderTextColor={theme.colors.mutedForeground}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={canCreate && busyId === null}
-          onSubmitEditing={() => void handleCreate()}
-          style={styles.fieldInput}
-          accessibilityLabel="New mailbox name"
-        />
-        <Pressable
+      <SheetScroll>
+        {error ? <SheetMessage tone="destructive" text={error} /> : null}
+
+        <SheetSection
+          title="New mailbox"
+          footer="Create folders, hide them from the mail drawer, or reorder them. Inbox cannot be hidden. System folders cannot be renamed or deleted."
+        >
+          <SheetGroup>
+            <SheetTextField
+              value={name}
+              onChangeText={setName}
+              placeholder="New mailbox name"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={canCreate && busyId === null}
+              onSubmitEditing={() => void handleCreate()}
+              accessibilityLabel="New mailbox name"
+            />
+          </SheetGroup>
+        </SheetSection>
+
+        <SheetButton
+          label="Create mailbox"
+          icon="plus"
           onPress={() => void handleCreate()}
           disabled={!canCreate || busyId !== null || !name.trim()}
-          style={({ pressed }) => [
-            styles.primaryButton,
-            pressed && styles.pressed,
-            (!canCreate || busyId !== null || !name.trim()) && styles.disabled,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Create mailbox"
-        >
-          {busyId === "create" ? (
-            <ActivityIndicator
-              color={theme.colors.primaryForeground}
-              size="small"
-            />
-          ) : (
-            <>
-              <Feather
-                name="plus"
-                size={14}
-                color={theme.colors.primaryForeground}
-              />
-              <Text style={styles.primaryButtonText}>Create mailbox</Text>
-            </>
-          )}
-        </Pressable>
-      </View>
+          pending={busyId === "create"}
+        />
 
-      {runtimeQuery.isLoading ? (
-        <View style={styles.emptyState}>
-          <ActivityIndicator color={theme.colors.primaryBase} />
-          <Text style={styles.emptyText}>Loading mailboxes…</Text>
-        </View>
-      ) : !provisioned || mailboxes.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>
-            {provisioned
-              ? "No mailboxes found."
-              : "Your mailbox is still being set up."}
-          </Text>
-        </View>
-      ) : (
-        <SettingsScrollView
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {mailboxes.map((mailbox, index) => {
-            const isEditing = editingId === mailbox.id;
-            const isHidden = hidden.has(mailbox.id);
-            const canEdit = canRenameOrDeleteMailbox(mailbox);
-            const canHide = canHideMailbox(mailbox);
-            const isBusy = busyId === mailbox.id;
-            return (
-              <View key={mailbox.id} style={styles.row}>
-                <Feather
-                  name={
-                    getMailboxIcon(mailbox) as keyof typeof Feather.glyphMap
-                  }
-                  size={16}
-                  color={theme.colors.mutedForeground}
+        {runtimeQuery.isLoading ? (
+          <SheetCenteredState loading message="Loading mailboxes…" />
+        ) : !provisioned || mailboxes.length === 0 ? (
+          <SheetCenteredState
+            message={
+              provisioned
+                ? "No mailboxes found."
+                : "Your mailbox is still being set up."
+            }
+          />
+        ) : (
+          <SheetSection title="Mailboxes">
+            <SheetGroup>
+              {mailboxes.map((mailbox, index) => (
+                <MailboxRow
+                  key={mailbox.id}
+                  icon={getMailboxIcon(mailbox) as FeatherName}
+                  mailbox={mailbox}
+                  isFirst={index === 0}
+                  isLast={index === mailboxes.length - 1}
+                  isEditing={editingId === mailbox.id}
+                  isHidden={hidden.has(mailbox.id)}
+                  isBusy={busyId === mailbox.id}
+                  editingName={editingName}
+                  onEditingNameChange={setEditingName}
+                  onMove={(direction) => void handleMove(index, direction)}
+                  onToggleHidden={() => void handleToggleHidden(mailbox)}
+                  onStartRename={() => {
+                    setEditingId(mailbox.id);
+                    setEditingName(mailbox.name);
+                    setError(null);
+                  }}
+                  onRename={() => void handleRename(mailbox)}
+                  onDelete={() => handleDelete(mailbox)}
                 />
-                <View style={styles.rowBody}>
-                  {isEditing ? (
-                    <TextInput
-                      value={editingName}
-                      onChangeText={setEditingName}
-                      autoFocus
-                      onSubmitEditing={() => void handleRename(mailbox)}
-                      style={styles.fieldInput}
-                    />
-                  ) : (
-                    <>
-                      <Text style={styles.rowTitle} numberOfLines={1}>
-                        {getMailboxDisplayName(mailbox)}
-                      </Text>
-                      <Text style={styles.rowMeta} numberOfLines={1}>
-                        {isHidden ? "Hidden from drawer" : "Visible"}
-                        {mailbox.role ? ` · ${mailbox.role}` : ""}
-                      </Text>
-                    </>
-                  )}
-                </View>
-                <View style={styles.rowActions}>
-                  <IconButton
-                    name="chevron-up"
-                    disabled={index === 0 || isBusy}
-                    onPress={() => void handleMove(index, "up")}
-                    theme={theme}
-                    label={`Move ${getMailboxDisplayName(mailbox)} up`}
-                  />
-                  <IconButton
-                    name="chevron-down"
-                    disabled={index === mailboxes.length - 1 || isBusy}
-                    onPress={() => void handleMove(index, "down")}
-                    theme={theme}
-                    label={`Move ${getMailboxDisplayName(mailbox)} down`}
-                  />
-                  {canHide ? (
-                    <IconButton
-                      name={isHidden ? "eye-off" : "eye"}
-                      disabled={isBusy}
-                      onPress={() => void handleToggleHidden(mailbox)}
-                      theme={theme}
-                      label={
-                        isHidden
-                          ? `Show ${getMailboxDisplayName(mailbox)}`
-                          : `Hide ${getMailboxDisplayName(mailbox)}`
-                      }
-                    />
-                  ) : null}
-                  {canEdit ? (
-                    isEditing ? (
-                      <IconButton
-                        name="check"
-                        disabled={isBusy}
-                        onPress={() => void handleRename(mailbox)}
-                        theme={theme}
-                        label="Save name"
-                      />
-                    ) : (
-                      <IconButton
-                        name="edit-2"
-                        disabled={isBusy}
-                        onPress={() => {
-                          setEditingId(mailbox.id);
-                          setEditingName(mailbox.name);
-                          setError(null);
-                        }}
-                        theme={theme}
-                        label={`Rename ${getMailboxDisplayName(mailbox)}`}
-                      />
-                    )
-                  ) : null}
-                  {canEdit ? (
-                    <IconButton
-                      name="trash-2"
-                      disabled={isBusy}
-                      onPress={() => handleDelete(mailbox)}
-                      theme={theme}
-                      destructive
-                      label={`Delete ${getMailboxDisplayName(mailbox)}`}
-                    />
-                  ) : null}
-                </View>
-              </View>
-            );
-          })}
-        </SettingsScrollView>
-      )}
+              ))}
+            </SheetGroup>
+          </SheetSection>
+        )}
+      </SheetScroll>
     </SettingsPage>
+  );
+}
+
+/** `icon` is a top-level prop so SheetGroup insets the divider under the label. */
+function MailboxRow({
+  icon,
+  mailbox,
+  isFirst,
+  isLast,
+  isEditing,
+  isHidden,
+  isBusy,
+  editingName,
+  onEditingNameChange,
+  onMove,
+  onToggleHidden,
+  onStartRename,
+  onRename,
+  onDelete,
+}: {
+  icon: FeatherName;
+  mailbox: JmapMailbox;
+  isFirst: boolean;
+  isLast: boolean;
+  isEditing: boolean;
+  isHidden: boolean;
+  isBusy: boolean;
+  editingName: string;
+  onEditingNameChange: (value: string) => void;
+  onMove: (direction: "up" | "down") => void;
+  onToggleHidden: () => void;
+  onStartRename: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  const { theme } = useTheme();
+  const skin = useMailSkin();
+  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
+  const displayName = getMailboxDisplayName(mailbox);
+  const canEdit = canRenameOrDeleteMailbox(mailbox);
+  const canHide = canHideMailbox(mailbox);
+
+  const actions = (
+    <View style={styles.actions}>
+      <IconButton
+        name="chevron-up"
+        disabled={isFirst || isBusy}
+        onPress={() => onMove("up")}
+        label={`Move ${displayName} up`}
+      />
+      <IconButton
+        name="chevron-down"
+        disabled={isLast || isBusy}
+        onPress={() => onMove("down")}
+        label={`Move ${displayName} down`}
+      />
+      {canHide ? (
+        <IconButton
+          name={isHidden ? "eye-off" : "eye"}
+          disabled={isBusy}
+          onPress={onToggleHidden}
+          label={isHidden ? `Show ${displayName}` : `Hide ${displayName}`}
+        />
+      ) : null}
+      {canEdit ? (
+        isEditing ? (
+          <IconButton
+            name="check"
+            disabled={isBusy}
+            onPress={onRename}
+            label="Save name"
+          />
+        ) : (
+          <IconButton
+            name="edit-2"
+            disabled={isBusy}
+            onPress={onStartRename}
+            label={`Rename ${displayName}`}
+          />
+        )
+      ) : null}
+      {canEdit ? (
+        <IconButton
+          name="trash-2"
+          disabled={isBusy}
+          onPress={onDelete}
+          destructive
+          label={`Delete ${displayName}`}
+        />
+      ) : null}
+    </View>
+  );
+
+  if (!isEditing) {
+    return (
+      <SheetItem
+        label={displayName}
+        detail={`${isHidden ? "Hidden from drawer" : "Visible"}${mailbox.role ? ` · ${mailbox.role}` : ""}`}
+        icon={icon}
+        trailing={actions}
+      />
+    );
+  }
+
+  return (
+    <View style={styles.editRow}>
+      <View style={styles.iconSlot}>
+        <Feather name={icon} size={MAIL_ICON.sheetAccessory} color={skin.textSecondary} />
+      </View>
+      <SheetTextField
+        value={editingName}
+        onChangeText={onEditingNameChange}
+        autoFocus
+        onSubmitEditing={onRename}
+        style={styles.editInput}
+        accessibilityLabel={`Rename ${displayName}`}
+      />
+      {actions}
+    </View>
   );
 }
 
@@ -375,32 +389,27 @@ function IconButton({
   name,
   onPress,
   disabled,
-  theme,
   label,
   destructive = false,
 }: {
-  name: React.ComponentProps<typeof Feather>["name"];
+  name: FeatherName;
   onPress: () => void;
   disabled?: boolean;
-  theme: ThemeTokens;
   label: string;
   destructive?: boolean;
 }) {
+  const { theme } = useTheme();
+  const skin = useMailSkin();
+  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       hitSlop={6}
       style={({ pressed }) => [
-        {
-          width: 36,
-          height: 36,
-          alignItems: "center" as const,
-          justifyContent: "center" as const,
-          borderRadius: theme.borderRadius.md,
-          opacity: disabled ? 0.35 : 1,
-        },
-        pressed && { backgroundColor: theme.colors.accent },
+        styles.iconButton,
+        pressed && styles.iconButtonPressed,
+        disabled && styles.iconButtonDisabled,
       ]}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -408,114 +417,49 @@ function IconButton({
       <Feather
         name={name}
         size={16}
-        color={
-          destructive ? theme.colors.destructive : theme.colors.mutedForeground
-        }
+        color={destructive ? theme.colors.destructive : skin.textSecondary}
       />
     </Pressable>
   );
 }
 
-function createStyles(theme: ThemeTokens) {
-  const view = {
-    addForm: {
-      padding: theme.spacing["4"],
-      gap: theme.spacing["2"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
+function createStyles(theme: ThemeTokens, skin: MailSkin) {
+  return StyleSheet.create({
+    actions: {
+      flexDirection: "row",
+      alignItems: "center",
     },
-    primaryButton: {
-      marginTop: theme.spacing["1"],
-      minHeight: 44,
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      gap: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["3"],
-      borderRadius: theme.borderRadius.md,
-      backgroundColor: theme.colors.primaryBase,
+    editRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      minHeight: 48,
+      paddingHorizontal: 16,
+      paddingVertical: theme.spacing["2"],
     },
-    pressed: { opacity: 0.85 },
-    disabled: { opacity: 0.5 },
-    list: { flex: 1 },
-    listContent: { paddingBottom: theme.spacing["8"] },
-    emptyState: {
+    iconSlot: {
+      width: MAIL_ICON.sheet,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    editInput: {
       flex: 1,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      padding: theme.spacing["6"],
-      gap: theme.spacing["2"],
+      minHeight: 32,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
     },
-    fieldInput: {
-      height: 44,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.md,
-      paddingHorizontal: theme.spacing["3"],
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.foreground,
-      backgroundColor: theme.colors.background,
-    } as ViewStyle & TextStyle,
-    feedback: {
-      borderRadius: theme.borderRadius.md,
-      borderWidth: StyleSheet.hairlineWidth,
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
+    iconButton: {
+      width: 32,
+      height: 32,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: theme.borderRadius.full,
     },
-    feedbackError: {
-      borderColor: theme.colors.destructive + "40",
-      backgroundColor: theme.colors.destructive + "18",
+    iconButtonPressed: {
+      backgroundColor: skin.selected,
     },
-    row: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["4"],
-      paddingVertical: theme.spacing["2"],
-      minHeight: 56,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
+    iconButtonDisabled: {
+      opacity: 0.35,
     },
-    rowBody: { flex: 1, minWidth: 0 },
-    rowActions: { flexDirection: "row" as const, alignItems: "center" as const },
-  } satisfies Record<string, ViewStyle | (ViewStyle & TextStyle)>;
-
-  const text = {
-    addHint: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    emptyText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-      textAlign: "center" as const,
-    },
-    primaryButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.primaryForeground,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
-    feedbackText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-    },
-    feedbackTextError: { color: theme.colors.destructive },
-    rowTitle: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
-    rowMeta: {
-      marginTop: 2,
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-  } satisfies Record<string, TextStyle>;
-
-  return { ...StyleSheet.create(view), ...StyleSheet.create(text) };
+  });
 }

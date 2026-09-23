@@ -102,7 +102,7 @@ function buildEditorDocument(input: {
       margin: 0;
       padding: 0;
       height: 100%;
-      background: ${theme.colors.background};
+      background: ${theme.colors.card};
       color: ${theme.colors.foreground};
       font-size: ${fontSize}px;
       line-height: ${lineHeight}px;
@@ -112,6 +112,7 @@ function buildEditorDocument(input: {
       min-height: 100%;
       padding: ${theme.spacing["3"]}px ${theme.spacing["4"]}px;
       outline: none;
+      caret-color: ${theme.colors.primaryBase};
       -webkit-user-select: text;
       user-select: text;
     }
@@ -318,7 +319,7 @@ export const ComposeBodyEditor = forwardRef<
         onFocusChange?.(false);
         return;
       }
-    const sanitizedHtml = sanitizeUntrustedEmailHtml(message.html);
+      const sanitizedHtml = sanitizeUntrustedEmailHtml(message.html);
       const next = htmlToComposeText(sanitizedHtml);
       lastEmittedRef.current = next;
       if (next !== value) {
@@ -345,12 +346,11 @@ export const ComposeBodyEditor = forwardRef<
           lastEmittedRef.current = text;
           onChangeText(text);
         }}
-        onSelectionChange={(event) =>
-          setSelection(event.nativeEvent.selection)
-        }
+        onSelectionChange={(event) => setSelection(event.nativeEvent.selection)}
         placeholder={placeholder}
         placeholderTextColor={skin.textTertiary}
-        selectionColor={skin.accent}
+        selectionColor={theme.colors.primaryBase}
+        cursorColor={theme.colors.primaryBase}
         multiline
         textAlignVertical="top"
         autoFocus={false}
@@ -392,12 +392,12 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
     container: {
       flex: 1,
       minHeight: 0,
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.card,
     },
     webView: {
       flex: 1,
       minHeight: 0,
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.card,
     },
   } satisfies Record<string, ViewStyle>;
 

@@ -1,36 +1,21 @@
-import React, { useMemo } from "react";
-import { View } from "react-native";
-import {
-  SettingsPage,
-  SettingsScrollView,
-  settingsPageStyles,
-} from "../SettingsPage";
+import React from "react";
+import { SettingsPage } from "../SettingsPage";
 import { AppDebugSettingsSection } from "../AppDebugSettingsSection";
 import { AppUpdateSettingsSection } from "../AppUpdateSettingsSection";
-import { SettingsSectionLabel } from "../SettingsRows";
-import { useTheme } from "../../../providers/ThemeProvider";
+import { SheetScroll, SheetSection } from "../../sheet/SheetSections";
 
 export function AppSettingsContent() {
-  const { theme } = useTheme();
-  const styles = useMemo(() => settingsPageStyles(theme), [theme]);
-
   return (
     <SettingsPage title="App">
-      <SettingsScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <SettingsSectionLabel text="Updates" theme={theme} />
-        <View style={styles.sectionItems}>
+      <SheetScroll>
+        <SheetSection title="Updates">
           <AppUpdateSettingsSection />
-        </View>
+        </SheetSection>
 
-        <SettingsSectionLabel text="Debugging" theme={theme} isFirst={false} />
-        <View style={styles.sectionItems}>
+        <SheetSection title="Debugging">
           <AppDebugSettingsSection />
-        </View>
-      </SettingsScrollView>
+        </SheetSection>
+      </SheetScroll>
     </SettingsPage>
   );
 }

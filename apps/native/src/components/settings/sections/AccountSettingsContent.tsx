@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Alert, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Alert } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   extractLinkedAuthAccounts,
@@ -8,38 +7,36 @@ import {
   summarizeLinkedAuthAccounts,
   type LinkedAuthAccountLike,
 } from "@workspace/calendar-core";
-import {
-  SettingsPage,
-  SettingsScrollView,
-  settingsPageStyles,
-} from "../SettingsPage";
-import {
-  SettingsAccountCard,
-  SettingsActionRow,
-  SettingsHintRow,
-} from "../SettingsRows";
+import { SettingsPage } from "../SettingsPage";
 import {
   SettingsPasswordForm,
   SettingsProfilePictureForm,
 } from "../SettingsAccountForms";
+import { BlobatarAvatar } from "../../BlobatarAvatar";
 import {
-  BottomSheet,
-  BottomSheetHeader,
-  BottomSheetTitle,
-} from "../../BottomSheet";
-import { SheetPortal } from "../../SheetPortal";
+  SheetGroup,
+  SheetItem,
+  SheetScroll,
+  SheetSection,
+} from "../../sheet/SheetSections";
 import { authClient } from "../../../lib/auth-client";
-import { getSettingsAccountActions } from "../../../lib/settings-screen-utils";
+import {
+  getSettingsAccountActions,
+  type SettingsAccountActionKey,
+} from "../../../lib/settings-screen-utils";
 import { useAuth } from "../../../providers/AuthProvider";
 import { useNativeUserSettings } from "../../../hooks/use-native-user-settings";
 import { calendarApiService } from "../../../lib/api";
-import { useTheme } from "../../../providers/ThemeProvider";
 import { useToast } from "../../../providers/ToastProvider";
 
+const PROFILE_ACTION_KEYS: SettingsAccountActionKey[] = [
+  "change-password",
+  "set-password",
+  "change-profile-picture",
+];
+const SESSION_ACTION_KEYS: SettingsAccountActionKey[] = ["sign-out", "delete-account"];
+
 export function AccountSettingsContent() {
-  const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
-  const styles = useMemo(() => settingsPageStyles(theme), [theme]);
   const queryClient = useQueryClient();
   const { user, signOut } = useAuth();
   const { toast } = useToast();
@@ -262,17 +259,15 @@ export function AccountSettingsContent() {
 
   const handleAccountAction = useCallback(
     (key: (typeof accountActions)[number]["key"]) => {
-      if (key === "change-password") {
+      if (key === "change-password" || key === "set-password") {
+        setShowProfilePictureForm(false);
         setPasswordChangeError(null);
-        setActivePasswordSheet("change-password");
-        return;
-      }
-      if (key === "set-password") {
-        setPasswordChangeError(null);
-        setActivePasswordSheet("set-password");
+        setActivePasswordSheet(key);
         return;
       }
       if (key === "change-profile-picture") {
+        setActivePasswordSheet(null);
+        resetChangePasswordForm();
         setProfilePictureUrlInput(user?.image ?? "");
         setShowProfilePictureForm(true);
         return;
@@ -287,123 +282,128 @@ export function AccountSettingsContent() {
       }
       handleSignOut();
     },
-    [handleDeleteAccount, handleResetSettings, handleSignOut, user?.image],
+    [
+      handleDeleteAccount,
+      handleResetSettings,
+      handleSignOut,
+      resetChangePasswordForm,
+      user?.image,
+    ],
   );
 
-  return (
-    <SettingsPage title="Account">
-      <SettingsScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.sectionItems}>
-          <SettingsAccountCard
-            name={user?.name}
-            email={user?.email}
-            imageUrl={user?.image}
-            theme={theme}
-          />
-          {hasOAuthAccount ? (
-            <SettingsHintRow
-              text={
-                hasPasswordAccount
-                  ? "Email sign-in updates your login password. Existing encrypted data stays intact."
-                  : "Adding an email password gives this account an email sign-in option without changing your existing encrypted data."
-              }
-              theme={theme}
-            />
-          ) : null}
-          {accountActions.map((action) => (
-            <SettingsActionRow
+  const actionPending = (key: SettingsAccountActionKey) =>
+    key === "change-password"
+      ? isChangingPassword
+      : key === "set-password"
+        ? isSettingPassword
+        : key === "change-profile-picture"
+          ? isUpdatingProfilePicture
+          : key === "reset-preferences"
+            ? resetSettingsMutation.isPending
+            : key === "delete-account"
+              ? isDeletingAccount
+              : isSigningOut;
+
+  const renderActions = (keys: SettingsAccountActionKey[]) =>
+    accountActions.flatMap((action) =>
+      keys.includes(action.key)
+        ? [
+            <SheetItem
               key={action.key}
               icon={action.icon}
               label={action.label}
-              description={action.description}
+              detail={action.description}
+              tone={action.destructive ? "destructive" : "default"}
+              pending={actionPending(action.key)}
               onPress={() => handleAccountAction(action.key)}
-              theme={theme}
-              destructive={action.destructive}
-              isPending={
-                action.key === "change-password"
-                  ? isChangingPassword
-                  : action.key === "set-password"
-                    ? isSettingPassword
-                    : action.key === "change-profile-picture"
-                      ? isUpdatingProfilePicture
-                      : action.key === "reset-preferences"
-                        ? resetSettingsMutation.isPending
-                        : action.key === "delete-account"
-                          ? isDeletingAccount
-                          : isSigningOut
-              }
-            />
-          ))}
-        </View>
-      </SettingsScrollView>
+            />,
+          ]
+        : [],
+    );
 
-      <SheetPortal>
-        <BottomSheet
-          visible={showProfilePictureForm}
-          onDismiss={() => {
-            setShowProfilePictureForm(false);
-            setProfilePictureUrlInput("");
-          }}
-        >
-          <BottomSheetHeader>
-            <BottomSheetTitle>Profile picture</BottomSheetTitle>
-          </BottomSheetHeader>
-          <View style={{ paddingBottom: insets.bottom + 8 }}>
-            <SettingsProfilePictureForm
-              value={profilePictureUrlInput}
-              onChange={setProfilePictureUrlInput}
-              onSubmit={() => void handleSubmitProfilePicture()}
-              onCancel={() => {
-                setShowProfilePictureForm(false);
-                setProfilePictureUrlInput("");
-              }}
-              isPending={isUpdatingProfilePicture}
-              theme={theme}
-            />
-          </View>
-        </BottomSheet>
-      </SheetPortal>
+  const profileActions = renderActions(PROFILE_ACTION_KEYS);
+  const preferenceActions = renderActions(["reset-preferences"]);
+  const sessionActions = renderActions(SESSION_ACTION_KEYS);
+  const displayName = user?.name?.trim() || null;
+  const displayEmail = user?.email?.trim() || null;
 
-      <SheetPortal>
-        <BottomSheet
-          visible={activePasswordSheet !== null}
-          onDismiss={() => {
-            setActivePasswordSheet(null);
-            resetChangePasswordForm();
-          }}
-        >
-          <BottomSheetHeader>
-            <BottomSheetTitle>
-              {activePasswordSheet === "set-password"
-                ? "Set password"
-                : "Change password"}
-            </BottomSheetTitle>
-          </BottomSheetHeader>
-          <View style={{ paddingBottom: insets.bottom + 8 }}>
-            <SettingsPasswordForm
-              mode={activePasswordSheet ?? "change-password"}
-              currentPassword={currentPasswordInput}
-              newPassword={newPasswordInput}
-              confirmPassword={confirmPasswordInput}
-              onCurrentPasswordChange={setCurrentPasswordInput}
-              onNewPasswordChange={setNewPasswordInput}
-              onConfirmPasswordChange={setConfirmPasswordInput}
-              onSubmit={() => void handleSubmitPasswordChange()}
-              onCancel={() => {
-                setActivePasswordSheet(null);
-                resetChangePasswordForm();
-              }}
-              error={passwordChangeError}
-              isPending={isChangingPassword || isSettingPassword}
-              theme={theme}
-            />
-          </View>
-        </BottomSheet>
-      </SheetPortal>
+  return (
+    <SettingsPage title="Account">
+      <SheetScroll>
+        <SheetGroup>
+          <SheetItem
+            label={displayName ?? displayEmail ?? "Solace account"}
+            detail={displayName ? (displayEmail ?? undefined) : undefined}
+            leading={
+              <BlobatarAvatar
+                email={user?.email}
+                name={user?.name}
+                src={user?.image}
+                size={40}
+              />
+            }
+          />
+        </SheetGroup>
+
+        {profileActions.length > 0 ? (
+          <SheetSection
+            title="Profile and sign-in"
+            footer={
+              hasOAuthAccount
+                ? hasPasswordAccount
+                  ? "Email sign-in updates your login password. Existing encrypted data stays intact."
+                  : "Adding an email password gives this account an email sign-in option without changing your existing encrypted data."
+                : undefined
+            }
+          >
+            <SheetGroup>{profileActions}</SheetGroup>
+          </SheetSection>
+        ) : null}
+
+        {activePasswordSheet ? (
+          <SettingsPasswordForm
+            mode={activePasswordSheet}
+            currentPassword={currentPasswordInput}
+            newPassword={newPasswordInput}
+            confirmPassword={confirmPasswordInput}
+            onCurrentPasswordChange={setCurrentPasswordInput}
+            onNewPasswordChange={setNewPasswordInput}
+            onConfirmPasswordChange={setConfirmPasswordInput}
+            onSubmit={() => void handleSubmitPasswordChange()}
+            onCancel={() => {
+              setActivePasswordSheet(null);
+              resetChangePasswordForm();
+            }}
+            error={passwordChangeError}
+            isPending={isChangingPassword || isSettingPassword}
+          />
+        ) : null}
+
+        {showProfilePictureForm ? (
+          <SettingsProfilePictureForm
+            value={profilePictureUrlInput}
+            onChange={setProfilePictureUrlInput}
+            onSubmit={() => void handleSubmitProfilePicture()}
+            onCancel={() => {
+              setShowProfilePictureForm(false);
+              setProfilePictureUrlInput("");
+            }}
+            isPending={isUpdatingProfilePicture}
+          />
+        ) : null}
+
+        {preferenceActions.length > 0 ? (
+          <SheetSection title="Preferences">
+            <SheetGroup>{preferenceActions}</SheetGroup>
+          </SheetSection>
+        ) : null}
+
+        {sessionActions.length > 0 ? (
+          <SheetSection title="Session">
+            <SheetGroup>{sessionActions}</SheetGroup>
+          </SheetSection>
+        ) : null}
+      </SheetScroll>
     </SettingsPage>
   );
 }

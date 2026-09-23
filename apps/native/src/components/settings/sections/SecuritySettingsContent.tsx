@@ -1,16 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Platform,
   Pressable,
   StyleSheet,
-  Text,
-  View,
-  type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import type { Passkey as AuthPasskey } from "@better-auth/passkey/client";
@@ -21,24 +16,16 @@ import {
   summarizeLinkedAuthAccounts,
   type LinkedAuthAccountLike,
 } from "@workspace/calendar-core";
-import type { ThemeTokens } from "@workspace/design-tokens";
-import {
-  SettingsPage,
-  SettingsScrollView,
-  settingsPageStyles,
-} from "../SettingsPage";
-import {
-  SettingsActionRow,
-  SettingsHintRow,
-  SettingsToggleRow,
-} from "../SettingsRows";
+import { SettingsPage } from "../SettingsPage";
 import { SettingsPasswordForm } from "../SettingsAccountForms";
+import { useMailSkin, type MailSkin } from "../../mail/mail-ui";
 import {
-  BottomSheet,
-  BottomSheetHeader,
-  BottomSheetTitle,
-} from "../../BottomSheet";
-import { SheetPortal } from "../../SheetPortal";
+  SheetGroup,
+  SheetItem,
+  SheetScroll,
+  SheetSection,
+  SheetSwitchItem,
+} from "../../sheet/SheetSections";
 import { authClient } from "../../../lib/auth-client";
 import { getAuthCapabilities } from "../../../lib/auth-capabilities";
 import { formatStoredPasskeyDescription } from "../../../lib/passkey-auth";
@@ -62,8 +49,8 @@ import { useToast } from "../../../providers/ToastProvider";
 
 export function SecuritySettingsContent() {
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const skin = useMailSkin();
+  const styles = useMemo(() => createStyles(skin), [skin]);
   const { user, registerPasskey, deletePasskey } = useAuth();
   const { toast } = useToast();
   const { resetEncryptionPassword } = useE2ee();
@@ -219,161 +206,112 @@ export function SecuritySettingsContent() {
     toast,
   ]);
 
+  const passkeyFooter = !isPasskeySupported
+    ? Platform.OS === "web"
+      ? passkeySupportMessage
+      : `${passkeySupportMessage} Native passkeys also need the passkey domain, apple-app-site-association, and assetlinks setup to match your build.`
+    : storedPasskeys.length === 0
+      ? "No passkeys saved yet. Add one to sign in with Face ID, Touch ID, or your device credential manager."
+      : undefined;
+
   return (
     <SettingsPage title="Security">
-      <SettingsScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.sectionItems}>
-          <SettingsHintRow text={EVENT_ENCRYPTION_HINT} theme={theme} />
-          <SettingsToggleRow
-            icon="search"
-            label="On-device search index"
-            description="Keep encrypted titles of your mail and events on this device so older items stay searchable."
-            value={titleIndexEnabled}
-            onValueChange={(value) => {
-              setTitleIndexEnabled(value);
-              void setNativeTitleIndexEnabled(value);
+      <SheetScroll>
+        <SheetSection title="Encryption" footer={EVENT_ENCRYPTION_HINT}>
+          <SheetGroup>
+            <SheetSwitchItem
+              key="title-index"
+              icon="search"
+              label="On-device search index"
+              detail="Keep encrypted titles of your mail and events on this device so older items stay searchable."
+              value={titleIndexEnabled}
+              onValueChange={(value) => {
+                setTitleIndexEnabled(value);
+                void setNativeTitleIndexEnabled(value);
+              }}
+            />
+            {canResetEncryption ? (
+              <SheetItem
+                key="reset-encryption"
+                icon="lock"
+                label="Reset encryption password"
+                detail="Update the password that protects your encryption keys on this device. Existing data is not re-encrypted."
+                pending={isResettingEncryptionPassword}
+                onPress={() => {
+                  resetForm();
+                  setShowResetEncryption(true);
+                }}
+              />
+            ) : null}
+          </SheetGroup>
+        </SheetSection>
+
+        {showResetEncryption ? (
+          <SettingsPasswordForm
+            mode="reset-encryption"
+            currentPassword=""
+            newPassword={newPasswordInput}
+            confirmPassword={confirmPasswordInput}
+            onCurrentPasswordChange={() => undefined}
+            onNewPasswordChange={setNewPasswordInput}
+            onConfirmPasswordChange={setConfirmPasswordInput}
+            onSubmit={() => void handleResetEncryption()}
+            onCancel={() => {
+              setShowResetEncryption(false);
+              resetForm();
             }}
-            theme={theme}
+            error={passwordError}
+            isPending={isResettingEncryptionPassword}
           />
+        ) : null}
+
+        <SheetSection title="Passkeys" footer={passkeyFooter}>
           {isPasskeySupported ? (
-            <>
-              <SettingsActionRow
+            <SheetGroup>
+              <SheetItem
+                key="add-passkey"
                 icon="key"
                 label="Add Passkey"
-                description={
+                detail={
                   storedPasskeys.length > 0
                     ? `${storedPasskeys.length} saved on your account`
                     : "Use this device for faster, passwordless sign-in."
                 }
+                pending={isRegisteringPasskey}
                 onPress={handleRegisterPasskey}
-                theme={theme}
-                isPending={isRegisteringPasskey}
               />
-              {storedPasskeys.length > 0 ? (
-                storedPasskeys.map((passkey) => (
-                  <View key={passkey.id} style={styles.passkeyRow}>
-                    <Feather
-                      name="key"
-                      size={16}
-                      color={theme.colors.mutedForeground}
-                    />
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={styles.passkeyName} numberOfLines={1}>
-                        {passkey.name || "Unnamed Passkey"}
-                      </Text>
-                      <Text style={styles.passkeyMeta} numberOfLines={2}>
-                        {formatStoredPasskeyDescription(passkey)}
-                      </Text>
-                    </View>
+              {storedPasskeys.map((passkey) => (
+                <SheetItem
+                  key={passkey.id}
+                  icon="key"
+                  label={passkey.name || "Unnamed Passkey"}
+                  detail={formatStoredPasskeyDescription(passkey)}
+                  pending={pendingPasskeyDeletionId === passkey.id}
+                  trailing={
                     <Pressable
                       onPress={() => handleDeletePasskey(passkey)}
                       style={({ pressed }) => [
                         styles.deleteButton,
-                        pressed && { backgroundColor: theme.colors.accent },
+                        pressed && styles.deleteButtonPressed,
                       ]}
                       accessibilityRole="button"
                       accessibilityLabel={`Delete ${passkey.name || "passkey"}`}
                     >
-                      {pendingPasskeyDeletionId === passkey.id ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={theme.colors.destructive}
-                        />
-                      ) : (
-                        <Feather
-                          name="trash-2"
-                          size={16}
-                          color={theme.colors.destructive}
-                        />
-                      )}
+                      <Feather name="trash-2" size={16} color={theme.colors.destructive} />
                     </Pressable>
-                  </View>
-                ))
-              ) : (
-                <SettingsHintRow
-                  text="No passkeys saved yet. Add one to sign in with Face ID, Touch ID, or your device credential manager."
-                  theme={theme}
+                  }
                 />
-              )}
-            </>
-          ) : (
-            <SettingsHintRow
-              text={
-                Platform.OS === "web"
-                  ? passkeySupportMessage
-                  : `${passkeySupportMessage} Native passkeys also need the passkey domain, apple-app-site-association, and assetlinks setup to match your build.`
-              }
-              theme={theme}
-            />
-          )}
-          {canResetEncryption ? (
-            <SettingsActionRow
-              icon="lock"
-              label="Reset encryption password"
-              description="Update the password that protects your encryption keys on this device. Existing data is not re-encrypted."
-              onPress={() => {
-                resetForm();
-                setShowResetEncryption(true);
-              }}
-              theme={theme}
-              isPending={isResettingEncryptionPassword}
-            />
+              ))}
+            </SheetGroup>
           ) : null}
-        </View>
-      </SettingsScrollView>
-
-      <SheetPortal>
-        <BottomSheet
-          visible={showResetEncryption}
-          onDismiss={() => {
-            setShowResetEncryption(false);
-            resetForm();
-          }}
-        >
-          <BottomSheetHeader>
-            <BottomSheetTitle>Reset encryption password</BottomSheetTitle>
-          </BottomSheetHeader>
-          <View style={{ paddingBottom: insets.bottom + 8 }}>
-            <SettingsPasswordForm
-              mode="reset-encryption"
-              currentPassword=""
-              newPassword={newPasswordInput}
-              confirmPassword={confirmPasswordInput}
-              onCurrentPasswordChange={() => undefined}
-              onNewPasswordChange={setNewPasswordInput}
-              onConfirmPasswordChange={setConfirmPasswordInput}
-              onSubmit={() => void handleResetEncryption()}
-              onCancel={() => {
-                setShowResetEncryption(false);
-                resetForm();
-              }}
-              error={passwordError}
-              isPending={isResettingEncryptionPassword}
-              theme={theme}
-            />
-          </View>
-        </BottomSheet>
-      </SheetPortal>
+        </SheetSection>
+      </SheetScroll>
     </SettingsPage>
   );
 }
 
-function createStyles(theme: ThemeTokens) {
-  const view = {
-    ...settingsPageStyles(theme),
-    passkeyRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["3"],
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-      borderRadius: theme.borderRadius.md,
-      marginHorizontal: theme.spacing["1"],
-    },
+function createStyles(skin: MailSkin) {
+  return StyleSheet.create({
     deleteButton: {
       width: 32,
       height: 32,
@@ -381,20 +319,8 @@ function createStyles(theme: ThemeTokens) {
       alignItems: "center" as const,
       justifyContent: "center" as const,
     },
-  } satisfies Record<string, ViewStyle>;
-
-  const text = {
-    passkeyName: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
+    deleteButtonPressed: {
+      backgroundColor: skin.selected,
     },
-    passkeyMeta: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-  } satisfies Record<string, TextStyle>;
-
-  return { ...StyleSheet.create(view), ...StyleSheet.create(text) };
+  } satisfies Record<string, ViewStyle>);
 }

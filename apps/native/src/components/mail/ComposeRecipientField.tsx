@@ -28,10 +28,7 @@ import { LAYOUT_METRICS } from "../../lib/app-layout";
 import { useRecentContacts } from "../../hooks/use-recent-contacts";
 import { useMailSkin, type MailSkin } from "./mail-ui";
 import { RecipientSuggestionList } from "./RecipientSuggestionList";
-import {
-  collapseRecipientChips,
-  recipientInitial,
-} from "../../lib/mail/compose-display";
+import { collapseRecipientChips } from "../../lib/mail/compose-display";
 import {
   addRecipientChip,
   consumeRecipientDraft,
@@ -43,6 +40,7 @@ import {
 } from "../../lib/mail/compose-recipients";
 
 const SUGGESTION_LIST_MAX_HEIGHT = 280;
+const CHIP_HEIGHT = 30;
 const BLUR_CLOSE_MS = 120;
 const EMPTY_EMAILS: string[] = [];
 
@@ -52,6 +50,8 @@ export type ComposeRecipientFieldProps = {
   label: string;
   trailing?: ReactNode;
   excludeEmails?: string[];
+  /** Return key on an empty draft moves on, like Mail's "next". */
+  onSubmitEmpty?: () => void;
 };
 
 export function ComposeRecipientField({
@@ -60,6 +60,7 @@ export function ComposeRecipientField({
   label,
   trailing,
   excludeEmails = EMPTY_EMAILS,
+  onSubmitEmpty,
 }: ComposeRecipientFieldProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
@@ -168,7 +169,10 @@ export function ComposeRecipientField({
 
   const handleRemove = useCallback(
     (email: string) => {
-      applyField(removeRecipientChip(chipsRef.current, email), draftRef.current);
+      applyField(
+        removeRecipientChip(chipsRef.current, email),
+        draftRef.current,
+      );
       inputRef.current?.focus();
     },
     [applyField],
@@ -176,7 +180,10 @@ export function ComposeRecipientField({
 
   const handleKeyPress = useCallback(
     (event: { nativeEvent: { key: string } }) => {
-      if (event.nativeEvent.key !== "Backspace" || draftRef.current.length > 0) {
+      if (
+        event.nativeEvent.key !== "Backspace" ||
+        draftRef.current.length > 0
+      ) {
         return;
       }
       const last = chipsRef.current[chipsRef.current.length - 1];
@@ -225,6 +232,8 @@ export function ComposeRecipientField({
 
   const { visible, hiddenCount } = collapseRecipientChips(chips, focused);
   const collapsed = !focused && chips.length > 0;
+  const showSuggestions =
+    focused && draft.trim().length > 0 && suggestions.length > 0;
 
   return (
     <View style={styles.container}>
@@ -233,7 +242,9 @@ export function ComposeRecipientField({
         onPress={() => inputRef.current?.focus()}
         accessible={false}
       >
-        <Text style={styles.label}>{label}</Text>
+        <View style={styles.lineSlot}>
+          <Text style={styles.label}>{label}</Text>
+        </View>
         <View style={styles.chips}>
           {visible.map((chip) => {
             const chipLabel = recipientChipLabel(chip);
@@ -243,17 +254,15 @@ export function ComposeRecipientField({
                 onPress={() =>
                   focused ? handleRemove(chip.email) : inputRef.current?.focus()
                 }
-                style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.chip,
+                  pressed && styles.pressed,
+                ]}
                 accessibilityRole="button"
                 accessibilityLabel={
                   focused ? `Remove ${chipLabel}` : `${label}: ${chipLabel}`
                 }
               >
-                <View style={styles.chipAvatar}>
-                  <Text style={styles.chipAvatarText}>
-                    {recipientInitial(chipLabel)}
-                  </Text>
-                </View>
                 <Text style={styles.chipText} numberOfLines={1}>
                   {chipLabel}
                 </Text>
@@ -266,11 +275,7 @@ export function ComposeRecipientField({
           {hiddenCount > 0 ? (
             <Pressable
               onPress={() => inputRef.current?.focus()}
-              style={({ pressed }) => [
-                styles.chip,
-                styles.overflowChip,
-                pressed && styles.pressed,
-              ]}
+              style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
               accessibilityRole="button"
               accessibilityLabel={`Show ${hiddenCount} more recipients`}
             >
@@ -288,10 +293,14 @@ export function ComposeRecipientField({
             onSubmitEditing={() => {
               if (draft.trim()) {
                 commitDraft(draft);
+                return;
               }
+              inputRef.current?.blur();
+              onSubmitEmpty?.();
             }}
             placeholderTextColor={skin.textTertiary}
-            selectionColor={skin.accent}
+            selectionColor={theme.colors.primaryBase}
+            cursorColor={theme.colors.primaryBase}
             autoCapitalize="none"
             autoCorrect={false}
             autoComplete="off"
@@ -304,9 +313,9 @@ export function ComposeRecipientField({
             accessibilityLabel={label}
           />
         </View>
-        {trailing}
+        {trailing ? <View style={styles.lineSlot}>{trailing}</View> : null}
       </Pressable>
-      {focused ? (
+      {showSuggestions ? (
         <ScrollView
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="none"
@@ -328,6 +337,7 @@ export function ComposeRecipientField({
 }
 
 function createStyles(theme: ThemeTokens, skin: MailSkin) {
+  const rowHeight = LAYOUT_METRICS.hitSize + theme.spacing["2"];
   const view = {
     container: {
       flexGrow: 0,
@@ -340,13 +350,17 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
     },
     row: {
       flexDirection: "row" as const,
-      alignItems: "center" as const,
-      minHeight: LAYOUT_METRICS.hitSize + theme.spacing["1"],
+      alignItems: "flex-start" as const,
+      minHeight: rowHeight,
       paddingLeft: theme.spacing["4"],
-      paddingRight: theme.spacing["1"],
-      backgroundColor: theme.colors.background,
+      paddingRight: theme.spacing["2"],
+      backgroundColor: theme.colors.card,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: skin.borderTertiary,
+    },
+    lineSlot: {
+      height: rowHeight,
+      justifyContent: "center" as const,
     },
     chips: {
       flex: 1,
@@ -355,31 +369,19 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       flexWrap: "wrap" as const,
       alignItems: "center" as const,
       gap: 6,
-      paddingVertical: theme.spacing["2"],
+      paddingVertical: (rowHeight - CHIP_HEIGHT) / 2,
     },
     chip: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: 6,
       maxWidth: "100%" as const,
-      height: 28,
-      paddingLeft: 3,
-      paddingRight: 10,
-      borderRadius: theme.borderRadius.full,
+      height: CHIP_HEIGHT,
+      paddingHorizontal: 10,
+      borderRadius: theme.borderRadius.md,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: skin.borderPrimary,
-      backgroundColor: skin.surface,
-    },
-    overflowChip: {
-      paddingLeft: 10,
-    },
-    chipAvatar: {
-      width: 20,
-      height: 20,
-      borderRadius: theme.borderRadius.full,
-      backgroundColor: skin.field,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
+      backgroundColor: theme.colors.card,
     },
     pressed: {
       backgroundColor: skin.pressed,
@@ -388,17 +390,14 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
 
   const text = {
     label: {
-      ...skin.meta,
-      marginRight: theme.spacing["2"],
-    },
-    chipAvatarText: {
-      fontSize: 10,
-      fontWeight: "600" as TextStyle["fontWeight"],
-      color: skin.textSecondary,
+      ...skin.body,
+      fontWeight: "500" as TextStyle["fontWeight"],
+      color: skin.textTertiary,
+      marginRight: theme.spacing["3"],
     },
     chipText: {
-      maxWidth: 180,
-      fontSize: 13,
+      maxWidth: 200,
+      fontSize: 14,
       fontWeight: "500" as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
@@ -406,8 +405,8 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       flexGrow: 1,
       flexBasis: 120,
       minWidth: 120,
-      minHeight: 28,
-      paddingVertical: 4,
+      height: CHIP_HEIGHT,
+      paddingVertical: 0,
       fontSize: skin.body.fontSize,
       color: theme.colors.foreground,
     },

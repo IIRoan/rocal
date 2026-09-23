@@ -10,7 +10,6 @@ export type CommandActionId =
   | "view-week"
   | "view-day"
   | "view-3day"
-  | "view-agenda"
   | "open-calendar"
   | "open-mail"
   | "compose-mail"
@@ -108,14 +107,6 @@ function buildCalendarCommandActions(): CommandAction[] {
       icon: "sidebar",
       keywords: ["three day", "3 day", "switch view"],
       view: "3day",
-    },
-    {
-      id: "view-agenda",
-      label: "Agenda view",
-      group: "Calendar",
-      icon: "list",
-      keywords: ["agenda", "schedule", "list", "switch view"],
-      view: "agenda",
     },
     {
       id: "open-calendar",

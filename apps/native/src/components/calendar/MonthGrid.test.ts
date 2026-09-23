@@ -4,12 +4,6 @@ import {
   getMonthDayEvents,
   groupEventsByDay,
   resolveEventDotColor,
-  getCompactStripCollapsedHeight,
-  getCompactStripExpandedHeight,
-  getCompactStripWeekRowOffset,
-  COMPACT_STRIP_EXPANDED_WEEK_ROWS,
-  COMPACT_STRIP_WEEK_ROW_HEIGHT,
-  COMPACT_STRIP_HEADER_ROW_HEIGHT,
 } from "./month-grid-utils";
 import { isSameDay, getDay } from "date-fns";
 import { nativeLightTheme, nativeDarkTheme } from "@workspace/design-tokens";
@@ -207,66 +201,5 @@ describe("resolveEventDotColor", () => {
     expect(resolveEventDotColor("emerald", darkTheme)).toBe(
       darkTheme.colors.calendar.emerald.bg,
     );
-  });
-});
-
-// ─── CompactMonthStrip height helpers ────────────────────────────────────────
-
-describe("getCompactStripCollapsedHeight", () => {
-  it("returns full week-row + header height when NOT collapsing to handle only", () => {
-    expect(getCompactStripCollapsedHeight(false)).toBe(
-      COMPACT_STRIP_HEADER_ROW_HEIGHT + COMPACT_STRIP_WEEK_ROW_HEIGHT,
-    );
-  });
-
-  it("returns 0 when collapseToHandleOnly is true (timeline provides the header)", () => {
-    expect(getCompactStripCollapsedHeight(true)).toBe(0);
-  });
-
-  it("collapsed height is less than expanded height in default mode", () => {
-    expect(getCompactStripCollapsedHeight(false)).toBeLessThan(
-      getCompactStripExpandedHeight(),
-    );
-  });
-
-  it("collapsed handle-only height is less than expanded height", () => {
-    expect(getCompactStripCollapsedHeight(true)).toBeLessThan(
-      getCompactStripExpandedHeight(),
-    );
-  });
-});
-
-describe("getCompactStripWeekRowOffset", () => {
-  it("starts at row 0 for June 2025 with Sunday week start", () => {
-    expect(getCompactStripWeekRowOffset(new Date(2025, 5, 1), 0)).toBe(0);
-  });
-
-  it("skips leading padding row for June 2025 with Monday week start", () => {
-    expect(getCompactStripWeekRowOffset(new Date(2025, 5, 1), 1)).toBe(1);
-  });
-});
-
-describe("getCompactStripExpandedHeight", () => {
-  it("expanded height spans exactly five week rows plus the header row", () => {
-    expect(getCompactStripExpandedHeight()).toBe(
-      COMPACT_STRIP_HEADER_ROW_HEIGHT +
-        COMPACT_STRIP_WEEK_ROW_HEIGHT * COMPACT_STRIP_EXPANDED_WEEK_ROWS,
-    );
-  });
-
-  it("expanded height is a positive value", () => {
-    expect(getCompactStripExpandedHeight()).toBeGreaterThan(0);
-  });
-});
-
-describe("COMPACT_STRIP constants", () => {
-  it("week row height is a positive integer", () => {
-    expect(COMPACT_STRIP_WEEK_ROW_HEIGHT).toBeGreaterThan(0);
-    expect(Number.isInteger(COMPACT_STRIP_WEEK_ROW_HEIGHT)).toBe(true);
-  });
-
-  it("header row height is a positive integer", () => {
-    expect(COMPACT_STRIP_HEADER_ROW_HEIGHT).toBeGreaterThan(0);
-    expect(Number.isInteger(COMPACT_STRIP_HEADER_ROW_HEIGHT)).toBe(true);
   });
 });

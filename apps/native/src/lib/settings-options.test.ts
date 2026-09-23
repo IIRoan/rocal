@@ -23,7 +23,6 @@ describe("settings-options", () => {
       "week",
       "day",
       "3day",
-      "agenda",
     ]);
   });
 

@@ -13,6 +13,7 @@ import { AppUpdateProvider } from "../src/providers/AppUpdateProvider";
 import { AppUpdateScreen } from "../src/components/settings/AppUpdateScreen";
 import { E2eeProvider, useE2ee } from "../src/providers/E2eeProvider";
 import { SheetProvider } from "../src/providers/SheetProvider";
+import { MailComposeProvider } from "../src/providers/MailComposeProvider";
 import { ToastProvider } from "../src/providers/ToastProvider";
 import { MailSelectionProvider } from "../src/providers/MailSelectionProvider";
 import { CommandPaletteProvider } from "../src/providers/CommandPaletteProvider";
@@ -148,7 +149,8 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   // hand-off to calendar instead of flashing the calendar underneath.
   const isPreparingWorkspace =
     isAuthenticated && !isLoading && (!isE2eeReady || isPreparingStartupCrypto);
-  const isPushNavigationReady = isAuthenticated && !isLoading && !isPreparingWorkspace;
+  const isPushNavigationReady =
+    isAuthenticated && !isLoading && !isPreparingWorkspace;
 
   return (
     <View style={{ flex: 1 }}>
@@ -192,11 +194,12 @@ function RootLayout() {
               <AppUpdateProvider>
                 <AppUpdateScreen />
                 <E2eeProvider>
-                    <MailSelectionProvider>
-                      <CalendarViewProvider>
-                        <NavigationGuard>
-                          <ToastProvider>
-                            <SheetProvider>
+                  <MailSelectionProvider>
+                    <CalendarViewProvider>
+                      <NavigationGuard>
+                        <ToastProvider>
+                          <SheetProvider>
+                            <MailComposeProvider>
                               <CommandPaletteProvider>
                                 <WorkspaceTabHostProvider>
                                   <Stack
@@ -224,11 +227,12 @@ function RootLayout() {
                                   <AuthenticatedChrome />
                                 </WorkspaceTabHostProvider>
                               </CommandPaletteProvider>
-                            </SheetProvider>
-                          </ToastProvider>
-                        </NavigationGuard>
-                      </CalendarViewProvider>
-                    </MailSelectionProvider>
+                            </MailComposeProvider>
+                          </SheetProvider>
+                        </ToastProvider>
+                      </NavigationGuard>
+                    </CalendarViewProvider>
+                  </MailSelectionProvider>
                 </E2eeProvider>
               </AppUpdateProvider>
             </ThemeProvider>

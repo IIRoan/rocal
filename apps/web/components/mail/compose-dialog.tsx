@@ -38,6 +38,7 @@ import { Button } from "@workspace/ui/components/ui/button";
 import { useIsMobile } from "@workspace/ui/hooks";
 import type { JmapIdentity } from "@/lib/mail/types";
 import {
+  canSendCompose,
   validateComposeRecipients,
   pickOutgoingAttachmentFiles,
 } from "@workspace/calendar-core";
@@ -314,18 +315,26 @@ export function ComposeForm({
     bcc: composeBcc,
     subject: composeSubject,
   });
-  const toValid =
-    recipientValidation.to.length > 0 && !recipientValidation.errors.recipients;
   const showToError =
     toTouched &&
     composeTo.trim().length > 0 &&
     Boolean(
       recipientValidation.errors.to ?? recipientValidation.errors.recipients,
     );
-  const canSend =
-    toValid &&
-    composeSubject.trim().length > 0 &&
-    !recipientValidation.errors.subject;
+  const composeBodyText = plainTextMode
+    ? composeBody
+    : htmlToPlainText(composeHtmlBody);
+  const inlineImageCount = plainTextMode
+    ? 0
+    : (composeHtmlBody.match(/<img\b/gi)?.length ?? 0);
+  const canSend = canSendCompose({
+    to: composeTo,
+    cc: composeCc,
+    bcc: composeBcc,
+    subject: composeSubject,
+    bodyText: composeBodyText,
+    attachmentCount: composeAttachments.length + inlineImageCount,
+  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const accepted = pickOutgoingAttachmentFiles(
@@ -405,14 +414,11 @@ export function ComposeForm({
 
   async function requestSend(skipAttachmentCheck = false) {
     if (!skipAttachmentCheck) {
-      const bodyText = plainTextMode
-        ? composeBody
-        : htmlToPlainText(composeHtmlBody);
       const matched = shouldWarnAboutMissingAttachment({
         enabled: composeSettings.attachmentReminderEnabled,
         attachmentCount: composeAttachments.length,
         subject: composeSubject,
-        bodyText,
+        bodyText: composeBodyText,
         keywords: composeSettings.attachmentReminderKeywords,
       });
       if (matched) {

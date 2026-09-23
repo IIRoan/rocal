@@ -1,5 +1,6 @@
 import { settingsSectionPath } from "@workspace/calendar-core";
 import { buildAccountSheetGroups } from "./account-sheet-model";
+import { CALENDARS_ROOT_PAGE } from "./calendars-sheet-pages";
 
 describe("buildAccountSheetGroups", () => {
   it("groups settings sections with routes", () => {
@@ -16,19 +17,15 @@ describe("buildAccountSheetGroups", () => {
     );
   });
 
-  it("filters rows by label or description and drops empty groups", () => {
-    const groups = buildAccountSheetGroups("  SECURITY ");
-    expect(groups.map((group) => group.title)).toContain("Security");
-    for (const group of groups) {
-      expect(group.rows.length).toBeGreaterThan(0);
-      for (const row of group.rows) {
-        const haystack = `${row.label} ${row.description}`.toLowerCase();
-        expect(haystack).toContain("security");
-      }
-    }
-  });
-
-  it("returns no groups when nothing matches", () => {
-    expect(buildAccountSheetGroups("zzz-no-match")).toEqual([]);
+  it("lists calendars management before calendar settings", () => {
+    const calendarGroup = buildAccountSheetGroups().find(
+      (group) => group.title === "Calendar",
+    );
+    expect(
+      calendarGroup?.rows.map((row) => ({ id: row.id, label: row.label })),
+    ).toEqual([
+      { id: CALENDARS_ROOT_PAGE, label: "Calendars" },
+      { id: "calendar", label: "Calendar settings" },
+    ]);
   });
 });

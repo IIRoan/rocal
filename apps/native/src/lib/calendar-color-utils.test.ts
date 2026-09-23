@@ -4,6 +4,7 @@ import {
   isValidCalendarColorValue,
   mixHexInOklch,
   resolveCalendarSwatchColor,
+  resolveCalendarSwatchForeground,
   resolveEventBlockColor,
 } from "./calendar-color-utils";
 
@@ -83,6 +84,26 @@ describe("calendar-color-utils", () => {
     it("maps the web sky alias to blue", () => {
       expect(resolveCalendarSwatchColor("sky", nativeLightTheme)).toBe(
         nativeLightTheme.colors.calendar.blue.bg,
+      );
+    });
+  });
+
+  describe("resolveCalendarSwatchForeground", () => {
+    it("pairs named colors with their theme fg", () => {
+      expect(resolveCalendarSwatchForeground("red", nativeLightTheme)).toBe(
+        nativeLightTheme.colors.calendar.red.fg,
+      );
+      expect(resolveCalendarSwatchForeground("sky", nativeDarkTheme)).toBe(
+        nativeDarkTheme.colors.calendar.blue.fg,
+      );
+    });
+
+    it("uses the primary foreground for custom hex and blue fg for unknown values", () => {
+      expect(resolveCalendarSwatchForeground("#123abc", nativeLightTheme)).toBe(
+        nativeLightTheme.colors.primaryForeground,
+      );
+      expect(resolveCalendarSwatchForeground("bogus", nativeLightTheme)).toBe(
+        nativeLightTheme.colors.calendar.blue.fg,
       );
     });
   });

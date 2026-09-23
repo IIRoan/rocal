@@ -1,11 +1,8 @@
-import type { Calendar, CalendarView } from "@workspace/calendar-core";
-import { partitionCalendarsByKind } from "@workspace/calendar-core";
-import type { ThemeTokens } from "@workspace/design-tokens";
+import type { CalendarView } from "@workspace/calendar-core";
 import {
   CALENDAR_HOME_ROUTE,
   SETTINGS_ROUTE,
 } from "../lib/navigation-routes";
-import { resolveCalendarSwatchColor } from "../lib/calendar-color-utils";
 import type { NativeCalendarView } from "../lib/calendar-views";
 
 export type SidebarIconName =
@@ -20,26 +17,6 @@ export interface SidebarMenuItem {
   label: string;
   icon: SidebarIconName;
   route: string;
-}
-
-export interface SidebarCalendarAction {
-  key: "create-calendar" | "add-import" | "manage-calendars";
-  icon: SidebarIconName;
-  route: string;
-  accessibilityLabel: string;
-}
-
-export interface SidebarCalendarRow {
-  id: string;
-  name: string;
-  isVisible: boolean;
-  swatchColor: string;
-}
-
-export interface SidebarCalendarSection {
-  key: "owned" | "public" | "subscribed";
-  title: string | null;
-  rows: SidebarCalendarRow[];
 }
 
 const SIDEBAR_PRIMARY_MENU_ITEMS: SidebarMenuItem[] = [
@@ -57,55 +34,8 @@ const SIDEBAR_PRIMARY_MENU_ITEMS: SidebarMenuItem[] = [
   },
 ];
 
-const SIDEBAR_CALENDAR_ACTIONS: SidebarCalendarAction[] = [
-  {
-    key: "create-calendar",
-    icon: "plus",
-    route: "/calendar-manage/create",
-    accessibilityLabel: "Create new calendar",
-  },
-  {
-    key: "manage-calendars",
-    icon: "settings",
-    route: "/calendar-manage",
-    accessibilityLabel: "Manage calendars",
-  },
-];
-
 export function getSidebarPrimaryMenuItems(): SidebarMenuItem[] {
   return SIDEBAR_PRIMARY_MENU_ITEMS;
-}
-
-export function getSidebarCalendarActions(): SidebarCalendarAction[] {
-  return SIDEBAR_CALENDAR_ACTIONS;
-}
-
-export function buildSidebarCalendarSections(
-  calendars: Calendar[],
-  theme: ThemeTokens,
-): SidebarCalendarSection[] {
-  const { ownedCalendars, publicCalendars, subscribedCalendars } =
-    partitionCalendarsByKind(calendars);
-
-  const toRows = (entries: Calendar[]): SidebarCalendarRow[] =>
-    entries.map((calendar) => ({
-      id: calendar.id,
-      name: calendar.name,
-      isVisible: calendar.isVisible,
-      swatchColor: resolveCalendarSwatchColor(calendar.color, theme),
-    }));
-
-  const sections: SidebarCalendarSection[] = [
-    { key: "owned", title: null, rows: toRows(ownedCalendars) },
-    { key: "public", title: "Public", rows: toRows(publicCalendars) },
-    {
-      key: "subscribed",
-      title: "Subscribed",
-      rows: toRows(subscribedCalendars),
-    },
-  ];
-
-  return sections.filter((section) => section.rows.length > 0);
 }
 
 // ─── View switcher ─────────────────────────────────────────────────────────────
@@ -113,14 +43,12 @@ export function buildSidebarCalendarSections(
 export interface SidebarViewOption {
   view: NativeCalendarView;
   label: string;
-  icon: "square" | "columns" | "grid" | "list";
 }
 
 export const SIDEBAR_VIEW_OPTIONS: SidebarViewOption[] = [
-  { view: "day", label: "Day", icon: "square" },
-  { view: "3day", label: "3 Day", icon: "columns" },
-  { view: "week", label: "Week", icon: "grid" },
-  { view: "agenda", label: "Agenda", icon: "list" },
+  { view: "day", label: "Day" },
+  { view: "3day", label: "3 Day" },
+  { view: "week", label: "Week" },
 ];
 
 export function getViewLabel(view: CalendarView): string {

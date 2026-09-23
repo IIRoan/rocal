@@ -208,6 +208,27 @@ export function validateComposeRecipients(input: {
   return { to, cc, bcc, errors };
 }
 
+/** Send needs valid recipients, a subject, and a message body or attachment. */
+export function canSendCompose(input: {
+  to: string;
+  cc?: string;
+  bcc?: string;
+  subject: string;
+  bodyText: string;
+  attachmentCount: number;
+}): boolean {
+  const { to, errors } = validateComposeRecipients(input);
+  const hasContent =
+    input.bodyText.trim().length > 0 || input.attachmentCount > 0;
+  return (
+    to.length > 0 &&
+    !errors.to &&
+    !errors.recipients &&
+    !errors.subject &&
+    hasContent
+  );
+}
+
 export function parsedAddressesToEmails(
   addresses: ParsedMailAddress[],
 ): string[] {

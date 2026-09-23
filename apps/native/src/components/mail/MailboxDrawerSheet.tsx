@@ -1,25 +1,29 @@
-import React, { useMemo } from "react";
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type TextStyle,
-  type ViewStyle,
-} from "react-native";
-import { useRouter } from "expo-router";
+import React, { useRef } from "react";
 import { Feather } from "@expo/vector-icons";
-import type { ThemeTokens } from "@workspace/design-tokens";
-import { useTheme } from "../../providers/ThemeProvider";
-import { BottomSheet, BottomSheetScrollView } from "../BottomSheet";
-import { WorkspaceAppSwitch } from "../WorkspaceAppSwitch";
-import { InlineLoader } from "../ui/loading";
-import { useDeferredSheetAction } from "../../hooks/use-deferred-sheet-action";
-import { useWorkspaceTabSwitch } from "../../lib/use-workspace-tab-switch";
-import { SETTINGS_MAILBOXES_ROUTE } from "../../lib/navigation-routes";
-import { getMailboxDisplayName, getMailboxIcon } from "../../lib/mail/mail-helpers";
+import { BottomSheet, type BottomSheetHandle } from "../BottomSheet";
+import {
+  SheetPageStack,
+  SheetSubPage,
+  useSheetPageStack,
+} from "../sheet/SheetPageStack";
+import {
+  SheetGroup,
+  SheetItem,
+  SheetMessage,
+  SheetScroll,
+  SheetSection,
+} from "../sheet/SheetSections";
+import { SettingsSheetPageProvider } from "../settings/SettingsPage";
+import { MailboxesSettingsContent } from "../settings/sections/MailboxesSettingsContent";
+import {
+  getMailboxDisplayName,
+  getMailboxIcon,
+} from "../../lib/mail/mail-helpers";
 import type { JmapMailbox } from "../../lib/mail/types";
-import { useMailSkin, type MailSkin } from "./mail-ui";
+
+const ROOT_PAGE = "root";
+const MANAGE_PAGE = "mailboxes";
+const SNAP_POINTS = [0.6, 0.92];
 
 interface MailboxDrawerSheetProps {
   visible: boolean;
@@ -30,192 +34,102 @@ interface MailboxDrawerSheetProps {
   onSelectMailbox: (mailboxId: string) => void;
 }
 
-/** Mail drawer: app switch and mailbox list. */
+/** Mail drawer: mailbox list, with mailbox management in-sheet. */
 export function MailboxDrawerSheet({
   visible,
   onDismiss,
-  loading,
-  mailboxes,
-  selectedMailboxId,
-  onSelectMailbox,
+  ...listProps
 }: MailboxDrawerSheetProps) {
-  const { theme } = useTheme();
-  const skin = useMailSkin();
-  const router = useRouter();
-  const switchTab = useWorkspaceTabSwitch();
-  const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
-  const { runAfterClose, onCloseComplete } = useDeferredSheetAction(onDismiss);
+  const sheetRef = useRef<BottomSheetHandle>(null);
+  const pageStack = useSheetPageStack(ROOT_PAGE, visible);
+  const { push, pop, reset } = pageStack;
+
+  const openManage = () => {
+    sheetRef.current?.snapTo(SNAP_POINTS.length - 1);
+    push(MANAGE_PAGE);
+  };
 
   return (
     <BottomSheet
+      ref={sheetRef}
       visible={visible}
       onDismiss={onDismiss}
-      onCloseComplete={onCloseComplete}
-      snapPoints={[0.6, 0.92]}
+      onCloseComplete={reset}
+      snapPoints={SNAP_POINTS}
       initialSnapIndex={0}
     >
-      <BottomSheetScrollView contentContainerStyle={styles.content}>
-        <WorkspaceAppSwitch
-          activeApp="mail"
-          onSwitch={(app) => runAfterClose(() => switchTab(app))}
+      <SettingsSheetPageProvider push={push} back={pop}>
+        <SheetPageStack
+          state={pageStack}
+          renderPage={(pageId) =>
+            pageId === MANAGE_PAGE ? (
+              <SheetSubPage title="Mailboxes" backLabel="Back to mail">
+                <MailboxesSettingsContent />
+              </SheetSubPage>
+            ) : (
+              <MailboxList
+                {...listProps}
+                onDismiss={onDismiss}
+                onManage={openManage}
+              />
+            )
+          }
         />
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Mail</Text>
-            <SectionAction
-              styles={styles}
-              skin={skin}
-              label="Manage mailboxes"
-              onPress={() =>
-                runAfterClose(() => router.push(SETTINGS_MAILBOXES_ROUTE as never))
-              }
-            />
-          </View>
-          {loading ? (
-            <InlineLoader theme={theme} />
-          ) : mailboxes.length === 0 ? (
-            <Text style={styles.empty}>No mailboxes found.</Text>
-          ) : (
-            <View style={styles.card}>
-              {mailboxes.map((mailbox, index) => {
-                const active = mailbox.id === selectedMailboxId;
-                return (
-                  <Pressable
-                    key={mailbox.id}
-                    onPress={() => {
-                      onSelectMailbox(mailbox.id);
-                      onDismiss();
-                    }}
-                    style={({ pressed }) => [
-                      styles.row,
-                      index > 0 && styles.rowDivider,
-                      pressed && styles.rowPressed,
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel={getMailboxDisplayName(mailbox)}
-                    accessibilityState={{ selected: active }}
-                  >
-                    <Feather
-                      name={getMailboxIcon(mailbox) as keyof typeof Feather.glyphMap}
-                      size={17}
-                      color={active ? theme.colors.foreground : skin.textSecondary}
-                    />
-                    <Text
-                      style={[styles.rowLabel, active && styles.rowLabelActive]}
-                      numberOfLines={1}
-                    >
-                      {getMailboxDisplayName(mailbox)}
-                    </Text>
-                    {active ? (
-                      <Feather name="check" size={17} color={skin.accent} />
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-        </View>
-      </BottomSheetScrollView>
+      </SettingsSheetPageProvider>
     </BottomSheet>
   );
 }
 
-function SectionAction({
-  styles,
-  skin,
-  label,
-  onPress,
-}: {
-  styles: ReturnType<typeof createStyles>;
-  skin: MailSkin;
-  label: string;
-  onPress: () => void;
-}) {
+function MailboxList({
+  onDismiss,
+  onManage,
+  loading,
+  mailboxes,
+  selectedMailboxId,
+  onSelectMailbox,
+}: Omit<MailboxDrawerSheetProps, "visible"> & { onManage: () => void }) {
   return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={8}
-      style={({ pressed }) => [styles.sectionAction, pressed && styles.pressed]}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
-      <Feather name="sliders" size={15} color={skin.textTertiary} />
-    </Pressable>
+    <SheetScroll>
+      <SheetSection title="Mail">
+        {loading ? (
+          <SheetMessage text="Loading mailboxes…" />
+        ) : mailboxes.length === 0 ? (
+          <SheetMessage text="No mailboxes found." />
+        ) : (
+          <SheetGroup>
+            {mailboxes.map((mailbox) => {
+              const active = mailbox.id === selectedMailboxId;
+              return (
+                <SheetItem
+                  key={mailbox.id}
+                  label={getMailboxDisplayName(mailbox)}
+                  icon={
+                    getMailboxIcon(mailbox) as keyof typeof Feather.glyphMap
+                  }
+                  checked={active}
+                  onPress={() => {
+                    onSelectMailbox(mailbox.id);
+                    onDismiss();
+                  }}
+                  accessibilityState={{ selected: active }}
+                />
+              );
+            })}
+          </SheetGroup>
+        )}
+      </SheetSection>
+
+      <SheetSection title="Manage">
+        <SheetGroup>
+          <SheetItem
+            label="Mailboxes"
+            icon="settings"
+            chevron
+            onPress={onManage}
+            accessibilityLabel="Manage mailboxes"
+          />
+        </SheetGroup>
+      </SheetSection>
+    </SheetScroll>
   );
-}
-
-function createStyles(theme: ThemeTokens, skin: MailSkin) {
-  const view = {
-    content: {
-      paddingHorizontal: theme.spacing["4"],
-      paddingTop: theme.spacing["1"],
-      paddingBottom: theme.spacing["10"],
-      gap: theme.spacing["5"],
-    },
-    section: {
-      gap: theme.spacing["2"],
-    },
-    sectionHeader: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "space-between" as const,
-    },
-    sectionAction: {
-      width: 32,
-      height: 32,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-    },
-    pressed: {
-      opacity: 0.6,
-    },
-    card: {
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: skin.field,
-      overflow: "hidden" as const,
-    },
-    row: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["3"],
-      minHeight: 48,
-      paddingHorizontal: theme.spacing["3"],
-    },
-    rowDivider: {
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: skin.borderPrimary,
-    },
-    rowPressed: {
-      backgroundColor: skin.selected,
-    },
-  } satisfies Record<string, ViewStyle>;
-
-  const text = {
-    sectionTitle: {
-      fontSize: 12,
-      lineHeight: 16,
-      fontWeight: "600" as TextStyle["fontWeight"],
-      letterSpacing: 0.6,
-      textTransform: "uppercase" as const,
-      color: skin.textTertiary,
-    },
-    rowLabel: {
-      flex: 1,
-      fontSize: 15,
-      lineHeight: 20,
-      color: skin.textSecondary,
-    },
-    rowLabelActive: {
-      color: theme.colors.foreground,
-      fontWeight: "600" as TextStyle["fontWeight"],
-    },
-    empty: {
-      fontSize: 14,
-      lineHeight: 19,
-      color: skin.textTertiary,
-    },
-  } satisfies Record<string, TextStyle>;
-
-  return { ...StyleSheet.create(view), ...StyleSheet.create(text) };
 }

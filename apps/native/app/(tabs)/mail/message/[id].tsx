@@ -34,6 +34,8 @@ import { CenteredLoader } from "../../../../src/components/ui/loading";
 import { AttachmentPreviewModal } from "../../../../src/components/mail/AttachmentPreviewModal";
 import { ConversationThreadStrip } from "../../../../src/components/mail/ConversationThreadStrip";
 import { useAuth } from "../../../../src/providers/AuthProvider";
+import { useMailCompose } from "../../../../src/providers/MailComposeProvider";
+import { MAIL_TAB_ROUTE } from "../../../../src/lib/navigation-routes";
 import {
   MAIL_REPLY_FAB_SIZE,
   MailReplyFab,
@@ -56,7 +58,8 @@ export default function MailMessageScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const isDark = useColorScheme() === "dark";
-  const { replace, push } = useRouter();
+  const { replace, push, back, canGoBack } = useRouter();
+  const { openCompose } = useMailCompose();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const scrollBottomPad =
     theme.spacing["8"] + MAIL_REPLY_FAB_SIZE + insets.bottom;
@@ -107,14 +110,20 @@ export default function MailMessageScreen() {
     );
   }, [message, recordUsage, runtime?.session?.username]);
 
+  const openedDraftRef = useRef<string | null>(null);
   useEffect(() => {
     if (!message || !runtime) return;
+    if (openedDraftRef.current === message.id) return;
     if (isDraftMessage(message, null, runtime.mailboxes)) {
-      replace(
-        `/(tabs)/mail/compose?mode=draft&messageId=${message.id}` as never,
-      );
+      openedDraftRef.current = message.id;
+      openCompose({ mode: "draft", messageId: message.id });
+      if (canGoBack()) {
+        back();
+      } else {
+        replace(MAIL_TAB_ROUTE as never);
+      }
     }
-  }, [message, replace, runtime]);
+  }, [back, canGoBack, message, openCompose, replace, runtime]);
 
   // Decrypting unlocks the vault, so refresh label names/colors from its backup.
   useEffect(() => {

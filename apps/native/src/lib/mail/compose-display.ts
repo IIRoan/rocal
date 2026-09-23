@@ -11,11 +11,6 @@ export function collapseRecipientChips<T>(
   return { visible: chips.slice(0, 1), hiddenCount: chips.length - 1 };
 }
 
-export function recipientInitial(label: string): string {
-  const first = label.trim().match(/[\p{L}\p{N}]/u)?.[0];
-  return first ? first.toUpperCase() : "?";
-}
-
 export function composeTitle(subject: string): string {
   return subject.trim() || "New message";
 }

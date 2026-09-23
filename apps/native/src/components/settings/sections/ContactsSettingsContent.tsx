@@ -1,31 +1,28 @@
 import React, { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type TextStyle,
-  type ViewStyle,
-} from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Alert, StyleSheet } from "react-native";
 import {
   formatContactContextSummary,
   getContactDisplayLabel,
   normalizeEmailAddress,
   type RecentContactEntry,
 } from "@workspace/calendar-core";
-import type { ThemeTokens } from "@workspace/design-tokens";
-import { SettingsPage, SettingsScrollView } from "../SettingsPage";
+import { SettingsPage } from "../SettingsPage";
 import { BlobatarAvatar } from "../../BlobatarAvatar";
-import { useTheme } from "../../../providers/ThemeProvider";
+import {
+  SheetButton,
+  SheetCenteredState,
+  SheetGroup,
+  SheetItem,
+  SheetScroll,
+  SheetSearchField,
+  SheetSection,
+  SheetTextField,
+} from "../../sheet/SheetSections";
 import { useRecentContacts } from "../../../hooks/use-recent-contacts";
 
+const AVATAR_SIZE = 28;
+
 export function ContactsSettingsContent() {
-  const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
   const {
     payload,
     filterContacts,
@@ -60,9 +57,7 @@ export function ContactsSettingsContent() {
   if (isLoading && !payload) {
     return (
       <SettingsPage title="Contacts">
-        <View style={styles.emptyState}>
-          <ActivityIndicator color={theme.colors.mutedForeground} />
-        </View>
+        <SheetCenteredState loading message="Loading contacts…" />
       </SettingsPage>
     );
   }
@@ -70,11 +65,7 @@ export function ContactsSettingsContent() {
   if (!isAvailable) {
     return (
       <SettingsPage title="Contacts">
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>
-            Unlock encrypted data on this device to view and manage contacts.
-          </Text>
-        </View>
+        <SheetCenteredState message="Unlock encrypted data on this device to view and manage contacts." />
       </SettingsPage>
     );
   }
@@ -116,126 +107,111 @@ export function ContactsSettingsContent() {
     );
   }
 
+  const cancelAdd = () => {
+    setIsAdding(false);
+    setNewEmail("");
+    setNewName("");
+  };
+
+  const saveNewContact = () => {
+    const email = normalizeEmailAddress(newEmail);
+    if (!email) return;
+    setIsSaving(true);
+    void addContact({
+      email,
+      displayName: newName.trim() || undefined,
+    })
+      .then((saved) => {
+        if (!saved) return;
+        setNewEmail("");
+        setNewName("");
+        setIsAdding(false);
+        setSelectedEmail(email);
+      })
+      .finally(() => setIsSaving(false));
+  };
+
   return (
     <SettingsPage title="Contacts">
-      <View style={styles.searchRow}>
-        <Feather name="search" size={16} color={theme.colors.mutedForeground} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search contacts"
-          placeholderTextColor={theme.colors.mutedForeground}
+      <SheetScroll>
+        <SheetSearchField
           value={query}
           onChangeText={setQuery}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="off"
-          returnKeyType="search"
-          clearButtonMode="while-editing"
+          placeholder="Search contacts"
+          accessibilityLabel="Search contacts"
         />
-        <Pressable
-          onPress={() => setIsAdding((value) => !value)}
-          style={styles.addButton}
-          accessibilityRole="button"
-          accessibilityLabel="Add contact"
-        >
-          <Feather name="plus" size={18} color={theme.colors.foreground} />
-        </Pressable>
-      </View>
 
-      {isAdding ? (
-        <View style={styles.addForm}>
-          <Text style={styles.addHint}>
-            Add someone you email even if they have not appeared in your
-            history yet.
-          </Text>
-          <TextInput
-            style={styles.fieldInput}
-            value={newEmail}
-            onChangeText={setNewEmail}
-            placeholder="email@example.com"
-            placeholderTextColor={theme.colors.mutedForeground}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <TextInput
-            style={styles.fieldInput}
-            value={newName}
-            onChangeText={setNewName}
-            placeholder="Full name (optional)"
-            placeholderTextColor={theme.colors.mutedForeground}
-          />
-          <View style={styles.addActions}>
-            <Pressable
-              disabled={!newEmail.trim().includes("@") || isSaving}
-              onPress={() => {
-                const email = normalizeEmailAddress(newEmail);
-                if (!email) return;
-                setIsSaving(true);
-                void addContact({
-                  email,
-                  displayName: newName.trim() || undefined,
-                })
-                  .then((saved) => {
-                    if (!saved) return;
-                    setNewEmail("");
-                    setNewName("");
-                    setIsAdding(false);
-                    setSelectedEmail(email);
-                  })
-                  .finally(() => setIsSaving(false));
-              }}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && styles.pressed,
-                (!newEmail.trim().includes("@") || isSaving) && styles.disabled,
-              ]}
-            >
-              <Text style={styles.primaryButtonText}>Save contact</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                setIsAdding(false);
-                setNewEmail("");
-                setNewName("");
-              }}
-              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-            >
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
+        {isAdding ? (
+          <SheetSection
+            title="New contact"
+            footer="Add someone you email even if they have not appeared in your history yet."
+          >
+            <SheetGroup>
+              <SheetTextField
+                value={newEmail}
+                onChangeText={setNewEmail}
+                placeholder="email@example.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                accessibilityLabel="Email"
+              />
+              <SheetTextField
+                value={newName}
+                onChangeText={setNewName}
+                placeholder="Full name (optional)"
+                accessibilityLabel="Full name"
+              />
+            </SheetGroup>
+          </SheetSection>
+        ) : null}
 
-      {isLoading ? (
-        <View style={styles.emptyState}>
-          <ActivityIndicator color={theme.colors.primaryBase} />
-          <Text style={styles.emptyText}>Loading contacts…</Text>
-        </View>
-      ) : contacts.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>
-            {query.trim()
-              ? "No contacts match your search."
-              : "Contacts from mail and calendar appear here as you correspond with people."}
-          </Text>
-        </View>
-      ) : (
-        <SettingsScrollView
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {contacts.map((contact) => (
-            <ContactRow
-              key={contact.email}
-              contact={contact}
-              onPress={() => setSelectedEmail(contact.email)}
-              theme={theme}
+        {isAdding ? (
+          <SheetSection>
+            <SheetButton
+              label="Save contact"
+              onPress={saveNewContact}
+              disabled={!newEmail.trim().includes("@")}
+              pending={isSaving}
             />
-          ))}
-        </SettingsScrollView>
-      )}
+            <SheetButton label="Cancel" variant="secondary" onPress={cancelAdd} />
+          </SheetSection>
+        ) : null}
+
+        {isLoading ? (
+          <SheetCenteredState loading message="Loading contacts…" />
+        ) : (
+          <SheetSection
+            title="Contacts"
+            footer={
+              contacts.length === 0
+                ? query.trim()
+                  ? "No contacts match your search."
+                  : "Contacts from mail and calendar appear here as you correspond with people."
+                : undefined
+            }
+          >
+            <SheetGroup>
+              {contacts.map((contact) => (
+                <ContactRow
+                  key={contact.email}
+                  contact={contact}
+                  onPress={() => setSelectedEmail(contact.email)}
+                />
+              ))}
+              <SheetItem
+                key="new-contact"
+                label="New contact"
+                icon="plus"
+                tone="accent"
+                onPress={() => setIsAdding((value) => !value)}
+                accessibilityLabel="Add contact"
+              />
+
+            </SheetGroup>
+          </SheetSection>
+        )}
+      </SheetScroll>
     </SettingsPage>
   );
 }
@@ -243,73 +219,23 @@ export function ContactsSettingsContent() {
 function ContactRow({
   contact,
   onPress,
-  theme,
 }: {
   contact: RecentContactEntry;
   onPress: () => void;
-  theme: ThemeTokens;
 }) {
   const label = getContactDisplayLabel(contact);
   const summary = formatContactContextSummary(contact);
 
   return (
-    <Pressable
+    <SheetItem
+      label={label}
+      detail={summary ? `${contact.email} · ${summary}` : contact.email}
+      leading={
+        <BlobatarAvatar email={contact.email} name={label} size={AVATAR_SIZE} />
+      }
+      chevron
       onPress={onPress}
-      style={({ pressed }) => [
-        {
-          flexDirection: "row" as const,
-          alignItems: "center" as const,
-          gap: theme.spacing["3"],
-          paddingHorizontal: theme.spacing["3"],
-          paddingVertical: theme.spacing["3"],
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: theme.colors.border,
-        },
-        pressed && { backgroundColor: theme.colors.accent },
-      ]}
-    >
-      <BlobatarAvatar
-        email={contact.email}
-        name={label}
-        size={32}
-      />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.sm.size,
-            lineHeight: theme.typography.fontSize.sm.lineHeight,
-            color: theme.colors.foreground,
-          }}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.xs.size,
-            lineHeight: theme.typography.fontSize.xs.lineHeight,
-            color: theme.colors.mutedForeground,
-          }}
-          numberOfLines={1}
-        >
-          {contact.email}
-        </Text>
-        {summary ? (
-          <Text
-            style={{
-              fontSize: theme.typography.fontSize.xs.size,
-              lineHeight: theme.typography.fontSize.xs.lineHeight,
-              color: theme.colors.mutedForeground,
-              opacity: 0.8,
-            }}
-            numberOfLines={1}
-          >
-            {summary}
-          </Text>
-        ) : null}
-      </View>
-      <Feather name="chevron-right" size={16} color={theme.colors.mutedForeground} />
-    </Pressable>
+    />
   );
 }
 
@@ -330,242 +256,89 @@ function ContactDetailScreen({
   }) => Promise<void>;
   onRemove: () => void;
 }) {
-  const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
   const [displayName, setDisplayName] = useState(contact.displayName ?? "");
   const [phone, setPhone] = useState(contact.phone ?? "");
   const [notes, setNotes] = useState(contact.notes ?? "");
   const summary = formatContactContextSummary(contact);
+  const label = getContactDisplayLabel(contact);
 
   return (
-    <SettingsPage title={getContactDisplayLabel(contact)} onBack={onBack}>
-      <SettingsScrollView
-        style={styles.list}
-        contentContainerStyle={styles.detailContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.detailEmail}>{contact.email}</Text>
-        {summary ? <Text style={styles.detailSummary}>{summary}</Text> : null}
-
-        <Field label="Full name" theme={theme}>
-          <TextInput
-            style={styles.fieldInput}
-            value={displayName}
-            onChangeText={setDisplayName}
-            placeholder="Display name"
-            placeholderTextColor={theme.colors.mutedForeground}
-          />
-        </Field>
-
-        <Field label="Phone" theme={theme}>
-          <TextInput
-            style={styles.fieldInput}
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="+1 555 0100"
-            placeholderTextColor={theme.colors.mutedForeground}
-            keyboardType="phone-pad"
-          />
-        </Field>
-
-        <Field label="Notes" theme={theme}>
-          <TextInput
-            style={[styles.fieldInput, styles.notesInput]}
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="Optional notes"
-            placeholderTextColor={theme.colors.mutedForeground}
-            multiline
-          />
-        </Field>
-
-        <View style={styles.addActions}>
-          <Pressable
-            disabled={isSaving}
-            onPress={() =>
-              void onSave({
-                displayName,
-                phone,
-                notes,
-              })
+    <SettingsPage title={label} onBack={onBack}>
+      <SheetScroll>
+        <SheetGroup>
+          <SheetItem
+            label={contact.email}
+            detail={summary || undefined}
+            leading={
+              <BlobatarAvatar email={contact.email} name={label} size={AVATAR_SIZE} />
             }
-            style={({ pressed }) => [
-              styles.primaryButton,
-              pressed && styles.pressed,
-              isSaving && styles.disabled,
-            ]}
-          >
-            <Text style={styles.primaryButtonText}>
-              {isSaving ? "Saving…" : "Save"}
-            </Text>
-          </Pressable>
-          <Pressable
+          />
+        </SheetGroup>
+
+        <SheetSection title="Full name">
+          <SheetGroup>
+            <SheetTextField
+              value={displayName}
+              onChangeText={setDisplayName}
+              placeholder="Display name"
+              accessibilityLabel="Full name"
+            />
+          </SheetGroup>
+        </SheetSection>
+
+        <SheetSection title="Phone">
+          <SheetGroup>
+            <SheetTextField
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+1 555 0100"
+              keyboardType="phone-pad"
+              accessibilityLabel="Phone"
+            />
+          </SheetGroup>
+        </SheetSection>
+
+        <SheetSection title="Notes">
+          <SheetGroup>
+            <SheetTextField
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Optional notes"
+              multiline
+              style={styles.notesInput}
+              accessibilityLabel="Notes"
+            />
+          </SheetGroup>
+        </SheetSection>
+
+        <SheetButton
+          label="Save"
+          pending={isSaving}
+          onPress={() =>
+            void onSave({
+              displayName,
+              phone,
+              notes,
+            })
+          }
+        />
+
+        <SheetGroup>
+          <SheetItem
+            label="Remove contact"
+            icon="trash-2"
+            tone="destructive"
             onPress={onRemove}
-            style={({ pressed }) => [styles.destructiveButton, pressed && styles.pressed]}
-          >
-            <Text style={styles.destructiveButtonText}>Remove</Text>
-          </Pressable>
-        </View>
-      </SettingsScrollView>
+          />
+        </SheetGroup>
+      </SheetScroll>
     </SettingsPage>
   );
 }
 
-function Field({
-  label,
-  children,
-  theme,
-}: {
-  label: string;
-  children: React.ReactNode;
-  theme: ThemeTokens;
-}) {
-  return (
-    <View style={{ gap: theme.spacing["2"] }}>
-      <Text
-        style={{
-          fontSize: theme.typography.fontSize.sm.size,
-          lineHeight: theme.typography.fontSize.sm.lineHeight,
-          fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-          color: theme.colors.foreground,
-        }}
-      >
-        {label}
-      </Text>
-      {children}
-    </View>
-  );
-}
-
-function createStyles(theme: ThemeTokens) {
-  const view = {
-    searchRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["4"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
-    },
-    searchInput: {
-      flex: 1,
-      height: 44,
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.foreground,
-    } as ViewStyle & TextStyle,
-    addButton: {
-      width: 36,
-      height: 36,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      borderRadius: theme.borderRadius.md,
-    },
-    addForm: {
-      padding: theme.spacing["4"],
-      gap: theme.spacing["2"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
-    },
-    addActions: {
-      flexDirection: "row" as const,
-      gap: theme.spacing["2"],
-      marginTop: theme.spacing["2"],
-    },
-    primaryButton: {
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-      borderRadius: theme.borderRadius.md,
-      backgroundColor: theme.colors.primaryBase,
-    },
-    secondaryButton: {
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-      borderRadius: theme.borderRadius.md,
-    },
-    destructiveButton: {
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-      borderRadius: theme.borderRadius.md,
-    },
-    pressed: {
-      opacity: 0.85,
-    },
-    disabled: {
-      opacity: 0.5,
-    },
-    list: {
-      flex: 1,
-    },
-    listContent: {
-      paddingBottom: theme.spacing["8"],
-    },
-    detailContent: {
-      padding: theme.spacing["4"],
-      gap: theme.spacing["4"],
-      paddingBottom: theme.spacing["8"],
-    },
-    emptyState: {
-      flex: 1,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      padding: theme.spacing["6"],
-      gap: theme.spacing["2"],
-    },
-    fieldInput: {
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.md,
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.foreground,
-      backgroundColor: theme.colors.background,
-    } as ViewStyle & TextStyle,
-    notesInput: {
-      minHeight: 88,
-      textAlignVertical: "top" as const,
-    },
-  } satisfies Record<string, ViewStyle | (ViewStyle & TextStyle)>;
-
-  const text = {
-    addHint: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    emptyText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-      textAlign: "center" as const,
-    },
-    primaryButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.primaryForeground,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
-    secondaryButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-    },
-    destructiveButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.destructive,
-    },
-    detailEmail: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-    },
-    detailSummary: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-  } satisfies Record<string, TextStyle>;
-
-  return { ...StyleSheet.create(view), ...StyleSheet.create(text) };
-}
+const styles = StyleSheet.create({
+  notesInput: {
+    minHeight: 88,
+    textAlignVertical: "top",
+  },
+});

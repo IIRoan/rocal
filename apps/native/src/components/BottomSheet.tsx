@@ -24,7 +24,6 @@ import {
   useRef,
   useState,
   type ComponentProps,
-  type DependencyList,
   type EffectCallback,
   type ReactNode,
 } from "react";
@@ -40,7 +39,6 @@ import Animated, {
 } from "react-native-reanimated";
 import GorhomBottomSheet, {
   BottomSheetScrollView as GorhomBottomSheetScrollView,
-  BottomSheetView,
   useBottomSheetInternal,
   type BottomSheetBackdropProps,
   type BottomSheetBackgroundProps,
@@ -50,6 +48,7 @@ import { useTheme } from "../providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { LAYOUT_ICON, layoutSideSlot } from "../lib/app-layout";
 import { splitSheetChildren } from "./sheet/sheet-children";
+import { SheetViewport } from "./sheet/SheetViewport";
 
 const SHEET_RADIUS = 20;
 const SHEET_TOP_GAP = 16;
@@ -112,6 +111,10 @@ export interface BottomSheetProps {
   snapPoints?: number[];
   /** Which snap index to open at. Default: last (tallest). */
   initialSnapIndex?: number;
+  /** `extend` keeps the sheet in place under the keyboard, for content that pads itself above it. */
+  keyboardBehavior?: "interactive" | "extend";
+  /** Off for bodies with their own scrolling editor, so drags there never move the sheet. */
+  enableContentPanningGesture?: boolean;
 }
 
 export interface BottomSheetHandle {
@@ -152,13 +155,9 @@ export function SheetScrollFocusProvider({
 }
 
 /** Registers a scroll view as the sheet's active scrollable only while its page is focused. */
-function useSheetScrollFocusEffect(
-  effect: EffectCallback,
-  deps: DependencyList = [],
-) {
+function useSheetScrollFocusEffect(effect: EffectCallback) {
   const focused = useContext(SheetScrollFocusContext);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are forwarded from Gorhom's scrollable setter.
-  useEffect(() => (focused ? effect() : undefined), [focused, ...deps]);
+  useEffect(() => (focused ? effect() : undefined), [focused, effect]);
 }
 
 export function BottomSheetClose({
@@ -333,6 +332,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       children,
       snapPoints: snapPointsProp = [0.92],
       initialSnapIndex,
+      keyboardBehavior = "interactive",
+      enableContentPanningGesture = true,
     },
     ref,
   ) {
@@ -349,11 +350,13 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const [presented, setPresented] = useState({ visible, presentKey });
     const keyboardVisibleRef = useRef(false);
     const visibleRef = useRef(visible);
-    visibleRef.current = visible;
     const sessionRef = useRef(session);
-    sessionRef.current = session;
     const onCloseCompleteRef = useRef(onCloseComplete);
-    onCloseCompleteRef.current = onCloseComplete;
+    useLayoutEffect(() => {
+      visibleRef.current = visible;
+      sessionRef.current = session;
+      onCloseCompleteRef.current = onCloseComplete;
+    });
     const overlayMaxOpacity = isDark ? OVERLAY_DARK : OVERLAY_LIGHT;
 
     if (
@@ -526,7 +529,10 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const renderHandle = useCallback(
       () => (
         <View
-          style={[styles.handleArea, handleDivider ? styles.handleDivider : null]}
+          style={[
+            styles.handleArea,
+            handleDivider ? styles.handleDivider : null,
+          ]}
         >
           <View style={styles.handlePill} />
         </View>
@@ -548,6 +554,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
             index={openIndex}
             snapPoints={snapPoints}
             enableDynamicSizing={false}
+            enableContentPanningGesture={enableContentPanningGesture}
+            enableHandlePanningGesture
             enablePanDownToClose
             animateOnMount
             animationConfigs={reduceMotion ? SHEET_REDUCED : SHEET_SPRING}
@@ -555,7 +563,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
             topInset={topInset}
             failOffsetX={PAN_FAIL_OFFSET_X}
             activeOffsetY={PAN_ACTIVE_OFFSET_Y}
-            keyboardBehavior="interactive"
+            keyboardBehavior={keyboardBehavior}
             keyboardBlurBehavior="restore"
             android_keyboardInputMode="adjustResize"
             backdropComponent={renderBackdrop}
@@ -565,15 +573,11 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
             onAnimate={sessionCallbacks.onAnimate}
             style={styles.sheetShadow}
           >
-            {/* Layout effect runs before children's passive effects, so a mounted BottomSheetScrollView keeps the scrollable slot instead of being overwritten as a plain view. */}
-            <BottomSheetView
-              style={styles.contentWrapper}
-              focusHook={useLayoutEffect}
-            >
+            <SheetViewport>
               {header}
               <View style={styles.bodySlot}>{body}</View>
               {footer}
-            </BottomSheetView>
+            </SheetViewport>
           </GorhomBottomSheet>
         </View>
       </BottomSheetContext.Provider>
@@ -629,11 +633,6 @@ function createStyles(theme: ThemeTokens) {
       borderRadius: 3,
       backgroundColor: theme.colors.mutedForeground + "99",
     } as ViewStyle,
-
-    contentWrapper: {
-      flex: 1,
-      minHeight: 0,
-    },
 
     bodySlot: {
       flex: 1,

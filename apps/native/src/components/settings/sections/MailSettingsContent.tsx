@@ -1,26 +1,34 @@
 import React, { useMemo } from "react";
-import { View } from "react-native";
 import {
   getSettingsMailItems,
   settingsSectionPath,
 } from "@workspace/calendar-core";
 import {
   SettingsPage,
-  SettingsScrollView,
-  settingsPageStyles,
+  useInSettingsSheet,
   useSettingsNavigator,
 } from "../SettingsPage";
-import { SettingsNavigationRow } from "../SettingsRows";
+import {
+  SheetGroup,
+  SheetItem,
+  SheetScroll,
+  SheetSection,
+} from "../../sheet/SheetSections";
 import { useRecentContacts } from "../../../hooks/use-recent-contacts";
 import { SETTINGS_MAIL_ICONS } from "../../../lib/settings-nav-icons";
-import { useTheme } from "../../../providers/ThemeProvider";
 
 export function MailSettingsContent() {
-  const { theme } = useTheme();
-  const styles = useMemo(() => settingsPageStyles(theme), [theme]);
   const navigate = useSettingsNavigator();
+  const inSheet = useInSettingsSheet();
   const { contacts } = useRecentContacts();
-  const items = useMemo(() => getSettingsMailItems("native"), []);
+  // Mailbox management only exists as a drawer page, so the standalone settings stack cannot open it.
+  const items = useMemo(
+    () =>
+      getSettingsMailItems("native").filter(
+        (item) => inSheet || item.id !== "mailboxes",
+      ),
+    [inSheet],
+  );
   const contactsCount = contacts.length;
 
   const summaries: Record<string, string | undefined> = {
@@ -34,24 +42,22 @@ export function MailSettingsContent() {
 
   return (
     <SettingsPage title="Mail">
-      <SettingsScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.sectionItems}>
-          {items.map((item) => (
-            <SettingsNavigationRow
-              key={item.id}
-              icon={SETTINGS_MAIL_ICONS[item.id]}
-              label={item.label}
-              value={summaries[item.id] ?? item.description}
-              onPress={() => navigate(settingsSectionPath(item.id))}
-              theme={theme}
-            />
-          ))}
-        </View>
-      </SettingsScrollView>
+      <SheetScroll>
+        <SheetSection>
+          <SheetGroup>
+            {items.map((item) => (
+              <SheetItem
+                key={item.id}
+                icon={SETTINGS_MAIL_ICONS[item.id]}
+                label={item.label}
+                value={summaries[item.id] ?? item.description}
+                chevron
+                onPress={() => navigate(settingsSectionPath(item.id))}
+              />
+            ))}
+          </SheetGroup>
+        </SheetSection>
+      </SheetScroll>
     </SettingsPage>
   );
 }

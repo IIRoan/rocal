@@ -1,8 +1,4 @@
-import {
-  collapseRecipientChips,
-  composeTitle,
-  recipientInitial,
-} from "./compose-display";
+import { collapseRecipientChips, composeTitle } from "./compose-display";
 
 describe("collapseRecipientChips", () => {
   it("shows every chip when expanded", () => {
@@ -27,21 +23,11 @@ describe("collapseRecipientChips", () => {
   });
 });
 
-describe("recipientInitial", () => {
-  it("uses the first letter or digit, uppercased", () => {
-    expect(recipientInitial("  jason ginsberg")).toBe("J");
-    expect(recipientInitial("\"Élise\" <e@solace.onl>")).toBe("É");
-    expect(recipientInitial("42@solace.onl")).toBe("4");
-  });
-
-  it("falls back when there is nothing to show", () => {
-    expect(recipientInitial("  ")).toBe("?");
-  });
-});
-
 describe("composeTitle", () => {
   it("prefers the subject and falls back to New message", () => {
-    expect(composeTitle(" Re: Prototype Designs ")).toBe("Re: Prototype Designs");
+    expect(composeTitle(" Re: Prototype Designs ")).toBe(
+      "Re: Prototype Designs",
+    );
     expect(composeTitle("   ")).toBe("New message");
   });
 });

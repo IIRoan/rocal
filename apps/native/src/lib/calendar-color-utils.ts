@@ -42,6 +42,19 @@ export function resolveCalendarSwatchColor(
   return theme.colors.calendar.blue.bg;
 }
 
+/** Readable ink on top of a calendar swatch; custom hex colors get the primary foreground. */
+export function resolveCalendarSwatchForeground(
+  value: string | null | undefined,
+  theme: ThemeTokens,
+): string {
+  const color = value?.trim();
+  if (color && HEX_COLOR_PATTERN.test(color)) {
+    return theme.colors.primaryForeground;
+  }
+  const named = color ? toNamedCalendarColor(color) : null;
+  return theme.colors.calendar[named ?? "blue"].fg;
+}
+
 export interface ResolvedEventColor {
   bg: string;
   fg: string;

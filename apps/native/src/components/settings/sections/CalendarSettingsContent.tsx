@@ -1,30 +1,22 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getErrorMessage,
   partitionCalendarsByKind,
   type Calendar,
 } from "@workspace/calendar-core";
+import { SettingsPage } from "../SettingsPage";
 import {
-  SettingsPage,
-  SettingsScrollView,
-  settingsPageStyles,
-} from "../SettingsPage";
-import { SettingsPickerRow, SettingsSheetOption } from "../SettingsRows";
-import {
-  BottomSheet,
-  BottomSheetHeader,
-  BottomSheetScrollView,
-  BottomSheetTitle,
-} from "../../BottomSheet";
-import { SheetPortal } from "../../SheetPortal";
-import { CenteredLoader } from "../../ui/loading";
+  SheetCenteredState,
+  SheetGroup,
+  SheetItem,
+  SheetMessage,
+  SheetScroll,
+  SheetSection,
+} from "../../sheet/SheetSections";
 import { useNativeUserSettings } from "../../../hooks/use-native-user-settings";
 import { calendarApiService } from "../../../lib/api";
 import { QUERY_KEYS } from "../../../lib/query-keys";
-import { useTheme } from "../../../providers/ThemeProvider";
 import { useToast } from "../../../providers/ToastProvider";
 import {
   WEEK_START_OPTIONS,
@@ -36,17 +28,11 @@ import {
   serializeWorkingDays,
 } from "../../../lib/settings-working-days";
 
-type PickerKey = "defaultCalendar" | "weekStart" | "workingDays";
-
 export function CalendarSettingsContent() {
-  const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
-  const styles = useMemo(() => settingsPageStyles(theme), [theme]);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { settings, isLoading, pendingKeys, updateSetting } =
     useNativeUserSettings();
-  const [activePicker, setActivePicker] = useState<PickerKey | null>(null);
   const [pendingDefaultCalendarId, setPendingDefaultCalendarId] = useState<
     string | null
   >(null);
@@ -127,135 +113,80 @@ export function CalendarSettingsContent() {
     [workingDaysSet, updateSetting],
   );
 
-  const defaultCalendarLabel =
-    sortedOwnedCalendars.find((calendar) => calendar.isDefault)?.name ??
-    sortedOwnedCalendars[0]?.name ??
-    "Not set";
-  const weekStartLabel =
-    WEEK_START_OPTIONS.find(
-      (option) => option.value === (settings?.weekStartDay ?? 0),
-    )?.label ?? "Sunday";
+  const weekStartDay = settings?.weekStartDay ?? 0;
+  const weekStartPending = pendingKeys.has("weekStartDay");
 
   if (isLoading && !settings) {
-    return <CenteredLoader theme={theme} message="Loading settings…" />;
+    return (
+      <SettingsPage title="Calendar">
+        <SheetCenteredState loading message="Loading settings…" />
+      </SettingsPage>
+    );
   }
 
   return (
     <SettingsPage title="Calendar">
-      <SettingsScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.sectionItems}>
-          <SettingsPickerRow
-            icon="star"
-            label="Default Calendar"
-            value={defaultCalendarLabel}
-            onPress={() => setActivePicker("defaultCalendar")}
-            theme={theme}
-            isPending={Boolean(pendingDefaultCalendarId)}
-          />
-          <SettingsPickerRow
-            icon="calendar"
-            label="Week Starts On"
-            value={weekStartLabel}
-            onPress={() => setActivePicker("weekStart")}
-            theme={theme}
-            isPending={pendingKeys.has("weekStartDay")}
-          />
-          <SettingsPickerRow
-            icon="briefcase"
-            label="Working Days"
-            value={formatWorkingDaysLabel(workingDaysSet)}
-            onPress={() => setActivePicker("workingDays")}
-            theme={theme}
-          />
-        </View>
-      </SettingsScrollView>
+      <SheetScroll>
+        <SheetSection title="Default calendar">
+          {sortedOwnedCalendars.length === 0 ? (
+            <SheetMessage text="No calendars yet. Create one first." />
+          ) : (
+            <SheetGroup>
+              {sortedOwnedCalendars.map((calendar) => (
+                <SheetItem
+                  key={calendar.id}
+                  label={calendar.name}
+                  checked={calendar.isDefault}
+                  pending={pendingDefaultCalendarId === calendar.id}
+                  onPress={() => setDefaultCalendarMutation.mutate(calendar.id)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: calendar.isDefault }}
+                />
+              ))}
+            </SheetGroup>
+          )}
+        </SheetSection>
 
-      <SheetPortal>
-        <BottomSheet
-          visible={activePicker !== null}
-          onDismiss={() => setActivePicker(null)}
-          snapPoints={[0.52]}
+        <SheetSection title="Week starts on">
+          <SheetGroup>
+            {WEEK_START_OPTIONS.map((option) => {
+              const selected = weekStartDay === option.value;
+              return (
+                <SheetItem
+                  key={option.value}
+                  label={option.label}
+                  checked={selected}
+                  pending={selected && weekStartPending}
+                  onPress={() => updateSetting({ weekStartDay: option.value })}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                />
+              );
+            })}
+          </SheetGroup>
+        </SheetSection>
+
+        <SheetSection
+          title="Working days"
+          footer={formatWorkingDaysLabel(workingDaysSet)}
         >
-          <BottomSheetHeader>
-            <BottomSheetTitle>
-              {activePicker === "defaultCalendar"
-                ? "Default calendar"
-                : activePicker === "weekStart"
-                  ? "Start of week"
-                  : "Working days"}
-            </BottomSheetTitle>
-          </BottomSheetHeader>
-          <BottomSheetScrollView
-            contentContainerStyle={{
-              paddingVertical: 8,
-              paddingBottom: insets.bottom + 8,
-            }}
-          >
-            {activePicker === "defaultCalendar" ? (
-              sortedOwnedCalendars.length === 0 ? (
-                <View
-                  style={{
-                    paddingHorizontal: 20,
-                    paddingVertical: theme.spacing["3"],
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: theme.typography.fontSize.sm.size,
-                      color: theme.colors.mutedForeground,
-                    }}
-                  >
-                    No calendars yet. Create one first.
-                  </Text>
-                </View>
-              ) : (
-                sortedOwnedCalendars.map((calendar) => (
-                  <SettingsSheetOption
-                    key={calendar.id}
-                    label={calendar.name}
-                    isSelected={calendar.isDefault}
-                    onPress={() => {
-                      setDefaultCalendarMutation.mutate(calendar.id);
-                      setActivePicker(null);
-                    }}
-                    theme={theme}
-                  />
-                ))
-              )
-            ) : null}
-            {activePicker === "weekStart"
-              ? WEEK_START_OPTIONS.map((option) => (
-                  <SettingsSheetOption
-                    key={option.value}
-                    label={option.label}
-                    isSelected={(settings?.weekStartDay ?? 0) === option.value}
-                    onPress={() => {
-                      updateSetting({ weekStartDay: option.value });
-                      setActivePicker(null);
-                    }}
-                    theme={theme}
-                  />
-                ))
-              : null}
-            {activePicker === "workingDays"
-              ? WEEKDAY_OPTIONS.map((day) => (
-                  <SettingsSheetOption
-                    key={day.value}
-                    label={day.label}
-                    isSelected={workingDaysSet.has(day.value)}
-                    onPress={() => handleToggleWorkingDay(day.value)}
-                    theme={theme}
-                    multiSelect
-                  />
-                ))
-              : null}
-          </BottomSheetScrollView>
-        </BottomSheet>
-      </SheetPortal>
+          <SheetGroup>
+            {WEEKDAY_OPTIONS.map((day) => {
+              const checked = workingDaysSet.has(day.value);
+              return (
+                <SheetItem
+                  key={day.value}
+                  label={day.label}
+                  checked={checked}
+                  onPress={() => handleToggleWorkingDay(day.value)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked }}
+                />
+              );
+            })}
+          </SheetGroup>
+        </SheetSection>
+      </SheetScroll>
     </SettingsPage>
   );
 }

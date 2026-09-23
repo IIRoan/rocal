@@ -38,7 +38,7 @@ function isHostedSegments(segments: readonly string[]): boolean {
     return true;
   }
   // Inside (tabs), only root tab screens (length === 2) are hosted.
-  // Nested screens (e.g. /(tabs)/mail/compose) need isHosted = false so the nested stack renders.
+  // Nested screens (e.g. /(tabs)/mail/message/[id]) need isHosted = false so the nested stack renders.
   return segments.length === 2;
 }
 
@@ -51,7 +51,9 @@ export function WorkspaceTabHostProvider({
   const segments = useSegments();
   const routeTab = tabFromSegments(segments);
   const isHosted = isHostedSegments(segments);
-  const [activeTab, setActiveTab] = useState<AppSwitchKey>(routeTab ?? "calendar");
+  const [activeTab, setActiveTab] = useState<AppSwitchKey>(
+    routeTab ?? "calendar",
+  );
 
   useEffect(() => {
     if (routeTab) {

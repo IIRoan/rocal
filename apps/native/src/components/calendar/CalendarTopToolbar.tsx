@@ -17,6 +17,7 @@ interface CalendarTopToolbarProps {
   currentDate: Date;
   timezone?: string | null;
   onOpenDrawer: () => void;
+  onOpenCalendars: () => void;
   onOpenAccount: () => void;
   onNewEvent: () => void;
 }
@@ -25,6 +26,7 @@ export function CalendarTopToolbar({
   currentDate,
   timezone,
   onOpenDrawer,
+  onOpenCalendars,
   onOpenAccount,
   onNewEvent,
 }: CalendarTopToolbarProps) {
@@ -41,7 +43,7 @@ export function CalendarTopToolbar({
         onPress={onOpenDrawer}
         style={({ pressed }) => [styles.title, pressed && styles.pressed]}
         accessibilityRole="button"
-        accessibilityLabel="Open calendars"
+        accessibilityLabel="Choose date and view"
       >
         <Text style={styles.titleText} numberOfLines={1}>
           <Text style={styles.month}>{month}</Text>
@@ -54,6 +56,13 @@ export function CalendarTopToolbar({
         />
       </Pressable>
       <View style={styles.actions}>
+        <ToolbarIconButton
+          name="layers"
+          onPress={onOpenCalendars}
+          accessibilityLabel="Calendars"
+          styles={styles}
+          color={theme.colors.foreground}
+        />
         <ToolbarIconButton
           name="plus"
           onPress={onNewEvent}

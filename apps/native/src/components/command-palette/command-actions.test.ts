@@ -27,10 +27,9 @@ describe("buildCommandActions", () => {
   it("attaches a calendar view to every view-switch action", () => {
     const actions = buildCommandActions("calendar");
     const viewActions = actions.filter((a) => a.id.startsWith("view-"));
-    expect(viewActions.length).toBe(4);
+    expect(viewActions.length).toBe(3);
     expect(viewActions.map((a) => a.view).sort()).toEqual([
       "3day",
-      "agenda",
       "day",
       "week",
     ]);
@@ -46,8 +45,8 @@ describe("filterCommandActions", () => {
   });
 
   it("matches against the label case-insensitively", () => {
-    const result = filterCommandActions(actions, "AGENDA");
-    expect(result.some((a) => a.id === "view-agenda")).toBe(true);
+    const result = filterCommandActions(actions, "WEEK VIEW");
+    expect(result.some((a) => a.id === "view-week")).toBe(true);
   });
 
   it("matches against keywords when the label does not match", () => {

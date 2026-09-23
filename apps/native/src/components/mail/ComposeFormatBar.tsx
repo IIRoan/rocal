@@ -110,7 +110,7 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       flexShrink: 0,
       minHeight: MAIL_LAYOUT.hitSize,
       paddingHorizontal: theme.spacing["2"],
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.card,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: skin.borderTertiary,
     },

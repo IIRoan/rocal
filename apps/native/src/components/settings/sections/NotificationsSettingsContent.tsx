@@ -1,16 +1,5 @@
-import React, { useCallback, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-  type TextStyle,
-  type ViewStyle,
-} from "react-native";
-import { Feather } from "@expo/vector-icons";
+import React, { useCallback, useState } from "react";
+import { Platform } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   APP_NOTIFICATION_IOS_ONLY_HINT,
@@ -28,19 +17,21 @@ import {
   type UpdateSettingsRequest,
   type UserSettings,
 } from "@workspace/calendar-core";
-import type { ThemeTokens } from "@workspace/design-tokens";
-import { SettingsPage, SettingsScrollView } from "../SettingsPage";
+import { SettingsPage } from "../SettingsPage";
+import {
+  SheetGroup,
+  SheetItem,
+  SheetMessage,
+  SheetScroll,
+  SheetSection,
+  SheetSwitchItem,
+} from "../../sheet/SheetSections";
 import { calendarApiService } from "../../../lib/api";
 import { QUERY_KEYS } from "../../../lib/query-keys";
 import { usePushNotifications } from "../../../providers/PushProvider";
-import { useTheme } from "../../../providers/ThemeProvider";
 import { useToast } from "../../../providers/ToastProvider";
 
-type FeatherIcon = keyof typeof Feather.glyphMap;
-
 export function NotificationsSettingsContent() {
-  const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { permissionDenied, refreshRegistration } = usePushNotifications();
@@ -146,371 +137,89 @@ export function NotificationsSettingsContent() {
     deviceCount: devices.length,
   });
 
+  const isIos = Platform.OS === "ios";
+  const appFooter = !isIos
+    ? APP_NOTIFICATION_IOS_ONLY_HINT
+    : permissionDenied
+      ? APP_NOTIFICATION_PERMISSION_HINT
+      : undefined;
+
+  const devicesMessage =
+    devicesStatus === "paused"
+      ? PUSH_DEVICES_SECTION.paused
+      : devicesStatus === "loading"
+        ? PUSH_DEVICES_SECTION.loading
+        : devicesStatus === "error"
+          ? PUSH_DEVICES_SECTION.error
+          : devicesStatus === "empty"
+            ? PUSH_DEVICES_SECTION.empty
+            : null;
+
   return (
     <SettingsPage title="Notifications">
-      <SettingsScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <Text style={styles.intro}>{NOTIFICATION_SETTINGS_INTRO}</Text>
+      <SheetScroll>
+        <SheetMessage text={NOTIFICATION_SETTINGS_INTRO} />
 
-        <SectionLabel text="Mail" theme={theme} isFirst />
-        <View style={styles.sectionItems}>
-          <SettingToggleRow
-            icon="mail"
-            label={EMAIL_REMINDER_SETTING.label}
-            description={EMAIL_REMINDER_SETTING.description}
-            value={emailEnabled}
-            onValueChange={(value) =>
-              updateSetting({ emailNotifications: value })
-            }
-            isPending={pendingKeys.has("emailNotifications")}
-            theme={theme}
-          />
-        </View>
-
-        <SectionLabel text="App" theme={theme} isFirst={false} />
-        <View style={styles.sectionItems}>
-          <SettingToggleRow
-            icon="bell"
-            label={APP_NOTIFICATION_SETTING.label}
-            description={APP_NOTIFICATION_SETTING.description}
-            value={appEnabled}
-            onValueChange={handleAppNotificationsChange}
-            isPending={pendingKeys.has("pushNotifications")}
-            theme={theme}
-          />
-          {Platform.OS === "ios" && permissionDenied ? (
-            <HintRow text={APP_NOTIFICATION_PERMISSION_HINT} theme={theme} />
-          ) : null}
-          {Platform.OS !== "ios" ? (
-            <HintRow text={APP_NOTIFICATION_IOS_ONLY_HINT} theme={theme} />
-          ) : null}
-          {Platform.OS === "ios" ? (
-            <ActionRow
-              icon="send"
-              label={TEST_NOTIFICATION_SETTING.label}
-              description={TEST_NOTIFICATION_SETTING.description}
-              onPress={() => void handleSendTest()}
-              theme={theme}
-              isPending={isSendingTest}
-              disabled={!appEnabled || permissionDenied}
+        <SheetSection title="Mail">
+          <SheetGroup>
+            <SheetSwitchItem
+              icon="mail"
+              label={EMAIL_REMINDER_SETTING.label}
+              detail={EMAIL_REMINDER_SETTING.description}
+              value={emailEnabled}
+              onValueChange={(value) =>
+                updateSetting({ emailNotifications: value })
+              }
+              pending={pendingKeys.has("emailNotifications")}
             />
-          ) : null}
-        </View>
+          </SheetGroup>
+        </SheetSection>
 
-        <SectionLabel text={PUSH_DEVICES_SECTION.label} theme={theme} isFirst={false} />
-        <View style={styles.sectionItems}>
-          {devicesStatus === "paused" ? (
-            <HintRow text={PUSH_DEVICES_SECTION.paused} theme={theme} />
-          ) : null}
-          {devicesStatus === "loading" ? (
-            <HintRow text={PUSH_DEVICES_SECTION.loading} theme={theme} />
-          ) : null}
-          {devicesStatus === "error" ? (
-            <HintRow text={PUSH_DEVICES_SECTION.error} theme={theme} />
-          ) : null}
-          {devicesStatus === "empty" ? (
-            <HintRow text={PUSH_DEVICES_SECTION.empty} theme={theme} />
-          ) : null}
-          {devicesStatus === "ready"
-            ? devices.map((device) => (
-                <DeviceRow
+        <SheetSection title="App" footer={appFooter}>
+          <SheetGroup>
+            <SheetSwitchItem
+              icon="bell"
+              label={APP_NOTIFICATION_SETTING.label}
+              detail={APP_NOTIFICATION_SETTING.description}
+              value={appEnabled}
+              onValueChange={handleAppNotificationsChange}
+              pending={pendingKeys.has("pushNotifications")}
+            />
+            {isIos ? (
+              <SheetItem
+                icon="send"
+                label={TEST_NOTIFICATION_SETTING.label}
+                detail={TEST_NOTIFICATION_SETTING.description}
+                chevron
+                onPress={() => void handleSendTest()}
+                pending={isSendingTest}
+                disabled={!appEnabled || permissionDenied}
+                accessibilityLabel={TEST_NOTIFICATION_SETTING.label}
+              />
+            ) : null}
+          </SheetGroup>
+        </SheetSection>
+
+        <SheetSection title={PUSH_DEVICES_SECTION.label}>
+          {devicesMessage ? (
+            <SheetMessage
+              text={devicesMessage}
+              tone={devicesStatus === "error" ? "destructive" : "muted"}
+            />
+          ) : (
+            <SheetGroup>
+              {devices.map((device) => (
+                <SheetItem
                   key={device.id}
+                  icon="smartphone"
                   label={formatPushDeviceLabel(device)}
-                  description={formatPushDeviceLastSeen(device.lastSeenAt)}
-                  theme={theme}
+                  detail={formatPushDeviceLastSeen(device.lastSeenAt)}
                 />
-              ))
-            : null}
-        </View>
-      </SettingsScrollView>
+              ))}
+            </SheetGroup>
+          )}
+        </SheetSection>
+      </SheetScroll>
     </SettingsPage>
   );
-}
-
-function SectionLabel({
-  text,
-  theme,
-  isFirst = true,
-}: {
-  text: string;
-  theme: ThemeTokens;
-  isFirst?: boolean;
-}) {
-  return (
-    <View
-      style={{
-        paddingHorizontal: theme.spacing["4"],
-        paddingTop: isFirst ? theme.spacing["3"] : theme.spacing["2"],
-        paddingBottom: theme.spacing["1"],
-        ...(isFirst
-          ? {}
-          : {
-              borderTopWidth: StyleSheet.hairlineWidth,
-              borderTopColor: theme.colors.border,
-              marginTop: theme.spacing["2"],
-            }),
-      }}
-    >
-      <Text
-        style={{
-          fontSize: theme.typography.fontSize.xs.size,
-          lineHeight: theme.typography.fontSize.xs.lineHeight,
-          fontWeight: theme.typography.fontWeight
-            .medium as TextStyle["fontWeight"],
-          color: theme.colors.mutedForeground,
-        }}
-        accessibilityRole="header"
-      >
-        {text}
-      </Text>
-    </View>
-  );
-}
-
-function HintRow({ text, theme }: { text: string; theme: ThemeTokens }) {
-  return (
-    <View
-      style={{
-        paddingHorizontal: theme.spacing["3"],
-        paddingVertical: theme.spacing["2"],
-      }}
-    >
-      <Text
-        style={{
-          fontSize: theme.typography.fontSize.xs.size,
-          lineHeight: theme.typography.fontSize.xs.lineHeight,
-          color: theme.colors.mutedForeground,
-        }}
-      >
-        {text}
-      </Text>
-    </View>
-  );
-}
-
-function DeviceRow({
-  label,
-  description,
-  theme,
-}: {
-  label: string;
-  description: string;
-  theme: ThemeTokens;
-}) {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing["3"],
-        paddingHorizontal: theme.spacing["3"],
-        paddingVertical: theme.spacing["3"],
-        marginHorizontal: theme.spacing["1"],
-      }}
-      accessibilityRole="text"
-      accessibilityLabel={`${label}. ${description}`}
-    >
-      <Feather
-        name="smartphone"
-        size={16}
-        color={theme.colors.mutedForeground}
-      />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.sm.size,
-            lineHeight: theme.typography.fontSize.sm.lineHeight,
-            color: theme.colors.foreground,
-          }}
-        >
-          {label}
-        </Text>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.xs.size,
-            lineHeight: theme.typography.fontSize.xs.lineHeight,
-            color: theme.colors.mutedForeground,
-          }}
-        >
-          {description}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function SettingToggleRow({
-  icon,
-  label,
-  description,
-  value,
-  onValueChange,
-  isPending,
-  theme,
-}: {
-  icon: FeatherIcon;
-  label: string;
-  description: string;
-  value: boolean;
-  onValueChange: (value: boolean) => void;
-  isPending: boolean;
-  theme: ThemeTokens;
-}) {
-  return (
-    <Pressable
-      onPress={() => onValueChange(!value)}
-      style={({ pressed }) => [
-        {
-          flexDirection: "row" as const,
-          alignItems: "center" as const,
-          gap: theme.spacing["3"],
-          paddingHorizontal: theme.spacing["3"],
-          paddingVertical: theme.spacing["3"],
-          borderRadius: theme.borderRadius.md,
-          marginHorizontal: theme.spacing["1"],
-        },
-        pressed && { backgroundColor: theme.colors.accent },
-      ]}
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
-      accessibilityLabel={label}
-    >
-      <Feather
-        name={icon}
-        size={16}
-        color={theme.colors.mutedForeground}
-        style={{ marginTop: 2 }}
-      />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.sm.size,
-            lineHeight: theme.typography.fontSize.sm.lineHeight,
-            color: theme.colors.foreground,
-          }}
-        >
-          {label}
-        </Text>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.xs.size,
-            lineHeight: theme.typography.fontSize.xs.lineHeight,
-            color: theme.colors.mutedForeground,
-          }}
-        >
-          {description}
-        </Text>
-      </View>
-      {isPending ? (
-        <ActivityIndicator size="small" />
-      ) : (
-        <Switch
-          value={value}
-          pointerEvents="none"
-          trackColor={{
-            false: theme.colors.input,
-            true: theme.colors.primaryBase,
-          }}
-          thumbColor="#ffffff"
-          style={{ transform: [{ scale: 0.85 }] }}
-        />
-      )}
-    </Pressable>
-  );
-}
-
-function ActionRow({
-  icon,
-  label,
-  description,
-  onPress,
-  theme,
-  isPending = false,
-  disabled = false,
-}: {
-  icon: FeatherIcon;
-  label: string;
-  description: string;
-  onPress: () => void;
-  theme: ThemeTokens;
-  isPending?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled || isPending}
-      style={({ pressed }) => [
-        {
-          flexDirection: "row" as const,
-          alignItems: "center" as const,
-          gap: theme.spacing["3"],
-          paddingHorizontal: theme.spacing["3"],
-          paddingVertical: theme.spacing["3"],
-          borderRadius: theme.borderRadius.md,
-          marginHorizontal: theme.spacing["1"],
-          opacity: disabled ? 0.5 : 1,
-        },
-        pressed && !disabled && { backgroundColor: theme.colors.accent },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled: disabled || isPending }}
-    >
-      <Feather name={icon} size={16} color={theme.colors.mutedForeground} />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.sm.size,
-            lineHeight: theme.typography.fontSize.sm.lineHeight,
-            color: theme.colors.foreground,
-          }}
-        >
-          {label}
-        </Text>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.xs.size,
-            lineHeight: theme.typography.fontSize.xs.lineHeight,
-            color: theme.colors.mutedForeground,
-          }}
-        >
-          {description}
-        </Text>
-      </View>
-      {isPending ? (
-        <ActivityIndicator size="small" />
-      ) : (
-        <Feather
-          name="chevron-right"
-          size={14}
-          color={theme.colors.mutedForeground}
-        />
-      )}
-    </Pressable>
-  );
-}
-
-function createStyles(theme: ThemeTokens) {
-  return StyleSheet.create({
-    scrollView: {
-      flex: 1,
-    },
-    scrollContent: {
-      paddingBottom: theme.spacing["8"],
-    },
-    intro: {
-      paddingHorizontal: theme.spacing["4"],
-      paddingTop: theme.spacing["3"],
-      paddingBottom: theme.spacing["1"],
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    sectionItems: {
-      paddingVertical: theme.spacing["1"],
-    },
-  } satisfies Record<string, ViewStyle | TextStyle>);
 }

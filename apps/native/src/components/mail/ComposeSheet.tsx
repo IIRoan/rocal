@@ -11,17 +11,31 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { AppScreen } from "../../../src/components/layout";
-import { LAYOUT_METRICS } from "../../../src/lib/app-layout";
+import {
+  BottomSheet,
+  BottomSheetHeader,
+  type BottomSheetHandle,
+} from "../BottomSheet";
+import { LAYOUT_METRICS } from "../../lib/app-layout";
+import type { ComposeRequest } from "../../lib/mail/compose-request";
 import { useQuery } from "@tanstack/react-query";
-import { getErrorMessage, hasComposeUserContent, resolveReplyRecipients, validateComposeRecipients, resolveComposeSendBodies, messageBodiesToComposeText, type ComposeTextFields } from "@workspace/calendar-core";
+import {
+  canSendCompose,
+  composeTextToPlain,
+  getErrorMessage,
+  hasComposeUserContent,
+  resolveReplyRecipients,
+  validateComposeRecipients,
+  resolveComposeSendBodies,
+  messageBodiesToComposeText,
+  type ComposeTextFields,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
-import { useTheme } from "../../../src/providers/ThemeProvider";
-import { useToast } from "../../../src/providers/ToastProvider";
-import { QUERY_KEYS } from "../../../src/lib/query-keys";
+import { useTheme } from "../../providers/ThemeProvider";
+import { useToast } from "../../providers/ToastProvider";
+import { QUERY_KEYS } from "../../lib/query-keys";
 import {
   useCachedMessage,
   resolveComposeContext,
@@ -29,66 +43,101 @@ import {
   useMailMutations,
   useMailRuntime,
   useSendMessage,
-} from "../../../src/lib/mail/use-mail";
+} from "../../lib/mail/use-mail";
 import {
   formatReplyAllRecipientFields,
   validateComposeInput,
-} from "../../../src/lib/mail/mail-helpers";
+} from "../../lib/mail/mail-helpers";
 import {
   createPendingComposeAttachment,
   toJmapAttachmentInput,
   type PendingComposeAttachment,
-} from "../../../src/lib/mail/compose-attachments";
-import { decodeBase64ToBytes } from "../../../src/lib/mail/binary-utils";
+} from "../../lib/mail/compose-attachments";
+import { decodeBase64ToBytes } from "../../lib/mail/binary-utils";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import {
   classifyMessageEncryption,
   extractMessageBodies,
   resolveInlinePgpArmoredCiphertext,
-} from "../../../src/lib/mail/message-security";
+} from "../../lib/mail/message-security";
 import {
   decryptMailMessage,
   decryptPgpMimeMessage,
-} from "../../../src/lib/mail/mail-crypto";
-import { resolveOutgoingMessageBody } from "../../../src/lib/mail/outgoing-message-crypto";
+} from "../../lib/mail/mail-crypto";
+import { resolveOutgoingMessageBody } from "../../lib/mail/outgoing-message-crypto";
 import {
   appendPlainTextSignature,
   getPlainTextSignature,
-} from "../../../src/lib/mail/signature-utils";
+} from "../../lib/mail/signature-utils";
 import {
   useComposeDraftAutosave,
   type DraftSaveStatus,
-} from "../../../src/hooks/use-compose-draft-autosave";
-import type { JmapEmailMessage, JmapIdentity, MailAddress } from "../../../src/lib/mail/types";
-import { ComposeRecipientField } from "../../../src/components/mail/ComposeRecipientField";
-import { ComposeBodyEditor, type ComposeBodyEditorHandle } from "../../../src/components/mail/ComposeBodyEditor";
-import { useRecentContacts } from "../../../src/hooks/use-recent-contacts";
-import { extractRecentContactEntries } from "../../../src/lib/record-recent-contacts";
-import { collectCommittedEmails } from "../../../src/lib/mail/compose-recipients";
-import { useKeyboardInset } from "../../../src/hooks/use-keyboard-inset";
-import { ComposeHeader } from "../../../src/components/mail/ComposeHeader";
+} from "../../hooks/use-compose-draft-autosave";
+import type {
+  JmapEmailMessage,
+  JmapIdentity,
+  MailAddress,
+} from "../../lib/mail/types";
+import { ComposeRecipientField } from "./ComposeRecipientField";
 import {
-  ComposeMoreSheet,
-  type ComposeMoreAction,
-} from "../../../src/components/mail/ComposeMoreSheet";
-import { ComposeFormatBar } from "../../../src/components/mail/ComposeFormatBar";
-import { ComposeAttachmentList } from "../../../src/components/mail/ComposeAttachmentList";
-import { ComposeIdentitySheet } from "../../../src/components/mail/ComposeIdentitySheet";
-import { useMailSkin, type MailSkin } from "../../../src/components/mail/mail-ui";
-import { composeTitle } from "../../../src/lib/mail/compose-display";
+  ComposeBodyEditor,
+  type ComposeBodyEditorHandle,
+} from "./ComposeBodyEditor";
+import { useRecentContacts } from "../../hooks/use-recent-contacts";
+import { extractRecentContactEntries } from "../../lib/record-recent-contacts";
+import { collectCommittedEmails } from "../../lib/mail/compose-recipients";
+import { useKeyboardInset } from "../../hooks/use-keyboard-inset";
+import { ComposeHeader } from "./ComposeHeader";
+import { ComposeFormatBar } from "./ComposeFormatBar";
+import { ComposeAttachmentList } from "./ComposeAttachmentList";
+import { ComposeIdentitySheet } from "./ComposeIdentitySheet";
+import { useMailSkin, type MailSkin } from "./mail-ui";
+import { composeTitle } from "../../lib/mail/compose-display";
 
-export default function ComposeScreen() {
+interface ComposeSheetProps {
+  visible: boolean;
+  /** Null once the sheet has finished closing; each open passes a fresh request. */
+  request: ComposeRequest | null;
+  presentKey: number;
+  onClose: () => void;
+  onCloseComplete: () => void;
+}
+
+/** Compose drawer: new messages, replies, forwards, and drafts. */
+export function ComposeSheet({
+  visible,
+  request,
+  presentKey,
+  onClose,
+  onCloseComplete,
+}: ComposeSheetProps) {
+  if (!request) {
+    return null;
+  }
+  return (
+    <ComposeSession
+      key={presentKey}
+      visible={visible}
+      params={request}
+      presentKey={presentKey}
+      onClose={onClose}
+      onCloseComplete={onCloseComplete}
+    />
+  );
+}
+
+function ComposeSession({
+  visible,
+  params,
+  presentKey,
+  onClose,
+  onCloseComplete,
+}: Omit<ComposeSheetProps, "request"> & { params: ComposeRequest }) {
   const { theme } = useTheme();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardInset();
-  const params = useLocalSearchParams<{
-    mode?: string;
-    messageId?: string;
-    to?: string;
-    toName?: string;
-  }>();
+  const sheetRef = useRef<BottomSheetHandle>(null);
   const skin = useMailSkin();
   const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
   const { toast } = useToast();
@@ -114,8 +163,6 @@ export default function ComposeScreen() {
     null,
   );
   const [identityPickerOpen, setIdentityPickerOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const pendingMoreActionRef = useRef<ComposeMoreAction | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draftSaveStatus, setDraftSaveStatus] =
     useState<DraftSaveStatus>("idle");
@@ -124,6 +171,8 @@ export default function ComposeScreen() {
   );
   const [isDraftDecrypting, setIsDraftDecrypting] = useState(false);
   const [bodyFocused, setBodyFocused] = useState(false);
+  const subjectInputRef = useRef<TextInput>(null);
+  const focusSubject = useCallback(() => subjectInputRef.current?.focus(), []);
   const bodyEditorRef = useRef<ComposeBodyEditorHandle>(null);
 
   const composeContext = resolveComposeContext(
@@ -271,7 +320,7 @@ export default function ComposeScreen() {
               recordUsage(entries, "mail");
             }
             toast(encrypted ? "Encrypted message sent" : "Message sent");
-            router.back();
+            onClose();
           },
           onError: (err) =>
             setError(getErrorMessage(err, "Failed to send message")),
@@ -294,7 +343,7 @@ export default function ComposeScreen() {
     sendMessage,
     composeContext,
     recordUsage,
-    router,
+    onClose,
     toast,
     attachments,
   ]);
@@ -334,9 +383,7 @@ export default function ComposeScreen() {
 
   const isDirty = hasUserContent || attachments.length > 0;
 
-  const leaveCompose = useCallback(() => {
-    router.back();
-  }, [router]);
+  const leaveCompose = onClose;
 
   const handleDiscard = useCallback(() => {
     if (draftId && runtime) {
@@ -356,13 +403,35 @@ export default function ComposeScreen() {
     leaveCompose();
   }, [hasUserContent, leaveCompose, saveDraft, toast]);
 
+  const leaveClean = useCallback(() => {
+    // Drop a draft autosaved earlier in this session once its content was removed again.
+    if (draftId && params.mode !== "draft" && runtime) {
+      moveToTrash.mutate(draftId);
+    }
+    leaveCompose();
+  }, [draftId, leaveCompose, moveToTrash, params.mode, runtime]);
+
+  // Swipe-down and backdrop taps have no room for a prompt, so they keep the work as a draft.
+  const handleSheetDismiss = useCallback(() => {
+    if (!isDirty) {
+      leaveClean();
+      return;
+    }
+    void (async () => {
+      const savedDraftId = await saveDraft();
+      if (!savedDraftId && hasUserContent) {
+        toast("Couldn't save draft", "error");
+        sheetRef.current?.snapTo(0);
+        return;
+      }
+      if (savedDraftId) toast("Draft saved", "success");
+      leaveCompose();
+    })();
+  }, [hasUserContent, isDirty, leaveClean, leaveCompose, saveDraft, toast]);
+
   const handleCancel = useCallback(() => {
     if (!isDirty) {
-      // Drop a draft autosaved earlier in this session once its content was removed again.
-      if (draftId && params.mode !== "draft" && runtime) {
-        moveToTrash.mutate(draftId);
-      }
-      leaveCompose();
+      leaveClean();
       return;
     }
 
@@ -380,18 +449,10 @@ export default function ComposeScreen() {
         },
       },
     ]);
-  }, [
-    draftId,
-    handleDiscard,
-    handleSaveAndLeave,
-    isDirty,
-    leaveCompose,
-    moveToTrash,
-    params.mode,
-    runtime,
-  ]);
+  }, [handleDiscard, handleSaveAndLeave, isDirty, leaveClean]);
 
   useEffect(() => {
+    if (!visible) return;
     const subscription = BackHandler.addEventListener(
       "hardwareBackPress",
       () => {
@@ -400,13 +461,20 @@ export default function ComposeScreen() {
       },
     );
     return () => subscription.remove();
-  }, [handleCancel]);
+  }, [handleCancel, visible]);
 
   const canSend =
     Boolean(composeContext) &&
     !sendMessage.isPending &&
     !isDraftDecrypting &&
-    to.trim().length > 0;
+    canSendCompose({
+      to,
+      cc,
+      bcc,
+      subject,
+      bodyText: composeTextToPlain(body),
+      attachmentCount: attachments.length,
+    });
 
   useEffect(() => {
     if (seedFields) {
@@ -426,12 +494,9 @@ export default function ComposeScreen() {
       setSeedFields(fields);
     };
 
-    const toParam = Array.isArray(params.to) ? params.to[0] : params.to;
+    const toParam = params.to;
     if (toParam) {
-      const toName = Array.isArray(params.toName)
-        ? params.toName[0]
-        : params.toName;
-      const trimmedName = toName?.trim();
+      const trimmedName = params.toName?.trim();
       seedCompose({
         ...EMPTY_COMPOSE_FIELDS,
         to:
@@ -512,9 +577,7 @@ export default function ComposeScreen() {
             }
           } catch (err) {
             if (!cancelled) {
-              setError(
-                getErrorMessage(err, "Could not decrypt this draft."),
-              );
+              setError(getErrorMessage(err, "Could not decrypt this draft."));
             }
           } finally {
             if (!cancelled) {
@@ -547,223 +610,206 @@ export default function ComposeScreen() {
   ]);
 
   const hasSignature = Boolean(getPlainTextSignature(selectedIdentity));
-  const toExcludeEmails = useMemo(() => collectCommittedEmails(cc, bcc), [bcc, cc]);
-  const ccExcludeEmails = useMemo(() => collectCommittedEmails(to, bcc), [bcc, to]);
-  const bccExcludeEmails = useMemo(() => collectCommittedEmails(to, cc), [cc, to]);
+  const toExcludeEmails = useMemo(
+    () => collectCommittedEmails(cc, bcc),
+    [bcc, cc],
+  );
+  const ccExcludeEmails = useMemo(
+    () => collectCommittedEmails(to, bcc),
+    [bcc, to],
+  );
+  const bccExcludeEmails = useMemo(
+    () => collectCommittedEmails(to, cc),
+    [cc, to],
+  );
   const canChooseIdentity = Boolean(composeContext) && identities.length > 1;
 
-  const confirmDeleteDraft = useCallback(() => {
-    Alert.alert("Delete draft?", undefined, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete Draft", style: "destructive", onPress: handleDiscard },
-    ]);
-  }, [handleDiscard]);
-
-  const runMoreAction = useCallback(
-    (action: ComposeMoreAction) => {
-      if (action === "toggle-cc-bcc") setShowCcBcc((prev) => !prev);
-      else if (action === "choose-identity") setIdentityPickerOpen(true);
-      else if (action === "insert-signature") handleInsertSignature();
-      else confirmDeleteDraft();
-    },
-    [confirmDeleteDraft, handleInsertSignature],
-  );
-
-  const handleMoreSelect = useCallback((action: ComposeMoreAction) => {
-    pendingMoreActionRef.current = action;
-    setMoreOpen(false);
-  }, []);
-
-  // Follow-up sheets and alerts wait for the options sheet to finish closing.
-  const handleMoreCloseComplete = useCallback(() => {
-    const action = pendingMoreActionRef.current;
-    pendingMoreActionRef.current = null;
-    if (action) runMoreAction(action);
-  }, [runMoreAction]);
-
   return (
-    <AppScreen
-      header={
-        <ComposeHeader
-          title={composeTitle(subject)}
-          canSend={canSend}
-          sending={sendMessage.isPending}
-          onClose={handleCancel}
-          onAttach={() => {
-            void handleAttach();
-          }}
-          onMore={() => setMoreOpen(true)}
-          onSend={() => {
-            void handleSend();
-          }}
-        />
-      }
-    >
-      <View
-        style={[
-          styles.composeShell,
-          { paddingBottom: keyboardHeight > 0 ? 0 : insets.bottom },
-        ]}
+    <>
+      <BottomSheet
+        ref={sheetRef}
+        visible={visible}
+        presentKey={presentKey}
+        onDismiss={handleSheetDismiss}
+        onCloseComplete={onCloseComplete}
+        keyboardBehavior="extend"
+        enableContentPanningGesture={false}
       >
-        <View style={styles.flex}>
-          <View style={styles.headerFields}>
-            {runtimeQuery.isLoading && !composeContext ? (
-              <View style={styles.fieldRow}>
-                <ActivityIndicator size="small" color={skin.textTertiary} />
-                <Text style={styles.noticeInline}>Preparing your mailbox…</Text>
-              </View>
-            ) : null}
+        <BottomSheetHeader showClose={false} style={styles.sheetHeader}>
+          <ComposeHeader
+            title={composeTitle(subject)}
+            canSend={canSend}
+            sending={sendMessage.isPending}
+            onClose={handleCancel}
+            onAttach={() => {
+              void handleAttach();
+            }}
+            onSend={() => {
+              void handleSend();
+            }}
+          />
+        </BottomSheetHeader>
+        <View
+          style={[
+            styles.composeShell,
+            { paddingBottom: keyboardHeight > 0 ? 0 : insets.bottom },
+          ]}
+        >
+          <View style={styles.flex}>
+            <View style={styles.headerFields}>
+              {runtimeQuery.isLoading && !composeContext ? (
+                <View style={styles.fieldRow}>
+                  <ActivityIndicator size="small" color={skin.textTertiary} />
+                  <Text style={styles.noticeInline}>
+                    Preparing your mailbox…
+                  </Text>
+                </View>
+              ) : null}
 
-            {!runtimeQuery.isLoading && !composeContext ? (
-              <Text style={styles.noticeText}>
-                Your mailbox cannot send messages right now.
-              </Text>
-            ) : null}
+              {!runtimeQuery.isLoading && !composeContext ? (
+                <Text style={styles.noticeText}>
+                  Your mailbox cannot send messages right now.
+                </Text>
+              ) : null}
 
-            <ComposeRecipientField
-              value={to}
-              onChangeText={setTo}
-              label="To"
-              excludeEmails={toExcludeEmails}
-              trailing={
-                <Pressable
-                  onPress={() => setShowCcBcc((prev) => !prev)}
-                  style={({ pressed }) => [
-                    styles.ccToggleHit,
-                    pressed && styles.pressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    showCcBcc ? "Hide Cc, Bcc, and From" : "Show Cc, Bcc, and From"
-                  }
-                >
-                  <Feather
-                    name={showCcBcc ? "chevron-up" : "chevron-down"}
-                    size={18}
-                    color={skin.textTertiary}
-                  />
-                </Pressable>
-              }
-            />
-
-            {showCcBcc ? (
-              <>
-                <ComposeRecipientField
-                  value={cc}
-                  onChangeText={setCc}
-                  label="Cc"
-                  excludeEmails={ccExcludeEmails}
-                />
-                <ComposeRecipientField
-                  value={bcc}
-                  onChangeText={setBcc}
-                  label="Bcc"
-                  excludeEmails={bccExcludeEmails}
-                />
-                {composeContext ? (
+              <ComposeRecipientField
+                value={to}
+                onChangeText={setTo}
+                label="To"
+                excludeEmails={toExcludeEmails}
+                onSubmitEmpty={focusSubject}
+                trailing={
                   <Pressable
+                    onPress={() => setShowCcBcc((prev) => !prev)}
                     style={({ pressed }) => [
-                      styles.fieldRow,
-                      pressed && canChooseIdentity && styles.pressed,
+                      styles.ccToggleHit,
+                      pressed && styles.pressed,
                     ]}
-                    onPress={
-                      canChooseIdentity
-                        ? () => setIdentityPickerOpen(true)
-                        : undefined
-                    }
                     accessibilityRole="button"
-                    accessibilityLabel="Choose sending identity"
+                    accessibilityLabel={
+                      showCcBcc
+                        ? "Hide Cc, Bcc, and From"
+                        : "Show Cc, Bcc, and From"
+                    }
                   >
-                    <Text style={styles.fieldLabel}>From</Text>
-                    <Text style={styles.fieldValue} numberOfLines={1}>
-                      {composeContext.fromName
-                        ? `${composeContext.fromName}`
-                        : composeContext.fromEmail}
-                    </Text>
-                    {canChooseIdentity ? (
-                      <Feather
-                        name="chevron-down"
-                        size={16}
-                        color={skin.textTertiary}
-                      />
-                    ) : null}
+                    <Feather
+                      name={showCcBcc ? "chevron-up" : "chevron-down"}
+                      size={18}
+                      color={skin.textTertiary}
+                    />
                   </Pressable>
-                ) : null}
-              </>
-            ) : null}
-
-            <View style={styles.fieldRow}>
-              <Text style={styles.fieldLabel}>Subject</Text>
-              <TextInput
-                style={styles.subjectInput}
-                value={subject}
-                onChangeText={setSubject}
-                onFocus={() => setBodyFocused(false)}
-                placeholderTextColor={skin.textTertiary}
-                selectionColor={skin.accent}
-                autoCapitalize="sentences"
-                autoCorrect
-                autoFocus={false}
-                accessibilityLabel="Subject"
-              />
-            </View>
-
-            {attachments.length > 0 ? (
-              <ComposeAttachmentList
-                attachments={attachments}
-                onRemove={(id) =>
-                  setAttachments((current) =>
-                    current.filter((item) => item.id !== id),
-                  )
                 }
               />
-            ) : null}
 
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              {showCcBcc ? (
+                <>
+                  <ComposeRecipientField
+                    value={cc}
+                    onChangeText={setCc}
+                    label="Cc"
+                    excludeEmails={ccExcludeEmails}
+                    onSubmitEmpty={focusSubject}
+                  />
+                  <ComposeRecipientField
+                    value={bcc}
+                    onChangeText={setBcc}
+                    label="Bcc"
+                    excludeEmails={bccExcludeEmails}
+                    onSubmitEmpty={focusSubject}
+                  />
+                  {composeContext ? (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.fieldRow,
+                        pressed && canChooseIdentity && styles.pressed,
+                      ]}
+                      onPress={
+                        canChooseIdentity
+                          ? () => setIdentityPickerOpen(true)
+                          : undefined
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel="Choose sending identity"
+                    >
+                      <Text style={styles.fieldLabel}>From</Text>
+                      <Text style={styles.fieldValue} numberOfLines={1}>
+                        {composeContext.fromName
+                          ? `${composeContext.fromName}`
+                          : composeContext.fromEmail}
+                      </Text>
+                      {canChooseIdentity ? (
+                        <Feather
+                          name="chevron-down"
+                          size={16}
+                          color={skin.textTertiary}
+                        />
+                      ) : null}
+                    </Pressable>
+                  ) : null}
+                </>
+              ) : null}
+
+              <View style={styles.fieldRow}>
+                <Text style={styles.fieldLabel}>Subject</Text>
+                <TextInput
+                  ref={subjectInputRef}
+                  style={styles.subjectInput}
+                  value={subject}
+                  onChangeText={setSubject}
+                  onFocus={() => setBodyFocused(false)}
+                  placeholderTextColor={skin.textTertiary}
+                  selectionColor={theme.colors.primaryBase}
+                  cursorColor={theme.colors.primaryBase}
+                  autoCapitalize="sentences"
+                  autoCorrect
+                  autoFocus={false}
+                  accessibilityLabel="Subject"
+                />
+              </View>
+
+              {attachments.length > 0 ? (
+                <ComposeAttachmentList
+                  attachments={attachments}
+                  onRemove={(id) =>
+                    setAttachments((current) =>
+                      current.filter((item) => item.id !== id),
+                    )
+                  }
+                />
+              ) : null}
+
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            </View>
+
+            {isDraftDecrypting ? (
+              <View style={styles.bodyLoading}>
+                <ActivityIndicator size="small" color={skin.textTertiary} />
+                <Text style={styles.noticeInline}>Decrypting draft…</Text>
+              </View>
+            ) : (
+              <ComposeBodyEditor
+                ref={bodyEditorRef}
+                value={body}
+                onChangeText={setBody}
+                onFocusChange={setBodyFocused}
+                placeholder="Message"
+              />
+            )}
           </View>
 
-          {isDraftDecrypting ? (
-            <View style={styles.bodyLoading}>
-              <ActivityIndicator size="small" color={skin.textTertiary} />
-              <Text style={styles.noticeInline}>Decrypting draft…</Text>
-            </View>
-          ) : (
-            <ComposeBodyEditor
-              ref={bodyEditorRef}
-              value={body}
-              onChangeText={setBody}
-              onFocusChange={setBodyFocused}
-              placeholder="Message"
+          {bodyFocused ? (
+            <ComposeFormatBar
+              draftSaveStatus={draftSaveStatus}
+              hasSignature={hasSignature}
+              onBold={() => bodyEditorRef.current?.applyBold()}
+              onItalic={() => bodyEditorRef.current?.applyItalic()}
+              onUnderline={() => bodyEditorRef.current?.applyUnderline()}
+              onList={() => bodyEditorRef.current?.applyList()}
+              onInsertSignature={handleInsertSignature}
             />
-          )}
+          ) : null}
         </View>
-
-        {bodyFocused ? (
-          <ComposeFormatBar
-            draftSaveStatus={draftSaveStatus}
-            hasSignature={hasSignature}
-            onBold={() => bodyEditorRef.current?.applyBold()}
-            onItalic={() => bodyEditorRef.current?.applyItalic()}
-            onUnderline={() => bodyEditorRef.current?.applyUnderline()}
-            onList={() => bodyEditorRef.current?.applyList()}
-            onInsertSignature={handleInsertSignature}
-          />
-        ) : null}
-        {keyboardHeight > 0 ? (
-          <View style={{ height: keyboardHeight }} />
-        ) : null}
-      </View>
-
-      <ComposeMoreSheet
-        visible={moreOpen}
-        showCcBcc={showCcBcc}
-        canChooseIdentity={canChooseIdentity}
-        canInsertSignature={hasSignature}
-        canDeleteDraft={isDirty || Boolean(draftId)}
-        onSelect={handleMoreSelect}
-        onDismiss={() => setMoreOpen(false)}
-        onCloseComplete={handleMoreCloseComplete}
-      />
+      </BottomSheet>
 
       <ComposeIdentitySheet
         visible={identityPickerOpen}
@@ -775,7 +821,7 @@ export default function ComposeScreen() {
         }}
         onDismiss={() => setIdentityPickerOpen(false)}
       />
-    </AppScreen>
+    </>
   );
 }
 
@@ -887,18 +933,21 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       flex: 1,
       minHeight: 0,
       overflow: "hidden" as const,
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.card,
+    },
+    sheetHeader: {
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+      borderBottomWidth: 0,
     },
     headerFields: {
       flexShrink: 0,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: skin.borderTertiary,
     },
     fieldRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: theme.spacing["2"],
-      minHeight: LAYOUT_METRICS.hitSize + theme.spacing["1"],
+      gap: theme.spacing["3"],
+      minHeight: LAYOUT_METRICS.hitSize + theme.spacing["2"],
       paddingHorizontal: theme.spacing["4"],
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: skin.borderTertiary,
@@ -923,7 +972,9 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
 
   const text = {
     fieldLabel: {
-      ...skin.meta,
+      ...skin.body,
+      fontWeight: "500" as TextStyle["fontWeight"],
+      color: skin.textTertiary,
     },
     fieldValue: {
       flex: 1,
