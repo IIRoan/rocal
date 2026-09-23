@@ -64,6 +64,7 @@ import {
 import { toKitTheme } from "./calendar-kit-theme";
 import { TimelineDraggingEvent } from "./TimelineDraggingEvent";
 import { TimelineEventContent } from "./TimelineEventContent";
+import { AllDayEventContent } from "./AllDayEventContent";
 import {
   resolveTimelineEventDensity,
   timelineEventTitleLines,
@@ -120,6 +121,7 @@ export const NativeTimelineCalendar = forwardRef<
   const isDraggingRef = useRef(false);
   const dragOriginalRef = useRef<DecoratedCalendarEvent | null>(null);
   const resolvedTimezone = resolveTimezone(timezone);
+  const allDayRowMinutes = (theme.spacing["8"] / KIT_HOUR_HEIGHT) * 60;
   const kitTheme = useMemo(() => toKitTheme(theme), [theme]);
   const dayShadeRegions = useMemo(
     () =>
@@ -136,10 +138,22 @@ export const NativeTimelineCalendar = forwardRef<
     () =>
       events.map((event) => {
         const colors = resolveEventBlockColor(event.color, theme);
-        return toKitEvent(event, resolvedTimezone, {
+        const kitEvent = toKitEvent(event, resolvedTimezone, {
           color: colors.bg,
           titleColor: colors.fg,
         });
+        return {
+          ...kitEvent,
+          containerStyle:
+            "date" in kitEvent.start
+              ? {
+                  borderRadius: theme.borderRadius.sm,
+                  marginTop: theme.spacing["1"],
+                  paddingHorizontal: 0,
+                  paddingVertical: 0,
+                }
+              : undefined,
+        };
       }),
     [events, resolvedTimezone, theme],
   );
@@ -267,14 +281,22 @@ export const NativeTimelineCalendar = forwardRef<
           ? formatEventSpanLabel(source, resolvedTimezone)
           : null;
 
-      const content = (
-        <TimelineEventContent
-          title={source?.title ?? event.title ?? ""}
+      const title = source?.title ?? event.title ?? "";
+      const cancelled = source ? isCancelledCalendarEvent(source) : false;
+      const content = options.allDay ? (
+        <AllDayEventContent
+          title={title}
           titleColor={titleColor}
-          cancelled={source ? isCancelledCalendarEvent(source) : false}
+          cancelled={cancelled}
+          spanLabel={spanLabel}
+        />
+      ) : (
+        <TimelineEventContent
+          title={title}
+          titleColor={titleColor}
+          cancelled={cancelled}
           density={density}
           titleLines={titleLines}
-          spanLabel={spanLabel}
         />
       );
 
@@ -409,7 +431,13 @@ export const NativeTimelineCalendar = forwardRef<
         onDragEventStart={handleDragEventStart}
         onDragEventEnd={handleDragEventEnd}
       >
-        <CalendarHeader dayBarHeight={52} renderEvent={renderAllDayEvent} />
+        <CalendarHeader
+          dayBarHeight={52}
+          eventMinMinutes={allDayRowMinutes}
+          eventMaxMinutes={allDayRowMinutes}
+          eventInitialMinutes={allDayRowMinutes}
+          renderEvent={renderAllDayEvent}
+        />
         <CalendarBody
           hourFormat={toKitHourFormat(timeFormat)}
           renderHour={renderHour}

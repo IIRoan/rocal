@@ -1,12 +1,128 @@
+diff --git a/lib/commonjs/CalendarHeader.js b/lib/commonjs/CalendarHeader.js
+index e30a49f..dc9df57 100644
+--- a/lib/commonjs/CalendarHeader.js
++++ b/lib/commonjs/CalendarHeader.js
+@@ -104,7 +104,10 @@ const CalendarHeader = ({
+     });
+   }, [maxEventRows, collapsedItems]);
+   const allDayEventsHeight = (0, _reactNativeReanimated.useDerivedValue)(() => {
+-    const extraHeight = numberOfDays > 1 ? headerBottomHeight : 0;
++    const extraHeight =
++      numberOfDays > 1 && isShowExpandButton.value && !isExpanded.value
++        ? headerBottomHeight
++        : 0;
+     let nextHeight = 0;
+     if (visibleRows.value) {
+       nextHeight = visibleRows.value * eventHeight.value + extraHeight;
+diff --git a/lib/commonjs/components/MultiDayBarItem.js b/lib/commonjs/components/MultiDayBarItem.js
+index 10f1028..8e714d8 100644
+--- a/lib/commonjs/components/MultiDayBarItem.js
++++ b/lib/commonjs/components/MultiDayBarItem.js
+@@ -256,7 +256,7 @@ const styles = _reactNative.StyleSheet.create({
+     alignItems: 'center'
+   },
+   eventContent: {
+-    ..._reactNative.StyleSheet.absoluteFillObject,
++    ..._reactNative.StyleSheet.absoluteFill,
+     overflow: 'hidden',
+     borderRadius: 2,
+     paddingHorizontal: 2,
+diff --git a/lib/commonjs/components/SingleDayBarItem.js b/lib/commonjs/components/SingleDayBarItem.js
+index 7fd0574..81ca9de 100644
+--- a/lib/commonjs/components/SingleDayBarItem.js
++++ b/lib/commonjs/components/SingleDayBarItem.js
+@@ -60,10 +60,15 @@ const SingleDayBarItem = ({
+     onPressBackground,
+     onLongPressBackground
+   } = (0, _ActionsProvider.useActions)();
+-  const _renderEvent = event => {
++  const _renderEvent = (event, rowIndex) => {
++    // Week lanes can have gaps on this day, but visibility needs consecutive day rows.
++    const dayEvent = {
++      ...event,
++      _internal: { ...event._internal, rowIndex },
++    };
+     return /*#__PURE__*/_react.default.createElement(EventItem, {
+       key: event.localId,
+-      event: event,
++      event: dayEvent,
+       onPressEvent: onPressEvent,
+       renderEvent: renderEvent
+     });
+diff --git a/lib/module/CalendarHeader.js b/lib/module/CalendarHeader.js
+index da8a2cc..5121459 100644
+--- a/lib/module/CalendarHeader.js
++++ b/lib/module/CalendarHeader.js
+@@ -96,7 +96,10 @@ const CalendarHeader = ({
+     });
+   }, [maxEventRows, collapsedItems]);
+   const allDayEventsHeight = useDerivedValue(() => {
+-    const extraHeight = numberOfDays > 1 ? headerBottomHeight : 0;
++    const extraHeight =
++      numberOfDays > 1 && isShowExpandButton.value && !isExpanded.value
++        ? headerBottomHeight
++        : 0;
+     let nextHeight = 0;
+     if (visibleRows.value) {
+       nextHeight = visibleRows.value * eventHeight.value + extraHeight;
+diff --git a/lib/module/components/MultiDayBarItem.js b/lib/module/components/MultiDayBarItem.js
+index 58a5492..b3ba6bb 100644
+--- a/lib/module/components/MultiDayBarItem.js
++++ b/lib/module/components/MultiDayBarItem.js
+@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
+     alignItems: 'center'
+   },
+   eventContent: {
+-    ...StyleSheet.absoluteFillObject,
++    ...StyleSheet.absoluteFill,
+     overflow: 'hidden',
+     borderRadius: 2,
+     paddingHorizontal: 2,
+diff --git a/lib/module/components/SingleDayBarItem.js b/lib/module/components/SingleDayBarItem.js
+index c7e9eda..694fadd 100644
+--- a/lib/module/components/SingleDayBarItem.js
++++ b/lib/module/components/SingleDayBarItem.js
+@@ -52,10 +52,15 @@ const SingleDayBarItem = ({
+     onPressBackground,
+     onLongPressBackground
+   } = useActions();
+-  const _renderEvent = event => {
++  const _renderEvent = (event, rowIndex) => {
++    // Week lanes can have gaps on this day, but visibility needs consecutive day rows.
++    const dayEvent = {
++      ...event,
++      _internal: { ...event._internal, rowIndex },
++    };
+     return /*#__PURE__*/React.createElement(EventItem, {
+       key: event.localId,
+-      event: event,
++      event: dayEvent,
+       onPressEvent: onPressEvent,
+       renderEvent: renderEvent
+     });
+diff --git a/src/CalendarHeader.tsx b/src/CalendarHeader.tsx
+index b3e564f..acdf3cf 100644
+--- a/src/CalendarHeader.tsx
++++ b/src/CalendarHeader.tsx
+@@ -132,5 +132,8 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
+   const allDayEventsHeight = useDerivedValue(() => {
+-    const extraHeight = numberOfDays > 1 ? headerBottomHeight : 0;
++    const extraHeight =
++      numberOfDays > 1 && isShowExpandButton.value && !isExpanded.value
++        ? headerBottomHeight
++        : 0;
+     let nextHeight = 0;
+     if (visibleRows.value) {
+       nextHeight = visibleRows.value * eventHeight.value + extraHeight;
 diff --git a/src/components/MultiDayBarItem.tsx b/src/components/MultiDayBarItem.tsx
-index 12cc627c2ff6db487487f2cef53d1816dcd925cc..8df6a8982b1d632b3996365e864acc2da8ba4d50 100644
+index 12cc627..54cc886 100644
 --- a/src/components/MultiDayBarItem.tsx
 +++ b/src/components/MultiDayBarItem.tsx
 @@ -282,12 +282,12 @@ const EventItem = ({
      return _internal.rowIndex * height.value;
    }, [_internal.rowIndex]);
  
-+  // Layout props like position/top in an animated style are dropped on RN 0.85+, collapsing the event to its padding.
++  // Keep the event anchored while animating its vertical offset.
    const eventContainerStyle = useAnimatedStyle(() => {
      return {
 -      position: 'absolute',
@@ -31,11 +147,34 @@ index 12cc627c2ff6db487487f2cef53d1816dcd925cc..8df6a8982b1d632b3996365e864acc2d
        <TouchableOpacity
          activeOpacity={0.6}
          disabled={!onPressEvent}
-@@ -330,6 +335,7 @@ const EventItem = ({
+@@ -330,8 +335,9 @@ const EventItem = ({
  
  const styles = StyleSheet.create({
    container: { flexDirection: 'row', alignItems: 'center' },
 +  eventContainer: { position: 'absolute', top: 0 },
    eventContent: {
-     ...StyleSheet.absoluteFillObject,
+-    ...StyleSheet.absoluteFillObject,
++    ...StyleSheet.absoluteFill,
      overflow: 'hidden',
+     borderRadius: 2,
+     paddingHorizontal: 2,
+diff --git a/src/components/SingleDayBarItem.tsx b/src/components/SingleDayBarItem.tsx
+index 9e79da7..f4a6b22 100644
+--- a/src/components/SingleDayBarItem.tsx
++++ b/src/components/SingleDayBarItem.tsx
+@@ -82,8 +82,13 @@ const SingleDayBarItem = ({
+-  const _renderEvent = (event: PackedAllDayEvent) => {
++  const _renderEvent = (event: PackedAllDayEvent, rowIndex: number) => {
++    // Week lanes can have gaps on this day, but visibility needs consecutive day rows.
++    const dayEvent = {
++      ...event,
++      _internal: { ...event._internal, rowIndex },
++    };
+     return (
+       <EventItem
+         key={event.localId}
+-        event={event}
++        event={dayEvent}
+         onPressEvent={onPressEvent}
+         renderEvent={renderEvent}
+       />
