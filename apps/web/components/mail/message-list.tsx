@@ -59,6 +59,8 @@ export interface MessageListProps {
   onExpandThread?: (threadId: string) => Promise<JmapEmailMessage[]> | void;
   /** Keep search relevance order instead of re-sorting threads by date. */
   preserveMessageOrder?: boolean;
+  /** Stack rows and collapse hover actions into a menu when the reader is open beside the list. */
+  narrow?: boolean;
 }
 
 export function MessageList({
@@ -92,6 +94,7 @@ export function MessageList({
   threadExpandEnabled = true,
   onExpandThread,
   preserveMessageOrder = false,
+  narrow = false,
 }: MessageListProps) {
   const [state, dispatch] = useReducer(
     messageListReducer,
@@ -202,7 +205,13 @@ export function MessageList({
     labels,
     moveTargets,
     spamActions: { canReportSpam, canNotSpam },
-    display: { isMobile, density, showLabelChips, threadExpandEnabled },
+    display: {
+      isMobile,
+      narrow: narrow && !isMobile,
+      density,
+      showLabelChips,
+      threadExpandEnabled,
+    },
     threadUi: {
       expandedThreads: state.expandedThreads,
       expandedThreadMessages: state.expandedThreadMessages,

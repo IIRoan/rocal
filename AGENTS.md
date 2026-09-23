@@ -109,6 +109,7 @@ Look like Solace: quiet, warm, dense, utilitarian. Copy the nearest existing scr
 - Icons: web `lucide-react`, native Feather. No emoji icons, no mixed sets.
 - No press-scale/dent (`active:scale-*`, `whileTap`); feedback via color/opacity. `cursor-pointer` on web clickables. 44px touch targets, tap equivalents for hover affordances.
 - Subtle motion only; real product copy; no new UI/CSS-in-JS libraries.
+- Web motion that must stay smooth in Firefox: animate only `translate`/`opacity` on what moves, use WAAPI for fades, render before sliding. Worked example: `apps/web/components/mail/mail-app/READER-TRANSITION.md`.
 
 ## 8. Mail: JMAP only (MUST)
 

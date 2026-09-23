@@ -3,12 +3,10 @@
 import { Star } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import {
-  DropdownPanel,
   Typography,
   TypographySize,
   TypographyWeight,
 } from "@workspace/ui/solace";
-import { LabelPickerPanel } from "../label-picker-panel";
 import { resolveLabelDisplayColor } from "@workspace/calendar-core";
 import { MailSecurityBadge } from "./mail-security-badge";
 import type {
@@ -23,62 +21,18 @@ export function MessageReaderTitle({
   controller: MessageReaderController;
   view: MessageReaderViewModel;
 }) {
-  const {
-    isMobile,
-    labelPopoverOpen,
-    dispatchChrome,
-    isBusy,
-    message,
-    isFlagged,
-    messageLabels,
-    props,
-  } = controller;
+  const { isMobile, isBusy, message, isFlagged, messageLabels, props } =
+    controller;
   const {
     signatureVerificationState,
     decryptError,
     accountEncryptedAtRest,
     onToggleFlagged,
-    onSetLabel,
-    onCreateLabel,
-    onUpdateLabel,
-    onDeleteLabel,
-    labels,
   } = props;
   const { messageState } = view;
 
   return (
-    <div className="relative shrink-0 border-b border-[var(--border-tertiary)]">
-      {((onSetLabel && labels.length > 0) || onCreateLabel) && (
-        <DropdownPanel
-          open={labelPopoverOpen}
-          onOpenChange={(open) =>
-            dispatchChrome({ type: "patch", patch: { labelPopoverOpen: open } })
-          }
-          side={isMobile ? "top" : "bottom"}
-          align={isMobile ? "start" : "end"}
-          width={240}
-          trigger={
-            <span
-              aria-hidden
-              className="pointer-events-none absolute top-0 right-0 opacity-0"
-            />
-          }
-        >
-          <LabelPickerPanel
-            labels={labels}
-            messageKeywords={message?.keywords}
-            onToggleLabel={
-              onSetLabel
-                ? (labelId, assigned) => onSetLabel(labelId, assigned)
-                : undefined
-            }
-            onCreateLabel={onCreateLabel}
-            onUpdateLabel={onUpdateLabel}
-            onDeleteLabel={onDeleteLabel}
-          />
-        </DropdownPanel>
-      )}
-
+    <div className="shrink-0 border-b border-[var(--border-tertiary)]">
       <div
         className={cn(
           "flex items-start justify-between gap-2",

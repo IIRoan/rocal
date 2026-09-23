@@ -475,11 +475,11 @@ export function useMessageReaderController(props: MessageReaderProps) {
     <div className="flex h-full min-h-0 flex-col items-center justify-center gap-1 p-8">
       <p className="text-sm text-muted-foreground">Select a conversation</p>
     </div>
-  ) : isMessageBodyLoading && !messageHasLoadedBody(message) ? (
-    <div className="flex h-full min-h-0 items-center justify-center p-8">
-      <p className="text-sm text-muted-foreground">Loading message…</p>
-    </div>
   ) : null;
+  // The shell renders from list metadata while the body loads, so only the body area changes when it arrives.
+  const isBodyLoading = Boolean(
+    message && isMessageBodyLoading && !messageHasLoadedBody(message),
+  );
 
   const viewModel = ((): MessageReaderViewModel | null => {
     if (!message) return null;
@@ -574,6 +574,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
     isMobile,
     isBusy,
     isDecrypting,
+    isBodyLoading,
     isDark,
     hasPrev,
     hasNext,

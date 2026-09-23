@@ -1145,24 +1145,34 @@ describe("MessageReader — more actions dropdown", () => {
     expect(onMarkAsUnread).toHaveBeenCalledTimes(1);
   });
 
-  it("shows Move to mailbox options when otherMailboxes exist", () => {
+});
+
+describe("MessageReader — toolbar move to", () => {
+  it("moves the message to a mailbox picked from the toolbar", () => {
+    const onMove = jest.fn();
     render({
+      onMove,
       mailboxes: [
         { id: "inbox", name: "Inbox", role: "inbox" } as any,
         { id: "archive", name: "Archive", role: "archive" } as any,
       ],
       currentMailboxId: "inbox",
     });
-    openMoreActions();
-    const moveTo = findMenuItem("Move to");
-    expect(moveTo).toBeDefined();
+    const trigger = container.querySelector(
+      '[aria-label="Move to"]',
+    ) as HTMLElement | null;
+    expect(trigger).not.toBeNull();
     act(() => {
-      moveTo!.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+      trigger!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
       );
     });
-
-    expect(document.body.textContent).toContain("Archive");
+    const archive = findMenuItem("Archive");
+    expect(archive).toBeDefined();
+    act(() => {
+      archive!.click();
+    });
+    expect(onMove).toHaveBeenCalledWith("archive");
   });
 });
 

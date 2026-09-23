@@ -1,5 +1,7 @@
 "use client";
 
+import { useLayoutEffect, useRef } from "react";
+import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import {
   Image as ImageIcon,
   Lock,
@@ -13,6 +15,7 @@ import {
   EventReminderMessageBody,
   EventReminderMessageBodyLoading,
 } from "../event-reminder-message-body";
+import { fadeInMailReaderContent } from "../mail-app/mail-reader-transition";
 import { MessageDecryptingSkeleton } from "../message-decrypting-loader";
 import { HtmlEmailRenderer } from "./html-email-renderer";
 import type {
@@ -30,6 +33,7 @@ export function MessageReaderBody({
 }) {
   const {
     isDecrypting,
+    isBodyLoading,
     isDark,
     displaySettings,
     allowExternalContent,
@@ -58,9 +62,26 @@ export function MessageReaderBody({
     plaintextBody,
     plaintextQuote,
   } = view;
+  const showSkeleton = isDecrypting || isBodyLoading;
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const wasSkeletonRef = useRef(showSkeleton);
 
-  const standardBodyContent = isDecrypting ? (
-    <MessageDecryptingSkeleton isDark={isDark} />
+  // Skeleton and body share the same flex-1 box, so the swap is a fade in place with no layout shift.
+  useLayoutEffect(() => {
+    const wasSkeleton = wasSkeletonRef.current;
+    wasSkeletonRef.current = showSkeleton;
+    const body = bodyRef.current;
+    if (!wasSkeleton || showSkeleton || !body) return;
+    const fade = fadeInMailReaderContent(body, prefersReducedMotion);
+    return () => fade?.cancel();
+  }, [showSkeleton, prefersReducedMotion]);
+
+  const standardBodyContent = showSkeleton ? (
+    <MessageDecryptingSkeleton
+      isDark={isDark}
+      label={isDecrypting ? undefined : "Loading message"}
+    />
   ) : shouldReplaceBodyWithEventReminder &&
   eventReminderView ? (
     <EventReminderMessageBody reminder={eventReminderView} isDark={isDark} />
@@ -106,6 +127,7 @@ export function MessageReaderBody({
         </div>
       )}
       <HtmlEmailRenderer
+        key={view.message.id}
         html={showQuote ? displayHtml! : cleanHtml}
         blockRemoteImages={blockRemoteImages}
         blockTrackingPixels={blockTrackingPixels}
@@ -205,5 +227,9 @@ export function MessageReaderBody({
       standardBodyContent
     );
 
-  return bodyContent;
+  return (
+    <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col">
+      {bodyContent}
+    </div>
+  );
 }

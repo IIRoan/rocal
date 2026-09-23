@@ -9,7 +9,12 @@ import { MailSidebar } from "../mail-sidebar";
 import { MobileMailHeader } from "../mail-app-mobile-header";
 import { MailAppListColumn } from "./mail-app-list-column";
 import { MailAppDetailPane } from "./mail-app-detail-pane";
+import type { CSSProperties } from "react";
 import type { MailAppContentController } from "../use-mail-app-content-controller";
+import {
+  MAIL_READER_EASING,
+  MAIL_READER_TRANSITION_MS,
+} from "./mail-reader-transition";
 
 export function MailAppMainLayout({
   controller,
@@ -73,7 +78,15 @@ export function MailAppMainLayout({
               />
             )}
 
-            <div className="flex flex-1 min-h-0 overflow-hidden relative">
+            <div
+              className="@container relative flex min-h-0 flex-1 overflow-hidden"
+              style={
+                {
+                  "--mail-reader-ms": `${MAIL_READER_TRANSITION_MS}ms`,
+                  "--mail-reader-ease": MAIL_READER_EASING,
+                } as CSSProperties
+              }
+            >
               <MailAppListColumn controller={controller} />
               <MailAppDetailPane controller={controller} />
             </div>

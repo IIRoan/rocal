@@ -32,6 +32,7 @@ import type {
 } from "./message-list-types";
 import { MessageListRowContextMenu } from "./message-list-row-context-menu";
 import { MessageListRowHoverActions } from "./message-list-row-hover-actions";
+import { MessageListRowOverflowMenu } from "./message-list-row-overflow-menu";
 
 function MessageLabelChips({
   messageLabels,
@@ -77,27 +78,27 @@ function MessageLabelChips({
 }
 
 function rowShellClassName({
-  isMobile,
+  stacked,
   density,
   isChecked,
   isSelected,
   isRead,
 }: {
-  isMobile: boolean;
+  stacked: boolean;
   density: "compact" | "comfortable";
   isChecked: boolean;
   isSelected: boolean;
   isRead: boolean;
 }) {
   const padding =
-    isMobile || density === "comfortable" ? "px-[18px] py-3" : "px-5 py-3";
+    stacked || density === "comfortable" ? "px-[18px] py-3" : "px-5 py-3";
   const tone = isChecked || isSelected
     ? "bg-[var(--bg-cell-active)]"
     : isRead
       ? "hover:bg-[var(--bg-cell-hover)]"
       : "bg-[var(--bg-cell-unread)] hover:border-b-[var(--border-primary)]";
   return cn(
-    "group/row relative h-full w-full overflow-hidden text-left cursor-pointer border-b border-[var(--border-tertiary)] box-border",
+    "group/row relative h-full w-full overflow-hidden text-left cursor-pointer border-b border-[var(--border-tertiary)] box-border transition-colors duration-150",
     padding,
     tone,
   );
@@ -308,13 +309,15 @@ function UnreadDot({ opacity, label }: { opacity: number; label?: string }) {
   );
 }
 
-/** Phone widths stack sender/date over subject so the subject keeps the full row width. */
+/** Phone widths and the narrow desktop list stack sender/date over subject so the subject keeps the full row width. */
 function MessageListRowStacked({
   view,
 }: {
   view: ReturnType<typeof buildMessageListRowView>;
 }) {
   const { message, row } = view;
+  const showMenu = view.display.narrow;
+  const date = formatMessageDate(message.receivedAt, view.timeFormat, view.timezone);
   return (
     <div className="flex h-full items-start">
       <MessageListRowSelectAvatar
@@ -324,7 +327,7 @@ function MessageListRowStacked({
         onToggleSelect={(event) => view.onToggleSelect(event, row.messageIds)}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex min-w-0 items-center gap-1">
+        <div className={cn("flex min-w-0 items-center gap-1", showMenu && "h-6")}>
           <div className="flex min-w-0 flex-1 overflow-hidden">
             <Typography color={view.senderTone} weight={view.senderWeight}>
               {view.senderLabel}
@@ -334,9 +337,34 @@ function MessageListRowStacked({
           {view.hasAttachments ? (
             <Icons color="disabled" icon={Icon.PaperClip} size={Size.SMALL} />
           ) : null}
-          <Typography color="disabled" mono size={TypographySize.SMALL}>
-            {formatMessageDate(message.receivedAt, view.timeFormat, view.timezone)}
-          </Typography>
+          {showMenu ? (
+            <div className="group/actions flex shrink-0 items-center">
+              <Typography
+                className="group-hover/row:hidden group-has-[[data-state=open]]/actions:hidden"
+                color="disabled"
+                mono
+                size={TypographySize.SMALL}
+              >
+                {date}
+              </Typography>
+              <div className="hidden transition-opacity duration-150 ease-in-out group-hover/row:flex group-has-[[data-state=open]]/actions:flex starting:opacity-0">
+                <MessageListRowOverflowMenu
+                  message={message}
+                  messageIds={row.messageIds}
+                  isRead={view.isRead}
+                  isFlagged={view.isFlagged}
+                  labels={view.labels}
+                  moveTargets={view.moveTargets}
+                  spamActions={view.spamActions}
+                  mailboxActions={view.mailboxActions}
+                />
+              </div>
+            </div>
+          ) : (
+            <Typography color="disabled" mono size={TypographySize.SMALL}>
+              {date}
+            </Typography>
+          )}
         </div>
         <MessageListRowSubject
           className="ml-0 w-full flex-none"
@@ -424,14 +452,14 @@ export function MessageListRow(props: MessageListRowProps) {
             }
           }}
           className={rowShellClassName({
-            isMobile: display.isMobile,
+            stacked: display.isMobile || display.narrow,
             density: display.density,
             isChecked: view.isChecked,
             isSelected: view.isSelected,
             isRead: view.isRead,
           })}
         >
-          {display.isMobile ? (
+          {display.isMobile || display.narrow ? (
             <MessageListRowStacked view={view} />
           ) : (
             <MessageListRowInline view={view} />

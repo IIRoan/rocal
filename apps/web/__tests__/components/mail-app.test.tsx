@@ -97,6 +97,7 @@ jest.mock("@workspace/ui/components/ui/button", () => ({
 
 jest.mock("@workspace/ui/hooks", () => ({
   useIsMobile: () => mockUseIsMobile(),
+  usePrefersReducedMotion: () => true,
 }));
 
 jest.mock("@workspace/ui/components/ui/app-skeletons", () => ({
@@ -345,9 +346,11 @@ jest.mock("../../components/mail/message-reader", () => ({
     conversationMessages = [],
     onReply,
     onSendReply,
+    onClose,
   }: any) =>
     message ? (
       <div>
+        <button type="button" aria-label="Close message" onClick={onClose} />
         <div>{message.subject}</div>
         <ul data-testid="conversation-strip">
           {conversationMessages.map((entry: any) => (
@@ -1374,6 +1377,46 @@ describe("MailApp", () => {
     });
 
     expect(container.querySelector('button[aria-label="Reply"]')).toBeNull();
+  });
+
+  it("keeps the message rendered while the desktop reader slides closed", async () => {
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    const messageButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent === "Encrypted hello",
+    );
+    await act(async () => {
+      messageButton?.click();
+      await Promise.resolve();
+    });
+
+    const findCloseButton = () =>
+      container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Close message"]',
+      );
+    await waitForExpectation(() => {
+      expect(findCloseButton()).not.toBeNull();
+    });
+    // The slide starts a couple of frames after the reader renders.
+    await waitForExpectation(() => {
+      expect(findCloseButton()?.closest("[inert]")).toBeNull();
+    });
+
+    act(() => {
+      findCloseButton()?.click();
+    });
+
+    const reply = container.querySelector('button[aria-label="Reply"]');
+    expect(reply).not.toBeNull();
+    expect(reply?.closest("[inert]")).not.toBeNull();
+
+    await waitForExpectation(() => {
+      expect(container.querySelector('button[aria-label="Reply"]')).toBeNull();
+    });
   });
 
   it("does not auto-open the newest message on mobile", async () => {
