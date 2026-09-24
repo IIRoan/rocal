@@ -666,6 +666,9 @@ func nullableString(value sql.NullString) string {
 
 const reminderMailTitle = "Event reminder"
 
+// Must match SOLACE_REMINDER_MESSAGE_ID_PREFIX in apps/backend/lib/stalwart-webhook.ts (skips the new-mail push).
+const reminderMessageIDPrefix = "solace-reminder."
+
 func (ns *NotificationServer) generateEmailContent(event EventData, user UserData, minutesBefore int, eventID string) (*EmailContent, error) {
 	formattedDetails, err := ns.formatEventDetailsForEmail(event, user.TimeZone, minutesBefore)
 	if err != nil {
@@ -823,10 +826,11 @@ func (ns *NotificationServer) sendEmailNotification(ctx context.Context, event E
 	}
 
 	id, err := ns.mailer.Send(ctx, email.Message{
-		To:      user.Email,
-		Subject: ns.generateEmailSubject(event, minutesBefore),
-		HTML:    content.HTML,
-		Text:    content.Text,
+		To:              user.Email,
+		Subject:         ns.generateEmailSubject(event, minutesBefore),
+		HTML:            content.HTML,
+		Text:            content.Text,
+		MessageIDPrefix: reminderMessageIDPrefix,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to send email with Stalwart: %w", err)

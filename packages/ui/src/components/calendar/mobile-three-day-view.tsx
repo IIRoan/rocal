@@ -163,7 +163,7 @@ export function MobileThreeDayView({
   return (
     <div
       data-slot="three-day-view"
-      className="flex h-full min-h-0 flex-col overflow-hidden bg-background animate-fade-in"
+      className="flex h-full min-h-0 flex-col overflow-hidden bg-background"
     >
       <ThreeDayViewDayHeaders
         currentDate={currentDate}

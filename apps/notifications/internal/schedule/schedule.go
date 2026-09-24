@@ -22,6 +22,8 @@ type DueSchedule struct {
 	MinutesBefore int
 	Settings      Settings
 	HasPushDevice bool
+	// MailsToOwnMailbox is true when the account email is the user's own Solace mailbox.
+	MailsToOwnMailbox bool
 }
 
 func ClaimDue(ctx context.Context, db *sql.DB, now time.Time) ([]DueSchedule, error) {
@@ -48,6 +50,7 @@ func ClaimDue(ctx context.Context, db *sql.DB, now time.Time) ([]DueSchedule, er
 			&item.Settings.EmailNotifications,
 			&item.Settings.PushNotifications,
 			&item.HasPushDevice,
+			&item.MailsToOwnMailbox,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan due notification: %w", err)
 		}
@@ -87,9 +90,14 @@ const claimDueSQL = `
 			EXISTS (
 				SELECT 1 FROM push_device pd
 				WHERE pd.user_id = ce.user_id AND pd.is_enabled = TRUE
+			),
+			EXISTS (
+				SELECT 1 FROM mail_directory_entry mde
+				WHERE mde.user_id = ce.user_id AND LOWER(mde.email) = LOWER(u.email)
 			)
 		FROM event_notification en
 		INNER JOIN calendar_event ce ON ce.id = en.event_id
+		INNER JOIN "user" u ON u.id = ce.user_id
 		LEFT JOIN user_settings us ON us.user_id = ce.user_id
 		WHERE en.notification_time <= $1
 		  AND en.is_enabled = TRUE
@@ -107,10 +115,12 @@ func newID() string {
 
 func ChannelsFor(item DueSchedule) []string {
 	var channels []string
-	if item.Settings.EmailNotifications {
+	sendsPush := item.Settings.PushNotifications && item.HasPushDevice
+	// Reminder mail into the user's own Solace inbox would only duplicate the push on the same device.
+	if item.Settings.EmailNotifications && !(sendsPush && item.MailsToOwnMailbox) {
 		channels = append(channels, "email")
 	}
-	if item.Settings.PushNotifications && item.HasPushDevice {
+	if sendsPush {
 		channels = append(channels, "push")
 	}
 	return channels

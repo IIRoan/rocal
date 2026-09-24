@@ -6,7 +6,7 @@ import { Skeleton } from "./skeleton";
 // Dashboard skeleton for the main layout
 export function DashboardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn("flex h-screen bg-background", className)}>
+    <div className={cn("flex h-dvh bg-background", className)}>
       {/* Sidebar skeleton */}
       <div className="hidden md:flex w-64 flex-col border-r border-border bg-sidebar animate-fade-in">
         {/* Header */}
@@ -265,7 +265,7 @@ export function MobileCalendarSkeleton({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "h-screen flex flex-col bg-background animate-fade-in",
+        "h-dvh flex flex-col bg-background animate-fade-in",
         className,
       )}
     >
@@ -351,7 +351,7 @@ export function ListSkeleton({
 export function MailSkeleton({ className }: { className?: string }) {
   return (
     <div
-      className={cn("flex h-screen bg-background animate-fade-in", className)}
+      className={cn("flex h-dvh bg-background animate-fade-in", className)}
     >
       {/* Sidebar */}
       <div className="hidden md:flex w-56 flex-col border-r border-border bg-sidebar shrink-0">

@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useLayoutEffect,
   useState,
   useRef,
   useReducer,
@@ -16,9 +17,8 @@ import {
   resolveMailServerLimits,
 } from "@workspace/calendar-core";
 import { useQuery } from "@tanstack/react-query";
-import { useGSAP } from "@gsap/react";
-import gsap from "gsap";
 import { Clock, MapPin } from "lucide-react";
+import { slideFadeIn } from "@workspace/ui/lib/motion";
 import { toast } from "sonner";
 import { useIsMobile, usePrefersReducedMotion } from "@workspace/ui/hooks";
 import type { CalendarEvent } from "@workspace/calendar-core";
@@ -427,21 +427,15 @@ export function useMessageReaderController(props: MessageReaderProps) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  useGSAP(
-    () => {
-      const wrap = expandedWrapRef.current;
-      if (!isReplyExpanded || !wrap) return;
-      textareaRef.current?.focus();
-      if (prefersReducedMotion) return;
-      // Fade only: tweening height would re-lay out the mail iframe every frame.
-      gsap.fromTo(
-        wrap,
-        { autoAlpha: 0, y: 4 },
-        { autoAlpha: 1, y: 0, duration: 0.16, ease: "power3.out", clearProps: "transform" },
-      );
-    },
-    { dependencies: [isReplyExpanded] },
-  );
+  useLayoutEffect(() => {
+    const wrap = expandedWrapRef.current;
+    if (!isReplyExpanded || !wrap) return;
+    textareaRef.current?.focus();
+    if (prefersReducedMotion) return;
+    // Fade only: tweening height would re-lay out the mail iframe every frame.
+    const animation = slideFadeIn(wrap, { y: 4 }, { duration: 160 });
+    return () => animation?.cancel();
+  }, [isReplyExpanded, prefersReducedMotion]);
 
   const autoResizeTextarea = () => {
     const el = textareaRef.current;

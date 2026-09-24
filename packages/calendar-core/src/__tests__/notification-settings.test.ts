@@ -120,6 +120,33 @@ describe("formatPushDeviceLastSeen", () => {
       "Last seen unknown",
     );
   });
+
+  it("falls back when Intl.RelativeTimeFormat is missing (Hermes)", () => {
+    const original = Intl.RelativeTimeFormat;
+    Object.defineProperty(Intl, "RelativeTimeFormat", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+    try {
+      const now = new Date("2026-08-26T12:00:00.000Z");
+      expect(formatPushDeviceLastSeen("2026-08-26T11:00:00.000Z", now)).toBe(
+        "Last seen 1 hour ago",
+      );
+      expect(formatPushDeviceLastSeen("2026-08-21T12:00:00.000Z", now)).toBe(
+        "Last seen 5 days ago",
+      );
+      expect(formatPushDeviceLastSeen("2026-08-26T12:00:00.000Z", now)).toBe(
+        "Last seen just now",
+      );
+    } finally {
+      Object.defineProperty(Intl, "RelativeTimeFormat", {
+        value: original,
+        configurable: true,
+        writable: true,
+      });
+    }
+  });
 });
 
 describe("isSolaceIosBundleId", () => {

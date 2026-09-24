@@ -2,6 +2,19 @@ import { z } from "zod";
 
 export const STALWART_MAIL_INGEST_EVENT = "message-ingest.ham" as const;
 
+/** Must match reminderMessageIDPrefix in apps/notifications/main.go. */
+export const SOLACE_REMINDER_MESSAGE_ID_PREFIX = "solace-reminder.";
+
+export function isSolaceReminderMessageId(value: string | null | undefined): boolean {
+  return (
+    value
+      ?.trim()
+      .replace(/^</, "")
+      .toLowerCase()
+      .startsWith(SOLACE_REMINDER_MESSAGE_ID_PREFIX) ?? false
+  );
+}
+
 const stalwartIdSchema = z
   .union([z.string(), z.number()])
   .transform((value) => String(value).trim())

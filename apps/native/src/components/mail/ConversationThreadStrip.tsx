@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  LayoutAnimation,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
-  UIManager,
   View,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
@@ -19,12 +16,7 @@ import { listPreviewSnippet } from "../../lib/mail/mail-preview";
 import type { JmapEmailMessage } from "../../lib/mail/types";
 import { BlobatarAvatar } from "../BlobatarAvatar";
 
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+const listEntering = FadeIn.duration(180);
 
 interface ConversationThreadStripProps {
   messages: JmapEmailMessage[];
@@ -61,28 +53,10 @@ export function ConversationThreadStrip({
       ).length
     : 0;
 
-  function toggleExpanded() {
-    LayoutAnimation.configureNext({
-      duration: 200,
-      update: {
-        type: LayoutAnimation.Types.easeInEaseOut,
-      },
-      create: {
-        type: LayoutAnimation.Types.easeInEaseOut,
-        property: LayoutAnimation.Properties.opacity,
-      },
-      delete: {
-        type: LayoutAnimation.Types.easeInEaseOut,
-        property: LayoutAnimation.Properties.opacity,
-      },
-    });
-    setExpanded((open) => !open);
-  }
-
   return (
     <View style={styles.container}>
       <Pressable
-        onPress={toggleExpanded}
+        onPress={() => setExpanded((open) => !open)}
         style={({ pressed }) => [
           styles.header,
           pressed && styles.headerPressed,
@@ -108,7 +82,11 @@ export function ConversationThreadStrip({
       </Pressable>
 
       {expanded ? (
-        <ScrollView style={styles.list} nestedScrollEnabled>
+        <Animated.ScrollView
+          entering={listEntering}
+          style={styles.list}
+          nestedScrollEnabled
+        >
           {messages.map((threadMessage) => {
             const isActive = threadMessage.id === activeMessageId;
             const sender = formatAddress(threadMessage.from);
@@ -158,7 +136,7 @@ export function ConversationThreadStrip({
               </Pressable>
             );
           })}
-        </ScrollView>
+        </Animated.ScrollView>
       ) : null}
 
       {expanded && ownCount > 0 ? (

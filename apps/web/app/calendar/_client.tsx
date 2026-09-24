@@ -296,7 +296,7 @@ export function CalendarPageContent() {
       <MobileLayoutContent />
     </div>
   ) : (
-    <CalendarWithData className="h-full min-h-screen flex flex-1" />
+    <CalendarWithData className="h-full min-h-dvh flex flex-1" />
   );
 }
 

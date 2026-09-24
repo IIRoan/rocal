@@ -32,6 +32,7 @@ const EMAIL_HEADER_PROPERTIES = [
   "receivedAt",
   "keywords",
 ] as const;
+const INGEST_LOOKUP_PROPERTIES = [...EMAIL_HEADER_PROPERTIES, "messageId"] as const;
 const EMAIL_FULL_PROPERTIES = [
   ...EMAIL_HEADER_PROPERTIES,
   "to",
@@ -80,6 +81,17 @@ export type MailSyncThreadRecord = {
   id: string;
   emailIds: string[];
 };
+
+export type IngestedEmailRef = {
+  id: string;
+  messageIds: string[];
+};
+
+function toIngestedEmailRef(
+  email: JmapEmail | null | undefined,
+): IngestedEmailRef | null {
+  return email?.id ? { id: email.id, messageIds: email.messageId ?? [] } : null;
+}
 
 type JmapGetResponse<T> = {
   state: string;
@@ -400,7 +412,7 @@ export class MailSyncService {
     return [entry.stalwartAccountId];
   }
 
-  async resolveIngestedJmapEmailId(
+  async resolveIngestedEmail(
     accountId: string,
     input: {
       documentId: string;
@@ -408,23 +420,23 @@ export class MailSyncService {
       messageId?: string | null;
       fromEmail?: string | null;
     },
-  ): Promise<string | null> {
+  ): Promise<IngestedEmailRef | null> {
     const direct = await this.getEmailsWithProperties(
       accountId,
       [input.documentId],
-      EMAIL_HEADER_PROPERTIES,
+      INGEST_LOOKUP_PROPERTIES,
       false,
     );
     if (direct[0]?.id) {
-      return direct[0].id;
+      return toIngestedEmailRef(direct[0]);
     }
 
-    const byMessageId = await this.findIngestedEmailIdByMessageId(
+    const byMessageId = await this.findIngestedEmailByMessageId(
       accountId,
       input.messageId,
     );
     if (byMessageId) {
-      return byMessageId;
+      return toIngestedEmailRef(byMessageId);
     }
 
     if (input.subject?.trim()) {
@@ -439,34 +451,36 @@ export class MailSyncService {
         const emails = await this.getEmailsWithProperties(
           accountId,
           ids,
-          ["id", "subject", "receivedAt"],
+          ["id", "subject", "receivedAt", "messageId"],
           false,
         );
         const normalizedSubject = input.subject.trim().toLowerCase();
         const exact = emails.find(
           (email) => email.subject?.trim().toLowerCase() === normalizedSubject,
         );
-        return exact?.id ?? emails[0]?.id ?? null;
+        return toIngestedEmailRef(exact ?? emails[0]);
       }
     }
 
-    return this.findIngestedEmailIdByRecentDelivery(accountId, {
-      messageId: input.messageId,
-      fromEmail: input.fromEmail,
-    });
+    return toIngestedEmailRef(
+      await this.findIngestedEmailByRecentDelivery(accountId, {
+        messageId: input.messageId,
+        fromEmail: input.fromEmail,
+      }),
+    );
   }
 
-  private async findIngestedEmailIdByRecentDelivery(
+  private async findIngestedEmailByRecentDelivery(
     accountId: string,
     input: {
       messageId?: string | null;
       fromEmail?: string | null;
     },
-  ): Promise<string | null> {
+  ): Promise<JmapEmail | null> {
     const recent = await this.getRecentEmailsWithProperties(
       accountId,
       10,
-      [...EMAIL_HEADER_PROPERTIES, "messageId"],
+      INGEST_LOOKUP_PROPERTIES,
     );
     const cutoff = Date.now() - RECENT_INGEST_LOOKUP_WINDOW_MS;
     const recentWindow = recent.filter((email) => {
@@ -490,7 +504,7 @@ export class MailSyncService {
         ),
       );
       if (byMessageId) {
-        return byMessageId.id;
+        return byMessageId;
       }
     }
 
@@ -501,21 +515,21 @@ export class MailSyncService {
           email.from?.[0]?.email?.trim().toLowerCase() === normalizedFromEmail,
       );
       if (bySender) {
-        return bySender.id;
+        return bySender;
       }
     }
 
-    return recentWindow[0]?.id ?? null;
+    return recentWindow[0] ?? null;
   }
 
   private normalizeMessageIdHeader(value: string): string {
     return value.trim().replace(/^<|>$/g, "").toLowerCase();
   }
 
-  private async findIngestedEmailIdByMessageId(
+  private async findIngestedEmailByMessageId(
     accountId: string,
     messageId: string | null | undefined,
-  ): Promise<string | null> {
+  ): Promise<JmapEmail | null> {
     const normalizedMessageId = messageId
       ? this.normalizeMessageIdHeader(messageId)
       : "";
@@ -526,7 +540,7 @@ export class MailSyncService {
     const recent = await this.getRecentEmailsWithProperties(
       accountId,
       20,
-      [...EMAIL_HEADER_PROPERTIES, "messageId"],
+      INGEST_LOOKUP_PROPERTIES,
     );
     for (const email of recent) {
       const matches = (email.messageId ?? []).some(
@@ -534,7 +548,7 @@ export class MailSyncService {
           this.normalizeMessageIdHeader(candidate) === normalizedMessageId,
       );
       if (matches) {
-        return email.id;
+        return email;
       }
     }
 

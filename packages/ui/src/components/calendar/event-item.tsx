@@ -117,7 +117,7 @@ function EventWrapper({
     return (
       <div
         className={cn(
-          "flex h-full w-full overflow-hidden text-left font-medium transition-all duration-200 ease-out outline-none select-none",
+          "flex h-full w-full overflow-hidden text-left font-medium transition-[color,background-color,border-color,opacity] duration-200 ease-out outline-none select-none",
           "min-h-[20px] sm:min-h-[24px]",
           "px-[2px] sm:px-2",
           "border-2 border-dashed rounded-md",
@@ -148,7 +148,7 @@ function EventWrapper({
     <button
       type="button"
       className={cn(
-        "group/ev relative flex h-full w-full overflow-hidden text-left transition-all duration-150 ease-out outline-none select-none",
+        "group/ev relative flex h-full w-full overflow-hidden text-left transition-[color,background-color,border-color,box-shadow,opacity,filter] duration-150 ease-out outline-none select-none",
         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
         "cursor-pointer",
         "data-dragging:cursor-grabbing data-dragging:shadow-lg data-dragging:z-20",

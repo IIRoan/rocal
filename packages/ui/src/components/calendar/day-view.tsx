@@ -104,7 +104,7 @@ export function DayView({
   return (
     <div
       data-slot="day-view"
-      className="absolute inset-0 flex flex-col bg-background animate-fade-in"
+      className="absolute inset-0 flex flex-col bg-background"
     >
       {showAllDaySection && (
         <div className="border-border/70 bg-muted/50 border-t shrink-0 overflow-hidden [scrollbar-gutter:stable]">

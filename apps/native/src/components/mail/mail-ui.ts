@@ -77,7 +77,7 @@ export function mailColors(theme: ThemeTokens) {
   };
 }
 
-/** Nightwatch tokens that have no ThemeTokens slot (unread accent, disabled text, cell states). */
+/** Nightwatch tokens that have no ThemeTokens slot (disabled text, cell states, status colors). */
 export function useMailPalette(): MailPaletteTokens {
   const { isDark } = useTheme();
   return isDark ? mailDarkPalette : mailLightPalette;
@@ -86,8 +86,8 @@ export function useMailPalette(): MailPaletteTokens {
 /** Skiff-style mail skin: accent, CTA, and the text/border steps the list, reader, and compose share. */
 export function mailSkin(theme: ThemeTokens, palette: MailPaletteTokens) {
   return {
-    accent: palette.textLink,
-    unreadDot: palette.unreadDot,
+    accent: theme.colors.primaryBase,
+    unreadDot: theme.colors.primaryBase,
     cta: palette.ctaPrimary,
     ctaForeground: palette.ctaPrimaryForeground,
     textSecondary: theme.colors.mutedForeground,

@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
+import { useReduceMotion } from "../lib/use-reduce-motion";
 
 const logoSource = require("../assets/logo.png");
 
@@ -50,6 +51,7 @@ export function WorkspaceLoadingScreen({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const reduceMotion = useReduceMotion();
 
   const [mounted, setMounted] = useState(active);
   const screenOpacity = useRef(new Animated.Value(active ? 1 : 0)).current;
@@ -86,7 +88,10 @@ export function WorkspaceLoadingScreen({
 
   // Gentle breathing on the logo.
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || reduceMotion) {
+      logoPulse.setValue(0);
+      return;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(logoPulse, {
@@ -105,12 +110,12 @@ export function WorkspaceLoadingScreen({
     );
     loop.start();
     return () => loop.stop();
-  }, [logoPulse, mounted]);
+  }, [logoPulse, mounted, reduceMotion]);
 
   // Sweep line travelling across the footer rule.
   useEffect(() => {
-    if (!mounted) return;
-    sweep.setValue(0);
+    sweep.setValue(reduceMotion ? 0.5 : 0);
+    if (!mounted || reduceMotion) return;
     const loop = Animated.loop(
       Animated.timing(sweep, {
         toValue: 1,
@@ -121,10 +126,14 @@ export function WorkspaceLoadingScreen({
     );
     loop.start();
     return () => loop.stop();
-  }, [sweep, mounted]);
+  }, [sweep, mounted, reduceMotion]);
 
   // Soft cross-fade when the status phase changes.
   useEffect(() => {
+    if (reduceMotion) {
+      messageOpacity.setValue(1);
+      return;
+    }
     messageOpacity.setValue(0.35);
     Animated.timing(messageOpacity, {
       toValue: 1,
@@ -132,7 +141,7 @@ export function WorkspaceLoadingScreen({
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
-  }, [message, messageOpacity]);
+  }, [message, messageOpacity, reduceMotion]);
 
   if (!mounted) return null;
 

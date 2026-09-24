@@ -1,9 +1,12 @@
 "use client";
 
-import { useReducer, useRef } from "react";
-import { useGSAP } from "@gsap/react";
-import gsap from "gsap";
+import { useLayoutEffect, useReducer, useRef } from "react";
 import { useIsMobile } from "@workspace/ui/hooks";
+import {
+  MOTION_EASING,
+  slideFadeIn,
+  slideFadeOut,
+} from "@workspace/ui/lib/motion";
 import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import {
   findSpamMailbox,
@@ -131,24 +134,27 @@ export function MessageList({
   const selectedIds = new Set(bulkIds);
   const hasBulkSelection = bulkIds.length > 0;
 
-  useGSAP(() => {
+  useLayoutEffect(() => {
     const bar = barRef.current;
     if (!bar) return;
     if (hasBulkSelection) {
-      gsap.fromTo(
-        bar,
-        { y: -6, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.22, ease: "power2.out" },
-      );
-    } else if (state.isBarVisible) {
-      gsap.to(bar, {
-        y: -6,
-        opacity: 0,
-        duration: 0.16,
-        ease: "power2.in",
-        onComplete: () => dispatch({ type: "hideBar" }),
+      const enter = slideFadeIn(bar, { y: -6 }, {
+        duration: 220,
+        easing: MOTION_EASING.soft,
       });
+      return () => enter?.cancel();
     }
+    if (!state.isBarVisible) return;
+    const exit = slideFadeOut(bar, { y: -6 }, { duration: 160 });
+    if (!exit) {
+      dispatch({ type: "hideBar" });
+      return;
+    }
+    exit.onfinish = () => dispatch({ type: "hideBar" });
+    return () => {
+      exit.onfinish = null;
+      exit.cancel();
+    };
   }, [hasBulkSelection, state.isBarVisible]);
 
   const primaryIds = new Set(messages.map((message) => message.id));

@@ -1,8 +1,24 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  isSolaceReminderMessageId,
   parseStalwartMailIngestEvents,
   STALWART_MAIL_INGEST_EVENT,
 } from "../../lib/stalwart-webhook";
+
+describe("isSolaceReminderMessageId", () => {
+  it("matches reminder Message-IDs with or without angle brackets", () => {
+    expect(isSolaceReminderMessageId("<solace-reminder.abc@solace.onl>")).toBe(true);
+    expect(isSolaceReminderMessageId("solace-reminder.abc@solace.onl")).toBe(true);
+    expect(isSolaceReminderMessageId(" <SOLACE-REMINDER.abc@solace.onl> ")).toBe(true);
+  });
+
+  it("does not match other Message-IDs", () => {
+    expect(isSolaceReminderMessageId("<abc@example.com>")).toBe(false);
+    expect(isSolaceReminderMessageId("<x.solace-reminder.abc@solace.onl>")).toBe(false);
+    expect(isSolaceReminderMessageId(null)).toBe(false);
+    expect(isSolaceReminderMessageId(undefined)).toBe(false);
+  });
+});
 
 describe("parseStalwartMailIngestEvents", () => {
   it("parses message-ingest.ham events with telemetry ids and recipients", () => {

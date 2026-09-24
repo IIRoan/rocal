@@ -37,6 +37,88 @@ func TestChannelsForHonorsSettingsAndDevices(t *testing.T) {
 	}
 }
 
+func TestChannelsForSkipsEmailToOwnMailboxWhenPushIsDelivered(t *testing.T) {
+	item := DueSchedule{
+		Settings: Settings{
+			EmailNotifications: true,
+			PushNotifications:  true,
+		},
+		HasPushDevice:     true,
+		MailsToOwnMailbox: true,
+	}
+	got := ChannelsFor(item)
+	if len(got) != 1 || got[0] != "push" {
+		t.Fatalf("expected push only for own-mailbox users with a device, got %v", got)
+	}
+
+	item.HasPushDevice = false
+	got = ChannelsFor(item)
+	if len(got) != 1 || got[0] != "email" {
+		t.Fatalf("expected email fallback without a device, got %v", got)
+	}
+
+	item.HasPushDevice = true
+	item.Settings.PushNotifications = false
+	got = ChannelsFor(item)
+	if len(got) != 1 || got[0] != "email" {
+		t.Fatalf("expected email fallback when app notifications are off, got %v", got)
+	}
+
+	item.Settings.EmailNotifications = false
+	got = ChannelsFor(item)
+	if len(got) != 0 {
+		t.Fatalf("expected no channels when both are off, got %v", got)
+	}
+}
+
+func TestChannelsForSendsExactlyOneReminderToOwnMailboxUsers(t *testing.T) {
+	for _, email := range []bool{false, true} {
+		for _, pushOn := range []bool{false, true} {
+			for _, device := range []bool{false, true} {
+				for _, ownMailbox := range []bool{false, true} {
+					item := DueSchedule{
+						Settings:          Settings{EmailNotifications: email, PushNotifications: pushOn},
+						HasPushDevice:     device,
+						MailsToOwnMailbox: ownMailbox,
+					}
+					sendsPush := pushOn && device
+					var want []string
+					if email && !(sendsPush && ownMailbox) {
+						want = append(want, "email")
+					}
+					if sendsPush {
+						want = append(want, "push")
+					}
+
+					got := ChannelsFor(item)
+					if strings.Join(got, ",") != strings.Join(want, ",") {
+						t.Fatalf("%+v: expected %v, got %v", item, want, got)
+					}
+					if ownMailbox && len(got) > 1 {
+						t.Fatalf("%+v: own-mailbox users must never get both email and push, got %v", item, got)
+					}
+					if (email || sendsPush) && len(got) == 0 {
+						t.Fatalf("%+v: an enabled channel must still deliver the reminder", item)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestClaimDueSQLChecksOwnMailboxByAccountEmail(t *testing.T) {
+	for _, fragment := range []string{
+		"FROM mail_directory_entry mde",
+		"mde.user_id = ce.user_id",
+		"LOWER(mde.email) = LOWER(u.email)",
+		`INNER JOIN "user" u ON u.id = ce.user_id`,
+	} {
+		if !strings.Contains(claimDueSQL, fragment) {
+			t.Fatalf("expected claim query to contain %q", fragment)
+		}
+	}
+}
+
 func TestClaimDueSQLUsesPrismaColumnNames(t *testing.T) {
 	if !strings.Contains(claimDueSQL, `us."emailNotifications"`) {
 		t.Fatal(`expected quoted Prisma column "emailNotifications" (unmapped camelCase)`)

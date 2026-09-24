@@ -139,7 +139,7 @@ export function GlobalLoadingScreen({
   if (variant === "minimal") {
     return (
       <div
-        data-gsap-skip="true"
+        data-motion-skip="true"
         className={cn(
           "fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm",
           className,
@@ -159,7 +159,7 @@ export function GlobalLoadingScreen({
   // Enhanced splash/detailed variants share the same improved UI
   return (
     <div
-      data-gsap-skip="true"
+      data-motion-skip="true"
       className={cn(
         "fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm",
         className,
@@ -271,7 +271,7 @@ export function SectionLoading({
 }: SectionLoadingProps) {
   return (
     <div
-      data-gsap-skip="true"
+      data-motion-skip="true"
       className={cn(
         "flex flex-col items-center justify-center p-8 text-center space-y-4",
         className,
@@ -301,7 +301,7 @@ export function LoadingOverlay({
   className,
 }: LoadingOverlayProps) {
   return (
-    <div data-gsap-skip="true" className={cn("relative", className)}>
+    <div data-motion-skip="true" className={cn("relative", className)}>
       {children}
       {isLoading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg">

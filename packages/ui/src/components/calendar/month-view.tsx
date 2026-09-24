@@ -141,7 +141,7 @@ export function MonthView({
   }, [events, resolvedTimezone, weeks]);
 
   return (
-    <div data-slot="month-view" className="contents animate-fade-in">
+    <div data-slot="month-view" className="contents">
       <div
         className={`border-border/70 grid ${showWeekNumbers ? "grid-cols-8" : "grid-cols-7"} border-y uppercase`}
       >

@@ -5,6 +5,7 @@ import type {
 } from "../contracts/stalwart-webhook.contract";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import {
+  isSolaceReminderMessageId,
   parseStalwartMailIngestEvents,
   type StalwartMailIngestEvent,
   type StalwartWebhookPayload,
@@ -35,7 +36,7 @@ export class StalwartWebhookService implements IStalwartWebhookService {
       prisma: WebhookPrisma;
       mailSyncService?: Pick<
         MailSyncService,
-        "resolveIngestedJmapEmailId"
+        "resolveIngestedEmail"
       >;
     },
   ) {}
@@ -124,10 +125,15 @@ export class StalwartWebhookService implements IStalwartWebhookService {
       return false;
     }
 
+    if (isSolaceReminderMessageId(event.messageId)) {
+      this.logSkippedReminderMail(directoryEntry, event);
+      return false;
+    }
+
     let jmapEmailId = event.documentId;
     if (this.input.mailSyncService) {
       try {
-        const resolved = await this.input.mailSyncService.resolveIngestedJmapEmailId(
+        const resolved = await this.input.mailSyncService.resolveIngestedEmail(
           directoryEntry.stalwartAccountId,
           {
             documentId: event.documentId,
@@ -137,7 +143,11 @@ export class StalwartWebhookService implements IStalwartWebhookService {
           },
         );
         if (resolved) {
-          jmapEmailId = resolved;
+          if (resolved.messageIds.some(isSolaceReminderMessageId)) {
+            this.logSkippedReminderMail(directoryEntry, event);
+            return false;
+          }
+          jmapEmailId = resolved.id;
         }
       } catch (error) {
         logger.warn("Failed to resolve JMAP email id for Stalwart ingest webhook", {
@@ -156,5 +166,16 @@ export class StalwartWebhookService implements IStalwartWebhookService {
       items: [item],
     });
     return true;
+  }
+
+  /** Reminder mail already has its own event_reminder push. */
+  private logSkippedReminderMail(
+    directoryEntry: ResolvedDirectoryEntry,
+    event: StalwartMailIngestEvent,
+  ): void {
+    logger.info("Skipped mail push for Solace reminder mail", {
+      accountRef: logRef(directoryEntry.stalwartAccountId),
+      documentRef: logRef(event.documentId),
+    });
   }
 }

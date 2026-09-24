@@ -374,7 +374,7 @@ export function PageLoadingOverlay({
 
   return (
     <div
-      data-gsap-skip="true"
+      data-motion-skip="true"
       data-page-loading-overlay="true"
       className={cn(
         "fixed inset-0 bg-background",

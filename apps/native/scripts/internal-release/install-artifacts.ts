@@ -106,7 +106,7 @@ export function buildCombinedInstallPage(input: {
   .platform { border: 1px solid #2e2e2e; border-radius: 12px; padding: 20px; margin-bottom: 16px; background: #262626; }
   .platform h2 { font-size: 1rem; margin: 0 0 12px; }
   .btn { display: block; text-align: center; text-decoration: none; padding: 12px 16px; border-radius: 8px;
-    background: #ef5a3c; color: #ffffff; font-weight: 600; }
+    background: #ffe0c2; color: #1f1f1f; font-weight: 600; }
   .btn-disabled { background: #2e2e2e; color: #6b6b6b; }
   .hint { color: #a3a3a3; font-size: 0.85rem; margin: 12px 0 0; }
 </style>

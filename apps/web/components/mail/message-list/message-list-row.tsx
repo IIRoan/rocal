@@ -301,7 +301,7 @@ function UnreadDot({ opacity, label }: { opacity: number; label?: string }) {
   return (
     <span className="ml-1 flex h-2 w-2.5 shrink-0 items-center">
       <span
-        className="size-2 rounded-full bg-[rgb(var(--orange-500))]"
+        className="size-2 rounded-full bg-primary"
         style={{ opacity }}
         aria-label={label}
       />

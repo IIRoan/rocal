@@ -53,7 +53,7 @@ export function AgendaView({
   );
 
   return (
-    <div className="absolute inset-0 border-border/70 border-t overflow-y-auto bg-background animate-fade-in">
+    <div className="absolute inset-0 border-border/70 border-t overflow-y-auto bg-background">
       {!hasEvents ? (
         <div className="flex min-h-[70svh] flex-col items-center justify-center py-16 text-center">
           <span className="text-muted-foreground/50 mb-2">
@@ -80,7 +80,7 @@ export function AgendaView({
             return (
               <section key={day.toString()} className="flex flex-col gap-1.5">
                 <header
-                  className="sticky top-0 z-10 -mx-3 sm:-mx-6 flex items-baseline gap-3 bg-background/95 px-3 sm:px-6 pt-1 pb-2 backdrop-blur-sm"
+                  className="sticky top-0 z-10 -mx-3 sm:-mx-6 flex items-baseline gap-3 bg-background px-3 sm:px-6 pt-1 pb-2"
                   data-today={today || undefined}
                 >
                   <div className="flex items-baseline gap-2">

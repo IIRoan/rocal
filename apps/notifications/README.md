@@ -7,6 +7,7 @@ Go worker (Railway, always-on): claims due reminders and `notification_job` rows
 The worker never sees reminder titles or mail sender/subject. `notification_job.payload` holds opaque refs only (`kind`, `eventId`, `minutesBefore`, `inboundCount`, `emailId`, `accountId`; legacy `title`/`subject`/`fromName` keys are tolerated and ignored).
 
 - Reminder email: generic ("You have an event at 3:04 PM. Open Solace to view the details."), no title/location/description/calendar names.
+- No duplicate reminders: email is skipped when the reminder push goes out and the account email is the user's own Solace mailbox. Reminder mail carries a `solace-reminder.` Message-ID so the Stalwart webhook doesn't also send a `new_mail` push for it (`apps/backend/lib/stalwart-webhook.ts`).
 - APNs payloads are generic with `mutable-content: 1`; the iOS Notification Service Extension replaces the alert on-device. `body` keeps the `t`/`eid`/`mid` tap keys for older binaries.
 
 ```jsonc

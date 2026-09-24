@@ -5,16 +5,7 @@
 @source "../../../packages/ui/src/**/*.{ts,tsx}";
 
 @layer utilities {
-  /*
-   * GSAP drives every transient enter/exit animation in the app. Without this
-   * kill switch the legacy tw-animate-css keyframes would compose with GSAP
-   * tweens and produce double-animations or position glitches. We deliberately
-   * leave `animate-spin` and `animate-pulse` alone — they are infinite, do not
-   * conflict with GSAP exit tweens, and must keep working even if
-   * `GsapAnimationProvider` is not mounted (e.g. in isolated playgrounds).
-   */
-  [class*="animate-shimmer"],
-  [class*="animate-wave"],
+  /* SurfaceMotionProvider runs these as WAAPI animations; the CSS keyframes would play on top of them. */
   [class*="animate-fade-in"],
   [class*="animate-slide-in"],
   [class*="animate-scale-in"],
@@ -37,14 +28,7 @@
     animation: none !important;
   }
 
-  /*
-   * Radix surfaces are now rendered with `forceMount`, so their closed state
-   * is part of the static DOM. Without a baseline rule the content paints
-   * fully visible until `GsapAnimationProvider`'s effect runs (causing a
-   * first-paint flash) — and stays visible forever in any tree that does not
-   * mount the provider. Hide closed surfaces by default; GSAP only needs to
-   * tween, not gate visibility.
-   */
+  /* Radix surfaces use `forceMount`, so CSS (not the motion provider) owns hiding the closed state. */
   [data-slot$="-overlay"][data-state="closed"],
   [data-slot$="-content"][data-state="closed"] {
     opacity: 0;
@@ -681,6 +665,25 @@
     background: var(--primary);
   }
 
+  /* Firefox ignores ::-webkit-scrollbar; Chrome drops it once scrollbar-color is set, so scope this to Firefox. */
+  @supports not selector(::-webkit-scrollbar) {
+    html {
+      scrollbar-color: color-mix(in oklch, var(--accent) 70%, var(--border))
+        transparent;
+    }
+
+    * {
+      scrollbar-width: thin;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-shimmer,
+    .animate-wave {
+      animation: none;
+    }
+  }
+
   /* Animation utilities */
   .animate-shimmer {
     animation: shimmer 1.5s ease-in-out infinite;
@@ -753,9 +756,11 @@
     transition: opacity 0.2s ease;
   }
 
-  /* Smooth scrolling */
-  * {
-    scroll-behavior: smooth;
+  /* Only the page scroller: on every element it made programmatic scrollTop writes (list anchoring, virtualizers) animate. */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 
   @supports (view-transition-name: none) {
@@ -779,16 +784,15 @@
     }
   }
 
+  /* No filter: blur() here; it forces a full-page repaint per frame instead of a composited fade. */
   @keyframes route-root-exit {
     from {
       opacity: 1;
       transform: none;
-      filter: blur(0);
     }
     to {
       opacity: 0;
       transform: scale(0.994);
-      filter: blur(1.5px);
     }
   }
 
@@ -796,12 +800,10 @@
     from {
       opacity: 0;
       transform: scale(1.004);
-      filter: blur(1.5px);
     }
     to {
       opacity: 1;
       transform: none;
-      filter: blur(0);
     }
   }
 

@@ -13,9 +13,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  Extrapolation,
   cancelAnimation,
-  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -170,19 +168,9 @@ export function PickerSheet({
     opacity: overlayOpacity.value,
   }));
 
-  const sheetStyle = useAnimatedStyle(() => {
-    const handleOpacity = interpolate(
-      translateY.value,
-      [0, height * 0.25],
-      [1, 0.25],
-      Extrapolation.CLAMP,
-    );
-
-    return {
-      transform: [{ translateY: translateY.value }],
-      opacity: handleOpacity,
-    };
-  });
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   if (!mounted) return null;
 

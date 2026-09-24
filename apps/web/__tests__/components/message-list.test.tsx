@@ -39,18 +39,6 @@ jest.mock("@tanstack/react-virtual", () => ({
   }),
 }));
 
-jest.mock("@gsap/react", () => ({
-  useGSAP: jest.fn(),
-}));
-
-jest.mock("gsap", () => ({
-  __esModule: true,
-  default: {
-    fromTo: jest.fn(),
-    to: jest.fn(),
-  },
-}));
-
 jest.mock("@workspace/ui/lib/utils", () => ({
   cn: (...args: Array<string | false | null | undefined>) =>
     args.filter(Boolean).join(" "),

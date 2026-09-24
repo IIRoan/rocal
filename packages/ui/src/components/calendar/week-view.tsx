@@ -108,7 +108,7 @@ export const WeekView = React.memo(function WeekView({
   return (
     <div
       data-slot="week-view"
-      className="absolute inset-0 flex flex-col bg-background animate-fade-in"
+      className="absolute inset-0 flex flex-col bg-background"
     >
       <WeekViewDayHeaders
         currentDate={currentDate}

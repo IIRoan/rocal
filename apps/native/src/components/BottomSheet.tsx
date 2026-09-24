@@ -1,5 +1,4 @@
 import {
-  AccessibilityInfo,
   BackHandler,
   Keyboard,
   Platform,
@@ -47,6 +46,7 @@ import { Feather } from "@expo/vector-icons";
 import { useTheme } from "../providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { LAYOUT_ICON, layoutSideSlot } from "../lib/app-layout";
+import { useReduceMotion } from "../lib/use-reduce-motion";
 import { splitSheetChildren } from "./sheet/sheet-children";
 import { SheetViewport } from "./sheet/SheetViewport";
 
@@ -71,32 +71,6 @@ const SHEET_REDUCED: WithTimingConfig = {
   duration: 220,
   easing: Easing.out(Easing.cubic),
 };
-
-function useReduceMotion() {
-  const [reduceMotion, setReduceMotion] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (!cancelled) {
-        setReduceMotion(enabled);
-      }
-    });
-
-    const subscription = AccessibilityInfo.addEventListener(
-      "reduceMotionChanged",
-      setReduceMotion,
-    );
-
-    return () => {
-      cancelled = true;
-      subscription.remove();
-    };
-  }, []);
-
-  return reduceMotion;
-}
 
 export interface BottomSheetProps {
   visible: boolean;

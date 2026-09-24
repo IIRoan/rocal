@@ -7,7 +7,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { Feather, FontAwesome } from "@expo/vector-icons";
 import { enrichSelfMailRecipient } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -51,9 +51,8 @@ export type MailMessageHeaderProps = {
 };
 
 const AVATAR_SIZE = 36;
-const DETAILS_ANIMATION_MS = 200;
-const detailsEntering = FadeIn.duration(DETAILS_ANIMATION_MS);
-const detailsExiting = FadeOut.duration(DETAILS_ANIMATION_MS);
+/** No exit fade: siblings reflow at once, so a fading ghost would overlap the body below. */
+const detailsEntering = FadeIn.duration(200);
 
 export function MailMessageHeader({
   message,
@@ -216,7 +215,6 @@ export function MailMessageHeader({
       {detailsOpen ? (
         <Animated.View
           entering={detailsEntering}
-          exiting={detailsExiting}
           style={styles.detailsBlock}
         >
           {showSenderEmail && sender ? (

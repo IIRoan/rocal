@@ -44,25 +44,6 @@ jest.mock("sonner", () => ({
   }),
 }));
 
-jest.mock("@gsap/react", () => ({
-  useGSAP: jest.fn(),
-}));
-
-jest.mock("gsap", () => ({
-  __esModule: true,
-  default: {
-    set: jest.fn(),
-    to: jest.fn(),
-    killTweensOf: jest.fn(),
-    timeline: jest.fn(() => ({
-      to: jest.fn().mockReturnThis(),
-      set: jest.fn().mockReturnThis(),
-      from: jest.fn().mockReturnThis(),
-      call: jest.fn().mockReturnThis(),
-    })),
-  },
-}));
-
 jest.mock("@workspace/ui/hooks", () => ({
   useIsMobile: () => false,
   usePrefersReducedMotion: () => false,

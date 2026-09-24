@@ -401,14 +401,12 @@ export const nativeDarkTheme: ThemeTokens = toNativeTheme(darkTheme);
 export interface MailPaletteTokens {
   textTertiary: string;
   textDisabled: string;
-  textLink: string;
   borderPrimary: string;
   borderTertiary: string;
   cellHover: string;
   cellActive: string;
   cellUnread: string;
   surface: string;
-  unreadDot: string;
   success: string;
   warning: string;
   star: string;
@@ -420,14 +418,12 @@ export interface MailPaletteTokens {
 export const mailLightPalette: MailPaletteTokens = {
   textTertiary: "#8f8f8f",
   textDisabled: "#adadad",
-  textLink: "#ef5a3c",
   borderPrimary: "#e0e0e0",
   borderTertiary: "#f5f5f5",
   cellHover: "#f0f0f0",
   cellActive: "#ebebeb",
   cellUnread: "#ffffff",
   surface: "#ffffff",
-  unreadDot: "#ef5a3c",
   success: "#00a05e",
   warning: "#f59e0b",
   star: "#fbbf24",
@@ -438,14 +434,12 @@ export const mailLightPalette: MailPaletteTokens = {
 export const mailDarkPalette: MailPaletteTokens = {
   textTertiary: "#7d7d7d",
   textDisabled: "#5e5e5e",
-  textLink: "#ff8e78",
   borderPrimary: "#3a3a3a",
   borderTertiary: "#282828",
   cellHover: "#2c2c2c",
   cellActive: "#313131",
   cellUnread: "#242424",
   surface: "#1f1f1f",
-  unreadDot: "#ef5a3c",
   success: "#19c77f",
   warning: "#f59e0b",
   star: "#fbbf24",

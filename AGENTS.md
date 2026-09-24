@@ -104,12 +104,14 @@ Checklist: web updated · native updated · shared logic in `packages/*` · clie
 
 Look like Solace: quiet, warm, dense, utilitarian. Copy the nearest existing screen before building.
 - Tokens only: web semantic Tailwind (`bg-background`, `text-muted-foreground`, `border-border`) from `globals.css`; native `theme.colors/spacing/typography/borderRadius`. No hex, no raw color scales, no gradients, glassmorphism, neon, nested cards, heavy shadows.
+- **Accent is the brown/beige `primary` token (MUST)**: web `primary` (`bg-primary`, `text-primary`; mail `--text-link`/`--icon-link` alias it), native `theme.colors.primaryBase` (mail `skin.accent`). Never use orange (e.g. Nightwatch `#ef5a3c`) or other hues as an accent for links, active states, checkmarks, unread dots, or buttons; orange/amber exist only as user-picked event/label colors.
 - Components: web `@workspace/ui` (extend variants, no raw-div buttons); native `AppScreen`, `NavigationHeader`, `SheetRow`, `BottomSheet`, `createStyles(theme)` at file bottom. Drawer lists and forms use the grouped Skiff-style primitives in `src/components/sheet/SheetSections.tsx`.
 - **Native: drawers, not pages (MUST).** Secondary UI (management lists, create/edit forms, pickers) opens in a `BottomSheet` drawer; nested screens slide in-sheet with `SheetPageStack`/`SheetSubPage` (`src/components/sheet/`), like `AccountSheet` settings and `CalendarsSheet`. Never add an Expo Router route for it; routes are for tabs, auth, and deep-linked content.
 - Icons: web `lucide-react`, native Feather. No emoji icons, no mixed sets.
 - No press-scale/dent (`active:scale-*`, `whileTap`); feedback via color/opacity. `cursor-pointer` on web clickables. 44px touch targets, tap equivalents for hover affordances.
 - Subtle motion only; real product copy; no new UI/CSS-in-JS libraries.
-- Web motion that must stay smooth in Firefox: animate only `translate`/`opacity` on what moves, use WAAPI for fades, render before sliding. Worked example: `apps/web/components/mail/mail-app/READER-TRANSITION.md`.
+- Web motion must stay smooth in Firefox and Safari: animate only `transform`/`opacity` (never width/height/left/top on visible content), use WAAPI via `@workspace/ui/lib/motion` (not GSAP) for new motion, render before sliding, no fades nested inside a moving layer, no `backdrop-blur`/`filter` on large or moving surfaces, `dvh` not `h-screen`. Radix surfaces animate through `SurfaceMotionProvider` (`data-motion-skip` opts out). Worked example: `apps/web/components/mail/mail-app/READER-TRANSITION.md`.
+- Native motion runs on the UI thread: Reanimated worklets animating `transform`/`opacity` (core `Animated` only with `useNativeDriver: true`), no `LayoutAnimation`, no per-frame layout or shadow props, no opacity on a whole sliding sheet, no `exiting` fades on in-flow content (siblings reflow under the ghost). Reanimated honors Reduce Motion by default; core `Animated` loops and Gorhom configs must check `useReduceMotion()` (`src/lib/use-reduce-motion.ts`).
 
 ## 8. Mail: JMAP only (MUST)
 

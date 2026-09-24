@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { format } from "date-fns";
 import { CalendarIcon, Loader2, Mail, MapPin, Paperclip } from "lucide-react";
 import type { UnifiedSearchResult } from "@workspace/calendar-core";
 import { cn } from "@workspace/ui/lib/utils";
-import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
+import { MOTION_EASING } from "@workspace/ui/lib/motion";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import type { JmapEmailMessage } from "@/lib/mail/types";
 
@@ -41,7 +41,7 @@ function encryptionLabel(result: Result) {
   }
 }
 
-// GSAP animates items from the parent — no inline animation here
+// The parent staggers row entry, so rows carry no animation of their own.
 function SearchResultRow({
   globalIndex,
   isSelected,
@@ -128,7 +128,19 @@ function SearchResultRow({
 }
 
 
-const COL_DURATION = 0.22;
+const ROW_ENTER_KEYFRAMES: Keyframe[] = [
+  { opacity: 0, transform: "translateY(3px) scale(0.96)" },
+  { opacity: 1, transform: "none" },
+];
+
+const ROW_ENTER_OPTIONS: KeyframeAnimationOptions = {
+  duration: 110,
+  easing: MOTION_EASING.soft,
+  fill: "backwards",
+};
+
+const ROW_STAGGER_MS = 15;
+const ROW_STAGGER_LIMIT = 12;
 
 export function UnifiedSearchResults({
   results,
@@ -138,9 +150,6 @@ export function UnifiedSearchResults({
   onSelect,
 }: UnifiedSearchResultsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mailSectionRef = useRef<HTMLElement>(null);
-  const calSectionRef = useRef<HTMLElement>(null);
-  const dividerRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
   const mailResults = results.filter((r) => r.source === "mail");
@@ -154,60 +163,25 @@ export function UnifiedSearchResults({
   // Stable key: only changes when the actual set of result IDs changes
   const resultKey = results.map((r) => r.id).join(",");
 
-  // Stagger items only when the result IDs actually change (not on selection highlight etc.)
-  useGSAP(
-    () => {
-      const container = containerRef.current;
-      if (!container || !hasResults) return;
-      const items = container.querySelectorAll<HTMLElement>("[data-source-row]");
-      if (!items.length) return;
-      if (prefersReducedMotion) {
-        gsap.set(items, { clearProps: "all" });
-        return;
-      }
-      gsap.fromTo(
-        items,
-        { autoAlpha: 0, scale: 0.96, y: 3 },
-        {
-          autoAlpha: 1,
-          scale: 1,
-          y: 0,
-          duration: 0.11,
-          stagger: 0.015,
-          ease: "power2.out",
-          clearProps: "transform,opacity,visibility",
-        },
-      );
-    },
-    { dependencies: [resultKey, hasResults, prefersReducedMotion] },
-  );
-
-  // Animate column widths
-  useGSAP(
-    () => {
-      const mailEl = mailSectionRef.current;
-      const calEl = calSectionRef.current;
-      const dividerEl = dividerRef.current;
-      if (!mailEl || !calEl || !dividerEl) return;
-
-      const mailW = hasBoth ? "50%" : hasOnlyMail ? "100%" : "0%";
-      const calW = hasBoth ? "50%" : hasOnlyCalendar ? "100%" : "0%";
-      const mailOp = hasOnlyCalendar ? 0 : 1;
-      const calOp = hasOnlyMail ? 0 : 1;
-
-      if (prefersReducedMotion) {
-        gsap.set(mailEl, { width: mailW, opacity: mailOp });
-        gsap.set(calEl, { width: calW, opacity: calOp });
-        gsap.set(dividerEl, { width: hasBoth ? 1 : 0, opacity: hasBoth ? 1 : 0 });
-        return;
-      }
-
-      gsap.to(mailEl, { width: mailW, opacity: mailOp, duration: COL_DURATION, ease: "power2.inOut" });
-      gsap.to(calEl, { width: calW, opacity: calOp, duration: COL_DURATION, ease: "power2.inOut" });
-      gsap.to(dividerEl, { width: hasBoth ? 1 : 0, opacity: hasBoth ? 1 : 0, duration: 0.18, ease: "power2.inOut" });
-    },
-    { dependencies: [hasBoth, hasOnlyMail, hasOnlyCalendar, prefersReducedMotion] },
-  );
+  // Stagger items only when the result IDs change; column widths snap and this fade covers the swap.
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container || !hasResults || prefersReducedMotion) return;
+    const items = Array.from(
+      container.querySelectorAll<HTMLElement>("[data-source-row]"),
+    );
+    const animations = items.map((item, index) =>
+      typeof item.animate === "function"
+        ? item.animate(ROW_ENTER_KEYFRAMES, {
+            ...ROW_ENTER_OPTIONS,
+            delay: Math.min(index, ROW_STAGGER_LIMIT) * ROW_STAGGER_MS,
+          })
+        : null,
+    );
+    return () => {
+      for (const animation of animations) animation?.cancel();
+    };
+  }, [resultKey, hasResults, prefersReducedMotion]);
 
   if (isLoading && !hasResults) {
     return (
@@ -222,9 +196,7 @@ export function UnifiedSearchResults({
 
   return (
     <div ref={containerRef} className="flex">
-      {/* Mail column — always in DOM for smooth width animation */}
       <section
-        ref={mailSectionRef}
         data-source-section="messages"
         className="min-w-0 overflow-hidden"
         style={{
@@ -250,9 +222,7 @@ export function UnifiedSearchResults({
         )}
       </section>
 
-      {/* Vertical divider */}
       <div
-        ref={dividerRef}
         className="shrink-0 bg-border/40"
         style={{
           width: hasBoth ? "1px" : "0px",
@@ -260,9 +230,7 @@ export function UnifiedSearchResults({
         }}
       />
 
-      {/* Calendar column — always in DOM for smooth width animation */}
       <section
-        ref={calSectionRef}
         data-source-section="calendar"
         className="min-w-0 overflow-hidden"
         style={{

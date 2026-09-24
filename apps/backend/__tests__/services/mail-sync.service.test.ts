@@ -738,11 +738,14 @@ describe("MailSyncService", () => {
     );
 
     await expect(
-      service.resolveIngestedJmapEmailId("acct-1", {
+      service.resolveIngestedEmail("acct-1", {
         documentId: "1558",
         fromEmail: "vanwesteropbroan@gmail.com",
       }),
-    ).resolves.toBe("gcqaaabqw");
+    ).resolves.toEqual({
+      id: "gcqaaabqw",
+      messageIds: ["<latest@example.com>"],
+    });
   });
 
   it("resolves ingested telemetry document ids via RFC Message-ID", async () => {
@@ -790,10 +793,130 @@ describe("MailSyncService", () => {
     );
 
     await expect(
-      service.resolveIngestedJmapEmailId("acct-1", {
+      service.resolveIngestedEmail("acct-1", {
         documentId: "1556",
         messageId: "abc@example.com",
       }),
-    ).resolves.toBe("gceaaabqr");
+    ).resolves.toEqual({
+      id: "gceaaabqr",
+      messageIds: ["<abc@example.com>"],
+    });
+  });
+
+  it("returns Message-IDs when resolving by subject search", async () => {
+    const { userJmapClient, service } = createHarness();
+    const requestedProperties: unknown[] = [];
+    userJmapClient.callJmap.mockImplementation(
+      async ({
+        methodCalls,
+      }: {
+        methodCalls: Array<[string, Record<string, unknown>, string]>;
+      }) => {
+        const [methodName, params] = methodCalls[0]!;
+        if (methodName === "Email/query") {
+          return {
+            methodResponses: [[methodName, { ids: ["gc5aaabq4", "gc6aaabq5"] }, "c1"]],
+          };
+        }
+        if (methodName === "Email/get" && Array.isArray(params.ids)) {
+          const ids = params.ids as string[];
+          if (ids.includes("1561")) {
+            return { methodResponses: [[methodName, { list: [] }, "c1"]] };
+          }
+          requestedProperties.push(params.properties);
+          return {
+            methodResponses: [
+              [
+                methodName,
+                {
+                  list: [
+                    { id: "gc5aaabq4", subject: "Something else", messageId: ["<x@example.com>"] },
+                    {
+                      id: "gc6aaabq5",
+                      subject: "Event reminder in 15 minutes",
+                      messageId: ["solace-reminder.ee@solace.onl"],
+                    },
+                  ],
+                },
+                "c1",
+              ],
+            ],
+          };
+        }
+        throw new Error(`Unexpected JMAP method ${methodName}`);
+      },
+    );
+
+    await expect(
+      service.resolveIngestedEmail("acct-1", {
+        documentId: "1561",
+        subject: "Event reminder in 15 minutes",
+      }),
+    ).resolves.toEqual({
+      id: "gc6aaabq5",
+      messageIds: ["solace-reminder.ee@solace.onl"],
+    });
+    expect(requestedProperties).toEqual([expect.arrayContaining(["messageId"])]);
+  });
+
+  it("returns an empty Message-ID list when the email has none", async () => {
+    const { userJmapClient, service } = createHarness();
+    userJmapClient.callJmap.mockImplementation(
+      async ({
+        methodCalls,
+      }: {
+        methodCalls: Array<[string, Record<string, unknown>, string]>;
+      }) => {
+        const [methodName] = methodCalls[0]!;
+        if (methodName === "Email/get") {
+          return { methodResponses: [[methodName, { list: [{ id: "gc7aaabq6" }] }, "c1"]] };
+        }
+        throw new Error(`Unexpected JMAP method ${methodName}`);
+      },
+    );
+
+    await expect(
+      service.resolveIngestedEmail("acct-1", { documentId: "1562" }),
+    ).resolves.toEqual({ id: "gc7aaabq6", messageIds: [] });
+  });
+
+  it("returns Message-IDs from the direct document lookup", async () => {
+    const { userJmapClient, service } = createHarness();
+    userJmapClient.callJmap.mockImplementation(
+      async ({
+        methodCalls,
+      }: {
+        methodCalls: Array<[string, Record<string, unknown>, string]>;
+      }) => {
+        const [methodName, params] = methodCalls[0]!;
+        if (methodName === "Email/get") {
+          expect(params.properties).toContain("messageId");
+          return {
+            methodResponses: [
+              [
+                methodName,
+                {
+                  list: [
+                    {
+                      id: "gcyaaabqz",
+                      messageId: ["solace-reminder.abc@solace.onl"],
+                    },
+                  ],
+                },
+                "c1",
+              ],
+            ],
+          };
+        }
+        throw new Error(`Unexpected JMAP method ${methodName}`);
+      },
+    );
+
+    await expect(
+      service.resolveIngestedEmail("acct-1", { documentId: "1560" }),
+    ).resolves.toEqual({
+      id: "gcyaaabqz",
+      messageIds: ["solace-reminder.abc@solace.onl"],
+    });
   });
 });
