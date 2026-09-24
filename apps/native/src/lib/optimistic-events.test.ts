@@ -1,10 +1,14 @@
+import { QueryClient } from "@tanstack/react-query";
 import {
   generateOptimisticId,
   buildOptimisticEvent,
+  commitOptimisticEvent,
   findCachedEvent,
+  invalidateEventRanges,
   optimisticallyInsertEvent,
   optimisticallyPatchEvent,
   optimisticallyRemoveEvent,
+  readCachedEventsForRange,
   rollbackFromSnapshot,
 } from "./optimistic-events";
 import type {
@@ -12,8 +16,6 @@ import type {
   CreateEventRequest,
   EventsResponse,
 } from "@workspace/calendar-core";
-
-// ─── Mock QueryClient ─────────────────────────────────────────────────────────
 
 function makeEventResponse(events: CalendarEvent[]): EventsResponse {
   return { events, categories: [], calendars: [] };
@@ -55,14 +57,18 @@ function makeMockQueryClient(initial: Record<string, EventsResponse>) {
   };
 }
 
-// ─── Fixtures ─────────────────────────────────────────────────────────────────
-
 const BASE_REQUEST: CreateEventRequest = {
   title: "Team meeting",
   start: "2024-03-15T09:00:00",
   end: "2024-03-15T10:00:00",
   calendarId: "cal-1",
   allDay: false,
+};
+
+const TIMED_REQUEST: CreateEventRequest = {
+  ...BASE_REQUEST,
+  start: "2024-03-15T09:00:00.000Z",
+  end: "2024-03-15T10:00:00.000Z",
 };
 
 const EXISTING_EVENT: CalendarEvent = {
@@ -86,8 +92,6 @@ const EXISTING_EVENT: CalendarEvent = {
   updatedAt: new Date("2024-01-01"),
 };
 
-// ─── generateOptimisticId ─────────────────────────────────────────────────────
-
 describe("generateOptimisticId", () => {
   it("returns a string prefixed with __optimistic__", () => {
     const id = generateOptimisticId();
@@ -101,8 +105,6 @@ describe("generateOptimisticId", () => {
     expect(ids.size).toBe(50);
   });
 });
-
-// ─── buildOptimisticEvent ─────────────────────────────────────────────────────
 
 describe("buildOptimisticEvent", () => {
   it("builds an event with the provided tempId and userId", () => {
@@ -146,8 +148,6 @@ describe("buildOptimisticEvent", () => {
   });
 });
 
-// ─── findCachedEvent ─────────────────────────────────────────────────────────
-
 describe("findCachedEvent", () => {
   it("returns the event from an overlapping events query", () => {
     const key = ["events", "2024-03-15T00:00:00", "2024-03-16T00:00:00"];
@@ -170,11 +170,8 @@ describe("findCachedEvent", () => {
   });
 });
 
-// ─── optimisticallyInsertEvent ────────────────────────────────────────────────
-
 describe("optimisticallyInsertEvent", () => {
   it("inserts event into cache entries whose range overlaps the event", async () => {
-    // Range covers 2024-03-15 all day
     const key = ["events", "2024-03-15T00:00:00", "2024-03-16T00:00:00"];
     const client = makeMockQueryClient({
       [key.join("|")]: makeEventResponse([EXISTING_EVENT]),
@@ -189,7 +186,6 @@ describe("optimisticallyInsertEvent", () => {
   });
 
   it("does NOT insert event into cache entries whose range does not overlap", async () => {
-    // Range is a week earlier
     const key = ["events", "2024-03-08T00:00:00", "2024-03-09T00:00:00"];
     const client = makeMockQueryClient({
       [key.join("|")]: makeEventResponse([]),
@@ -219,11 +215,162 @@ describe("optimisticallyInsertEvent", () => {
     const client = makeMockQueryClient({});
     const event = buildOptimisticEvent(BASE_REQUEST, "u", "t");
     await optimisticallyInsertEvent(client as never, event);
-    expect(client.cancelQueries).toHaveBeenCalledWith({ queryKey: ["events"] });
+    expect(client.cancelQueries).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ["events"] }),
+    );
+  });
+
+  it("does not cancel a range that is still on its first load", async () => {
+    const client = new QueryClient();
+    const loaded = ["events", "2024-03-15T00:00:00.000Z", "2024-03-16T00:00:00.000Z"];
+    const firstLoad = ["events", "2024-03-14T00:00:00.000Z", "2024-03-17T00:00:00.000Z"];
+    client.setQueryData(loaded, makeEventResponse([]));
+    let resolveFirstLoad: (value: EventsResponse) => void = () => undefined;
+    const firstLoadFetch = client.fetchQuery({
+      queryKey: firstLoad,
+      queryFn: () =>
+        new Promise<EventsResponse>((resolve) => {
+          resolveFirstLoad = resolve;
+        }),
+    });
+
+    await optimisticallyInsertEvent(
+      client,
+      buildOptimisticEvent(TIMED_REQUEST, "u", "temp-first-load"),
+    );
+    resolveFirstLoad(makeEventResponse([EXISTING_EVENT]));
+
+    await expect(firstLoadFetch).resolves.toEqual(
+      makeEventResponse([EXISTING_EVENT]),
+    );
+    expect(
+      client.getQueryData<EventsResponse>(loaded)?.events.map((e) => e.id),
+    ).toEqual(["temp-first-load"]);
   });
 });
 
-// ─── optimisticallyRemoveEvent ────────────────────────────────────────────────
+describe("commitOptimisticEvent", () => {
+  const dayOne = ["events", "2024-03-15T00:00:00.000Z", "2024-03-16T00:00:00.000Z"];
+  const dayTwo = ["events", "2024-03-16T00:00:00.000Z", "2024-03-17T00:00:00.000Z"];
+  const lateNight: CalendarEvent = {
+    ...EXISTING_EVENT,
+    id: "ev-saved",
+    start: new Date("2024-03-15T21:00:00.000Z"),
+    end: new Date("2024-03-16T02:00:00.000Z"),
+  };
+
+  it("replaces the placeholder and fills ranges that reloaded without it", () => {
+    const client = new QueryClient();
+    const placeholder = { ...lateNight, id: "temp-1" };
+    client.setQueryData(dayOne, makeEventResponse([placeholder, EXISTING_EVENT]));
+    client.setQueryData(dayTwo, makeEventResponse([]));
+
+    commitOptimisticEvent(client, "temp-1", lateNight);
+
+    expect(
+      client.getQueryData<EventsResponse>(dayOne)?.events.map((e) => e.id),
+    ).toEqual(["ev-saved", "ev-existing"]);
+    expect(
+      client.getQueryData<EventsResponse>(dayTwo)?.events.map((e) => e.id),
+    ).toEqual(["ev-saved"]);
+  });
+
+  it("leaves unrelated ranges untouched", () => {
+    const client = new QueryClient();
+    const other = ["events", "2024-04-01T00:00:00.000Z", "2024-04-02T00:00:00.000Z"];
+    const data = makeEventResponse([EXISTING_EVENT]);
+    client.setQueryData(other, data);
+
+    commitOptimisticEvent(client, "temp-1", lateNight);
+
+    expect(client.getQueryData(other)).toBe(data);
+  });
+});
+
+describe("invalidateEventRanges", () => {
+  const march = ["events", "2024-03-01T00:00:00.000Z", "2024-04-01T00:00:00.000Z"];
+  const april = ["events", "2024-04-01T00:00:00.000Z", "2024-05-01T00:00:00.000Z"];
+  const february = ["events", "2024-02-01T00:00:00.000Z", "2024-03-01T00:00:00.000Z"];
+  const event = {
+    start: new Date("2024-03-15T21:00:00.000Z"),
+    end: new Date("2024-03-16T02:00:00.000Z"),
+    recurrence: null,
+  };
+
+  function seed() {
+    const client = new QueryClient();
+    for (const key of [february, march, april]) {
+      client.setQueryData(key, makeEventResponse([]));
+    }
+    return client;
+  }
+
+  const invalidated = (client: QueryClient) =>
+    [february, march, april].map(
+      (key) => client.getQueryState(key)?.isInvalidated ?? false,
+    );
+
+  it("only invalidates ranges the event overlaps", async () => {
+    const client = seed();
+    await invalidateEventRanges(client, event);
+    expect(invalidated(client)).toEqual([false, true, false]);
+  });
+
+  it("invalidates every later range for a recurring event", async () => {
+    const client = seed();
+    await invalidateEventRanges(client, { ...event, recurrence: "{}" });
+    expect(invalidated(client)).toEqual([false, true, true]);
+  });
+});
+
+describe("readCachedEventsForRange", () => {
+  const monthA = ["events", "2024-02-22T00:00:00.000Z", "2024-04-08T00:00:00.000Z"];
+  const monthB = ["events", "2024-03-25T00:00:00.000Z", "2024-05-08T00:00:00.000Z"];
+  const inRange: CalendarEvent = {
+    ...EXISTING_EVENT,
+    id: "ev-in",
+    start: new Date("2024-04-02T09:00:00.000Z"),
+    end: new Date("2024-04-02T10:00:00.000Z"),
+  };
+  const outOfRange: CalendarEvent = {
+    ...EXISTING_EVENT,
+    id: "ev-out",
+    start: new Date("2024-03-01T09:00:00.000Z"),
+    end: new Date("2024-03-01T10:00:00.000Z"),
+  };
+
+  it("merges overlapping loaded ranges that fully cover the request", () => {
+    const client = new QueryClient();
+    client.setQueryData(monthA, makeEventResponse([outOfRange, inRange]), {
+      updatedAt: 1_000,
+    });
+    client.setQueryData(monthB, makeEventResponse([inRange]), {
+      updatedAt: 2_000,
+    });
+
+    const seeded = readCachedEventsForRange(
+      client,
+      new Date("2024-03-28T00:00:00.000Z"),
+      new Date("2024-04-20T00:00:00.000Z"),
+    );
+
+    expect(seeded?.data.events.map((e) => e.id)).toEqual(["ev-in"]);
+    expect(seeded?.updatedAt).toBe(1_000);
+  });
+
+  it("returns undefined when loaded ranges leave a gap", () => {
+    const client = new QueryClient();
+    client.setQueryData(monthA, makeEventResponse([inRange]));
+
+    expect(
+      readCachedEventsForRange(
+        client,
+        new Date("2024-03-28T00:00:00.000Z"),
+        new Date("2024-04-20T00:00:00.000Z"),
+      ),
+    ).toBeUndefined();
+  });
+});
 
 describe("optimisticallyRemoveEvent", () => {
   it("removes the event with the given ID from all cache entries", async () => {
@@ -268,8 +415,6 @@ describe("optimisticallyRemoveEvent", () => {
     expect(snapshot[0].data?.events).toContainEqual(EXISTING_EVENT);
   });
 });
-
-// ─── optimisticallyPatchEvent ─────────────────────────────────────────────────
 
 describe("optimisticallyPatchEvent", () => {
   it("updates start and end on the matching event", async () => {
@@ -345,8 +490,6 @@ describe("optimisticallyPatchEvent", () => {
   });
 });
 
-// ─── rollbackFromSnapshot ─────────────────────────────────────────────────────
-
 describe("rollbackFromSnapshot", () => {
   it("restores cache entries to their snapshot state", async () => {
     const key = ["events", "2024-03-15T00:00:00", "2024-03-16T00:00:00"];
@@ -354,14 +497,12 @@ describe("rollbackFromSnapshot", () => {
       [key.join("|")]: makeEventResponse([EXISTING_EVENT]),
     });
 
-    // Optimistically remove so cache is now empty
     const snapshot = await optimisticallyRemoveEvent(
       client as never,
       "ev-existing",
     );
     expect(client._store[key.join("|")]?.events.length).toBe(0);
 
-    // Roll back — original event should be restored
     rollbackFromSnapshot(client as never, snapshot);
     expect(client._store[key.join("|")]?.events).toContainEqual(EXISTING_EVENT);
   });

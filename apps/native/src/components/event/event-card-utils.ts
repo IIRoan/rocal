@@ -1,19 +1,16 @@
-import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import type {
+  DecoratedCalendarEvent,
+  TimeFormat,
+} from "@workspace/calendar-core";
 import {
   formatInUserTimezone,
   resolveTimezone,
 } from "@workspace/calendar-core";
 
-/**
- * Format a compact time range for display in the event card.
- *
- * - All-day events return "All day"
- * - 12h format: "9am – 10am"
- * - 24h format: "09:00 – 10:00"
- */
+/** Compact time range: "All day", "9am – 10am" (12h), or "09:00 – 10:00" (24h). */
 export function formatTimeRange(
   event: DecoratedCalendarEvent,
-  timeFormat: "12h" | "24h",
+  timeFormat: TimeFormat,
   timezone?: string,
 ): string {
   if (event.allDay) return "All day";

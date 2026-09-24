@@ -39,18 +39,6 @@ jest.mock("@tanstack/react-virtual", () => ({
   }),
 }));
 
-jest.mock("@gsap/react", () => ({
-  useGSAP: jest.fn(),
-}));
-
-jest.mock("gsap", () => ({
-  __esModule: true,
-  default: {
-    fromTo: jest.fn(),
-    to: jest.fn(),
-  },
-}));
-
 jest.mock("@workspace/ui/lib/utils", () => ({
   cn: (...args: Array<string | false | null | undefined>) =>
     args.filter(Boolean).join(" "),
@@ -195,6 +183,7 @@ describe("MessageList", () => {
         <MessageList
           messages={[message]}
           selectedMessageId={null}
+          timeFormat="24h"
           onSelect={onSelect}
         />,
       );
@@ -238,7 +227,12 @@ describe("MessageList", () => {
     const render = (messages: JmapEmailMessage[]) =>
       act(() => {
         renderedRoot.render(
-          <MessageList messages={messages} selectedMessageId={null} onSelect={jest.fn()} />,
+          <MessageList
+            messages={messages}
+            selectedMessageId={null}
+            timeFormat="24h"
+            onSelect={jest.fn()}
+          />,
         );
       });
 
@@ -252,5 +246,51 @@ describe("MessageList", () => {
 
     render([other]);
     expect(renderedContainer.textContent).not.toContain("1 selected");
+  });
+
+  it("collapses row actions into a menu that does not open the message when narrow", () => {
+    const onSelect = jest.fn();
+    const onDelete = jest.fn();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const renderedContainer = container;
+    const renderedRoot = root;
+
+    act(() => {
+      renderedRoot.render(
+        <MessageList
+          messages={[message]}
+          selectedMessageId={null}
+          timeFormat="24h"
+          onSelect={onSelect}
+          onDelete={onDelete}
+          narrow
+        />,
+      );
+    });
+
+    expect(renderedContainer.querySelector('[aria-label="Trash"]')).toBeNull();
+    const trigger = renderedContainer.querySelector(
+      '[aria-label="Message actions"]',
+    ) as HTMLElement | null;
+    expect(trigger).not.toBeNull();
+
+    act(() => {
+      trigger!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      trigger!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+    });
+    expect(onSelect).not.toHaveBeenCalled();
+
+    const deleteItem = Array.from(
+      document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    ).find((item) => item.textContent?.includes("Delete"));
+    expect(deleteItem).toBeDefined();
+    act(() => {
+      deleteItem!.click();
+    });
+    expect(onDelete).toHaveBeenCalledWith("message-1");
   });
 });

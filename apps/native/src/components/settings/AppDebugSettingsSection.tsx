@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
 import {
-  ActivityIndicator,
   Alert,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -13,6 +11,8 @@ import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
+import { useMailSkin, type MailSkin } from "../mail/mail-ui";
+import { SheetGroup, SheetItem } from "../sheet/SheetSections";
 import { useAppUpdate } from "../../providers/AppUpdateProvider";
 import { useAuth } from "../../providers/AuthProvider";
 import {
@@ -39,7 +39,8 @@ type HealthState = "idle" | "checking" | "ok" | "failed";
 
 export function AppDebugSettingsSection() {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const skin = useMailSkin();
+  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
   const { runtime } = useAppUpdate();
   const { isAuthenticated, signOut } = useAuth();
   const [health, setHealth] = useState<HealthState>("idle");
@@ -165,8 +166,13 @@ export function AppDebugSettingsSection() {
           ? "Unreachable — try again"
           : "Ping API";
 
+  const trailingIcon = (
+    icon: ComponentProps<typeof Feather>["name"],
+    color: string = skin.textSecondary,
+  ) => <Feather name={icon} size={16} color={color} />;
+
   return (
-    <View style={styles.card}>
+    <SheetGroup>
       <View style={styles.metrics}>
         <View style={styles.metric}>
           <Text style={styles.metricLabel}>Variant</Text>
@@ -189,30 +195,26 @@ export function AppDebugSettingsSection() {
         </View>
       </View>
 
-      <DebugRow
+      <SheetItem
         label="Copy diagnostics"
         detail="Variant, channel, API, session cookie"
-        icon="copy"
+        trailing={trailingIcon("copy")}
         onPress={onCopyDiagnostics}
-        styles={styles}
-        theme={theme}
       />
-      <DebugRow
+      <SheetItem
         label={healthLabel}
         detail={API_BASE_URL}
-        icon={
+        trailing={trailingIcon(
           health === "ok"
             ? "check-circle"
             : health === "failed"
               ? "alert-circle"
-              : "activity"
-        }
+              : "activity",
+        )}
+        pending={health === "checking"}
         onPress={onPingApi}
-        busy={health === "checking"}
-        styles={styles}
-        theme={theme}
       />
-      <DebugRow
+      <SheetItem
         label="Clear session cookies"
         detail={
           hasSessionCookie === null
@@ -221,98 +223,26 @@ export function AppDebugSettingsSection() {
               ? "Session cookie present"
               : "No session cookie"
         }
-        icon="trash-2"
+        tone="destructive"
+        trailing={trailingIcon("trash-2", theme.colors.destructive)}
         onPress={onClearSessionCookies}
-        styles={styles}
-        theme={theme}
-        destructive
       />
-      <DebugRow
+      <SheetItem
         label="Send test error"
         detail={
           getErrexReportingOptions()
             ? "Errex · errors.solace.onl/solace"
             : "DSN not configured"
         }
-        icon="upload"
+        trailing={trailingIcon("upload")}
         onPress={onSendTestError}
-        styles={styles}
-        theme={theme}
       />
-    </View>
+    </SheetGroup>
   );
 }
 
-function DebugRow({
-  label,
-  detail,
-  icon,
-  onPress,
-  busy,
-  destructive,
-  styles,
-  theme,
-}: {
-  label: string;
-  detail: string;
-  icon: ComponentProps<typeof Feather>["name"];
-  onPress: () => void;
-  busy?: boolean;
-  destructive?: boolean;
-  styles: ReturnType<typeof createStyles>;
-  theme: ThemeTokens;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={busy}
-      style={({ pressed }) => [
-        styles.row,
-        pressed && !busy && styles.rowPressed,
-        busy && styles.rowDisabled,
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint={detail}
-      accessibilityState={{ disabled: Boolean(busy), busy: Boolean(busy) }}
-    >
-      <View style={styles.rowText}>
-        <Text
-          style={[styles.rowLabel, destructive && styles.destructive]}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
-        <Text style={styles.rowDetail} numberOfLines={1}>
-          {detail}
-        </Text>
-      </View>
-      {busy ? (
-        <ActivityIndicator size="small" color={theme.colors.mutedForeground} />
-      ) : (
-        <Feather
-          name={icon}
-          size={16}
-          color={
-            destructive ? theme.colors.destructive : theme.colors.mutedForeground
-          }
-        />
-      )}
-    </Pressable>
-  );
-}
-
-function createStyles(theme: ThemeTokens) {
+function createStyles(theme: ThemeTokens, skin: MailSkin) {
   return StyleSheet.create({
-    card: {
-      marginHorizontal: theme.spacing["3"],
-      marginBottom: theme.spacing["2"],
-      overflow: "hidden",
-      borderRadius: theme.borderRadius.lg,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-    } as ViewStyle,
     metrics: {
       flexDirection: "row",
       alignItems: "stretch",
@@ -328,7 +258,7 @@ function createStyles(theme: ThemeTokens) {
       fontSize: 10,
       letterSpacing: 1.4,
       textTransform: "uppercase",
-      color: theme.colors.mutedForeground,
+      color: skin.textTertiary,
     } as TextStyle,
     metricValue: {
       fontFamily: theme.typography.fontFamily.mono,
@@ -345,46 +275,11 @@ function createStyles(theme: ThemeTokens) {
     stamp: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
+      color: skin.textSecondary,
     } as TextStyle,
     divider: {
       width: StyleSheet.hairlineWidth,
-      backgroundColor: theme.colors.border,
+      backgroundColor: skin.borderPrimary,
     } as ViewStyle,
-    row: {
-      minHeight: 48,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingVertical: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["4"],
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border,
-    } as ViewStyle,
-    rowPressed: {
-      backgroundColor: theme.colors.accent,
-    } as ViewStyle,
-    rowDisabled: {
-      opacity: 0.55,
-    } as ViewStyle,
-    rowText: {
-      flex: 1,
-      marginRight: theme.spacing["3"],
-      gap: 2,
-    } as ViewStyle,
-    rowLabel: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    } as TextStyle,
-    rowDetail: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    } as TextStyle,
-    destructive: {
-      color: theme.colors.destructive,
-    } as TextStyle,
   });
 }

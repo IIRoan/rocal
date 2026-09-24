@@ -18,6 +18,7 @@ import {
   isRecurringEventDeleteCandidate,
 } from "@/lib/event-editor-view-model";
 import type { EventEditorFooterProps } from "./types";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 export function EventEditorFooter({
   canEditEvent,
@@ -194,14 +195,15 @@ export function EventEditorFooter({
             {invitationActions}
             <div className="flex-1" />
             {eventForm.selectedEvent?.id && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleEventDownloadIcs}
-                title="Download .ics"
-              >
-                <Download className="size-4" /> Export
-              </Button>
+              <SimpleTooltip content="Download .ics">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleEventDownloadIcs}
+                >
+                  <Download className="size-4" /> Export
+                </Button>
+              </SimpleTooltip>
             )}
             {canOpenEditor && (
               <Button

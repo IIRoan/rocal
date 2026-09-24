@@ -1,15 +1,14 @@
 "use client";
 
-import { EllipsisVertical } from "lucide-react";
-import { Button } from "@workspace/ui/components/ui/button";
 import {
   Dropdown,
   DropdownDivider,
   DropdownItem,
-  DropdownSubmenu,
   Icon,
+  IconButton,
+  Size,
+  Type,
 } from "@workspace/ui/solace";
-import { getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
 import type {
   MessageReaderController,
   MessageReaderViewModel,
@@ -26,6 +25,7 @@ export function MessageReaderMoreActionsPopover({
     morePopoverOpen,
     dispatchChrome,
     isBusy,
+    canReply,
     isFlagged,
     props,
   } = controller;
@@ -35,21 +35,8 @@ export function MessageReaderMoreActionsPopover({
     onMarkAsUnread,
     onUntrash,
     onReportSpam,
-    onMove,
-    onSetLabel,
-    onCreateLabel,
-    labels,
   } = props;
-  const {
-    isInTrash,
-    isInSpam,
-    canReportSpam,
-    otherMailboxes,
-    displayHtml,
-  } = view;
-
-  const close = () =>
-    dispatchChrome({ type: "patch", patch: { morePopoverOpen: false } });
+  const { isInTrash, isInSpam, canReportSpam, displayHtml } = view;
 
   return (
     <Dropdown
@@ -59,21 +46,20 @@ export function MessageReaderMoreActionsPopover({
       }
       width={220}
       trigger={
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="More actions"
-          title="More actions"
+        <IconButton
+          active={morePopoverOpen}
           disabled={isBusy}
-        >
-          <EllipsisVertical />
-        </Button>
+          icon={Icon.OverflowH}
+          size={Size.SMALL}
+          tooltip="More actions"
+          type={Type.SECONDARY}
+        />
       }
     >
       <DropdownItem
         icon={Icon.Forward}
         label="Forward"
-        disabled={isBusy}
+        disabled={!canReply}
         onSelect={onForward}
       />
       {onToggleFlagged ? (
@@ -95,40 +81,6 @@ export function MessageReaderMoreActionsPopover({
           icon={Icon.Inbox}
           label={isInTrash ? "Restore to inbox" : "Not spam"}
           onSelect={onUntrash}
-        />
-      ) : null}
-      <DropdownDivider />
-      {otherMailboxes.length > 0 ? (
-        <DropdownSubmenu
-          icon={Icon.MoveMailbox}
-          label="Move to"
-          disabled={isBusy}
-          width={200}
-        >
-          {otherMailboxes.map((mailbox) => (
-            <DropdownItem
-              key={mailbox.id}
-              label={getMailboxDisplayName(mailbox)}
-              onSelect={() => onMove(mailbox.id)}
-            />
-          ))}
-        </DropdownSubmenu>
-      ) : null}
-      {(onSetLabel && labels.length > 0) || onCreateLabel ? (
-        <DropdownItem
-          icon={Icon.Tag}
-          label="Labels"
-          onSelect={() => {
-            close();
-            setTimeout(
-              () =>
-                dispatchChrome({
-                  type: "patch",
-                  patch: { labelPopoverOpen: true },
-                }),
-              80,
-            );
-          }}
         />
       ) : null}
       {canReportSpam ? (

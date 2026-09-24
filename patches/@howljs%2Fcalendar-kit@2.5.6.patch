@@ -1,0 +1,703 @@
+diff --git a/lib/commonjs/CalendarHeader.js b/lib/commonjs/CalendarHeader.js
+index e30a49f..dc9df57 100644
+--- a/lib/commonjs/CalendarHeader.js
++++ b/lib/commonjs/CalendarHeader.js
+@@ -104,7 +104,10 @@ const CalendarHeader = ({
+     });
+   }, [maxEventRows, collapsedItems]);
+   const allDayEventsHeight = (0, _reactNativeReanimated.useDerivedValue)(() => {
+-    const extraHeight = numberOfDays > 1 ? headerBottomHeight : 0;
++    const extraHeight =
++      numberOfDays > 1 && isShowExpandButton.value && !isExpanded.value
++        ? headerBottomHeight
++        : 0;
+     let nextHeight = 0;
+     if (visibleRows.value) {
+       nextHeight = visibleRows.value * eventHeight.value + extraHeight;
+diff --git a/lib/commonjs/components/MultiDayBarItem.js b/lib/commonjs/components/MultiDayBarItem.js
+index 10f1028..8e714d8 100644
+--- a/lib/commonjs/components/MultiDayBarItem.js
++++ b/lib/commonjs/components/MultiDayBarItem.js
+@@ -256,7 +256,7 @@ const styles = _reactNative.StyleSheet.create({
+     alignItems: 'center'
+   },
+   eventContent: {
+-    ..._reactNative.StyleSheet.absoluteFillObject,
++    ..._reactNative.StyleSheet.absoluteFill,
+     overflow: 'hidden',
+     borderRadius: 2,
+     paddingHorizontal: 2,
+diff --git a/lib/commonjs/components/SingleDayBarItem.js b/lib/commonjs/components/SingleDayBarItem.js
+index 7fd0574..81ca9de 100644
+--- a/lib/commonjs/components/SingleDayBarItem.js
++++ b/lib/commonjs/components/SingleDayBarItem.js
+@@ -60,10 +60,15 @@ const SingleDayBarItem = ({
+     onPressBackground,
+     onLongPressBackground
+   } = (0, _ActionsProvider.useActions)();
+-  const _renderEvent = event => {
++  const _renderEvent = (event, rowIndex) => {
++    // Week lanes can have gaps on this day, but visibility needs consecutive day rows.
++    const dayEvent = {
++      ...event,
++      _internal: { ...event._internal, rowIndex },
++    };
+     return /*#__PURE__*/_react.default.createElement(EventItem, {
+       key: event.localId,
+-      event: event,
++      event: dayEvent,
+       onPressEvent: onPressEvent,
+       renderEvent: renderEvent
+     });
+diff --git a/lib/module/CalendarHeader.js b/lib/module/CalendarHeader.js
+index da8a2cc..5121459 100644
+--- a/lib/module/CalendarHeader.js
++++ b/lib/module/CalendarHeader.js
+@@ -96,7 +96,10 @@ const CalendarHeader = ({
+     });
+   }, [maxEventRows, collapsedItems]);
+   const allDayEventsHeight = useDerivedValue(() => {
+-    const extraHeight = numberOfDays > 1 ? headerBottomHeight : 0;
++    const extraHeight =
++      numberOfDays > 1 && isShowExpandButton.value && !isExpanded.value
++        ? headerBottomHeight
++        : 0;
+     let nextHeight = 0;
+     if (visibleRows.value) {
+       nextHeight = visibleRows.value * eventHeight.value + extraHeight;
+diff --git a/lib/module/components/MultiDayBarItem.js b/lib/module/components/MultiDayBarItem.js
+index 58a5492..b3ba6bb 100644
+--- a/lib/module/components/MultiDayBarItem.js
++++ b/lib/module/components/MultiDayBarItem.js
+@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
+     alignItems: 'center'
+   },
+   eventContent: {
+-    ...StyleSheet.absoluteFillObject,
++    ...StyleSheet.absoluteFill,
+     overflow: 'hidden',
+     borderRadius: 2,
+     paddingHorizontal: 2,
+diff --git a/lib/module/components/SingleDayBarItem.js b/lib/module/components/SingleDayBarItem.js
+index c7e9eda..694fadd 100644
+--- a/lib/module/components/SingleDayBarItem.js
++++ b/lib/module/components/SingleDayBarItem.js
+@@ -52,10 +52,15 @@ const SingleDayBarItem = ({
+     onPressBackground,
+     onLongPressBackground
+   } = useActions();
+-  const _renderEvent = event => {
++  const _renderEvent = (event, rowIndex) => {
++    // Week lanes can have gaps on this day, but visibility needs consecutive day rows.
++    const dayEvent = {
++      ...event,
++      _internal: { ...event._internal, rowIndex },
++    };
+     return /*#__PURE__*/React.createElement(EventItem, {
+       key: event.localId,
+-      event: event,
++      event: dayEvent,
+       onPressEvent: onPressEvent,
+       renderEvent: renderEvent
+     });
+diff --git a/src/CalendarHeader.tsx b/src/CalendarHeader.tsx
+index b3e564f..acdf3cf 100644
+--- a/src/CalendarHeader.tsx
++++ b/src/CalendarHeader.tsx
+@@ -130,7 +130,10 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
+   }, [maxEventRows, collapsedItems]);
+ 
+   const allDayEventsHeight = useDerivedValue(() => {
+-    const extraHeight = numberOfDays > 1 ? headerBottomHeight : 0;
++    const extraHeight =
++      numberOfDays > 1 && isShowExpandButton.value && !isExpanded.value
++        ? headerBottomHeight
++        : 0;
+     let nextHeight = 0;
+     if (visibleRows.value) {
+       nextHeight = visibleRows.value * eventHeight.value + extraHeight;
+diff --git a/src/components/MultiDayBarItem.tsx b/src/components/MultiDayBarItem.tsx
+index 12cc627..6758fa9 100644
+--- a/src/components/MultiDayBarItem.tsx
++++ b/src/components/MultiDayBarItem.tsx
+@@ -7,14 +7,16 @@ import Animated, {
+ } from 'react-native-reanimated';
+ import { useActions } from '../context/ActionsProvider';
+ import { useHeader } from '../context/DayBarContext';
+-import { useAllDayEvents } from '../context/EventsProvider';
++import { useAllDayEventsForDays } from '../context/EventsProvider';
+ import { useTheme } from '../context/ThemeProvider';
+ import { useTimezone } from '../context/TimeZoneProvider';
++import { useSharedValueState } from '../hooks/useSharedValueState';
+ import type {
+   OnEventResponse,
+   PackedAllDayEvent,
+   SizeAnimation,
+ } from '../types';
++import { layoutAllDayEventsForPage } from '../utils/allDayPageLayout';
+ import {
+   dateTimeToISOString,
+   forceUpdateZone,
+@@ -60,7 +62,6 @@ const MultiDayBarItem: React.FC<MultiDayBarItemProps> = ({
+     dayBarHeight,
+     calendarData,
+     columns,
+-    numberOfDays,
+     allDayEventsHeight,
+     columnWidth,
+   } = useHeader();
+@@ -80,12 +81,32 @@ const MultiDayBarItem: React.FC<MultiDayBarItemProps> = ({
+     return data;
+   }, [calendarData.visibleDatesArray, columns, pageIndex]);
+ 
+-  const { data: events, eventCounts } = useAllDayEvents(
+-    startUnix,
+-    numberOfDays,
+-    visibleDates
++  const pageDays = useMemo(
++    () => Object.keys(visibleDates).map(Number),
++    [visibleDates]
+   );
+ 
++  // The store packs all-day events per week; this page may start mid-week, so positions are re-derived per page.
++  const pageEvents = useAllDayEventsForDays(pageDays);
++  const events = useMemo(
++    () => layoutAllDayEventsForPage(pageEvents, pageDays),
++    [pageEvents, pageDays]
++  );
++
++  const eventCounts = useMemo(() => {
++    const counts: Record<string, number> = {};
++    for (const event of events) {
++      const { startIndex, columnSpan } = event._internal;
++      for (let i = startIndex; i < startIndex + columnSpan; i++) {
++        const dayUnix = pageDays[i];
++        if (dayUnix !== undefined) {
++          counts[dayUnix] = (counts[dayUnix] ?? 0) + 1;
++        }
++      }
++    }
++    return counts;
++  }, [events, pageDays]);
++
+   const _onPressBackground = (event: GestureResponderEvent) => {
+     const columnIndex = Math.floor(event.nativeEvent.locationX / columnWidth);
+     const dayIndex = pageIndex + columnIndex;
+@@ -268,28 +289,15 @@ const EventItem = ({
+   const eventWidth = _internal.columnSpan * columnWidth - rightEdgeSpacing;
+   const eventWidthAnim = useDerivedValue(() => eventWidth, [eventWidth]);
+ 
+-  const isShow = useDerivedValue(() => {
+-    return isExpanded.value || _internal.rowIndex < 2;
+-  }, [_internal.rowIndex]);
+-
+-  const eventHeight = useDerivedValue(() => {
+-    return isShow.value ? height.value - overlapEventsSpacing : 0;
+-  }, [overlapEventsSpacing]);
++  // Layout props in animated styles are unreliable on RN 0.85+, so size and position are plain styles driven by mirrored state.
++  const rowHeight = useSharedValueState(height);
++  const expanded = useSharedValueState(isExpanded);
+ 
++  const isShow = expanded || _internal.rowIndex < 2;
++  const eventHeight = isShow ? rowHeight - overlapEventsSpacing : 0;
++  const eventHeightAnim = useDerivedValue(() => eventHeight, [eventHeight]);
+   const left = _internal.startIndex * columnWidth;
+-
+-  const top = useDerivedValue(() => {
+-    return _internal.rowIndex * height.value;
+-  }, [_internal.rowIndex]);
+-
+-  const eventContainerStyle = useAnimatedStyle(() => {
+-    return {
+-      position: 'absolute',
+-      top: top.value,
+-      height: eventHeight.value,
+-      opacity: isShow.value ? 1 : 0,
+-    };
+-  });
++  const top = _internal.rowIndex * rowHeight;
+ 
+   const _onPressEvent = () => {
+     if (onPressEvent) {
+@@ -298,7 +306,17 @@ const EventItem = ({
+   };
+ 
+   return (
+-    <Animated.View style={[{ left, width: eventWidth }, eventContainerStyle]}>
++    <View
++      style={[
++        styles.eventContainer,
++        {
++          left,
++          top,
++          width: eventWidth,
++          height: eventHeight,
++          opacity: isShow ? 1 : 0,
++        },
++      ]}>
+       <TouchableOpacity
+         activeOpacity={0.6}
+         disabled={!onPressEvent}
+@@ -311,7 +329,7 @@ const EventItem = ({
+         {renderEvent ? (
+           renderEvent(event, {
+             width: eventWidthAnim,
+-            height: eventHeight,
++            height: eventHeightAnim,
+           })
+         ) : (
+           <Text
+@@ -324,14 +342,15 @@ const EventItem = ({
+           </Text>
+         )}
+       </TouchableOpacity>
+-    </Animated.View>
++    </View>
+   );
+ };
+ 
+ const styles = StyleSheet.create({
+   container: { flexDirection: 'row', alignItems: 'center' },
++  eventContainer: { position: 'absolute' },
+   eventContent: {
+-    ...StyleSheet.absoluteFillObject,
++    ...StyleSheet.absoluteFill,
+     overflow: 'hidden',
+     borderRadius: 2,
+     paddingHorizontal: 2,
+diff --git a/src/components/SingleDayBarItem.tsx b/src/components/SingleDayBarItem.tsx
+index 9e79da7..8afd793 100644
+--- a/src/components/SingleDayBarItem.tsx
++++ b/src/components/SingleDayBarItem.tsx
+@@ -5,7 +5,6 @@ import type { SharedValue } from 'react-native-reanimated';
+ import Animated, {
+   useAnimatedStyle,
+   useDerivedValue,
+-  withTiming,
+ } from 'react-native-reanimated';
+ import { COLLAPSED_ITEMS } from '../constants';
+ import { useActions } from '../context/ActionsProvider';
+@@ -13,6 +12,7 @@ import { useHeader } from '../context/DayBarContext';
+ import { useAllDayEventsByDay } from '../context/EventsProvider';
+ import { useLocale } from '../context/LocaleProvider';
+ import { useTheme } from '../context/ThemeProvider';
++import { useSharedValueState } from '../hooks/useSharedValueState';
+ import type {
+   OnEventResponse,
+   PackedAllDayEvent,
+@@ -79,11 +79,16 @@ const SingleDayBarItem = ({
+   const { onPressEvent, onPressBackground, onLongPressBackground } =
+     useActions();
+ 
+-  const _renderEvent = (event: PackedAllDayEvent) => {
++  const _renderEvent = (event: PackedAllDayEvent, rowIndex: number) => {
++    // Week lanes can have gaps on this day, but visibility needs consecutive day rows.
++    const dayEvent = {
++      ...event,
++      _internal: { ...event._internal, rowIndex },
++    };
+     return (
+       <EventItem
+         key={event.localId}
+-        event={event}
++        event={dayEvent}
+         onPressEvent={onPressEvent}
+         renderEvent={renderEvent}
+       />
+@@ -227,18 +232,13 @@ const EventItem = ({
+   const eventWidth = columnWidth - rightEdgeSpacing;
+   const eventWidthAnim = useDerivedValue(() => eventWidth, [eventWidth]);
+ 
+-  const isShow = useDerivedValue(() => {
+-    return isExpanded.value || _internal.rowIndex < 2;
+-  }, [_internal.rowIndex]);
++  // Layout props in animated styles are unreliable on RN 0.85+, so size is a plain style driven by mirrored state.
++  const rowHeight = useSharedValueState(height);
++  const expanded = useSharedValueState(isExpanded);
+ 
+-  const eventHeight = useDerivedValue(() => {
+-    return isShow.value ? height.value - overlapEventsSpacing : 0;
+-  }, [overlapEventsSpacing]);
+-
+-  const eventContainerStyle = useAnimatedStyle(() => ({
+-    height: eventHeight.value,
+-    opacity: withTiming(isShow.value ? 1 : 0),
+-  }));
++  const isShow = expanded || _internal.rowIndex < 2;
++  const eventHeight = isShow ? rowHeight - overlapEventsSpacing : 0;
++  const eventHeightAnim = useDerivedValue(() => eventHeight, [eventHeight]);
+ 
+   const _onPressEvent = () => {
+     if (onPressEvent) {
+@@ -247,8 +247,13 @@ const EventItem = ({
+   };
+ 
+   return (
+-    <Animated.View
+-      style={[{ width: eventWidth, marginBottom: 2 }, eventContainerStyle]}>
++    <View
++      style={{
++        width: eventWidth,
++        height: eventHeight,
++        marginBottom: 2,
++        opacity: isShow ? 1 : 0,
++      }}>
+       <TouchableOpacity
+         activeOpacity={0.6}
+         disabled={!onPressEvent}
+@@ -261,7 +266,7 @@ const EventItem = ({
+         {renderEvent ? (
+           renderEvent(event, {
+             width: eventWidthAnim,
+-            height: eventHeight,
++            height: eventHeightAnim,
+           })
+         ) : (
+           <Text
+@@ -274,7 +279,7 @@ const EventItem = ({
+           </Text>
+         )}
+       </TouchableOpacity>
+-    </Animated.View>
++    </View>
+   );
+ };
+ 
+@@ -323,7 +328,7 @@ const styles = StyleSheet.create({
+   dayItemContainer: { borderRightWidth: 1 },
+   rightContainer: { flexGrow: 1 },
+   eventContent: {
+-    width: ' 100%',
++    width: '100%',
+     height: '100%',
+     overflow: 'hidden',
+     borderRadius: 2,
+diff --git a/src/context/EventsProvider.tsx b/src/context/EventsProvider.tsx
+index e1ad54a..ba787ed 100644
+--- a/src/context/EventsProvider.tsx
++++ b/src/context/EventsProvider.tsx
+@@ -292,6 +292,36 @@ export const useAllDayEventsByDay = (date: number) => {
+   return state;
+ };
+ 
++export const useAllDayEventsForDays = (visibleDays: number[]) => {
++  const eventsContext = useContext(EventsContext);
++
++  const selectorByDays = useCallback(
++    (state: EventsState) => {
++      const data: PackedAllDayEvent[] = [];
++      for (const dateUnix of visibleDays) {
++        const events = state.allDayEventsByDay[dateUnix];
++        if (events) {
++          data.push(...events);
++        }
++      }
++      return data;
++    },
++    [visibleDays]
++  );
++
++  if (!eventsContext) {
++    throw new Error(
++      'useAllDayEventsForDays must be used within a EventsProvider'
++    );
++  }
++
++  return useSyncExternalStoreWithSelector(
++    eventsContext.subscribe,
++    eventsContext.getState,
++    selectorByDays
++  );
++};
++
+ export const useRegularEvents = (
+   date: number,
+   numberOfDays: number,
+diff --git a/src/hooks/useSharedValueState.tsx b/src/hooks/useSharedValueState.tsx
+new file mode 100644
+index 0000000..8b4fcc1
+--- /dev/null
++++ b/src/hooks/useSharedValueState.tsx
+@@ -0,0 +1,20 @@
++import { useState } from 'react';
++import type { SharedValue } from 'react-native-reanimated';
++import { runOnJS, useAnimatedReaction } from 'react-native-reanimated';
++
++/** Mirrors a shared value into React state so it can drive plain layout styles, which RN 0.85+ drops from animated styles. */
++export const useSharedValueState = <T,>(sharedValue: SharedValue<T>): T => {
++  const [value, setValue] = useState<T>(() => sharedValue.value);
++
++  useAnimatedReaction(
++    () => sharedValue.value,
++    (next, prev) => {
++      if (next !== prev) {
++        runOnJS(setValue)(next);
++      }
++    },
++    [sharedValue]
++  );
++
++  return value;
++};
+diff --git a/src/utils/allDayPageLayout.ts b/src/utils/allDayPageLayout.ts
+new file mode 100644
+index 0000000..981919e
+--- /dev/null
++++ b/src/utils/allDayPageLayout.ts
+@@ -0,0 +1,97 @@
++type DateOrDateTimeLike =
++  | { date: string; dateTime?: never; timeZone?: never }
++  | { dateTime: string; timeZone?: string; date?: never };
++
++// Structural mirror of PackedAllDayEvent so this file stays free of imports.
++export interface PackedAllDayEventLike extends Record<string, any> {
++  id: string;
++  localId: string;
++  start: DateOrDateTimeLike;
++  end: DateOrDateTimeLike;
++  _internal: {
++    startUnix: number;
++    endUnix: number;
++    duration: number;
++    startMinutes?: number;
++    weekStart?: number;
++    resourceIndex?: number;
++    rowIndex: number;
++    totalRows: number;
++    startIndex: number;
++    columnSpan: number;
++  };
++}
++
++/** Re-packs all-day events against the page's own columns; the store packs per week, which breaks pages that don't start on the week start. */
++export const layoutAllDayEventsForPage = (
++  events: PackedAllDayEventLike[],
++  pageDays: number[]
++): PackedAllDayEventLike[] => {
++  const mergedById = new Map<string, PackedAllDayEventLike>();
++  for (const event of events) {
++    const existing = mergedById.get(event.id);
++    if (!existing) {
++      mergedById.set(event.id, event);
++      continue;
++    }
++    mergedById.set(event.id, {
++      ...existing,
++      _internal: {
++        ...existing._internal,
++        startUnix: Math.min(
++          existing._internal.startUnix,
++          event._internal.startUnix
++        ),
++        endUnix: Math.max(existing._internal.endUnix, event._internal.endUnix),
++      },
++    });
++  }
++
++  const placed: {
++    event: PackedAllDayEventLike;
++    startIndex: number;
++    columnSpan: number;
++  }[] = [];
++  for (const event of mergedById.values()) {
++    const { startUnix, endUnix } = event._internal;
++    let first = -1;
++    let last = -1;
++    pageDays.forEach((dayUnix, index) => {
++      if (dayUnix >= startUnix && dayUnix <= endUnix) {
++        if (first === -1) {
++          first = index;
++        }
++        last = index;
++      }
++    });
++    if (first !== -1) {
++      placed.push({ event, startIndex: first, columnSpan: last - first + 1 });
++    }
++  }
++
++  placed.sort(
++    (a, b) => a.startIndex - b.startIndex || b.columnSpan - a.columnSpan
++  );
++
++  const rowEnds: number[] = [];
++  const packed = placed.map(({ event, startIndex, columnSpan }) => {
++    let rowIndex = rowEnds.findIndex((end) => end < startIndex);
++    if (rowIndex === -1) {
++      rowIndex = rowEnds.length;
++      rowEnds.push(0);
++    }
++    rowEnds[rowIndex] = startIndex + columnSpan - 1;
++    return { event, startIndex, columnSpan, rowIndex };
++  });
++
++  return packed.map(({ event, startIndex, columnSpan, rowIndex }) => ({
++    ...event,
++    _internal: {
++      ...event._internal,
++      startIndex,
++      columnSpan,
++      rowIndex,
++      totalRows: rowEnds.length,
++    },
++  }));
++};
+diff --git a/lib/commonjs/CalendarBody.js b/lib/commonjs/CalendarBody.js
+index d575b29649d9ccc8ac3535a97e6deb2ea28a4787..9df818cb7fb584fad083e7ee1052f9aa5366fe3d 100644
+--- a/lib/commonjs/CalendarBody.js
++++ b/lib/commonjs/CalendarBody.js
+@@ -44,7 +44,9 @@ const CalendarBody = ({
+   renderDraggingEvent,
+   renderDraggingHour,
+   NowIndicatorComponent,
+-  renderCustomHorizontalLine
++  renderCustomHorizontalLine,
++  initialScrollY = 0,
++  bounces = true
+ }) => {
+   const {
+     calendarLayout,
+@@ -117,6 +119,13 @@ const CalendarBody = ({
+   const dragToCreateGesture = (0, _useDragToCreateGesture.default)({
+     mode: dragToCreateMode
+   });
++  const [initialContentOffset] = (0, _react.useState)(() => ({
++    x: 0,
++    y: initialScrollY
++  }));
++  (0, _react.useLayoutEffect)(() => {
++    offsetY.value = initialContentOffset.y;
++  }, [initialContentOffset, offsetY]);
+   const _onLayout = event => {
+     scrollVisibleHeight.current = event.nativeEvent.layout.height;
+     scrollVisibleHeightAnim.value = event.nativeEvent.layout.height;
+@@ -232,6 +241,9 @@ const CalendarBody = ({
+     scrollEventThrottle: 16,
+     pinchGestureEnabled: false,
+     showsVerticalScrollIndicator: false,
++    contentOffset: initialContentOffset,
++    bounces: bounces,
++    overScrollMode: bounces ? 'auto' : 'never',
+     onLayout: _onLayout,
+     onScroll: _onScroll,
+     refreshControl: onRefresh ? /*#__PURE__*/_react.default.createElement(_reactNative.RefreshControl, {
+diff --git a/lib/module/CalendarBody.js b/lib/module/CalendarBody.js
+index ba9f793e84db8e74ecff21959284dccee86df6f3..5a77ad2b491fa7f21d1949fa5ae9fef934303e62 100644
+--- a/lib/module/CalendarBody.js
++++ b/lib/module/CalendarBody.js
+@@ -1,5 +1,5 @@
+ function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
+-import React, { useCallback, useMemo } from 'react';
++import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+ import { Platform, RefreshControl, StyleSheet, View } from 'react-native';
+ import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
+ import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+@@ -36,7 +36,9 @@ const CalendarBody = ({
+   renderDraggingEvent,
+   renderDraggingHour,
+   NowIndicatorComponent,
+-  renderCustomHorizontalLine
++  renderCustomHorizontalLine,
++  initialScrollY = 0,
++  bounces = true
+ }) => {
+   const {
+     calendarLayout,
+@@ -109,6 +111,13 @@ const CalendarBody = ({
+   const dragToCreateGesture = useDragToCreateGesture({
+     mode: dragToCreateMode
+   });
++  const [initialContentOffset] = useState(() => ({
++    x: 0,
++    y: initialScrollY
++  }));
++  useLayoutEffect(() => {
++    offsetY.value = initialContentOffset.y;
++  }, [initialContentOffset, offsetY]);
+   const _onLayout = event => {
+     scrollVisibleHeight.current = event.nativeEvent.layout.height;
+     scrollVisibleHeightAnim.value = event.nativeEvent.layout.height;
+@@ -224,6 +233,9 @@ const CalendarBody = ({
+     scrollEventThrottle: 16,
+     pinchGestureEnabled: false,
+     showsVerticalScrollIndicator: false,
++    contentOffset: initialContentOffset,
++    bounces: bounces,
++    overScrollMode: bounces ? 'auto' : 'never',
+     onLayout: _onLayout,
+     onScroll: _onScroll,
+     refreshControl: onRefresh ? /*#__PURE__*/React.createElement(RefreshControl, {
+diff --git a/lib/typescript/types.d.ts b/lib/typescript/types.d.ts
+index 7de7ba60795d1212beea25e720be4f9442202808..cc157d7c314045e17d2a763ddfe3de5a69f9cc49 100644
+--- a/lib/typescript/types.d.ts
++++ b/lib/typescript/types.d.ts
+@@ -662,6 +662,10 @@ export interface CalendarBodyProps {
+     renderDraggingEvent?: (props: DraggingEventProps) => React.ReactElement | null;
+     /** Custom now indicator */
+     NowIndicatorComponent?: React.ReactElement | null;
++    /** Initial vertical scroll offset in pixels, applied on mount */
++    initialScrollY?: number;
++    /** Allow overscroll past the first and last hour (iOS bounce, Android stretch) */
++    bounces?: boolean;
+ }
+ export interface RenderHourProps {
+     hourStr: string;
+diff --git a/src/CalendarBody.tsx b/src/CalendarBody.tsx
+index 91d3264e916fd162251b4a46a1bf0424d840ee05..5594dda286366a434b52965b0354afabdcc786ac 100644
+--- a/src/CalendarBody.tsx
++++ b/src/CalendarBody.tsx
+@@ -1,4 +1,4 @@
+-import React, { useCallback, useMemo } from 'react';
++import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+ import type {
+   LayoutChangeEvent,
+   NativeScrollEvent,
+@@ -53,6 +53,8 @@ const CalendarBody: React.FC<CalendarBodyProps> = ({
+   renderDraggingHour,
+   NowIndicatorComponent,
+   renderCustomHorizontalLine,
++  initialScrollY = 0,
++  bounces = true,
+ }) => {
+   const {
+     calendarLayout,
+@@ -123,6 +125,12 @@ const CalendarBody: React.FC<CalendarBodyProps> = ({
+     mode: dragToCreateMode,
+   });
+ 
++  // Native contentOffset positions the first frame; a post-mount scrollTo would visibly jump.
++  const [initialContentOffset] = useState(() => ({ x: 0, y: initialScrollY }));
++  useLayoutEffect(() => {
++    offsetY.value = initialContentOffset.y;
++  }, [initialContentOffset, offsetY]);
++
+   const _onLayout = (event: LayoutChangeEvent) => {
+     scrollVisibleHeight.current = event.nativeEvent.layout.height;
+     scrollVisibleHeightAnim.value = event.nativeEvent.layout.height;
+@@ -322,6 +330,9 @@ const CalendarBody: React.FC<CalendarBodyProps> = ({
+           scrollEventThrottle={16}
+           pinchGestureEnabled={false}
+           showsVerticalScrollIndicator={false}
++          contentOffset={initialContentOffset}
++          bounces={bounces}
++          overScrollMode={bounces ? 'auto' : 'never'}
+           onLayout={_onLayout}
+           onScroll={_onScroll}
+           refreshControl={
+diff --git a/src/types.ts b/src/types.ts
+index 9946f01141e1fa5ffe434cda6b4a3c332860d3fc..d853b9ce8cd698c66c25bda527b16828b9acc069 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -813,6 +813,12 @@ export interface CalendarBodyProps {
+ 
+   /** Custom now indicator */
+   NowIndicatorComponent?: React.ReactElement | null;
++
++  /** Initial vertical scroll offset in pixels, applied on mount */
++  initialScrollY?: number;
++
++  /** Allow overscroll past the first and last hour (iOS bounce, Android stretch) */
++  bounces?: boolean;
+ }
+ 
+ export interface RenderHourProps {

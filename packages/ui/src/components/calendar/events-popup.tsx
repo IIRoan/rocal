@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { XIcon } from "lucide-react";
 import {
   resolveTimezone,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 
 import { EventItem } from "./event-item";
@@ -18,6 +19,7 @@ interface EventsPopupProps {
   onClose: () => void;
   onEventSelect: (event: CalendarEvent) => void;
   timezone?: string;
+  timeFormat: TimeFormat;
 }
 
 export function EventsPopup({
@@ -27,11 +29,11 @@ export function EventsPopup({
   onClose,
   onEventSelect,
   timezone,
+  timeFormat,
 }: EventsPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const resolvedTimezone = resolveTimezone(timezone);
 
-  // Handle click outside to close popup
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -48,7 +50,6 @@ export function EventsPopup({
     };
   }, [onClose]);
 
-  // Handle escape key to close popup
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -67,22 +68,18 @@ export function EventsPopup({
     onClose();
   };
 
-  // Adjust position to ensure popup stays within viewport
   const adjustedPosition = useMemo(() => {
     const positionCopy = { ...position };
 
-    // Check if we need to adjust the position to fit in the viewport
     if (popupRef.current) {
       const rect = popupRef.current.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
 
-      // Adjust horizontally if needed
       if (positionCopy.left + rect.width > viewportWidth) {
         positionCopy.left = Math.max(0, viewportWidth - rect.width);
       }
 
-      // Adjust vertically if needed
       if (positionCopy.top + rect.height > viewportHeight) {
         positionCopy.top = Math.max(0, viewportHeight - rect.height);
       }
@@ -134,6 +131,7 @@ export function EventsPopup({
                   isFirstDay={isFirstDay}
                   isLastDay={isLastDay}
                   timezone={timezone}
+                  timeFormat={timeFormat}
                 />
               </div>
             );

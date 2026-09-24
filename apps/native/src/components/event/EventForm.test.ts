@@ -1,15 +1,75 @@
 import {
   roundToNextHour,
   toLocalISOString,
-  startOfDay,
-  endOfDay,
   mapErrorToField,
   buildEventRequest,
+  shiftEndWithStart,
   validateForm,
-  REMINDER_OPTIONS,
 } from "./event-form-utils";
 
-// ─── roundToNextHour ─────────────────────────────────────────────────────────
+describe("shiftEndWithStart", () => {
+  const timezone = "Europe/Amsterdam";
+
+  it("keeps the event length when the start time moves", () => {
+    expect(
+      shiftEndWithStart(
+        "2025-06-15T09:00",
+        "2025-06-15T10:30",
+        "2025-06-15T09:45",
+        false,
+        timezone,
+      ),
+    ).toBe("2025-06-15T11:15");
+  });
+
+  it("carries the end over midnight when needed", () => {
+    expect(
+      shiftEndWithStart(
+        "2025-06-15T09:00",
+        "2025-06-15T23:30",
+        "2025-06-15T10:00",
+        false,
+        timezone,
+      ),
+    ).toBe("2025-06-16T00:30");
+  });
+
+  it("keeps the real duration across a DST change", () => {
+    expect(
+      shiftEndWithStart(
+        "2025-03-29T23:00",
+        "2025-03-30T01:00",
+        "2025-03-30T01:00",
+        false,
+        timezone,
+      ),
+    ).toBe("2025-03-30T04:00");
+  });
+
+  it("falls back to one hour when the end was not after the start", () => {
+    expect(
+      shiftEndWithStart(
+        "2025-06-15T10:00",
+        "2025-06-15T11:00",
+        "2025-06-15T09:00",
+        false,
+        timezone,
+      ),
+    ).toBe("2025-06-15T12:00");
+  });
+
+  it("keeps the day span for all-day events", () => {
+    expect(
+      shiftEndWithStart(
+        "2025-03-28T00:00",
+        "2025-03-29T00:00",
+        "2025-03-30T23:59",
+        true,
+        timezone,
+      ),
+    ).toBe("2025-03-31T23:59");
+  });
+});
 
 describe("roundToNextHour", () => {
   it("rounds up when minutes are non-zero", () => {
@@ -41,8 +101,6 @@ describe("roundToNextHour", () => {
   });
 });
 
-// ─── toLocalISOString ────────────────────────────────────────────────────────
-
 describe("toLocalISOString", () => {
   it("formats a date as YYYY-MM-DDTHH:mm", () => {
     const d = new Date(2025, 0, 5, 9, 5);
@@ -54,37 +112,6 @@ describe("toLocalISOString", () => {
     expect(toLocalISOString(d)).toBe("2025-03-03T14:30");
   });
 });
-
-// ─── startOfDay / endOfDay ───────────────────────────────────────────────────
-
-describe("startOfDay", () => {
-  it("sets time to 00:00:00.000", () => {
-    const d = new Date(2025, 5, 15, 14, 30, 45, 123);
-    const result = startOfDay(d);
-    expect(result.getHours()).toBe(0);
-    expect(result.getMinutes()).toBe(0);
-    expect(result.getSeconds()).toBe(0);
-    expect(result.getMilliseconds()).toBe(0);
-  });
-
-  it("does not mutate the original date", () => {
-    const d = new Date(2025, 5, 15, 14, 30);
-    startOfDay(d);
-    expect(d.getHours()).toBe(14);
-  });
-});
-
-describe("endOfDay", () => {
-  it("sets time to 23:59:00.000", () => {
-    const d = new Date(2025, 5, 15, 9, 0);
-    const result = endOfDay(d);
-    expect(result.getHours()).toBe(23);
-    expect(result.getMinutes()).toBe(59);
-    expect(result.getSeconds()).toBe(0);
-  });
-});
-
-// ─── mapErrorToField ─────────────────────────────────────────────────────────
 
 describe("mapErrorToField", () => {
   it("maps title errors to 'title'", () => {
@@ -139,8 +166,6 @@ describe("mapErrorToField", () => {
     }
   });
 });
-
-// ─── buildEventRequest ───────────────────────────────────────────────────────
 
 describe("buildEventRequest", () => {
   it("trims title, location, and description", () => {
@@ -287,8 +312,6 @@ describe("buildEventRequest", () => {
   });
 });
 
-// ─── validateForm ────────────────────────────────────────────────────────────
-
 describe("validateForm", () => {
   it("returns no errors for valid data", () => {
     const { fieldErrors, generalErrors } = validateForm({
@@ -401,13 +424,5 @@ describe("validateForm", () => {
     });
     expect(fieldErrors.description).toBeUndefined();
     expect(generalErrors).toHaveLength(0);
-  });
-});
-
-// ─── REMINDER_OPTIONS ────────────────────────────────────────────────────────
-
-describe("REMINDER_OPTIONS", () => {
-  it("contains expected values", () => {
-    expect(REMINDER_OPTIONS).toEqual([0, 5, 10, 15, 30, 60]);
   });
 });

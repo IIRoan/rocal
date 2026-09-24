@@ -10,47 +10,26 @@ import { useColorScheme } from "react-native";
 import {
   nativeLightTheme,
   nativeDarkTheme,
+  nativeMailDarkTheme,
+  nativeMailLightTheme,
   type ThemeTokens,
 } from "@workspace/design-tokens";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 export type ThemePreference = "light" | "dark" | "system";
 
 export interface ThemeContextValue {
-  /** Resolved theme tokens for the active color scheme. */
   theme: ThemeTokens;
-  /** The active color scheme after resolving "system". */
   colorScheme: "light" | "dark";
-  /** Convenience boolean — true when the dark theme is active. */
   isDark: boolean;
-  /** The raw user preference (may be "system"). */
   themePreference: ThemePreference;
-  /** Persist a new theme preference. */
   setThemePreference: (pref: ThemePreference) => void;
 }
 
-// ---------------------------------------------------------------------------
-// Context
-// ---------------------------------------------------------------------------
-
 const ThemeContext = createContext<ThemeContextValue | null>(null);
-
-// ---------------------------------------------------------------------------
-// Local cache helpers
-// ---------------------------------------------------------------------------
 
 const THEME_PREF_CACHE_KEY = "THEME_PREFERENCE";
 
-/**
- * In-memory cache for the theme preference.
- *
- * `expo-secure-store` is async, so we keep a synchronous mirror that is
- * populated on mount and updated on every write.  This avoids a flash of
- * the wrong theme on cold start.
- */
+/** Synchronous mirror of the async secure-store preference, so a remount does not flash the wrong theme. */
 let cachedPreference: ThemePreference | null = null;
 
 async function loadThemePreference(): Promise<ThemePreference> {
@@ -82,10 +61,6 @@ async function saveThemePreference(pref: ThemePreference): Promise<void> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Resolver
-// ---------------------------------------------------------------------------
-
 function resolveTheme(
   preference: ThemePreference,
   systemScheme: "light" | "dark",
@@ -96,10 +71,6 @@ function resolveTheme(
     colorScheme,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Provider
-// ---------------------------------------------------------------------------
 
 export function ThemeProvider({
   children,
@@ -112,7 +83,6 @@ export function ThemeProvider({
   );
   const [isReady, setIsReady] = useState(cachedPreference !== null);
 
-  // Hydrate from secure store on mount.
   useEffect(() => {
     let cancelled = false;
     loadThemePreference().then((pref) => {
@@ -144,8 +114,7 @@ export function ThemeProvider({
     [theme, colorScheme, preference, handleSetPreference],
   );
 
-  // Avoid rendering children until the persisted preference is loaded so
-  // there is no flash of the wrong theme.
+  // Wait for the persisted preference so there is no flash of the wrong theme.
   if (!isReady) return <></>;
 
   return (
@@ -153,9 +122,24 @@ export function ThemeProvider({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
+/** Re-themes calendar and mail with the Solace palette, like `[data-solace]` scopes web mail. */
+export function WorkspaceThemeScope({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactNode {
+  const parent = useTheme();
+  const value = useMemo<ThemeContextValue>(
+    () => ({
+      ...parent,
+      theme: parent.isDark ? nativeMailDarkTheme : nativeMailLightTheme,
+    }),
+    [parent],
+  );
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
+}
 
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);

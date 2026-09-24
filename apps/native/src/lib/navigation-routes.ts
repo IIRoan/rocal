@@ -11,7 +11,6 @@ export const SETTINGS_TIMEZONE_ROUTE = "/settings/timezone";
 export const SETTINGS_TIME_REGION_ROUTE = "/settings/time-region";
 export const SETTINGS_CONTACTS_ROUTE = "/settings/contacts";
 export const SETTINGS_INVITES_ROUTE = "/settings/invites";
-export const SETTINGS_MAILBOXES_ROUTE = "/settings/mailboxes";
 export const SETTINGS_LABELS_ROUTE = "/settings/labels";
 export const SETTINGS_NOTIFICATIONS_ROUTE = "/settings/notifications";
 export const SETTINGS_SECURITY_ROUTE = "/settings/security";
@@ -28,7 +27,6 @@ export function mailMessageRoute(messageId: string): string {
   return `${MAIL_TAB_ROUTE}/message/${encodeURIComponent(messageId)}`;
 }
 
-/** Native stack defaults — interactive swipe-back (iOS full-screen gesture). */
 export const NATIVE_STACK_SCREEN_OPTIONS = {
   headerShown: false,
   animation: "slide_from_right",
@@ -49,17 +47,6 @@ export function isAuthRouteSegments(segments: Segments): boolean {
   return segments[0] === "(auth)";
 }
 
-export function isCalendarRouteSegments(segments: Segments): boolean {
-  return segments[0] === "(tabs)" && segments[1] === "calendar";
-}
-
 export function isMailRouteSegments(segments: Segments): boolean {
   return segments[0] === "(tabs)" && segments[1] === "mail";
-}
-
-export function isSidebarGestureRootSegments(segments: Segments): boolean {
-  return (
-    (isCalendarRouteSegments(segments) || isMailRouteSegments(segments)) &&
-    segments.length === 2
-  );
 }

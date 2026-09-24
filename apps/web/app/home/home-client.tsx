@@ -11,6 +11,7 @@ import { CALENDAR_HOME_PATH, MAIL_HOME_PATH } from "@/lib/app-routes";
 import { CalendarDays, Mail, ChevronRight, LogOut } from "lucide-react";
 import { signOutAndClearLocalState } from "@/lib/auth-local-state";
 import Link from "next/link";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 const NAV_ITEMS = [
   {
@@ -102,7 +103,6 @@ export function HomeAppClient() {
 
   return (
     <div ref={containerRef} className="min-h-svh bg-background flex flex-col">
-      {/* Header */}
       <header
         data-home-header
         className="flex items-center justify-between px-5 pt-safe-top pt-4 pb-3 border-b border-border/40"
@@ -110,21 +110,20 @@ export function HomeAppClient() {
         <Logo className="h-5 w-auto text-foreground" aria-label="Solace" />
         <div className="flex items-center gap-1">
           <ThemeToggle />
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
-            aria-label="Sign out"
-            title="Sign out"
-          >
-            <LogOut size={15} />
-          </button>
+          <SimpleTooltip content="Sign out">
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+              aria-label="Sign out"
+            >
+              <LogOut size={15} />
+            </button>
+          </SimpleTooltip>
         </div>
       </header>
 
-      {/* Main */}
       <main className="flex-1 flex flex-col px-5 pt-10 pb-8 max-w-md mx-auto w-full">
-        {/* Greeting */}
         <div data-home-greeting className="mb-10">
           <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">
             Good{timeOfDay}
@@ -134,7 +133,6 @@ export function HomeAppClient() {
           </h1>
         </div>
 
-        {/* Navigation list */}
         <nav>
           <ul className="divide-y divide-border/50 border-t border-b border-border/50">
             {NAV_ITEMS.map((item) => (

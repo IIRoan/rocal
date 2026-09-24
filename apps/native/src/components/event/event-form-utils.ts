@@ -10,13 +10,6 @@ import {
   validateEventData,
 } from "@workspace/calendar-core";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-export const REMINDER_OPTIONS = [0, 5, 10, 15, 30, 60] as const;
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Round a date up to the next full hour. */
 export function roundToNextHour(date: Date): Date {
   const d = new Date(date);
   if (d.getMinutes() > 0 || d.getSeconds() > 0 || d.getMilliseconds() > 0) {
@@ -73,6 +66,14 @@ export function pickerISOStringToUtc(value: string, timezone?: string): Date {
   );
 }
 
+/** Wall-clock date and time of a picker string as a local Date, for display and pickers only. */
+export function pickerISOStringToWallClock(value: string): Date {
+  const [datePart = "", timePart = "00:00"] = value.split("T");
+  const [year = 0, month = 1, day = 1] = datePart.split("-").map(Number);
+  const [hours = 0, minutes = 0] = timePart.split(":").map(Number);
+  return new Date(year, month - 1, day, hours, minutes);
+}
+
 function pickerISOStringToCalendarDay(value: string): Date {
   const [datePart = ""] = value.split("T");
   const [year = 0, month = 1, day = 1] = datePart.split("-").map(Number);
@@ -96,24 +97,42 @@ export function setPickerTimePart(value: string, time: Date): string {
   return `${datePart}T${hours}:${minutes}`;
 }
 
-/** Set a date to the start of day (00:00). */
-export function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_DURATION_MS = 60 * 60 * 1000;
+
+function pickerDayNumber(value: string): number {
+  const [year = 0, month = 1, day = 1] = (value.split("T")[0] ?? "")
+    .split("-")
+    .map(Number);
+  return Date.UTC(year, month - 1, day) / DAY_MS;
 }
 
-/** Set a date to the end of day (23:59). */
-export function endOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(23, 59, 0, 0);
-  return d;
+/** Move the end so the event keeps its length when the start changes; all-day events keep their day span. */
+export function shiftEndWithStart(
+  previousStart: string,
+  nextStart: string,
+  end: string,
+  allDay: boolean,
+  timezone?: string,
+): string {
+  if (allDay) {
+    const span = Math.max(0, pickerDayNumber(end) - pickerDayNumber(previousStart));
+    const endDay = new Date((pickerDayNumber(nextStart) + span) * DAY_MS);
+    const datePart = endDay.toISOString().slice(0, 10);
+    return `${datePart}T${end.split("T")[1] ?? "00:00"}`;
+  }
+  const resolvedTimezone = resolveTimezone(timezone);
+  const duration =
+    pickerISOStringToUtc(end, resolvedTimezone).getTime() -
+    pickerISOStringToUtc(previousStart, resolvedTimezone).getTime();
+  const nextEnd = new Date(
+    pickerISOStringToUtc(nextStart, resolvedTimezone).getTime() +
+      (duration > 0 ? duration : DEFAULT_DURATION_MS),
+  );
+  return toTimezonePickerISOString(nextEnd, resolvedTimezone);
 }
 
-/**
- * Map a validation error message to the field it belongs to.
- * Returns null if the error doesn't map to a specific field.
- */
+/** Map a validation error message to its field, or null when it belongs to none. */
 export function mapErrorToField(error: string): string | null {
   const lower = error.toLowerCase();
   if (lower.includes("title")) return "title";
@@ -126,10 +145,6 @@ export function mapErrorToField(error: string): string | null {
   return null;
 }
 
-/**
- * Build a CreateEventRequest from form field values.
- * Returns the request object ready for validation and submission.
- */
 export function buildEventRequest(fields: {
   title: string;
   start: string;
@@ -194,10 +209,7 @@ export function buildEventRequest(fields: {
   };
 }
 
-/**
- * Validate form data and return categorised errors.
- * Returns `{ fieldErrors, generalErrors }`.
- */
+/** Split validation errors into `{ fieldErrors, generalErrors }`. */
 export function validateForm(data: CreateEventRequest): {
   fieldErrors: Record<string, string>;
   generalErrors: string[];

@@ -1,4 +1,3 @@
-// UI components
 export { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 export { BlobatarAvatar } from "./blobatar-avatar";
 export { Badge, badgeVariants } from "./badge";
@@ -114,6 +113,7 @@ export {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  SimpleTooltip,
 } from "./tooltip";
 export { VisuallyHidden } from "./visually-hidden";
 export {

@@ -26,8 +26,9 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { LAYOUT_METRICS } from "../../lib/app-layout";
 import { useRecentContacts } from "../../hooks/use-recent-contacts";
-import { mailColors } from "./mail-ui";
+import { useMailSkin, type MailSkin } from "./mail-ui";
 import { RecipientSuggestionList } from "./RecipientSuggestionList";
+import { collapseRecipientChips } from "../../lib/mail/compose-display";
 import {
   addRecipientChip,
   consumeRecipientDraft,
@@ -39,26 +40,31 @@ import {
 } from "../../lib/mail/compose-recipients";
 
 const SUGGESTION_LIST_MAX_HEIGHT = 280;
+const CHIP_HEIGHT = 30;
 const BLUR_CLOSE_MS = 120;
 const EMPTY_EMAILS: string[] = [];
 
 export type ComposeRecipientFieldProps = {
   value: string;
   onChangeText: (text: string) => void;
-  placeholder: string;
+  label: string;
   trailing?: ReactNode;
   excludeEmails?: string[];
+  /** Return key on an empty draft moves on, like Mail's "next". */
+  onSubmitEmpty?: () => void;
 };
 
 export function ComposeRecipientField({
   value,
   onChangeText,
-  placeholder,
+  label,
   trailing,
   excludeEmails = EMPTY_EMAILS,
+  onSubmitEmpty,
 }: ComposeRecipientFieldProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const skin = useMailSkin();
+  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
   const inputRef = useRef<TextInput>(null);
   const selectingRef = useRef(false);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -163,7 +169,10 @@ export function ComposeRecipientField({
 
   const handleRemove = useCallback(
     (email: string) => {
-      applyField(removeRecipientChip(chipsRef.current, email), draftRef.current);
+      applyField(
+        removeRecipientChip(chipsRef.current, email),
+        draftRef.current,
+      );
       inputRef.current?.focus();
     },
     [applyField],
@@ -171,7 +180,10 @@ export function ComposeRecipientField({
 
   const handleKeyPress = useCallback(
     (event: { nativeEvent: { key: string } }) => {
-      if (event.nativeEvent.key !== "Backspace" || draftRef.current.length > 0) {
+      if (
+        event.nativeEvent.key !== "Backspace" ||
+        draftRef.current.length > 0
+      ) {
         return;
       }
       const last = chipsRef.current[chipsRef.current.length - 1];
@@ -218,33 +230,61 @@ export function ComposeRecipientField({
     }, BLUR_CLOSE_MS);
   }, [commitDraft]);
 
-  const showList = focused;
+  const { visible, hiddenCount } = collapseRecipientChips(chips, focused);
+  const collapsed = !focused && chips.length > 0;
+  const showSuggestions =
+    focused && draft.trim().length > 0 && suggestions.length > 0;
 
   return (
     <View style={styles.container}>
-      <View style={styles.row}>
+      <Pressable
+        style={styles.row}
+        onPress={() => inputRef.current?.focus()}
+        accessible={false}
+      >
+        <View style={styles.lineSlot}>
+          <Text style={styles.label}>{label}</Text>
+        </View>
         <View style={styles.chips}>
-          {chips.map((chip) => (
+          {visible.map((chip) => {
+            const chipLabel = recipientChipLabel(chip);
+            return (
+              <Pressable
+                key={chip.email}
+                onPress={() =>
+                  focused ? handleRemove(chip.email) : inputRef.current?.focus()
+                }
+                style={({ pressed }) => [
+                  styles.chip,
+                  pressed && styles.pressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  focused ? `Remove ${chipLabel}` : `${label}: ${chipLabel}`
+                }
+              >
+                <Text style={styles.chipText} numberOfLines={1}>
+                  {chipLabel}
+                </Text>
+                {focused ? (
+                  <Feather name="x" size={12} color={skin.textTertiary} />
+                ) : null}
+              </Pressable>
+            );
+          })}
+          {hiddenCount > 0 ? (
             <Pressable
-              key={chip.email}
-              onPress={() => handleRemove(chip.email)}
-              style={styles.chip}
+              onPress={() => inputRef.current?.focus()}
+              style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
               accessibilityRole="button"
-              accessibilityLabel={`Remove ${recipientChipLabel(chip)}`}
+              accessibilityLabel={`Show ${hiddenCount} more recipients`}
             >
-              <Text style={styles.chipText} numberOfLines={1}>
-                {recipientChipLabel(chip)}
-              </Text>
-              <Feather
-                name="x"
-                size={11}
-                color={theme.colors.mutedForeground}
-              />
+              <Text style={styles.chipText}>+{hiddenCount}</Text>
             </Pressable>
-          ))}
+          ) : null}
           <TextInput
             ref={inputRef}
-            style={styles.input}
+            style={[styles.input, collapsed && styles.inputCollapsed]}
             value={draft}
             onChangeText={handleDraftChange}
             onKeyPress={handleKeyPress}
@@ -253,10 +293,14 @@ export function ComposeRecipientField({
             onSubmitEditing={() => {
               if (draft.trim()) {
                 commitDraft(draft);
+                return;
               }
+              inputRef.current?.blur();
+              onSubmitEmpty?.();
             }}
-            placeholder={chips.length === 0 && !draft ? placeholder : ""}
-            placeholderTextColor={theme.colors.mutedForeground}
+            placeholderTextColor={skin.textTertiary}
+            selectionColor={theme.colors.primaryBase}
+            cursorColor={theme.colors.primaryBase}
             autoCapitalize="none"
             autoCorrect={false}
             autoComplete="off"
@@ -266,12 +310,12 @@ export function ComposeRecipientField({
             autoFocus={false}
             blurOnSubmit={false}
             returnKeyType="next"
-            accessibilityLabel={placeholder}
+            accessibilityLabel={label}
           />
         </View>
-        {trailing}
-      </View>
-      {showList ? (
+        {trailing ? <View style={styles.lineSlot}>{trailing}</View> : null}
+      </Pressable>
+      {showSuggestions ? (
         <ScrollView
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="none"
@@ -292,9 +336,8 @@ export function ComposeRecipientField({
   );
 }
 
-function createStyles(theme: ThemeTokens) {
-  const colors = mailColors(theme);
-
+function createStyles(theme: ThemeTokens, skin: MailSkin) {
+  const rowHeight = LAYOUT_METRICS.hitSize + theme.spacing["2"];
   const view = {
     container: {
       flexGrow: 0,
@@ -302,16 +345,22 @@ function createStyles(theme: ThemeTokens) {
     },
     suggestionScroll: {
       maxHeight: SUGGESTION_LIST_MAX_HEIGHT,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: skin.borderTertiary,
     },
     row: {
       flexDirection: "row" as const,
-      alignItems: "center" as const,
-      minHeight: LAYOUT_METRICS.hitSize,
+      alignItems: "flex-start" as const,
+      minHeight: rowHeight,
       paddingLeft: theme.spacing["4"],
       paddingRight: theme.spacing["2"],
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.card,
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
+      borderBottomColor: skin.borderTertiary,
+    },
+    lineSlot: {
+      height: rowHeight,
+      justifyContent: "center" as const,
     },
     chips: {
       flex: 1,
@@ -320,36 +369,50 @@ function createStyles(theme: ThemeTokens) {
       flexWrap: "wrap" as const,
       alignItems: "center" as const,
       gap: 6,
-      paddingVertical: 8,
+      paddingVertical: (rowHeight - CHIP_HEIGHT) / 2,
     },
     chip: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: 4,
+      gap: 6,
       maxWidth: "100%" as const,
-      height: 28,
-      paddingLeft: 10,
-      paddingRight: 6,
-      borderRadius: theme.borderRadius.full,
-      backgroundColor: colors.chipBg,
+      height: CHIP_HEIGHT,
+      paddingHorizontal: 10,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: skin.borderPrimary,
+      backgroundColor: theme.colors.card,
+    },
+    pressed: {
+      backgroundColor: skin.pressed,
     },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
+    label: {
+      ...skin.body,
+      fontWeight: "500" as TextStyle["fontWeight"],
+      color: skin.textTertiary,
+      marginRight: theme.spacing["3"],
+    },
     chipText: {
       maxWidth: 200,
-      fontSize: theme.typography.fontSize.sm.size,
+      fontSize: 14,
+      fontWeight: "500" as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
     input: {
       flexGrow: 1,
       flexBasis: 120,
       minWidth: 120,
-      minHeight: 28,
-      paddingVertical: 4,
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
+      height: CHIP_HEIGHT,
+      paddingVertical: 0,
+      fontSize: skin.body.fontSize,
       color: theme.colors.foreground,
+    },
+    inputCollapsed: {
+      flexBasis: 24,
+      minWidth: 24,
     },
   } satisfies Record<string, TextStyle>;
 

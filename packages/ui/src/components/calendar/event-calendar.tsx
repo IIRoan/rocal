@@ -1,12 +1,13 @@
 "use client";
 
-import { useDeferredValue, useRef } from "react";
+import { useDeferredValue, useLayoutEffect, useRef } from "react";
 import { createLogger } from "@workspace/logger";
 import {
   getCalendarViewAnimationKey,
   getPrefetchCalendarDateRange,
   navigateCalendarDate,
   resolveTimezone,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 import { addDays } from "date-fns";
 import { Loader2 } from "lucide-react";
@@ -37,7 +38,7 @@ import { Button } from "../ui/button";
 import { ErrorBoundary } from "../ui/error-boundary";
 import { useDropdownShortcuts } from "../../hooks/use-keyboard-shortcuts";
 import { usePrefersReducedMotion } from "../../hooks/use-prefers-reduced-motion";
-import { gsap, useGSAP } from "../../lib/gsap";
+import { slideFadeIn } from "../../lib/motion";
 
 const log = createLogger("event-calendar");
 
@@ -63,7 +64,7 @@ export interface EventCalendarProps {
   onDateRangeChange?: (dateRange: { start: Date; end: Date }) => void;
   showWeekNumbers?: boolean;
   compactView?: boolean;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   defaultEventDuration?: number;
   defaultCalendarId?: string | null;
   weekStartDay?: number;
@@ -101,7 +102,7 @@ export function EventCalendar({
   onDeleteEvent,
   showWeekNumbers = false,
   compactView = false,
-  timeFormat = "24h",
+  timeFormat,
   defaultEventDuration = 60,
   defaultCalendarId = null,
   weekStartDay = 1,
@@ -193,42 +194,19 @@ export function EventCalendar({
   );
   const canAnimateCalendar = !loading && !error;
 
-  useGSAP(
-    () => {
-      if (!canAnimateCalendar) {
-        return;
-      }
+  useLayoutEffect(() => {
+    const node = viewStageRef.current;
+    if (!canAnimateCalendar || shouldReduceMotion || !node) {
+      return;
+    }
 
-      const node = viewStageRef.current;
-      if (!node) {
-        return;
-      }
-
-      if (shouldReduceMotion) {
-        gsap.set(node, { clearProps: "opacity,transform" });
-        return;
-      }
-
-      gsap.fromTo(
-        node,
-        {
-          x: navDirectionRef.current > 0 ? 32 : -32,
-          autoAlpha: 0,
-        },
-        {
-          x: 0,
-          autoAlpha: 1,
-          duration: 0.28,
-          ease: "power3.out",
-          overwrite: "auto",
-        },
-      );
-    },
-    {
-      dependencies: [calendarViewKey, canAnimateCalendar, shouldReduceMotion],
-      scope: viewStageRef,
-    },
-  );
+    const animation = slideFadeIn(
+      node,
+      { x: navDirectionRef.current > 0 ? 32 : -32 },
+      { duration: 280 },
+    );
+    return () => animation?.cancel();
+  }, [calendarViewKey, canAnimateCalendar, shouldReduceMotion]);
 
   const handleEventSelect = (event: CalendarEvent) => {
     onEventEdit?.(event);
@@ -269,6 +247,7 @@ export function EventCalendar({
   const handleEventUpdate = (updatedEvent: CalendarEvent) =>
     persistDraggedCalendarEvent({
       timezone: resolvedTimezone,
+      timeFormat,
       updateEvent,
       updatedEvent,
     });
@@ -322,6 +301,7 @@ export function EventCalendar({
         <CalendarDndProvider
           onEventUpdate={handleEventUpdate}
           timezone={timezone}
+          timeFormat={timeFormat}
         >
           <EventCalendarToolbar
             currentDate={currentDate}

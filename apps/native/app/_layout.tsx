@@ -13,13 +13,12 @@ import { AppUpdateProvider } from "../src/providers/AppUpdateProvider";
 import { AppUpdateScreen } from "../src/components/settings/AppUpdateScreen";
 import { E2eeProvider, useE2ee } from "../src/providers/E2eeProvider";
 import { SheetProvider } from "../src/providers/SheetProvider";
+import { MailComposeProvider } from "../src/providers/MailComposeProvider";
 import { ToastProvider } from "../src/providers/ToastProvider";
-import { SidebarProvider, useSidebar } from "../src/providers/SidebarProvider";
 import { MailSelectionProvider } from "../src/providers/MailSelectionProvider";
 import { CommandPaletteProvider } from "../src/providers/CommandPaletteProvider";
 import { CalendarViewProvider } from "../src/providers/CalendarViewProvider";
 import { WorkspaceTabHostProvider } from "../src/providers/WorkspaceTabHostProvider";
-import { AppSidebar } from "../src/components/AppSidebar";
 import { CommandPalette } from "../src/components/CommandPalette";
 import { WorkspaceLoadingScreen } from "../src/components/WorkspaceLoadingScreen";
 import { calendarApiService } from "../src/lib/api";
@@ -40,9 +39,6 @@ import {
   NATIVE_STACK_SCREEN_OPTIONS,
 } from "../src/lib/navigation-routes";
 
-// ---------------------------------------------------------------------------
-// Navigation guard — redirects based on auth state
-// ---------------------------------------------------------------------------
 function NavigationGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const { isReady: isE2eeReady, bootstrap, clearSession, provider } = useE2ee();
@@ -56,7 +52,6 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
     "Setting up encryption…",
   );
 
-  // Redirect based on auth state.
   useEffect(() => {
     const redirectPath = getAuthRedirectPath({
       isAuthenticated,
@@ -74,7 +69,6 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
     };
   }, [isAuthenticated, isLoading, segments, router]);
 
-  // Bootstrap E2EE after authentication.
   useEffect(() => {
     calendarApiService.setE2eeProvider(provider);
 
@@ -145,12 +139,11 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
     };
   }, [isAuthenticated, user, bootstrap, clearSession, provider, queryClient]);
 
-  // Keep the navigator mounted and cover it until encryption is ready. That
-  // way sign-in stays put during passkey, then one loading board covers the
-  // hand-off to calendar instead of flashing the calendar underneath.
+  // Cover the still-mounted navigator so sign-in stays put during passkey and the calendar never flashes underneath.
   const isPreparingWorkspace =
     isAuthenticated && !isLoading && (!isE2eeReady || isPreparingStartupCrypto);
-  const isPushNavigationReady = isAuthenticated && !isLoading && !isPreparingWorkspace;
+  const isPushNavigationReady =
+    isAuthenticated && !isLoading && !isPreparingWorkspace;
 
   return (
     <View style={{ flex: 1 }}>
@@ -166,7 +159,6 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
 
 function AuthenticatedChrome() {
   const { isAuthenticated, isLoading } = useAuth();
-  const { isOpen, close } = useSidebar();
   const segments = useSegments();
   const showChrome = shouldRenderAuthenticatedChrome({
     isAuthenticated,
@@ -174,27 +166,12 @@ function AuthenticatedChrome() {
     segments,
   });
 
-  useEffect(() => {
-    if (!showChrome && isOpen) {
-      close();
-    }
-  }, [close, isOpen, showChrome]);
-
   if (!showChrome) {
     return null;
   }
 
-  return (
-    <>
-      <AppSidebar />
-      <CommandPalette />
-    </>
-  );
+  return <CommandPalette />;
 }
-
-// ---------------------------------------------------------------------------
-// Root layout
-// ---------------------------------------------------------------------------
 
 function RootLayout() {
   return (
@@ -206,12 +183,12 @@ function RootLayout() {
               <AppUpdateProvider>
                 <AppUpdateScreen />
                 <E2eeProvider>
-                  <SidebarProvider>
-                    <MailSelectionProvider>
-                      <CalendarViewProvider>
-                        <NavigationGuard>
-                          <ToastProvider>
-                            <SheetProvider>
+                  <MailSelectionProvider>
+                    <CalendarViewProvider>
+                      <NavigationGuard>
+                        <ToastProvider>
+                          <SheetProvider>
+                            <MailComposeProvider>
                               <CommandPaletteProvider>
                                 <WorkspaceTabHostProvider>
                                   <Stack
@@ -239,12 +216,12 @@ function RootLayout() {
                                   <AuthenticatedChrome />
                                 </WorkspaceTabHostProvider>
                               </CommandPaletteProvider>
-                            </SheetProvider>
-                          </ToastProvider>
-                        </NavigationGuard>
-                      </CalendarViewProvider>
-                    </MailSelectionProvider>
-                  </SidebarProvider>
+                            </MailComposeProvider>
+                          </SheetProvider>
+                        </ToastProvider>
+                      </NavigationGuard>
+                    </CalendarViewProvider>
+                  </MailSelectionProvider>
                 </E2eeProvider>
               </AppUpdateProvider>
             </ThemeProvider>

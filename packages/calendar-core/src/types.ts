@@ -13,12 +13,7 @@ import type {
 } from "@workspace/calendar-ics";
 import type { RecurrenceRule as SharedRecurrenceRule } from "@workspace/calendar-ics/recurrence";
 
-// ─── Calendar View Types ─────────────────────────────────────────────────────
-
-/**
- * Calendar display modes. Defined here so calendar-core has no dependency
- * on the web-only @workspace/ui package.
- */
+/** Defined here so calendar-core has no dependency on the web-only @workspace/ui package. */
 export type CalendarView = "month" | "week" | "3day" | "day" | "agenda";
 
 export const CALENDAR_VIEWS: readonly CalendarView[] = [
@@ -29,12 +24,7 @@ export const CALENDAR_VIEWS: readonly CalendarView[] = [
   "agenda",
 ];
 
-/**
- * Number of days shown in the agenda view.
- */
 export const AgendaDaysToShow = 30;
-
-// ─── Event Search Types ──────────────────────────────────────────────────────
 
 export interface EventSearchResult {
   events: CalendarEvent[];
@@ -61,8 +51,6 @@ export interface EventSearchCorpusParams {
   updatedAfter?: string;
 }
 
-// ─── Core Calendar Types ─────────────────────────────────────────────────────
-
 export type EventColor =
   | "blue"
   | "orange"
@@ -86,6 +74,7 @@ import type {
   EventParticipantStatus,
 } from "./route-schemas";
 import type { E2eeRolloutStage } from "./content-encryption";
+import type { TimeFormat } from "./time-format";
 
 export type {
   EncryptionState,
@@ -328,8 +317,6 @@ export interface EventCategory {
   updatedAt: Date;
 }
 
-// ─── API Request/Response Types ──────────────────────────────────────────────
-
 export interface EventsResponse {
   events: CalendarEvent[];
   categories: EventCategory[];
@@ -408,8 +395,6 @@ export function isApiError(value: unknown): value is ApiError {
   );
 }
 
-// ─── User Settings Types ─────────────────────────────────────────────────────
-
 export interface UserSettings {
   id: string;
   userId: string;
@@ -417,7 +402,7 @@ export interface UserSettings {
   defaultView: CalendarView;
   weekStartDay: number;
   timezone: string;
-  timeFormat: "12h" | "24h";
+  timeFormat: TimeFormat;
   workingHoursStart: number;
   workingHoursEnd: number;
   workingDays: string;
@@ -446,8 +431,6 @@ export interface RecentContactsRecord {
   encryptionKeyVersion: number;
   updatedAt: string;
 }
-
-// ─── Recurring Events Types ──────────────────────────────────────────────────
 
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
 
@@ -485,8 +468,6 @@ export interface EditRecurringEventRequest {
   updates: UpdateEventRequest;
 }
 
-// ─── Calendar Deletion Types ─────────────────────────────────────────────────
-
 export type CalendarDeleteAction = "delete_events" | "move_events";
 
 export interface CalendarDeleteResponse {
@@ -497,8 +478,6 @@ export interface CalendarDeleteResponse {
   action: string;
 }
 
-// ─── Bulk Operations Types ───────────────────────────────────────────────────
-
 export type BulkEventAction = "move" | "delete" | "duplicate";
 
 export interface BulkEventResponse {
@@ -508,8 +487,6 @@ export interface BulkEventResponse {
   action: string;
   createdEvents?: CalendarEvent[];
 }
-
-// ─── Event Notification Types ────────────────────────────────────────────────
 
 export interface EventNotification {
   id?: string;
@@ -548,8 +525,6 @@ export interface NotificationStatus {
   queueProcessInterval: string;
 }
 
-// ─── ICS and Subscription API Types ──────────────────────────────────────────
-
 export type CalendarSubscription = CalendarSubscriptionSummary;
 export type CreateSubscriptionRequest = CreateCalendarSubscriptionRequest;
 export type UpdateSubscriptionRequest = UpdateCalendarSubscriptionRequest;
@@ -562,8 +537,6 @@ export type CreateCalendarShareLinkRequestPayload =
   CreateCalendarShareLinkRequest;
 export type DisableCalendarShareLinkResponsePayload =
   DisableCalendarShareLinkResponse;
-
-// ─── E2EE Types ──────────────────────────────────────────────────────────────
 
 export interface E2eeDeviceRecord {
   id: string;

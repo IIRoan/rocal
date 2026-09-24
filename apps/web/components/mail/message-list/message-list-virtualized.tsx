@@ -1,7 +1,7 @@
 "use client";
 "use no memo";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { AppLoadingState } from "@workspace/ui/components/ui";
 import { MessageListRow } from "./message-list-row";
@@ -26,6 +26,17 @@ export type MessageListVirtualizedProps = {
   pagination: MessageListPaginationState;
 };
 
+function findThreadRowIndex(
+  threadRows: MessageListThreadRow[],
+  messageId: string | null | undefined,
+) {
+  if (!messageId) return -1;
+  return threadRows.findIndex(
+    (row) =>
+      row.latestMessage.id === messageId || row.messageIds.includes(messageId),
+  );
+}
+
 export function MessageListVirtualized({
   threadRows,
   primaryIds,
@@ -36,7 +47,7 @@ export function MessageListVirtualized({
   "use no memo";
   const { selectedMessageId } = interaction;
   const { labels, display } = presentation;
-  const { isMobile, density, showLabelChips } = display;
+  const { isMobile, narrow, density, showLabelChips } = display;
   const { hasMore, isLoadingMore, onLoadMore } = pagination;
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadMoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -49,7 +60,14 @@ export function MessageListVirtualized({
   const estimateRowSize = (index: number) => {
     const row = threadRows[index];
     if (!row) return isMobile ? ROW_HEIGHT_MOBILE : ROW_HEIGHT_DESKTOP;
-    return getRowHeight(row.latestMessage, labels, isMobile, density, showLabelChips);
+    return getRowHeight(
+      row.latestMessage,
+      labels,
+      isMobile,
+      density,
+      showLabelChips,
+      narrow,
+    );
   };
 
   const virtualizer = useVirtualizer({
@@ -122,17 +140,47 @@ export function MessageListVirtualized({
     };
   }, [threadRows.length, isLoadingMore]);
 
+  const renderedNarrowRef = useRef(narrow);
+  // Row heights change with `narrow`; keep the selected (else top) row at the same screen position so nothing jumps.
+  useLayoutEffect(() => {
+    if (renderedNarrowRef.current === narrow) return;
+    renderedNarrowRef.current = narrow;
+    const element = scrollRef.current;
+    if (!element) return;
+    const scrollTop = element.scrollTop;
+    const previousStarts: number[] = [];
+    const nextStarts: number[] = [];
+    let previous = 0;
+    let next = 0;
+    let topIndex = 0;
+    threadRows.forEach((row, index) => {
+      previousStarts.push(previous);
+      nextStarts.push(next);
+      if (previous <= scrollTop) topIndex = index;
+      const heightFor = (rowNarrow: boolean) =>
+        getRowHeight(row.latestMessage, labels, isMobile, density, showLabelChips, rowNarrow);
+      previous += heightFor(!narrow);
+      next += heightFor(narrow);
+    });
+    const selectedIndex = findThreadRowIndex(threadRows, selectedMessageId);
+    const selectedStart = previousStarts[selectedIndex];
+    const selectedVisible =
+      selectedStart !== undefined &&
+      selectedStart >= scrollTop &&
+      selectedStart < scrollTop + element.clientHeight;
+    const anchor = selectedVisible ? selectedIndex : topIndex;
+    const previousStart = previousStarts[anchor];
+    const nextStart = nextStarts[anchor];
+    if (previousStart === undefined || nextStart === undefined) return;
+    element.scrollTop = nextStart + (scrollTop - previousStart);
+  }, [narrow, threadRows, selectedMessageId, labels, isMobile, density, showLabelChips]);
+
   useEffect(() => {
-    if (!selectedMessageId) return;
-    const index = threadRows.findIndex(
-      (row) =>
-        row.latestMessage.id === selectedMessageId ||
-        row.messageIds.includes(selectedMessageId),
-    );
+    const index = findThreadRowIndex(threadRows, selectedMessageId);
     if (index >= 0) {
       virtualizer.scrollToIndex(index, { align: "auto" });
     }
-  }, [selectedMessageId, threadRows, virtualizer]);
+  }, [selectedMessageId, threadRows, virtualizer, narrow]);
 
   return (
     <div

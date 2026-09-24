@@ -3,13 +3,10 @@
 import { cn } from "@workspace/ui/lib/utils";
 import { Skeleton } from "./skeleton";
 
-// Dashboard skeleton for the main layout
 export function DashboardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn("flex h-screen bg-background", className)}>
-      {/* Sidebar skeleton */}
+    <div className={cn("flex h-dvh bg-background", className)}>
       <div className="hidden md:flex w-64 flex-col border-r border-border bg-sidebar animate-fade-in">
-        {/* Header */}
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
             <Skeleton className="size-8 rounded-full" variant="shimmer" />
@@ -17,9 +14,7 @@ export function DashboardSkeleton({ className }: { className?: string }) {
           </div>
         </div>
 
-        {/* Navigation */}
         <div className="flex-1 p-4 space-y-6">
-          {/* User section */}
           <div className="space-y-3">
             <div className="flex items-center gap-3 p-2">
               <Skeleton className="size-8 rounded-full" variant="shimmer" />
@@ -30,7 +25,6 @@ export function DashboardSkeleton({ className }: { className?: string }) {
             </div>
           </div>
 
-          {/* Calendar section */}
           <div className="space-y-3">
             <Skeleton className="h-4 w-16" variant="shimmer" />
             <div className="space-y-2">
@@ -47,7 +41,6 @@ export function DashboardSkeleton({ className }: { className?: string }) {
             </div>
           </div>
 
-          {/* Categories section */}
           <div className="space-y-3">
             <Skeleton className="h-4 w-20" variant="shimmer" />
             <div className="space-y-2">
@@ -65,9 +58,7 @@ export function DashboardSkeleton({ className }: { className?: string }) {
         </div>
       </div>
 
-      {/* Main content skeleton */}
       <div className="flex-1 flex flex-col">
-        {/* Header */}
         <div className="border-b border-border p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -88,7 +79,6 @@ export function DashboardSkeleton({ className }: { className?: string }) {
           </div>
         </div>
 
-        {/* Calendar content */}
         <div className="flex-1 p-4">
           <Skeleton className="h-full w-full rounded-lg" variant="wave" />
         </div>
@@ -97,24 +87,20 @@ export function DashboardSkeleton({ className }: { className?: string }) {
   );
 }
 
-// Settings dialog skeleton
 export function SettingsDialogSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn("space-y-6 p-6 animate-fade-in", className)}>
-      {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-border">
         <Skeleton className="h-6 w-32" variant="shimmer" />
         <Skeleton className="size-6 rounded" variant="shimmer" />
       </div>
 
-      {/* Navigation tabs */}
       <div className="flex gap-x-4 border-b border-border">
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-8 w-20 mb-2" variant="shimmer" />
         ))}
       </div>
 
-      {/* Settings content */}
       <div className="space-y-6">
         {Array.from({ length: 6 }).map((_, i) => (
           <div
@@ -129,7 +115,6 @@ export function SettingsDialogSkeleton({ className }: { className?: string }) {
         ))}
       </div>
 
-      {/* Footer actions */}
       <div className="flex justify-between pt-4 border-t border-border">
         <Skeleton className="h-10 w-16 rounded" variant="shimmer" />
         <div className="flex gap-2">
@@ -141,19 +126,15 @@ export function SettingsDialogSkeleton({ className }: { className?: string }) {
   );
 }
 
-// Event editor skeleton
 export function EventEditorSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn("space-y-6 p-6 animate-fade-in", className)}>
-      {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-border">
         <Skeleton className="h-6 w-28" variant="shimmer" />
         <Skeleton className="size-6 rounded" variant="shimmer" />
       </div>
 
-      {/* Event form fields */}
       <div className="space-y-4">
-        {/* Title */}
         <div
           className="space-y-2 animate-slide-in"
           style={{ animationDelay: "0.1s" }}
@@ -162,7 +143,6 @@ export function EventEditorSkeleton({ className }: { className?: string }) {
           <Skeleton className="h-10 w-full rounded" variant="wave" />
         </div>
 
-        {/* Description */}
         <div
           className="space-y-2 animate-slide-in"
           style={{ animationDelay: "0.2s" }}
@@ -171,7 +151,6 @@ export function EventEditorSkeleton({ className }: { className?: string }) {
           <Skeleton className="h-20 w-full rounded" variant="wave" />
         </div>
 
-        {/* Calendar selection */}
         <div
           className="space-y-2 animate-slide-in"
           style={{ animationDelay: "0.3s" }}
@@ -180,7 +159,6 @@ export function EventEditorSkeleton({ className }: { className?: string }) {
           <Skeleton className="h-10 w-full rounded" variant="wave" />
         </div>
 
-        {/* Date and time fields */}
         <div
           className="grid grid-cols-2 gap-4 animate-slide-in"
           style={{ animationDelay: "0.4s" }}
@@ -209,7 +187,6 @@ export function EventEditorSkeleton({ className }: { className?: string }) {
           </div>
         </div>
 
-        {/* All day toggle */}
         <div
           className="flex items-center gap-x-2 animate-slide-in"
           style={{ animationDelay: "0.6s" }}
@@ -218,7 +195,6 @@ export function EventEditorSkeleton({ className }: { className?: string }) {
           <Skeleton className="h-4 w-24" variant="shimmer" />
         </div>
 
-        {/* Location */}
         <div
           className="space-y-2 animate-slide-in"
           style={{ animationDelay: "0.7s" }}
@@ -227,7 +203,6 @@ export function EventEditorSkeleton({ className }: { className?: string }) {
           <Skeleton className="h-10 w-full rounded" variant="wave" />
         </div>
 
-        {/* Color selection */}
         <div
           className="space-y-2 animate-slide-in"
           style={{ animationDelay: "0.8s" }}
@@ -245,7 +220,6 @@ export function EventEditorSkeleton({ className }: { className?: string }) {
         </div>
       </div>
 
-      {/* Actions */}
       <div
         className="flex justify-between pt-4 border-t border-border animate-scale-in"
         style={{ animationDelay: "0.9s" }}
@@ -260,16 +234,14 @@ export function EventEditorSkeleton({ className }: { className?: string }) {
   );
 }
 
-// Mobile calendar skeleton
 export function MobileCalendarSkeleton({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "h-screen flex flex-col bg-background animate-fade-in",
+        "h-dvh flex flex-col bg-background animate-fade-in",
         className,
       )}
     >
-      {/* Mobile header */}
       <div className="flex items-center justify-between p-4 border-b border-border safe-area-inset-top">
         <div className="flex items-center gap-3">
           <Skeleton className="size-8 rounded-full" variant="shimmer" />
@@ -284,7 +256,6 @@ export function MobileCalendarSkeleton({ className }: { className?: string }) {
         </div>
       </div>
 
-      {/* Calendar navigation */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -299,12 +270,10 @@ export function MobileCalendarSkeleton({ className }: { className?: string }) {
         </div>
       </div>
 
-      {/* Calendar content */}
       <div className="flex-1 p-4">
         <Skeleton className="h-full w-full rounded-lg" variant="wave" />
       </div>
 
-      {/* Mobile bottom navigation */}
       <div className="border-t border-border bg-background/95 backdrop-blur safe-area-inset-bottom">
         <div className="flex justify-around py-2">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -319,7 +288,6 @@ export function MobileCalendarSkeleton({ className }: { className?: string }) {
   );
 }
 
-// List skeleton for generic lists
 export function ListSkeleton({
   itemCount = 5,
   className,
@@ -347,13 +315,11 @@ export function ListSkeleton({
   );
 }
 
-// Mail app skeleton matching the sidebar + message-list + reader layout
 export function MailSkeleton({ className }: { className?: string }) {
   return (
     <div
-      className={cn("flex h-screen bg-background animate-fade-in", className)}
+      className={cn("flex h-dvh bg-background animate-fade-in", className)}
     >
-      {/* Sidebar */}
       <div className="hidden md:flex w-56 flex-col border-r border-border bg-sidebar shrink-0">
         <div className="flex items-center gap-2 px-4 h-12 border-b border-sidebar-border">
           <Skeleton className="size-6 rounded-full" />
@@ -372,7 +338,6 @@ export function MailSkeleton({ className }: { className?: string }) {
         </div>
       </div>
 
-      {/* Message list */}
       <div className="flex flex-col min-w-[280px] flex-1 border-r border-border">
         <div className="flex items-center px-4 h-12 border-b border-border/40">
           <Skeleton className="h-3.5 w-16" />
@@ -390,7 +355,6 @@ export function MailSkeleton({ className }: { className?: string }) {
         </div>
       </div>
 
-      {/* Message reader */}
       <div className="flex flex-col w-[42%] shrink-0 min-w-0">
         <div className="flex items-center gap-3 px-6 h-12 border-b border-border/40">
           <Skeleton className="h-4 w-40" />
@@ -423,7 +387,6 @@ export function MailContentSkeleton({ className }: { className?: string }) {
         className,
       )}
     >
-      {/* Message list */}
       <div className="hidden md:flex flex-col min-w-[280px] flex-1 border-r border-border/40">
         <div className="flex items-center px-4 h-12 border-b border-border/40">
           <Skeleton className="h-3.5 w-16" />
@@ -441,7 +404,6 @@ export function MailContentSkeleton({ className }: { className?: string }) {
         </div>
       </div>
 
-      {/* Message reader */}
       <div className="flex flex-col w-[42%] shrink-0 min-w-0">
         <div className="flex items-center gap-3 px-6 h-12 border-b border-border/40">
           <Skeleton className="h-4 w-40" />
@@ -464,7 +426,6 @@ export function MailContentSkeleton({ className }: { className?: string }) {
   );
 }
 
-// Form skeleton for generic forms
 export function FormSkeleton({
   fieldCount = 6,
   className,
@@ -491,7 +452,6 @@ export function FormSkeleton({
         </div>
       ))}
 
-      {/* Form actions */}
       <div className="flex justify-end gap-2 pt-4 border-t border-border animate-scale-in">
         <Skeleton className="h-10 w-16 rounded" variant="shimmer" />
         <Skeleton className="h-10 w-12 rounded" variant="shimmer" />

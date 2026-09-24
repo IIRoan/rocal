@@ -1,15 +1,16 @@
 import { format } from "date-fns";
 import {
+  formatClockTimeRange,
   formatEventCalendarDate,
-  formatInUserTimezone,
   resolveTimezone,
 } from "@workspace/calendar-core";
-import type { CalendarEvent } from "@workspace/calendar-core";
+import type {
+  CalendarEvent,
+  RecurrenceRule,
+  TimeFormat,
+} from "@workspace/calendar-core";
 import { parseRRule, type ParsedRule } from "./recurrence-picker-utils";
 
-/**
- * Format the date portion of an event for display on the detail screen.
- */
 export function formatEventDate(
   event: CalendarEvent,
   timezone?: string,
@@ -17,35 +18,18 @@ export function formatEventDate(
   return formatEventCalendarDate(event, timezone);
 }
 
-/**
- * Format the time portion of an event for display on the detail screen.
- */
 export function formatEventTime(
   event: CalendarEvent,
-  timezone?: string,
+  timezone: string | undefined,
+  timeFormat: TimeFormat,
 ): string {
   if (event.allDay) return "All day";
-  const start = new Date(event.start);
-  const end = new Date(event.end);
-  const resolvedTimezone = resolveTimezone(timezone ?? event.timezone);
-  return `${formatInUserTimezone(
-    start,
-    resolvedTimezone,
-    "h:mm a",
-  )} – ${formatInUserTimezone(end, resolvedTimezone, "h:mm a")}`;
-}
-
-/**
- * Format a reminder value (in minutes) into a human-readable label.
- */
-export function formatReminderLabel(minutes: number): string {
-  if (minutes === 0) return "At time of event";
-  if (minutes < 60)
-    return `${minutes} minute${minutes === 1 ? "" : "s"} before`;
-  const hours = Math.floor(minutes / 60);
-  const remaining = minutes % 60;
-  if (remaining === 0) return `${hours} hour${hours === 1 ? "" : "s"} before`;
-  return `${hours}h ${remaining}m before`;
+  return formatClockTimeRange(
+    new Date(event.start),
+    new Date(event.end),
+    resolveTimezone(timezone ?? event.timezone),
+    timeFormat,
+  );
 }
 
 const WEEKDAY_SUMMARY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -166,9 +150,18 @@ function summarizeRecurrence(rule: ParsedRule): string {
   return description;
 }
 
-/**
- * Turn a stored recurrence payload (RRULE or JSON rule) into view copy.
- */
+export function summarizeRecurrenceRule(rule: RecurrenceRule): string {
+  return summarizeRecurrence({
+    frequency: rule.frequency,
+    interval: rule.interval,
+    byDay: rule.byWeekDay ?? [],
+    endCondition: rule.count ? "count" : rule.until ? "until" : "never",
+    count: rule.count ?? 0,
+    until: rule.until ? new Date(rule.until).toISOString() : "",
+  });
+}
+
+/** Turn a stored recurrence payload (RRULE or JSON rule) into view copy. */
 export function formatRecurrenceLabel(
   recurrence: string | null | undefined,
 ): string | null {

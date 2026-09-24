@@ -1,5 +1,6 @@
 "use client";
 
+import type { TimeFormat } from "@workspace/calendar-core";
 import type { Ref } from "react";
 
 import { AgendaView } from "./agenda-view";
@@ -27,7 +28,7 @@ type EventCalendarViewStageProps = {
   showWeekNumbers?: boolean;
   stageKey: string;
   stageRef: Ref<HTMLDivElement>;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   view: CalendarView;
   weekStartDay?: number;

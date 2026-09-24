@@ -9,8 +9,13 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "../ui/drawer";
+import {
+  REMINDER_MINUTE_OPTIONS,
+  formatReminderShort,
+} from "@workspace/calendar-core";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
 import { cn } from "@workspace/ui/lib/utils";
+import { SimpleTooltip } from "../ui/tooltip";
 
 export interface EventNotification {
   id?: string;
@@ -21,28 +26,11 @@ export interface EventNotification {
   isSent?: boolean;
 }
 
-const TIME_OPTIONS = [
-  { value: 5, label: "5 min before" },
-  { value: 10, label: "10 min before" },
-  { value: 15, label: "15 min before" },
-  { value: 30, label: "30 min before" },
-  { value: 60, label: "1 hour before" },
-  { value: 120, label: "2 hours before" },
-  { value: 360, label: "6 hours before" },
-  { value: 720, label: "12 hours before" },
-  { value: 1440, label: "1 day before" },
-  { value: 2880, label: "2 days before" },
-  { value: 4320, label: "3 days before" },
-  { value: 10080, label: "1 week before" },
-];
+const TIME_OPTIONS = REMINDER_MINUTE_OPTIONS.map((value) => ({
+  value,
+  label: `${formatReminderShort(value)} before`,
+}));
 
-function formatTimeShort(minutes: number): string {
-  if (minutes < 60) return `${minutes} min`;
-  if (minutes < 1440)
-    return `${minutes / 60} hour${minutes / 60 > 1 ? "s" : ""}`;
-  const days = minutes / 1440;
-  return `${days} day${days > 1 ? "s" : ""}`;
-}
 
 interface NotificationManagerProps {
   eventId?: string;
@@ -100,10 +88,10 @@ function ReminderChip({
   const trigger = (
     <button
       type="button"
-      aria-label={`Reminder ${formatTimeShort(value)} before, change time`}
+      aria-label={`Reminder ${formatReminderShort(value)} before, change time`}
       className={cn(CHIP_CLASS, height, "pl-2.5 pr-1.5")}
     >
-      {formatTimeShort(value)} before
+      {formatReminderShort(value)} before
       <ChevronDown className="size-3.5 opacity-60" />
     </button>
   );
@@ -130,18 +118,19 @@ function ReminderChip({
           </PopoverContent>
         </Popover>
       )}
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Remove ${formatTimeShort(value)} reminder`}
-        title="Remove reminder"
-        className={cn(
-          "tap-target ml-0.5 flex aspect-square items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50",
-          height,
-        )}
-      >
-        <X className="size-3.5" />
-      </button>
+      <SimpleTooltip content="Remove reminder">
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${formatReminderShort(value)} reminder`}
+          className={cn(
+            "tap-target ml-0.5 flex aspect-square items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50",
+            height,
+          )}
+        >
+          <X className="size-3.5" />
+        </button>
+      </SimpleTooltip>
     </div>
   );
 }

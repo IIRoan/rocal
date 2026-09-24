@@ -1,12 +1,4 @@
-import {
-  parseRRule,
-  buildRRule,
-  FREQUENCY_OPTIONS,
-  WEEKDAYS,
-  type ParsedRule,
-} from "./recurrence-picker-utils";
-
-// ─── parseRRule ──────────────────────────────────────────────────────────────
+import { parseRRule, parseStoredRecurrence } from "./recurrence-picker-utils";
 
 describe("RecurrencePicker", () => {
   describe("parseRRule", () => {
@@ -82,164 +74,46 @@ describe("RecurrencePicker", () => {
     });
   });
 
-  // ─── buildRRule ──────────────────────────────────────────────────────────────
-
-  describe("buildRRule", () => {
-    it("builds a simple daily rule", () => {
-      const rule: ParsedRule = {
-        frequency: "daily",
-        interval: 1,
-        byDay: [],
-        endCondition: "never",
-        count: 10,
-        until: "",
-      };
-      expect(buildRRule(rule)).toBe("FREQ=DAILY");
+  describe("parseStoredRecurrence", () => {
+    it("returns null for empty values", () => {
+      expect(parseStoredRecurrence(null)).toBeNull();
+      expect(parseStoredRecurrence("  ")).toBeNull();
     });
 
-    it("includes INTERVAL when greater than 1", () => {
-      const rule: ParsedRule = {
-        frequency: "weekly",
-        interval: 2,
-        byDay: [],
-        endCondition: "never",
-        count: 10,
-        until: "",
-      };
-      expect(buildRRule(rule)).toBe("FREQ=WEEKLY;INTERVAL=2");
-    });
-
-    it("includes BYDAY for weekly frequency", () => {
-      const rule: ParsedRule = {
-        frequency: "weekly",
-        interval: 1,
-        byDay: [1, 3, 5],
-        endCondition: "never",
-        count: 10,
-        until: "",
-      };
-      expect(buildRRule(rule)).toBe("FREQ=WEEKLY;BYDAY=MO,WE,FR");
-    });
-
-    it("does not include BYDAY for non-weekly frequency", () => {
-      const rule: ParsedRule = {
-        frequency: "daily",
-        interval: 1,
-        byDay: [1, 3],
-        endCondition: "never",
-        count: 10,
-        until: "",
-      };
-      expect(buildRRule(rule)).toBe("FREQ=DAILY");
-    });
-
-    it("includes COUNT when end condition is count", () => {
-      const rule: ParsedRule = {
+    it("reads the JSON rule the backend stores", () => {
+      const result = parseStoredRecurrence(
+        JSON.stringify({
+          frequency: "monthly",
+          interval: 2,
+          byMonthDay: [23],
+          until: "2027-01-01T00:00:00.000Z",
+        }),
+      );
+      expect(result).toEqual({
         frequency: "monthly",
-        interval: 1,
-        byDay: [],
-        endCondition: "count",
-        count: 5,
-        until: "",
-      };
-      expect(buildRRule(rule)).toBe("FREQ=MONTHLY;COUNT=5");
+        interval: 2,
+        byMonthDay: [23],
+        until: new Date("2027-01-01T00:00:00.000Z"),
+      });
     });
 
-    it("includes UNTIL when end condition is until", () => {
-      const rule: ParsedRule = {
-        frequency: "yearly",
-        interval: 1,
-        byDay: [],
-        endCondition: "until",
-        count: 10,
-        until: "20261231",
-      };
-      expect(buildRRule(rule)).toBe("FREQ=YEARLY;UNTIL=20261231");
-    });
-
-    it("sorts BYDAY values", () => {
-      const rule: ParsedRule = {
+    it("converts legacy RRULE strings into a JSON-compatible rule", () => {
+      expect(parseStoredRecurrence("FREQ=WEEKLY;BYDAY=MO,WE;COUNT=4")).toEqual({
         frequency: "weekly",
         interval: 1,
-        byDay: [5, 1, 3],
-        endCondition: "never",
-        count: 10,
-        until: "",
-      };
-      expect(buildRRule(rule)).toBe("FREQ=WEEKLY;BYDAY=MO,WE,FR");
-    });
-
-    it("does not include BYDAY for weekly with empty byDay", () => {
-      const rule: ParsedRule = {
-        frequency: "weekly",
+        byWeekDay: [1, 3],
+        count: 4,
+      });
+      expect(parseStoredRecurrence("FREQ=DAILY;UNTIL=20261231")).toEqual({
+        frequency: "daily",
         interval: 1,
-        byDay: [],
-        endCondition: "never",
-        count: 10,
-        until: "",
-      };
-      expect(buildRRule(rule)).toBe("FREQ=WEEKLY");
-    });
-  });
-
-  // ─── parseRRule / buildRRule round-trip ─────────────────────────────────────
-
-  describe("parseRRule / buildRRule round-trip", () => {
-    it("round-trips a weekly rule with BYDAY", () => {
-      const original = "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE,FR";
-      const parsed = parseRRule(original);
-      expect(parsed).not.toBeNull();
-      expect(buildRRule(parsed!)).toBe(original);
+        until: new Date(2026, 11, 31),
+      });
     });
 
-    it("round-trips a daily rule with COUNT", () => {
-      const original = "FREQ=DAILY;COUNT=30";
-      const parsed = parseRRule(original);
-      expect(parsed).not.toBeNull();
-      expect(buildRRule(parsed!)).toBe(original);
-    });
-
-    it("round-trips a yearly rule with UNTIL", () => {
-      const original = "FREQ=YEARLY;UNTIL=20301231";
-      const parsed = parseRRule(original);
-      expect(parsed).not.toBeNull();
-      expect(buildRRule(parsed!)).toBe(original);
-    });
-  });
-
-  // ─── Constants ─────────────────────────────────────────────────────────────
-
-  describe("FREQUENCY_OPTIONS", () => {
-    it("contains 5 options including none", () => {
-      expect(FREQUENCY_OPTIONS).toHaveLength(5);
-    });
-
-    it("has none as the first option", () => {
-      expect(FREQUENCY_OPTIONS[0].value).toBe("none");
-    });
-
-    it("includes all four recurrence frequencies", () => {
-      const values = FREQUENCY_OPTIONS.map((o) => o.value);
-      expect(values).toContain("daily");
-      expect(values).toContain("weekly");
-      expect(values).toContain("monthly");
-      expect(values).toContain("yearly");
-    });
-  });
-
-  describe("WEEKDAYS", () => {
-    it("contains 7 days", () => {
-      expect(WEEKDAYS).toHaveLength(7);
-    });
-
-    it("starts with Sunday (0) and ends with Saturday (6)", () => {
-      expect(WEEKDAYS[0].value).toBe(0);
-      expect(WEEKDAYS[6].value).toBe(6);
-    });
-
-    it("has unique short labels", () => {
-      const shorts = WEEKDAYS.map((d) => d.short);
-      expect(new Set(shorts).size).toBe(7);
+    it("rejects invalid rules", () => {
+      expect(parseStoredRecurrence("FREQ=HOURLY")).toBeNull();
+      expect(parseStoredRecurrence('{"frequency":"hourly","interval":1}')).toBeNull();
     });
   });
 });

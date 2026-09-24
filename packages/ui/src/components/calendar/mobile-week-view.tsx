@@ -2,6 +2,7 @@
 
 import React, { useMemo, useEffect, useRef, useState } from "react";
 import {
+  formatClockTimeRange,
   formatInUserTimezone,
   getWeekCalendarDays,
   getZonedDateParts,
@@ -9,6 +10,7 @@ import {
   isTodayInTimezone,
   resolveTimezone,
   wallClockToUtc,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 import {
   addHours,
@@ -31,7 +33,6 @@ import { resolveInlineColorValue } from "./utils";
 import { CurrentTimeIndicator } from "./current-time-indicator";
 import { layoutTimelineEvents } from "./timeline-layout";
 
-// Show entire 24 hours for mobile week view
 const MobileStartHour = 0;
 const MobileEndHour = 23;
 const MobileCellHeight = 50; // Smaller cells for week view to fit more
@@ -41,7 +42,7 @@ interface MobileWeekViewProps {
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
   onEventCreate: (startTime: Date) => void;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   weekStartDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   workingDays?: number[];
   timezone?: string;
@@ -53,7 +54,7 @@ export function MobileWeekView({
   events,
   onEventSelect,
   onEventCreate,
-  timeFormat = "12h",
+  timeFormat,
   weekStartDay = 1,
   workingDays = [1, 2, 3, 4, 5],
   timezone,
@@ -149,7 +150,6 @@ export function MobileWeekView({
     timezone,
   );
 
-  // Auto-scroll to current time or 9 AM
   useEffect(() => {
     if (scrollContainerRef.current && !hasScrolledRef.current) {
       const now = new Date();
@@ -178,11 +178,8 @@ export function MobileWeekView({
 
   return (
     <div className="flex flex-col h-full min-h-full">
-      {/* Week grid - day strip and all-day events handled by StickyMiniCalendar */}
       <div className="relative">
-        {/* Time grid with events */}
         <div className="flex">
-          {/* Time column - all hours shown, time label ON the hour line */}
           <div className="w-11 flex-shrink-0 border-r border-border/50 bg-background">
             {hours.map((hour, index) => (
               <div
@@ -190,7 +187,6 @@ export function MobileWeekView({
                 className="relative"
                 style={{ height: MobileCellHeight }}
               >
-                {/* Time label positioned ON the line with background to hide line behind text */}
                 <span className="absolute top-0 left-0.5 -translate-y-1/2 bg-background px-0.5 text-[9px] font-medium text-muted-foreground">
                   {format(hour, timeFormat === "24h" ? "HH:00" : "h:00a")}
                 </span>
@@ -198,7 +194,6 @@ export function MobileWeekView({
             ))}
           </div>
 
-          {/* Days columns */}
           {days.map((day, dayIndex) => (
             <div
               key={day.toString()}
@@ -207,7 +202,6 @@ export function MobileWeekView({
                 isTodayInTimezone(day, resolvedTimezone) && "bg-primary/5",
               )}
             >
-              {/* Positioned events */}
               {(processedDayEvents[dayIndex] ?? []).map(
                 (positionedEvent, index) => (
                   <div
@@ -241,12 +235,10 @@ export function MobileWeekView({
                 ),
               )}
 
-              {/* Current time indicator */}
               {currentTimeVisible && isTodayInTimezone(day, resolvedTimezone) && (
                 <CurrentTimeIndicator position={currentTimePosition} />
               )}
 
-              {/* Time grid cells */}
               {hours.map((hour) => {
                 const hourValue = getHours(hour);
                 return (
@@ -290,7 +282,6 @@ export function MobileWeekView({
             </div>
           ))}
 
-          {/* Mobile event selection drawer */}
           <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
             <DrawerContent
               responsive
@@ -352,7 +343,12 @@ export function MobileWeekView({
                           <div className="text-xs text-muted-foreground">
                             {event.allDay
                               ? "All day"
-                              : `${format(eventStart, "h:mm a")} - ${format(eventEnd, "h:mm a")}`}
+                              : formatClockTimeRange(
+                                  eventStart,
+                                  eventEnd,
+                                  resolvedTimezone,
+                                  timeFormat,
+                                )}
                             {event.location && ` · ${event.location}`}
                           </div>
                         </div>

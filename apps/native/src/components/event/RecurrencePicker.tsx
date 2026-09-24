@@ -1,512 +1,371 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type StyleProp,
   type TextStyle,
-  type ViewStyle,
 } from "react-native";
-import { useTheme } from "../../providers/ThemeProvider";
-import type { ThemeTokens } from "@workspace/design-tokens";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { format } from "date-fns";
 import type {
   RecurrenceFrequency,
-  RecurrencePreview,
+  RecurrenceRule,
 } from "@workspace/calendar-core";
-import { calendarApiService } from "../../lib/api";
+import type { ThemeTokens } from "@workspace/design-tokens";
+import { useTheme } from "../../providers/ThemeProvider";
 import {
-  FREQUENCY_OPTIONS,
-  WEEKDAYS,
-  parseRRule,
-  buildRRule,
-  type EndCondition,
-} from "./recurrence-picker-utils";
+  EventEditorChip,
+  createEditorFieldStyle,
+} from "./EventEditorPrimitives";
+import { OptionSheet, type OptionSheetItem } from "./EventPickerSheets";
 
-// ─── Props ───────────────────────────────────────────────────────────────────
+const WEEKDAYS = [
+  { index: 1, short: "M", long: "Monday" },
+  { index: 2, short: "T", long: "Tuesday" },
+  { index: 3, short: "W", long: "Wednesday" },
+  { index: 4, short: "T", long: "Thursday" },
+  { index: 5, short: "F", long: "Friday" },
+  { index: 6, short: "S", long: "Saturday" },
+  { index: 0, short: "S", long: "Sunday" },
+];
 
-interface RecurrencePickerProps {
-  /** Current recurrence rule string (RRULE format) or null for no recurrence */
-  value: string | null;
-  /** Callback when the recurrence rule changes; null means no recurrence */
-  onChange: (rule: string | null) => void;
-  /** Event start date (ISO string) for preview generation */
-  eventStart: string;
-  /** Event end date (ISO string) for preview generation */
-  eventEnd: string;
+const UNIT_LABELS: Record<RecurrenceFrequency, [string, string]> = {
+  daily: ["day", "days"],
+  weekly: ["week", "weeks"],
+  monthly: ["month", "months"],
+  yearly: ["year", "years"],
+};
+
+const MONTHS = Array.from({ length: 12 }, (_, index) =>
+  format(new Date(2024, index, 1), "MMMM"),
+);
+
+type OpenSheet = "unit" | "month" | "ends" | null;
+
+function parseBounded(value: string, min: number, max: number) {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, parsed));
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+/** Lets the field sit empty while typing; the rule only ever receives a bounded number. */
+function BoundedNumberInput({
+  value,
+  min,
+  max,
+  onChange,
+  style,
+  accessibilityLabel,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+  style: StyleProp<TextStyle>;
+  accessibilityLabel: string;
+}) {
+  const [text, setText] = useState<string | null>(null);
+  return (
+    <TextInput
+      style={style}
+      value={text ?? String(value)}
+      onChangeText={(next) => {
+        setText(next);
+        if (next) onChange(parseBounded(next, min, max));
+      }}
+      onBlur={() => setText(null)}
+      keyboardType="number-pad"
+      maxLength={String(max).length}
+      accessibilityLabel={accessibilityLabel}
+    />
+  );
+}
 
 export function RecurrencePicker({
-  value,
+  rule,
   onChange,
-  eventStart,
-  eventEnd,
-}: RecurrencePickerProps) {
+}: {
+  rule: RecurrenceRule;
+  onChange: (rule: RecurrenceRule) => void;
+}) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [openSheet, setOpenSheet] = useState<OpenSheet>(null);
+  const update = (updates: Partial<RecurrenceRule>) =>
+    onChange({ ...rule, ...updates });
+  const selectedWeekdays = rule.byWeekDay ?? [];
+  const unitIndex = rule.interval === 1 ? 0 : 1;
+  const endMode = rule.count ? "after" : rule.until ? "until" : "never";
+  const closeSheet = () => setOpenSheet(null);
 
-  const initial = useMemo(() => parseRRule(value), [value]);
-
-  const [frequency, setFrequency] = useState<RecurrenceFrequency | "none">(
-    initial?.frequency ?? "none",
-  );
-  const [interval, setInterval] = useState(initial?.interval ?? 1);
-  const [byDay, setByDay] = useState<number[]>(initial?.byDay ?? []);
-  const [endCondition, setEndCondition] = useState<EndCondition>(
-    initial?.endCondition ?? "never",
-  );
-  const [count, setCount] = useState(initial?.count ?? 10);
-  const [until, setUntil] = useState(initial?.until ?? "");
-  const [preview, setPreview] = useState<RecurrencePreview | null>(null);
-
-  // Build and emit the RRULE whenever inputs change
-  const emitChange = useCallback(
-    (
-      freq: RecurrenceFrequency | "none",
-      intv: number,
-      days: number[],
-      endCond: EndCondition,
-      cnt: number,
-      untilVal: string,
-    ) => {
-      if (freq === "none") {
-        onChange(null);
-        return;
-      }
-      const rule = buildRRule({
-        frequency: freq,
-        interval: intv,
-        byDay: days,
-        endCondition: endCond,
-        count: cnt,
-        until: untilVal,
+  const unitItems: OptionSheetItem[] = (
+    Object.keys(UNIT_LABELS) as RecurrenceFrequency[]
+  ).map((frequency) => ({
+    key: frequency,
+    label: UNIT_LABELS[frequency][unitIndex],
+    selected: rule.frequency === frequency,
+    onSelect: () => {
+      update({
+        frequency,
+        byWeekDay: undefined,
+        byMonthDay: undefined,
+        byMonth: undefined,
       });
-      onChange(rule);
+      closeSheet();
     },
-    [onChange],
-  );
+  }));
 
-  // Fetch preview when rule changes
-  useEffect(() => {
-    if (frequency === "none") {
-      setPreview(null);
-      return;
-    }
+  const monthItems: OptionSheetItem[] = MONTHS.map((month, index) => ({
+    key: month,
+    label: month,
+    selected: rule.byMonth?.[0] === index + 1,
+    onSelect: () => {
+      update({ byMonth: [index + 1] });
+      closeSheet();
+    },
+  }));
 
-    const rule = buildRRule({
-      frequency,
-      interval,
-      byDay,
-      endCondition,
-      count,
-      until,
-    });
+  const endItems: OptionSheetItem[] = [
+    {
+      key: "never",
+      label: "Never",
+      selected: endMode === "never",
+      onSelect: () => {
+        update({ count: undefined, until: undefined });
+        closeSheet();
+      },
+    },
+    {
+      key: "after",
+      label: "After",
+      selected: endMode === "after",
+      onSelect: () => {
+        update({ count: rule.count ?? 10, until: undefined });
+        closeSheet();
+      },
+    },
+    ...(rule.until
+      ? [
+          {
+            key: "until",
+            label: `On ${format(new Date(rule.until), "MMM d, yyyy")}`,
+            selected: endMode === "until",
+            onSelect: closeSheet,
+          },
+        ]
+      : []),
+  ];
 
-    let cancelled = false;
-    calendarApiService
-      .previewRecurrence(eventStart, eventEnd, rule, 30)
-      .then((result) => {
-        if (!cancelled) setPreview(result);
-      })
-      .catch(() => {
-        if (!cancelled) setPreview(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    frequency,
-    interval,
-    byDay,
-    endCondition,
-    count,
-    until,
-    eventStart,
-    eventEnd,
-  ]);
-
-  const handleFrequencyChange = (freq: RecurrenceFrequency | "none") => {
-    setFrequency(freq);
-    emitChange(freq, interval, byDay, endCondition, count, until);
-  };
-
-  const handleIntervalChange = (text: string) => {
-    const val = Math.max(1, parseInt(text, 10) || 1);
-    setInterval(val);
-    emitChange(frequency, val, byDay, endCondition, count, until);
-  };
-
-  const handleDayToggle = (day: number) => {
-    const next = byDay.includes(day)
-      ? byDay.filter((d) => d !== day)
-      : [...byDay, day];
-    setByDay(next);
-    emitChange(frequency, interval, next, endCondition, count, until);
-  };
-
-  const handleEndConditionChange = (cond: EndCondition) => {
-    setEndCondition(cond);
-    emitChange(frequency, interval, byDay, cond, count, until);
-  };
-
-  const handleCountChange = (text: string) => {
-    const val = Math.max(1, parseInt(text, 10) || 1);
-    setCount(val);
-    emitChange(frequency, interval, byDay, endCondition, val, until);
-  };
-
-  const handleUntilChange = (text: string) => {
-    setUntil(text);
-    emitChange(frequency, interval, byDay, endCondition, count, text);
-  };
-
-  const frequencyLabel = (freq: RecurrenceFrequency): string => {
-    switch (freq) {
-      case "daily":
-        return interval === 1 ? "day" : "days";
-      case "weekly":
-        return interval === 1 ? "week" : "weeks";
-      case "monthly":
-        return interval === 1 ? "month" : "months";
-      case "yearly":
-        return interval === 1 ? "year" : "years";
-    }
-  };
+  const endLabel =
+    endMode === "after"
+      ? "After"
+      : endMode === "until" && rule.until
+        ? `On ${format(new Date(rule.until), "MMM d, yyyy")}`
+        : "Never";
 
   return (
     <View style={styles.container}>
-      {/* Frequency selector */}
-      <Text style={styles.sectionLabel}>Repeat</Text>
-      <View style={styles.frequencyRow}>
-        {FREQUENCY_OPTIONS.map((opt) => {
-          const isActive = frequency === opt.value;
-          return (
-            <Pressable
-              key={opt.value}
-              style={[
-                styles.frequencyChip,
-                isActive && styles.frequencyChipActive,
-                isActive && { backgroundColor: theme.colors.primaryBase },
-              ]}
-              onPress={() => handleFrequencyChange(opt.value)}
-              accessibilityRole="button"
-              accessibilityLabel={`Repeat ${opt.label}`}
-              accessibilityState={{ selected: isActive }}
-            >
-              <Text
-                style={[
-                  styles.frequencyChipText,
-                  isActive && styles.frequencyChipTextActive,
-                  isActive && { color: theme.colors.primaryForeground },
-                ]}
-              >
-                {opt.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+      <View style={styles.line}>
+        <Text style={styles.lineLabel}>Every</Text>
+        <BoundedNumberInput
+          style={[styles.field, styles.numberField]}
+          value={rule.interval}
+          min={1}
+          max={99}
+          onChange={(interval) => update({ interval })}
+          accessibilityLabel="Repeat interval"
+        />
+        <EventEditorChip
+          label={UNIT_LABELS[rule.frequency][unitIndex]}
+          trailingIcon="chevron-down"
+          accessibilityLabel={`Repeat unit: ${UNIT_LABELS[rule.frequency][unitIndex]}`}
+          onPress={() => setOpenSheet("unit")}
+        />
       </View>
 
-      {frequency !== "none" && (
-        <>
-          {/* Interval */}
-          <View style={styles.intervalRow}>
-            <Text style={styles.intervalLabel}>Every</Text>
-            <TextInput
-              style={styles.intervalInput}
-              value={String(interval)}
-              onChangeText={handleIntervalChange}
-              keyboardType="number-pad"
-              accessibilityLabel="Repeat interval"
-            />
-            <Text style={styles.intervalLabel}>
-              {frequencyLabel(frequency)}
-            </Text>
-          </View>
-
-          {/* Weekly day selector */}
-          {frequency === "weekly" && (
-            <View style={styles.dayRow}>
-              {WEEKDAYS.map((day) => {
-                const isActive = byDay.includes(day.value);
-                return (
-                  <Pressable
-                    key={day.value}
-                    style={[
-                      styles.dayChip,
-                      isActive && styles.dayChipActive,
-                      isActive && { backgroundColor: theme.colors.primaryBase },
-                    ]}
-                    onPress={() => handleDayToggle(day.value)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${day.label}${isActive ? ", selected" : ""}`}
-                    accessibilityState={{ selected: isActive }}
-                  >
-                    <Text
-                      style={[
-                        styles.dayChipText,
-                        isActive && styles.dayChipTextActive,
-                        isActive && {
-                          color: theme.colors.primaryForeground,
-                        },
-                      ]}
-                    >
-                      {day.short}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-
-          {/* End condition */}
-          <Text style={styles.sectionLabel}>Ends</Text>
-          <View style={styles.endRow}>
-            {(["never", "count", "until"] as const).map((cond) => {
-              const isActive = endCondition === cond;
-              const labels: Record<EndCondition, string> = {
-                never: "Never",
-                count: "After",
-                until: "On date",
-              };
+      {rule.frequency === "weekly" && (
+        <View style={styles.line}>
+          <Text style={styles.lineLabel}>On</Text>
+          <View style={styles.weekdays}>
+            {WEEKDAYS.map((day) => {
+              const active = selectedWeekdays.includes(day.index);
               return (
                 <Pressable
-                  key={cond}
-                  style={[
-                    styles.endChip,
-                    isActive && styles.endChipActive,
-                    isActive && { backgroundColor: theme.colors.primaryBase },
-                  ]}
-                  onPress={() => handleEndConditionChange(cond)}
+                  key={day.index}
+                  style={[styles.weekday, active && styles.weekdayActive]}
+                  hitSlop={4}
+                  onPress={() => {
+                    const next = active
+                      ? selectedWeekdays.filter((value) => value !== day.index)
+                      : [...selectedWeekdays, day.index].sort();
+                    update({ byWeekDay: next.length > 0 ? next : undefined });
+                  }}
                   accessibilityRole="button"
-                  accessibilityLabel={`End ${labels[cond]}`}
-                  accessibilityState={{ selected: isActive }}
+                  accessibilityLabel={day.long}
+                  accessibilityState={{ selected: active }}
                 >
                   <Text
                     style={[
-                      styles.endChipText,
-                      isActive && styles.endChipTextActive,
-                      isActive && {
-                        color: theme.colors.primaryForeground,
-                      },
+                      styles.weekdayText,
+                      active && styles.weekdayTextActive,
                     ]}
                   >
-                    {labels[cond]}
+                    {day.short}
                   </Text>
                 </Pressable>
               );
             })}
           </View>
-
-          {endCondition === "count" && (
-            <View style={styles.intervalRow}>
-              <TextInput
-                style={styles.intervalInput}
-                value={String(count)}
-                onChangeText={handleCountChange}
-                keyboardType="number-pad"
-                accessibilityLabel="Number of occurrences"
-              />
-              <Text style={styles.intervalLabel}>occurrences</Text>
-            </View>
-          )}
-
-          {endCondition === "until" && (
-            <View style={styles.intervalRow}>
-              <TextInput
-                style={styles.untilInput}
-                value={until}
-                onChangeText={handleUntilChange}
-                placeholder="YYYYMMDD"
-                placeholderTextColor={theme.colors.mutedForeground}
-                accessibilityLabel="End date"
-              />
-            </View>
-          )}
-
-          {/* Occurrence preview */}
-          {preview && preview.instances.length > 0 && (
-            <View style={styles.previewSection}>
-              <Text style={styles.sectionLabel}>Preview</Text>
-              {preview.description ? (
-                <Text style={styles.previewDescription}>
-                  {preview.description}
-                </Text>
-              ) : null}
-              <View style={styles.previewList}>
-                {preview.instances.slice(0, 5).map((instance, idx) => (
-                  <Text key={idx} style={styles.previewDate}>
-                    {instance.date}
-                  </Text>
-                ))}
-                {preview.totalInstances > 5 && (
-                  <Text style={styles.previewMore}>
-                    +{preview.totalInstances - 5} more
-                  </Text>
-                )}
-              </View>
-            </View>
-          )}
-        </>
+        </View>
       )}
+
+      {(rule.frequency === "monthly" || rule.frequency === "yearly") && (
+        <View style={styles.line}>
+          <Text style={styles.lineLabel}>On</Text>
+          {rule.frequency === "yearly" && (
+            <EventEditorChip
+              label={
+                rule.byMonth?.[0] ? (MONTHS[rule.byMonth[0] - 1] ?? "") : "Same month"
+              }
+              muted={!rule.byMonth?.[0]}
+              trailingIcon="chevron-down"
+              accessibilityLabel="Month"
+              onPress={() => setOpenSheet("month")}
+            />
+          )}
+          <TextInput
+            style={[styles.field, styles.numberField]}
+            value={rule.byMonthDay?.[0]?.toString() ?? ""}
+            onChangeText={(text) =>
+              update({
+                byMonthDay: text ? [parseBounded(text, 1, 31)] : undefined,
+              })
+            }
+            placeholder="Day"
+            placeholderTextColor={theme.colors.mutedForeground}
+            keyboardType="number-pad"
+            maxLength={2}
+            accessibilityLabel="Day of month"
+          />
+          {rule.frequency === "monthly" && (
+            <Text style={styles.suffixLabel}>of the month</Text>
+          )}
+        </View>
+      )}
+
+      <View style={styles.line}>
+        <Text style={styles.lineLabel}>Ends</Text>
+        <EventEditorChip
+          label={endLabel}
+          trailingIcon="chevron-down"
+          accessibilityLabel={`Ends: ${endLabel}`}
+          onPress={() => setOpenSheet("ends")}
+        />
+        {endMode === "after" && (
+          <>
+            <BoundedNumberInput
+              style={[styles.field, styles.countField]}
+              value={rule.count ?? 1}
+              min={1}
+              max={999}
+              onChange={(count) => update({ count })}
+              accessibilityLabel="Number of occurrences"
+            />
+            <Text style={styles.suffixLabel}>
+              {rule.count === 1 ? "time" : "times"}
+            </Text>
+          </>
+        )}
+      </View>
+
+      <OptionSheet
+        visible={openSheet === "unit"}
+        onClose={closeSheet}
+        title="Repeat every"
+        items={unitItems}
+        theme={theme}
+        bottomInset={insets.bottom}
+      />
+      <OptionSheet
+        visible={openSheet === "month"}
+        onClose={closeSheet}
+        title="Month"
+        items={monthItems}
+        theme={theme}
+        bottomInset={insets.bottom}
+      />
+      <OptionSheet
+        visible={openSheet === "ends"}
+        onClose={closeSheet}
+        title="Ends"
+        items={endItems}
+        theme={theme}
+        bottomInset={insets.bottom}
+      />
     </View>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
 function createStyles(theme: ThemeTokens) {
-  const view = {
+  const lineLabel: TextStyle = {
+    fontSize: theme.typography.fontSize.sm.size,
+    color: theme.colors.mutedForeground,
+  };
+  return StyleSheet.create({
     container: {
-      gap: theme.spacing["3"],
+      gap: 6,
+      paddingTop: 6,
     },
-    frequencyRow: {
-      flexDirection: "row" as const,
-      flexWrap: "wrap" as const,
-      gap: theme.spacing["2"],
+    line: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 6,
     },
-    frequencyChip: {
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["1"],
-      borderRadius: theme.borderRadius.full,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-    },
-    frequencyChipActive: {
-      borderColor: "transparent",
-    },
-    intervalRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
-    },
-    intervalInput: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.sm,
-      paddingHorizontal: theme.spacing["2"],
-      paddingVertical: theme.spacing["1"],
+    lineLabel: {
+      ...lineLabel,
       minWidth: 48,
-      textAlign: "center" as const,
-      color: theme.colors.foreground,
-      backgroundColor: theme.colors.card,
     },
-    untilInput: {
-      flex: 1,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.sm,
+    suffixLabel: lineLabel,
+    field: createEditorFieldStyle(theme),
+    numberField: {
+      width: 56,
       paddingHorizontal: theme.spacing["2"],
-      paddingVertical: theme.spacing["1"],
-      color: theme.colors.foreground,
-      backgroundColor: theme.colors.card,
+      textAlign: "center",
     },
-    dayRow: {
-      flexDirection: "row" as const,
-      gap: theme.spacing["1"],
+    countField: {
+      width: 64,
+      paddingHorizontal: theme.spacing["2"],
+      textAlign: "center",
     },
-    dayChip: {
+    weekdays: {
+      flexDirection: "row",
+      gap: 4,
+    },
+    weekday: {
       width: 36,
       height: 36,
       borderRadius: theme.borderRadius.full,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.accent + "99",
     },
-    dayChipActive: {
-      borderColor: "transparent",
+    weekdayActive: {
+      backgroundColor: theme.colors.primaryBase,
     },
-    endRow: {
-      flexDirection: "row" as const,
-      gap: theme.spacing["2"],
-    },
-    endChip: {
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["1"],
-      borderRadius: theme.borderRadius.full,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-    },
-    endChipActive: {
-      borderColor: "transparent",
-    },
-    previewSection: {
-      gap: theme.spacing["1"],
-    },
-    previewList: {
-      gap: 2,
-    },
-  } satisfies Record<string, ViewStyle | TextStyle>;
-
-  const text = {
-    sectionLabel: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
+    weekdayText: {
+      fontSize: theme.typography.fontSize.xs.size,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
-    frequencyChipText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
+    weekdayTextActive: {
+      color: theme.colors.primaryForeground,
     },
-    frequencyChipTextActive: {
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
-    intervalLabel: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    dayChipText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.foreground,
-    },
-    dayChipTextActive: {
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
-    endChipText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-    },
-    endChipTextActive: {
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
-    previewDescription: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    previewDate: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.foreground,
-    },
-    previewMore: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-      fontStyle: "italic" as const,
-    },
-  } satisfies Record<string, TextStyle>;
-
-  return { ...StyleSheet.create(view), ...StyleSheet.create(text) };
+  });
 }
-
-export {
-  parseRRule,
-  buildRRule,
-  FREQUENCY_OPTIONS,
-  WEEKDAYS,
-} from "./recurrence-picker-utils";
-export type { RecurrencePickerProps };
-export type { ParsedRule, EndCondition } from "./recurrence-picker-utils";

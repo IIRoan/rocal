@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { addDays, format } from "date-fns";
-import { isTodayInTimezone, resolveTimezone } from "@workspace/calendar-core";
+import { isTodayInTimezone, resolveTimezone, type TimeFormat } from "@workspace/calendar-core";
 
 import { AgendaDaysToShow } from "./constants";
 import { CalendarEvent } from "./types";
@@ -16,9 +16,8 @@ interface AgendaViewProps {
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
   onEventCreate?: (startTime: Date) => void;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
-  // Context menu actions
   onEventEdit?: (event: CalendarEvent) => void;
   onEventDelete?: (event: CalendarEvent) => void;
   onEventView?: (event: CalendarEvent) => void;
@@ -28,14 +27,13 @@ export function AgendaView({
   currentDate,
   events,
   onEventSelect,
-  timeFormat = "12h",
+  timeFormat,
   timezone,
   onEventEdit,
   onEventDelete,
   onEventView,
 }: AgendaViewProps) {
   const resolvedTimezone = resolveTimezone(timezone);
-  // Show events for the next days based on constant
   const days = useMemo(() => {
     return Array.from({ length: AgendaDaysToShow }, (_, i) =>
       addDays(new Date(currentDate), i),
@@ -47,13 +45,12 @@ export function AgendaView({
     onEventSelect(event);
   };
 
-  // Check if there are any days with events
   const hasEvents = days.some(
     (day) => getAgendaEventsForDay(events, day, resolvedTimezone).length > 0,
   );
 
   return (
-    <div className="absolute inset-0 border-border/70 border-t overflow-y-auto bg-background animate-fade-in">
+    <div className="absolute inset-0 border-border/70 border-t overflow-y-auto bg-background">
       {!hasEvents ? (
         <div className="flex min-h-[70svh] flex-col items-center justify-center py-16 text-center">
           <span className="text-muted-foreground/50 mb-2">
@@ -80,7 +77,7 @@ export function AgendaView({
             return (
               <section key={day.toString()} className="flex flex-col gap-1.5">
                 <header
-                  className="sticky top-0 z-10 -mx-3 sm:-mx-6 flex items-baseline gap-3 bg-background/95 px-3 sm:px-6 pt-1 pb-2 backdrop-blur-sm"
+                  className="sticky top-0 z-10 -mx-3 sm:-mx-6 flex items-baseline gap-3 bg-background px-3 sm:px-6 pt-1 pb-2"
                   data-today={today || undefined}
                 >
                   <div className="flex items-baseline gap-2">

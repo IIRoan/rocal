@@ -18,13 +18,11 @@ describe("settings-options", () => {
     expect(THEME_OPTIONS.every((o) => typeof o.icon === "string")).toBe(true);
   });
 
-  it("covers every calendar view in the view options", () => {
+  it("covers every native calendar view in the view options", () => {
     expect(VIEW_OPTIONS.map((o) => o.value)).toEqual([
-      "month",
       "week",
       "day",
       "3day",
-      "agenda",
     ]);
   });
 

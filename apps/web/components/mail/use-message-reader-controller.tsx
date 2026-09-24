@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useLayoutEffect,
   useState,
   useRef,
   useReducer,
@@ -10,15 +11,16 @@ import {
 import {
   buildEventReminderMailView,
   enrichSelfMailRecipient,
+  formatDateTimeLabel,
   getErrorMessage,
   isDecryptedEventReminderContent,
   pickOutgoingAttachmentFiles,
   resolveMailServerLimits,
+  resolveTimezone,
 } from "@workspace/calendar-core";
 import { useQuery } from "@tanstack/react-query";
-import { useGSAP } from "@gsap/react";
-import gsap from "gsap";
 import { Clock, MapPin } from "lucide-react";
+import { slideFadeIn } from "@workspace/ui/lib/motion";
 import { toast } from "sonner";
 import { useIsMobile, usePrefersReducedMotion } from "@workspace/ui/hooks";
 import type { CalendarEvent } from "@workspace/calendar-core";
@@ -132,6 +134,12 @@ export function useMessageReaderController(props: MessageReaderProps) {
   } = props;
   const isMessageBodyLoading = loading?.messageBody ?? false;
   const isDecrypting = loading?.decrypting ?? false;
+  // The shell renders from list metadata while the body loads, so only the body area changes when it arrives.
+  const isBodyLoading = Boolean(
+    message && isMessageBodyLoading && !messageHasLoadedBody(message),
+  );
+  // Replies and forwards quote the body, so they wait until it has loaded.
+  const canReply = !isBusy && !isBodyLoading;
   const hasPrev = navigation?.hasPrev;
   const hasNext = navigation?.hasNext;
   const { settings: displaySettings } = useMailDisplaySettings();
@@ -271,17 +279,11 @@ export function useMessageReaderController(props: MessageReaderProps) {
       items.push({
         id: "time",
         icon: Clock,
-        children: mailCalendarInvite.start.toLocaleString(undefined, {
-          dateStyle: "medium",
-          timeStyle: "short",
-          hour12:
-            timeFormat === "12h"
-              ? true
-              : timeFormat === "24h"
-                ? false
-                : undefined,
-          timeZone: timezone ?? undefined,
-        }),
+        children: formatDateTimeLabel(
+          mailCalendarInvite.start,
+          resolveTimezone(timezone),
+          timeFormat,
+        ),
       });
     }
     if (mailCalendarInvite.location) {
@@ -387,6 +389,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
   };
 
   const handleSendReply = async () => {
+    if (!canReply) return;
     if (onSendReply) {
       if (!replyText.trim()) {
         toast.error("Enter a reply message.");
@@ -427,21 +430,15 @@ export function useMessageReaderController(props: MessageReaderProps) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  useGSAP(
-    () => {
-      const wrap = expandedWrapRef.current;
-      if (!isReplyExpanded || !wrap) return;
-      textareaRef.current?.focus();
-      if (prefersReducedMotion) return;
-      // Fade only: tweening height would re-lay out the mail iframe every frame.
-      gsap.fromTo(
-        wrap,
-        { autoAlpha: 0, y: 4 },
-        { autoAlpha: 1, y: 0, duration: 0.16, ease: "power3.out", clearProps: "transform" },
-      );
-    },
-    { dependencies: [isReplyExpanded] },
-  );
+  useLayoutEffect(() => {
+    const wrap = expandedWrapRef.current;
+    if (!isReplyExpanded || !wrap) return;
+    textareaRef.current?.focus();
+    if (prefersReducedMotion) return;
+    // Fade only: tweening height would re-lay out the mail iframe every frame.
+    const animation = slideFadeIn(wrap, { y: 4 }, { duration: 160 });
+    return () => animation?.cancel();
+  }, [isReplyExpanded, prefersReducedMotion]);
 
   const autoResizeTextarea = () => {
     const el = textareaRef.current;
@@ -474,10 +471,6 @@ export function useMessageReaderController(props: MessageReaderProps) {
   const earlyReturn: ReactNode | null = !message ? (
     <div className="flex h-full min-h-0 flex-col items-center justify-center gap-1 p-8">
       <p className="text-sm text-muted-foreground">Select a conversation</p>
-    </div>
-  ) : isMessageBodyLoading && !messageHasLoadedBody(message) ? (
-    <div className="flex h-full min-h-0 items-center justify-center p-8">
-      <p className="text-sm text-muted-foreground">Loading message…</p>
     </div>
   ) : null;
 
@@ -574,6 +567,8 @@ export function useMessageReaderController(props: MessageReaderProps) {
     isMobile,
     isBusy,
     isDecrypting,
+    isBodyLoading,
+    canReply,
     isDark,
     hasPrev,
     hasNext,

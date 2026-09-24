@@ -3,7 +3,7 @@ import type { Calendar } from "./types";
 export const MAIL_INVITATION_STAGING_CALENDAR_NAME = "Invitations";
 
 export function isMailInvitationStagingCalendar(
-  calendar: Pick<Calendar, "name" | "kind" | "isVisible" | "isSyncOnly">,
+  calendar: Pick<Calendar, "name" | "isVisible" | "isSyncOnly"> & { kind: string },
 ): boolean {
   return (
     calendar.kind === "owned" &&

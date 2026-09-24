@@ -1,9 +1,13 @@
 "use client";
 
-import { useReducer, useRef } from "react";
-import { useGSAP } from "@gsap/react";
-import gsap from "gsap";
+import type { TimeFormat } from "@workspace/calendar-core";
+import { useLayoutEffect, useReducer, useRef } from "react";
 import { useIsMobile } from "@workspace/ui/hooks";
+import {
+  MOTION_EASING,
+  slideFadeIn,
+  slideFadeOut,
+} from "@workspace/ui/lib/motion";
 import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import {
   findSpamMailbox,
@@ -48,7 +52,7 @@ export interface MessageListProps {
   onBulkReportSpam?: (ids: string[]) => void;
   onSetLabel?: (messageId: string, labelId: string, assigned: boolean) => void;
   labels?: LabelDef[];
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   onLoadMore?: () => void;
   hasMore?: boolean;
@@ -59,6 +63,8 @@ export interface MessageListProps {
   onExpandThread?: (threadId: string) => Promise<JmapEmailMessage[]> | void;
   /** Keep search relevance order instead of re-sorting threads by date. */
   preserveMessageOrder?: boolean;
+  /** Stack rows and collapse hover actions into a menu when the reader is open beside the list. */
+  narrow?: boolean;
 }
 
 export function MessageList({
@@ -92,6 +98,7 @@ export function MessageList({
   threadExpandEnabled = true,
   onExpandThread,
   preserveMessageOrder = false,
+  narrow = false,
 }: MessageListProps) {
   const [state, dispatch] = useReducer(
     messageListReducer,
@@ -128,24 +135,27 @@ export function MessageList({
   const selectedIds = new Set(bulkIds);
   const hasBulkSelection = bulkIds.length > 0;
 
-  useGSAP(() => {
+  useLayoutEffect(() => {
     const bar = barRef.current;
     if (!bar) return;
     if (hasBulkSelection) {
-      gsap.fromTo(
-        bar,
-        { y: -6, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.22, ease: "power2.out" },
-      );
-    } else if (state.isBarVisible) {
-      gsap.to(bar, {
-        y: -6,
-        opacity: 0,
-        duration: 0.16,
-        ease: "power2.in",
-        onComplete: () => dispatch({ type: "hideBar" }),
+      const enter = slideFadeIn(bar, { y: -6 }, {
+        duration: 220,
+        easing: MOTION_EASING.soft,
       });
+      return () => enter?.cancel();
     }
+    if (!state.isBarVisible) return;
+    const exit = slideFadeOut(bar, { y: -6 }, { duration: 160 });
+    if (!exit) {
+      dispatch({ type: "hideBar" });
+      return;
+    }
+    exit.onfinish = () => dispatch({ type: "hideBar" });
+    return () => {
+      exit.onfinish = null;
+      exit.cancel();
+    };
   }, [hasBulkSelection, state.isBarVisible]);
 
   const primaryIds = new Set(messages.map((message) => message.id));
@@ -202,7 +212,13 @@ export function MessageList({
     labels,
     moveTargets,
     spamActions: { canReportSpam, canNotSpam },
-    display: { isMobile, density, showLabelChips, threadExpandEnabled },
+    display: {
+      isMobile,
+      narrow: narrow && !isMobile,
+      density,
+      showLabelChips,
+      threadExpandEnabled,
+    },
     threadUi: {
       expandedThreads: state.expandedThreads,
       expandedThreadMessages: state.expandedThreadMessages,

@@ -4,6 +4,7 @@ import {
   useEffect,
   useReducer,
   useRef,
+  useState,
   type KeyboardEvent,
   type RefObject,
 } from "react";
@@ -12,6 +13,7 @@ import { useIsMobile } from "@workspace/ui/hooks";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useMailUrlSync } from "@/hooks/use-mail-url-sync";
 import { useSettings } from "@/hooks/use-settings";
+import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { useMailKeyboardShortcuts } from "@/hooks/use-mail-keyboard-shortcuts";
 import { useMailListSettings } from "@/lib/mail/mail-list-settings";
 import {
@@ -37,6 +39,8 @@ import {
   type MailAppListChromeAction,
   type MailAppListChromeState,
 } from "./mail-app-list-chrome-state";
+import { MAIL_READER_TRANSITION_MS } from "./mail-app/mail-reader-transition";
+import { useDeferredReaderPane } from "./mail-app/use-deferred-reader-pane";
 
 export type MailAppContentController = ReturnType<
   typeof useMailAppContentController
@@ -127,7 +131,7 @@ export function useMailAppContentController(
   });
 
   const { settings } = useSettings();
-  const timeFormat = settings?.timeFormat ?? "24h";
+  const timeFormat = useUserTimeFormat();
   const [listChrome, dispatchListChrome] = useReducer(
     mailAppListChromeReducer,
     initialMailAppListChromeState,
@@ -263,7 +267,8 @@ export function useMailAppContentController(
   const handleDismissCompose = () => {
     dismissCompose();
     editingDraftIdRef.current = null;
-    setSelectedMessageId(null);
+    // A selected draft has no reader view, so drop it; any other open message stays in the reader.
+    if (selectedIsDraft) setSelectedMessageId(null);
   };
 
   const closeComposeThen = (action: () => void) => {
@@ -276,6 +281,14 @@ export function useMailAppContentController(
       action();
     }
   };
+
+  const [closingMessageId, setClosingMessageId] = useState<string | null>(null);
+  // Clears the close once the selection is cleared or another message is opened.
+  if (closingMessageId !== null && closingMessageId !== selectedMessageId) {
+    setClosingMessageId(null);
+  }
+  const isReaderClosing =
+    closingMessageId !== null && closingMessageId === selectedMessageId;
 
   const performSelectMessage = (id: string | null) => {
     if (!id) {
@@ -303,6 +316,8 @@ export function useMailAppContentController(
     }
 
     editingDraftIdRef.current = null;
+    // Re-opening the message that is sliding out keeps it open.
+    setClosingMessageId(null);
     void openMessageById(id, message ?? undefined);
   };
 
@@ -312,11 +327,7 @@ export function useMailAppContentController(
 
   useEffect(() => {
     registerComposeCloseActions({
-      dismiss: () => {
-        dismissCompose();
-        editingDraftIdRef.current = null;
-        setSelectedMessageId(null);
-      },
+      dismiss: handleDismissCompose,
       discardDraft: (draftId) => {
         void handleDiscardDraft(draftId);
       },
@@ -354,12 +365,17 @@ export function useMailAppContentController(
   const handleNavigateNext = () => {
     if (hasNext) handleSelectMessage(filteredListMessages[selectedIndex + 1].id);
   };
+
   const handleCloseMessage = () => {
     if (selectedIsDraft) {
       void handleDismissCompose();
       return;
     }
-    setSelectedMessageId(null);
+    if (isMobile || !selectedMessageId) {
+      setSelectedMessageId(null);
+      return;
+    }
+    setClosingMessageId(selectedMessageId);
   };
 
   useMailUrlSync({
@@ -448,6 +464,24 @@ export function useMailAppContentController(
   const showMobileDetailPane =
     isMobile &&
     (isFullCompose || (Boolean(selectedMessageId) && !selectedIsDraft));
+  const wantsDesktopDetailPane =
+    !isMobile &&
+    (isFullCompose ||
+      (Boolean(selectedMessage) && !selectedIsDraft && !isReaderClosing));
+  const showDesktopDetailPane = useDeferredReaderPane(wantsDesktopDetailPane);
+  const desktopDetailPanePending = wantsDesktopDetailPane && !showDesktopDetailPane;
+  // Drives the list layout and reader interactivity: flips with the slide on open, at the click on close.
+  const desktopDetailPaneActive = wantsDesktopDetailPane && showDesktopDetailPane;
+
+  // Keep the message mounted until the reader has slid out; the slide starts a couple of frames after the click.
+  useEffect(() => {
+    if (closingMessageId === null || showDesktopDetailPane) return;
+    const timer = setTimeout(
+      () => setSelectedMessageId(null),
+      MAIL_READER_TRANSITION_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [closingMessageId, showDesktopDetailPane, setSelectedMessageId]);
 
   const selectedMailboxName = selectedMailbox
     ? getMailboxDisplayName(selectedMailbox)
@@ -542,6 +576,9 @@ export function useMailAppContentController(
     isSearchDebouncing,
     showSearchLoadingState,
     showMobileDetailPane,
+    showDesktopDetailPane,
+    desktopDetailPanePending,
+    desktopDetailPaneActive,
     selectedIsDraft,
     selectedMessage,
     selectedMessageId,

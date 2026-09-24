@@ -2,7 +2,9 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   buildEventReminderMailView,
+  formatDateTimeLabel,
   isDecryptedEventReminderContent,
+  resolveTimezone,
 } from "@workspace/calendar-core";
 import { QUERY_KEYS } from "../lib/query-keys";
 import { calendarApiService } from "../lib/api";
@@ -16,6 +18,7 @@ import {
 } from "../lib/mail/calendar-event-link";
 import { useE2ee } from "../providers/E2eeProvider";
 import { useMailCalendarInvitation } from "./use-mail-calendar-invitation";
+import { useUserTimeFormat } from "./use-user-time-format";
 
 export function useMailMessageCalendar({
   message,
@@ -80,6 +83,7 @@ export function useMailMessageCalendar({
     queryFn: () => calendarApiService.getUserSettings(),
     staleTime: 5 * 60_000,
   });
+  const timeFormat = useUserTimeFormat();
   const eventReminderView = useMemo(() => {
     if (!linkedEvent || !isDecryptedEventReminderContent(linkedEvent)) {
       return null;
@@ -91,9 +95,9 @@ export function useMailMessageCalendar({
         ? extractReminderLeadMinutes(calendarEventLinkSource)
         : null,
       timezone: userSettings?.timezone,
-      timeFormat: userSettings?.timeFormat,
+      timeFormat,
     });
-  }, [calendarEventLinkSource, linkedEvent, userSettings]);
+  }, [calendarEventLinkSource, linkedEvent, timeFormat, userSettings?.timezone]);
   const isReminderEventLoading =
     isEventReminderEmail &&
     (!isE2eeReady || isLinkedEventLoading || isLinkedEventFetching);
@@ -102,18 +106,12 @@ export function useMailMessageCalendar({
     const start = calendarInvitation.mailCalendarInvite?.start;
     if (!start) return null;
 
-    return start.toLocaleString(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
-      hour12:
-        userSettings?.timeFormat === "12h"
-          ? true
-          : userSettings?.timeFormat === "24h"
-            ? false
-            : undefined,
-      timeZone: userSettings?.timezone ?? undefined,
-    });
-  }, [calendarInvitation.mailCalendarInvite?.start, userSettings]);
+    return formatDateTimeLabel(
+      start,
+      resolveTimezone(userSettings?.timezone),
+      timeFormat,
+    );
+  }, [calendarInvitation.mailCalendarInvite?.start, timeFormat, userSettings?.timezone]);
 
   return {
     calendarInvitation,

@@ -47,6 +47,14 @@ describe("retainMonthEvents", () => {
     expect(retained.map((event) => event.id)).toEqual(["aug"]);
   });
 
+  it("colors events from the live calendar list over the one cached with the events", () => {
+    const [event] = retainMonthEvents(new Map(), "2026-08", createResponse("aug"), [
+      { ...createResponse("aug").calendars[0], color: "amber" },
+    ]);
+
+    expect(event?.color).toBe("amber");
+  });
+
   it("does not paint another month's events onto a page that has not loaded yet", () => {
     const cache = new Map();
     retainMonthEvents(cache, "2026-08", createResponse("aug"));
@@ -111,9 +119,7 @@ describe("getMiniCalendarSwipeTarget", () => {
   });
 
   it("clamps extreme flicks to the window bounds on absolute indices", () => {
-    // Hard flick toward next months clamps to the window's max index. The
-    // release point sits within a radius of the edge so the window (not the
-    // near-release clamp) is what bites.
+    // The release sits within a radius of the edge so the window bound, not the near-release clamp, is what bites.
     expect(
       swipe({
         startIndex: -11.5,
@@ -138,8 +144,7 @@ describe("getMiniCalendarSwipeTarget", () => {
   });
 
   it("never settles more than a window radius from the release point", () => {
-    // From the middle of the window a hard flick is capped two pages forward,
-    // keeping the committed month inside the next rendered window.
+    // From mid-window a hard flick is capped two pages forward, inside the next rendered window.
     expect(
       swipe({
         startIndex: -12,

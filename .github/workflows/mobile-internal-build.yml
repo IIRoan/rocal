@@ -1,0 +1,274 @@
+name: Mobile internal build
+
+on:
+  pull_request:
+    branches: [master, main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - "apps/native/**"
+      - "packages/**"
+      - "package.json"
+      - "bun.lock"
+      - "babel.config.cts"
+      - ".github/workflows/mobile-internal-build.yml"
+  push:
+    branches: [master, main]
+    paths:
+      - "apps/native/**"
+      - "packages/**"
+      - "package.json"
+      - "bun.lock"
+      - "babel.config.cts"
+      - ".github/workflows/mobile-internal-build.yml"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile to publish as the latest slot
+        type: choice
+        options:
+          - development
+          - preview
+        default: development
+
+# One group per profile (each publishes to one R2 slot, newest run wins); fork PRs, which the meta guard skips, get their own group so they can't cancel a real build.
+concurrency:
+  group: mobile-internal-${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && format('fork-{0}', github.run_id) || github.event_name == 'push' && 'preview' || inputs.profile || 'development' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  BUN_VERSION: 1.4.2
+  EAS_VERSION: 24.6.0
+
+jobs:
+  meta:
+    # Fork PRs have no access to EXPO_TOKEN / R2 secrets.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      profile: ${{ steps.meta.outputs.profile }}
+      app_variant: ${{ steps.meta.outputs.app_variant }}
+      ios_bundle_id: ${{ steps.meta.outputs.ios_bundle_id }}
+      title: ${{ steps.meta.outputs.title }}
+    steps:
+      - name: Resolve profile metadata
+        id: meta
+        env:
+          # PRs → development client; master/main pushes → preview (EAS channel/branch preview for OTA).
+          PROFILE: ${{ github.event_name == 'push' && 'preview' || inputs.profile || 'development' }}
+        run: |
+          set -euo pipefail
+          echo "profile=$PROFILE" >> "$GITHUB_OUTPUT"
+          case "$PROFILE" in
+            development)
+              echo "app_variant=development" >> "$GITHUB_OUTPUT"
+              echo "ios_bundle_id=onl.solace.mobile.dev" >> "$GITHUB_OUTPUT"
+              echo "title=Solace Dev" >> "$GITHUB_OUTPUT"
+              ;;
+            preview)
+              echo "app_variant=preview" >> "$GITHUB_OUTPUT"
+              echo "ios_bundle_id=onl.solace.mobile" >> "$GITHUB_OUTPUT"
+              echo "title=Solace Preview" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unknown PROFILE=$PROFILE" >&2
+              exit 1
+              ;;
+          esac
+
+  ios:
+    needs: meta
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      PROFILE: ${{ needs.meta.outputs.profile }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: ${{ env.EAS_VERSION }}
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build .ipa
+        working-directory: apps/native
+        env:
+          APP_VARIANT: ${{ needs.meta.outputs.app_variant }}
+        run: |
+          set -o pipefail
+          # Strip device UDIDs, team ids and certificate serials from the public build log.
+          eas build \
+            --platform ios \
+            --profile "$PROFILE" \
+            --local \
+            --non-interactive \
+            --output "$RUNNER_TEMP/solace.ipa" 2>&1 | sed -E \
+              -e 's/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{16}/[redacted udid]/g' \
+              -e 's/\b[0-9A-Fa-f]{40}\b/[redacted udid]/g' \
+              -e 's/(Apple Team( ID)?[[:space:]]*[:=]?[[:space:]]*)[^[:space:])]+/\1[redacted]/g' \
+              -e 's/^([[:space:]]*(Serial Number|Developer Portal ID)[[:space:]]+).*/\1[redacted]/' \
+              -e 's/^([[:space:]]*-[[:space:]]+).*\(UDID:.*/\1[redacted device]/' \
+              -e 's/^([[:space:]]*Provisioned devices[[:space:]]+).*/\1[redacted]/'
+
+      - name: Publish iOS artifact to R2
+        env:
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          S3_PUBLIC_BASE_URL: ${{ secrets.S3_PUBLIC_BASE_URL }}
+          IOS_BUNDLE_ID: ${{ needs.meta.outputs.ios_bundle_id }}
+          TITLE: ${{ needs.meta.outputs.title }}
+        run: |
+          set -euo pipefail
+          IPA_PATH="$RUNNER_TEMP/solace.ipa"
+
+          EXTRACT_DIR="$RUNNER_TEMP/ipa-extract"
+          rm -rf "$EXTRACT_DIR"
+          mkdir -p "$EXTRACT_DIR"
+          unzip -q -o "$IPA_PATH" -d "$EXTRACT_DIR" 'Payload/*.app/Info.plist'
+          INFO_PLIST=$(echo "$EXTRACT_DIR"/Payload/*.app/Info.plist)
+          BUNDLE_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")
+          test -n "$BUNDLE_VERSION"
+
+          bun apps/native/scripts/internal-release/publish-ios.ts \
+            --profile "$PROFILE" \
+            --ipa "$IPA_PATH" \
+            --bundle-id "$IOS_BUNDLE_ID" \
+            --bundle-version "$BUNDLE_VERSION" \
+            --title "$TITLE" \
+            --out-dir "$RUNNER_TEMP/r2-publish"
+
+  android:
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      PROFILE: ${{ needs.meta.outputs.profile }}
+      # Hosted runners OOM with Gradle's default heap on RN 0.86 builds.
+      GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" -Dorg.gradle.parallel=true -Dorg.gradle.daemon=false
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: ${{ env.EAS_VERSION }}
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build .apk
+        working-directory: apps/native
+        env:
+          APP_VARIANT: ${{ needs.meta.outputs.app_variant }}
+        run: |
+          set -o pipefail
+          eas build \
+            --platform android \
+            --profile "$PROFILE" \
+            --local \
+            --non-interactive \
+            --output "$RUNNER_TEMP/solace.apk"
+
+      - name: Publish Android artifact to R2
+        env:
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          S3_PUBLIC_BASE_URL: ${{ secrets.S3_PUBLIC_BASE_URL }}
+        run: |
+          set -euo pipefail
+          bun apps/native/scripts/internal-release/publish-android.ts \
+            --profile "$PROFILE" \
+            --apk "$RUNNER_TEMP/solace.apk" \
+            --out-dir "$RUNNER_TEMP/r2-publish"
+
+  publish:
+    needs: [meta, ios, android]
+    # Publish whichever platform built; the page script skips missing artifacts.
+    if: always() && needs.meta.result == 'success' && (needs.ios.result == 'success' || needs.android.result == 'success')
+    runs-on: ubuntu-latest
+    env:
+      PROFILE: ${{ needs.meta.outputs.profile }}
+      TITLE: ${{ needs.meta.outputs.title }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install qrencode
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends qrencode
+
+      - name: Build combined install page + QR
+        env:
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          S3_PUBLIC_BASE_URL: ${{ secrets.S3_PUBLIC_BASE_URL }}
+        run: |
+          set -euo pipefail
+          bun apps/native/scripts/internal-release/publish-page.ts \
+            --profile "$PROFILE" \
+            --title "$TITLE" \
+            --out-dir "$RUNNER_TEMP/r2-publish"
+
+          {
+            echo "### Mobile ${PROFILE} internal build"
+            echo
+            echo "iOS → \`solace/releases/${PROFILE}.ipa\`, Android → \`solace/releases/${PROFILE}.apk\`."
+            echo "Combined install QR (iOS + Android) sent to Discord."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Send install QR to Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          QR_PATH="$RUNNER_TEMP/r2-publish/${PROFILE}-qr.png"
+          test -f "$QR_PATH"
+          PAGE_URL=$(jq -r '.pageUrl // empty' "$RUNNER_TEMP/r2-publish/publish-page.json")
+
+          REF_LINE="$GITHUB_SHA"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            REF_LINE="PR #${PR_NUMBER} · $GITHUB_SHA"
+          elif [ "$EVENT_NAME" = "push" ]; then
+            REF_LINE="${REF_NAME} · $GITHUB_SHA"
+          fi
+
+          bun apps/native/scripts/internal-release/notify-discord.ts \
+            --qr "$QR_PATH" \
+            --profile "$PROFILE" \
+            --title "$TITLE" \
+            --url "$PAGE_URL" \
+            --ref "$REF_LINE"

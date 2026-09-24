@@ -3,11 +3,12 @@
 import { useMemo } from "react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
-import { differenceInMinutes, format, getMinutes, isPast } from "date-fns";
+import { differenceInMinutes, isPast } from "date-fns";
 import { MapPin as MapPinIcon } from "lucide-react";
 import {
   isAwaitingUserInvitationResponse,
   isCancelledCalendarEvent,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 
 import {
@@ -21,46 +22,7 @@ import { EncryptionStatusBadge } from "./encryption-status";
 import { CalendarEvent, type CalendarView } from "./types";
 import { cn } from "../../lib/utils";
 import { formatEventDescription } from "./event-description-formatter";
-import { formatInTimeZone } from "date-fns-tz";
-
-// Using date-fns format with custom formatting:
-// 12h format: 'h' - hours (1-12), 'a' - am/pm
-// 24h format: 'H' - hours (0-23)
-// ':mm' - minutes with leading zero (only if the token 'mm' is present)
-const formatTimeWithOptionalMinutes = (
-  date: Date,
-  timeFormat: "12h" | "24h" = "12h",
-) => {
-  if (timeFormat === "24h") {
-    return format(date, getMinutes(date) === 0 ? "H" : "H:mm");
-  } else {
-    return format(date, getMinutes(date) === 0 ? "ha" : "h:mma").toLowerCase();
-  }
-};
-
-// Timezone-aware formatter (falls back to local if no timezone)
-const formatTimeWithOptionalMinutesTZ = (
-  date: Date,
-  timeFormat: "12h" | "24h" = "12h",
-  timezone?: string,
-) => {
-  if (!timezone) return formatTimeWithOptionalMinutes(date, timeFormat);
-
-  const minutesInTimezone = Number.parseInt(
-    formatInTimeZone(date, timezone, "m"),
-    10,
-  );
-  const token =
-    timeFormat === "24h"
-      ? minutesInTimezone === 0
-        ? "H"
-        : "H:mm"
-      : minutesInTimezone === 0
-        ? "ha"
-        : "h:mma";
-  const str = formatInTimeZone(date, timezone, token);
-  return timeFormat === "12h" ? str.toLowerCase() : str;
-};
+import { formatTimeWithOptionalMinutesTZ } from "./event-time-label";
 
 interface EventWrapperProps {
   event: CalendarEvent;
@@ -79,7 +41,6 @@ interface EventWrapperProps {
   onTouchStart?: (e: React.TouchEvent) => void;
 }
 
-// Shared wrapper component for event styling
 function EventWrapper({
   event,
   isFirstDay = true,
@@ -96,7 +57,6 @@ function EventWrapper({
   onMouseDown,
   onTouchStart,
 }: EventWrapperProps) {
-  // Always use the currentTime (if provided) to determine if the event is in the past
   const displayEnd = currentTime
     ? new Date(
         new Date(currentTime).getTime() +
@@ -108,16 +68,14 @@ function EventWrapper({
   const isPreview = !!(event as any).isPreview;
   const isInvitationGhost = isAwaitingUserInvitationResponse(event);
 
-  // Preview events get a distinct ghost/outline style
   if (isPreview) {
-    // For hex colors, derive a semi-transparent background from the hex
-    // For named colors, use the color class with reduced opacity for visibility in both themes
+    // Hex colors derive a translucent fill; named colors use their class at reduced opacity so the ghost reads in both themes.
     const colorIsHex = isHexColor(event.color || "");
 
     return (
       <div
         className={cn(
-          "flex h-full w-full overflow-hidden text-left font-medium transition-all duration-200 ease-out outline-none select-none",
+          "flex h-full w-full overflow-hidden text-left font-medium transition-[color,background-color,border-color,opacity] duration-200 ease-out outline-none select-none",
           "min-h-[20px] sm:min-h-[24px]",
           "px-[2px] sm:px-2",
           "border-2 border-dashed rounded-md",
@@ -148,7 +106,7 @@ function EventWrapper({
     <button
       type="button"
       className={cn(
-        "group/ev relative flex h-full w-full overflow-hidden text-left transition-all duration-150 ease-out outline-none select-none",
+        "group/ev relative flex h-full w-full overflow-hidden text-left transition-[color,background-color,border-color,box-shadow,opacity,filter] duration-150 ease-out outline-none select-none",
         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
         "cursor-pointer",
         "data-dragging:cursor-grabbing data-dragging:shadow-lg data-dragging:z-20",
@@ -196,9 +154,8 @@ interface EventItemProps {
   dndAttributes?: DraggableAttributes;
   onMouseDown?: (e: React.MouseEvent) => void;
   onTouchStart?: (e: React.TouchEvent) => void;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
-  // Context menu actions
   onEdit?: (event: CalendarEvent) => void;
   onDelete?: (event: CalendarEvent) => void;
   onView?: (event: CalendarEvent) => void;
@@ -221,12 +178,11 @@ export function EventItem({
   dndAttributes,
   onMouseDown,
   onTouchStart,
-  timeFormat = "12h",
+  timeFormat,
   timezone,
 }: EventItemProps) {
   const eventColor = event.color;
 
-  // Use the provided currentTime (for dragging) or the event's actual time
   const displayStart = useMemo(() => {
     return currentTime || new Date(event.start);
   }, [currentTime, event.start]);
@@ -240,12 +196,10 @@ export function EventItem({
       : new Date(event.end);
   }, [currentTime, event.start, event.end]);
 
-  // Calculate event duration in minutes
   const durationMinutes = useMemo(() => {
     return differenceInMinutes(displayEnd, displayStart);
   }, [displayStart, displayEnd]);
 
-  // Render the event content based on view
   const renderEventContent = () => {
     if (view === "month") {
       return (
@@ -284,7 +238,6 @@ export function EventItem({
     }
 
     if (view === "week" || view === "day") {
-      // Height-based sizing thresholds
       const isCompact = height != null && height < 22;
       const isSmall = height != null && height < 32;
       const showStacked =
@@ -381,7 +334,6 @@ export function EventItem({
       );
     }
 
-    // Agenda view — Apple Calendar-inspired flat list row
     const agendaTimeStart = formatTimeWithOptionalMinutesTZ(
       new Date(event.start),
       timeFormat,
@@ -417,7 +369,6 @@ export function EventItem({
         {...dndAttributes}
       >
         <div className="flex items-start gap-3 px-2 py-3">
-          {/* Time column */}
           <div className="flex w-[68px] shrink-0 flex-col items-end pt-0.5 tabular-nums">
             {event.allDay ? (
               <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -435,14 +386,12 @@ export function EventItem({
             )}
           </div>
 
-          {/* Color indicator */}
           <span
             aria-hidden
             className="mt-1.5 size-2.5 shrink-0 rounded-full ring-2 ring-background"
             style={{ backgroundColor: "var(--ev-accent)" }}
           />
 
-          {/* Content */}
           <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0">
             <div className="flex items-center gap-1.5 min-w-0">
               <EncryptionStatusBadge item={event} asIcon />

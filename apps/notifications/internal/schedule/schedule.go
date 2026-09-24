@@ -22,6 +22,8 @@ type DueSchedule struct {
 	MinutesBefore int
 	Settings      Settings
 	HasPushDevice bool
+	// MailsToOwnMailbox is true when the account email is the user's own Solace mailbox.
+	MailsToOwnMailbox bool
 }
 
 func ClaimDue(ctx context.Context, db *sql.DB, now time.Time) ([]DueSchedule, error) {
@@ -48,6 +50,7 @@ func ClaimDue(ctx context.Context, db *sql.DB, now time.Time) ([]DueSchedule, er
 			&item.Settings.EmailNotifications,
 			&item.Settings.PushNotifications,
 			&item.HasPushDevice,
+			&item.MailsToOwnMailbox,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan due notification: %w", err)
 		}
@@ -87,9 +90,14 @@ const claimDueSQL = `
 			EXISTS (
 				SELECT 1 FROM push_device pd
 				WHERE pd.user_id = ce.user_id AND pd.is_enabled = TRUE
+			),
+			EXISTS (
+				SELECT 1 FROM mail_directory_entry mde
+				WHERE mde.user_id = ce.user_id AND LOWER(mde.email) = LOWER(u.email)
 			)
 		FROM event_notification en
 		INNER JOIN calendar_event ce ON ce.id = en.event_id
+		INNER JOIN "user" u ON u.id = ce.user_id
 		LEFT JOIN user_settings us ON us.user_id = ce.user_id
 		WHERE en.notification_time <= $1
 		  AND en.is_enabled = TRUE
@@ -105,9 +113,14 @@ func newID() string {
 	return hex.EncodeToString(buf[:])
 }
 
+// emailDeferredToPush: reminder mail into the user's own Solace inbox would only duplicate the push on the same device.
+func emailDeferredToPush(item DueSchedule) bool {
+	return item.Settings.EmailNotifications && item.Settings.PushNotifications && item.HasPushDevice && item.MailsToOwnMailbox
+}
+
 func ChannelsFor(item DueSchedule) []string {
 	var channels []string
-	if item.Settings.EmailNotifications {
+	if item.Settings.EmailNotifications && !emailDeferredToPush(item) {
 		channels = append(channels, "email")
 	}
 	if item.Settings.PushNotifications && item.HasPushDevice {
@@ -117,25 +130,43 @@ func ChannelsFor(item DueSchedule) []string {
 }
 
 // reminderJobPayload holds opaque refs only; the encrypted title is read at push time.
-func reminderJobPayload(item DueSchedule) map[string]any {
-	return map[string]any{
+func reminderJobPayload(item DueSchedule, channel string) map[string]any {
+	payload := map[string]any{
 		"kind":          "event_reminder",
 		"eventId":       item.EventID,
 		"minutesBefore": item.MinutesBefore,
 	}
+	if channel == "push" && emailDeferredToPush(item) {
+		payload["emailFallback"] = true
+	}
+	return payload
 }
 
-func insertJobs(ctx context.Context, tx *sql.Tx, item DueSchedule) error {
-	payload, err := json.Marshal(reminderJobPayload(item))
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+func insertJob(ctx context.Context, db execer, item DueSchedule, channel string) error {
+	payload, err := json.Marshal(reminderJobPayload(item, channel))
 	if err != nil {
 		return err
 	}
+	_, err = db.ExecContext(ctx, insertJobSQL, newID(), item.UserID, "event_reminder", channel, item.EventID, payload)
+	return err
+}
+
+func insertJobs(ctx context.Context, tx *sql.Tx, item DueSchedule) error {
 	for _, channel := range ChannelsFor(item) {
-		if _, err := tx.ExecContext(ctx, insertJobSQL, newID(), item.UserID, "event_reminder", channel, item.EventID, payload); err != nil {
+		if err := insertJob(ctx, tx, item, channel); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// QueueEmailFallback queues the reminder email that was deferred to a push job that ended skipped.
+func QueueEmailFallback(ctx context.Context, db execer, userID, eventID string, minutesBefore int) error {
+	return insertJob(ctx, db, DueSchedule{UserID: userID, EventID: eventID, MinutesBefore: minutesBefore}, "email")
 }
 
 const insertJobSQL = `

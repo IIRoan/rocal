@@ -1,4 +1,5 @@
 import type { CalendarEvent } from "./types";
+import { formatClockTime, type TimeFormat } from "./time-format";
 import { resolveTimezone } from "./timezone";
 
 export const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
@@ -41,7 +42,7 @@ type BuildEventReminderMailViewInput = {
   >;
   minutesBefore?: number | null;
   timezone?: string;
-  timeFormat?: "12h" | "24h" | "system";
+  timeFormat: TimeFormat;
 };
 
 function formatReminderSummary(minutesBefore: number): string {
@@ -110,24 +111,6 @@ function formatInTimezone(
   }).format(date);
 }
 
-function formatEventClockTime(
-  date: Date,
-  options: { timezone: string; timeFormat?: "12h" | "24h" | "system" },
-): string {
-  const hour12 =
-    options.timeFormat === "12h"
-      ? true
-      : options.timeFormat === "24h"
-        ? false
-        : undefined;
-
-  return formatInTimezone(date, options.timezone, {
-    hour: "numeric",
-    minute: "2-digit",
-    ...(hour12 === undefined ? {} : { hour12 }),
-  });
-}
-
 export function buildEventReminderMailView(
   input: BuildEventReminderMailViewInput,
 ): EventReminderMailView {
@@ -144,14 +127,8 @@ export function buildEventReminderMailView(
 
   let eventTime = "All day";
   if (!input.event.allDay) {
-    const startLabel = formatEventClockTime(start, {
-      timezone,
-      timeFormat: input.timeFormat,
-    });
-    const endLabel = formatEventClockTime(end, {
-      timezone,
-      timeFormat: input.timeFormat,
-    });
+    const startLabel = formatClockTime(start, timezone, input.timeFormat);
+    const endLabel = formatClockTime(end, timezone, input.timeFormat);
     eventTime = end > start ? `${startLabel} - ${endLabel}` : startLabel;
   }
 
@@ -159,7 +136,7 @@ export function buildEventReminderMailView(
     title: input.event.title?.trim() || "Untitled event",
     timeUntilEvent:
       minutesBefore === null
-        ? formatEventClockTime(start, { timezone, timeFormat: input.timeFormat })
+        ? formatClockTime(start, timezone, input.timeFormat)
         : formatEventReminderLeadText(minutesBefore),
     eventDate,
     eventTime,

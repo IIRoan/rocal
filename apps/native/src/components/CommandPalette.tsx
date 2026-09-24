@@ -11,18 +11,29 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter, useSegments } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import {
+  clockTimePattern,
+  formatInUserTimezone,
+  resolveTimezone,
+  utcToPickerDate,
+  type TimeFormat,
+  type UserSettings,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCommandPalette } from "../providers/CommandPaletteProvider";
 import { useSheet } from "../providers/SheetProvider";
+import { useUserTimeFormat } from "../hooks/use-user-time-format";
+import { useUserTimezone } from "../hooks/use-user-timezone";
+import { useMailCompose } from "../providers/MailComposeProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
 import { useMailSelection } from "../providers/MailSelectionProvider";
 import { calendarApiService } from "../lib/api";
+import { QUERY_KEYS } from "../lib/query-keys";
 import {
-  MAIL_TAB_ROUTE,
   SETTINGS_ROUTE,
   SETTINGS_NOTIFICATIONS_ROUTE,
   isMailRouteSegments,
@@ -79,17 +90,16 @@ function IconBox({
   );
 }
 
-/**
- * Global command palette. Commands follow the active tab. Search looks across
- * the on-device title index plus live calendar/mail results.
- */
+/** Commands follow the active tab; search spans the on-device title index plus live calendar/mail results. */
 export function CommandPalette() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { isOpen, close } = useCommandPalette();
   const { openEventSheet } = useSheet();
+  const { openCompose } = useMailCompose();
   const { setActiveView, setCurrentDate, setSelectedDate } = useCalendarView();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const segments = useSegments();
   const inputRef = useRef<TextInput>(null);
@@ -183,7 +193,9 @@ export function CommandPalette() {
       trimmedQuery,
     ],
   );
-  const mailResults = searchResults.filter((result) => result.source === "mail");
+  const mailResults = searchResults.filter(
+    (result) => result.source === "mail",
+  );
   const calendarResults = searchResults.filter(
     (result) => result.source === "calendar",
   );
@@ -207,17 +219,18 @@ export function CommandPalette() {
           openEventSheet({ type: "create" });
           break;
         case "go-today": {
-          const now = new Date();
-          setCurrentDate(now);
-          setSelectedDate(now);
+          const timezone = resolveTimezone(
+            queryClient.getQueryData<UserSettings>(QUERY_KEYS.settings())?.timezone,
+          );
+          const today = utcToPickerDate(new Date(), timezone);
+          setCurrentDate(today);
+          setSelectedDate(today);
           navigateToCalendar();
           break;
         }
-        case "view-month":
         case "view-week":
         case "view-day":
         case "view-3day":
-        case "view-agenda":
           if (action.view) setActiveView(action.view);
           navigateToCalendar();
           break;
@@ -228,7 +241,7 @@ export function CommandPalette() {
           switchTab("mail");
           break;
         case "compose-mail":
-          router.push(`${MAIL_TAB_ROUTE}/compose` as never);
+          openCompose();
           break;
         case "open-settings":
           router.push(SETTINGS_ROUTE as never);
@@ -241,6 +254,8 @@ export function CommandPalette() {
     [
       close,
       openEventSheet,
+      openCompose,
+      queryClient,
       setActiveView,
       setCurrentDate,
       setSelectedDate,
@@ -266,7 +281,14 @@ export function CommandPalette() {
       openEventSheet({ type: "view", eventId: result.eventId });
       navigateToCalendar();
     },
-    [close, navigateToCalendar, openEventSheet, router, setCurrentDate, setSelectedDate],
+    [
+      close,
+      navigateToCalendar,
+      openEventSheet,
+      router,
+      setCurrentDate,
+      setSelectedDate,
+    ],
   );
 
   const showSearchResults = trimmedQuery.length >= SEARCH_MIN_LENGTH;
@@ -453,7 +475,10 @@ function ActionRow({
     <View>
       {showDivider ? <View style={styles.sectionDivider} /> : null}
       <Pressable
-        style={({ pressed }) => [styles.sectionRow, pressed && styles.rowPressed]}
+        style={({ pressed }) => [
+          styles.sectionRow,
+          pressed && styles.rowPressed,
+        ]}
         onPress={() => onPress(action)}
         accessibilityRole="button"
         accessibilityLabel={action.label}
@@ -483,14 +508,19 @@ function SearchResultRow({
   showDivider: boolean;
   onPress: (result: NativePaletteSearchResult) => void;
 }) {
-  const subtitle = formatSearchSubtitle(result);
+  const timezone = useUserTimezone();
+  const timeFormat = useUserTimeFormat();
+  const subtitle = formatSearchSubtitle(result, timezone, timeFormat);
   const icon = result.source === "mail" ? "mail" : "calendar";
 
   return (
     <View>
       {showDivider ? <View style={styles.sectionDivider} /> : null}
       <Pressable
-        style={({ pressed }) => [styles.sectionRow, pressed && styles.rowPressed]}
+        style={({ pressed }) => [
+          styles.sectionRow,
+          pressed && styles.rowPressed,
+        ]}
         onPress={() => onPress(result)}
         accessibilityRole="button"
         accessibilityLabel={result.title}
@@ -511,7 +541,11 @@ function SearchResultRow({
   );
 }
 
-function formatSearchSubtitle(result: NativePaletteSearchResult): string | null {
+function formatSearchSubtitle(
+  result: NativePaletteSearchResult,
+  timezone: string,
+  timeFormat: TimeFormat,
+): string | null {
   if (result.source === "mail") {
     const from =
       result.from ??
@@ -530,8 +564,12 @@ function formatSearchSubtitle(result: NativePaletteSearchResult): string | null 
     return result.snippet ?? null;
   }
   return result.event.allDay
-    ? format(start, "EEE, MMM d")
-    : format(start, "EEE, MMM d · p");
+    ? formatInUserTimezone(start, timezone, "EEE, MMM d")
+    : formatInUserTimezone(
+        start,
+        timezone,
+        `EEE, MMM d · ${clockTimePattern(timeFormat)}`,
+      );
 }
 
 function createStyles(theme: ThemeTokens) {

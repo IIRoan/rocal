@@ -2,11 +2,8 @@ import {
   formatEventDate,
   formatEventTime,
   formatRecurrenceLabel,
-  formatReminderLabel,
 } from "./event-detail-utils";
 import type { CalendarEvent } from "@workspace/calendar-core";
-
-// ─── Test Helpers ────────────────────────────────────────────────────────────
 
 function makeEvent(overrides: Record<string, unknown> = {}): CalendarEvent {
   return {
@@ -22,8 +19,6 @@ function makeEvent(overrides: Record<string, unknown> = {}): CalendarEvent {
     ...overrides,
   } as unknown as CalendarEvent;
 }
-
-// ─── formatEventDate ─────────────────────────────────────────────────────────
 
 describe("formatEventDate", () => {
   it("formats a regular event date", () => {
@@ -69,12 +64,10 @@ describe("formatEventDate", () => {
   });
 });
 
-// ─── formatEventTime ─────────────────────────────────────────────────────────
-
 describe("formatEventTime", () => {
   it("returns 'All day' for all-day events", () => {
     const event = makeEvent({ allDay: true });
-    expect(formatEventTime(event)).toBe("All day");
+    expect(formatEventTime(event, undefined, "24h")).toBe("All day");
   });
 
   it("formats a morning event time range", () => {
@@ -83,7 +76,7 @@ describe("formatEventTime", () => {
       end: "2025-01-15T10:00:00.000Z",
       timezone: "UTC",
     });
-    expect(formatEventTime(event, "UTC")).toBe("9:00 AM – 10:00 AM");
+    expect(formatEventTime(event, "UTC", "12h")).toBe("9:00 AM – 10:00 AM");
   });
 
   it("formats a PM event time range", () => {
@@ -92,7 +85,7 @@ describe("formatEventTime", () => {
       end: "2025-01-15T16:00:00.000Z",
       timezone: "UTC",
     });
-    expect(formatEventTime(event, "UTC")).toBe("2:30 PM – 4:00 PM");
+    expect(formatEventTime(event, "UTC", "12h")).toBe("2:30 PM – 4:00 PM");
   });
 
   it("formats noon correctly", () => {
@@ -101,7 +94,7 @@ describe("formatEventTime", () => {
       end: "2025-01-15T13:00:00.000Z",
       timezone: "UTC",
     });
-    expect(formatEventTime(event, "UTC")).toBe("12:00 PM – 1:00 PM");
+    expect(formatEventTime(event, "UTC", "12h")).toBe("12:00 PM – 1:00 PM");
   });
 
   it("formats midnight correctly", () => {
@@ -110,35 +103,16 @@ describe("formatEventTime", () => {
       end: "2025-01-15T01:00:00.000Z",
       timezone: "UTC",
     });
-    expect(formatEventTime(event, "UTC")).toBe("12:00 AM – 1:00 AM");
-  });
-});
-
-// ─── formatReminderLabel ─────────────────────────────────────────────────────
-
-describe("formatReminderLabel", () => {
-  it("returns 'At time of event' for 0 minutes", () => {
-    expect(formatReminderLabel(0)).toBe("At time of event");
+    expect(formatEventTime(event, "UTC", "12h")).toBe("12:00 AM – 1:00 AM");
   });
 
-  it("returns singular minute label for 1 minute", () => {
-    expect(formatReminderLabel(1)).toBe("1 minute before");
-  });
-
-  it("returns plural minutes label for 5 minutes", () => {
-    expect(formatReminderLabel(5)).toBe("5 minutes before");
-  });
-
-  it("returns hour label for exactly 60 minutes", () => {
-    expect(formatReminderLabel(60)).toBe("1 hour before");
-  });
-
-  it("returns plural hours label for 120 minutes", () => {
-    expect(formatReminderLabel(120)).toBe("2 hours before");
-  });
-
-  it("returns mixed hours and minutes for 90 minutes", () => {
-    expect(formatReminderLabel(90)).toBe("1h 30m before");
+  it("uses a 24-hour clock when the user picked 24h", () => {
+    const event = makeEvent({
+      start: "2025-01-15T14:30:00.000Z",
+      end: "2025-01-15T16:00:00.000Z",
+      timezone: "UTC",
+    });
+    expect(formatEventTime(event, "UTC", "24h")).toBe("14:30 – 16:00");
   });
 });
 

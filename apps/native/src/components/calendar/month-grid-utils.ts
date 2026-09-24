@@ -1,53 +1,20 @@
-import {
-  startOfMonth,
-  startOfWeek,
-  addDays,
-  format,
-  isSameMonth,
-} from "date-fns";
+import { startOfMonth, startOfWeek, addDays } from "date-fns";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 import {
   formatCalendarDayKey,
   formatInstantCalendarDayKey,
   resolveTimezone,
 } from "@workspace/calendar-core";
-import type { CalendarColor, ThemeTokens } from "@workspace/design-tokens";
-
-// ─── Constants ───────────────────────────────────────────────────────────────
+import type { ThemeTokens } from "@workspace/design-tokens";
+import { resolveCalendarSwatchColor } from "../../lib/calendar-color-utils";
 
 const DAYS_IN_GRID = 42; // 6 rows × 7 columns
 export const MAX_DOTS = 3;
 
-export const KNOWN_CALENDAR_COLORS: ReadonlySet<string> =
-  new Set<CalendarColor>([
-    "blue",
-    "orange",
-    "violet",
-    "rose",
-    "emerald",
-    "red",
-    "cyan",
-    "lime",
-    "amber",
-    "indigo",
-    "pink",
-    "teal",
-  ]);
-
-// ─── Day-of-week header labels ──────────────────────────────────────────────
-
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 type Day = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Build an ordered array of day-of-week header labels starting from the
- * configured week start day.
- */
 export function getOrderedDayLabels(weekStartDay: number): string[] {
   const start = ((weekStartDay % 7) + 7) % 7;
   const labels: string[] = [];
@@ -57,10 +24,7 @@ export function getOrderedDayLabels(weekStartDay: number): string[] {
   return labels;
 }
 
-/**
- * Generate the 42 dates (6 weeks) that fill the month grid, starting from
- * the first day of the week that contains the first day of the month.
- */
+/** 42 dates (6 weeks) starting at the week that contains the first of the month. */
 export function generateGridDates(
   currentDate: Date,
   weekStartDay: number,
@@ -76,41 +40,6 @@ export function generateGridDates(
   return dates;
 }
 
-/** Week rows shown when CompactMonthStrip is fully expanded (never 6). */
-export const COMPACT_STRIP_EXPANDED_WEEK_ROWS = 5;
-
-/**
- * First week-row index (0–1) for the expanded compact strip's 5-row window.
- * When a month spans six grid rows, drops the leading padding week.
- */
-export function getCompactStripWeekRowOffset(
-  currentDate: Date,
-  weekStartDay: number,
-): number {
-  const gridDates = generateGridDates(currentDate, weekStartDay);
-  const month = startOfMonth(currentDate);
-  let minRow = 5;
-  let maxRow = 0;
-
-  for (let i = 0; i < gridDates.length; i++) {
-    if (isSameMonth(gridDates[i]!, month)) {
-      const row = Math.floor(i / 7);
-      minRow = Math.min(minRow, row);
-      maxRow = Math.max(maxRow, row);
-    }
-  }
-
-  const span = maxRow - minRow + 1;
-  if (span <= COMPACT_STRIP_EXPANDED_WEEK_ROWS) {
-    return minRow;
-  }
-
-  return Math.max(0, maxRow - (COMPACT_STRIP_EXPANDED_WEEK_ROWS - 1));
-}
-
-/**
- * Build a map from date key (YYYY-MM-DD) to the list of events on that day.
- */
 export function groupEventsByDay(
   events: DecoratedCalendarEvent[],
   timezone?: string,
@@ -143,48 +72,10 @@ export function getMonthDayEvents(
   return eventsByDay.get(formatCalendarDayKey(date)) ?? [];
 }
 
-/**
- * Resolve the dot color for an event. If the event's color matches a known
- * CalendarColor, use the theme's calendar palette bg. Otherwise use the raw
- * color string, falling back to mutedForeground.
- */
+/** Dot color for an event, matching the web swatch (named palette bg, raw hex, sky fallback). */
 export function resolveEventDotColor(
   eventColor: string | undefined,
   theme: ThemeTokens,
 ): string {
-  if (!eventColor) {
-    return theme.colors.mutedForeground;
-  }
-  if (KNOWN_CALENDAR_COLORS.has(eventColor)) {
-    return theme.colors.calendar[eventColor as CalendarColor].bg;
-  }
-  return eventColor;
-}
-
-// ─── CompactMonthStrip height helpers ────────────────────────────────────────
-
-/** Height of a single week row in the compact strip */
-export const COMPACT_STRIP_WEEK_ROW_HEIGHT = 48;
-/** Height of the day-of-week header row in the compact strip */
-export const COMPACT_STRIP_HEADER_ROW_HEIGHT = 24;
-
-/**
- * Returns the collapsed content height for CompactMonthStrip.
- * When `collapseToHandleOnly` is true (timeline views that already render
- * a sticky day header), the content area collapses to 0.
- */
-export function getCompactStripCollapsedHeight(
-  collapseToHandleOnly: boolean,
-): number {
-  return collapseToHandleOnly
-    ? 0
-    : COMPACT_STRIP_HEADER_ROW_HEIGHT + COMPACT_STRIP_WEEK_ROW_HEIGHT;
-}
-
-/** Returns the fully expanded content height for CompactMonthStrip. */
-export function getCompactStripExpandedHeight(): number {
-  return (
-    COMPACT_STRIP_HEADER_ROW_HEIGHT +
-    COMPACT_STRIP_WEEK_ROW_HEIGHT * COMPACT_STRIP_EXPANDED_WEEK_ROWS
-  );
+  return resolveCalendarSwatchColor(eventColor, theme);
 }

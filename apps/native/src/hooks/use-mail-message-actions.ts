@@ -6,6 +6,7 @@ import {
   type MailAttachmentPreviewKind,
 } from "@workspace/calendar-core";
 import { useToast } from "../providers/ToastProvider";
+import { useMailCompose } from "../providers/MailComposeProvider";
 import {
   releaseMarkAsReadSuppression,
   suppressMarkAsRead,
@@ -35,7 +36,8 @@ export function useMailMessageActions({
   message: JmapEmailMessage | null;
   runtime: MailRuntime | undefined;
 }) {
-  const { push, back } = useRouter();
+  const { back } = useRouter();
+  const { openCompose: presentCompose } = useMailCompose();
   const { toast } = useToast();
   const {
     markAsRead,
@@ -85,8 +87,8 @@ export function useMailMessageActions({
     runtime?.mailboxes.find((mailbox) => mailbox.role === "archive")?.id ??
     null;
   const spamMailboxId =
-    runtime?.mailboxes.find((mailbox) => isSpamMailboxRole(mailbox.role))
-      ?.id ?? null;
+    runtime?.mailboxes.find((mailbox) => isSpamMailboxRole(mailbox.role))?.id ??
+    null;
   const moveTargets = useMemo(() => {
     if (!runtime || !message) {
       return [];
@@ -117,7 +119,8 @@ export function useMailMessageActions({
     const { attachment } = preview;
     return writeAttachmentToCache({
       attachment,
-      cacheKey: attachment.blobId ?? `preview-${attachment.name ?? "attachment"}`,
+      cacheKey:
+        attachment.blobId ?? `preview-${attachment.name ?? "attachment"}`,
       runtime,
     });
   }, [preview, runtime]);
@@ -150,10 +153,7 @@ export function useMailMessageActions({
   const openCompose = (mode: "reply" | "reply-all" | "forward") => {
     if (!messageId) return;
     setActiveSheetView(null);
-    push({
-      pathname: "/(tabs)/mail/compose",
-      params: { mode, messageId },
-    });
+    presentCompose({ mode, messageId });
   };
 
   const handleToggleStar = () => {
@@ -225,7 +225,11 @@ export function useMailMessageActions({
   };
 
   const handleMoveToMailbox = (targetMailboxId: string) =>
-    moveMessage(targetMailboxId, "Message moved", "Failed to move the message.");
+    moveMessage(
+      targetMailboxId,
+      "Message moved",
+      "Failed to move the message.",
+    );
 
   const handleArchive = () => {
     if (!archiveMailboxId) {

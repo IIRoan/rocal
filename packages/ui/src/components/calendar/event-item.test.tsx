@@ -57,6 +57,7 @@ describe("EventItem", () => {
         <EventItem
           event={eventFixture()}
           view="month"
+          timeFormat="24h"
           onClick={() => undefined}
         />,
       );

@@ -7,15 +7,14 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
-import type { CalendarView } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import type { NativeCalendarView } from "../../lib/calendar-views";
 import { useTheme } from "../../providers/ThemeProvider";
 import { SIDEBAR_VIEW_OPTIONS } from "../app-sidebar-utils";
 
 interface CalendarViewToggleProps {
-  activeView: CalendarView;
-  onViewChange: (view: CalendarView) => void;
+  activeView: NativeCalendarView;
+  onViewChange: (view: NativeCalendarView) => void;
 }
 
 export function CalendarViewToggle({
@@ -26,31 +25,25 @@ export function CalendarViewToggle({
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
-    <View style={styles.list} accessibilityRole="tablist">
+    <View style={styles.track} accessibilityRole="tablist">
       {SIDEBAR_VIEW_OPTIONS.map((option) => {
         const selected = option.view === activeView;
 
         return (
           <Pressable
             key={option.view}
-            onPress={() => onViewChange(option.view)}
+            onPress={() => {
+              if (!selected) onViewChange(option.view);
+            }}
             style={({ pressed }) => [
-              styles.row,
-              pressed && styles.rowPressed,
+              styles.segment,
+              selected && styles.segmentSelected,
+              pressed && !selected && styles.pressed,
             ]}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             accessibilityLabel={option.label}
           >
-            <Feather
-              name={option.icon}
-              size={16}
-              color={
-                selected
-                  ? theme.colors.primaryBase
-                  : theme.colors.mutedForeground
-              }
-            />
             <Text
               style={[styles.label, selected && styles.labelSelected]}
               numberOfLines={1}
@@ -66,31 +59,38 @@ export function CalendarViewToggle({
 
 function createStyles(theme: ThemeTokens) {
   const view = {
-    list: {
-      gap: 2,
-    },
-    row: {
+    track: {
       flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 10,
-      minHeight: 44,
-      paddingHorizontal: 4,
+      padding: 3,
+      gap: 2,
+      borderRadius: theme.borderRadius.full,
+      backgroundColor: theme.colors.muted,
     },
-    rowPressed: {
-      opacity: 0.7,
+    segment: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 42,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      borderRadius: theme.borderRadius.full,
+    },
+    segmentSelected: {
+      backgroundColor: theme.colors.background,
+    },
+    pressed: {
+      opacity: 0.6,
     },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
     label: {
-      flex: 1,
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.mutedForeground,
     },
     labelSelected: {
-      color: theme.colors.primaryBase,
+      color: theme.colors.foreground,
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
     },

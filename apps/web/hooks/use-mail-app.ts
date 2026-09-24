@@ -30,6 +30,12 @@ import {
   appendMailboxMessages,
   hasMoreMailboxMessages,
 } from "@workspace/calendar-core";
+import { useSettings } from "@/hooks/use-settings";
+import { useUserTimeFormat } from "@/hooks/use-user-time-format";
+import {
+  formatQuotedMailDate,
+  type QuotedDateOptions,
+} from "@/components/mail/mail-compose-seed";
 import { toast } from "sonner";
 import { createLogger } from "@workspace/logger";
 import { useSession, signOut } from "@/lib/auth-client";
@@ -159,6 +165,12 @@ export function useMailApp() {
   const router = useSmoothRouter();
   const queryClient = useQueryClient();
   const { recordUsage } = useRecentContacts();
+  const { settings } = useSettings();
+  const timeFormat = useUserTimeFormat();
+  const quoteDateOptions = useMemo<QuotedDateOptions>(
+    () => ({ timeFormat, timezone: settings?.timezone }),
+    [timeFormat, settings?.timezone],
+  );
 
   const [isBusy, setIsBusy] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -266,7 +278,6 @@ export function useMailApp() {
     });
   }, []);
 
-  // Auth redirect
   useEffect(() => {
     if (!isSessionPending && !session?.user) {
       const currentPath =
@@ -280,7 +291,6 @@ export function useMailApp() {
     }
   }, [isSessionPending, session?.user, router]);
 
-  // ⌘K shortcut
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -337,7 +347,6 @@ export function useMailApp() {
     });
   }, [config, isSessionPending, session?.user?.id]);
 
-  // Decrypt selected message
   const selectedMailboxMessage = useMemo(() => {
     if (!selectedMessageId) {
       return null;
@@ -584,8 +593,7 @@ export function useMailApp() {
       return;
     }
 
-    // Use the ref so keyword/flag updates to activeMailbox don't re-trigger
-    // a full thread re-fetch (threadId never changes for a given message).
+    // Read activeMailbox via ref so keyword/flag updates don't refetch the thread (threadId is stable per message).
     const selectedMsg =
       activeMailboxRef.current.messages.find(
         (m) => m.id === selectedMessageId,
@@ -765,8 +773,7 @@ export function useMailApp() {
     };
   }, [applyLoadedMessage, queryClient, selectedMessageId]);
 
-  // Thread list prefetch: when a mailbox is loaded, fetch sent messages
-  // for thread grouping in the list (rate-limit safe — only once per mailbox).
+  // Fetch sent messages once per mailbox to augment thread grouping without hitting rate limits.
   useEffect(() => {
     const mailbox = activeMailboxRef.current;
     if (!mailbox || !mailbox.selectedMailboxId) {
@@ -774,11 +781,9 @@ export function useMailApp() {
       return;
     }
 
-    // Only prefetch once per mailbox switch
     if (threadPrefetchedMailboxRef.current === mailbox.selectedMailboxId) return;
     threadPrefetchedMailboxRef.current = mailbox.selectedMailboxId;
 
-    // Don't prefetch if we're already viewing sent (no need for self-reference)
     const currentMailbox = mailbox.mailboxes.find(
       (m) => m.id === mailbox.selectedMailboxId,
     );
@@ -796,7 +801,6 @@ export function useMailApp() {
       return;
     }
 
-    // Fetch first page of sent messages for thread augmentation
     void mailbox.client
       .getMailboxMessages(mailbox.session, sentMailbox.id, {
         limit: 50,
@@ -870,7 +874,6 @@ export function useMailApp() {
               mailbox.client.getBlobAsText(mailbox.session, blobId),
           });
         } else {
-          // pgp_mime: download the ciphertext blob
           const blobId = extractPgpMimeCiphertextBlobId(
             selectedMessage.bodyStructure,
           );
@@ -960,9 +963,7 @@ export function useMailApp() {
     return () => {
       cancelled = true;
     };
-    // Only re-decrypt when the message identity or E2EE config changes.
-    // Keyword-only updates (flag/read) do not change encryption state, so we
-    // exclude activeMailbox and use activeMailboxRef.current inside the effect.
+    // Only re-decrypt on message identity or E2EE config changes; keyword updates never change encryption state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMessage?.id, selectedMessageBodyLoaded, config]);
 
@@ -1050,7 +1051,6 @@ export function useMailApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMessage?.id, selectedMessageBodyLoaded]);
 
-  // Auto-mark read when a message is opened (with configurable delay)
   useEffect(() => {
     if (!selectedMessageId) return;
     manualUnreadWhileOpenRef.current = null;
@@ -1262,8 +1262,7 @@ export function useMailApp() {
         let hadRemoteBackup = false;
 
         if (!mailboxStatus.provisioned) {
-          // Provisioning mints and seals the vault secret itself, so a new
-          // mailbox is never readable by the server, not even briefly.
+          // Provisioning mints and seals the vault secret itself, so the server can never read a new mailbox.
           const provisioned = await bootstrapMailboxForAccount({
             email: accountEmail,
             displayName: accountDisplayName,
@@ -1284,7 +1283,6 @@ export function useMailApp() {
             await deleteStoredDerivedVaultKey(accountUserId).catch(() => undefined);
           }
 
-          // After bootstrap, fetch JMAP + vault backup in parallel
           const [session, remoteBackup, localBackup] = await Promise.all([
             (prefetch?.discoveryPromise ?? Promise.reject()).catch(() =>
               client.discoverSession(),
@@ -1312,12 +1310,10 @@ export function useMailApp() {
           throw new Error("No encrypted vault backup found for this mailbox.");
         if (hadRemoteBackup) await putStoredMailVault(backup);
 
-        // JMAP bootstrap only needs the session — overlap it with vault unlock
-        // so argon2 / AES work does not delay mailbox metadata.
+        // JMAP bootstrap only needs the session, so overlap it with vault unlock to keep argon2/AES off the critical path.
         const bootstrapPromise = client.bootstrapMailboxState(jmapSession);
 
-        // The vault passphrase is sealed to this user's E2EE account key, so
-        // only a signed-in device of theirs can open it.
+        // The vault passphrase is sealed to the user's E2EE account key, so only their signed-in device can open it.
         let unlockedVault: UserKeyVault | null = null;
         let effectivePassphrase = "";
 
@@ -1405,7 +1401,6 @@ export function useMailApp() {
         );
 
         const initialMailboxId = getPrimaryMailboxId(mailboxes, "inbox");
-        // Crypto worker + first inbox page in parallel
         const [, inboxResult] = await Promise.all([
           mailCryptoWorkerClient.loadVault({
             privateKeyArmored: unlockedVault.encryptedPrivateKeyArmored,
@@ -1475,7 +1470,6 @@ export function useMailApp() {
     ],
   );
 
-  // Trigger sign-in automatically once mailbox status and session are ready.
   useEffect(() => {
     if (!session?.user || isSessionPending || isMailboxStatusLoading) {
       return;
@@ -1873,8 +1867,7 @@ export function useMailApp() {
         recordUsage(recentEntries, "mail");
       }
       toast(encrypted ? "Encrypted message sent." : "Message sent.");
-      // Only reload the conversation thread for replies; let realtime sync
-      // update the inbox list so the sent draft never briefly flashes there.
+      // Reload only the thread; realtime sync updates the inbox so the sent draft never flashes there.
       if (effectiveThreadId) {
         void loadConversationThread(effectiveThreadId);
       }
@@ -1919,7 +1912,6 @@ export function useMailApp() {
       );
       const isInTrash = activeMailbox.selectedMailboxId === trashMailbox?.id;
 
-      // For permanent deletes (already in trash), no undo
       if (isInTrash) {
         const remaining = activeMailbox.messages.filter((m) => m.id !== targetId);
         setIsBusy(true);
@@ -1949,14 +1941,12 @@ export function useMailApp() {
         return;
       }
 
-      // For move-to-trash, show undo toast
       const targetMessage = activeMailbox.messages.find((m) => m.id === targetId);
       const originalMailboxId = targetMessage?.mailboxIds
         ? Object.entries(targetMessage.mailboxIds).find(([_, v]) => v)?.[0]
         : activeMailbox.selectedMailboxId;
       const remaining = activeMailbox.messages.filter((m) => m.id !== targetId);
 
-      // Optimistic removal
       setActiveMailbox((cur) =>
         cur ? { ...cur, messages: remaining } : cur,
       );
@@ -1974,12 +1964,10 @@ export function useMailApp() {
           label: "Undo",
           onClick: () => {
             undone = true;
-            // Restore the message to the list
             if (targetMessage) {
               setActiveMailbox((cur) => {
                 if (!cur) return cur;
                 const restored = [...cur.messages];
-                // Insert at the original position (or at the start as fallback)
                 const insertIndex = Math.min(
                   remaining.findIndex((m) =>
                     m.receivedAt &&
@@ -1997,7 +1985,6 @@ export function useMailApp() {
         },
       });
 
-      // After undo window, perform the actual JMAP move
       setTimeout(() => {
         if (undone) return;
         void activeMailbox.client
@@ -2010,21 +1997,25 @@ export function useMailApp() {
     [activeMailbox, selectedMessageId],
   );
 
+  // Seeds quote the body once, so a reply started before it loads would lose the original.
+  const selectedMessageBodyPending =
+    isMessageBodyLoading && !selectedMessageBodyLoaded;
+
   const handleReply = useCallback(() => {
-    if (!selectedMessage) return;
+    if (!selectedMessage || selectedMessageBodyPending) return;
     getMailComposeBridge()?.seedReply(
       selectedMessage,
       selectedMessagePlaintext,
     );
-  }, [selectedMessage, selectedMessagePlaintext]);
+  }, [selectedMessage, selectedMessageBodyPending, selectedMessagePlaintext]);
 
   const handleForward = useCallback(() => {
-    if (!selectedMessage) return;
+    if (!selectedMessage || selectedMessageBodyPending) return;
     getMailComposeBridge()?.seedForward(
       selectedMessage,
       selectedMessagePlaintext,
     );
-  }, [selectedMessage, selectedMessagePlaintext]);
+  }, [selectedMessage, selectedMessageBodyPending, selectedMessagePlaintext]);
 
   const handleDraftSaved = useCallback(
     (input: {
@@ -2141,6 +2132,9 @@ export function useMailApp() {
   const handleQuickReply = useCallback(
     async (replyText: string, files: File[] = []) => {
       if (!selectedMessage || !activeMailbox) return;
+      if (selectedMessageBodyPending) {
+        throw new Error("Wait for the message to finish loading.");
+      }
       if (!replyText.trim()) {
         toast.error("Enter a reply message.");
         return;
@@ -2149,9 +2143,10 @@ export function useMailApp() {
       const subject = selectedMessage.subject ?? "";
       const { text } = extractMessageBodies(selectedMessage);
       const body = selectedMessagePlaintext ?? text ?? "";
-      const date = selectedMessage.receivedAt
-        ? new Date(selectedMessage.receivedAt).toLocaleString()
-        : "";
+      const date = formatQuotedMailDate(
+        selectedMessage.receivedAt,
+        quoteDateOptions,
+      );
       setIsBusy(true);
       try {
         const mailbox = await refreshActiveMailboxPolicy(activeMailbox, {
@@ -2291,10 +2286,12 @@ export function useMailApp() {
       selectedMessage,
       selectedConversationMessages,
       selectedMessagePlaintext,
+      selectedMessageBodyPending,
       activeMailbox,
       config,
       loadConversationThread,
       refreshActiveMailboxPolicy,
+      quoteDateOptions,
     ],
   );
 
@@ -2456,7 +2453,6 @@ export function useMailApp() {
       );
       const remaining = activeMailbox.messages.filter((m) => m.id !== targetId);
 
-      // Optimistic removal
       setActiveMailbox((cur) =>
         cur ? { ...cur, messages: remaining } : cur,
       );
@@ -2492,14 +2488,12 @@ export function useMailApp() {
         },
       });
 
-      // After undo window, perform the actual JMAP move
       setTimeout(() => {
         if (undone) return;
         void activeMailbox.client
           .moveToMailbox(activeMailbox.session, targetId, targetMailboxId)
           .catch((err) => {
             log.error("Failed to move message", err);
-            // On failure, try to restore the message
             if (targetMessage) {
               setActiveMailbox((cur) => {
                 if (!cur) return cur;
@@ -3351,6 +3345,7 @@ export function useMailApp() {
   return {
     session,
     isSessionPending,
+    quoteDateOptions,
     config,
     isBusy,
     mailboxStatus,

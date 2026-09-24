@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   format,
   isSameDay,
@@ -19,7 +19,7 @@ import { cn } from "../../lib/utils";
 import { useHorizontalSwipeGesture } from "../../hooks/use-horizontal-swipe-gesture";
 import { useMiniCalendarMonthData } from "../../hooks/use-mini-calendar-month-data";
 import { usePrefersReducedMotion } from "../../hooks/use-prefers-reduced-motion";
-import { gsap, useGSAP } from "../../lib/gsap";
+import { MOTION_EASING, slideFadeIn } from "../../lib/motion";
 
 interface SidebarCalendarProps {
   events?: CalendarEvent[];
@@ -121,39 +121,19 @@ export function SidebarCalendar({
     threshold: 40,
   });
 
-  useGSAP(
-    () => {
-      const node = monthStageRef.current;
+  useLayoutEffect(() => {
+    const node = monthStageRef.current;
+    if (shouldReduceMotion || !node) {
+      return;
+    }
 
-      if (!node) {
-        return;
-      }
-
-      if (shouldReduceMotion) {
-        gsap.set(node, { clearProps: "opacity,transform" });
-        return;
-      }
-
-      gsap.fromTo(
-        node,
-        {
-          x: slideDirectionRef.current > 0 ? 18 : -18,
-          autoAlpha: 0,
-        },
-        {
-          x: 0,
-          autoAlpha: 1,
-          duration: 0.18,
-          ease: "power2.out",
-          overwrite: "auto",
-        },
-      );
-    },
-    {
-      dependencies: [monthKey, shouldReduceMotion],
-      scope: monthStageRef,
-    },
-  );
+    const animation = slideFadeIn(
+      node,
+      { x: slideDirectionRef.current > 0 ? 18 : -18 },
+      { duration: 180, easing: MOTION_EASING.soft },
+    );
+    return () => animation?.cancel();
+  }, [monthKey, shouldReduceMotion]);
 
   return (
     <div ref={containerRef} className={cn("w-full", className)}>

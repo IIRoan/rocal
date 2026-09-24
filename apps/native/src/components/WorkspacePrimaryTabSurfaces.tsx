@@ -24,14 +24,22 @@ import {
 } from "../lib/workspace-tab-transition";
 import { useReduceMotion } from "../lib/use-reduce-motion";
 import { useWorkspaceTabHost } from "../providers/WorkspaceTabHostProvider";
-import { useTheme } from "../providers/ThemeProvider";
+import { WorkspaceThemeScope, useTheme } from "../providers/ThemeProvider";
 import type { AppSwitchKey } from "../lib/app-switcher-config";
 
-/**
- * Keep-alive Calendar / Mail host. Transition matches iOS UINavigationController
- * (incoming covers from the right, outgoing peeks 30%) and the app's native stack.
- */
+/** Parks the resting mail card past its own shadow so the shadow can stay static instead of animating per frame. */
+const MAIL_SHADOW_GUTTER = 16;
+
+/** Keep-alive Calendar / Mail host; the transition matches iOS UINavigationController (incoming covers from the right, outgoing peeks 30%). */
 export function WorkspacePrimaryTabSurfaces() {
+  return (
+    <WorkspaceThemeScope>
+      <WorkspacePrimaryTabHost />
+    </WorkspaceThemeScope>
+  );
+}
+
+function WorkspacePrimaryTabHost() {
   const { theme } = useTheme();
   const { width } = useWindowDimensions();
   const reduceMotion = useReduceMotion();
@@ -76,17 +84,11 @@ export function WorkspacePrimaryTabSurfaces() {
         translateX: interpolate(
           progress.value,
           [0, 1],
-          [width, 0],
+          [width + MAIL_SHADOW_GUTTER, 0],
           Extrapolation.CLAMP,
         ),
       },
     ],
-    shadowOpacity: interpolate(
-      progress.value,
-      [0, 0.15, 0.85, 1],
-      [0, 0.22, 0.22, 0],
-      Extrapolation.CLAMP,
-    ),
   }));
 
   const coverStyle = useAnimatedStyle(() => ({
@@ -177,6 +179,7 @@ function createStyles(theme: { colors: { background: string } }) {
         ? {
             shadowColor: "#000",
             shadowOffset: { width: -2, height: 0 },
+            shadowOpacity: 0.22,
             shadowRadius: 8,
           }
         : { elevation: 6 }),

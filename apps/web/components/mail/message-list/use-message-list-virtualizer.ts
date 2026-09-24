@@ -38,6 +38,7 @@ function estimateThreadRowSize(
     sizing.isMobile,
     sizing.density,
     sizing.showLabelChips,
+    sizing.narrow,
   );
 }
 

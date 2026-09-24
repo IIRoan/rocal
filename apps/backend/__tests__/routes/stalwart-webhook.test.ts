@@ -173,6 +173,119 @@ describe("stalwartWebhookRoutes", () => {
     });
   });
 
+  describe("with the real webhook service", () => {
+    const notificationJobCreate = jest.fn(async (_args: unknown) => ({ id: "job-1" }));
+    const prisma = {
+      mailDirectoryEntry: {
+        findUnique: jest.fn(async () => ({
+          userId: "user-1",
+          stalwartAccountId: "n",
+          email: "owner@solace.onl",
+        })),
+      },
+      userSettings: {
+        findUnique: jest.fn(async () => ({ pushNotifications: true })),
+      },
+      notificationJob: {
+        findFirst: jest.fn(async () => null),
+        create: notificationJobCreate,
+      },
+    };
+    const resolveIngestedEmail = jest.fn(
+      async (_accountId: string, input: { documentId: string }) => ({
+        id: `jmap-${input.documentId}`,
+        messageIds:
+          input.documentId === "2001"
+            ? ["solace-reminder.ff@solace.onl"]
+            : [`<${input.documentId}@example.com>`],
+        fromEmail:
+          input.documentId === "2001" ? "noreply@solace.onl" : "sam@example.com",
+        exactMatch: true,
+      }),
+    );
+
+    beforeEach(() => {
+      notificationJobCreate.mockClear();
+      resolveIngestedEmail.mockClear();
+    });
+
+    function realApp() {
+      return new Elysia({ normalize: false }).use(
+        createStalwartWebhookRoutes(
+          new StalwartWebhookService({
+            prisma: prisma as never,
+            noreplyEmail: "noreply@solace.onl",
+            mailSyncService: { resolveIngestedEmail },
+          }),
+        ),
+      );
+    }
+
+    async function post(events: unknown[]) {
+      const body = JSON.stringify({ events });
+      return realApp().handle(
+        new Request("http://localhost/internal/stalwart/webhook", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Signature": signBody(body),
+          },
+          body,
+        }),
+      );
+    }
+
+    it("queues no new_mail job for a Solace reminder mail", async () => {
+      const response = await post([
+        {
+          type: "message-ingest.ham",
+          data: {
+            accountId: "n",
+            documentId: "2000",
+            to: ["owner@solace.onl"],
+            from: "Reminder in 15 minutes <noreply@solace.onl>",
+            messageId: "<solace-reminder.ee@solace.onl>",
+          },
+        },
+      ]);
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        ok: true,
+        processedCount: 1,
+        enqueuedCount: 0,
+        ignoredCount: 0,
+      });
+      expect(notificationJobCreate).not.toHaveBeenCalled();
+    });
+
+    it("queues exactly one new_mail job when only regular mail is in a mixed batch", async () => {
+      const response = await post([
+        {
+          type: "message-ingest.ham",
+          data: { accountId: "n", documentId: "2001", to: ["owner@solace.onl"] },
+        },
+        {
+          type: "message-ingest.ham",
+          data: { accountId: "n", documentId: "2002", to: ["owner@solace.onl"] },
+        },
+      ]);
+
+      await expect(response.json()).resolves.toEqual(
+        expect.objectContaining({ processedCount: 2, enqueuedCount: 1 }),
+      );
+      expect(notificationJobCreate).toHaveBeenCalledTimes(1);
+      expect(notificationJobCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: "user-1",
+          kind: "new_mail",
+          channel: "push",
+          payload: expect.objectContaining({ emailId: "jmap-2002", accountId: "n" }),
+        }),
+      });
+    });
+  });
+
   it("returns ignoredCount from the webhook service", async () => {
     handlePayload.mockResolvedValueOnce({
       processedCount: 1,
