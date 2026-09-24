@@ -11,6 +11,8 @@ import Animated, { FadeIn } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
+import { useUserTimeFormat } from "../../hooks/use-user-time-format";
+import { useUserTimezone } from "../../hooks/use-user-timezone";
 import { formatAddress, formatMessageDate } from "../../lib/mail/mail-helpers";
 import { listPreviewSnippet } from "../../lib/mail/mail-preview";
 import type { JmapEmailMessage } from "../../lib/mail/types";
@@ -35,6 +37,8 @@ export function ConversationThreadStrip({
 }: ConversationThreadStripProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const timezone = useUserTimezone();
+  const timeFormat = useUserTimeFormat();
   const [expanded, setExpanded] = useState(false);
   const threadKey = messages[0]?.threadId ?? messages[0]?.id ?? "";
 
@@ -131,7 +135,10 @@ export function ConversationThreadStrip({
                   </Text>
                 </View>
                 <Text style={styles.date}>
-                  {formatMessageDate(threadMessage.receivedAt)}
+                  {formatMessageDate(threadMessage.receivedAt, {
+                    timeFormat,
+                    timezone,
+                  })}
                 </Text>
               </Pressable>
             );

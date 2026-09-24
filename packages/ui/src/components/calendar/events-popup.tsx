@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { XIcon } from "lucide-react";
 import {
   resolveTimezone,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 
 import { EventItem } from "./event-item";
@@ -18,6 +19,7 @@ interface EventsPopupProps {
   onClose: () => void;
   onEventSelect: (event: CalendarEvent) => void;
   timezone?: string;
+  timeFormat: TimeFormat;
 }
 
 export function EventsPopup({
@@ -27,6 +29,7 @@ export function EventsPopup({
   onClose,
   onEventSelect,
   timezone,
+  timeFormat,
 }: EventsPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const resolvedTimezone = resolveTimezone(timezone);
@@ -134,6 +137,7 @@ export function EventsPopup({
                   isFirstDay={isFirstDay}
                   isLastDay={isLastDay}
                   timezone={timezone}
+                  timeFormat={timeFormat}
                 />
               </div>
             );

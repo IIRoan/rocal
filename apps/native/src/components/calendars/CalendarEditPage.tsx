@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Alert } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import type { Calendar, EventColor } from "@workspace/calendar-core";
-import { getErrorMessage } from "@workspace/calendar-core";
+import { getErrorMessage, partitionCalendarsByKind } from "@workspace/calendar-core";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useToast } from "../../providers/ToastProvider";
 import {
@@ -69,7 +69,10 @@ function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calenda
   const [moveTargetId, setMoveTargetId] = useState<string>();
 
   const moveTargets = useMemo(
-    () => calendars.filter((entry) => entry.id !== calendar.id && entry.kind === "owned"),
+    () =>
+      partitionCalendarsByKind(calendars).ownedCalendars.filter(
+        (entry) => entry.id !== calendar.id,
+      ),
     [calendar.id, calendars],
   );
   const selectedMoveTargetId = moveTargetId ?? moveTargets[0]?.id;

@@ -22,7 +22,11 @@ import { ShadcnAutocomleteTimePicker } from "@workspace/ui/components/ui/autocom
 import { cn } from "@workspace/ui/lib/utils";
 import { format } from "date-fns";
 import { Check, ChevronDown, Clock, Repeat } from "lucide-react";
-import { findRepeatPreset, getRepeatPresets } from "@workspace/calendar-core";
+import {
+  findRepeatPreset,
+  getRepeatPresets,
+  resolveTimeFormat,
+} from "@workspace/calendar-core";
 
 import { getRecurringRuleSummary } from "@/lib/event-editor-view-model";
 import type { RecurrenceRule, UserSettings } from "@/lib/types/calendar";
@@ -204,7 +208,7 @@ export function EventEditorDateTimeFields({
   localSettings: UserSettings | null | undefined;
 }) {
   const [customRepeatOpen, setCustomRepeatOpen] = useState(false);
-  const is24Hour = localSettings?.timeFormat === "24h";
+  const timeFormat = resolveTimeFormat(localSettings?.timeFormat);
   const sameDay =
     format(eventForm.eventStartDate, "yyyy-MM-dd") ===
     format(eventForm.eventEndDate, "yyyy-MM-dd");
@@ -247,7 +251,7 @@ export function EventEditorDateTimeFields({
             onChange={(date) =>
               eventForm.handleStartTimeChange(formatWallClockTime(date))
             }
-            is24Hour={is24Hour}
+            timeFormat={timeFormat}
             className={chipClass(desktop)}
           />
         )}
@@ -261,7 +265,7 @@ export function EventEditorDateTimeFields({
             onChange={(date) =>
               eventForm.handleEndTimeChange(formatWallClockTime(date))
             }
-            is24Hour={is24Hour}
+            timeFormat={timeFormat}
             className={chipClass(desktop)}
           />
         )}

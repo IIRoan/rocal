@@ -1,10 +1,14 @@
 import type { JmapEmailMessage, JmapMailbox, MailAddress } from "./types";
 import {
+  formatClockTime,
+  formatDateTimeLabel,
   isCurrentUserMailAddress,
   isValidEmailAddress,
   parseAddressList,
   resolveReplyAllRecipients,
+  resolveTimezone,
   validateComposeRecipients,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 
 const MAILBOX_ROLE_ORDER: Record<string, number> = {
@@ -50,47 +54,31 @@ export function formatAddressFull(
 }
 
 export type FormatMessageDateOptions = {
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   style?: "compact" | "full";
 };
 
 export function formatMessageDate(
   receivedAt: string | undefined,
-  options?: FormatMessageDateOptions,
+  options: FormatMessageDateOptions,
 ): string {
   if (!receivedAt) return "";
   const date = new Date(receivedAt);
   if (Number.isNaN(date.getTime())) return "";
 
-  const hour12 =
-    options?.timeFormat === "12h"
-      ? true
-      : options?.timeFormat === "24h"
-        ? false
-        : undefined;
-  const timeZone = options?.timezone;
-  const localeOptions = timeZone ? { timeZone } : undefined;
+  const timeZone = resolveTimezone(options.timezone);
+  const localeOptions = { timeZone };
 
-  if (options?.style === "full") {
-    return date.toLocaleString(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
-      hour12,
-      ...localeOptions,
-    });
+  if (options.style === "full") {
+    return formatDateTimeLabel(date, timeZone, options.timeFormat);
   }
 
   const now = new Date();
   const dateStr = date.toLocaleDateString(undefined, localeOptions);
   const todayStr = now.toLocaleDateString(undefined, localeOptions);
   if (dateStr === todayStr) {
-    return date.toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12,
-      ...localeOptions,
-    });
+    return formatClockTime(date, timeZone, options.timeFormat);
   }
 
   const yearStr = date.toLocaleDateString(undefined, {

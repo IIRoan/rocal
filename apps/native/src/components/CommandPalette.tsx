@@ -14,8 +14,11 @@ import { useRouter, useSegments } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
+  clockTimePattern,
+  formatInUserTimezone,
   resolveTimezone,
   utcToPickerDate,
+  type TimeFormat,
   type UserSettings,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -23,6 +26,8 @@ import { useTheme } from "../providers/ThemeProvider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCommandPalette } from "../providers/CommandPaletteProvider";
 import { useSheet } from "../providers/SheetProvider";
+import { useUserTimeFormat } from "../hooks/use-user-time-format";
+import { useUserTimezone } from "../hooks/use-user-timezone";
 import { useMailCompose } from "../providers/MailComposeProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
 import { useMailSelection } from "../providers/MailSelectionProvider";
@@ -506,7 +511,9 @@ function SearchResultRow({
   showDivider: boolean;
   onPress: (result: NativePaletteSearchResult) => void;
 }) {
-  const subtitle = formatSearchSubtitle(result);
+  const timezone = useUserTimezone();
+  const timeFormat = useUserTimeFormat();
+  const subtitle = formatSearchSubtitle(result, timezone, timeFormat);
   const icon = result.source === "mail" ? "mail" : "calendar";
 
   return (
@@ -539,6 +546,8 @@ function SearchResultRow({
 
 function formatSearchSubtitle(
   result: NativePaletteSearchResult,
+  timezone: string,
+  timeFormat: TimeFormat,
 ): string | null {
   if (result.source === "mail") {
     const from =
@@ -558,8 +567,12 @@ function formatSearchSubtitle(
     return result.snippet ?? null;
   }
   return result.event.allDay
-    ? format(start, "EEE, MMM d")
-    : format(start, "EEE, MMM d · p");
+    ? formatInUserTimezone(start, timezone, "EEE, MMM d")
+    : formatInUserTimezone(
+        start,
+        timezone,
+        `EEE, MMM d · ${clockTimePattern(timeFormat)}`,
+      );
 }
 
 function createStyles(theme: ThemeTokens) {

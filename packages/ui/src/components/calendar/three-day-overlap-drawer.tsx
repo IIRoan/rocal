@@ -1,9 +1,10 @@
 "use client";
 
-import { format } from "date-fns";
 import {
+  formatClockTimeRange,
   formatInUserTimezone,
   isCancelledCalendarEvent,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 
 import { cn } from "../../lib/utils";
@@ -17,12 +18,14 @@ export function ThreeDayOverlapDrawer({
   onOpenChange,
   onEventSelect,
   timezone,
+  timeFormat,
 }: {
   events: CalendarEvent[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEventSelect: (event: CalendarEvent) => void;
   timezone: string;
+  timeFormat: TimeFormat;
 }) {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -84,7 +87,12 @@ export function ThreeDayOverlapDrawer({
                     <div className="text-xs text-muted-foreground">
                       {event.allDay
                         ? "All day"
-                        : `${format(eventStart, "h:mm a")} - ${format(eventEnd, "h:mm a")}`}
+                        : formatClockTimeRange(
+                            eventStart,
+                            eventEnd,
+                            timezone,
+                            timeFormat,
+                          )}
                       {event.location && ` · ${event.location}`}
                     </div>
                   </div>

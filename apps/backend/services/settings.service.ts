@@ -6,6 +6,7 @@ import type {
 } from "../contracts/settings.contract";
 import { ValidationError } from "../lib/errors";
 import { createLogger } from "@workspace/logger";
+import { isMailInvitationStagingCalendar } from "@workspace/calendar-core";
 import {
   backfillEncryptedEventsToCiphertextOnly,
   normalizeEventEncryptionMode,
@@ -106,7 +107,10 @@ export class SettingsService implements ISettingsService {
         );
       }
 
-      if (calendar.kind !== "owned") {
+      if (
+        calendar.kind !== "owned" ||
+        isMailInvitationStagingCalendar(calendar)
+      ) {
         throw new ValidationError(
           "The default calendar must be one of your editable calendars.",
           "defaultCalendarId",

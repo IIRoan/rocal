@@ -6,6 +6,7 @@ import {
   isCancelledCalendarEvent,
   isTodayInTimezone,
   wallClockToUtc,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 import { cn } from "../../lib/utils";
 import { format, isSameMonth } from "date-fns";
@@ -14,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
+import { formatTimeWithOptionalMinutesTZ } from "./event-time-label";
 import { getEventSegmentForCalendarDay, sortEvents } from "./utils";
 import { EventHeight, DefaultStartHour } from "./constants";
 import { CalendarEvent } from "./types";
@@ -39,7 +41,7 @@ type MonthDayCellProps = {
   dayIndex: number;
   isMounted: boolean;
   compactView: boolean;
-  timeFormat: "12h" | "24h";
+  timeFormat: TimeFormat;
   workingDays: number[];
   timezone: string | undefined;
   resolvedTimezone: string;
@@ -149,7 +151,13 @@ export function MonthDayCell({
                   >
                     <div className="invisible" aria-hidden={true}>
                       {!event.allDay && (
-                        <span>{format(new Date(event.start), "h:mm")} </span>
+                        <span>
+                          {formatTimeWithOptionalMinutesTZ(
+                            new Date(event.start),
+                            timeFormat,
+                            timezone,
+                          )}{" "}
+                        </span>
                       )}
                       <span
                         className={cn(

@@ -258,6 +258,7 @@ const baseMessage = {
 const defaultProps: MessageReaderProps = {
   message: baseMessage as any,
   plaintext: "Hello, this is the message body.",
+  timeFormat: "24h",
   decryptedHtml: null,
   signatureVerificationState: "not_signed",
   decryptError: null,

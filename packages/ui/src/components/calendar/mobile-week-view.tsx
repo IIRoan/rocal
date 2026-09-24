@@ -2,6 +2,7 @@
 
 import React, { useMemo, useEffect, useRef, useState } from "react";
 import {
+  formatClockTimeRange,
   formatInUserTimezone,
   getWeekCalendarDays,
   getZonedDateParts,
@@ -9,6 +10,7 @@ import {
   isTodayInTimezone,
   resolveTimezone,
   wallClockToUtc,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 import {
   addHours,
@@ -41,7 +43,7 @@ interface MobileWeekViewProps {
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
   onEventCreate: (startTime: Date) => void;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   weekStartDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   workingDays?: number[];
   timezone?: string;
@@ -53,7 +55,7 @@ export function MobileWeekView({
   events,
   onEventSelect,
   onEventCreate,
-  timeFormat = "12h",
+  timeFormat,
   weekStartDay = 1,
   workingDays = [1, 2, 3, 4, 5],
   timezone,
@@ -352,7 +354,12 @@ export function MobileWeekView({
                           <div className="text-xs text-muted-foreground">
                             {event.allDay
                               ? "All day"
-                              : `${format(eventStart, "h:mm a")} - ${format(eventEnd, "h:mm a")}`}
+                              : formatClockTimeRange(
+                                  eventStart,
+                                  eventEnd,
+                                  resolvedTimezone,
+                                  timeFormat,
+                                )}
                             {event.location && ` · ${event.location}`}
                           </div>
                         </div>

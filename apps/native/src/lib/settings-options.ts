@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import type { TimeFormat } from "@workspace/calendar-core";
 import type { ThemePreference } from "../providers/ThemeProvider";
 import type { NativeCalendarView } from "./calendar-views";
 
@@ -31,7 +32,7 @@ export const WEEK_START_OPTIONS: { label: string; value: number }[] = [
 
 export const TIME_FORMAT_OPTIONS: {
   label: string;
-  value: "12h" | "24h";
+  value: TimeFormat;
 }[] = [
   { label: "12 Hour (1:00 PM)", value: "12h" },
   { label: "24 Hour (13:00)", value: "24h" },

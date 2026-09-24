@@ -32,6 +32,7 @@ import { useAuth } from "../../providers/AuthProvider";
 import { useRecentContacts } from "../../hooks/use-recent-contacts";
 import { useReminderTitleEncryptor } from "../../hooks/use-reminder-title-encryptor";
 import { useEventReminders } from "../../hooks/use-event-reminders";
+import { useUserTimeFormat } from "../../hooks/use-user-time-format";
 import { extractRecentContactEntries } from "../../lib/record-recent-contacts";
 import { useToast } from "../../providers/ToastProvider";
 import { toastOperationWarnings } from "../../lib/operation-warnings";
@@ -40,8 +41,10 @@ import { calendarApiService } from "../../lib/api";
 import { QUERY_KEYS } from "../../lib/query-keys";
 import {
   buildOptimisticEvent,
+  commitOptimisticEvent,
   findCachedEvent,
   generateOptimisticId,
+  invalidateEventRanges,
   optimisticallyInsertEvent,
   optimisticallyRemoveEvent,
   rollbackFromSnapshot,
@@ -262,22 +265,15 @@ export function EventSheet({
     enabled: visible,
   });
   const resolvedTimezone = resolveTimezone(settings?.timezone);
+  const timeFormat = useUserTimeFormat();
   const { reminders: eventReminders, isLoading: remindersLoading } =
     useEventReminders(eventId, event?.reminder, visible && !isCreate);
 
   // ─── Mutations ─────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
-    mutationFn: async ({ request, reminders }: EventFormSubmission) => {
-      const saved = await calendarApiService.createEvent(request);
-      await persistEventReminderNotifications(
-        saved.id,
-        request.title,
-        reminders,
-        encryptReminderTitle,
-      );
-      return saved;
-    },
+    mutationFn: ({ request }: EventFormSubmission) =>
+      calendarApiService.createEvent(request),
     onMutate: async ({ request }: EventFormSubmission) => {
       const tempId = generateOptimisticId();
       const optimisticEvent = buildOptimisticEvent(
@@ -293,8 +289,20 @@ export function EventSheet({
       dismissSheet();
       return { tempId };
     },
-    onSuccess: (savedEvent, { request }) => {
-      queryClient.invalidateQueries({ queryKey: ["events"] });
+    onSuccess: (savedEvent, { request, reminders }, context) => {
+      commitOptimisticEvent(queryClient, context.tempId, savedEvent);
+      void invalidateEventRanges(queryClient, savedEvent);
+      // Reminders are a separate round trip that never throws, so they stay off the timeline's critical path.
+      void persistEventReminderNotifications(
+        savedEvent.id,
+        request.title,
+        reminders,
+        encryptReminderTitle,
+      ).then(() =>
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.eventNotifications(savedEvent.id),
+        }),
+      );
       const entries = extractRecentContactEntries(
         request.participants,
         user?.email,
@@ -687,7 +695,7 @@ export function EventSheet({
                       {formatEventDate(event, resolvedTimezone)}
                     </Text>
                     <Text style={styles.viewSubtext}>
-                      {formatEventTime(event, resolvedTimezone)}
+                      {formatEventTime(event, resolvedTimezone, timeFormat)}
                       {recurrenceLabel ? ` · ${recurrenceLabel}` : ""}
                     </Text>
                   </View>
@@ -872,7 +880,7 @@ export function EventSheet({
               initialValues={initialValues}
               initialReminders={isCreate ? undefined : eventReminders}
               timezone={resolvedTimezone}
-              timeFormat={settings?.timeFormat === "24h" ? "24h" : "12h"}
+              timeFormat={timeFormat}
             />
           </View>
         )}

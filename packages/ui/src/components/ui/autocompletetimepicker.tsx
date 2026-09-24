@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useId, useMemo } from "react";
 import { Clock } from "lucide-react";
+import type { TimeFormat } from "@workspace/calendar-core";
 import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "./button";
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from "./drawer";
@@ -17,7 +18,7 @@ const INPUT_STYLES =
 interface TimePickerProps {
   value?: Date;
   onChange?: (date: Date) => void;
-  is24Hour?: boolean;
+  timeFormat: TimeFormat;
   locale?: string;
   timeZone?: string;
   placeholder?: string;
@@ -269,7 +270,7 @@ function TimeInput({
 export function ShadcnAutocomleteTimePicker({
   value,
   onChange,
-  is24Hour = false,
+  timeFormat,
   locale = "en-US",
   timeZone = currentTimezone,
   placeholder = "Select time...",
@@ -282,7 +283,7 @@ export function ShadcnAutocomleteTimePicker({
   const isMobile = useIsMobile();
   const timePickerContentId = useId();
   const { timeOptions, formatTime } = useAutocompleteTimepicker({
-    is24Hour,
+    timeFormat,
     locale,
     timeZone,
   });

@@ -1,5 +1,6 @@
 "use client";
 
+import type { TimeFormat } from "@workspace/calendar-core";
 import { useLayoutEffect, useReducer, useRef } from "react";
 import { useIsMobile } from "@workspace/ui/hooks";
 import {
@@ -51,7 +52,7 @@ export interface MessageListProps {
   onBulkReportSpam?: (ids: string[]) => void;
   onSetLabel?: (messageId: string, labelId: string, assigned: boolean) => void;
   labels?: LabelDef[];
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   onLoadMore?: () => void;
   hasMore?: boolean;

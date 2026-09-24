@@ -1,5 +1,6 @@
 "use client";
 
+import type { TimeFormat } from "@workspace/calendar-core";
 import { useState, type KeyboardEvent, type PointerEvent } from "react";
 import { ChevronDown, Eye, EyeOff, MessageSquare } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
@@ -177,7 +178,7 @@ function ThreadMessageRow({
   isActive: boolean;
   accountEmail?: string | null;
   preview: string;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string | null;
   onSelect?: (id: string) => void;
   onDelete?: (id: string) => void;

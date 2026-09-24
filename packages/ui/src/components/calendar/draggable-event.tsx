@@ -1,5 +1,6 @@
 "use client";
 
+import type { TimeFormat } from "@workspace/calendar-core";
 import { useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -20,7 +21,7 @@ interface DraggableEventProps {
   isFirstDay?: boolean;
   isLastDay?: boolean;
   "aria-hidden"?: boolean | "true" | "false";
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   // Context menu actions
   onEdit?: (event: CalendarEvent) => void;
@@ -39,7 +40,7 @@ export function DraggableEvent({
   isFirstDay = true,
   isLastDay = true,
   "aria-hidden": ariaHidden,
-  timeFormat = "12h",
+  timeFormat,
   timezone,
   onEdit,
   onDelete,

@@ -1,3 +1,8 @@
+import {
+  formatClockTime,
+  resolveTimezone,
+  type TimeFormat,
+} from "@workspace/calendar-core";
 import type { MailAddress } from "@/lib/mail/types";
 
 export function formatAddress(addresses: MailAddress[] | undefined): string {
@@ -22,24 +27,17 @@ export function formatAddressFull(
 
 export function formatMessageDate(
   receivedAt: string | undefined,
-  timeFormat?: "12h" | "24h",
+  timeFormat: TimeFormat,
   timezone?: string,
 ): string {
   if (!receivedAt) return "";
   const date = new Date(receivedAt);
   const now = new Date();
-  const hour12 =
-    timeFormat === "12h" ? true : timeFormat === "24h" ? false : undefined;
-  const timeZone = timezone ?? undefined;
+  const timeZone = resolveTimezone(timezone);
   const dateStr = date.toLocaleDateString(undefined, { timeZone });
   const todayStr = now.toLocaleDateString(undefined, { timeZone });
   if (dateStr === todayStr) {
-    return date.toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12,
-      timeZone,
-    });
+    return formatClockTime(date, timeZone, timeFormat);
   }
   return date.toLocaleDateString(undefined, {
     month: "short",

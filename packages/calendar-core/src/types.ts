@@ -86,6 +86,7 @@ import type {
   EventParticipantStatus,
 } from "./route-schemas";
 import type { E2eeRolloutStage } from "./content-encryption";
+import type { TimeFormat } from "./time-format";
 
 export type {
   EncryptionState,
@@ -417,7 +418,7 @@ export interface UserSettings {
   defaultView: CalendarView;
   weekStartDay: number;
   timezone: string;
-  timeFormat: "12h" | "24h";
+  timeFormat: TimeFormat;
   workingHoursStart: number;
   workingHoursEnd: number;
   workingDays: string;

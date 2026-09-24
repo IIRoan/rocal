@@ -1,4 +1,7 @@
-import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import type {
+  DecoratedCalendarEvent,
+  TimeFormat,
+} from "@workspace/calendar-core";
 import {
   formatInUserTimezone,
   resolveTimezone,
@@ -13,7 +16,7 @@ import {
  */
 export function formatTimeRange(
   event: DecoratedCalendarEvent,
-  timeFormat: "12h" | "24h",
+  timeFormat: TimeFormat,
   timezone?: string,
 ): string {
   if (event.allDay) return "All day";

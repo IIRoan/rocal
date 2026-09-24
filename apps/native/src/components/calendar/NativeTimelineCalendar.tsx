@@ -28,7 +28,10 @@ import {
   type RenderHourProps,
   type WeekdayNumbers,
 } from "@howljs/calendar-kit";
-import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import type {
+  DecoratedCalendarEvent,
+  TimeFormat,
+} from "@workspace/calendar-core";
 import {
   formatEventSpanLabel,
   isCancelledCalendarEvent,
@@ -41,6 +44,7 @@ import {
   KIT_DRAG_STEP_MINUTES,
   KIT_HOUR_HEIGHT,
   KIT_INITIAL_HOUR,
+  KIT_INITIAL_SCROLL_Y,
   KIT_NUMBER_OF_DAYS,
   kitBackgroundToCreateSlot,
   kitDropToEventMove,
@@ -86,7 +90,7 @@ interface NativeTimelineCalendarProps {
   timezone: string;
   weekStartDay: number;
   workingDays: readonly number[];
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   swipeEnabled?: boolean;
   isLoading?: boolean;
   onEventPress: (eventId: string) => void;
@@ -106,7 +110,7 @@ export const NativeTimelineCalendar = forwardRef<
     timezone,
     weekStartDay,
     workingDays,
-    timeFormat = "12h",
+    timeFormat,
     swipeEnabled = true,
     isLoading = false,
     onEventPress,
@@ -340,10 +344,6 @@ export const NativeTimelineCalendar = forwardRef<
     );
   }, []);
 
-  const handleLoad = useCallback(() => {
-    calendarRef.current?.goToHour(KIT_INITIAL_HOUR, false);
-  }, []);
-
   useImperativeHandle(
     ref,
     () => ({
@@ -422,7 +422,6 @@ export const NativeTimelineCalendar = forwardRef<
         useHaptic
         scrollToNow={false}
         isLoading={isLoading}
-        onLoad={handleLoad}
         onChange={handleChange}
         onDateChanged={handleDateChanged}
         onPressEvent={handlePressEvent}
@@ -442,6 +441,8 @@ export const NativeTimelineCalendar = forwardRef<
           hourFormat={toKitHourFormat(timeFormat)}
           renderHour={renderHour}
           showNowIndicator
+          initialScrollY={KIT_INITIAL_SCROLL_Y}
+          bounces={false}
           renderEvent={renderEvent}
           renderDraggingEvent={renderDraggingEvent}
         />

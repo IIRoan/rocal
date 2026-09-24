@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { addDays, format } from "date-fns";
-import { isTodayInTimezone, resolveTimezone } from "@workspace/calendar-core";
+import { isTodayInTimezone, resolveTimezone, type TimeFormat } from "@workspace/calendar-core";
 
 import { AgendaDaysToShow } from "./constants";
 import { CalendarEvent } from "./types";
@@ -16,7 +16,7 @@ interface AgendaViewProps {
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
   onEventCreate?: (startTime: Date) => void;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   // Context menu actions
   onEventEdit?: (event: CalendarEvent) => void;
@@ -28,7 +28,7 @@ export function AgendaView({
   currentDate,
   events,
   onEventSelect,
-  timeFormat = "12h",
+  timeFormat,
   timezone,
   onEventEdit,
   onEventDelete,

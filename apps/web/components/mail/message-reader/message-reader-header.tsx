@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTimeLabel, resolveTimezone } from "@workspace/calendar-core";
 import { cn } from "@workspace/ui/lib/utils";
 import { SenderAvatar } from "../mail-avatar";
 import {
@@ -82,17 +83,11 @@ export function MessageReaderHeader({
                   isMobile ? "text-[10px]" : "text-[11px]",
                 )}
               >
-                {new Date(message.receivedAt).toLocaleString(undefined, {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                  hour12:
-                    timeFormat === "12h"
-                      ? true
-                      : timeFormat === "24h"
-                        ? false
-                        : undefined,
-                  timeZone: timezone ?? undefined,
-                } as Intl.DateTimeFormatOptions)}
+                {formatDateTimeLabel(
+                  new Date(message.receivedAt),
+                  resolveTimezone(timezone),
+                  timeFormat,
+                )}
               </span>
             )}
           </div>

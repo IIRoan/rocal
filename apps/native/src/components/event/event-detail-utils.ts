@@ -1,10 +1,14 @@
 import { format } from "date-fns";
 import {
+  formatClockTimeRange,
   formatEventCalendarDate,
-  formatInUserTimezone,
   resolveTimezone,
 } from "@workspace/calendar-core";
-import type { CalendarEvent, RecurrenceRule } from "@workspace/calendar-core";
+import type {
+  CalendarEvent,
+  RecurrenceRule,
+  TimeFormat,
+} from "@workspace/calendar-core";
 import { parseRRule, type ParsedRule } from "./recurrence-picker-utils";
 
 /**
@@ -22,17 +26,16 @@ export function formatEventDate(
  */
 export function formatEventTime(
   event: CalendarEvent,
-  timezone?: string,
+  timezone: string | undefined,
+  timeFormat: TimeFormat,
 ): string {
   if (event.allDay) return "All day";
-  const start = new Date(event.start);
-  const end = new Date(event.end);
-  const resolvedTimezone = resolveTimezone(timezone ?? event.timezone);
-  return `${formatInUserTimezone(
-    start,
-    resolvedTimezone,
-    "h:mm a",
-  )} – ${formatInUserTimezone(end, resolvedTimezone, "h:mm a")}`;
+  return formatClockTimeRange(
+    new Date(event.start),
+    new Date(event.end),
+    resolveTimezone(timezone ?? event.timezone),
+    timeFormat,
+  );
 }
 
 const WEEKDAY_SUMMARY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

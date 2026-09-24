@@ -80,6 +80,7 @@ import {
 import type { JmapEmailMessage } from "../../../src/lib/mail/types";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { useUserTimezone } from "../../../src/hooks/use-user-timezone";
+import { useUserTimeFormat } from "../../../src/hooks/use-user-time-format";
 import { useWorkspaceTabHost } from "../../../src/providers/WorkspaceTabHostProvider";
 
 type ListSheetView = "bulkMore" | "bulkMove" | "bulkLabel" | null;
@@ -195,6 +196,7 @@ export function MailScreen() {
     DEFAULT_MAIL_LIST_FILTERS,
   );
   const timezone = useUserTimezone();
+  const timeFormat = useUserTimeFormat();
   const { hiddenIds } = useHiddenMailboxIds();
 
   const drawerMailboxes = useMemo(
@@ -644,6 +646,8 @@ export function MailScreen() {
             preview={decryptedPreviews[item.latestMessage.id]}
             selectionActive={selectionActive}
             selected={isRowSelected}
+            timeFormat={timeFormat}
+            timezone={timezone}
             onPress={handleOpenMessage}
             onLongPress={(message) => handleLongPress(message, item.messageIds)}
             onToggleSelect={(message) =>
@@ -667,6 +671,8 @@ export function MailScreen() {
       selectedIds,
       selectionActive,
       decryptedPreviews,
+      timeFormat,
+      timezone,
     ],
   );
 

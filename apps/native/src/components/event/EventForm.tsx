@@ -40,6 +40,7 @@ import {
   type CreateEventRequest,
   type EventParticipantInput,
   type RecurrenceRule,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 import { RecurrencePicker } from "./RecurrencePicker";
 import {
@@ -61,7 +62,7 @@ import {
 } from "./EventPickerSheets";
 import { Switch } from "../ui/Switch";
 import { TimeWheelPicker } from "./TimeWheelPicker";
-import { formatPickerTime, type TimeFormat } from "./time-wheel-utils";
+import { formatPickerTime } from "./time-wheel-utils";
 import { parseStoredRecurrence } from "./recurrence-picker-utils";
 import { summarizeRecurrenceRule } from "./event-detail-utils";
 import {
@@ -97,7 +98,7 @@ interface EventFormProps {
   initialValues?: Partial<CreateEventRequest>;
   initialReminders?: number[];
   timezone?: string;
-  timeFormat?: TimeFormat;
+  timeFormat: TimeFormat;
   calendars: Calendar[];
   serverErrors?: string[];
   isSubmitting?: boolean;
@@ -127,7 +128,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       initialValues,
       initialReminders,
       timezone,
-      timeFormat = "12h",
+      timeFormat,
       calendars,
       serverErrors,
       isSubmitting = false,

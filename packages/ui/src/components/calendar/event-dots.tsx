@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { isCancelledCalendarEvent } from "@workspace/calendar-core";
+import { isCancelledCalendarEvent, type TimeFormat } from "@workspace/calendar-core";
 import { CalendarEvent, type CalendarView } from "./types";
 import { EncryptionStatusBadge } from "./encryption-status";
 import { EventItem } from "./event-item";
@@ -26,7 +26,7 @@ interface EventDotsProps {
   view: CalendarView;
   onClick?: (event: CalendarEvent) => void;
   showTime?: boolean;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   className?: string;
   style?: React.CSSProperties;
   timezone?: string;
@@ -37,7 +37,7 @@ export function EventDots({
   view,
   onClick,
   showTime,
-  timeFormat = "12h",
+  timeFormat,
   className,
   style,
   timezone,

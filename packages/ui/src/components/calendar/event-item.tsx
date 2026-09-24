@@ -3,11 +3,12 @@
 import { useMemo } from "react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
-import { differenceInMinutes, format, getMinutes, isPast } from "date-fns";
+import { differenceInMinutes, isPast } from "date-fns";
 import { MapPin as MapPinIcon } from "lucide-react";
 import {
   isAwaitingUserInvitationResponse,
   isCancelledCalendarEvent,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 
 import {
@@ -21,46 +22,7 @@ import { EncryptionStatusBadge } from "./encryption-status";
 import { CalendarEvent, type CalendarView } from "./types";
 import { cn } from "../../lib/utils";
 import { formatEventDescription } from "./event-description-formatter";
-import { formatInTimeZone } from "date-fns-tz";
-
-// Using date-fns format with custom formatting:
-// 12h format: 'h' - hours (1-12), 'a' - am/pm
-// 24h format: 'H' - hours (0-23)
-// ':mm' - minutes with leading zero (only if the token 'mm' is present)
-const formatTimeWithOptionalMinutes = (
-  date: Date,
-  timeFormat: "12h" | "24h" = "12h",
-) => {
-  if (timeFormat === "24h") {
-    return format(date, getMinutes(date) === 0 ? "H" : "H:mm");
-  } else {
-    return format(date, getMinutes(date) === 0 ? "ha" : "h:mma").toLowerCase();
-  }
-};
-
-// Timezone-aware formatter (falls back to local if no timezone)
-const formatTimeWithOptionalMinutesTZ = (
-  date: Date,
-  timeFormat: "12h" | "24h" = "12h",
-  timezone?: string,
-) => {
-  if (!timezone) return formatTimeWithOptionalMinutes(date, timeFormat);
-
-  const minutesInTimezone = Number.parseInt(
-    formatInTimeZone(date, timezone, "m"),
-    10,
-  );
-  const token =
-    timeFormat === "24h"
-      ? minutesInTimezone === 0
-        ? "H"
-        : "H:mm"
-      : minutesInTimezone === 0
-        ? "ha"
-        : "h:mma";
-  const str = formatInTimeZone(date, timezone, token);
-  return timeFormat === "12h" ? str.toLowerCase() : str;
-};
+import { formatTimeWithOptionalMinutesTZ } from "./event-time-label";
 
 interface EventWrapperProps {
   event: CalendarEvent;
@@ -196,7 +158,7 @@ interface EventItemProps {
   dndAttributes?: DraggableAttributes;
   onMouseDown?: (e: React.MouseEvent) => void;
   onTouchStart?: (e: React.TouchEvent) => void;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   // Context menu actions
   onEdit?: (event: CalendarEvent) => void;
@@ -221,7 +183,7 @@ export function EventItem({
   dndAttributes,
   onMouseDown,
   onTouchStart,
-  timeFormat = "12h",
+  timeFormat,
   timezone,
 }: EventItemProps) {
   const eventColor = event.color;

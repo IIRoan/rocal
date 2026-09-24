@@ -542,3 +542,162 @@ index 0000000..981919e
 +    },
 +  }));
 +};
+diff --git a/lib/commonjs/CalendarBody.js b/lib/commonjs/CalendarBody.js
+index d575b29649d9ccc8ac3535a97e6deb2ea28a4787..9df818cb7fb584fad083e7ee1052f9aa5366fe3d 100644
+--- a/lib/commonjs/CalendarBody.js
++++ b/lib/commonjs/CalendarBody.js
+@@ -44,7 +44,9 @@ const CalendarBody = ({
+   renderDraggingEvent,
+   renderDraggingHour,
+   NowIndicatorComponent,
+-  renderCustomHorizontalLine
++  renderCustomHorizontalLine,
++  initialScrollY = 0,
++  bounces = true
+ }) => {
+   const {
+     calendarLayout,
+@@ -117,6 +119,13 @@ const CalendarBody = ({
+   const dragToCreateGesture = (0, _useDragToCreateGesture.default)({
+     mode: dragToCreateMode
+   });
++  const [initialContentOffset] = (0, _react.useState)(() => ({
++    x: 0,
++    y: initialScrollY
++  }));
++  (0, _react.useLayoutEffect)(() => {
++    offsetY.value = initialContentOffset.y;
++  }, [initialContentOffset, offsetY]);
+   const _onLayout = event => {
+     scrollVisibleHeight.current = event.nativeEvent.layout.height;
+     scrollVisibleHeightAnim.value = event.nativeEvent.layout.height;
+@@ -232,6 +241,9 @@ const CalendarBody = ({
+     scrollEventThrottle: 16,
+     pinchGestureEnabled: false,
+     showsVerticalScrollIndicator: false,
++    contentOffset: initialContentOffset,
++    bounces: bounces,
++    overScrollMode: bounces ? 'auto' : 'never',
+     onLayout: _onLayout,
+     onScroll: _onScroll,
+     refreshControl: onRefresh ? /*#__PURE__*/_react.default.createElement(_reactNative.RefreshControl, {
+diff --git a/lib/module/CalendarBody.js b/lib/module/CalendarBody.js
+index ba9f793e84db8e74ecff21959284dccee86df6f3..5a77ad2b491fa7f21d1949fa5ae9fef934303e62 100644
+--- a/lib/module/CalendarBody.js
++++ b/lib/module/CalendarBody.js
+@@ -1,5 +1,5 @@
+ function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
+-import React, { useCallback, useMemo } from 'react';
++import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+ import { Platform, RefreshControl, StyleSheet, View } from 'react-native';
+ import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
+ import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+@@ -36,7 +36,9 @@ const CalendarBody = ({
+   renderDraggingEvent,
+   renderDraggingHour,
+   NowIndicatorComponent,
+-  renderCustomHorizontalLine
++  renderCustomHorizontalLine,
++  initialScrollY = 0,
++  bounces = true
+ }) => {
+   const {
+     calendarLayout,
+@@ -109,6 +111,13 @@ const CalendarBody = ({
+   const dragToCreateGesture = useDragToCreateGesture({
+     mode: dragToCreateMode
+   });
++  const [initialContentOffset] = useState(() => ({
++    x: 0,
++    y: initialScrollY
++  }));
++  useLayoutEffect(() => {
++    offsetY.value = initialContentOffset.y;
++  }, [initialContentOffset, offsetY]);
+   const _onLayout = event => {
+     scrollVisibleHeight.current = event.nativeEvent.layout.height;
+     scrollVisibleHeightAnim.value = event.nativeEvent.layout.height;
+@@ -224,6 +233,9 @@ const CalendarBody = ({
+     scrollEventThrottle: 16,
+     pinchGestureEnabled: false,
+     showsVerticalScrollIndicator: false,
++    contentOffset: initialContentOffset,
++    bounces: bounces,
++    overScrollMode: bounces ? 'auto' : 'never',
+     onLayout: _onLayout,
+     onScroll: _onScroll,
+     refreshControl: onRefresh ? /*#__PURE__*/React.createElement(RefreshControl, {
+diff --git a/lib/typescript/types.d.ts b/lib/typescript/types.d.ts
+index 7de7ba60795d1212beea25e720be4f9442202808..cc157d7c314045e17d2a763ddfe3de5a69f9cc49 100644
+--- a/lib/typescript/types.d.ts
++++ b/lib/typescript/types.d.ts
+@@ -662,6 +662,10 @@ export interface CalendarBodyProps {
+     renderDraggingEvent?: (props: DraggingEventProps) => React.ReactElement | null;
+     /** Custom now indicator */
+     NowIndicatorComponent?: React.ReactElement | null;
++    /** Initial vertical scroll offset in pixels, applied on mount */
++    initialScrollY?: number;
++    /** Allow overscroll past the first and last hour (iOS bounce, Android stretch) */
++    bounces?: boolean;
+ }
+ export interface RenderHourProps {
+     hourStr: string;
+diff --git a/src/CalendarBody.tsx b/src/CalendarBody.tsx
+index 91d3264e916fd162251b4a46a1bf0424d840ee05..5594dda286366a434b52965b0354afabdcc786ac 100644
+--- a/src/CalendarBody.tsx
++++ b/src/CalendarBody.tsx
+@@ -1,4 +1,4 @@
+-import React, { useCallback, useMemo } from 'react';
++import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+ import type {
+   LayoutChangeEvent,
+   NativeScrollEvent,
+@@ -53,6 +53,8 @@ const CalendarBody: React.FC<CalendarBodyProps> = ({
+   renderDraggingHour,
+   NowIndicatorComponent,
+   renderCustomHorizontalLine,
++  initialScrollY = 0,
++  bounces = true,
+ }) => {
+   const {
+     calendarLayout,
+@@ -123,6 +125,12 @@ const CalendarBody: React.FC<CalendarBodyProps> = ({
+     mode: dragToCreateMode,
+   });
+ 
++  // Native contentOffset positions the first frame; a post-mount scrollTo would visibly jump.
++  const [initialContentOffset] = useState(() => ({ x: 0, y: initialScrollY }));
++  useLayoutEffect(() => {
++    offsetY.value = initialContentOffset.y;
++  }, [initialContentOffset, offsetY]);
++
+   const _onLayout = (event: LayoutChangeEvent) => {
+     scrollVisibleHeight.current = event.nativeEvent.layout.height;
+     scrollVisibleHeightAnim.value = event.nativeEvent.layout.height;
+@@ -322,6 +330,9 @@ const CalendarBody: React.FC<CalendarBodyProps> = ({
+           scrollEventThrottle={16}
+           pinchGestureEnabled={false}
+           showsVerticalScrollIndicator={false}
++          contentOffset={initialContentOffset}
++          bounces={bounces}
++          overScrollMode={bounces ? 'auto' : 'never'}
+           onLayout={_onLayout}
+           onScroll={_onScroll}
+           refreshControl={
+diff --git a/src/types.ts b/src/types.ts
+index 9946f01141e1fa5ffe434cda6b4a3c332860d3fc..d853b9ce8cd698c66c25bda527b16828b9acc069 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -813,6 +813,12 @@ export interface CalendarBodyProps {
+ 
+   /** Custom now indicator */
+   NowIndicatorComponent?: React.ReactElement | null;
++
++  /** Initial vertical scroll offset in pixels, applied on mount */
++  initialScrollY?: number;
++
++  /** Allow overscroll past the first and last hour (iOS bounce, Android stretch) */
++  bounces?: boolean;
+ }
+ 
+ export interface RenderHourProps {

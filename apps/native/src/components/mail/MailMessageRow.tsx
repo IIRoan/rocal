@@ -14,6 +14,7 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { Feather, FontAwesome } from "@expo/vector-icons";
+import type { TimeFormat } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import {
@@ -69,6 +70,8 @@ interface MailMessageRowProps {
   preview?: string;
   selectionActive?: boolean;
   selected?: boolean;
+  timeFormat: TimeFormat;
+  timezone?: string;
   onPress: (message: JmapEmailMessage) => void;
   onLongPress?: (message: JmapEmailMessage) => void;
   onToggleSelect?: (message: JmapEmailMessage) => void;
@@ -86,6 +89,8 @@ function MailMessageRowComponent({
   preview: previewOverride,
   selectionActive = false,
   selected = false,
+  timeFormat,
+  timezone,
   onPress,
   onLongPress,
   onToggleSelect,
@@ -212,7 +217,7 @@ function MailMessageRowComponent({
               />
             ) : null}
             <Text style={styles.date}>
-              {formatMessageDate(message.receivedAt)}
+              {formatMessageDate(message.receivedAt, { timeFormat, timezone })}
             </Text>
           </View>
         </View>

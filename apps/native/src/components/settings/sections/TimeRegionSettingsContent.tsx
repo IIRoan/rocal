@@ -1,4 +1,5 @@
 import React from "react";
+import { resolveTimeFormat } from "@workspace/calendar-core";
 import { SettingsPage, useSettingsNavigator } from "../SettingsPage";
 import {
   SheetCenteredState,
@@ -16,7 +17,7 @@ export function TimeRegionSettingsContent() {
   const { settings, isLoading, pendingKeys, updateSetting } =
     useNativeUserSettings();
 
-  const timeFormat = settings?.timeFormat ?? "12h";
+  const timeFormat = resolveTimeFormat(settings?.timeFormat);
   const timeFormatPending = pendingKeys.has("timeFormat");
 
   if (isLoading && !settings) {

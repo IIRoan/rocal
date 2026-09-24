@@ -1,5 +1,9 @@
 import { addDays } from "date-fns";
-import type { CalendarView, DecoratedCalendarEvent } from "@workspace/calendar-core";
+import type {
+  CalendarView,
+  DecoratedCalendarEvent,
+  TimeFormat,
+} from "@workspace/calendar-core";
 import {
   canCurrentUserModifyEvent,
   formatCalendarDayKey,
@@ -16,13 +20,14 @@ import {
  * Kit insets hour labels by the tick (8) plus 8px. `20:00` / `12 pm` must
  * stay on one line in that remaining width.
  */
-export function toKitHourWidth(timeFormat: "12h" | "24h"): number {
+export function toKitHourWidth(timeFormat: TimeFormat): number {
   return timeFormat === "24h" ? 52 : 58;
 }
 
-export const KIT_HOUR_WIDTH = toKitHourWidth("24h");
-export const KIT_HOUR_HEIGHT = 72;
-export const KIT_INITIAL_HOUR = 9;
+/** A full day spans ~1.5 phone screens; below 56 a 30-minute event loses its stacked layout. */
+export const KIT_HOUR_HEIGHT = 56;
+export const KIT_INITIAL_HOUR = 8;
+export const KIT_INITIAL_SCROLL_Y = KIT_INITIAL_HOUR * KIT_HOUR_HEIGHT;
 export const KIT_DRAG_STEP_MINUTES = 15;
 
 export type TimelineKitView = Extract<CalendarView, "day" | "3day" | "week">;
@@ -195,7 +200,7 @@ export function toKitDayShadeRegions(
   return regions;
 }
 
-export function toKitHourFormat(timeFormat: "12h" | "24h"): string {
+export function toKitHourFormat(timeFormat: TimeFormat): string {
   return timeFormat === "24h" ? "HH:mm" : "h a";
 }
 

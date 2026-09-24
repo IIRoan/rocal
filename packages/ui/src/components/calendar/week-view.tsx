@@ -4,6 +4,7 @@ import React, { useLayoutEffect, useMemo, useRef } from "react";
 import {
   getWeekCalendarDays,
   resolveTimezone,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 
 import { AllDayEventRow } from "./all-day-event-row";
@@ -21,7 +22,7 @@ interface WeekViewProps {
   onEventSelect: (event: CalendarEvent) => void;
   onEventCreate: (startTime: Date) => void;
   compactView?: boolean;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   weekStartDay?: number;
   workingDays?: number[];
   timezone?: string;
@@ -35,7 +36,7 @@ export const WeekView = React.memo(function WeekView({
   events,
   onEventSelect,
   onEventCreate,
-  timeFormat = "12h",
+  timeFormat,
   weekStartDay = 0,
   timezone,
   onEventEdit,
@@ -121,6 +122,7 @@ export const WeekView = React.memo(function WeekView({
         events={events}
         handlers={handlers}
         timezone={resolvedTimezone}
+        timeFormat={timeFormat}
       />
       <WeekViewTimeGrid
         currentTimePosition={currentTimePosition}

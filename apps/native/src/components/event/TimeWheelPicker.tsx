@@ -16,6 +16,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import * as Haptics from "expo-haptics";
+import type { TimeFormat } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import {
@@ -32,7 +33,6 @@ import {
   wheelIndexesToTime,
   wheelRowProjection,
   wheelValueAt,
-  type TimeFormat,
   type TimeWheelIndexes,
 } from "./time-wheel-utils";
 

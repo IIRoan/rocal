@@ -22,6 +22,7 @@ import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import {
   optimisticallyPatchEvent,
+  readCachedEventsForRange,
   rollbackFromSnapshot,
 } from "../../../src/lib/optimistic-events";
 import { useToast } from "../../../src/providers/ToastProvider";
@@ -39,6 +40,7 @@ import {
 } from "../../../src/components/calendar/NativeTimelineCalendar";
 import type { KitEventMove } from "../../../src/components/calendar/calendar-kit-adapter";
 import { useWorkspaceTabHost } from "../../../src/providers/WorkspaceTabHostProvider";
+import { useUserTimeFormat } from "../../../src/hooks/use-user-time-format";
 
 export function CalendarScreen() {
   const { openEventSheet } = useSheet();
@@ -74,6 +76,7 @@ export function CalendarScreen() {
   });
   const settingsLoading = settingsPending && !settings;
   const resolvedTimezone = resolveTimezone(settings?.timezone);
+  const timeFormat = useUserTimeFormat();
   const workingDays = useMemo(
     () => parseWorkingDays(settings?.workingDays),
     [settings?.workingDays],
@@ -100,6 +103,17 @@ export function CalendarScreen() {
     [selectedDate, activeView, settings?.weekStartDay, resolvedTimezone],
   );
 
+  // Every page change is a new range key; seeding it from prefetched months keeps it real cache data that optimistic writes reach.
+  const detailSeed = useMemo(
+    () =>
+      readCachedEventsForRange(
+        queryClient,
+        detailDateRange.start,
+        detailDateRange.end,
+      ),
+    [queryClient, detailDateRange],
+  );
+
   const { data: detailEventsData, isLoading: detailEventsLoading } = useQuery({
     queryKey: QUERY_KEYS.events(
       detailDateRange.start.toISOString(),
@@ -108,6 +122,8 @@ export function CalendarScreen() {
     queryFn: () =>
       calendarApiService.getEvents(detailDateRange.start, detailDateRange.end),
     enabled: !settingsLoading,
+    initialData: detailSeed?.data,
+    initialDataUpdatedAt: detailSeed?.updatedAt,
     placeholderData: keepPreviousData,
   });
 
@@ -286,7 +302,7 @@ export function CalendarScreen() {
           timezone={resolvedTimezone}
           weekStartDay={settings?.weekStartDay ?? 1}
           workingDays={workingDays}
-          timeFormat={settings?.timeFormat ?? "12h"}
+          timeFormat={timeFormat}
           swipeEnabled
           isLoading={detailEventsLoading}
           onEventPress={handleTimelineEventPress}

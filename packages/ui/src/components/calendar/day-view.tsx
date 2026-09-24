@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { isCancelledCalendarEvent } from "@workspace/calendar-core";
+import { isCancelledCalendarEvent, type TimeFormat } from "@workspace/calendar-core";
 import {
   eventOverlapsCalendarDay,
   formatEventSpanLabel,
@@ -28,7 +28,7 @@ interface DayViewProps {
   onEventSelect: (event: CalendarEvent) => void;
   onEventCreate: (startTime: Date) => void;
   compactView?: boolean;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   workingDays?: number[];
   // Context menu actions
@@ -43,7 +43,7 @@ export function DayView({
   onEventSelect,
   onEventCreate,
   compactView = false,
-  timeFormat = "12h",
+  timeFormat,
   timezone,
   onEventEdit,
   onEventDelete,
@@ -135,6 +135,7 @@ export function DayView({
                     isLastDay={isLastDay}
                     connectAcrossCells={false}
                     timezone={timezone}
+                    timeFormat={timeFormat}
                     onEdit={onEventEdit}
                     onDelete={onEventDelete}
                     onView={onEventView}

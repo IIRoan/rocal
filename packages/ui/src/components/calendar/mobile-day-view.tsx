@@ -16,6 +16,7 @@ import {
   resolveTimezone,
   utcToPickerDate,
   wallClockToUtc,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 
 import { DraggableEvent } from "./draggable-event";
@@ -33,7 +34,7 @@ const MobileCellHeight = 60; // Cells for each hour
 
 function formatCurrentTimeLabel(
   currentTime: { hours: number; minutes: number } | null,
-  timeFormat: "12h" | "24h",
+  timeFormat: TimeFormat,
 ) {
   if (!currentTime) return undefined;
 
@@ -52,7 +53,7 @@ interface MobileDayViewProps {
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
   onEventCreate: (startTime: Date) => void;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   workingDays?: number[];
   showMonthPicker?: boolean;
@@ -64,7 +65,7 @@ export function MobileDayView({
   events,
   onEventSelect,
   onEventCreate,
-  timeFormat = "12h",
+  timeFormat,
   timezone,
   workingDays = [1, 2, 3, 4, 5],
   showMonthPicker = true,

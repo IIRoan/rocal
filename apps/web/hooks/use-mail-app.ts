@@ -30,6 +30,12 @@ import {
   appendMailboxMessages,
   hasMoreMailboxMessages,
 } from "@workspace/calendar-core";
+import { useSettings } from "@/hooks/use-settings";
+import { useUserTimeFormat } from "@/hooks/use-user-time-format";
+import {
+  formatQuotedMailDate,
+  type QuotedDateOptions,
+} from "@/components/mail/mail-compose-seed";
 import { toast } from "sonner";
 import { createLogger } from "@workspace/logger";
 import { useSession, signOut } from "@/lib/auth-client";
@@ -159,6 +165,12 @@ export function useMailApp() {
   const router = useSmoothRouter();
   const queryClient = useQueryClient();
   const { recordUsage } = useRecentContacts();
+  const { settings } = useSettings();
+  const timeFormat = useUserTimeFormat();
+  const quoteDateOptions = useMemo<QuotedDateOptions>(
+    () => ({ timeFormat, timezone: settings?.timezone }),
+    [timeFormat, settings?.timezone],
+  );
 
   const [isBusy, setIsBusy] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -2149,9 +2161,10 @@ export function useMailApp() {
       const subject = selectedMessage.subject ?? "";
       const { text } = extractMessageBodies(selectedMessage);
       const body = selectedMessagePlaintext ?? text ?? "";
-      const date = selectedMessage.receivedAt
-        ? new Date(selectedMessage.receivedAt).toLocaleString()
-        : "";
+      const date = formatQuotedMailDate(
+        selectedMessage.receivedAt,
+        quoteDateOptions,
+      );
       setIsBusy(true);
       try {
         const mailbox = await refreshActiveMailboxPolicy(activeMailbox, {
@@ -2295,6 +2308,7 @@ export function useMailApp() {
       config,
       loadConversationThread,
       refreshActiveMailboxPolicy,
+      quoteDateOptions,
     ],
   );
 
@@ -3351,6 +3365,7 @@ export function useMailApp() {
   return {
     session,
     isSessionPending,
+    quoteDateOptions,
     config,
     isBusy,
     mailboxStatus,

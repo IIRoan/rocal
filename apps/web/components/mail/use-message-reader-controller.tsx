@@ -11,10 +11,12 @@ import {
 import {
   buildEventReminderMailView,
   enrichSelfMailRecipient,
+  formatDateTimeLabel,
   getErrorMessage,
   isDecryptedEventReminderContent,
   pickOutgoingAttachmentFiles,
   resolveMailServerLimits,
+  resolveTimezone,
 } from "@workspace/calendar-core";
 import { useQuery } from "@tanstack/react-query";
 import { Clock, MapPin } from "lucide-react";
@@ -271,17 +273,11 @@ export function useMessageReaderController(props: MessageReaderProps) {
       items.push({
         id: "time",
         icon: Clock,
-        children: mailCalendarInvite.start.toLocaleString(undefined, {
-          dateStyle: "medium",
-          timeStyle: "short",
-          hour12:
-            timeFormat === "12h"
-              ? true
-              : timeFormat === "24h"
-                ? false
-                : undefined,
-          timeZone: timezone ?? undefined,
-        }),
+        children: formatDateTimeLabel(
+          mailCalendarInvite.start,
+          resolveTimezone(timezone),
+          timeFormat,
+        ),
       });
     }
     if (mailCalendarInvite.location) {

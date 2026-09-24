@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Feather, FontAwesome } from "@expo/vector-icons";
-import { enrichSelfMailRecipient } from "@workspace/calendar-core";
+import { enrichSelfMailRecipient, type TimeFormat } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { formatMessageDate } from "../../lib/mail/mail-helpers";
@@ -46,7 +46,7 @@ export type MailMessageHeaderProps = {
   encryptedAtRest: boolean;
   signatureVerificationState?: MailSignatureVerificationState;
   decryptionFailed: boolean;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
 };
 

@@ -19,7 +19,7 @@ import type { JmapEmailMessage } from "@/lib/mail/types";
 import { formatAddress, formatMessageDate } from "../mail-helpers";
 import { SenderAvatar } from "../mail-avatar";
 import { getAllMessageLabels } from "@/lib/mail/mail-labels";
-import { resolveLabelDisplayColor } from "@workspace/calendar-core";
+import { resolveLabelDisplayColor, type TimeFormat } from "@workspace/calendar-core";
 import { buildMailPreviewSnippet } from "@/lib/mail/mail-preview";
 import {
   formatThreadSenders,
@@ -272,7 +272,7 @@ function MessageListRowTrailing({
   hasAttachments: boolean;
   messageLabels: { id: string; name: string; color?: string }[];
   receivedAt?: string;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   hover: ComponentProps<typeof MessageListRowHoverActions>;
 }) {
@@ -500,7 +500,7 @@ function MessageListRowThreadChildren({
 }: {
   visible: boolean;
   messages: JmapEmailMessage[];
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   onSelect: (id: string) => void;
 }) {

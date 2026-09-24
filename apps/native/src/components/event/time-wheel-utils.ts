@@ -1,4 +1,4 @@
-export type TimeFormat = "12h" | "24h";
+import type { TimeFormat } from "@workspace/calendar-core";
 
 export const WHEEL_HOURS_24 = Array.from({ length: 24 }, (_, i) =>
   String(i).padStart(2, "0"),

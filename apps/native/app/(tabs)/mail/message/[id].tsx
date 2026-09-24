@@ -48,6 +48,7 @@ import { MailMessageActionsSheet } from "../../../../src/components/mail/MailMes
 import { useRecentContacts } from "../../../../src/hooks/use-recent-contacts";
 import { useMailMessageContent } from "../../../../src/hooks/use-mail-message-content";
 import { useMailMessageCalendar } from "../../../../src/hooks/use-mail-message-calendar";
+import { useUserTimeFormat } from "../../../../src/hooks/use-user-time-format";
 import { useMailMessageActions } from "../../../../src/hooks/use-mail-message-actions";
 import {
   useLabels,
@@ -134,6 +135,7 @@ export default function MailMessageScreen() {
 
   const { currentMailbox, preview } = actions;
   const { userSettings } = calendar;
+  const timeFormat = useUserTimeFormat();
   const accountEmail =
     user?.email?.trim().toLowerCase() ??
     runtime?.session.username?.trim().toLowerCase() ??
@@ -202,12 +204,7 @@ export default function MailMessageScreen() {
                 content.decryptResult?.signatureVerificationState
               }
               decryptionFailed={Boolean(content.decryptError)}
-              timeFormat={
-                userSettings?.timeFormat === "12h" ||
-                userSettings?.timeFormat === "24h"
-                  ? userSettings.timeFormat
-                  : undefined
-              }
+              timeFormat={timeFormat}
               timezone={userSettings?.timezone}
             />
 

@@ -73,7 +73,7 @@ describe("formatEventDate", () => {
 describe("formatEventTime", () => {
   it("returns 'All day' for all-day events", () => {
     const event = makeEvent({ allDay: true });
-    expect(formatEventTime(event)).toBe("All day");
+    expect(formatEventTime(event, undefined, "24h")).toBe("All day");
   });
 
   it("formats a morning event time range", () => {
@@ -82,7 +82,7 @@ describe("formatEventTime", () => {
       end: "2025-01-15T10:00:00.000Z",
       timezone: "UTC",
     });
-    expect(formatEventTime(event, "UTC")).toBe("9:00 AM – 10:00 AM");
+    expect(formatEventTime(event, "UTC", "12h")).toBe("9:00 AM – 10:00 AM");
   });
 
   it("formats a PM event time range", () => {
@@ -91,7 +91,7 @@ describe("formatEventTime", () => {
       end: "2025-01-15T16:00:00.000Z",
       timezone: "UTC",
     });
-    expect(formatEventTime(event, "UTC")).toBe("2:30 PM – 4:00 PM");
+    expect(formatEventTime(event, "UTC", "12h")).toBe("2:30 PM – 4:00 PM");
   });
 
   it("formats noon correctly", () => {
@@ -100,7 +100,7 @@ describe("formatEventTime", () => {
       end: "2025-01-15T13:00:00.000Z",
       timezone: "UTC",
     });
-    expect(formatEventTime(event, "UTC")).toBe("12:00 PM – 1:00 PM");
+    expect(formatEventTime(event, "UTC", "12h")).toBe("12:00 PM – 1:00 PM");
   });
 
   it("formats midnight correctly", () => {
@@ -109,7 +109,16 @@ describe("formatEventTime", () => {
       end: "2025-01-15T01:00:00.000Z",
       timezone: "UTC",
     });
-    expect(formatEventTime(event, "UTC")).toBe("12:00 AM – 1:00 AM");
+    expect(formatEventTime(event, "UTC", "12h")).toBe("12:00 AM – 1:00 AM");
+  });
+
+  it("uses a 24-hour clock when the user picked 24h", () => {
+    const event = makeEvent({
+      start: "2025-01-15T14:30:00.000Z",
+      end: "2025-01-15T16:00:00.000Z",
+      timezone: "UTC",
+    });
+    expect(formatEventTime(event, "UTC", "24h")).toBe("14:30 – 16:00");
   });
 });
 

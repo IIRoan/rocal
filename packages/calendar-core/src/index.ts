@@ -27,6 +27,7 @@ export * from "./title-search-index";
 export * from "./color-utils";
 export * from "./date-utils";
 export * from "./timezone";
+export * from "./time-format";
 export * from "./event-date";
 export * from "./event-utils";
 export * from "./event-optional-sections";

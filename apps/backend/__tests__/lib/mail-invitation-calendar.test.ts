@@ -1,6 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { MAIL_INVITATION_STAGING_CALENDAR_NAME } from "@workspace/calendar-core";
 import {
+  excludeInvitationStagingCalendarWhere,
   resolveAcceptedInvitationTargetCalendar,
   resolveInvitationStagingCalendar,
 } from "../../lib/mail-invitation-calendar";
@@ -76,6 +77,18 @@ describe("resolveAcceptedInvitationTargetCalendar", () => {
     );
 
     expect(calendar?.id).toBe("calendar-work");
+  });
+
+  it("never files accepted invitations into the staging calendar", async () => {
+    const prisma = createPrismaMock();
+
+    await resolveAcceptedInvitationTargetCalendar(prisma as never, "user-1");
+
+    for (const [query] of prisma.calendar.findFirst.mock.calls) {
+      expect(query.where).toEqual(
+        expect.objectContaining(excludeInvitationStagingCalendarWhere),
+      );
+    }
   });
 });
 

@@ -63,6 +63,7 @@ export function MailApp() {
     <MailComposeProvider
       identities={mail.activeMailbox?.pickerIdentities ?? []}
       mailServerLimits={mail.composeMailPolicy.limits}
+      quoteDateOptions={mail.quoteDateOptions}
     >
       <MailComposeAutosave
         activeMailbox={mail.activeMailbox}

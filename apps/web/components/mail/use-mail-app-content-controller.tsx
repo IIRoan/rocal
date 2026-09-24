@@ -13,6 +13,7 @@ import { useIsMobile } from "@workspace/ui/hooks";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useMailUrlSync } from "@/hooks/use-mail-url-sync";
 import { useSettings } from "@/hooks/use-settings";
+import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { useMailKeyboardShortcuts } from "@/hooks/use-mail-keyboard-shortcuts";
 import { useMailListSettings } from "@/lib/mail/mail-list-settings";
 import {
@@ -130,7 +131,7 @@ export function useMailAppContentController(
   });
 
   const { settings } = useSettings();
-  const timeFormat = settings?.timeFormat ?? "24h";
+  const timeFormat = useUserTimeFormat();
   const [listChrome, dispatchListChrome] = useReducer(
     mailAppListChromeReducer,
     initialMailAppListChromeState,

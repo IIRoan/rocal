@@ -30,6 +30,7 @@ import type { ComposeRequest } from "../../lib/mail/compose-request";
 import {
   canSendCompose,
   composeTextToPlain,
+  formatDateTimeLabel,
   getErrorMessage,
   hasComposeUserContent,
   resolveReplyRecipients,
@@ -37,6 +38,7 @@ import {
   resolveComposeSendBodies,
   messageBodiesToComposeText,
   type ComposeTextFields,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
@@ -94,12 +96,19 @@ import { useRecentContacts } from "../../hooks/use-recent-contacts";
 import { extractRecentContactEntries } from "../../lib/record-recent-contacts";
 import { collectCommittedEmails } from "../../lib/mail/compose-recipients";
 import { useKeyboardInset } from "../../hooks/use-keyboard-inset";
+import { useUserTimeFormat } from "../../hooks/use-user-time-format";
+import { useUserTimezone } from "../../hooks/use-user-timezone";
 import { ComposeHeader } from "./ComposeHeader";
 import { ComposeFormatBar } from "./ComposeFormatBar";
 import { ComposeAttachmentList } from "./ComposeAttachmentList";
 import { ComposeIdentitySheet } from "./ComposeIdentitySheet";
 import { useMailSkin, type MailSkin } from "./mail-ui";
 import { composeTitle } from "../../lib/mail/compose-display";
+
+interface QuotedDateOptions {
+  timeFormat: TimeFormat;
+  timezone: string;
+}
 
 interface ComposeSheetProps {
   visible: boolean;
@@ -147,6 +156,8 @@ function ComposeSession({
   const skin = useMailSkin();
   const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
   const { toast } = useToast();
+  const timezone = useUserTimezone();
+  const timeFormat = useUserTimeFormat();
 
   const accountQuery = useMailAccount();
   const provisioned = accountQuery.data?.provisioned ?? false;
@@ -538,12 +549,13 @@ function ComposeSession({
 
     const fromEmail =
       composeContext?.fromEmail ?? runtime?.session.username ?? null;
+    const dateOptions = { timeFormat, timezone };
     if (params.mode === "reply") {
       seedCompose({
         ...EMPTY_COMPOSE_FIELDS,
         to: getReplyRecipients(sourceMessage, fromEmail),
         subject: prefixSubject(sourceMessage.subject, "Re:"),
-        body: buildReplyBody(sourceMessage),
+        body: buildReplyBody(sourceMessage, dateOptions),
       });
     } else if (params.mode === "reply-all") {
       const fields = formatReplyAllRecipientFields(sourceMessage, fromEmail);
@@ -552,13 +564,13 @@ function ComposeSession({
         to: fields.to,
         cc: fields.cc,
         subject: prefixSubject(sourceMessage.subject, "Re:"),
-        body: buildReplyBody(sourceMessage),
+        body: buildReplyBody(sourceMessage, dateOptions),
       });
     } else if (params.mode === "forward") {
       seedCompose({
         ...EMPTY_COMPOSE_FIELDS,
         subject: prefixSubject(sourceMessage.subject, "Fwd:"),
-        body: buildForwardBody(sourceMessage),
+        body: buildForwardBody(sourceMessage, dateOptions),
       });
     } else if (params.mode === "draft") {
       const headers = {
@@ -632,6 +644,8 @@ function ComposeSession({
     runtime,
     seedFields,
     sourceMessage,
+    timeFormat,
+    timezone,
   ]);
 
   const hasSignature = Boolean(getPlainTextSignature(selectedIdentity));
@@ -889,14 +903,24 @@ function getReplyRecipients(
   }).join(", ");
 }
 
-function buildReplyBody(message: JmapEmailMessage): string {
+function formatQuotedDate(
+  receivedAt: string | undefined,
+  { timeFormat, timezone }: QuotedDateOptions,
+): string {
+  return receivedAt
+    ? formatDateTimeLabel(new Date(receivedAt), timezone, timeFormat)
+    : "Unknown date";
+}
+
+function buildReplyBody(
+  message: JmapEmailMessage,
+  dateOptions: QuotedDateOptions,
+): string {
   const sender =
     message.from?.[0]?.name?.trim() ||
     message.from?.[0]?.email?.trim() ||
     "Unknown sender";
-  const receivedAt = message.receivedAt
-    ? new Date(message.receivedAt).toLocaleString()
-    : "Unknown date";
+  const receivedAt = formatQuotedDate(message.receivedAt, dateOptions);
   const bodies = extractMessageBodies(message);
   const source = bodies.text?.trim() || stripHtmlToText(bodies.html);
   const quoted = source
@@ -907,7 +931,10 @@ function buildReplyBody(message: JmapEmailMessage): string {
   return `\n\nOn ${receivedAt}, ${sender} wrote:\n${quoted}`;
 }
 
-function buildForwardBody(message: JmapEmailMessage): string {
+function buildForwardBody(
+  message: JmapEmailMessage,
+  dateOptions: QuotedDateOptions,
+): string {
   const bodies = extractMessageBodies(message);
   const textBody = bodies.text?.trim() || stripHtmlToText(bodies.html);
   const from = getReplyRecipients(message) || "Unknown sender";
@@ -919,9 +946,7 @@ function buildForwardBody(message: JmapEmailMessage): string {
     .map((entry) => entry.email?.trim())
     .filter((value): value is string => Boolean(value))
     .join(", ");
-  const date = message.receivedAt
-    ? new Date(message.receivedAt).toLocaleString()
-    : "Unknown date";
+  const date = formatQuotedDate(message.receivedAt, dateOptions);
 
   return [
     "",

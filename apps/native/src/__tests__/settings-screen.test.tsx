@@ -3,6 +3,7 @@ import type {
   UpdateSettingsRequest,
   UserSettings,
 } from "@workspace/calendar-core";
+import { resolveTimeFormat } from "@workspace/calendar-core";
 
 const DEFAULT_WORKING_DAYS = [1, 2, 3, 4, 5];
 
@@ -437,10 +438,10 @@ describe("Default values for undefined settings", () => {
     expect(defaultCalendarId).toBeNull();
   });
 
-  it("defaults timeFormat to 12h", () => {
+  it("defaults timeFormat to 24h", () => {
     const settings = getSettings();
-    const timeFormat = settings?.timeFormat ?? "12h";
-    expect(timeFormat).toBe("12h");
+    const timeFormat = resolveTimeFormat(settings?.timeFormat);
+    expect(timeFormat).toBe("24h");
   });
 
   it("defaults workingDays to the web-compatible JSON shape", () => {

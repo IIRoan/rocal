@@ -2,6 +2,7 @@ import {
   formatCalendarDayKey,
   isTodayInTimezone,
   wallClockToUtc,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 
 import type { RefObject } from "react";
@@ -30,7 +31,7 @@ export function WeekViewTimeGrid({
   handlers: WeekEventHandlers;
   processedDayEvents: PositionedTimelineEvent[][];
   scrollRef: RefObject<HTMLDivElement | null>;
-  timeFormat: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone: string;
 }) {
   return (

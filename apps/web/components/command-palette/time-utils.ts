@@ -1,10 +1,12 @@
 import { format } from "date-fns";
 import {
+  clockTimePattern,
   formatWallClockTime,
   pickerDateAndTimeToUtc,
   pickerDateToAllDayUtcRange,
   resolveTimezone,
   utcToPickerDate,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 
 export interface TimeValidationResult {
@@ -147,7 +149,7 @@ export const scrollToSelectedTime = (
   }
 };
 
-export const generateAllTimeOptions = (timeFormat?: string) => {
+export const generateAllTimeOptions = (timeFormat: TimeFormat) => {
   const options = [];
 
   for (let hour = 0; hour <= 23; hour++) {
@@ -156,12 +158,7 @@ export const generateAllTimeOptions = (timeFormat?: string) => {
       const formattedMinute = minute.toString().padStart(2, "0");
       const value = `${formattedHour}:${formattedMinute}`;
       const date = new Date(2000, 0, 1, hour, minute);
-
-      // Use 24h format if explicitly set to "24h", otherwise use 12h format
-      const label =
-        timeFormat === "24h"
-          ? `${formattedHour}:${formattedMinute}`
-          : format(date, "h:mm a");
+      const label = format(date, clockTimePattern(timeFormat));
 
       options.push({ value, label });
     }

@@ -183,6 +183,7 @@ describe("MessageList", () => {
         <MessageList
           messages={[message]}
           selectedMessageId={null}
+          timeFormat="24h"
           onSelect={onSelect}
         />,
       );
@@ -226,7 +227,12 @@ describe("MessageList", () => {
     const render = (messages: JmapEmailMessage[]) =>
       act(() => {
         renderedRoot.render(
-          <MessageList messages={messages} selectedMessageId={null} onSelect={jest.fn()} />,
+          <MessageList
+            messages={messages}
+            selectedMessageId={null}
+            timeFormat="24h"
+            onSelect={jest.fn()}
+          />,
         );
       });
 
@@ -256,6 +262,7 @@ describe("MessageList", () => {
         <MessageList
           messages={[message]}
           selectedMessageId={null}
+          timeFormat="24h"
           onSelect={onSelect}
           onDelete={onDelete}
           narrow

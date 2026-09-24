@@ -31,6 +31,7 @@ import {
   moveAllDayEventToDay,
   resolveTimezone,
   wallClockToUtc,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 
 import { EventItem } from "./event-item";
@@ -77,12 +78,14 @@ interface CalendarDndProviderProps {
   children: ReactNode;
   onEventUpdate: (event: CalendarEvent) => void;
   timezone?: string;
+  timeFormat: TimeFormat;
 }
 
 export function CalendarDndProvider({
   children,
   onEventUpdate,
   timezone,
+  timeFormat,
 }: CalendarDndProviderProps) {
   const resolvedTimezone = resolveTimezone(timezone);
   const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
@@ -404,6 +407,7 @@ export function CalendarDndProvider({
                 isFirstDay={dragHandlePosition?.data?.isFirstDay !== false}
                 isLastDay={dragHandlePosition?.data?.isLastDay !== false}
                 timezone={timezone}
+                timeFormat={timeFormat}
               />
             </div>
           )}
