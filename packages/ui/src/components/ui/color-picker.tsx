@@ -7,6 +7,7 @@ import { Label } from "./label";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { cn } from "@workspace/ui/lib/utils";
 import { isHexColor, PRESET_COLOR_OPTIONS } from "@workspace/calendar-core";
+import { SimpleTooltip } from "./tooltip";
 
 export interface PresetColorOption {
   value: string;
@@ -84,22 +85,24 @@ export function ColorPicker({
               </Label>
               <div className="grid grid-cols-6 gap-2">
                 {presetColors.map((preset) => (
-                  <button
-                    key={preset.value}
-                    className={cn(
-                      "w-8 h-8 rounded border-2 transition-all duration-200 ease-out hover:scale-110 hover:shadow-sm focus-visible:scale-110 focus-visible:ring-2 focus-visible:ring-ring/50 outline-none",
-                      value === preset.value
-                        ? "border-foreground ring-2 ring-ring"
-                        : "border-border hover:border-foreground",
-                    )}
-                    style={{
-                      backgroundColor: getSwatchBackground(preset.value),
-                    }}
-                    onClick={() => handlePresetClick(preset.value)}
-                    title={preset.label}
-                  >
-                    <span className="sr-only">{preset.label}</span>
-                  </button>
+                  <SimpleTooltip content={preset.label} key={preset.value}>
+                    <button
+                      type="button"
+                      className={cn(
+                        "w-8 h-8 rounded border-2 transition-all duration-200 ease-out hover:scale-110 hover:shadow-sm focus-visible:scale-110 focus-visible:ring-2 focus-visible:ring-ring/50 outline-none",
+                        value === preset.value
+                          ? "border-foreground ring-2 ring-ring"
+                          : "border-border hover:border-foreground",
+                      )}
+                      style={{
+                        backgroundColor: getSwatchBackground(preset.value),
+                      }}
+                      onClick={() => handlePresetClick(preset.value)}
+                      aria-label={preset.label}
+                    >
+                      <span className="sr-only">{preset.label}</span>
+                    </button>
+                  </SimpleTooltip>
                 ))}
               </div>
             </div>

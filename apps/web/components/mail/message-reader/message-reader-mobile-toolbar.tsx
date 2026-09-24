@@ -54,14 +54,13 @@ export function MessageReaderMobileToolbar({
                 variant="ghost"
                 size="icon-sm"
                 aria-label="Report spam"
-                title="Report spam"
                 disabled={isBusy}
                 onClick={onReportSpam}
               >
                 <OctagonAlert className="text-muted-foreground" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" className="z-[200]">
+            <TooltipContent side="bottom">
               Report spam
             </TooltipContent>
           </Tooltip>
@@ -73,14 +72,13 @@ export function MessageReaderMobileToolbar({
                 variant="ghost"
                 size="icon-sm"
                 aria-label="Not spam"
-                title="Not spam"
                 disabled={isBusy}
                 onClick={onNotSpam}
               >
                 <Inbox />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" className="z-[200]">
+            <TooltipContent side="bottom">
               Not spam
             </TooltipContent>
           </Tooltip>
@@ -91,14 +89,13 @@ export function MessageReaderMobileToolbar({
               variant="ghost"
               size="icon-sm"
               aria-label={isInTrash ? "Delete permanently" : "Move to trash"}
-              title={isInTrash ? "Delete permanently" : "Move to trash"}
               disabled={isBusy}
               onClick={onDelete}
             >
               <Trash2 className="text-destructive" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="z-[200]">
+          <TooltipContent side="bottom">
             {isInTrash ? "Delete permanently" : "Move to trash"}
           </TooltipContent>
         </Tooltip>
@@ -108,7 +105,6 @@ export function MessageReaderMobileToolbar({
               variant="ghost"
               size="icon-sm"
               aria-label="More actions"
-              title="More actions"
               disabled={isBusy}
               onClick={() =>
                 dispatchChrome({ type: "patch", patch: { moreActionsOpen: true } })
@@ -117,7 +113,7 @@ export function MessageReaderMobileToolbar({
               <EllipsisVertical />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="z-[200]">
+          <TooltipContent side="bottom">
             More actions
           </TooltipContent>
         </Tooltip>

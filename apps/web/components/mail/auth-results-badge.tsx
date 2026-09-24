@@ -46,7 +46,7 @@ export function AuthResultsBadge({
           <Icon className="size-3.5" strokeWidth={2.25} />
         </span>
       </TooltipTrigger>
-      <TooltipContent side="bottom" className="text-xs">
+      <TooltipContent side="bottom">
         <div className="space-y-0.5">
           {tooltipText.map((line) => (
             <div key={line}>{line}</div>

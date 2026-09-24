@@ -113,6 +113,7 @@ jest.mock("@workspace/ui/components/ui/tooltip", () => ({
   TooltipContent: ({ children }: { children: React.ReactNode }) => (
     <span>{children}</span>
   ),
+  SimpleTooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 jest.mock("@workspace/ui/components/ui/dropdown-menu", () => {

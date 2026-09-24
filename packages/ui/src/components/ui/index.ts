@@ -114,6 +114,7 @@ export {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  SimpleTooltip,
 } from "./tooltip";
 export { VisuallyHidden } from "./visually-hidden";
 export {

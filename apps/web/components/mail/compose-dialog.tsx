@@ -68,6 +68,7 @@ import { serializeEditorContent } from "./quoted-html";
 import { plainTextToComposerBody } from "@/lib/mail/compose-editor-utils";
 import { toast } from "sonner";
 import { cn } from "@workspace/ui/lib/utils";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 export interface ComposeDialogProps {
   identities: JmapIdentity[];
@@ -509,14 +510,16 @@ export function ComposeForm({
           Clear
         </Button>
         {onExpand && (
-          <button
-            type="button"
-            onClick={onExpand}
-            title="Open full editor"
-            className="p-1 rounded hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
-          >
-            <Maximize2 className="size-3.5" />
-          </button>
+          <SimpleTooltip content="Open full editor">
+            <button
+              type="button"
+              onClick={onExpand}
+              aria-label="Open full editor"
+              className="p-1 rounded hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+            >
+              <Maximize2 className="size-3.5" />
+            </button>
+          </SimpleTooltip>
         )}
         <Button
           size="sm"
@@ -851,27 +854,24 @@ export function ComposeForm({
           >
             <Paperclip className="size-4" />
           </button>
-          <button
-            type="button"
-            onClick={() =>
-              updateSettings({ plainTextMode: !composeSettings.plainTextMode })
-            }
-            disabled={isBusy}
-            title={
-              composeSettings.plainTextMode
-                ? "Rich text compose"
-                : "Plain text compose"
-            }
-            className={cn(
-              "inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors disabled:opacity-40",
-              composeSettings.plainTextMode
-                ? "bg-primary/15 text-primary"
-                : "text-muted-foreground/60 hover:bg-muted/50 hover:text-muted-foreground",
-            )}
-          >
-            <AlignLeft className="size-3.5" />
-            Plain text
-          </button>
+          <SimpleTooltip content={composeSettings.plainTextMode ? "Rich text compose" : "Plain text compose"}>
+            <button
+              type="button"
+              onClick={() =>
+                updateSettings({ plainTextMode: !composeSettings.plainTextMode })
+              }
+              disabled={isBusy}
+              className={cn(
+                "inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors disabled:opacity-40",
+                composeSettings.plainTextMode
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground/60 hover:bg-muted/50 hover:text-muted-foreground",
+              )}
+            >
+              <AlignLeft className="size-3.5" />
+              Plain text
+            </button>
+          </SimpleTooltip>
         </div>
         <span className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground/40">
           <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">

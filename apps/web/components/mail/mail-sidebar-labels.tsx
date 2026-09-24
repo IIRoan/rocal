@@ -10,6 +10,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import type { LabelDef } from "@/lib/mail/types";
 import { resolveLabelDisplayColor } from "@workspace/calendar-core";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 export function MailSidebarLabels({
   labels,
@@ -43,16 +44,17 @@ export function MailSidebarLabels({
           Labels
         </button>
         {onOpenLabels ? (
-          <button
-            type="button"
-            onClick={onOpenLabels}
-            disabled={isBusy}
-            aria-label="Manage labels"
-            title="Manage labels"
-            className="flex size-6 cursor-pointer items-center justify-center rounded-md text-[var(--icon-tertiary)] transition-colors hover:bg-[var(--bg-cell-hover)] hover:text-[var(--icon-primary)] disabled:opacity-30"
-          >
-            <CirclePlus size={14} strokeWidth={2} />
-          </button>
+          <SimpleTooltip content="Manage labels">
+            <button
+              type="button"
+              onClick={onOpenLabels}
+              disabled={isBusy}
+              aria-label="Manage labels"
+              className="flex size-6 cursor-pointer items-center justify-center rounded-md text-[var(--icon-tertiary)] transition-colors hover:bg-[var(--bg-cell-hover)] hover:text-[var(--icon-primary)] disabled:opacity-30"
+            >
+              <CirclePlus size={14} strokeWidth={2} />
+            </button>
+          </SimpleTooltip>
         ) : null}
       </div>
       {expanded ? (

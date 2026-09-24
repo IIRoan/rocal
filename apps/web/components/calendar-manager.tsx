@@ -60,6 +60,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 interface CalendarManagerProps {
   onBack: () => void;
@@ -210,6 +211,7 @@ export function CalendarManager({
         {/* Header */}
         <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
           <button
+            type="button"
             onClick={onBack}
             className="p-1 rounded hover:bg-muted/50 transition-colors"
           >
@@ -468,6 +470,7 @@ export function CalendarManager({
         {/* Header */}
         <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
           <button
+            type="button"
             onClick={() => goBack()}
             className="p-1 rounded hover:bg-muted/50 transition-colors"
           >
@@ -511,29 +514,29 @@ export function CalendarManager({
               <Label className="text-xs text-muted-foreground">Color</Label>
               <div className="flex flex-wrap gap-2">
                 {PRESET_COLORS.map((preset) => (
-                  <button
-                    key={preset.value}
-                    type="button"
-                    onClick={() => {
-                      setCalendarColor(preset.value);
-                      if (calendarValidationErrors.color) {
-                        setCalendarValidationErrors((prev) => ({
-                          ...prev,
-                          color: undefined,
-                        }));
-                      }
-                    }}
-                    className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
-                      calendarColor === preset.value
-                        ? "border-foreground scale-110"
-                        : "border-transparent hover:scale-105"
-                    }`}
-                    style={{
-                      backgroundColor: getColorSwatchValue(preset.value),
-                    }}
-                    title={preset.label}
-                    aria-label={preset.label}
-                  />
+                  <SimpleTooltip content={preset.label} key={preset.value}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCalendarColor(preset.value);
+                        if (calendarValidationErrors.color) {
+                          setCalendarValidationErrors((prev) => ({
+                            ...prev,
+                            color: undefined,
+                          }));
+                        }
+                      }}
+                      className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
+                        calendarColor === preset.value
+                          ? "border-foreground scale-110"
+                          : "border-transparent hover:scale-105"
+                      }`}
+                      style={{
+                        backgroundColor: getColorSwatchValue(preset.value),
+                      }}
+                      aria-label={preset.label}
+                    />
+                  </SimpleTooltip>
                 ))}
               </div>
               {calendarValidationErrors.color && (
@@ -603,6 +606,7 @@ export function CalendarManager({
           {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
             <button
+              type="button"
               onClick={() => goBack()}
               className="p-1 rounded hover:bg-muted/50 transition-colors"
             >
@@ -653,29 +657,29 @@ export function CalendarManager({
                 <Label className="text-xs text-muted-foreground">Color</Label>
                 <div className="flex flex-wrap gap-2">
                   {PRESET_COLORS.map((preset) => (
-                    <button
-                      key={preset.value}
-                      type="button"
-                      onClick={() => {
-                        setCalendarColor(preset.value);
-                        if (calendarValidationErrors.color) {
-                          setCalendarValidationErrors((prev) => ({
-                            ...prev,
-                            color: undefined,
-                          }));
-                        }
-                      }}
-                      className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
-                        calendarColor === preset.value
-                          ? "border-foreground scale-110"
-                          : "border-transparent hover:scale-105"
-                      }`}
-                      style={{
-                        backgroundColor: getColorSwatchValue(preset.value),
-                      }}
-                      title={preset.label}
-                      aria-label={preset.label}
-                    />
+                    <SimpleTooltip content={preset.label} key={preset.value}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCalendarColor(preset.value);
+                          if (calendarValidationErrors.color) {
+                            setCalendarValidationErrors((prev) => ({
+                              ...prev,
+                              color: undefined,
+                            }));
+                          }
+                        }}
+                        className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
+                          calendarColor === preset.value
+                            ? "border-foreground scale-110"
+                            : "border-transparent hover:scale-105"
+                        }`}
+                        style={{
+                          backgroundColor: getColorSwatchValue(preset.value),
+                        }}
+                        aria-label={preset.label}
+                      />
+                    </SimpleTooltip>
                   ))}
                 </div>
                 {calendarValidationErrors.color && (
@@ -728,15 +732,17 @@ export function CalendarManager({
                       readOnly
                       className="h-8 text-xs font-mono"
                     />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleCopyShareLink}
-                      className="h-8 px-2"
-                      title="Copy link"
-                    >
-                      <Copy className="size-3.5" />
-                    </Button>
+                    <SimpleTooltip content="Copy link">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleCopyShareLink}
+                        className="h-8 px-2"
+                        aria-label="Copy link"
+                      >
+                        <Copy className="size-3.5" />
+                      </Button>
+                    </SimpleTooltip>
                   </div>
                   <Button
                     size="sm"

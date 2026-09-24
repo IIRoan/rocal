@@ -58,6 +58,7 @@ import {
   Search,
   Copy,
 } from "lucide-react";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 const ALLOWED_COLOR_VALUES = PRESET_COLORS.map((c) => c.value);
 
@@ -528,6 +529,7 @@ export function SubscriptionManagement({
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
             {onBack && (
               <button
+                type="button"
                 onClick={onBack}
                 className="p-1 rounded hover:bg-muted/50 transition-colors"
               >
@@ -639,45 +641,51 @@ export function SubscriptionManagement({
                       </button>
                       {/* Quick actions */}
                       <div className="flex items-center gap-0.5 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            toggleCalendarVisibility(subscription.calendar.id)
-                          }
-                          title={
-                            isCalendarVisible(subscription.calendar.id)
-                              ? "Hide calendar"
-                              : "Show calendar"
-                          }
-                          className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
-                        >
-                          {isCalendarVisible(subscription.calendar.id) ? (
-                            <Eye className="size-3.5" />
-                          ) : (
-                            <EyeOff className="size-3.5" />
-                          )}
-                        </button>
-                        {!isHoliday && (
+                        <SimpleTooltip content={isCalendarVisible(subscription.calendar.id) ? "Hide calendar" : "Show calendar"}>
                           <button
                             type="button"
-                            onClick={() => handleSyncSubscription(subscription)}
-                            disabled={syncMutation.isPending}
-                            title="Sync now"
+                            onClick={() =>
+                              toggleCalendarVisibility(subscription.calendar.id)
+                            }
+                            aria-label={
+                              isCalendarVisible(subscription.calendar.id)
+                                ? "Hide calendar"
+                                : "Show calendar"
+                            }
                             className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
                           >
-                            <RefreshCw
-                              className={`size-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`}
-                            />
+                            {isCalendarVisible(subscription.calendar.id) ? (
+                              <Eye className="size-3.5" />
+                            ) : (
+                              <EyeOff className="size-3.5" />
+                            )}
                           </button>
+                        </SimpleTooltip>
+                        {!isHoliday && (
+                          <SimpleTooltip content="Sync now">
+                            <button
+                              type="button"
+                              onClick={() => handleSyncSubscription(subscription)}
+                              disabled={syncMutation.isPending}
+                              aria-label="Sync now"
+                              className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
+                            >
+                              <RefreshCw
+                                className={`size-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`}
+                              />
+                            </button>
+                          </SimpleTooltip>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(subscription)}
-                          title="Edit"
-                          className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
-                        >
-                          <ChevronRight className="size-3.5" />
-                        </button>
+                        <SimpleTooltip content="Edit">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(subscription)}
+                            aria-label="Edit"
+                            className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
+                          >
+                            <ChevronRight className="size-3.5" />
+                          </button>
+                        </SimpleTooltip>
                       </div>
                     </div>
                   );
@@ -694,6 +702,7 @@ export function SubscriptionManagement({
           {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
             <button
+              type="button"
               onClick={goBackToMain}
               className="p-1 rounded hover:bg-muted/50 transition-colors"
             >
@@ -808,6 +817,7 @@ export function SubscriptionManagement({
           {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
             <button
+              type="button"
               onClick={goBackToMain}
               className="p-1 rounded hover:bg-muted/50 transition-colors"
             >
@@ -829,6 +839,7 @@ export function SubscriptionManagement({
             />
             {holidaySearch && (
               <button
+                type="button"
                 onClick={() => setHolidaySearch("")}
                 className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
               >
@@ -912,6 +923,7 @@ export function SubscriptionManagement({
           {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
             <button
+              type="button"
               onClick={goBackToMain}
               className="p-1 rounded hover:bg-muted/50 transition-colors"
             >
@@ -968,28 +980,28 @@ export function SubscriptionManagement({
                 <Label className="text-xs text-muted-foreground">Color</Label>
                 <div className="flex flex-wrap gap-2">
                   {PRESET_COLORS.map((preset) => (
-                    <button
-                      key={preset.value}
-                      type="button"
-                      onClick={() => {
-                        updateEditField("color", preset.value);
-                        if (editValidationErrors.color)
-                          setEditValidationErrors((prev) => ({
-                            ...prev,
-                            color: undefined,
-                          }));
-                      }}
-                      className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
-                        editingColor === preset.value
-                          ? "border-foreground scale-110"
-                          : "border-transparent hover:scale-105"
-                      }`}
-                      style={{
-                        backgroundColor: getColorSwatchValue(preset.value),
-                      }}
-                      title={preset.label}
-                      aria-label={preset.label}
-                    />
+                    <SimpleTooltip content={preset.label} key={preset.value}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          updateEditField("color", preset.value);
+                          if (editValidationErrors.color)
+                            setEditValidationErrors((prev) => ({
+                              ...prev,
+                              color: undefined,
+                            }));
+                        }}
+                        className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
+                          editingColor === preset.value
+                            ? "border-foreground scale-110"
+                            : "border-transparent hover:scale-105"
+                        }`}
+                        style={{
+                          backgroundColor: getColorSwatchValue(preset.value),
+                        }}
+                        aria-label={preset.label}
+                      />
+                    </SimpleTooltip>
                   ))}
                 </div>
                 {editValidationErrors.color && (
@@ -1101,26 +1113,28 @@ export function SubscriptionManagement({
                       readOnly
                       className="h-8 text-xs font-mono"
                     />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={async () => {
-                        if (!editingSubscriptionData) return;
-                        try {
-                          await navigator.clipboard.writeText(
-                            editingSubscriptionData.url,
-                          );
-                          toast.success("Feed URL copied to clipboard");
-                        } catch {
-                          toast.error("Unable to copy link automatically");
-                        }
-                      }}
-                      disabled={!editingSubscriptionData}
-                      className="h-8 px-2"
-                      title="Copy URL"
-                    >
-                      <Copy className="size-3.5" />
-                    </Button>
+                    <SimpleTooltip content="Copy URL">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          if (!editingSubscriptionData) return;
+                          try {
+                            await navigator.clipboard.writeText(
+                              editingSubscriptionData.url,
+                            );
+                            toast.success("Feed URL copied to clipboard");
+                          } catch {
+                            toast.error("Unable to copy link automatically");
+                          }
+                        }}
+                        disabled={!editingSubscriptionData}
+                        className="h-8 px-2"
+                        aria-label="Copy URL"
+                      >
+                        <Copy className="size-3.5" />
+                      </Button>
+                    </SimpleTooltip>
                   </div>
                 </div>
               </>

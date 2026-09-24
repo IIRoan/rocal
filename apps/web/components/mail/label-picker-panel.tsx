@@ -9,6 +9,7 @@ import {
   resolveLabelDisplayColor,
 } from "@workspace/calendar-core";
 import { LabelColorPicker } from "./label-color-picker";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 const DEFAULT_LABEL_COLOR = "#6366f1";
 
@@ -206,26 +207,28 @@ export function LabelPickerPanel({
                   </div>
                 )}
                 {onUpdateLabel ? (
-                  <button
-                    type="button"
-                    onClick={() => startEditing(label)}
-                    className="mr-0.5 size-6 flex items-center justify-center rounded text-muted-foreground/50 opacity-0 transition-opacity hover:bg-accent/60 hover:text-foreground group-hover:opacity-100"
-                    aria-label={`Edit label ${label.name}`}
-                    title={`Edit ${label.name}`}
-                  >
-                    <Pencil className="size-3" strokeWidth={2.25} />
-                  </button>
+                  <SimpleTooltip content={`Edit ${label.name}`}>
+                    <button
+                      type="button"
+                      onClick={() => startEditing(label)}
+                      className="mr-0.5 size-6 flex items-center justify-center rounded text-muted-foreground/50 opacity-0 transition-opacity hover:bg-accent/60 hover:text-foreground group-hover:opacity-100"
+                      aria-label={`Edit label ${label.name}`}
+                    >
+                      <Pencil className="size-3" strokeWidth={2.25} />
+                    </button>
+                  </SimpleTooltip>
                 ) : null}
                 {onDeleteLabel ? (
-                  <button
-                    type="button"
-                    onClick={() => onDeleteLabel(label.id)}
-                    className="mr-1 size-6 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors shrink-0"
-                    aria-label={`Delete label ${label.name}`}
-                    title={`Delete ${label.name}`}
-                  >
-                    <Trash2 className="size-3" strokeWidth={2.25} />
-                  </button>
+                  <SimpleTooltip content={`Delete ${label.name}`}>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteLabel(label.id)}
+                      className="mr-1 size-6 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors shrink-0"
+                      aria-label={`Delete label ${label.name}`}
+                    >
+                      <Trash2 className="size-3" strokeWidth={2.25} />
+                    </button>
+                  </SimpleTooltip>
                 ) : null}
               </div>
             );

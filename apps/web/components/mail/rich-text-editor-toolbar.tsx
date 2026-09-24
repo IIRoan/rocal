@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { TableSizePicker } from "./rich-text-editor-table-picker";
+import { SimpleTooltip, Tooltip, TooltipTrigger, TooltipContent } from "@workspace/ui/components/ui/tooltip";
 
 function ToolbarButton({
   active,
@@ -44,18 +45,20 @@ function ToolbarButton({
   disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      title={title}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        "inline-flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--icon-secondary)] hover:bg-[var(--bg-overlay-secondary)] disabled:opacity-40",
-        active && "bg-[var(--bg-overlay-secondary)] text-[var(--icon-primary)]",
-      )}
-    >
-      {children}
-    </button>
+    <SimpleTooltip content={title}>
+      <button
+        type="button"
+        aria-label={title}
+        disabled={disabled}
+        onClick={onClick}
+        className={cn(
+          "inline-flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--icon-secondary)] hover:bg-[var(--bg-overlay-secondary)] disabled:opacity-40",
+          active && "bg-[var(--bg-overlay-secondary)] text-[var(--icon-primary)]",
+        )}
+      >
+        {children}
+      </button>
+    </SimpleTooltip>
   );
 }
 
@@ -76,125 +79,130 @@ function TableMenu({
 }) {
   const close = () => onOpenChange(false);
   return (
-    <DropdownPanel
-      open={open}
-      onOpenChange={onOpenChange}
-      align="start"
-      className="z-[100] p-1"
-      onOpenAutoFocus={(event) => event.preventDefault()}
-      trigger={
-        <button
-          type="button"
-          title="Table"
-          disabled={disabled}
-          className={cn(
-            "inline-flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--icon-secondary)] hover:bg-[var(--bg-overlay-secondary)] disabled:opacity-40",
-            editor.isActive("table") &&
-              "bg-[var(--bg-overlay-secondary)] text-[var(--icon-primary)]",
+    <Tooltip>
+      <DropdownPanel
+        open={open}
+        onOpenChange={onOpenChange}
+        align="start"
+        className="z-[100] p-1"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        trigger={
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label="Table"
+              disabled={disabled}
+              className={cn(
+                "inline-flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--icon-secondary)] hover:bg-[var(--bg-overlay-secondary)] disabled:opacity-40",
+                editor.isActive("table") &&
+                  "bg-[var(--bg-overlay-secondary)] text-[var(--icon-primary)]",
+              )}
+            >
+              <TableIcon className="size-3.5" strokeWidth={2.25} />
+            </button>
+          </TooltipTrigger>
+        }
+      >
+          {editor.isActive("table") ? (
+            <div className="flex flex-col gap-0.5">
+              <button
+                type="button"
+                className={DROPDOWN_PANEL_ROW_CLASS}
+                onClick={() => {
+                  editor.chain().focus().addRowBefore().run();
+                  close();
+                }}
+              >
+                <Rows3 className="size-4 text-[var(--icon-secondary)]" /> Add row above
+              </button>
+              <button
+                type="button"
+                className={DROPDOWN_PANEL_ROW_CLASS}
+                onClick={() => {
+                  editor.chain().focus().addRowAfter().run();
+                  close();
+                }}
+              >
+                <Rows3 className="size-4 text-[var(--icon-secondary)]" /> Add row below
+              </button>
+              <button
+                type="button"
+                className={DROPDOWN_PANEL_ROW_CLASS}
+                onClick={() => {
+                  editor.chain().focus().addColumnBefore().run();
+                  close();
+                }}
+              >
+                <Columns3 className="size-4 text-[var(--icon-secondary)]" /> Add column before
+              </button>
+              <button
+                type="button"
+                className={DROPDOWN_PANEL_ROW_CLASS}
+                onClick={() => {
+                  editor.chain().focus().addColumnAfter().run();
+                  close();
+                }}
+              >
+                <Columns3 className="size-4 text-[var(--icon-secondary)]" /> Add column after
+              </button>
+              <div className="-mx-1 my-1 h-px bg-[var(--border-tertiary)]" />
+              <button
+                type="button"
+                className={DROPDOWN_PANEL_ROW_CLASS}
+                onClick={() => {
+                  editor.chain().focus().deleteRow().run();
+                  close();
+                }}
+              >
+                <Trash2 className="size-4 text-[var(--icon-secondary)]" /> Delete row
+              </button>
+              <button
+                type="button"
+                className={DROPDOWN_PANEL_ROW_CLASS}
+                onClick={() => {
+                  editor.chain().focus().deleteColumn().run();
+                  close();
+                }}
+              >
+                <Trash2 className="size-4 text-[var(--icon-secondary)]" /> Delete column
+              </button>
+              <button
+                type="button"
+                className={DROPDOWN_PANEL_ROW_CLASS}
+                onClick={() => {
+                  editor.chain().focus().toggleHeaderRow().run();
+                  close();
+                }}
+              >
+                <Rows3 className="size-4 text-[var(--icon-secondary)]" /> Toggle header row
+              </button>
+              <div className="-mx-1 my-1 h-px bg-[var(--border-tertiary)]" />
+              <button
+                type="button"
+                className={cn(DROPDOWN_PANEL_ROW_CLASS, "text-[var(--text-destructive)]")}
+                onClick={() => {
+                  editor.chain().focus().deleteTable().run();
+                  close();
+                }}
+              >
+                <Trash2 className="size-4 text-[var(--icon-secondary)]" /> Delete table
+              </button>
+            </div>
+          ) : (
+            <TableSizePicker
+              onPick={(rows, cols) => {
+                editor
+                  .chain()
+                  .focus()
+                  .insertTable({ rows, cols, withHeaderRow: true })
+                  .run();
+                close();
+              }}
+            />
           )}
-        >
-          <TableIcon className="size-3.5" strokeWidth={2.25} />
-        </button>
-      }
-    >
-        {editor.isActive("table") ? (
-          <div className="flex flex-col gap-0.5">
-            <button
-              type="button"
-              className={DROPDOWN_PANEL_ROW_CLASS}
-              onClick={() => {
-                editor.chain().focus().addRowBefore().run();
-                close();
-              }}
-            >
-              <Rows3 className="size-4 text-[var(--icon-secondary)]" /> Add row above
-            </button>
-            <button
-              type="button"
-              className={DROPDOWN_PANEL_ROW_CLASS}
-              onClick={() => {
-                editor.chain().focus().addRowAfter().run();
-                close();
-              }}
-            >
-              <Rows3 className="size-4 text-[var(--icon-secondary)]" /> Add row below
-            </button>
-            <button
-              type="button"
-              className={DROPDOWN_PANEL_ROW_CLASS}
-              onClick={() => {
-                editor.chain().focus().addColumnBefore().run();
-                close();
-              }}
-            >
-              <Columns3 className="size-4 text-[var(--icon-secondary)]" /> Add column before
-            </button>
-            <button
-              type="button"
-              className={DROPDOWN_PANEL_ROW_CLASS}
-              onClick={() => {
-                editor.chain().focus().addColumnAfter().run();
-                close();
-              }}
-            >
-              <Columns3 className="size-4 text-[var(--icon-secondary)]" /> Add column after
-            </button>
-            <div className="-mx-1 my-1 h-px bg-[var(--border-tertiary)]" />
-            <button
-              type="button"
-              className={DROPDOWN_PANEL_ROW_CLASS}
-              onClick={() => {
-                editor.chain().focus().deleteRow().run();
-                close();
-              }}
-            >
-              <Trash2 className="size-4 text-[var(--icon-secondary)]" /> Delete row
-            </button>
-            <button
-              type="button"
-              className={DROPDOWN_PANEL_ROW_CLASS}
-              onClick={() => {
-                editor.chain().focus().deleteColumn().run();
-                close();
-              }}
-            >
-              <Trash2 className="size-4 text-[var(--icon-secondary)]" /> Delete column
-            </button>
-            <button
-              type="button"
-              className={DROPDOWN_PANEL_ROW_CLASS}
-              onClick={() => {
-                editor.chain().focus().toggleHeaderRow().run();
-                close();
-              }}
-            >
-              <Rows3 className="size-4 text-[var(--icon-secondary)]" /> Toggle header row
-            </button>
-            <div className="-mx-1 my-1 h-px bg-[var(--border-tertiary)]" />
-            <button
-              type="button"
-              className={cn(DROPDOWN_PANEL_ROW_CLASS, "text-[var(--text-destructive)]")}
-              onClick={() => {
-                editor.chain().focus().deleteTable().run();
-                close();
-              }}
-            >
-              <Trash2 className="size-4 text-[var(--icon-secondary)]" /> Delete table
-            </button>
-          </div>
-        ) : (
-          <TableSizePicker
-            onPick={(rows, cols) => {
-              editor
-                .chain()
-                .focus()
-                .insertTable({ rows, cols, withHeaderRow: true })
-                .run();
-              close();
-            }}
-          />
-        )}
-    </DropdownPanel>
+      </DropdownPanel>
+      <TooltipContent>Table</TooltipContent>
+    </Tooltip>
   );
 }
 

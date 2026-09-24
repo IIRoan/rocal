@@ -147,7 +147,7 @@ export function EventCalendarToolbar({
                     <Icon size={14} aria-hidden="true" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
+                <TooltipContent side="bottom">
                   {label}
                   <span className="ml-1.5 opacity-60">{shortcut}</span>
                 </TooltipContent>

@@ -15,6 +15,7 @@ import {
 } from "@workspace/calendar-core";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
 import { cn } from "@workspace/ui/lib/utils";
+import { SimpleTooltip } from "../ui/tooltip";
 
 export interface EventNotification {
   id?: string;
@@ -117,18 +118,19 @@ function ReminderChip({
           </PopoverContent>
         </Popover>
       )}
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Remove ${formatReminderShort(value)} reminder`}
-        title="Remove reminder"
-        className={cn(
-          "tap-target ml-0.5 flex aspect-square items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50",
-          height,
-        )}
-      >
-        <X className="size-3.5" />
-      </button>
+      <SimpleTooltip content="Remove reminder">
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${formatReminderShort(value)} reminder`}
+          className={cn(
+            "tap-target ml-0.5 flex aspect-square items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50",
+            height,
+          )}
+        >
+          <X className="size-3.5" />
+        </button>
+      </SimpleTooltip>
     </div>
   );
 }
