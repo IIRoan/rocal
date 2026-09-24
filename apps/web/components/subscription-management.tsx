@@ -119,10 +119,7 @@ export function SubscriptionManagement({
       url: "",
       color: "indigo",
     });
-  // Edit form: only the user-editable overrides for the calendar identified
-  // by `initialEditCalendarId`. The underlying source-of-truth (subscription
-  // detail + calendar entry) is derived synchronously from the query cache,
-  // so the form renders fully populated on first paint — no flash.
+  // Only user-editable overrides; the source data is derived synchronously from the query cache so the form is populated on first paint.
   const [editFormOverride, setEditFormOverride] = useState<{
     forCalendarId: string;
     name?: string;
@@ -155,9 +152,7 @@ export function SubscriptionManagement({
     onBack?.();
   };
 
-  // Query — kept enabled while the palette is open. The `initialData` lets
-  // us read whatever the parent (CalendarManager) prefetched into the cache
-  // before the user ever clicked into the edit screen.
+  // initialData picks up the CalendarManager prefetch so the edit screen renders populated.
   const {
     data: subscriptions = [],
     isLoading: isLoadingSubscriptions,
@@ -176,25 +171,18 @@ export function SubscriptionManagement({
     }
   }, [queryError]);
 
-  // The calendar id currently being edited. Sourced from either the parent
-  // (`initialEditCalendarId`, when navigated here from CalendarManager) or
-  // from local navigation within this component (clicking a row in the list).
+  // Target comes from `initialEditCalendarId` (CalendarManager) or a row clicked in this list.
   const [internalEditCalendarId, setInternalEditCalendarId] = useState<
     string | undefined
   >(undefined);
   const editTargetCalendarId = initialEditCalendarId ?? internalEditCalendarId;
 
-  // Active override: only honored when it matches the current target. Stale
-  // overrides for a previous target are simply ignored (no effect needed),
-  // and the lazy setter below garbage-collects them on next user input.
+  // Overrides for a previous target are ignored here and garbage-collected by the setter on next input.
   const activeOverride =
     editFormOverride && editFormOverride.forCalendarId === editTargetCalendarId
       ? editFormOverride
       : null;
 
-  // Synchronously derived: the subscription detail and calendar for the
-  // currently-edited target. Available on first render whenever the query
-  // cache has been populated (typically via parent prefetch).
   const editingSubscriptionData: CalendarSubscription | null = useMemo(() => {
     if (!editTargetCalendarId) return null;
     return (
@@ -233,7 +221,6 @@ export function SubscriptionManagement({
     });
   };
 
-  // Mutations
   const createMutation = useMutation({
     mutationFn: (data: CreateSubscriptionRequest) =>
       calendarApiService.createSubscription(data),
@@ -522,10 +509,8 @@ export function SubscriptionManagement({
         maxHeight: "calc(100dvh - 200px)",
       }}
     >
-      {/* ─── MAIN VIEW ─── */}
       {currentView === "subscriptions" && (
         <>
-          {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
             {onBack && (
               <button
@@ -541,7 +526,6 @@ export function SubscriptionManagement({
           </div>
 
           <div className="flex-1 overflow-y-auto min-h-0">
-            {/* Actions section */}
             <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
               Actions
             </div>
@@ -571,7 +555,6 @@ export function SubscriptionManagement({
               </button>
             </div>
 
-            {/* Synced Calendars section */}
             <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
               Synced Calendars
               {readOnlyCalendars.length > 0 && (
@@ -600,7 +583,6 @@ export function SubscriptionManagement({
                       key={subscription.id}
                       className="flex items-center gap-2.5 px-3 py-2.5 rounded-md hover:bg-accent/20 group"
                     >
-                      {/* Color swatch */}
                       <div
                         className="size-3.5 rounded-sm shrink-0"
                         style={{
@@ -609,7 +591,6 @@ export function SubscriptionManagement({
                           ),
                         }}
                       />
-                      {/* Info — click to edit */}
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(subscription)}
@@ -639,7 +620,6 @@ export function SubscriptionManagement({
                           )}
                         </div>
                       </button>
-                      {/* Quick actions */}
                       <div className="flex items-center gap-0.5 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
                         <SimpleTooltip content={isCalendarVisible(subscription.calendar.id) ? "Hide calendar" : "Show calendar"}>
                           <button
@@ -696,10 +676,8 @@ export function SubscriptionManagement({
         </>
       )}
 
-      {/* ─── ADD EXTERNAL FEED VIEW ─── */}
       {currentView === "subscriptions-add-feed" && (
         <>
-          {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
             <button
               type="button"
@@ -811,10 +789,8 @@ export function SubscriptionManagement({
         </>
       )}
 
-      {/* ─── HOLIDAY CALENDARS VIEW ─── */}
       {currentView === "subscriptions-holidays" && (
         <>
-          {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
             <button
               type="button"
@@ -827,7 +803,6 @@ export function SubscriptionManagement({
             <span className="text-sm font-medium">Holiday Calendars</span>
           </div>
 
-          {/* Search bar */}
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
             <Search className="size-3.5 text-muted-foreground/50 shrink-0" />
             <Input
@@ -917,10 +892,8 @@ export function SubscriptionManagement({
         </>
       )}
 
-      {/* ─── EDIT VIEW ─── */}
       {currentView === "subscriptions-edit" && editTargetCalendarId && (
         <>
-          {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
             <button
               type="button"
@@ -943,7 +916,6 @@ export function SubscriptionManagement({
           </div>
 
           <div className="flex-1 overflow-y-auto min-h-0">
-            {/* Calendar Section */}
             <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
               Calendar
             </div>
@@ -1013,7 +985,6 @@ export function SubscriptionManagement({
               </div>
             </div>
 
-            {/* Holiday calendar info */}
             {isHolidayCalendar &&
               editingSubscriptionData &&
               (() => {
@@ -1051,7 +1022,6 @@ export function SubscriptionManagement({
                 );
               })()}
 
-            {/* Sync Section — external feeds only */}
             {!isHolidayCalendar && (
               <>
                 <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
@@ -1096,7 +1066,6 @@ export function SubscriptionManagement({
                   </div>
                 )}
 
-                {/* Source Section */}
                 <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
                   Source
                 </div>
@@ -1141,7 +1110,6 @@ export function SubscriptionManagement({
             )}
           </div>
 
-          {/* Action Buttons */}
           <div className="border-t border-border/50 px-4 py-3 flex items-center justify-between shrink-0">
             <Button
               type="button"
@@ -1220,7 +1188,6 @@ export function SubscriptionManagement({
     </Dialog>
   );
 
-  // When used standalone (with onOpenChange), wrap in Dialog
   if (onOpenChange) {
     return (
       <>
@@ -1242,7 +1209,6 @@ export function SubscriptionManagement({
     );
   }
 
-  // When embedded in command palette, return content directly
   return (
     <>
       {content}

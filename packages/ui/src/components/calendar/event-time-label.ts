@@ -2,10 +2,6 @@ import type { TimeFormat } from "@workspace/calendar-core";
 import { format, getMinutes } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 
-// Using date-fns format with custom formatting:
-// 12h format: 'h' - hours (1-12), 'a' - am/pm
-// 24h format: 'H' - hours (0-23)
-// ':mm' - minutes with leading zero (only if the token 'mm' is present)
 const formatTimeWithOptionalMinutes = (
   date: Date,
   timeFormat: TimeFormat,
@@ -17,7 +13,6 @@ const formatTimeWithOptionalMinutes = (
   }
 };
 
-// Timezone-aware formatter (falls back to local if no timezone)
 export const formatTimeWithOptionalMinutesTZ = (
   date: Date,
   timeFormat: TimeFormat,

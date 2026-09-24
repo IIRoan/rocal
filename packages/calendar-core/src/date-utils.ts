@@ -10,10 +10,7 @@ import { AgendaDaysToShow, type CalendarView } from "./types";
 
 type Day = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
-/**
- * Returns the date range to fetch events for a given calendar view.
- * For month view, the range extends to cover partial weeks at the start/end.
- */
+/** Event fetch range for a view; month view extends to cover the partial first and last weeks. */
 export function getDefaultCalendarDateRange({
   baseDate,
   view,
@@ -65,10 +62,7 @@ export function getDefaultCalendarDateRange({
   return { start, end };
 }
 
-/**
- * Parses a JSON-encoded working days string into an array of day numbers (0-6).
- * Falls back to Monday–Friday if the input is invalid.
- */
+/** Parses a JSON working-days string (0-6), falling back to Monday–Friday. */
 export function parseWorkingDays(
   workingDays: string | null | undefined,
 ): number[] {

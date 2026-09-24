@@ -5,15 +5,11 @@ export type ParsedMailAddress = {
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Lowercases a bare email address. */
 export function normalizeEmailAddress(value: string): string {
   return value.trim().toLowerCase();
 }
 
-/**
- * Parse a recipient token that may be `Name <email@example.com>` or a bare
- * address. Mirrors the webmail JMAP client behaviour.
- */
+/** Parses `Name <email@example.com>` or a bare address, mirroring the webmail JMAP client. */
 export function parseRecipientString(value: string): ParsedMailAddress {
   const trimmed = value.trim();
   const angleMatch = trimmed.match(/^(.+?)\s*<([^>]+)>$/);
@@ -26,7 +22,6 @@ export function parseRecipientString(value: string): ParsedMailAddress {
   return { email: normalizeEmailAddress(trimmed) };
 }
 
-/** Split a free-text recipient field on commas and semicolons. */
 export function parseAddressList(raw: string): ParsedMailAddress[] {
   const seen = new Set<string>();
   const result: ParsedMailAddress[] = [];
@@ -108,11 +103,7 @@ export function isAutomatedMailAddress(value: string): boolean {
   return base.includes("noreply") || base.includes("no-reply");
 }
 
-/**
- * Detects administrative, system, and machine-only email addresses that must
- * never be invited to calendar events, targeted for account creation, or used
- * by normal users in queries (e.g. admin@solace.onl, alert@solace.onl, root@...).
- */
+/** Administrative, system, and machine addresses that must never be invited, provisioned, or used in normal-user queries. */
 export function isReservedSystemEmail(
   value: string,
   systemDomain?: string | null,
@@ -128,7 +119,6 @@ export function isReservedSystemEmail(
   const domain = normalized.slice(atIndex + 1);
   const baseLocal = (local.split("+")[0] ?? local).replace(/[._]/g, "-");
 
-  // Explicitly protect admin@solace.onl and administrative aliases
   if (
     normalized === "admin@solace.onl" ||
     (baseLocal === "admin" && (domain === "solace.onl" || domain.endsWith(".solace.onl")))
@@ -148,7 +138,6 @@ export function isReservedSystemEmail(
     return true;
   }
 
-  // Also block machine/daemon/root accounts across any domain
   if (
     baseLocal === "admin" ||
     baseLocal === "postmaster" ||
@@ -175,7 +164,6 @@ export type ComposeRecipientValidation = {
   };
 };
 
-/** Validate compose recipient fields and return normalized addresses. */
 export function validateComposeRecipients(input: {
   to: string;
   cc?: string;
@@ -285,13 +273,7 @@ type ReplyAddress = {
   email?: string | null;
 };
 
-/**
- * Resolve recipients for a "Reply" action.
- *
- * - Prefer original sender(s), excluding the current user.
- * - If the selected message was sent by the current user, fall back to `to` + `cc`
- *   (excluding the current user) so replies continue the conversation.
- */
+/** Reply to the original sender minus self; on your own message, fall back to its To + Cc so the conversation continues. */
 export function resolveReplyRecipients(input: {
   from?: ReplyAddress[];
   to?: ReplyAddress[];
@@ -330,14 +312,7 @@ export type ReplyAllRecipients = {
   cc: string[];
 };
 
-/**
- * Resolve recipients for a "Reply all" action.
- *
- * - To: original sender(s), excluding the current user.
- * - Cc: original To + Cc, excluding the current user and anyone already in To.
- * - If the selected message was sent by the current user, To is original To
- *   (minus self) and Cc is original Cc (minus self).
- */
+/** Reply all: To is the sender and Cc is To + Cc minus self and To; on your own message, To and Cc are kept minus self. */
 export function resolveReplyAllRecipients(input: {
   from?: ReplyAddress[];
   to?: ReplyAddress[];

@@ -39,7 +39,6 @@ import { CalendarEvent, type CalendarView } from "./types";
 
 const log = createLogger("calendar-dnd");
 
-// Define the context type
 type CalendarDndContextType = {
   activeEvent: CalendarEvent | null;
   activeId: UniqueIdentifier | null;
@@ -58,7 +57,6 @@ type CalendarDndContextType = {
   } | null;
 };
 
-// Create the context
 const CalendarDndContext = createContext<CalendarDndContextType>({
   activeEvent: null,
   activeId: null,
@@ -70,10 +68,8 @@ const CalendarDndContext = createContext<CalendarDndContextType>({
   dragHandlePosition: null,
 });
 
-// Hook to use the context
 export const useCalendarDnd = () => use(CalendarDndContext);
 
-// Props for the provider
 interface CalendarDndProviderProps {
   children: ReactNode;
   onEventUpdate: (event: CalendarEvent) => void;
@@ -104,39 +100,32 @@ export function CalendarDndProvider({
     };
   } | null>(null);
 
-  // Store original event dimensions
   const eventDimensions = useRef<{ height: number }>({ height: 0 });
 
-  // Configure sensors for better drag detection
   const sensors = useSensors(
     useSensor(MouseSensor, {
-      // Require the mouse to move by 5px before activating
       activationConstraint: {
         distance: 5,
       },
     }),
     useSensor(TouchSensor, {
-      // Press delay of 250ms, with tolerance of 5px of movement
       activationConstraint: {
         delay: 250,
         tolerance: 5,
       },
     }),
     useSensor(PointerSensor, {
-      // Require the pointer to move by 5px before activating
       activationConstraint: {
         distance: 5,
       },
     }),
   );
 
-  // Generate a stable ID for the DndContext
   const dndContextId = useId();
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
 
-    // Add safety check for data.current
     if (!active.data.current) {
       log.error("Missing data in drag start event", event);
       return;
@@ -173,7 +162,6 @@ export function CalendarDndProvider({
     setMultiDayWidth(eventMultiDayWidth || null);
     setDragHandlePosition(eventDragHandlePosition || null);
 
-    // Store event height if provided
     if (height) {
       eventDimensions.current.height = height;
       setEventHeight(height);
@@ -186,9 +174,7 @@ export function CalendarDndProvider({
     if (over && activeEvent && over.data.current) {
       const { date, time } = over.data.current as { date: Date; time?: number };
 
-      // Update time for week/day views
       if (time !== undefined && activeView !== "month") {
-        // Calculate hours and minutes with exact precision
         const hours = Math.floor(time);
         const fractionalHour = time - hours;
 
@@ -201,7 +187,6 @@ export function CalendarDndProvider({
           ? getZonedDateParts(currentTime, resolvedTimezone)
           : null;
 
-        // Only update if time has changed
         if (
           !currentParts ||
           newParts.hours !== currentParts.hours ||
@@ -213,7 +198,6 @@ export function CalendarDndProvider({
           setCurrentTime(newTime);
         }
       } else if (activeView === "month") {
-        // For month view, just update the date but preserve time
         const currentParts = currentTime
           ? getZonedDateParts(currentTime, resolvedTimezone)
           : null;
@@ -225,7 +209,6 @@ export function CalendarDndProvider({
         );
         const newParts = getZonedDateParts(newTime, resolvedTimezone);
 
-        // Only update if date has changed
         if (
           !currentParts ||
           newParts.day !== currentParts.day ||
@@ -241,9 +224,7 @@ export function CalendarDndProvider({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    // Add robust error checking
     if (!over || !activeEvent || !currentTime) {
-      // Reset state and exit early
       setActiveEvent(null);
       setActiveId(null);
       setActiveView(null);
@@ -256,7 +237,6 @@ export function CalendarDndProvider({
     }
 
     try {
-      // Safely access data with checks
       if (!active.data.current || !over.data.current) {
         throw new Error("Missing data in drag event");
       }
@@ -267,7 +247,6 @@ export function CalendarDndProvider({
       };
       const overData = over.data.current as { date?: Date; time?: number };
 
-      // Verify we have all required data
       if (!activeData.event || !overData.date) {
         throw new Error("Missing required event data");
       }
@@ -291,10 +270,8 @@ export function CalendarDndProvider({
         return;
       }
 
-      // Calculate new start time
       let newStart: Date;
 
-      // If time is provided (for week/day views), set the hours and minutes
       if (time !== undefined) {
         const hours = Math.floor(time);
         const fractionalHour = time - hours;
@@ -304,7 +281,7 @@ export function CalendarDndProvider({
 
         newStart = wallClockToUtc(date, hours, minutes, resolvedTimezone);
       } else {
-        // For month view, preserve the original time from currentTime
+        // Month view drops carry no time, so keep the original time of day.
         const currentParts = getZonedDateParts(currentTime, resolvedTimezone);
         newStart = wallClockToUtc(
           date,
@@ -314,13 +291,11 @@ export function CalendarDndProvider({
         );
       }
 
-      // Calculate new end time based on the original duration
       const originalStart = new Date(calendarEvent.start);
       const originalEnd = new Date(calendarEvent.end);
       const durationMinutes = differenceInMinutes(originalEnd, originalStart);
       const newEnd = addMinutes(newStart, durationMinutes);
 
-      // Only update if the start time has actually changed
       const originalParts = getZonedDateParts(originalStart, resolvedTimezone);
       const newParts = getZonedDateParts(newStart, resolvedTimezone);
       const hasStartTimeChanged =
@@ -331,7 +306,6 @@ export function CalendarDndProvider({
         originalParts.minutes !== newParts.minutes;
 
       if (hasStartTimeChanged) {
-        // Update the event only if the time has changed
         onEventUpdate({
           ...calendarEvent,
           start: newStart,
@@ -342,7 +316,6 @@ export function CalendarDndProvider({
     } catch (error) {
       log.error("Error in drag end handler:", error);
     } finally {
-      // Always reset state
       setActiveEvent(null);
       setActiveId(null);
       setActiveView(null);
@@ -395,7 +368,6 @@ export function CalendarDndProvider({
                 height: eventHeight ? `${eventHeight}px` : "auto",
                 width:
                   isMultiDay && multiDayWidth ? `${multiDayWidth}%` : "100%",
-                // Remove the transform that was causing the shift
               }}
             >
               <EventItem

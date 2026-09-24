@@ -209,6 +209,8 @@ jobs:
 
   publish:
     needs: [meta, ios, android]
+    # Publish whichever platform built; the page script skips missing artifacts.
+    if: always() && needs.meta.result == 'success' && (needs.ios.result == 'success' || needs.android.result == 'success')
     runs-on: ubuntu-latest
     env:
       PROFILE: ${{ needs.meta.outputs.profile }}

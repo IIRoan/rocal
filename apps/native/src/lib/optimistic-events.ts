@@ -1,11 +1,3 @@
-/**
- * Utilities for optimistic event mutations.
- *
- * Events are cached per date-range under keys ["events", start, end].
- * These helpers let mutations immediately patch every matching cache entry
- * so the UI feels instant, then roll back if the server rejects the change.
- */
-
 import type { QueryClient } from "@tanstack/react-query";
 import type {
   CalendarEvent,
@@ -14,25 +6,17 @@ import type {
 } from "@workspace/calendar-core";
 import { QUERY_KEYS } from "./query-keys";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export type CacheSnapshot = {
   queryKey: readonly unknown[];
   data: EventsResponse | undefined;
 }[];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Generate a temporary client-side ID so we can remove the event on rollback. */
 export function generateOptimisticId(): string {
   return `__optimistic__${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
-/**
- * Find an event already loaded in any `["events"]` list cache.
- * Recurring instances and synced events are shown from list payloads, so
- * the sheet can open even when `/api/events/:id` cannot load that row.
- */
+/** Recurring instances and synced events come from list payloads, so the sheet can open even when `/api/events/:id` cannot load that row. */
 export function findCachedEvent(
   queryClient: QueryClient,
   eventId: string,
@@ -51,10 +35,6 @@ export function findCachedEvent(
   return undefined;
 }
 
-/**
- * Build a `CalendarEvent` from a `CreateEventRequest` so it can be injected
- * into the cache before the server responds.
- */
 export function buildOptimisticEvent(
   data: CreateEventRequest,
   userId: string,
@@ -83,9 +63,6 @@ export function buildOptimisticEvent(
   };
 }
 
-/**
- * Returns true if `event` falls within (or overlaps) the range [rangeStart, rangeEnd].
- */
 function eventOverlapsRange(
   event: Pick<CalendarEvent, "start" | "end">,
   rangeStart: Date,
@@ -123,12 +100,6 @@ function parseEventsQueryRange(
   return { start, end };
 }
 
-/**
- * Optimistically inserts `event` into every active `["events", start, end]`
- * cache entry whose range overlaps the event.
- *
- * Returns a snapshot of every affected entry so callers can roll back.
- */
 export async function optimisticallyInsertEvent(
   queryClient: QueryClient,
   event: CalendarEvent,
@@ -156,12 +127,6 @@ export async function optimisticallyInsertEvent(
   return snapshot;
 }
 
-/**
- * Optimistically removes an event from every active `["events", start, end]`
- * cache entry.
- *
- * Returns a snapshot for rollback.
- */
 export async function optimisticallyRemoveEvent(
   queryClient: QueryClient,
   eventId: string,
@@ -188,12 +153,7 @@ export async function optimisticallyRemoveEvent(
   return snapshot;
 }
 
-/**
- * Optimistically patches an existing event in every active `["events"]`
- * cache entry. Used when drag-rescheduling so the timeline does not snap back.
- *
- * Returns a snapshot for rollback.
- */
+/** Moves the event between ranges too, so a drag-rescheduled event does not snap back. */
 export async function optimisticallyPatchEvent(
   queryClient: QueryClient,
   eventId: string,
@@ -355,9 +315,6 @@ export function readCachedEventsForRange(
   };
 }
 
-/**
- * Restores every cache entry from a previously captured snapshot.
- */
 export function rollbackFromSnapshot(
   queryClient: QueryClient,
   snapshot: CacheSnapshot,

@@ -3,7 +3,6 @@ import type { NativeCalendarView } from "../../lib/calendar-views";
 
 export type CommandPaletteScope = "calendar" | "mail";
 
-/** Identifiers for every quick action exposed by the command palette. */
 export type CommandActionId =
   | "new-event"
   | "go-today"
@@ -146,10 +145,7 @@ function buildCalendarCommandActions(): CommandAction[] {
   ];
 }
 
-/**
- * Case-insensitive, order-preserving filter over the action label and its
- * keywords. An empty/whitespace query returns every action unchanged.
- */
+/** Case-insensitive, order-preserving match on label and keywords; a blank query returns every action. */
 export function filterCommandActions(
   actions: CommandAction[],
   query: string,

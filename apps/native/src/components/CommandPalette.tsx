@@ -90,10 +90,7 @@ function IconBox({
   );
 }
 
-/**
- * Global command palette. Commands follow the active tab. Search looks across
- * the on-device title index plus live calendar/mail results.
- */
+/** Commands follow the active tab; search spans the on-device title index plus live calendar/mail results. */
 export function CommandPalette() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();

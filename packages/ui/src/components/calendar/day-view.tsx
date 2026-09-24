@@ -31,7 +31,6 @@ interface DayViewProps {
   timeFormat: TimeFormat;
   timezone?: string;
   workingDays?: number[];
-  // Context menu actions
   onEventEdit?: (event: CalendarEvent) => void;
   onEventDelete?: (event: CalendarEvent) => void;
   onEventView?: (event: CalendarEvent) => void;
@@ -65,7 +64,6 @@ export function DayView({
       );
   }, [calendarDay, events, resolvedTimezone]);
 
-  // Filter all-day events
   const allDayEvents = useMemo(() => {
     return dayEvents.filter((event) =>
       isAllDayRowEvent(event, resolvedTimezone),
@@ -78,7 +76,6 @@ export function DayView({
     );
   }, [dayEvents, resolvedTimezone]);
 
-  // Process events to calculate positions
   const positionedEvents = useMemo(() => {
     return layoutTimelineEvents(timeEvents, calendarDay, {
       cellHeight: WeekCellsHeight,
@@ -182,7 +179,6 @@ export function DayView({
         </div>
 
         <div className="relative">
-          {/* Positioned events */}
           {positionedEvents.map((positionedEvent) => (
             <div
               key={positionedEvent.event.id}
@@ -212,7 +208,6 @@ export function DayView({
             </div>
           ))}
 
-          {/* Current time indicator */}
           {currentTimeVisible && (
             <CurrentTimeIndicator
               position={currentTimePosition}
@@ -220,14 +215,12 @@ export function DayView({
             />
           )}
 
-          {/* Time grid */}
           {WEEK_HOUR_VALUES.map((hourValue) => {
             return (
               <div
                 key={hourValue}
                 className="border-border/70 relative h-[var(--week-cells-height)] border-b last:border-b-0"
               >
-                {/* Quarter-hour intervals */}
                 {[0, 1, 2, 3].map((quarter) => {
                   const quarterHourTime = hourValue + quarter * 0.25;
                   return (

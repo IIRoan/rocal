@@ -8,16 +8,7 @@ import {
   type ShadowTokenValue,
 } from "../index";
 
-/**
- * Property 1: Design token completeness
- *
- * For any theme variant (light or dark), the exported ThemeTokens object SHALL
- * contain all required keys: colors (with all 12 calendar colors), spacing,
- * typography (with fontFamily, fontSize, fontWeight), borderRadius, and shadows,
- * and every value SHALL be of the correct type.
- *
- * **Validates: Requirements 2.2, 3.1, 3.5**
- */
+/** Property 1: every theme exposes all required token keys with correctly typed values. */
 
 const ALL_CALENDAR_COLORS: CalendarColor[] = [
   "blue",

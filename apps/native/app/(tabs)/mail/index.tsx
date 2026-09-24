@@ -572,14 +572,14 @@ export function MailScreen() {
   const handleSwipeTrash = useCallback(
     (ids: string[]) => {
       if (ids.length === 0) return;
-      bulkMoveToTrash.mutate(ids, {
-        onSuccess: () => toast("Moved to trash"),
-        onError: (error) =>
+      return bulkMoveToTrash.mutateAsync(ids).then(
+        () => toast("Moved to trash"),
+        (error: unknown) =>
           toast(
             getErrorMessage(error, "Failed to move message to trash."),
             "error",
           ),
-      });
+      );
     },
     [bulkMoveToTrash, toast],
   );

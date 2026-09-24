@@ -11,9 +11,6 @@ import type {
 } from "@workspace/calendar-core";
 import { parseRRule, type ParsedRule } from "./recurrence-picker-utils";
 
-/**
- * Format the date portion of an event for display on the detail screen.
- */
 export function formatEventDate(
   event: CalendarEvent,
   timezone?: string,
@@ -21,9 +18,6 @@ export function formatEventDate(
   return formatEventCalendarDate(event, timezone);
 }
 
-/**
- * Format the time portion of an event for display on the detail screen.
- */
 export function formatEventTime(
   event: CalendarEvent,
   timezone: string | undefined,
@@ -167,9 +161,7 @@ export function summarizeRecurrenceRule(rule: RecurrenceRule): string {
   });
 }
 
-/**
- * Turn a stored recurrence payload (RRULE or JSON rule) into view copy.
- */
+/** Turn a stored recurrence payload (RRULE or JSON rule) into view copy. */
 export function formatRecurrenceLabel(
   recurrence: string | null | undefined,
 ): string | null {

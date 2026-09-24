@@ -9,6 +9,7 @@ import {
 } from "react";
 import { ComposeSheet } from "../components/mail/ComposeSheet";
 import type { ComposeRequest } from "../lib/mail/compose-request";
+import { useAuth } from "./AuthProvider";
 import { WorkspaceThemeScope } from "./ThemeProvider";
 
 interface MailComposeContextValue {
@@ -19,11 +20,22 @@ const MailComposeContext = createContext<MailComposeContextValue | null>(null);
 
 /** Hosts the compose drawer above the mail list and message screens. */
 export function MailComposeProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
   const [visible, setVisible] = useState(false);
   const [request, setRequest] = useState<ComposeRequest | null>(null);
   const [presentKey, setPresentKey] = useState(0);
   // Updated with the state, not in an effect: the sheet can report close-complete in the same commit as a reopen.
   const visibleRef = useRef(visible);
+  const [wasAuthenticated, setWasAuthenticated] = useState(isAuthenticated);
+
+  // Unmount the session on sign-out so the draft's recipients and decrypted body leave memory.
+  if (wasAuthenticated !== isAuthenticated) {
+    setWasAuthenticated(isAuthenticated);
+    if (!isAuthenticated) {
+      setVisible(false);
+      setRequest(null);
+    }
+  }
 
   const openCompose = useCallback((next: ComposeRequest = {}) => {
     visibleRef.current = true;

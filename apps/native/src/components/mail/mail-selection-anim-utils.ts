@@ -10,7 +10,6 @@ import {
 /** Shared duration for selection chrome + list footer. */
 export const MAIL_SELECT_CHROME_MS = 420;
 
-/** Silky deceleration — no bounce, no snap. */
 const MAIL_SELECT_EASING = Easing.bezier(0.22, 1, 0.36, 1);
 
 const MAIL_SELECT_EXIT_EASING = Easing.bezier(0.4, 0, 0.2, 1);
@@ -34,7 +33,6 @@ export const MAIL_SELECT_CHECK_SPRING = {
   overshootClamping: true,
 } as const;
 
-/** Bulk bar floats up into place with a soft scale settle. */
 export function bottomChromeMotion(p: number) {
   "worklet";
   return {
@@ -49,7 +47,6 @@ export function bottomChromeMotion(p: number) {
   };
 }
 
-/** List footer height — smooth linear blend. */
 export function selectionFooterHeight(
   p: number,
   compose: number,

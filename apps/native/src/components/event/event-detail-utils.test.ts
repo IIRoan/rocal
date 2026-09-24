@@ -5,8 +5,6 @@ import {
 } from "./event-detail-utils";
 import type { CalendarEvent } from "@workspace/calendar-core";
 
-// ─── Test Helpers ────────────────────────────────────────────────────────────
-
 function makeEvent(overrides: Record<string, unknown> = {}): CalendarEvent {
   return {
     id: "evt-1",
@@ -21,8 +19,6 @@ function makeEvent(overrides: Record<string, unknown> = {}): CalendarEvent {
     ...overrides,
   } as unknown as CalendarEvent;
 }
-
-// ─── formatEventDate ─────────────────────────────────────────────────────────
 
 describe("formatEventDate", () => {
   it("formats a regular event date", () => {
@@ -67,8 +63,6 @@ describe("formatEventDate", () => {
     expect(formatEventDate(event, "UTC")).toBe("Wednesday, December 31, 2025");
   });
 });
-
-// ─── formatEventTime ─────────────────────────────────────────────────────────
 
 describe("formatEventTime", () => {
   it("returns 'All day' for all-day events", () => {

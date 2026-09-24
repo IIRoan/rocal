@@ -10,9 +10,6 @@ import {
   validateEventData,
 } from "@workspace/calendar-core";
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Round a date up to the next full hour. */
 export function roundToNextHour(date: Date): Date {
   const d = new Date(date);
   if (d.getMinutes() > 0 || d.getSeconds() > 0 || d.getMilliseconds() > 0) {
@@ -135,10 +132,7 @@ export function shiftEndWithStart(
   return toTimezonePickerISOString(nextEnd, resolvedTimezone);
 }
 
-/**
- * Map a validation error message to the field it belongs to.
- * Returns null if the error doesn't map to a specific field.
- */
+/** Map a validation error message to its field, or null when it belongs to none. */
 export function mapErrorToField(error: string): string | null {
   const lower = error.toLowerCase();
   if (lower.includes("title")) return "title";
@@ -151,10 +145,6 @@ export function mapErrorToField(error: string): string | null {
   return null;
 }
 
-/**
- * Build a CreateEventRequest from form field values.
- * Returns the request object ready for validation and submission.
- */
 export function buildEventRequest(fields: {
   title: string;
   start: string;
@@ -219,10 +209,7 @@ export function buildEventRequest(fields: {
   };
 }
 
-/**
- * Validate form data and return categorised errors.
- * Returns `{ fieldErrors, generalErrors }`.
- */
+/** Split validation errors into `{ fieldErrors, generalErrors }`. */
 export function validateForm(data: CreateEventRequest): {
   fieldErrors: Record<string, string>;
   generalErrors: string[];

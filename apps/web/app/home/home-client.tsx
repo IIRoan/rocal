@@ -103,7 +103,6 @@ export function HomeAppClient() {
 
   return (
     <div ref={containerRef} className="min-h-svh bg-background flex flex-col">
-      {/* Header */}
       <header
         data-home-header
         className="flex items-center justify-between px-5 pt-safe-top pt-4 pb-3 border-b border-border/40"
@@ -124,9 +123,7 @@ export function HomeAppClient() {
         </div>
       </header>
 
-      {/* Main */}
       <main className="flex-1 flex flex-col px-5 pt-10 pb-8 max-w-md mx-auto w-full">
-        {/* Greeting */}
         <div data-home-greeting className="mb-10">
           <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">
             Good{timeOfDay}
@@ -136,7 +133,6 @@ export function HomeAppClient() {
           </h1>
         </div>
 
-        {/* Navigation list */}
         <nav>
           <ul className="divide-y divide-border/50 border-t border-b border-border/50">
             {NAV_ITEMS.map((item) => (

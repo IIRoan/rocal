@@ -16,10 +16,7 @@ import {
   utcToPickerDate,
 } from "@workspace/calendar-core";
 
-/**
- * Kit insets hour labels by the tick (8) plus 8px. `20:00` / `12 pm` must
- * stay on one line in that remaining width.
- */
+/** Kit insets hour labels by the tick (8) plus 8px; `20:00` / `12 pm` must stay on one line in the remaining width. */
 export function toKitHourWidth(timeFormat: TimeFormat): number {
   return timeFormat === "24h" ? 52 : 58;
 }
@@ -89,10 +86,7 @@ type KitDropOriginal = Pick<
 const OCCURRENCE_ID_SUFFIX =
   /_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)$/;
 
-/**
- * Non-original instances use `parentId_ISODate`. Updating that id without a
- * recurrence scope rewrites to the parent and moves the whole series.
- */
+/** Non-original instances use `parentId_ISODate`; updating that id without a recurrence scope moves the whole series. */
 export function resolveKitRecurrenceEdit(
   event: Pick<
     DecoratedCalendarEvent,
@@ -130,9 +124,7 @@ function kitDateTime(value: KitDateOrDateTime | undefined): string | undefined {
   return value.dateTime;
 }
 
-/**
- * Keep the original duration when kit rounding or a week-page jump drifts the end.
- */
+/** Keep the original duration when kit rounding or a week-page jump drifts the end. */
 export function preserveDroppedEventDuration(
   newStartIso: string,
   originalStart: Date | string,
@@ -208,10 +200,7 @@ export function kitScrollByDay(view: TimelineKitView): boolean {
   return view === "day";
 }
 
-/**
- * Calendar-kit starts a 3-day window at `selectedDate`. Solace (and web) show
- * yesterday through tomorrow centered on that date.
- */
+/** Calendar-kit starts a 3-day window at `selectedDate`; Solace (and web) center yesterday through tomorrow on it. */
 export function toKitPageDate(
   view: TimelineKitView,
   selectedDate: Date,

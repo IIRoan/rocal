@@ -24,7 +24,8 @@ interface MailSwipeRowProps {
   enabled: boolean;
   read: boolean;
   onToggleRead: () => void;
-  onTrash?: () => void;
+  /** Return a promise to keep the row offscreen until the trash settles. */
+  onTrash?: () => void | Promise<unknown>;
 }
 
 /** Swipe right to toggle read, swipe left to trash. */
@@ -46,8 +47,11 @@ export function MailSwipeRow({
   }, []);
 
   const runTrash = useCallback(() => {
-    onTrash?.();
-  }, [onTrash]);
+    const reset = () => {
+      translateX.value = withSpring(0, SPRING);
+    };
+    void Promise.resolve(onTrash?.()).then(reset, reset);
+  }, [onTrash, translateX]);
 
   const pan = Gesture.Pan()
     .enabled(enabled)
@@ -75,7 +79,6 @@ export function MailSwipeRow({
       if (x <= -ACTION_THRESHOLD && canTrash) {
         translateX.value = withTiming(-600, { duration: 180 }, () => {
           scheduleOnRN(runTrash);
-          translateX.value = 0;
         });
         return;
       }
@@ -121,7 +124,7 @@ export function MailSwipeRow({
         <Feather
           name={read ? "mail" : "check"}
           size={20}
-          color={theme.colors.calendar.blue.fg}
+          color={theme.colors.primaryBase}
         />
       </Animated.View>
       {canTrash ? (
@@ -142,7 +145,7 @@ export function MailSwipeRow({
           accessibilityActions={accessibilityActions}
           onAccessibilityAction={(e) => {
             if (e.nativeEvent.actionName === "toggleRead") onToggleRead();
-            if (e.nativeEvent.actionName === "trash") onTrash?.();
+            if (e.nativeEvent.actionName === "trash") void onTrash?.();
           }}
         >
           {children}
@@ -165,7 +168,7 @@ function createStyles(theme: ThemeTokens) {
     } as ViewStyle,
     readAction: {
       justifyContent: "flex-start",
-      backgroundColor: theme.colors.calendar.blue.bg,
+      backgroundColor: theme.colors.primaryBase + "40",
     } as ViewStyle,
     trashAction: {
       justifyContent: "flex-end",

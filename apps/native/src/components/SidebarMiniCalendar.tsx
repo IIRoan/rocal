@@ -196,11 +196,7 @@ export function SidebarMiniCalendar({
   const fallbackSelectedDate = useMemo(() => new Date(), []);
   const effectiveSelectedDate = selectedDate ?? fallbackSelectedDate;
 
-  // Absolute-coordinate pager: months are indexed on an unbounded number
-  // line anchored at the month the pager mounted with. The strip position
-  // (`pageIndex`) lives in the same coordinate, so committing a swipe only
-  // re-centers the rendered window — the visible page keeps its native view
-  // and nothing re-positions mid-flight (no wrong-month frame, no flicker).
+  // Months use absolute indices anchored at mount, so a commit only re-centers the window and the visible page never re-positions mid-flight.
   const [epochMonth] = useState(() => startOfMonth(selectedDate ?? new Date()));
   const [committedIndex, setCommittedIndex] = useState(0);
   const [pageWidth, setPageWidth] = useState(1);
@@ -358,8 +354,7 @@ export function SidebarMiniCalendar({
 
   useLayoutEffect(() => {
     pageWidthShared.value = pageWidth;
-    // Keep the worklet-facing committed index in lockstep with the rendered
-    // window so the gesture's rubber-band bounds always match what is mounted.
+    // Keep the worklet-facing committed index in lockstep with the rendered window so rubber-band bounds match what is mounted.
     committedIndexShared.value = committedIndex;
   }, [committedIndex, committedIndexShared, pageWidth, pageWidthShared]);
 
@@ -403,8 +398,7 @@ export function SidebarMiniCalendar({
         .failOffsetY([-14, 14])
         .onBegin(() => {
           "worklet";
-          // Grab the strip wherever it is — even mid-settle — so the motion
-          // stays with the finger instead of snapping to a page edge.
+          // Grab the strip wherever it is, even mid-settle, so the motion stays with the finger instead of snapping to a page edge.
           cancelAnimation(pageIndex);
           dragStartPageIndex.value = pageIndex.value;
         })
@@ -442,11 +436,7 @@ export function SidebarMiniCalendar({
             momentumSeconds: FLICK_MOMENTUM_SECONDS,
           });
 
-          // Commit at release — not when the settle animation finishes — so a
-          // second swipe can chain off this one instead of dropping it. The
-          // target is an absolute index, so commits are order-safe. The
-          // committed-index shared value is re-synced by the layout effect
-          // once the window re-renders around the new month.
+          // Commit at release, not when the settle finishes, so a second swipe can chain off this one; absolute targets keep commits order-safe.
           if (target !== committed) {
             scheduleOnRN(commitToIndex, target);
           }
@@ -459,13 +449,7 @@ export function SidebarMiniCalendar({
     [commitToIndex, committedIndexShared, dragStartPageIndex, pageIndex, pageWidthShared],
   );
 
-  // The strip lays pages out in a flex row starting at x=0, but the pages
-  // live at absolute month indices. `left` shifts the whole row so page
-  // `windowStartIndex` sits at absolute position `windowStartIndex*width`.
-  // `left` is a layout property committed by React in the same pass as the
-  // page set, so the two can never disagree on a painted frame. The animated
-  // transform then applies the finger/settle position on top and depends only
-  // on `pageIndex`, so recycling the window never moves the strip.
+  // `left` commits with the page set to place the window at absolute month offsets; the transform reads only `pageIndex`, so recycling never moves the strip.
   const windowOffsetPx = windowStartIndex * pageWidth;
 
   const pagesAnimatedStyle = useAnimatedStyle(() => ({

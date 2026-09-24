@@ -21,9 +21,6 @@ interface ColorPickerProps {
   className?: string;
 }
 
-/**
- * Get CSS variable reference for a named color, or return hex as-is.
- */
 function getSwatchBackground(color: string): string {
   if (isHexColor(color)) return color;
   if (color === "blue") return "var(--event-sky)";
@@ -43,14 +40,12 @@ export function ColorPicker({
     const newValue = e.target.value;
     setCustomHex(newValue);
 
-    // Validate hex color format and apply
     if (isHexColor(newValue)) {
       onChange(newValue);
     }
   };
 
   const handleHexInputBlur = () => {
-    // If the input is not a valid hex color, clear it
     if (customHex && !isHexColor(customHex)) {
       setCustomHex("");
     }
@@ -62,7 +57,6 @@ export function ColorPicker({
     setIsOpen(false);
   };
 
-  // Determine the swatch background for the trigger button
   const triggerBackground = getSwatchBackground(value);
 
   return (

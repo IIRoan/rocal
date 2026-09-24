@@ -179,7 +179,6 @@ describe("mail address parsing", () => {
     expect(isReservedSystemEmail("root@external.org")).toBe(true);
     expect(isReservedSystemEmail("postmaster@external.org")).toBe(true);
 
-    // Normal user addresses are allowed
     expect(isReservedSystemEmail("testingproduction15@solace.onl")).toBe(false);
     expect(isReservedSystemEmail("alice@example.com")).toBe(false);
     expect(isReservedSystemEmail("user@solace.onl")).toBe(false);

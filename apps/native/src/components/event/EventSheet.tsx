@@ -84,8 +84,6 @@ import { shouldShowEncryptionIcon } from "../calendar/timeline-event-content";
 import { resolveEventSheetViewActions } from "./event-sheet-view-actions";
 
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 export type EventSheetMode =
   | { type: "create"; date?: string; hour?: string }
   | { type: "view"; eventId: string }
@@ -103,8 +101,6 @@ export interface EventSheetProps {
   onDismiss: () => void;
   onCloseComplete?: () => void;
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function eventToInitialValues(
   event: CalendarEvent,
@@ -156,8 +152,6 @@ function formatParticipantStatus(status?: string) {
   }
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
-
 export function EventSheet({
   visible,
   mode,
@@ -200,7 +194,6 @@ export function EventSheet({
         ? mode.eventId
         : undefined;
 
-  // Reset internal state when mode changes
   useEffect(() => {
     if (mode?.type === "create") {
       setViewMode("edit");
@@ -240,8 +233,6 @@ export function EventSheet({
     onDismiss();
   }, [onDismiss]);
 
-  // ─── Data fetching ─────────────────────────────────────────────────────
-
   const cachedEvent = eventId
     ? findCachedEvent(queryClient, eventId)
     : undefined;
@@ -268,8 +259,6 @@ export function EventSheet({
   const timeFormat = useUserTimeFormat();
   const { reminders: eventReminders, isLoading: remindersLoading } =
     useEventReminders(eventId, event?.reminder, visible && !isCreate);
-
-  // ─── Mutations ─────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
     mutationFn: ({ request }: EventFormSubmission) =>
@@ -432,8 +421,6 @@ export function EventSheet({
     },
   });
 
-  // ─── Handlers ──────────────────────────────────────────────────────────
-
   const handleSubmit = useCallback(
     (submission: EventFormSubmission) => {
       setServerErrors([]);
@@ -510,8 +497,6 @@ export function EventSheet({
     [scopeAction, event, deleteMutation],
   );
 
-  // ─── Initial values ───────────────────────────────────────────────────
-
   const initialValues = useMemo(() => {
     if (isViewOrEdit && event) {
       return eventToInitialValues(event, resolvedTimezone);
@@ -555,8 +540,6 @@ export function EventSheet({
     return undefined;
   }, [event, isCreate, isViewOrEdit, mode, resolvedTimezone]);
 
-  // ─── Derived ───────────────────────────────────────────────────────────
-
   // A new event needs no server data to start typing; the calendar chip fills in when calendars arrive.
   // The mode-reset effect runs after the first render, so derive create's mode to avoid a stale view frame.
   const sheetViewMode = isCreate ? "edit" : viewMode;
@@ -583,8 +566,6 @@ export function EventSheet({
   const viewActions = resolveEventSheetViewActions(event);
   const showFormHeader = !isLoading && sheetViewMode === "edit";
   const sheetTitle = viewMode === "edit" ? "Edit event" : "Event";
-
-  // ─── Render ────────────────────────────────────────────────────────────
 
   return (
     <>
@@ -637,7 +618,6 @@ export function EventSheet({
           <CenteredLoader theme={theme} message="Loading…" />
         ) : sheetViewMode === "view" && event ? (
           <>
-            {/* ── View mode body ─────────────────────────────────── */}
             <BottomSheetScrollView
               style={styles.viewScroll}
               contentContainerStyle={styles.viewBody}
@@ -782,7 +762,6 @@ export function EventSheet({
                 ) : null}
               </View>
 
-              {/* Errors */}
               {serverErrors.length > 0 && (
                 <View style={styles.errorContainer}>
                   {serverErrors.map((err) => (
@@ -864,7 +843,6 @@ export function EventSheet({
             </BottomSheetFooter>
           </>
         ) : (
-          /* ── Edit / Create mode ──────────────────────────────── */
           <View style={styles.editBody}>
             <EventForm
               ref={formRef}
@@ -886,7 +864,6 @@ export function EventSheet({
         )}
       </BottomSheet>
 
-      {/* Scope picker modal for recurring events */}
       <Modal
         visible={scopeModalVisible}
         transparent
@@ -931,8 +908,6 @@ export function EventSheet({
     </>
   );
 }
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
 
 function createStyles(theme: ThemeTokens) {
   const view = {
@@ -1060,7 +1035,6 @@ function createStyles(theme: ThemeTokens) {
       marginTop: 8,
     },
 
-    // ── Scope modal ────────────────────────────────────────────────────
     modalOverlay: {
       flex: 1,
       backgroundColor: "rgba(0,0,0,0.5)",

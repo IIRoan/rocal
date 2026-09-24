@@ -119,9 +119,7 @@ describe("getMiniCalendarSwipeTarget", () => {
   });
 
   it("clamps extreme flicks to the window bounds on absolute indices", () => {
-    // Hard flick toward next months clamps to the window's max index. The
-    // release point sits within a radius of the edge so the window (not the
-    // near-release clamp) is what bites.
+    // The release sits within a radius of the edge so the window bound, not the near-release clamp, is what bites.
     expect(
       swipe({
         startIndex: -11.5,
@@ -146,8 +144,7 @@ describe("getMiniCalendarSwipeTarget", () => {
   });
 
   it("never settles more than a window radius from the release point", () => {
-    // From the middle of the window a hard flick is capped two pages forward,
-    // keeping the committed month inside the next rendered window.
+    // From mid-window a hard flick is capped two pages forward, inside the next rendered window.
     expect(
       swipe({
         startIndex: -12,

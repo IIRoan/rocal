@@ -1,7 +1,5 @@
 import { parseRRule, parseStoredRecurrence } from "./recurrence-picker-utils";
 
-// ─── parseRRule ──────────────────────────────────────────────────────────────
-
 describe("RecurrencePicker", () => {
   describe("parseRRule", () => {
     it("returns null for null input", () => {

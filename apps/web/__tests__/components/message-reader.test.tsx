@@ -32,7 +32,6 @@ Object.defineProperty(window, "matchMedia", {
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-// Mock clipboard API
 Object.defineProperty(navigator, "clipboard", {
   writable: true,
   value: { writeText: jest.fn().mockImplementation(() => Promise.resolve()) },
@@ -399,7 +398,7 @@ describe("MessageReader — email header", () => {
 
   it("renders To address", () => {
     render();
-    // Header shows recipient name (Bob), not raw email, matching the reference design
+    // Header shows the recipient name, not the raw email.
     expect(container.textContent).toContain("Bob");
   });
 
@@ -410,7 +409,7 @@ describe("MessageReader — email header", () => {
         cc: [{ name: "Charlie", email: "charlie@example.com" }],
       } as any,
     });
-    // Header shows CC recipient name (Charlie), not raw email, matching the reference design
+    // Header shows the CC recipient name, not the raw email.
     expect(container.textContent).toContain("Charlie");
   });
 
@@ -1302,7 +1301,6 @@ describe("MessageReader — attachments", () => {
 });
 
 describe("MessageReader — reply bar", () => {
-  /** Helper: expand the reply bar by clicking the collapsed pill. */
   function expandReplyBar() {
     const pillBtn = container.querySelector(
       "button[data-test='message-reply']",
@@ -1460,7 +1458,6 @@ describe("MessageReader — reply bar", () => {
 describe("MessageReader — pin / star", () => {
   it("shows star button when onToggleFlagged is provided", () => {
     render({ onToggleFlagged: jest.fn() });
-    // Pin button removed from toolbar; star is in the header
     const starBtn = container.querySelector("[aria-label='Star']");
     expect(starBtn).not.toBeNull();
   });

@@ -1,4 +1,3 @@
-// Providers
 export { ThemeProvider } from "./theme-provider";
 export { SurfaceMotionProvider } from "./surface-motion-provider";
 export {

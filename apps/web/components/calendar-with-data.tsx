@@ -56,8 +56,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     workspace?.markReady();
   }, [isAllInitialLoading, workspace]);
 
-  // Keep the calendar mounted under the workspace overlay so the view can
-  // paint in parallel. The shell hides chrome until markReady() runs.
+  // Stays mounted under the workspace overlay so the view paints in parallel; the shell hides chrome until markReady().
   return (
     <>
       <EventCalendar

@@ -1,9 +1,3 @@
-/**
- * Centralised React Query cache key definitions.
- *
- * Using a constant map avoids typos and makes cache invalidation
- * predictable across the app.
- */
 import {
   CALENDARS_QUERY_KEY,
   CATEGORIES_QUERY_KEY,

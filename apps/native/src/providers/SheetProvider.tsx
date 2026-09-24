@@ -12,16 +12,12 @@ import {
   type EventSheetMode,
 } from "../components/event/EventSheet";
 
-// ─── Context ─────────────────────────────────────────────────────────────────
-
 interface SheetContextValue {
   openEventSheet: (mode: EventSheetMode) => void;
   closeEventSheet: () => void;
 }
 
 const SheetContext = createContext<SheetContextValue | null>(null);
-
-// ─── Provider ────────────────────────────────────────────────────────────────
 
 export function SheetProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
@@ -67,8 +63,6 @@ export function SheetProvider({ children }: { children: ReactNode }) {
     </SheetContext.Provider>
   );
 }
-
-// ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function useSheet(): SheetContextValue {
   const ctx = useContext(SheetContext);

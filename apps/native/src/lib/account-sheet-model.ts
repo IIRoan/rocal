@@ -38,7 +38,6 @@ export function accountSheetLabel(id: string): string | undefined {
   return ACCOUNT_SHEET_LABELS[id];
 }
 
-/** Grouped settings rows for the account drawer. */
 export function buildAccountSheetGroups(): AccountSheetGroup[] {
   const items = new Map<string, string>(
     [...getSettingsHubItems("native"), ...getSettingsMailItems("native")].map(

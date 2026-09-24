@@ -223,7 +223,6 @@ export function PickerSheet({
   );
 }
 
-/** Shared picker sheet chrome styles. */
 function createModalStyles(theme: ThemeTokens) {
   return StyleSheet.create({
     overlay: {

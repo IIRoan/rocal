@@ -22,7 +22,6 @@ export function AuthResultsBadge({
 
   const results = parseAuthResults(headers);
 
-  // If all are "none", don't show anything
   if (results.spf === "none" && results.dkim === "none" && results.dmarc === "none") {
     return null;
   }

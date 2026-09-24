@@ -8,25 +8,13 @@ import {
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { resolveCalendarSwatchColor } from "../../lib/calendar-color-utils";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
 const DAYS_IN_GRID = 42; // 6 rows × 7 columns
 export const MAX_DOTS = 3;
 
-// ─── Day-of-week header labels ──────────────────────────────────────────────
-
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 type Day = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Build an ordered array of day-of-week header labels starting from the
- * configured week start day.
- */
 export function getOrderedDayLabels(weekStartDay: number): string[] {
   const start = ((weekStartDay % 7) + 7) % 7;
   const labels: string[] = [];
@@ -36,10 +24,7 @@ export function getOrderedDayLabels(weekStartDay: number): string[] {
   return labels;
 }
 
-/**
- * Generate the 42 dates (6 weeks) that fill the month grid, starting from
- * the first day of the week that contains the first day of the month.
- */
+/** 42 dates (6 weeks) starting at the week that contains the first of the month. */
 export function generateGridDates(
   currentDate: Date,
   weekStartDay: number,
@@ -55,9 +40,6 @@ export function generateGridDates(
   return dates;
 }
 
-/**
- * Build a map from date key (YYYY-MM-DD) to the list of events on that day.
- */
 export function groupEventsByDay(
   events: DecoratedCalendarEvent[],
   timezone?: string,

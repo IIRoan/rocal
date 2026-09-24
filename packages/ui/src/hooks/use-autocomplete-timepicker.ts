@@ -13,7 +13,6 @@ export function useAutocompleteTimepicker({
   locale = "en-US",
   timeZone = currentTimezone,
 }: UseAutocompleteTimepickerProps) {
-  // Generate time options (15-minute intervals)
   const generateTimeOptions = () => {
     const times = [];
     for (let hour = 0; hour < 24; hour++) {

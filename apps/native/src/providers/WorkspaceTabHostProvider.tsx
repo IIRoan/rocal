@@ -14,9 +14,9 @@ import {
 } from "../lib/app-switcher-config";
 
 interface WorkspaceTabHostContextValue {
-  /** Tab shown by the keep-alive host (updates before navigation). */
+  /** Updates before navigation so the keep-alive host switches first. */
   activeTab: AppSwitchKey;
-  /** True on calendar/mail list routes — index routes render null; host shows content. */
+  /** Tab index routes render null while the host shows their content. */
   isHosted: boolean;
   switchTab: (key: AppSwitchKey) => void;
 }
@@ -32,13 +32,11 @@ function tabFromSegments(segments: readonly string[]): AppSwitchKey | null {
 }
 
 function isHostedSegments(segments: readonly string[]): boolean {
-  // If not inside (tabs) (e.g. root stack routes like /event or /settings),
-  // keep tabs hosted so surfaces remain mounted in the background.
+  // Root stack routes like /event keep tabs hosted so surfaces stay mounted underneath.
   if (segments[0] !== "(tabs)") {
     return true;
   }
-  // Inside (tabs), only root tab screens (length === 2) are hosted.
-  // Nested screens (e.g. /(tabs)/mail/message/[id]) need isHosted = false so the nested stack renders.
+  // Nested tab screens like /(tabs)/mail/message/[id] must be unhosted so their stack renders.
   return segments.length === 2;
 }
 

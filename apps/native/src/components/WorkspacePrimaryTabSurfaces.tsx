@@ -30,10 +30,7 @@ import type { AppSwitchKey } from "../lib/app-switcher-config";
 /** Parks the resting mail card past its own shadow so the shadow can stay static instead of animating per frame. */
 const MAIL_SHADOW_GUTTER = 16;
 
-/**
- * Keep-alive Calendar / Mail host. Transition matches iOS UINavigationController
- * (incoming covers from the right, outgoing peeks 30%) and the app's native stack.
- */
+/** Keep-alive Calendar / Mail host; the transition matches iOS UINavigationController (incoming covers from the right, outgoing peeks 30%). */
 export function WorkspacePrimaryTabSurfaces() {
   return (
     <WorkspaceThemeScope>

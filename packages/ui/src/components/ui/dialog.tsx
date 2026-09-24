@@ -65,11 +65,7 @@ function DialogContent({
   showOverlay = true,
   ...props
 }: DialogContentProps) {
-  // NOTE: spotlight intentionally sits in the upper viewport (top-[15%]) and
-  // only translates on X — vertical position is fixed, NOT centered. Don't
-  // change to `top-1/2 -translate-y-1/2` without a UX review; the command
-  // palette and similar surfaces rely on this near-top placement.
-  // The dialog can grow to use most of the viewport height when content is long.
+  // Spotlight sits near the top (top-[15%]) and only translates on X; the command palette relies on this, so don't center it.
   const positionClasses =
     variant === "center"
       ? "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
@@ -112,7 +108,6 @@ function DialogContent({
         data-slot="dialog-content"
         data-variant={variant}
         className={cn(
-          // Base
           "bg-background fixed z-50 overflow-hidden border shadow-lg duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
           radius,
           sizeDefaults,

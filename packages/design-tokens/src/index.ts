@@ -1,5 +1,3 @@
-// ─── Type Definitions ────────────────────────────────────────────────────────
-
 export interface ColorScale {
   50: string;
   100: string;
@@ -76,8 +74,6 @@ export interface ThemeTokens {
   borderRadius: Record<string, number>;
   shadows: Record<string, ShadowTokenValue>;
 }
-
-// ─── Shared Values ───────────────────────────────────────────────────────────
 
 const FONT_FAMILY_SANS =
   'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"';
@@ -191,8 +187,6 @@ const shadows: Record<string, ShadowTokenValue> = {
   },
 };
 
-// ─── Light Theme ─────────────────────────────────────────────────────────────
-
 export const lightTheme: ThemeTokens = {
   colors: {
     primary: {
@@ -249,8 +243,6 @@ export const lightTheme: ThemeTokens = {
   borderRadius,
   shadows,
 };
-
-// ─── Dark Theme ──────────────────────────────────────────────────────────────
 
 export const darkTheme: ThemeTokens = {
   colors: {
@@ -309,17 +301,7 @@ export const darkTheme: ThemeTokens = {
   shadows,
 };
 
-// ─── OKLCH → Hex Conversion (for React Native) ──────────────────────────────
-
-/**
- * Converts an OKLCH color string to a hex color string.
- *
- * React Native does not support oklch() — only hex, rgb(), rgba(), hsl(),
- * hsla(), and named colors. This converter is used to produce native-
- * compatible theme objects.
- *
- * Algorithm: oklch → OKLab → linear-sRGB → sRGB → hex
- */
+/** Converts oklch() to hex because React Native styles don't support oklch. */
 function oklchToHex(oklchStr: string): string {
   const match = oklchStr.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/);
   if (!match) return oklchStr; // passthrough non-oklch values (e.g. rgba)
@@ -357,7 +339,6 @@ function oklchToHex(oklchStr: string): string {
   return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${bVal.toString(16).padStart(2, "0")}`;
 }
 
-/** Recursively convert all oklch color strings in an object to hex. */
 function convertColors<T>(obj: T): T {
   if (typeof obj === "string") {
     return oklchToHex(obj) as unknown as T;
@@ -375,10 +356,6 @@ function convertColors<T>(obj: T): T {
   return obj;
 }
 
-/**
- * Convert a ThemeTokens object so all oklch() color values become hex strings
- * compatible with React Native's style system.
- */
 export function toNativeTheme(tokens: ThemeTokens): ThemeTokens {
   return {
     ...tokens,
@@ -388,14 +365,9 @@ export function toNativeTheme(tokens: ThemeTokens): ThemeTokens {
   };
 }
 
-/**
- * Pre-computed native-compatible themes with hex colors.
- * Use these in React Native instead of `lightTheme`/`darkTheme` directly.
- */
+/** Use these in React Native instead of `lightTheme`/`darkTheme`. */
 export const nativeLightTheme: ThemeTokens = toNativeTheme(lightTheme);
 export const nativeDarkTheme: ThemeTokens = toNativeTheme(darkTheme);
-
-// ─── Mail (Nightwatch) Palette ───────────────────────────────────────────────
 
 /** Mail-only tokens beyond ThemeTokens, mirroring `packages/ui/src/solace/theme.css`. */
 export interface MailPaletteTokens {
@@ -492,13 +464,7 @@ export const nativeMailDarkTheme: ThemeTokens = {
   },
 };
 
-// ─── Tailwind Adapter ────────────────────────────────────────────────────────
-
-/**
- * Converts a ThemeTokens object into a format suitable for Tailwind CSS v4.
- * Maps semantic color names to CSS custom property references since the web app
- * uses CSS custom properties for theming.
- */
+/** Maps semantic colors to CSS custom property references because web theming is driven by CSS variables. */
 export function toTailwindTheme(tokens: ThemeTokens): Record<string, unknown> {
   return {
     colors: {

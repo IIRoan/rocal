@@ -11,11 +11,9 @@ interface GlobalLoadingScreenProps {
   message?: string;
   variant?: "minimal" | "detailed" | "splash";
   className?: string;
-  // Improved UX options
   enableMessageCycling?: boolean; // When no static message provided
   messageContext?: keyof typeof COMBINED_MESSAGES;
-  // Auto-retry & recovery
-  autoRetry?: boolean; // Enable automatic retry when stuck
+  autoRetry?: boolean;
   retryDelaysMs?: number[]; // Sequence of retry delays per attempt
   longerThanUsualMs?: number; // When to show the "taking longer" hint
   onRetry?: (attempt: number) => void | Promise<void>; // Default reload
@@ -35,7 +33,6 @@ export function GlobalLoadingScreen({
   onRetry,
   onGiveUp,
 }: GlobalLoadingScreenProps) {
-  // Simple dot animation used by minimal variant
   const [dots, setDots] = useState("");
   useEffect(() => {
     if (!isLoading) return;
@@ -58,7 +55,6 @@ export function GlobalLoadingScreen({
   const [nextRetryAt, setNextRetryAt] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
-  // Default retry action: reload the app
   const defaultRetry = useCallback((attemptNo: number) => {
     if (typeof window !== "undefined") {
       window.location.reload();
@@ -75,7 +71,6 @@ export function GlobalLoadingScreen({
     } catch {
       // ignore
     } finally {
-      // If still loading after retry, schedule next one
       if (autoRetryEnabled && next < delays.length) {
         const d = delays.at(next) ?? delays[delays.length - 1] ?? 10000;
         setNextRetryAt(Date.now() + d);
@@ -85,7 +80,6 @@ export function GlobalLoadingScreen({
     }
   }, [attempt, onRetry, defaultRetry, autoRetryEnabled, delays, onGiveUp]);
 
-  // Manage timers when overlay is visible
   useEffect(() => {
     if (!isLoading) {
       setAttempt(0);
@@ -115,7 +109,6 @@ export function GlobalLoadingScreen({
     nextRetryAt,
   ]);
 
-  // Countdown state for next retry
   useEffect(() => {
     if (!nextRetryAt) {
       setTimeLeft(null);
@@ -127,7 +120,6 @@ export function GlobalLoadingScreen({
     return () => window.clearInterval(interval);
   }, [nextRetryAt]);
 
-  // Trigger retry when countdown hits zero
   useEffect(() => {
     if (nextRetryAt && timeLeft === 0) {
       void doRetry();
@@ -156,7 +148,6 @@ export function GlobalLoadingScreen({
     );
   }
 
-  // Enhanced splash/detailed variants share the same improved UI
   return (
     <div
       data-motion-skip="true"
@@ -166,7 +157,6 @@ export function GlobalLoadingScreen({
       )}
     >
       <div className="flex flex-col items-center space-y-6 max-w-md mx-auto px-4">
-        {/* Animated logo + cycling message */}
         <LogoSpinner
           size={variant === "splash" ? "lg" : "md"}
           text={message}
@@ -175,7 +165,6 @@ export function GlobalLoadingScreen({
           className="animate-fade-in"
         />
 
-        {/* Status and guidance */}
         <div className="w-full text-center space-y-2">
           {showLonger && (
             <p className="text-sm text-muted-foreground">
@@ -192,7 +181,6 @@ export function GlobalLoadingScreen({
           )}
         </div>
 
-        {/* Indeterminate progress bar */}
         <div className="w-full max-w-sm">
           <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
             <div
@@ -202,7 +190,6 @@ export function GlobalLoadingScreen({
           </div>
         </div>
 
-        {/* Actions */}
         {autoRetryEnabled && (
           <div className="flex items-center gap-3">
             <button
@@ -224,7 +211,6 @@ export function GlobalLoadingScreen({
           </div>
         )}
 
-        {/* Decorative skeletons remain for detailed variant only */}
         {variant === "detailed" && (
           <div className="w-full max-w-sm space-y-3 animate-fade-in">
             <div className="space-y-2">
@@ -257,7 +243,6 @@ export function GlobalLoadingScreen({
   );
 }
 
-// Loading screen for specific sections
 interface SectionLoadingProps {
   title?: string;
   description?: string;
@@ -286,7 +271,6 @@ export function SectionLoading({
   );
 }
 
-// Loading overlay for interactive elements
 interface LoadingOverlayProps {
   isLoading?: boolean;
   children: React.ReactNode;

@@ -17,8 +17,6 @@ import type {
   EventsResponse,
 } from "@workspace/calendar-core";
 
-// ─── Mock QueryClient ─────────────────────────────────────────────────────────
-
 function makeEventResponse(events: CalendarEvent[]): EventsResponse {
   return { events, categories: [], calendars: [] };
 }
@@ -59,8 +57,6 @@ function makeMockQueryClient(initial: Record<string, EventsResponse>) {
   };
 }
 
-// ─── Fixtures ─────────────────────────────────────────────────────────────────
-
 const BASE_REQUEST: CreateEventRequest = {
   title: "Team meeting",
   start: "2024-03-15T09:00:00",
@@ -96,8 +92,6 @@ const EXISTING_EVENT: CalendarEvent = {
   updatedAt: new Date("2024-01-01"),
 };
 
-// ─── generateOptimisticId ─────────────────────────────────────────────────────
-
 describe("generateOptimisticId", () => {
   it("returns a string prefixed with __optimistic__", () => {
     const id = generateOptimisticId();
@@ -111,8 +105,6 @@ describe("generateOptimisticId", () => {
     expect(ids.size).toBe(50);
   });
 });
-
-// ─── buildOptimisticEvent ─────────────────────────────────────────────────────
 
 describe("buildOptimisticEvent", () => {
   it("builds an event with the provided tempId and userId", () => {
@@ -156,8 +148,6 @@ describe("buildOptimisticEvent", () => {
   });
 });
 
-// ─── findCachedEvent ─────────────────────────────────────────────────────────
-
 describe("findCachedEvent", () => {
   it("returns the event from an overlapping events query", () => {
     const key = ["events", "2024-03-15T00:00:00", "2024-03-16T00:00:00"];
@@ -180,11 +170,8 @@ describe("findCachedEvent", () => {
   });
 });
 
-// ─── optimisticallyInsertEvent ────────────────────────────────────────────────
-
 describe("optimisticallyInsertEvent", () => {
   it("inserts event into cache entries whose range overlaps the event", async () => {
-    // Range covers 2024-03-15 all day
     const key = ["events", "2024-03-15T00:00:00", "2024-03-16T00:00:00"];
     const client = makeMockQueryClient({
       [key.join("|")]: makeEventResponse([EXISTING_EVENT]),
@@ -199,7 +186,6 @@ describe("optimisticallyInsertEvent", () => {
   });
 
   it("does NOT insert event into cache entries whose range does not overlap", async () => {
-    // Range is a week earlier
     const key = ["events", "2024-03-08T00:00:00", "2024-03-09T00:00:00"];
     const client = makeMockQueryClient({
       [key.join("|")]: makeEventResponse([]),
@@ -263,8 +249,6 @@ describe("optimisticallyInsertEvent", () => {
   });
 });
 
-// ─── commitOptimisticEvent ────────────────────────────────────────────────────
-
 describe("commitOptimisticEvent", () => {
   const dayOne = ["events", "2024-03-15T00:00:00.000Z", "2024-03-16T00:00:00.000Z"];
   const dayTwo = ["events", "2024-03-16T00:00:00.000Z", "2024-03-17T00:00:00.000Z"];
@@ -303,8 +287,6 @@ describe("commitOptimisticEvent", () => {
   });
 });
 
-// ─── invalidateEventRanges ────────────────────────────────────────────────────
-
 describe("invalidateEventRanges", () => {
   const march = ["events", "2024-03-01T00:00:00.000Z", "2024-04-01T00:00:00.000Z"];
   const april = ["events", "2024-04-01T00:00:00.000Z", "2024-05-01T00:00:00.000Z"];
@@ -340,8 +322,6 @@ describe("invalidateEventRanges", () => {
     expect(invalidated(client)).toEqual([false, true, true]);
   });
 });
-
-// ─── readCachedEventsForRange ─────────────────────────────────────────────────
 
 describe("readCachedEventsForRange", () => {
   const monthA = ["events", "2024-02-22T00:00:00.000Z", "2024-04-08T00:00:00.000Z"];
@@ -392,8 +372,6 @@ describe("readCachedEventsForRange", () => {
   });
 });
 
-// ─── optimisticallyRemoveEvent ────────────────────────────────────────────────
-
 describe("optimisticallyRemoveEvent", () => {
   it("removes the event with the given ID from all cache entries", async () => {
     const key = ["events", "2024-03-15T00:00:00", "2024-03-16T00:00:00"];
@@ -437,8 +415,6 @@ describe("optimisticallyRemoveEvent", () => {
     expect(snapshot[0].data?.events).toContainEqual(EXISTING_EVENT);
   });
 });
-
-// ─── optimisticallyPatchEvent ─────────────────────────────────────────────────
 
 describe("optimisticallyPatchEvent", () => {
   it("updates start and end on the matching event", async () => {
@@ -514,8 +490,6 @@ describe("optimisticallyPatchEvent", () => {
   });
 });
 
-// ─── rollbackFromSnapshot ─────────────────────────────────────────────────────
-
 describe("rollbackFromSnapshot", () => {
   it("restores cache entries to their snapshot state", async () => {
     const key = ["events", "2024-03-15T00:00:00", "2024-03-16T00:00:00"];
@@ -523,14 +497,12 @@ describe("rollbackFromSnapshot", () => {
       [key.join("|")]: makeEventResponse([EXISTING_EVENT]),
     });
 
-    // Optimistically remove so cache is now empty
     const snapshot = await optimisticallyRemoveEvent(
       client as never,
       "ev-existing",
     );
     expect(client._store[key.join("|")]?.events.length).toBe(0);
 
-    // Roll back — original event should be restored
     rollbackFromSnapshot(client as never, snapshot);
     expect(client._store[key.join("|")]?.events).toContainEqual(EXISTING_EVENT);
   });

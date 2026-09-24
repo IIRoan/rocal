@@ -134,6 +134,12 @@ export function useMessageReaderController(props: MessageReaderProps) {
   } = props;
   const isMessageBodyLoading = loading?.messageBody ?? false;
   const isDecrypting = loading?.decrypting ?? false;
+  // The shell renders from list metadata while the body loads, so only the body area changes when it arrives.
+  const isBodyLoading = Boolean(
+    message && isMessageBodyLoading && !messageHasLoadedBody(message),
+  );
+  // Replies and forwards quote the body, so they wait until it has loaded.
+  const canReply = !isBusy && !isBodyLoading;
   const hasPrev = navigation?.hasPrev;
   const hasNext = navigation?.hasNext;
   const { settings: displaySettings } = useMailDisplaySettings();
@@ -383,6 +389,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
   };
 
   const handleSendReply = async () => {
+    if (!canReply) return;
     if (onSendReply) {
       if (!replyText.trim()) {
         toast.error("Enter a reply message.");
@@ -466,10 +473,6 @@ export function useMessageReaderController(props: MessageReaderProps) {
       <p className="text-sm text-muted-foreground">Select a conversation</p>
     </div>
   ) : null;
-  // The shell renders from list metadata while the body loads, so only the body area changes when it arrives.
-  const isBodyLoading = Boolean(
-    message && isMessageBodyLoading && !messageHasLoadedBody(message),
-  );
 
   const viewModel = ((): MessageReaderViewModel | null => {
     if (!message) return null;
@@ -565,6 +568,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
     isBusy,
     isDecrypting,
     isBodyLoading,
+    canReply,
     isDark,
     hasPrev,
     hasNext,

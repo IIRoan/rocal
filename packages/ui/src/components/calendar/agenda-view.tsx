@@ -18,7 +18,6 @@ interface AgendaViewProps {
   onEventCreate?: (startTime: Date) => void;
   timeFormat: TimeFormat;
   timezone?: string;
-  // Context menu actions
   onEventEdit?: (event: CalendarEvent) => void;
   onEventDelete?: (event: CalendarEvent) => void;
   onEventView?: (event: CalendarEvent) => void;
@@ -35,7 +34,6 @@ export function AgendaView({
   onEventView,
 }: AgendaViewProps) {
   const resolvedTimezone = resolveTimezone(timezone);
-  // Show events for the next days based on constant
   const days = useMemo(() => {
     return Array.from({ length: AgendaDaysToShow }, (_, i) =>
       addDays(new Date(currentDate), i),
@@ -47,7 +45,6 @@ export function AgendaView({
     onEventSelect(event);
   };
 
-  // Check if there are any days with events
   const hasEvents = days.some(
     (day) => getAgendaEventsForDay(events, day, resolvedTimezone).length > 0,
   );

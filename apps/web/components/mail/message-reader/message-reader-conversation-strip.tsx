@@ -53,8 +53,7 @@ export function MessageReaderConversationStrip({
   const messageCount = orderedConversationMessages.length;
 
   function toggleExpandedFromPointer(event: PointerEvent<HTMLButtonElement>) {
-    // Primary button only. preventDefault stops text/image drag so the
-    // press can't turn into a scroll/selection gesture on the reader pane.
+    // Primary button only; preventDefault stops a text/image drag turning into a scroll or selection gesture on the reader.
     if (event.button !== 0) return;
     event.preventDefault();
     setExpanded((open) => !open);

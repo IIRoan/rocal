@@ -1,12 +1,4 @@
-/**
- * WorkspaceLoadingScreen
- *
- * Full-screen gate shown while the encrypted workspace is being prepared
- * after sign-in. It mirrors the web "loading board": a faint oversized date,
- * the Solace wordmark, the weekday, and a moving sweep line beneath a status
- * message. The screen owns its own mount lifecycle so it can fade smoothly
- * into the app content once preparation finishes.
- */
+/** Gate shown while the encrypted workspace is prepared after sign-in; owns its mount lifecycle so it can fade into the app. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -28,7 +20,6 @@ const FADE_OUT_MS = 460;
 interface WorkspaceLoadingScreenProps {
   /** When true the gate is shown; when it flips to false the screen fades out. */
   active: boolean;
-  /** Status text describing the current preparation phase. */
   message: string;
 }
 
@@ -68,8 +59,7 @@ export function WorkspaceLoadingScreen({
     return () => clearInterval(id);
   }, []);
 
-  // Mount / fade lifecycle. Children render underneath once `active` clears,
-  // so fading this layer out reveals the app smoothly.
+  // Children render underneath once `active` clears, so fading this layer out reveals the app.
   useEffect(() => {
     if (active) {
       setMounted(true);
@@ -86,7 +76,6 @@ export function WorkspaceLoadingScreen({
     });
   }, [active, screenOpacity]);
 
-  // Gentle breathing on the logo.
   useEffect(() => {
     if (!mounted || reduceMotion) {
       logoPulse.setValue(0);
@@ -112,7 +101,6 @@ export function WorkspaceLoadingScreen({
     return () => loop.stop();
   }, [logoPulse, mounted, reduceMotion]);
 
-  // Sweep line travelling across the footer rule.
   useEffect(() => {
     sweep.setValue(reduceMotion ? 0.5 : 0);
     if (!mounted || reduceMotion) return;
@@ -128,7 +116,6 @@ export function WorkspaceLoadingScreen({
     return () => loop.stop();
   }, [sweep, mounted, reduceMotion]);
 
-  // Soft cross-fade when the status phase changes.
   useEffect(() => {
     if (reduceMotion) {
       messageOpacity.setValue(1);

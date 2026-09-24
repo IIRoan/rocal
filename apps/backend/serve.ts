@@ -1,7 +1,4 @@
-/**
- * Local / long-running process entry. Vercel uses `app.ts` → `vercel-bundle.mjs`
- * (built from `main.ts`) and must never call `.listen()`.
- */
+/** Local long-running entry; Vercel builds from main.ts via app.ts and must never call `.listen()`. */
 import { Manifest } from "elysia";
 import { createLogger } from "@workspace/logger";
 import { env } from "./lib/env";

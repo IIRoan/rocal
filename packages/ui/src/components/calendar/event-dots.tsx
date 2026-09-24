@@ -44,7 +44,7 @@ export function EventDots({
 }: EventDotsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Add keyboard shortcuts for numbered event selection - must be called before any early returns
+  // Must run before any early return (rules of hooks).
   useNumberedShortcuts(
     events.map((event) => () => {
       setIsExpanded(false);
@@ -55,7 +55,6 @@ export function EventDots({
 
   if (events.length === 0) return null;
 
-  // If only one event, render it normally
   if (events.length === 1 && events[0]) {
     const singleEvent = events[0];
     return (
@@ -75,10 +74,8 @@ export function EventDots({
     );
   }
 
-  // For multiple events with same time, show dots
   const primaryEvent = events[0];
 
-  // Safety check - if no primary event, return null
   if (!primaryEvent) {
     return null;
   }
@@ -100,7 +97,6 @@ export function EventDots({
               }}
             >
               <div className="flex h-full w-full min-w-0 items-stretch">
-                {/* Show first 2 events as separate styled event items */}
                 {events.slice(0, 2).map((event, index) => (
                   <div
                     key={event.id || index}
@@ -129,7 +125,6 @@ export function EventDots({
                   </div>
                 ))}
 
-                {/* Show count if more than 2 events */}
                 {events.length > 2 && (
                   <div
                     className={cn(
@@ -161,7 +156,6 @@ export function EventDots({
           }}
         >
           {events.map((event, index) => {
-            // Only show shortcuts for first 9 events
             const showShortcut = index < 9;
             const shortcutNumber = index + 1;
 

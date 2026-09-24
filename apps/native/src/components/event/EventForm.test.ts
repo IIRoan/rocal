@@ -71,8 +71,6 @@ describe("shiftEndWithStart", () => {
   });
 });
 
-// ─── roundToNextHour ─────────────────────────────────────────────────────────
-
 describe("roundToNextHour", () => {
   it("rounds up when minutes are non-zero", () => {
     const d = new Date(2025, 5, 15, 9, 30, 0, 0);
@@ -103,8 +101,6 @@ describe("roundToNextHour", () => {
   });
 });
 
-// ─── toLocalISOString ────────────────────────────────────────────────────────
-
 describe("toLocalISOString", () => {
   it("formats a date as YYYY-MM-DDTHH:mm", () => {
     const d = new Date(2025, 0, 5, 9, 5);
@@ -116,8 +112,6 @@ describe("toLocalISOString", () => {
     expect(toLocalISOString(d)).toBe("2025-03-03T14:30");
   });
 });
-
-// ─── mapErrorToField ─────────────────────────────────────────────────────────
 
 describe("mapErrorToField", () => {
   it("maps title errors to 'title'", () => {
@@ -172,8 +166,6 @@ describe("mapErrorToField", () => {
     }
   });
 });
-
-// ─── buildEventRequest ───────────────────────────────────────────────────────
 
 describe("buildEventRequest", () => {
   it("trims title, location, and description", () => {
@@ -319,8 +311,6 @@ describe("buildEventRequest", () => {
     expect(result.participants).toEqual([]);
   });
 });
-
-// ─── validateForm ────────────────────────────────────────────────────────────
 
 describe("validateForm", () => {
   it("returns no errors for valid data", () => {

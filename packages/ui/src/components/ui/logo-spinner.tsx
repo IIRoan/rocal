@@ -117,13 +117,11 @@ export function LogoSpinner({
   const logoRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  // Use cycling messages if no static text provided
   const { message, isTransitioning } = useCyclingMessage({
     context: messageContext,
     enabled: enableCycling && !text && showText,
   });
 
-  // Use static text if provided, otherwise use cycling message
   const displayText = text || message;
 
   useEffect(() => {
@@ -244,7 +242,6 @@ function LoadingBoard({
 
   return (
     <div className="relative flex h-full flex-col justify-between overflow-hidden p-8 sm:p-14">
-      {/* Top row: logo + wordmark left, day name right */}
       <div className="relative flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Logo className="h-4 w-4 text-primary" fill="currentColor" />
@@ -260,7 +257,6 @@ function LoadingBoard({
         </span>
       </div>
 
-      {/* Center: giant date number */}
       <div className="relative select-none text-center leading-none">
         <span
           className="block font-bold text-foreground/[0.07]"
@@ -286,7 +282,6 @@ function LoadingBoard({
         </div>
       </div>
 
-      {/* Bottom: status message + sweep line */}
       <div className="relative">
         <p
           className={cn(
@@ -309,7 +304,6 @@ function LoadingBoard({
   );
 }
 
-// Page loading overlay with logo spinner
 interface PageLoadingOverlayProps {
   isLoading?: boolean;
   message?: string;
@@ -409,7 +403,6 @@ export function PageLoadingOverlay({
   );
 }
 
-// Small inline loader for components
 interface InlineLogoSpinnerProps {
   className?: string;
   size?: "sm" | "md";
@@ -430,7 +423,6 @@ export function InlineLogoSpinner({
   const logoRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  // Use cycling messages if no static text provided
   const { message, isTransitioning } = useCyclingMessage({
     context: messageContext,
     enabled: enableCycling && !text,

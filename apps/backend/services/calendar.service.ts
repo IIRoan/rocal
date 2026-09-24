@@ -217,10 +217,7 @@ export class CalendarService implements ICalendarService {
         });
 
         if (enablingForceFullEncryption) {
-          // Backfill: any event in this calendar that already has an encrypted
-          // payload should drop its plaintext shadows and become fully ciphertext.
-          // Events without an encryptedContent payload (legacy plaintext) are
-          // left untouched – they require a client-side re-encryption pass.
+          // Events that already have encryptedContent drop their plaintext shadows; legacy plaintext events need a client-side re-encryption pass.
           await tx.calendarEvent.updateMany({
             where: {
               calendarId,

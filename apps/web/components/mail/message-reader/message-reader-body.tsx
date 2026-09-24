@@ -170,7 +170,6 @@ export function MessageReaderBody({
                 return activeText;
               })()}
             </div>
-            {/* Show more/less for long bodies */}
             {(showQuote ? displayText : plaintextBody).length >
               PLAINTEXT_COLLAPSE_THRESHOLD && (
               <button
@@ -190,7 +189,6 @@ export function MessageReaderBody({
           <span className="text-sm italic text-[var(--text-disabled)]">No message body</span>
         )}
       </div>
-      {/* Quoted chain toggle — pinned outside the scroll, same style as HTML version */}
       {plaintextQuote && (
         <div className="shrink-0 border-t border-[var(--border-tertiary)] px-4 py-2">
           <button

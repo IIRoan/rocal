@@ -9,8 +9,6 @@ import { isSameDay, getDay } from "date-fns";
 import { nativeLightTheme, nativeDarkTheme } from "@workspace/design-tokens";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 
-// ─── getOrderedDayLabels ─────────────────────────────────────────────────────
-
 describe("getOrderedDayLabels", () => {
   it("returns Sun–Sat when weekStartDay is 0 (Sunday)", () => {
     expect(getOrderedDayLabels(0)).toEqual([
@@ -42,8 +40,6 @@ describe("getOrderedDayLabels", () => {
     }
   });
 });
-
-// ─── generateGridDates ───────────────────────────────────────────────────────
 
 describe("generateGridDates", () => {
   it("returns exactly 42 dates (6 weeks)", () => {
@@ -83,8 +79,6 @@ describe("generateGridDates", () => {
     }
   });
 });
-
-// ─── groupEventsByDay ────────────────────────────────────────────────────────
 
 describe("groupEventsByDay", () => {
   const makeEvent = (
@@ -147,8 +141,6 @@ describe("getMonthDayEvents", () => {
     expect(getMonthDayEvents(map, new Date(2025, 0, 31), false)).toEqual([]);
   });
 });
-
-// ─── resolveEventDotColor ────────────────────────────────────────────────────
 
 describe("resolveEventDotColor", () => {
   const theme = nativeLightTheme;

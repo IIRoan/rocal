@@ -9,7 +9,6 @@ import {
 import { LAYOUT_ICON } from "../../lib/app-layout";
 import { useTheme } from "../../providers/ThemeProvider";
 
-/** Shared icon sizes across the native mail experience. */
 export const MAIL_ICON = {
   headerMenu: LAYOUT_ICON.menu,
   headerSearch: LAYOUT_ICON.search,
@@ -22,7 +21,6 @@ export const MAIL_ICON = {
   emptyState: 36,
 } as const;
 
-/** Layout constants (heights, touch targets). */
 export const MAIL_LAYOUT = {
   hitSize: 44,
   avatarSize: 40,
@@ -30,7 +28,6 @@ export const MAIL_LAYOUT = {
   bottomBarHeight: 52,
   /** Padding above action row inside the dock. */
   bottomBarPaddingTop: 8,
-  /** Selection checkbox size (bulk select). */
   selectBoxSize: 22,
   sheetSectionGap: 8,
   unreadDotSize: 8,

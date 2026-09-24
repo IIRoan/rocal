@@ -82,8 +82,7 @@ export function CalendarManager({
     partitionCalendarsByKind(calendars);
   const { toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
 
-  // Prefetch subscriptions so the synced-calendar edit screen renders
-  // populated immediately (no Feed URL flash) when the user opens it.
+  // Prefetch subscriptions so the synced-calendar edit screen opens populated without a Feed URL flash.
   useEffect(() => {
     void queryClient.prefetchQuery({
       queryKey: ["subscriptions"],
@@ -91,7 +90,6 @@ export function CalendarManager({
     });
   }, [queryClient]);
 
-  // Calendar management state
   const [calendarName, setCalendarName] = useState("");
   const [calendarColor, setCalendarColor] = useState("blue");
   const [calendarIsDefault, setCalendarIsDefault] = useState(false);
@@ -208,7 +206,6 @@ export function CalendarManager({
   if (currentView === "calendars") {
     return (
       <div className="flex flex-col">
-        {/* Header */}
         <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
           <button
             type="button"
@@ -220,7 +217,6 @@ export function CalendarManager({
           <span className="text-sm font-medium">Calendars</span>
         </div>
         <div className="flex-1 overflow-y-auto min-h-0">
-          {/* Actions Section */}
           <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
             Actions
           </div>
@@ -255,7 +251,6 @@ export function CalendarManager({
             </button>
           </div>
 
-          {/* Your Calendars Section */}
           <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
             Your Calendars
           </div>
@@ -467,7 +462,6 @@ export function CalendarManager({
   if (currentView === "calendar-create") {
     return (
       <div className="flex flex-col">
-        {/* Header */}
         <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
           <button
             type="button"
@@ -558,7 +552,6 @@ export function CalendarManager({
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="border-t border-border/50 px-4 py-3 flex items-center justify-end shrink-0">
           <Button
             size="sm"
@@ -603,7 +596,6 @@ export function CalendarManager({
     return (
       <>
         <div className="flex flex-col">
-          {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
             <button
               type="button"
@@ -766,7 +758,6 @@ export function CalendarManager({
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="border-t border-border/50 px-4 py-3 flex items-center justify-between shrink-0">
             {editingCalendar && (
               <Button

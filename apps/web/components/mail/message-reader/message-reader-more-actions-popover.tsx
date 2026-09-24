@@ -25,6 +25,7 @@ export function MessageReaderMoreActionsPopover({
     morePopoverOpen,
     dispatchChrome,
     isBusy,
+    canReply,
     isFlagged,
     props,
   } = controller;
@@ -58,7 +59,7 @@ export function MessageReaderMoreActionsPopover({
       <DropdownItem
         icon={Icon.Forward}
         label="Forward"
-        disabled={isBusy}
+        disabled={!canReply}
         onSelect={onForward}
       />
       {onToggleFlagged ? (

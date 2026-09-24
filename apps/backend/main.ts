@@ -83,8 +83,7 @@ export const createAPI = (prefix = "") => {
             request,
           ),
         credentials: true,
-        // Browser default without this is short; 5s was effectively redoing
-        // OPTIONS on nearly every JMAP call. 24h covers a full mail session.
+        // A short preflight cache re-sent OPTIONS on nearly every JMAP call; 24h covers a full mail session.
         maxAge: 86400,
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: [
@@ -240,14 +239,12 @@ if (!Manifest.isCapturing()) {
   process.on("SIGTERM", shutdown);
 }
 
-// Handle OAuth errors at root (better-auth redirects here on error)
+// better-auth redirects OAuth errors to the root.
 app.get("/", ({ query, redirect }) => {
-  // If there's an OAuth error, redirect to frontend with error
   if (query.error) {
     return redirect(`${frontendUrl}/login?error=${query.error}`);
   }
 
-  // Otherwise redirect to frontend
   return redirect(frontendUrl);
 });
 

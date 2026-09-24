@@ -186,7 +186,6 @@ function TimeInput({
   const hours = value.split(":")[0] || "";
   const minutes = value.split(":")[1] || "";
 
-  // Auto-focus HH input when drawer opens
   useEffect(() => {
     if (open) {
       const timer = setTimeout(() => hhRef.current?.focus(), 150);

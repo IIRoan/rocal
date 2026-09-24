@@ -36,7 +36,6 @@ export function MessageReaderHeader({
 
   return (
     <div className={cn("flex shrink-0 flex-col", isMobile ? "gap-1.5" : "gap-3")}>
-      {/* Sender row: avatar + name/email/to + date */}
       <div className={cn("flex items-start", isMobile ? "gap-2" : "gap-3")}>
         <SenderAvatar
           email={senderEmail}

@@ -3,12 +3,11 @@
 import { Plus } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import {
+  MAIL_LABEL_CUSTOM_DEFAULT_COLOR,
   MAIL_LABEL_PRESET_COLORS,
   resolveLabelDisplayColor,
 } from "@workspace/calendar-core";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
-
-const DEFAULT_CUSTOM_COLOR = "#6366f1";
 
 function swatchRing(color: string) {
   return { boxShadow: `0 0 0 2px var(--background), 0 0 0 3.5px ${color}` };
@@ -62,7 +61,7 @@ export function LabelColorPicker({
           <input
             type="color"
             aria-label="Custom label color"
-            value={isPreset ? DEFAULT_CUSTOM_COLOR : selected}
+            value={isPreset ? MAIL_LABEL_CUSTOM_DEFAULT_COLOR : selected}
             disabled={disabled}
             onChange={(e) => onChange(e.target.value)}
             className="absolute inset-0 size-full cursor-pointer opacity-0"

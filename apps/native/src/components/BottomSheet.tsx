@@ -93,7 +93,6 @@ export interface BottomSheetProps {
 
 export interface BottomSheetHandle {
   dismiss: () => void;
-  /** Snap to a specific snap index. */
   snapTo: (index: number) => void;
 }
 

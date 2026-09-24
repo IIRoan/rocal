@@ -5,13 +5,14 @@ import { Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import type { LabelDef } from "@/lib/mail/types";
 import {
+  MAIL_LABEL_CUSTOM_DEFAULT_COLOR,
   normalizeLabelColorInput,
   resolveLabelDisplayColor,
 } from "@workspace/calendar-core";
 import { LabelColorPicker } from "./label-color-picker";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
-const DEFAULT_LABEL_COLOR = "#6366f1";
+const DEFAULT_LABEL_COLOR = MAIL_LABEL_CUSTOM_DEFAULT_COLOR;
 
 const initialLabelPickerState = {
   newLabelName: "",

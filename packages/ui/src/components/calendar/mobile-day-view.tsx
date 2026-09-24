@@ -27,10 +27,9 @@ import { cn } from "../../lib/utils";
 import { CurrentTimeIndicator } from "./current-time-indicator";
 import { layoutTimelineEvents } from "./timeline-layout";
 
-// Show entire 24 hours for mobile
 const MobileStartHour = 0;
 const MobileEndHour = 23;
-const MobileCellHeight = 60; // Cells for each hour
+const MobileCellHeight = 60;
 
 function formatCurrentTimeLabel(
   currentTime: { hours: number; minutes: number } | null,
@@ -87,11 +86,10 @@ export function MobileDayView({
     });
   }, [calendarDay]);
 
-  // Get time-based events (excluding all-day/multi-day events which are shown in sticky header)
+  // All-day and multi-day events render in the sticky header.
   const timeEvents = useMemo(() => {
     return events
       .filter((event) => {
-        // Exclude all-day and multi-day events
         if (event.allDay) return false;
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
@@ -134,7 +132,6 @@ export function MobileDayView({
     useCurrentTimeIndicator(currentDate, "day", timezone);
   const currentTimeLabel = formatCurrentTimeLabel(currentTime, timeFormat);
 
-  // Auto-scroll to current time or 9 AM
   useEffect(() => {
     if (scrollContainerRef.current && !hasScrolledRef.current) {
       const now = new Date();
@@ -143,10 +140,8 @@ export function MobileDayView({
       let targetHour: number;
 
       if (isTodayInTimezone(calendarDay, resolvedTimezone)) {
-        // If it's today, scroll to current time
         targetHour = nowParts.hours + nowParts.minutes / 60;
       } else {
-        // Otherwise scroll to 9 AM
         targetHour = 9;
       }
 
@@ -159,16 +154,13 @@ export function MobileDayView({
     }
   }, [calendarDay, resolvedTimezone]);
 
-  // Reset scroll flag when date changes
   useEffect(() => {
     hasScrolledRef.current = false;
   }, [currentDate]);
 
   return (
     <div className="flex flex-col h-full min-h-full">
-      {/* Timeline with events */}
       <div className="relative pt-3">
-        {/* Time column - all hours shown, time label ON the hour line */}
         <div className="absolute left-0 top-0 w-11 z-10 bg-background pt-3">
           {hours.map((hour) => (
             <div
@@ -176,7 +168,6 @@ export function MobileDayView({
               className="relative"
               style={{ height: MobileCellHeight }}
             >
-              {/* Time label positioned ON the line with background to hide line behind text */}
               <span className="absolute top-0 left-0.5 -translate-y-1/2 bg-background px-0.5 text-[9px] font-medium text-muted-foreground">
                 {format(hour, timeFormat === "24h" ? "HH:00" : "h:00a")}
               </span>
@@ -184,9 +175,7 @@ export function MobileDayView({
           ))}
         </div>
 
-        {/* Events column */}
         <div className="ml-11 relative">
-          {/* Positioned events */}
           {positionedEvents.map((positionedEvent) => (
             <div
               key={positionedEvent.event.id}
@@ -211,7 +200,6 @@ export function MobileDayView({
             </div>
           ))}
 
-          {/* Current time indicator - enhanced for mobile */}
           {currentTimeVisible && (
             <CurrentTimeIndicator
               position={currentTimePosition}
@@ -221,7 +209,6 @@ export function MobileDayView({
             />
           )}
 
-          {/* Time grid cells for creating events */}
           {hours.map((hour) => {
             const hourValue = getHours(hour);
             return (

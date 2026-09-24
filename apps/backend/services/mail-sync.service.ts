@@ -330,10 +330,7 @@ export class MailSyncService {
     this.writeCached(this.syncStateCache, state.directoryEntryId, state);
   }
 
-  /**
-   * Lightweight check for new JMAP state without advancing stored state or fetching records.
-   * The stored state is intentionally NOT updated here — only syncForUser advances it.
-   */
+  /** Checks for new JMAP state without advancing it; only syncForUser advances the stored state. */
   async detectChanges(input: {
     userId: string;
     accountId: string;

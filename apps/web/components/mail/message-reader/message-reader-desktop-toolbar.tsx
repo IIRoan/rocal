@@ -28,8 +28,16 @@ export function MessageReaderDesktopToolbar({
   controller: MessageReaderController;
   view: MessageReaderViewModel;
 }) {
-  const { hasPrev, hasNext, isBusy, labelPopoverOpen, dispatchChrome, message, props } =
-    controller;
+  const {
+    hasPrev,
+    hasNext,
+    isBusy,
+    canReply,
+    labelPopoverOpen,
+    dispatchChrome,
+    message,
+    props,
+  } = controller;
   const {
     onClose,
     onNavigatePrev,
@@ -172,7 +180,7 @@ export function MessageReaderDesktopToolbar({
           />
         ) : null}
         <IconButton
-          disabled={isBusy}
+          disabled={!canReply}
           icon={Icon.Reply}
           onClick={onReply}
           size={Size.SMALL}

@@ -6,8 +6,6 @@ import {
 
 export type EndCondition = "never" | "count" | "until";
 
-// ─── RRULE Helpers ───────────────────────────────────────────────────────────
-
 const BYDAY_REVERSE: Record<string, number> = {
   SU: 0,
   MO: 1,
@@ -27,10 +25,7 @@ export interface ParsedRule {
   until: string;
 }
 
-/**
- * Parse an RRULE string into a structured object.
- * Returns null if the input is null, empty, or has an unrecognised FREQ.
- */
+/** Parse an RRULE string; null for empty input or an unrecognised FREQ. */
 export function parseRRule(rrule: string | null): ParsedRule | null {
   if (!rrule) return null;
 

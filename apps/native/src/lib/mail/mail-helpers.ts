@@ -228,7 +228,6 @@ export { isValidEmailAddress };
 /** @deprecated Use isValidEmailAddress */
 export const isLikelyEmail = isValidEmailAddress;
 
-/** Returns bare email addresses parsed from a recipient field. */
 export function parseEmailList(value: string): string[] {
   return parseAddressList(value).map((address) => address.email);
 }
@@ -244,7 +243,6 @@ export type ComposeValidationResult = {
   };
 };
 
-/** Validates and normalises native compose form input. */
 export function validateComposeInput(input: {
   to: string;
   cc?: string;
@@ -266,7 +264,6 @@ export function validateComposeInput(input: {
   };
 }
 
-/** Formats Reply All To/Cc fields from a source message. */
 export function formatReplyAllRecipientFields(
   message: Pick<JmapEmailMessage, "from" | "to" | "cc">,
   currentUserEmail?: string | null,

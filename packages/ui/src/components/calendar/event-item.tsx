@@ -41,7 +41,6 @@ interface EventWrapperProps {
   onTouchStart?: (e: React.TouchEvent) => void;
 }
 
-// Shared wrapper component for event styling
 function EventWrapper({
   event,
   isFirstDay = true,
@@ -58,7 +57,6 @@ function EventWrapper({
   onMouseDown,
   onTouchStart,
 }: EventWrapperProps) {
-  // Always use the currentTime (if provided) to determine if the event is in the past
   const displayEnd = currentTime
     ? new Date(
         new Date(currentTime).getTime() +
@@ -70,10 +68,8 @@ function EventWrapper({
   const isPreview = !!(event as any).isPreview;
   const isInvitationGhost = isAwaitingUserInvitationResponse(event);
 
-  // Preview events get a distinct ghost/outline style
   if (isPreview) {
-    // For hex colors, derive a semi-transparent background from the hex
-    // For named colors, use the color class with reduced opacity for visibility in both themes
+    // Hex colors derive a translucent fill; named colors use their class at reduced opacity so the ghost reads in both themes.
     const colorIsHex = isHexColor(event.color || "");
 
     return (
@@ -160,7 +156,6 @@ interface EventItemProps {
   onTouchStart?: (e: React.TouchEvent) => void;
   timeFormat: TimeFormat;
   timezone?: string;
-  // Context menu actions
   onEdit?: (event: CalendarEvent) => void;
   onDelete?: (event: CalendarEvent) => void;
   onView?: (event: CalendarEvent) => void;
@@ -188,7 +183,6 @@ export function EventItem({
 }: EventItemProps) {
   const eventColor = event.color;
 
-  // Use the provided currentTime (for dragging) or the event's actual time
   const displayStart = useMemo(() => {
     return currentTime || new Date(event.start);
   }, [currentTime, event.start]);
@@ -202,12 +196,10 @@ export function EventItem({
       : new Date(event.end);
   }, [currentTime, event.start, event.end]);
 
-  // Calculate event duration in minutes
   const durationMinutes = useMemo(() => {
     return differenceInMinutes(displayEnd, displayStart);
   }, [displayStart, displayEnd]);
 
-  // Render the event content based on view
   const renderEventContent = () => {
     if (view === "month") {
       return (
@@ -246,7 +238,6 @@ export function EventItem({
     }
 
     if (view === "week" || view === "day") {
-      // Height-based sizing thresholds
       const isCompact = height != null && height < 22;
       const isSmall = height != null && height < 32;
       const showStacked =
@@ -343,7 +334,6 @@ export function EventItem({
       );
     }
 
-    // Agenda view — Apple Calendar-inspired flat list row
     const agendaTimeStart = formatTimeWithOptionalMinutesTZ(
       new Date(event.start),
       timeFormat,
@@ -379,7 +369,6 @@ export function EventItem({
         {...dndAttributes}
       >
         <div className="flex items-start gap-3 px-2 py-3">
-          {/* Time column */}
           <div className="flex w-[68px] shrink-0 flex-col items-end pt-0.5 tabular-nums">
             {event.allDay ? (
               <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -397,14 +386,12 @@ export function EventItem({
             )}
           </div>
 
-          {/* Color indicator */}
           <span
             aria-hidden
             className="mt-1.5 size-2.5 shrink-0 rounded-full ring-2 ring-background"
             style={{ backgroundColor: "var(--ev-accent)" }}
           />
 
-          {/* Content */}
           <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0">
             <div className="flex items-center gap-1.5 min-w-0">
               <EncryptionStatusBadge item={event} asIcon />

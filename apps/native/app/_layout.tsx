@@ -39,9 +39,6 @@ import {
   NATIVE_STACK_SCREEN_OPTIONS,
 } from "../src/lib/navigation-routes";
 
-// ---------------------------------------------------------------------------
-// Navigation guard — redirects based on auth state
-// ---------------------------------------------------------------------------
 function NavigationGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const { isReady: isE2eeReady, bootstrap, clearSession, provider } = useE2ee();
@@ -55,7 +52,6 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
     "Setting up encryption…",
   );
 
-  // Redirect based on auth state.
   useEffect(() => {
     const redirectPath = getAuthRedirectPath({
       isAuthenticated,
@@ -73,7 +69,6 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
     };
   }, [isAuthenticated, isLoading, segments, router]);
 
-  // Bootstrap E2EE after authentication.
   useEffect(() => {
     calendarApiService.setE2eeProvider(provider);
 
@@ -144,9 +139,7 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
     };
   }, [isAuthenticated, user, bootstrap, clearSession, provider, queryClient]);
 
-  // Keep the navigator mounted and cover it until encryption is ready. That
-  // way sign-in stays put during passkey, then one loading board covers the
-  // hand-off to calendar instead of flashing the calendar underneath.
+  // Cover the still-mounted navigator so sign-in stays put during passkey and the calendar never flashes underneath.
   const isPreparingWorkspace =
     isAuthenticated && !isLoading && (!isE2eeReady || isPreparingStartupCrypto);
   const isPushNavigationReady =
@@ -179,10 +172,6 @@ function AuthenticatedChrome() {
 
   return <CommandPalette />;
 }
-
-// ---------------------------------------------------------------------------
-// Root layout
-// ---------------------------------------------------------------------------
 
 function RootLayout() {
   return (
