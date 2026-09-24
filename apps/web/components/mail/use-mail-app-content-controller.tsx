@@ -266,7 +266,8 @@ export function useMailAppContentController(
   const handleDismissCompose = () => {
     dismissCompose();
     editingDraftIdRef.current = null;
-    setSelectedMessageId(null);
+    // A selected draft has no reader view, so drop it; any other open message stays in the reader.
+    if (selectedIsDraft) setSelectedMessageId(null);
   };
 
   const closeComposeThen = (action: () => void) => {
@@ -325,11 +326,7 @@ export function useMailAppContentController(
 
   useEffect(() => {
     registerComposeCloseActions({
-      dismiss: () => {
-        dismissCompose();
-        editingDraftIdRef.current = null;
-        setSelectedMessageId(null);
-      },
+      dismiss: handleDismissCompose,
       discardDraft: (draftId) => {
         void handleDiscardDraft(draftId);
       },

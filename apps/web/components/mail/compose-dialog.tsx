@@ -999,7 +999,7 @@ export function ComposeDialog({
         showClose={false}
         showOverlay={false}
         aria-describedby={undefined}
-        className="left-auto right-2 bottom-2 translate-x-0 overflow-hidden p-0 flex flex-col min-h-[360px] w-[min(45vw,720px)] min-w-[min(100%,624px)] max-h-[min(780px,calc(100dvh-16px))] rounded-[20px] bg-[var(--bg-l2-solid)] border-[var(--border-secondary)] shadow-[var(--shadow-l3)]"
+        className="left-auto right-2 bottom-2 translate-x-0 overflow-hidden p-0 flex flex-col min-h-[500px] w-[min(50vw,800px)] min-w-[min(100%,680px)] max-h-[min(920px,calc(100dvh-16px))] rounded-[20px] bg-[var(--bg-l2-solid)] border-[var(--border-secondary)] shadow-[var(--shadow-l3)]"
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={handleDismissRequest}
