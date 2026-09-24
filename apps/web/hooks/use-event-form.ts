@@ -13,6 +13,8 @@ import type {
 import {
   getEventPickerDateRange,
   getOperationWarningMessages,
+  eventNotificationsQueryKey,
+  getReminderMinutes,
   pickerDateAndTimeToUtc,
   pickerDateToAllDayUtcRange,
   resolveTimezone,
@@ -67,16 +69,7 @@ function getFallbackNotifications(
 function getReminderFromNotifications(
   notifications: NotificationPayload[],
 ): number | null {
-  const reminderMinutes = notifications.flatMap((notification) => {
-    if (!notification.isEnabled || notification.notificationType !== "email") {
-      return [];
-    }
-
-    const minutes = Number(notification.minutesBefore) || 0;
-    return minutes > 0 ? [minutes] : [];
-  });
-
-  return reminderMinutes.length > 0 ? Math.min(...reminderMinutes) : null;
+  return getReminderMinutes(notifications)[0] ?? null;
 }
 
 function getDuplicateNotificationTimes(
@@ -142,7 +135,6 @@ interface UseEventFormProps {
 }
 
 interface UseEventFormReturn {
-  // Form state
   selectedEvent: CalendarEvent | null;
   eventViewMode: "view" | "edit";
   eventTitle: string;
@@ -160,7 +152,6 @@ interface UseEventFormReturn {
   isRecurring: boolean;
   recurrenceRule: RecurrenceRule | null;
 
-  // UI state
   eventSaving: boolean;
   showRecurringDeleteModal: boolean;
   startDateOpen: boolean;
@@ -171,7 +162,6 @@ interface UseEventFormReturn {
   notificationsLoading: boolean;
   showNotifications: boolean;
 
-  // Actions
   setSelectedEvent: (event: CalendarEvent | null) => void;
   setEventViewMode: (mode: "view" | "edit") => void;
   setEventTitle: (title: string) => void;
@@ -195,7 +185,6 @@ interface UseEventFormReturn {
   setEndTimeOpen: (open: boolean) => void;
   setShowNotifications: (show: boolean) => void;
 
-  // Form actions
   handleStartTimeChange: (newStartTime: string) => void;
   handleEndTimeChange: (newEndTime: string) => void;
   handleNotificationChange: (notifications: EventNotification[]) => void;
@@ -221,7 +210,6 @@ export function useEventForm({
   useEffect(() => {
     calendarsRef.current = calendars;
   }, [calendars]);
-  // Event editor state
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null,
   );
@@ -251,7 +239,6 @@ export function useEventForm({
     end?: string;
   }>({});
 
-  // Notification state
   const [eventNotifications, setEventNotificationsState] = useState<
     EventNotification[]
   >([]);
@@ -289,7 +276,6 @@ export function useEventForm({
     }
   }, []);
 
-  // Mutations
   const validateRecurrenceMutation = useMutation({
     mutationFn: (rule: RecurrenceRule) =>
       calendarApiService.validateRecurrence(rule),
@@ -309,10 +295,9 @@ export function useEventForm({
         encryptedDisplayTitle: await encryptReminderTitle(eventId, title),
       }),
     onSuccess: (_result, variables) => {
-      // Invalidate the cached notifications list so the editor shows the
-      // freshly saved entries instead of the stale 5-minute cache.
+      // Invalidate so the editor shows the saved entries instead of the 5-minute stale cache.
       queryClient.invalidateQueries({
-        queryKey: ["eventNotifications", variables.eventId],
+        queryKey: eventNotificationsQueryKey(variables.eventId),
       });
     },
   });
@@ -332,7 +317,6 @@ export function useEventForm({
     },
   });
 
-  // Load event data into form
   const loadEventData = useCallback(
     async (event: CalendarEvent) => {
       const isNewEvent = !event.id || event.id === "" || event.id === undefined;
@@ -372,7 +356,6 @@ export function useEventForm({
       );
       setShowNotifications(fallbackNotifications.length > 0);
 
-      // Handle recurring event data
       const hasRecurrence = !!event.recurrence;
       setIsRecurring(hasRecurrence);
       if (hasRecurrence && event.recurrence) {
@@ -390,14 +373,13 @@ export function useEventForm({
         setRecurrenceRule(null);
       }
 
-      // Load notifications for existing events
       if (!isNewEvent && event.id) {
         setNotificationsLoading(true);
         try {
           const response = await queryClient.fetchQuery({
-            queryKey: ["eventNotifications", event.id],
+            queryKey: eventNotificationsQueryKey(event.id),
             queryFn: () => calendarApiService.getEventNotifications(event.id),
-            staleTime: 1000 * 60 * 5, // 5 minutes
+            staleTime: 1000 * 60 * 5,
           });
 
           if (
@@ -442,7 +424,6 @@ export function useEventForm({
     [queryClient, setEventNotifications, localSettings.timezone],
   );
 
-  // Reset form to initial state
   const resetForm = useCallback(() => {
     const startDate = new Date();
     const endDate = new Date();
@@ -474,7 +455,6 @@ export function useEventForm({
     setShowNotifications(false);
   }, [setEventNotifications]);
 
-  // Handle start time change with validation
   const handleStartTimeChange = useCallback(
     (newStartTime: string) => {
       const validation = validateTime(newStartTime);
@@ -500,7 +480,6 @@ export function useEventForm({
     [eventEndTime],
   );
 
-  // Handle end time change with validation
   const handleEndTimeChange = useCallback(
     (newEndTime: string) => {
       const validation = validateTime(newEndTime);
@@ -512,9 +491,8 @@ export function useEventForm({
         const startMinutes = timeToMinutes(eventStartTime);
         const endMinutes = timeToMinutes(validation.time);
 
-        // If end time is before or equal to start time, auto-adjust start time
         if (endMinutes <= startMinutes) {
-          const newStartMinutes = Math.max(0, endMinutes - 60); // 1 hour before end time, but not negative
+          const newStartMinutes = Math.max(0, endMinutes - 60);
           const newStartTime = minutesToTime(newStartMinutes);
           setEventStartTime(newStartTime);
           setTimeErrors((prev) => ({ ...prev, start: undefined }));
@@ -527,7 +505,6 @@ export function useEventForm({
     [eventStartTime],
   );
 
-  // Handle notification changes
   const handleNotificationChange = useCallback(
     (notifications: EventNotification[]) => {
       setEventNotifications(notifications);
@@ -535,7 +512,6 @@ export function useEventForm({
     [setEventNotifications],
   );
 
-  // Save event
   const handleEventSave = useCallback(
     async (calendarData: any) => {
       const validationError = validateEventForm(
@@ -553,7 +529,6 @@ export function useEventForm({
         return;
       }
 
-      // Validate recurrence rule if recurring is enabled
       if (isRecurring && recurrenceRule) {
         try {
           const validation =
@@ -571,7 +546,6 @@ export function useEventForm({
         }
       }
 
-      // Validate for duplicate notifications
       const duplicateTimes = getDuplicateNotificationTimes(eventNotifications);
 
       if (duplicateTimes.length > 0) {
@@ -696,10 +670,8 @@ export function useEventForm({
           }
         }
 
-        // Save notifications (non-blocking, sanitized)
         if (savedEventId) {
-          // If the event starts in the past, skip creating future reminders,
-          // but still allow an empty update to clear existing rows.
+          // Past events skip future reminders but still send an empty update to clear existing rows.
           const now = new Date();
           const startsInFuture = new Date(eventData.start) > now;
           const shouldSyncNotifications =
@@ -872,7 +844,6 @@ export function useEventForm({
     ],
   );
 
-  // Delete event
   const handleEventDelete = useCallback<(calendarData: any) => Promise<void>>(
     async (calendarData: any) => {
       if (!selectedEvent?.id) return;
@@ -897,7 +868,6 @@ export function useEventForm({
     [selectedEvent, eventTitle, onEventSaved, onClose, resetForm],
   );
 
-  // Delete recurring event - this instance only
   const handleRecurringDeleteThis = useCallback(
     async (calendarData: any) => {
       if (!selectedEvent?.id) return;
@@ -973,7 +943,6 @@ export function useEventForm({
     ],
   );
 
-  // Delete recurring event - entire series
   const handleRecurringDeleteAll = useCallback(
     async (calendarData: any) => {
       if (!selectedEvent?.id) return;
@@ -1023,7 +992,6 @@ export function useEventForm({
   );
 
   return {
-    // Form state
     selectedEvent,
     eventViewMode,
     eventTitle,
@@ -1041,7 +1009,6 @@ export function useEventForm({
     isRecurring,
     recurrenceRule,
 
-    // UI state
     eventSaving,
     showRecurringDeleteModal,
     startDateOpen,
@@ -1052,7 +1019,6 @@ export function useEventForm({
     notificationsLoading,
     showNotifications,
 
-    // Actions
     setSelectedEvent,
     setEventViewMode,
     setEventTitle,
@@ -1076,7 +1042,6 @@ export function useEventForm({
     setEndTimeOpen,
     setShowNotifications,
 
-    // Form actions
     handleStartTimeChange,
     handleEndTimeChange,
     handleNotificationChange,

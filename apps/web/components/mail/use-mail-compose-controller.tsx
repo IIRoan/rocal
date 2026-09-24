@@ -29,6 +29,7 @@ import {
   buildNewMessageSeed,
   buildOpenNewComposeSeed,
   buildReplySeed,
+  type QuotedDateOptions,
 } from "./mail-compose-seed";
 import {
   initialMailComposeState,
@@ -87,9 +88,11 @@ function patchAttachments(
 export function useMailComposeController({
   identities,
   mailServerLimits,
+  quoteDateOptions,
 }: {
   identities: JmapIdentity[];
   mailServerLimits: MailServerLimits;
+  quoteDateOptions: QuotedDateOptions;
 }) {
   const [state, dispatch] = useReducer(
     mailComposeReducer,
@@ -330,13 +333,25 @@ export function useMailComposeController({
 
   const seedReply = (message: JmapEmailMessage, plaintext: string | null) => {
     applySeed(
-      buildReplySeed(message, plaintext, identities, resolvedIdentityId),
+      buildReplySeed(
+        message,
+        plaintext,
+        identities,
+        resolvedIdentityId,
+        quoteDateOptions,
+      ),
     );
   };
 
   const seedForward = (message: JmapEmailMessage, plaintext: string | null) => {
     applySeed(
-      buildForwardSeed(message, plaintext, identities, resolvedIdentityId),
+      buildForwardSeed(
+        message,
+        plaintext,
+        identities,
+        resolvedIdentityId,
+        quoteDateOptions,
+      ),
     );
   };
 

@@ -8,6 +8,7 @@ import {
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useCalendarPresentation } from "@/hooks/use-calendar-presentation";
 import { useSettings } from "@/hooks/use-settings";
+import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { useCommandPalette } from "./command-palette-context";
 import { useCalendarWorkspaceReady } from "@/components/calendar-workspace-ready";
 import {
@@ -22,6 +23,7 @@ interface CalendarWithDataProps {
 export function CalendarWithData({ className }: CalendarWithDataProps) {
   const { isCalendarVisible, currentDate, currentView } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
+  const timeFormat = useUserTimeFormat();
   const { openEventEditor, previewEvent } = useCommandPalette();
   const calendarData = useSharedCalendarData();
   const workspace = useCalendarWorkspaceReady();
@@ -54,8 +56,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     workspace?.markReady();
   }, [isAllInitialLoading, workspace]);
 
-  // Keep the calendar mounted under the workspace overlay so the view can
-  // paint in parallel. The shell hides chrome until markReady() runs.
+  // Stays mounted under the workspace overlay so the view paints in parallel; the shell hides chrome until markReady().
   return (
     <>
       <EventCalendar
@@ -73,7 +74,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         onDateRangeChange={calendarData.setDateRange}
         showWeekNumbers={settings?.showWeekNumbers}
         compactView={settings?.compactView}
-        timeFormat={settings?.timeFormat}
+        timeFormat={timeFormat}
         defaultEventDuration={settings?.defaultEventDuration}
         defaultCalendarId={defaultCalendarId}
         weekStartDay={settings?.weekStartDay}

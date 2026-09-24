@@ -11,7 +11,8 @@ function parseAddressFromHeader(value: string): string {
   return (match?.[1] ?? trimmed).trim();
 }
 
-const configuredFrom =
+/** The noreply identity every app mail (auth, invites, reminders) is sent from. */
+export const noreplyEmail =
   process.env.EMAIL_FROM?.trim() ||
   parseAddressFromHeader(
     process.env.AUTH_EMAIL_FROM ||
@@ -23,7 +24,7 @@ const configuredFrom =
 export const authEmailFromName =
   process.env.EMAIL_FROM_NAME?.trim() || "Solace";
 
-export const authEmailFrom = `${authEmailFromName} <${configuredFrom}>`;
+export const authEmailFrom = `${authEmailFromName} <${noreplyEmail}>`;
 
 function readMailerConfig() {
   return {
@@ -32,7 +33,7 @@ function readMailerConfig() {
     ),
     username: process.env.STALWART_JMAP_USERNAME?.trim() || "",
     password: process.env.STALWART_JMAP_PASSWORD || "",
-    from: configuredFrom,
+    from: noreplyEmail,
     fromName: authEmailFromName,
   };
 }

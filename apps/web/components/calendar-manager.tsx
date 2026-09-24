@@ -60,6 +60,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 interface CalendarManagerProps {
   onBack: () => void;
@@ -81,8 +82,7 @@ export function CalendarManager({
     partitionCalendarsByKind(calendars);
   const { toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
 
-  // Prefetch subscriptions so the synced-calendar edit screen renders
-  // populated immediately (no Feed URL flash) when the user opens it.
+  // Prefetch subscriptions so the synced-calendar edit screen opens populated without a Feed URL flash.
   useEffect(() => {
     void queryClient.prefetchQuery({
       queryKey: ["subscriptions"],
@@ -90,7 +90,6 @@ export function CalendarManager({
     });
   }, [queryClient]);
 
-  // Calendar management state
   const [calendarName, setCalendarName] = useState("");
   const [calendarColor, setCalendarColor] = useState("blue");
   const [calendarIsDefault, setCalendarIsDefault] = useState(false);
@@ -207,9 +206,9 @@ export function CalendarManager({
   if (currentView === "calendars") {
     return (
       <div className="flex flex-col">
-        {/* Header */}
         <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
           <button
+            type="button"
             onClick={onBack}
             className="p-1 rounded hover:bg-muted/50 transition-colors"
           >
@@ -218,7 +217,6 @@ export function CalendarManager({
           <span className="text-sm font-medium">Calendars</span>
         </div>
         <div className="flex-1 overflow-y-auto min-h-0">
-          {/* Actions Section */}
           <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
             Actions
           </div>
@@ -253,7 +251,6 @@ export function CalendarManager({
             </button>
           </div>
 
-          {/* Your Calendars Section */}
           <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
             Your Calendars
           </div>
@@ -465,9 +462,9 @@ export function CalendarManager({
   if (currentView === "calendar-create") {
     return (
       <div className="flex flex-col">
-        {/* Header */}
         <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
           <button
+            type="button"
             onClick={() => goBack()}
             className="p-1 rounded hover:bg-muted/50 transition-colors"
           >
@@ -511,29 +508,29 @@ export function CalendarManager({
               <Label className="text-xs text-muted-foreground">Color</Label>
               <div className="flex flex-wrap gap-2">
                 {PRESET_COLORS.map((preset) => (
-                  <button
-                    key={preset.value}
-                    type="button"
-                    onClick={() => {
-                      setCalendarColor(preset.value);
-                      if (calendarValidationErrors.color) {
-                        setCalendarValidationErrors((prev) => ({
-                          ...prev,
-                          color: undefined,
-                        }));
-                      }
-                    }}
-                    className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
-                      calendarColor === preset.value
-                        ? "border-foreground scale-110"
-                        : "border-transparent hover:scale-105"
-                    }`}
-                    style={{
-                      backgroundColor: getColorSwatchValue(preset.value),
-                    }}
-                    title={preset.label}
-                    aria-label={preset.label}
-                  />
+                  <SimpleTooltip content={preset.label} key={preset.value}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCalendarColor(preset.value);
+                        if (calendarValidationErrors.color) {
+                          setCalendarValidationErrors((prev) => ({
+                            ...prev,
+                            color: undefined,
+                          }));
+                        }
+                      }}
+                      className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
+                        calendarColor === preset.value
+                          ? "border-foreground scale-110"
+                          : "border-transparent hover:scale-105"
+                      }`}
+                      style={{
+                        backgroundColor: getColorSwatchValue(preset.value),
+                      }}
+                      aria-label={preset.label}
+                    />
+                  </SimpleTooltip>
                 ))}
               </div>
               {calendarValidationErrors.color && (
@@ -555,7 +552,6 @@ export function CalendarManager({
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="border-t border-border/50 px-4 py-3 flex items-center justify-end shrink-0">
           <Button
             size="sm"
@@ -600,9 +596,9 @@ export function CalendarManager({
     return (
       <>
         <div className="flex flex-col">
-          {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
             <button
+              type="button"
               onClick={() => goBack()}
               className="p-1 rounded hover:bg-muted/50 transition-colors"
             >
@@ -653,29 +649,29 @@ export function CalendarManager({
                 <Label className="text-xs text-muted-foreground">Color</Label>
                 <div className="flex flex-wrap gap-2">
                   {PRESET_COLORS.map((preset) => (
-                    <button
-                      key={preset.value}
-                      type="button"
-                      onClick={() => {
-                        setCalendarColor(preset.value);
-                        if (calendarValidationErrors.color) {
-                          setCalendarValidationErrors((prev) => ({
-                            ...prev,
-                            color: undefined,
-                          }));
-                        }
-                      }}
-                      className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
-                        calendarColor === preset.value
-                          ? "border-foreground scale-110"
-                          : "border-transparent hover:scale-105"
-                      }`}
-                      style={{
-                        backgroundColor: getColorSwatchValue(preset.value),
-                      }}
-                      title={preset.label}
-                      aria-label={preset.label}
-                    />
+                    <SimpleTooltip content={preset.label} key={preset.value}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCalendarColor(preset.value);
+                          if (calendarValidationErrors.color) {
+                            setCalendarValidationErrors((prev) => ({
+                              ...prev,
+                              color: undefined,
+                            }));
+                          }
+                        }}
+                        className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
+                          calendarColor === preset.value
+                            ? "border-foreground scale-110"
+                            : "border-transparent hover:scale-105"
+                        }`}
+                        style={{
+                          backgroundColor: getColorSwatchValue(preset.value),
+                        }}
+                        aria-label={preset.label}
+                      />
+                    </SimpleTooltip>
                   ))}
                 </div>
                 {calendarValidationErrors.color && (
@@ -728,15 +724,17 @@ export function CalendarManager({
                       readOnly
                       className="h-8 text-xs font-mono"
                     />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleCopyShareLink}
-                      className="h-8 px-2"
-                      title="Copy link"
-                    >
-                      <Copy className="size-3.5" />
-                    </Button>
+                    <SimpleTooltip content="Copy link">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleCopyShareLink}
+                        className="h-8 px-2"
+                        aria-label="Copy link"
+                      >
+                        <Copy className="size-3.5" />
+                      </Button>
+                    </SimpleTooltip>
                   </div>
                   <Button
                     size="sm"
@@ -760,7 +758,6 @@ export function CalendarManager({
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="border-t border-border/50 px-4 py-3 flex items-center justify-between shrink-0">
             {editingCalendar && (
               <Button

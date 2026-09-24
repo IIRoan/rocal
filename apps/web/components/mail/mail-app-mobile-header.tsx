@@ -2,6 +2,7 @@ import { Button } from "@workspace/ui/components/ui/button";
 import { MobileAppSwitcher } from "@/components/mobile-app-switcher";
 import { useSidebar } from "@workspace/ui/components/ui/sidebar";
 import { Menu, Pencil, RotateCcw } from "lucide-react";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 export type MobileMailHeaderRefreshState = {
   disabled: boolean;
@@ -65,23 +66,24 @@ export function MobileMailHeader({
           </div>
 
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="size-9 rounded-xl text-muted-foreground disabled:opacity-40"
-              disabled={refresh.disabled}
-              onClick={onRefresh}
-              aria-label="Refresh mail"
-              title="Refresh mail"
-            >
-              <RotateCcw
-                size={16}
-                strokeWidth={2.25}
-                className={
-                  refresh.spinning ? "animate-spin" : "transition-transform"
-                }
-              />
-            </Button>
+            <SimpleTooltip content="Refresh mail">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="size-9 rounded-xl text-muted-foreground disabled:opacity-40"
+                disabled={refresh.disabled}
+                onClick={onRefresh}
+                aria-label="Refresh mail"
+              >
+                <RotateCcw
+                  size={16}
+                  strokeWidth={2.25}
+                  className={
+                    refresh.spinning ? "animate-spin" : "transition-transform"
+                  }
+                />
+              </Button>
+            </SimpleTooltip>
           </div>
         </div>
       </div>

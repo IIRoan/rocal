@@ -27,6 +27,7 @@ import {
   PaletteView,
 } from "../command-palette/palette-ui";
 import { PALETTE_INPUT_CLASS } from "../command-palette/palette-styles";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 const ROLE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   inbox: Inbox,
@@ -50,16 +51,17 @@ function VisibilityToggle({
 }) {
   const Icon = isHidden ? EyeOff : Eye;
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={!isHidden}
-      aria-label={isHidden ? `Show ${name} in sidebar` : `Hide ${name} from sidebar`}
-      title={isHidden ? "Show in sidebar" : "Hide from sidebar"}
-      className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
-    >
-      <Icon className="size-4" />
-    </button>
+    <SimpleTooltip content={isHidden ? "Show in sidebar" : "Hide from sidebar"}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={!isHidden}
+        aria-label={isHidden ? `Show ${name} in sidebar` : `Hide ${name} from sidebar`}
+        className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <Icon className="size-4" />
+      </button>
+    </SimpleTooltip>
   );
 }
 

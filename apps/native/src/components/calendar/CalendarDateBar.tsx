@@ -17,11 +17,9 @@ interface CalendarDateBarProps {
   currentDate: Date;
   weekStartDay?: number;
   timezone?: string | null;
-  monthStripExpanded?: boolean;
   onTodayPress?: () => void;
   onForwardPress?: () => void;
   onBackwardPress?: () => void;
-  onToggleMonthStrip?: () => void;
 }
 
 export function CalendarDateBar({
@@ -29,11 +27,9 @@ export function CalendarDateBar({
   currentDate,
   weekStartDay = 0,
   timezone,
-  monthStripExpanded,
   onTodayPress,
   onForwardPress,
   onBackwardPress,
-  onToggleMonthStrip,
 }: CalendarDateBarProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -54,31 +50,11 @@ export function CalendarDateBar({
         <Text style={styles.navArrow}>‹</Text>
       </Pressable>
 
-      {onToggleMonthStrip ? (
-        <Pressable
-          onPress={onToggleMonthStrip}
-          style={styles.dateHeaderButton}
-          accessibilityRole="button"
-          accessibilityLabel={
-            monthStripExpanded
-              ? "Collapse month calendar"
-              : "Expand month calendar"
-          }
-        >
-          <Text style={styles.dateHeader} numberOfLines={1}>
-            {dateHeader}
-          </Text>
-          <Text style={styles.chevron}>
-            {monthStripExpanded ? "▲" : "▼"}
-          </Text>
-        </Pressable>
-      ) : (
-        <View style={styles.dateHeaderButton}>
-          <Text style={styles.dateHeader} numberOfLines={1}>
-            {dateHeader}
-          </Text>
-        </View>
-      )}
+      <View style={styles.dateHeader}>
+        <Text style={styles.dateHeaderText} numberOfLines={1}>
+          {dateHeader}
+        </Text>
+      </View>
 
       <Pressable
         onPress={onTodayPress}
@@ -118,12 +94,10 @@ function createStyles(theme: ThemeTokens) {
       minWidth: 36,
       alignItems: "center" as const,
     },
-    dateHeaderButton: {
+    dateHeader: {
       flex: 1,
-      flexDirection: "row" as const,
       alignItems: "center" as const,
       justifyContent: "center" as const,
-      gap: theme.spacing["1"],
       paddingVertical: theme.spacing["1"],
       minWidth: 0,
     },
@@ -143,7 +117,7 @@ function createStyles(theme: ThemeTokens) {
       lineHeight: theme.typography.fontSize["2xl"].lineHeight,
       color: theme.colors.foreground,
     },
-    dateHeader: {
+    dateHeaderText: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
       fontWeight: theme.typography.fontWeight
@@ -151,10 +125,6 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.foreground,
       flexShrink: 1,
       textAlign: "center" as const,
-    },
-    chevron: {
-      fontSize: 10,
-      color: theme.colors.mutedForeground,
     },
     todayText: {
       fontSize: theme.typography.fontSize.sm.size,

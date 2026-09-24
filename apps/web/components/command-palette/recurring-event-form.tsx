@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import type { RecurrenceRule, RecurrenceFrequency } from "@/lib/types/calendar";
 
 import { chipClass, fieldClass } from "../event-editor/event-editor-styles";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 const WEEKDAYS = [
   { index: 1, short: "M", long: "Monday" },
@@ -55,22 +56,22 @@ function WeekdayPicker({
       {WEEKDAYS.map((day) => {
         const active = selected.includes(day.index);
         return (
-          <button
-            key={day.index}
-            type="button"
-            aria-pressed={active}
-            aria-label={day.long}
-            title={day.long}
-            onClick={() => onToggle(day.index)}
-            className={cn(
-              "inline-flex size-8 items-center justify-center rounded-full text-xs font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-              active
-                ? "bg-primary text-primary-foreground"
-                : "bg-accent/60 text-foreground hover:bg-accent",
-            )}
-          >
-            {day.short}
-          </button>
+          <SimpleTooltip content={day.long} key={day.index}>
+            <button
+              type="button"
+              aria-pressed={active}
+              aria-label={day.long}
+              onClick={() => onToggle(day.index)}
+              className={cn(
+                "inline-flex size-8 items-center justify-center rounded-full text-xs font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-accent/60 text-foreground hover:bg-accent",
+              )}
+            >
+              {day.short}
+            </button>
+          </SimpleTooltip>
         );
       })}
     </div>

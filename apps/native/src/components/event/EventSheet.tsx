@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -10,11 +11,6 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { ScrollView } from "react-native-gesture-handler";
-import Animated, {
-  useAnimatedScrollHandler,
-  useSharedValue,
-} from "react-native-reanimated";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   CalendarEvent,
@@ -23,8 +19,10 @@ import type {
   RecurrenceEditScope,
 } from "@workspace/calendar-core";
 import {
+  formatReminderShort,
   getErrorMessage,
   hasOptionalEventParticipants,
+  isCancelledCalendarEvent,
   resolveTimezone,
   wallClockToUtc,
 } from "@workspace/calendar-core";
@@ -33,6 +31,8 @@ import { useTheme } from "../../providers/ThemeProvider";
 import { useAuth } from "../../providers/AuthProvider";
 import { useRecentContacts } from "../../hooks/use-recent-contacts";
 import { useReminderTitleEncryptor } from "../../hooks/use-reminder-title-encryptor";
+import { useEventReminders } from "../../hooks/use-event-reminders";
+import { useUserTimeFormat } from "../../hooks/use-user-time-format";
 import { extractRecentContactEntries } from "../../lib/record-recent-contacts";
 import { useToast } from "../../providers/ToastProvider";
 import { toastOperationWarnings } from "../../lib/operation-warnings";
@@ -41,8 +41,10 @@ import { calendarApiService } from "../../lib/api";
 import { QUERY_KEYS } from "../../lib/query-keys";
 import {
   buildOptimisticEvent,
+  commitOptimisticEvent,
   findCachedEvent,
   generateOptimisticId,
+  invalidateEventRanges,
   optimisticallyInsertEvent,
   optimisticallyRemoveEvent,
   rollbackFromSnapshot,
@@ -50,13 +52,13 @@ import {
 } from "../../lib/optimistic-events";
 import {
   BottomSheet,
+  BottomSheetClose,
   BottomSheetFooter,
   BottomSheetHeader,
+  BottomSheetScrollView,
   BottomSheetTitle,
   type BottomSheetHandle,
 } from "../BottomSheet";
-
-const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 import { CenteredLoader } from "../ui/loading";
 import {
   SheetActions,
@@ -64,20 +66,23 @@ import {
   SheetSecondaryButton,
 } from "../sheet/SheetActions";
 
-import { EventForm } from "./EventForm";
+import {
+  EventForm,
+  type EventFormHandle,
+  type EventFormSubmission,
+} from "./EventForm";
 import { BlobatarAvatar } from "../BlobatarAvatar";
+import { EventEditorRow } from "./EventEditorPrimitives";
 import { toTimezonePickerISOString, parseCreateEventCalendarDay } from "./event-form-utils";
 import {
   formatEventDate,
   formatEventTime,
   formatRecurrenceLabel,
-  formatReminderLabel,
 } from "./event-detail-utils";
 import { EncryptionStatusIcon } from "../calendar/EncryptionStatusIcon";
 import { shouldShowEncryptionIcon } from "../calendar/timeline-event-content";
 import { resolveEventSheetViewActions } from "./event-sheet-view-actions";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 export type EventSheetMode =
   | { type: "create"; date?: string; hour?: string }
@@ -92,11 +97,10 @@ export type EventSheetMode =
 export interface EventSheetProps {
   visible: boolean;
   mode: EventSheetMode | null;
+  presentKey?: number;
   onDismiss: () => void;
   onCloseComplete?: () => void;
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function eventToInitialValues(
   event: CalendarEvent,
@@ -124,6 +128,8 @@ function eventToInitialValues(
   };
 }
 
+const BODY_MOUNT_FALLBACK_MS = 250;
+
 const SCOPE_OPTIONS: {
   label: string;
   scope: RecurrenceEditScope & RecurrenceDeleteScope;
@@ -132,33 +138,6 @@ const SCOPE_OPTIONS: {
   { label: "This and future", scope: "this_and_future" },
   { label: "All occurrences", scope: "all" },
 ];
-
-// ─── Icon wrapper (matches web: w-6 h-6 centered) ───────────────────────────
-
-function IconBox({
-  name,
-  color,
-  bg = "transparent",
-}: {
-  name: React.ComponentProps<typeof Feather>["name"];
-  color: string;
-  bg?: string;
-}) {
-  return (
-    <View
-      style={{
-        width: 32,
-        height: 32,
-        borderRadius: 9,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: bg,
-      }}
-    >
-      <Feather name={name} size={16} color={color} />
-    </View>
-  );
-}
 
 function formatParticipantStatus(status?: string) {
   switch (status) {
@@ -173,11 +152,10 @@ function formatParticipantStatus(status?: string) {
   }
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
-
 export function EventSheet({
   visible,
   mode,
+  presentKey,
   onDismiss,
   onCloseComplete,
 }: EventSheetProps) {
@@ -189,10 +167,16 @@ export function EventSheet({
   const encryptReminderTitle = useReminderTitleEncryptor();
   const { toast } = useToast();
   const bottomSheetRef = useRef<BottomSheetHandle>(null);
+  const formRef = useRef<EventFormHandle>(null);
   const createSnapshotRef = useRef<CacheSnapshot>([]);
   const deleteSnapshotRef = useRef<CacheSnapshot>([]);
 
   const [viewMode, setViewMode] = useState<"view" | "edit">("view");
+  // The body mounts once the open animation runs so rendering the form never delays the tap response.
+  const [bodyReady, setBodyReady] = useState(false);
+  if (!visible && bodyReady) {
+    setBodyReady(false);
+  }
   const [serverErrors, setServerErrors] = useState<string[]>([]);
   const [editScope, setEditScope] = useState<RecurrenceEditScope | undefined>();
   const [editOccurrenceDate, setEditOccurrenceDate] = useState<
@@ -200,7 +184,6 @@ export function EventSheet({
   >();
   const [scopeModalVisible, setScopeModalVisible] = useState(false);
   const [scopeAction, setScopeAction] = useState<"edit" | "delete">("edit");
-  const viewScrollAtTop = useSharedValue(false);
 
   const isCreate = mode?.type === "create";
   const isViewOrEdit = mode?.type === "view" || mode?.type === "edit";
@@ -211,7 +194,6 @@ export function EventSheet({
         ? mode.eventId
         : undefined;
 
-  // Reset internal state when mode changes
   useEffect(() => {
     if (mode?.type === "create") {
       setViewMode("edit");
@@ -227,21 +209,15 @@ export function EventSheet({
       setEditOccurrenceDate(mode.occurrenceDate);
     }
     setServerErrors([]);
-    viewScrollAtTop.value = mode?.type === "view";
-  }, [mode, viewScrollAtTop]);
+  }, [mode]);
+
+  const markBodyReady = useCallback(() => setBodyReady(true), []);
 
   useEffect(() => {
-    viewScrollAtTop.value = viewMode === "view";
-  }, [viewMode, viewScrollAtTop]);
-
-  const viewScrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      const atTop = event.contentOffset.y <= 0.5;
-      if (viewScrollAtTop.value !== atTop) {
-        viewScrollAtTop.value = atTop;
-      }
-    },
-  });
+    if (!visible || bodyReady) return;
+    const timer = setTimeout(markBodyReady, BODY_MOUNT_FALLBACK_MS);
+    return () => clearTimeout(timer);
+  }, [visible, bodyReady, markBodyReady]);
 
   const handleSheetDismissRequest = useCallback(() => {
     setServerErrors([]);
@@ -256,8 +232,6 @@ export function EventSheet({
     }
     onDismiss();
   }, [onDismiss]);
-
-  // ─── Data fetching ─────────────────────────────────────────────────────
 
   const cachedEvent = eventId
     ? findCachedEvent(queryClient, eventId)
@@ -282,23 +256,17 @@ export function EventSheet({
     enabled: visible,
   });
   const resolvedTimezone = resolveTimezone(settings?.timezone);
-
-  // ─── Mutations ─────────────────────────────────────────────────────────
+  const timeFormat = useUserTimeFormat();
+  const { reminders: eventReminders, isLoading: remindersLoading } =
+    useEventReminders(eventId, event?.reminder, visible && !isCreate);
 
   const createMutation = useMutation({
-    mutationFn: async (data: CreateEventRequest) => {
-      const saved = await calendarApiService.createEvent(data);
-      await persistEventReminderNotifications(
-        saved.id,
-        data,
-        encryptReminderTitle,
-      );
-      return saved;
-    },
-    onMutate: async (data: CreateEventRequest) => {
+    mutationFn: ({ request }: EventFormSubmission) =>
+      calendarApiService.createEvent(request),
+    onMutate: async ({ request }: EventFormSubmission) => {
       const tempId = generateOptimisticId();
       const optimisticEvent = buildOptimisticEvent(
-        data,
+        request,
         user?.id ?? "",
         tempId,
       );
@@ -310,10 +278,22 @@ export function EventSheet({
       dismissSheet();
       return { tempId };
     },
-    onSuccess: (savedEvent, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["events"] });
+    onSuccess: (savedEvent, { request, reminders }, context) => {
+      commitOptimisticEvent(queryClient, context.tempId, savedEvent);
+      void invalidateEventRanges(queryClient, savedEvent);
+      // Reminders are a separate round trip that never throws, so they stay off the timeline's critical path.
+      void persistEventReminderNotifications(
+        savedEvent.id,
+        request.title,
+        reminders,
+        encryptReminderTitle,
+      ).then(() =>
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.eventNotifications(savedEvent.id),
+        }),
+      );
       const entries = extractRecentContactEntries(
-        variables.participants,
+        request.participants,
         user?.email,
       );
       if (entries.length > 0) {
@@ -329,30 +309,34 @@ export function EventSheet({
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: CreateEventRequest) => {
+    mutationFn: async ({ request, reminders }: EventFormSubmission) => {
       const saved = editScope
         ? await calendarApiService.editRecurringEvent(eventId!, {
             editScope,
             occurrenceDate: editOccurrenceDate,
-            updates: data,
+            updates: request,
           })
-        : await calendarApiService.updateEvent(eventId!, data);
+        : await calendarApiService.updateEvent(eventId!, request);
       await persistEventReminderNotifications(
         saved.id,
-        data,
+        request.title,
+        reminders,
         encryptReminderTitle,
       );
       return saved;
     },
-    onSuccess: (savedEvent, variables) => {
+    onSuccess: (savedEvent, { request }) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       if (eventId) {
         queryClient.invalidateQueries({
           queryKey: QUERY_KEYS.eventDetail(eventId),
         });
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.eventNotifications(eventId),
+        });
       }
       const entries = extractRecentContactEntries(
-        variables.participants,
+        request.participants,
         user?.email,
       );
       if (entries.length > 0) {
@@ -437,13 +421,11 @@ export function EventSheet({
     },
   });
 
-  // ─── Handlers ──────────────────────────────────────────────────────────
-
   const handleSubmit = useCallback(
-    (data: CreateEventRequest) => {
+    (submission: EventFormSubmission) => {
       setServerErrors([]);
-      if (isCreate) createMutation.mutate(data);
-      else updateMutation.mutate(data);
+      if (isCreate) createMutation.mutate(submission);
+      else updateMutation.mutate(submission);
     },
     [isCreate, createMutation, updateMutation],
   );
@@ -515,8 +497,6 @@ export function EventSheet({
     [scopeAction, event, deleteMutation],
   );
 
-  // ─── Initial values ───────────────────────────────────────────────────
-
   const initialValues = useMemo(() => {
     if (isViewOrEdit && event) {
       return eventToInitialValues(event, resolvedTimezone);
@@ -560,67 +540,127 @@ export function EventSheet({
     return undefined;
   }, [event, isCreate, isViewOrEdit, mode, resolvedTimezone]);
 
-  // ─── Derived ───────────────────────────────────────────────────────────
-
+  // A new event needs no server data to start typing; the calendar chip fills in when calendars arrive.
+  // The mode-reset effect runs after the first render, so derive create's mode to avoid a stale view frame.
+  const sheetViewMode = isCreate ? "edit" : viewMode;
+  // The form seeds its reminder list once, so editing waits for the saved reminders.
   const isLoading =
-    calendarsLoading || (isViewOrEdit && eventLoading && !event);
+    !isCreate &&
+    (calendarsLoading ||
+      (eventLoading && !event) ||
+      (sheetViewMode === "edit" && remindersLoading));
   const isPending =
     createMutation.isPending ||
     updateMutation.isPending ||
     deleteMutation.isPending ||
     rsvpMutation.isPending;
-  const iconColor = theme.colors.mutedForeground;
-  const iconBg = theme.colors.mutedForeground + "18";
-
   const calendarInfo = useMemo(() => {
     if (!event || !calendars) return null;
     return calendars.find((c) => c.id === event.calendarId) ?? null;
   }, [event, calendars]);
+  const calendarSwatch = calendarInfo
+    ? (theme.colors.calendar[
+        calendarInfo.color as keyof typeof theme.colors.calendar
+      ]?.bg ?? calendarInfo.color)
+    : theme.colors.calendar.blue.bg;
   const viewActions = resolveEventSheetViewActions(event);
-  const sheetTitle = isCreate
-    ? "New event"
-    : viewMode === "edit"
-      ? "Edit event"
-      : "Event";
-
-  // ─── Render ────────────────────────────────────────────────────────────
+  const showFormHeader = !isLoading && sheetViewMode === "edit";
+  const sheetTitle = viewMode === "edit" ? "Edit event" : "Event";
 
   return (
     <>
       <BottomSheet
         ref={bottomSheetRef}
         visible={visible}
+        presentKey={presentKey}
         onDismiss={handleSheetDismissRequest}
         onCloseComplete={onCloseComplete}
-        swipeContentToDismissAtTop={viewScrollAtTop}
+        onOpenAnimationStart={markBodyReady}
       >
-        <BottomSheetHeader>
-          <BottomSheetTitle>{sheetTitle}</BottomSheetTitle>
-        </BottomSheetHeader>
-        {isLoading ? (
+        {showFormHeader ? (
+          <BottomSheetHeader showClose={false} style={styles.formHeader}>
+            <View style={styles.formHeaderRow}>
+              <BottomSheetClose
+                onPress={handleCancel}
+                accessibilityLabel={isCreate ? "Discard event" : "Cancel editing"}
+              />
+              <Pressable
+                onPress={() => formRef.current?.submit()}
+                disabled={isPending}
+                hitSlop={4}
+                style={({ pressed }) => [
+                  styles.savePill,
+                  (pressed || isPending) && styles.savePillPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Save"
+                accessibilityState={{ disabled: isPending }}
+              >
+                {isPending ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.colors.primaryForeground}
+                  />
+                ) : (
+                  <Text style={styles.savePillText}>Save</Text>
+                )}
+              </Pressable>
+            </View>
+          </BottomSheetHeader>
+        ) : (
+          <BottomSheetHeader>
+            <BottomSheetTitle>{sheetTitle}</BottomSheetTitle>
+          </BottomSheetHeader>
+        )}
+        {!bodyReady ? (
+          <View style={styles.editBody} />
+        ) : isLoading ? (
           <CenteredLoader theme={theme} message="Loading…" />
-        ) : viewMode === "view" && event ? (
+        ) : sheetViewMode === "view" && event ? (
           <>
-            {/* ── View mode body ─────────────────────────────────── */}
-            <AnimatedScrollView
+            <BottomSheetScrollView
               style={styles.viewScroll}
               contentContainerStyle={styles.viewBody}
               showsVerticalScrollIndicator={false}
               bounces={false}
               overScrollMode="never"
-              scrollEventThrottle={16}
-              onScroll={viewScrollHandler}
             >
-              {/* Event title */}
+              {isCancelledCalendarEvent(event) ? (
+                <View style={styles.cancelledBanner}>
+                  <Feather
+                    name="alert-triangle"
+                    size={16}
+                    color={theme.colors.destructive}
+                  />
+                  <View style={styles.viewRowContent}>
+                    <Text style={styles.cancelledTitle}>Cancelled event</Text>
+                    <Text style={styles.viewSubtext}>
+                      The organiser cancelled this event. It stays on your
+                      calendar until you remove it.
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
               <View style={styles.viewTitleRow}>
-                <EncryptionStatusIcon
-                  encrypted={shouldShowEncryptionIcon(event)}
-                  color={theme.colors.foreground}
-                  size={18}
+                <View
+                  style={[styles.titleBar, { backgroundColor: calendarSwatch }]}
                 />
-                <Text style={styles.viewEventTitle} numberOfLines={2}>
-                  {event.title || "Untitled Event"}
+                <Text
+                  style={[
+                    styles.viewEventTitle,
+                    isCancelledCalendarEvent(event) && styles.viewEventTitleCancelled,
+                  ]}
+                >
+                  {event.title || "Untitled event"}
                 </Text>
+                <View style={styles.titleIcon}>
+                  <EncryptionStatusIcon
+                    encrypted={shouldShowEncryptionIcon(event)}
+                    color={theme.colors.mutedForeground}
+                    size={16}
+                  />
+                </View>
               </View>
               {event.isSynced ? (
                 <Text style={styles.viewSyncedHint}>
@@ -628,135 +668,100 @@ export function EventSheet({
                 </Text>
               ) : null}
 
-              {/* Primary section: date/time + calendar + reminder + recurrence */}
-              <View style={styles.sectionCard}>
-                <View style={styles.sectionRow}>
-                  <IconBox name="clock" color={iconColor} bg={iconBg} />
-                  <View style={styles.viewRowContent}>
+              <View style={styles.viewRows}>
+                <EventEditorRow icon="clock" label="Date and time">
+                  <View style={styles.viewRowText}>
                     <Text style={styles.viewText}>
                       {formatEventDate(event, resolvedTimezone)}
                     </Text>
                     <Text style={styles.viewSubtext}>
-                      {formatEventTime(event, resolvedTimezone)}
+                      {formatEventTime(event, resolvedTimezone, timeFormat)}
+                      {recurrenceLabel ? ` · ${recurrenceLabel}` : ""}
                     </Text>
                   </View>
-                </View>
+                </EventEditorRow>
 
-                {calendarInfo && (
-                  <>
-                    <View style={styles.sectionDivider} />
-                    <View style={styles.sectionRow}>
-                      <View style={styles.iconBoxWrapper}>
-                        <View
-                          style={[
-                            styles.calendarDot,
-                            {
-                              backgroundColor:
-                                theme.colors.calendar[
-                                  calendarInfo.color as keyof typeof theme.colors.calendar
-                                ]?.bg ?? calendarInfo.color,
-                            },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.viewText}>{calendarInfo.name}</Text>
-                    </View>
-                  </>
-                )}
-
-                {event.reminder != null && event.reminder >= 0 ? (
-                  <>
-                    <View style={styles.sectionDivider} />
-                    <View style={styles.sectionRow}>
-                      <IconBox name="bell" color={iconColor} bg={iconBg} />
-                      <Text style={styles.viewText}>
-                        {formatReminderLabel(event.reminder)}
+                {calendarInfo ? (
+                  <EventEditorRow icon="calendar" label="Calendar">
+                    <View style={styles.viewInlineRow}>
+                      <View
+                        style={[
+                          styles.calendarDot,
+                          { backgroundColor: calendarSwatch },
+                        ]}
+                      />
+                      <Text style={styles.viewText} numberOfLines={1}>
+                        {calendarInfo.name}
                       </Text>
                     </View>
-                  </>
-                ) : null}
-
-                {recurrenceLabel ? (
-                  <>
-                    <View style={styles.sectionDivider} />
-                    <View
-                      style={[styles.sectionRow, { alignItems: "flex-start" }]}
-                    >
-                      <View style={{ marginTop: 2 }}>
-                        <IconBox name="repeat" color={iconColor} bg={iconBg} />
-                      </View>
-                      <Text style={styles.viewText}>{recurrenceLabel}</Text>
-                    </View>
-                  </>
+                  </EventEditorRow>
                 ) : null}
 
                 {hasOptionalEventParticipants(event.participants) ? (
-                  <>
-                    <View style={styles.sectionDivider} />
-                    <View
-                      style={[styles.sectionRow, styles.participantSectionRow]}
-                    >
-                      <IconBox name="users" color={iconColor} bg={iconBg} />
-                      <View style={styles.participantList}>
-                        {(event.participants ?? []).map((participant) => (
-                          <View
-                            key={participant.id}
-                            style={styles.participantRow}
-                          >
-                            <BlobatarAvatar
-                              email={participant.email}
-                              name={participant.displayName}
-                              src={participant.image}
-                              size={32}
-                            />
-                            <View style={styles.participantMeta}>
-                              <Text style={styles.viewText}>
-                                {participant.displayName || participant.email}
-                              </Text>
-                              <Text style={styles.viewSubtext}>
-                                {participant.role === "organizer"
-                                  ? "Organizer"
-                                  : formatParticipantStatus(participant.status)}
-                                {participant.displayName
-                                  ? ` · ${participant.email}`
-                                  : ""}
-                              </Text>
-                            </View>
-                          </View>
-                        ))}
-                      </View>
+                  <EventEditorRow icon="users" label="Participants">
+                    <View style={styles.viewInlineRow}>
+                      <Text style={styles.viewMutedText}>
+                        {event.participants?.length ?? 0}{" "}
+                        {event.participants?.length === 1
+                          ? "participant"
+                          : "participants"}
+                      </Text>
                     </View>
-                  </>
+                    <View style={styles.participantList}>
+                      {(event.participants ?? []).map((participant) => (
+                        <View key={participant.id} style={styles.participantRow}>
+                          <BlobatarAvatar
+                            email={participant.email}
+                            name={participant.displayName}
+                            src={participant.image}
+                            size={28}
+                          />
+                          <View style={styles.participantMeta}>
+                            <Text style={styles.viewText} numberOfLines={1}>
+                              {participant.displayName || participant.email}
+                            </Text>
+                            <Text style={styles.viewSubtext} numberOfLines={1}>
+                              {participant.role === "organizer"
+                                ? "Organizer"
+                                : formatParticipantStatus(participant.status)}
+                              {participant.displayName
+                                ? ` · ${participant.email}`
+                                : ""}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  </EventEditorRow>
+                ) : null}
+
+                {event.location ? (
+                  <EventEditorRow icon="map-pin" label="Location">
+                    <Text style={[styles.viewText, styles.viewRowText]}>
+                      {event.location}
+                    </Text>
+                  </EventEditorRow>
+                ) : null}
+
+                {eventReminders.length > 0 ? (
+                  <EventEditorRow icon="bell" label="Reminders">
+                    <Text style={[styles.viewText, styles.viewRowText]}>
+                      {eventReminders
+                        .map((minutes) => `${formatReminderShort(minutes)} before`)
+                        .join(", ")}
+                    </Text>
+                  </EventEditorRow>
+                ) : null}
+
+                {event.description ? (
+                  <EventEditorRow icon="align-left" label="Description">
+                    <Text style={[styles.viewDescription, styles.viewRowText]}>
+                      {event.description}
+                    </Text>
+                  </EventEditorRow>
                 ) : null}
               </View>
 
-              {/* Location */}
-              {event.location ? (
-                <View style={styles.sectionCard}>
-                  <View style={styles.sectionRow}>
-                    <IconBox name="map-pin" color={iconColor} bg={iconBg} />
-                    <Text style={styles.viewText}>{event.location}</Text>
-                  </View>
-                </View>
-              ) : null}
-
-              {/* Description */}
-              {event.description ? (
-                <View style={styles.sectionCard}>
-                  <View
-                    style={[styles.sectionRow, { alignItems: "flex-start" }]}
-                  >
-                    <View style={{ marginTop: 2 }}>
-                      <IconBox name="file-text" color={iconColor} bg={iconBg} />
-                    </View>
-                    <Text style={styles.viewDescription}>
-                      {event.description}
-                    </Text>
-                  </View>
-                </View>
-              ) : null}
-
-              {/* Errors */}
               {serverErrors.length > 0 && (
                 <View style={styles.errorContainer}>
                   {serverErrors.map((err) => (
@@ -766,7 +771,7 @@ export function EventSheet({
                   ))}
                 </View>
               )}
-            </AnimatedScrollView>
+            </BottomSheetScrollView>
             <BottomSheetFooter>
               {viewActions.showInvitationActions ? (
                 <View style={styles.rsvpRow}>
@@ -826,7 +831,7 @@ export function EventSheet({
               </SheetActions>
             </BottomSheetFooter>
           </>
-        ) : viewMode === "view" ? (
+        ) : sheetViewMode === "view" ? (
           <>
             <View style={styles.viewBody}>
               <Text style={styles.viewText}>Couldn't load this event.</Text>
@@ -838,9 +843,10 @@ export function EventSheet({
             </BottomSheetFooter>
           </>
         ) : (
-          /* ── Edit / Create mode ──────────────────────────────── */
           <View style={styles.editBody}>
             <EventForm
+              ref={formRef}
+              actionsPlacement="external"
               key={
                 isCreate ? "create" : `edit-${eventId}-${editScope ?? "none"}`
               }
@@ -850,13 +856,14 @@ export function EventSheet({
               onSubmit={handleSubmit}
               onCancel={handleCancel}
               initialValues={initialValues}
+              initialReminders={isCreate ? undefined : eventReminders}
               timezone={resolvedTimezone}
+              timeFormat={timeFormat}
             />
           </View>
         )}
       </BottomSheet>
 
-      {/* Scope picker modal for recurring events */}
       <Modal
         visible={scopeModalVisible}
         transparent
@@ -902,8 +909,6 @@ export function EventSheet({
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
 function createStyles(theme: ThemeTokens) {
   const view = {
     rsvpRow: {
@@ -941,79 +946,87 @@ function createStyles(theme: ThemeTokens) {
     viewTitleRow: {
       flexDirection: "row" as const,
       alignItems: "flex-start" as const,
+      gap: 12,
+      marginBottom: 12,
+    },
+    titleBar: {
+      width: 4,
+      height: 20,
+      marginTop: 5,
+      borderRadius: theme.borderRadius.full,
+    },
+    titleIcon: {
+      height: 30,
+      justifyContent: "center" as const,
+    },
+    cancelledBanner: {
+      flexDirection: "row" as const,
+      alignItems: "flex-start" as const,
+      gap: 10,
+      padding: 12,
+      marginBottom: 12,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.destructive + "40",
+      backgroundColor: theme.colors.destructive + "0D",
+    },
+    viewRows: {
+      gap: 4,
+    },
+    viewRowText: {
+      paddingVertical: 12,
+    },
+    viewInlineRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
       gap: 8,
-      marginBottom: 10,
-      paddingHorizontal: 4,
+      minHeight: 44,
     },
 
     editBody: {
       flex: 1,
       minHeight: 0,
     },
-    // Card section
-    sectionCard: {
-      backgroundColor: theme.colors.muted + "28",
-      borderRadius: theme.borderRadius.lg,
-      marginBottom: 8,
-      overflow: "hidden" as const,
+    formHeader: {
+      paddingVertical: theme.spacing["2"],
+      borderBottomWidth: 0,
     },
-    sectionRow: {
+    formHeaderRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
+      justifyContent: "space-between" as const,
     },
-    participantSectionRow: {
-      alignItems: "flex-start" as const,
+    savePill: {
+      minWidth: 72,
+      height: 36,
+      paddingHorizontal: theme.spacing["4"],
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      borderRadius: theme.borderRadius.full,
+      backgroundColor: theme.colors.primaryBase,
     },
-    sectionDivider: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: theme.colors.border + "60",
-      marginLeft: 14 + 32 + 12,
+    savePillPressed: {
+      opacity: 0.8,
     },
     viewRowContent: {
       flex: 1,
     },
-    iconBoxWrapper: {
-      width: 32,
-      height: 32,
-      borderRadius: 9,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      backgroundColor: theme.colors.mutedForeground + "18",
-    },
     participantList: {
-      flex: 1,
-      gap: 10,
+      gap: 8,
+      paddingBottom: 4,
     },
     participantRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: 10,
     },
-    participantAvatarImage: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-    },
-    participantAvatarFallback: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      backgroundColor: theme.colors.muted,
-    },
     participantMeta: {
       flex: 1,
     },
     calendarDot: {
-      width: 12,
-      height: 12,
-      borderRadius: 9999,
-      borderWidth: 1,
-      borderColor: theme.colors.border + "99",
+      width: 10,
+      height: 10,
+      borderRadius: theme.borderRadius.full,
     },
     errorContainer: {
       backgroundColor: theme.colors.destructive + "18",
@@ -1022,7 +1035,6 @@ function createStyles(theme: ThemeTokens) {
       marginTop: 8,
     },
 
-    // ── Scope modal ────────────────────────────────────────────────────
     modalOverlay: {
       flex: 1,
       backgroundColor: "rgba(0,0,0,0.5)",
@@ -1053,6 +1065,12 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
+    savePillText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
+      color: theme.colors.primaryForeground,
+    },
     rsvpButtonTextSelected: {
       color: theme.colors.primaryBase,
     },
@@ -1064,12 +1082,25 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.foreground,
       lineHeight: theme.typography.fontSize.xl.lineHeight,
     },
+    viewEventTitleCancelled: {
+      color: theme.colors.mutedForeground,
+      textDecorationLine: "line-through" as const,
+    },
     viewSyncedHint: {
       fontSize: theme.typography.fontSize.xs.size,
       color: theme.colors.mutedForeground,
       marginTop: -6,
       marginBottom: 10,
-      paddingHorizontal: 4,
+      paddingLeft: 16,
+    },
+    viewMutedText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      color: theme.colors.mutedForeground,
+    },
+    cancelledTitle: {
+      fontSize: theme.typography.fontSize.sm.size,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      color: theme.colors.destructive,
     },
     viewText: {
       flex: 1,
@@ -1086,11 +1117,6 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       color: theme.colors.foreground,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-    },
-    participantAvatarFallbackText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
     },
     errorText: {
       fontSize: theme.typography.fontSize.sm.size,

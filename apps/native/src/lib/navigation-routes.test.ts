@@ -5,9 +5,7 @@ import {
   mailMessageRoute,
   NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS,
   NATIVE_STACK_SCREEN_OPTIONS,
-  isCalendarRouteSegments,
   isMailRouteSegments,
-  isSidebarGestureRootSegments,
 } from "./navigation-routes";
 
 describe("navigation-routes", () => {
@@ -18,20 +16,9 @@ describe("navigation-routes", () => {
     expect(mailMessageRoute("em-1")).toBe("/(tabs)/mail/message/em-1");
   });
 
-  it("marks calendar and mail segments correctly", () => {
-    expect(isCalendarRouteSegments(["(tabs)", "calendar"])).toBe(true);
-    expect(isCalendarRouteSegments(["(tabs)", "calendar", "day"])).toBe(true);
+  it("marks mail segments correctly", () => {
     expect(isMailRouteSegments(["(tabs)", "mail"])).toBe(true);
     expect(isMailRouteSegments(["settings"])).toBe(false);
-  });
-
-  it("only enables the sidebar edge gesture on main tab roots", () => {
-    expect(isSidebarGestureRootSegments(["(tabs)", "calendar"])).toBe(true);
-    expect(isSidebarGestureRootSegments(["(tabs)", "mail"])).toBe(true);
-    expect(isSidebarGestureRootSegments(["(tabs)", "mail", "compose"])).toBe(
-      false,
-    );
-    expect(isSidebarGestureRootSegments(["settings"])).toBe(false);
   });
 
   it("shares consistent native stack animation defaults", () => {

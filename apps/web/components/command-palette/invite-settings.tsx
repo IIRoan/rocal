@@ -27,6 +27,7 @@ import {
   PaletteView,
 } from "./palette-ui";
 import { PALETTE_INPUT_CLASS } from "./palette-styles";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 interface InviteSettingsProps {
   goBack: () => void;
@@ -107,35 +108,39 @@ function InviteRow({
             <code className="max-w-[180px] truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
               {invite.token}
             </code>
-            <button
-              type="button"
-              onClick={copyToken}
-              className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              title="Copy invite token"
-            >
-              {copied ? (
-                <Check className="size-3.5 text-success" />
-              ) : (
-                <Copy className="size-3.5" />
-              )}
-            </button>
+            <SimpleTooltip content="Copy invite token">
+              <button
+                type="button"
+                onClick={copyToken}
+                className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Copy invite token"
+              >
+                {copied ? (
+                  <Check className="size-3.5 text-success" />
+                ) : (
+                  <Copy className="size-3.5" />
+                )}
+              </button>
+            </SimpleTooltip>
           </div>
         )}
       </div>
       {isActive && !isExpired && (
-        <button
-          type="button"
-          onClick={() => onRevoke(invite.id)}
-          disabled={revoking}
-          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-          title="Revoke invite"
-        >
-          {revoking ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <X className="size-4" />
-          )}
-        </button>
+        <SimpleTooltip content="Revoke invite">
+          <button
+            type="button"
+            onClick={() => onRevoke(invite.id)}
+            disabled={revoking}
+            className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+            aria-label="Revoke invite"
+          >
+            {revoking ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <X className="size-4" />
+            )}
+          </button>
+        </SimpleTooltip>
       )}
     </div>
   );
@@ -219,15 +224,16 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
       title="Invites"
       onBack={goBack}
       actions={
-        <button
-          type="button"
-          onClick={() => refetch()}
-          aria-label="Refresh invites"
-          title="Refresh invites"
-          className="flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <RotateCcw className="size-3.5" />
-        </button>
+        <SimpleTooltip content="Refresh invites">
+          <button
+            type="button"
+            onClick={() => refetch()}
+            aria-label="Refresh invites"
+            className="flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <RotateCcw className="size-3.5" />
+          </button>
+        </SimpleTooltip>
       }
     >
       <p className="p-2 text-[13px] leading-[130%] text-muted-foreground">

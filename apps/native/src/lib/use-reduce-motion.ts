@@ -6,18 +6,21 @@ export function useReduceMotion(): boolean {
   const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      setReduceMotion(enabled);
+      if (!cancelled) {
+        setReduceMotion(enabled);
+      }
     });
 
     const subscription = AccessibilityInfo.addEventListener(
       "reduceMotionChanged",
-      (enabled) => {
-        setReduceMotion(enabled);
-      },
+      setReduceMotion,
     );
 
     return () => {
+      cancelled = true;
       subscription.remove();
     };
   }, []);

@@ -2,6 +2,7 @@ import {
   formatInUserTimezone,
   getZonedDateParts,
   resolveTimezone,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 import { KIT_HOUR_HEIGHT } from "./calendar-kit-adapter";
 
@@ -10,7 +11,7 @@ export type TimelineEventDensity = "compact" | "small" | "stacked";
 const COMPACT_HEIGHT_PX = 22;
 const TIME_VISIBLE_HEIGHT_PX = 28;
 
-/** Smallest on-screen height for a timed event; at 1.2px/minute a 5-minute one would be a 6px sliver. */
+/** Smallest on-screen height for a timed event; at under 1px/minute a 5-minute one would be a sliver. */
 export const TIMELINE_MIN_EVENT_HEIGHT_PX = 30;
 
 /** Minimum minutes calendar-kit lays a timed event out with. */
@@ -100,7 +101,7 @@ export function timelineEventTitleLines(
 
 export function formatTimelineEventTime(
   instant: Date,
-  timeFormat: "12h" | "24h",
+  timeFormat: TimeFormat,
   timezone: string,
 ): string {
   const resolvedTimezone = resolveTimezone(timezone);

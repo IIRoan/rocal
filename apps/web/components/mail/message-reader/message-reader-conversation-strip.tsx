@@ -1,5 +1,6 @@
 "use client";
 
+import type { TimeFormat } from "@workspace/calendar-core";
 import { useState, type KeyboardEvent, type PointerEvent } from "react";
 import { ChevronDown, Eye, EyeOff, MessageSquare } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
@@ -52,8 +53,7 @@ export function MessageReaderConversationStrip({
   const messageCount = orderedConversationMessages.length;
 
   function toggleExpandedFromPointer(event: PointerEvent<HTMLButtonElement>) {
-    // Primary button only. preventDefault stops text/image drag so the
-    // press can't turn into a scroll/selection gesture on the reader pane.
+    // Primary button only; preventDefault stops a text/image drag turning into a scroll or selection gesture on the reader.
     if (event.button !== 0) return;
     event.preventDefault();
     setExpanded((open) => !open);
@@ -177,7 +177,7 @@ function ThreadMessageRow({
   isActive: boolean;
   accountEmail?: string | null;
   preview: string;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string | null;
   onSelect?: (id: string) => void;
   onDelete?: (id: string) => void;

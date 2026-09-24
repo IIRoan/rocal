@@ -9,18 +9,15 @@ import Animated, {
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { MailSelectionBar } from "./MailSelectionBar";
-import { MailTopToolbar } from "./MailTopToolbar";
+import { MailTopToolbar, type MailTopToolbarProps } from "./MailTopToolbar";
 import { useSelectionProgress } from "./mail-selection-anim";
-import { layoutHairlineBorder } from "../../lib/app-layout";
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
 interface MailListHeaderProps {
   selectedCount: number;
   totalCount: number;
-  onMenu: () => void;
-  onCompose: () => void;
-  onSearch?: () => void;
+  toolbar: MailTopToolbarProps;
   onClearSelection: () => void;
   onSelectAll: () => void;
 }
@@ -28,9 +25,7 @@ interface MailListHeaderProps {
 export function MailListHeader({
   selectedCount,
   totalCount,
-  onMenu,
-  onCompose,
-  onSearch,
+  toolbar,
   onClearSelection,
   onSelectAll,
 }: MailListHeaderProps) {
@@ -69,11 +64,7 @@ export function MailListHeader({
   return (
     <View style={styles.shell}>
       <AnimatedView style={toolbarStyle} animatedProps={toolbarPointerProps}>
-        <MailTopToolbar
-          onMenu={onMenu}
-          onCompose={onCompose}
-          onSearch={onSearch}
-        />
+        <MailTopToolbar {...toolbar} />
       </AnimatedView>
 
       <AnimatedView
@@ -95,11 +86,10 @@ function createStyles(theme: ThemeTokens) {
   return StyleSheet.create({
     shell: {
       backgroundColor: theme.colors.background,
-      ...layoutHairlineBorder(theme),
     } as ViewStyle,
     selectionLayer: {
       ...StyleSheet.absoluteFill,
-      justifyContent: "center",
+      justifyContent: "flex-start",
       backgroundColor: theme.colors.background,
     } as ViewStyle,
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useSyncExternalStore } from "react";
-import { resolveTimezone } from "@workspace/calendar-core";
+import { resolveTimezone, type TimeFormat } from "@workspace/calendar-core";
 import {
   addDays,
   eachDayOfInterval,
@@ -31,7 +31,7 @@ interface MonthViewProps {
   onEventCreate: (startTime: Date) => void;
   showWeekNumbers?: boolean;
   compactView?: boolean;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   weekStartDay?: number;
   workingDays?: number[];
   timezone?: string;
@@ -49,7 +49,7 @@ export function MonthView({
   onEventCreate,
   showWeekNumbers = false,
   compactView = false,
-  timeFormat = "12h",
+  timeFormat,
   weekStartDay = 0,
   workingDays = [1, 2, 3, 4, 5],
   timezone,
@@ -141,7 +141,7 @@ export function MonthView({
   }, [events, resolvedTimezone, weeks]);
 
   return (
-    <div data-slot="month-view" className="contents animate-fade-in">
+    <div data-slot="month-view" className="contents">
       <div
         className={`border-border/70 grid ${showWeekNumbers ? "grid-cols-8" : "grid-cols-7"} border-y uppercase`}
       >

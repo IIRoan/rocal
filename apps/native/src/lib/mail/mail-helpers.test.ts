@@ -72,25 +72,51 @@ describe("formatAddressFull", () => {
 
 describe("formatMessageDate", () => {
   it("returns an empty string for missing or invalid dates", () => {
-    expect(formatMessageDate(undefined)).toBe("");
-    expect(formatMessageDate("not-a-date")).toBe("");
+    expect(formatMessageDate(undefined, { timeFormat: "24h" })).toBe("");
+    expect(formatMessageDate("not-a-date", { timeFormat: "24h" })).toBe("");
   });
 
   it("returns a non-empty label for a valid date", () => {
-    expect(formatMessageDate(new Date().toISOString()).length).toBeGreaterThan(
-      0,
-    );
     expect(
-      formatMessageDate("2000-01-02T03:04:05.000Z").length,
+      formatMessageDate(new Date().toISOString(), { timeFormat: "24h" }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      formatMessageDate("2000-01-02T03:04:05.000Z", { timeFormat: "24h" })
+        .length,
     ).toBeGreaterThan(0);
   });
 
   it("returns a fuller timestamp for style=full", () => {
-    const compact = formatMessageDate("2000-01-02T03:04:05.000Z");
+    const compact = formatMessageDate("2000-01-02T03:04:05.000Z", {
+      timeFormat: "24h",
+    });
     const full = formatMessageDate("2000-01-02T03:04:05.000Z", {
+      timeFormat: "24h",
       style: "full",
     });
     expect(full.length).toBeGreaterThan(compact.length);
+  });
+
+  it("follows the user's clock preference instead of the device locale", () => {
+    const receivedAt = "2000-01-02T15:04:05.000Z";
+    const options = { timezone: "UTC", style: "full" } as const;
+    expect(
+      formatMessageDate(receivedAt, { ...options, timeFormat: "24h" }),
+    ).toMatch(/15:04$/);
+    expect(
+      formatMessageDate(receivedAt, { ...options, timeFormat: "12h" }),
+    ).toMatch(/3:04 PM$/);
+  });
+
+  it("shows only the clock time for messages received today", () => {
+    const now = new Date();
+    now.setUTCHours(18, 30, 0, 0);
+    expect(
+      formatMessageDate(now.toISOString(), {
+        timezone: "UTC",
+        timeFormat: "24h",
+      }),
+    ).toBe("18:30");
   });
 });
 

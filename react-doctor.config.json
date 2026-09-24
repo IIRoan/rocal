@@ -65,7 +65,7 @@
         "rules": ["react-doctor/js-hoist-intl"]
       },
       {
-        "files": ["**/app/settings/index.tsx", "**/app/calendar-manage/index.tsx"],
+        "files": ["**/app/settings/index.tsx"],
         "rules": ["react-doctor/js-tosorted-immutable"]
       },
       {

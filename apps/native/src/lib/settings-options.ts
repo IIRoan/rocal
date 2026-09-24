@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
-import type { CalendarView } from "@workspace/calendar-core";
+import type { TimeFormat } from "@workspace/calendar-core";
 import type { ThemePreference } from "../providers/ThemeProvider";
+import type { NativeCalendarView } from "./calendar-views";
 
 type FeatherIcon = React.ComponentProps<typeof Feather>["name"];
 
@@ -16,14 +17,12 @@ export const THEME_OPTIONS: {
 
 export const VIEW_OPTIONS: {
   label: string;
-  value: CalendarView;
+  value: NativeCalendarView;
   icon: FeatherIcon;
 }[] = [
-  { label: "Month View", value: "month", icon: "grid" },
   { label: "Week View", value: "week", icon: "columns" },
   { label: "Day View", value: "day", icon: "square" },
   { label: "3-Day View", value: "3day", icon: "sidebar" },
-  { label: "Agenda View", value: "agenda", icon: "list" },
 ];
 
 export const WEEK_START_OPTIONS: { label: string; value: number }[] = [
@@ -33,7 +32,7 @@ export const WEEK_START_OPTIONS: { label: string; value: number }[] = [
 
 export const TIME_FORMAT_OPTIONS: {
   label: string;
-  value: "12h" | "24h";
+  value: TimeFormat;
 }[] = [
   { label: "12 Hour (1:00 PM)", value: "12h" },
   { label: "24 Hour (13:00)", value: "24h" },

@@ -4,7 +4,9 @@ jest.mock("../../lib/user-setup", () => ({
   ensureUserCalendars: jest.fn(),
 }));
 
+import { MAIL_INVITATION_STAGING_CALENDAR_NAME } from "@workspace/calendar-core";
 import { ValidationError } from "../../lib/errors";
+import { excludeInvitationStagingCalendarWhere } from "../../lib/mail-invitation-calendar";
 import { CalendarService } from "../../services/calendar.service";
 
 type CalendarFixtureInput = Partial<{
@@ -312,6 +314,80 @@ describe("CalendarService", () => {
         "Cannot delete the last editable calendar. Create another calendar first.",
     } as Partial<ValidationError>);
     expect(mockPrisma.calendar.delete).not.toHaveBeenCalled();
+  });
+
+  it("refuses to make the invitations staging calendar the default", async () => {
+    mockPrisma.calendar.findFirst.mockResolvedValue(
+      calendarFixture({
+        name: MAIL_INVITATION_STAGING_CALENDAR_NAME,
+        isVisible: false,
+      }),
+    );
+
+    await expect(
+      service.update({
+        userId: "user-1",
+        calendarId: "calendar-1",
+        isDefault: true,
+      }),
+    ).rejects.toMatchObject({
+      name: "ValidationError",
+      field: "isDefault",
+    } as Partial<ValidationError>);
+    expect(mockPrisma.calendar.update).not.toHaveBeenCalled();
+    expect(mockPrisma.calendar.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses to move events into the invitations staging calendar", async () => {
+    mockPrisma.calendar.findFirst
+      .mockResolvedValueOnce(calendarFixture())
+      .mockResolvedValueOnce(
+        calendarFixture({
+          id: "invitations-cal-1",
+          name: MAIL_INVITATION_STAGING_CALENDAR_NAME,
+          isVisible: false,
+        }),
+      );
+    mockPrisma.calendarEvent.count.mockResolvedValue(2);
+
+    await expect(
+      service.delete({
+        userId: "user-1",
+        calendarId: "calendar-1",
+        action: "move_events",
+        targetCalendarId: "invitations-cal-1",
+      }),
+    ).rejects.toMatchObject({
+      name: "ValidationError",
+      field: "targetCalendarId",
+    } as Partial<ValidationError>);
+    expect(mockPrisma.calendarEvent.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.calendar.delete).not.toHaveBeenCalled();
+  });
+
+  it("never promotes the staging calendar when deleting the default", async () => {
+    mockPrisma.calendar.findFirst
+      .mockResolvedValueOnce(calendarFixture({ isDefault: true }))
+      .mockResolvedValueOnce(calendarFixture({ id: "calendar-2" }));
+
+    await service.delete({ userId: "user-1", calendarId: "calendar-1" });
+
+    expect(mockPrisma.calendar.count).toHaveBeenCalledWith({
+      where: expect.objectContaining(excludeInvitationStagingCalendarWhere),
+    });
+    expect(mockPrisma.calendar.findFirst).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          kind: "owned",
+          isSyncOnly: false,
+          ...excludeInvitationStagingCalendarWhere,
+        }),
+      }),
+    );
+    expect(mockPrisma.calendar.update).toHaveBeenCalledWith({
+      where: { id: "calendar-2" },
+      data: { isDefault: true },
+    });
   });
 
   it("lists local calendars without syncing remote Stalwart calendars", async () => {

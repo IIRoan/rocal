@@ -11,6 +11,7 @@ import {
   backfillEncryptedEventsToCiphertextOnly,
   normalizeEventEncryptionMode,
 } from "../../lib/event-encryption";
+import { MAIL_INVITATION_STAGING_CALENDAR_NAME } from "@workspace/calendar-core";
 import { ValidationError } from "../../lib/errors";
 import { SettingsService } from "../../services/settings.service";
 
@@ -211,6 +212,27 @@ describe("SettingsService", () => {
       name: "ValidationError",
       field: "defaultCalendarId",
       message: "The default calendar must be one of your editable calendars.",
+    } as Partial<ValidationError>);
+  });
+
+  it("rejects the invitations staging calendar as the default calendar", async () => {
+    mockPrisma.prisma.calendar.findFirst.mockResolvedValue({
+      id: "invitations-cal-1",
+      userId: "user-1",
+      name: MAIL_INVITATION_STAGING_CALENDAR_NAME,
+      kind: "owned",
+      isVisible: false,
+      isSyncOnly: false,
+    });
+
+    await expect(
+      service.update({
+        userId: "user-1",
+        defaultCalendarId: "invitations-cal-1",
+      }),
+    ).rejects.toMatchObject({
+      name: "ValidationError",
+      field: "defaultCalendarId",
     } as Partial<ValidationError>);
   });
 

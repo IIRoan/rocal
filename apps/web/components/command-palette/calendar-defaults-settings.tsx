@@ -7,6 +7,7 @@ import {
   SelectValue,
 } from "@workspace/ui/components/ui/select";
 import { Calendar, Check, BookOpen } from "lucide-react";
+import { partitionCalendarsByKind } from "@workspace/calendar-core";
 import type { UserSettings } from "@/lib/types/calendar";
 import type { CalendarView } from "@workspace/ui/components/calendar";
 import { WORKING_DAYS } from "./constants";
@@ -38,9 +39,7 @@ export function CalendarDefaultsSettings({
 }: CalendarDefaultsSettingsProps) {
   const { calendars, updateCalendar, refetchCalendars } =
     useSharedCalendarData();
-  const editableCalendars = calendars.filter(
-    (calendar) => calendar.kind === "owned",
-  );
+  const editableCalendars = partitionCalendarsByKind(calendars).ownedCalendars;
   const defaultCalendar =
     editableCalendars.find((calendar) => calendar.isDefault) ||
     editableCalendars[0];

@@ -1,39 +1,35 @@
 import React, { useMemo } from "react";
-import { ScrollView, StyleSheet, View, type ViewStyle } from "react-native";
 import { useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
 import {
   formatNotificationChannelsSummary,
   getSettingsHubItems,
   settingsSectionPath,
 } from "@workspace/calendar-core";
-import type { ThemeTokens } from "@workspace/design-tokens";
 import { AppScreen, StackScreenHeader } from "../../src/components/layout";
+import { BlobatarAvatar } from "../../src/components/BlobatarAvatar";
 import {
-  SettingsAccountCard,
-  SettingsNavigationRow,
-} from "../../src/components/settings/SettingsRows";
+  SheetGroup,
+  SheetItem,
+  SheetScroll,
+} from "../../src/components/sheet/SheetSections";
 import { LoadingScreen } from "../../src/components/ui/loading";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { useTheme } from "../../src/providers/ThemeProvider";
-import { calendarApiService } from "../../src/lib/api";
-import { QUERY_KEYS } from "../../src/lib/query-keys";
+import { useNativeUserSettings } from "../../src/hooks/use-native-user-settings";
 import { SETTINGS_HUB_ICONS } from "../../src/lib/settings-nav-icons";
 import { THEME_OPTIONS } from "../../src/lib/settings-options";
 
 export default function SettingsScreen() {
   const { theme, themePreference } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
   const { push } = useRouter();
   const { user } = useAuth();
 
-  const { data: settings, isLoading } = useQuery({
-    queryKey: QUERY_KEYS.settings(),
-    queryFn: () => calendarApiService.getUserSettings(),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { settings, isLoading } = useNativeUserSettings();
 
-  const hubItems = useMemo(() => getSettingsHubItems("native"), []);
+  const hubItems = useMemo(
+    () => getSettingsHubItems("native").filter((item) => item.id !== "account"),
+    [],
+  );
   const themeLabel =
     THEME_OPTIONS.find((option) => option.value === themePreference)?.label ??
     "System";
@@ -52,54 +48,37 @@ export default function SettingsScreen() {
 
   return (
     <AppScreen header={<StackScreenHeader title="Settings" />}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.sectionItems}>
-          <SettingsAccountCard
-            name={user?.name}
-            email={user?.email}
-            imageUrl={user?.image}
-            theme={theme}
-            onPress={() => push(settingsSectionPath("account") as never)}
-          />
-        </View>
-        <View style={styles.sectionItems}>
-          {hubItems
-            .filter((item) => item.id !== "account")
-            .map((item) => (
-              <SettingsNavigationRow
-                key={item.id}
-                icon={SETTINGS_HUB_ICONS[item.id]}
-                label={item.label}
-                value={summaries[item.id] ?? item.description}
-                onPress={() => push(settingsSectionPath(item.id) as never)}
-                theme={theme}
+      <SheetScroll>
+        <SheetGroup>
+          <SheetItem
+            label={user?.name?.trim() || user?.email?.trim() || "Solace account"}
+            detail={user?.name?.trim() ? user?.email ?? undefined : undefined}
+            leading={
+              <BlobatarAvatar
+                email={user?.email}
+                name={user?.name}
+                src={user?.image}
+                size={40}
               />
-            ))}
-        </View>
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+            }
+            chevron
+            onPress={() => push(settingsSectionPath("account") as never)}
+            accessibilityLabel="Open account settings"
+          />
+        </SheetGroup>
+        <SheetGroup>
+          {hubItems.map((item) => (
+            <SheetItem
+              key={item.id}
+              icon={SETTINGS_HUB_ICONS[item.id]}
+              label={item.label}
+              value={summaries[item.id]}
+              chevron
+              onPress={() => push(settingsSectionPath(item.id) as never)}
+            />
+          ))}
+        </SheetGroup>
+      </SheetScroll>
     </AppScreen>
   );
-}
-
-function createStyles(theme: ThemeTokens) {
-  return StyleSheet.create({
-    scrollView: {
-      flex: 1,
-    },
-    scrollContent: {
-      paddingBottom: theme.spacing["8"],
-      paddingTop: theme.spacing["2"],
-    },
-    sectionItems: {
-      paddingVertical: theme.spacing["1"],
-    },
-    bottomSpacer: {
-      height: theme.spacing["8"],
-    },
-  } satisfies Record<string, ViewStyle>);
 }

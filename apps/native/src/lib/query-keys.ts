@@ -1,16 +1,12 @@
-/**
- * Centralised React Query cache key definitions.
- *
- * Using a constant map avoids typos and makes cache invalidation
- * predictable across the app.
- */
 import {
   CALENDARS_QUERY_KEY,
   CATEGORIES_QUERY_KEY,
   PUSH_DEVICES_QUERY_KEY,
+  eventNotificationsQueryKey,
 } from "@workspace/calendar-core";
 
 export const QUERY_KEYS = {
+  eventsRoot: () => ["events"] as const,
   events: (start: string, end: string) => ["events", start, end] as const,
   calendars: () => CALENDARS_QUERY_KEY,
   categories: () => CATEGORIES_QUERY_KEY,
@@ -18,7 +14,7 @@ export const QUERY_KEYS = {
   subscriptions: () => ["subscriptions"] as const,
   eventDetail: (id: string) => ["event", id] as const,
   searchResults: (query: string) => ["search", query] as const,
-  notifications: (eventId: string) => ["notifications", eventId] as const,
+  eventNotifications: (eventId: string) => eventNotificationsQueryKey(eventId),
   calendarShareLink: (calendarId: string) =>
     ["calendarShareLink", calendarId] as const,
   mailConfig: () => ["mail", "config"] as const,

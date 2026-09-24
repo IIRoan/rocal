@@ -1,4 +1,4 @@
-import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import type { Calendar, DecoratedCalendarEvent } from "@workspace/calendar-core";
 import { calendarApiService } from "../lib/api";
 
 type MiniCalendarEventsResponse = Awaited<
@@ -26,18 +26,7 @@ export interface MiniCalendarSwipeTargetInput {
   momentumSeconds: number;
 }
 
-/**
- * Decides which page a mini-calendar swipe settles on.
- *
- * Slow releases snap to the nearest page. Flicks project the release
- * velocity forward and guarantee at least one page of progress in the flick
- * direction, so a swipe that interrupts a previous settle first finishes
- * that page and then keeps going. Always settles inside
- * `[minIndex, maxIndex]` — the rendered window — so the committed page is
- * mounted by the time the window re-centers.
- *
- * Worklet-safe: only reads its parameters.
- */
+/** Slow releases snap to the nearest page; flicks project velocity and advance at least one page, always settling inside the rendered window. */
 export function getMiniCalendarSwipeTarget(
   input: MiniCalendarSwipeTargetInput,
 ): number {
@@ -67,10 +56,7 @@ export function getMiniCalendarSwipeTarget(
     target = Math.round(currentIndex);
   }
 
-  // Never settle further from the release point than the window radius, so a
-  // momentum flick cannot commit a month that the rendered window (centered on
-  // the new month) would not cover — that gap is what reads as a flicker when
-  // the next finger interrupts the settle.
+  // Cap the distance from release at the window radius so a flick never commits a month the re-centered window would not cover (reads as flicker).
   const radius = (maxIndex - minIndex) / 2;
   const nearReleaseMin = Math.ceil(currentIndex - radius);
   const nearReleaseMax = Math.floor(currentIndex + radius);
@@ -84,11 +70,13 @@ export function getMiniCalendarSwipeTarget(
 
 export function decorateMiniCalendarEvents(
   data: MiniCalendarEventsResponse | undefined,
+  calendars: readonly Calendar[] = [],
 ): DecoratedCalendarEvent[] {
   if (!data) return [];
 
+  // The calendars query is refreshed on recolor; the list embedded in a cached events response is not.
   const calendarColorById = new Map(
-    data.calendars.map((calendar) => [calendar.id, calendar.color]),
+    [...data.calendars, ...calendars].map((calendar) => [calendar.id, calendar.color]),
   );
 
   return data.events.map((event) => ({
@@ -105,9 +93,10 @@ export function retainMonthEvents(
   cache: Map<string, DecoratedCalendarEvent[]>,
   monthKey: string,
   data: MiniCalendarEventsResponse | undefined,
+  calendars?: readonly Calendar[],
 ): DecoratedCalendarEvent[] {
   if (data) {
-    const decorated = decorateMiniCalendarEvents(data);
+    const decorated = decorateMiniCalendarEvents(data, calendars);
     cache.set(monthKey, decorated);
     return decorated;
   }

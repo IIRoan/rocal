@@ -27,7 +27,7 @@ if (!aotResult.success) {
 }
 
 const compileResult = await Bun.build({
-  entrypoints: [`${backendRoot}/dist/index.js`],
+  entrypoints: [`${backendRoot}/dist/serve.js`],
   compile: {
     target: "bun-linux-x64",
     outfile: `${backendRoot}/server`,

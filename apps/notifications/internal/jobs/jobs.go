@@ -131,7 +131,11 @@ func MarkFailed(ctx context.Context, db *sql.DB, id string, delay time.Duration,
 	return err
 }
 
-func MarkSkipped(ctx context.Context, db *sql.DB, id string) error {
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+func MarkSkipped(ctx context.Context, db execer, id string) error {
 	_, err := db.ExecContext(ctx, `
 		UPDATE notification_job SET status = 'skipped', updated_at = NOW() WHERE id = $1
 	`, id)

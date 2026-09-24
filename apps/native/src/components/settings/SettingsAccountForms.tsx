@@ -1,65 +1,63 @@
-import React from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import React, { useMemo, type ReactNode } from "react";
+import { StyleSheet, View, type ViewStyle } from "react-native";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import { useTheme } from "../../providers/ThemeProvider";
 import {
-  SheetActions,
-  SheetPrimaryButton,
-  SheetSecondaryButton,
-} from "../sheet";
-export function SettingsPasswordField({
+  SheetButton,
+  SheetGroup,
+  SheetMessage,
+  SheetSection,
+  SheetTextField,
+} from "../sheet/SheetSections";
+
+function PasswordField({
   label,
   value,
   onChangeText,
   autoComplete,
-  theme,
 }: {
   label: string;
   value: string;
   onChangeText: (value: string) => void;
   autoComplete: "password" | "new-password";
-  theme: ThemeTokens;
 }) {
   return (
-    <View>
-      <Text
-        style={{
-          marginBottom: theme.spacing["1"],
-          fontSize: theme.typography.fontSize.xs.size,
-          lineHeight: theme.typography.fontSize.xs.lineHeight,
-          color: theme.colors.mutedForeground,
-        }}
-      >
-        {label}
-      </Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete={autoComplete}
-        textContentType={
-          autoComplete === "new-password" ? "newPassword" : "password"
-        }
-        placeholder={label}
-        placeholderTextColor={theme.colors.mutedForeground}
-        style={{
-          borderWidth: 1,
-          borderColor: theme.colors.input,
-          borderRadius: theme.borderRadius.md,
-          paddingHorizontal: theme.spacing["3"],
-          paddingVertical: theme.spacing["3"],
-          fontSize: theme.typography.fontSize.base.size,
-          color: theme.colors.foreground,
-          backgroundColor: theme.colors.background,
-        }}
-      />
+    <SheetTextField
+      value={value}
+      onChangeText={onChangeText}
+      secureTextEntry
+      autoCapitalize="none"
+      autoCorrect={false}
+      autoComplete={autoComplete}
+      textContentType={autoComplete === "new-password" ? "newPassword" : "password"}
+      placeholder={label}
+      accessibilityLabel={label}
+    />
+  );
+}
+
+function SettingsInlineForm({
+  children,
+  submitLabel,
+  onSubmit,
+  onCancel,
+  isPending,
+}: {
+  children: ReactNode;
+  submitLabel: string;
+  onSubmit: () => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  return (
+    <View style={styles.form}>
+      {children}
+      <View style={styles.actions}>
+        <SheetButton label={submitLabel} onPress={onSubmit} pending={isPending} />
+        <SheetButton label="Cancel" variant="secondary" onPress={onCancel} disabled={isPending} />
+      </View>
     </View>
   );
 }
@@ -76,7 +74,6 @@ export function SettingsPasswordForm({
   onCancel,
   error,
   isPending,
-  theme,
 }: {
   mode: "change-password" | "set-password" | "reset-encryption";
   currentPassword: string;
@@ -89,103 +86,67 @@ export function SettingsPasswordForm({
   onCancel: () => void;
   error: string | null;
   isPending: boolean;
-  theme: ThemeTokens;
 }) {
   const isChangePassword = mode === "change-password";
   const isResetEncryption = mode === "reset-encryption";
 
   return (
-    <ScrollView
-      contentContainerStyle={{
-        padding: theme.spacing["4"],
-        gap: theme.spacing["4"],
-      }}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      <Text
-        style={{
-          fontSize: theme.typography.fontSize.sm.size,
-          lineHeight: theme.typography.fontSize.sm.lineHeight,
-          color: theme.colors.mutedForeground,
-        }}
-      >
-        {isResetEncryption
-          ? "This updates the password that protects your encryption keys on this device. It does not re-encrypt existing data. You can only do this if you have a passkey or a social sign-in option."
+    <SettingsInlineForm
+      submitLabel={
+        isResetEncryption
+          ? "Reset encryption password"
           : isChangePassword
-            ? "Update your email sign-in password. After email sign-in, Solace also uses it to protect your encryption keys."
-            : "Add an email sign-in password to this account. This gives you an email/password sign-in option without changing your existing encrypted data."}
-      </Text>
-
-      {error ? (
-        <View
-          style={{
-            borderRadius: theme.borderRadius.md,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: theme.colors.destructive + "40",
-            backgroundColor: theme.colors.destructive + "18",
-            paddingHorizontal: theme.spacing["3"],
-            paddingVertical: 10,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: theme.typography.fontSize.sm.size,
-              lineHeight: theme.typography.fontSize.sm.lineHeight,
-              color: theme.colors.destructive,
-            }}
-          >
-            {error}
-          </Text>
-        </View>
-      ) : null}
-
-      <View style={{ gap: theme.spacing["3"] }}>
-        {isChangePassword ? (
-          <SettingsPasswordField
-            label="Current password"
-            value={currentPassword}
-            onChangeText={onCurrentPasswordChange}
-            autoComplete="password"
-            theme={theme}
+            ? "Update Password"
+            : "Set Password"
+      }
+      onSubmit={onSubmit}
+      onCancel={onCancel}
+      isPending={isPending}
+    >
+      <SheetSection
+        title={
+          isResetEncryption
+            ? "Reset encryption password"
+            : isChangePassword
+              ? "Change password"
+              : "Set password"
+        }
+        footer={
+          isResetEncryption
+            ? "This updates the password that protects your encryption keys on this device. It does not re-encrypt existing data. You can only do this if you have a passkey or a social sign-in option."
+            : isChangePassword
+              ? "Update your email sign-in password. After email sign-in, Solace also uses it to protect your encryption keys."
+              : "Add an email sign-in password to this account. This gives you an email/password sign-in option without changing your existing encrypted data."
+        }
+      >
+        <SheetGroup>
+          {isChangePassword ? (
+            <PasswordField
+              key="current"
+              label="Current password"
+              value={currentPassword}
+              onChangeText={onCurrentPasswordChange}
+              autoComplete="password"
+            />
+          ) : null}
+          <PasswordField
+            key="new"
+            label="New password"
+            value={newPassword}
+            onChangeText={onNewPasswordChange}
+            autoComplete="new-password"
           />
-        ) : null}
-        <SettingsPasswordField
-          label="New password"
-          value={newPassword}
-          onChangeText={onNewPasswordChange}
-          autoComplete="new-password"
-          theme={theme}
-        />
-        <SettingsPasswordField
-          label="Confirm new password"
-          value={confirmPassword}
-          onChangeText={onConfirmPasswordChange}
-          autoComplete="new-password"
-          theme={theme}
-        />
-      </View>
-
-      <SheetActions>
-        <SheetPrimaryButton
-          label={
-            isResetEncryption
-              ? "Reset encryption password"
-              : isChangePassword
-                ? "Update Password"
-                : "Set Password"
-          }
-          onPress={onSubmit}
-          loading={isPending}
-          disabled={isPending}
-        />
-        <SheetSecondaryButton
-          label="Cancel"
-          onPress={onCancel}
-          disabled={isPending}
-        />
-      </SheetActions>
-    </ScrollView>
+          <PasswordField
+            key="confirm"
+            label="Confirm new password"
+            value={confirmPassword}
+            onChangeText={onConfirmPasswordChange}
+            autoComplete="new-password"
+          />
+        </SheetGroup>
+        {error ? <SheetMessage tone="destructive" text={error} /> : null}
+      </SheetSection>
+    </SettingsInlineForm>
   );
 }
 
@@ -195,72 +156,48 @@ export function SettingsProfilePictureForm({
   onSubmit,
   onCancel,
   isPending,
-  theme,
 }: {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
   isPending: boolean;
-  theme: ThemeTokens;
 }) {
   return (
-    <View style={{ padding: theme.spacing["4"], gap: theme.spacing["4"] }}>
-      <Text
-        style={{
-          fontSize: theme.typography.fontSize.sm.size,
-          lineHeight: theme.typography.fontSize.sm.lineHeight,
-          color: theme.colors.mutedForeground,
-        }}
+    <SettingsInlineForm
+      submitLabel="Save"
+      onSubmit={onSubmit}
+      onCancel={onCancel}
+      isPending={isPending}
+    >
+      <SheetSection
+        title="Profile picture"
+        footer="Paste the URL of the image you want to use."
       >
-        Paste the URL of the image you want to use.
-      </Text>
-      <View style={{ gap: 6 }}>
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.xs.size,
-            lineHeight: theme.typography.fontSize.xs.lineHeight,
-            color: theme.colors.mutedForeground,
-            textTransform: "uppercase",
-            letterSpacing: 0.5,
-          }}
-        >
-          Image URL
-        </Text>
-        <TextInput
-          value={value}
-          onChangeText={onChange}
-          placeholder="https://example.com/photo.png"
-          placeholderTextColor={theme.colors.mutedForeground}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          editable={!isPending}
-          style={{
-            height: 44,
-            borderRadius: theme.borderRadius.lg,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: theme.colors.border,
-            backgroundColor: theme.colors.muted + "50",
-            paddingHorizontal: theme.spacing["3"],
-            fontSize: theme.typography.fontSize.sm.size,
-            color: theme.colors.foreground,
-          }}
-        />
-      </View>
-      <SheetActions>
-        <SheetPrimaryButton
-          label="Save"
-          onPress={onSubmit}
-          loading={isPending}
-          disabled={isPending}
-        />
-        <SheetSecondaryButton
-          label="Cancel"
-          onPress={onCancel}
-          disabled={isPending}
-        />
-      </SheetActions>
-    </View>
+        <SheetGroup>
+          <SheetTextField
+            value={value}
+            onChangeText={onChange}
+            placeholder="https://example.com/photo.png"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            editable={!isPending}
+            accessibilityLabel="Image URL"
+          />
+        </SheetGroup>
+      </SheetSection>
+    </SettingsInlineForm>
   );
+}
+
+function createStyles(theme: ThemeTokens) {
+  return StyleSheet.create({
+    form: {
+      gap: theme.spacing["3"],
+    },
+    actions: {
+      gap: theme.spacing["2"],
+    },
+  } satisfies Record<string, ViewStyle>);
 }

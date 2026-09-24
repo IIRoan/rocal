@@ -1,6 +1,5 @@
-// Providers
 export { ThemeProvider } from "./theme-provider";
-export { GsapAnimationProvider } from "./gsap-animation-provider";
+export { SurfaceMotionProvider } from "./surface-motion-provider";
 export {
   LoadingProvider,
   useLoading,

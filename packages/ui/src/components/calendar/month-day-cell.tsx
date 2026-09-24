@@ -2,9 +2,11 @@
 
 import React from "react";
 import {
+  getWorkingDayShade,
   isCancelledCalendarEvent,
   isTodayInTimezone,
   wallClockToUtc,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 import { cn } from "../../lib/utils";
 import { format, isSameMonth } from "date-fns";
@@ -13,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
+import { formatTimeWithOptionalMinutesTZ } from "./event-time-label";
 import { getEventSegmentForCalendarDay, sortEvents } from "./utils";
 import { EventHeight, DefaultStartHour } from "./constants";
 import { CalendarEvent } from "./types";
@@ -24,6 +27,12 @@ type DayBuckets = {
   sortedAllDay: CalendarEvent[];
 };
 
+const DAY_SHADE_CLASS = {
+  workday: "bg-[var(--calendar-workday)]",
+  weekend: "bg-[var(--calendar-weekend)]",
+  none: "",
+} as const;
+
 type MonthDayCellProps = {
   day: Date;
   currentDate: Date;
@@ -32,7 +41,7 @@ type MonthDayCellProps = {
   dayIndex: number;
   isMounted: boolean;
   compactView: boolean;
-  timeFormat: "12h" | "24h";
+  timeFormat: TimeFormat;
   workingDays: number[];
   timezone: string | undefined;
   resolvedTimezone: string;
@@ -67,6 +76,7 @@ export function MonthDayCell({
 }: MonthDayCellProps) {
   const { dayEvents, spanningEvents, allEvents, sortedAllDay } = buckets;
   const isCurrentMonth = isSameMonth(day, currentDate);
+  const shade = getWorkingDayShade(day.getDay(), workingDays);
   const cellId = `month-cell-${day.toISOString()}`;
   const allDayEvents = [...spanningEvents, ...dayEvents];
   const isReferenceCell = weekIndex === 0 && dayIndex === 0;
@@ -84,14 +94,8 @@ export function MonthDayCell({
 
   return (
     <div
-      className={`group border-border/70 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground/70 border-r border-b last:border-r-0 transition-all duration-200 hover:bg-accent/5 hover:shadow-sm ${
-        workingDays.includes(day.getDay()) && isCurrentMonth
-          ? "bg-[var(--calendar-workday)]"
-          : !workingDays.includes(day.getDay()) &&
-              [0, 6].includes(day.getDay()) &&
-              isCurrentMonth
-            ? "bg-[var(--calendar-weekend)]"
-            : ""
+      className={`group border-border/70 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground/70 border-r border-b last:border-r-0 transition-[background-color,box-shadow] duration-200 hover:bg-accent/5 hover:shadow-sm ${
+        isCurrentMonth ? DAY_SHADE_CLASS[shade ?? "none"] : ""
       }`}
       data-today={isTodayInTimezone(day, resolvedTimezone) || undefined}
       data-outside-cell={!isCurrentMonth || undefined}
@@ -105,7 +109,7 @@ export function MonthDayCell({
           );
         }}
       >
-        <div className="group-data-today:bg-[var(--calendar-accent-bg)] group-data-today:text-[var(--calendar-accent)] group-data-today:font-semibold mt-1 inline-flex size-6 items-center justify-center rounded-full text-sm transition-all duration-200 hover:scale-110 hover:bg-accent/10 group-data-today:animate-pulse">
+        <div className="group-data-today:bg-[var(--calendar-accent-bg)] group-data-today:text-[var(--calendar-accent)] group-data-today:font-semibold mt-1 inline-flex size-6 items-center justify-center rounded-full text-sm transition-[background-color,scale] duration-200 hover:scale-110 hover:bg-accent/10 group-data-today:animate-pulse">
           {format(day, "d")}
         </div>
         <div
@@ -147,7 +151,13 @@ export function MonthDayCell({
                   >
                     <div className="invisible" aria-hidden={true}>
                       {!event.allDay && (
-                        <span>{format(new Date(event.start), "h:mm")} </span>
+                        <span>
+                          {formatTimeWithOptionalMinutesTZ(
+                            new Date(event.start),
+                            timeFormat,
+                            timezone,
+                          )}{" "}
+                        </span>
                       )}
                       <span
                         className={cn(
@@ -166,9 +176,8 @@ export function MonthDayCell({
             return (
               <div
                 key={event.id}
-                className="aria-hidden:hidden animate-scale-in"
+                className="aria-hidden:hidden"
                 aria-hidden={isHidden ? "true" : undefined}
-                style={{ animationDelay: `${index * 0.05}s` }}
               >
                 <DraggableEvent
                   event={event}
@@ -191,7 +200,7 @@ export function MonthDayCell({
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="focus-visible:border-ring focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-[1.02] mt-[var(--event-gap)] flex h-[var(--event-height)] w-full items-center overflow-hidden px-1 text-left text-[10px] backdrop-blur-md transition-all duration-200 outline-none select-none focus-visible:ring-[3px] sm:px-2 sm:text-xs animate-fade-in"
+                  className="focus-visible:border-ring focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-[1.02] mt-[var(--event-gap)] flex h-[var(--event-height)] w-full items-center overflow-hidden px-1 text-left text-[10px] transition-[color,background-color,scale] duration-200 outline-none select-none focus-visible:ring-[3px] sm:px-2 sm:text-xs"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <span>

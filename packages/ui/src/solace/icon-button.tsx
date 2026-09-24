@@ -58,6 +58,7 @@ export interface IconButtonProps
   extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "type"> {
   active?: boolean;
   icon: Icon | React.ReactElement;
+  iconColor?: IconColor;
   size?: Size.SMALL | Size.MEDIUM | Size.LARGE;
   tooltip?: string;
   type?: IconButtonType;
@@ -70,6 +71,7 @@ export function IconButton({
   className,
   disabled,
   icon,
+  iconColor,
   size = Size.MEDIUM,
   tooltip = "",
   type = Type.PRIMARY,
@@ -82,9 +84,10 @@ export function IconButton({
   const iconSize = BUTTON_ICON_SIZE[size];
   const color = disabled
     ? "disabled"
-    : variant === FilledVariant.FILLED
-      ? BUTTON_TYPE_COLOR[type]
-      : (type as IconColor);
+    : (iconColor ??
+      (variant === FilledVariant.FILLED
+        ? BUTTON_TYPE_COLOR[type]
+        : (type as IconColor)));
   const surfaceClass =
     variant === FilledVariant.FILLED ? FILLED_CLASS[type] : GHOST_CLASS[type];
 

@@ -22,7 +22,6 @@ export function AuthResultsBadge({
 
   const results = parseAuthResults(headers);
 
-  // If all are "none", don't show anything
   if (results.spf === "none" && results.dkim === "none" && results.dmarc === "none") {
     return null;
   }
@@ -46,7 +45,7 @@ export function AuthResultsBadge({
           <Icon className="size-3.5" strokeWidth={2.25} />
         </span>
       </TooltipTrigger>
-      <TooltipContent side="bottom" className="text-xs">
+      <TooltipContent side="bottom">
         <div className="space-y-0.5">
           {tooltipText.map((line) => (
             <div key={line}>{line}</div>

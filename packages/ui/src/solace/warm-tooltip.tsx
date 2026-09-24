@@ -146,7 +146,7 @@ const ORIGIN: Record<WarmTooltipSide, string> = {
 };
 const SIZES: Record<WarmTooltipSize, { font: number; px: number; py: number }> = {
   sm: { font: 11.5, px: 8, py: 5 },
-  md: { font: 12.5, px: 10, py: 6 },
+  md: { font: 12, px: 12, py: 6 },
   lg: { font: 13.5, px: 12, py: 7 }
 };
 const MARGIN = 8;
@@ -209,7 +209,7 @@ const LAYER: Variants = {
 const GroupContext = createContext<GroupApi | null>(null);
 
 export function WarmTooltipGroup({
-  delay = 400,
+  delay = 1500,
   warmWindow = 300,
   travel = 320,
   lean = 0,
@@ -689,10 +689,10 @@ const WarmTooltip: React.FC<WarmTooltipProps> = ({
   side = 'top',
   delay,
   warmWindow,
-  surfaceColor = "var(--bg-emphasis)",
-  inkColor = "var(--text-always-white)",
+  surfaceColor = "var(--primary)",
+  inkColor = "var(--primary-foreground)",
   size = 'md',
-  radius = 8,
+  radius = 6,
   gap = 8,
   arrow = true,
   popDuration = 160,

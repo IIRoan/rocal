@@ -6,6 +6,7 @@ import {
   formatCalendarDayKey,
   formatEventSpanLabel,
   isCancelledCalendarEvent,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 
 import { cn } from "../../lib/utils";
@@ -22,12 +23,14 @@ export function AllDayEventRow({
   events,
   handlers,
   timezone,
+  timeFormat,
 }: {
   columnTemplate: string;
   days: Date[];
   events: CalendarEvent[];
   handlers: WeekEventHandlers;
   timezone: string;
+  timeFormat: TimeFormat;
 }) {
   const { placements, laneCount } = useMemo(
     () => layoutAllDayRowEvents(events, days, timezone),
@@ -90,6 +93,7 @@ export function AllDayEventRow({
               connectAcrossCells={false}
               className="mt-0 h-[22px] min-h-[20px] sm:min-h-[20px] items-center text-[10px]"
               timezone={timezone}
+              timeFormat={timeFormat}
               onEdit={handlers.onEventEdit}
               onDelete={handlers.onEventDelete}
               onView={handlers.onEventView}

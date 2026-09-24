@@ -1,4 +1,4 @@
-import type { MailServerLimits } from "@workspace/calendar-core";
+import type { MailServerLimits, TimeFormat } from "@workspace/calendar-core";
 import type {
   JmapEmailMessage,
   JmapIdentity,
@@ -49,7 +49,7 @@ export interface MessageReaderProps {
     updates: { name: string; color: string },
   ) => Promise<void> | void;
   onDeleteLabel?: (labelId: string) => void;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   onClose?: () => void;
   onNavigatePrev?: () => void;

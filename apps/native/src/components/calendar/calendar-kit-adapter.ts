@@ -1,27 +1,30 @@
 import { addDays } from "date-fns";
-import type { CalendarView, DecoratedCalendarEvent } from "@workspace/calendar-core";
+import type {
+  CalendarView,
+  DecoratedCalendarEvent,
+  TimeFormat,
+} from "@workspace/calendar-core";
 import {
   canCurrentUserModifyEvent,
   formatCalendarDayKey,
   getEventCalendarDayRange,
   getThreeDayCalendarDays,
+  getWorkingDayShade,
   getZonedDateParts,
   resolveTimezone,
   spansMultipleCalendarDays,
   utcToPickerDate,
 } from "@workspace/calendar-core";
 
-/**
- * Kit insets hour labels by the tick (8) plus 8px. `20:00` / `12 pm` must
- * stay on one line in that remaining width.
- */
-export function toKitHourWidth(timeFormat: "12h" | "24h"): number {
+/** Kit insets hour labels by the tick (8) plus 8px; `20:00` / `12 pm` must stay on one line in the remaining width. */
+export function toKitHourWidth(timeFormat: TimeFormat): number {
   return timeFormat === "24h" ? 52 : 58;
 }
 
-export const KIT_HOUR_WIDTH = toKitHourWidth("24h");
-export const KIT_HOUR_HEIGHT = 72;
-export const KIT_INITIAL_HOUR = 9;
+/** A full day spans ~1.5 phone screens; below 56 a 30-minute event loses its stacked layout. */
+export const KIT_HOUR_HEIGHT = 56;
+export const KIT_INITIAL_HOUR = 8;
+export const KIT_INITIAL_SCROLL_Y = KIT_INITIAL_HOUR * KIT_HOUR_HEIGHT;
 export const KIT_DRAG_STEP_MINUTES = 15;
 
 export type TimelineKitView = Extract<CalendarView, "day" | "3day" | "week">;
@@ -83,10 +86,7 @@ type KitDropOriginal = Pick<
 const OCCURRENCE_ID_SUFFIX =
   /_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)$/;
 
-/**
- * Non-original instances use `parentId_ISODate`. Updating that id without a
- * recurrence scope rewrites to the parent and moves the whole series.
- */
+/** Non-original instances use `parentId_ISODate`; updating that id without a recurrence scope moves the whole series. */
 export function resolveKitRecurrenceEdit(
   event: Pick<
     DecoratedCalendarEvent,
@@ -124,9 +124,7 @@ function kitDateTime(value: KitDateOrDateTime | undefined): string | undefined {
   return value.dateTime;
 }
 
-/**
- * Keep the original duration when kit rounding or a week-page jump drifts the end.
- */
+/** Keep the original duration when kit rounding or a week-page jump drifts the end. */
 export function preserveDroppedEventDuration(
   newStartIso: string,
   originalStart: Date | string,
@@ -161,16 +159,40 @@ export const KIT_NUMBER_OF_DAYS: Record<TimelineKitView, number> = {
   week: 7,
 };
 
-export function isTimelineKitView(view: CalendarView): view is TimelineKitView {
-  return view === "day" || view === "3day" || view === "week";
-}
-
 export function toKitFirstDay(weekStartDay: number): KitWeekday {
   const normalized = ((weekStartDay % 7) + 7) % 7;
   return (normalized === 0 ? 7 : normalized) as KitWeekday;
 }
 
-export function toKitHourFormat(timeFormat: "12h" | "24h"): string {
+export type KitDayShadeRegion = {
+  start: number;
+  end: number;
+  backgroundColor: string;
+  enableBackgroundInteraction: true;
+};
+
+/** Full-day kit `unavailableHours` regions keyed by kit weekday, tinting columns like the web month grid. */
+export function toKitDayShadeRegions(
+  workingDays: readonly number[],
+  colors: { workday: string; weekend: string },
+): Record<string, KitDayShadeRegion[]> {
+  const regions: Record<string, KitDayShadeRegion[]> = {};
+  for (let day = 0; day < 7; day++) {
+    const shade = getWorkingDayShade(day, workingDays);
+    if (!shade) continue;
+    regions[String(toKitFirstDay(day))] = [
+      {
+        start: 0,
+        end: 1440,
+        backgroundColor: colors[shade],
+        enableBackgroundInteraction: true,
+      },
+    ];
+  }
+  return regions;
+}
+
+export function toKitHourFormat(timeFormat: TimeFormat): string {
   return timeFormat === "24h" ? "HH:mm" : "h a";
 }
 
@@ -178,10 +200,7 @@ export function kitScrollByDay(view: TimelineKitView): boolean {
   return view === "day";
 }
 
-/**
- * Calendar-kit starts a 3-day window at `selectedDate`. Solace (and web) show
- * yesterday through tomorrow centered on that date.
- */
+/** Calendar-kit starts a 3-day window at `selectedDate`; Solace (and web) center yesterday through tomorrow on it. */
 export function toKitPageDate(
   view: TimelineKitView,
   selectedDate: Date,

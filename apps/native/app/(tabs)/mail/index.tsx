@@ -13,16 +13,22 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppScreen } from "../../../src/components/layout";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { getErrorMessage } from "@workspace/calendar-core";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  DEFAULT_MAIL_LIST_FILTERS,
+  applyMailListFilters,
+  countActiveMailListFilters,
+  getErrorMessage,
+  type MailListFilters,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useToast } from "../../../src/providers/ToastProvider";
-import { useSidebar } from "../../../src/providers/SidebarProvider";
+import { useMailCompose } from "../../../src/providers/MailComposeProvider";
 import { useMailSelection } from "../../../src/providers/MailSelectionProvider";
 import { useCommandPalette } from "../../../src/providers/CommandPaletteProvider";
 import { CenteredLoader } from "../../../src/components/ui/loading";
 import { MailMessageRow } from "../../../src/components/mail/MailMessageRow";
-import { MAIL_COMPOSE_LIST_EXTRA } from "../../../src/components/mail/MailComposeButton";
 import { mailBottomBarTotalHeight } from "../../../src/components/mail/mail-bottom-action-bar-layout";
 import {
   BottomSheet,
@@ -33,6 +39,10 @@ import { MailBulkMoveSheet } from "../../../src/components/mail/MailBulkMoveShee
 import { MailBulkMoreSheet } from "../../../src/components/mail/MailBulkMoreSheet";
 import { MailBulkLabelsSheet } from "../../../src/components/mail/MailBulkLabelsSheet";
 import { MailSheetPanel } from "../../../src/components/mail/MailSheetPanel";
+import { MailSwipeRow } from "../../../src/components/mail/MailSwipeRow";
+import { MailboxDrawerSheet } from "../../../src/components/mail/MailboxDrawerSheet";
+import { MailFilterSheet } from "../../../src/components/mail/MailFilterSheet";
+import { AccountSheet } from "../../../src/components/AccountSheet";
 import { MailListHeader } from "../../../src/components/mail/MailListHeader";
 import { MailListBottomChrome } from "../../../src/components/mail/MailListBottomChrome";
 import { MailListAnimatedFooter } from "../../../src/components/mail/MailListAnimatedFooter";
@@ -52,10 +62,13 @@ import {
 } from "../../../src/lib/mail/use-mail";
 import { useLabels } from "../../../src/lib/mail/use-labels";
 import {
+  getMailboxDisplayName,
   getPrimaryMailboxId,
   isDraftMessage,
+  sortMailboxes,
 } from "../../../src/lib/mail/mail-helpers";
-import { layoutListSeparator } from "../../../src/lib/app-layout";
+import { filterVisibleMailboxes } from "../../../src/lib/mail/mailbox-management";
+import { useHiddenMailboxIds } from "../../../src/hooks/use-hidden-mailbox-ids";
 import { buildMailboxThreadRows } from "../../../src/lib/mail/conversation-thread";
 import { useConversationListExtras } from "../../../src/lib/mail/use-conversation-thread";
 import { useConversationDecryptedPreviews } from "../../../src/lib/mail/use-conversation-decrypted-previews";
@@ -65,6 +78,9 @@ import {
   openWebMail,
 } from "../../../src/lib/mail/mail-web-bridge";
 import type { JmapEmailMessage } from "../../../src/lib/mail/types";
+import { QUERY_KEYS } from "../../../src/lib/query-keys";
+import { useUserTimezone } from "../../../src/hooks/use-user-timezone";
+import { useUserTimeFormat } from "../../../src/hooks/use-user-time-format";
 import { useWorkspaceTabHost } from "../../../src/providers/WorkspaceTabHostProvider";
 
 type ListSheetView = "bulkMore" | "bulkMove" | "bulkLabel" | null;
@@ -74,9 +90,10 @@ const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
 
 export function MailScreen() {
   const { theme } = useTheme();
-  const { toggle: toggleSidebar } = useSidebar();
+  const queryClient = useQueryClient();
   const { open: openCommandPalette } = useCommandPalette();
   const router = useRouter();
+  const { openCompose } = useMailCompose();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const accountQuery = useMailAccount();
@@ -134,8 +151,6 @@ export function MailScreen() {
     () => messagesQuery.data?.pages.flatMap((page) => page.messages) ?? [],
     [messagesQuery.data?.pages],
   );
-  const totalMailboxMessages =
-    messagesQuery.data?.pages[0]?.total ?? mailboxMessages.length;
   const companionMessages = useMemo(() => {
     if (!companionMailboxId) return [];
     return (
@@ -174,16 +189,34 @@ export function MailScreen() {
 
   const [activeSheetView, setActiveSheetView] = useState<ListSheetView>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [listFilters, setListFilters] = useState<MailListFilters>(
+    DEFAULT_MAIL_LIST_FILTERS,
+  );
+  const timezone = useUserTimezone();
+  const timeFormat = useUserTimeFormat();
+  const { hiddenIds } = useHiddenMailboxIds();
+
+  const drawerMailboxes = useMemo(
+    () =>
+      runtime
+        ? filterVisibleMailboxes(sortMailboxes(runtime.mailboxes), hiddenIds)
+        : [],
+    [hiddenIds, runtime],
+  );
 
   const sheetPadCompact = sheetCompactBottomPadding(insets.bottom);
   const selectionActive = selectedIds.size > 0;
   const bulkIds = useMemo(() => Array.from(selectedIds), [selectedIds]);
-  const composeListPadding = MAIL_COMPOSE_LIST_EXTRA + insets.bottom;
+  const idleListPadding = insets.bottom;
   const bulkListPadding = mailBottomBarTotalHeight(insets.bottom);
   const showMailChrome = provisioned && Boolean(runtime);
 
   useEffect(() => {
     setSelectedIds(new Set());
+    setListFilters(DEFAULT_MAIL_LIST_FILTERS);
   }, [resolvedMailboxId]);
 
   const selectedMailbox = runtime?.mailboxes.find(
@@ -198,10 +231,27 @@ export function MailScreen() {
     [mailboxMessages],
   );
 
-  const threadRows = useMemo(
+  const allThreadRows = useMemo(
     () => buildMailboxThreadRows(mailboxMessages, conversationExtras),
     [mailboxMessages, conversationExtras],
   );
+
+  const listFilterActive = countActiveMailListFilters(listFilters) > 0;
+  const threadRows = useMemo(() => {
+    if (!listFilterActive) return allThreadRows;
+    const filtered = applyMailListFilters(mailboxMessages, listFilters, {
+      now: new Date(),
+      timezone,
+    });
+    return buildMailboxThreadRows(filtered, conversationExtras);
+  }, [
+    allThreadRows,
+    conversationExtras,
+    listFilters,
+    listFilterActive,
+    mailboxMessages,
+    timezone,
+  ]);
 
   const latestMessages = useMemo(
     () => threadRows.map((row) => row.latestMessage),
@@ -223,6 +273,16 @@ export function MailScreen() {
   const clearSelection = useCallback(() => {
     setSelectedIds(new Set());
   }, []);
+
+  const handleSelectMailbox = useCallback(
+    (mailboxId: string) => {
+      setSelectedMailboxId(mailboxId);
+      void queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.mailMessages(mailboxId),
+      });
+    },
+    [queryClient, setSelectedMailboxId],
+  );
 
   const messageById = useMemo(() => {
     const map = new Map<string, JmapEmailMessage>();
@@ -261,14 +321,12 @@ export function MailScreen() {
     (message: JmapEmailMessage) => {
       const mailboxes = runtime?.mailboxes ?? [];
       if (isDraftMessage(message, resolvedMailboxId, mailboxes)) {
-        router.push(
-          `/(tabs)/mail/compose?mode=draft&messageId=${message.id}` as never,
-        );
+        openCompose({ mode: "draft", messageId: message.id });
         return;
       }
       router.push(`/(tabs)/mail/message/${message.id}` as never);
     },
-    [router, runtime?.mailboxes, resolvedMailboxId],
+    [openCompose, router, runtime?.mailboxes, resolvedMailboxId],
   );
 
   const toggleThreadSelection = useCallback((messageIds: string[]) => {
@@ -499,6 +557,33 @@ export function MailScreen() {
     [bulkIds, labels, setMessageLabel, clearSelection, toast],
   );
 
+  const handleSwipeToggleRead = useCallback(
+    (ids: string[], read: boolean) => {
+      if (ids.length === 0) return;
+      const mutation = read ? bulkMarkAsUnread : bulkMarkAsRead;
+      mutation.mutate(ids, {
+        onError: (error) =>
+          toast(getErrorMessage(error, "Failed to update message."), "error"),
+      });
+    },
+    [bulkMarkAsRead, bulkMarkAsUnread, toast],
+  );
+
+  const handleSwipeTrash = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      return bulkMoveToTrash.mutateAsync(ids).then(
+        () => toast("Moved to trash"),
+        (error: unknown) =>
+          toast(
+            getErrorMessage(error, "Failed to move message to trash."),
+            "error",
+          ),
+      );
+    },
+    [bulkMoveToTrash, toast],
+  );
+
   const bulkSheetSnapPoints = useMemo(() => {
     if (activeSheetView === "bulkLabel") return [0.55];
     if (activeSheetView === "bulkMove") return bulkMoveSnapPoints;
@@ -536,31 +621,49 @@ export function MailScreen() {
         (rowSelectableIds.length === 0 &&
           selectedIds.has(item.latestMessage.id));
 
+      const swipeIds =
+        rowSelectableIds.length > 0
+          ? rowSelectableIds
+          : [item.latestMessage.id];
+      const rowRead = unreadCount === 0;
+
       return (
-        <MailMessageRow
-          message={item.latestMessage}
-          threadMessages={item.messages}
-          threadCount={item.messages.length}
-          threadUnreadCount={unreadCount}
-          hasAttachments={hasAttachments}
-          showRecipient={showRecipient}
-          labels={labels}
-          identities={runtime?.identities ?? []}
-          preview={decryptedPreviews[item.latestMessage.id]}
-          selectionActive={selectionActive}
-          selected={isRowSelected}
-          onPress={handleOpenMessage}
-          onLongPress={(message) => handleLongPress(message, item.messageIds)}
-          onToggleSelect={(message) =>
-            handleToggleSelect(message, item.messageIds)
-          }
-        />
+        <MailSwipeRow
+          enabled={!selectionActive}
+          read={rowRead}
+          onToggleRead={() => handleSwipeToggleRead(swipeIds, rowRead)}
+          onTrash={isInTrash ? undefined : () => handleSwipeTrash(swipeIds)}
+        >
+          <MailMessageRow
+            message={item.latestMessage}
+            threadMessages={item.messages}
+            threadCount={item.messages.length}
+            threadUnreadCount={unreadCount}
+            hasAttachments={hasAttachments}
+            showRecipient={showRecipient}
+            labels={labels}
+            identities={runtime?.identities ?? []}
+            preview={decryptedPreviews[item.latestMessage.id]}
+            selectionActive={selectionActive}
+            selected={isRowSelected}
+            timeFormat={timeFormat}
+            timezone={timezone}
+            onPress={handleOpenMessage}
+            onLongPress={(message) => handleLongPress(message, item.messageIds)}
+            onToggleSelect={(message) =>
+              handleToggleSelect(message, item.messageIds)
+            }
+          />
+        </MailSwipeRow>
       );
     },
     [
       handleOpenMessage,
       handleLongPress,
       handleToggleSelect,
+      handleSwipeToggleRead,
+      handleSwipeTrash,
+      isInTrash,
       showRecipient,
       labels,
       primaryMessageIds,
@@ -568,7 +671,25 @@ export function MailScreen() {
       selectedIds,
       selectionActive,
       decryptedPreviews,
+      timeFormat,
+      timezone,
     ],
+  );
+
+  const unreadThreadCount = useMemo(
+    () =>
+      allThreadRows.filter((row) =>
+        row.messages.some(
+          (entry) =>
+            primaryMessageIds.has(entry.id) && !entry.keywords?.["$seen"],
+        ),
+      ).length,
+    [allThreadRows, primaryMessageIds],
+  );
+
+  const renderSeparator = useCallback(
+    () => <View style={styles.separator} />,
+    [styles.separator],
   );
 
   const listFooter = useMemo(
@@ -581,7 +702,7 @@ export function MailScreen() {
         ) : null}
         {showMailChrome ? (
           <MailListAnimatedFooter
-            composePadding={composeListPadding}
+            idlePadding={idleListPadding}
             bulkPadding={bulkListPadding}
           />
         ) : null}
@@ -589,7 +710,7 @@ export function MailScreen() {
     ),
     [
       showMailChrome,
-      composeListPadding,
+      idleListPadding,
       bulkListPadding,
       messagesQuery.isFetchingNextPage,
       styles.centered,
@@ -611,9 +732,18 @@ export function MailScreen() {
           <MailListHeader
             selectedCount={selectedIds.size}
             totalCount={selectableIds.length}
-            onMenu={toggleSidebar}
-            onCompose={() => router.push("/(tabs)/mail/compose" as never)}
-            onSearch={openCommandPalette}
+            toolbar={{
+              mailboxName: selectedMailbox
+                ? getMailboxDisplayName(selectedMailbox)
+                : "Mail",
+              unreadCount: unreadThreadCount,
+              filterActive: listFilterActive,
+              onSearch: openCommandPalette,
+              onCompose: () => openCompose(),
+              onOpenMailboxes: () => setDrawerOpen(true),
+              onOpenFilter: () => setFilterOpen(true),
+              onOpenAccount: () => setAccountOpen(true),
+            }}
             onClearSelection={clearSelection}
             onSelectAll={handleSelectAll}
           />
@@ -662,7 +792,7 @@ export function MailScreen() {
               keyExtractor={(item) => item.id}
               extraData={listExtraData}
               renderItem={renderItem}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
+              ItemSeparatorComponent={renderSeparator}
               refreshing={
                 messagesQuery.isFetching &&
                 !messagesQuery.isLoading &&
@@ -696,7 +826,11 @@ export function MailScreen() {
                       size={MAIL_ICON.emptyState}
                       color={theme.colors.mutedForeground}
                     />
-                    <Text style={styles.mutedText}>No messages here</Text>
+                    <Text style={styles.mutedText}>
+                      {listFilterActive
+                        ? "No messages match this filter"
+                        : "No messages here"}
+                    </Text>
                   </View>
                 )
               }
@@ -707,7 +841,6 @@ export function MailScreen() {
         {showMailChrome ? (
           <MailListBottomChrome
             bottomInset={insets.bottom}
-            composeOnPress={() => router.push("/(tabs)/mail/compose" as never)}
             bulk={{
               isInTrash,
               canMarkRead: unreadSelectedIds.length > 0,
@@ -765,6 +898,30 @@ export function MailScreen() {
           ) : null}
         </BottomSheet>
       </AppScreen>
+
+      <MailboxDrawerSheet
+        visible={drawerOpen}
+        onDismiss={() => setDrawerOpen(false)}
+        loading={runtimeQuery.isPending && !runtime}
+        mailboxes={drawerMailboxes}
+        selectedMailboxId={resolvedMailboxId}
+        onSelectMailbox={handleSelectMailbox}
+      />
+
+      <MailFilterSheet
+        visible={filterOpen}
+        filters={listFilters}
+        onFiltersChange={setListFilters}
+        labels={labels}
+        resultCount={threadRows.length}
+        onDismiss={() => setFilterOpen(false)}
+      />
+
+      <AccountSheet
+        visible={accountOpen}
+        activeApp="mail"
+        onDismiss={() => setAccountOpen(false)}
+      />
     </MailSelectionAnimProvider>
   );
 }
@@ -890,7 +1047,8 @@ function createStyles(theme: ThemeTokens) {
       flex: 1,
     },
     separator: {
-      ...layoutListSeparator(theme),
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: theme.colors.border,
       marginLeft: separatorInset,
     },
     centered: {

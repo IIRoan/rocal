@@ -7,6 +7,7 @@ import {
   navigateCalendarDate,
   resolveTimezone,
   wallClockToUtc,
+  type TimeFormat,
 } from "@workspace/calendar-core";
 import { addDays } from "date-fns";
 import { Loader2 } from "lucide-react";
@@ -58,7 +59,7 @@ export interface MobileEventCalendarProps {
   onDateRangeChange?: (dateRange: { start: Date; end: Date }) => void;
   showWeekNumbers?: boolean;
   compactView?: boolean;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   defaultEventDuration?: number;
   defaultCalendarId?: string | null;
   weekStartDay?: number;
@@ -95,7 +96,7 @@ export function MobileEventCalendar({
   onDeleteEvent,
   showWeekNumbers = false,
   compactView = false,
-  timeFormat = "24h",
+  timeFormat,
   defaultEventDuration = 60,
   defaultCalendarId = null,
   weekStartDay = 1,
@@ -234,11 +235,13 @@ export function MobileEventCalendar({
           onEventUpdate={(updatedEvent) =>
             persistDraggedCalendarEvent({
               timezone: resolvedTimezone,
+              timeFormat,
               updateEvent,
               updatedEvent,
             })
           }
           timezone={timezone}
+          timeFormat={timeFormat}
         >
           <MobileEventCalendarToolbar
             currentDate={currentDate}

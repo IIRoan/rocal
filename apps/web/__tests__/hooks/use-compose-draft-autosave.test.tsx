@@ -110,6 +110,7 @@ describe("useComposeDraftAutosave", () => {
             { id: "identity-1", email: "alice@solace.onl", name: "Alice" },
           ]}
           mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
         >
           <ChromeProbe onReady={(value) => { chrome = value; }} />
           <ComposeProbe onReady={(value) => { compose = value; }} />

@@ -45,7 +45,7 @@ describe("resolveTimelineEventDensity", () => {
     ).toBe("stacked");
   });
 
-  it("uses stacked density for 30-minute events", () => {
+  it("uses stacked density for 30-minute events at the kit hour height", () => {
     expect(
       resolveTimelineEventDensity({ durationMinutes: 30 }),
     ).toBe("stacked");

@@ -14,6 +14,8 @@ import {
   TypographySize,
 } from "@workspace/ui/solace";
 import type { JmapEmailMessage } from "@/lib/mail/types";
+import { useSettings } from "@/hooks/use-settings";
+import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { formatMessageDate } from "./mail-helpers";
 import { PALETTE_VIEW_STYLE } from "../command-palette/palette-styles";
 import type { MailPaletteItem } from "./mail-command-palette-items";
@@ -92,6 +94,8 @@ function ResultRow({
   isSelected: boolean;
   onSelect: (result: PaletteResult) => void;
 }) {
+  const { settings } = useSettings();
+  const timeFormat = useUserTimeFormat();
   const isMail = result.source === "mail";
   return (
     <PaletteRow
@@ -102,7 +106,11 @@ function ResultRow({
       subtitle={isMail ? (result.from ?? result.snippet) : result.snippet}
       meta={
         <Typography size={TypographySize.SMALL} color="disabled">
-          {formatMessageDate(result.timestamp)}
+          {formatMessageDate(
+            result.timestamp,
+            timeFormat,
+            settings?.timezone,
+          )}
         </Typography>
       }
       onSelect={() => onSelect(result)}

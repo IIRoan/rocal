@@ -32,7 +32,6 @@ Object.defineProperty(window, "matchMedia", {
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-// Mock clipboard API
 Object.defineProperty(navigator, "clipboard", {
   writable: true,
   value: { writeText: jest.fn().mockImplementation(() => Promise.resolve()) },
@@ -42,25 +41,6 @@ jest.mock("sonner", () => ({
   toast: Object.assign(jest.fn(), {
     error: jest.fn(),
   }),
-}));
-
-jest.mock("@gsap/react", () => ({
-  useGSAP: jest.fn(),
-}));
-
-jest.mock("gsap", () => ({
-  __esModule: true,
-  default: {
-    set: jest.fn(),
-    to: jest.fn(),
-    killTweensOf: jest.fn(),
-    timeline: jest.fn(() => ({
-      to: jest.fn().mockReturnThis(),
-      set: jest.fn().mockReturnThis(),
-      from: jest.fn().mockReturnThis(),
-      call: jest.fn().mockReturnThis(),
-    })),
-  },
 }));
 
 jest.mock("@workspace/ui/hooks", () => ({
@@ -132,6 +112,7 @@ jest.mock("@workspace/ui/components/ui/tooltip", () => ({
   TooltipContent: ({ children }: { children: React.ReactNode }) => (
     <span>{children}</span>
   ),
+  SimpleTooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 jest.mock("@workspace/ui/components/ui/dropdown-menu", () => {
@@ -276,6 +257,7 @@ const baseMessage = {
 const defaultProps: MessageReaderProps = {
   message: baseMessage as any,
   plaintext: "Hello, this is the message body.",
+  timeFormat: "24h",
   decryptedHtml: null,
   signatureVerificationState: "not_signed",
   decryptError: null,
@@ -416,7 +398,7 @@ describe("MessageReader — email header", () => {
 
   it("renders To address", () => {
     render();
-    // Header shows recipient name (Bob), not raw email, matching the reference design
+    // Header shows the recipient name, not the raw email.
     expect(container.textContent).toContain("Bob");
   });
 
@@ -427,7 +409,7 @@ describe("MessageReader — email header", () => {
         cc: [{ name: "Charlie", email: "charlie@example.com" }],
       } as any,
     });
-    // Header shows CC recipient name (Charlie), not raw email, matching the reference design
+    // Header shows the CC recipient name, not the raw email.
     expect(container.textContent).toContain("Charlie");
   });
 
@@ -1145,24 +1127,34 @@ describe("MessageReader — more actions dropdown", () => {
     expect(onMarkAsUnread).toHaveBeenCalledTimes(1);
   });
 
-  it("shows Move to mailbox options when otherMailboxes exist", () => {
+});
+
+describe("MessageReader — toolbar move to", () => {
+  it("moves the message to a mailbox picked from the toolbar", () => {
+    const onMove = jest.fn();
     render({
+      onMove,
       mailboxes: [
         { id: "inbox", name: "Inbox", role: "inbox" } as any,
         { id: "archive", name: "Archive", role: "archive" } as any,
       ],
       currentMailboxId: "inbox",
     });
-    openMoreActions();
-    const moveTo = findMenuItem("Move to");
-    expect(moveTo).toBeDefined();
+    const trigger = container.querySelector(
+      '[aria-label="Move to"]',
+    ) as HTMLElement | null;
+    expect(trigger).not.toBeNull();
     act(() => {
-      moveTo!.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+      trigger!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
       );
     });
-
-    expect(document.body.textContent).toContain("Archive");
+    const archive = findMenuItem("Archive");
+    expect(archive).toBeDefined();
+    act(() => {
+      archive!.click();
+    });
+    expect(onMove).toHaveBeenCalledWith("archive");
   });
 });
 
@@ -1309,7 +1301,6 @@ describe("MessageReader — attachments", () => {
 });
 
 describe("MessageReader — reply bar", () => {
-  /** Helper: expand the reply bar by clicking the collapsed pill. */
   function expandReplyBar() {
     const pillBtn = container.querySelector(
       "button[data-test='message-reply']",
@@ -1467,7 +1458,6 @@ describe("MessageReader — reply bar", () => {
 describe("MessageReader — pin / star", () => {
   it("shows star button when onToggleFlagged is provided", () => {
     render({ onToggleFlagged: jest.fn() });
-    // Pin button removed from toolbar; star is in the header
     const starBtn = container.querySelector("[aria-label='Star']");
     expect(starBtn).not.toBeNull();
   });

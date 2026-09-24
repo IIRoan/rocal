@@ -1,4 +1,9 @@
-import { resolveReplyRecipients } from "@workspace/calendar-core";
+import {
+  formatDateTimeLabel,
+  resolveReplyRecipients,
+  resolveTimezone,
+  type TimeFormat,
+} from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { extractMessageBodies } from "@/lib/mail/message-security";
 import {
@@ -27,6 +32,24 @@ type SeedResult = {
   identityId?: string | null;
 };
 
+export interface QuotedDateOptions {
+  timeFormat: TimeFormat;
+  timezone?: string;
+}
+
+/** "On <date>, X wrote:" header date, rendered in the user's timezone and clock format. */
+export function formatQuotedMailDate(
+  receivedAt: string | undefined,
+  options: QuotedDateOptions,
+): string {
+  if (!receivedAt) return "";
+  return formatDateTimeLabel(
+    new Date(receivedAt),
+    resolveTimezone(options.timezone),
+    options.timeFormat,
+  );
+}
+
 function resolveSeedIdentity(
   identities: JmapIdentity[],
   resolvedIdentityId: string | null,
@@ -52,6 +75,7 @@ export function buildReplySeed(
   plaintext: string | null,
   identities: JmapIdentity[],
   resolvedIdentityId: string | null,
+  dateOptions: QuotedDateOptions,
 ): SeedResult {
   const settings = readMailComposeSettings();
   const replyIdentityId = resolveSeedIdentity(
@@ -78,9 +102,7 @@ export function buildReplySeed(
   const { text, html } = extractMessageBodies(message);
   const body = plaintext ?? text ?? "";
   const htmlBody = html ?? `<p>${body.replace(/\n/g, "<br>")}</p>`;
-  const date = message.receivedAt
-    ? new Date(message.receivedAt).toLocaleString()
-    : "";
+  const date = formatQuotedMailDate(message.receivedAt, dateOptions);
   const sender = message.from?.[0]?.email ?? "";
   const from = message.from?.[0];
   const fromLabel = from?.name || from?.email || sender;
@@ -135,6 +157,7 @@ export function buildForwardSeed(
   plaintext: string | null,
   identities: JmapIdentity[],
   resolvedIdentityId: string | null,
+  dateOptions: QuotedDateOptions,
 ): SeedResult {
   const settings = readMailComposeSettings();
   const forwardIdentityId = resolveSeedIdentity(
@@ -167,9 +190,7 @@ export function buildForwardSeed(
         separator: settings.signatureSeparatorEnabled,
       })
     : "";
-  const date = message.receivedAt
-    ? new Date(message.receivedAt).toLocaleString()
-    : "";
+  const date = formatQuotedMailDate(message.receivedAt, dateOptions);
   const from = message.from?.[0];
   const fromFull =
     from?.name && from.email && from.name !== from.email

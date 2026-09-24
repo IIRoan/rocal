@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import {
   enrichSelfMailRecipient,
   isCurrentUserMailAddress,
@@ -19,6 +18,7 @@ import {
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useToast } from "../../providers/ToastProvider";
+import { useMailCompose } from "../../providers/MailComposeProvider";
 import { BottomSheet, BottomSheetHeader } from "../BottomSheet";
 import { SheetRow } from "../sheet/SheetRow";
 import { BlobatarAvatar } from "../BlobatarAvatar";
@@ -44,7 +44,7 @@ export function RecipientSheet({
 }: RecipientSheetProps) {
   const { theme } = useTheme();
   const { toast } = useToast();
-  const router = useRouter();
+  const { openCompose } = useMailCompose();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [open, setOpen] = React.useState(false);
@@ -59,12 +59,10 @@ export function RecipientSheet({
 
   const handleEmail = () => {
     setOpen(false);
-    const query = new URLSearchParams({ to: recipient.email });
-    const name = recipient.name?.trim();
-    if (name) {
-      query.set("toName", name);
-    }
-    router.push(`/(tabs)/mail/compose?${query.toString()}` as never);
+    openCompose({
+      to: recipient.email,
+      toName: recipient.name?.trim() || undefined,
+    });
   };
 
   return (

@@ -6,7 +6,7 @@ import type { LabelDef } from "@/lib/mail/types";
 import {
   normalizeLabelColorInput,
   resolveLabelDisplayColor,
-} from "@/lib/mail/mail-label-colors";
+} from "@workspace/calendar-core";
 import {
   PaletteButton,
   PaletteEmptyState,

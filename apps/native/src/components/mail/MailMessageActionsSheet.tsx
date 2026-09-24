@@ -35,7 +35,7 @@ const SHEET_TITLES: Record<Exclude<MessageSheetView, null>, string> = {
 };
 
 const SHEET_SNAP_POINTS: Record<Exclude<MessageSheetView, null>, number[]> = {
-  menu: [0.64],
+  menu: [0.7],
   move: [0.55],
   label: [0.7],
   html: [0.92],
@@ -176,6 +176,7 @@ function MessageMenuContent({
   const role = actions.currentMailboxRole;
   const isTrash = role === "trash";
   const isSpam = isSpamMailboxRole(role);
+  const isArchive = role === "archive";
 
   return (
     <>
@@ -199,6 +200,16 @@ function MessageMenuContent({
             label="Forward"
             onPress={actions.handleForward}
           />
+          {actions.archiveMailboxId && !isArchive ? (
+            <SheetRow
+              variant="mail"
+              icon="archive"
+              label="Archive"
+              onPress={actions.handleArchive}
+              disabled={actions.isActionBusy}
+              showDivider
+            />
+          ) : null}
           <SheetRow
             variant="mail"
             icon="star"

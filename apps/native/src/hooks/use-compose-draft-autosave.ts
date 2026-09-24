@@ -11,6 +11,11 @@ const AUTOSAVE_DEBOUNCE_MS = 2000;
 
 export type DraftSaveStatus = "idle" | "saving" | "saved" | "error";
 
+export type DraftSaveResult =
+  | { status: "saved"; draftId: string }
+  | { status: "empty" }
+  | { status: "failed" };
+
 type ComposeDraftAutosaveInput = {
   runtime: MailRuntime | undefined;
   enabled: boolean;
@@ -32,24 +37,38 @@ function parseAddressList(raw: string): string[] {
     .filter(Boolean);
 }
 
+/** Whether the text fields hold anything a draft can store; drafts never keep attachments. */
+export function hasDraftContent(
+  fields: Pick<ComposeDraftAutosaveInput, "to" | "cc" | "bcc" | "subject" | "body">,
+): boolean {
+  return (
+    [fields.to, fields.cc, fields.bcc].some(
+      (raw) => parseAddressList(raw).length > 0,
+    ) ||
+    Boolean(fields.subject.trim()) ||
+    Boolean(fields.body.trim())
+  );
+}
+
 export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
-  const inflightSaveRef = useRef<Promise<string | null> | null>(null);
+  const inflightSaveRef = useRef<Promise<DraftSaveResult> | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedDataRef = useRef<string>("");
+  const lastSavedDraftIdRef = useRef<string | null>(null);
   const savedDraftsMailboxIdRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
+  const draftHasContent = hasDraftContent(input);
 
-  const saveDraftOnce = useCallback(async (): Promise<string | null> => {
-    if (!input.runtime) return input.draftId;
+  const saveDraftOnce = useCallback(async (): Promise<DraftSaveResult> => {
+    if (!draftHasContent) return { status: "empty" };
+    if (!input.runtime) return { status: "failed" };
 
     const toAddresses = parseAddressList(input.to);
     const ccAddresses = parseAddressList(input.cc);
     const bccAddresses = parseAddressList(input.bcc);
     const plainBody = input.body.trim();
-
-    if (!toAddresses.length && !input.subject.trim() && !plainBody) {
-      return input.draftId;
-    }
+    // A save queued behind an autosave runs with its render's draftId, which that autosave already replaced.
+    const previousDraftId = lastSavedDraftIdRef.current ?? input.draftId;
 
     const payloadKey = JSON.stringify({
       to: toAddresses,
@@ -58,18 +77,17 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       subject: input.subject,
       body: plainBody,
       identityId: input.identityId,
-      draftId: input.draftId,
     });
 
-    if (payloadKey === lastSavedDataRef.current) {
-      return input.draftId;
+    if (previousDraftId && payloadKey === lastSavedDataRef.current) {
+      return { status: "saved", draftId: previousDraftId };
     }
 
     const draftsMailboxId = getPrimaryMailboxId(
       input.runtime.mailboxes,
       "drafts",
     );
-    if (!draftsMailboxId) return null;
+    if (!draftsMailboxId) return { status: "failed" };
 
     const identity =
       input.runtime.identities.find((entry) => entry.id === input.identityId) ??
@@ -95,23 +113,25 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
           htmlBody: hasComposeFormatting(plainBody)
             ? composeTextToHtml(plainBody)
             : undefined,
-          previousDraftId: input.draftId ?? undefined,
+          previousDraftId: previousDraftId ?? undefined,
         },
       );
 
+      lastSavedDraftIdRef.current = savedDraftId;
       input.setDraftId(savedDraftId);
       lastSavedDataRef.current = payloadKey;
       savedDraftsMailboxIdRef.current = draftsMailboxId;
       input.setDraftSaveStatus("saved");
       setTimeout(() => input.setDraftSaveStatus("idle"), 2000);
-      return savedDraftId;
+      return { status: "saved", draftId: savedDraftId };
     } catch (error) {
       log.error("Failed to auto-save draft", error);
       input.setDraftSaveStatus("error");
       setTimeout(() => input.setDraftSaveStatus("idle"), 3000);
-      return null;
+      return { status: "failed" };
     }
   }, [
+    draftHasContent,
     input.bcc,
     input.body,
     input.cc,
@@ -124,7 +144,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     input.to,
   ]);
 
-  const saveDraft = useCallback((): Promise<string | null> => {
+  const saveDraft = useCallback((): Promise<DraftSaveResult> => {
     const previous = inflightSaveRef.current;
     const promise = (async () => {
       if (previous) {
@@ -154,11 +174,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       return;
     }
 
-    const hasContent =
-      input.to.trim() ||
-      input.subject.trim() ||
-      input.body.trim();
-    if (!hasContent) return;
+    if (!draftHasContent) return;
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -174,6 +190,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       }
     };
   }, [
+    draftHasContent,
     input.bcc,
     input.body,
     input.cc,

@@ -53,7 +53,7 @@ export function EventCalendarToolbar({
   weekStartDay: number;
 }) {
   return (
-    <div className="z-50 h-[var(--calendar-toolbar-height)] sm:h-[var(--calendar-toolbar-height-sm)] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between gap-2 px-2 sm:px-4 shrink-0">
+    <div className="z-50 h-[var(--calendar-toolbar-height)] sm:h-[var(--calendar-toolbar-height-sm)] bg-background flex items-center justify-between gap-2 px-2 sm:px-4 shrink-0">
       <div className="flex items-center gap-1.5 min-w-0">
         {onSidebarToggle && (
           <Button
@@ -147,7 +147,7 @@ export function EventCalendarToolbar({
                     <Icon size={14} aria-hidden="true" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
+                <TooltipContent side="bottom">
                   {label}
                   <span className="ml-1.5 opacity-60">{shortcut}</span>
                 </TooltipContent>

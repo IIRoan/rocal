@@ -44,6 +44,7 @@ export function MessageReaderMobileActionsDrawer({
     labelPopoverOpen,
     dispatchChrome,
     isBusy,
+    canReply,
     props,
   } = controller;
   const {
@@ -140,7 +141,7 @@ export function MessageReaderMobileActionsDrawer({
                   onReply();
                   dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
                 }}
-                disabled={isBusy}
+                disabled={!canReply}
                 className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
               >
                 <Reply
@@ -155,7 +156,7 @@ export function MessageReaderMobileActionsDrawer({
                   onForward();
                   dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
                 }}
-                disabled={isBusy}
+                disabled={!canReply}
                 className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
               >
                 <Forward

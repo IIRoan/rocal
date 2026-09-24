@@ -35,7 +35,8 @@ describe("persistEventReminderNotifications", () => {
   it("sends only the encrypted title with the reminder", async () => {
     await persistEventReminderNotifications(
       "evt-1",
-      { title: " Lunch with Sam ", reminder: 15 },
+      " Lunch with Sam ",
+      [15],
       encryptTitle,
     );
 
@@ -53,10 +54,31 @@ describe("persistEventReminderNotifications", () => {
     );
   });
 
+  it("sends every reminder once, earliest first", async () => {
+    await persistEventReminderNotifications(
+      "evt-1",
+      "Lunch with Sam",
+      [1440, 15, 1440, 60],
+      encryptTitle,
+    );
+
+    expect(encryptTitle).toHaveBeenCalledTimes(1);
+    expect(updateEventNotifications).toHaveBeenCalledWith(
+      "evt-1",
+      [15, 60, 1440].map((minutesBefore) => ({
+        notificationType: "email",
+        minutesBefore,
+        isEnabled: true,
+      })),
+      { encryptedDisplayTitle: "enc:evt-1:Lunch with Sam" },
+    );
+  });
+
   it("clears reminders without encrypting when none are set", async () => {
     await persistEventReminderNotifications(
       "evt-1",
-      { title: "Lunch with Sam", reminder: 0 },
+      "Lunch with Sam",
+      [],
       encryptTitle,
     );
 
@@ -71,7 +93,8 @@ describe("persistEventReminderNotifications", () => {
 
     await persistEventReminderNotifications(
       "evt-1",
-      { title: "Lunch with Sam", reminder: 15 },
+      "Lunch with Sam",
+      [15],
       encryptTitle,
     );
 

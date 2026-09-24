@@ -106,33 +106,42 @@ export function formatPushDeviceLastSeen(
   }
 
   const diffMs = then.getTime() - now.getTime();
+  const sign = Math.sign(diffMs);
   const absSeconds = Math.round(Math.abs(diffMs) / 1000);
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-
-  if (absSeconds < 60) {
-    return `Last seen ${rtf.format(Math.sign(diffMs) * absSeconds, "second")}`;
-  }
-
   const absMinutes = Math.round(absSeconds / 60);
-  if (absMinutes < 60) {
-    return `Last seen ${rtf.format(Math.sign(diffMs) * absMinutes, "minute")}`;
-  }
-
   const absHours = Math.round(absMinutes / 60);
-  if (absHours < 48) {
-    return `Last seen ${rtf.format(Math.sign(diffMs) * absHours, "hour")}`;
-  }
-
   const absDays = Math.round(absHours / 24);
-  if (absDays < 30) {
-    return `Last seen ${rtf.format(Math.sign(diffMs) * absDays, "day")}`;
-  }
-
   const absMonths = Math.round(absDays / 30);
-  if (absMonths < 12) {
-    return `Last seen ${rtf.format(Math.sign(diffMs) * absMonths, "month")}`;
-  }
 
-  const absYears = Math.round(absDays / 365);
-  return `Last seen ${rtf.format(Math.sign(diffMs) * absYears, "year")}`;
+  const [amount, unit]: [number, Intl.RelativeTimeFormatUnit] =
+    absSeconds < 60
+      ? [absSeconds, "second"]
+      : absMinutes < 60
+        ? [absMinutes, "minute"]
+        : absHours < 48
+          ? [absHours, "hour"]
+          : absDays < 30
+            ? [absDays, "day"]
+            : absMonths < 12
+              ? [absMonths, "month"]
+              : [Math.round(absDays / 365), "year"];
+
+  return `Last seen ${formatRelativeTime(sign * amount, unit)}`;
+}
+
+/** Hermes (native) ships no `Intl.RelativeTimeFormat`, so fall back to English copy there. */
+function formatRelativeTime(
+  value: number,
+  unit: Intl.RelativeTimeFormatUnit,
+): string {
+  if (typeof Intl.RelativeTimeFormat === "function") {
+    return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(
+      value,
+      unit,
+    );
+  }
+  if (value === 0) return "just now";
+  const abs = Math.abs(value);
+  const label = `${abs} ${unit}${abs === 1 ? "" : "s"}`;
+  return value < 0 ? `${label} ago` : `in ${label}`;
 }

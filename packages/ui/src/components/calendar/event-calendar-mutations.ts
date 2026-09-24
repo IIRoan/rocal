@@ -1,5 +1,5 @@
 import { createLogger } from "@workspace/logger";
-import { formatInUserTimezone } from "@workspace/calendar-core";
+import { clockTimePattern, formatInUserTimezone, type TimeFormat } from "@workspace/calendar-core";
 import { toast } from "sonner";
 
 import type { CalendarEvent } from "./types";
@@ -100,10 +100,12 @@ export function buildDraggedEventUpdate(
 
 export async function persistDraggedCalendarEvent({
   timezone,
+  timeFormat,
   updateEvent,
   updatedEvent,
 }: {
   timezone: string;
+  timeFormat: TimeFormat;
   updateEvent: (id: string, event: unknown) => Promise<unknown>;
   updatedEvent: CalendarEvent;
 }) {
@@ -117,7 +119,7 @@ export async function persistDraggedCalendarEvent({
       description: formatInUserTimezone(
         new Date(updatedEvent.start),
         timezone,
-        "MMM d, yyyy 'at' h:mm a",
+        `MMM d, yyyy 'at' ${clockTimePattern(timeFormat)}`,
       ),
       position: "bottom-left",
     });

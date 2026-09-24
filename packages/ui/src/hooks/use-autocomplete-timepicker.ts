@@ -1,17 +1,18 @@
+import type { TimeFormat } from "@workspace/calendar-core";
+
 const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 interface UseAutocompleteTimepickerProps {
-  is24Hour?: boolean;
+  timeFormat: TimeFormat;
   locale?: string;
   timeZone?: string;
 }
 
 export function useAutocompleteTimepicker({
-  is24Hour = false,
+  timeFormat,
   locale = "en-US",
   timeZone = currentTimezone,
 }: UseAutocompleteTimepickerProps) {
-  // Generate time options (15-minute intervals)
   const generateTimeOptions = () => {
     const times = [];
     for (let hour = 0; hour < 24; hour++) {
@@ -30,7 +31,7 @@ export function useAutocompleteTimepicker({
     return new Intl.DateTimeFormat(locale, {
       hour: "numeric",
       minute: "2-digit",
-      hour12: !is24Hour,
+      hour12: timeFormat === "12h",
       timeZone: timeZone,
     }).format(date);
   };

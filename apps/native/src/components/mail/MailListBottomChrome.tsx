@@ -5,7 +5,6 @@ import Animated, {
   useAnimatedStyle,
 } from "react-native-reanimated";
 import { MailBulkToolbar } from "./MailBulkToolbar";
-import { MailComposeButton } from "./MailComposeButton";
 import { bottomChromeMotion } from "./mail-selection-anim-utils";
 import { useSelectionProgress } from "./mail-selection-anim";
 
@@ -13,7 +12,6 @@ const AnimatedView = Animated.createAnimatedComponent(View);
 
 interface MailListBottomChromeProps {
   bottomInset: number;
-  composeOnPress: () => void;
   bulk: {
     isInTrash: boolean;
     canMarkRead: boolean;
@@ -28,31 +26,17 @@ interface MailListBottomChromeProps {
 
 export function MailListBottomChrome({
   bottomInset,
-  composeOnPress,
   bulk,
 }: MailListBottomChromeProps) {
   const progress = useSelectionProgress();
 
-  const composeStyle = useAnimatedStyle(() => {
-    const motion = bottomChromeMotion(progress.value, "outgoing");
-    return {
-      opacity: motion.opacity,
-      transform: [{ translateY: motion.translateY }, { scale: motion.scale }],
-    };
-  });
-
   const bulkStyle = useAnimatedStyle(() => {
-    const motion = bottomChromeMotion(progress.value, "incoming");
+    const motion = bottomChromeMotion(progress.value);
     return {
       opacity: motion.opacity,
       transform: [{ translateY: motion.translateY }, { scale: motion.scale }],
     };
   });
-
-  const composePointerProps = useAnimatedProps(() => ({
-    pointerEvents:
-      progress.value < 0.35 ? ("box-none" as const) : ("none" as const),
-  }));
 
   const bulkPointerProps = useAnimatedProps(() => ({
     pointerEvents:
@@ -61,12 +45,6 @@ export function MailListBottomChrome({
 
   return (
     <View style={styles.root} pointerEvents="box-none">
-      <AnimatedView
-        style={[styles.composeLayer, composeStyle]}
-        animatedProps={composePointerProps}
-      >
-        <MailComposeButton bottomInset={bottomInset} onPress={composeOnPress} />
-      </AnimatedView>
       <AnimatedView
         style={[styles.bulkLayer, bulkStyle]}
         animatedProps={bulkPointerProps}
@@ -81,9 +59,6 @@ const styles = StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFill,
     zIndex: 20,
-  },
-  composeLayer: {
-    ...StyleSheet.absoluteFill,
   },
   bulkLayer: {
     ...StyleSheet.absoluteFill,

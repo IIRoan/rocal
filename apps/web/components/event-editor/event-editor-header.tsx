@@ -2,6 +2,7 @@ import { EncryptionStatusBadge } from "@workspace/ui/components/calendar";
 import { X } from "lucide-react";
 
 import type { EventEditorDesktopHeaderProps } from "./types";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 export function EventEditorDesktopHeader({
   badgeItem,
@@ -21,15 +22,16 @@ export function EventEditorDesktopHeader({
         iconSize="sm"
       />
       {onClose && (
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          title="Close (Esc)"
-          className="ml-auto flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-        >
-          <X className="size-4" />
-        </button>
+        <SimpleTooltip content="Close (Esc)">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="ml-auto flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <X className="size-4" />
+          </button>
+        </SimpleTooltip>
       )}
     </div>
   );

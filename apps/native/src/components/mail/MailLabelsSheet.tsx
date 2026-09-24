@@ -9,6 +9,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { MAIL_LABEL_CUSTOM_DEFAULT_COLOR } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import type { LabelDef } from "../../lib/mail/types";
 import { LABEL_COLOR_OPTIONS } from "../../lib/mail/use-labels";
@@ -43,7 +44,7 @@ export function MailLabelsSheet({
   const { styles, dividerInset } = useMemo(() => createStyles(theme), [theme]);
   const type = mailTypography(theme);
   const [newLabelName, setNewLabelName] = useState("");
-  const [newLabelColor, setNewLabelColor] = useState("#6366f1");
+  const [newLabelColor, setNewLabelColor] = useState<string>(MAIL_LABEL_CUSTOM_DEFAULT_COLOR);
 
   const handleCreate = () => {
     const name = newLabelName.trim();

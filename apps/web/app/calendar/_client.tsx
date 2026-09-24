@@ -35,6 +35,7 @@ import { useCalendarContext } from "@workspace/ui/components/calendar";
 import { useCalendarPresentation } from "@/hooks/use-calendar-presentation";
 import { useDashboardUserActions } from "@/hooks/use-dashboard-user-actions";
 import { useSettings } from "@/hooks/use-settings";
+import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { CALENDAR_HOME_PATH } from "@/lib/app-routes";
 import { readCalendarLinkSearchParams } from "./calendar-link-params";
@@ -191,6 +192,7 @@ function MobileLayoutContent() {
     useCommandPaletteContext();
   const { isCalendarVisible, currentDate, currentView } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
+  const timeFormat = useUserTimeFormat();
   const calendarData = useSharedCalendarData();
   const { handleLogout, openNewEventEditor } = useDashboardUserActions({
     defaultCalendarId: settings?.defaultCalendarId,
@@ -262,7 +264,7 @@ function MobileLayoutContent() {
       onDateRangeChange={calendarData.setDateRange}
       showWeekNumbers={settings?.showWeekNumbers}
       compactView={settings?.compactView}
-      timeFormat={settings?.timeFormat}
+      timeFormat={timeFormat}
       defaultEventDuration={settings?.defaultEventDuration}
       defaultCalendarId={defaultCalendarId}
       weekStartDay={settings?.weekStartDay}
@@ -296,7 +298,7 @@ export function CalendarPageContent() {
       <MobileLayoutContent />
     </div>
   ) : (
-    <CalendarWithData className="h-full min-h-screen flex flex-1" />
+    <CalendarWithData className="h-full min-h-dvh flex flex-1" />
   );
 }
 

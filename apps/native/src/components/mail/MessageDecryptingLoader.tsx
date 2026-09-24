@@ -7,8 +7,10 @@ import {
 } from "react-native";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
+import { useReduceMotion } from "../../lib/use-reduce-motion";
 
 const BODY_LINE_WIDTHS = [1, 0.94, 0.82, 0.9, 0.68, 0.76, 0.58] as const;
+const PULSE_REST_OPACITY = 0.7;
 
 type MessageDecryptingSkeletonProps = {
   attachedBelowBanner?: boolean;
@@ -17,8 +19,13 @@ type MessageDecryptingSkeletonProps = {
 
 function useSkeletonPulse() {
   const opacity = useRef(new Animated.Value(0.45)).current;
+  const reduceMotion = useReduceMotion();
 
   useEffect(() => {
+    if (reduceMotion) {
+      opacity.setValue(PULSE_REST_OPACITY);
+      return;
+    }
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, {
@@ -35,34 +42,9 @@ function useSkeletonPulse() {
     );
     animation.start();
     return () => animation.stop();
-  }, [opacity]);
+  }, [opacity, reduceMotion]);
 
   return opacity;
-}
-
-function useShimmerShift(width: number) {
-  const translateX = useRef(new Animated.Value(-width * 0.5)).current;
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(translateX, {
-          toValue: width * 1.2,
-          duration: 2400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(translateX, {
-          toValue: -width * 0.5,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [translateX, width]);
-
-  return translateX;
 }
 
 export function MessageDecryptingSkeleton({
@@ -73,11 +55,7 @@ export function MessageDecryptingSkeleton({
   const isDark = isDarkProp ?? themeIsDark;
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
   const pulse = useSkeletonPulse();
-  const shimmerX = useShimmerShift(280);
   const barColor = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)";
-  const shimmerColor = isDark
-    ? "rgba(255,255,255,0.06)"
-    : "rgba(0,0,0,0.04)";
 
   return (
     <View
@@ -89,15 +67,6 @@ export function MessageDecryptingSkeleton({
       accessibilityLabel="Decrypting message"
     >
       <View style={styles.body}>
-        <Animated.View
-          style={[
-            styles.shimmerBand,
-            {
-              backgroundColor: shimmerColor,
-              transform: [{ translateX: shimmerX }],
-            },
-          ]}
-        />
         <View style={styles.lines}>
           {BODY_LINE_WIDTHS.map((widthRatio, index) => (
             <Animated.View
@@ -144,18 +113,9 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       borderTopRightRadius: 0,
     },
     body: {
-      position: "relative",
       minHeight: 160,
       paddingHorizontal: theme.spacing["5"],
       paddingVertical: theme.spacing["4"],
-      overflow: "hidden",
-    },
-    shimmerBand: {
-      position: "absolute",
-      top: 0,
-      bottom: 0,
-      width: "45%",
-      opacity: 0.8,
     },
     lines: {
       gap: theme.spacing["2.5"],

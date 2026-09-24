@@ -98,7 +98,10 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+        <MailComposeProvider
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
           <ComposeProbe onReady={(value) => { latest = value; }} />
         </MailComposeProvider>,
       );
@@ -128,7 +131,10 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+        <MailComposeProvider
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
           <ComposeProbe onReady={(value) => { latest = value; }} />
         </MailComposeProvider>,
       );
@@ -153,7 +159,10 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+        <MailComposeProvider
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
           <ChromeProbe onReady={(value) => { chrome = value; }} />
           <ComposeProbe onReady={(value) => { latest = value; }} />
         </MailComposeProvider>,
@@ -180,7 +189,10 @@ describe("useMailCompose", () => {
   it("seedDraft opens full compose with message fields", async () => {
     await act(async () => {
       root.render(
-        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+        <MailComposeProvider
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
           <ComposeProbe onReady={() => {}} />
         </MailComposeProvider>,
       );
@@ -199,7 +211,10 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+        <MailComposeProvider
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
           <ChromeProbe onReady={(value) => { chrome = value; }} />
         </MailComposeProvider>,
       );
@@ -227,7 +242,10 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+        <MailComposeProvider
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
           <ComposeProbe onReady={(value) => { latest = value; }} />
         </MailComposeProvider>,
       );
@@ -273,7 +291,10 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+        <MailComposeProvider
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
           <ComposeProbe onReady={(value) => { latest = value; }} />
         </MailComposeProvider>,
       );
@@ -300,7 +321,10 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+        <MailComposeProvider
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
           <ComposeProbe onReady={(value) => { latest = value; }} />
         </MailComposeProvider>,
       );
@@ -330,7 +354,10 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+        <MailComposeProvider
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
           <ComposeProbe onReady={(value) => { latest = value; }} />
         </MailComposeProvider>,
       );
@@ -363,7 +390,10 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+        <MailComposeProvider
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
           <ComposeProbe onReady={(value) => { latest = value; }} />
         </MailComposeProvider>,
       );
@@ -392,7 +422,10 @@ describe("useMailCompose", () => {
 
     await act(async () => {
       root.render(
-        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+        <MailComposeProvider
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
           <ComposeProbe onReady={(value) => { latest = value; }} />
         </MailComposeProvider>,
       );
@@ -416,7 +449,10 @@ describe("useMailCompose", () => {
   it("seedReply sets reply mode and threading context", async () => {
     await act(async () => {
       root.render(
-        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+        <MailComposeProvider
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
           <ComposeProbe onReady={() => {}} />
         </MailComposeProvider>,
       );
@@ -450,7 +486,10 @@ describe("useMailCompose", () => {
   it("treats an untouched reply as clean so closing it saves no draft", async () => {
     await act(async () => {
       root.render(
-        <MailComposeProvider mailServerLimits={fallbackMailServerLimits}>
+        <MailComposeProvider
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
           <ComposeProbe onReady={() => {}} />
         </MailComposeProvider>,
       );

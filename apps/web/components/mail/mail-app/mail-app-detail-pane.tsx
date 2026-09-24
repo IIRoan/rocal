@@ -1,6 +1,11 @@
 "use client";
 
+import { cn } from "@workspace/ui/lib/utils";
 import { Typography, TypographySize } from "@workspace/ui/solace";
+import {
+  MAIL_READER_MOTION_CLASS,
+  MAIL_READER_WIDTH_CLASS,
+} from "./mail-reader-transition";
 import { ComposeForm } from "../compose-dialog";
 import { MessageReader } from "../message-reader";
 import type { MailAppContentController } from "../use-mail-app-content-controller";
@@ -13,6 +18,9 @@ export function MailAppDetailPane({
   const {
     isMobile,
     showMobileDetailPane,
+    showDesktopDetailPane,
+    desktopDetailPanePending,
+    desktopDetailPaneActive,
     isFullCompose,
     selectedMessage,
     selectedIsDraft,
@@ -69,21 +77,8 @@ export function MailAppDetailPane({
     return null;
   }
 
-  const readerOpen =
-    isMobile
-      ? showMobileDetailPane
-      : Boolean((selectedMessage && !selectedIsDraft) || isFullCompose);
-
-  return (
-    <div
-      className={
-        !readerOpen
-          ? "hidden"
-          : isMobile
-            ? "relative flex w-full min-h-0 flex-col overflow-hidden"
-            : "relative flex h-full min-h-0 min-w-0 w-[42%] shrink-0 overflow-hidden bg-[var(--bg-l2-solid)]"
-      }
-    >
+  const panes = (
+    <>
       {selectedMessage && !selectedIsDraft ? (
         <div
           className="absolute inset-0 flex flex-col transition-[transform,opacity] duration-200 ease-in-out"
@@ -200,6 +195,38 @@ export function MailAppDetailPane({
           isBusy={isBusy}
         />
       </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <div
+        className={
+          showMobileDetailPane
+            ? "relative flex w-full min-h-0 flex-col overflow-hidden"
+            : "hidden"
+        }
+      >
+        {panes}
+      </div>
+    );
+  }
+
+  // Translate-only slide on the compositor; while pending it stays visible off-screen so Firefox can raster it before the slide starts; inert as soon as a close is requested.
+  return (
+    <div
+      data-mail-reader-pane=""
+      inert={!desktopDetailPaneActive}
+      className={cn(
+        "absolute inset-y-0 right-0 z-10 overflow-hidden border-l border-[var(--border-secondary)] bg-[var(--bg-l2-solid)] contain-strict transition-[translate,visibility] will-change-[translate]",
+        MAIL_READER_WIDTH_CLASS,
+        MAIL_READER_MOTION_CLASS,
+        showDesktopDetailPane
+          ? "translate-x-0"
+          : cn("translate-x-full", !desktopDetailPanePending && "invisible"),
+      )}
+    >
+      {panes}
     </div>
   );
 }

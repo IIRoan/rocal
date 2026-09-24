@@ -55,3 +55,13 @@ func TestParseRejectsEventIDOnNewMail(t *testing.T) {
 		t.Fatal("expected new-mail eventId to be rejected")
 	}
 }
+
+func TestParseAllowsEmailFallbackOnlyOnEventReminder(t *testing.T) {
+	payload, err := Parse([]byte(`{"kind":"event_reminder","eventId":"evt-1","minutesBefore":15,"emailFallback":true}`))
+	if err != nil || !payload.EmailFallback {
+		t.Fatalf("expected the reminder fallback flag to parse, got %+v %v", payload, err)
+	}
+	if _, err := Parse([]byte(`{"kind":"new_mail","inboundCount":1,"emailFallback":true}`)); err == nil {
+		t.Fatal("expected new-mail emailFallback to be rejected")
+	}
+}

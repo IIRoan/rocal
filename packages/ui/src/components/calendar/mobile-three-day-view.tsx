@@ -2,7 +2,7 @@
 
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { areIntervalsOverlapping } from "date-fns";
-import { resolveTimezone } from "@workspace/calendar-core";
+import { resolveTimezone, type TimeFormat } from "@workspace/calendar-core";
 
 import { AllDayEventRow } from "./all-day-event-row";
 import { CalendarEvent } from "./types";
@@ -24,7 +24,7 @@ interface MobileThreeDayViewProps {
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
   onEventCreate: (startTime: Date) => void;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   weekStartDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   workingDays?: number[];
   timezone?: string;
@@ -69,7 +69,7 @@ export function MobileThreeDayView({
   events,
   onEventSelect,
   onEventCreate,
-  timeFormat = "24h",
+  timeFormat,
   timezone,
   onEventEdit,
   onEventDelete,
@@ -163,7 +163,7 @@ export function MobileThreeDayView({
   return (
     <div
       data-slot="three-day-view"
-      className="flex h-full min-h-0 flex-col overflow-hidden bg-background animate-fade-in"
+      className="flex h-full min-h-0 flex-col overflow-hidden bg-background"
     >
       <ThreeDayViewDayHeaders
         currentDate={currentDate}
@@ -176,6 +176,7 @@ export function MobileThreeDayView({
         events={events}
         handlers={allDayHandlers}
         timezone={resolvedTimezone}
+        timeFormat={timeFormat}
       />
       <ThreeDayViewTimeGrid
         currentTimePosition={currentTimePosition}
@@ -204,6 +205,7 @@ export function MobileThreeDayView({
           setDrawerEvents([]);
         }}
         timezone={resolvedTimezone}
+        timeFormat={timeFormat}
       />
     </div>
   );

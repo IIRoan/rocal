@@ -486,6 +486,124 @@ func TestSendEmailNotificationValidation(t *testing.T) {
 	}
 }
 
+// newCapturingJMAPServer fakes Stalwart and captures the draft created by Email/set.
+func newCapturingJMAPServer(t *testing.T, draft *map[string]any) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/jmap/session") {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"apiUrl":          "http://" + r.Host + "/jmap/",
+				"primaryAccounts": map[string]string{"urn:ietf:params:jmap:mail": "acct-1"},
+				"accounts":        map[string]any{"acct-1": map[string]any{}},
+			})
+			return
+		}
+		var request struct {
+			MethodCalls [][]json.RawMessage `json:"methodCalls"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil || len(request.MethodCalls) == 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		var method string
+		_ = json.Unmarshal(request.MethodCalls[0][0], &method)
+		switch method {
+		case "Mailbox/get":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"methodResponses": []any{
+					[]any{"Mailbox/get", map[string]any{"list": []any{
+						map[string]any{"id": "mb-drafts", "role": "drafts", "name": "Drafts"},
+						map[string]any{"id": "mb-sent", "role": "sent", "name": "Sent"},
+					}}, "m"},
+					[]any{"Identity/get", map[string]any{"list": []any{
+						map[string]any{"id": "ident-1", "email": "noreply@solace.onl"},
+					}}, "i"},
+				},
+			})
+		case "Email/set":
+			var params struct {
+				Create map[string]map[string]any `json:"create"`
+			}
+			_ = json.Unmarshal(request.MethodCalls[0][1], &params)
+			*draft = params.Create["draft1"]
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"methodResponses": []any{
+					[]any{"Email/set", map[string]any{"created": map[string]any{"draft1": map[string]any{"id": "e1"}}}, "c1"},
+					[]any{"EmailSubmission/set", map[string]any{"created": map[string]any{"s1": map[string]any{"id": "sub-1"}}}, "c2"},
+				},
+			})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func draftMessageIDs(t *testing.T, draft map[string]any) []string {
+	t.Helper()
+	raw, _ := draft["messageId"].([]any)
+	ids := make([]string, 0, len(raw))
+	for _, value := range raw {
+		id, ok := value.(string)
+		if !ok {
+			t.Fatalf("messageId entry is not a string: %#v", value)
+		}
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func TestSendEmailNotificationTagsReminderMessageID(t *testing.T) {
+	var draft map[string]any
+	jmap := newCapturingJMAPServer(t, &draft)
+
+	server := newTestServer(t)
+	server.mailer = email.NewClient(email.Config{
+		BaseURL:  jmap.URL,
+		Username: "noreply@solace.onl",
+		Password: "secret",
+		From:     "noreply@solace.onl",
+		FromName: "Solace",
+		HTTP:     jmap.Client(),
+	})
+
+	start := time.Date(2026, time.September, 24, 13, 0, 0, 0, time.UTC)
+	err := server.sendEmailNotification(context.Background(), EventData{Start: start, End: start.Add(time.Hour)},
+		UserData{Name: "Owner", Email: "owner@solace.onl", TimeZone: "Europe/Amsterdam"}, 15, "evt-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ids := draftMessageIDs(t, draft)
+	if len(ids) != 1 {
+		t.Fatalf("expected exactly one Message-ID on the reminder mail, got %v", ids)
+	}
+	if !strings.HasPrefix(ids[0], reminderMessageIDPrefix) || !strings.HasSuffix(ids[0], "@solace.onl") {
+		t.Fatalf("expected %s…@solace.onl, got %q", reminderMessageIDPrefix, ids[0])
+	}
+	if strings.ContainsAny(ids[0], "<> ") {
+		t.Fatalf("JMAP messageId must be a bare msg-id without brackets or spaces, got %q", ids[0])
+	}
+	if subject, _ := draft["subject"].(string); !strings.HasPrefix(subject, reminderMailTitle) {
+		t.Fatalf("expected a reminder subject, got %q", subject)
+	}
+}
+
+func TestReminderMessageIDPrefixMatchesBackend(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join("..", "backend", "lib", "stalwart-webhook.ts"))
+	if errors.Is(err, os.ErrNotExist) {
+		t.Skip("backend source not available outside the monorepo")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `SOLACE_REMINDER_MESSAGE_ID_PREFIX = "` + reminderMessageIDPrefix + `"`
+	if !strings.Contains(string(source), want) {
+		t.Fatalf("backend webhook must declare %s so reminder mail skips the new-mail push", want)
+	}
+}
+
 func TestDispatchSkipsAfterMaxAttempts(t *testing.T) {
 	server := newTestServer(t)
 

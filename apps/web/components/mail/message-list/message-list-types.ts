@@ -1,3 +1,4 @@
+import type { TimeFormat } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
 
 export type MessageListSpamActions = {
@@ -7,6 +8,8 @@ export type MessageListSpamActions = {
 
 export type MessageListDisplayOptions = {
   isMobile: boolean;
+  /** Desktop list squeezed next to the open reader. */
+  narrow: boolean;
   density: "compact" | "comfortable";
   showLabelChips: boolean;
   threadExpandEnabled: boolean;
@@ -53,7 +56,7 @@ export type MessageListRowPresentation = {
   spamActions: MessageListSpamActions;
   display: MessageListDisplayOptions;
   threadUi: MessageListThreadUiState;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   mailboxActions: MessageListRowMailboxActions;
 };

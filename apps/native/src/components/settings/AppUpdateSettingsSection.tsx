@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Linking,
   Pressable,
@@ -14,6 +13,8 @@ import { Feather } from "@expo/vector-icons";
 import * as Updates from "expo-updates";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
+import { useMailSkin, type MailSkin } from "../mail/mail-ui";
+import { SheetGroup, SheetItem } from "../sheet/SheetSections";
 import { useAppUpdate } from "../../providers/AppUpdateProvider";
 import {
   actionLabel,
@@ -33,7 +34,8 @@ const EXPO_UPDATES_URL =
 
 export function AppUpdateSettingsSection() {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const skin = useMailSkin();
+  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
   const {
     enabled,
     action,
@@ -90,18 +92,8 @@ export function AppUpdateSettingsSection() {
     })();
   };
 
-  const accessory = checking ? (
-    <ActivityIndicator size="small" color={theme.colors.mutedForeground} />
-  ) : (
-    <Feather
-      name={updateAccessoryIcon(enabled, action, checkStatus)}
-      size={16}
-      color={theme.colors.mutedForeground}
-    />
-  );
-
   return (
-    <View style={styles.card}>
+    <SheetGroup>
       <Pressable
         onPress={showDiagnostics}
         style={({ pressed }) => [styles.metrics, pressed && styles.rowPressed]}
@@ -133,70 +125,43 @@ export function AppUpdateSettingsSection() {
         </View>
       </Pressable>
 
-      <Pressable
-        onPress={onAction}
+      <SheetItem
+        label={label}
+        detail={
+          detail ??
+          (enabled
+            ? `Looks for a newer bundle on ${channel}.`
+            : "Updates are off in this session.")
+        }
+        trailing={
+          <Feather
+            name={updateAccessoryIcon(enabled, action, checkStatus)}
+            size={16}
+            color={skin.textSecondary}
+          />
+        }
+        pending={checking}
         disabled={busy}
-        style={({ pressed }) => [
-          styles.primaryRow,
-          pressed && !busy && styles.primaryRowPressed,
-          busy && styles.rowDisabled,
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityHint={detail ?? undefined}
-        accessibilityState={{ disabled: busy, busy }}
-      >
-        <View style={styles.rowText}>
-          <Text style={styles.primaryLabel} numberOfLines={1}>
-            {label}
-          </Text>
-          {detail ? (
-            <Text style={styles.rowDetail} numberOfLines={2}>
-              {detail}
-            </Text>
-          ) : (
-            <Text style={styles.rowDetail} numberOfLines={1}>
-              {enabled
-                ? `Looks for a newer bundle on ${channel}.`
-                : "Updates are off in this session."}
-            </Text>
-          )}
-        </View>
-        {accessory}
-      </Pressable>
+        onPress={onAction}
+      />
 
-      <Pressable
+      <SheetItem
+        label="Browse Expo updates"
+        trailing={
+          <Feather name="external-link" size={16} color={skin.textSecondary} />
+        }
         onPress={() => {
           void Linking.openURL(EXPO_UPDATES_URL);
         }}
-        style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
         accessibilityRole="link"
         accessibilityLabel="Browse Expo updates"
-      >
-        <Text style={styles.rowLabel} numberOfLines={1}>
-          Browse Expo updates
-        </Text>
-        <Feather
-          name="external-link"
-          size={16}
-          color={theme.colors.mutedForeground}
-        />
-      </Pressable>
-    </View>
+      />
+    </SheetGroup>
   );
 }
 
-function createStyles(theme: ThemeTokens) {
+function createStyles(theme: ThemeTokens, skin: MailSkin) {
   return StyleSheet.create({
-    card: {
-      marginHorizontal: theme.spacing["3"],
-      marginBottom: theme.spacing["2"],
-      overflow: "hidden",
-      borderRadius: theme.borderRadius.lg,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-    } as ViewStyle,
     metrics: {
       flexDirection: "row",
       alignItems: "stretch",
@@ -212,7 +177,7 @@ function createStyles(theme: ThemeTokens) {
       fontSize: 10,
       letterSpacing: 1.4,
       textTransform: "uppercase",
-      color: theme.colors.mutedForeground,
+      color: skin.textTertiary,
     } as TextStyle,
     channel: {
       fontFamily: theme.typography.fontFamily.mono,
@@ -231,63 +196,14 @@ function createStyles(theme: ThemeTokens) {
     stamp: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
+      color: skin.textSecondary,
     } as TextStyle,
     divider: {
       width: StyleSheet.hairlineWidth,
-      backgroundColor: theme.colors.border,
-    } as ViewStyle,
-    primaryRow: {
-      minHeight: 56,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingVertical: theme.spacing["3"],
-      paddingHorizontal: theme.spacing["4"],
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border,
-      backgroundColor: theme.colors.muted + "33",
-    } as ViewStyle,
-    primaryRowPressed: {
-      backgroundColor: theme.colors.accent,
-    } as ViewStyle,
-    row: {
-      minHeight: 44,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingVertical: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["4"],
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border,
+      backgroundColor: skin.borderPrimary,
     } as ViewStyle,
     rowPressed: {
-      backgroundColor: theme.colors.accent,
+      backgroundColor: skin.selected,
     } as ViewStyle,
-    rowDisabled: {
-      opacity: 0.55,
-    } as ViewStyle,
-    rowText: {
-      flex: 1,
-      marginRight: theme.spacing["3"],
-      gap: 2,
-    } as ViewStyle,
-    primaryLabel: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    } as TextStyle,
-    rowLabel: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    } as TextStyle,
-    rowDetail: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    } as TextStyle,
   });
 }

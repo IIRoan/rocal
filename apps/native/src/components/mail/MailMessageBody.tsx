@@ -22,6 +22,7 @@ import { CalendarInviteBanner } from "./CalendarInviteBanner";
 import { EventReminderMessageBody } from "./EventReminderMessageBody";
 import { EventReminderMessageBodyLoading } from "./EventReminderMessageBodyLoading";
 import { MessageDecryptingSkeleton } from "./MessageDecryptingLoader";
+import { useMailSkin, type MailSkin } from "./mail-ui";
 
 type MailMessageBodyProps = {
   messageId: string;
@@ -39,7 +40,8 @@ export function MailMessageBody({
   const { theme } = useTheme();
   const { toast } = useToast();
   const isDark = useColorScheme() === "dark";
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const skin = useMailSkin();
+  const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
   const {
     calendarInvitation,
     eventReminderView,
@@ -206,7 +208,7 @@ function SignatureBadge({
   );
 }
 
-function createStyles(theme: ThemeTokens) {
+function createStyles(theme: ThemeTokens, skin: MailSkin) {
   const view = {
     signatureBadge: {
       flexDirection: "row" as const,
@@ -244,11 +246,7 @@ function createStyles(theme: ThemeTokens) {
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    bodyText: {
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      color: theme.colors.foreground,
-    },
+    bodyText: skin.body,
     mutedText: {
       textAlign: "center" as const,
       fontSize: theme.typography.fontSize.sm.size,

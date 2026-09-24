@@ -26,6 +26,7 @@ import {
 import { sanitizeUntrustedEmailHtml } from "@workspace/calendar-core/sanitize-email-html";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
+import { useMailSkin, type MailSkin } from "./mail-ui";
 
 type WebViewModule = typeof import("react-native-webview");
 type WebViewComponent = WebViewModule["WebView"];
@@ -86,10 +87,11 @@ function buildEditorDocument(input: {
   html: string;
   placeholder: string;
   theme: ThemeTokens;
+  skin: MailSkin;
 }): string {
-  const { html, placeholder, theme } = input;
-  const fontSize = theme.typography.fontSize.base.size;
-  const lineHeight = theme.typography.fontSize.base.lineHeight;
+  const { html, placeholder, theme, skin } = input;
+  const fontSize = skin.body.fontSize;
+  const lineHeight = skin.body.lineHeight;
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -100,7 +102,7 @@ function buildEditorDocument(input: {
       margin: 0;
       padding: 0;
       height: 100%;
-      background: ${theme.colors.background};
+      background: ${theme.colors.card};
       color: ${theme.colors.foreground};
       font-size: ${fontSize}px;
       line-height: ${lineHeight}px;
@@ -110,12 +112,19 @@ function buildEditorDocument(input: {
       min-height: 100%;
       padding: ${theme.spacing["3"]}px ${theme.spacing["4"]}px;
       outline: none;
+      caret-color: ${theme.colors.primaryBase};
       -webkit-user-select: text;
       user-select: text;
     }
     #ed:empty:before {
       content: attr(data-placeholder);
-      color: ${theme.colors.mutedForeground};
+      color: ${skin.textTertiary};
+    }
+    #ed .quote {
+      margin-top: ${theme.spacing["2"]}px;
+      padding-left: ${theme.spacing["3"]}px;
+      border-left: 2px solid ${skin.borderPrimary};
+      color: ${skin.textSecondary};
     }
     strong, b { font-weight: 700; }
     em, i { font-style: italic; }
@@ -132,11 +141,23 @@ function buildEditorDocument(input: {
       function post(payload) {
         window.ReactNativeWebView.postMessage(JSON.stringify(payload));
       }
+      // Class-only marking: attributes are dropped when the HTML is converted back to compose text.
+      function markQuotes() {
+        var blocks = ed.querySelectorAll('p');
+        for (var i = 0; i < blocks.length; i++) {
+          var text = blocks[i].textContent || '';
+          if (/^On [\\s\\S]+ wrote:/.test(text) || text.indexOf('---------- Forwarded message ----------') === 0) {
+            blocks[i].classList.add('quote');
+          }
+        }
+      }
       window.setHtml = function(next) {
         skip = true;
         ed.innerHTML = next || '';
+        markQuotes();
         skip = false;
       };
+      markQuotes();
       window.applyFormat = function(command) {
         ed.focus();
         document.execCommand(command, false, null);
@@ -184,7 +205,8 @@ export const ComposeBodyEditor = forwardRef<
   ref,
 ) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const skin = useMailSkin();
+  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
   const injectJavaScriptRef = useRef<((script: string) => void) | null>(null);
   const lastEmittedRef = useRef(value);
   const [selection, setSelection] = useState<TextSelection>({
@@ -199,10 +221,11 @@ export const ComposeBodyEditor = forwardRef<
         html: composeTextToHtml(value),
         placeholder,
         theme,
+        skin,
       }),
     // Recreate only when chrome changes; typing updates via setHtml.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [placeholder, theme],
+    [placeholder, theme, skin],
   );
 
   const isFirstDocument = useRef(true);
@@ -296,7 +319,7 @@ export const ComposeBodyEditor = forwardRef<
         onFocusChange?.(false);
         return;
       }
-    const sanitizedHtml = sanitizeUntrustedEmailHtml(message.html);
+      const sanitizedHtml = sanitizeUntrustedEmailHtml(message.html);
       const next = htmlToComposeText(sanitizedHtml);
       lastEmittedRef.current = next;
       if (next !== value) {
@@ -323,11 +346,11 @@ export const ComposeBodyEditor = forwardRef<
           lastEmittedRef.current = text;
           onChangeText(text);
         }}
-        onSelectionChange={(event) =>
-          setSelection(event.nativeEvent.selection)
-        }
+        onSelectionChange={(event) => setSelection(event.nativeEvent.selection)}
         placeholder={placeholder}
-        placeholderTextColor={theme.colors.mutedForeground}
+        placeholderTextColor={skin.textTertiary}
+        selectionColor={theme.colors.primaryBase}
+        cursorColor={theme.colors.primaryBase}
         multiline
         textAlignVertical="top"
         autoFocus={false}
@@ -364,17 +387,17 @@ export const ComposeBodyEditor = forwardRef<
   );
 });
 
-function createStyles(theme: ThemeTokens) {
+function createStyles(theme: ThemeTokens, skin: MailSkin) {
   const view = {
     container: {
       flex: 1,
       minHeight: 0,
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.card,
     },
     webView: {
       flex: 1,
       minHeight: 0,
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.card,
     },
   } satisfies Record<string, ViewStyle>;
 
@@ -383,9 +406,7 @@ function createStyles(theme: ThemeTokens) {
       flex: 1,
       paddingHorizontal: theme.spacing["4"],
       paddingTop: theme.spacing["3"],
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      color: theme.colors.foreground,
+      ...skin.body,
     },
   } satisfies Record<string, TextStyle>;
 

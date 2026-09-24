@@ -3,7 +3,9 @@ package email
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,6 +31,8 @@ type Message struct {
 	Subject string
 	Text    string
 	HTML    string
+	// MessageIDPrefix, when set, yields a Message-ID of <prefix><random>@<sender domain>.
+	MessageIDPrefix string
 }
 
 type Client struct {
@@ -72,6 +76,10 @@ func (c *Client) Send(ctx context.Context, message Message) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	messageID, err := buildMessageID(message.MessageIDPrefix, c.config.From)
+	if err != nil {
+		return "", err
+	}
 
 	envelope, err := c.jmapCall(ctx, session.APIURL, authorization, buildSendCalls(sendCallInput{
 		mailAccountID:       session.MailAccountID,
@@ -85,6 +93,7 @@ func (c *Client) Send(ctx context.Context, message Message) (string, error) {
 		subject:             message.Subject,
 		text:                message.Text,
 		html:                message.HTML,
+		messageID:           messageID,
 	}))
 	if err != nil {
 		return "", err
@@ -297,7 +306,22 @@ func pickIdentityID(result map[string]any, from string) string {
 
 type sendCallInput struct {
 	mailAccountID, submissionAccountID, draftsID, sentID, identityID string
-	from, fromName, to, subject, text, html                          string
+	from, fromName, to, subject, text, html, messageID               string
+}
+
+func buildMessageID(prefix, from string) (string, error) {
+	if prefix == "" {
+		return "", nil
+	}
+	at := strings.LastIndex(from, "@")
+	if at < 0 || at == len(from)-1 {
+		return "", fmt.Errorf("sender address has no domain for Message-ID")
+	}
+	var buf [16]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "", err
+	}
+	return prefix + hex.EncodeToString(buf[:]) + "@" + strings.TrimSpace(from[at+1:]), nil
 }
 
 func buildSendCalls(input sendCallInput) []any {
@@ -322,24 +346,26 @@ func buildSendCalls(input sendCallInput) []any {
 			},
 		}
 	}
+	draft := map[string]any{
+		"mailboxIds": map[string]any{input.draftsID: true},
+		"keywords":   map[string]any{"$seen": true, "$draft": true},
+		"from":       []any{map[string]any{"name": input.fromName, "email": input.from}},
+		"to":         []any{map[string]any{"email": input.to}},
+		"subject":    input.subject,
+		"bodyValues": map[string]any{
+			"text": map[string]any{"value": input.text},
+			"html": map[string]any{"value": input.html},
+		},
+		"textBody": []any{map[string]any{"partId": "text", "type": "text/plain"}},
+		"htmlBody": []any{map[string]any{"partId": "html", "type": "text/html"}},
+	}
+	if input.messageID != "" {
+		draft["messageId"] = []any{input.messageID}
+	}
 	return []any{
 		[]any{"Email/set", map[string]any{
 			"accountId": input.mailAccountID,
-			"create": map[string]any{
-				"draft1": map[string]any{
-					"mailboxIds": map[string]any{input.draftsID: true},
-					"keywords":   map[string]any{"$seen": true, "$draft": true},
-					"from":       []any{map[string]any{"name": input.fromName, "email": input.from}},
-					"to":         []any{map[string]any{"email": input.to}},
-					"subject":    input.subject,
-					"bodyValues": map[string]any{
-						"text": map[string]any{"value": input.text},
-						"html": map[string]any{"value": input.html},
-					},
-					"textBody": []any{map[string]any{"partId": "text", "type": "text/plain"}},
-					"htmlBody": []any{map[string]any{"partId": "html", "type": "text/html"}},
-				},
-			},
+			"create":    map[string]any{"draft1": draft},
 		}, "c1"},
 		[]any{"EmailSubmission/set", submission, "c2"},
 	}

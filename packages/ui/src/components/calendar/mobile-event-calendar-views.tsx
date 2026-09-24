@@ -1,5 +1,6 @@
 "use client";
 
+import type { TimeFormat } from "@workspace/calendar-core";
 import { AgendaView } from "./agenda-view";
 import { DayView } from "./day-view";
 import { MobileDayView } from "./mobile-day-view";
@@ -30,7 +31,7 @@ export function MobileEventCalendarViews({
   onEventCreate: (startTime: Date) => void;
   onEventSelect: (event: CalendarEvent) => void;
   showWeekNumbers?: boolean;
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
   view: CalendarView;
   weekStartDay?: number;

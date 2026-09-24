@@ -28,10 +28,16 @@ const invitationTargetCalendarSelect = {
   stalwartCalendarId: true,
 } as const;
 
+/** Mirrors `isMailInvitationStagingCalendar` from calendar-core as a Prisma filter. */
+export const excludeInvitationStagingCalendarWhere = {
+  NOT: { name: MAIL_INVITATION_STAGING_CALENDAR_NAME, isVisible: false },
+} as const;
+
 const writableOwnedCalendarWhere = {
   kind: "owned",
   isSyncOnly: false,
   forceFullEncryption: false,
+  ...excludeInvitationStagingCalendarWhere,
 } as const;
 
 export async function resolveAcceptedInvitationTargetCalendar(

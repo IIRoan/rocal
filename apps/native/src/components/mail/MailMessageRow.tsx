@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -8,15 +8,13 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
-  Extrapolation,
-  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { Feather } from "@expo/vector-icons";
-import { FontAwesome } from "@expo/vector-icons";
+import { Feather, FontAwesome } from "@expo/vector-icons";
+import type { TimeFormat } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import {
@@ -31,20 +29,26 @@ import {
   listPreviewSnippet,
 } from "../../lib/mail/mail-preview";
 import { getAllMessageLabels } from "../../lib/mail/use-labels";
-import type { JmapEmailMessage, JmapIdentity, LabelDef } from "../../lib/mail/types";
+import type {
+  JmapEmailMessage,
+  JmapIdentity,
+  LabelDef,
+} from "../../lib/mail/types";
 import {
   MAIL_ICON,
   MAIL_LAYOUT,
-  mailColors,
-  mailRadii,
   mailSpacing,
+  useMailSkin,
+  type MailSkin,
 } from "./mail-ui";
 import { MAIL_SELECT_CHECK_SPRING } from "./mail-selection-anim-utils";
 import { MailIdentityBadge } from "./MailIdentityBadge";
+import { MailLabelChip } from "./MailLabelChip";
 import { BlobatarAvatar } from "../BlobatarAvatar";
 
 const EMPTY_LABELS: LabelDef[] = [];
 const EMPTY_IDENTITIES: JmapIdentity[] = [];
+const MAX_VISIBLE_LABELS = 2;
 
 function pulseSelect(entering: boolean) {
   void Haptics.impactAsync(
@@ -66,6 +70,8 @@ interface MailMessageRowProps {
   preview?: string;
   selectionActive?: boolean;
   selected?: boolean;
+  timeFormat: TimeFormat;
+  timezone?: string;
   onPress: (message: JmapEmailMessage) => void;
   onLongPress?: (message: JmapEmailMessage) => void;
   onToggleSelect?: (message: JmapEmailMessage) => void;
@@ -83,19 +89,19 @@ function MailMessageRowComponent({
   preview: previewOverride,
   selectionActive = false,
   selected = false,
+  timeFormat,
+  timezone,
   onPress,
   onLongPress,
   onToggleSelect,
 }: MailMessageRowProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  const radii = useMemo(() => mailRadii(theme), [theme]);
-  const colors = useMemo(() => mailColors(theme), [theme]);
+  const skin = useMailSkin();
+  const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
 
   const read =
     threadCount > 1 ? threadUnreadCount === 0 : isMessageRead(message);
   const flagged = isMessageFlagged(message);
-  const showThreadBadge = threadCount > 1;
   const messageLabels = getAllMessageLabels(message, labels);
   const addresses = showRecipient ? message.to : message.from;
   const threadSenders =
@@ -107,9 +113,8 @@ function MailMessageRowComponent({
   const previewRaw = previewOverride?.trim() || listPreviewSnippet(message);
   const preview =
     previewRaw === ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER ? "" : previewRaw;
-  const visibleLabels = messageLabels.slice(0, 2);
+  const visibleLabels = messageLabels.slice(0, MAX_VISIBLE_LABELS);
   const extraLabelCount = messageLabels.length - visibleLabels.length;
-  const skipRowPressRef = useRef(false);
 
   const selectedProgress = useSharedValue(selected ? 1 : 0);
 
@@ -120,58 +125,16 @@ function MailMessageRowComponent({
     );
   }, [selected, selectedProgress]);
 
-  const avatarFaceStyle = useAnimatedStyle(() => {
-    const progress = selectedProgress.value;
-    return {
-      opacity: progress < 0.5 ? 1 : 0,
-      transform: [
-        {
-          scaleX: interpolate(
-            progress,
-            [0, 0.5],
-            [1, 0.02],
-            Extrapolation.CLAMP,
-          ),
-        },
-      ],
-    };
-  });
-
-  const checkFaceStyle = useAnimatedStyle(() => {
-    const progress = selectedProgress.value;
-    return {
-      opacity: progress > 0.5 ? 1 : 0,
-      transform: [
-        {
-          scaleX: interpolate(
-            progress,
-            [0.5, 1],
-            [0.02, 1],
-            Extrapolation.CLAMP,
-          ),
-        },
-      ],
-    };
-  });
+  const checkFillStyle = useAnimatedStyle(() => ({
+    opacity: selectedProgress.value,
+  }));
 
   const applyToggle = () => {
     pulseSelect(!selectionActive || !selected);
     onToggleSelect?.(message);
   };
 
-  const handleAvatarPress = () => {
-    skipRowPressRef.current = true;
-    applyToggle();
-    setTimeout(() => {
-      skipRowPressRef.current = false;
-    }, 80);
-  };
-
   const handleRowPress = () => {
-    if (skipRowPressRef.current) {
-      skipRowPressRef.current = false;
-      return;
-    }
     if (selectionActive) {
       applyToggle();
       return;
@@ -179,174 +142,113 @@ function MailMessageRowComponent({
     onPress(message);
   };
 
-  const handleRowLongPress = () => {
-    if (skipRowPressRef.current) {
-      skipRowPressRef.current = false;
-      return;
-    }
-    applyToggle();
-  };
-
   return (
     <Pressable
       onPress={handleRowPress}
-      onLongPress={
-        onLongPress || onToggleSelect ? handleRowLongPress : undefined
-      }
+      onLongPress={onLongPress || onToggleSelect ? applyToggle : undefined}
       delayLongPress={350}
       style={({ pressed }) => [
         styles.row,
         selected && styles.rowSelected,
-        pressed && !selected && styles.rowPressed,
-        pressed && selected && styles.rowSelectedPressed,
+        pressed && styles.rowPressed,
       ]}
       accessibilityRole={selectionActive ? "checkbox" : "button"}
-      accessibilityLabel={`${name}: ${subject}`}
-      accessibilityState={{ selected: selectionActive ? selected : undefined }}
+      accessibilityLabel={`${read ? "" : "Unread, "}${name}: ${subject}`}
+      accessibilityState={selectionActive ? { checked: selected } : undefined}
     >
-      <View style={styles.rowInner}>
-        <Pressable
-          onPress={handleAvatarPress}
-          onLongPress={handleAvatarPress}
-          delayLongPress={350}
-          hitSlop={6}
-          style={styles.avatarHit}
-          accessibilityRole="checkbox"
-          accessibilityLabel={selected ? "Deselect conversation" : "Select conversation"}
-          accessibilityState={{ checked: selected }}
+      <Pressable
+        onPress={applyToggle}
+        hitSlop={6}
+        style={styles.avatar}
+        accessibilityRole="checkbox"
+        accessibilityLabel={
+          selected ? "Deselect conversation" : "Select conversation"
+        }
+        accessibilityState={{ checked: selected }}
+      >
+        <BlobatarAvatar
+          email={addresses?.[0]?.email}
+          name={addresses?.[0]?.name}
+          size={MAIL_LAYOUT.rowAvatarSize}
+          borderRadius={theme.borderRadius.md}
+        />
+        <Animated.View
+          style={[styles.checkFill, checkFillStyle]}
+          pointerEvents="none"
         >
-          {!read && !selected ? <View style={styles.unreadDot} /> : null}
-          <View
-            style={[
-              styles.avatarWrap,
-              { borderRadius: radii.avatar, overflow: "hidden" },
-            ]}
-          >
-            <Animated.View
-              style={[styles.avatarFace, avatarFaceStyle]}
-              pointerEvents="none"
+          <Feather name="check" size={16} color={skin.ctaForeground} />
+        </Animated.View>
+      </Pressable>
+
+      <View style={styles.content}>
+        <View style={styles.topLine}>
+          <View style={styles.senderLine}>
+            <Text
+              style={[styles.sender, !read && styles.senderUnread]}
+              numberOfLines={1}
             >
-              <BlobatarAvatar
-                email={addresses?.[0]?.email}
-                name={addresses?.[0]?.name}
-                size={MAIL_LAYOUT.avatarSize}
-                borderRadius={radii.avatar}
+              {name}
+            </Text>
+            {threadCount > 1 ? (
+              <Text style={styles.threadCount}>{threadCount}</Text>
+            ) : null}
+            {!read ? <View style={styles.unreadDot} /> : null}
+            <MailIdentityBadge
+              message={message}
+              identities={identities}
+              compact
+            />
+          </View>
+          <View style={styles.meta}>
+            {flagged ? (
+              <FontAwesome
+                name="star"
+                size={MAIL_ICON.rowMeta - 2}
+                color={skin.accent}
+                accessibilityLabel="Starred"
               />
-            </Animated.View>
-            <Animated.View
-              style={[
-                styles.checkFace,
-                { backgroundColor: colors.selectIndicatorOn },
-                checkFaceStyle,
-              ]}
-              pointerEvents="none"
-            >
+            ) : null}
+            {hasAttachments ? (
               <Feather
-                name="check"
-                size={MAIL_ICON.rowSelect}
-                color={theme.colors.primaryForeground}
+                name="paperclip"
+                size={MAIL_ICON.rowMeta - 1}
+                color={skin.textTertiary}
+                accessibilityLabel="Has attachments"
               />
-            </Animated.View>
+            ) : null}
+            <Text style={styles.date}>
+              {formatMessageDate(message.receivedAt, { timeFormat, timezone })}
+            </Text>
           </View>
-        </Pressable>
-
-        <View style={styles.content}>
-          <View style={styles.topLine}>
-            <View style={styles.senderLine}>
-              <Text
-                style={[
-                  styles.sender,
-                  read ? styles.senderRead : styles.senderUnread,
-                ]}
-                numberOfLines={1}
-              >
-                {name}
-              </Text>
-              {showThreadBadge ? (
-                <Text
-                  style={[
-                    styles.threadCount,
-                    threadUnreadCount > 0 && styles.threadCountUnread,
-                  ]}
-                >
-                  {threadUnreadCount > 0 && threadUnreadCount < threadCount
-                    ? `(${threadUnreadCount}/${threadCount})`
-                    : `(${threadCount})`}
-                </Text>
-              ) : null}
-              <MailIdentityBadge
-                message={message}
-                identities={identities}
-                compact
-              />
-            </View>
-            <View style={styles.meta}>
-              {hasAttachments ? (
-                <Feather
-                  name="paperclip"
-                  size={MAIL_ICON.rowMeta}
-                  color={theme.colors.mutedForeground}
-                  accessibilityLabel="Has attachments"
-                />
-              ) : null}
-              <Text style={[styles.date, !read && styles.dateUnread]}>
-                {formatMessageDate(message.receivedAt)}
-              </Text>
-              {flagged ? (
-                <FontAwesome
-                  name="star"
-                  size={MAIL_ICON.rowMeta}
-                  color="#fbbf24"
-                />
-              ) : null}
-            </View>
-          </View>
-
-          <Text
-            style={[
-              styles.subject,
-              read ? styles.subjectRead : styles.subjectUnread,
-            ]}
-            numberOfLines={1}
-          >
-            {subject}
-          </Text>
-
-          {preview || visibleLabels.length > 0 ? (
-            <View style={styles.snippetLine}>
-              {visibleLabels.map((label) => (
-                <View
-                  key={label.id}
-                  style={[
-                    styles.labelChip,
-                    {
-                      borderColor: `${label.color}40`,
-                      backgroundColor: `${label.color}18`,
-                    },
-                  ]}
-                >
-                  <View
-                    style={[styles.labelDot, { backgroundColor: label.color }]}
-                  />
-                  <Text
-                    style={[styles.labelText, { color: label.color }]}
-                    numberOfLines={1}
-                  >
-                    {label.name}
-                  </Text>
-                </View>
-              ))}
-              {extraLabelCount > 0 ? (
-                <Text style={styles.labelOverflow}>+{extraLabelCount}</Text>
-              ) : null}
-              {preview ? (
-                <Text style={styles.preview} numberOfLines={1}>
-                  {preview}
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
         </View>
+
+        <Text
+          style={[styles.subject, !read && styles.subjectUnread]}
+          numberOfLines={1}
+        >
+          {subject}
+        </Text>
+
+        {preview ? (
+          <Text style={styles.preview} numberOfLines={1}>
+            {preview}
+          </Text>
+        ) : null}
+
+        {visibleLabels.length > 0 ? (
+          <View style={styles.labels}>
+            {visibleLabels.map((label) => (
+              <MailLabelChip
+                key={label.id}
+                name={label.name}
+                color={label.color}
+              />
+            ))}
+            {extraLabelCount > 0 ? (
+              <Text style={styles.labelOverflow}>+{extraLabelCount}</Text>
+            ) : null}
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -354,57 +256,42 @@ function MailMessageRowComponent({
 
 export const MailMessageRow = React.memo(MailMessageRowComponent);
 
-function createStyles(theme: ThemeTokens) {
+function createStyles(theme: ThemeTokens, skin: MailSkin) {
   const pad = mailSpacing(theme);
-  const colors = mailColors(theme);
 
   const view = {
     row: {
+      flexDirection: "row" as const,
+      alignItems: "flex-start" as const,
       paddingHorizontal: pad.rowH,
       paddingVertical: pad.rowV,
       backgroundColor: theme.colors.background,
     },
-    rowInner: {
-      flexDirection: "row" as const,
-      alignItems: "flex-start" as const,
-      gap: pad.rowGap,
-    },
     rowSelected: {
-      backgroundColor: colors.selectedRow,
+      backgroundColor: skin.selected,
     },
     rowPressed: {
-      backgroundColor: colors.pressed,
+      backgroundColor: skin.pressed,
     },
-    rowSelectedPressed: {
-      backgroundColor: theme.colors.primaryBase + "22",
-    },
-    avatarHit: {
-      width: MAIL_LAYOUT.avatarSize,
-      height: MAIL_LAYOUT.avatarSize,
+    avatar: {
+      width: MAIL_LAYOUT.rowAvatarSize,
+      height: MAIL_LAYOUT.rowAvatarSize,
+      marginTop: 2,
+      marginRight: pad.rowGap,
+      borderRadius: theme.borderRadius.md,
+      overflow: "hidden" as const,
     },
     unreadDot: {
-      position: "absolute" as const,
-      left: -5,
-      top: (MAIL_LAYOUT.avatarSize - MAIL_LAYOUT.unreadDotSize) / 2,
       width: MAIL_LAYOUT.unreadDotSize,
       height: MAIL_LAYOUT.unreadDotSize,
       borderRadius: theme.borderRadius.full,
-      backgroundColor: theme.colors.primaryBase,
-      zIndex: 2,
+      backgroundColor: skin.unreadDot,
     },
-    avatarWrap: {
-      width: MAIL_LAYOUT.avatarSize,
-      height: MAIL_LAYOUT.avatarSize,
-    },
-    avatarFace: {
+    checkFill: {
       ...StyleSheet.absoluteFill,
       alignItems: "center" as const,
       justifyContent: "center" as const,
-    },
-    checkFace: {
-      ...StyleSheet.absoluteFill,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
+      backgroundColor: skin.cta,
     },
     content: {
       flex: 1,
@@ -421,102 +308,61 @@ function createStyles(theme: ThemeTokens) {
       flex: 1,
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: pad.tight,
+      gap: pad.tight + 2,
       minWidth: 0,
     },
     meta: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: pad.tight,
+      gap: pad.tight + 2,
       flexShrink: 0,
     },
-    snippetLine: {
+    labels: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: pad.tight,
-    },
-    labelChip: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      maxWidth: 88,
-      gap: 4,
-      paddingHorizontal: 6,
-      paddingVertical: 1,
-      borderRadius: theme.borderRadius.full,
-      borderWidth: StyleSheet.hairlineWidth,
-    },
-    labelDot: {
-      width: 5,
-      height: 5,
-      borderRadius: theme.borderRadius.full,
+      gap: pad.tight + 2,
+      marginTop: pad.tight + 2,
     },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
     sender: {
       flexShrink: 1,
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
+      fontSize: 15,
+      lineHeight: 20,
+      fontWeight: "400" as TextStyle["fontWeight"],
+      color: skin.textTertiary,
     },
     senderUnread: {
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-    },
-    senderRead: {
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
-    threadCount: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.mutedForeground,
-      fontVariant: ["tabular-nums"] as TextStyle["fontVariant"],
-    },
-    threadCountUnread: {
-      color: theme.colors.primaryBase,
-    },
-    date: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-      fontVariant: ["tabular-nums"] as TextStyle["fontVariant"],
-    },
-    dateUnread: {
-      color: theme.colors.primaryBase,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-    },
-    subject: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: 18,
-    },
-    subjectUnread: {
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
+      fontWeight: "600" as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
-    subjectRead: {
-      fontWeight: theme.typography.fontWeight.normal as TextStyle["fontWeight"],
-      color: theme.colors.mutedForeground,
+    threadCount: {
+      ...skin.meta,
+      fontVariant: ["tabular-nums"] as TextStyle["fontVariant"],
+    },
+    date: {
+      ...skin.meta,
+      fontVariant: ["tabular-nums"] as TextStyle["fontVariant"],
+    },
+    subject: {
+      fontSize: 14,
+      lineHeight: 19,
+      fontWeight: "400" as TextStyle["fontWeight"],
+      color: skin.textSecondary,
+    },
+    subjectUnread: {
+      fontWeight: "600" as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
     },
     preview: {
-      flex: 1,
-      minWidth: 0,
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    labelText: {
-      flexShrink: 1,
-      fontSize: 11,
-      lineHeight: 14,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      fontSize: 14,
+      lineHeight: 19,
+      color: skin.textTertiary,
     },
     labelOverflow: {
-      fontSize: 11,
-      lineHeight: 14,
-      color: theme.colors.mutedForeground,
+      ...skin.meta,
+      fontSize: 12,
       fontVariant: ["tabular-nums"] as TextStyle["fontVariant"],
     },
   } satisfies Record<string, TextStyle>;

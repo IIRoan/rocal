@@ -1,14 +1,5 @@
 import type { MailSearchFilters } from "@/lib/mail/mail-search-filter";
-import type { JmapEmailMessage } from "@/lib/mail/types";
-
-export type MailListViewFilter = "all" | "unread" | "read" | "attachments";
-
-export const MAIL_LIST_VIEW_FILTERS: { value: MailListViewFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "unread", label: "Unread" },
-  { value: "read", label: "Read" },
-  { value: "attachments", label: "Attachments" },
-];
+import type { MailListViewFilter } from "@workspace/calendar-core";
 
 export type MailAppListChromeState = {
   paletteInitialView?: string;
@@ -61,25 +52,8 @@ export function mailAppListChromeReducer(
   }
 }
 
-export function applyMailListViewFilter(
-  messages: JmapEmailMessage[],
-  filter: MailListViewFilter,
-  labelId: string | null,
-): JmapEmailMessage[] {
-  let next = messages;
-  if (filter === "unread") {
-    next = next.filter((message) => !message.keywords?.["$seen"]);
-  } else if (filter === "read") {
-    next = next.filter((message) => message.keywords?.["$seen"] === true);
-  } else if (filter === "attachments") {
-    next = next.filter(
-      (message) =>
-        message.hasAttachment === true || (message.attachments?.length ?? 0) > 0,
-    );
-  }
-  if (labelId) {
-    const key = `label:${labelId}`;
-    next = next.filter((message) => message.keywords?.[key] === true);
-  }
-  return next;
-}
+export {
+  applyMailListViewFilter,
+  MAIL_LIST_VIEW_FILTERS,
+  type MailListViewFilter,
+} from "@workspace/calendar-core";

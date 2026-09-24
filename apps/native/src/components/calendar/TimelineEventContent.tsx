@@ -7,7 +7,6 @@ interface TimelineEventContentProps {
   cancelled?: boolean;
   density: TimelineEventDensity;
   titleLines?: number;
-  spanLabel?: string | null;
 }
 
 export function TimelineEventContent({
@@ -16,7 +15,6 @@ export function TimelineEventContent({
   cancelled = false,
   density,
   titleLines = 1,
-  spanLabel,
 }: TimelineEventContentProps) {
   const compact = density === "compact";
 
@@ -36,20 +34,6 @@ export function TimelineEventContent({
       >
         {title}
       </Text>
-      {spanLabel ? (
-        <Text
-          style={[
-            styles.spanLabel,
-            compact ? styles.spanLabelCompact : null,
-            { color: titleColor },
-          ]}
-          numberOfLines={1}
-          ellipsizeMode="clip"
-          allowFontScaling={false}
-        >
-          {spanLabel}
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -88,17 +72,5 @@ const styles = StyleSheet.create({
   titleCancelled: {
     textDecorationLine: "line-through",
     opacity: 0.7,
-  } satisfies TextStyle,
-  spanLabel: {
-    fontSize: 9,
-    lineHeight: 11,
-    fontWeight: "400",
-    includeFontPadding: false,
-    opacity: 0.8,
-    fontVariant: ["tabular-nums"],
-  } satisfies TextStyle,
-  spanLabelCompact: {
-    fontSize: 8,
-    lineHeight: 10,
   } satisfies TextStyle,
 });

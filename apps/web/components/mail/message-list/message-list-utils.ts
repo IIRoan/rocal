@@ -10,6 +10,8 @@ export const ROW_HEIGHT_DESKTOP_COMFORTABLE = 72;
 export const ROW_HEIGHT_MOBILE_COMFORTABLE = 101;
 export const ROW_HEIGHT_WITH_LABELS = 56;
 export const ROW_HEIGHT_WITH_LABELS_COMFORTABLE = 72;
+export const ROW_HEIGHT_NARROW = 76;
+export const ROW_HEIGHT_NARROW_WITH_LABELS = 96;
 export const SCROLL_LOAD_THRESHOLD = 62;
 
 export type MessageListThreadRow = {
@@ -25,6 +27,7 @@ export function getRowHeight(
   isMobile: boolean,
   density: "compact" | "comfortable" = "compact",
   showLabelChips: boolean = true,
+  narrow: boolean = false,
 ): number {
   if (isMobile) {
     return density === "comfortable"
@@ -33,6 +36,9 @@ export function getRowHeight(
   }
   const hasLabels =
     showLabelChips && getAllMessageLabels(message, labels).length > 0;
+  if (narrow) {
+    return hasLabels ? ROW_HEIGHT_NARROW_WITH_LABELS : ROW_HEIGHT_NARROW;
+  }
   if (density === "comfortable") {
     return hasLabels
       ? ROW_HEIGHT_WITH_LABELS_COMFORTABLE

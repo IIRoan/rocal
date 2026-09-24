@@ -4,25 +4,25 @@ import { selectionFooterHeight } from "./mail-selection-anim-utils";
 import { useSelectionProgress } from "./mail-selection-anim";
 
 interface MailListAnimatedFooterProps {
-  composePadding: number;
+  idlePadding: number;
   bulkPadding: number;
 }
 
-/** Scroll spacer that eases between compose FAB and bulk toolbar heights. */
+/** Scroll spacer that eases between the idle inset and bulk toolbar height. */
 export function MailListAnimatedFooter({
-  composePadding,
+  idlePadding,
   bulkPadding,
 }: MailListAnimatedFooterProps) {
   const progress = useSelectionProgress();
   const maxPadding = useMemo(
-    () => Math.max(composePadding, bulkPadding, 1),
-    [composePadding, bulkPadding],
+    () => Math.max(idlePadding, bulkPadding, 1),
+    [idlePadding, bulkPadding],
   );
 
   const style = useAnimatedStyle(() => {
     const height = selectionFooterHeight(
       progress.value,
-      composePadding,
+      idlePadding,
       bulkPadding,
     );
     const scaleY = height / maxPadding;

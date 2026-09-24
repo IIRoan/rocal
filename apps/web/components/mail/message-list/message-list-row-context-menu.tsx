@@ -7,7 +7,7 @@ import {
   Icon,
 } from "@workspace/ui/solace";
 import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
-import { resolveLabelDisplayColor } from "@/lib/mail/mail-label-colors";
+import { resolveLabelDisplayColor } from "@workspace/calendar-core";
 import { getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
 import type {
   MessageListRowMailboxActions,

@@ -17,7 +17,7 @@ export function WeekViewDayHeaders({
   timezone: string;
 }) {
   return (
-    <div className="z-40 bg-background/95 backdrop-blur-md shrink-0">
+    <div className="z-40 bg-background shrink-0">
       <div className="hidden w-full grid-cols-[3rem_repeat(7,minmax(0,1fr))] items-center justify-between pt-3 sm:grid border-b border-border/40">
         <div className="caption text-right text-muted-foreground/40 text-[9px] pr-1.5">
           {formatInTimeZone(currentDate, timezone, "zzz")}

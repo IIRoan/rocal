@@ -1,17 +1,20 @@
 "use client";
 
 import { cn } from "@workspace/ui/lib/utils";
+import { mailBodySurfaceClassName } from "./message-reader/constants";
 
 const BODY_LINE_WIDTHS = [100, 94, 82, 90, 68, 76, 58] as const;
 
 type MessageDecryptingSkeletonProps = {
   isDark?: boolean;
   className?: string;
+  label?: string;
 };
 
 export function MessageDecryptingSkeleton({
   isDark = false,
   className,
+  label = "Decrypting message",
 }: MessageDecryptingSkeletonProps) {
   const bar = isDark ? "bg-white/10" : "bg-black/[0.06]";
 
@@ -22,14 +25,12 @@ export function MessageDecryptingSkeleton({
         className,
       )}
       aria-busy
-      aria-label="Decrypting message"
+      aria-label={label}
     >
       <div
         className={cn(
           "relative min-h-[10rem] flex-1 px-5 py-4",
-          isDark
-            ? "bg-[#1a1a1a] [color-scheme:dark]"
-            : "bg-white [color-scheme:light]",
+          mailBodySurfaceClassName(isDark),
         )}
       >
         <div

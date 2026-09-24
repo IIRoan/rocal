@@ -38,6 +38,7 @@ export function MessageReaderReplyBar({
     handleSendReply,
     autoResizeTextarea,
     isBusy,
+    canReply,
     props,
   } = controller;
   const { onSendReply, onForward } = props;
@@ -45,7 +46,6 @@ export function MessageReaderReplyBar({
 
   return (
     <div className="shrink-0">
-      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -108,7 +108,6 @@ export function MessageReaderReplyBar({
             aria-label={`Reply to ${senderName || senderEmail}`}
             disabled={isBusy || isSendingReply}
           />
-          {/* Attached file chips */}
           {attachedFiles.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pb-1.5">
               {attachedFiles.map((file) => (
@@ -195,7 +194,7 @@ export function MessageReaderReplyBar({
               aria-label="Send reply"
               className="ml-auto"
               disabled={
-                isBusy ||
+                !canReply ||
                 isSendingReply ||
                 (Boolean(onSendReply) && !replyText.trim())
               }
@@ -221,6 +220,7 @@ export function MessageReaderReplyBar({
             weight={TypographyWeight.REGULAR}
           />
           <IconText
+            disabled={!canReply}
             label="Forward"
             onClick={onForward}
             size={Size.SMALL}

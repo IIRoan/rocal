@@ -2,9 +2,6 @@
 
 html:has([data-solace]),
 [data-solace] {
-  --orange-400: 255, 142, 120;
-  --orange-500: 239, 90, 60;
-  --orange-600: 199, 64, 37;
   --red-400: 255, 143, 143;
   --red-600: 215, 40, 40;
   --green-400: 25, 199, 127;
@@ -24,7 +21,7 @@ html:has([data-solace]),
   --text-disabled: rgba(0, 0, 0, 0.32);
   --text-always-white: rgb(255, 255, 255);
   --text-always-black: rgb(0, 0, 0);
-  --text-link: rgb(239, 90, 60);
+  --text-link: var(--primary);
   --text-destructive: rgb(215, 40, 40);
   --text-inverse: rgb(255, 255, 255);
 
@@ -34,7 +31,7 @@ html:has([data-solace]),
   --icon-disabled: rgba(0, 0, 0, 0.32);
   --icon-always-white: rgb(255, 255, 255);
   --icon-always-black: rgb(0, 0, 0);
-  --icon-link: rgb(239, 90, 60);
+  --icon-link: var(--primary);
   --icon-destructive: rgb(215, 40, 40);
   --icon-inverse: rgb(255, 255, 255);
 
@@ -130,7 +127,6 @@ html.dark:has([data-solace]),
   --text-secondary: rgba(255, 255, 255, 0.54);
   --text-tertiary: rgba(255, 255, 255, 0.42);
   --text-disabled: rgba(255, 255, 255, 0.28);
-  --text-link: rgb(255, 142, 120);
   --text-destructive: rgb(255, 143, 143);
   --text-inverse: rgb(0, 0, 0);
 
@@ -138,7 +134,6 @@ html.dark:has([data-solace]),
   --icon-secondary: rgba(255, 255, 255, 0.54);
   --icon-tertiary: rgba(255, 255, 255, 0.42);
   --icon-disabled: rgba(255, 255, 255, 0.28);
-  --icon-link: rgb(255, 142, 120);
   --icon-destructive: rgb(255, 143, 143);
   --icon-inverse: rgb(0, 0, 0);
 

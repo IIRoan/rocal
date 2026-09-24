@@ -16,6 +16,8 @@ import {
   resolveEntityNamePersistence,
 } from "../lib/entity-metadata";
 import { ensureUserCalendars } from "../lib/user-setup";
+import { excludeInvitationStagingCalendarWhere } from "../lib/mail-invitation-calendar";
+import { isMailInvitationStagingCalendar } from "@workspace/calendar-core";
 
 const logger = createLogger("backend:calendar-service");
 
@@ -151,6 +153,13 @@ export class CalendarService implements ICalendarService {
       );
     }
 
+    if (isDefault && isMailInvitationStagingCalendar(existingCalendar)) {
+      throw new ValidationError(
+        "The invitations calendar cannot be the default calendar.",
+        "isDefault",
+      );
+    }
+
     if (normalizedName !== undefined) {
       await assertPlaintextNameAllowed(this.prisma, userId, "Calendar");
 
@@ -208,10 +217,7 @@ export class CalendarService implements ICalendarService {
         });
 
         if (enablingForceFullEncryption) {
-          // Backfill: any event in this calendar that already has an encrypted
-          // payload should drop its plaintext shadows and become fully ciphertext.
-          // Events without an encryptedContent payload (legacy plaintext) are
-          // left untouched – they require a client-side re-encryption pass.
+          // Events that already have encryptedContent drop their plaintext shadows; legacy plaintext events need a client-side re-encryption pass.
           await tx.calendarEvent.updateMany({
             where: {
               calendarId,
@@ -254,7 +260,7 @@ export class CalendarService implements ICalendarService {
     }
 
     const calendarCount = await this.prisma.calendar.count({
-      where: { userId, kind: "owned" },
+      where: { userId, kind: "owned", ...excludeInvitationStagingCalendarWhere },
     });
 
     if (calendarCount <= 1) {
@@ -281,7 +287,7 @@ export class CalendarService implements ICalendarService {
           where: { id: targetCalendarId, userId },
         });
 
-        if (!targetCalendar) {
+        if (!targetCalendar || isMailInvitationStagingCalendar(targetCalendar)) {
           throw new ValidationError(
             "Target calendar not found or access denied",
             "targetCalendarId",
@@ -315,7 +321,13 @@ export class CalendarService implements ICalendarService {
 
     if (existingCalendar.isDefault) {
       const nextCalendar = await this.prisma.calendar.findFirst({
-        where: { userId, id: { not: calendarId } },
+        where: {
+          userId,
+          id: { not: calendarId },
+          kind: "owned",
+          isSyncOnly: false,
+          ...excludeInvitationStagingCalendarWhere,
+        },
         orderBy: { createdAt: "asc" },
       });
 

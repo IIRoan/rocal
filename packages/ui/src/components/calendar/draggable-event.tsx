@@ -1,5 +1,6 @@
 "use client";
 
+import type { TimeFormat } from "@workspace/calendar-core";
 import { useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -20,9 +21,8 @@ interface DraggableEventProps {
   isFirstDay?: boolean;
   isLastDay?: boolean;
   "aria-hidden"?: boolean | "true" | "false";
-  timeFormat?: "12h" | "24h";
+  timeFormat: TimeFormat;
   timezone?: string;
-  // Context menu actions
   onEdit?: (event: CalendarEvent) => void;
   onDelete?: (event: CalendarEvent) => void;
   onView?: (event: CalendarEvent) => void;
@@ -39,7 +39,7 @@ export function DraggableEvent({
   isFirstDay = true,
   isLastDay = true,
   "aria-hidden": ariaHidden,
-  timeFormat = "12h",
+  timeFormat,
   timezone,
   onEdit,
   onDelete,
@@ -54,7 +54,6 @@ export function DraggableEvent({
 
   const isPreview = !!(event as any).isPreview;
 
-  // Check if this is a multi-day event
   const eventStart = new Date(event.start);
   const eventEnd = new Date(event.end);
   const isMultiDayEvent =
@@ -76,7 +75,6 @@ export function DraggableEvent({
       disabled: isPreview,
     });
 
-  // Handle mouse down to track where on the event the user clicked
   const handleMouseDown = (e: React.MouseEvent) => {
     if (elementRef.current) {
       const rect = elementRef.current.getBoundingClientRect();
@@ -87,7 +85,6 @@ export function DraggableEvent({
     }
   };
 
-  // Don't render if this event is being dragged
   if (isDragging || activeId === `${event.id}-${view}`) {
     return (
       <div
@@ -111,7 +108,6 @@ export function DraggableEvent({
           isMultiDayEvent && multiDayWidth ? `${multiDayWidth}%` : undefined,
       };
 
-  // Handle touch start to track where on the event the user touched
   const handleTouchStart = (e: React.TouchEvent) => {
     if (elementRef.current) {
       const rect = elementRef.current.getBoundingClientRect();

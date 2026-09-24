@@ -12,6 +12,7 @@ import { EventEditorRow } from "./event-editor-row";
 import { fieldClass } from "./event-editor-styles";
 import { ParticipantsInviteInfo } from "./participants-invite-info";
 import type { EventEditorFormState } from "./types";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 type ParticipantItem = EventParticipantInput & { image?: string | null };
 
@@ -51,18 +52,19 @@ function ParticipantList({
               </div>
             </div>
             {participant.role !== "organizer" && (
-              <button
-                type="button"
-                aria-label={`Remove ${name}`}
-                title={`Remove ${name}`}
-                onClick={() => onRemove(participant.email)}
-                className={cn(
-                  "tap-target flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color,opacity] cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/50",
-                  desktop && "opacity-0 group-hover/participant:opacity-100",
-                )}
-              >
-                <X className="size-3.5" />
-              </button>
+              <SimpleTooltip content={`Remove ${name}`}>
+                <button
+                  type="button"
+                  aria-label={`Remove ${name}`}
+                  onClick={() => onRemove(participant.email)}
+                  className={cn(
+                    "tap-target flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color,opacity] cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/50",
+                    desktop && "opacity-0 group-hover/participant:opacity-100",
+                  )}
+                >
+                  <X className="size-3.5" />
+                </button>
+              </SimpleTooltip>
             )}
           </li>
         );

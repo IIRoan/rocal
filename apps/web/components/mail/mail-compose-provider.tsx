@@ -7,6 +7,7 @@ import {
   MailComposeChromeContext,
   MailComposeFieldsContext,
 } from "./mail-compose-contexts";
+import type { QuotedDateOptions } from "./mail-compose-seed";
 import { useMailComposeController } from "./use-mail-compose-controller";
 
 const EMPTY_IDENTITIES: JmapIdentity[] = [];
@@ -15,14 +16,17 @@ export function MailComposeProvider({
   children,
   identities = EMPTY_IDENTITIES,
   mailServerLimits,
+  quoteDateOptions,
 }: {
   children: ReactNode;
   identities?: JmapIdentity[];
   mailServerLimits: MailServerLimits;
+  quoteDateOptions: QuotedDateOptions;
 }) {
   const { fieldsValue, chromeValue } = useMailComposeController({
     identities,
     mailServerLimits,
+    quoteDateOptions,
   });
 
   return (

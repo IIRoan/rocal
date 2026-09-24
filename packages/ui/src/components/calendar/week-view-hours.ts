@@ -1,3 +1,4 @@
+import type { TimeFormat } from "@workspace/calendar-core";
 import { EndHour, StartHour } from "./constants";
 
 export const WEEK_HOUR_VALUES = Array.from(
@@ -7,7 +8,7 @@ export const WEEK_HOUR_VALUES = Array.from(
 
 export function formatWeekHourLabel(
   hour: number,
-  timeFormat: "12h" | "24h",
+  timeFormat: TimeFormat,
 ): string {
   if (timeFormat === "24h") {
     return `${String(hour).padStart(2, "0")}:00`;

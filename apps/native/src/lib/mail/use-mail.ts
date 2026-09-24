@@ -1,6 +1,3 @@
-/**
- * React Query hooks for the native mail experience.
- */
 import { useCallback } from "react";
 import {
   useMutation,
@@ -156,7 +153,6 @@ export function useMailboxMessages(
   });
 }
 
-/** Locates a single message in any cached mailbox list. */
 export function useCachedMessage(
   messageId: string,
 ): JmapEmailMessage | undefined {
@@ -173,7 +169,27 @@ export function useCachedMessage(
   return undefined;
 }
 
-/** Find a cached message by id across all mailbox lists. */
+/** Loads one message, seeded from any cached mailbox list that already holds it. */
+export function useMailMessage(
+  runtime: MailRuntime | undefined,
+  messageId: string,
+) {
+  const cached = useCachedMessage(messageId);
+  return useQuery<JmapEmailMessage | null>({
+    queryKey: QUERY_KEYS.mailMessage(messageId),
+    enabled: Boolean(messageId) && (Boolean(cached) || Boolean(runtime)),
+    initialData: cached ?? undefined,
+    queryFn: async () => {
+      if (cached) return cached;
+      // Non-null: the query is only enabled once runtime (or a cached copy) exists.
+      const list = await runtime!.client.getMessagesByIds(runtime!.session, [
+        messageId,
+      ]);
+      return list[0] ?? null;
+    },
+  });
+}
+
 function findCachedMessage(
   queryClient: ReturnType<typeof useQueryClient>,
   messageId: string,
@@ -190,7 +206,6 @@ function findCachedMessage(
   return undefined;
 }
 
-/** Patch multiple messages inside all cached mailbox lists. */
 function patchManyMessagesInCache(
   queryClient: ReturnType<typeof useQueryClient>,
   messageIds: string[],
@@ -212,7 +227,6 @@ function patchManyMessagesInCache(
   }
 }
 
-/** Patch a single message inside all cached mailbox lists. */
 function patchMessageInCache(
   queryClient: ReturnType<typeof useQueryClient>,
   messageId: string,
@@ -417,7 +431,9 @@ export function useMailMutations(
         isInTrash ? null : trashId,
       );
     },
-    onSuccess: invalidateMessages,
+    // Resolve only after the refetch so swiped rows are gone before they reset.
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["mail", "messages"] }),
   });
 
   const bulkMoveToMailbox = useMutation({
@@ -457,10 +473,7 @@ export interface ComposeMessageInput {
   attachments?: import("./jmap-client").JmapAttachmentInput[];
 }
 
-/**
- * Resolves the identity + drafts/sent mailboxes needed to send mail, or `null`
- * when the runtime is not ready or has no usable sending identity.
- */
+/** Identity plus drafts/sent mailboxes for sending, or `null` when the runtime is not ready or has no usable identity. */
 export function resolveComposeContext(
   runtime: MailRuntime | undefined,
   identityId?: string | null,

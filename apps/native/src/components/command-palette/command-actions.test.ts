@@ -7,9 +7,9 @@ import {
 describe("buildCommandActions", () => {
   it("returns calendar actions by default", () => {
     const actions = buildCommandActions();
-    expect(actions.length).toBeGreaterThanOrEqual(11);
+    expect(actions.length).toBeGreaterThanOrEqual(10);
     expect(actions.some((a) => a.id === "new-event")).toBe(true);
-    expect(actions.some((a) => a.id === "view-month")).toBe(true);
+    expect(actions.some((a) => a.id === "view-week")).toBe(true);
   });
 
   it("returns mail-only actions in mail scope", () => {
@@ -27,12 +27,10 @@ describe("buildCommandActions", () => {
   it("attaches a calendar view to every view-switch action", () => {
     const actions = buildCommandActions("calendar");
     const viewActions = actions.filter((a) => a.id.startsWith("view-"));
-    expect(viewActions.length).toBe(5);
+    expect(viewActions.length).toBe(3);
     expect(viewActions.map((a) => a.view).sort()).toEqual([
       "3day",
-      "agenda",
       "day",
-      "month",
       "week",
     ]);
   });
@@ -47,8 +45,8 @@ describe("filterCommandActions", () => {
   });
 
   it("matches against the label case-insensitively", () => {
-    const result = filterCommandActions(actions, "MONTH");
-    expect(result.some((a) => a.id === "view-month")).toBe(true);
+    const result = filterCommandActions(actions, "WEEK VIEW");
+    expect(result.some((a) => a.id === "view-week")).toBe(true);
   });
 
   it("matches against keywords when the label does not match", () => {

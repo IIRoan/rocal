@@ -5,16 +5,7 @@
 @source "../../../packages/ui/src/**/*.{ts,tsx}";
 
 @layer utilities {
-  /*
-   * GSAP drives every transient enter/exit animation in the app. Without this
-   * kill switch the legacy tw-animate-css keyframes would compose with GSAP
-   * tweens and produce double-animations or position glitches. We deliberately
-   * leave `animate-spin` and `animate-pulse` alone — they are infinite, do not
-   * conflict with GSAP exit tweens, and must keep working even if
-   * `GsapAnimationProvider` is not mounted (e.g. in isolated playgrounds).
-   */
-  [class*="animate-shimmer"],
-  [class*="animate-wave"],
+  /* SurfaceMotionProvider runs these as WAAPI animations; the CSS keyframes would play on top of them. */
   [class*="animate-fade-in"],
   [class*="animate-slide-in"],
   [class*="animate-scale-in"],
@@ -37,14 +28,7 @@
     animation: none !important;
   }
 
-  /*
-   * Radix surfaces are now rendered with `forceMount`, so their closed state
-   * is part of the static DOM. Without a baseline rule the content paints
-   * fully visible until `GsapAnimationProvider`'s effect runs (causing a
-   * first-paint flash) — and stays visible forever in any tree that does not
-   * mount the provider. Hide closed surfaces by default; GSAP only needs to
-   * tween, not gate visibility.
-   */
+  /* Radix surfaces use `forceMount`, so CSS (not the motion provider) owns hiding the closed state. */
   [data-slot$="-overlay"][data-state="closed"],
   [data-slot$="-content"][data-state="closed"] {
     opacity: 0;
@@ -68,65 +52,44 @@
   }
 }
 
-/* Dark mode via class on root element */
 @custom-variant dark (&:is(.dark *));
 
-/* ============================================
-   SOLACE DESIGN SYSTEM
-   ============================================
-   Warm, vibrant color palette with clear hierarchy
-   Enhanced contrast for icons and text
-   Subtle animation system throughout
-   ============================================ */
-
 :root {
-  /* Core Background - warm undertones */
   --background: oklch(0.9821 0 0);
   --foreground: oklch(0.2435 0 0);
 
-  /* Card & surfaces - pure white for contrast */
   --card: oklch(0.9911 0 0);
   --card-foreground: oklch(0.2435 0 0);
 
-  /* Popover */
   --popover: oklch(0.9911 0 0);
   --popover-foreground: oklch(0.2435 0 0);
 
-  /* Primary - warm amber/ochre - THE SIGNATURE COLOR */
   --primary: oklch(0.4341 0.0392 41.9938);
   --primary-foreground: oklch(1 0 0);
 
-  /* Secondary - warm cream/gold accent */
   --secondary: oklch(0.92 0.0651 74.3695);
   --secondary-foreground: oklch(0.3499 0.0685 40.8288);
 
-  /* Muted - warm gray with better icon contrast */
   --muted: oklch(0.9521 0 0);
   --muted-foreground: oklch(0.45 0 0);
 
-  /* Accent - warm highlight */
   --accent: oklch(0.931 0 0);
   --accent-foreground: oklch(0.2435 0 0);
 
-  /* Destructive */
   --destructive: oklch(0.6271 0.1936 33.339);
   --destructive-foreground: oklch(1 0 0);
 
-  /* Borders & Inputs - slightly more visible */
   --border: oklch(0.86 0 0);
   --input: oklch(0.8822 0 0);
 
-  /* Ring focus */
   --ring: oklch(0.4341 0.0392 41.9938);
 
-  /* Charts - vibrant and distinct */
   --chart-1: oklch(0.4341 0.0392 41.9938);
   --chart-2: oklch(0.92 0.0651 74.3695);
   --chart-3: oklch(0.931 0 0);
   --chart-4: oklch(0.9367 0.0523 75.5009);
   --chart-5: oklch(0.4338 0.0437 41.6746);
 
-  /* Sidebar */
   --sidebar: oklch(0.9881 0 0);
   --sidebar-foreground: oklch(0.2645 0 0);
   --sidebar-primary: oklch(0.325 0 0);
@@ -136,7 +99,6 @@
   --sidebar-border: oklch(0.9401 0 0);
   --sidebar-ring: oklch(0.7731 0 0);
 
-  /* Typography */
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
@@ -147,11 +109,9 @@
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
 
-  /* Spacing & Radius */
   --radius: 0.5rem;
   --spacing: 0.25rem;
 
-  /* Shadows */
   --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-sm:
@@ -165,7 +125,6 @@
     0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
 
-  /* Layered shadow rings for elevated surfaces (light mode) */
   --shadow-border:
     0px 0px 0px 1px rgba(0, 0, 0, 0.06),
     0px 1px 2px -1px rgba(0, 0, 0, 0.06),
@@ -177,13 +136,11 @@
 
   --tracking-normal: 0em;
 
-  /* Calendar */
   --calendar-accent: var(--primary);
   --calendar-accent-bg: oklch(0.85 0.02 42);
   --calendar-workday: oklch(0.975 0.005 42);
   --calendar-weekend: oklch(0.96 0.005 42);
 
-  /* Events - vibrant and colorful */
   --event-sky: oklch(0.86 0.09 250);
   --event-sky-foreground: oklch(0.28 0.12 250);
   --event-violet: oklch(0.86 0.09 285);
@@ -211,13 +168,11 @@
   --event-default: var(--event-sky);
   --event-default-foreground: var(--event-sky-foreground);
 
-  /* Status */
   --success: oklch(0.78 0.12 150);
   --success-foreground: oklch(0.995 0.002 286);
   --warning: oklch(0.84 0.14 85);
   --warning-foreground: var(--foreground);
 
-  /* Info */
   --info: oklch(0.72 0.16 250);
   --info-foreground: oklch(0.995 0.002 286);
   --info-bg: oklch(0.95 0.03 250);
@@ -225,53 +180,41 @@
 }
 
 .dark {
-  /* Core Background - rich dark with cool undertones */
   --background: oklch(0.1776 0 0);
   --foreground: oklch(0.9491 0 0);
 
-  /* Card & surfaces */
   --card: oklch(0.2134 0 0);
   --card-foreground: oklch(0.9491 0 0);
 
-  /* Popover */
   --popover: oklch(0.2134 0 0);
   --popover-foreground: oklch(0.9491 0 0);
 
-  /* Primary - warm gold in dark mode */
   --primary: oklch(0.9247 0.0524 66.1732);
   --primary-foreground: oklch(0.2029 0.024 200.1962);
 
-  /* Secondary */
   --secondary: oklch(0.3163 0.019 63.6992);
   --secondary-foreground: oklch(0.9247 0.0524 66.1732);
 
-  /* Muted - better icon visibility */
   --muted: oklch(0.252 0 0);
   --muted-foreground: oklch(0.7 0 0);
 
-  /* Accent */
   --accent: oklch(0.285 0 0);
   --accent-foreground: oklch(0.9491 0 0);
 
-  /* Destructive */
   --destructive: oklch(0.6271 0.1936 33.339);
   --destructive-foreground: oklch(1 0 0);
 
-  /* Borders & Inputs */
   --border: oklch(0.3 0.0115 91.7467);
   --input: oklch(0.4017 0 0);
 
-  /* Ring focus */
   --ring: oklch(0.9247 0.0524 66.1732);
 
-  /* Charts */
   --chart-1: oklch(0.9247 0.0524 66.1732);
   --chart-2: oklch(0.3163 0.019 63.6992);
   --chart-3: oklch(0.285 0 0);
   --chart-4: oklch(0.3481 0.0219 67.0001);
   --chart-5: oklch(0.9245 0.0533 67.0855);
 
-  /* Sidebar */
   --sidebar: oklch(0.2103 0.0059 285.8852);
   --sidebar-foreground: oklch(0.9674 0.0013 286.3752);
   --sidebar-primary: oklch(0.4882 0.2172 264.3763);
@@ -281,7 +224,6 @@
   --sidebar-border: oklch(0.2739 0.0055 286.0326);
   --sidebar-ring: oklch(0.8711 0.0055 286.286);
 
-  /* Shadows */
   --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-sm:
@@ -298,13 +240,11 @@
   --shadow-border: 0 0 0 1px rgba(255, 255, 255, 0.08);
   --shadow-border-hover: 0 0 0 1px rgba(255, 255, 255, 0.13);
 
-  /* Calendar */
   --calendar-accent: var(--primary);
   --calendar-accent-bg: oklch(0.25 0.02 66);
   --calendar-workday: oklch(0.185 0.005 0);
   --calendar-weekend: oklch(0.16 0.008 0);
 
-  /* Events - vibrant in dark mode */
   --event-sky: oklch(0.45 0.18 250);
   --event-sky-foreground: oklch(0.92 0.04 250);
   --event-violet: oklch(0.45 0.18 285);
@@ -332,20 +272,17 @@
   --event-default: var(--event-sky);
   --event-default-foreground: var(--event-sky-foreground);
 
-  /* Status */
   --success: oklch(0.68 0.15 150);
   --success-foreground: var(--foreground);
   --warning: oklch(0.72 0.16 85);
   --warning-foreground: oklch(0.12 0.01 286);
 
-  /* Info */
   --info: oklch(0.78 0.18 250);
   --info-foreground: var(--foreground);
   --info-bg: oklch(0.26 0.03 250);
   --info-border: oklch(0.38 0.09 250);
 }
 
-/* Tailwind color aliases */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -383,7 +320,6 @@
   --color-info-bg: var(--info-bg);
   --color-info-border: var(--info-border);
 
-  /* Sidebar */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -411,13 +347,11 @@
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
 
-  /* Calendar */
   --color-calendar-accent: var(--calendar-accent);
   --color-calendar-accent-bg: var(--calendar-accent-bg);
   --color-calendar-workday: var(--calendar-workday);
   --color-calendar-weekend: var(--calendar-weekend);
 
-  /* Events */
   --color-event-sky: var(--event-sky);
   --color-event-sky-foreground: var(--event-sky-foreground);
   --color-event-violet: var(--event-violet);
@@ -453,7 +387,6 @@
   --color-rose-400: var(--event-rose);
 }
 
-/* Hex color theme adaptation - automatically adjusts custom hex colors for light/dark mode */
 .event-hex-adaptive {
   background-color: color-mix(
     in oklch,
@@ -473,7 +406,6 @@
 }
 
 @layer base {
-  /* Custom keyframes for animations */
   @keyframes shimmer {
     0% {
       background-position: -200% 0;
@@ -536,7 +468,6 @@
     }
   }
 
-  /* Improve contrast on borders and focus outlines globally */
   * {
     @apply border-border outline-ring/50;
   }
@@ -589,7 +520,6 @@
     min-height: 100%;
   }
 
-  /* Form fields: clearer separation from cards/background */
   input,
   textarea,
   select {
@@ -616,7 +546,7 @@
       inset 0 1px 0 color-mix(in oklch, var(--background) 70%, transparent);
   }
 
-  /* Buttons: color/surface feedback only — never press-scale / indent */
+  /* Buttons: color/surface feedback only, never press-scale or indent. */
   button {
     transition:
       color 0.15s ease,
@@ -645,25 +575,20 @@
     cursor: not-allowed;
   }
 
-  /* Focus visibility for a11y */
   *:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 
-  /* Calendar-specific */
   [data-today="true"] {
-    /* strengthen contrast of today indicators when used */
     --_accent-bg: var(--color-calendar-accent-bg);
     --_accent-fg: var(--color-calendar-accent);
   }
 
-  /* Fix: correct var name for working day highlight */
   [data-working-day="true"] {
     background-color: var(--calendar-workday);
   }
 
-  /* Scrollbar styling */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -681,7 +606,25 @@
     background: var(--primary);
   }
 
-  /* Animation utilities */
+  /* Firefox ignores ::-webkit-scrollbar; Chrome drops it once scrollbar-color is set, so scope this to Firefox. */
+  @supports not selector(::-webkit-scrollbar) {
+    html {
+      scrollbar-color: color-mix(in oklch, var(--accent) 70%, var(--border))
+        transparent;
+    }
+
+    * {
+      scrollbar-width: thin;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-shimmer,
+    .animate-wave {
+      animation: none;
+    }
+  }
+
   .animate-shimmer {
     animation: shimmer 1.5s ease-in-out infinite;
   }
@@ -702,7 +645,6 @@
     animation: scaleIn 0.2s ease-out;
   }
 
-  /* Smooth transitions for interactive elements */
   .transition-smooth {
     transition:
       color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
@@ -717,13 +659,11 @@
     transition: transform 0.15s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   }
 
-  /* Text selection */
   ::selection {
     background-color: var(--accent);
     color: var(--accent-foreground);
   }
 
-  /* States */
   [aria-invalid="true"] {
     border-color: var(--destructive);
     background-color: color-mix(in oklch, var(--destructive) 6%, var(--input));
@@ -739,23 +679,23 @@
     background-color: color-mix(in oklch, var(--warning) 6%, var(--input));
   }
 
-  /* Disabled */
   :disabled,
   [aria-disabled="true"] {
     opacity: 0.55;
     cursor: not-allowed;
   }
 
-  /* Loading */
   [data-loading="true"] {
     opacity: 0.7;
     pointer-events: none;
     transition: opacity 0.2s ease;
   }
 
-  /* Smooth scrolling */
-  * {
-    scroll-behavior: smooth;
+  /* Only the page scroller: on every element it made programmatic scrollTop writes (list anchoring, virtualizers) animate. */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 
   @supports (view-transition-name: none) {
@@ -779,16 +719,15 @@
     }
   }
 
+  /* No filter: blur() here; it forces a full-page repaint per frame instead of a composited fade. */
   @keyframes route-root-exit {
     from {
       opacity: 1;
       transform: none;
-      filter: blur(0);
     }
     to {
       opacity: 0;
       transform: scale(0.994);
-      filter: blur(1.5px);
     }
   }
 
@@ -796,25 +735,19 @@
     from {
       opacity: 0;
       transform: scale(1.004);
-      filter: blur(1.5px);
     }
     to {
       opacity: 1;
       transform: none;
-      filter: blur(0);
     }
   }
 
-  /* Reduce motion block removed - was blocking animations based on Windows setting */
-
-  /* Enhanced focus states for accessibility */
   .focus-enhanced:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
     box-shadow: 0 0 0 4px color-mix(in oklch, var(--ring) 20%, transparent);
   }
 
-  /* Utility classes for common animations */
   .animate-bounce-in {
     animation: scaleIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   }
@@ -823,14 +756,7 @@
     animation: slideUp 0.3s ease-out;
   }
 
-  /* Command palette / dialog animations */
-  /*
-   * Centered + spotlight dialog variants are positioned via Tailwind v4's
-   * native `translate` property (`-translate-x-1/2 -translate-y-1/2`).
-   * Keyframes MUST NOT touch `transform` or `translate` — doing so would
-   * compose with Tailwind's translate and visibly knock the dialog off
-   * center. Animate only the native `scale` property and `opacity`.
-   */
+  /* Dialogs are centered via Tailwind's native `translate`; animating transform/translate here would knock them off center, so only animate `scale` and `opacity`. */
   [data-slot="dialog-content"].dialog-spotlight-animation,
   [data-slot="dialog-content"].dialog-center-animation {
     will-change: opacity, scale;
@@ -909,7 +835,6 @@
     }
   }
 
-  /* optional: for future exit animations if you want to crossfade; current impl animates only entering */
   @keyframes slide-fade-out-left {
     from {
       opacity: 1;
@@ -932,7 +857,6 @@
     }
   }
 
-  /* Submenu transitions - smooth fade with subtle slide */
   .crossfade-enter {
     animation: fadeIn 150ms ease-out;
   }
@@ -959,7 +883,6 @@
     }
   }
 
-  /* Legacy keyframes kept for other uses */
   @keyframes slideInRight {
     from {
       opacity: 0;
@@ -1004,7 +927,6 @@
     }
   }
 
-  /* Legacy slide animations (kept for compatibility) */
   .animate-slide-fade {
     will-change: opacity, transform;
   }
@@ -1017,19 +939,17 @@
     animation: slide-fade-in-right 180ms cubic-bezier(0.2, 0, 0, 1);
   }
 
-  /* Mobile-specific optimizations */
   @media (max-width: 768px) {
-    /* Safe area insets for mobile devices */
     .safe-area-inset-top {
       padding-top: calc(
         env(safe-area-inset-top, 0) * 0.5
-      ); /* Reduced by half */
+      );
     }
 
     .safe-area-inset-bottom {
       padding-bottom: calc(
         env(safe-area-inset-bottom, 0) * 0.5
-      ); /* Reduced by half */
+      );
     }
 
     .safe-area-inset-left {
@@ -1040,13 +960,11 @@
       padding-right: calc(env(safe-area-inset-right, 0) * 0.5);
     }
 
-    /* Improved mobile touch targets */
     button {
       min-height: 44px;
       min-width: 44px;
     }
 
-    /* Mobile calendar optimizations */
     .mobile-calendar-header {
       touch-action: manipulation;
       user-select: none;
@@ -1059,29 +977,24 @@
       }
     }
 
-    /* Better mobile scrolling */
     .mobile-scroll-container {
       -webkit-overflow-scrolling: touch;
       overflow-scrolling: touch;
       scroll-behavior: smooth;
     }
 
-    /* Mobile bottom navigation spacing */
     .mobile-content-with-bottom-nav {
       padding-bottom: calc(80px + env(safe-area-inset-bottom, 0));
     }
   }
 
-  /* PWA specific styles */
   @media (display-mode: standalone) {
-    /* Remove any browser chrome styles when running as PWA */
     body {
       overscroll-behavior: none;
     }
   }
 }
 
-/* Popup and modal animation keyframes */
 @keyframes fadeInZoom {
   from {
     opacity: 0;
@@ -1137,7 +1050,6 @@
   }
 }
 
-/* Animation utility classes */
 .animate-fade-in-zoom {
   animation: fadeInZoom 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -1158,14 +1070,6 @@
   animation: slideInFromRight 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ============================================
-   PREMIUM MODAL & COMMAND PALETTE SYSTEM
-   ============================================
-   Modern glass-morphism with refined animations
-   Better contrast and visual hierarchy
-   ============================================ */
-
-/* Custom Modal Animations */
 @keyframes modalEnter {
   from {
     opacity: 0;
@@ -1298,7 +1202,6 @@
   }
 }
 
-/* Premium Modal Container */
 .modal-premium {
   background: linear-gradient(
     145deg,
@@ -1328,7 +1231,6 @@
     inset 0 1px 0 color-mix(in oklch, var(--foreground) 5%, transparent);
 }
 
-/* Premium Modal Header */
 .modal-header-premium {
   background: linear-gradient(
     180deg,
@@ -1354,7 +1256,6 @@
   );
 }
 
-/* Premium Modal Footer */
 .modal-footer-premium {
   background: linear-gradient(
     180deg,
@@ -1364,7 +1265,6 @@
   border-top: 1px solid color-mix(in oklch, var(--border) 40%, transparent);
 }
 
-/* Premium Input Fields */
 .input-premium {
   background: color-mix(in oklch, var(--background) 80%, var(--card));
   border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
@@ -1393,7 +1293,6 @@
   background: color-mix(in oklch, var(--muted) 60%, var(--card));
 }
 
-/* Premium Section Cards */
 .section-card-premium {
   background: color-mix(in oklch, var(--muted) 30%, transparent);
   border: 1px solid color-mix(in oklch, var(--border) 50%, transparent);
@@ -1417,7 +1316,6 @@
   );
 }
 
-/* Premium Option Pills */
 .option-pill {
   background: color-mix(in oklch, var(--muted) 40%, transparent);
   border: 1px solid color-mix(in oklch, var(--border) 40%, transparent);
@@ -1457,7 +1355,6 @@
   );
 }
 
-/* Premium Action Buttons */
 .btn-action-primary {
   background: linear-gradient(
     145deg,
@@ -1480,7 +1377,7 @@
 }
 
 .btn-action-primary:active {
-  /* No press indent — keep surface flat; hover lift already resets via :active specificity if needed */
+  /* No press indent; keep the surface flat. */
   transform: none;
   box-shadow:
     0 1px 2px color-mix(in oklch, var(--primary) 30%, transparent),
@@ -1488,7 +1385,6 @@
     inset 0 1px 0 color-mix(in oklch, white 15%, transparent);
 }
 
-/* Command Palette Premium Styling */
 .command-item-premium {
   border-radius: calc(var(--radius) - 2px);
   margin: 2px 4px;
@@ -1527,7 +1423,6 @@
   transform: scaleY(1);
 }
 
-/* Expand/Collapse Animation Classes */
 .field-expand {
   animation: fieldExpandIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   transform-origin: top;
@@ -1537,7 +1432,6 @@
   animation: chipPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
-/* Premium Scrollbar for Modals */
 .modal-scroll::-webkit-scrollbar {
   width: 6px;
 }
@@ -1556,7 +1450,6 @@
   background: color-mix(in oklch, var(--muted-foreground) 50%, transparent);
 }
 
-/* Date/Time Section Premium */
 .datetime-section {
   background: color-mix(in oklch, var(--muted) 25%, transparent);
   border: 1px solid color-mix(in oklch, var(--border) 40%, transparent);
@@ -1580,7 +1473,6 @@
   border-radius: inherit;
 }
 
-/* Icon Contrast Enhancement */
 .icon-contrast {
   color: var(--muted-foreground);
   opacity: 0.8;
@@ -1594,7 +1486,6 @@
   color: var(--foreground);
 }
 
-/* Label Premium Styling */
 .label-premium {
   font-size: 0.7rem;
   font-weight: 600;
@@ -1604,7 +1495,6 @@
   margin-bottom: 0.5rem;
 }
 
-/* Divider Premium */
 .divider-premium {
   height: 1px;
   background: linear-gradient(
@@ -1617,7 +1507,6 @@
   margin: 0.75rem 0;
 }
 
-/* Title Input Premium */
 .title-input-premium {
   background: transparent;
   border: none;
@@ -1639,7 +1528,6 @@
   opacity: 0.5;
 }
 
-/* TipTap rich text editor (compose) */
 .tiptap {
   outline: none;
 }

@@ -22,7 +22,7 @@ export function ThreeDayViewDayHeaders({
   return (
     <div
       className={cn(
-        "z-40 grid shrink-0 border-b border-border/40 bg-background/95 backdrop-blur-md",
+        "z-40 grid shrink-0 border-b border-border/40 bg-background",
         THREE_DAY_GRID_COLS,
       )}
     >
