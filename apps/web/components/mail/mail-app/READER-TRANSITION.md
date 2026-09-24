@@ -38,7 +38,7 @@ How the desktop reader pane opens and closes next to the message list, and why i
 This mirrors the open: the heavy render goes first, the slide second.
 1. Click → `wantsDesktopDetailPane` and `desktopDetailPaneActive` become false. The reader turns `inert` but stays in place, covering the list. Underneath it, the list jumps to `w-full` (no width transition) and the rows switch to inline, with the selected row anchored. The list fade (`0.4 → 1`, full duration) starts here.
 2. Two animation frames later `showDesktopDetailPane` becomes false and the reader slides out over an already-painted list.
-3. `visibility` switches to hidden at the end of the transition. The controller's unmount timer starts when the slide starts (`showDesktopDetailPane` false), not at the click, so the message never disappears from a pane that is still on screen. Opening another message during a close cancels the close.
+3. `visibility` switches to hidden at the end of the transition. The controller's unmount timer starts when the slide starts (`showDesktopDetailPane` false), not at the click, so the message never disappears from a pane that is still on screen. Opening any message during a close, including the one closing, cancels the close.
 
 ## Text easing in without layout shift
 

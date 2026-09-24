@@ -34,24 +34,9 @@ export const MAIL_SELECT_CHECK_SPRING = {
   overshootClamping: true,
 } as const;
 
-/**
- * Bottom "float swap" — compose gently sinks and fades; bulk bar floats up
- * into place with a soft scale settle.
- */
-export function bottomChromeMotion(p: number, layer: "outgoing" | "incoming") {
+/** Bulk bar floats up into place with a soft scale settle. */
+export function bottomChromeMotion(p: number) {
   "worklet";
-  if (layer === "outgoing") {
-    return {
-      opacity: interpolate(
-        p,
-        [0, 0.4, 0.75, 1],
-        [1, 0.65, 0.12, 0],
-        Extrapolation.CLAMP,
-      ),
-      translateY: interpolate(p, [0, 1], [0, 28], Extrapolation.CLAMP),
-      scale: interpolate(p, [0, 1], [1, 0.82], Extrapolation.CLAMP),
-    };
-  }
   return {
     opacity: interpolate(
       p,

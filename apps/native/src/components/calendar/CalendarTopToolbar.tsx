@@ -15,7 +15,6 @@ import { formatCalendarHeaderTitle } from "./calendar-header-utils";
 
 interface CalendarTopToolbarProps {
   currentDate: Date;
-  timezone?: string | null;
   onOpenDrawer: () => void;
   onOpenCalendars: () => void;
   onOpenAccount: () => void;
@@ -24,7 +23,6 @@ interface CalendarTopToolbarProps {
 
 export function CalendarTopToolbar({
   currentDate,
-  timezone,
   onOpenDrawer,
   onOpenCalendars,
   onOpenAccount,
@@ -33,8 +31,8 @@ export function CalendarTopToolbar({
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { month, year } = useMemo(
-    () => formatCalendarHeaderTitle(currentDate, timezone),
-    [currentDate, timezone],
+    () => formatCalendarHeaderTitle(currentDate),
+    [currentDate],
   );
 
   return (

@@ -36,7 +36,6 @@ export function useToggleCalendarVisibility() {
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
     },
   });
 

@@ -24,6 +24,9 @@ const mockInternal = {
   animatedKeyboardState: {
     get: () => ({ status: 2, heightWithinContainer: 0 }),
   },
+  animatedAnimationState: { get: () => ({ status: 2 }) },
+  animatedContentGestureState: { get: () => 0 },
+  animatedHandleGestureState: { get: () => 0 },
 };
 
 jest.mock("react-native", () => ({
@@ -70,6 +73,14 @@ jest.mock("react-native-reanimated", () => ({
   default: { View: ({ children }: { children?: ReactNode }) => children },
   Easing: { out: (easing: unknown) => easing, cubic: jest.fn() },
   useAnimatedStyle: (compute: () => object) => compute(),
+  useSharedValue: (initial: number) => {
+    let value = initial;
+    return { get: () => value, set: (next: number) => (value = next) };
+  },
+  useAnimatedReaction: <T,>(
+    prepare: () => T,
+    react: (value: T) => void,
+  ) => react(prepare()),
 }));
 
 jest.mock("@gorhom/bottom-sheet", () => ({
@@ -176,4 +187,24 @@ it("retains handle dragging and swipe-down dismissal", async () => {
   expect(mockSheetProps.enablePanDownToClose).toBe(true);
   act(() => mockSheetProps.onClose?.());
   expect(onDismiss).toHaveBeenCalledTimes(1);
+});
+
+it("registers the back handler once per open even when onDismiss changes", async () => {
+  const { BackHandler } = jest.requireMock<typeof import("react-native")>(
+    "react-native",
+  );
+  const latestDismiss = jest.fn();
+  for (const onDismiss of [jest.fn(), jest.fn(), latestDismiss]) {
+    await act(async () => {
+      root.render(
+        <BottomSheet visible onDismiss={onDismiss}>
+          Content
+        </BottomSheet>,
+      );
+    });
+  }
+  const addListener = BackHandler.addEventListener as jest.Mock;
+  expect(addListener).toHaveBeenCalledTimes(1);
+  act(() => addListener.mock.calls[0][1]());
+  expect(latestDismiss).toHaveBeenCalledTimes(1);
 });

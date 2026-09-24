@@ -1,8 +1,6 @@
 import {
   roundToNextHour,
   toLocalISOString,
-  startOfDay,
-  endOfDay,
   mapErrorToField,
   buildEventRequest,
   shiftEndWithStart,
@@ -116,35 +114,6 @@ describe("toLocalISOString", () => {
   it("pads single-digit months and days", () => {
     const d = new Date(2025, 2, 3, 14, 30);
     expect(toLocalISOString(d)).toBe("2025-03-03T14:30");
-  });
-});
-
-// ─── startOfDay / endOfDay ───────────────────────────────────────────────────
-
-describe("startOfDay", () => {
-  it("sets time to 00:00:00.000", () => {
-    const d = new Date(2025, 5, 15, 14, 30, 45, 123);
-    const result = startOfDay(d);
-    expect(result.getHours()).toBe(0);
-    expect(result.getMinutes()).toBe(0);
-    expect(result.getSeconds()).toBe(0);
-    expect(result.getMilliseconds()).toBe(0);
-  });
-
-  it("does not mutate the original date", () => {
-    const d = new Date(2025, 5, 15, 14, 30);
-    startOfDay(d);
-    expect(d.getHours()).toBe(14);
-  });
-});
-
-describe("endOfDay", () => {
-  it("sets time to 23:59:00.000", () => {
-    const d = new Date(2025, 5, 15, 9, 0);
-    const result = endOfDay(d);
-    expect(result.getHours()).toBe(23);
-    expect(result.getMinutes()).toBe(59);
-    expect(result.getSeconds()).toBe(0);
   });
 });
 

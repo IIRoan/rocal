@@ -38,13 +38,6 @@ export const MAIL_LAYOUT = {
   rowAvatarSize: 32,
 } as const;
 
-export function mailRadii(theme: ThemeTokens) {
-  return {
-    avatar: theme.borderRadius.md,
-    selectBox: theme.borderRadius.sm,
-  };
-}
-
 export function mailSpacing(theme: ThemeTokens) {
   return {
     /** Matches {@link layoutHeaderInsets} / {@link layoutScrollContent}. */

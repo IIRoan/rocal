@@ -8,6 +8,7 @@ import { enqueueInboundMailPush } from "../../lib/mail-push-enqueue";
 import { StalwartWebhookService } from "../../services/stalwart-webhook.service";
 
 describe("StalwartWebhookService", () => {
+  const NOREPLY = "noreply@solace.onl";
   type DirectoryEntry = {
     userId: string;
     stalwartAccountId: string;
@@ -18,7 +19,12 @@ describe("StalwartWebhookService", () => {
     (args: { where: Record<string, string> }) => Promise<DirectoryEntry | null>
   >();
   const resolveIngestedEmail = jest.fn<
-    (...args: unknown[]) => Promise<{ id: string; messageIds: string[] }>
+    (...args: unknown[]) => Promise<{
+      id: string;
+      messageIds: string[];
+      fromEmail: string | null;
+      exactMatch: boolean;
+    }>
   >();
   const enqueue = enqueueInboundMailPush as jest.MockedFunction<
     typeof enqueueInboundMailPush
@@ -31,6 +37,8 @@ describe("StalwartWebhookService", () => {
     resolveIngestedEmail.mockResolvedValue({
       id: "gceaaabqr",
       messageIds: ["<abc@example.com>"],
+      fromEmail: "sam@example.com",
+      exactMatch: true,
     });
   });
 
@@ -51,6 +59,7 @@ describe("StalwartWebhookService", () => {
 
     const service = new StalwartWebhookService({
       prisma: { mailDirectoryEntry: { findUnique } } as never,
+      noreplyEmail: NOREPLY,
       mailSyncService: {
         resolveIngestedEmail,
       },
@@ -95,6 +104,7 @@ describe("StalwartWebhookService", () => {
     findUnique.mockResolvedValue(null);
     const service = new StalwartWebhookService({
       prisma: { mailDirectoryEntry: { findUnique } } as never,
+      noreplyEmail: NOREPLY,
       mailSyncService: {
         resolveIngestedEmail,
       },
@@ -124,6 +134,7 @@ describe("StalwartWebhookService", () => {
   it("reports ignored non-ham events", async () => {
     const service = new StalwartWebhookService({
       prisma: { mailDirectoryEntry: { findUnique } } as never,
+      noreplyEmail: NOREPLY,
     });
 
     const result = await service.handlePayload({
@@ -149,6 +160,7 @@ describe("StalwartWebhookService", () => {
     });
     const service = new StalwartWebhookService({
       prisma: { mailDirectoryEntry: { findUnique } } as never,
+      noreplyEmail: NOREPLY,
       mailSyncService: { resolveIngestedEmail },
     });
 
@@ -181,9 +193,12 @@ describe("StalwartWebhookService", () => {
     resolveIngestedEmail.mockResolvedValue({
       id: "gcyaaabqz",
       messageIds: ["solace-reminder.0f1e2d@solace.onl"],
+      fromEmail: NOREPLY,
+      exactMatch: true,
     });
     const service = new StalwartWebhookService({
       prisma: { mailDirectoryEntry: { findUnique } } as never,
+      noreplyEmail: NOREPLY,
       mailSyncService: { resolveIngestedEmail },
     });
 
@@ -214,9 +229,12 @@ describe("StalwartWebhookService", () => {
     resolveIngestedEmail.mockResolvedValue({
       id: "gc2aaabq1",
       messageIds: ["<auth.123@solace.onl>"],
+      fromEmail: NOREPLY,
+      exactMatch: true,
     });
     const service = new StalwartWebhookService({
       prisma: { mailDirectoryEntry: { findUnique } } as never,
+      noreplyEmail: NOREPLY,
       mailSyncService: { resolveIngestedEmail },
     });
 
@@ -262,16 +280,26 @@ describe("StalwartWebhookService", () => {
     it("pushes regular mail but not reminder mail in the same webhook batch", async () => {
       resolveIngestedEmail.mockImplementation(async (...args: unknown[]) => {
         const input = args[1] as { documentId: string };
-        return { id: `jmap-${input.documentId}`, messageIds: [`<${input.documentId}@example.com>`] };
+        return {
+          id: `jmap-${input.documentId}`,
+          messageIds: [`<${input.documentId}@example.com>`],
+          fromEmail: null,
+          exactMatch: true,
+        };
       });
       const service = new StalwartWebhookService({
         prisma: { mailDirectoryEntry: { findUnique } } as never,
+        noreplyEmail: NOREPLY,
         mailSyncService: { resolveIngestedEmail },
       });
 
       const result = await service.handlePayload({
         events: [
-          ingest({ documentId: "1700", messageId: "<solace-reminder.aa@solace.onl>" }),
+          ingest({
+            documentId: "1700",
+            from: "Reminder <noreply@solace.onl>",
+            messageId: "<solace-reminder.aa@solace.onl>",
+          }),
           ingest({ documentId: "1701", from: "Sam <sam@example.com>" }),
         ],
       });
@@ -289,11 +317,18 @@ describe("StalwartWebhookService", () => {
     it("recognizes the reminder Message-ID under the message-id alias key", async () => {
       const service = new StalwartWebhookService({
         prisma: { mailDirectoryEntry: { findUnique } } as never,
+        noreplyEmail: NOREPLY,
         mailSyncService: { resolveIngestedEmail },
       });
 
       const result = await service.handlePayload({
-        events: [ingest({ documentId: "1702", "message-id": "<solace-reminder.bb@solace.onl>" })],
+        events: [
+          ingest({
+            documentId: "1702",
+            from: "Reminder <noreply@solace.onl>",
+            "message-id": "<solace-reminder.bb@solace.onl>",
+          }),
+        ],
       });
 
       expect(result.enqueuedCount).toBe(0);
@@ -305,9 +340,12 @@ describe("StalwartWebhookService", () => {
       resolveIngestedEmail.mockResolvedValue({
         id: "gc3aaabq2",
         messageIds: ["<other@example.com>", "solace-reminder.cc@solace.onl"],
+        fromEmail: NOREPLY,
+        exactMatch: true,
       });
       const service = new StalwartWebhookService({
         prisma: { mailDirectoryEntry: { findUnique } } as never,
+        noreplyEmail: NOREPLY,
         mailSyncService: { resolveIngestedEmail },
       });
 
@@ -317,10 +355,34 @@ describe("StalwartWebhookService", () => {
       expect(enqueue).not.toHaveBeenCalled();
     });
 
+    it("still pushes when only a heuristic lookup matched a reminder", async () => {
+      resolveIngestedEmail.mockResolvedValue({
+        id: "gc8aaabq7",
+        messageIds: ["solace-reminder.gg@solace.onl"],
+        fromEmail: NOREPLY,
+        exactMatch: false,
+      });
+      const service = new StalwartWebhookService({
+        prisma: { mailDirectoryEntry: { findUnique } } as never,
+        noreplyEmail: NOREPLY,
+        mailSyncService: { resolveIngestedEmail },
+      });
+
+      const result = await service.handlePayload({ events: [ingest({ documentId: "1707" })] });
+
+      expect(result.enqueuedCount).toBe(1);
+      expect(enqueue).toHaveBeenCalledWith(expect.anything(), {
+        accountId: "n",
+        userId: "user-1",
+        items: [{ emailId: "gc8aaabq7" }],
+      });
+    });
+
     it("still pushes when the JMAP lookup fails and the payload has no Message-ID", async () => {
       resolveIngestedEmail.mockRejectedValue(new Error("Stalwart unavailable"));
       const service = new StalwartWebhookService({
         prisma: { mailDirectoryEntry: { findUnique } } as never,
+        noreplyEmail: NOREPLY,
         mailSyncService: { resolveIngestedEmail },
       });
 
@@ -338,6 +400,7 @@ describe("StalwartWebhookService", () => {
       resolveIngestedEmail.mockResolvedValue(null as never);
       const service = new StalwartWebhookService({
         prisma: { mailDirectoryEntry: { findUnique } } as never,
+        noreplyEmail: NOREPLY,
         mailSyncService: { resolveIngestedEmail },
       });
 
@@ -350,13 +413,44 @@ describe("StalwartWebhookService", () => {
       });
     });
 
+    it.each([
+      ["an external sender", "Mallory <mallory@evil.example>", "<solace-reminder.x@solace.onl>"],
+      ["a foreign Message-ID domain", "Reminder <noreply@solace.onl>", "<solace-reminder.x@evil.example>"],
+    ])("still pushes a spoofed reminder Message-ID from %s", async (_case, from, messageId) => {
+      resolveIngestedEmail.mockResolvedValue({
+        id: "gc9aaabq8",
+        messageIds: [messageId],
+        fromEmail: from.match(/<([^>]+)>/)?.[1] ?? null,
+        exactMatch: true,
+      });
+      const service = new StalwartWebhookService({
+        prisma: { mailDirectoryEntry: { findUnique } } as never,
+        noreplyEmail: NOREPLY,
+        mailSyncService: { resolveIngestedEmail },
+      });
+
+      const result = await service.handlePayload({
+        events: [ingest({ documentId: "1708", from, messageId })],
+      });
+
+      expect(result.enqueuedCount).toBe(1);
+      expect(enqueue).toHaveBeenCalledWith(expect.anything(), {
+        accountId: "n",
+        userId: "user-1",
+        items: [{ emailId: "gc9aaabq8" }],
+      });
+    });
+
     it("does not treat a Message-ID that only contains the prefix as a reminder", async () => {
       resolveIngestedEmail.mockResolvedValue({
         id: "gc4aaabq3",
         messageIds: ["<re.solace-reminder.dd@example.com>"],
+        fromEmail: NOREPLY,
+        exactMatch: true,
       });
       const service = new StalwartWebhookService({
         prisma: { mailDirectoryEntry: { findUnique } } as never,
+        noreplyEmail: NOREPLY,
         mailSyncService: { resolveIngestedEmail },
       });
 
@@ -382,6 +476,7 @@ describe("StalwartWebhookService", () => {
 
     const service = new StalwartWebhookService({
       prisma: { mailDirectoryEntry: { findUnique } } as never,
+      noreplyEmail: NOREPLY,
     });
 
     await service.handlePayload({

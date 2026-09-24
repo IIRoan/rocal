@@ -5,7 +5,7 @@ import type {
 } from "../contracts/stalwart-webhook.contract";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import {
-  isSolaceReminderMessageId,
+  isSolaceReminderMail,
   parseStalwartMailIngestEvents,
   type StalwartMailIngestEvent,
   type StalwartWebhookPayload,
@@ -34,6 +34,7 @@ export class StalwartWebhookService implements IStalwartWebhookService {
   constructor(
     private readonly input: {
       prisma: WebhookPrisma;
+      noreplyEmail: string;
       mailSyncService?: Pick<
         MailSyncService,
         "resolveIngestedEmail"
@@ -125,7 +126,12 @@ export class StalwartWebhookService implements IStalwartWebhookService {
       return false;
     }
 
-    if (isSolaceReminderMessageId(event.messageId)) {
+    if (
+      isSolaceReminderMail(
+        { fromEmail: event.fromEmail, messageIds: [event.messageId] },
+        this.input.noreplyEmail,
+      )
+    ) {
       this.logSkippedReminderMail(directoryEntry, event);
       return false;
     }
@@ -143,7 +149,10 @@ export class StalwartWebhookService implements IStalwartWebhookService {
           },
         );
         if (resolved) {
-          if (resolved.messageIds.some(isSolaceReminderMessageId)) {
+          if (
+            resolved.exactMatch &&
+            isSolaceReminderMail(resolved, this.input.noreplyEmail)
+          ) {
             this.logSkippedReminderMail(directoryEntry, event);
             return false;
           }

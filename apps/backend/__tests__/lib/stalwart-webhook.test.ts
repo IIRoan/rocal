@@ -1,22 +1,32 @@
 import { describe, expect, it } from "@jest/globals";
 import {
-  isSolaceReminderMessageId,
+  isSolaceReminderMail,
   parseStalwartMailIngestEvents,
   STALWART_MAIL_INGEST_EVENT,
 } from "../../lib/stalwart-webhook";
 
-describe("isSolaceReminderMessageId", () => {
-  it("matches reminder Message-IDs with or without angle brackets", () => {
-    expect(isSolaceReminderMessageId("<solace-reminder.abc@solace.onl>")).toBe(true);
-    expect(isSolaceReminderMessageId("solace-reminder.abc@solace.onl")).toBe(true);
-    expect(isSolaceReminderMessageId(" <SOLACE-REMINDER.abc@solace.onl> ")).toBe(true);
+describe("isSolaceReminderMail", () => {
+  const noreply = "noreply@solace.onl";
+  const reminder = (fromEmail: string | null, messageId: string | null) =>
+    isSolaceReminderMail({ fromEmail, messageIds: [messageId] }, noreply);
+
+  it("matches noreply mail with a reminder Message-ID with or without angle brackets", () => {
+    expect(reminder(noreply, "<solace-reminder.abc@solace.onl>")).toBe(true);
+    expect(reminder(noreply, "solace-reminder.abc@solace.onl")).toBe(true);
+    expect(reminder("NOREPLY@solace.onl", " <SOLACE-REMINDER.abc@solace.onl> ")).toBe(true);
+  });
+
+  it("rejects reminder Message-IDs that a third party can forge", () => {
+    expect(reminder("mallory@evil.example", "<solace-reminder.abc@solace.onl>")).toBe(false);
+    expect(reminder(null, "<solace-reminder.abc@solace.onl>")).toBe(false);
+    expect(reminder(noreply, "<solace-reminder.abc@evil.example>")).toBe(false);
+    expect(reminder(noreply, "<solace-reminder.abc@evil.example@solace.onl>")).toBe(false);
   });
 
   it("does not match other Message-IDs", () => {
-    expect(isSolaceReminderMessageId("<abc@example.com>")).toBe(false);
-    expect(isSolaceReminderMessageId("<x.solace-reminder.abc@solace.onl>")).toBe(false);
-    expect(isSolaceReminderMessageId(null)).toBe(false);
-    expect(isSolaceReminderMessageId(undefined)).toBe(false);
+    expect(reminder(noreply, "<abc@example.com>")).toBe(false);
+    expect(reminder(noreply, "<x.solace-reminder.abc@solace.onl>")).toBe(false);
+    expect(reminder(noreply, null)).toBe(false);
   });
 });
 

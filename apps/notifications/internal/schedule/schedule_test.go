@@ -135,11 +135,33 @@ func TestClaimDueSQLUsesPrismaColumnNames(t *testing.T) {
 }
 
 func TestReminderJobPayloadHasOpaqueRefsOnly(t *testing.T) {
-	payload := reminderJobPayload(DueSchedule{
-		EventID:       "evt-1",
-		MinutesBefore: 15,
-	})
-	if len(payload) != 3 || payload["eventId"] != "evt-1" || payload["minutesBefore"] != 15 || payload["kind"] != "event_reminder" {
-		t.Fatalf("unexpected payload %#v", payload)
+	for _, channel := range []string{"email", "push"} {
+		payload := reminderJobPayload(DueSchedule{
+			EventID:       "evt-1",
+			MinutesBefore: 15,
+		}, channel)
+		if len(payload) != 3 || payload["eventId"] != "evt-1" || payload["minutesBefore"] != 15 || payload["kind"] != "event_reminder" {
+			t.Fatalf("unexpected %s payload %#v", channel, payload)
+		}
+	}
+}
+
+func TestReminderJobPayloadFlagsEmailFallbackOnlyOnDeferringPush(t *testing.T) {
+	item := DueSchedule{
+		Settings:          Settings{EmailNotifications: true, PushNotifications: true},
+		HasPushDevice:     true,
+		MailsToOwnMailbox: true,
+	}
+	if reminderJobPayload(item, "push")["emailFallback"] != true {
+		t.Fatal("expected the push that replaces the email to carry the fallback flag")
+	}
+	item.MailsToOwnMailbox = false
+	if _, ok := reminderJobPayload(item, "push")["emailFallback"]; ok {
+		t.Fatal("email is queued alongside push, so no fallback is needed")
+	}
+	item.MailsToOwnMailbox = true
+	item.Settings.EmailNotifications = false
+	if _, ok := reminderJobPayload(item, "push")["emailFallback"]; ok {
+		t.Fatal("email notifications are off, so there is nothing to fall back to")
 	}
 }

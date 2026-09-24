@@ -173,6 +173,27 @@ export function useCachedMessage(
   return undefined;
 }
 
+/** Loads one message, seeded from any cached mailbox list that already holds it. */
+export function useMailMessage(
+  runtime: MailRuntime | undefined,
+  messageId: string,
+) {
+  const cached = useCachedMessage(messageId);
+  return useQuery<JmapEmailMessage | null>({
+    queryKey: QUERY_KEYS.mailMessage(messageId),
+    enabled: Boolean(messageId) && (Boolean(cached) || Boolean(runtime)),
+    initialData: cached ?? undefined,
+    queryFn: async () => {
+      if (cached) return cached;
+      // Non-null: the query is only enabled once runtime (or a cached copy) exists.
+      const list = await runtime!.client.getMessagesByIds(runtime!.session, [
+        messageId,
+      ]);
+      return list[0] ?? null;
+    },
+  });
+}
+
 /** Find a cached message by id across all mailbox lists. */
 function findCachedMessage(
   queryClient: ReturnType<typeof useQueryClient>,

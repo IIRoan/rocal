@@ -5,14 +5,32 @@ export const STALWART_MAIL_INGEST_EVENT = "message-ingest.ham" as const;
 /** Must match reminderMessageIDPrefix in apps/notifications/main.go. */
 export const SOLACE_REMINDER_MESSAGE_ID_PREFIX = "solace-reminder.";
 
-export function isSolaceReminderMessageId(value: string | null | undefined): boolean {
-  return (
-    value
-      ?.trim()
-      .replace(/^</, "")
+/** Both headers are sender-controlled, so require the noreply From and a reminder Message-ID on the noreply domain. */
+export function isSolaceReminderMail(
+  mail: {
+    fromEmail: string | null | undefined;
+    messageIds: readonly (string | null | undefined)[];
+  },
+  noreplyEmail: string,
+): boolean {
+  const noreply = noreplyEmail.trim().toLowerCase();
+  if (!noreply || mail.fromEmail?.trim().toLowerCase() !== noreply) {
+    return false;
+  }
+
+  const noreplyDomain = noreply.slice(noreply.lastIndexOf("@") + 1);
+  return mail.messageIds.some((value) => {
+    const [localPart = "", domain, ...rest] = (value ?? "")
+      .trim()
+      .replace(/^<|>$/g, "")
       .toLowerCase()
-      .startsWith(SOLACE_REMINDER_MESSAGE_ID_PREFIX) ?? false
-  );
+      .split("@");
+    return (
+      rest.length === 0 &&
+      domain === noreplyDomain &&
+      localPart.startsWith(SOLACE_REMINDER_MESSAGE_ID_PREFIX)
+    );
+  });
 }
 
 const stalwartIdSchema = z

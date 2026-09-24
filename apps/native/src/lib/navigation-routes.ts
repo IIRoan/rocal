@@ -48,10 +48,6 @@ export function isAuthRouteSegments(segments: Segments): boolean {
   return segments[0] === "(auth)";
 }
 
-export function isCalendarRouteSegments(segments: Segments): boolean {
-  return segments[0] === "(tabs)" && segments[1] === "calendar";
-}
-
 export function isMailRouteSegments(segments: Segments): boolean {
   return segments[0] === "(tabs)" && segments[1] === "mail";
 }

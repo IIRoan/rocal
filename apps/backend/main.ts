@@ -24,6 +24,7 @@ import { inviteRoutes } from "./routes/invites";
 import { mailAccountRoutes } from "./routes/mail-account";
 import { mailRoutes, probeMailJmapProxyDiscovery } from "./routes/mail";
 import { isStalwartMailConfigured } from "./lib/stalwart-jmap-mailer";
+import { noreplyEmail } from "./lib/email-client";
 import { mailSyncRoutes, defaultMailSyncService } from "./routes/mail-sync";
 import {
   defaultMailRealtimeService,
@@ -216,6 +217,7 @@ export const createAPI = (prefix = "") => {
       createStalwartWebhookRoutes(
         new StalwartWebhookService({
           prisma,
+          noreplyEmail,
           mailSyncService: defaultMailSyncService,
         }),
       ),

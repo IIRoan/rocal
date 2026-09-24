@@ -533,21 +533,42 @@ func (ns *NotificationServer) dispatchJob(ctx context.Context, job jobs.Job) err
 }
 
 func (ns *NotificationServer) skipJob(ctx context.Context, job jobs.Job, reason string) error {
-	ns.log.Info("Skipped %s %s job: %s", job.Kind, job.Channel, reason)
 	if ns.db != nil {
-		_ = jobs.MarkSkipped(ctx, ns.db, job.ID)
+		if job.Channel == "push" && job.Payload.EmailFallback {
+			tx, err := ns.db.BeginTx(ctx, nil)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = tx.Rollback() }()
+			if err := jobs.MarkSkipped(ctx, tx, job.ID); err != nil {
+				return err
+			}
+			if err := schedule.QueueEmailFallback(ctx, tx, job.UserID, jobEventID(job), job.MinutesBefore); err != nil {
+				return err
+			}
+			if err := tx.Commit(); err != nil {
+				return err
+			}
+		} else if err := jobs.MarkSkipped(ctx, ns.db, job.ID); err != nil {
+			return err
+		}
 	}
+	ns.log.Info("Skipped %s %s job: %s", job.Kind, job.Channel, reason)
 	return errJobSkipped
+}
+
+func jobEventID(job jobs.Job) string {
+	if job.Payload.EventID == "" && job.EventID.Valid {
+		return job.EventID.String
+	}
+	return job.Payload.EventID
 }
 
 func (ns *NotificationServer) dispatchEmailJob(ctx context.Context, job jobs.Job) error {
 	if ns.mailer == nil {
 		return ns.skipJob(ctx, job, "email sending is not configured")
 	}
-	eventID := job.Payload.EventID
-	if eventID == "" && job.EventID.Valid {
-		eventID = job.EventID.String
-	}
+	eventID := jobEventID(job)
 	event, user, err := jobs.LoadReminder(ctx, ns.db, eventID, job.UserID)
 	if err != nil {
 		return err
@@ -591,10 +612,7 @@ func (ns *NotificationServer) dispatchPushJob(ctx context.Context, job jobs.Job)
 			notification.CollapseID = "mail:" + job.ID
 		}
 	case "event_reminder":
-		eventID := job.Payload.EventID
-		if eventID == "" && job.EventID.Valid {
-			eventID = job.EventID.String
-		}
+		eventID := jobEventID(job)
 		encryptedTitle, startsAt := "", ""
 		if eventID != "" && eventID != "test-notification" && eventID != "manual-test" {
 			event, user, err := jobs.LoadReminder(ctx, ns.db, eventID, job.UserID)

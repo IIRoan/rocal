@@ -85,12 +85,23 @@ export type MailSyncThreadRecord = {
 export type IngestedEmailRef = {
   id: string;
   messageIds: string[];
+  fromEmail: string | null;
+  /** False when the email was picked by the subject or recent-delivery heuristics. */
+  exactMatch: boolean;
 };
 
 function toIngestedEmailRef(
   email: JmapEmail | null | undefined,
+  exactMatch: boolean,
 ): IngestedEmailRef | null {
-  return email?.id ? { id: email.id, messageIds: email.messageId ?? [] } : null;
+  return email?.id
+    ? {
+        id: email.id,
+        messageIds: email.messageId ?? [],
+        fromEmail: email.from?.[0]?.email ?? null,
+        exactMatch,
+      }
+    : null;
 }
 
 type JmapGetResponse<T> = {
@@ -428,7 +439,7 @@ export class MailSyncService {
       false,
     );
     if (direct[0]?.id) {
-      return toIngestedEmailRef(direct[0]);
+      return toIngestedEmailRef(direct[0], true);
     }
 
     const byMessageId = await this.findIngestedEmailByMessageId(
@@ -436,7 +447,7 @@ export class MailSyncService {
       input.messageId,
     );
     if (byMessageId) {
-      return toIngestedEmailRef(byMessageId);
+      return toIngestedEmailRef(byMessageId, true);
     }
 
     if (input.subject?.trim()) {
@@ -458,7 +469,7 @@ export class MailSyncService {
         const exact = emails.find(
           (email) => email.subject?.trim().toLowerCase() === normalizedSubject,
         );
-        return toIngestedEmailRef(exact ?? emails[0]);
+        return toIngestedEmailRef(exact ?? emails[0], false);
       }
     }
 
@@ -467,6 +478,7 @@ export class MailSyncService {
         messageId: input.messageId,
         fromEmail: input.fromEmail,
       }),
+      false,
     );
   }
 

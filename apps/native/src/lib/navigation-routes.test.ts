@@ -5,7 +5,6 @@ import {
   mailMessageRoute,
   NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS,
   NATIVE_STACK_SCREEN_OPTIONS,
-  isCalendarRouteSegments,
   isMailRouteSegments,
 } from "./navigation-routes";
 
@@ -17,9 +16,7 @@ describe("navigation-routes", () => {
     expect(mailMessageRoute("em-1")).toBe("/(tabs)/mail/message/em-1");
   });
 
-  it("marks calendar and mail segments correctly", () => {
-    expect(isCalendarRouteSegments(["(tabs)", "calendar"])).toBe(true);
-    expect(isCalendarRouteSegments(["(tabs)", "calendar", "day"])).toBe(true);
+  it("marks mail segments correctly", () => {
     expect(isMailRouteSegments(["(tabs)", "mail"])).toBe(true);
     expect(isMailRouteSegments(["settings"])).toBe(false);
   });

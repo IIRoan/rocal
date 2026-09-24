@@ -5,6 +5,7 @@ import {
   Text,
   TextInput,
   View,
+  type StyleProp,
   type TextStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -50,6 +51,39 @@ function parseBounded(value: string, min: number, max: number) {
     return min;
   }
   return Math.min(max, Math.max(min, parsed));
+}
+
+/** Lets the field sit empty while typing; the rule only ever receives a bounded number. */
+function BoundedNumberInput({
+  value,
+  min,
+  max,
+  onChange,
+  style,
+  accessibilityLabel,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+  style: StyleProp<TextStyle>;
+  accessibilityLabel: string;
+}) {
+  const [text, setText] = useState<string | null>(null);
+  return (
+    <TextInput
+      style={style}
+      value={text ?? String(value)}
+      onChangeText={(next) => {
+        setText(next);
+        if (next) onChange(parseBounded(next, min, max));
+      }}
+      onBlur={() => setText(null)}
+      keyboardType="number-pad"
+      maxLength={String(max).length}
+      accessibilityLabel={accessibilityLabel}
+    />
+  );
 }
 
 export function RecurrencePicker({
@@ -139,12 +173,12 @@ export function RecurrencePicker({
     <View style={styles.container}>
       <View style={styles.line}>
         <Text style={styles.lineLabel}>Every</Text>
-        <TextInput
+        <BoundedNumberInput
           style={[styles.field, styles.numberField]}
-          value={String(rule.interval)}
-          onChangeText={(text) => update({ interval: parseBounded(text, 1, 99) })}
-          keyboardType="number-pad"
-          maxLength={2}
+          value={rule.interval}
+          min={1}
+          max={99}
+          onChange={(interval) => update({ interval })}
           accessibilityLabel="Repeat interval"
         />
         <EventEditorChip
@@ -235,12 +269,12 @@ export function RecurrencePicker({
         />
         {endMode === "after" && (
           <>
-            <TextInput
+            <BoundedNumberInput
               style={[styles.field, styles.countField]}
-              value={rule.count?.toString() ?? ""}
-              onChangeText={(text) => update({ count: parseBounded(text, 1, 999) })}
-              keyboardType="number-pad"
-              maxLength={3}
+              value={rule.count ?? 1}
+              min={1}
+              max={999}
+              onChange={(count) => update({ count })}
               accessibilityLabel="Number of occurrences"
             />
             <Text style={styles.suffixLabel}>

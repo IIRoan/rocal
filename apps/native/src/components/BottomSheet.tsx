@@ -326,10 +326,13 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const visibleRef = useRef(visible);
     const sessionRef = useRef(session);
     const onCloseCompleteRef = useRef(onCloseComplete);
+    // Keeps requestClose stable so the back handler isn't re-registered above in-sheet page handlers.
+    const onDismissRef = useRef(onDismiss);
     useLayoutEffect(() => {
       visibleRef.current = visible;
       sessionRef.current = session;
       onCloseCompleteRef.current = onCloseComplete;
+      onDismissRef.current = onDismiss;
     });
     const overlayMaxOpacity = isDark ? OVERLAY_DARK : OVERLAY_LIGHT;
 
@@ -376,8 +379,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
 
     const requestClose = useCallback(() => {
       Keyboard.dismiss();
-      onDismiss();
-    }, [onDismiss]);
+      onDismissRef.current();
+    }, []);
 
     const snapTo = useCallback(
       (index: number) => {

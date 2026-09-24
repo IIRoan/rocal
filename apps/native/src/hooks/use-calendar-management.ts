@@ -14,7 +14,11 @@ export type DeleteCalendarAction = "delete_events" | "move_events";
 
 function invalidateCalendarData(
   queryClient: QueryClient,
-  { subscriptions = false, settings = false }: { subscriptions?: boolean; settings?: boolean } = {},
+  {
+    subscriptions = false,
+    settings = false,
+    events = true,
+  }: { subscriptions?: boolean; settings?: boolean; events?: boolean } = {},
 ) {
   void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
   if (subscriptions) {
@@ -23,7 +27,9 @@ function invalidateCalendarData(
   if (settings) {
     void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
   }
-  void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
+  if (events) {
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
+  }
 }
 
 export function useCalendars() {
@@ -54,7 +60,7 @@ export function useCreateCalendar() {
   return useMutation({
     mutationFn: (request: CreateCalendarRequest) => calendarApiService.createCalendar(request),
     onSuccess: () => {
-      invalidateCalendarData(queryClient, { settings: true });
+      invalidateCalendarData(queryClient, { settings: true, events: false });
       toast("Calendar created");
     },
     onError: (error) => toast(getErrorMessage(error, "Failed to create calendar"), "error"),
@@ -68,7 +74,8 @@ export function useUpdateCalendar(calendarId: string) {
     mutationFn: (request: UpdateCalendarRequest) =>
       calendarApiService.updateCalendar(calendarId, request),
     onSuccess: () => {
-      invalidateCalendarData(queryClient, { settings: true });
+      // Event colors and visibility are resolved from the calendars query on the client.
+      invalidateCalendarData(queryClient, { settings: true, events: false });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendarShareLink(calendarId) });
       toast("Calendar saved");
     },

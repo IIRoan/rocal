@@ -12,7 +12,6 @@ import {
 } from "./install-artifacts";
 import { createClient, resolveUrl } from "./r2";
 
-const QRCODE_PACKAGE = "qrcode@1.5.4";
 const USAGE =
   "Usage: publish-page --profile <development|preview> --title <title> [--out-dir <dir>]";
 
@@ -60,13 +59,14 @@ async function main(): Promise<void> {
 
   const pageUrl = resolveUrl(client, keys.page);
   const qrPath = join(args.outDir, `${args.profile}-qr.png`);
-  const qrProc = Bun.spawn(
-    ["bunx", QRCODE_PACKAGE, "-o", qrPath, "-w", "512", pageUrl],
-    { stdout: "inherit", stderr: "inherit" },
-  );
+  // qrencode comes from the runner's signed apt archive, not npm, so no unlocked package runs next to the R2 keys.
+  const qrProc = Bun.spawn(["qrencode", "-s", "12", "-o", qrPath, pageUrl], {
+    stdout: "inherit",
+    stderr: "inherit",
+  });
   const qrExit = await qrProc.exited;
   if (qrExit !== 0) {
-    throw new Error(`qrcode exited ${String(qrExit)}`);
+    throw new Error(`qrencode exited ${String(qrExit)}`);
   }
   await client.write(keys.qr, Bun.file(qrPath), { type: "image/png" });
 

@@ -31,7 +31,7 @@ export function MailListBottomChrome({
   const progress = useSelectionProgress();
 
   const bulkStyle = useAnimatedStyle(() => {
-    const motion = bottomChromeMotion(progress.value, "incoming");
+    const motion = bottomChromeMotion(progress.value);
     return {
       opacity: motion.opacity,
       transform: [{ translateY: motion.translateY }, { scale: motion.scale }],

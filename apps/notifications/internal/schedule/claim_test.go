@@ -119,6 +119,15 @@ func TestClaimDueQueuesOnlyPushForOwnMailboxUsers(t *testing.T) {
 		t.Fatal("expected the claim transaction to commit")
 	}
 
+	for _, exec := range db.execs {
+		if strings.Contains(exec.query, "INSERT INTO notification_job") {
+			flagged := strings.Contains(string(exec.args[5].([]byte)), `"emailFallback":true`)
+			if flagged != (exec.args[4] == "evt-own") {
+				t.Fatalf("event %v %v job: unexpected emailFallback=%v", exec.args[4], exec.args[3], flagged)
+			}
+		}
+	}
+
 	got := insertedChannels(t, db)
 	want := map[string][]string{
 		"evt-own":           {"push"},
@@ -157,5 +166,21 @@ func TestClaimDueMarksScheduleSentEvenWithoutChannels(t *testing.T) {
 	}
 	if len(db.execs) != 1 || !strings.Contains(db.execs[0].query, "SET is_sent = TRUE") {
 		t.Fatalf("expected only the sent marker, got %+v", db.execs)
+	}
+}
+
+func TestQueueEmailFallbackInsertsReminderEmailWithoutFlag(t *testing.T) {
+	db := &fakeDB{}
+	conn := sql.OpenDB(db)
+	defer conn.Close()
+
+	if err := QueueEmailFallback(context.Background(), conn, "user-own", "evt-own", 15); err != nil {
+		t.Fatal(err)
+	}
+	if got := insertedChannels(t, db); strings.Join(got["evt-own"], ",") != "email" {
+		t.Fatalf("expected one fallback email job, got %v", got)
+	}
+	if strings.Contains(string(db.execs[0].args[5].([]byte)), "emailFallback") {
+		t.Fatal("the fallback email must not fall back again")
 	}
 }

@@ -39,6 +39,7 @@ import {
   formatCalendarMonthKey,
   getPaddedCalendarMonthRange,
   resolveTimezone,
+  utcToPickerDate,
   type DecoratedCalendarEvent,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -54,6 +55,7 @@ import {
   resolveEventDotColor,
 } from "./calendar/month-grid-utils";
 import { useCurrentDateTime } from "./calendar/useCurrentDateTime";
+import { useCalendars } from "../hooks/use-calendar-management";
 import {
   getMiniCalendarPagerWindow,
   rubberBandPagerPosition,
@@ -189,6 +191,7 @@ export function SidebarMiniCalendar({
   const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const today = useCurrentDateTime();
+  const { data: calendars } = useCalendars();
   const resolvedTimezone = resolveTimezone(timezone);
   const fallbackSelectedDate = useMemo(() => new Date(), []);
   const effectiveSelectedDate = selectedDate ?? fallbackSelectedDate;
@@ -337,11 +340,13 @@ export function SidebarMiniCalendar({
           retainedEventsByMonthRef.current,
           page.key,
           queryData[index],
+          calendars,
         ),
         resolvedTimezone,
       ),
     }));
   }, [
+    calendars,
     currentMonthEvents,
     monthWindow,
     nextMonthEvents,
@@ -359,12 +364,12 @@ export function SidebarMiniCalendar({
   }, [committedIndex, committedIndexShared, pageWidth, pageWidthShared]);
 
   const handleGoToToday = useCallback(() => {
-    const todayDate = new Date();
+    const todayDate = utcToPickerDate(new Date(), resolvedTimezone);
     if (formatCalendarMonthKey(todayDate) !== monthKeyRef.current) {
       jumpToMonth(todayDate);
     }
     onDayPress?.(todayDate);
-  }, [jumpToMonth, onDayPress]);
+  }, [jumpToMonth, onDayPress, resolvedTimezone]);
 
   const stepMonth = useCallback(
     (delta: 1 | -1) => {

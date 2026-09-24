@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,7 +27,6 @@ import {
 } from "../BottomSheet";
 import { LAYOUT_METRICS } from "../../lib/app-layout";
 import type { ComposeRequest } from "../../lib/mail/compose-request";
-import { useQuery } from "@tanstack/react-query";
 import {
   canSendCompose,
   composeTextToPlain,
@@ -35,11 +41,10 @@ import {
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useToast } from "../../providers/ToastProvider";
-import { QUERY_KEYS } from "../../lib/query-keys";
 import {
-  useCachedMessage,
   resolveComposeContext,
   useMailAccount,
+  useMailMessage,
   useMailMutations,
   useMailRuntime,
   useSendMessage,
@@ -71,6 +76,7 @@ import {
   getPlainTextSignature,
 } from "../../lib/mail/signature-utils";
 import {
+  hasDraftContent,
   useComposeDraftAutosave,
   type DraftSaveStatus,
 } from "../../hooks/use-compose-draft-autosave";
@@ -149,7 +155,8 @@ function ComposeSession({
   const sendMessage = useSendMessage(runtime);
   const { moveToTrash } = useMailMutations(runtime, null);
   const { recordUsage } = useRecentContacts();
-  const cachedMessage = useCachedMessage(params.messageId ?? "");
+  const sourceMessage =
+    useMailMessage(runtime, params.messageId ?? "").data ?? null;
 
   const [to, setTo] = useState("");
   const [showCcBcc, setShowCcBcc] = useState(false);
@@ -205,20 +212,6 @@ function ComposeSession({
     setDraftId,
     setDraftSaveStatus,
   });
-
-  const sourceMessageQuery = useQuery<JmapEmailMessage | null>({
-    queryKey: QUERY_KEYS.mailMessage(params.messageId ?? ""),
-    enabled:
-      Boolean(params.messageId) && Boolean(runtime) && !Boolean(cachedMessage),
-    queryFn: async () => {
-      const list = await runtime!.client.getMessagesByIds(runtime!.session, [
-        params.messageId!,
-      ]);
-      return list[0] ?? null;
-    },
-    initialData: cachedMessage ?? undefined,
-  });
-  const sourceMessage = sourceMessageQuery.data ?? cachedMessage ?? null;
 
   const selectedIdentity = useMemo(
     () =>
@@ -276,7 +269,7 @@ function ComposeSession({
         }
       }
 
-      const savedDraftId = await saveDraft();
+      const savedDraft = await saveDraft();
 
       sendMessage.mutate(
         {
@@ -287,7 +280,8 @@ function ComposeSession({
           textBody,
           htmlBody,
           identityId: selectedIdentityId,
-          previousDraftId: savedDraftId ?? draftId,
+          previousDraftId:
+            savedDraft.status === "saved" ? savedDraft.draftId : draftId,
           attachments:
             uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
         },
@@ -383,7 +377,17 @@ function ComposeSession({
 
   const isDirty = hasUserContent || attachments.length > 0;
 
-  const leaveCompose = onClose;
+  // A swipe-close saves after the sheet is gone; its late close must not hit a compose opened meanwhile.
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  const leaveCompose = useCallback(() => {
+    if (mountedRef.current) onClose();
+  }, [onClose]);
 
   const handleDiscard = useCallback(() => {
     if (draftId && runtime) {
@@ -391,17 +395,6 @@ function ComposeSession({
     }
     leaveCompose();
   }, [draftId, leaveCompose, moveToTrash, runtime]);
-
-  const handleSaveAndLeave = useCallback(async () => {
-    const savedDraftId = await saveDraft();
-    if (!savedDraftId && hasUserContent) {
-      // Stay open so a failed save never silently drops the message.
-      toast("Couldn't save draft", "error");
-      return;
-    }
-    if (savedDraftId) toast("Draft saved", "success");
-    leaveCompose();
-  }, [hasUserContent, leaveCompose, saveDraft, toast]);
 
   const leaveClean = useCallback(() => {
     // Drop a draft autosaved earlier in this session once its content was removed again.
@@ -411,23 +404,21 @@ function ComposeSession({
     leaveCompose();
   }, [draftId, leaveCompose, moveToTrash, params.mode, runtime]);
 
-  // Swipe-down and backdrop taps have no room for a prompt, so they keep the work as a draft.
-  const handleSheetDismiss = useCallback(() => {
-    if (!isDirty) {
+  const saveAndLeave = useCallback(async () => {
+    const result = await saveDraft();
+    if (result.status === "failed") {
+      // Stay open (reopening a swiped-away sheet) so a failed save never silently drops the message.
+      toast("Couldn't save draft", "error");
+      sheetRef.current?.snapTo(0);
+      return;
+    }
+    if (result.status === "empty") {
       leaveClean();
       return;
     }
-    void (async () => {
-      const savedDraftId = await saveDraft();
-      if (!savedDraftId && hasUserContent) {
-        toast("Couldn't save draft", "error");
-        sheetRef.current?.snapTo(0);
-        return;
-      }
-      if (savedDraftId) toast("Draft saved", "success");
-      leaveCompose();
-    })();
-  }, [hasUserContent, isDirty, leaveClean, leaveCompose, saveDraft, toast]);
+    toast("Draft saved", "success");
+    leaveCompose();
+  }, [leaveClean, leaveCompose, saveDraft, toast]);
 
   const handleCancel = useCallback(() => {
     if (!isDirty) {
@@ -435,33 +426,67 @@ function ComposeSession({
       return;
     }
 
-    Alert.alert("Draft", undefined, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete Draft",
-        style: "destructive",
-        onPress: handleDiscard,
-      },
-      {
-        text: "Save Draft",
-        onPress: () => {
-          void handleSaveAndLeave();
+    const saveOption = hasDraftContent({ to, cc, bcc, subject, body })
+      ? [{ text: "Save Draft", onPress: () => void saveAndLeave() }]
+      : [];
+    Alert.alert(
+      "Draft",
+      attachments.length > 0 ? "Attachments aren't saved with drafts." : undefined,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Draft",
+          style: "destructive",
+          onPress: handleDiscard,
         },
-      },
-    ]);
-  }, [handleDiscard, handleSaveAndLeave, isDirty, leaveClean]);
+        ...saveOption,
+      ],
+    );
+  }, [
+    attachments.length,
+    bcc,
+    body,
+    cc,
+    handleDiscard,
+    isDirty,
+    leaveClean,
+    saveAndLeave,
+    subject,
+    to,
+  ]);
 
+  // Swipe-down and backdrop taps keep text as a draft; drafts don't store attachments, so those still prompt.
+  const handleSheetDismiss = useCallback(() => {
+    if (!isDirty) {
+      leaveClean();
+      return;
+    }
+    if (attachments.length > 0) {
+      sheetRef.current?.snapTo(0);
+      handleCancel();
+      return;
+    }
+    void saveAndLeave();
+  }, [attachments.length, handleCancel, isDirty, leaveClean, saveAndLeave]);
+
+  const handleHardwareBack = useEffectEvent(() => {
+    if (identityPickerOpen) {
+      setIdentityPickerOpen(false);
+    } else {
+      handleCancel();
+    }
+    return true;
+  });
+
+  // Registered once per open: re-registering each render would put it above the identity picker's handler.
   useEffect(() => {
     if (!visible) return;
     const subscription = BackHandler.addEventListener(
       "hardwareBackPress",
-      () => {
-        handleCancel();
-        return true;
-      },
+      () => handleHardwareBack(),
     );
     return () => subscription.remove();
-  }, [handleCancel, visible]);
+  }, [visible]);
 
   const canSend =
     Boolean(composeContext) &&

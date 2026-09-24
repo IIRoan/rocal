@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { QUERY_KEYS } from "../lib/query-keys";
-import { useCachedMessage, useMailRuntime } from "../lib/mail/use-mail";
+import { useMailMessage, useMailRuntime } from "../lib/mail/use-mail";
 import {
   classifyMessageEncryption,
   extractMessageBodies,
@@ -11,31 +11,17 @@ import { useConversationThread } from "../lib/mail/use-conversation-thread";
 import { useConversationDecryptedPreviews } from "../lib/mail/use-conversation-decrypted-previews";
 import type { MailDecryptResult } from "../lib/mail/mail-crypto";
 import { decryptEncryptedMessage } from "../lib/mail/mail-sender-key";
-import type { JmapEmailMessage } from "../lib/mail/types";
 
 export function useMailMessageContent(messageId: string) {
   const runtimeQuery = useMailRuntime(true);
   const runtime = runtimeQuery.data;
-  const cached = useCachedMessage(messageId);
 
   const {
     data: messageData,
     isLoading: isMessageLoading,
     isError: isMessageError,
     error: messageError,
-  } = useQuery<JmapEmailMessage | null>({
-    queryKey: QUERY_KEYS.mailMessage(messageId),
-    enabled: Boolean(messageId) && (Boolean(cached) || Boolean(runtime)),
-    initialData: cached ?? undefined,
-    queryFn: async () => {
-      if (cached) return cached;
-      // Non-null: the query is only enabled once runtime (or a cached copy) exists.
-      const list = await runtime!.client.getMessagesByIds(runtime!.session, [
-        messageId,
-      ]);
-      return list[0] ?? null;
-    },
-  });
+  } = useMailMessage(runtime, messageId);
   const message = messageData ?? null;
 
   const { conversationMessages, isLoading: isConversationLoading } =

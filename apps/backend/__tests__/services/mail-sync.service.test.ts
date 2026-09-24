@@ -745,6 +745,8 @@ describe("MailSyncService", () => {
     ).resolves.toEqual({
       id: "gcqaaabqw",
       messageIds: ["<latest@example.com>"],
+      fromEmail: "vanwesteropbroan@gmail.com",
+      exactMatch: false,
     });
   });
 
@@ -800,6 +802,8 @@ describe("MailSyncService", () => {
     ).resolves.toEqual({
       id: "gceaaabqr",
       messageIds: ["<abc@example.com>"],
+      fromEmail: "sam@example.com",
+      exactMatch: true,
     });
   });
 
@@ -855,6 +859,8 @@ describe("MailSyncService", () => {
     ).resolves.toEqual({
       id: "gc6aaabq5",
       messageIds: ["solace-reminder.ee@solace.onl"],
+      fromEmail: null,
+      exactMatch: false,
     });
     expect(requestedProperties).toEqual([expect.arrayContaining(["messageId"])]);
   });
@@ -877,7 +883,12 @@ describe("MailSyncService", () => {
 
     await expect(
       service.resolveIngestedEmail("acct-1", { documentId: "1562" }),
-    ).resolves.toEqual({ id: "gc7aaabq6", messageIds: [] });
+    ).resolves.toEqual({
+      id: "gc7aaabq6",
+      messageIds: [],
+      fromEmail: null,
+      exactMatch: true,
+    });
   });
 
   it("returns Message-IDs from the direct document lookup", async () => {
@@ -917,6 +928,8 @@ describe("MailSyncService", () => {
     ).resolves.toEqual({
       id: "gcyaaabqz",
       messageIds: ["solace-reminder.abc@solace.onl"],
+      fromEmail: null,
+      exactMatch: true,
     });
   });
 });

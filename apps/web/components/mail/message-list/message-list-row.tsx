@@ -446,6 +446,8 @@ export function MessageListRow(props: MessageListRowProps) {
           tabIndex={0}
           onClick={() => view.onSelect(message.id)}
           onKeyDown={(event) => {
+            // Keys from nested controls and portaled menu items bubble here through the React tree.
+            if (event.target !== event.currentTarget) return;
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
               view.onSelect(message.id);

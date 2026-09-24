@@ -35,19 +35,6 @@ export function formatEventTime(
   )} – ${formatInUserTimezone(end, resolvedTimezone, "h:mm a")}`;
 }
 
-/**
- * Format a reminder value (in minutes) into a human-readable label.
- */
-export function formatReminderLabel(minutes: number): string {
-  if (minutes === 0) return "At time of event";
-  if (minutes < 60)
-    return `${minutes} minute${minutes === 1 ? "" : "s"} before`;
-  const hours = Math.floor(minutes / 60);
-  const remaining = minutes % 60;
-  if (remaining === 0) return `${hours} hour${hours === 1 ? "" : "s"} before`;
-  return `${hours}h ${remaining}m before`;
-}
-
 const WEEKDAY_SUMMARY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function parseJsonRecurrence(raw: string): ParsedRule | null {

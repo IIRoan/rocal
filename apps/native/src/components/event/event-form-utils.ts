@@ -135,20 +135,6 @@ export function shiftEndWithStart(
   return toTimezonePickerISOString(nextEnd, resolvedTimezone);
 }
 
-/** Set a date to the start of day (00:00). */
-export function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-/** Set a date to the end of day (23:59). */
-export function endOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(23, 59, 0, 0);
-  return d;
-}
-
 /**
  * Map a validation error message to the field it belongs to.
  * Returns null if the error doesn't map to a specific field.

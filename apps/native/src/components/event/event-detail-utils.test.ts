@@ -2,7 +2,6 @@ import {
   formatEventDate,
   formatEventTime,
   formatRecurrenceLabel,
-  formatReminderLabel,
 } from "./event-detail-utils";
 import type { CalendarEvent } from "@workspace/calendar-core";
 
@@ -111,34 +110,6 @@ describe("formatEventTime", () => {
       timezone: "UTC",
     });
     expect(formatEventTime(event, "UTC")).toBe("12:00 AM – 1:00 AM");
-  });
-});
-
-// ─── formatReminderLabel ─────────────────────────────────────────────────────
-
-describe("formatReminderLabel", () => {
-  it("returns 'At time of event' for 0 minutes", () => {
-    expect(formatReminderLabel(0)).toBe("At time of event");
-  });
-
-  it("returns singular minute label for 1 minute", () => {
-    expect(formatReminderLabel(1)).toBe("1 minute before");
-  });
-
-  it("returns plural minutes label for 5 minutes", () => {
-    expect(formatReminderLabel(5)).toBe("5 minutes before");
-  });
-
-  it("returns hour label for exactly 60 minutes", () => {
-    expect(formatReminderLabel(60)).toBe("1 hour before");
-  });
-
-  it("returns plural hours label for 120 minutes", () => {
-    expect(formatReminderLabel(120)).toBe("2 hours before");
-  });
-
-  it("returns mixed hours and minutes for 90 minutes", () => {
-    expect(formatReminderLabel(90)).toBe("1h 30m before");
   });
 });
 

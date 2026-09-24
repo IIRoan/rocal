@@ -11,8 +11,13 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter, useSegments } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import {
+  resolveTimezone,
+  utcToPickerDate,
+  type UserSettings,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,6 +27,7 @@ import { useMailCompose } from "../providers/MailComposeProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
 import { useMailSelection } from "../providers/MailSelectionProvider";
 import { calendarApiService } from "../lib/api";
+import { QUERY_KEYS } from "../lib/query-keys";
 import {
   SETTINGS_ROUTE,
   SETTINGS_NOTIFICATIONS_ROUTE,
@@ -91,6 +97,7 @@ export function CommandPalette() {
   const { openEventSheet } = useSheet();
   const { openCompose } = useMailCompose();
   const { setActiveView, setCurrentDate, setSelectedDate } = useCalendarView();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const segments = useSegments();
   const inputRef = useRef<TextInput>(null);
@@ -210,9 +217,12 @@ export function CommandPalette() {
           openEventSheet({ type: "create" });
           break;
         case "go-today": {
-          const now = new Date();
-          setCurrentDate(now);
-          setSelectedDate(now);
+          const timezone = resolveTimezone(
+            queryClient.getQueryData<UserSettings>(QUERY_KEYS.settings())?.timezone,
+          );
+          const today = utcToPickerDate(new Date(), timezone);
+          setCurrentDate(today);
+          setSelectedDate(today);
           navigateToCalendar();
           break;
         }
@@ -243,6 +253,7 @@ export function CommandPalette() {
       close,
       openEventSheet,
       openCompose,
+      queryClient,
       setActiveView,
       setCurrentDate,
       setSelectedDate,

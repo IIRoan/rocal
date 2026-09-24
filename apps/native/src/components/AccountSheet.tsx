@@ -17,7 +17,6 @@ import { useToast } from "../providers/ToastProvider";
 import { BottomSheet } from "./BottomSheet";
 import { BlobatarAvatar } from "./BlobatarAvatar";
 import { WorkspaceAppSwitch } from "./WorkspaceAppSwitch";
-import { SheetPortalHostProvider } from "./SheetPortal";
 import { SheetPageStack, SheetSubPage, useSheetPageStack } from "./sheet/SheetPageStack";
 import {
   SheetGroup,
@@ -158,21 +157,19 @@ export function AccountSheet({ visible, activeApp, onDismiss }: AccountSheetProp
   };
 
   return (
-    <SheetPortalHostProvider>
-      <BottomSheet
-        visible={visible}
-        onDismiss={onDismiss}
-        onCloseComplete={() => {
-          resetPageStack();
-          onCloseComplete();
-        }}
-        snapPoints={[0.92]}
-      >
-        <SettingsSheetPageProvider push={pushPage} back={popPage}>
-          <SheetPageStack state={pageStack} renderPage={renderPage} />
-        </SettingsSheetPageProvider>
-      </BottomSheet>
-    </SheetPortalHostProvider>
+    <BottomSheet
+      visible={visible}
+      onDismiss={onDismiss}
+      onCloseComplete={() => {
+        resetPageStack();
+        onCloseComplete();
+      }}
+      snapPoints={[0.92]}
+    >
+      <SettingsSheetPageProvider push={pushPage} back={popPage}>
+        <SheetPageStack state={pageStack} renderPage={renderPage} />
+      </SettingsSheetPageProvider>
+    </BottomSheet>
   );
 }
 

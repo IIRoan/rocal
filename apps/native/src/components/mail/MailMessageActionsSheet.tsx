@@ -176,6 +176,7 @@ function MessageMenuContent({
   const role = actions.currentMailboxRole;
   const isTrash = role === "trash";
   const isSpam = isSpamMailboxRole(role);
+  const isArchive = role === "archive";
 
   return (
     <>
@@ -199,7 +200,7 @@ function MessageMenuContent({
             label="Forward"
             onPress={actions.handleForward}
           />
-          {actions.archiveMailboxId ? (
+          {actions.archiveMailboxId && !isArchive ? (
             <SheetRow
               variant="mail"
               icon="archive"

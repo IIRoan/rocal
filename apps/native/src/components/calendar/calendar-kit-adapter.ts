@@ -162,10 +162,6 @@ export const KIT_NUMBER_OF_DAYS: Record<TimelineKitView, number> = {
   week: 7,
 };
 
-export function isTimelineKitView(view: CalendarView): view is TimelineKitView {
-  return view === "day" || view === "3day" || view === "week";
-}
-
 export function toKitFirstDay(weekStartDay: number): KitWeekday {
   const normalized = ((weekStartDay % 7) + 7) % 7;
   return (normalized === 0 ? 7 : normalized) as KitWeekday;

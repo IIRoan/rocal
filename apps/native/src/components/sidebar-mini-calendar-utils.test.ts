@@ -47,6 +47,14 @@ describe("retainMonthEvents", () => {
     expect(retained.map((event) => event.id)).toEqual(["aug"]);
   });
 
+  it("colors events from the live calendar list over the one cached with the events", () => {
+    const [event] = retainMonthEvents(new Map(), "2026-08", createResponse("aug"), [
+      { ...createResponse("aug").calendars[0], color: "amber" },
+    ]);
+
+    expect(event?.color).toBe("amber");
+  });
+
   it("does not paint another month's events onto a page that has not loaded yet", () => {
     const cache = new Map();
     retainMonthEvents(cache, "2026-08", createResponse("aug"));

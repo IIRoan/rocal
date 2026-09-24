@@ -13,6 +13,7 @@ import {
   createVisibleCalendarIdSet,
   transformCalendarEvents,
   resolveTimezone,
+  utcToPickerDate,
 } from "@workspace/calendar-core";
 import { useSheet } from "../../../src/providers/SheetProvider";
 import { toNativeCalendarView } from "../../../src/lib/calendar-views";
@@ -202,11 +203,11 @@ export function CalendarScreen() {
   }, []);
 
   const handleTodayPress = useCallback(() => {
-    const now = new Date();
-    setCurrentDate(now);
-    setSelectedDate(now);
-    timelineRef.current?.goToDate(now, { animated: true, hourScroll: true });
-  }, [setCurrentDate, setSelectedDate]);
+    const today = utcToPickerDate(new Date(), resolvedTimezone);
+    setCurrentDate(today);
+    setSelectedDate(today);
+    timelineRef.current?.goToDate(today, { animated: true, hourScroll: true });
+  }, [resolvedTimezone, setCurrentDate, setSelectedDate]);
 
   const handleTimelineEventPress = useCallback(
     (eventId: string) => {
@@ -259,7 +260,6 @@ export function CalendarScreen() {
         header={
           <CalendarTopToolbar
             currentDate={switcherDate}
-            timezone={resolvedTimezone}
             onOpenDrawer={openDrawer}
             onOpenCalendars={openCalendars}
             onOpenAccount={openAccount}

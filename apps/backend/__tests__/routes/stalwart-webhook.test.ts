@@ -198,6 +198,9 @@ describe("stalwartWebhookRoutes", () => {
           input.documentId === "2001"
             ? ["solace-reminder.ff@solace.onl"]
             : [`<${input.documentId}@example.com>`],
+        fromEmail:
+          input.documentId === "2001" ? "noreply@solace.onl" : "sam@example.com",
+        exactMatch: true,
       }),
     );
 
@@ -211,6 +214,7 @@ describe("stalwartWebhookRoutes", () => {
         createStalwartWebhookRoutes(
           new StalwartWebhookService({
             prisma: prisma as never,
+            noreplyEmail: "noreply@solace.onl",
             mailSyncService: { resolveIngestedEmail },
           }),
         ),

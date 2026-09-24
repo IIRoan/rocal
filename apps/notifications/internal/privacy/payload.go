@@ -14,6 +14,7 @@ var allowedKeys = map[string]struct{}{
 	"inboundCount":  {},
 	"emailId":       {},
 	"accountId":     {},
+	"emailFallback": {},
 }
 
 // Legacy plaintext keys: rows that still carry them are delivered, but the values are never decoded.
@@ -32,6 +33,8 @@ type Payload struct {
 	InboundCount  *int   `json:"inboundCount,omitempty"`
 	EmailID       string `json:"emailId,omitempty"`
 	AccountID     string `json:"accountId,omitempty"`
+	// EmailFallback marks a reminder push whose email was dropped; a skipped push queues that email instead.
+	EmailFallback bool `json:"emailFallback,omitempty"`
 }
 
 func Parse(raw []byte) (Payload, error) {
@@ -61,7 +64,7 @@ func Parse(raw []byte) (Payload, error) {
 	if payload.Kind == "event_reminder" && (payload.EmailID != "" || payload.AccountID != "") {
 		return Payload{}, fmt.Errorf("notification job payload contains disallowed fields")
 	}
-	if payload.Kind == "new_mail" && payload.EventID != "" {
+	if payload.Kind == "new_mail" && (payload.EventID != "" || payload.EmailFallback) {
 		return Payload{}, fmt.Errorf("notification job payload contains disallowed fields")
 	}
 	if len(payload.EventID) > maxOpaqueIDLength || len(payload.EmailID) > maxOpaqueIDLength || len(payload.AccountID) > maxOpaqueIDLength {

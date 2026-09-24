@@ -13,3 +13,17 @@ export function getBottomSheetViewportHeight(
     Math.min(sheetHeight, visibleHeight) - Math.max(0, handleHeight),
   );
 }
+
+/** Position the viewport should size for, or null to keep the current size so it doesn't relayout every frame. */
+export function getSheetRestingPosition(
+  position: number,
+  animationTarget: number | null,
+  gestureActive: boolean,
+): number | null {
+  "worklet";
+  if (animationTarget !== null) {
+    // Grow before sliding up so no gap shows; shrink only once the sheet has settled lower.
+    return animationTarget < position ? animationTarget : null;
+  }
+  return gestureActive ? null : position;
+}

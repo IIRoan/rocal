@@ -280,6 +280,14 @@ export function useMailAppContentController(
     }
   };
 
+  const [closingMessageId, setClosingMessageId] = useState<string | null>(null);
+  // Clears the close once the selection is cleared or another message is opened.
+  if (closingMessageId !== null && closingMessageId !== selectedMessageId) {
+    setClosingMessageId(null);
+  }
+  const isReaderClosing =
+    closingMessageId !== null && closingMessageId === selectedMessageId;
+
   const performSelectMessage = (id: string | null) => {
     if (!id) {
       editingDraftIdRef.current = null;
@@ -306,6 +314,8 @@ export function useMailAppContentController(
     }
 
     editingDraftIdRef.current = null;
+    // Re-opening the message that is sliding out keeps it open.
+    setClosingMessageId(null);
     void openMessageById(id, message ?? undefined);
   };
 
@@ -357,13 +367,6 @@ export function useMailAppContentController(
   const handleNavigateNext = () => {
     if (hasNext) handleSelectMessage(filteredListMessages[selectedIndex + 1].id);
   };
-  const [closingMessageId, setClosingMessageId] = useState<string | null>(null);
-  // Clears the close once the selection is cleared or another message is opened.
-  if (closingMessageId !== null && closingMessageId !== selectedMessageId) {
-    setClosingMessageId(null);
-  }
-  const isReaderClosing =
-    closingMessageId !== null && closingMessageId === selectedMessageId;
 
   const handleCloseMessage = () => {
     if (selectedIsDraft) {

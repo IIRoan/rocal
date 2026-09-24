@@ -1,4 +1,7 @@
-import { getBottomSheetViewportHeight } from "./bottom-sheet-layout";
+import {
+  getBottomSheetViewportHeight,
+  getSheetRestingPosition,
+} from "./bottom-sheet-layout";
 
 describe("drawer viewport", () => {
   it.each([
@@ -32,5 +35,23 @@ describe("drawer viewport", () => {
     const bottomOffset = contentHeight - scrollHeight;
     expect(header + contentHeight - bottomOffset).toBe(viewport - footer);
     expect(scrollHeight).toBe(244);
+  });
+});
+
+describe("sheet resting position", () => {
+  it("sizes for the target before sliding up", () => {
+    expect(getSheetRestingPosition(800, 100, false)).toBe(100);
+  });
+
+  it("keeps the current size while sliding down", () => {
+    expect(getSheetRestingPosition(150, 400, false)).toBeNull();
+  });
+
+  it("keeps the current size while dragging", () => {
+    expect(getSheetRestingPosition(250, null, true)).toBeNull();
+  });
+
+  it("sizes for wherever the sheet settles", () => {
+    expect(getSheetRestingPosition(400, null, false)).toBe(400);
   });
 });
