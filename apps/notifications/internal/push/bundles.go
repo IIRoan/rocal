@@ -2,7 +2,7 @@ package push
 
 // Keep in sync with packages/calendar-core/src/push-device.ts.
 var (
-	calendarBundleIDs = map[string]bool{"onl.solace.mobile": true, "onl.solace.mobile.dev": true}
+	calendarBundleIDs = map[string]bool{"onl.solace.calendar": true, "onl.solace.calendar.dev": true}
 	mailBundleIDs     = map[string]bool{"onl.solace.mail": true, "onl.solace.mail.dev": true}
 )
 

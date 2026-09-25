@@ -91,7 +91,7 @@ jobs:
           - app: calendar
             dir: apps/native-calendar
             name: Calendar
-            ios_bundle_base: onl.solace.mobile
+            ios_bundle_base: onl.solace.calendar
           - app: mail
             dir: apps/native-mail
             name: Mail
@@ -175,7 +175,7 @@ jobs:
           - app: calendar
             dir: apps/native-calendar
             name: Calendar
-            ios_bundle_base: onl.solace.mobile
+            ios_bundle_base: onl.solace.calendar
           - app: mail
             dir: apps/native-mail
             name: Mail
@@ -245,7 +245,7 @@ jobs:
           - app: calendar
             dir: apps/native-calendar
             name: Calendar
-            ios_bundle_base: onl.solace.mobile
+            ios_bundle_base: onl.solace.calendar
           - app: mail
             dir: apps/native-mail
             name: Mail

@@ -170,7 +170,7 @@ describe("development diagnostics", () => {
   const metroDev: AppUpdateRuntimeInfo = {
     appVariant: "development",
     appName: "Calendar Dev",
-    bundleId: "onl.solace.mobile.dev",
+    bundleId: "onl.solace.calendar.dev",
     updatesEnabled: false,
     channel: null,
     runtimeVersion: "abc123",
@@ -184,7 +184,7 @@ describe("development diagnostics", () => {
     expect(resolveAppVariant("development")).toBe("development");
     expect(jsSourceLabel(metroDev)).toBe("Metro bundler");
     expect(updateDiagnosticsTitle(metroDev)).toBe("Calendar Dev");
-    expect(updateDiagnosticsBody(metroDev)).toContain("onl.solace.mobile.dev");
+    expect(updateDiagnosticsBody(metroDev)).toContain("onl.solace.calendar.dev");
     expect(updateDiagnosticsBody(metroDev)).toContain("Quit the bundler");
     expect(formatChannelLabel(metroDev.channel, metroDev.appVariant)).toBe(
       "DEVELOPMENT",

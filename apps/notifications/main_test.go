@@ -1223,7 +1223,7 @@ func TestApplyEnvFileSkipsBackendPort(t *testing.T) {
 
 func TestPushDevicesForKindRoutesPushesToTheirApp(t *testing.T) {
 	devices := []jobs.PushDevice{
-		{BundleID: "onl.solace.mobile", TokenHash: "calendar"},
+		{BundleID: "onl.solace.calendar", TokenHash: "calendar"},
 		{BundleID: "onl.solace.mail", TokenHash: "mail"},
 		{BundleID: "onl.solace.mail.dev", TokenHash: "mail-dev"},
 	}

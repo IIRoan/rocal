@@ -17,7 +17,7 @@ describe("internal release manifest", () => {
       "https://example.r2.cloudflarestorage.com/bucket/app.ipa?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=key";
     const plist = buildManifestPlist({
       ipaUrl,
-      bundleId: "onl.solace.mobile.dev",
+      bundleId: "onl.solace.calendar.dev",
       bundleVersion: "1",
       title: "Solace Calendar Dev",
     });

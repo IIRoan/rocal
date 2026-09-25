@@ -132,7 +132,7 @@ func TestSendMarksUnregistered(t *testing.T) {
 		return http.DefaultTransport.RoundTrip(req)
 	})
 
-	result, err := client.Send(Device{Token: "abcd", BundleID: "onl.solace.mobile", Environment: "production"}, NewMail(1, "em-1", ""))
+	result, err := client.Send(Device{Token: "abcd", BundleID: "onl.solace.calendar", Environment: "production"}, NewMail(1, "em-1", ""))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestSendBadDeviceTokenIsNotUnregistered(t *testing.T) {
 		return http.DefaultTransport.RoundTrip(req)
 	})
 
-	result, err := client.Send(Device{Token: "abcd", BundleID: "onl.solace.mobile.dev", Environment: "sandbox"}, NewMail(1, "em-1", ""))
+	result, err := client.Send(Device{Token: "abcd", BundleID: "onl.solace.calendar.dev", Environment: "sandbox"}, NewMail(1, "em-1", ""))
 	if err != nil {
 		t.Fatal(err)
 	}

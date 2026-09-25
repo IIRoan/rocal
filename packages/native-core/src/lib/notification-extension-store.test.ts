@@ -13,7 +13,7 @@ import { resolveNotificationExtensionOptions } from "./notification-extension-st
 
 const extra = {
   notificationExtension: {
-    appGroup: "group.onl.solace.mobile",
+    appGroup: "group.onl.solace.calendar",
     keychainService: "onl.solace.notification-extension",
   },
 };
@@ -21,7 +21,7 @@ const extra = {
 describe("resolveNotificationExtensionOptions", () => {
   it("targets the App Group keychain with a lock-screen-safe accessibility", () => {
     expect(resolveNotificationExtensionOptions({ platform: "ios", extra })).toEqual({
-      accessGroup: "group.onl.solace.mobile",
+      accessGroup: "group.onl.solace.calendar",
       keychainService: "onl.solace.notification-extension",
       keychainAccessible: 2,
     });

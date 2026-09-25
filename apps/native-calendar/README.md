@@ -9,8 +9,10 @@ This app is configured for Expo/EAS under the `astralgrove` org, project slug `s
 | App name               | Solace Calendar | Calendar Dev |
 | Icon                   | `assets/icon.png` (logo + label) | `assets/icon-dev.png` (logo + label + DEV) |
 | Deep-link scheme       | `solace` | `solace-dev` |
-| iOS bundle identifier  | `onl.solace.mobile` | `onl.solace.mobile.dev` |
-| Android application ID | `onl.solace.mobile` | `onl.solace.mobile.dev` |
+| iOS bundle identifier  | `onl.solace.calendar` | `onl.solace.calendar.dev` |
+| Android application ID | `onl.solace.calendar` | `onl.solace.calendar.dev` |
+
+EAS project: `@astralgrove/solace` (`1047b680-b99f-4671-9824-23b9a0487125`, set in `app.config.ts`; `EXPO_PROJECT_ID` overrides it). Register `onl.solace.calendar` / `onl.solace.calendar.dev` (plus their `group.*` App Groups and NSE bundle IDs) in the Apple Developer account and add them to the site's `apple-app-site-association` `webcredentials` for passkeys.
 
 `APP_VARIANT=development` is what switches the binary to the Dev name, icon, scheme, and `.dev` identifiers so both builds can sit on a device at once.
 

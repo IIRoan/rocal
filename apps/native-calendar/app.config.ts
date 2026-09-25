@@ -2,7 +2,7 @@ import type { ExpoConfig } from "expo/config";
 
 const variant = process.env.APP_VARIANT ?? "production";
 const isDev = variant === "development";
-const iosBundleIdentifier = isDev ? "onl.solace.mobile.dev" : "onl.solace.mobile";
+const iosBundleIdentifier = isDev ? "onl.solace.calendar.dev" : "onl.solace.calendar";
 const IOS_DEPLOYMENT_TARGET = "16.4";
 
 // The App Group id doubles as the keychain access group shared with the notification extension.
@@ -43,7 +43,7 @@ const baseConfig = {
     },
   },
   android: {
-    package: isDev ? "onl.solace.mobile.dev" : "onl.solace.mobile",
+    package: isDev ? "onl.solace.calendar.dev" : "onl.solace.calendar",
     versionCode: 1,
     adaptiveIcon: {
       foregroundImage: isDev

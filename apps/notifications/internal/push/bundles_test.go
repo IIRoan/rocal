@@ -8,9 +8,9 @@ func TestBundleReceivesKind(t *testing.T) {
 		kind     string
 		want     bool
 	}{
-		{"onl.solace.mobile", "event_reminder", true},
-		{"onl.solace.mobile.dev", "event_reminder", true},
-		{"onl.solace.mobile", "new_mail", false},
+		{"onl.solace.calendar", "event_reminder", true},
+		{"onl.solace.calendar.dev", "event_reminder", true},
+		{"onl.solace.calendar", "new_mail", false},
 		{"onl.solace.mail", "new_mail", true},
 		{"onl.solace.mail.dev", "new_mail", true},
 		{"onl.solace.mail", "event_reminder", false},
