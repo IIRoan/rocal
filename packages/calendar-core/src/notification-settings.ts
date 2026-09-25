@@ -1,4 +1,9 @@
-import { SOLACE_IOS_DEV_BUNDLE_ID } from "./push-device";
+import {
+  SOLACE_CALENDAR_IOS_BUNDLE_ID,
+  SOLACE_CALENDAR_IOS_DEV_BUNDLE_ID,
+  SOLACE_MAIL_IOS_BUNDLE_ID,
+  SOLACE_MAIL_IOS_DEV_BUNDLE_ID,
+} from "./push-device";
 
 export const EMAIL_REMINDER_SETTING = {
   label: "Email reminders",
@@ -82,16 +87,20 @@ export function getPushDevicesListStatus({
   return "ready";
 }
 
-const SOLACE_DEV_BUNDLE_ID = SOLACE_IOS_DEV_BUNDLE_ID;
+const PUSH_APP_LABELS: Record<string, string> = {
+  [SOLACE_CALENDAR_IOS_BUNDLE_ID]: "Calendar",
+  [SOLACE_CALENDAR_IOS_DEV_BUNDLE_ID]: "Calendar Dev",
+  [SOLACE_MAIL_IOS_BUNDLE_ID]: "Mail",
+  [SOLACE_MAIL_IOS_DEV_BUNDLE_ID]: "Mail Dev",
+};
 
 export function formatPushDeviceLabel(device: {
   platform: string;
   bundleId: string;
 }): string {
   if (device.platform === "ios") {
-    return device.bundleId === SOLACE_DEV_BUNDLE_ID
-      ? "iPhone · Solace Dev"
-      : "iPhone";
+    const app = PUSH_APP_LABELS[device.bundleId];
+    return app ? `iPhone · ${app}` : "iPhone";
   }
   return "Device";
 }

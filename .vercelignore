@@ -14,8 +14,12 @@ webmail
 .env*
 !.env.example
 # Native app source is large; keep package.json for workspace resolution.
-apps/native/**
-!apps/native/package.json
+apps/native-calendar/**
+!apps/native-calendar/package.json
+apps/native-mail/**
+!apps/native-mail/package.json
+packages/native-core/**
+!packages/native-core/package.json
 apps/gatus/**
 !apps/gatus/package.json
 apps/stalwart/**

@@ -24,12 +24,14 @@ describe("buildMobileTrustedOriginVariants", () => {
 });
 
 describe("getAuthTrustedOrigins", () => {
-  it("trusts production and development-client Solace deep links by default", () => {
+  it("trusts production and development-client deep links for both apps by default", () => {
     const origins = getAuthTrustedOrigins();
 
     expect(DEFAULT_MOBILE_AUTH_CALLBACK_URLS).toEqual([
       "solace://api/auth",
       "solace-dev://api/auth",
+      "solace-mail://api/auth",
+      "solace-mail-dev://api/auth",
       "app.solace.onl://api/auth",
     ]);
     expect(origins).toEqual(
@@ -38,6 +40,8 @@ describe("getAuthTrustedOrigins", () => {
         "solace://api/auth",
         "solace-dev://",
         "solace-dev://api/auth",
+        "solace-mail://",
+        "solace-mail-dev://api/auth",
       ]),
     );
   });

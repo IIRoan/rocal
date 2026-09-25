@@ -21,6 +21,7 @@ describe("native passkey bridge helpers", () => {
       isValidNativePasskeyCallbackURL("exps://192.168.1.1:8081/--/calendar"),
     ).toBe(true);
     expect(isValidNativePasskeyCallbackURL("solace-dev://calendar")).toBe(true);
+    expect(isValidNativePasskeyCallbackURL("solace-mail://mail")).toBe(true);
     expect(isValidNativePasskeyCallbackURL("https://app.example.com")).toBe(
       false,
     );

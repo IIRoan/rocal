@@ -1,6 +1,6 @@
 import {
-  SOLACE_IOS_DEV_BUNDLE_ID,
-  SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+  SOLACE_CALENDAR_IOS_DEV_BUNDLE_ID,
+  SOLACE_CALENDAR_IOS_BUNDLE_ID,
 } from "@workspace/calendar-core";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { hashPushToken } from "../../lib/push-token";
@@ -72,7 +72,7 @@ describe("PushDeviceService", () => {
       userId: "user-1",
       token,
       platform: "ios",
-      bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+      bundleId: SOLACE_CALENDAR_IOS_BUNDLE_ID,
       environment: "production",
     });
 
@@ -100,7 +100,7 @@ describe("PushDeviceService", () => {
       userId: "user-1",
       token,
       platform: "ios",
-      bundleId: SOLACE_IOS_DEV_BUNDLE_ID,
+      bundleId: SOLACE_CALENDAR_IOS_DEV_BUNDLE_ID,
       environment: "sandbox",
     });
 
@@ -124,7 +124,7 @@ describe("PushDeviceService", () => {
       userId: "user-1",
       token,
       platform: "ios",
-      bundleId: SOLACE_IOS_DEV_BUNDLE_ID,
+      bundleId: SOLACE_CALENDAR_IOS_DEV_BUNDLE_ID,
       environment: "sandbox",
     });
 
@@ -156,7 +156,7 @@ describe("PushDeviceService", () => {
       {
         id: "dev-1",
         platform: "ios",
-        bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+        bundleId: SOLACE_CALENDAR_IOS_BUNDLE_ID,
         environment: "production",
         isEnabled: true,
         lastSeenAt,
@@ -169,7 +169,7 @@ describe("PushDeviceService", () => {
         {
           id: "dev-1",
           platform: "ios",
-          bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+          bundleId: SOLACE_CALENDAR_IOS_BUNDLE_ID,
           environment: "production",
           isEnabled: true,
           lastSeenAt: lastSeenAt.toISOString(),

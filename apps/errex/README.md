@@ -54,7 +54,7 @@ Init is a no-op when the DSN is unset. Production DSN for project `solace`:
 Official Sentry SDKs require a **numeric** DSN project id. Errex uses the string
 name `solace`. Web and API init with a numeric stand-in and `tunnel` envelopes to
 `/api/solace/envelope/?sentry_key=…`. Native builds the same envelope format in
-`apps/native/src/lib/reporting.ts` (no `@sentry/react-native` — avoids native
+`packages/native-core/src/lib/reporting.ts` (no `@sentry/react-native` — avoids native
 SDK startup crashes). Keep `sendDefaultPii: false`.
 
 
