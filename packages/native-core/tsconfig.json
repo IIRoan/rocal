@@ -1,0 +1,31 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["DOM", "ES2022"],
+    "types": ["jest", "@types/react"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@workspace/native-core/*": ["./src/*"],
+      "@workspace/design-tokens": ["../design-tokens/src/index.ts"],
+      "@workspace/design-tokens/*": ["../design-tokens/src/*"],
+      "@workspace/calendar-core": ["../calendar-core/src/index.ts"],
+      "@workspace/calendar-core/*": ["../calendar-core/src/*"],
+      "@workspace/calendar-client": ["../calendar-client/src/index.ts"],
+      "@workspace/calendar-client/*": ["../calendar-client/src/*"],
+      "@workspace/e2ee": ["../e2ee/src/index.ts"],
+      "@workspace/e2ee/*": ["../e2ee/src/*"],
+      "@workspace/logger": ["../logger/src/index.ts"],
+      "@workspace/logger/*": ["../logger/src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "jest.setup.ts", "env.d.ts"],
+  "exclude": ["node_modules", "coverage"]
+}

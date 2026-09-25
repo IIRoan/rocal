@@ -4,7 +4,7 @@ Patterns that fire diagnostics but are safe to suppress.
 
 ## react-doctor/no-giant-component — native AuthProvider
 
-- **File**: `apps/native/src/providers/AuthProvider.tsx` (`AuthProvider`)
+- **File**: `packages/native-core/src/providers/AuthProvider.tsx` (`AuthProvider`)
 - **Why FP**: `AuthProvider` is a single auth context surface (session hydrate,
   email/passkey sign-in, sign-out, step-up, header helpers). Splitting would
   fragment tightly coupled session state transitions without a reusable seam —
@@ -14,7 +14,7 @@ Patterns that fire diagnostics but are safe to suppress.
 
 ## react-doctor/no-set-state-after-await-in-effect — native AuthProvider bootstrap
 
-- **File**: `apps/native/src/providers/AuthProvider.tsx` (session `useEffect`)
+- **File**: `packages/native-core/src/providers/AuthProvider.tsx` (session `useEffect`)
 - **Why FP**: The mount effect already gates every post-`await` setter behind an
   `ignore` flag cleared in the effect cleanup. Overlapping dependency re-runs
   cannot commit stale session state. The static rule still matches the
@@ -24,7 +24,7 @@ Patterns that fire diagnostics but are safe to suppress.
 
 ## react-doctor/no-giant-component — native E2eeProvider
 
-- **File**: `apps/native/src/providers/E2eeProvider.tsx` (`E2eeProvider`)
+- **File**: `packages/native-core/src/providers/E2eeProvider.tsx` (`E2eeProvider`)
 - **Why FP**: Network/crypto helpers and the `IE2eeProvider` implementation
   live in `src/lib/native-e2ee-provider.ts`; what remains (~350 lines) is the
   bootstrap state machine (generation guard, pending-bootstrap promise, session
@@ -35,7 +35,7 @@ Patterns that fire diagnostics but are safe to suppress.
 
 ## react-doctor/rn-prefer-expo-image — AttachmentPreviewModal
 
-- **File**: `apps/native/src/components/mail/AttachmentPreviewModal.tsx`
+- **File**: `apps/native-mail/src/components/mail/AttachmentPreviewModal.tsx`
 - **Why FP**: `expo-image` is not a dependency and we avoid new deps. The image
   is a single local `file://` URI from the attachment cache shown once in a
   preview modal, so expo-image's disk/memory caching and placeholders add
@@ -57,14 +57,14 @@ Patterns that fire diagnostics but are safe to suppress.
 
 ## react-doctor/rn-no-raw-text
 
-- **Files**: `apps/native/src/providers/E2eeProvider.test.tsx`
+- **Files**: `packages/native-core/src/providers/E2eeProvider.test.tsx`
 - **Why FP**: Test files use a JSDOM/jest environment with `react-test-renderer`
   rather than mounting on a real React Native host. Raw strings inside JSX in
   tests do not crash because no native `<Text>` component is rendered.
 
 ## react-doctor/rn-no-scroll-state
 
-- **File**: `apps/native/src/components/event/EventSheet.tsx:580`
+- **File**: `apps/native-calendar/src/components/event/EventSheet.tsx:580`
 - **Why FP**: The `setState` call inside `onScroll` is gated by a ref-based
   edge-detector (`viewScrollAtTopRef.current !== nextAtTop`), so it fires at
   most twice per scroll session (entering / leaving the top region) — not on
@@ -122,9 +122,9 @@ Patterns that fire diagnostics but are safe to suppress.
 
 ## react-doctor/js-tosorted-immutable — native tsconfig ES2022
 
-- **Files**: `apps/native/app/calendar-manage/index.tsx:76`,
-  `apps/native/app/settings/index.tsx` (timezone/calendar sort),
-  `apps/native/app/(tabs)/settings/index.tsx:197` (legacy path)
+- **Files**: `apps/native-calendar/app/calendar-manage/index.tsx:76`,
+  `apps/native-calendar/app/settings/index.tsx` (timezone/calendar sort),
+  `apps/native-calendar/app/(tabs)/settings/index.tsx:197` (legacy path)
 - **Why FP**: `Array.prototype.toSorted` is ES2023. The native app tsconfig
   uses `lib: ["DOM", "ES2022"]` and `target: ES2022`. The existing
   `[...arr].sort(compareFn)` pattern is already immutable (spread creates a

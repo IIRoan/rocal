@@ -1,10 +1,12 @@
 import { createRuntimeOriginPolicy } from "@workspace/runtime";
 import { env, parseCsvEnv } from "./env";
 
-/** Production + development-client deep links trusted without extra env. */
+/** Production + development-client deep links (Calendar and Mail apps) trusted without extra env. */
 export const DEFAULT_MOBILE_AUTH_CALLBACK_URLS = [
   "solace://api/auth",
   "solace-dev://api/auth",
+  "solace-mail://api/auth",
+  "solace-mail-dev://api/auth",
   "app.solace.onl://api/auth",
 ] as const;
 

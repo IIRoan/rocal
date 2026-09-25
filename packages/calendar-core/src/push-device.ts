@@ -1,11 +1,16 @@
 import { z } from "zod";
 
-export const SOLACE_IOS_PRODUCTION_BUNDLE_ID = "onl.solace.mobile" as const;
-export const SOLACE_IOS_DEV_BUNDLE_ID = "onl.solace.mobile.dev" as const;
+/** Keep in sync with apps/notifications/internal/push/bundles.go. */
+export const SOLACE_CALENDAR_IOS_BUNDLE_ID = "onl.solace.calendar" as const;
+export const SOLACE_CALENDAR_IOS_DEV_BUNDLE_ID = "onl.solace.calendar.dev" as const;
+export const SOLACE_MAIL_IOS_BUNDLE_ID = "onl.solace.mail" as const;
+export const SOLACE_MAIL_IOS_DEV_BUNDLE_ID = "onl.solace.mail.dev" as const;
 
 export const SOLACE_IOS_BUNDLE_IDS = [
-  SOLACE_IOS_PRODUCTION_BUNDLE_ID,
-  SOLACE_IOS_DEV_BUNDLE_ID,
+  SOLACE_CALENDAR_IOS_BUNDLE_ID,
+  SOLACE_CALENDAR_IOS_DEV_BUNDLE_ID,
+  SOLACE_MAIL_IOS_BUNDLE_ID,
+  SOLACE_MAIL_IOS_DEV_BUNDLE_ID,
 ] as const;
 
 export type SolaceIosBundleId = (typeof SOLACE_IOS_BUNDLE_IDS)[number];
@@ -103,8 +108,5 @@ export const PUSH_DEVICES_QUERY_KEY = ["push-devices"] as const;
 export function isSolaceIosBundleId(
   bundleId: string | null | undefined,
 ): bundleId is SolaceIosBundleId {
-  return (
-    bundleId === SOLACE_IOS_PRODUCTION_BUNDLE_ID ||
-    bundleId === SOLACE_IOS_DEV_BUNDLE_ID
-  );
+  return SOLACE_IOS_BUNDLE_IDS.some((id) => id === bundleId);
 }

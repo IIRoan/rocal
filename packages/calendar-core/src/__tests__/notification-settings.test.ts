@@ -6,8 +6,10 @@ import {
   getPushDevicesListStatus,
 } from "../notification-settings";
 import {
-  SOLACE_IOS_DEV_BUNDLE_ID,
-  SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+  SOLACE_CALENDAR_IOS_BUNDLE_ID,
+  SOLACE_CALENDAR_IOS_DEV_BUNDLE_ID,
+  SOLACE_MAIL_IOS_BUNDLE_ID,
+  SOLACE_MAIL_IOS_DEV_BUNDLE_ID,
   isSolaceIosBundleId,
 } from "../push-device";
 
@@ -94,19 +96,16 @@ describe("getPushDevicesListStatus", () => {
 });
 
 describe("formatPushDeviceLabel", () => {
-  it("labels production and development iPhones", () => {
-    expect(
-      formatPushDeviceLabel({
-        platform: "ios",
-        bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
-      }),
-    ).toBe("iPhone");
-    expect(
-      formatPushDeviceLabel({
-        platform: "ios",
-        bundleId: SOLACE_IOS_DEV_BUNDLE_ID,
-      }),
-    ).toBe("iPhone · Solace Dev");
+  it("labels iPhones by app and variant", () => {
+    const label = (bundleId: string) =>
+      formatPushDeviceLabel({ platform: "ios", bundleId });
+    expect(label(SOLACE_CALENDAR_IOS_BUNDLE_ID)).toBe("iPhone · Calendar");
+    expect(label(SOLACE_CALENDAR_IOS_DEV_BUNDLE_ID)).toBe(
+      "iPhone · Calendar Dev",
+    );
+    expect(label(SOLACE_MAIL_IOS_BUNDLE_ID)).toBe("iPhone · Mail");
+    expect(label(SOLACE_MAIL_IOS_DEV_BUNDLE_ID)).toBe("iPhone · Mail Dev");
+    expect(label("com.example.app")).toBe("iPhone");
   });
 });
 
@@ -151,8 +150,10 @@ describe("formatPushDeviceLastSeen", () => {
 
 describe("isSolaceIosBundleId", () => {
   it("accepts only known Solace iOS bundle ids", () => {
-    expect(isSolaceIosBundleId(SOLACE_IOS_PRODUCTION_BUNDLE_ID)).toBe(true);
-    expect(isSolaceIosBundleId(SOLACE_IOS_DEV_BUNDLE_ID)).toBe(true);
+    expect(isSolaceIosBundleId(SOLACE_CALENDAR_IOS_BUNDLE_ID)).toBe(true);
+    expect(isSolaceIosBundleId(SOLACE_CALENDAR_IOS_DEV_BUNDLE_ID)).toBe(true);
+    expect(isSolaceIosBundleId(SOLACE_MAIL_IOS_BUNDLE_ID)).toBe(true);
+    expect(isSolaceIosBundleId(SOLACE_MAIL_IOS_DEV_BUNDLE_ID)).toBe(true);
     expect(isSolaceIosBundleId("com.example.app")).toBe(false);
     expect(isSolaceIosBundleId(null)).toBe(false);
   });
