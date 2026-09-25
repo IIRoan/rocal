@@ -19,6 +19,7 @@
     "dev:backend": "cd apps/backend && bun run dev",
     "dev:calendar": "cd apps/native-calendar && bun run dev",
     "dev:mail": "cd apps/native-mail && bun run dev",
+    "dev:mobile": "bun run ./scripts/dev-mobile.ts",
     "cloudflared": "bun run ./scripts/cloudflared.ts",
     "dev:notifications": "cd apps/notifications && bun run dev",
     "lint": "bun run check:rules && cd apps/backend && bun run lint && cd ../web && bun run lint && cd ../native-calendar && bun run lint && cd ../native-mail && bun run lint && cd ../../packages/native-core && bun run lint && cd ../../apps/notifications && bun run lint",

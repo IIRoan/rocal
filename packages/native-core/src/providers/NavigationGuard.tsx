@@ -14,6 +14,7 @@ import {
 } from "../lib/auth-routing";
 import { API_BASE_URL } from "../lib/constants";
 import { captureException } from "../lib/reporting";
+import { resetPreSessionQueries } from "../lib/session-query-reset";
 import {
   useNotificationExtensionSync,
   type NotificationExtensionSecrets,
@@ -103,9 +104,7 @@ export function NavigationGuard({
 
       if (cancelled) return;
 
-      queryClient.removeQueries({ queryKey: ["events"] });
-      queryClient.removeQueries({ queryKey: QUERY_KEYS.calendars() });
-      queryClient.removeQueries({ queryKey: QUERY_KEYS.categories() });
+      void resetPreSessionQueries(queryClient);
 
       // Silent on failure; the next launch retries the remaining rows.
       void calendarApiService
