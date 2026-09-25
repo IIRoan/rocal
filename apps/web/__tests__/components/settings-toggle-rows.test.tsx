@@ -57,7 +57,7 @@ jest.mock("../../lib/calendar-api-service", () => ({
 
 import {
   PUSH_DEVICES_SECTION,
-  SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+  SOLACE_CALENDAR_IOS_BUNDLE_ID,
 } from "@workspace/calendar-core";
 import { NotificationSettingsView } from "../../components/command-palette/notification-settings";
 import { SecuritySettings } from "../../components/command-palette/security-settings";
@@ -100,7 +100,7 @@ describe("settings toggle rows", () => {
           {
             id: "dev-1",
             platform: "ios",
-            bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+            bundleId: SOLACE_CALENDAR_IOS_BUNDLE_ID,
             environment: "production",
             isEnabled: true,
             lastSeenAt: "2026-08-26T10:00:00.000Z",
@@ -141,7 +141,7 @@ describe("settings toggle rows", () => {
           {
             id: "dev-1",
             platform: "ios",
-            bundleId: SOLACE_IOS_PRODUCTION_BUNDLE_ID,
+            bundleId: SOLACE_CALENDAR_IOS_BUNDLE_ID,
             environment: "production",
             isEnabled: true,
             lastSeenAt: "2026-08-26T10:00:00.000Z",

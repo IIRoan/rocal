@@ -5,8 +5,8 @@ type MobileRuntimeBridgeProps = {
 };
 
 /**
- * Previously handled web-based mobile runtime setup. The native app now lives
- * in apps/native, so this component is a simple passthrough for the web app.
+ * Previously handled web-based mobile runtime setup. The native apps now live
+ * in apps/native-calendar and apps/native-mail, so this component is a simple passthrough for the web app.
  */
 export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
   return <>{children}</>;

@@ -1220,3 +1220,23 @@ func TestApplyEnvFileSkipsBackendPort(t *testing.T) {
 		t.Fatalf("expected DATABASE_URL from backend env, got %q", got)
 	}
 }
+
+func TestPushDevicesForKindRoutesPushesToTheirApp(t *testing.T) {
+	devices := []jobs.PushDevice{
+		{BundleID: "onl.solace.mobile", TokenHash: "calendar"},
+		{BundleID: "onl.solace.mail", TokenHash: "mail"},
+		{BundleID: "onl.solace.mail.dev", TokenHash: "mail-dev"},
+	}
+
+	mail := pushDevicesForKind(devices, "new_mail")
+	if len(mail) != 2 || mail[0].TokenHash != "mail" || mail[1].TokenHash != "mail-dev" {
+		t.Fatalf("expected mail devices only, got %+v", mail)
+	}
+	reminders := pushDevicesForKind(devices, "event_reminder")
+	if len(reminders) != 1 || reminders[0].TokenHash != "calendar" {
+		t.Fatalf("expected calendar device only, got %+v", reminders)
+	}
+	if !isTestReminderEventID("test-notification") || isTestReminderEventID("evt-1") {
+		t.Fatal("unexpected test reminder detection")
+	}
+}

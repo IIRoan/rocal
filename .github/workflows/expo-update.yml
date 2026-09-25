@@ -7,7 +7,8 @@ on:
       - main
       - testing
     paths:
-      - "apps/native/**"
+      - "apps/native-calendar/**"
+      - "apps/native-mail/**"
       - "packages/**"
       - "package.json"
       - "bun.lock"
@@ -19,7 +20,8 @@ on:
       - synchronize
       - reopened
     paths:
-      - "apps/native/**"
+      - "apps/native-calendar/**"
+      - "apps/native-mail/**"
       - "packages/**"
       - "package.json"
       - "bun.lock"
@@ -49,9 +51,13 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [native-calendar, native-mail]
     defaults:
       run:
-        working-directory: apps/native
+        working-directory: apps/${{ matrix.app }}
 
     steps:
       - name: Check for EXPO_TOKEN
@@ -90,9 +96,13 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/testing'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [native-calendar, native-mail]
     defaults:
       run:
-        working-directory: apps/native
+        working-directory: apps/${{ matrix.app }}
 
     steps:
       - name: Check for EXPO_TOKEN
@@ -131,9 +141,13 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [native-calendar, native-mail]
     defaults:
       run:
-        working-directory: apps/native
+        working-directory: apps/${{ matrix.app }}
 
     steps:
       - name: Check for EXPO_TOKEN
@@ -174,9 +188,13 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [native-calendar, native-mail]
     defaults:
       run:
-        working-directory: apps/native
+        working-directory: apps/${{ matrix.app }}
 
     steps:
       - name: Check for EXPO_TOKEN

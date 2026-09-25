@@ -5,7 +5,8 @@ on:
     branches: [master, main]
     types: [opened, synchronize, reopened]
     paths:
-      - "apps/native/**"
+      - "apps/native-calendar/**"
+      - "apps/native-mail/**"
       - "packages/**"
       - "package.json"
       - "bun.lock"
@@ -14,7 +15,8 @@ on:
   push:
     branches: [master, main]
     paths:
-      - "apps/native/**"
+      - "apps/native-calendar/**"
+      - "apps/native-mail/**"
       - "packages/**"
       - "package.json"
       - "bun.lock"
@@ -50,8 +52,8 @@ jobs:
     outputs:
       profile: ${{ steps.meta.outputs.profile }}
       app_variant: ${{ steps.meta.outputs.app_variant }}
-      ios_bundle_id: ${{ steps.meta.outputs.ios_bundle_id }}
-      title: ${{ steps.meta.outputs.title }}
+      bundle_suffix: ${{ steps.meta.outputs.bundle_suffix }}
+      title_suffix: ${{ steps.meta.outputs.title_suffix }}
     steps:
       - name: Resolve profile metadata
         id: meta
@@ -64,13 +66,13 @@ jobs:
           case "$PROFILE" in
             development)
               echo "app_variant=development" >> "$GITHUB_OUTPUT"
-              echo "ios_bundle_id=onl.solace.mobile.dev" >> "$GITHUB_OUTPUT"
-              echo "title=Solace Dev" >> "$GITHUB_OUTPUT"
+              echo "bundle_suffix=.dev" >> "$GITHUB_OUTPUT"
+              echo "title_suffix=Dev" >> "$GITHUB_OUTPUT"
               ;;
             preview)
               echo "app_variant=preview" >> "$GITHUB_OUTPUT"
-              echo "ios_bundle_id=onl.solace.mobile" >> "$GITHUB_OUTPUT"
-              echo "title=Solace Preview" >> "$GITHUB_OUTPUT"
+              echo "bundle_suffix=" >> "$GITHUB_OUTPUT"
+              echo "title_suffix=Preview" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "Unknown PROFILE=$PROFILE" >&2
@@ -82,6 +84,18 @@ jobs:
     needs: meta
     runs-on: macos-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: calendar
+            dir: apps/native-calendar
+            name: Calendar
+            ios_bundle_base: onl.solace.mobile
+          - app: mail
+            dir: apps/native-mail
+            name: Mail
+            ios_bundle_base: onl.solace.mail
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       PROFILE: ${{ needs.meta.outputs.profile }}
@@ -101,7 +115,7 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build .ipa
-        working-directory: apps/native
+        working-directory: ${{ matrix.dir }}
         env:
           APP_VARIANT: ${{ needs.meta.outputs.app_variant }}
         run: |
@@ -128,8 +142,8 @@ jobs:
           S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
           S3_REGION: ${{ secrets.S3_REGION }}
           S3_PUBLIC_BASE_URL: ${{ secrets.S3_PUBLIC_BASE_URL }}
-          IOS_BUNDLE_ID: ${{ needs.meta.outputs.ios_bundle_id }}
-          TITLE: ${{ needs.meta.outputs.title }}
+          IOS_BUNDLE_ID: ${{ matrix.ios_bundle_base }}${{ needs.meta.outputs.bundle_suffix }}
+          TITLE: Solace ${{ matrix.name }} ${{ needs.meta.outputs.title_suffix }}
         run: |
           set -euo pipefail
           IPA_PATH="$RUNNER_TEMP/solace.ipa"
@@ -142,7 +156,7 @@ jobs:
           BUNDLE_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")
           test -n "$BUNDLE_VERSION"
 
-          bun apps/native/scripts/internal-release/publish-ios.ts \
+          bun "${{ matrix.dir }}/scripts/internal-release/publish-ios.ts" \
             --profile "$PROFILE" \
             --ipa "$IPA_PATH" \
             --bundle-id "$IOS_BUNDLE_ID" \
@@ -154,6 +168,18 @@ jobs:
     needs: meta
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: calendar
+            dir: apps/native-calendar
+            name: Calendar
+            ios_bundle_base: onl.solace.mobile
+          - app: mail
+            dir: apps/native-mail
+            name: Mail
+            ios_bundle_base: onl.solace.mail
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       PROFILE: ${{ needs.meta.outputs.profile }}
@@ -180,7 +206,7 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build .apk
-        working-directory: apps/native
+        working-directory: ${{ matrix.dir }}
         env:
           APP_VARIANT: ${{ needs.meta.outputs.app_variant }}
         run: |
@@ -202,7 +228,7 @@ jobs:
           S3_PUBLIC_BASE_URL: ${{ secrets.S3_PUBLIC_BASE_URL }}
         run: |
           set -euo pipefail
-          bun apps/native/scripts/internal-release/publish-android.ts \
+          bun "${{ matrix.dir }}/scripts/internal-release/publish-android.ts" \
             --profile "$PROFILE" \
             --apk "$RUNNER_TEMP/solace.apk" \
             --out-dir "$RUNNER_TEMP/r2-publish"
@@ -212,9 +238,21 @@ jobs:
     # Publish whichever platform built; the page script skips missing artifacts.
     if: always() && needs.meta.result == 'success' && (needs.ios.result == 'success' || needs.android.result == 'success')
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: calendar
+            dir: apps/native-calendar
+            name: Calendar
+            ios_bundle_base: onl.solace.mobile
+          - app: mail
+            dir: apps/native-mail
+            name: Mail
+            ios_bundle_base: onl.solace.mail
     env:
       PROFILE: ${{ needs.meta.outputs.profile }}
-      TITLE: ${{ needs.meta.outputs.title }}
+      TITLE: Solace ${{ matrix.name }} ${{ needs.meta.outputs.title_suffix }}
     steps:
       - uses: actions/checkout@v6
 
@@ -235,15 +273,15 @@ jobs:
           S3_PUBLIC_BASE_URL: ${{ secrets.S3_PUBLIC_BASE_URL }}
         run: |
           set -euo pipefail
-          bun apps/native/scripts/internal-release/publish-page.ts \
+          bun "${{ matrix.dir }}/scripts/internal-release/publish-page.ts" \
             --profile "$PROFILE" \
             --title "$TITLE" \
             --out-dir "$RUNNER_TEMP/r2-publish"
 
           {
-            echo "### Mobile ${PROFILE} internal build"
+            echo "### ${TITLE} internal build"
             echo
-            echo "iOS → \`solace/releases/${PROFILE}.ipa\`, Android → \`solace/releases/${PROFILE}.apk\`."
+            echo "iOS → \`solace/releases/${{ matrix.app }}/${PROFILE}.ipa\`, Android → \`solace/releases/${{ matrix.app }}/${PROFILE}.apk\`."
             echo "Combined install QR (iOS + Android) sent to Discord."
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -266,7 +304,7 @@ jobs:
             REF_LINE="${REF_NAME} · $GITHUB_SHA"
           fi
 
-          bun apps/native/scripts/internal-release/notify-discord.ts \
+          bun "${{ matrix.dir }}/scripts/internal-release/notify-discord.ts" \
             --qr "$QR_PATH" \
             --profile "$PROFILE" \
             --title "$TITLE" \

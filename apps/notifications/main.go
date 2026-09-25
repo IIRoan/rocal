@@ -599,6 +599,12 @@ func (ns *NotificationServer) dispatchPushJob(ctx context.Context, job jobs.Job)
 	if kind == "" {
 		kind = job.Payload.Kind
 	}
+	if !isTestReminderEventID(jobEventID(job)) {
+		devices = pushDevicesForKind(devices, kind)
+		if len(devices) == 0 {
+			return ns.skipJob(ctx, job, "no devices for this push kind")
+		}
+	}
 
 	var notification push.Notification
 	switch kind {
@@ -614,7 +620,7 @@ func (ns *NotificationServer) dispatchPushJob(ctx context.Context, job jobs.Job)
 	case "event_reminder":
 		eventID := jobEventID(job)
 		encryptedTitle, startsAt := "", ""
-		if eventID != "" && eventID != "test-notification" && eventID != "manual-test" {
+		if eventID != "" && !isTestReminderEventID(eventID) {
 			event, user, err := jobs.LoadReminder(ctx, ns.db, eventID, job.UserID)
 			if err != nil {
 				return err
@@ -647,6 +653,21 @@ func (ns *NotificationServer) dispatchPushJob(ctx context.Context, job jobs.Job)
 	}
 	ns.log.Info("Delivered %s push to %d/%d device(s)", kind, sent, len(devices))
 	return nil
+}
+
+// Test pushes go to every app so either app's settings can verify delivery.
+func isTestReminderEventID(eventID string) bool {
+	return eventID == "test-notification" || eventID == "manual-test"
+}
+
+func pushDevicesForKind(devices []jobs.PushDevice, kind string) []jobs.PushDevice {
+	matched := make([]jobs.PushDevice, 0, len(devices))
+	for _, device := range devices {
+		if push.BundleReceivesKind(device.BundleID, kind) {
+			matched = append(matched, device)
+		}
+	}
+	return matched
 }
 
 func (ns *NotificationServer) sendPushToDevice(ctx context.Context, device jobs.PushDevice, notification push.Notification) error {
@@ -1079,9 +1100,9 @@ func (ns *NotificationServer) sendTestPush(recipient string) error {
 	}
 	if enabledCount == 0 {
 		if totalCount > 0 {
-			return fmt.Errorf("this account has %d disabled iOS device(s); open Solace Dev while signed in", totalCount)
+			return fmt.Errorf("this account has %d disabled iOS device(s); open Solace Calendar or Solace Mail while signed in", totalCount)
 		}
-		return fmt.Errorf("no registered iOS devices for this account; open Solace Dev while signed in")
+		return fmt.Errorf("no registered iOS devices for this account; open Solace Calendar or Solace Mail while signed in")
 	}
 
 	devices, err := jobs.ListPushDevices(ctx, ns.db, userID)
@@ -1089,7 +1110,7 @@ func (ns *NotificationServer) sendTestPush(recipient string) error {
 		return err
 	}
 	if len(devices) == 0 {
-		return fmt.Errorf("no registered iOS devices for this account; open Solace Dev while signed in")
+		return fmt.Errorf("no registered iOS devices for this account; open Solace Calendar or Solace Mail while signed in")
 	}
 
 	notification := push.EventReminder(15, "manual-test", "", "")
