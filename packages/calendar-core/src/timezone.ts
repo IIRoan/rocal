@@ -245,11 +245,7 @@ export function getInclusiveCalendarDayRange(
   const firstDay = utcToPickerDate(rawStart, resolvedTimezone);
 
   let lastInstant = rawEnd;
-  if (
-    rawEnd > rawStart &&
-    isStartOfZonedDay(rawEnd, resolvedTimezone) &&
-    !isSameCalendarDayInTimezone(rawStart, rawEnd, resolvedTimezone)
-  ) {
+  if (rawEnd > rawStart && isStartOfZonedDay(rawEnd, resolvedTimezone)) {
     lastInstant = new Date(rawEnd.getTime() - 1);
   }
 
