@@ -33,12 +33,17 @@ describe("settings navigation catalog", () => {
     ]);
   });
 
-  it("keeps composing, display, and list settings on web until native mail consumes them", () => {
-    expect(getSettingsMailItems("native").map((item) => item.id)).toEqual([
-      "mailboxes",
-      "labels",
-      "contacts",
-    ]);
+  it("ships message list settings on native alongside the shared mail sections", () => {
+    expect(getSettingsMailItems("native").map((item) => item.id)).toEqual(
+      expect.arrayContaining([
+        "mailboxes",
+        "labels",
+        "contacts",
+        "composing",
+        "mail-display",
+        "mail-list",
+      ]),
+    );
     expect(getSettingsMailItems("web").map((item) => item.id)).toEqual([
       "mailboxes",
       "labels",

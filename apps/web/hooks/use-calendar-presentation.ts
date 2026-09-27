@@ -38,7 +38,6 @@ type UseCalendarPresentationOptions = {
   currentDate?: Date | null;
   currentView?: CalendarView | null;
   previewEvent?: UiCalendarEvent | null;
-  updateTheme: (theme: "light" | "dark" | "system") => Promise<void>;
 };
 
 export function useCalendarPresentation({
@@ -49,24 +48,12 @@ export function useCalendarPresentation({
   currentDate,
   currentView,
   previewEvent,
-  updateTheme,
 }: UseCalendarPresentationOptions) {
   const [contextPreviewEvent, setContextPreviewEvent] =
     useState<UiCalendarEvent | null>(null);
   const initialView = settings?.defaultView || "month";
   const defaultCalendarId =
     settings?.defaultCalendarId || calendarData.calendars[0]?.id || "";
-
-  const themeSettings = useMemo(
-    () => ({
-      currentTheme: (settings?.theme || "system") as
-        | "light"
-        | "dark"
-        | "system",
-      updateTheme,
-    }),
-    [settings?.theme, updateTheme],
-  );
 
   const workingDays = useMemo(
     () => parseWorkingDays(settings?.workingDays),
@@ -181,7 +168,6 @@ export function useCalendarPresentation({
     initialView,
     isAllInitialLoading: loadingState.isAllInitialLoading,
     overlayContext: loadingState.overlayContext,
-    themeSettings,
     transformedEvents,
     workingDays,
   };

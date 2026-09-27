@@ -8,6 +8,12 @@ import React, {
 } from "react";
 import { useColorScheme } from "react-native";
 import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider as NavigationThemeProvider,
+  type Theme as NavigationTheme,
+} from "expo-router";
+import {
   nativeLightTheme,
   nativeDarkTheme,
   nativeMailDarkTheme,
@@ -72,6 +78,45 @@ function resolveTheme(
   };
 }
 
+/** Stack screens paint the navigation theme's background, so it must match ours or light grey flashes between screens. */
+function toNavigationTheme(
+  theme: ThemeTokens,
+  isDark: boolean,
+): NavigationTheme {
+  const base = isDark ? DarkTheme : DefaultTheme;
+  return {
+    ...base,
+    colors: {
+      primary: theme.colors.primaryBase,
+      background: theme.colors.background,
+      card: theme.colors.card,
+      text: theme.colors.foreground,
+      border: theme.colors.border,
+      notification: theme.colors.destructive,
+    },
+  };
+}
+
+function ThemeContextProvider({
+  value,
+  children,
+}: {
+  value: ThemeContextValue;
+  children: React.ReactNode;
+}): React.ReactNode {
+  const navigationTheme = useMemo(
+    () => toNavigationTheme(value.theme, value.isDark),
+    [value.theme, value.isDark],
+  );
+  return (
+    <ThemeContext.Provider value={value}>
+      <NavigationThemeProvider value={navigationTheme}>
+        {children}
+      </NavigationThemeProvider>
+    </ThemeContext.Provider>
+  );
+}
+
 export function ThemeProvider({
   children,
 }: {
@@ -117,9 +162,7 @@ export function ThemeProvider({
   // Wait for the persisted preference so there is no flash of the wrong theme.
   if (!isReady) return <></>;
 
-  return (
-    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
-  );
+  return <ThemeContextProvider value={value}>{children}</ThemeContextProvider>;
 }
 
 /** Re-themes calendar and mail with the Solace palette, like `[data-solace]` scopes web mail. */
@@ -136,9 +179,7 @@ export function WorkspaceThemeScope({
     }),
     [parent],
   );
-  return (
-    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
-  );
+  return <ThemeContextProvider value={value}>{children}</ThemeContextProvider>;
 }
 
 export function useTheme(): ThemeContextValue {

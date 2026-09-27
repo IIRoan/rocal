@@ -54,7 +54,7 @@ const NAMED_ENTITIES: Record<string, string> = {
   tab: "\t",
 };
 
-function decodeHtmlEntities(value: string): string {
+export function decodeHtmlEntities(value: string): string {
   return value.replace(
     /&(?:#x([0-9a-f]+)|#(\d+)|([a-z]+));?/gi,
     (match, hex: string | undefined, dec: string | undefined, name: string | undefined) => {
@@ -91,7 +91,7 @@ export function isSafeEmailUrl(tag: string, attr: string, rawValue: string): boo
   return scheme === "http" || scheme === "https";
 }
 
-function decodeCssEscapes(css: string): string {
+export function decodeCssEscapes(css: string): string {
   return css
     .replace(/\/\*[\s\S]*?(?:\*\/|$)/g, "")
     .replace(/\\([0-9a-f]{1,6})\s?/gi, (_m, hex: string) => {

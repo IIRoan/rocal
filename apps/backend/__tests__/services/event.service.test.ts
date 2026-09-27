@@ -134,6 +134,37 @@ function createInvitationResolutionPrismaMock(
   };
 }
 
+describe("EventService.list", () => {
+  it("expands split series and returns detached occurrences only once", async () => {
+    const split = eventFixture({
+      id: "split", parentEventId: "old-series",
+      recurrence: JSON.stringify({ frequency: "weekly", interval: 1 }),
+      recurrenceExceptions: [],
+    });
+    const detached = eventFixture({ id: "detached", parentEventId: "split" });
+    const findMany = jest.fn<(input: Record<string, unknown>) => Promise<ReturnType<typeof eventFixture>[]>>()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([split])
+      .mockResolvedValueOnce([detached]);
+    const prisma = {
+      calendarEvent: { findMany },
+      calendar: { findMany: jest.fn(async () => []) },
+      eventCategory: { findMany: jest.fn(async () => []) },
+    };
+    const result = await new EventService(prisma as never).list({
+      userId: "user-1", start: "2026-05-26T00:00:00Z", end: "2026-06-03T00:00:00Z",
+    });
+    expect(findMany.mock.calls[0]?.[0]).toMatchObject({ where: { parentEventId: null } });
+    expect(findMany.mock.calls[1]?.[0].where).not.toHaveProperty("parentEventId");
+    expect(findMany.mock.calls[2]?.[0]).toMatchObject({ where: { recurrence: null } });
+    expect(result.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "split_2026-06-02T10:00:00.000Z" }),
+      expect.objectContaining({ id: "detached" }),
+    ]));
+    expect(result.events.filter((event) => (event as { id: string }).id === "detached")).toHaveLength(1);
+  });
+});
+
 describe("EventService.search", () => {
   it("does not keep plaintext match-all clauses when the trimmed query is blank", async () => {
     const queryRawUnsafe = jest.fn<

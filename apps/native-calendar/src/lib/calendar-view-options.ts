@@ -11,4 +11,6 @@ export const VIEW_OPTIONS: {
   { label: "Week View", value: "week", icon: "columns" },
   { label: "Day View", value: "day", icon: "square" },
   { label: "3-Day View", value: "3day", icon: "sidebar" },
+  { label: "Month View", value: "month", icon: "grid" },
+  { label: "Agenda View", value: "agenda", icon: "list" },
 ];

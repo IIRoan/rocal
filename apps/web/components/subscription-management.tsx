@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { getErrorMessage } from "@/lib/calendar-ui-helpers";
 import { useCalendarData } from "@/hooks/use-calendar-data";
+import { EVENTS_QUERY_KEY } from "@/hooks/use-calendar-events-loader";
 import { useCalendarContext } from "@workspace/ui/components/calendar";
 import type {
   ApiError,
@@ -41,6 +42,7 @@ import { PRESET_COLORS } from "./command-palette/navigation-config";
 import type { PaletteView } from "./command-palette/constants";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import { SubscriptionFeedUrlInfo } from "./subscription-feed-url-info";
+import { IcsImportPanel } from "./ics-import-panel";
 import {
   Plus,
   Trash2,
@@ -57,6 +59,7 @@ import {
   Rss,
   Search,
   Copy,
+  FileText,
 } from "lucide-react";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
@@ -143,6 +146,7 @@ export function SubscriptionManagement({
     view:
       | "subscriptions-add-feed"
       | "subscriptions-holidays"
+      | "subscriptions-import-ics"
       | "subscriptions-edit",
   ) => {
     onNavigateTo(view);
@@ -227,7 +231,7 @@ export function SubscriptionManagement({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       await refetchCalendars();
-      await queryClient.invalidateQueries({ queryKey: ["events"] });
+      await queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
       toast.success("Read-only calendar added successfully.");
       setNewSubscription({ name: "", url: "", color: "indigo" });
       setValidationErrors({});
@@ -246,7 +250,7 @@ export function SubscriptionManagement({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       await refetchCalendars();
-      await queryClient.invalidateQueries({ queryKey: ["events"] });
+      await queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
       toast.success("Subscription removed.");
       if (currentView === "subscriptions-edit") goBackToMain();
     },
@@ -259,7 +263,7 @@ export function SubscriptionManagement({
     onSuccess: async (_: SyncSubscriptionResponse, id: string) => {
       await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       await refetchCalendars();
-      await queryClient.invalidateQueries({ queryKey: ["events"] });
+      await queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
       const sub = subscriptions.find((subscription) => subscription.id === id);
       toast.success(`Synced "${sub?.name || "subscription"}"`);
     },
@@ -279,7 +283,7 @@ export function SubscriptionManagement({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       await refetchCalendars();
-      await queryClient.invalidateQueries({ queryKey: ["events"] });
+      await queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
       toast.success("Calendar updated.");
       setEditValidationErrors({});
       goBackToMain();
@@ -552,6 +556,15 @@ export function SubscriptionManagement({
                   </span>
                 )}
                 <ChevronRight className="size-3.5 text-muted-foreground/40 shrink-0" />
+              </button>
+              <button
+                type="button"
+                onClick={() => goToSubView("subscriptions-import-ics")}
+                className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors cursor-pointer"
+              >
+                <FileText className="size-4 text-muted-foreground shrink-0" />
+                <span className="text-sm">Import .ics File</span>
+                <ChevronRight className="ml-auto size-3.5 text-muted-foreground/40 shrink-0" />
               </button>
             </div>
 
@@ -890,6 +903,10 @@ export function SubscriptionManagement({
             )}
           </div>
         </>
+      )}
+
+      {currentView === "subscriptions-import-ics" && (
+        <IcsImportPanel calendars={calendars} onBack={goBackToMain} />
       )}
 
       {currentView === "subscriptions-edit" && editTargetCalendarId && (

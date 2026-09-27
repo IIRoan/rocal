@@ -1129,6 +1129,40 @@ describe("MessageReader — more actions dropdown", () => {
 
 });
 
+describe("MessageReader — show original look", () => {
+  const html = `<p style="color:#0d0d0d">We have been busy.</p>`;
+  const frameDoc = () =>
+    container.querySelector("iframe")?.getAttribute("srcdoc") ?? "";
+
+  it("renders one message in its original light look without touching the saved appearance", () => {
+    localStorage.removeItem("mail:displaySettings");
+    render({ decryptedHtml: html });
+    expect(frameDoc()).toContain('<meta name="color-scheme" content="dark">');
+    expect(frameDoc()).not.toContain("color:#0d0d0d");
+
+    openMoreActions();
+    act(() => findMenuItem("Show original")!.click());
+
+    expect(frameDoc()).toContain('<meta name="color-scheme" content="light">');
+    expect(frameDoc()).toContain("color:#0d0d0d");
+    expect(localStorage.getItem("mail:displaySettings")).toBeNull();
+
+    openMoreActions();
+    act(() => findMenuItem("Show in dark mode")!.click());
+    expect(frameDoc()).toContain('<meta name="color-scheme" content="dark">');
+  });
+
+  it("returns to the saved appearance on the next message", () => {
+    render({ decryptedHtml: html });
+    openMoreActions();
+    act(() => findMenuItem("Show original")!.click());
+    expect(frameDoc()).toContain('<meta name="color-scheme" content="light">');
+
+    render({ decryptedHtml: html, message: { ...baseMessage, id: "msg-2" } as any });
+    expect(frameDoc()).toContain('<meta name="color-scheme" content="dark">');
+  });
+});
+
 describe("MessageReader — toolbar move to", () => {
   it("moves the message to a mailbox picked from the toolbar", () => {
     const onMove = jest.fn();

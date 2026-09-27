@@ -1,11 +1,13 @@
 import { SIDEBAR_VIEW_OPTIONS } from "./app-sidebar-utils";
 
 describe("View switcher options", () => {
-  it("exposes the native calendar views in logical order, without month or agenda", () => {
+  it("exposes every calendar view in logical order", () => {
     expect(SIDEBAR_VIEW_OPTIONS.map((o) => o.view)).toEqual([
       "day",
       "3day",
       "week",
+      "month",
+      "agenda",
     ]);
   });
 
@@ -14,6 +16,8 @@ describe("View switcher options", () => {
       "Day",
       "3 Day",
       "Week",
+      "Month",
+      "Agenda",
     ]);
   });
 });

@@ -9,6 +9,7 @@ import { PasskeySettings } from "../passkey-settings";
 import { SubscriptionManagement } from "../subscription-management";
 import { EventEditor } from "../event-editor";
 import { CalendarManager } from "../calendar-manager";
+import { CategoryManager } from "../category-manager";
 import { AppearanceSettings } from "./appearance-settings";
 import { NotificationSettings } from "./notification-settings";
 import { TimeRegionSettings } from "./time-region-settings";
@@ -242,9 +243,24 @@ export function CommandPaletteViewContent({
   }
 
   if (
+    currentView === "categories" ||
+    currentView === "category-create" ||
+    currentView === "category-edit"
+  ) {
+    return (
+      <CategoryManager
+        currentView={currentView}
+        onBack={goBack}
+        onNavigateTo={goForward}
+      />
+    );
+  }
+
+  if (
     currentView === "subscriptions" ||
     currentView === "subscriptions-add-feed" ||
     currentView === "subscriptions-holidays" ||
+    currentView === "subscriptions-import-ics" ||
     currentView === "subscriptions-edit"
   ) {
     return (

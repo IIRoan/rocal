@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   keepPreviousData,
   useQuery,
@@ -13,10 +13,9 @@ import {
   createVisibleCalendarIdSet,
   transformCalendarEvents,
   resolveTimezone,
-  utcToPickerDate,
 } from "@workspace/calendar-core";
 import { useSheet } from "../../src/providers/SheetProvider";
-import { toNativeCalendarView } from "../../src/lib/calendar-views";
+import { isTimelineCalendarView } from "../../src/lib/calendar-views";
 import { useCalendarView } from "../../src/providers/CalendarViewProvider";
 import { calendarApiService } from "@workspace/native-core/lib/api";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
@@ -34,10 +33,10 @@ import { CalendarAccountSheet } from "../../src/components/CalendarAccountSheet"
 import { CalendarsSheet } from "../../src/components/calendars/CalendarsSheet";
 import { CalendarBottomChrome } from "../../src/components/calendar/CalendarBottomChrome";
 import { resolveCalendarSwitcherDate } from "../../src/components/calendar/view-switcher-utils";
-import {
-  NativeTimelineCalendar,
-  type NativeTimelineCalendarHandle,
-} from "../../src/components/calendar/NativeTimelineCalendar";
+import { NativeTimelineCalendar } from "../../src/components/calendar/NativeTimelineCalendar";
+import { NativeMonthCalendar } from "../../src/components/calendar/NativeMonthCalendar";
+import { useCalendarViewNavigation } from "../../src/components/calendar/use-calendar-view-navigation";
+import { NativeAgendaView } from "../../src/components/calendar/NativeAgendaView";
 import type { KitEventMove } from "../../src/components/calendar/calendar-kit-adapter";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
 
@@ -53,7 +52,6 @@ export default function CalendarScreen() {
     setCurrentDate,
     setSelectedDate,
   } = useCalendarView();
-  const timelineRef = useRef<NativeTimelineCalendarHandle>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -75,6 +73,16 @@ export default function CalendarScreen() {
   });
   const settingsLoading = settingsPending && !settings;
   const resolvedTimezone = resolveTimezone(settings?.timezone);
+  const {
+    timelineRef,
+    monthRef,
+    handleNavigateForward,
+    handleNavigateBackward,
+    handleTodayPress,
+    handleMonthChange,
+    handleMonthDayPress,
+    handleMonthCreateAtDay,
+  } = useCalendarViewNavigation(resolvedTimezone);
   const timeFormat = useUserTimeFormat();
   const workingDays = useMemo(
     () => parseWorkingDays(settings?.workingDays),
@@ -144,7 +152,7 @@ export default function CalendarScreen() {
 
   useEffect(() => {
     if (settings?.defaultView) {
-      setActiveView(toNativeCalendarView(settings.defaultView));
+      setActiveView(settings.defaultView);
     }
   }, [settings?.defaultView, setActiveView]);
 
@@ -208,21 +216,6 @@ export default function CalendarScreen() {
       ),
     [detailEventsData?.events, calendarMap, visibleCalendarIds],
   );
-
-  const handleNavigateForward = useCallback(() => {
-    timelineRef.current?.goToNextPage(true);
-  }, []);
-
-  const handleNavigateBackward = useCallback(() => {
-    timelineRef.current?.goToPrevPage(true);
-  }, []);
-
-  const handleTodayPress = useCallback(() => {
-    const today = utcToPickerDate(new Date(), resolvedTimezone);
-    setCurrentDate(today);
-    setSelectedDate(today);
-    timelineRef.current?.goToDate(today, { animated: true, hourScroll: true });
-  }, [resolvedTimezone, setCurrentDate, setSelectedDate]);
 
   const handleTimelineEventPress = useCallback(
     (eventId: string) => {
@@ -293,22 +286,48 @@ export default function CalendarScreen() {
           />
         }
       >
-        <NativeTimelineCalendar
-          ref={timelineRef}
-          view={activeView}
-          selectedDate={selectedDate}
-          events={decoratedDetailEvents}
-          timezone={resolvedTimezone}
-          weekStartDay={settings?.weekStartDay ?? 1}
-          workingDays={workingDays}
-          timeFormat={timeFormat}
-          swipeEnabled
-          isLoading={detailEventsLoading}
-          onEventPress={handleTimelineEventPress}
-          onTimeSlotPress={handleTimeSlotPress}
-          onDateChange={handleTimelineDateChange}
-          onEventMove={handleTimelineEventMove}
-        />
+        {isTimelineCalendarView(activeView) ? (
+          <NativeTimelineCalendar
+            ref={timelineRef}
+            view={activeView}
+            selectedDate={selectedDate}
+            events={decoratedDetailEvents}
+            timezone={resolvedTimezone}
+            weekStartDay={settings?.weekStartDay ?? 1}
+            workingDays={workingDays}
+            timeFormat={timeFormat}
+            swipeEnabled
+            isLoading={detailEventsLoading}
+            onEventPress={handleTimelineEventPress}
+            onTimeSlotPress={handleTimeSlotPress}
+            onDateChange={handleTimelineDateChange}
+            onEventMove={handleTimelineEventMove}
+          />
+        ) : activeView === "month" ? (
+          <NativeMonthCalendar
+            ref={monthRef}
+            selectedDate={selectedDate}
+            events={decoratedDetailEvents}
+            timezone={resolvedTimezone}
+            weekStartDay={settings?.weekStartDay ?? 1}
+            workingDays={workingDays}
+            timeFormat={timeFormat}
+            isLoading={detailEventsLoading}
+            onDayPress={handleMonthDayPress}
+            onCreateAtDay={handleMonthCreateAtDay}
+            onEventPress={handleTimelineEventPress}
+            onMonthChange={handleMonthChange}
+          />
+        ) : (
+          <NativeAgendaView
+            selectedDate={selectedDate}
+            events={decoratedDetailEvents}
+            timezone={resolvedTimezone}
+            timeFormat={timeFormat}
+            isLoading={detailEventsLoading}
+            onEventPress={handleTimelineEventPress}
+          />
+        )}
       </AppScreen>
       <CalendarDrawerSheet
         visible={drawerOpen}

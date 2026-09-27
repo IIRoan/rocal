@@ -1,4 +1,5 @@
-import { useEffect, createContext, use, useMemo } from "react";
+import { useEffect, createContext, use, useMemo, useRef } from "react";
+import { getAccountTimezoneSeed } from "@workspace/calendar-core";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import type { UserSettings, UpdateSettingsRequest, ApiError } from "@/lib/types/calendar";
 import { useSession } from "@/lib/auth-client";
@@ -26,6 +27,7 @@ export function useSettings() {
 export function useSettingsState(): SettingsContextValue {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
+  const seededSettingsId = useRef<string | null>(null);
 
   // Include the user ID in the key so each user gets their own cache entry.
   // staleTime: Infinity means data is never re-fetched automatically, so
@@ -40,7 +42,7 @@ export function useSettingsState(): SettingsContextValue {
     queryKey: settingsQueryKey,
     queryFn: () => calendarApiService.getUserSettings(),
     enabled: !!session?.user,
-    staleTime: Infinity, // Settings don't change often
+    staleTime: Infinity,
     retry: false,
   });
 
@@ -49,7 +51,6 @@ export function useSettingsState(): SettingsContextValue {
       calendarApiService.updateUserSettings(updates),
     onSuccess: (newSettings: UserSettings) => {
       queryClient.setQueryData<UserSettings>(settingsQueryKey, newSettings);
-      applyTheme(newSettings.theme);
     },
   });
 
@@ -60,29 +61,20 @@ export function useSettingsState(): SettingsContextValue {
     },
   });
 
-  // Apply theme when settings are loaded
+  const { mutate: mutateSettings } = updateSettingsMutation;
+  // One attempt per settings row (a reset creates a new one), so a failed seed never loops.
   useEffect(() => {
-    if (settingsQuery.data?.theme) {
-      // Check if there's a pending theme sync from the login page
-      const pendingTheme = localStorage.getItem("pending-theme-sync") as
-        | "light"
-        | "dark"
-        | "system"
-        | null;
-      if (pendingTheme && pendingTheme !== settingsQuery.data.theme) {
-        localStorage.removeItem("pending-theme-sync");
-        updateSettingsMutation.mutate({ theme: pendingTheme });
-      } else {
-        localStorage.removeItem("pending-theme-sync");
-        applyTheme(settingsQuery.data.theme);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settingsQuery.data?.theme]);
+    const settings = settingsQuery.data;
+    if (!settings || seededSettingsId.current === settings.id) return;
+    const timezone = getAccountTimezoneSeed(settings);
+    if (!timezone) return;
+    seededSettingsId.current = settings.id;
+    mutateSettings({ timezone });
+  }, [settingsQuery.data, mutateSettings]);
 
   return {
     settings: settingsQuery.data || null,
-    loading: settingsQuery.isLoading && !settingsQuery.isError, // Don't show loading on error
+    loading: settingsQuery.isLoading && !settingsQuery.isError,
     error: settingsQuery.error?.message ?? null,
     updateSettings: async (updates) => {
       await updateSettingsMutation.mutateAsync(updates);
@@ -94,37 +86,6 @@ export function useSettingsState(): SettingsContextValue {
       await settingsQuery.refetch();
     },
   };
-}
-
-function applyTheme(theme: "light" | "dark" | "system") {
-  const root = document.documentElement;
-
-  if (theme === "system") {
-    const systemPrefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)",
-    ).matches;
-    root.classList.toggle("dark", systemPrefersDark);
-  } else {
-    root.classList.toggle("dark", theme === "dark");
-  }
-
-  // Store theme preference
-  localStorage.setItem("theme", theme);
-}
-
-// Initialize theme on page load
-if (typeof window !== "undefined") {
-  const storedTheme = localStorage.getItem("theme") as
-    | "light"
-    | "dark"
-    | "system"
-    | null;
-  if (storedTheme) {
-    applyTheme(storedTheme);
-  } else {
-    // Default to system theme
-    applyTheme("system");
-  }
 }
 
 export { SettingsContext };

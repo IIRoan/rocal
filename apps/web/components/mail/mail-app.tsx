@@ -3,6 +3,7 @@
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useComposeDraftAutosave } from "@/hooks/use-compose-draft-autosave";
+import { useMailSyncedSettingsHydration } from "@/lib/mail/use-mail-synced-settings-hydration";
 import {
   MailComposeProvider,
 } from "./mail-compose-context";
@@ -41,6 +42,7 @@ function MailComposeAutosave({
 
 export function MailApp() {
   const mail = useMailApp();
+  useMailSyncedSettingsHydration();
   const isOpeningMailbox =
     Boolean(mail.session?.user) &&
     !mail.activeMailbox &&

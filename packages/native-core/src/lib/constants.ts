@@ -63,6 +63,12 @@ export const SECURE_STORE_KEYS = {
    */
   MAIL_VAULT_PGP_KEY_PART: "MAIL_VAULT_PGP_KEY_PART_",
   HIDDEN_MAILBOX_IDS: "HIDDEN_MAILBOX_IDS",
+  /** Reader remote-content policy and trusted senders. Cleared on sign-out. */
+  MAIL_DISPLAY_SETTINGS: "MAIL_DISPLAY_SETTINGS",
+  /** Compose preferences (plain text, signature, attachment reminder). Cleared on sign-out. */
+  MAIL_COMPOSE_SETTINGS: "MAIL_COMPOSE_SETTINGS",
+  /** Message list density, read delay, and undo duration. Cleared on sign-out. */
+  MAIL_LIST_SETTINGS: "MAIL_LIST_SETTINGS",
   SEARCH_INDEX_KEY: "SEARCH_INDEX_KEY",
   SEARCH_INDEX_ENABLED: "SEARCH_INDEX_ENABLED",
 } as const;

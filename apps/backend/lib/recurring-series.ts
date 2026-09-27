@@ -23,6 +23,7 @@ type RecurringEventSnapshot = {
   categoryId: string | null;
   start: Date;
   end: Date;
+  timezone?: string;
 };
 
 type BuildRecurringEventCreateDataInput = {
@@ -33,6 +34,11 @@ type BuildRecurringEventCreateDataInput = {
   recurrence: string | null;
   occurrenceDate?: Date;
 };
+
+/** An empty id clears the category, matching single-event updates. */
+function clearableCategoryId(categoryId: string): string | null {
+  return categoryId || null;
+}
 
 export function parseRecurringRuleInput(
   input: RecurringRuleInput,
@@ -141,11 +147,15 @@ export function buildRecurringEventCreateData(
   return {
     ...resolveRecurringContentData(existingEvent, updates),
     allDay: updates.allDay ?? existingEvent.allDay,
+    timezone: updates.timezone ?? existingEvent.timezone,
     color: updates.color ?? existingEvent.color,
     reminder: updates.reminder ?? existingEvent.reminder,
     recurrence,
     calendarId: updates.calendarId ?? existingEvent.calendarId,
-    categoryId: updates.categoryId ?? existingEvent.categoryId,
+    categoryId:
+      updates.categoryId === undefined
+        ? existingEvent.categoryId
+        : clearableCategoryId(updates.categoryId),
     userId,
     parentEventId,
     start,
@@ -165,11 +175,15 @@ export function buildRecurringEventUpdateData(
 
   return {
     allDay: updates.allDay,
+    timezone: updates.timezone,
     color: updates.color,
     reminder: updates.reminder,
     recurrence: updates.recurrence,
     calendarId: updates.calendarId,
-    categoryId: updates.categoryId,
+    categoryId:
+      updates.categoryId === undefined
+        ? undefined
+        : clearableCategoryId(updates.categoryId),
     ...(editsContent ? resolveRecurringContentData(existingEvent, updates) : {}),
     start: updates.start ? new Date(updates.start) : undefined,
     end: updates.end ? new Date(updates.end) : undefined,

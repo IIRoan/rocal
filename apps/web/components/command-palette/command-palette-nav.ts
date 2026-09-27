@@ -12,9 +12,13 @@ const PARENT_CHAINS: Partial<Record<PaletteView, PaletteView[]>> = {
   calendars: ["main"],
   "calendar-create": ["main", "calendars"],
   "calendar-edit": ["main", "calendars"],
+  categories: ["main", "calendars"],
+  "category-create": ["main", "calendars", "categories"],
+  "category-edit": ["main", "calendars", "categories"],
   subscriptions: ["main"],
   "subscriptions-add-feed": ["main", "subscriptions"],
   "subscriptions-holidays": ["main", "subscriptions"],
+  "subscriptions-import-ics": ["main", "subscriptions"],
   "subscriptions-edit": ["main", "subscriptions"],
   events: ["main"],
   "event-editor": ["main"],
@@ -58,12 +62,20 @@ export function getDialogTitle(currentView: PaletteView): string {
       return "Create Calendar";
     case "calendar-edit":
       return "Edit Calendar";
+    case "categories":
+      return "Categories";
+    case "category-create":
+      return "Create Category";
+    case "category-edit":
+      return "Edit Category";
     case "subscriptions":
       return "Calendar Subscriptions";
     case "subscriptions-add-feed":
       return "Add External Feed";
     case "subscriptions-holidays":
       return "Holiday Calendars";
+    case "subscriptions-import-ics":
+      return "Import .ics File";
     case "subscriptions-edit":
       return "Edit Calendar";
     case "events":

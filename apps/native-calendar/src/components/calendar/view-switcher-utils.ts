@@ -1,35 +1,40 @@
-import { format, isSameMonth } from "date-fns";
+import { format, isSameMonth, isSameYear } from "date-fns";
 import type { CalendarView } from "@workspace/calendar-core";
 import {
+  getAgendaLastDay,
   getThreeDayCalendarDays,
   getWeekCalendarRange,
   resolveTimezone,
 } from "@workspace/calendar-core";
+import { isTimelineCalendarView } from "../../lib/calendar-views";
 
-// ─── Date Header Formatting ──────────────────────────────────────────────────
-
-/**
- * Format the date header string for a given calendar view and current date.
- *
- * - Month view: "January 2025"
- * - Week view: "Jan 13 – 19" or "Dec 30 – Jan 5" (cross-month)
- * - Day view: "Jan 15, 2025"
- * - 3-Day view: "Jan 14 – 16" or "Dec 31 – Jan 2" (cross-month)
- * - Agenda view: "January 2025"
- */
 /** Month-only title for the calendar tab toolbar (e.g. "Jun 2025"). */
 export function formatCalendarToolbarTitle(currentDate: Date): string {
   return format(currentDate, "MMM yyyy");
 }
 
+/** Timelines preview the swiped page via `currentDate`; month and agenda only move on commit, so they follow `selectedDate`. */
 export function resolveCalendarSwitcherDate({
+  view,
   currentDate,
+  selectedDate,
 }: {
   view: CalendarView;
   currentDate: Date;
   selectedDate: Date;
 }): Date {
-  return currentDate;
+  return isTimelineCalendarView(view) ? currentDate : selectedDate;
+}
+
+function formatAgendaHeader(startDate: Date): string {
+  const lastDay = getAgendaLastDay(startDate);
+  if (isSameMonth(startDate, lastDay)) {
+    return format(startDate, "MMMM yyyy");
+  }
+  if (isSameYear(startDate, lastDay)) {
+    return `${format(startDate, "MMM")} – ${format(lastDay, "MMM yyyy")}`;
+  }
+  return `${format(startDate, "MMM yyyy")} – ${format(lastDay, "MMM yyyy")}`;
 }
 
 export function formatViewDateHeader(
@@ -40,8 +45,10 @@ export function formatViewDateHeader(
 ): string {
   switch (view) {
     case "month":
-    case "agenda":
       return format(currentDate, "MMMM yyyy");
+
+    case "agenda":
+      return formatAgendaHeader(currentDate);
 
     case "week": {
       const { start: weekStart, end: weekEnd } = getWeekCalendarRange(

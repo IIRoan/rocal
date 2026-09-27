@@ -1,8 +1,10 @@
 ﻿import { addDays } from "date-fns";
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 
 import {
   DEFAULT_CALENDAR_TIMEZONE,
+  getAccountTimezoneSeed,
+  getDeviceTimezone,
   eventOverlapsZonedCalendarDay,
   comparePickerDays,
   formatCalendarDayKey,
@@ -23,6 +25,7 @@ import {
   pickerDateAndTimeToUtc,
   pickerDateToAllDayUtcRange,
   resolveTimezone,
+  shouldSeedAccountTimezone,
   utcToPickerDate,
   wallClockFromCalendarDayKey,
   wallClockToUtc,
@@ -40,6 +43,65 @@ describe("resolveTimezone", () => {
   it("returns trimmed configured timezones", () => {
     expect(resolveTimezone("  America/New_York  ")).toBe("America/New_York");
     expect(resolveTimezone("Europe/Paris")).toBe("Europe/Paris");
+  });
+});
+
+describe("getDeviceTimezone", () => {
+  it("falls back to the default when the runtime zone is not a valid IANA id", () => {
+    const spy = jest
+      .spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions")
+      .mockReturnValue({
+        timeZone: "Etc/Unknown",
+      } as Intl.ResolvedDateTimeFormatOptions);
+    try {
+      expect(getDeviceTimezone()).toBe(DEFAULT_CALENDAR_TIMEZONE);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe("getAccountTimezoneSeed", () => {
+  it("returns the device zone only for never-edited UTC settings", () => {
+    const stamp = "2026-01-01T00:00:00.000Z";
+    expect(
+      getAccountTimezoneSeed({ timezone: "UTC", createdAt: stamp, updatedAt: stamp }),
+    ).toBe(getDeviceTimezone() === "UTC" ? null : getDeviceTimezone());
+    expect(
+      getAccountTimezoneSeed({
+        timezone: "UTC",
+        createdAt: stamp,
+        updatedAt: "2026-02-01T00:00:00.000Z",
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("shouldSeedAccountTimezone", () => {
+  const stamp = "2026-01-01T00:00:00.000Z";
+
+  it("seeds only the never-edited UTC default", () => {
+    expect(
+      shouldSeedAccountTimezone({
+        timezone: "UTC",
+        createdAt: stamp,
+        updatedAt: stamp,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSeedAccountTimezone({
+        timezone: "Europe/Amsterdam",
+        createdAt: stamp,
+        updatedAt: stamp,
+      }),
+    ).toBe(false);
+    expect(
+      shouldSeedAccountTimezone({
+        timezone: "UTC",
+        createdAt: stamp,
+        updatedAt: "2026-01-02T00:00:00.000Z",
+      }),
+    ).toBe(false);
   });
 });
 

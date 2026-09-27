@@ -85,9 +85,11 @@ export function buildViewPrefetchRanges(
 // Query helpers
 // ---------------------------------------------------------------------------
 
+export const EVENTS_QUERY_KEY = ["events"] as const;
+
 export function getMonthQueryKey(month: string | null) {
-  if (!month) return ["events", "none"] as const;
-  return ["events", month] as const;
+  if (!month) return [...EVENTS_QUERY_KEY, "none"] as const;
+  return [...EVENTS_QUERY_KEY, month] as const;
 }
 
 /**

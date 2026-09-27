@@ -51,4 +51,15 @@ export * from "./invitation-encryption";
 export * from "./operation-warnings";
 export * from "./recent-contacts";
 export * from "./solace-profiles";
+export * from "./mail-display-settings";
+export * from "./mail-compose-settings";
+export * from "./mail-synced-settings";
+export * from "./mail-signature";
+export * from "./mail-reply-identity";
 
+export * from "./recurring-event-target";
+export * from "./event-categories";
+export * from "./mail-list-settings";
+export * from "./mail-search-filter";
+export * from "./mail-jmap-email-set";
+export * from "./calendar-view-days";
