@@ -1,4 +1,8 @@
-import type { PrismaClient } from "../generated/prisma/index.js";
+import type { PrismaClient, CalendarEvent } from "../generated/prisma/index.js";
+import { EventParticipantService } from "./event-participant.service";
+import { toIcsBuildEvent } from "../lib/ics-export";
+import { resolveInvitationContent } from "../lib/event-encryption";
+import { mapEventParticipant, EVENT_PARTICIPANT_USER_SELECT } from "../lib/event-participants";
 import type {
   IRecurringService,
   RecurringRuleInput,
@@ -8,7 +12,12 @@ import type {
   RecurringEditInput,
   RecurringDeleteInput,
   RecurringDeleteResult,
+  RecurringUpdates,
 } from "../contracts/recurring.contract";
+import {
+  assertCalendarWritable,
+  findUserCalendarOrThrow,
+} from "../lib/calendar-access";
 import { ValidationError } from "../lib/errors";
 import { MS_PER_DAY } from "../lib/time-constants";
 import { RecurrenceEngine, type RecurrenceRule } from "../lib/recurrence";
@@ -24,7 +33,10 @@ import { createLogger } from "@workspace/logger";
 const logger = createLogger("backend:recurring-service");
 
 export class RecurringService implements IRecurringService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly participantService: Pick<EventParticipantService, "syncParticipants"> = new EventParticipantService(prisma),
+  ) {}
 
   validate(rule: RecurringRuleInput): RecurrenceValidateResult {
     try {
@@ -106,6 +118,7 @@ export class RecurringService implements IRecurringService {
     const { userId, eventId, editScope, occurrenceDate, updates } = input;
 
     const existingEvent = await this.getRecurringEvent(userId, eventId);
+    await this.assertEditTargetsOwned(userId, updates);
 
     switch (editScope) {
       case "this_only": {
@@ -136,7 +149,7 @@ export class RecurringService implements IRecurringService {
           },
         });
 
-        return modifiedEvent;
+        return this.syncParticipants(modifiedEvent, userId, updates, existingEvent);
       }
 
       case "this_and_future": {
@@ -171,7 +184,7 @@ export class RecurringService implements IRecurringService {
           include: { category: true, calendar: true },
         });
 
-        return newEvent;
+        return this.syncParticipants(newEvent, userId, updates, existingEvent);
       }
 
       case "all": {
@@ -181,7 +194,7 @@ export class RecurringService implements IRecurringService {
           include: { category: true, calendar: true },
         });
 
-        return updatedEvent;
+        return this.syncParticipants(updatedEvent, userId, updates);
       }
 
       default:
@@ -320,9 +333,65 @@ export class RecurringService implements IRecurringService {
     };
   }
 
+  private async assertEditTargetsOwned(
+    userId: string,
+    updates: RecurringUpdates,
+  ) {
+    if (updates.calendarId) {
+      const calendar = await findUserCalendarOrThrow(
+        this.prisma,
+        userId,
+        updates.calendarId,
+      );
+      assertCalendarWritable(
+        calendar,
+        "Cannot move events to a read-only calendar.",
+      );
+    }
+
+    if (updates.categoryId) {
+      const category = await this.prisma.eventCategory.findFirst({
+        where: { id: updates.categoryId, userId, isActive: true },
+      });
+      if (!category) {
+        throw new ValidationError(
+          "Invalid category or category does not belong to user",
+          "categoryId",
+        );
+      }
+    }
+  }
+
+  private async syncParticipants(
+    event: CalendarEvent & { calendar: { name: string } },
+    userId: string,
+    updates: RecurringUpdates,
+    source?: Awaited<ReturnType<RecurringService["getRecurringEvent"]>>,
+  ) {
+    const participants = updates.participants ?? source?.participants.map((participant) => {
+      const mapped = mapEventParticipant(participant);
+      return { email: mapped.email, displayName: mapped.displayName ?? undefined, role: mapped.role, status: mapped.status };
+    });
+    if (!participants) return event;
+    const invitationContent = resolveInvitationContent({
+      hasEncryptedPayload: Boolean(event.encryptedContent),
+      invitationContent: updates.invitationContent,
+      title: event.title, description: event.description, location: event.location,
+    });
+    const result = await this.participantService.syncParticipants({
+      eventId: event.id, participants, ownerUserId: userId,
+      sendInvitations: updates.participants !== undefined,
+      calendarName: event.calendar.name,
+      invitationEvent: invitationContent ? toIcsBuildEvent({ ...event, ...invitationContent }) : undefined,
+    });
+    const warnings = await result.sendPendingInvitations();
+    return { ...event, participants: result.participants, ...(warnings.length ? { warnings } : {}) };
+  }
+
   private async getRecurringEvent(userId: string, eventId: string) {
     const existingEvent = await this.prisma.calendarEvent.findFirst({
       where: { id: eventId, userId, recurrence: { not: null } },
+      include: { participants: { include: { user: { select: EVENT_PARTICIPANT_USER_SELECT } } } },
     });
 
     if (!existingEvent) {

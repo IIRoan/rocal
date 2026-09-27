@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
+import type { EventCategory } from "@workspace/calendar-core";
 import type { Calendar } from "@workspace/ui/components/calendar";
 import { EncryptionStatusBadge } from "@workspace/ui/components/calendar";
 
@@ -16,6 +17,7 @@ export type EventEditorInvitationResponseStatus =
 
 export type EventEditorBodyProps = {
   calendars: Calendar[];
+  categories: EventCategory[];
   desktop?: boolean;
   eventForm: EventEditorFormState;
   isViewMode: boolean;
@@ -63,6 +65,7 @@ export type EventEditorViewProps = {
   anchorPosition: { x: number; y: number } | null;
   badgeItem: EventEditorBadgeItem;
   calendars: Calendar[];
+  categories: EventCategory[];
   dialogTitle: string;
   eventForm: EventEditorFormState;
   flags: EventEditorViewFlags;

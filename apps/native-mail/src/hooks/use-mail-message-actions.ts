@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import {
   getErrorMessage,
   resolveAttachmentPreviewKind,
+  resolveMarkAsReadDelayMs,
   type MailAttachmentPreviewKind,
 } from "@workspace/calendar-core";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
@@ -13,6 +15,8 @@ import {
   useMailMutations,
 } from "../lib/mail/use-mail";
 import { isSpamMailboxRole } from "../lib/mail/mail-helpers";
+import { useMailListSettings } from "./use-mail-list-settings";
+import { useMailUndoToast } from "./use-mail-undo-toast";
 import {
   shareCachedAttachment,
   writeAttachmentToCache,
@@ -48,6 +52,12 @@ export function useMailMessageActions({
     moveToMailbox,
     setMessageLabel,
   } = useMailMutations(runtime, null);
+  const { settings: listSettings, isLoaded: listSettingsLoaded } =
+    useMailListSettings();
+  const showMoveToast = useMailUndoToast(runtime);
+  const markAsReadDelayMs = resolveMarkAsReadDelayMs(
+    listSettings.markAsReadDelay,
+  );
   const [downloadingBlobId, setDownloadingBlobId] = useState<string | null>(
     null,
   );
@@ -62,11 +72,28 @@ export function useMailMessageActions({
 
   // Mark read once per visit; a mid-visit "mark unread" also claims the id so it is not undone.
   useEffect(() => {
-    if (!runtime || !messageId || isSeen) return;
+    if (!runtime || !messageId || isSeen || !listSettingsLoaded) return;
+    if (markAsReadDelayMs === null) return;
     if (markReadHandledIdRef.current === messageId) return;
-    markReadHandledIdRef.current = messageId;
-    markAsReadMutate(messageId);
-  }, [isSeen, markAsReadMutate, messageId, runtime]);
+    const markRead = () => {
+      if (markReadHandledIdRef.current === messageId) return;
+      markReadHandledIdRef.current = messageId;
+      markAsReadMutate(messageId);
+    };
+    if (markAsReadDelayMs === 0) {
+      markRead();
+      return;
+    }
+    const timer = setTimeout(markRead, markAsReadDelayMs);
+    return () => clearTimeout(timer);
+  }, [
+    isSeen,
+    listSettingsLoaded,
+    markAsReadDelayMs,
+    markAsReadMutate,
+    messageId,
+    runtime,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -185,10 +212,33 @@ export function useMailMessageActions({
     if (!message) return;
     setActiveSheetView(null);
     const isTrash = currentMailboxRole === "trash";
+    if (isTrash) {
+      Alert.alert(
+        "Delete forever?",
+        "This message will be permanently deleted. This cannot be undone.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => runTrashAction(message.id, true),
+          },
+        ],
+      );
+      return;
+    }
+    runTrashAction(message.id, false);
+  };
+
+  const runTrashAction = (targetMessageId: string, isTrash: boolean) => {
     const mutation = isTrash ? deleteMessage : moveToTrash;
-    mutation.mutate(message.id, {
-      onSuccess: () => {
-        toast(isTrash ? "Message deleted" : "Message moved to trash");
+    mutation.mutate(targetMessageId, {
+      onSuccess: (_data, _messageId, snapshot) => {
+        if (isTrash) {
+          toast("Message deleted");
+        } else {
+          showMoveToast("Message moved to trash", snapshot);
+        }
         back();
       },
       onError: (error) =>
@@ -213,9 +263,9 @@ export function useMailMessageActions({
     moveToMailbox.mutate(
       { messageId: message.id, targetMailboxId },
       {
-        onSuccess: () => {
+        onSuccess: (_data, _input, snapshot) => {
           setActiveSheetView(null);
-          toast(successMessage);
+          showMoveToast(successMessage, snapshot);
           back();
         },
         onError: (error) =>

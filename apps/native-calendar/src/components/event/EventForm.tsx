@@ -35,9 +35,11 @@ import {
   isReservedSystemEmail,
   isMailInvitationStagingCalendar,
   normalizeReminderMinutes,
+  resolveSubmittedCategoryId,
   resolveTimezone,
   type Calendar,
   type CreateEventRequest,
+  type EventCategory,
   type EventParticipantInput,
   type RecurrenceRule,
   type TimeFormat,
@@ -65,6 +67,7 @@ import { TimeWheelPicker } from "./TimeWheelPicker";
 import { formatPickerTime } from "./time-wheel-utils";
 import { parseStoredRecurrence } from "./recurrence-picker-utils";
 import { summarizeRecurrenceRule } from "./event-detail-utils";
+import { resolveCalendarSwatchColor } from "../../lib/calendar-color-utils";
 import {
   roundToNextHour,
   buildEventRequest,
@@ -79,7 +82,13 @@ import {
 
 const DEFAULT_REMINDER_MINUTES = 15;
 
-type OpenSheet = "calendar" | "repeat" | "reminder" | "participants" | null;
+type OpenSheet =
+  | "calendar"
+  | "category"
+  | "repeat"
+  | "reminder"
+  | "participants"
+  | null;
 type DateTimeTarget = "start-date" | "start-time" | "end-date" | "end-time";
 
 const DATE_TIME_TITLES: Record<DateTimeTarget, string> = {
@@ -100,6 +109,7 @@ interface EventFormProps {
   timezone?: string;
   timeFormat: TimeFormat;
   calendars: Calendar[];
+  categories?: EventCategory[];
   serverErrors?: string[];
   isSubmitting?: boolean;
   onSubmit: (submission: EventFormSubmission) => void;
@@ -130,6 +140,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       timezone,
       timeFormat,
       calendars,
+      categories = [],
       serverErrors,
       isSubmitting = false,
       onSubmit,
@@ -170,6 +181,8 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       initialValues?.description ?? "",
     );
     const color = initialValues?.color ?? undefined;
+    const initialCategoryId = initialValues?.categoryId || undefined;
+    const [categoryId, setCategoryId] = useState(initialCategoryId ?? "");
     const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule | null>(
       () => parseStoredRecurrence(initialValues?.recurrence),
     );
@@ -325,7 +338,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
         location,
         description,
         color,
-        categoryId: undefined,
+        categoryId: resolveSubmittedCategoryId(categoryId, initialCategoryId),
         recurrence: recurrenceRule ? JSON.stringify(recurrenceRule) : null,
         // The legacy single field mirrors the earliest reminder for older clients.
         reminder: reminders[0] ?? 0,
@@ -362,6 +375,8 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       location,
       description,
       color,
+      categoryId,
+      initialCategoryId,
       recurrenceRule,
       reminders,
       resolvedTimezone,
@@ -464,6 +479,35 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
         closeSheet();
       },
     }));
+
+    const selectedCategory = categories.find(
+      (category) => category.id === categoryId,
+    );
+    const categoryLabel = !categoryId
+      ? "No category"
+      : (selectedCategory?.name ?? "Category");
+    const categoryItems: OptionSheetItem[] = [
+      {
+        key: "none",
+        label: "No category",
+        selected: !categoryId,
+        onSelect: () => {
+          setCategoryId("");
+          closeSheet();
+        },
+      },
+      ...categories.map((category, index) => ({
+        key: category.id,
+        label: category.name,
+        swatch: resolveCalendarSwatchColor(category.color, theme),
+        selected: category.id === categoryId,
+        separatorBefore: index === 0,
+        onSelect: () => {
+          setCategoryId(category.id);
+          closeSheet();
+        },
+      })),
+    ];
 
     const repeatItems: OptionSheetItem[] = [
       {
@@ -697,6 +741,15 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                   onPress={() => openPicker(() => setOpenSheet("calendar"))}
                 />
                 {renderFieldError("calendarId")}
+                {categories.length > 0 || categoryId ? (
+                  <EventEditorListRow
+                    icon="tag"
+                    label={categoryLabel}
+                    muted={!categoryId}
+                    accessibilityLabel={`Category: ${categoryLabel}`}
+                    onPress={() => openPicker(() => setOpenSheet("category"))}
+                  />
+                ) : null}
                 {reminders.map((minutes, index) => {
                   const label = `${formatReminderShort(minutes)} before`;
                   return (
@@ -862,6 +915,14 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
           onClose={closeSheet}
           title="Calendar"
           items={calendarItems}
+          theme={theme}
+          bottomInset={insets.bottom}
+        />
+        <OptionSheet
+          visible={openSheet === "category"}
+          onClose={closeSheet}
+          title="Category"
+          items={categoryItems}
           theme={theme}
           bottomInset={insets.bottom}
         />

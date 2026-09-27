@@ -94,6 +94,32 @@ export const eventParticipantInputSchema = z
 
 export type EventParticipantInput = z.infer<typeof eventParticipantInputSchema>;
 
+export const encryptedIcsImportEventSchema = z.object({
+  externalId: z.string().min(1).max(128),
+  seriesExternalId: z.string().min(1).max(128).optional(),
+  occurrenceDate: z.string().datetime().optional(),
+  excludedDates: z.array(z.string().datetime()).max(1000).default([]),
+  start: z.string().datetime(), end: z.string().datetime(),
+  allDay: z.boolean(), timezone: timezoneSchema,
+  recurrence: z.string().optional(),
+  encryptedContent: z.string().min(1),
+  blindIndexTokens: z.array(z.string()).optional(),
+  encryptionKeyVersion: z.number().int().min(1).optional(),
+  participants: z.array(eventParticipantInputSchema).optional(),
+}).strict().superRefine((event, ctx) => {
+  if (Boolean(event.seriesExternalId) !== Boolean(event.occurrenceDate)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "An override requires a series and occurrence date" });
+  if (new Date(event.end) <= new Date(event.start)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "End must follow start" });
+  if (event.recurrence) {
+    try { recurrenceRuleObjectSchema.parse(JSON.parse(event.recurrence)); }
+    catch { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid recurrence rule" }); }
+  }
+});
+export type EncryptedIcsImportEvent = z.infer<typeof encryptedIcsImportEventSchema>;
+export const encryptedIcsImportBodySchema = z.object({
+  calendarId: z.string().min(1),
+  encryptedEvents: z.array(encryptedIcsImportEventSchema).min(1).max(100),
+}).strict();
+
 export const calendarDeleteActionSchema = z.enum([
   "delete_events",
   "move_events",

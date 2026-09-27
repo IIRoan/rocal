@@ -11,9 +11,15 @@ export type CacheSnapshot = {
   data: EventsResponse | undefined;
 }[];
 
+const OPTIMISTIC_ID_PREFIX = "__optimistic__";
+
 /** Generate a temporary client-side ID so we can remove the event on rollback. */
 export function generateOptimisticId(): string {
-  return `__optimistic__${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  return `${OPTIMISTIC_ID_PREFIX}${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+export function isOptimisticId(id: string): boolean {
+  return id.startsWith(OPTIMISTIC_ID_PREFIX);
 }
 
 /** Recurring instances and synced events come from list payloads, so the sheet can open even when `/api/events/:id` cannot load that row. */

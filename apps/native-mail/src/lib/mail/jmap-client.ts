@@ -26,6 +26,12 @@ import {
   validateJmapRequestSize,
   isStalwartEncryptOnAppendEnabled,
   sortMailMessagesBySearchRelevance,
+  extractTextQueryFromJmapFilter,
+  buildEmailDestroyMethodCall,
+  buildEmailMoveMethodCall,
+  buildEmailRestoreMailboxesMethodCall,
+  destroyMailboxMessagesInBatches,
+  type MailMailboxRestore,
   parseJmapBlobUploadResponse,
   type MailServerPolicy,
   type MailServerPolicyConfig,
@@ -992,6 +998,71 @@ export class StalwartJmapClient {
     };
   }
 
+  /** Field search (from/to/subject/body/dates/keywords) with a FilterCondition from `buildJmapFilter`. */
+  async searchMailboxMessagesWithFilter(
+    session: JmapSession,
+    mailboxId: string,
+    filter: Record<string, unknown>,
+    limit = this.getDefaultSearchPageSize(),
+    position = 0,
+  ): Promise<{ messages: JmapEmailMessage[]; total: number }> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/query",
+          {
+            accountId,
+            filter:
+              filter.inMailbox || filter.operator
+                ? filter
+                : { inMailbox: mailboxId, ...filter },
+            sort: [{ property: "receivedAt", isAscending: false }],
+            limit,
+            position,
+            calculateTotal: true,
+          },
+          "q1",
+        ],
+        [
+          "Email/get",
+          {
+            accountId,
+            "#ids": {
+              resultOf: "q1",
+              name: "Email/query",
+              path: "/ids",
+            },
+            properties: EMAIL_GET_PROPERTIES,
+            fetchTextBodyValues: true,
+            fetchHTMLBodyValues: true,
+            fetchAllBodyValues: true,
+          },
+          "g1",
+        ],
+      ],
+    );
+    assertSuccessfulJmapResponses(envelope, "Search messages");
+    const queryResult = this.getMethodResult<{
+      ids?: string[];
+      total?: number;
+    }>(envelope, "Email/query");
+    const result = this.getMethodResult<{ list?: JmapEmailMessage[] }>(
+      envelope,
+      "Email/get",
+    );
+    const messages = result.list ?? [];
+    const textQuery = extractTextQueryFromJmapFilter(filter);
+    return {
+      messages: textQuery
+        ? sortMailMessagesBySearchRelevance(messages, textQuery)
+        : messages,
+      total: queryResult.total ?? 0,
+    };
+  }
+
   async getMailboxMessageIds(
     session: JmapSession,
     mailboxId: string,
@@ -1377,23 +1448,10 @@ export class StalwartJmapClient {
     messageIds: string[],
     trashMailboxId: string | null,
   ): Promise<void> {
-    if (messageIds.length === 0) return;
-    const accountId = this.requirePrimaryAccountId(session);
     if (trashMailboxId) {
-      const update = Object.fromEntries(
-        messageIds.map((id) => [id, { mailboxIds: { [trashMailboxId]: true } }]),
-      );
-      await this.call(
-        session,
-        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-        [["Email/set", { accountId, update }, "c1"]],
-      );
+      await this.bulkMoveToMailbox(session, messageIds, trashMailboxId);
     } else {
-      await this.call(
-        session,
-        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-        [["Email/set", { accountId, destroy: messageIds }, "c1"]],
-      );
+      await this.bulkDestroyMessages(session, messageIds);
     }
   }
 
@@ -1404,14 +1462,53 @@ export class StalwartJmapClient {
   ): Promise<void> {
     if (messageIds.length === 0) return;
     const accountId = this.requirePrimaryAccountId(session);
-    const update = Object.fromEntries(
-      messageIds.map((id) => [id, { mailboxIds: { [targetMailboxId]: true } }]),
-    );
-    await this.call(
+    const envelope = await this.call(
       session,
       ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-      [["Email/set", { accountId, update }, "c1"]],
+      [buildEmailMoveMethodCall(accountId, messageIds, targetMailboxId)],
     );
+    assertSuccessfulJmapResponses(envelope, "Move messages");
+  }
+
+  /** Undo for a move: restores each message's previous mailbox membership. */
+  async restoreMessageMailboxes(
+    session: JmapSession,
+    restores: MailMailboxRestore[],
+  ): Promise<void> {
+    if (restores.length === 0) return;
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [buildEmailRestoreMailboxesMethodCall(accountId, restores)],
+    );
+    assertSuccessfulJmapResponses(envelope, "Restore messages");
+  }
+
+  async bulkDestroyMessages(
+    session: JmapSession,
+    messageIds: string[],
+  ): Promise<void> {
+    if (messageIds.length === 0) return;
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [buildEmailDestroyMethodCall(accountId, messageIds)],
+    );
+    assertSuccessfulJmapResponses(envelope, "Delete messages");
+  }
+
+  /** Permanently deletes every message in a mailbox (Trash / Spam empty). */
+  async emptyMailbox(session: JmapSession, mailboxId: string): Promise<number> {
+    return destroyMailboxMessagesInBatches({
+      listIds: async (limit) =>
+        (await this.getMailboxMessageIds(session, mailboxId, {
+          limit,
+          position: 0,
+        })).ids,
+      destroy: (ids) => this.bulkDestroyMessages(session, ids),
+    });
   }
 
   async bulkMarkAsRead(

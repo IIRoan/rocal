@@ -212,7 +212,9 @@ export function useMailAppContentController(
           ...advancedFilters,
           text: inlineText || advancedFilters.text?.trim() || undefined,
         };
-        const jmapFilter = buildJmapFilter(mailboxId, filters);
+        const jmapFilter = buildJmapFilter(mailboxId, filters, {
+          timezone: settings?.timezone,
+        });
         const { messages } = await activeMailbox.client.searchMailboxMessagesWithFilter(
           activeMailbox.session,
           mailboxId,

@@ -54,6 +54,7 @@ function recurringEventFixture(overrides: RecurringEventFixtureInput = {}) {
     end: new Date("2026-05-05T10:30:00.000Z"),
     createdAt: new Date("2026-04-01T10:00:00.000Z"),
     updatedAt: new Date("2026-04-01T10:00:00.000Z"),
+    participants: [],
     ...overrides,
   };
 }
@@ -65,10 +66,17 @@ function createMockPrisma() {
       create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
         id: "event-2",
         ...data,
+        calendar: { name: "Work" },
       })),
-      update: jest.fn(async () => ({ id: "event-1" })),
+      update: jest.fn(async () => ({ ...recurringEventFixture(), calendar: { name: "Work" } })),
       delete: jest.fn(async () => ({ id: "event-1" })),
       deleteMany: jest.fn(async () => ({ count: 2 })),
+    },
+    calendar: {
+      findFirst: jest.fn<() => Promise<any | null>>(async () => null),
+    },
+    eventCategory: {
+      findFirst: jest.fn<() => Promise<any | null>>(async () => null),
     },
     recurrenceException: {
       create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
@@ -83,12 +91,73 @@ function createMockPrisma() {
 }
 
 describe("RecurringService", () => {
+  it("does not regenerate the original anchor when the series is split at its first occurrence", () => {
+    const event = recurringEventFixture();
+    const rule = RecurrenceEngine.createRecurrenceRule({ frequency: "weekly", interval: 1, until: new Date("2026-05-04T09:00:00Z") });
+    expect(RecurrenceEngine.generateInstances({ ...event, recurrence: rule }, new Date("2026-05-01T00:00:00Z"), new Date("2026-06-01T00:00:00Z"))).toEqual([]);
+  });
+
+  it.each(["2026-05-05T09:00:00.000Z", "2026-05-12T09:00:00.000Z"])("suppresses modified occurrence %s", (instant) => {
+    const event = recurringEventFixture();
+    const instances = RecurrenceEngine.generateInstances(
+      { ...event, recurrence: event.recurrence ?? "" },
+      new Date("2026-05-01T00:00:00Z"),
+      new Date("2026-05-20T00:00:00Z"),
+      [{ exceptionDate: new Date(instant), type: "modified" }],
+    );
+    expect(instances.map((instance) => instance.date.toISOString())).not.toContain(instant);
+  });
+
   let mockPrisma: ReturnType<typeof createMockPrisma>;
   let service: RecurringService;
+  const sendPendingInvitations = jest.fn(async () => []);
+  const participantService = { syncParticipants: jest.fn(async () => ({ changed: true, participants: [], sendPendingInvitations })) };
 
   beforeEach(() => {
     mockPrisma = createMockPrisma();
-    service = new RecurringService(mockPrisma as never);
+    participantService.syncParticipants.mockClear();
+    sendPendingInvitations.mockClear();
+    service = new RecurringService(mockPrisma as never, participantService);
+  });
+
+  it.each(["this_only", "this_and_future", "all"] as const)("saves and invites attendees for %s", async (editScope) => {
+    mockPrisma.calendarEvent.findFirst.mockResolvedValue(recurringEventFixture());
+    await service.editSeries({
+      userId: "user-1", eventId: "event-1", editScope,
+      occurrenceDate: "2026-05-19T09:00:00.000Z",
+      updates: { title: "Meeting", participants: [{ email: "guest@example.com" }] },
+    });
+    expect(participantService.syncParticipants).toHaveBeenCalledWith(expect.objectContaining({
+      participants: [{ email: "guest@example.com" }], ownerUserId: "user-1", sendInvitations: true,
+    }));
+    expect(sendPendingInvitations).toHaveBeenCalled();
+  });
+
+  it("copies inherited attendees to a detached occurrence without resending invitations", async () => {
+    mockPrisma.calendarEvent.findFirst.mockResolvedValue({ ...recurringEventFixture(), participants: [{
+      id: "participant", eventId: "event-1", email: "guest@example.com", displayName: null,
+      userId: null, user: null, role: "attendee", status: "accepted",
+    }] });
+    await service.editSeries({ userId: "user-1", eventId: "event-1", editScope: "this_only",
+      occurrenceDate: "2026-05-19T09:00:00.000Z", updates: { start: "2026-05-19T11:00:00.000Z" },
+    });
+    expect(participantService.syncParticipants).toHaveBeenCalledWith(expect.objectContaining({
+      participants: [{ email: "guest@example.com", displayName: "guest@example.com", role: "attendee", status: "accepted" }],
+      sendInvitations: false,
+    }));
+  });
+
+  it("uses transient content for invitations without persisting it", async () => {
+    mockPrisma.calendarEvent.findFirst.mockResolvedValue({ ...recurringEventFixture(), title: "", encryptedContent: "old" });
+    await service.editSeries({ userId: "user-1", eventId: "event-1", editScope: "this_only",
+      occurrenceDate: "2026-05-19T09:00:00.000Z", updates: {
+        encryptedContent: "new-ciphertext", invitationContent: { title: "Private meeting" },
+        participants: [{ email: "guest@example.com" }],
+      },
+    });
+    expect(mockPrisma.calendarEvent.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ title: "", encryptedContent: "new-ciphertext" }) }));
+    expect(JSON.stringify(mockPrisma.calendarEvent.create.mock.calls)).not.toContain("Private meeting");
+    expect(participantService.syncParticipants).toHaveBeenCalledWith(expect.objectContaining({ invitationEvent: expect.objectContaining({ title: "Private meeting" }) }));
   });
 
   it("validates recurrence objects and returns their description", () => {
@@ -155,6 +224,61 @@ describe("RecurringService", () => {
         type: "modified",
       },
     });
+  });
+
+  it("rejects recurring edits that assign another user's category", async () => {
+    mockPrisma.calendarEvent.findFirst.mockResolvedValue(
+      recurringEventFixture(),
+    );
+
+    await expect(
+      service.editSeries({
+        userId: "user-1",
+        eventId: "event-1",
+        editScope: "all",
+        updates: { categoryId: "category-foreign" },
+      }),
+    ).rejects.toMatchObject({ name: "ValidationError", field: "categoryId" });
+    expect(mockPrisma.eventCategory.findFirst).toHaveBeenCalledWith({
+      where: { id: "category-foreign", userId: "user-1", isActive: true },
+    });
+    expect(mockPrisma.calendarEvent.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects recurring edits that move the series to another user's calendar", async () => {
+    mockPrisma.calendarEvent.findFirst.mockResolvedValue(
+      recurringEventFixture(),
+    );
+
+    await expect(
+      service.editSeries({
+        userId: "user-1",
+        eventId: "event-1",
+        editScope: "all",
+        updates: { calendarId: "calendar-foreign" },
+      }),
+    ).rejects.toMatchObject({ name: "ValidationError", field: "calendarId" });
+    expect(mockPrisma.calendarEvent.update).not.toHaveBeenCalled();
+  });
+
+  it("clears the series category without an ownership lookup", async () => {
+    mockPrisma.calendarEvent.findFirst.mockResolvedValue(
+      recurringEventFixture(),
+    );
+
+    await service.editSeries({
+      userId: "user-1",
+      eventId: "event-1",
+      editScope: "all",
+      updates: { categoryId: "" },
+    });
+
+    expect(mockPrisma.eventCategory.findFirst).not.toHaveBeenCalled();
+    expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ categoryId: null }),
+      }),
+    );
   });
 
   it("preserves duration from the updated start when splitting future occurrences", async () => {

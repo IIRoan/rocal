@@ -20,6 +20,7 @@ export const QUERY_KEYS = {
   mailConfig: () => ["mail", "config"] as const,
   mailAccount: () => ["mail", "account"] as const,
   mailRuntime: () => ["mail", "runtime"] as const,
+  mailMessagesAll: () => ["mail", "messages"] as const,
   mailMessages: (mailboxId: string | null) =>
     ["mail", "messages", mailboxId] as const,
   mailMessage: (messageId: string) => ["mail", "message", messageId] as const,
@@ -30,4 +31,15 @@ export const QUERY_KEYS = {
   invites: () => ["invites"] as const,
   pushDevices: () => PUSH_DEVICES_QUERY_KEY,
   hiddenMailboxIds: () => ["mail", "hiddenMailboxIds"] as const,
+  mailDisplaySettings: () => ["mail", "displaySettings"] as const,
+  mailComposeSettings: () => ["mail", "composeSettings"] as const,
+  mailListSettings: () => ["mail", "listSettings"] as const,
+  mailSearchMessages: (mailboxId: string | null, revision: number) =>
+    ["mail", "messages", mailboxId, "search", revision] as const,
+  signupConfig: () => ["account", "signupConfig"] as const,
+  inviteValidation: (token: string) => ["inviteValidation", token] as const,
+  paletteEventSearch: (query: string) =>
+    ["command-palette-search", "events", query] as const,
+  paletteMailSearch: (mailboxId: string | null, query: string) =>
+    ["command-palette-search", "mail", mailboxId, query] as const,
 } as const;

@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
@@ -19,10 +18,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCommandPalette } from "@workspace/native-core/providers/CommandPaletteProvider";
 import { useMailCompose } from "../providers/MailComposeProvider";
 import { useMailSelection } from "../providers/MailSelectionProvider";
-import {
-  SETTINGS_ROUTE,
-  SETTINGS_NOTIFICATIONS_ROUTE,
-} from "@workspace/native-core/lib/navigation-routes";
+import { SETTINGS_ROUTE } from "@workspace/native-core/lib/navigation-routes";
+import { useCommonCommandActions } from "@workspace/native-core/hooks/use-common-command-actions";
+import { useDeferredSheetAction } from "@workspace/native-core/hooks/use-deferred-sheet-action";
 import { useMailAccount, useMailRuntime } from "../lib/mail/use-mail";
 import { formatAddress } from "../lib/mail/mail-helpers";
 import { MAIL_HOME_ROUTE, mailMessageRoute } from "../lib/mail-routes";
@@ -44,6 +42,7 @@ import {
   groupCommandActions,
   type CommandAction,
 } from "./command-palette/command-actions";
+import { usePaletteMailSearch } from "./command-palette/use-palette-mail-search";
 
 const SEARCH_MIN_LENGTH = 2;
 const SEARCH_DEBOUNCE_MS = 250;
@@ -111,23 +110,14 @@ export function CommandPalette() {
   const trimmedQuery = debouncedQuery.trim();
   const searchEnabled = isOpen && trimmedQuery.length >= SEARCH_MIN_LENGTH;
 
-  const { data: mailSearchData, isFetching: mailSearchFetching } = useQuery({
-    queryKey: [
-      "command-palette-search",
-      "mail",
-      selectedMailboxId,
-      trimmedQuery,
-    ],
-    queryFn: () =>
-      runtime!.client.searchMailboxMessages(
-        runtime!.session,
-        selectedMailboxId!,
-        trimmedQuery,
-        SEARCH_LIMIT,
-      ),
-    enabled: searchEnabled && Boolean(runtime && selectedMailboxId),
-    staleTime: 10_000,
-  });
+  const { data: mailSearchData, isFetching: mailSearchFetching } =
+    usePaletteMailSearch(runtime, selectedMailboxId, trimmedQuery, {
+      enabled: searchEnabled,
+      limit: SEARCH_LIMIT,
+    });
+
+  const runCommonAction = useCommonCommandActions();
+  const { runAfterClose, onCloseComplete } = useDeferredSheetAction(close);
 
   const actions = useMemo(() => buildCommandActions(), []);
   const filteredActions = useMemo(
@@ -161,11 +151,17 @@ export function CommandPalette() {
   const handleCloseComplete = useCallback(() => {
     setQuery("");
     setDebouncedQuery("");
-  }, []);
+    onCloseComplete();
+  }, [onCloseComplete]);
 
   const runAction = useCallback(
     (action: CommandAction) => {
+      if (action.id === "add-passkey") {
+        runAfterClose(() => runCommonAction(action));
+        return;
+      }
       close();
+      if (runCommonAction(action)) return;
       switch (action.id) {
         case "compose-mail":
           openCompose();
@@ -176,12 +172,9 @@ export function CommandPalette() {
         case "open-settings":
           router.push(SETTINGS_ROUTE as never);
           break;
-        case "open-notification-settings":
-          router.push(SETTINGS_NOTIFICATIONS_ROUTE as never);
-          break;
       }
     },
-    [close, openCompose, router],
+    [close, openCompose, router, runAfterClose, runCommonAction],
   );
 
   const handleSearchResultPress = useCallback(

@@ -36,6 +36,8 @@ import { useCalendarPresentation } from "@/hooks/use-calendar-presentation";
 import { useDashboardUserActions } from "@/hooks/use-dashboard-user-actions";
 import { useSettings } from "@/hooks/use-settings";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
+import { useRecurringMovePrompt } from "@/hooks/use-recurring-move-prompt";
+import { RecurringScopeModal } from "@/components/command-palette/recurring-scope-modal";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { CALENDAR_HOME_PATH } from "@/lib/app-routes";
 import { readCalendarLinkSearchParams } from "./calendar-link-params";
@@ -219,6 +221,9 @@ function MobileLayoutContent() {
     },
   });
   const workspace = useCalendarWorkspaceReady();
+  const { moveRecurringEvent, scopePrompt } = useRecurringMovePrompt(
+    calendarData.editRecurringEvent,
+  );
 
   useEffect(() => {
     if (FORCE_LOADING_DESIGN_PREVIEW || isAllInitialLoading) {
@@ -236,47 +241,51 @@ function MobileLayoutContent() {
   }
 
   return (
-    <MobileCalendarWrapper
-      user={{
-        name: session?.user.name || "Unknown User",
-        email: session?.user.email || "",
-        avatar: session?.user.image || undefined,
-      }}
-      onLogout={handleLogout}
-      onOpenSettings={() => {
-        log.debug("onOpenSettings called - using openPalette");
-        openPalette();
-      }}
-      onOpenCalendarManagement={openCalendarManagement}
-      onOpenSearch={openSearchPalette}
-      onOpenAddEvent={openNewEventEditor}
-      appSwitcher={<MobileAppSwitcher activeApp="calendar" />}
-      initialView={initialView}
-      events={transformedEvents}
-      categories={calendarData.categories}
-      loading={false}
-      eventsLoading={calendarData.eventsLoading}
-      error={calendarData.error}
-      onCreateEvent={calendarData.createEvent}
-      onUpdateEvent={calendarData.updateEvent}
-      onDeleteEvent={calendarData.deleteEvent}
-      onCreateCategory={calendarData.createCategory}
-      onDateRangeChange={calendarData.setDateRange}
-      showWeekNumbers={settings?.showWeekNumbers}
-      compactView={settings?.compactView}
-      timeFormat={timeFormat}
-      defaultEventDuration={settings?.defaultEventDuration}
-      defaultCalendarId={defaultCalendarId}
-      weekStartDay={settings?.weekStartDay}
-      workingDays={workingDays}
-      timezone={settings?.timezone}
-      themeSettings={themeSettings}
-      onLoadNotifications={calendarData.loadNotifications}
-      onUpdateNotifications={calendarData.updateNotifications}
-      onEventEdit={openEventEditor}
-      getCachedEventsForRange={calendarData.getCachedEventsForRange}
-      prefetchRange={calendarData.prefetchRange}
-    />
+    <>
+      <MobileCalendarWrapper
+        user={{
+          name: session?.user.name || "Unknown User",
+          email: session?.user.email || "",
+          avatar: session?.user.image || undefined,
+        }}
+        onLogout={handleLogout}
+        onOpenSettings={() => {
+          log.debug("onOpenSettings called - using openPalette");
+          openPalette();
+        }}
+        onOpenCalendarManagement={openCalendarManagement}
+        onOpenSearch={openSearchPalette}
+        onOpenAddEvent={openNewEventEditor}
+        appSwitcher={<MobileAppSwitcher activeApp="calendar" />}
+        initialView={initialView}
+        events={transformedEvents}
+        categories={calendarData.categories}
+        loading={false}
+        eventsLoading={calendarData.eventsLoading}
+        error={calendarData.error}
+        onCreateEvent={calendarData.createEvent}
+        onUpdateEvent={calendarData.updateEvent}
+        onMoveRecurringEvent={moveRecurringEvent}
+        onDeleteEvent={calendarData.deleteEvent}
+        onCreateCategory={calendarData.createCategory}
+        onDateRangeChange={calendarData.setDateRange}
+        showWeekNumbers={settings?.showWeekNumbers}
+        compactView={settings?.compactView}
+        timeFormat={timeFormat}
+        defaultEventDuration={settings?.defaultEventDuration}
+        defaultCalendarId={defaultCalendarId}
+        weekStartDay={settings?.weekStartDay}
+        workingDays={workingDays}
+        timezone={settings?.timezone}
+        themeSettings={themeSettings}
+        onLoadNotifications={calendarData.loadNotifications}
+        onUpdateNotifications={calendarData.updateNotifications}
+        onEventEdit={openEventEditor}
+        getCachedEventsForRange={calendarData.getCachedEventsForRange}
+        prefetchRange={calendarData.prefetchRange}
+      />
+      <RecurringScopeModal action="edit" {...scopePrompt} />
+    </>
   );
 }
 

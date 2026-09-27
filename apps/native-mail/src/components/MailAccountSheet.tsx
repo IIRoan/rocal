@@ -12,8 +12,11 @@ import {
   SETTINGS_HUB_ICONS,
   SETTINGS_MAIL_ICONS,
 } from "@workspace/native-core/lib/settings-nav-icons";
+import { ComposeSettingsContent } from "./settings/sections/ComposeSettingsContent";
 import { ContactsSettingsContent } from "./settings/sections/ContactsSettingsContent";
 import { LabelsSettingsContent } from "./settings/sections/LabelsSettingsContent";
+import { MailDisplaySettingsContent } from "./settings/sections/MailDisplaySettingsContent";
+import { MailListSettingsContent } from "./settings/sections/MailListSettingsContent";
 import { MailSettingsContent } from "./settings/sections/MailSettingsContent";
 import { MailboxesSettingsContent } from "./settings/sections/MailboxesSettingsContent";
 
@@ -26,9 +29,12 @@ const MAIL_ACCOUNT_SHEET_CONFIG: AccountSheetConfig = {
   ),
   pages: {
     ...SHARED_SETTINGS_SHEET_PAGES,
+    composing: ComposeSettingsContent,
     contacts: ContactsSettingsContent,
     labels: LabelsSettingsContent,
     mail: MailSettingsContent,
+    "mail-display": MailDisplaySettingsContent,
+    "mail-list": MailListSettingsContent,
     mailboxes: MailboxesSettingsContent,
   },
   icons: { ...SETTINGS_HUB_ICONS, ...SETTINGS_MAIL_ICONS },

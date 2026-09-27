@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -16,6 +16,7 @@ import {
   getErrorMessage,
   isCurrentUserMailAddress,
   isAutomatedMailAddress,
+  resolveMailContentIsDark,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
@@ -51,6 +52,7 @@ import { useMailMessageContent } from "../../../src/hooks/use-mail-message-conte
 import { useMailMessageCalendar } from "../../../src/hooks/use-mail-message-calendar";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
 import { useMailMessageActions } from "../../../src/hooks/use-mail-message-actions";
+import { useMailDisplaySettings } from "../../../src/hooks/use-mail-settings";
 import {
   useLabels,
   getAllMessageLabels,
@@ -85,6 +87,11 @@ export default function MailMessageScreen() {
     isDecrypting: content.isDecrypting,
   });
   const actions = useMailMessageActions({ messageId, message, runtime });
+  const { settings: displaySettings } = useMailDisplaySettings();
+  // Per-message override: never written back to the saved appearance setting.
+  const [originalLookMessageId, setOriginalLookMessageId] = useState<string | null>(null);
+  const showOriginalLook = originalLookMessageId === messageId;
+  const canShowOriginalLook = isDark && resolveMailContentIsDark(displaySettings);
   const { recordUsage } = useRecentContacts();
   const recordedContactMessageRef = useRef<string | null>(null);
 
@@ -238,6 +245,7 @@ export default function MailMessageScreen() {
               content={content}
               calendar={calendar}
               onOpenEvent={openEvent}
+              showOriginalLook={showOriginalLook}
             />
 
             <MailAttachmentCards
@@ -292,6 +300,14 @@ export default function MailMessageScreen() {
         labels={labels}
         messageKeywords={message?.keywords}
         rawHtmlSource={content.rawHtmlSource}
+        originalLook={
+          canShowOriginalLook && content.htmlContent
+            ? {
+                showing: showOriginalLook,
+                toggle: () => setOriginalLookMessageId(showOriginalLook ? null : messageId),
+              }
+            : null
+        }
         createLabel={createLabel}
         deleteLabel={deleteLabel}
       />

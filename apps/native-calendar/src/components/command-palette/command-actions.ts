@@ -1,4 +1,17 @@
 import type { Feather } from "@expo/vector-icons";
+import {
+  getSettingsHubItems,
+  type SettingsHubId,
+} from "@workspace/calendar-core";
+import {
+  buildPasskeyCommandActions,
+  buildSettingsCommandActions,
+  buildThemeCommandActions,
+  type CommonCommandAction,
+  type CommonCommandActionGroup,
+  type CommonCommandActionId,
+} from "@workspace/native-core/lib/command-palette-common";
+import { SETTINGS_HUB_ICONS } from "@workspace/native-core/lib/settings-nav-icons";
 import type { NativeCalendarView } from "../../lib/calendar-views";
 
 export type CommandActionId =
@@ -7,22 +20,29 @@ export type CommandActionId =
   | "view-week"
   | "view-day"
   | "view-3day"
+  | "view-month"
+  | "view-agenda"
+  | "new-calendar"
+  | "manage-calendars"
   | "open-calendar"
   | "open-settings"
-  | "open-notification-settings";
+  | CommonCommandActionId;
 
-export type CommandActionGroup = "Calendar" | "Navigation";
+export type CommandActionGroup =
+  | "Calendar"
+  | "Navigation"
+  | CommonCommandActionGroup;
 
-export interface CommandAction {
+export interface CommandAction extends Omit<CommonCommandAction, "id" | "group"> {
   id: CommandActionId;
-  label: string;
   group: CommandActionGroup;
   icon: keyof typeof Feather.glyphMap;
-  /** Extra terms (besides the label) matched against the search query. */
-  keywords: string[];
   /** When set, the action switches the calendar to this view. */
   view?: NativeCalendarView;
 }
+
+/** Mail settings belong to Solace Mail. */
+const CALENDAR_HIDDEN_SETTINGS: readonly SettingsHubId[] = ["mail"];
 
 export function buildCommandActions(): CommandAction[] {
   return [
@@ -65,6 +85,44 @@ export function buildCommandActions(): CommandAction[] {
       view: "3day",
     },
     {
+      id: "view-month",
+      label: "Month view",
+      group: "Calendar",
+      icon: "grid",
+      keywords: ["month", "switch view"],
+      view: "month",
+    },
+    {
+      id: "view-agenda",
+      label: "Agenda view",
+      group: "Calendar",
+      icon: "list",
+      keywords: ["agenda", "list", "upcoming", "schedule", "switch view"],
+      view: "agenda",
+    },
+    {
+      id: "new-calendar",
+      label: "New calendar",
+      group: "Calendar",
+      icon: "folder-plus",
+      keywords: ["create calendar", "add calendar"],
+    },
+    {
+      id: "manage-calendars",
+      label: "Manage calendars",
+      group: "Calendar",
+      icon: "layers",
+      keywords: [
+        "calendars",
+        "delete calendar",
+        "edit calendar",
+        "subscriptions",
+        "ics",
+      ],
+    },
+    ...buildThemeCommandActions(),
+    ...buildPasskeyCommandActions(),
+    {
       id: "open-calendar",
       label: "Go to Calendar",
       group: "Navigation",
@@ -78,13 +136,12 @@ export function buildCommandActions(): CommandAction[] {
       icon: "settings",
       keywords: ["preferences", "account", "options"],
     },
-    {
-      id: "open-notification-settings",
-      label: "Notification settings",
-      group: "Navigation",
-      icon: "bell",
-      keywords: ["email", "push", "reminder", "alert", "iphone"],
-    },
+    ...buildSettingsCommandActions(
+      getSettingsHubItems("native").filter(
+        (item) => !CALENDAR_HIDDEN_SETTINGS.includes(item.id),
+      ),
+      SETTINGS_HUB_ICONS,
+    ),
   ];
 }
 
@@ -104,12 +161,19 @@ export function filterCommandActions(
   });
 }
 
+const GROUP_ORDER: CommandActionGroup[] = [
+  "Calendar",
+  "Appearance",
+  "Security",
+  "Navigation",
+  "Settings",
+];
+
 /** Groups actions in their natural order for sectioned rendering. */
 export function groupCommandActions(
   actions: CommandAction[],
 ): { group: CommandActionGroup; actions: CommandAction[] }[] {
-  const order: CommandActionGroup[] = ["Calendar", "Navigation"];
-  return order.flatMap((group) => {
+  return GROUP_ORDER.flatMap((group) => {
     const grouped = actions.filter((action) => action.group === group);
     return grouped.length > 0 ? [{ group, actions: grouped }] : [];
   });

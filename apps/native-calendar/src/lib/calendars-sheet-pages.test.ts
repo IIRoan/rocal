@@ -1,8 +1,11 @@
 import {
   CALENDAR_CREATE_PAGE,
   CALENDARS_ROOT_PAGE,
+  CATEGORIES_PAGE,
+  CATEGORY_CREATE_PAGE,
   SUBSCRIPTION_CREATE_PAGE,
   calendarEditPage,
+  categoryEditPage,
   isCalendarsSheetPage,
   parseCalendarsSheetPage,
   subscriptionEditPage,
@@ -32,6 +35,17 @@ describe("calendars sheet pages", () => {
     expect(parseCalendarsSheetPage("nope")).toEqual({ kind: "root" });
     expect(parseCalendarsSheetPage(calendarEditPage(""))).toEqual({ kind: "root" });
     expect(parseCalendarsSheetPage(subscriptionEditPage(""))).toEqual({ kind: "root" });
+  });
+
+  it("parses the category pages", () => {
+    expect(parseCalendarsSheetPage(CATEGORIES_PAGE)).toEqual({ kind: "categories" });
+    expect(parseCalendarsSheetPage(CATEGORY_CREATE_PAGE)).toEqual({ kind: "category-create" });
+    expect(parseCalendarsSheetPage(categoryEditPage("cat-1"))).toEqual({
+      kind: "category-edit",
+      id: "cat-1",
+    });
+    expect(parseCalendarsSheetPage(categoryEditPage(""))).toEqual({ kind: "root" });
+    expect(isCalendarsSheetPage(CATEGORIES_PAGE)).toBe(true);
   });
 
   it("recognizes only calendars drawer keys", () => {

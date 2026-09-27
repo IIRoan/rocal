@@ -1,9 +1,12 @@
 export const CALENDARS_ROOT_PAGE = "calendars";
 export const CALENDAR_CREATE_PAGE = "calendar-create";
 export const SUBSCRIPTION_CREATE_PAGE = "subscription-create";
+export const CATEGORIES_PAGE = "categories";
+export const CATEGORY_CREATE_PAGE = "category-create";
 
 const CALENDAR_EDIT_PREFIX = "calendar-edit:";
 const SUBSCRIPTION_EDIT_PREFIX = "subscription-edit:";
+const CATEGORY_EDIT_PREFIX = "category-edit:";
 
 export function calendarEditPage(calendarId: string): string {
   return `${CALENDAR_EDIT_PREFIX}${calendarId}`;
@@ -13,17 +16,29 @@ export function subscriptionEditPage(subscriptionId: string): string {
   return `${SUBSCRIPTION_EDIT_PREFIX}${subscriptionId}`;
 }
 
+export function categoryEditPage(categoryId: string): string {
+  return `${CATEGORY_EDIT_PREFIX}${categoryId}`;
+}
+
 export type CalendarsSheetPage =
   | { kind: "root" }
   | { kind: "calendar-create" }
   | { kind: "calendar-edit"; id: string }
   | { kind: "subscription-create" }
-  | { kind: "subscription-edit"; id: string };
+  | { kind: "subscription-edit"; id: string }
+  | { kind: "categories" }
+  | { kind: "category-create" }
+  | { kind: "category-edit"; id: string };
 
 /** Maps a page-stack key to the calendars drawer page it renders; unknown keys fall back to the root list. */
 export function parseCalendarsSheetPage(page: string): CalendarsSheetPage {
   if (page === CALENDAR_CREATE_PAGE) return { kind: "calendar-create" };
   if (page === SUBSCRIPTION_CREATE_PAGE) return { kind: "subscription-create" };
+  if (page === CATEGORIES_PAGE) return { kind: "categories" };
+  if (page === CATEGORY_CREATE_PAGE) return { kind: "category-create" };
+  if (page.startsWith(CATEGORY_EDIT_PREFIX) && page.length > CATEGORY_EDIT_PREFIX.length) {
+    return { kind: "category-edit", id: page.slice(CATEGORY_EDIT_PREFIX.length) };
+  }
   if (page.startsWith(CALENDAR_EDIT_PREFIX) && page.length > CALENDAR_EDIT_PREFIX.length) {
     return { kind: "calendar-edit", id: page.slice(CALENDAR_EDIT_PREFIX.length) };
   }

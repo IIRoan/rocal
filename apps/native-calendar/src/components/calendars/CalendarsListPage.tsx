@@ -3,6 +3,7 @@ import { getErrorMessage, type Calendar } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useToggleCalendarVisibility } from "../../hooks/use-toggle-calendar-visibility";
 import { useCalendarSubscriptions, useCalendars } from "../../hooks/use-calendar-management";
+import { useCategories } from "../../hooks/use-categories";
 import { useSheetPageNavigator } from "@workspace/native-core/components/sheet/SheetPageStack";
 import {
   SheetCenteredState,
@@ -14,6 +15,7 @@ import {
 } from "@workspace/native-core/components/sheet/SheetSections";
 import {
   CALENDAR_CREATE_PAGE,
+  CATEGORIES_PAGE,
   SUBSCRIPTION_CREATE_PAGE,
   calendarEditPage,
   subscriptionEditPage,
@@ -32,6 +34,7 @@ export function CalendarsListPage() {
   const { push } = useSheetPageNavigator();
   const calendarsQuery = useCalendars();
   const subscriptionsQuery = useCalendarSubscriptions();
+  const categoryCount = useCategories().data?.length ?? 0;
   const { toggle, pendingCalendarId } = useToggleCalendarVisibility();
 
   const model = useMemo(
@@ -90,6 +93,18 @@ export function CalendarsListPage() {
             icon="plus"
             tone="accent"
             onPress={() => push(CALENDAR_CREATE_PAGE)}
+          />
+        </SheetGroup>
+      </SheetSection>
+
+      <SheetSection>
+        <SheetGroup>
+          <SheetItem
+            label="Categories"
+            icon="tag"
+            value={categoryCount > 0 ? String(categoryCount) : undefined}
+            chevron
+            onPress={() => push(CATEGORIES_PAGE)}
           />
         </SheetGroup>
       </SheetSection>

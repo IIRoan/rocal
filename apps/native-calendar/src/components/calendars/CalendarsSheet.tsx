@@ -7,13 +7,16 @@ import { CalendarCreatePage } from "./CalendarCreatePage";
 import { CalendarEditPage } from "./CalendarEditPage";
 import { SubscriptionCreatePage } from "./SubscriptionCreatePage";
 import { SubscriptionEditPage } from "./SubscriptionEditPage";
+import { CategoriesListPage } from "./CategoriesListPage";
+import { CategoryCreatePage } from "./CategoryCreatePage";
+import { CategoryEditPage } from "./CategoryEditPage";
 
 interface CalendarsSheetProps {
   visible: boolean;
   onDismiss: () => void;
 }
 
-/** Calendars drawer: owned and read-only calendars, with create/edit pages in-sheet. */
+/** Calendars drawer: owned and read-only calendars plus categories, with create/edit pages in-sheet. */
 export function CalendarsSheet({ visible, onDismiss }: CalendarsSheetProps) {
   const pageStack = useSheetPageStack(CALENDARS_ROOT_PAGE, visible);
 
@@ -70,6 +73,24 @@ export function CalendarsSheetContent({
       return (
         <SheetSubPage title="Read-only calendar" backLabel="Back to calendars">
           <SubscriptionEditPage id={page.id} />
+        </SheetSubPage>
+      );
+    case "categories":
+      return (
+        <SheetSubPage title="Categories" backLabel="Back to calendars">
+          <CategoriesListPage />
+        </SheetSubPage>
+      );
+    case "category-create":
+      return (
+        <SheetSubPage title="New category" backLabel="Back to categories">
+          <CategoryCreatePage />
+        </SheetSubPage>
+      );
+    case "category-edit":
+      return (
+        <SheetSubPage title="Edit category" backLabel="Back to categories">
+          <CategoryEditPage id={page.id} />
         </SheetSubPage>
       );
   }

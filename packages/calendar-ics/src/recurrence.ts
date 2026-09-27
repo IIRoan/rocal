@@ -166,14 +166,14 @@ export class RecurrenceEngine {
 
     if (
       currentOccurrenceInstant >= rangeStart &&
-      currentOccurrenceInstant <= rangeEnd
+      currentOccurrenceInstant <= rangeEnd &&
+      (!rule.until || currentOccurrenceInstant <= rule.until)
     ) {
-      const isDeleted = exceptions.some(
+      const isException = exceptions.some(
         (ex) =>
-          isSameDay(ex.exceptionDate, currentOccurrenceInstant) &&
-          ex.type === "deleted",
+          isSameDay(ex.exceptionDate, currentOccurrenceInstant),
       );
-      if (!isDeleted) {
+      if (!isException) {
         instances.push({
           date: new Date(currentOccurrenceInstant),
           isOriginal: true,
@@ -201,12 +201,11 @@ export class RecurrenceEngine {
         currentOccurrenceInstant >= rangeStart &&
         currentOccurrenceInstant <= rangeEnd
       ) {
-        const isDeleted = exceptions.some(
+        const isException = exceptions.some(
           (ex) =>
-            isSameDay(ex.exceptionDate, currentOccurrenceInstant) &&
-            ex.type === "deleted",
+            isSameDay(ex.exceptionDate, currentOccurrenceInstant),
         );
-        if (!isDeleted) {
+        if (!isException) {
           instances.push({
             date: new Date(currentOccurrenceInstant),
             isOriginal: false,

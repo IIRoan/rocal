@@ -94,3 +94,60 @@ describe("recurring series content encryption", () => {
     expect(data).toEqual(expect.objectContaining({ color: "blue" }));
   });
 });
+
+describe("recurring series category updates", () => {
+  const occurrence = {
+    userId: "user-1",
+    parentEventId: "event-1",
+    recurrence: null,
+    occurrenceDate: new Date("2026-06-08T09:00:00.000Z"),
+  };
+
+  it("keeps the series category when the edit leaves it untouched", () => {
+    const data = buildRecurringEventCreateData({
+      ...occurrence,
+      existingEvent: seriesFixture({ categoryId: "category-1" }),
+      updates: { color: "blue" },
+    });
+
+    expect(data.categoryId).toBe("category-1");
+  });
+
+  it("clears the category on occurrence edits sent an empty id", () => {
+    const data = buildRecurringEventCreateData({
+      ...occurrence,
+      existingEvent: seriesFixture({ categoryId: "category-1" }),
+      updates: { categoryId: "" },
+    });
+
+    expect(data.categoryId).toBeNull();
+  });
+
+  it("assigns a newly picked category to the occurrence", () => {
+    const data = buildRecurringEventCreateData({
+      ...occurrence,
+      existingEvent: seriesFixture({ categoryId: "category-1" }),
+      updates: { categoryId: "category-2" },
+    });
+
+    expect(data.categoryId).toBe("category-2");
+  });
+
+  it("clears the series category when sent an empty id", () => {
+    const data = buildRecurringEventUpdateData(
+      seriesFixture({ categoryId: "category-1" }),
+      { categoryId: "" },
+    );
+
+    expect(data.categoryId).toBeNull();
+  });
+
+  it("leaves the series category untouched when omitted", () => {
+    const data = buildRecurringEventUpdateData(
+      seriesFixture({ categoryId: "category-1" }),
+      { color: "blue" },
+    );
+
+    expect(data.categoryId).toBeUndefined();
+  });
+});

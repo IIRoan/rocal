@@ -100,14 +100,12 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
         detail: {
           summary: "Import ICS file manually",
           description:
-            "Parses a raw ICS payload and imports its events into a specific calendar. This is useful for one-off imports when no ongoing subscription is needed.",
+            "Imports client-encrypted events into a calendar; legacy ICS payloads remain supported for shipped clients.",
         },
       }, async ({ body, routeUser }) => {
         return subscriptionService.importIcs({
+          ...body,
           userId: routeUser.id,
-          calendarId: body.calendarId,
-          icsContent: body.icsContent,
-          fileName: body.fileName,
         });
       }),
   );

@@ -11,11 +11,13 @@ import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
 import { toast } from "sonner";
 
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
-import { RecurringDeleteModal } from "@/components/command-palette/recurring-delete-modal";
+import { RecurringScopeModal } from "@/components/command-palette/recurring-scope-modal";
+import { useCategories } from "@/hooks/use-categories";
 import { useEventForm } from "@/hooks/use-event-form";
 import {
   buildEventEditorEncryptionPreview,
   canSaveEventEditor,
+  isRecurringEventDeleteCandidate,
 } from "@/lib/event-editor-view-model";
 import { getActiveE2eeSession } from "@/lib/e2ee-session";
 import type { UserSettings } from "@/lib/types/calendar";
@@ -60,6 +62,7 @@ export function EventEditor({
   const calendarData = useSharedCalendarData();
   const queryClient = useQueryClient();
   const { calendars } = calendarData;
+  const { data: categories = [] } = useCategories(open);
   const eventForm = useEventForm({
     calendars,
     localSettings,
@@ -79,8 +82,7 @@ export function EventEditor({
     eventViewMode,
     handleEventDelete: deleteEvent,
     handleEventSave: saveEvent,
-    handleRecurringDeleteAll: deleteRecurringAll,
-    handleRecurringDeleteThis: deleteRecurringThis,
+    handleRecurringDelete: deleteRecurring,
     isRecurring,
     loadEventData,
     resetForm,
@@ -92,6 +94,7 @@ export function EventEditor({
   } = eventForm;
   const [inviteResponsePending, setInviteResponsePending] =
     useState<EventEditorInvitationResponseStatus | null>(null);
+  const [showRecurringSaveModal, setShowRecurringSaveModal] = useState(false);
   const isMobile = useIsMobile();
 
   useEventEditorLivePreview({
@@ -145,6 +148,16 @@ export function EventEditor({
       return;
     }
     if (!canSaveEventEditor({ eventCalendarId, eventSaving, eventTitle })) {
+      return;
+    }
+    // The recurring edit endpoint cannot clear a rule, so turning repeat off keeps the plain series update.
+    const stopsRepeating = Boolean(selectedEvent?.recurrence) && !isRecurring;
+    if (
+      selectedEvent?.id &&
+      !stopsRepeating &&
+      isRecurringEventDeleteCandidate(selectedEvent)
+    ) {
+      setShowRecurringSaveModal(true);
       return;
     }
     void saveEvent(calendarData);
@@ -203,6 +216,7 @@ export function EventEditor({
       anchorPosition={anchorPosition}
       badgeItem={badgeItem}
       calendars={calendars}
+      categories={categories}
       dialogTitle={dialogTitle}
       eventForm={eventForm}
       flags={{
@@ -235,14 +249,27 @@ export function EventEditor({
       open={open}
       recurringModal={
         selectedEvent ? (
-          <RecurringDeleteModal
-            open={showRecurringDeleteModal}
-            onOpenChange={setShowRecurringDeleteModal}
-            eventTitle={selectedEvent.title}
-            onDeleteThis={() => deleteRecurringThis(calendarData)}
-            onDeleteAll={() => deleteRecurringAll(calendarData)}
-            loading={eventSaving}
-          />
+          <>
+            <RecurringScopeModal
+              open={showRecurringDeleteModal}
+              onOpenChange={setShowRecurringDeleteModal}
+              action="delete"
+              eventTitle={selectedEvent.title}
+              onSelect={(scope) => void deleteRecurring(calendarData, scope)}
+              loading={eventSaving}
+            />
+            <RecurringScopeModal
+              open={showRecurringSaveModal}
+              onOpenChange={setShowRecurringSaveModal}
+              action="edit"
+              eventTitle={eventTitle}
+              onSelect={(scope) => {
+                setShowRecurringSaveModal(false);
+                void saveEvent(calendarData, scope);
+              }}
+              loading={eventSaving}
+            />
+          </>
         ) : null
       }
     />

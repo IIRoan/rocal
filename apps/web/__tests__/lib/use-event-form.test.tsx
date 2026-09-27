@@ -51,6 +51,10 @@ const mockUpdateEventNotifications =
   calendarApiService.updateEventNotifications as jest.MockedFunction<
     typeof calendarApiService.updateEventNotifications
   >;
+const mockValidateRecurrence =
+  calendarApiService.validateRecurrence as jest.MockedFunction<
+    typeof calendarApiService.validateRecurrence
+  >;
 
 const calendars = [
   {
@@ -553,5 +557,246 @@ describe("useEventForm reminder hydration", () => {
         participants: [],
       }),
     );
+  });
+
+  describe("recurring scopes", () => {
+    const occurrence = {
+      ...baseEvent,
+      id: "series-1_2099-04-24T16:45:00.000Z",
+      parentEventId: "series-1",
+      isRecurringInstance: true,
+      start: new Date("2099-04-24T16:45:00.000Z"),
+      end: new Date("2099-04-24T17:30:00.000Z"),
+      recurrence: JSON.stringify({ frequency: "weekly", interval: 1 }),
+      title: "Weekly sync",
+    };
+
+    beforeEach(async () => {
+      mockGetEventNotifications.mockResolvedValue({
+        data: { notifications: [] },
+        success: true,
+      } as any);
+      mockValidateRecurrence.mockResolvedValue({
+        valid: true,
+        errors: [],
+      } as any);
+      await act(async () => {
+        await latestFormRef.current!.loadEventData(occurrence as any);
+      });
+    });
+
+    it("saves through editRecurringEvent with the selected scope and pre-edit occurrence", async () => {
+      const calendarData = {
+        editRecurringEvent: jest.fn(async () => ({
+          ...occurrence,
+          id: "series-2",
+        })),
+        updateEvent: jest.fn(),
+      };
+
+      await act(async () => {
+        await latestFormRef.current!.handleEventSave(
+          calendarData,
+          "this_and_future",
+        );
+      });
+
+      expect(calendarData.updateEvent).not.toHaveBeenCalled();
+      expect(calendarData.editRecurringEvent).toHaveBeenCalledWith({
+        event: expect.objectContaining({ id: occurrence.id }),
+        scope: "this_and_future",
+        updates: expect.objectContaining({
+          title: "Weekly sync",
+          start: "2099-04-24T16:45:00.000Z",
+          end: "2099-04-24T17:30:00.000Z",
+        }),
+      });
+    });
+
+    it("keeps plain updates for saves without a scope", async () => {
+      const calendarData = {
+        editRecurringEvent: jest.fn(),
+        updateEvent: jest.fn(async (_id: string, event: any) => ({
+          ...occurrence,
+          ...event,
+          start: new Date(event.start),
+          end: new Date(event.end),
+        })),
+      };
+
+      await act(async () => {
+        await latestFormRef.current!.handleEventSave(calendarData);
+      });
+
+      expect(calendarData.editRecurringEvent).not.toHaveBeenCalled();
+      expect(calendarData.updateEvent).toHaveBeenCalledWith(
+        occurrence.id,
+        expect.any(Object),
+      );
+    });
+
+    it("sends an empty category id through the recurring edit path", async () => {
+      await act(async () => {
+        await latestFormRef.current!.loadEventData({
+          ...occurrence,
+          categoryId: "cat-1",
+        } as any);
+      });
+      act(() => {
+        latestFormRef.current!.setEventCategoryId("");
+      });
+
+      const calendarData = {
+        editRecurringEvent: jest.fn(async () => ({ ...occurrence })),
+        updateEvent: jest.fn(),
+      };
+
+      await act(async () => {
+        await latestFormRef.current!.handleEventSave(calendarData, "all");
+      });
+
+      expect(calendarData.editRecurringEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: "all",
+          updates: expect.objectContaining({ categoryId: "" }),
+        }),
+      );
+    });
+
+    it.each(["this_only", "this_and_future", "all"] as const)(
+      "deletes with the %s scope",
+      async (scope) => {
+        const calendarData = {
+          deleteRecurringEvent: jest.fn(async () => undefined),
+        };
+
+        await act(async () => {
+          await latestFormRef.current!.handleRecurringDelete(
+            calendarData,
+            scope,
+          );
+        });
+
+        expect(calendarData.deleteRecurringEvent).toHaveBeenCalledWith({
+          event: expect.objectContaining({ id: occurrence.id }),
+          scope,
+        });
+      },
+    );
+  });
+
+  describe("event categories", () => {
+    function makeCalendarData() {
+      return {
+        createEvent: jest.fn(async (event: any) => ({
+          ...baseEvent,
+          ...event,
+          id: "event-new",
+          start: new Date(event.start),
+          end: new Date(event.end),
+        })),
+        updateEvent: jest.fn(async (_eventId: string, event: any) => ({
+          ...baseEvent,
+          ...event,
+          id: "event-1",
+          start: new Date(event.start),
+          end: new Date(event.end),
+        })),
+      };
+    }
+
+    beforeEach(() => {
+      mockGetEventNotifications.mockResolvedValue({
+        data: { notifications: [] },
+        success: true,
+      } as any);
+    });
+
+    it("keeps the category id when the picker is untouched", async () => {
+      await act(async () => {
+        await latestFormRef.current!.loadEventData({
+          ...baseEvent,
+          categoryId: "cat-1",
+        } as any);
+      });
+      const calendarData = makeCalendarData();
+
+      await act(async () => {
+        await latestFormRef.current!.handleEventSave(calendarData);
+      });
+
+      expect(calendarData.updateEvent).toHaveBeenCalledWith(
+        "event-1",
+        expect.objectContaining({ categoryId: "cat-1" }),
+      );
+    });
+
+    it("sends an empty id when the category is cleared", async () => {
+      await act(async () => {
+        await latestFormRef.current!.loadEventData({
+          ...baseEvent,
+          categoryId: "cat-1",
+        } as any);
+      });
+      act(() => {
+        latestFormRef.current!.setEventCategoryId("");
+      });
+      const calendarData = makeCalendarData();
+
+      await act(async () => {
+        await latestFormRef.current!.handleEventSave(calendarData);
+      });
+
+      expect(calendarData.updateEvent).toHaveBeenCalledWith(
+        "event-1",
+        expect.objectContaining({ categoryId: "" }),
+      );
+    });
+
+    it("omits the category for events that never had one", async () => {
+      await act(async () => {
+        await latestFormRef.current!.loadEventData({ ...baseEvent } as any);
+      });
+      const calendarData = makeCalendarData();
+
+      await act(async () => {
+        await latestFormRef.current!.handleEventSave(calendarData);
+      });
+
+      const [, updates] = calendarData.updateEvent.mock.calls[0] as any[];
+      expect(updates).not.toHaveProperty("categoryId");
+    });
+
+    it("sends a picked category on create", async () => {
+      act(() => {
+        latestFormRef.current!.setEventTitle("Lunch");
+        latestFormRef.current!.setEventCalendarId("cal-1");
+        latestFormRef.current!.setEventCategoryId("cat-2");
+      });
+      const calendarData = makeCalendarData();
+
+      await act(async () => {
+        await latestFormRef.current!.handleEventSave(calendarData);
+      });
+
+      expect(calendarData.createEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ categoryId: "cat-2" }),
+      );
+    });
+
+    it("omits the category on create when none is picked", async () => {
+      act(() => {
+        latestFormRef.current!.setEventTitle("Lunch");
+        latestFormRef.current!.setEventCalendarId("cal-1");
+      });
+      const calendarData = makeCalendarData();
+
+      await act(async () => {
+        await latestFormRef.current!.handleEventSave(calendarData);
+      });
+
+      const [request] = calendarData.createEvent.mock.calls[0] as any[];
+      expect(request).not.toHaveProperty("categoryId");
+    });
   });
 });

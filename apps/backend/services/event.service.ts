@@ -564,6 +564,7 @@ export class EventService implements IEventService {
         where: {
           userId,
           recurrence: null,
+          parentEventId: null,
           OR: [
             {
               start: { gte: startDate, lte: endDate },
@@ -583,7 +584,6 @@ export class EventService implements IEventService {
         where: {
           userId,
           recurrence: { not: null },
-          parentEventId: null,
         },
         include: EVENT_WITH_RECURRENCE_INCLUDE,
       }),
@@ -670,6 +670,7 @@ export class EventService implements IEventService {
         where: {
           userId,
           parentEventId: { not: null },
+          recurrence: null,
           start: { gte: startDate, lte: endDate },
         },
         include: EVENT_WITH_RELATIONS_INCLUDE,

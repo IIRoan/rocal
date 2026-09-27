@@ -508,3 +508,147 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     ]);
   });
 });
+
+describe("StalwartJmapClient undo, delete, and field search", () => {
+  const session: JmapSession = {
+    apiUrl: "http://localhost:4001/api/mail/jmap/",
+    accounts: { acc1: { name: "alice@solace.onl" } },
+    primaryAccounts: { "urn:ietf:params:jmap:mail": "acc1" },
+  };
+
+  function createClient(
+    fetcher: jest.MockedFunction<(url: string, init?: RequestInit) => Promise<Response>>,
+  ) {
+    return new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      getAccessToken: async () => "mail-access-token",
+      fetcher,
+    });
+  }
+
+  it("restores every original mailbox when undoing a move", async () => {
+    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
+      jsonOk({ methodResponses: [["Email/set", { updated: { m1: null } }, "c1"]] }),
+    );
+    await createClient(fetcher).restoreMessageMailboxes(session, [
+      { id: "m1", mailboxIds: { inbox: true, project: true } },
+    ]);
+
+    expect(parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0]).toEqual([
+      "Email/set",
+      {
+        accountId: "acc1",
+        update: { m1: { mailboxIds: { inbox: true, project: true } } },
+      },
+      "c1",
+    ]);
+  });
+
+  it("surfaces a refused restore instead of reporting success", async () => {
+    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
+      jsonOk({
+        methodResponses: [
+          [
+            "Email/set",
+            { notUpdated: { m1: { type: "notFound", description: "Gone" } } },
+            "c1",
+          ],
+        ],
+      }),
+    );
+    await expect(
+      createClient(fetcher).restoreMessageMailboxes(session, [
+        { id: "m1", mailboxIds: { inbox: true } },
+      ]),
+    ).rejects.toThrow("Gone");
+  });
+
+  it("skips the request when there is nothing to restore or destroy", async () => {
+    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
+      jsonOk({ methodResponses: [] }),
+    );
+    const client = createClient(fetcher);
+    await client.restoreMessageMailboxes(session, []);
+    await client.bulkDestroyMessages(session, []);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("rejects a bulk delete the server refused", async () => {
+    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
+      jsonOk({
+        methodResponses: [
+          [
+            "Email/set",
+            { notDestroyed: { m2: { type: "forbidden", description: "Denied" } } },
+            "c1",
+          ],
+        ],
+      }),
+    );
+    await expect(
+      createClient(fetcher).bulkDestroyMessages(session, ["m1", "m2"]),
+    ).rejects.toThrow("Denied");
+    expect(parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1]).toEqual({
+      accountId: "acc1",
+      destroy: ["m1", "m2"],
+    });
+  });
+
+  it("empties a mailbox by querying and destroying until no ids remain", async () => {
+    const fetcher = jest
+      .fn<Promise<Response>, [string, RequestInit?]>()
+      .mockResolvedValueOnce(
+        jsonOk({
+          methodResponses: [["Email/query", { ids: ["m1", "m2"], total: 2 }, "q1"]],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonOk({ methodResponses: [["Email/set", { destroyed: ["m1", "m2"] }, "c1"]] }),
+      );
+    const count = await createClient(fetcher).emptyMailbox(session, "trash");
+
+    expect(count).toBe(2);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    const query = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0];
+    expect(query[0]).toBe("Email/query");
+    expect(query[1].filter).toEqual({ inMailbox: "trash" });
+    expect(parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1]).toEqual({
+      accountId: "acc1",
+      destroy: ["m1", "m2"],
+    });
+  });
+
+  it("sends the field filter to Email/query and returns fetched messages", async () => {
+    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
+      jsonOk({
+        methodResponses: [
+          ["Email/query", { ids: ["m1"], total: 1 }, "q1"],
+          ["Email/get", { list: [{ id: "m1", subject: "Invoice" }] }, "g1"],
+        ],
+      }),
+    );
+    const filter = {
+      inMailbox: "inbox",
+      from: "alice@example.com",
+      after: "2026-02-28T23:00:00Z",
+    };
+    const result = await createClient(fetcher).searchMailboxMessagesWithFilter(
+      session,
+      "inbox",
+      filter,
+      40,
+      40,
+    );
+
+    expect(result.total).toBe(1);
+    expect(result.messages.map((message) => message.id)).toEqual(["m1"]);
+    const [queryCall, getCall] = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls;
+    expect(queryCall[1].filter).toEqual(filter);
+    expect(queryCall[1]).toMatchObject({ position: 40, limit: 40, calculateTotal: true });
+    expect(getCall[1]["#ids"]).toEqual({
+      resultOf: "q1",
+      name: "Email/query",
+      path: "/ids",
+    });
+  });
+});

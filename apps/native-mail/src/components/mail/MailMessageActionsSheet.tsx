@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
@@ -46,6 +47,8 @@ type MailMessageActionsSheetProps = {
   labels: LabelDef[];
   messageKeywords: JmapEmailMessage["keywords"] | undefined;
   rawHtmlSource: string | null;
+  /** Null when the dark translation does not apply to this message. */
+  originalLook: { showing: boolean; toggle: () => void } | null;
   createLabel: (name: string, color: string) => Promise<LabelDef>;
   deleteLabel: (labelId: string) => Promise<void>;
 };
@@ -55,6 +58,7 @@ export function MailMessageActionsSheet({
   labels,
   messageKeywords,
   rawHtmlSource,
+  originalLook,
   createLabel,
   deleteLabel,
 }: MailMessageActionsSheetProps) {
@@ -84,6 +88,7 @@ export function MailMessageActionsSheet({
         <MessageMenuContent
           actions={actions}
           hasHtmlSource={Boolean(rawHtmlSource)}
+          originalLook={originalLook}
           sheetH={sheetH}
         />
       ) : activeSheetView === "move" ? (
@@ -153,6 +158,17 @@ export function MailMessageActionsSheet({
           }}
         >
           <SheetNavButton label="Actions" onPress={showMenu} />
+          <MailSheetList>
+            <SheetRow
+              variant="mail"
+              icon="copy"
+              label="Copy source"
+              onPress={async () => {
+                await Clipboard.setStringAsync(rawHtmlSource ?? "");
+                toast("Copied");
+              }}
+            />
+          </MailSheetList>
           <View style={styles.htmlSourceCard}>
             <Text selectable style={styles.htmlSourceText}>
               {rawHtmlSource ?? ""}
@@ -167,10 +183,12 @@ export function MailMessageActionsSheet({
 function MessageMenuContent({
   actions,
   hasHtmlSource,
+  originalLook,
   sheetH,
 }: {
   actions: MailMessageActions;
   hasHtmlSource: boolean;
+  originalLook: MailMessageActionsSheetProps["originalLook"];
   sheetH: number;
 }) {
   const role = actions.currentMailboxRole;
@@ -259,6 +277,18 @@ function MessageMenuContent({
               label="Move to…"
               accessory="chevron-right"
               onPress={() => actions.setActiveSheetView("move")}
+              showDivider
+            />
+          ) : null}
+          {originalLook ? (
+            <SheetRow
+              variant="mail"
+              icon={originalLook.showing ? "moon" : "sun"}
+              label={originalLook.showing ? "Show in dark mode" : "Show original"}
+              onPress={() => {
+                originalLook.toggle();
+                actions.setActiveSheetView(null);
+              }}
               showDivider
             />
           ) : null}

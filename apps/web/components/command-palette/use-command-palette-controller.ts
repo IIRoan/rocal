@@ -36,6 +36,7 @@ import {
 import { useNumberedShortcuts, useIsMobile } from "@workspace/ui/hooks";
 import type { JmapEmailMessage } from "@/lib/mail/types";
 import { buildMailUrlFromIds } from "@/lib/mail/mail-url";
+import { runCalendarPaletteCommand } from "@/lib/calendar-palette-commands";
 
 type UseCommandPaletteControllerOptions = {
   open: boolean;
@@ -303,6 +304,17 @@ export function useCommandPaletteController({
           onOpenChange(false);
         }
         break;
+      case "goToday":
+      case "setView":
+        if (
+          runCalendarPaletteCommand(action, payload, {
+            setCurrentDate,
+            setCalendarView,
+          })
+        ) {
+          onOpenChange(false);
+        }
+        break;
       case "newEvent":
         goForward("events");
         break;
@@ -311,6 +323,9 @@ export function useCommandPaletteController({
         break;
       case "openCalendars":
         goForward("calendars");
+        break;
+      case "newCategory":
+        goForward("category-create");
         break;
       case "newPasskey":
         dispatchChrome({ type: "setPasskeyAddMode", enabled: true });
