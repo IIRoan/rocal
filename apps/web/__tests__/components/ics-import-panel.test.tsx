@@ -85,6 +85,14 @@ async function pickFile(name: string, content: string) {
   });
 }
 
+/** TanStack Query notifies observers on a timer, so flush one macrotask after the click. */
+async function clickImport() {
+  await act(async () => {
+    findButton("Import events")?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
 function findButton(label: string) {
   return Array.from(container.querySelectorAll("button")).find((button) =>
     button.textContent?.includes(label),
@@ -126,9 +134,7 @@ describe("IcsImportPanel", () => {
     ]);
     expect(radios[1]?.getAttribute("aria-checked")).toBe("true");
 
-    await act(async () => {
-      findButton("Import events")?.click();
-    });
+    await clickImport();
 
     expect(mockImportICS).toHaveBeenCalledWith({
       calendarId: "cal-home",
@@ -151,9 +157,7 @@ describe("IcsImportPanel", () => {
     act(() => {
       findButton("Work")?.click();
     });
-    await act(async () => {
-      findButton("Import events")?.click();
-    });
+    await clickImport();
 
     expect(mockImportICS).toHaveBeenCalledWith(
       expect.objectContaining({ calendarId: "cal-work" }),
@@ -180,9 +184,7 @@ describe("IcsImportPanel", () => {
     render();
 
     await pickFile("broken.ics", "BEGIN:VCALENDAR");
-    await act(async () => {
-      findButton("Import events")?.click();
-    });
+    await clickImport();
 
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(
       "Invalid ICS file",
