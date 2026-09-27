@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useReducer } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
 import type { UnifiedSearchResult } from "@workspace/calendar-core";
 import { formatCalendarDayKey } from "@workspace/calendar-core";
 import { useSettings } from "@/hooks/use-settings";
@@ -56,6 +57,7 @@ export function useCommandPaletteController({
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
   const { settings, loading, updateSettings, resetSettings } = useSettings();
+  const { setTheme } = useTheme();
   const queryClient = useQueryClient();
   const { data: session, isPending: sessionLoading } = useSession();
   const sessionUserId = session?.user?.id ?? null;
@@ -297,10 +299,7 @@ export function useCommandPaletteController({
     switch (action) {
       case "setTheme":
         if (payload?.theme) {
-          void updateSetting(
-            "theme",
-            payload.theme as "light" | "dark" | "system",
-          );
+          setTheme(payload.theme as "light" | "dark" | "system");
           onOpenChange(false);
         }
         break;

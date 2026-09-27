@@ -6,6 +6,7 @@ import {
   clearOrphanedEncPasswordCookie,
 } from "@/lib/enc-password-cookie";
 import { resetE2eeBootstrap } from "@/lib/e2ee-bootstrap";
+import { clearLocalMailSettings } from "@/lib/mail/mail-settings-storage";
 
 const log = createLogger("auth-local-state");
 
@@ -19,6 +20,7 @@ export function clearSolaceClientAuthArtifacts(): void {
   clearAuthPasswords();
   clearEncPasswordCookie();
   resetE2eeBootstrap();
+  clearLocalMailSettings();
 }
 
 /**
@@ -27,6 +29,7 @@ export function clearSolaceClientAuthArtifacts(): void {
  */
 export function clearOrphanedClientAuthArtifacts(): void {
   clearOrphanedEncPasswordCookie();
+  clearLocalMailSettings();
 }
 
 /**

@@ -432,6 +432,12 @@ export interface RecentContactsRecord {
   updatedAt: string;
 }
 
+export interface MailSettingsRecord {
+  encryptedContent: string;
+  encryptionKeyVersion: number;
+  updatedAt: string;
+}
+
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
 
 export type RecurrenceRule = SharedRecurrenceRule;

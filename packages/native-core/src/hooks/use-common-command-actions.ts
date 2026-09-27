@@ -5,14 +5,12 @@ import type { CommonCommandAction } from "../lib/command-palette-common";
 import { useAuth } from "../providers/AuthProvider";
 import { useTheme } from "../providers/ThemeProvider";
 import { useToast } from "../providers/ToastProvider";
-import { useNativeUserSettings } from "./use-native-user-settings";
 
 /** Runs the theme, passkey, and settings commands both palettes share; returns false for app-specific actions. */
 export function useCommonCommandActions() {
   const router = useRouter();
   const { registerPasskey } = useAuth();
   const { setThemePreference } = useTheme();
-  const { updateSetting } = useNativeUserSettings();
   const { toast } = useToast();
 
   const addPasskey = useCallback(async () => {
@@ -30,7 +28,6 @@ export function useCommonCommandActions() {
     }): boolean => {
       if (action.theme) {
         setThemePreference(action.theme);
-        updateSetting({ theme: action.theme });
         return true;
       }
       if (action.settingsSection) {
@@ -43,6 +40,6 @@ export function useCommonCommandActions() {
       }
       return false;
     },
-    [addPasskey, router, setThemePreference, updateSetting],
+    [addPasskey, router, setThemePreference],
   );
 }

@@ -11,6 +11,8 @@ export const mailQueryKeys = {
   inlineSearch: (mailboxId: string | null, query: string) =>
     [...mailQueryKeys.all, "inline-search", mailboxId, query] as const,
   hiddenMailboxIds: () => [...mailQueryKeys.all, "hiddenMailboxIds"] as const,
+  syncedSettings: (userId: string | null) =>
+    [...mailQueryKeys.all, "syncedSettings", userId] as const,
 } as const;
 
 export type MailMailboxMessagesCache = {

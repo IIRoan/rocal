@@ -31,9 +31,7 @@ export const QUERY_KEYS = {
   invites: () => ["invites"] as const,
   pushDevices: () => PUSH_DEVICES_QUERY_KEY,
   hiddenMailboxIds: () => ["mail", "hiddenMailboxIds"] as const,
-  mailDisplaySettings: () => ["mail", "displaySettings"] as const,
-  mailComposeSettings: () => ["mail", "composeSettings"] as const,
-  mailListSettings: () => ["mail", "listSettings"] as const,
+  mailSyncedSettings: () => ["mail", "syncedSettings"] as const,
   mailSearchMessages: (mailboxId: string | null, revision: number) =>
     ["mail", "messages", mailboxId, "search", revision] as const,
   signupConfig: () => ["account", "signupConfig"] as const,

@@ -69,7 +69,10 @@ export function normalizeMailComposeSettings(input: unknown): MailComposeSetting
         )
       : DEFAULT_MAIL_COMPOSE_SETTINGS.attachmentReminderKeywords,
     signaturePosition:
-      parsed.signaturePosition === "below_quote" ? "below_quote" : "above_quote",
+      parsed.signaturePosition === "above_quote" ||
+      parsed.signaturePosition === "below_quote"
+        ? parsed.signaturePosition
+        : DEFAULT_MAIL_COMPOSE_SETTINGS.signaturePosition,
     signatureSeparatorEnabled: booleanOr(
       parsed.signatureSeparatorEnabled,
       DEFAULT_MAIL_COMPOSE_SETTINGS.signatureSeparatorEnabled,
