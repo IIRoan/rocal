@@ -7,6 +7,8 @@ import {
   serializeMailComposeSettings,
   type MailComposeSettings,
 } from "@workspace/calendar-core";
+import { MAIL_COMPOSE_SETTINGS_STORAGE_KEY } from "./mail-settings-storage";
+import { scheduleMailSettingsServerSync } from "./schedule-mail-settings-sync";
 
 export {
   DEFAULT_ATTACHMENT_REMINDER_KEYWORDS,
@@ -17,7 +19,7 @@ export {
   type MailSignaturePosition,
 } from "@workspace/calendar-core";
 
-const STORAGE_KEY = "mail:composeSettings";
+const STORAGE_KEY = MAIL_COMPOSE_SETTINGS_STORAGE_KEY;
 
 export function readMailComposeSettings(): MailComposeSettings {
   if (typeof window === "undefined") {
@@ -28,12 +30,16 @@ export function readMailComposeSettings(): MailComposeSettings {
 
 export function writeMailComposeSettings(
   next: MailComposeSettings | ((current: MailComposeSettings) => MailComposeSettings),
+  options?: { sync?: boolean },
 ): MailComposeSettings {
   const current = readMailComposeSettings();
   const resolved = typeof next === "function" ? next(current) : next;
   if (typeof window !== "undefined") {
     localStorage.setItem(STORAGE_KEY, serializeMailComposeSettings(resolved));
     window.dispatchEvent(new CustomEvent("mail-compose-settings-changed"));
+    if (options?.sync !== false) {
+      scheduleMailSettingsServerSync();
+    }
   }
   return resolved;
 }

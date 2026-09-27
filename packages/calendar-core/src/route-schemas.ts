@@ -156,6 +156,14 @@ export const putRecentContactsBodySchema = z
   .strict();
 export type PutRecentContactsRequest = z.infer<typeof putRecentContactsBodySchema>;
 
+export const putMailSettingsBodySchema = z
+  .object({
+    encryptedContent: z.string().min(1).max(65_536),
+    encryptionKeyVersion: z.number().int().min(1).max(1000).optional(),
+  })
+  .strict();
+export type PutMailSettingsRequest = z.infer<typeof putMailSettingsBodySchema>;
+
 export const bulkEventBodySchema = z
   .object({
     action: bulkEventActionSchema,

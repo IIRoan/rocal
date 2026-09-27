@@ -20,6 +20,21 @@ type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export const DEFAULT_CALENDAR_TIMEZONE = "Europe/Amsterdam";
 
+/** IANA zone from this runtime; falls back to the product default when unavailable. */
+export function getDeviceTimezone(): string {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone?.trim();
+    if (timezone) {
+      // ICU reports "Etc/Unknown" when the host zone is unknown, and Intl rejects it.
+      new Intl.DateTimeFormat(undefined, { timeZone: timezone });
+      return timezone;
+    }
+  } catch {
+    // Intl can throw for unusual runtimes.
+  }
+  return DEFAULT_CALENDAR_TIMEZONE;
+}
+
 export function resolveTimezone(timezone?: string | null): string {
   const trimmed = timezone?.trim();
   if (trimmed) {
@@ -27,6 +42,30 @@ export function resolveTimezone(timezone?: string | null): string {
   }
 
   return DEFAULT_CALENDAR_TIMEZONE;
+}
+
+/** True when settings still have the never-edited UTC default and should inherit this device's zone. */
+export function shouldSeedAccountTimezone(settings: {
+  timezone: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}): boolean {
+  if (settings.timezone.trim() !== "UTC") return false;
+  const created = new Date(settings.createdAt).getTime();
+  const updated = new Date(settings.updatedAt).getTime();
+  if (!Number.isFinite(created) || !Number.isFinite(updated)) return false;
+  return Math.abs(created - updated) < 1000;
+}
+
+/** Device zone to adopt for never-edited default settings, or null when nothing should change. */
+export function getAccountTimezoneSeed(settings: {
+  timezone: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}): string | null {
+  if (!shouldSeedAccountTimezone(settings)) return null;
+  const deviceTimezone = getDeviceTimezone();
+  return deviceTimezone === settings.timezone ? null : deviceTimezone;
 }
 
 export function getZonedDateParts(

@@ -12,7 +12,6 @@ import { useCommonCommandActions } from "./use-common-command-actions";
 const mockPush = jest.fn();
 const mockRegisterPasskey = jest.fn();
 const mockSetThemePreference = jest.fn();
-const mockUpdateSetting = jest.fn();
 const mockToast = jest.fn();
 
 jest.mock("expo-router", () => ({
@@ -29,10 +28,6 @@ jest.mock("../providers/ThemeProvider", () => ({
 
 jest.mock("../providers/ToastProvider", () => ({
   useToast: () => ({ toast: mockToast }),
-}));
-
-jest.mock("./use-native-user-settings", () => ({
-  useNativeUserSettings: () => ({ updateSetting: mockUpdateSetting }),
 }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -75,11 +70,10 @@ describe("useCommonCommandActions", () => {
     run = null;
   });
 
-  it("applies and persists theme commands", () => {
+  it("applies theme on this device only", () => {
     const dark = buildThemeCommandActions().find((a) => a.id === "theme-dark");
     expect(dark && getRunner()(dark)).toBe(true);
     expect(mockSetThemePreference).toHaveBeenCalledWith("dark");
-    expect(mockUpdateSetting).toHaveBeenCalledWith({ theme: "dark" });
   });
 
   it("opens settings sections by route", () => {

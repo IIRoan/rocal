@@ -57,6 +57,7 @@ import {
 import { updateSettingsBodySchema } from "./settings.contract";
 import { lookupProfilesBodySchema, profileAvatarQuerySchema } from "./profiles.contract";
 import { putRecentContactsBodySchema } from "./recent-contacts.contract";
+import { putMailSettingsBodySchema } from "./mail-settings.contract";
 import {
   createSubscriptionBodySchema,
   deleteSubscriptionQuerySchema,
@@ -103,6 +104,7 @@ const routeModelSchemas = {
   "push.unregisterBody": unregisterPushDeviceBodySchema,
   "settings.updateBody": updateSettingsBodySchema,
   "recentContacts.putBody": putRecentContactsBodySchema,
+  "mailSettings.putBody": putMailSettingsBodySchema,
   "profiles.lookupBody": lookupProfilesBodySchema,
   "profiles.avatarQuery": profileAvatarQuerySchema,
   "recurring.validateBody": validateRecurrenceBodySchema,
@@ -151,5 +153,6 @@ export * from "./profiles.contract";
 export * from "./recurring.contract";
 export * from "./settings.contract";
 export * from "./recent-contacts.contract";
+export * from "./mail-settings.contract";
 export * from "./stalwart-webhook.contract";
 export * from "./subscription.contract";

@@ -24,7 +24,7 @@ interface CalendarWithDataProps {
 
 export function CalendarWithData({ className }: CalendarWithDataProps) {
   const { isCalendarVisible, currentDate, currentView } = useCalendarContext();
-  const { settings, loading: settingsLoading, updateSettings } = useSettings();
+  const { settings, loading: settingsLoading } = useSettings();
   const timeFormat = useUserTimeFormat();
   const { openEventEditor, previewEvent } = useCommandPalette();
   const calendarData = useSharedCalendarData();
@@ -38,7 +38,6 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     initialView,
     isAllInitialLoading,
     overlayContext,
-    themeSettings,
     transformedEvents,
     workingDays,
   } = useCalendarPresentation({
@@ -49,9 +48,6 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     currentDate,
     currentView,
     previewEvent,
-    updateTheme: async (theme) => {
-      await updateSettings({ theme });
-    },
   });
 
   useEffect(() => {
@@ -86,7 +82,6 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         weekStartDay={settings?.weekStartDay}
         workingDays={workingDays}
         timezone={settings?.timezone}
-        themeSettings={themeSettings}
         onLoadNotifications={calendarData.loadNotifications}
         onUpdateNotifications={calendarData.updateNotifications}
         onEventEdit={openEventEditor}

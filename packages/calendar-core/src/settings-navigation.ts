@@ -40,7 +40,7 @@ export const SETTINGS_HUB_ITEMS: readonly SettingsNavItem<SettingsHubId>[] = [
   {
     id: "appearance",
     label: "Appearance",
-    description: "Theme and default calendar view",
+    description: "Theme on this device and default calendar view",
   },
   {
     id: "calendar",
@@ -55,7 +55,7 @@ export const SETTINGS_HUB_ITEMS: readonly SettingsNavItem<SettingsHubId>[] = [
   {
     id: "time-region",
     label: "Time & Region",
-    description: "Timezone and time format",
+    description: "Timezone and time format across your devices",
   },
   {
     id: "notifications",

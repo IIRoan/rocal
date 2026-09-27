@@ -20,6 +20,7 @@ import {
   useNotificationExtensionSync,
   type NotificationExtensionSecrets,
 } from "../hooks/use-notification-extension-sync";
+import { useAccountTimezoneSeed } from "../hooks/use-account-timezone-seed";
 import {
   STARTUP_CRYPTO_INITIAL_PHASE,
   type AuthenticatedSessionInput,
@@ -47,6 +48,7 @@ export function NavigationGuard({
   const { isAuthenticated, isLoading, user } = useAuth();
   const { isReady: isE2eeReady, bootstrap, clearSession, provider } = useE2ee();
   useNotificationExtensionSync(notificationExtensionSecrets);
+  useAccountTimezoneSeed(isAuthenticated && Boolean(user));
   const queryClient = useQueryClient();
   const segments = useSegments();
   const router = useRouter();

@@ -9,6 +9,8 @@ import {
   withoutTrustedSender,
   type MailDisplaySettings,
 } from "@workspace/calendar-core";
+import { MAIL_DISPLAY_SETTINGS_STORAGE_KEY } from "./mail-settings-storage";
+import { scheduleMailSettingsServerSync } from "./schedule-mail-settings-sync";
 
 export {
   DEFAULT_MAIL_DISPLAY_SETTINGS,
@@ -22,7 +24,7 @@ export {
   type MailDisplaySettings,
 } from "@workspace/calendar-core";
 
-const STORAGE_KEY = "mail:displaySettings";
+const STORAGE_KEY = MAIL_DISPLAY_SETTINGS_STORAGE_KEY;
 
 export function readMailDisplaySettings(): MailDisplaySettings {
   if (typeof window === "undefined") {
@@ -39,12 +41,16 @@ export function writeMailDisplaySettings(
   next:
     | MailDisplaySettings
     | ((current: MailDisplaySettings) => MailDisplaySettings),
+  options?: { sync?: boolean },
 ): MailDisplaySettings {
   const current = readMailDisplaySettings();
   const resolved = typeof next === "function" ? next(current) : next;
   if (typeof window !== "undefined") {
     localStorage.setItem(STORAGE_KEY, serializeMailDisplaySettings(resolved));
     window.dispatchEvent(new CustomEvent("mail-display-settings-changed"));
+    if (options?.sync !== false) {
+      scheduleMailSettingsServerSync();
+    }
   }
   return resolved;
 }

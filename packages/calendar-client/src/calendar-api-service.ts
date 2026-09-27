@@ -37,6 +37,8 @@ import type {
   UpdateSettingsRequest,
   RecentContactsRecord,
   PutRecentContactsRequest,
+  MailSettingsRecord,
+  PutMailSettingsRequest,
   RecurrenceValidation,
   RecurrencePreview,
   RecurrencePatterns,
@@ -771,6 +773,29 @@ export class CalendarApiService {
       );
     } catch (error) {
       throw this.transformError(error, "Failed to save recent contacts");
+    }
+  }
+
+  async getMailSettings(): Promise<MailSettingsRecord | null> {
+    try {
+      return await this.client.get<MailSettingsRecord | null>(
+        "/api/mail-settings",
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to fetch mail settings");
+    }
+  }
+
+  async putMailSettings(
+    request: PutMailSettingsRequest,
+  ): Promise<MailSettingsRecord> {
+    try {
+      return await this.client.put<MailSettingsRecord>(
+        "/api/mail-settings",
+        request,
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to save mail settings");
     }
   }
 

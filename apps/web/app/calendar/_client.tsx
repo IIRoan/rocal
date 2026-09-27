@@ -193,7 +193,7 @@ function MobileLayoutContent() {
   } =
     useCommandPaletteContext();
   const { isCalendarVisible, currentDate, currentView } = useCalendarContext();
-  const { settings, loading: settingsLoading, updateSettings } = useSettings();
+  const { settings, loading: settingsLoading } = useSettings();
   const timeFormat = useUserTimeFormat();
   const calendarData = useSharedCalendarData();
   const { handleLogout, openNewEventEditor } = useDashboardUserActions({
@@ -206,7 +206,6 @@ function MobileLayoutContent() {
     initialView,
     isAllInitialLoading,
     overlayContext,
-    themeSettings,
     transformedEvents,
     workingDays,
   } = useCalendarPresentation({
@@ -216,9 +215,6 @@ function MobileLayoutContent() {
     isCalendarVisible,
     currentDate,
     currentView,
-    updateTheme: async (theme) => {
-      await updateSettings({ theme });
-    },
   });
   const workspace = useCalendarWorkspaceReady();
   const { moveRecurringEvent, scopePrompt } = useRecurringMovePrompt(
@@ -277,7 +273,6 @@ function MobileLayoutContent() {
         weekStartDay={settings?.weekStartDay}
         workingDays={workingDays}
         timezone={settings?.timezone}
-        themeSettings={themeSettings}
         onLoadNotifications={calendarData.loadNotifications}
         onUpdateNotifications={calendarData.updateNotifications}
         onEventEdit={openEventEditor}

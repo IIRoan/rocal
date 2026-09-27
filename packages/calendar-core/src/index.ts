@@ -53,6 +53,7 @@ export * from "./recent-contacts";
 export * from "./solace-profiles";
 export * from "./mail-display-settings";
 export * from "./mail-compose-settings";
+export * from "./mail-synced-settings";
 export * from "./mail-signature";
 export * from "./mail-reply-identity";
 

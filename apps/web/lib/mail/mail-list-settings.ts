@@ -6,6 +6,8 @@ import {
   parseMailListSettings,
   type MailListSettings,
 } from "@workspace/calendar-core";
+import { MAIL_LIST_SETTINGS_STORAGE_KEY } from "./mail-settings-storage";
+import { scheduleMailSettingsServerSync } from "./schedule-mail-settings-sync";
 
 export {
   DEFAULT_MAIL_LIST_SETTINGS,
@@ -15,7 +17,7 @@ export {
   type MarkAsReadDelay,
 } from "@workspace/calendar-core";
 
-const STORAGE_KEY = "mail:listSettings";
+const STORAGE_KEY = MAIL_LIST_SETTINGS_STORAGE_KEY;
 
 export function readMailListSettings(): MailListSettings {
   if (typeof window === "undefined") {
@@ -26,12 +28,16 @@ export function readMailListSettings(): MailListSettings {
 
 export function writeMailListSettings(
   next: MailListSettings | ((current: MailListSettings) => MailListSettings),
+  options?: { sync?: boolean },
 ): MailListSettings {
   const current = readMailListSettings();
   const resolved = typeof next === "function" ? next(current) : next;
   if (typeof window !== "undefined") {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(resolved));
     window.dispatchEvent(new CustomEvent("mail-list-settings-changed"));
+    if (options?.sync !== false) {
+      scheduleMailSettingsServerSync();
+    }
   }
   return resolved;
 }
