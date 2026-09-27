@@ -1,5 +1,10 @@
 import { createLogger } from "@workspace/logger";
-import { clockTimePattern, formatInUserTimezone, type TimeFormat } from "@workspace/calendar-core";
+import {
+  clockTimePattern,
+  formatInUserTimezone,
+  resolveRecurringEventTarget,
+  type TimeFormat,
+} from "@workspace/calendar-core";
 import { toast } from "sonner";
 
 import type { CalendarEvent } from "./types";
@@ -98,22 +103,38 @@ export function buildDraggedEventUpdate(
   };
 }
 
+export type DraggedEventUpdate = ReturnType<typeof buildDraggedEventUpdate>;
+
+/** Receives the pre-drag event so the occurrence date is the original one; resolves false when the user cancels the scope prompt. */
+export type MoveRecurringCalendarEvent = (
+  originalEvent: CalendarEvent,
+  update: DraggedEventUpdate,
+) => Promise<boolean>;
+
 export async function persistDraggedCalendarEvent({
   timezone,
   timeFormat,
   updateEvent,
+  moveRecurringEvent,
+  originalEvent,
   updatedEvent,
 }: {
   timezone: string;
   timeFormat: TimeFormat;
   updateEvent: (id: string, event: unknown) => Promise<unknown>;
+  moveRecurringEvent?: MoveRecurringCalendarEvent;
+  originalEvent?: CalendarEvent;
   updatedEvent: CalendarEvent;
 }) {
   try {
-    await updateEvent(
-      updatedEvent.id,
-      buildDraggedEventUpdate(updatedEvent, timezone),
-    );
+    const update = buildDraggedEventUpdate(updatedEvent, timezone);
+    const sourceEvent = originalEvent ?? updatedEvent;
+    if (moveRecurringEvent && resolveRecurringEventTarget(sourceEvent)) {
+      const moved = await moveRecurringEvent(sourceEvent, update);
+      if (!moved) return;
+    } else {
+      await updateEvent(updatedEvent.id, update);
+    }
 
     toast.success(`Event "${updatedEvent.title}" moved`, {
       description: formatInUserTimezone(

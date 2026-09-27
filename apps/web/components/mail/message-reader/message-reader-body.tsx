@@ -55,7 +55,7 @@ export function MessageReaderBody({
     renderAsHtml,
     cleanHtml,
     htmlHasQuote,
-    hasRemoteContent,
+    remoteContentPrompt,
     shouldReplaceBodyWithEventReminder,
     isReminderEventLoading,
     eventReminderView,
@@ -89,9 +89,7 @@ export function MessageReaderBody({
     <EventReminderMessageBodyLoading isDark={isDark} />
   ) : renderAsHtml ? (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--border-secondary)]">
-      {blockRemoteImages &&
-        displaySettings.externalContentPolicy !== "allow" &&
-        hasRemoteContent && (
+      {remoteContentPrompt && (
         <div className="shrink-0 border-b border-[var(--border-tertiary)] bg-[var(--bg-overlay-tertiary)] px-4 py-2">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
@@ -99,7 +97,7 @@ export function MessageReaderBody({
               <span>Remote images and other external content are blocked.</span>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
-              {displaySettings.externalContentPolicy === "ask" && (
+              {remoteContentPrompt.canLoadOnce && (
                 <button
                   type="button"
                   onClick={() => setAllowExternalContent(true)}
@@ -109,7 +107,7 @@ export function MessageReaderBody({
                   Load images
                 </button>
               )}
-              {externalContentSenderEmail && (
+              {remoteContentPrompt.canTrustSender && externalContentSenderEmail && (
                 <button
                   type="button"
                   onClick={() => {

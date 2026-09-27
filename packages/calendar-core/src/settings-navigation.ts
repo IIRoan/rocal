@@ -100,19 +100,16 @@ export const SETTINGS_MAIL_ITEMS: readonly SettingsNavItem<SettingsMailId>[] = [
     id: "composing",
     label: "Composing",
     description: "Plain text, signatures, and attachment reminders",
-    platforms: ["web"],
   },
   {
     id: "mail-display",
     label: "Content & display",
     description: "Remote images, trusted senders, and reading appearance",
-    platforms: ["web"],
   },
   {
     id: "mail-list",
-    label: "List & shortcuts",
-    description: "Density, mark-as-read delay, undo toasts, and shortcuts",
-    platforms: ["web"],
+    label: "Message list",
+    description: "Density, mark-as-read delay, and undo toasts",
   },
 ] as const;
 

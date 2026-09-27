@@ -13,6 +13,7 @@ import {
   shouldRenderAuthenticatedChrome,
 } from "../lib/auth-routing";
 import { API_BASE_URL } from "../lib/constants";
+import { hideLaunchSplash } from "../lib/launch-splash";
 import { captureException } from "../lib/reporting";
 import { resetPreSessionQueries } from "../lib/session-query-reset";
 import {
@@ -52,6 +53,10 @@ export function NavigationGuard({
   const [isPreparingStartupCrypto, setIsPreparingStartupCrypto] =
     useState(false);
   const [setupMessage, setSetupMessage] = useState(STARTUP_CRYPTO_INITIAL_PHASE);
+
+  useEffect(() => {
+    if (!isLoading) hideLaunchSplash();
+  }, [isLoading]);
 
   useEffect(() => {
     const redirectPath = getAuthRedirectPath({

@@ -5,6 +5,10 @@ export { MonthView } from "./month-view";
 export { WeekView } from "./week-view";
 export { MobileThreeDayView } from "./mobile-three-day-view";
 export { EventCalendar, type EventCalendarProps } from "./event-calendar";
+export type {
+  DraggedEventUpdate,
+  MoveRecurringCalendarEvent,
+} from "./event-calendar-mutations";
 export { EventItem } from "./event-item";
 export { EventDots } from "./event-dots";
 export { EventsPopup } from "./events-popup";

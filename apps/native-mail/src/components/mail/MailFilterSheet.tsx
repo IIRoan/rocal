@@ -1,8 +1,9 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
   type TextStyle,
   type ViewStyle,
@@ -12,8 +13,14 @@ import {
   DEFAULT_MAIL_LIST_FILTERS,
   MAIL_LIST_AGES,
   MAIL_LIST_READ_STATES,
+  MAIL_SEARCH_TEXT_FIELDS,
+  SEARCH_FILTER_FIELDS,
   countActiveMailListFilters,
+  countMailSearchFieldValues,
+  isValidSearchDate,
   type MailListFilters,
+  type MailSearchFieldValues,
+  type MailSearchTextField,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import type { LabelDef } from "../../lib/mail/types";
@@ -34,22 +41,54 @@ interface MailFilterSheetProps {
   onFiltersChange: (filters: MailListFilters) => void;
   labels: LabelDef[];
   resultCount: number;
+  searchFields: MailSearchFieldValues;
+  onSearchFieldsChange: (fields: MailSearchFieldValues) => void;
   onDismiss: () => void;
 }
 
-/** Combinable message list filters: status, starred, attachments, received date, and labels. */
+const SEARCH_FIELD_META = new Map(
+  SEARCH_FILTER_FIELDS.map((entry) => [entry.field, entry]),
+);
+
+function sameSearchFields(a: MailSearchFieldValues, b: MailSearchFieldValues) {
+  return MAIL_SEARCH_TEXT_FIELDS.every(
+    (field) => (a[field]?.trim() ?? "") === (b[field]?.trim() ?? ""),
+  );
+}
+
+/** Combinable message list filters plus server-side field search (sender, recipient, subject, body, dates). */
 export function MailFilterSheet({
   visible,
   filters,
   onFiltersChange,
   labels,
   resultCount,
+  searchFields,
+  onSearchFieldsChange,
   onDismiss,
 }: MailFilterSheetProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
   const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
-  const activeCount = countActiveMailListFilters(filters);
+  const [draftFields, setDraftFields] =
+    useState<MailSearchFieldValues>(searchFields);
+  const draftDirty = !sameSearchFields(draftFields, searchFields);
+  const activeCount =
+    countActiveMailListFilters(filters) + countMailSearchFieldValues(searchFields);
+
+  const commitAndDismiss = () => {
+    if (draftDirty) onSearchFieldsChange(draftFields);
+    onDismiss();
+  };
+
+  const resetAll = () => {
+    setDraftFields({});
+    onFiltersChange(DEFAULT_MAIL_LIST_FILTERS);
+    if (countMailSearchFieldValues(searchFields) > 0) onSearchFieldsChange({});
+  };
+
+  const setDraftField = (field: MailSearchTextField, value: string) =>
+    setDraftFields((prev) => ({ ...prev, [field]: value }));
 
   const patch = (next: Partial<MailListFilters>) =>
     onFiltersChange({ ...filters, ...next });
@@ -64,16 +103,16 @@ export function MailFilterSheet({
   return (
     <BottomSheet
       visible={visible}
-      onDismiss={onDismiss}
+      onDismiss={commitAndDismiss}
       snapPoints={[0.7, 0.92]}
       initialSnapIndex={0}
     >
       <BottomSheetHeader>
         <View style={styles.headerRow}>
           <BottomSheetTitle>Filter</BottomSheetTitle>
-          {activeCount > 0 ? (
+          {activeCount > 0 || draftDirty ? (
             <Pressable
-              onPress={() => onFiltersChange(DEFAULT_MAIL_LIST_FILTERS)}
+              onPress={resetAll}
               hitSlop={8}
               style={({ pressed }) => [styles.resetButton, pressed && styles.pressed]}
               accessibilityRole="button"
@@ -85,7 +124,49 @@ export function MailFilterSheet({
         </View>
       </BottomSheetHeader>
 
-      <BottomSheetScrollView contentContainerStyle={styles.content}>
+      <BottomSheetScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Search fields</Text>
+          <View style={styles.card}>
+            {MAIL_SEARCH_TEXT_FIELDS.map((field, index) => {
+              const meta = SEARCH_FIELD_META.get(field);
+              const value = draftFields[field] ?? "";
+              const isDate = meta?.type === "date";
+              const invalid =
+                isDate && value.trim().length > 0 && !isValidSearchDate(value);
+              return (
+                <View
+                  key={field}
+                  style={[styles.fieldRow, index > 0 && styles.rowDivider]}
+                >
+                  <Text style={styles.fieldLabel}>{meta?.label ?? field}</Text>
+                  <TextInput
+                    value={value}
+                    onChangeText={(text) => setDraftField(field, text)}
+                    onSubmitEditing={commitAndDismiss}
+                    placeholder={meta?.placeholder}
+                    placeholderTextColor={skin.textTertiary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType={
+                      isDate
+                        ? "numbers-and-punctuation"
+                        : field === "from" || field === "to"
+                          ? "email-address"
+                          : "default"
+                    }
+                    returnKeyType="search"
+                    accessibilityLabel={`${meta?.label ?? field} search`}
+                    style={[styles.fieldInput, invalid && styles.fieldInputInvalid]}
+                  />
+                </View>
+              );
+            })}
+          </View>
+        </View>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Status</Text>
           <View style={styles.segmentTrack} accessibilityRole="radiogroup">
@@ -202,12 +283,14 @@ export function MailFilterSheet({
 
       <BottomSheetFooter>
         <Pressable
-          onPress={onDismiss}
+          onPress={commitAndDismiss}
           style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}
           accessibilityRole="button"
         >
           <Text style={styles.doneLabel}>
-            {activeCount === 0
+            {draftDirty
+              ? "Search"
+              : activeCount === 0
               ? "Done"
               : resultCount === 1
                 ? "Show 1 conversation"
@@ -330,6 +413,13 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       height: 8,
       borderRadius: theme.borderRadius.full,
     },
+    fieldRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: pad.rowGap,
+      minHeight: 48,
+      paddingHorizontal: pad.rowH,
+    },
     switchSlot: {
       alignSelf: "stretch" as const,
       justifyContent: "center" as const,
@@ -366,6 +456,22 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
     segmentLabelActive: {
       color: theme.colors.foreground,
       fontWeight: "600" as TextStyle["fontWeight"],
+    },
+    fieldLabel: {
+      width: 64,
+      fontSize: 15,
+      lineHeight: 20,
+      color: skin.textSecondary,
+    },
+    fieldInput: {
+      flex: 1,
+      minHeight: 44,
+      paddingVertical: 0,
+      fontSize: 15,
+      color: theme.colors.foreground,
+    },
+    fieldInputInvalid: {
+      color: theme.colors.destructive,
     },
     rowLabel: {
       flex: 1,

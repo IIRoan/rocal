@@ -6,12 +6,11 @@ import {
   SheetSection,
 } from "@workspace/native-core/components/sheet/SheetSections";
 import { useNativeUserSettings } from "@workspace/native-core/hooks/use-native-user-settings";
-import { toNativeCalendarView } from "../../../lib/calendar-views";
 import { VIEW_OPTIONS } from "../../../lib/calendar-view-options";
 
 function DefaultViewSection() {
   const { settings, pendingKeys, updateSetting } = useNativeUserSettings();
-  const defaultView = toNativeCalendarView(settings?.defaultView ?? "month");
+  const defaultView = settings?.defaultView ?? "month";
   const viewPending = pendingKeys.has("defaultView");
 
   return (

@@ -144,6 +144,7 @@ export function normalizeIcsTimezone(
 }
 
 export interface ImportIcsRequest {
+  timezone?: string;
   calendarId: string;
   icsContent: string;
   fileName?: string;

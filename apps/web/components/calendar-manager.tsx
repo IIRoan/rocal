@@ -59,6 +59,7 @@ import {
   Star,
   Eye,
   EyeOff,
+  Tag,
 } from "lucide-react";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
@@ -247,6 +248,16 @@ export function CalendarManager({
             >
               <Globe className="size-4 text-muted-foreground shrink-0" />
               <span className="text-sm">Public & External Feeds</span>
+              <ChevronRight className="ml-auto size-3.5 text-muted-foreground/40 shrink-0" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => goForward("categories")}
+              className="flex items-center gap-3 px-3 py-2 w-full cursor-pointer rounded-md text-left hover:bg-accent/30 focus-visible:bg-accent/50 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 transition-colors"
+            >
+              <Tag className="size-4 text-muted-foreground shrink-0" />
+              <span className="text-sm">Categories</span>
               <ChevronRight className="ml-auto size-3.5 text-muted-foreground/40 shrink-0" />
             </button>
           </div>

@@ -27,7 +27,10 @@ import {
   EventHeight,
   WeekCellsHeight,
 } from "./constants";
-import { persistDraggedCalendarEvent } from "./event-calendar-mutations";
+import {
+  persistDraggedCalendarEvent,
+  type MoveRecurringCalendarEvent,
+} from "./event-calendar-mutations";
 import { MobileEventCalendarToolbar } from "./mobile-event-calendar-toolbar";
 import { MobileEventCalendarViews } from "./mobile-event-calendar-views";
 import type { EventNotification } from "./notification-manager";
@@ -54,6 +57,7 @@ export interface MobileEventCalendarProps {
   error?: { message?: string } | null;
   onCreateEvent?: (event: unknown) => Promise<unknown>;
   onUpdateEvent?: (id: string, event: unknown) => Promise<unknown>;
+  onMoveRecurringEvent?: MoveRecurringCalendarEvent;
   onDeleteEvent?: (id: string) => Promise<void>;
   onCreateCategory?: (category: unknown) => Promise<unknown>;
   onDateRangeChange?: (dateRange: { start: Date; end: Date }) => void;
@@ -93,6 +97,7 @@ export function MobileEventCalendar({
   eventsLoading = false,
   error = null,
   onUpdateEvent,
+  onMoveRecurringEvent,
   onDeleteEvent,
   showWeekNumbers = false,
   compactView = false,
@@ -237,6 +242,10 @@ export function MobileEventCalendar({
               timezone: resolvedTimezone,
               timeFormat,
               updateEvent,
+              moveRecurringEvent: onMoveRecurringEvent,
+              originalEvent: events.find(
+                (event) => event.id === updatedEvent.id,
+              ),
               updatedEvent,
             })
           }

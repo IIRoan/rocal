@@ -199,7 +199,7 @@ export function buildEventRequest(fields: {
     location: optionalFields.location?.trim() ?? "",
     description: optionalFields.description?.trim() ?? "",
     ...(fields.color ? { color: fields.color } : {}),
-    ...(fields.categoryId ? { categoryId: fields.categoryId } : {}),
+    ...(fields.categoryId !== undefined ? { categoryId: fields.categoryId } : {}),
     recurrence: optionalFields.recurrence || "",
     reminder:
       optionalFields.reminder && optionalFields.reminder > 0

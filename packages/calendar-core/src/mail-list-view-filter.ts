@@ -91,19 +91,14 @@ function zonedDayStartUtc(now: Date, daysAgo: number, timezone: string): number 
   return getZonedDayUtcBounds(day, timezone).start.getTime();
 }
 
-function ageMatcher(
+export function getMailListAgeCutoff(
   age: MailListAge,
   now: Date,
   timezone: string,
-): ((receivedAtMs: number) => boolean) | null {
+): { instant: number; before: boolean } | null {
   if (age === "any") return null;
-  if (age === "older") {
-    const cutoff = zonedDayStartUtc(now, 29, timezone);
-    return (receivedAtMs) => receivedAtMs < cutoff;
-  }
   const daysAgo = age === "today" ? 0 : age === "week" ? 6 : 29;
-  const cutoff = zonedDayStartUtc(now, daysAgo, timezone);
-  return (receivedAtMs) => receivedAtMs >= cutoff;
+  return { instant: zonedDayStartUtc(now, daysAgo, timezone), before: age === "older" };
 }
 
 /** Combines read state, star, attachment, age (zoned to the user's day), and any-of label filters. */
@@ -114,7 +109,7 @@ export function applyMailListFilters<T extends DatedFilterableMailMessage>(
 ): T[] {
   if (countActiveMailListFilters(filters) === 0) return messages;
   const timezone = resolveTimezone(options.timezone);
-  const matchesAge = ageMatcher(filters.age, options.now, timezone);
+  const cutoff = getMailListAgeCutoff(filters.age, options.now, timezone);
   const labelKeys = filters.labelIds.map((id) => `label:${id}`);
 
   return messages.filter((message) => {
@@ -129,9 +124,9 @@ export function applyMailListFilters<T extends DatedFilterableMailMessage>(
     ) {
       return false;
     }
-    if (matchesAge) {
+    if (cutoff) {
       const receivedAtMs = message.receivedAt ? Date.parse(message.receivedAt) : Number.NaN;
-      if (Number.isNaN(receivedAtMs) || !matchesAge(receivedAtMs)) return false;
+      if (Number.isNaN(receivedAtMs) || (cutoff.before ? receivedAtMs >= cutoff.instant : receivedAtMs < cutoff.instant)) return false;
     }
     if (labelKeys.length > 0 && !labelKeys.some((key) => keywords?.[key] === true)) {
       return false;

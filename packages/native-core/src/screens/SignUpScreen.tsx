@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -12,22 +12,31 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Link } from "expo-router";
+import { Feather } from "@expo/vector-icons";
+import { Link, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
 import { useAuth } from "@workspace/native-core/providers/AuthProvider";
 import { AUTH_SIGN_IN_ROUTE } from "@workspace/native-core/lib/auth-routing";
-import { accountApiService } from "@workspace/native-core/lib/api";
+import {
+  accountApiService,
+  inviteApiService,
+} from "@workspace/native-core/lib/api";
+import {
+  INVITE_REQUIRED_MESSAGE,
+  claimSignupInvite,
+  describeInviteValidation,
+  readInviteTokenParam,
+} from "@workspace/native-core/lib/invite-signup";
+import {
+  useInviteTokenValidation,
+  useSignupDomain,
+} from "@workspace/native-core/hooks/use-signup";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { ThemeToggle } from "@workspace/native-core/components/ThemeToggle";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
 const log = createLogger("auth:sign-up");
-const DEFAULT_SIGNUP_DOMAIN = "solace.onl";
-
-// ---------------------------------------------------------------------------
-// Validation helpers
-// ---------------------------------------------------------------------------
 
 function validateName(name: string): string | null {
   if (!name.trim()) return "Name is required";
@@ -51,59 +60,45 @@ function validatePassword(password: string): string | null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 export function SignUpScreen() {
   const { signUp } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const signupDomain = useSignupDomain();
+  const { invite } = useLocalSearchParams<{ invite?: string | string[] }>();
+  const inviteParam = readInviteTokenParam(invite);
 
-  // Form state
   const [name, setName] = useState("");
   const [desiredEmail, setDesiredEmail] = useState("");
+  const [inviteToken, setInviteToken] = useState(inviteParam);
   const [password, setPassword] = useState("");
-  const [signupDomain, setSignupDomain] = useState(DEFAULT_SIGNUP_DOMAIN);
+  const [lastInviteParam, setLastInviteParam] = useState(inviteParam);
 
-  // Validation state
+  // A new invite deep link can arrive while this screen stays mounted.
+  if (inviteParam !== lastInviteParam) {
+    setLastInviteParam(inviteParam);
+    if (inviteParam) setInviteToken(inviteParam);
+  }
+
+  const inviteValidation = useInviteTokenValidation(inviteToken);
+
   const [nameError, setNameError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  // Loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Refs for focus management
   const emailRef = useRef<TextInput>(null);
+  const inviteRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
-
-  // ── Handlers ───────────────────────────────────────────────────────
 
   const clearErrors = useCallback(() => {
     setNameError(null);
     setEmailError(null);
+    setInviteError(null);
     setPasswordError(null);
     setServerError(null);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void accountApiService
-      .getSignupConfig()
-      .then((config) => {
-        if (!cancelled) {
-          setSignupDomain(config.defaultEmailDomain);
-        }
-      })
-      .catch((error) => {
-        log.error("Failed to load signup config", error);
-      });
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   const handleSignUp = useCallback(async () => {
@@ -114,24 +109,28 @@ export function SignUpScreen() {
 
     const nErr = validateName(name);
     const eErr = validateDesiredEmail(desiredEmail);
+    const iErr = inviteToken.trim()
+      ? inviteValidation.status === "invalid"
+        ? inviteValidation.reason
+        : null
+      : INVITE_REQUIRED_MESSAGE;
     const pErr = validatePassword(password);
 
     if (nErr) setNameError(nErr);
     if (eErr) setEmailError(eErr);
+    if (iErr) setInviteError(iErr);
     if (pErr) setPasswordError(pErr);
-    if (nErr || eErr || pErr) {
+    if (nErr || eErr || iErr || pErr) {
       log.warn("Sign-up validation failed", {
         nameError: nErr,
         emailError: eErr,
+        inviteError: iErr,
         passwordError: pErr,
       });
       return;
     }
 
-    log.info("Attempting sign-up", {
-      desiredEmail: normalizedDesiredEmail,
-      name: trimmedName,
-    });
+    log.info("Attempting sign-up");
     setIsSubmitting(true);
     try {
       const availability = await accountApiService.checkEmailAvailability(
@@ -143,18 +142,45 @@ export function SignUpScreen() {
         return;
       }
 
+      const claim = await claimSignupInvite(
+        inviteApiService,
+        inviteToken,
+        availability.normalizedEmail,
+      );
+      if (!claim.ok) {
+        setInviteError(claim.error);
+        return;
+      }
+
       await signUp(trimmedName, availability.normalizedEmail, password);
       log.ok("Sign-up successful");
-    } catch (err: any) {
-      const message = err?.message ?? "Sign-up failed. Please try again.";
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : "Sign-up failed. Please try again.";
       log.error("Sign-up failed", err);
       setServerError(message);
     } finally {
       setIsSubmitting(false);
     }
-  }, [clearErrors, desiredEmail, name, password, signUp]);
+  }, [
+    clearErrors,
+    desiredEmail,
+    inviteToken,
+    inviteValidation,
+    name,
+    password,
+    signUp,
+  ]);
 
-  // ── Render ─────────────────────────────────────────────────────────
+  const inviteMessage = inviteError ?? describeInviteValidation(inviteValidation);
+  const inviteMessageStyle =
+    inviteError || inviteValidation.status === "invalid"
+      ? styles.fieldError
+      : inviteValidation.status === "valid"
+        ? styles.fieldSuccess
+        : styles.fieldHint;
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
@@ -237,7 +263,7 @@ export function SignUpScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  onSubmitEditing={() => inviteRef.current?.focus()}
                   editable={!isSubmitting}
                   accessibilityLabel="Solace email"
                   accessibilityHint={`Choose the name before @${signupDomain}`}
@@ -247,6 +273,64 @@ export function SignUpScreen() {
               {emailError && (
                 <Text style={styles.fieldError}>{emailError}</Text>
               )}
+            </View>
+
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Invite token</Text>
+              <View
+                style={[
+                  styles.inputWithSuffix,
+                  (inviteError || inviteValidation.status === "invalid") &&
+                    styles.inputError,
+                ]}
+              >
+                <TextInput
+                  ref={inviteRef}
+                  style={styles.inputInner}
+                  placeholder="Paste your invite token"
+                  placeholderTextColor={theme.colors.mutedForeground}
+                  value={inviteToken}
+                  onChangeText={(text) => {
+                    setInviteToken(text);
+                    if (inviteError) setInviteError(null);
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  editable={!isSubmitting}
+                  accessibilityLabel="Invite token"
+                  accessibilityHint="Paste the invite token shared with you"
+                />
+                <View style={styles.inputStatusIcon}>
+                  {inviteValidation.status === "checking" ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.colors.mutedForeground}
+                    />
+                  ) : inviteValidation.status === "valid" ? (
+                    <Feather
+                      name="check"
+                      size={16}
+                      color={theme.colors.primaryBase}
+                    />
+                  ) : inviteValidation.status === "invalid" ? (
+                    <Feather
+                      name="x"
+                      size={16}
+                      color={theme.colors.destructive}
+                    />
+                  ) : (
+                    <Feather
+                      name="user-plus"
+                      size={16}
+                      color={theme.colors.mutedForeground}
+                    />
+                  )}
+                </View>
+              </View>
+              <Text style={inviteMessageStyle}>{inviteMessage}</Text>
             </View>
 
             {/* Password field */}
@@ -314,10 +398,6 @@ export function SignUpScreen() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
-
 function createStyles(theme: ThemeTokens) {
   const view = {
     flex: {
@@ -367,6 +447,11 @@ function createStyles(theme: ThemeTokens) {
     },
     inputError: {
       borderColor: theme.colors.destructive,
+    },
+    inputStatusIcon: {
+      width: 44,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
     },
     primaryButton: {
       backgroundColor: theme.colors.primaryBase,
@@ -482,6 +567,18 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
       color: theme.colors.destructive,
+      marginTop: theme.spacing["1"],
+    },
+    fieldHint: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.mutedForeground,
+      marginTop: theme.spacing["1"],
+    },
+    fieldSuccess: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.primaryBase,
       marginTop: theme.spacing["1"],
     },
     primaryButtonText: {

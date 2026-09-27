@@ -25,6 +25,7 @@ export function EventEditorView({
   anchorPosition,
   badgeItem,
   calendars,
+  categories,
   dialogTitle,
   eventForm,
   flags,
@@ -67,6 +68,7 @@ export function EventEditorView({
         isViewMode={flags.isViewMode}
         localSettings={localSettings}
         calendars={calendars}
+        categories={categories}
         onSubmit={handleEventSave}
         desktop
       />
@@ -144,6 +146,7 @@ export function EventEditorView({
                   isViewMode={flags.isViewMode}
                   localSettings={localSettings}
                   calendars={calendars}
+                  categories={categories}
                   onSubmit={handleEventSave}
                 />
               </div>

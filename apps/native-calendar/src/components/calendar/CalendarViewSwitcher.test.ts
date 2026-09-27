@@ -25,9 +25,22 @@ describe("formatViewDateHeader", () => {
     expect(formatViewDateHeader("month", date)).toBe("January 2025");
   });
 
-  it('returns "MMMM yyyy" for agenda view', () => {
-    const date = new Date(2025, 5, 10); // June 10, 2025
-    expect(formatViewDateHeader("agenda", date)).toBe("June 2025");
+  it('returns "MMMM yyyy" for an agenda page inside one month', () => {
+    expect(formatViewDateHeader("agenda", new Date(2025, 4, 1))).toBe(
+      "May 2025",
+    );
+  });
+
+  it("spans both months when the 30-day agenda page crosses a month", () => {
+    expect(formatViewDateHeader("agenda", new Date(2025, 5, 10))).toBe(
+      "Jun – Jul 2025",
+    );
+  });
+
+  it("shows both years when the agenda page crosses a year", () => {
+    expect(formatViewDateHeader("agenda", new Date(2025, 11, 20))).toBe(
+      "Dec 2025 – Jan 2026",
+    );
   });
 
   // Day view
@@ -131,5 +144,30 @@ describe("resolveCalendarSwitcherDate", () => {
         "Europe/Amsterdam",
       ),
     ).toBe("Aug 17 – 23");
+  });
+
+  it("uses the committed selected date for month and agenda", () => {
+    const selectedDate = new Date(2026, 7, 11);
+    const pagingDate = new Date(2026, 8, 18);
+
+    for (const view of ["month", "agenda"] as const) {
+      expect(
+        resolveCalendarSwitcherDate({
+          view,
+          currentDate: pagingDate,
+          selectedDate,
+        }),
+      ).toBe(selectedDate);
+    }
+    expect(
+      formatViewDateHeader(
+        "month",
+        resolveCalendarSwitcherDate({
+          view: "month",
+          currentDate: pagingDate,
+          selectedDate,
+        }),
+      ),
+    ).toBe("August 2026");
   });
 });

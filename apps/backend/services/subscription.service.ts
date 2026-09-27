@@ -13,7 +13,8 @@ import {
   type ImportIcsResponse,
   findNationalHolidayCalendarByUrl,
 } from "@workspace/calendar-ics";
-import { resolveTimezone, CALENDAR_COLORS, isValidCalendarColor } from "@workspace/calendar-core";
+import { resolveTimezone, CALENDAR_COLORS, isValidCalendarColor, encryptedIcsImportBodySchema } from "@workspace/calendar-core";
+import { assertCalendarWritable } from "../lib/calendar-access";
 import {
   areParsedEventParticipantsDifferent,
   parseICSFile,
@@ -352,6 +353,7 @@ export class SubscriptionService implements ISubscriptionService {
   }
 
   async importIcs(input: ImportIcsInput): Promise<ImportIcsResponse> {
+    if ("encryptedEvents" in input) return this.importEncryptedIcs(input);
     const { userId, calendarId, icsContent, fileName } = input;
 
     const calendar = await this.prisma.calendar.findFirst({
@@ -426,6 +428,50 @@ export class SubscriptionService implements ISubscriptionService {
       calendarName: parseResult.calendarName,
       errors: errors.length > 0 ? errors : undefined,
     };
+  }
+
+  private async importEncryptedIcs(input: Extract<ImportIcsInput, { encryptedEvents: unknown }>): Promise<ImportIcsResponse> {
+    const { userId } = input;
+    const { calendarId, encryptedEvents } = encryptedIcsImportBodySchema.parse({ calendarId: input.calendarId, encryptedEvents: input.encryptedEvents });
+    const calendar = await this.prisma.calendar.findFirst({ where: { id: calendarId, userId } });
+    if (!calendar) throw new NotFoundError("Calendar not found or not owned by user");
+    assertCalendarWritable(calendar, "Cannot import events into a read-only calendar.");
+    return this.prisma.$transaction(async (tx) => {
+      let eventsCreated = 0;
+      const errors: string[] = [];
+      for (const entry of [...encryptedEvents].sort((a, b) => Number(Boolean(a.seriesExternalId)) - Number(Boolean(b.seriesExternalId)))) {
+        const existing = await tx.calendarEvent.findFirst({ where: { userId, calendarId, externalId: entry.externalId, isSynced: false } });
+        if (existing) { errors.push("An event already exists in this calendar."); continue; }
+        const parent = entry.seriesExternalId ? await tx.calendarEvent.findFirst({ where: {
+          userId, calendarId, externalId: entry.seriesExternalId, recurrence: { not: null }, isSynced: false,
+        } }) : null;
+        if (entry.seriesExternalId && !parent) { errors.push("An occurrence could not be linked to its series."); continue; }
+        const event = await tx.calendarEvent.create({ data: {
+          userId, calendarId, externalId: entry.externalId,
+          title: "", description: null, location: null,
+          encryptedContent: entry.encryptedContent, encryptionState: "encrypted",
+          encryptionKeyVersion: entry.encryptionKeyVersion ?? 1,
+          blindIndexTokens: JSON.stringify(entry.blindIndexTokens ?? []),
+          start: new Date(entry.start), end: new Date(entry.end),
+          allDay: entry.allDay, timezone: entry.timezone, recurrence: parent ? null : entry.recurrence,
+          parentEventId: parent?.id,
+        } });
+        await this.eventParticipantService.syncParticipants({ eventId: event.id, participants: entry.participants ?? [], tx, sendInvitations: false });
+        for (const date of entry.excludedDates) await tx.recurrenceException.create({ data: {
+          parentEventId: event.id, exceptionDate: new Date(date), type: "deleted",
+        } });
+        if (parent && entry.occurrenceDate) {
+          const exceptionDate = new Date(entry.occurrenceDate);
+          await tx.recurrenceException.upsert({
+            where: { parentEventId_exceptionDate: { parentEventId: parent.id, exceptionDate } },
+            create: { parentEventId: parent.id, exceptionDate, modifiedEventId: event.id, type: "modified" },
+            update: { modifiedEventId: event.id, type: "modified" },
+          });
+        }
+        eventsCreated++;
+      }
+      return { success: true, eventsCreated, eventsTotal: encryptedEvents.length, ...(errors.length ? { errors } : {}) };
+    }, { timeout: 30_000 });
   }
 
   async syncCalendarSubscription(

@@ -28,12 +28,19 @@ import {
 import { LAYOUT_METRICS } from "@workspace/native-core/lib/app-layout";
 import type { ComposeRequest } from "../../lib/mail/compose-request";
 import {
+  appendPlainTextSignature,
   canSendCompose,
   composeTextToPlain,
   formatDateTimeLabel,
   getErrorMessage,
+  getPlainTextSignature,
   hasComposeUserContent,
+  hasPlainTextSignatureBlock,
+  prependPlainTextSignature,
+  replacePlainTextSignatureBlock,
+  resolveReplyFrom,
   resolveReplyRecipients,
+  shouldWarnAboutMissingAttachment,
   validateComposeRecipients,
   resolveComposeSendBodies,
   messageBodiesToComposeText,
@@ -73,10 +80,7 @@ import {
   decryptPgpMimeMessage,
 } from "../../lib/mail/mail-crypto";
 import { resolveOutgoingMessageBody } from "../../lib/mail/outgoing-message-crypto";
-import {
-  appendPlainTextSignature,
-  getPlainTextSignature,
-} from "../../lib/mail/signature-utils";
+import { useMailComposeSettings } from "../../hooks/use-mail-settings";
 import {
   hasDraftContent,
   useComposeDraftAutosave,
@@ -232,24 +236,26 @@ function ComposeSession({
     [identities, selectedIdentityId],
   );
 
-  const handleSend = useCallback(async () => {
-    setError(null);
-    const validation = validateComposeInput({ to, cc, bcc, subject });
-    const firstError =
-      validation.errors.to ??
-      validation.errors.recipients ??
-      validation.errors.subject;
-    if (firstError) {
-      setError(firstError);
-      return;
-    }
+  const { settings: composeSettings, isLoaded: composeSettingsLoaded } =
+    useMailComposeSettings();
+  const signatureOptions = useMemo(
+    () => ({ separator: composeSettings.signatureSeparatorEnabled }),
+    [composeSettings.signatureSeparatorEnabled],
+  );
 
-    const bodyWithSignature = appendPlainTextSignature(body, selectedIdentity);
-    const { plaintext, htmlBody: unencryptedHtml } = resolveComposeSendBodies({
+  const sendNow = useCallback(async () => {
+    const validation = validateComposeInput({ to, cc, bcc, subject });
+
+    // A signature seeded above the quote already sits mid-body, so only append when it is missing.
+    const bodyWithSignature = hasPlainTextSignatureBlock(body, selectedIdentity)
+      ? body
+      : appendPlainTextSignature(body, selectedIdentity, signatureOptions);
+    const { plaintext, htmlBody: formattedHtml } = resolveComposeSendBodies({
       body,
       bodyWithSignature,
       encrypted: false,
     });
+    const unencryptedHtml = composeSettings.plainTextMode ? undefined : formattedHtml;
     const allRecipients = [
       ...validation.to,
       ...validation.cc,
@@ -342,6 +348,8 @@ function ComposeSession({
     body,
     selectedIdentity,
     selectedIdentityId,
+    signatureOptions,
+    composeSettings.plainTextMode,
     draftId,
     runtime,
     saveDraft,
@@ -353,11 +361,75 @@ function ComposeSession({
     attachments,
   ]);
 
+  const handleSend = useCallback(() => {
+    setError(null);
+    const validation = validateComposeInput({ to, cc, bcc, subject });
+    const firstError =
+      validation.errors.to ??
+      validation.errors.recipients ??
+      validation.errors.subject;
+    if (firstError) {
+      setError(firstError);
+      return;
+    }
+
+    const missingAttachmentKeyword = shouldWarnAboutMissingAttachment({
+      enabled: composeSettings.attachmentReminderEnabled,
+      attachmentCount: attachments.length,
+      subject,
+      bodyText: composeTextToPlain(body),
+      keywords: composeSettings.attachmentReminderKeywords,
+    });
+    if (missingAttachmentKeyword) {
+      Alert.alert(
+        "Forgot an attachment?",
+        `Your message mentions “${missingAttachmentKeyword}” but no files are attached.`,
+        [
+          { text: "Go back", style: "cancel" },
+          { text: "Send anyway", onPress: () => void sendNow() },
+        ],
+      );
+      return;
+    }
+    void sendNow();
+  }, [
+    attachments.length,
+    bcc,
+    body,
+    cc,
+    composeSettings.attachmentReminderEnabled,
+    composeSettings.attachmentReminderKeywords,
+    sendNow,
+    subject,
+    to,
+  ]);
+
   const handleInsertSignature = useCallback(() => {
-    const signature = getPlainTextSignature(selectedIdentity);
-    if (!signature) return;
-    setBody((current) => appendPlainTextSignature(current, selectedIdentity));
-  }, [selectedIdentity]);
+    if (!getPlainTextSignature(selectedIdentity)) return;
+    setBody((current) =>
+      hasPlainTextSignatureBlock(current, selectedIdentity)
+        ? current
+        : appendPlainTextSignature(current, selectedIdentity, signatureOptions),
+    );
+  }, [selectedIdentity, signatureOptions]);
+
+  const handleSelectIdentity = useCallback(
+    (id: string) => {
+      const nextIdentity = identities.find((entry) => entry.id === id) ?? null;
+      setBody(
+        (current) =>
+          replacePlainTextSignatureBlock(
+            current,
+            selectedIdentity,
+            nextIdentity,
+            signatureOptions,
+          ) ?? current,
+      );
+      setSelectedIdentityId(id);
+      setIdentityPickerOpen(false);
+    },
+    [identities, selectedIdentity, signatureOptions],
+  );
 
   const handleAttach = useCallback(async () => {
     try {
@@ -543,19 +615,41 @@ function ComposeSession({
       return;
     }
 
-    if (!sourceMessage) {
+    if (!sourceMessage || !composeSettingsLoaded) {
       return;
     }
 
+    const isReplyLike =
+      params.mode === "reply" ||
+      params.mode === "reply-all" ||
+      params.mode === "forward";
+    const autoIdentity =
+      isReplyLike && composeSettings.autoSelectReplyIdentity
+        ? (identities.find(
+            (entry) =>
+              entry.id === resolveReplyFrom(identities, sourceMessage)?.identityId,
+          ) ?? null)
+        : null;
+    if (autoIdentity) {
+      setSelectedIdentityId(autoIdentity.id);
+    }
+    const seedIdentity = autoIdentity ?? selectedIdentity;
     const fromEmail =
-      composeContext?.fromEmail ?? runtime?.session.username ?? null;
+      autoIdentity?.email ??
+      composeContext?.fromEmail ??
+      runtime?.session.username ??
+      null;
     const dateOptions = { timeFormat, timezone };
+    const withSeedSignature = (quoteBody: string) =>
+      composeSettings.signaturePosition === "above_quote"
+        ? prependPlainTextSignature(quoteBody, seedIdentity, signatureOptions)
+        : quoteBody;
     if (params.mode === "reply") {
       seedCompose({
         ...EMPTY_COMPOSE_FIELDS,
         to: getReplyRecipients(sourceMessage, fromEmail),
         subject: prefixSubject(sourceMessage.subject, "Re:"),
-        body: buildReplyBody(sourceMessage, dateOptions),
+        body: withSeedSignature(buildReplyBody(sourceMessage, dateOptions)),
       });
     } else if (params.mode === "reply-all") {
       const fields = formatReplyAllRecipientFields(sourceMessage, fromEmail);
@@ -564,13 +658,13 @@ function ComposeSession({
         to: fields.to,
         cc: fields.cc,
         subject: prefixSubject(sourceMessage.subject, "Re:"),
-        body: buildReplyBody(sourceMessage, dateOptions),
+        body: withSeedSignature(buildReplyBody(sourceMessage, dateOptions)),
       });
     } else if (params.mode === "forward") {
       seedCompose({
         ...EMPTY_COMPOSE_FIELDS,
         subject: prefixSubject(sourceMessage.subject, "Fwd:"),
-        body: buildForwardBody(sourceMessage, dateOptions),
+        body: withSeedSignature(buildForwardBody(sourceMessage, dateOptions)),
       });
     } else if (params.mode === "draft") {
       const headers = {
@@ -638,11 +732,17 @@ function ComposeSession({
     }
   }, [
     composeContext?.fromEmail,
+    composeSettings.autoSelectReplyIdentity,
+    composeSettings.signaturePosition,
+    composeSettingsLoaded,
+    identities,
     params.mode,
     params.to,
     params.toName,
     runtime,
     seedFields,
+    selectedIdentity,
+    signatureOptions,
     sourceMessage,
     timeFormat,
     timezone,
@@ -683,9 +783,7 @@ function ComposeSession({
             onAttach={() => {
               void handleAttach();
             }}
-            onSend={() => {
-              void handleSend();
-            }}
+            onSend={handleSend}
           />
         </BottomSheetHeader>
         <View
@@ -840,6 +938,7 @@ function ComposeSession({
             <ComposeFormatBar
               draftSaveStatus={draftSaveStatus}
               hasSignature={hasSignature}
+              plainTextMode={composeSettings.plainTextMode}
               onBold={() => bodyEditorRef.current?.applyBold()}
               onItalic={() => bodyEditorRef.current?.applyItalic()}
               onUnderline={() => bodyEditorRef.current?.applyUnderline()}
@@ -854,10 +953,7 @@ function ComposeSession({
         visible={identityPickerOpen}
         identities={identities}
         selectedIdentityId={selectedIdentityId}
-        onSelect={(id) => {
-          setSelectedIdentityId(id);
-          setIdentityPickerOpen(false);
-        }}
+        onSelect={handleSelectIdentity}
         onDismiss={() => setIdentityPickerOpen(false)}
       />
     </>

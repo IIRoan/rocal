@@ -1,17 +1,23 @@
-import { toNativeCalendarView } from "./calendar-views";
+import { CALENDAR_VIEWS } from "@workspace/calendar-core";
+import { isTimelineCalendarView } from "./calendar-views";
 
-describe("toNativeCalendarView", () => {
-  it("opens week view when the shared default is month", () => {
-    expect(toNativeCalendarView("month")).toBe("week");
-  });
-
-  it("opens week view when the shared default is agenda", () => {
-    expect(toNativeCalendarView("agenda")).toBe("week");
-  });
-
-  it("keeps views native renders", () => {
+describe("isTimelineCalendarView", () => {
+  it("routes day, 3-day, and week to the timeline", () => {
     for (const view of ["day", "3day", "week"] as const) {
-      expect(toNativeCalendarView(view)).toBe(view);
+      expect(isTimelineCalendarView(view)).toBe(true);
     }
+  });
+
+  it("keeps month and agenda instead of coercing them to week", () => {
+    expect(isTimelineCalendarView("month")).toBe(false);
+    expect(isTimelineCalendarView("agenda")).toBe(false);
+  });
+
+  it("classifies every shared calendar view", () => {
+    expect(CALENDAR_VIEWS.filter(isTimelineCalendarView).sort()).toEqual([
+      "3day",
+      "day",
+      "week",
+    ]);
   });
 });

@@ -11,13 +11,17 @@ import type {
   EventParticipantInput,
 } from "@workspace/calendar-core";
 import {
+  getErrorMessage,
   getEventPickerDateRange,
   getOperationWarningMessages,
   eventNotificationsQueryKey,
   getReminderMinutes,
   pickerDateAndTimeToUtc,
   pickerDateToAllDayUtcRange,
+  resolveSubmittedCategoryId,
   resolveTimezone,
+  type RecurrenceDeleteScope,
+  type RecurrenceEditScope,
 } from "@workspace/calendar-core";
 import { RecurrenceEngine } from "@workspace/calendar-core";
 import type { RecurrenceRule } from "@/lib/types/calendar";
@@ -42,8 +46,24 @@ import {
   isReservedSystemEmail,
 } from "@workspace/calendar-core";
 import { useRecentContacts } from "./use-recent-contacts";
+import type { UseCalendarDataReturn } from "./use-calendar-data";
+import { EVENTS_QUERY_KEY } from "./use-calendar-events-loader";
 
 const log = createLogger("event-form");
+
+const RECURRING_DELETE_SUCCESS_MESSAGES: Record<RecurrenceDeleteScope, string> =
+  {
+    this_only: "Event occurrence deleted",
+    this_and_future: "This and following events deleted",
+    all: "Entire event series deleted",
+  };
+
+const RECURRING_DELETE_FAILURE_MESSAGES: Record<RecurrenceDeleteScope, string> =
+  {
+    this_only: "Failed to delete event occurrence",
+    this_and_future: "Failed to delete following events",
+    all: "Failed to delete event series",
+  };
 
 type NotificationPayload = Pick<
   EventNotification,
@@ -146,6 +166,7 @@ interface UseEventFormReturn {
   eventAllDay: boolean;
   eventLocation: string;
   eventCalendarId: string;
+  eventCategoryId: string;
   eventReminder: number | null;
   eventNotifications: EventNotification[];
   eventParticipants: EventParticipantInput[];
@@ -173,6 +194,7 @@ interface UseEventFormReturn {
   setEventAllDay: (allDay: boolean) => void;
   setEventLocation: (location: string) => void;
   setEventCalendarId: (id: string) => void;
+  setEventCategoryId: (id: string) => void;
   setEventReminder: (reminder: number | null) => void;
   setEventNotifications: (notifications: EventNotification[]) => void;
   setEventParticipants: (participants: EventParticipantInput[]) => void;
@@ -190,10 +212,15 @@ interface UseEventFormReturn {
   handleNotificationChange: (notifications: EventNotification[]) => void;
   loadEventData: (event: CalendarEvent) => void;
   resetForm: () => void;
-  handleEventSave: (calendarData: any) => Promise<void>;
+  handleEventSave: (
+    calendarData: any,
+    recurringScope?: RecurrenceEditScope,
+  ) => Promise<void>;
   handleEventDelete: (calendarData: any) => Promise<void>;
-  handleRecurringDeleteThis: (calendarData: any) => Promise<void>;
-  handleRecurringDeleteAll: (calendarData: any) => Promise<void>;
+  handleRecurringDelete: (
+    calendarData: Pick<UseCalendarDataReturn, "deleteRecurringEvent">,
+    scope: RecurrenceDeleteScope,
+  ) => Promise<void>;
 }
 
 export function useEventForm({
@@ -223,6 +250,7 @@ export function useEventForm({
   const [eventAllDay, setEventAllDay] = useState(false);
   const [eventLocation, setEventLocation] = useState("");
   const [eventCalendarId, setEventCalendarId] = useState<string>("");
+  const [eventCategoryId, setEventCategoryId] = useState<string>("");
   const [eventSaving, setEventSaving] = useState(false);
   const [isRecurring, setIsRecurringState] = useState(false);
   const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule | null>(
@@ -276,11 +304,6 @@ export function useEventForm({
     }
   }, []);
 
-  const validateRecurrenceMutation = useMutation({
-    mutationFn: (rule: RecurrenceRule) =>
-      calendarApiService.validateRecurrence(rule),
-  });
-
   const updateNotificationsMutation = useMutation({
     mutationFn: async ({
       eventId,
@@ -299,21 +322,6 @@ export function useEventForm({
       queryClient.invalidateQueries({
         queryKey: eventNotificationsQueryKey(variables.eventId),
       });
-    },
-  });
-
-  const deleteRecurringEventMutation = useMutation({
-    mutationFn: ({
-      parentEventId,
-      mode,
-      date,
-    }: {
-      parentEventId: string;
-      mode: "this_only" | "all";
-      date?: string;
-    }) => calendarApiService.deleteRecurringEvent(parentEventId, mode, date),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["events"] });
     },
   });
 
@@ -345,6 +353,7 @@ export function useEventForm({
         calendarsRef.current?.find((c) => !c.isSyncOnly)?.id ||
         "",
       );
+      setEventCategoryId(event.categoryId || "");
       setEventNotifications(fallbackNotifications);
       setEventParticipants(
         (event.participants ?? []).map((participant: EventParticipant) => ({
@@ -421,7 +430,13 @@ export function useEventForm({
         setShowNotifications(false);
       }
     },
-    [queryClient, setEventNotifications, localSettings.timezone],
+    [
+      queryClient,
+      setEventNotifications,
+      setIsRecurring,
+      setShowNotifications,
+      localSettings.timezone,
+    ],
   );
 
   const resetForm = useCallback(() => {
@@ -442,6 +457,7 @@ export function useEventForm({
     setEventCalendarId(
       calendarsRef.current?.find((c) => !c.isSyncOnly)?.id || "",
     );
+    setEventCategoryId("");
     setEventNotifications([]);
     setEventParticipants([]);
     setIsRecurring(false);
@@ -453,7 +469,7 @@ export function useEventForm({
     setEndTimeOpen(false);
     setTimeErrors({});
     setShowNotifications(false);
-  }, [setEventNotifications]);
+  }, [setEventNotifications, setIsRecurring, setShowNotifications]);
 
   const handleStartTimeChange = useCallback(
     (newStartTime: string) => {
@@ -513,7 +529,7 @@ export function useEventForm({
   );
 
   const handleEventSave = useCallback(
-    async (calendarData: any) => {
+    async (calendarData: any, recurringScope?: RecurrenceEditScope) => {
       const validationError = validateEventForm(
         eventTitle,
         eventCalendarId,
@@ -532,7 +548,7 @@ export function useEventForm({
       if (isRecurring && recurrenceRule) {
         try {
           const validation =
-            await validateRecurrenceMutation.mutateAsync(recurrenceRule);
+            await calendarApiService.validateRecurrence(recurrenceRule);
           if (!validation.valid) {
             toast.error(
               `Invalid recurrence rule: ${validation.errors.join(", ")}`,
@@ -585,6 +601,14 @@ export function useEventForm({
         (cal) => cal.id === eventCalendarId,
       );
       const calendarColor = selectedCalendar?.color || "blue";
+      const submittedCategoryId = resolveSubmittedCategoryId(
+        eventCategoryId,
+        selectedEvent?.categoryId,
+      );
+      const categoryField =
+        submittedCategoryId === undefined
+          ? {}
+          : { categoryId: submittedCategoryId };
 
       const eventData = {
         id: selectedEvent?.id || "",
@@ -597,6 +621,7 @@ export function useEventForm({
         location: eventLocation.trim(),
         color: calendarColor as any,
         calendarId: eventCalendarId,
+        categoryId: eventCategoryId || null,
         userId: selectedEvent?.userId || "demo-user",
         createdAt: selectedEvent?.createdAt || new Date(),
         updatedAt: new Date(),
@@ -628,7 +653,7 @@ export function useEventForm({
         let persistedEvent: CalendarEvent | null = null;
 
         if (isUpdate) {
-          persistedEvent = await calendarData.updateEvent(selectedEvent.id, {
+          const updates = {
             title: eventData.title,
             description: eventData.description,
             start: eventData.start.toISOString(),
@@ -637,10 +662,18 @@ export function useEventForm({
             allDay: eventData.allDay,
             location: eventData.location,
             calendarId: eventData.calendarId,
+            ...categoryField,
             reminder: eventData.reminder ?? null,
             recurrence: eventData.recurrence ?? null,
             participants: eventData.participants,
-          });
+          };
+          persistedEvent = recurringScope
+            ? await calendarData.editRecurringEvent({
+                event: selectedEvent,
+                scope: recurringScope,
+                updates,
+              })
+            : await calendarData.updateEvent(selectedEvent.id, updates);
           savedEventId = persistedEvent?.id ?? selectedEvent.id;
           toast.success(`Event "${eventTitle}" updated`);
           for (const warningMessage of getOperationWarningMessages(
@@ -658,6 +691,7 @@ export function useEventForm({
             allDay: eventData.allDay,
             location: eventData.location,
             calendarId: eventData.calendarId,
+            ...categoryField,
             reminder: eventData.reminder ?? null,
             recurrence: eventData.recurrence ?? undefined,
             participants: eventData.participants,
@@ -723,7 +757,7 @@ export function useEventForm({
           };
 
           queryClient.setQueriesData<CalendarEvent[]>(
-            { queryKey: ["events"] },
+            { queryKey: EVENTS_QUERY_KEY },
             (oldEvents) => {
               if (!oldEvents) {
                 return oldEvents;
@@ -818,6 +852,7 @@ export function useEventForm({
     [
       eventTitle,
       eventCalendarId,
+      eventCategoryId,
       eventStartDate,
       eventEndDate,
       eventAllDay,
@@ -836,7 +871,6 @@ export function useEventForm({
       onClose,
       queryClient,
       resetForm,
-      validateRecurrenceMutation,
       updateNotificationsMutation,
       localSettings.timezone,
       session,
@@ -868,127 +902,33 @@ export function useEventForm({
     [selectedEvent, eventTitle, onEventSaved, onClose, resetForm],
   );
 
-  const handleRecurringDeleteThis = useCallback(
-    async (calendarData: any) => {
-      if (!selectedEvent?.id) return;
-
-      if (eventSaving) return;
+  const handleRecurringDelete = useCallback(
+    async (
+      calendarData: Pick<UseCalendarDataReturn, "deleteRecurringEvent">,
+      scope: RecurrenceDeleteScope,
+    ) => {
+      if (!selectedEvent?.id || eventSaving) return;
 
       setShowRecurringDeleteModal(false);
-
-      let parentEventId = selectedEvent.parentEventId || selectedEvent.id;
-
-      if (!selectedEvent.parentEventId && selectedEvent.id.includes("_")) {
-        const parts = selectedEvent.id.split("_");
-        if (parts.length > 1 && parts[0]) {
-          parentEventId = parts[0];
-        }
-      }
-
-      let occurrenceDate = selectedEvent.start.toISOString();
-      let dateFromId = null;
-
-      if (selectedEvent.id.includes("_")) {
-        const parts = selectedEvent.id.split("_");
-        if (parts.length > 1) {
-          dateFromId = parts[1];
-          if (dateFromId) {
-            occurrenceDate = dateFromId;
-          }
-        }
-      }
-
       setEventSaving(true);
       try {
-        await deleteRecurringEventMutation.mutateAsync({
-          parentEventId,
-          mode: "this_only",
-          date: occurrenceDate,
+        await calendarData.deleteRecurringEvent({
+          event: selectedEvent,
+          scope,
         });
-        toast.success("Event occurrence deleted");
-
-        if (calendarData?.clearCache) {
-          calendarData.clearCache();
-        }
-
-        if (calendarData?.refetchEvents) {
-          await calendarData.refetchEvents();
-        }
-
-        if (onEventSaved) {
-          onEventSaved();
-        }
-
-        if (calendarData?.refetch) {
-          await calendarData.refetch();
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        toast.success(RECURRING_DELETE_SUCCESS_MESSAGES[scope]);
+        onEventSaved?.();
         onClose();
-      } catch (error: any) {
-        log.error("Failed to delete recurring event occurrence:", error);
+      } catch (error) {
+        log.error("Failed to delete recurring event:", error);
         toast.error(
-          `Failed to delete event occurrence: ${error.message || "Unknown error"}`,
+          getErrorMessage(error, RECURRING_DELETE_FAILURE_MESSAGES[scope]),
         );
       } finally {
         setEventSaving(false);
       }
     },
-    [
-      selectedEvent,
-      eventSaving,
-      onEventSaved,
-      onClose,
-      deleteRecurringEventMutation,
-    ],
-  );
-
-  const handleRecurringDeleteAll = useCallback(
-    async (calendarData: any) => {
-      if (!selectedEvent?.id) return;
-
-      if (eventSaving) return;
-
-      setShowRecurringDeleteModal(false);
-
-      let parentEventId = selectedEvent.parentEventId || selectedEvent.id;
-
-      if (!selectedEvent.parentEventId && selectedEvent.id.includes("_")) {
-        const parts = selectedEvent.id.split("_");
-        if (parts.length > 1 && parts[0]) {
-          parentEventId = parts[0];
-        }
-      }
-
-      setEventSaving(true);
-      try {
-        await deleteRecurringEventMutation.mutateAsync({
-          parentEventId,
-          mode: "all",
-        });
-        toast.success("Entire event series deleted");
-
-        if (calendarData?.refetchEvents) {
-          await calendarData.refetchEvents();
-        } else {
-          onEventSaved?.();
-        }
-
-        onClose();
-      } catch (error: any) {
-        log.error("Failed to delete recurring event series:", error);
-        toast.error("Failed to delete event series");
-      } finally {
-        setEventSaving(false);
-      }
-    },
-    [
-      selectedEvent,
-      eventSaving,
-      onEventSaved,
-      onClose,
-      deleteRecurringEventMutation,
-    ],
+    [selectedEvent, eventSaving, onEventSaved, onClose],
   );
 
   return {
@@ -1003,6 +943,7 @@ export function useEventForm({
     eventAllDay,
     eventLocation,
     eventCalendarId,
+    eventCategoryId,
     eventReminder,
     eventNotifications,
     eventParticipants,
@@ -1030,6 +971,7 @@ export function useEventForm({
     setEventAllDay,
     setEventLocation,
     setEventCalendarId,
+    setEventCategoryId,
     setEventReminder,
     setEventNotifications,
     setEventParticipants,
@@ -1049,7 +991,6 @@ export function useEventForm({
     resetForm,
     handleEventSave,
     handleEventDelete,
-    handleRecurringDeleteThis,
-    handleRecurringDeleteAll,
+    handleRecurringDelete,
   };
 }

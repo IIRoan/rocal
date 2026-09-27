@@ -7,7 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -28,14 +28,30 @@ import { useTheme } from "./ThemeProvider";
 
 export type ToastVariant = "success" | "error" | "info";
 
+export interface ToastAction {
+  label: string;
+  onPress: () => void;
+}
+
+export interface ToastOptions {
+  duration?: number;
+  action?: ToastAction;
+}
+
 export interface ToastMessage {
   id: number;
   message: string;
   variant: ToastVariant;
+  duration: number;
+  action?: ToastAction;
 }
 
 export interface ToastContextValue {
-  toast: (message: string, variant?: ToastVariant) => void;
+  toast: (
+    message: string,
+    variant?: ToastVariant,
+    options?: ToastOptions,
+  ) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +140,7 @@ function ToastItem({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
-    const timer = setTimeout(() => triggerDismiss(), TOAST_DURATION);
+    const timer = setTimeout(() => triggerDismiss(), item.duration);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -149,11 +165,18 @@ function ToastItem({
       }
     });
 
-  const tapGesture = Gesture.Tap().onEnd(() => {
+  // Tap-to-dismiss would race the action button, so actionable toasts dismiss by swipe or timeout.
+  const tapGesture = Gesture.Tap().enabled(!item.action).onEnd(() => {
     scheduleOnRN(triggerDismiss);
   });
 
   const combinedGesture = Gesture.Race(panGesture, tapGesture);
+
+  const handleActionPress = useCallback(() => {
+    if (isDismissing.current) return;
+    item.action?.onPress();
+    triggerDismiss();
+  }, [item.action, triggerDismiss]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -210,6 +233,31 @@ function ToastItem({
         >
           {item.message}
         </Text>
+        {item.action ? (
+          <Pressable
+            onPress={handleActionPress}
+            accessibilityRole="button"
+            accessibilityLabel={item.action.label}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.action,
+              { opacity: pressed ? 0.6 : 1 },
+            ]}
+          >
+            <Text
+              style={{
+                color: theme.colors.primaryBase,
+                fontSize: theme.typography.fontSize.sm.size,
+                lineHeight: theme.typography.fontSize.sm.lineHeight,
+                fontWeight:
+                  theme.typography.fontWeight
+                    .semibold as import("react-native").TextStyle["fontWeight"],
+              }}
+            >
+              {item.action.label}
+            </Text>
+          </Pressable>
+        ) : null}
       </Animated.View>
     </GestureDetector>
   );
@@ -226,9 +274,22 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
 
   const toast = useCallback(
-    (message: string, variant: ToastVariant = "success") => {
+    (
+      message: string,
+      variant: ToastVariant = "success",
+      options?: ToastOptions,
+    ) => {
       const id = nextId++;
-      setToasts((prev) => [...prev.slice(-2), { id, message, variant }]);
+      setToasts((prev) => [
+        ...prev.slice(-2),
+        {
+          id,
+          message,
+          variant,
+          duration: options?.duration ?? TOAST_DURATION,
+          action: options?.action,
+        },
+      ]);
     },
     [],
   );
@@ -297,5 +358,11 @@ const styles = StyleSheet.create({
   },
   message: {
     flex: 1,
+  },
+  action: {
+    flexShrink: 0,
+    minHeight: 28,
+    justifyContent: "center",
+    paddingHorizontal: 4,
   },
 });

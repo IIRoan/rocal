@@ -16,8 +16,8 @@ jest.mock("../../components/calendar-data-provider", () => ({
   useSharedCalendarData: jest.fn(),
 }));
 
-jest.mock("../../components/command-palette/recurring-delete-modal", () => ({
-  RecurringDeleteModal: () => null,
+jest.mock("../../components/command-palette/recurring-scope-modal", () => ({
+  RecurringScopeModal: () => null,
 }));
 
 jest.mock("../../components/event-editor/event-editor-body", () => ({
@@ -42,6 +42,7 @@ jest.mock("../../lib/calendar-api-service", () => ({
   calendarApiService: {
     deleteRecurringEvent: jest.fn(),
     downloadEventICS: jest.fn(),
+    getCategories: jest.fn(async () => []),
     getEventNotifications: jest.fn(),
     updateEventNotifications: jest.fn(),
     validateRecurrence: jest.fn(),

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   buildEmailHtmlDocument,
-  emailHasOwnDarkMode,
   processEmailHtml,
 } from "@workspace/calendar-core/mail-html";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
@@ -31,7 +30,6 @@ export function HtmlEmailRenderer({
     }),
     blockRemoteImages,
     isDark,
-    hasOwnDark: emailHasOwnDarkMode(html),
   });
 
   // The frame paints nothing until its document loads, so it stays hidden over a matching surface and fades in once.

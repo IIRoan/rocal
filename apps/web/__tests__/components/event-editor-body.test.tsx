@@ -153,6 +153,7 @@ describe("EventEditorBody", () => {
     await act(async () => {
       root.render(
         <EventEditorBody
+          categories={[]}
           calendars={[
             {
               id: "cal-1",
@@ -251,6 +252,7 @@ describe("EventEditorBody", () => {
     await act(async () => {
       root.render(
         <EventEditorBody
+          categories={[]}
           calendars={[
             {
               id: "cal-1",
@@ -315,6 +317,7 @@ describe("EventEditorBody", () => {
     await act(async () => {
       root.render(
         <EventEditorBody
+          categories={[]}
           calendars={[]}
           desktop={true}
           isViewMode={false}
@@ -358,5 +361,123 @@ describe("EventEditorBody", () => {
       );
     });
     expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the current category and clears it in edit mode", async () => {
+    const setEventCategoryId = jest.fn();
+    await act(async () => {
+      root.render(
+        <EventEditorBody
+          categories={[
+            {
+              id: "cat-1",
+              name: "Work",
+              color: "blue",
+              isActive: true,
+              userId: "user-1",
+              createdAt: new Date("2026-05-27T09:00:00.000Z"),
+              updatedAt: new Date("2026-05-27T09:00:00.000Z"),
+            },
+          ]}
+          calendars={[]}
+          desktop={true}
+          isViewMode={false}
+          localSettings={{ timeFormat: "24h" } as any}
+          onSubmit={() => {}}
+          eventForm={
+            {
+              eventAllDay: false,
+              eventCalendarId: "cal-1",
+              eventCategoryId: "cat-1",
+              eventDescription: "",
+              eventEndDate: new Date(2026, 4, 27),
+              eventEndTime: "11:00",
+              eventLocation: "",
+              eventNotifications: [],
+              eventParticipants: [],
+              eventStartDate: new Date(2026, 4, 27),
+              eventStartTime: "10:00",
+              eventTitle: "Planning sync",
+              isRecurring: false,
+              notificationsLoading: false,
+              recurrenceRule: null,
+              selectedEvent: null,
+              setEventCategoryId,
+              setEventTitle: () => {},
+            } as any
+          }
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("Work");
+    const clearButton = container.querySelector(
+      'button[aria-label="Remove category"]',
+    ) as HTMLButtonElement;
+    expect(clearButton).not.toBeNull();
+    await act(async () => {
+      clearButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(setEventCategoryId).toHaveBeenCalledWith("");
+  });
+
+  it("shows the category in view mode", async () => {
+    await act(async () => {
+      root.render(
+        <EventEditorBody
+          categories={[
+            {
+              id: "cat-1",
+              name: "Work",
+              color: "blue",
+              isActive: true,
+              userId: "user-1",
+              createdAt: new Date("2026-05-27T09:00:00.000Z"),
+              updatedAt: new Date("2026-05-27T09:00:00.000Z"),
+            },
+          ]}
+          calendars={[]}
+          desktop={true}
+          isViewMode={true}
+          localSettings={{ timeFormat: "24h" } as any}
+          onSubmit={() => {}}
+          eventForm={
+            {
+              eventAllDay: false,
+              eventCalendarId: "cal-1",
+              eventCategoryId: "cat-1",
+              eventDescription: "",
+              eventEndDate: new Date("2026-05-27T11:00:00.000Z"),
+              eventEndTime: "11:00",
+              eventLocation: "",
+              eventNotifications: [],
+              eventParticipants: [],
+              eventStartDate: new Date("2026-05-27T10:00:00.000Z"),
+              eventStartTime: "10:00",
+              eventTitle: "Planning sync",
+              eventViewMode: "view",
+              isRecurring: false,
+              notificationsLoading: false,
+              recurrenceRule: null,
+              selectedEvent: {
+                id: "event-1",
+                calendarId: "cal-1",
+                categoryId: "cat-1",
+                title: "Planning sync",
+                start: new Date("2026-05-27T10:00:00.000Z"),
+                end: new Date("2026-05-27T11:00:00.000Z"),
+                userId: "user-1",
+                createdAt: new Date("2026-05-27T09:00:00.000Z"),
+                updatedAt: new Date("2026-05-27T09:00:00.000Z"),
+              },
+              showNotifications: false,
+            } as any
+          }
+        />,
+      );
+    });
+
+    expect(container.querySelector('[title="Category"]')).not.toBeNull();
+    expect(container.textContent).toContain("Work");
   });
 });

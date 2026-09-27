@@ -4,7 +4,7 @@ import type {
   CalendarSubscriptionSyncResponse,
   ImportIcsResponse,
 } from "@workspace/calendar-ics";
-import { optionalCalendarColorSchema } from "@workspace/calendar-core";
+import { optionalCalendarColorSchema, encryptedIcsImportBodySchema } from "@workspace/calendar-core";
 import { strictZodObject } from "../lib/validation";
 import { resourceIdParamsSchema } from "./_schemas";
 import { optionalQueryBooleanSchema, resourceIdSchema, userIdField } from "./_zod";
@@ -26,11 +26,12 @@ export const deleteSubscriptionQuerySchema = strictZodObject({
   deleteEvents: optionalQueryBooleanSchema,
 });
 
-export const importIcsSubscriptionBodySchema = strictZodObject({
+const legacyImportIcsBodySchema = strictZodObject({
   calendarId: z.string().min(1),
   icsContent: z.string().min(1),
   fileName: z.string().optional(),
 });
+export const importIcsSubscriptionBodySchema = z.union([encryptedIcsImportBodySchema, legacyImportIcsBodySchema]);
 
 export const subscriptionIdParamsSchema = resourceIdParamsSchema;
 
@@ -59,8 +60,10 @@ export const subscriptionSyncInputSchema = z
   })
   .strict();
 
-export const importIcsInputSchema =
-  importIcsSubscriptionBodySchema.extend(userIdField);
+export const importIcsInputSchema = z.union([
+  encryptedIcsImportBodySchema.extend(userIdField),
+  legacyImportIcsBodySchema.extend(userIdField),
+]);
 
 export type SyncableSubscription = Prisma.CalendarSubscriptionGetPayload<{
   include: { calendar: true };

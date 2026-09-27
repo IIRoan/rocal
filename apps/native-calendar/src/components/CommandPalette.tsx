@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   clockTimePattern,
   formatInUserTimezone,
@@ -28,13 +28,16 @@ import { useSheet } from "../providers/SheetProvider";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
 import { useUserTimezone } from "@workspace/native-core/hooks/use-user-timezone";
 import { useCalendarView } from "../providers/CalendarViewProvider";
-import { calendarApiService } from "@workspace/native-core/lib/api";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
-import {
-  SETTINGS_ROUTE,
-  SETTINGS_NOTIFICATIONS_ROUTE,
-} from "@workspace/native-core/lib/navigation-routes";
+import { SETTINGS_ROUTE } from "@workspace/native-core/lib/navigation-routes";
+import { useCommonCommandActions } from "@workspace/native-core/hooks/use-common-command-actions";
+import { useDeferredSheetAction } from "@workspace/native-core/hooks/use-deferred-sheet-action";
+import { useSheetPageStack } from "@workspace/native-core/components/sheet/SheetPageStack";
 import { CALENDAR_HOME_ROUTE } from "../lib/calendar-routes";
+import {
+  CALENDARS_ROOT_PAGE,
+  CALENDAR_CREATE_PAGE,
+} from "../lib/calendars-sheet-pages";
 import { useNativeTitleIndex } from "../hooks/use-native-title-index";
 import {
   mergePaletteSearchResults,
@@ -53,6 +56,8 @@ import {
   groupCommandActions,
   type CommandAction,
 } from "./command-palette/command-actions";
+import { PaletteCalendarsSheet } from "./command-palette/PaletteCalendarsSheet";
+import { usePaletteEventSearch } from "./command-palette/use-palette-event-search";
 
 const SEARCH_MIN_LENGTH = 2;
 const SEARCH_DEBOUNCE_MS = 250;
@@ -92,7 +97,7 @@ export function CommandPalette() {
   const { openEventSheet } = useSheet();
   const { setActiveView, setCurrentDate, setSelectedDate } = useCalendarView();
   const queryClient = useQueryClient();
-  const router = useRouter();
+  const { navigate, push } = useRouter();
   const inputRef = useRef<TextInput>(null);
   const titleIndex = useNativeTitleIndex();
 
@@ -116,16 +121,21 @@ export function CommandPalette() {
   const trimmedQuery = debouncedQuery.trim();
   const searchEnabled = isOpen && trimmedQuery.length >= SEARCH_MIN_LENGTH;
 
-  const { data: eventSearchData, isFetching: eventSearchFetching } = useQuery({
-    queryKey: ["command-palette-search", "events", trimmedQuery],
-    queryFn: ({ signal }) =>
-      calendarApiService.searchEvents(
-        { q: trimmedQuery, limit: SEARCH_LIMIT },
-        signal,
-      ),
-    enabled: searchEnabled,
-    staleTime: 10_000,
-  });
+  const { data: eventSearchData, isFetching: eventSearchFetching } =
+    usePaletteEventSearch(trimmedQuery, {
+      enabled: searchEnabled,
+      limit: SEARCH_LIMIT,
+    });
+
+  const runCommonAction = useCommonCommandActions();
+  const { runAfterClose, onCloseComplete } = useDeferredSheetAction(close);
+  const [calendarsOpen, setCalendarsOpen] = useState(false);
+  const calendarsPageStack = useSheetPageStack(
+    CALENDARS_ROOT_PAGE,
+    calendarsOpen,
+  );
+  const { push: pushCalendarsPage } = calendarsPageStack;
+  const closeCalendars = useCallback(() => setCalendarsOpen(false), []);
 
   const actions = useMemo(() => buildCommandActions(), []);
   const filteredActions = useMemo(
@@ -159,15 +169,29 @@ export function CommandPalette() {
   const handleCloseComplete = useCallback(() => {
     setQuery("");
     setDebouncedQuery("");
-  }, []);
+    onCloseComplete();
+  }, [onCloseComplete]);
 
   const navigateToCalendar = useCallback(() => {
-    router.navigate(CALENDAR_HOME_ROUTE as never);
-  }, [router]);
+    navigate(CALENDAR_HOME_ROUTE as never);
+  }, [navigate]);
 
   const runAction = useCallback(
     (action: CommandAction) => {
+      if (action.id === "new-calendar" || action.id === "manage-calendars") {
+        const openCreatePage = action.id === "new-calendar";
+        runAfterClose(() => {
+          if (openCreatePage) pushCalendarsPage(CALENDAR_CREATE_PAGE);
+          setCalendarsOpen(true);
+        });
+        return;
+      }
+      if (action.id === "add-passkey") {
+        runAfterClose(() => runCommonAction(action));
+        return;
+      }
       close();
+      if (runCommonAction(action)) return;
       switch (action.id) {
         case "new-event":
           openEventSheet({ type: "create" });
@@ -185,6 +209,8 @@ export function CommandPalette() {
         case "view-week":
         case "view-day":
         case "view-3day":
+        case "view-month":
+        case "view-agenda":
           if (action.view) setActiveView(action.view);
           navigateToCalendar();
           break;
@@ -192,22 +218,22 @@ export function CommandPalette() {
           navigateToCalendar();
           break;
         case "open-settings":
-          router.push(SETTINGS_ROUTE as never);
-          break;
-        case "open-notification-settings":
-          router.push(SETTINGS_NOTIFICATIONS_ROUTE as never);
+          push(SETTINGS_ROUTE as never);
           break;
       }
     },
     [
       close,
       openEventSheet,
+      pushCalendarsPage,
       queryClient,
+      runAfterClose,
+      runCommonAction,
       setActiveView,
       setCurrentDate,
       setSelectedDate,
       navigateToCalendar,
-      router,
+      push,
     ],
   );
 
@@ -216,13 +242,26 @@ export function CommandPalette() {
       close();
       const start = new Date(result.event.start);
       if (!Number.isNaN(start.getTime()) && start.getTime() !== 0) {
-        setCurrentDate(start);
-        setSelectedDate(start);
+        const day = utcToPickerDate(
+          start,
+          resolveTimezone(
+            queryClient.getQueryData<UserSettings>(QUERY_KEYS.settings())?.timezone,
+          ),
+        );
+        setCurrentDate(day);
+        setSelectedDate(day);
       }
       openEventSheet({ type: "view", eventId: result.eventId });
       navigateToCalendar();
     },
-    [close, navigateToCalendar, openEventSheet, setCurrentDate, setSelectedDate],
+    [
+      close,
+      navigateToCalendar,
+      openEventSheet,
+      queryClient,
+      setCurrentDate,
+      setSelectedDate,
+    ],
   );
 
   const showSearchResults = trimmedQuery.length >= SEARCH_MIN_LENGTH;
@@ -232,111 +271,118 @@ export function CommandPalette() {
   const iconBg = theme.colors.mutedForeground + "18";
 
   return (
-    <BottomSheet
-      visible={isOpen}
-      onDismiss={close}
-      onCloseComplete={handleCloseComplete}
-    >
-      <BottomSheetHeader>
-        <BottomSheetTitle>Search</BottomSheetTitle>
-      </BottomSheetHeader>
-
-      <BottomSheetScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + 8 },
-        ]}
+    <>
+      <BottomSheet
+        visible={isOpen}
+        onDismiss={close}
+        onCloseComplete={handleCloseComplete}
       >
-        <View style={styles.sectionCard}>
-          <View style={styles.searchRow}>
-            <Feather
-              name="search"
-              size={16}
-              color={theme.colors.mutedForeground}
-            />
-            <TextInput
-              ref={inputRef}
-              style={styles.searchInput}
-              placeholder="Events and commands"
-              placeholderTextColor={theme.colors.mutedForeground}
-              value={query}
-              onChangeText={setQuery}
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="search"
-              accessibilityLabel="Search events and commands"
-            />
-            {query.length > 0 ? (
-              <Pressable
-                onPress={() => setQuery("")}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Clear search"
-              >
-                <Feather
-                  name="x"
-                  size={16}
-                  color={theme.colors.mutedForeground}
-                />
-              </Pressable>
-            ) : null}
-          </View>
-        </View>
+        <BottomSheetHeader>
+          <BottomSheetTitle>Search</BottomSheetTitle>
+        </BottomSheetHeader>
 
-        {showSearchResults ? (
-          <>
-            <SectionHeading
-              label="Events"
-              fetching={searchFetching && calendarResults.length === 0}
-              theme={theme}
-              styles={styles}
-            />
-            <View style={styles.sectionCard}>
-              {calendarResults.length === 0 ? (
-                <Text style={styles.emptyText}>No matching events.</Text>
-              ) : (
-                calendarResults.map((result, index) => (
-                  <SearchResultRow
-                    key={result.id}
-                    result={result}
-                    theme={theme}
-                    styles={styles}
-                    iconColor={iconColor}
-                    iconBg={iconBg}
-                    showDivider={index > 0}
-                    onPress={handleSearchResultPress}
-                  />
-                ))
-              )}
-            </View>
-          </>
-        ) : noActionMatches ? (
+        <BottomSheetScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: insets.bottom + 8 },
+          ]}
+        >
           <View style={styles.sectionCard}>
-            <Text style={styles.emptyText}>No matching commands.</Text>
-          </View>
-        ) : (
-          actionSections.map((section) => (
-            <View key={section.group}>
-              <Text style={styles.sectionLabel}>{section.group}</Text>
-              <View style={styles.sectionCard}>
-                {section.actions.map((action, index) => (
-                  <ActionRow
-                    key={action.id}
-                    action={action}
-                    theme={theme}
-                    styles={styles}
-                    iconColor={iconColor}
-                    iconBg={iconBg}
-                    showDivider={index > 0}
-                    onPress={runAction}
+            <View style={styles.searchRow}>
+              <Feather
+                name="search"
+                size={16}
+                color={theme.colors.mutedForeground}
+              />
+              <TextInput
+                ref={inputRef}
+                style={styles.searchInput}
+                placeholder="Events and commands"
+                placeholderTextColor={theme.colors.mutedForeground}
+                value={query}
+                onChangeText={setQuery}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+                accessibilityLabel="Search events and commands"
+              />
+              {query.length > 0 ? (
+                <Pressable
+                  onPress={() => setQuery("")}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear search"
+                >
+                  <Feather
+                    name="x"
+                    size={16}
+                    color={theme.colors.mutedForeground}
                   />
-                ))}
-              </View>
+                </Pressable>
+              ) : null}
             </View>
-          ))
-        )}
-      </BottomSheetScrollView>
-    </BottomSheet>
+          </View>
+
+          {showSearchResults ? (
+            <>
+              <SectionHeading
+                label="Events"
+                fetching={searchFetching && calendarResults.length === 0}
+                theme={theme}
+                styles={styles}
+              />
+              <View style={styles.sectionCard}>
+                {calendarResults.length === 0 ? (
+                  <Text style={styles.emptyText}>No matching events.</Text>
+                ) : (
+                  calendarResults.map((result, index) => (
+                    <SearchResultRow
+                      key={result.id}
+                      result={result}
+                      theme={theme}
+                      styles={styles}
+                      iconColor={iconColor}
+                      iconBg={iconBg}
+                      showDivider={index > 0}
+                      onPress={handleSearchResultPress}
+                    />
+                  ))
+                )}
+              </View>
+            </>
+          ) : noActionMatches ? (
+            <View style={styles.sectionCard}>
+              <Text style={styles.emptyText}>No matching commands.</Text>
+            </View>
+          ) : (
+            actionSections.map((section) => (
+              <View key={section.group}>
+                <Text style={styles.sectionLabel}>{section.group}</Text>
+                <View style={styles.sectionCard}>
+                  {section.actions.map((action, index) => (
+                    <ActionRow
+                      key={action.id}
+                      action={action}
+                      theme={theme}
+                      styles={styles}
+                      iconColor={iconColor}
+                      iconBg={iconBg}
+                      showDivider={index > 0}
+                      onPress={runAction}
+                    />
+                  ))}
+                </View>
+              </View>
+            ))
+          )}
+        </BottomSheetScrollView>
+      </BottomSheet>
+      <PaletteCalendarsSheet
+        visible={calendarsOpen}
+        pageStack={calendarsPageStack}
+        onDismiss={closeCalendars}
+      />
+    </>
   );
 }
 

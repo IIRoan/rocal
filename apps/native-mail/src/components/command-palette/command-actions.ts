@@ -1,21 +1,41 @@
 import type { Feather } from "@expo/vector-icons";
+import {
+  getSettingsHubItems,
+  getSettingsMailItems,
+  type SettingsHubId,
+  type SettingsMailId,
+} from "@workspace/calendar-core";
+import {
+  buildPasskeyCommandActions,
+  buildSettingsCommandActions,
+  buildThemeCommandActions,
+  type CommonCommandAction,
+  type CommonCommandActionGroup,
+  type CommonCommandActionId,
+} from "@workspace/native-core/lib/command-palette-common";
+import {
+  SETTINGS_HUB_ICONS,
+  SETTINGS_MAIL_ICONS,
+} from "@workspace/native-core/lib/settings-nav-icons";
 
 export type CommandActionId =
   | "compose-mail"
   | "open-mail"
   | "open-settings"
-  | "open-notification-settings";
+  | CommonCommandActionId;
 
-export type CommandActionGroup = "Mail" | "Navigation";
+export type CommandActionGroup = "Mail" | "Navigation" | CommonCommandActionGroup;
 
-export interface CommandAction {
+export interface CommandAction extends Omit<CommonCommandAction, "id" | "group"> {
   id: CommandActionId;
-  label: string;
   group: CommandActionGroup;
   icon: keyof typeof Feather.glyphMap;
-  /** Extra terms (besides the label) matched against the search query. */
-  keywords: string[];
 }
+
+/** Calendar settings belong to Solace Calendar. */
+const MAIL_HIDDEN_SETTINGS: readonly SettingsHubId[] = ["calendar"];
+/** Mailbox management only exists as a drawer page, so there is no settings route to jump to. */
+const MAIL_UNROUTABLE_SETTINGS: readonly SettingsMailId[] = ["mailboxes"];
 
 export function buildCommandActions(): CommandAction[] {
   return [
@@ -26,6 +46,8 @@ export function buildCommandActions(): CommandAction[] {
       icon: "edit",
       keywords: ["new mail", "write", "send", "message"],
     },
+    ...buildThemeCommandActions(),
+    ...buildPasskeyCommandActions(),
     {
       id: "open-mail",
       label: "Go to Mail",
@@ -40,13 +62,18 @@ export function buildCommandActions(): CommandAction[] {
       icon: "settings",
       keywords: ["preferences", "account", "options"],
     },
-    {
-      id: "open-notification-settings",
-      label: "Notification settings",
-      group: "Navigation",
-      icon: "bell",
-      keywords: ["email", "push", "reminder", "alert", "iphone"],
-    },
+    ...buildSettingsCommandActions(
+      getSettingsHubItems("native").filter(
+        (item) => !MAIL_HIDDEN_SETTINGS.includes(item.id),
+      ),
+      SETTINGS_HUB_ICONS,
+    ),
+    ...buildSettingsCommandActions(
+      getSettingsMailItems("native").filter(
+        (item) => !MAIL_UNROUTABLE_SETTINGS.includes(item.id),
+      ),
+      SETTINGS_MAIL_ICONS,
+    ),
   ];
 }
 
@@ -66,7 +93,13 @@ export function filterCommandActions(
   });
 }
 
-const GROUP_ORDER: CommandActionGroup[] = ["Mail", "Navigation"];
+const GROUP_ORDER: CommandActionGroup[] = [
+  "Mail",
+  "Appearance",
+  "Security",
+  "Navigation",
+  "Settings",
+];
 
 /** Groups actions in their natural order for sectioned rendering. */
 export function groupCommandActions(

@@ -18,6 +18,7 @@ import { MailboxesSettingsContent } from "../settings/sections/MailboxesSettings
 import {
   getMailboxDisplayName,
   getMailboxIcon,
+  isSpamMailboxRole,
 } from "../../lib/mail/mail-helpers";
 import type { JmapMailbox } from "../../lib/mail/types";
 
@@ -32,6 +33,8 @@ interface MailboxDrawerSheetProps {
   mailboxes: JmapMailbox[];
   selectedMailboxId: string | null;
   onSelectMailbox: (mailboxId: string) => void;
+  onEmptyMailbox: (mailbox: JmapMailbox) => void;
+  emptyingMailboxId: string | null;
 }
 
 /** Mail drawer: mailbox list, with mailbox management in-sheet. */
@@ -87,7 +90,12 @@ function MailboxList({
   mailboxes,
   selectedMailboxId,
   onSelectMailbox,
+  onEmptyMailbox,
+  emptyingMailboxId,
 }: Omit<MailboxDrawerSheetProps, "visible"> & { onManage: () => void }) {
+  const emptyableMailboxes = mailboxes.filter(
+    (mailbox) => mailbox.role === "trash" || isSpamMailboxRole(mailbox.role),
+  );
   return (
     <SheetScroll>
       <SheetSection title="Mail">
@@ -128,6 +136,17 @@ function MailboxList({
             onPress={onManage}
             accessibilityLabel="Manage mailboxes"
           />
+          {emptyableMailboxes.map((mailbox) => (
+            <SheetItem
+              key={mailbox.id}
+              label={`Empty ${getMailboxDisplayName(mailbox)}`}
+              icon="trash-2"
+              tone="destructive"
+              pending={emptyingMailboxId === mailbox.id}
+              disabled={emptyingMailboxId !== null}
+              onPress={() => onEmptyMailbox(mailbox)}
+            />
+          ))}
         </SheetGroup>
       </SheetSection>
     </SheetScroll>

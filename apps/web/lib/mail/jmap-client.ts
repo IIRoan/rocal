@@ -1,4 +1,3 @@
-import { toJmapTextQuery } from "@/lib/mail/mail-search-filter";
 import type {
   JmapEmailChanges,
   JmapEmailMessage,
@@ -32,6 +31,9 @@ import {
   isStalwartEncryptOnAppendEnabled,
   sortMailMessagesBySearchRelevance,
   extractTextQueryFromJmapFilter,
+  toJmapTextQuery,
+  buildEmailDestroyMethodCall,
+  destroyMailboxMessagesInBatches,
   type MailServerPolicy,
   type MailServerPolicyConfig,
 } from "@workspace/calendar-core";
@@ -1208,6 +1210,7 @@ export class StalwartJmapClient {
     mailboxId: string,
     filter: Record<string, unknown>,
     limit = this.getDefaultSearchPageSize(),
+    position = 0,
   ): Promise<{ messages: JmapEmailMessage[]; total: number }> {
     const accountId = this.requirePrimaryAccountId(session);
     const envelope = await this.call(
@@ -1224,7 +1227,8 @@ export class StalwartJmapClient {
                 : { inMailbox: mailboxId, ...filter },
             sort: [{ property: "receivedAt", isAscending: false }],
             limit,
-            position: 0,
+            position,
+            calculateTotal: true,
           },
           "q1",
         ],
@@ -2125,27 +2129,20 @@ export class StalwartJmapClient {
     await this.call(
       session,
       ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-      [["Email/set", { accountId, destroy: messageIds }, "c1"]],
+      [buildEmailDestroyMethodCall(accountId, messageIds)],
     );
   }
 
   /** Permanently delete every message in a mailbox (trash / spam empty). */
   async emptyMailbox(session: JmapSession, mailboxId: string): Promise<number> {
-    const batchSize = 100;
-    let destroyed = 0;
-
-    while (true) {
-      const { ids } = await this.getMailboxMessageIds(session, mailboxId, {
-        limit: batchSize,
-        position: 0,
-      });
-      if (ids.length === 0) break;
-      await this.bulkDestroyMessages(session, ids);
-      destroyed += ids.length;
-      if (ids.length < batchSize) break;
-    }
-
-    return destroyed;
+    return destroyMailboxMessagesInBatches({
+      listIds: async (limit) =>
+        (await this.getMailboxMessageIds(session, mailboxId, {
+          limit,
+          position: 0,
+        })).ids,
+      destroy: (ids) => this.bulkDestroyMessages(session, ids),
+    });
   }
 
   async getBlobAsText(session: JmapSession, blobId: string): Promise<string> {
