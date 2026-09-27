@@ -14,6 +14,8 @@ import {
   saveMailVaultPassword,
 } from "./mail/mail-password-cache";
 import { buildMailRuntime } from "./mail/mail-runtime";
+import { clearMailSettings } from "./mail/mail-settings-store";
+import { clearMailListSettings } from "./mail/mail-list-settings-store";
 
 /** Mail startup: provision the mailbox on first sign-in, then connect and unlock the vault. */
 export async function prepareMailSession(
@@ -85,6 +87,8 @@ export const MAIL_AUTH_LIFECYCLE: AuthLifecycle = {
     await clearMailVaultPassword();
     await clearDerivedVaultKey();
     await clearCachedPrivateKey();
+    await clearMailSettings();
+    await clearMailListSettings();
     clearVaultCache();
   },
 };

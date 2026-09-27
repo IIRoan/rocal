@@ -9,7 +9,9 @@ import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useCalendarPresentation } from "@/hooks/use-calendar-presentation";
 import { useSettings } from "@/hooks/use-settings";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
+import { useRecurringMovePrompt } from "@/hooks/use-recurring-move-prompt";
 import { useCommandPalette } from "./command-palette-context";
+import { RecurringScopeModal } from "./command-palette/recurring-scope-modal";
 import { useCalendarWorkspaceReady } from "@/components/calendar-workspace-ready";
 import {
   FORCE_LOADING_DESIGN_PREVIEW,
@@ -22,18 +24,20 @@ interface CalendarWithDataProps {
 
 export function CalendarWithData({ className }: CalendarWithDataProps) {
   const { isCalendarVisible, currentDate, currentView } = useCalendarContext();
-  const { settings, loading: settingsLoading, updateSettings } = useSettings();
+  const { settings, loading: settingsLoading } = useSettings();
   const timeFormat = useUserTimeFormat();
   const { openEventEditor, previewEvent } = useCommandPalette();
   const calendarData = useSharedCalendarData();
   const workspace = useCalendarWorkspaceReady();
+  const { moveRecurringEvent, scopePrompt } = useRecurringMovePrompt(
+    calendarData.editRecurringEvent,
+  );
   const {
     defaultCalendarId,
     handleSetPreview,
     initialView,
     isAllInitialLoading,
     overlayContext,
-    themeSettings,
     transformedEvents,
     workingDays,
   } = useCalendarPresentation({
@@ -44,9 +48,6 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     currentDate,
     currentView,
     previewEvent,
-    updateTheme: async (theme) => {
-      await updateSettings({ theme });
-    },
   });
 
   useEffect(() => {
@@ -69,6 +70,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         error={calendarData.error}
         onCreateEvent={calendarData.createEvent}
         onUpdateEvent={calendarData.updateEvent}
+        onMoveRecurringEvent={moveRecurringEvent}
         onDeleteEvent={calendarData.deleteEvent}
         onCreateCategory={calendarData.createCategory}
         onDateRangeChange={calendarData.setDateRange}
@@ -80,13 +82,13 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         weekStartDay={settings?.weekStartDay}
         workingDays={workingDays}
         timezone={settings?.timezone}
-        themeSettings={themeSettings}
         onLoadNotifications={calendarData.loadNotifications}
         onUpdateNotifications={calendarData.updateNotifications}
         onEventEdit={openEventEditor}
         onSetPreview={handleSetPreview}
         onPrefetchRange={calendarData.prefetchRange}
       />
+      <RecurringScopeModal action="edit" {...scopePrompt} />
       {FORCE_LOADING_DESIGN_PREVIEW ? (
         <PageLoadingOverlay
           isLoading={true}

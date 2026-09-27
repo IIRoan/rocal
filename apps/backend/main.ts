@@ -12,6 +12,7 @@ import { categoriesRoutes } from "./routes/categories";
 import { calendarsRoutes } from "./routes/calendars";
 import { settingsRoutes } from "./routes/settings";
 import { recentContactsRoutes } from "./routes/recent-contacts";
+import { mailSettingsRoutes } from "./routes/mail-settings";
 import { profilesRoutes } from "./routes/profiles";
 import { notificationsRoutes } from "./routes/notifications";
 import { pushDeviceRoutes } from "./routes/push-devices";
@@ -203,6 +204,7 @@ export const createAPI = (prefix = "") => {
     .use(calendarsRoutes)
     .use(settingsRoutes)
     .use(recentContactsRoutes)
+    .use(mailSettingsRoutes)
     .use(profilesRoutes)
     .use(notificationsRoutes)
     .use(pushDeviceRoutes)

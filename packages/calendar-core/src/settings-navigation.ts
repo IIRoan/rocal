@@ -40,7 +40,7 @@ export const SETTINGS_HUB_ITEMS: readonly SettingsNavItem<SettingsHubId>[] = [
   {
     id: "appearance",
     label: "Appearance",
-    description: "Theme and default calendar view",
+    description: "Theme on this device and default calendar view",
   },
   {
     id: "calendar",
@@ -55,7 +55,7 @@ export const SETTINGS_HUB_ITEMS: readonly SettingsNavItem<SettingsHubId>[] = [
   {
     id: "time-region",
     label: "Time & Region",
-    description: "Timezone and time format",
+    description: "Timezone and time format across your devices",
   },
   {
     id: "notifications",
@@ -100,19 +100,16 @@ export const SETTINGS_MAIL_ITEMS: readonly SettingsNavItem<SettingsMailId>[] = [
     id: "composing",
     label: "Composing",
     description: "Plain text, signatures, and attachment reminders",
-    platforms: ["web"],
   },
   {
     id: "mail-display",
     label: "Content & display",
     description: "Remote images, trusted senders, and reading appearance",
-    platforms: ["web"],
   },
   {
     id: "mail-list",
-    label: "List & shortcuts",
-    description: "Density, mark-as-read delay, undo toasts, and shortcuts",
-    platforms: ["web"],
+    label: "Message list",
+    description: "Density, mark-as-read delay, and undo toasts",
   },
 ] as const;
 

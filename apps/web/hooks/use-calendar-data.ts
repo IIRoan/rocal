@@ -4,6 +4,7 @@ import {
   useMutation,
   useQueryClient,
   type QueryClient,
+  type QueryKey,
 } from "@tanstack/react-query";
 import { createLogger } from "@workspace/logger";
 import { calendarApiService } from "../lib/calendar-api-service";
@@ -22,9 +23,20 @@ import {
   EventNotification as ApiEventNotification,
 } from "../lib/types/calendar";
 import { EventNotification } from "@workspace/ui/components/calendar";
-import { invitationByExternalIdQueryKey } from "@workspace/calendar-core";
+import {
+  CALENDARS_QUERY_KEY,
+  CATEGORIES_QUERY_KEY,
+  invitationByExternalIdQueryKey,
+  isRecurringSeriesMember,
+  resolveRecurringEventTarget,
+  shiftRecurringSeriesTimes,
+  toRecurringEventUpdates,
+  type RecurrenceDeleteScope,
+  type RecurrenceEditScope,
+} from "@workspace/calendar-core";
 import {
   useCalendarEventsLoader,
+  EVENTS_QUERY_KEY,
   getMonthQueryKey,
   monthKey,
   type DateRange,
@@ -32,25 +44,166 @@ import {
 
 const log = createLogger("calendar-data");
 
+export interface EditRecurringEventInput {
+  /** The event as it was before the edit, so the original occurrence date is used. */
+  event: CalendarEvent;
+  scope: RecurrenceEditScope;
+  updates: UpdateEventRequest;
+}
+
+export interface DeleteRecurringEventInput {
+  event: CalendarEvent;
+  scope: RecurrenceDeleteScope;
+}
+
+type EventCacheSnapshot = Array<[QueryKey, CalendarEvent[] | undefined]>;
+
 function hasRecurrence(
   event: { recurrence?: string | null } | null | undefined,
 ): boolean {
   return Boolean(event?.recurrence);
 }
 
-function findEventInCache(
+export function findEventInCache(
   queryClient: QueryClient,
   id: string,
 ): CalendarEvent | null {
   const entries = queryClient.getQueriesData<CalendarEvent[]>({
-    queryKey: ["events"],
+    queryKey: EVENTS_QUERY_KEY,
   });
   for (const [, events] of entries) {
-    if (!events) continue;
-    const match = events.find((event) => event.id === id);
-    if (match) return match;
+    if (!Array.isArray(events)) continue;
+    for (const event of events) {
+      if (event.id === id) return event;
+    }
   }
   return null;
+}
+
+async function snapshotEventCache(
+  queryClient: QueryClient,
+): Promise<EventCacheSnapshot> {
+  await queryClient.cancelQueries({ queryKey: EVENTS_QUERY_KEY });
+  return queryClient.getQueriesData<CalendarEvent[]>({
+    queryKey: EVENTS_QUERY_KEY,
+  });
+}
+
+function restoreEventCache(
+  queryClient: QueryClient,
+  snapshot: EventCacheSnapshot | undefined,
+) {
+  for (const [key, data] of snapshot ?? []) {
+    queryClient.setQueryData(key, data);
+  }
+}
+
+function mapCachedEvents(
+  queryClient: QueryClient,
+  map: (events: CalendarEvent[]) => CalendarEvent[],
+) {
+  queryClient.setQueriesData<CalendarEvent[]>(
+    { queryKey: EVENTS_QUERY_KEY },
+    (events) => (Array.isArray(events) ? map(events) : events),
+  );
+}
+
+function toContentPatch(updates: UpdateEventRequest): Partial<CalendarEvent> {
+  const patch: Partial<CalendarEvent> = {};
+  if (updates.title !== undefined) patch.title = updates.title;
+  if (updates.description !== undefined) {
+    patch.description = updates.description;
+  }
+  if (updates.location !== undefined) patch.location = updates.location;
+  if (updates.calendarId !== undefined) patch.calendarId = updates.calendarId;
+  if (updates.categoryId !== undefined) {
+    patch.categoryId = updates.categoryId || null;
+  }
+  return patch;
+}
+
+function toOccurrencePatch(
+  updates: UpdateEventRequest,
+): Partial<CalendarEvent> {
+  const patch = toContentPatch(updates);
+  if (updates.start) patch.start = new Date(updates.start);
+  if (updates.end) patch.end = new Date(updates.end);
+  if (updates.allDay !== undefined) patch.allDay = updates.allDay;
+  return patch;
+}
+
+function isAtOrAfter(event: CalendarEvent, instant: Date | string) {
+  return new Date(event.start).getTime() >= new Date(instant).getTime();
+}
+
+function isAffectedByScope(
+  candidate: CalendarEvent,
+  event: CalendarEvent,
+  scope: RecurrenceEditScope | RecurrenceDeleteScope,
+): boolean {
+  if (candidate.id === event.id) return true;
+  if (scope === "this_only") return false;
+  const target = resolveRecurringEventTarget(event);
+  if (!target || !isRecurringSeriesMember(candidate, target.parentEventId)) {
+    return false;
+  }
+  return scope === "all" || isAtOrAfter(candidate, event.start);
+}
+
+export async function persistRecurringEventEdit({
+  event,
+  scope,
+  updates,
+}: EditRecurringEventInput): Promise<CalendarEvent> {
+  const target = resolveRecurringEventTarget(event);
+  if (!target) return calendarApiService.updateEvent(event.id, updates);
+  if (scope === "this_only" && target.detachedEventId) {
+    return calendarApiService.updateEvent(target.detachedEventId, updates);
+  }
+
+  let recurringUpdates = toRecurringEventUpdates(updates);
+  if (scope === "all" && (recurringUpdates.start || recurringUpdates.end)) {
+    const series =
+      target.parentEventId === event.id
+        ? event
+        : await calendarApiService.getEvent(target.parentEventId);
+    const { start, end, ...rest } = recurringUpdates;
+    recurringUpdates = {
+      ...rest,
+      ...shiftRecurringSeriesTimes({
+        series,
+        occurrence: event,
+        next: { start, end },
+        timezone: updates.timezone ?? series.timezone,
+      }),
+    };
+  }
+
+  return calendarApiService.editRecurringEvent(target.parentEventId, {
+    editScope: scope,
+    occurrenceDate: scope === "all" ? undefined : target.occurrenceDate,
+    updates: recurringUpdates,
+  });
+}
+
+export async function persistRecurringEventDelete({
+  event,
+  scope,
+}: DeleteRecurringEventInput): Promise<void> {
+  const target = resolveRecurringEventTarget(event);
+  if (!target) {
+    await calendarApiService.deleteEvent(event.id);
+    return;
+  }
+  if (scope === "this_only" && target.detachedEventId) {
+    await calendarApiService.deleteEvent(target.detachedEventId);
+    return;
+  }
+  await calendarApiService.deleteRecurringEvent(
+    target.parentEventId,
+    scope,
+    scope === "all" ? undefined : target.occurrenceDate,
+  );
 }
 
 export function invalidateEventRanges(
@@ -59,7 +212,7 @@ export function invalidateEventRanges(
   end?: Date | string | null,
 ) {
   if (!start) {
-    queryClient.invalidateQueries({ queryKey: ["events"] });
+    queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
     return;
   }
   const startDate = new Date(start);
@@ -111,6 +264,8 @@ export interface UseCalendarDataReturn {
     event: UpdateEventRequest,
   ) => Promise<CalendarEvent>;
   deleteEvent: (id: string) => Promise<void>;
+  editRecurringEvent: (input: EditRecurringEventInput) => Promise<CalendarEvent>;
+  deleteRecurringEvent: (input: DeleteRecurringEventInput) => Promise<void>;
   createCalendar: (calendar: CreateCalendarRequest) => Promise<Calendar>;
   updateCalendar: (
     id: string,
@@ -171,14 +326,14 @@ export function useCalendarData(
   // --- Queries ---
 
   const calendarsQuery = useQuery({
-    queryKey: ["calendars"],
+    queryKey: CALENDARS_QUERY_KEY,
     queryFn: () => calendarApiService.getCalendars(),
     enabled: autoRefetch,
     staleTime: cacheTimeout,
   });
 
   const categoriesQuery = useQuery({
-    queryKey: ["categories"],
+    queryKey: CATEGORIES_QUERY_KEY,
     queryFn: () => calendarApiService.getCategories(),
     enabled: autoRefetch,
     staleTime: cacheTimeout,
@@ -191,7 +346,7 @@ export function useCalendarData(
       calendarApiService.createEvent(event),
     onSuccess: (_data, variables) => {
       if (hasRecurrence(variables)) {
-        queryClient.invalidateQueries({ queryKey: ["events"] });
+        queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         return;
       }
       invalidateEventRanges(queryClient, variables.start, variables.end);
@@ -203,16 +358,16 @@ export function useCalendarData(
       calendarApiService.updateEvent(id, event),
     onSuccess: (_data, { id, event }) => {
       if (hasRecurrence(event)) {
-        queryClient.invalidateQueries({ queryKey: ["events"] });
+        queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         return;
       }
       const cached = findEventInCache(queryClient, id);
       if (hasRecurrence(cached)) {
-        queryClient.invalidateQueries({ queryKey: ["events"] });
+        queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         return;
       }
       if (!cached && (!event.start || !event.end)) {
-        queryClient.invalidateQueries({ queryKey: ["events"] });
+        queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         return;
       }
       if (cached) {
@@ -221,7 +376,7 @@ export function useCalendarData(
       if (event.start && event.end) {
         invalidateEventRanges(queryClient, event.start, event.end);
       } else if (event.start || event.end) {
-        queryClient.invalidateQueries({ queryKey: ["events"] });
+        queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
       }
     },
   });
@@ -236,14 +391,70 @@ export function useCalendarData(
         });
       }
       if (!cached) {
-        queryClient.invalidateQueries({ queryKey: ["events"] });
+        queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         return;
       }
       if (hasRecurrence(cached)) {
-        queryClient.invalidateQueries({ queryKey: ["events"] });
+        queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         return;
       }
       invalidateEventRanges(queryClient, cached.start, cached.end);
+    },
+  });
+
+  const editRecurringEventMutation = useMutation({
+    mutationFn: persistRecurringEventEdit,
+    onMutate: async ({ event, scope, updates }) => {
+      const snapshot = await snapshotEventCache(queryClient);
+      const occurrencePatch = toOccurrencePatch(updates);
+      const seriesPatch = toContentPatch(updates);
+      mapCachedEvents(queryClient, (events) =>
+        events.map((candidate) => {
+          if (candidate.id === event.id) {
+            return { ...candidate, ...occurrencePatch };
+          }
+          return isAffectedByScope(candidate, event, scope)
+            ? { ...candidate, ...seriesPatch }
+            : candidate;
+        }),
+      );
+      return { snapshot };
+    },
+    onError: (_error, _input, context) => {
+      restoreEventCache(queryClient, context?.snapshot);
+    },
+    onSettled: (_data, _error, { event, scope, updates }) => {
+      if (scope !== "this_only") {
+        queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
+        return;
+      }
+      invalidateEventRanges(queryClient, event.start, event.end);
+      if (updates.start) {
+        invalidateEventRanges(queryClient, updates.start, updates.end);
+      }
+    },
+  });
+
+  const deleteRecurringEventMutation = useMutation({
+    mutationFn: persistRecurringEventDelete,
+    onMutate: async ({ event, scope }) => {
+      const snapshot = await snapshotEventCache(queryClient);
+      mapCachedEvents(queryClient, (events) =>
+        events.filter(
+          (candidate) => !isAffectedByScope(candidate, event, scope),
+        ),
+      );
+      return { snapshot };
+    },
+    onError: (_error, _input, context) => {
+      restoreEventCache(queryClient, context?.snapshot);
+    },
+    onSettled: (_data, _error, { event, scope }) => {
+      if (scope === "this_only") {
+        invalidateEventRanges(queryClient, event.start, event.end);
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
     },
   });
 
@@ -251,9 +462,9 @@ export function useCalendarData(
     mutationFn: (calendar: CreateCalendarRequest) =>
       calendarApiService.createCalendar(calendar),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["calendars"] });
+      queryClient.invalidateQueries({ queryKey: CALENDARS_QUERY_KEY });
       // Invalidate events too — new calendars (e.g. holiday) may have events
-      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
     },
   });
 
@@ -268,7 +479,7 @@ export function useCalendarData(
     onSuccess: () => {
       // Only refresh calendar metadata — visibility/name/color changes don't
       // alter server-side events, so there is no need to re-fetch events here.
-      queryClient.invalidateQueries({ queryKey: ["calendars"] });
+      queryClient.invalidateQueries({ queryKey: CALENDARS_QUERY_KEY });
     },
   });
 
@@ -284,8 +495,8 @@ export function useCalendarData(
     }) =>
       calendarApiService.deleteCalendarAdvanced(id, action, targetCalendarId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["calendars"] });
-      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: CALENDARS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
     },
   });
 
@@ -293,7 +504,7 @@ export function useCalendarData(
     mutationFn: (category: CreateCategoryRequest) =>
       calendarApiService.createCategory(category),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: CATEGORIES_QUERY_KEY });
     },
   });
 
@@ -306,15 +517,15 @@ export function useCalendarData(
       category: UpdateCategoryRequest;
     }) => calendarApiService.updateCategory(id, category),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: CATEGORIES_QUERY_KEY });
     },
   });
 
   const deleteCategoryMutation = useMutation({
     mutationFn: (id: string) => calendarApiService.deleteCategory(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
-      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: CATEGORIES_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
     },
   });
 
@@ -414,6 +625,19 @@ export function useCalendarData(
     [deleteEventMutation],
   );
 
+  const editRecurringEvent = useCallback(
+    (input: EditRecurringEventInput) =>
+      editRecurringEventMutation.mutateAsync(input),
+    [editRecurringEventMutation],
+  );
+
+  const deleteRecurringEvent = useCallback(
+    async (input: DeleteRecurringEventInput) => {
+      await deleteRecurringEventMutation.mutateAsync(input);
+    },
+    [deleteRecurringEventMutation],
+  );
+
   const createCalendar = useCallback(
     (calendar: CreateCalendarRequest) =>
       createCalendarMutation.mutateAsync(calendar),
@@ -494,6 +718,8 @@ export function useCalendarData(
       createEvent,
       updateEvent,
       deleteEvent,
+      editRecurringEvent,
+      deleteRecurringEvent,
       createCalendar,
       updateCalendar,
       deleteCalendar,
@@ -531,6 +757,8 @@ export function useCalendarData(
       createEvent,
       updateEvent,
       deleteEvent,
+      editRecurringEvent,
+      deleteRecurringEvent,
       createCalendar,
       updateCalendar,
       deleteCalendar,

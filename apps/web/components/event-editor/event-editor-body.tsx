@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Tag, X } from "lucide-react";
 import { isMailInvitationStagingCalendar } from "@workspace/calendar-core";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import { Input } from "@workspace/ui/components/ui/input";
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/ui/select";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 import type { RecentContactEntry } from "@workspace/calendar-core";
 import { isReservedSystemEmail, normalizeParticipantEmail } from "@workspace/calendar-core";
 
@@ -28,6 +29,7 @@ import type { EventEditorBodyProps } from "./types";
 
 export function EventEditorBody({
   calendars,
+  categories,
   desktop,
   eventForm,
   isViewMode,
@@ -159,6 +161,7 @@ export function EventEditorBody({
     <div className={bodyClass}>
       {isViewMode ? (
         <EventEditorReadView
+          categories={categories}
           eventDateDisplay={eventDateDisplay}
           eventForm={eventForm}
           participantItems={participantItems}
@@ -218,6 +221,52 @@ export function EventEditorBody({
               </SelectContent>
             </Select>
           </EventEditorRow>
+
+          {categories.length > 0 || eventForm.eventCategoryId ? (
+            <EventEditorRow desktop={desktop} icon={Tag} label="Category">
+              <div className="flex items-center gap-1">
+                <Select
+                  value={eventForm.eventCategoryId}
+                  onValueChange={eventForm.setEventCategoryId}
+                >
+                  <SelectTrigger
+                    aria-label="Category"
+                    className={cn(chipClass(desktop), "w-auto max-w-full gap-2 [&>svg]:opacity-60")}
+                  >
+                    <SelectValue placeholder="No category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        <div className="flex items-center gap-2">
+                          <span
+                            aria-hidden
+                            className="size-2.5 rounded-full"
+                            style={{
+                              backgroundColor: getColorSwatchValue(category.color),
+                            }}
+                          />
+                          <span>{category.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {eventForm.eventCategoryId ? (
+                  <SimpleTooltip content="Remove category">
+                    <button
+                      type="button"
+                      aria-label="Remove category"
+                      onClick={() => eventForm.setEventCategoryId("")}
+                      className="tap-target flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </SimpleTooltip>
+                ) : null}
+              </div>
+            </EventEditorRow>
+          ) : null}
 
           <EventEditorOptionalFields
             desktop={desktop}

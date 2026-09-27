@@ -1,27 +1,18 @@
-import { startOfMonth, startOfWeek, addDays } from "date-fns";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 import {
   formatCalendarDayKey,
   formatInstantCalendarDayKey,
+  getMonthGridDays,
+  getWeekdayLabels,
   resolveTimezone,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { resolveCalendarSwatchColor } from "../../lib/calendar-color-utils";
 
-const DAYS_IN_GRID = 42; // 6 rows × 7 columns
 export const MAX_DOTS = 3;
 
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-type Day = 0 | 1 | 2 | 3 | 4 | 5 | 6;
-
 export function getOrderedDayLabels(weekStartDay: number): string[] {
-  const start = ((weekStartDay % 7) + 7) % 7;
-  const labels: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    labels.push(DAY_LABELS[(start + i) % 7]);
-  }
-  return labels;
+  return getWeekdayLabels(weekStartDay, "EEE");
 }
 
 /** 42 dates (6 weeks) starting at the week that contains the first of the month. */
@@ -29,15 +20,7 @@ export function generateGridDates(
   currentDate: Date,
   weekStartDay: number,
 ): Date[] {
-  const monthStart = startOfMonth(currentDate);
-  const weekStartsOn = (((weekStartDay % 7) + 7) % 7) as Day;
-  const gridStart = startOfWeek(monthStart, { weekStartsOn });
-
-  const dates: Date[] = [];
-  for (let i = 0; i < DAYS_IN_GRID; i++) {
-    dates.push(addDays(gridStart, i));
-  }
-  return dates;
+  return getMonthGridDays(currentDate, weekStartDay, { fixedWeeks: true });
 }
 
 export function groupEventsByDay(

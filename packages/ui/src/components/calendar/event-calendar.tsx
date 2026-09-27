@@ -19,6 +19,7 @@ import { EventCalendarContextMenu } from "./event-calendar-context-menu";
 import {
   persistDeletedCalendarEvent,
   persistDraggedCalendarEvent,
+  type MoveRecurringCalendarEvent,
 } from "./event-calendar-mutations";
 import { EventCalendarToolbar } from "./event-calendar-toolbar";
 import { EventCalendarViewStage } from "./event-calendar-views";
@@ -59,6 +60,7 @@ export interface EventCalendarProps {
   error?: { message?: string } | null;
   onCreateEvent?: (event: unknown) => Promise<unknown>;
   onUpdateEvent?: (id: string, event: unknown) => Promise<unknown>;
+  onMoveRecurringEvent?: MoveRecurringCalendarEvent;
   onDeleteEvent?: (id: string) => Promise<void>;
   onCreateCategory?: (category: unknown) => Promise<unknown>;
   onDateRangeChange?: (dateRange: { start: Date; end: Date }) => void;
@@ -99,6 +101,7 @@ export function EventCalendar({
   eventsLoading = false,
   error = null,
   onUpdateEvent,
+  onMoveRecurringEvent,
   onDeleteEvent,
   showWeekNumbers = false,
   compactView = false,
@@ -249,6 +252,8 @@ export function EventCalendar({
       timezone: resolvedTimezone,
       timeFormat,
       updateEvent,
+      moveRecurringEvent: onMoveRecurringEvent,
+      originalEvent: events.find((event) => event.id === updatedEvent.id),
       updatedEvent,
     });
 

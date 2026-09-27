@@ -75,20 +75,17 @@ type ThemePreference = "light" | "dark" | "system";
 
 interface ThemeChangeResult {
   themePreferenceCalled: ThemePreference;
-  backendUpdatePayload: UpdateSettingsRequest;
 }
 
 function handleThemeChange(pref: ThemePreference): ThemeChangeResult {
   return {
     themePreferenceCalled: pref,
-    backendUpdatePayload: { theme: pref },
   };
 }
 
 function handleResetSettings() {
   return {
     backendResetCalled: true,
-    themePreferenceCalled: "system" as ThemePreference,
   };
 }
 
@@ -304,30 +301,23 @@ describe("Optimistic update rollback on error", () => {
 });
 
 describe("Theme switching", () => {
-  it("calls setThemePreference with light", () => {
-    const result = handleThemeChange("light");
-    expect(result.themePreferenceCalled).toBe("light");
-    expect(result.backendUpdatePayload).toEqual({ theme: "light" });
-  });
-
-  it("calls setThemePreference with dark", () => {
-    const result = handleThemeChange("dark");
-    expect(result.themePreferenceCalled).toBe("dark");
-    expect(result.backendUpdatePayload).toEqual({ theme: "dark" });
-  });
-
-  it("calls setThemePreference with system", () => {
-    const result = handleThemeChange("system");
-    expect(result.themePreferenceCalled).toBe("system");
-    expect(result.backendUpdatePayload).toEqual({ theme: "system" });
+  it("keeps theme on this device only", () => {
+    expect(handleThemeChange("light")).toEqual({
+      themePreferenceCalled: "light",
+    });
+    expect(handleThemeChange("dark")).toEqual({
+      themePreferenceCalled: "dark",
+    });
+    expect(handleThemeChange("system")).toEqual({
+      themePreferenceCalled: "system",
+    });
   });
 });
 
 describe("Reset settings", () => {
-  it("resets backend settings and local theme preference together", () => {
+  it("resets account settings without touching device theme", () => {
     const result = handleResetSettings();
     expect(result.backendResetCalled).toBe(true);
-    expect(result.themePreferenceCalled).toBe("system");
   });
 });
 

@@ -11,7 +11,6 @@ import * as WebBrowser from "expo-web-browser";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import {
   buildEmailHtmlDocument,
-  emailHasOwnDarkMode,
   processEmailHtml,
 } from "@workspace/calendar-core/mail-html";
 
@@ -85,7 +84,7 @@ export function HtmlEmailView({
   html,
   isDark,
   theme,
-  blockRemoteImages = false,
+  blockRemoteImages = true,
   blockTrackingPixels = true,
   style,
 }: HtmlEmailViewProps) {
@@ -103,7 +102,6 @@ export function HtmlEmailView({
       processedHtml,
       isDark,
       blockRemoteImages,
-      hasOwnDark: emailHasOwnDarkMode(html),
       mobileViewport: true,
     });
   }, [html, isDark, blockTrackingPixels, blockRemoteImages]);

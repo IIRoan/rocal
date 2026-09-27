@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -17,9 +18,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   DEFAULT_MAIL_LIST_FILTERS,
   applyMailListFilters,
+  buildMailboxFieldSearchFilter,
   countActiveMailListFilters,
   getErrorMessage,
+  hasMailSearchFieldValues,
   type MailListFilters,
+  type MailSearchFieldValues,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
@@ -59,13 +63,17 @@ import {
   useMailMutations,
   useProvisionMailbox,
   useMailRuntime,
+  useMailboxFieldSearch,
   useMailboxMessages,
 } from "../../src/lib/mail/use-mail";
+import { useMailListSettings } from "../../src/hooks/use-mail-list-settings";
+import { useMailUndoToast } from "../../src/hooks/use-mail-undo-toast";
 import { useLabels } from "../../src/lib/mail/use-labels";
 import {
   getMailboxDisplayName,
   getPrimaryMailboxId,
   isDraftMessage,
+  isSpamMailboxRole,
   sortMailboxes,
 } from "../../src/lib/mail/mail-helpers";
 import { filterVisibleMailboxes } from "../../src/lib/mail/mailbox-management";
@@ -78,7 +86,7 @@ import {
   isWebMailAvailable,
   openWebMail,
 } from "../../src/lib/mail/mail-web-bridge";
-import type { JmapEmailMessage } from "../../src/lib/mail/types";
+import type { JmapEmailMessage, JmapMailbox } from "../../src/lib/mail/types";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import { useUserTimezone } from "@workspace/native-core/hooks/use-user-timezone";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
@@ -179,7 +187,11 @@ export default function MailScreen() {
     bulkMarkAsUnread,
     bulkMoveToTrash,
     bulkMoveToMailbox,
+    bulkDestroyMessages,
+    emptyMailbox,
   } = useMailMutations(runtime, resolvedMailboxId);
+  const { settings: listSettings } = useMailListSettings();
+  const showMoveToast = useMailUndoToast(runtime);
   const { labels } = useLabels({
     runtime,
     enabled: provisioned,
@@ -195,9 +207,49 @@ export default function MailScreen() {
   const [listFilters, setListFilters] = useState<MailListFilters>(
     DEFAULT_MAIL_LIST_FILTERS,
   );
+  const [fieldSearch, setFieldSearch] = useState<{
+    fields: MailSearchFieldValues;
+    revision: number;
+  }>({ fields: {}, revision: 0 });
   const timezone = useUserTimezone();
   const timeFormat = useUserTimeFormat();
   const { hiddenIds } = useHiddenMailboxIds();
+
+  const fieldSearchActive = hasMailSearchFieldValues(fieldSearch.fields);
+  const fieldSearchFilter = useMemo(
+    () =>
+      fieldSearchActive && resolvedMailboxId
+        ? buildMailboxFieldSearchFilter(
+            resolvedMailboxId,
+            fieldSearch.fields,
+            listFilters,
+            { timezone, now: new Date() },
+          )
+        : null,
+    [fieldSearch.fields, fieldSearchActive, listFilters, resolvedMailboxId, timezone],
+  );
+  const fieldSearchQuery = useMailboxFieldSearch(
+    runtime,
+    resolvedMailboxId,
+    fieldSearchFilter,
+    fieldSearch.revision,
+  );
+  const searchMessages = useMemo(
+    () => (fieldSearchActive ? (fieldSearchQuery.data?.pages.flatMap((page) => page.messages) ?? []) : []),
+    [fieldSearchActive, fieldSearchQuery.data?.pages],
+  );
+
+  const handleSearchFieldsChange = useCallback(
+    (fields: MailSearchFieldValues) =>
+      setFieldSearch((prev) => ({ fields, revision: prev.revision + 1 })),
+    [],
+  );
+
+  // Toggles fold into the server query, so a new revision keeps each distinct search in its own cache entry.
+  const handleListFiltersChange = useCallback((next: MailListFilters) => {
+    setListFilters(next);
+    setFieldSearch((prev) => ({ ...prev, revision: prev.revision + 1 }));
+  }, []);
 
   const drawerMailboxes = useMemo(
     () =>
@@ -217,6 +269,7 @@ export default function MailScreen() {
   useEffect(() => {
     setSelectedIds(new Set());
     setListFilters(DEFAULT_MAIL_LIST_FILTERS);
+    setFieldSearch((prev) => ({ fields: {}, revision: prev.revision + 1 }));
   }, [resolvedMailboxId]);
 
   const selectedMailbox = runtime?.mailboxes.find(
@@ -227,8 +280,11 @@ export default function MailScreen() {
     : false;
 
   const primaryMessageIds = useMemo(
-    () => new Set(mailboxMessages.map((message) => message.id)),
-    [mailboxMessages],
+    () =>
+      new Set(
+        [...mailboxMessages, ...searchMessages].map((message) => message.id),
+      ),
+    [mailboxMessages, searchMessages],
   );
 
   const allThreadRows = useMemo(
@@ -236,10 +292,12 @@ export default function MailScreen() {
     [mailboxMessages, conversationExtras],
   );
 
-  const listFilterActive = countActiveMailListFilters(listFilters) > 0;
+  const listFilterActive =
+    countActiveMailListFilters(listFilters) > 0 || fieldSearchActive;
   const threadRows = useMemo(() => {
     if (!listFilterActive) return allThreadRows;
-    const filtered = applyMailListFilters(mailboxMessages, listFilters, {
+    const source = fieldSearchActive ? searchMessages : mailboxMessages;
+    const filtered = applyMailListFilters(source, listFilters, {
       now: new Date(),
       timezone,
     });
@@ -247,9 +305,11 @@ export default function MailScreen() {
   }, [
     allThreadRows,
     conversationExtras,
+    fieldSearchActive,
     listFilters,
     listFilterActive,
     mailboxMessages,
+    searchMessages,
     timezone,
   ]);
 
@@ -286,7 +346,7 @@ export default function MailScreen() {
 
   const messageById = useMemo(() => {
     const map = new Map<string, JmapEmailMessage>();
-    for (const message of mailboxMessages) {
+    for (const message of [...mailboxMessages, ...searchMessages]) {
       map.set(message.id, message);
     }
     for (const message of conversationExtras) {
@@ -295,7 +355,7 @@ export default function MailScreen() {
       }
     }
     return map;
-  }, [mailboxMessages, conversationExtras]);
+  }, [mailboxMessages, searchMessages, conversationExtras]);
 
   const unreadSelectedIds = useMemo(
     () => bulkIds.filter((id) => !messageById.get(id)?.keywords?.["$seen"]),
@@ -383,6 +443,7 @@ export default function MailScreen() {
     [runtime?.mailboxes],
   );
   const isInTrash = resolvedMailboxId === trashMailboxId;
+  const isInSpam = isSpamMailboxRole(selectedMailbox?.role);
 
   const handleBulkMarkRead = useCallback(() => {
     if (unreadSelectedIds.length === 0) return;
@@ -424,30 +485,72 @@ export default function MailScreen() {
     });
   }, [readSelectedIds, bulkMarkAsUnread, clearSelection, toast]);
 
-  const handleBulkTrash = useCallback(() => {
+  const handleBulkDeleteForever = useCallback(() => {
     if (bulkIds.length === 0) return;
     setActiveSheetView(null);
+    const ids = bulkIds;
+    Alert.alert(
+      "Delete forever?",
+      ids.length === 1
+        ? "This message will be permanently deleted. This cannot be undone."
+        : `${ids.length} messages will be permanently deleted. This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () =>
+            bulkDestroyMessages.mutate(ids, {
+              onSuccess: () => {
+                clearSelection();
+                toast(
+                  ids.length === 1
+                    ? "Permanently deleted 1 message"
+                    : `Permanently deleted ${ids.length} messages`,
+                );
+              },
+              onError: (error) =>
+                toast(
+                  getErrorMessage(error, "Failed to delete messages."),
+                  "error",
+                ),
+            }),
+        },
+      ],
+    );
+  }, [bulkDestroyMessages, bulkIds, clearSelection, toast]);
+
+  const handleBulkTrash = useCallback(() => {
+    if (bulkIds.length === 0) return;
+    if (isInTrash) {
+      handleBulkDeleteForever();
+      return;
+    }
+    setActiveSheetView(null);
+    const count = bulkIds.length;
     bulkMoveToTrash.mutate(bulkIds, {
-      onSuccess: () => {
+      onSuccess: (_data, _ids, snapshot) => {
         clearSelection();
-        toast(
-          isInTrash
-            ? `Deleted ${bulkIds.length} messages`
-            : `Moved ${bulkIds.length} to trash`,
+        showMoveToast(
+          count === 1 ? "Moved 1 to trash" : `Moved ${count} to trash`,
+          snapshot,
         );
       },
       onError: (error) =>
         toast(
-          getErrorMessage(
-            error,
-            isInTrash
-              ? "Failed to delete messages."
-              : "Failed to move messages to trash.",
-          ),
+          getErrorMessage(error, "Failed to move messages to trash."),
           "error",
         ),
     });
-  }, [bulkIds, bulkMoveToTrash, clearSelection, isInTrash, toast]);
+  }, [
+    bulkIds,
+    bulkMoveToTrash,
+    clearSelection,
+    handleBulkDeleteForever,
+    isInTrash,
+    showMoveToast,
+    toast,
+  ]);
 
   const handleBulkMove = useCallback(
     (targetMailboxId: string) => {
@@ -458,17 +561,65 @@ export default function MailScreen() {
       bulkMoveToMailbox.mutate(
         { messageIds: bulkIds, targetMailboxId },
         {
-          onSuccess: () => {
+          onSuccess: (_data, _input, snapshot) => {
             clearSelection();
             setActiveSheetView(null);
-            toast(`Moved ${bulkIds.length} to ${targetName}`);
+            showMoveToast(`Moved ${bulkIds.length} to ${targetName}`, snapshot);
           },
           onError: (error) =>
             toast(getErrorMessage(error, "Failed to move messages."), "error"),
         },
       );
     },
-    [bulkIds, bulkMoveToMailbox, clearSelection, runtime?.mailboxes, toast],
+    [
+      bulkIds,
+      bulkMoveToMailbox,
+      clearSelection,
+      runtime?.mailboxes,
+      showMoveToast,
+      toast,
+    ],
+  );
+
+  const [emptyingMailboxId, setEmptyingMailboxId] = useState<string | null>(
+    null,
+  );
+
+  const handleEmptyMailbox = useCallback(
+    (mailbox: JmapMailbox) => {
+      const name = getMailboxDisplayName(mailbox);
+      Alert.alert(
+        `Empty ${name}?`,
+        `Every message in ${name} will be permanently deleted. This cannot be undone.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Empty",
+            style: "destructive",
+            onPress: () => {
+              setEmptyingMailboxId(mailbox.id);
+              emptyMailbox.mutate(mailbox.id, {
+                onSuccess: (count) =>
+                  toast(
+                    count === 0
+                      ? "Folder is already empty."
+                      : count === 1
+                        ? "Permanently deleted 1 message."
+                        : `Permanently deleted ${count} messages.`,
+                  ),
+                onError: (error) =>
+                  toast(
+                    getErrorMessage(error, `Failed to empty ${name}.`),
+                    "error",
+                  ),
+                onSettled: () => setEmptyingMailboxId(null),
+              });
+            },
+          },
+        ],
+      );
+    },
+    [emptyMailbox, toast],
   );
 
   const [bulkActionPending, setBulkActionPending] = useState(false);
@@ -479,6 +630,7 @@ export default function MailScreen() {
     bulkMarkAsUnread.isPending ||
     bulkMoveToTrash.isPending ||
     bulkMoveToMailbox.isPending ||
+    bulkDestroyMessages.isPending ||
     toggleFlagged.isPending ||
     setMessageLabel.isPending;
 
@@ -572,16 +724,20 @@ export default function MailScreen() {
   const handleSwipeTrash = useCallback(
     (ids: string[]) => {
       if (ids.length === 0) return;
-      return bulkMoveToTrash.mutateAsync(ids).then(
-        () => toast("Moved to trash"),
-        (error: unknown) =>
-          toast(
-            getErrorMessage(error, "Failed to move message to trash."),
-            "error",
-          ),
-      );
+      return new Promise<void>((resolve) => {
+        bulkMoveToTrash.mutate(ids, {
+          onSuccess: (_data, _ids, snapshot) =>
+            showMoveToast("Moved to trash", snapshot),
+          onError: (error) =>
+            toast(
+              getErrorMessage(error, "Failed to move message to trash."),
+              "error",
+            ),
+          onSettled: () => resolve(),
+        });
+      });
     },
-    [bulkMoveToTrash, toast],
+    [bulkMoveToTrash, showMoveToast, toast],
   );
 
   const bulkSheetSnapPoints = useMemo(() => {
@@ -597,8 +753,15 @@ export default function MailScreen() {
       selectionActive,
       selectedKey: Array.from(selectedIds).sort().join(","),
       previewKey: Object.keys(decryptedPreviews).sort().join(","),
+      listSettings,
     }),
-    [resolvedMailboxId, selectionActive, selectedIds, decryptedPreviews],
+    [
+      resolvedMailboxId,
+      selectionActive,
+      selectedIds,
+      decryptedPreviews,
+      listSettings,
+    ],
   );
 
   const renderItem = useCallback(
@@ -648,6 +811,9 @@ export default function MailScreen() {
             selected={isRowSelected}
             timeFormat={timeFormat}
             timezone={timezone}
+            density={listSettings.density}
+            showLabelChips={listSettings.showLabelChipsInList}
+            threadExpandable={listSettings.threadExpandInList}
             onPress={handleOpenMessage}
             onLongPress={(message) => handleLongPress(message, item.messageIds)}
             onToggleSelect={(message) =>
@@ -673,6 +839,9 @@ export default function MailScreen() {
       decryptedPreviews,
       timeFormat,
       timezone,
+      listSettings.density,
+      listSettings.showLabelChipsInList,
+      listSettings.threadExpandInList,
     ],
   );
 
@@ -692,10 +861,11 @@ export default function MailScreen() {
     [styles.separator],
   );
 
+  const activeMessagesQuery = fieldSearchActive ? fieldSearchQuery : messagesQuery;
   const listFooter = useMemo(
     () => (
       <>
-        {messagesQuery.isFetchingNextPage ? (
+        {activeMessagesQuery.isFetchingNextPage ? (
           <View style={styles.centered}>
             <ActivityIndicator color={theme.colors.primaryBase} />
           </View>
@@ -712,7 +882,7 @@ export default function MailScreen() {
       showMailChrome,
       idleListPadding,
       bulkListPadding,
-      messagesQuery.isFetchingNextPage,
+      activeMessagesQuery.isFetchingNextPage,
       styles.centered,
       theme.colors.primaryBase,
     ],
@@ -794,21 +964,21 @@ export default function MailScreen() {
               renderItem={renderItem}
               ItemSeparatorComponent={renderSeparator}
               refreshing={
-                messagesQuery.isFetching &&
-                !messagesQuery.isLoading &&
-                !messagesQuery.isFetchingNextPage
+                activeMessagesQuery.isFetching &&
+                !activeMessagesQuery.isLoading &&
+                !activeMessagesQuery.isFetchingNextPage
               }
               onRefresh={() => {
                 void runtimeQuery.refetch();
-                void messagesQuery.refetch();
+                void activeMessagesQuery.refetch();
                 void companionMessagesQuery.refetch();
               }}
               onEndReached={() => {
                 if (
-                  messagesQuery.hasNextPage &&
-                  !messagesQuery.isFetchingNextPage
+                  activeMessagesQuery.hasNextPage &&
+                  !activeMessagesQuery.isFetchingNextPage
                 ) {
-                  void messagesQuery.fetchNextPage();
+                  void activeMessagesQuery.fetchNextPage();
                 }
               }}
               onEndReachedThreshold={0.4}
@@ -817,7 +987,8 @@ export default function MailScreen() {
               }
               ListFooterComponent={listFooter}
               ListEmptyComponent={
-                messagesQuery.isPending && !messagesQuery.data ? (
+                (messagesQuery.isPending && !messagesQuery.data) ||
+                (fieldSearchActive && fieldSearchQuery.isPending) ? (
                   <CenteredLoader theme={theme} />
                 ) : (
                   <View style={styles.centered}>
@@ -827,9 +998,14 @@ export default function MailScreen() {
                       color={theme.colors.mutedForeground}
                     />
                     <Text style={styles.mutedText}>
-                      {listFilterActive
-                        ? "No messages match this filter"
-                        : "No messages here"}
+                      {fieldSearchActive && fieldSearchQuery.isError
+                        ? getErrorMessage(
+                            fieldSearchQuery.error,
+                            "Search failed. Try again.",
+                          )
+                        : listFilterActive
+                          ? "No messages match this filter"
+                          : "No messages here"}
                     </Text>
                   </View>
                 )
@@ -874,6 +1050,8 @@ export default function MailScreen() {
                 showStar={unflaggedSelectedIds.length > 0}
                 showUnstar={flaggedSelectedIds.length > 0}
                 showMove={bulkMoveTargets.length > 0}
+                showDeleteForever={isInTrash || isInSpam}
+                onDeleteForever={handleBulkDeleteForever}
                 onStar={() => void handleBulkStar()}
                 onUnstar={() => void handleBulkUnstar()}
                 onLabels={() => setActiveSheetView("bulkLabel")}
@@ -906,12 +1084,17 @@ export default function MailScreen() {
         mailboxes={drawerMailboxes}
         selectedMailboxId={resolvedMailboxId}
         onSelectMailbox={handleSelectMailbox}
+        onEmptyMailbox={handleEmptyMailbox}
+        emptyingMailboxId={emptyingMailboxId}
       />
 
       <MailFilterSheet
+        key={resolvedMailboxId ?? "mailbox"}
         visible={filterOpen}
         filters={listFilters}
-        onFiltersChange={setListFilters}
+        onFiltersChange={handleListFiltersChange}
+        searchFields={fieldSearch.fields}
+        onSearchFieldsChange={handleSearchFieldsChange}
         labels={labels}
         resultCount={threadRows.length}
         onDismiss={() => setFilterOpen(false)}

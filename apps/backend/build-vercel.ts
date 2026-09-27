@@ -10,6 +10,14 @@ const backendRoot = import.meta.dir;
 const outdir = join(backendRoot, "dist/vercel");
 const prismaDir = join(backendRoot, "generated/prisma");
 
+// Migrate only on Vercel production builds: Preview and local .env share the prod DB.
+if (process.env.VERCEL_ENV === "production") {
+  const migrate = await Bun.$`bun run db:deploy`.cwd(backendRoot);
+  if (migrate.exitCode !== 0) {
+    process.exit(migrate.exitCode ?? 1);
+  }
+}
+
 const generate = await Bun.$`bun run db:generate`.cwd(backendRoot);
 if (generate.exitCode !== 0) {
   process.exit(generate.exitCode ?? 1);

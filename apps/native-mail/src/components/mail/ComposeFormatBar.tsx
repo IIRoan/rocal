@@ -16,6 +16,8 @@ import { MAIL_LAYOUT, useMailSkin, type MailSkin } from "@workspace/native-core/
 type ComposeFormatBarProps = {
   draftSaveStatus: DraftSaveStatus;
   hasSignature: boolean;
+  /** Plain-text compose sends no HTML, so the formatting buttons are hidden. */
+  plainTextMode?: boolean;
   onBold: () => void;
   onItalic: () => void;
   onUnderline: () => void;
@@ -26,6 +28,7 @@ type ComposeFormatBarProps = {
 export function ComposeFormatBar({
   draftSaveStatus,
   hasSignature,
+  plainTextMode = false,
   onBold,
   onItalic,
   onUnderline,
@@ -43,40 +46,44 @@ export function ComposeFormatBar({
   return (
     <View style={styles.formatBar}>
       <View style={styles.formatToolbar}>
-        <Pressable
-          onPressIn={onBold}
-          accessibilityRole="button"
-          accessibilityLabel="Bold"
-          style={buttonStyle}
-        >
-          <Text style={styles.formatButtonText}>B</Text>
-        </Pressable>
-        <Pressable
-          onPressIn={onItalic}
-          accessibilityRole="button"
-          accessibilityLabel="Italic"
-          style={buttonStyle}
-        >
-          <Text style={[styles.formatButtonText, styles.formatItalic]}>I</Text>
-        </Pressable>
-        <Pressable
-          onPressIn={onUnderline}
-          accessibilityRole="button"
-          accessibilityLabel="Underline"
-          style={buttonStyle}
-        >
-          <Text style={[styles.formatButtonText, styles.formatUnderline]}>
-            U
-          </Text>
-        </Pressable>
-        <Pressable
-          onPressIn={onList}
-          accessibilityRole="button"
-          accessibilityLabel="List"
-          style={buttonStyle}
-        >
-          <Feather name="list" size={16} color={theme.colors.foreground} />
-        </Pressable>
+        {plainTextMode ? null : (
+          <>
+            <Pressable
+              onPressIn={onBold}
+              accessibilityRole="button"
+              accessibilityLabel="Bold"
+              style={buttonStyle}
+            >
+              <Text style={styles.formatButtonText}>B</Text>
+            </Pressable>
+            <Pressable
+              onPressIn={onItalic}
+              accessibilityRole="button"
+              accessibilityLabel="Italic"
+              style={buttonStyle}
+            >
+              <Text style={[styles.formatButtonText, styles.formatItalic]}>I</Text>
+            </Pressable>
+            <Pressable
+              onPressIn={onUnderline}
+              accessibilityRole="button"
+              accessibilityLabel="Underline"
+              style={buttonStyle}
+            >
+              <Text style={[styles.formatButtonText, styles.formatUnderline]}>
+                U
+              </Text>
+            </Pressable>
+            <Pressable
+              onPressIn={onList}
+              accessibilityRole="button"
+              accessibilityLabel="List"
+              style={buttonStyle}
+            >
+              <Feather name="list" size={16} color={theme.colors.foreground} />
+            </Pressable>
+          </>
+        )}
         {hasSignature ? (
           <Pressable
             onPress={onInsertSignature}

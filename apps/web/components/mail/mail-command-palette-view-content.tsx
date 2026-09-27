@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Monitor, Moon, Shield, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 import type { UnifiedSearchResult } from "@workspace/calendar-core";
 import type { UserSettings } from "@/lib/types/calendar";
 import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
@@ -100,18 +101,12 @@ export type MailCommandPaletteViewContentProps = {
   onDeleteLabel?: (id: string) => Promise<void>;
 };
 
-function MailAppearanceView({
-  goBack,
-  localSettings,
-  updateSetting,
-}: {
-  goBack: () => void;
-  localSettings: UserSettings | null;
-  updateSetting: <K extends keyof UserSettings>(
-    key: K,
-    value: UserSettings[K],
-  ) => Promise<void>;
-}) {
+function MailAppearanceView({ goBack }: { goBack: () => void }) {
+  const { theme, setTheme } = useTheme();
+  const currentTheme =
+    theme === "light" || theme === "dark" || theme === "system"
+      ? theme
+      : "system";
   const themeOptions = [
     { value: "light" as const, icon: Sun, label: "Light" },
     { value: "dark" as const, icon: Moon, label: "Dark" },
@@ -120,15 +115,15 @@ function MailAppearanceView({
 
   return (
     <PaletteView title="Appearance" onBack={goBack}>
-      <PaletteSection label="Theme">
+      <PaletteSection label="Theme on this device">
         {themeOptions.map((item) => (
           <PaletteNavRow
             key={item.value}
             icon={item.icon}
             label={item.label}
-            onClick={() => void updateSetting("theme", item.value)}
+            onClick={() => setTheme(item.value)}
             trailing={
-              localSettings?.theme === item.value ? (
+              currentTheme === item.value ? (
                 <Check className="size-4 shrink-0 text-foreground" />
               ) : null
             }
@@ -232,13 +227,7 @@ export function MailCommandPaletteViewContent(
   }
 
   if (currentView === "appearance") {
-    return (
-      <MailAppearanceView
-        goBack={goBack}
-        localSettings={localSettings}
-        updateSetting={updateSetting}
-      />
-    );
+    return <MailAppearanceView goBack={goBack} />;
   }
 
   if (currentView === "time-region" || currentView === "timezone") {

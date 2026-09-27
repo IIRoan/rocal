@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -14,7 +14,7 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { Feather, FontAwesome } from "@expo/vector-icons";
-import type { TimeFormat } from "@workspace/calendar-core";
+import type { ListDensity, TimeFormat } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import {
@@ -72,6 +72,9 @@ interface MailMessageRowProps {
   selected?: boolean;
   timeFormat: TimeFormat;
   timezone?: string;
+  density?: ListDensity;
+  showLabelChips?: boolean;
+  threadExpandable?: boolean;
   onPress: (message: JmapEmailMessage) => void;
   onLongPress?: (message: JmapEmailMessage) => void;
   onToggleSelect?: (message: JmapEmailMessage) => void;
@@ -91,6 +94,9 @@ function MailMessageRowComponent({
   selected = false,
   timeFormat,
   timezone,
+  density = "compact",
+  showLabelChips = true,
+  threadExpandable = false,
   onPress,
   onLongPress,
   onToggleSelect,
@@ -98,6 +104,8 @@ function MailMessageRowComponent({
   const { theme } = useTheme();
   const skin = useMailSkin();
   const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
+  const [threadExpanded, setThreadExpanded] = useState(false);
+  const comfortable = density === "comfortable";
 
   const read =
     threadCount > 1 ? threadUnreadCount === 0 : isMessageRead(message);
@@ -113,8 +121,18 @@ function MailMessageRowComponent({
   const previewRaw = previewOverride?.trim() || listPreviewSnippet(message);
   const preview =
     previewRaw === ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER ? "" : previewRaw;
-  const visibleLabels = messageLabels.slice(0, MAX_VISIBLE_LABELS);
-  const extraLabelCount = messageLabels.length - visibleLabels.length;
+  const visibleLabels = showLabelChips
+    ? messageLabels.slice(0, MAX_VISIBLE_LABELS)
+    : EMPTY_LABELS;
+  const extraLabelCount = showLabelChips
+    ? messageLabels.length - visibleLabels.length
+    : 0;
+  const canExpandThread =
+    threadExpandable && threadCount > 1 && (threadMessages?.length ?? 0) > 1;
+  const earlierMessages =
+    canExpandThread && threadExpanded && threadMessages
+      ? threadMessages.filter((entry) => entry.id !== message.id)
+      : null;
 
   const selectedProgress = useSharedValue(selected ? 1 : 0);
 
@@ -149,6 +167,7 @@ function MailMessageRowComponent({
       delayLongPress={350}
       style={({ pressed }) => [
         styles.row,
+        comfortable && styles.rowComfortable,
         selected && styles.rowSelected,
         pressed && styles.rowPressed,
       ]}
@@ -189,7 +208,30 @@ function MailMessageRowComponent({
             >
               {name}
             </Text>
-            {threadCount > 1 ? (
+            {canExpandThread ? (
+              <Pressable
+                onPress={() => setThreadExpanded((prev) => !prev)}
+                hitSlop={10}
+                style={({ pressed }) => [
+                  styles.threadToggle,
+                  pressed && styles.threadTogglePressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  threadExpanded
+                    ? "Collapse conversation"
+                    : `Show ${threadCount} messages`
+                }
+                accessibilityState={{ expanded: threadExpanded }}
+              >
+                <Text style={styles.threadCount}>{threadCount}</Text>
+                <Feather
+                  name={threadExpanded ? "chevron-up" : "chevron-down"}
+                  size={MAIL_ICON.rowMeta}
+                  color={skin.textTertiary}
+                />
+              </Pressable>
+            ) : threadCount > 1 ? (
               <Text style={styles.threadCount}>{threadCount}</Text>
             ) : null}
             {!read ? <View style={styles.unreadDot} /> : null}
@@ -230,7 +272,7 @@ function MailMessageRowComponent({
         </Text>
 
         {preview ? (
-          <Text style={styles.preview} numberOfLines={1}>
+          <Text style={styles.preview} numberOfLines={comfortable ? 2 : 1}>
             {preview}
           </Text>
         ) : null}
@@ -247,6 +289,47 @@ function MailMessageRowComponent({
             {extraLabelCount > 0 ? (
               <Text style={styles.labelOverflow}>+{extraLabelCount}</Text>
             ) : null}
+          </View>
+        ) : null}
+
+        {earlierMessages ? (
+          <View style={styles.threadList}>
+            {earlierMessages.map((entry) => {
+              const entryRead = isMessageRead(entry);
+              const entryName = formatAddress(
+                showRecipient ? entry.to : entry.from,
+              );
+              return (
+                <Pressable
+                  key={entry.id}
+                  onPress={() => onPress(entry)}
+                  disabled={selectionActive}
+                  style={({ pressed }) => [
+                    styles.threadItem,
+                    pressed && styles.threadItemPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${entryRead ? "" : "Unread, "}${entryName}`}
+                >
+                  {!entryRead ? <View style={styles.unreadDot} /> : null}
+                  <Text
+                    style={[
+                      styles.threadItemSender,
+                      !entryRead && styles.senderUnread,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {entryName}
+                  </Text>
+                  <Text style={styles.date}>
+                    {formatMessageDate(entry.receivedAt, {
+                      timeFormat,
+                      timezone,
+                    })}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         ) : null}
       </View>
@@ -267,8 +350,37 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       paddingVertical: pad.rowV,
       backgroundColor: theme.colors.background,
     },
+    rowComfortable: {
+      paddingVertical: pad.rowV + theme.spacing["1"],
+    },
     rowSelected: {
       backgroundColor: skin.selected,
+    },
+    threadToggle: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 2,
+      minHeight: 24,
+      paddingHorizontal: pad.tight,
+      borderRadius: theme.borderRadius.sm,
+    },
+    threadTogglePressed: {
+      backgroundColor: skin.pressed,
+    },
+    threadList: {
+      marginTop: pad.tight + 2,
+      borderLeftWidth: StyleSheet.hairlineWidth,
+      borderLeftColor: skin.borderPrimary,
+    },
+    threadItem: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: pad.tight + 2,
+      minHeight: 36,
+      paddingLeft: pad.rowGap,
+    },
+    threadItemPressed: {
+      backgroundColor: skin.pressed,
     },
     rowPressed: {
       backgroundColor: skin.pressed,
@@ -354,6 +466,12 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
     subjectUnread: {
       fontWeight: "600" as TextStyle["fontWeight"],
       color: theme.colors.foreground,
+    },
+    threadItemSender: {
+      flex: 1,
+      fontSize: 14,
+      lineHeight: 19,
+      color: skin.textSecondary,
     },
     preview: {
       fontSize: 14,

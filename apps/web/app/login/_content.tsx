@@ -7,7 +7,6 @@ import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
 import { createLogger } from "@workspace/logger";
 import { getAppBaseUrl, resolveAuthRedirectTarget } from "@/lib/api-url";
 import { completeAuthNavigation } from "@/lib/auth-navigation";
-import { useTheme } from "next-themes";
 import { Key, Eye, EyeOff, ArrowRight, Check, X, Ticket } from "lucide-react";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { getErrorMessage } from "@workspace/calendar-core";
@@ -16,7 +15,6 @@ import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
-import { calendarApiService } from "@/lib/calendar-api-service";
 import { accountApiService, inviteApiService } from "@/lib/api-clients";
 import {
   clearPendingAuthPassword,
@@ -385,7 +383,6 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     refetch: refetchSession,
   } = useSession();
   const router = useSmoothRouter();
-  const { theme: currentTheme } = useTheme();
   const isCheckingSession = isPending;
   const { nextPath, callbackUrl, resetSucceeded, stepUpRequired } =
     loginSearchParams;
@@ -521,21 +518,6 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
       minimumVisibleMs: 120,
     });
     completeAuthNavigation(target.href);
-  }
-
-  async function syncThemeAfterAuth() {
-    if (
-      currentTheme &&
-      (currentTheme === "light" ||
-        currentTheme === "dark" ||
-        currentTheme === "system")
-    ) {
-      try {
-        await calendarApiService.updateUserSettings({ theme: currentTheme });
-      } catch {
-        // Settings sync is best-effort — don't block login
-      }
-    }
   }
 
   async function refreshAuthStatus() {
@@ -744,7 +726,6 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
         return;
       }
 
-      await syncThemeAfterAuth();
       redirectAfterCompletedAuth();
       dispatchChrome({ type: "finish-passkey-auth" });
     } catch (error) {
@@ -808,7 +789,6 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
       return false;
     }
 
-    await syncThemeAfterAuth();
     redirectAfterCompletedAuth();
     return true;
   }

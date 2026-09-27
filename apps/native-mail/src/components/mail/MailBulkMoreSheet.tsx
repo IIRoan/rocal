@@ -6,20 +6,24 @@ interface MailBulkMoreSheetProps {
   showStar: boolean;
   showUnstar: boolean;
   showMove: boolean;
+  showDeleteForever: boolean;
   onStar: () => void;
   onUnstar: () => void;
   onLabels: () => void;
   onMove: () => void;
+  onDeleteForever: () => void;
 }
 
 export function MailBulkMoreSheet({
   showStar,
   showUnstar,
   showMove,
+  showDeleteForever,
   onStar,
   onUnstar,
   onLabels,
   onMove,
+  onDeleteForever,
 }: MailBulkMoreSheetProps) {
   return (
     <MailSheetList>
@@ -51,6 +55,16 @@ export function MailBulkMoreSheet({
           label="Move to…"
           accessory="chevron-right"
           onPress={onMove}
+          showDivider
+        />
+      ) : null}
+      {showDeleteForever ? (
+        <SheetRow
+          variant="mail"
+          icon="trash-2"
+          label="Delete forever"
+          destructive
+          onPress={onDeleteForever}
           showDivider
         />
       ) : null}

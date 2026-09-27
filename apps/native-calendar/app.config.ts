@@ -72,7 +72,8 @@ const baseConfig = {
         resizeMode: "contain",
         backgroundColor: "#fafafa",
         dark: {
-          backgroundColor: "#2d2d2d",
+          // Matches nativeDarkTheme background so the splash hands off to the first screen without a color jump.
+          backgroundColor: "#111111",
         },
       },
     ],

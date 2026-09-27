@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -9,7 +9,12 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { getErrorMessage } from "@workspace/calendar-core";
+import {
+  getErrorMessage,
+  resolveMailContentIsDark,
+  resolveReaderRemoteContent,
+} from "@workspace/calendar-core";
+import { emailHtmlHasRemoteContent } from "@workspace/calendar-core/mail-html";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
@@ -22,13 +27,19 @@ import { CalendarInviteBanner } from "./CalendarInviteBanner";
 import { EventReminderMessageBody } from "./EventReminderMessageBody";
 import { EventReminderMessageBodyLoading } from "./EventReminderMessageBodyLoading";
 import { MessageDecryptingSkeleton } from "./MessageDecryptingLoader";
-import { useMailSkin, type MailSkin } from "@workspace/native-core/components/mail/mail-ui";
+import {
+  MAIL_LAYOUT,
+  useMailSkin,
+  type MailSkin,
+} from "@workspace/native-core/components/mail/mail-ui";
+import { useMailDisplaySettings } from "../../hooks/use-mail-settings";
 
 type MailMessageBodyProps = {
   messageId: string;
   content: ReturnType<typeof useMailMessageContent>;
   calendar: ReturnType<typeof useMailMessageCalendar>;
   onOpenEvent: (eventId: string) => void;
+  showOriginalLook: boolean;
 };
 
 export function MailMessageBody({
@@ -36,6 +47,7 @@ export function MailMessageBody({
   content,
   calendar,
   onOpenEvent,
+  showOriginalLook,
 }: MailMessageBodyProps) {
   const { theme } = useTheme();
   const { toast } = useToast();
@@ -52,6 +64,25 @@ export function MailMessageBody({
     linkedEventError,
   } = calendar;
   const { decryptError, decryptResult, htmlContent, plainContent } = content;
+  const { settings: displaySettings, addTrustedSender } = useMailDisplaySettings();
+  const [loadedMessageId, setLoadedMessageId] = useState<string | null>(null);
+  const senderEmail = content.message?.from?.[0]?.email ?? null;
+  const emailIsDark = isDark && resolveMailContentIsDark(displaySettings) && !showOriginalLook;
+  const hasRemoteContent = useMemo(
+    () =>
+      emailHtmlHasRemoteContent({
+        html: htmlContent ?? "",
+        isDark: emailIsDark,
+        blockTrackingPixels: displaySettings.blockTrackingPixels,
+      }),
+    [htmlContent, emailIsDark, displaySettings.blockTrackingPixels],
+  );
+  const remoteContent = resolveReaderRemoteContent({
+    settings: displaySettings,
+    hasRemoteContent,
+    senderEmail,
+    loadedForMessage: loadedMessageId === messageId,
+  });
   const invite = calendarInvitation.mailCalendarInvite;
   const inviteEvent = calendarInvitation.currentCalendarInviteEvent?.event;
   const signatureBadge = decryptResult ? (
@@ -134,11 +165,27 @@ export function MailMessageBody({
       ) : htmlContent ? (
         <>
           {signatureBadge}
+          {remoteContent.prompt ? (
+            <RemoteContentBanner
+              theme={theme}
+              styles={styles}
+              canLoadOnce={remoteContent.prompt.canLoadOnce}
+              canTrustSender={remoteContent.prompt.canTrustSender}
+              onLoadOnce={() => setLoadedMessageId(messageId)}
+              onTrustSender={() => {
+                if (!senderEmail) return;
+                addTrustedSender(senderEmail);
+                setLoadedMessageId(messageId);
+              }}
+            />
+          ) : null}
           <HtmlEmailView
             key={messageId}
             html={htmlContent}
-            isDark={isDark}
+            isDark={emailIsDark}
             theme={theme}
+            blockRemoteImages={remoteContent.blockRemoteImages}
+            blockTrackingPixels={displaySettings.blockTrackingPixels}
           />
         </>
       ) : plainContent ? (
@@ -176,6 +223,63 @@ function DecryptErrorCard({
       <Pressable onPress={onRetry} style={styles.retryButton}>
         <Text style={styles.retryButtonText}>Retry</Text>
       </Pressable>
+    </View>
+  );
+}
+
+function RemoteContentBanner({
+  theme,
+  styles,
+  canLoadOnce,
+  canTrustSender,
+  onLoadOnce,
+  onTrustSender,
+}: {
+  theme: ThemeTokens;
+  styles: ReturnType<typeof createStyles>;
+  canLoadOnce: boolean;
+  canTrustSender: boolean;
+  onLoadOnce: () => void;
+  onTrustSender: () => void;
+}) {
+  return (
+    <View style={styles.remoteBanner}>
+      <View style={styles.remoteBannerMessage}>
+        <Feather name="lock" size={14} color={theme.colors.mutedForeground} />
+        <Text style={styles.remoteBannerText}>Remote images are blocked.</Text>
+      </View>
+      {canLoadOnce || canTrustSender ? (
+        <View style={styles.remoteBannerActions}>
+          {canLoadOnce ? (
+            <Pressable
+              onPress={onLoadOnce}
+              style={({ pressed }) => [
+                styles.remoteBannerButton,
+                pressed && styles.remoteBannerButtonPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Load images for this message"
+            >
+              <Feather name="image" size={14} color={theme.colors.foreground} />
+              <Text style={styles.remoteBannerButtonText}>Load images</Text>
+            </Pressable>
+          ) : null}
+          {canTrustSender ? (
+            <Pressable
+              onPress={onTrustSender}
+              style={({ pressed }) => [
+                styles.remoteBannerButton,
+                pressed && styles.remoteBannerButtonPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Always load images from this sender"
+            >
+              <Feather name="shield" size={14} color={theme.colors.foreground} />
+              <Text style={styles.remoteBannerButtonText}>Trust sender</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -230,6 +334,38 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       borderRadius: theme.borderRadius.md,
       backgroundColor: theme.colors.primaryBase,
     },
+    remoteBanner: {
+      gap: theme.spacing["2"],
+      paddingHorizontal: theme.spacing["3"],
+      paddingVertical: theme.spacing["2"],
+      borderRadius: theme.borderRadius.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.card,
+    },
+    remoteBannerMessage: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["2"],
+    },
+    remoteBannerActions: {
+      flexDirection: "row" as const,
+      flexWrap: "wrap" as const,
+      gap: theme.spacing["2"],
+    },
+    remoteBannerButton: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["1"],
+      minHeight: MAIL_LAYOUT.hitSize,
+      paddingHorizontal: theme.spacing["3"],
+      borderRadius: theme.borderRadius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+    },
+    remoteBannerButtonPressed: {
+      backgroundColor: theme.colors.muted,
+    },
     reminderBodyPlaceholder: {
       alignItems: "center" as const,
       justifyContent: "center" as const,
@@ -264,6 +400,15 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryForeground,
+    },
+    remoteBannerText: {
+      flex: 1,
+      fontSize: theme.typography.fontSize.xs.size,
+      color: theme.colors.mutedForeground,
+    },
+    remoteBannerButtonText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      color: theme.colors.foreground,
     },
     signatureBadgeText: {
       fontSize: theme.typography.fontSize.xs.size,

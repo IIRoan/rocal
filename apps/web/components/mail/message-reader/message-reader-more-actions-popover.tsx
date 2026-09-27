@@ -27,6 +27,9 @@ export function MessageReaderMoreActionsPopover({
     isBusy,
     canReply,
     isFlagged,
+    canShowOriginalLook,
+    showOriginalLook,
+    toggleOriginalLook,
     props,
   } = controller;
   const {
@@ -94,6 +97,16 @@ export function MessageReaderMoreActionsPopover({
       {displayHtml ? (
         <>
           <DropdownDivider />
+          {canShowOriginalLook ? (
+            <DropdownItem
+              icon={showOriginalLook ? Icon.Moon : Icon.Sun}
+              label={showOriginalLook ? "Show in dark mode" : "Show original"}
+              onSelect={() => {
+                toggleOriginalLook();
+                dispatchChrome({ type: "patch", patch: { morePopoverOpen: false } });
+              }}
+            />
+          ) : null}
           <DropdownItem
             icon={Icon.Edit}
             label="View HTML source"

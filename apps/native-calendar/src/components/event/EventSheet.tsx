@@ -18,6 +18,7 @@ import type {
   RecurrenceDeleteScope,
   RecurrenceEditScope,
 } from "@workspace/calendar-core";
+import { EventIcsExportError } from "@workspace/calendar-core/event-ics-export";
 import {
   formatReminderShort,
   getErrorMessage,
@@ -32,6 +33,10 @@ import { useAuth } from "@workspace/native-core/providers/AuthProvider";
 import { useRecentContacts } from "@workspace/native-core/hooks/use-recent-contacts";
 import { useReminderTitleEncryptor } from "../../hooks/use-reminder-title-encryptor";
 import { useEventReminders } from "../../hooks/use-event-reminders";
+import { useCategories } from "../../hooks/use-categories";
+import { shareEventIcs } from "../../lib/event-ics-share";
+import { checkEventRecurrence } from "../../lib/event-recurrence-validation";
+import { resolveCalendarSwatchColor } from "../../lib/calendar-color-utils";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
 import { extractRecentContactEntries } from "@workspace/native-core/lib/record-recent-contacts";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
@@ -45,6 +50,7 @@ import {
   findCachedEvent,
   generateOptimisticId,
   invalidateEventRanges,
+  isOptimisticId,
   optimisticallyInsertEvent,
   optimisticallyRemoveEvent,
   rollbackFromSnapshot,
@@ -73,7 +79,10 @@ import {
 } from "./EventForm";
 import { BlobatarAvatar } from "@workspace/native-core/components/BlobatarAvatar";
 import { EventEditorRow } from "./EventEditorPrimitives";
-import { toTimezonePickerISOString, parseCreateEventCalendarDay } from "./event-form-utils";
+import {
+  parseCreateEventCalendarDay,
+  toTimezonePickerISOString,
+} from "./event-form-utils";
 import {
   formatEventDate,
   formatEventTime,
@@ -117,6 +126,7 @@ function eventToInitialValues(
     location: event.location ?? undefined,
     color: event.color ?? undefined,
     calendarId: event.calendarId,
+    categoryId: event.categoryId ?? undefined,
     reminder: event.reminder ?? undefined,
     recurrence: event.recurrence ?? undefined,
     participants: event.participants?.map((participant) => ({
@@ -184,6 +194,8 @@ export function EventSheet({
   >();
   const [scopeModalVisible, setScopeModalVisible] = useState(false);
   const [scopeAction, setScopeAction] = useState<"edit" | "delete">("edit");
+  const [validatingRecurrence, setValidatingRecurrence] = useState(false);
+  const [exportingIcs, setExportingIcs] = useState(false);
 
   const isCreate = mode?.type === "create";
   const isViewOrEdit = mode?.type === "view" || mode?.type === "edit";
@@ -255,6 +267,7 @@ export function EventSheet({
     queryFn: () => calendarApiService.getUserSettings(),
     enabled: visible,
   });
+  const { data: categories } = useCategories(visible);
   const resolvedTimezone = resolveTimezone(settings?.timezone);
   const timeFormat = useUserTimeFormat();
   const { reminders: eventReminders, isLoading: remindersLoading } =
@@ -421,13 +434,28 @@ export function EventSheet({
     },
   });
 
-  const handleSubmit = useCallback(
-    (submission: EventFormSubmission) => {
+  const submitEvent = useCallback(
+    async (submission: EventFormSubmission) => {
       setServerErrors([]);
+      setValidatingRecurrence(true);
+      const recurrenceError = await checkEventRecurrence(
+        submission.request.recurrence,
+        (rule) => calendarApiService.validateRecurrence(rule),
+      );
+      setValidatingRecurrence(false);
+      if (recurrenceError) {
+        setServerErrors([recurrenceError]);
+        return;
+      }
       if (isCreate) createMutation.mutate(submission);
       else updateMutation.mutate(submission);
     },
     [isCreate, createMutation, updateMutation],
+  );
+
+  const handleSubmit = useCallback(
+    (submission: EventFormSubmission) => void submitEvent(submission),
+    [submitEvent],
   );
 
   const handleCancel = useCallback(() => {
@@ -550,6 +578,7 @@ export function EventSheet({
       (eventLoading && !event) ||
       (sheetViewMode === "edit" && remindersLoading));
   const isPending =
+    validatingRecurrence ||
     createMutation.isPending ||
     updateMutation.isPending ||
     deleteMutation.isPending ||
@@ -563,7 +592,32 @@ export function EventSheet({
         calendarInfo.color as keyof typeof theme.colors.calendar
       ]?.bg ?? calendarInfo.color)
     : theme.colors.calendar.blue.bg;
+  const categoryInfo =
+    event?.categoryId && categories
+      ? (categories.find((category) => category.id === event.categoryId) ?? null)
+      : null;
   const viewActions = resolveEventSheetViewActions(event);
+  const canExportIcs = !!event && !isOptimisticId(event.id);
+
+  const handleExportIcs = useCallback(async () => {
+    if (!event) return;
+    setExportingIcs(true);
+    try {
+      await shareEventIcs(event, {
+        calendarName: calendarInfo?.name,
+        timezone: resolvedTimezone,
+      });
+    } catch (err: unknown) {
+      toast(
+        err instanceof EventIcsExportError
+          ? err.message
+          : getErrorMessage(err, "Failed to export event"),
+        "error",
+      );
+    } finally {
+      setExportingIcs(false);
+    }
+  }, [event, calendarInfo?.name, resolvedTimezone, toast]);
   const showFormHeader = !isLoading && sheetViewMode === "edit";
   const sheetTitle = viewMode === "edit" ? "Edit event" : "Event";
 
@@ -609,7 +663,31 @@ export function EventSheet({
           </BottomSheetHeader>
         ) : (
           <BottomSheetHeader>
-            <BottomSheetTitle>{sheetTitle}</BottomSheetTitle>
+            <View style={styles.viewHeaderRow}>
+              <BottomSheetTitle style={styles.viewHeaderTitle}>
+                {sheetTitle}
+              </BottomSheetTitle>
+              {sheetViewMode === "view" && canExportIcs && bodyReady && !isLoading ? (
+                <Pressable
+                  onPress={() => void handleExportIcs()}
+                  disabled={exportingIcs}
+                  hitSlop={8}
+                  style={({ pressed }) => [
+                    styles.headerIconButton,
+                    (pressed || exportingIcs) && styles.headerIconButtonPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Export .ics"
+                  accessibilityState={{ disabled: exportingIcs }}
+                >
+                  <Feather
+                    name="share"
+                    size={18}
+                    color={theme.colors.foreground}
+                  />
+                </Pressable>
+              ) : null}
+            </View>
           </BottomSheetHeader>
         )}
         {!bodyReady ? (
@@ -692,6 +770,27 @@ export function EventSheet({
                       />
                       <Text style={styles.viewText} numberOfLines={1}>
                         {calendarInfo.name}
+                      </Text>
+                    </View>
+                  </EventEditorRow>
+                ) : null}
+
+                {categoryInfo ? (
+                  <EventEditorRow icon="tag" label="Category">
+                    <View style={styles.viewInlineRow}>
+                      <View
+                        style={[
+                          styles.calendarDot,
+                          {
+                            backgroundColor: resolveCalendarSwatchColor(
+                              categoryInfo.color,
+                              theme,
+                            ),
+                          },
+                        ]}
+                      />
+                      <Text style={styles.viewText} numberOfLines={1}>
+                        {categoryInfo.name}
                       </Text>
                     </View>
                   </EventEditorRow>
@@ -851,6 +950,7 @@ export function EventSheet({
                 isCreate ? "create" : `edit-${eventId}-${editScope ?? "none"}`
               }
               calendars={calendars ?? []}
+              categories={categories}
               serverErrors={serverErrors}
               isSubmitting={isPending}
               onSubmit={handleSubmit}
@@ -987,6 +1087,21 @@ function createStyles(theme: ThemeTokens) {
       flex: 1,
       minHeight: 0,
     },
+    viewHeaderRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["2"],
+    },
+    headerIconButton: {
+      width: 36,
+      height: 36,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      borderRadius: theme.borderRadius.full,
+    },
+    headerIconButtonPressed: {
+      backgroundColor: theme.colors.accent,
+    },
     formHeader: {
       paddingVertical: theme.spacing["2"],
       borderBottomWidth: 0,
@@ -1073,6 +1188,9 @@ function createStyles(theme: ThemeTokens) {
     },
     rsvpButtonTextSelected: {
       color: theme.colors.primaryBase,
+    },
+    viewHeaderTitle: {
+      flex: 1,
     },
     viewEventTitle: {
       flex: 1,

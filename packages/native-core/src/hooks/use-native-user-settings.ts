@@ -8,12 +8,10 @@ import { getErrorMessage } from "@workspace/calendar-core";
 import { calendarApiService } from "../lib/api";
 import { QUERY_KEYS } from "../lib/query-keys";
 import { useToast } from "../providers/ToastProvider";
-import { useTheme } from "../providers/ThemeProvider";
 
 export function useNativeUserSettings() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { setThemePreference } = useTheme();
   const [pendingKeys, setPendingKeys] = useState<Set<string>>(new Set());
 
   const query = useQuery({
@@ -63,7 +61,6 @@ export function useNativeUserSettings() {
   const resetSettingsMutation = useMutation({
     mutationFn: () => calendarApiService.resetUserSettings(),
     onSuccess: () => {
-      setThemePreference("system");
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });

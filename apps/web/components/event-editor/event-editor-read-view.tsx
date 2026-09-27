@@ -24,12 +24,14 @@ import {
   MapPin,
   RefreshCw,
   Server,
+  Tag,
   Users,
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 
 import { SolaceAvatar } from "../solace-avatar";
 import { stopEventPropagation } from "@/lib/event-propagation";
+import type { EventCategory } from "@workspace/calendar-core";
 import { formatReminderMinutes } from "@/lib/event-editor-view-model";
 import type { EventEditorFormState } from "./types";
 import { formatParticipantStatus } from "./event-editor-participant-utils";
@@ -107,6 +109,7 @@ function SyncedEventInfoBadge() {
 }
 
 export function EventEditorReadView({
+  categories,
   eventDateDisplay,
   eventForm,
   participantItems,
@@ -114,6 +117,7 @@ export function EventEditorReadView({
   reminderMinutes,
   selectedCalendar,
 }: {
+  categories: EventCategory[];
   eventDateDisplay: PickerDateRangeDisplay;
   eventForm: EventEditorFormState;
   participantItems: Array<
@@ -128,6 +132,13 @@ export function EventEditorReadView({
     : false;
 
   const swatch = getColorSwatchValue(selectedCalendar?.color || "blue");
+  const categoryId =
+    eventForm.eventCategoryId || eventForm.selectedEvent?.categoryId || null;
+  const category = categoryId
+    ? (categories.find((entry) => entry.id === categoryId) ??
+      eventForm.selectedEvent?.category ??
+      null)
+    : null;
 
   return (
     <div className="space-y-3 py-1">
@@ -205,6 +216,19 @@ export function EventEditorReadView({
             </span>
           </div>
         </EventEditorRow>
+
+        {category ? (
+          <EventEditorRow desktop icon={Tag} label="Category">
+            <div className="flex min-h-9 items-center gap-2 text-sm text-foreground">
+              <span
+                aria-hidden
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: getColorSwatchValue(category.color) }}
+              />
+              <span className="truncate">{category.name}</span>
+            </div>
+          </EventEditorRow>
+        ) : null}
 
         {hasOptionalEventParticipants(participantItems) && (
           <EventEditorRow desktop icon={Users} label="Participants">

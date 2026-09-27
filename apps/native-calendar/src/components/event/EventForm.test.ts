@@ -295,6 +295,20 @@ describe("buildEventRequest", () => {
     ]);
   });
 
+  it("sends an empty categoryId so updates can clear the category", () => {
+    const result = buildEventRequest({
+      title: "Event",
+      start: "2025-06-15T09:00",
+      end: "2025-06-15T10:00",
+      calendarId: "cal-1",
+      allDay: false,
+      location: "",
+      description: "",
+      categoryId: "",
+    });
+    expect(result.categoryId).toBe("");
+  });
+
   it("preserves an explicitly empty participant list so updates can clear attendees", () => {
     const result = buildEventRequest({
       title: "Planning sync",

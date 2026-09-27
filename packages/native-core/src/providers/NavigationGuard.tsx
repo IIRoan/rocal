@@ -13,12 +13,14 @@ import {
   shouldRenderAuthenticatedChrome,
 } from "../lib/auth-routing";
 import { API_BASE_URL } from "../lib/constants";
+import { hideLaunchSplash } from "../lib/launch-splash";
 import { captureException } from "../lib/reporting";
 import { resetPreSessionQueries } from "../lib/session-query-reset";
 import {
   useNotificationExtensionSync,
   type NotificationExtensionSecrets,
 } from "../hooks/use-notification-extension-sync";
+import { useAccountTimezoneSeed } from "../hooks/use-account-timezone-seed";
 import {
   STARTUP_CRYPTO_INITIAL_PHASE,
   type AuthenticatedSessionInput,
@@ -46,12 +48,17 @@ export function NavigationGuard({
   const { isAuthenticated, isLoading, user } = useAuth();
   const { isReady: isE2eeReady, bootstrap, clearSession, provider } = useE2ee();
   useNotificationExtensionSync(notificationExtensionSecrets);
+  useAccountTimezoneSeed(isAuthenticated && Boolean(user));
   const queryClient = useQueryClient();
   const segments = useSegments();
   const router = useRouter();
   const [isPreparingStartupCrypto, setIsPreparingStartupCrypto] =
     useState(false);
   const [setupMessage, setSetupMessage] = useState(STARTUP_CRYPTO_INITIAL_PHASE);
+
+  useEffect(() => {
+    if (!isLoading) hideLaunchSplash();
+  }, [isLoading]);
 
   useEffect(() => {
     const redirectPath = getAuthRedirectPath({

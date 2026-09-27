@@ -1,6 +1,9 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
+import { Copy } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@workspace/ui/components/ui/button";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { fadeInMailReaderContent } from "../mail-app/mail-reader-transition";
 import {
@@ -34,6 +37,15 @@ export function MessageReaderShell({
     "";
   const rootRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
+
+  const handleCopySource = async () => {
+    try {
+      await navigator.clipboard.writeText(displayHtml);
+      toast.success("Copied");
+    } catch {
+      toast.error("Failed to copy");
+    }
+  };
 
   // Toolbar stays put; only the message content fades (WAAPI, so it stays on the compositor), making a switch read as new content in a fixed frame.
   useLayoutEffect(() => {
@@ -75,8 +87,12 @@ export function MessageReaderShell({
           className="flex flex-col w-[90vw] max-w-4xl max-h-[80vh]"
           variant="center"
         >
-          <DialogHeader className="shrink-0 px-6 pt-6 pb-4 border-b border-border/60">
+          <DialogHeader className="shrink-0 flex-row items-center justify-between gap-3 px-6 pt-6 pb-4 pr-12 border-b border-border/60">
             <DialogTitle className="text-base">HTML source</DialogTitle>
+            <Button variant="outline" size="sm" onClick={handleCopySource} disabled={!displayHtml}>
+              <Copy />
+              Copy source
+            </Button>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-auto px-6 py-4">
             <pre className="text-xs font-mono text-foreground/80 whitespace-pre-wrap break-all select-all">

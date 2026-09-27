@@ -3,6 +3,9 @@ import {
   recurrenceRuleSchema,
   recurrenceScopeSchema,
   optionalCalendarColorSchema,
+  timezoneSchema,
+  eventParticipantInputSchema,
+  eventInvitationContentSchema,
 } from "@workspace/calendar-core";
 import type { RecurrenceRule } from "../lib/recurrence";
 import { strictZodObject } from "../lib/validation";
@@ -39,6 +42,9 @@ export const editRecurringEventBodySchema = strictZodObject({
     recurrence: z.string().optional(),
     calendarId: z.string().optional(),
     categoryId: z.string().optional(),
+    timezone: timezoneSchema.optional(),
+    participants: z.array(eventParticipantInputSchema).optional(),
+    invitationContent: eventInvitationContentSchema.optional(),
     ...eventContentEncryptionFieldsSchema.shape,
   }).superRefine(refineEncryptedEventContentBody({ requireTitle: false })),
 });

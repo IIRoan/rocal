@@ -1,5 +1,6 @@
 import React from "react";
 import { Sun, Moon, Monitor, Layout, Check } from "lucide-react";
+import { useTheme } from "next-themes";
 import type { UserSettings } from "@/lib/types/calendar";
 import { CALENDAR_VIEWS } from "@workspace/ui/components/calendar";
 import { PaletteNavRow, PaletteSection, PaletteView } from "./palette-ui";
@@ -23,16 +24,21 @@ export function AppearanceSettings({
   updateSetting,
   goBack,
 }: AppearanceSettingsProps) {
+  const { theme, setTheme } = useTheme();
+  const currentTheme = theme === "light" || theme === "dark" || theme === "system"
+    ? theme
+    : "system";
+
   return (
     <PaletteView title="Appearance" onBack={goBack}>
-      <PaletteSection label="Theme">
+      <PaletteSection label="Theme on this device">
         {THEME_OPTIONS.map((item) => (
           <PaletteNavRow
             key={item.value}
             icon={item.icon}
             label={item.label}
-            onClick={() => updateSetting("theme", item.value)}
-            trailing={localSettings.theme === item.value ? selectedCheck : null}
+            onClick={() => setTheme(item.value)}
+            trailing={currentTheme === item.value ? selectedCheck : null}
           />
         ))}
       </PaletteSection>

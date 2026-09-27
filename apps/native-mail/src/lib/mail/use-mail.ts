@@ -30,7 +30,16 @@ import {
   type MailboxMessagesCacheData,
   type MailboxMessagesPage,
 } from "./mail-message-cache";
-import type { JmapEmailMessage, LabelDef } from "./types";
+import {
+  beginOptimisticMove,
+  invalidateMoveLists,
+  reinsertUndoneMessages,
+  rollbackOptimisticMove,
+  type MailMoveSnapshot,
+} from "./mail-move-cache";
+import type { JmapEmailMessage } from "./types";
+
+export type { MailMoveSnapshot } from "./mail-move-cache";
 
 const RUNTIME_STALE_MS = 5 * 60_000;
 
@@ -153,12 +162,47 @@ export function useMailboxMessages(
   });
 }
 
+/** Server-side field search; `revision` stands in for the query in the cache key so no search text lands in it. */
+export function useMailboxFieldSearch(
+  runtime: MailRuntime | undefined,
+  mailboxId: string | null,
+  filter: Record<string, unknown> | null,
+  revision: number,
+) {
+  const pageSize = 40;
+  return useInfiniteQuery({
+    initialPageParam: 0,
+    queryKey: QUERY_KEYS.mailSearchMessages(mailboxId, revision),
+    enabled: Boolean(runtime && mailboxId && filter),
+    staleTime: 30_000,
+    queryFn: async ({ pageParam }) => {
+      // Non-null: the query is only enabled once runtime, mailbox, and filter exist.
+      const { messages, total } =
+        await runtime!.client.searchMailboxMessagesWithFilter(
+          runtime!.session,
+          mailboxId!,
+          filter!,
+          pageSize,
+          pageParam,
+        );
+      return { messages: sortMessagesByDate(messages), total, position: pageParam };
+    },
+    getNextPageParam: (lastPage) => {
+      const next = lastPage.position + lastPage.messages.length;
+      if (!lastPage.messages.length) return undefined;
+      return lastPage.total > 0
+        ? (next < lastPage.total ? next : undefined)
+        : (lastPage.messages.length >= pageSize ? next : undefined);
+    },
+  });
+}
+
 export function useCachedMessage(
   messageId: string,
 ): JmapEmailMessage | undefined {
   const queryClient = useQueryClient();
   const lists = queryClient.getQueriesData<MailboxMessagesCacheData>({
-    queryKey: ["mail", "messages"],
+    queryKey: QUERY_KEYS.mailMessagesAll(),
   });
   for (const [, data] of lists) {
     const found = flattenMailboxMessagesCache(data).find(
@@ -190,22 +234,6 @@ export function useMailMessage(
   });
 }
 
-function findCachedMessage(
-  queryClient: ReturnType<typeof useQueryClient>,
-  messageId: string,
-): JmapEmailMessage | undefined {
-  const lists = queryClient.getQueriesData<MailboxMessagesCacheData>({
-    queryKey: ["mail", "messages"],
-  });
-  for (const [, data] of lists) {
-    const found = flattenMailboxMessagesCache(data).find(
-      (message) => message.id === messageId,
-    );
-    if (found) return found;
-  }
-  return undefined;
-}
-
 function patchManyMessagesInCache(
   queryClient: ReturnType<typeof useQueryClient>,
   messageIds: string[],
@@ -213,7 +241,7 @@ function patchManyMessagesInCache(
 ) {
   const idSet = new Set(messageIds);
   const lists = queryClient.getQueriesData<MailboxMessagesCacheData>({
-    queryKey: ["mail", "messages"],
+    queryKey: QUERY_KEYS.mailMessagesAll(),
   });
   for (const [key, data] of lists) {
     if (!data) continue;
@@ -233,7 +261,7 @@ function patchMessageInCache(
   patch: (msg: JmapEmailMessage) => Partial<JmapEmailMessage>,
 ) {
   const lists = queryClient.getQueriesData<MailboxMessagesCacheData>({
-    queryKey: ["mail", "messages"],
+    queryKey: QUERY_KEYS.mailMessagesAll(),
   });
   for (const [key, data] of lists) {
     if (!data) continue;
@@ -242,6 +270,35 @@ function patchMessageInCache(
       queryClient.setQueryData(key, updated);
     }
   }
+}
+
+/** Reverts a finished move by restoring each message's original mailboxes; callbacks run even if the caller unmounted. */
+export function useUndoMailMove(
+  runtime: MailRuntime | undefined,
+  callbacks: {
+    onSuccess?: (snapshot: MailMoveSnapshot) => void;
+    onError?: (error: Error) => void;
+  } = {},
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    onSuccess: (_data, snapshot) => callbacks.onSuccess?.(snapshot),
+    onError: (error) => callbacks.onError?.(error),
+    mutationFn: async (snapshot: MailMoveSnapshot) => {
+      if (!runtime) throw new Error("Your mailbox is not connected.");
+      await runtime.client.restoreMessageMailboxes(
+        runtime.session,
+        snapshot.restores,
+      );
+    },
+    onMutate: (snapshot) => reinsertUndoneMessages(queryClient, snapshot),
+    onSettled: (_data, _error, snapshot) =>
+      invalidateMoveLists(queryClient, snapshot),
+  });
+}
+
+function resolveTrashMailboxId(runtime: MailRuntime | undefined) {
+  return runtime?.mailboxes.find((m) => m.role === "trash")?.id ?? null;
 }
 
 /** Message ids the user marked unread while viewing — skip mark-as-read until they leave. */
@@ -275,7 +332,7 @@ export function useMailMutations(
   const queryClient = useQueryClient();
 
   const invalidateMessages = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["mail", "messages"] });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mailMessagesAll() });
   }, [queryClient]);
 
   const markAsRead = useMutation({
@@ -336,22 +393,33 @@ export function useMailMutations(
   });
 
   const moveToTrash = useMutation({
-    mutationFn: (messageId: string) => {
-      const trashId =
-        runtime!.mailboxes.find((m) => m.role === "trash")?.id ?? null;
-      return runtime!.client.moveToTrash(
+    mutationFn: (messageId: string) =>
+      runtime!.client.moveToTrash(
         runtime!.session,
         messageId,
-        trashId,
-      );
-    },
-    onSuccess: invalidateMessages,
+        resolveTrashMailboxId(runtime),
+      ),
+    onMutate: (messageId) =>
+      beginOptimisticMove(
+        queryClient,
+        [messageId],
+        resolveTrashMailboxId(runtime),
+      ),
+    onError: (_error, _messageId, snapshot) =>
+      rollbackOptimisticMove(queryClient, snapshot),
+    onSettled: (_data, _error, _messageId, snapshot) =>
+      invalidateMoveLists(queryClient, snapshot),
   });
 
   const deleteMessage = useMutation({
     mutationFn: (messageId: string) =>
       runtime!.client.deleteMessage(runtime!.session, messageId),
-    onSuccess: invalidateMessages,
+    onMutate: (messageId) =>
+      beginOptimisticMove(queryClient, [messageId], null),
+    onError: (_error, _messageId, snapshot) =>
+      rollbackOptimisticMove(queryClient, snapshot),
+    onSettled: (_data, _error, _messageId, snapshot) =>
+      invalidateMoveLists(queryClient, snapshot),
   });
 
   const moveToMailbox = useMutation({
@@ -361,7 +429,16 @@ export function useMailMutations(
         input.messageId,
         input.targetMailboxId,
       ),
-    onSuccess: invalidateMessages,
+    onMutate: (input) =>
+      beginOptimisticMove(
+        queryClient,
+        [input.messageId],
+        input.targetMailboxId,
+      ),
+    onError: (_error, _input, snapshot) =>
+      rollbackOptimisticMove(queryClient, snapshot),
+    onSettled: (_data, _error, _input, snapshot) =>
+      invalidateMoveLists(queryClient, snapshot),
   });
 
   const setMessageLabel = useMutation({
@@ -420,20 +497,25 @@ export function useMailMutations(
     onError: () => invalidateMessages(),
   });
 
+  const resolveBulkTrashTarget = () => {
+    const trashId = resolveTrashMailboxId(runtime);
+    return mailboxId === trashId ? null : trashId;
+  };
+
   const bulkMoveToTrash = useMutation({
-    mutationFn: (messageIds: string[]) => {
-      const trashId =
-        runtime!.mailboxes.find((m) => m.role === "trash")?.id ?? null;
-      const isInTrash = mailboxId === trashId;
-      return runtime!.client.bulkMoveToTrash(
+    mutationFn: (messageIds: string[]) =>
+      runtime!.client.bulkMoveToTrash(
         runtime!.session,
         messageIds,
-        isInTrash ? null : trashId,
-      );
-    },
+        resolveBulkTrashTarget(),
+      ),
+    onMutate: (messageIds) =>
+      beginOptimisticMove(queryClient, messageIds, resolveBulkTrashTarget()),
+    onError: (_error, _messageIds, snapshot) =>
+      rollbackOptimisticMove(queryClient, snapshot),
     // Resolve only after the refetch so swiped rows are gone before they reset.
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["mail", "messages"] }),
+    onSettled: (_data, _error, _messageIds, snapshot) =>
+      invalidateMoveLists(queryClient, snapshot),
   });
 
   const bulkMoveToMailbox = useMutation({
@@ -443,7 +525,36 @@ export function useMailMutations(
         input.messageIds,
         input.targetMailboxId,
       ),
-    onSuccess: invalidateMessages,
+    onMutate: (input) =>
+      beginOptimisticMove(
+        queryClient,
+        input.messageIds,
+        input.targetMailboxId,
+      ),
+    onError: (_error, _input, snapshot) =>
+      rollbackOptimisticMove(queryClient, snapshot),
+    onSettled: (_data, _error, _input, snapshot) =>
+      invalidateMoveLists(queryClient, snapshot),
+  });
+
+  const bulkDestroyMessages = useMutation({
+    mutationFn: (messageIds: string[]) =>
+      runtime!.client.bulkDestroyMessages(runtime!.session, messageIds),
+    onMutate: (messageIds) =>
+      beginOptimisticMove(queryClient, messageIds, null),
+    onError: (_error, _messageIds, snapshot) =>
+      rollbackOptimisticMove(queryClient, snapshot),
+    onSettled: (_data, _error, _messageIds, snapshot) =>
+      invalidateMoveLists(queryClient, snapshot),
+  });
+
+  const emptyMailbox = useMutation({
+    mutationFn: (targetMailboxId: string) =>
+      runtime!.client.emptyMailbox(runtime!.session, targetMailboxId),
+    onSettled: (_count, _error, targetMailboxId) =>
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.mailMessages(targetMailboxId),
+      }),
   });
 
   return {
@@ -458,6 +569,8 @@ export function useMailMutations(
     bulkMarkAsUnread,
     bulkMoveToTrash,
     bulkMoveToMailbox,
+    bulkDestroyMessages,
+    emptyMailbox,
   };
 }
 
@@ -555,7 +668,7 @@ export function useSendMessage(runtime: MailRuntime | undefined) {
       const draftId = variables.previousDraftId?.trim();
       if (draftId) {
         const lists = queryClient.getQueriesData<MailboxMessagesCacheData>({
-          queryKey: ["mail", "messages"],
+          queryKey: QUERY_KEYS.mailMessagesAll(),
         });
         for (const [key, data] of lists) {
           if (!data) continue;
@@ -569,7 +682,7 @@ export function useSendMessage(runtime: MailRuntime | undefined) {
         }
         queryClient.removeQueries({ queryKey: QUERY_KEYS.mailMessage(draftId) });
       }
-      queryClient.invalidateQueries({ queryKey: ["mail", "messages"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mailMessagesAll() });
     },
   });
 }

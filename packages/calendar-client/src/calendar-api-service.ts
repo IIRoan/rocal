@@ -14,6 +14,8 @@ import {
   shouldSealImportedInvitationEncryption,
   parseMailCalendarInviteFromIcs,
   type InvitationImportEncryptionPayload,
+  encryptedIcsImportEventSchema,
+  type EncryptedIcsImportEvent,
 } from "@workspace/calendar-core";
 import type {
   CalendarEvent,
@@ -35,6 +37,8 @@ import type {
   UpdateSettingsRequest,
   RecentContactsRecord,
   PutRecentContactsRequest,
+  MailSettingsRecord,
+  PutMailSettingsRequest,
   RecurrenceValidation,
   RecurrencePreview,
   RecurrencePatterns,
@@ -772,6 +776,29 @@ export class CalendarApiService {
     }
   }
 
+  async getMailSettings(): Promise<MailSettingsRecord | null> {
+    try {
+      return await this.client.get<MailSettingsRecord | null>(
+        "/api/mail-settings",
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to fetch mail settings");
+    }
+  }
+
+  async putMailSettings(
+    request: PutMailSettingsRequest,
+  ): Promise<MailSettingsRecord> {
+    try {
+      return await this.client.put<MailSettingsRecord>(
+        "/api/mail-settings",
+        request,
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to save mail settings");
+    }
+  }
+
   async lookupSolaceProfiles(
     request: SolaceProfileLookupRequest,
   ): Promise<SolaceProfileLookupResponse> {
@@ -840,11 +867,9 @@ export class CalendarApiService {
     request: EditRecurringEventRequest,
   ): Promise<CalendarEvent> {
     try {
-      // Recurring edits never send invitation mail, so the transient copy is dropped.
       const updates = await this.e2ee.attachEventEncryptionShadow(
         request.updates,
       );
-      delete updates.invitationContent;
       const response = await this.client.put<CalendarEvent>(
         `/api/recurring/event/${id}`,
         { ...request, updates },
@@ -877,13 +902,52 @@ export class CalendarApiService {
 
   async importICS(request: ImportICSRequest): Promise<ImportICSResponse> {
     try {
-      return await this.client.post<ImportICSResponse>(
-        "/api/subscriptions/import-ics",
-        request,
-      );
+      if (!(await this.e2ee.hasActiveSession())) throw new Error("Unlock your account before importing a calendar");
+      if (request.icsContent.length > 15 * 1024 * 1024) throw new Error("Calendar file is too large");
+      const { parseIcsImport } = await import("@workspace/calendar-core/ics-import");
+      const timezone = request.timezone ?? (await this.getUserSettings()).timezone;
+      const parsed = parseIcsImport(request.icsContent, timezone);
+      if (!parsed.events.length) throw new Error("No supported events found in calendar file");
+      const encryptedEvents: EncryptedIcsImportEvent[] = [];
+      for (const event of parsed.events) {
+        const { sourceUid, occurrenceDate, excludedDates, ...content } = event;
+        const payload = await this.e2ee.attachEventEncryptionShadow({ ...content, calendarId: request.calendarId });
+        const externalId = await this.icsImportId(JSON.stringify([sourceUid, occurrenceDate ?? null]));
+        encryptedEvents.push(encryptedIcsImportEventSchema.parse({
+          externalId,
+          seriesExternalId: occurrenceDate ? await this.icsImportId(JSON.stringify([sourceUid, null])) : undefined,
+          occurrenceDate, excludedDates,
+          start: content.start, end: content.end, allDay: Boolean(content.allDay), timezone: content.timezone,
+          recurrence: content.recurrence, participants: content.participants,
+          encryptedContent: payload.encryptedContent, blindIndexTokens: payload.blindIndexTokens,
+          encryptionKeyVersion: payload.encryptionKeyVersion,
+        }));
+      }
+      encryptedEvents.sort((left, right) => Number(Boolean(left.seriesExternalId)) - Number(Boolean(right.seriesExternalId)));
+      let eventsCreated = 0;
+      const errors = [...parsed.errors];
+      for (let offset = 0; offset < encryptedEvents.length; offset += 100) {
+        const result = await this.client.post<ImportICSResponse>("/api/subscriptions/import-ics", {
+          calendarId: request.calendarId, encryptedEvents: encryptedEvents.slice(offset, offset + 100),
+        });
+        eventsCreated += result.eventsCreated;
+        errors.push(...(result.errors ?? []));
+      }
+      return { success: true, eventsCreated, eventsTotal: parsed.eventsTotal,
+        calendarName: parsed.calendarName, fileName: request.fileName,
+        ...(errors.length ? { errors } : {}),
+      };
     } catch (error) {
       throw this.transformError(error, "Failed to import ICS file");
     }
+  }
+
+  private async icsImportId(value: string): Promise<string> {
+    // Fixed-width hex preserves the entire UID as one keyed token without exposing it to the server.
+    const encoded = Array.from(value, (character) => character.codePointAt(0)?.toString(16).padStart(6, "0") ?? "").join("");
+    const [token] = await this.e2ee.createBlindIndexTokens(`icsimport${encoded}`);
+    if (!token) throw new Error("Unlock your account before importing a calendar");
+    return token;
   }
 
   // ─── Subscriptions ───────────────────────────────────────────────────────────

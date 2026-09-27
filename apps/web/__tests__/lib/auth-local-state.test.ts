@@ -76,6 +76,20 @@ describe("auth-local-state", () => {
     expect(mockResetE2eeBootstrap).toHaveBeenCalledTimes(1);
   });
 
+  it("clears local mail settings so they cannot seed the next account", () => {
+    localStorage.setItem("mail:displaySettings", '{"trustedSenders":["a@example.com"]}');
+    localStorage.setItem("mail:composeSettings", "{}");
+    localStorage.setItem("mail:listSettings", "{}");
+    localStorage.setItem("mail:settingsSyncPending", "1");
+
+    clearSolaceClientAuthArtifacts();
+
+    expect(localStorage.getItem("mail:displaySettings")).toBeNull();
+    expect(localStorage.getItem("mail:composeSettings")).toBeNull();
+    expect(localStorage.getItem("mail:listSettings")).toBeNull();
+    expect(localStorage.getItem("mail:settingsSyncPending")).toBeNull();
+  });
+
   it("clears only orphaned encryption artifacts when unauthenticated", async () => {
     const result = await reconcileAuthSession({ hasClientSession: false });
 

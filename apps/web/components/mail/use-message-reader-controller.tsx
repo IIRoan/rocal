@@ -39,10 +39,10 @@ import { messageHasLoadedBody } from "@/lib/mail/mail-message-body";
 import { splitPlaintextQuote, splitHtmlQuote } from "@/lib/mail/quoted-text";
 import {
   resolveMailContentIsDark,
-  shouldBlockRemoteImages,
-  htmlContainsRemoteResources,
+  resolveReaderRemoteContent,
   useMailDisplaySettings,
 } from "@/lib/mail/mail-display-settings";
+import { emailHtmlHasRemoteContent } from "@workspace/calendar-core/mail-html";
 import {
   extractLinkedCalendarEventId,
   extractReminderLeadMinutes,
@@ -97,7 +97,7 @@ export type MessageReaderViewModel = {
   plaintextQuote: string;
   cleanHtml: string;
   htmlHasQuote: boolean;
-  hasRemoteContent: boolean;
+  remoteContentPrompt: ReturnType<typeof resolveReaderRemoteContent>["prompt"];
   shouldReplaceBodyWithEventReminder: boolean;
   isReminderEventLoading: boolean;
   eventReminderView: ReturnType<typeof buildEventReminderMailView> | null;
@@ -154,14 +154,14 @@ export function useMessageReaderController(props: MessageReaderProps) {
     setAllowExternalContent(displaySettings.externalContentPolicy === "allow");
   }
   const externalContentSenderEmail = message?.from?.[0]?.email ?? null;
-  const blockRemoteImages = shouldBlockRemoteImages({
-    policy: displaySettings.externalContentPolicy,
-    allowExternalContent,
-    senderEmail: externalContentSenderEmail,
-    trustedSenders: displaySettings.trustedSenders,
-  });
   const blockTrackingPixels = displaySettings.blockTrackingPixels;
-  const isDark = resolveMailContentIsDark(displaySettings);
+  // Per-message override: never written back to the saved appearance setting.
+  const [originalLookMessageId, setOriginalLookMessageId] = useState<string | null>(null);
+  const showOriginalLook = Boolean(message?.id) && originalLookMessageId === message?.id;
+  const canShowOriginalLook = resolveMailContentIsDark(displaySettings);
+  const toggleOriginalLook = () =>
+    setOriginalLookMessageId(showOriginalLook ? null : (message?.id ?? null));
+  const isDark = canShowOriginalLook && !showOriginalLook;
   const [chrome, dispatchChrome] = useReducer(
     messageReaderChromeReducer,
     initialMessageReaderChromeState,
@@ -461,7 +461,17 @@ export function useMessageReaderController(props: MessageReaderProps) {
   const { html: cleanHtml, hasQuote: htmlHasQuote } = splitHtmlQuote(
     _displayHtml ?? "",
   );
-  const hasRemoteContent = htmlContainsRemoteResources(_displayHtml ?? "");
+  const renderedHtml = showQuote ? (_displayHtml ?? "") : cleanHtml;
+  const { blockRemoteImages, prompt: remoteContentPrompt } = resolveReaderRemoteContent({
+    settings: displaySettings,
+    hasRemoteContent: emailHtmlHasRemoteContent({
+      html: renderedHtml,
+      isDark,
+      blockTrackingPixels,
+    }),
+    senderEmail: externalContentSenderEmail,
+    loadedForMessage: allowExternalContent,
+  });
 
   useEffect(() => {
     const el = conversationListRef.current;
@@ -547,7 +557,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
       plaintextQuote,
       cleanHtml,
       htmlHasQuote,
-      hasRemoteContent,
+      remoteContentPrompt,
       shouldReplaceBodyWithEventReminder,
       isReminderEventLoading,
       eventReminderView,
@@ -570,6 +580,9 @@ export function useMessageReaderController(props: MessageReaderProps) {
     isBodyLoading,
     canReply,
     isDark,
+    canShowOriginalLook,
+    showOriginalLook,
+    toggleOriginalLook,
     hasPrev,
     hasNext,
     displaySettings,

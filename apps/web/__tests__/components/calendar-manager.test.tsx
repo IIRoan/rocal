@@ -91,6 +91,7 @@ jest.mock("lucide-react", () => {
     Save: Icon,
     ShieldCheck: Icon,
     Star: Icon,
+    Tag: Icon,
     Trash2: Icon,
   };
 });

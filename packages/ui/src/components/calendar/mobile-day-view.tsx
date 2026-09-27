@@ -11,9 +11,9 @@ import {
 import {
   eventOverlapsZonedCalendarDay,
   getZonedDateParts,
-  isSameCalendarDayInTimezone,
   isTodayInTimezone,
   resolveTimezone,
+  spansMultipleCalendarDays,
   utcToPickerDate,
   wallClockToUtc,
   type TimeFormat,
@@ -93,13 +93,7 @@ export function MobileDayView({
         if (event.allDay) return false;
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
-        if (
-          !isSameCalendarDayInTimezone(
-            eventStart,
-            eventEnd,
-            resolvedTimezone,
-          )
-        ) {
+        if (spansMultipleCalendarDays(eventStart, eventEnd, resolvedTimezone)) {
           return false;
         }
         return eventOverlapsZonedCalendarDay(

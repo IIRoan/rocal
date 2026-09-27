@@ -13,6 +13,13 @@ import {
   Trash2,
   Users,
   Shield,
+  CalendarCheck,
+  CalendarDays,
+  CalendarRange,
+  Columns3,
+  Square,
+  List,
+  Tag,
 } from "lucide-react";
 import {
   APP_NOTIFICATION_SETTING,
@@ -26,6 +33,7 @@ import { BASE_SETTINGS_NAVIGATION_ITEMS } from "./base-navigation";
 export const VIEW_LABELS: Record<string, string> = {
   events: "Events",
   calendars: "Calendar Management",
+  categories: "Categories",
   appearance: "Appearance",
   "time-region": "Time & Region",
   notifications: "Notifications",
@@ -60,6 +68,49 @@ export const COMMANDS: Command[] = [
     description: "Create a new event",
     execute: { action: "newEvent" },
   },
+  // Calendar navigation
+  {
+    command: "go to today",
+    label: "Go to Today",
+    icon: CalendarCheck,
+    description: "Jump to today's date",
+    execute: { action: "goToday" },
+  },
+  {
+    command: "month view",
+    label: "Month View",
+    icon: CalendarDays,
+    description: "Switch the calendar to month view",
+    execute: { action: "setView", payload: { view: "month" } },
+  },
+  {
+    command: "week view",
+    label: "Week View",
+    icon: CalendarRange,
+    description: "Switch the calendar to week view",
+    execute: { action: "setView", payload: { view: "week" } },
+  },
+  {
+    command: "3 day view",
+    label: "3-Day View",
+    icon: Columns3,
+    description: "Switch the calendar to 3-day view",
+    execute: { action: "setView", payload: { view: "3day" } },
+  },
+  {
+    command: "day view",
+    label: "Day View",
+    icon: Square,
+    description: "Switch the calendar to day view",
+    execute: { action: "setView", payload: { view: "day" } },
+  },
+  {
+    command: "agenda view",
+    label: "Agenda View",
+    icon: List,
+    description: "Switch the calendar to agenda view",
+    execute: { action: "setView", payload: { view: "agenda" } },
+  },
   // Calendar actions
   {
     command: "new calendar",
@@ -74,6 +125,13 @@ export const COMMANDS: Command[] = [
     icon: Trash2,
     description: "Manage and delete calendars",
     execute: { action: "openCalendars" },
+  },
+  {
+    command: "new category",
+    label: "New Category",
+    icon: Plus,
+    description: "Create a new event category",
+    execute: { action: "newCategory" },
   },
   // Theme actions - execute immediately
   {
@@ -161,6 +219,16 @@ export const NAVIGATION_ITEMS = [
 export const SEARCH_INDEX = [
   // Main navigation items
   ...NAVIGATION_ITEMS,
+  {
+    id: "categories",
+    label: "Categories",
+    icon: Tag,
+    description: "Create, rename, recolor, and delete categories",
+    targetView: "categories",
+    keywords: ["category", "categories", "tag", "manage categories"],
+    parent: "calendars",
+    parentLabel: "Calendar Management",
+  },
   // Appearance sub-settings
   {
     id: "light-theme",
