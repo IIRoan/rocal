@@ -60,10 +60,7 @@ type CommandPaletteViewContentProps = {
     newPassword: string;
   }) => Promise<void>;
   updatingProfile: boolean;
-  handleUpdateProfile: (input: {
-    name?: string;
-    imageUrl?: string;
-  }) => Promise<void>;
+  handleUpdateProfile: (input: { image: string | null }) => Promise<void>;
   passkeyAddMode: boolean;
   setSubscriptionEditCalendarId: (calendarId: string | undefined) => void;
   activeSubscriptionEditCalendarId: string | undefined;

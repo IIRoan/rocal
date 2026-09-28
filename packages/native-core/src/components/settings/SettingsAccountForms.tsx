@@ -150,47 +150,6 @@ export function SettingsPasswordForm({
   );
 }
 
-export function SettingsProfilePictureForm({
-  value,
-  onChange,
-  onSubmit,
-  onCancel,
-  isPending,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-  onCancel: () => void;
-  isPending: boolean;
-}) {
-  return (
-    <SettingsInlineForm
-      submitLabel="Save"
-      onSubmit={onSubmit}
-      onCancel={onCancel}
-      isPending={isPending}
-    >
-      <SheetSection
-        title="Profile picture"
-        footer="Paste the URL of the image you want to use."
-      >
-        <SheetGroup>
-          <SheetTextField
-            value={value}
-            onChangeText={onChange}
-            placeholder="https://example.com/photo.png"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            editable={!isPending}
-            accessibilityLabel="Image URL"
-          />
-        </SheetGroup>
-      </SheetSection>
-    </SettingsInlineForm>
-  );
-}
-
 function createStyles(theme: ThemeTokens) {
   return StyleSheet.create({
     form: {

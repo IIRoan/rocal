@@ -135,6 +135,15 @@ export const env = {
    * also hand over mail at rest; rotating it self-heals on the next mint.
    */
   mailBridgeHmacKey: process.env.MAIL_BRIDGE_HMAC_KEY?.trim() || "",
+
+  /** Railway S3 bucket for uploaded profile pictures; uploads are disabled until all are set. */
+  avatarBucket: {
+    name: process.env.AVATAR_BUCKET?.trim() || "",
+    endpoint: process.env.AVATAR_BUCKET_ENDPOINT?.trim() || "",
+    region: process.env.AVATAR_BUCKET_REGION?.trim() || "auto",
+    accessKeyId: process.env.AVATAR_BUCKET_ACCESS_KEY_ID?.trim() || "",
+    secretAccessKey: process.env.AVATAR_BUCKET_SECRET_ACCESS_KEY?.trim() || "",
+  },
 } as const;
 
 /** Extract the origin from a URL string, returning the input on failure. */

@@ -9,6 +9,7 @@ import type {
   IAccountService,
 } from "../contracts/account.contract";
 import type { IMailService } from "../contracts/mail.contract";
+import { deleteCurrentAvatar } from "../lib/avatar-updates";
 import { NotFoundError } from "../lib/errors";
 import { normalizeDesiredSolaceEmailInput } from "../lib/solace-email";
 
@@ -113,33 +114,37 @@ export class AccountService implements IAccountService {
       await this.mailService.deleteMailboxForUser({ userId: input.userId });
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.calendarSharing.deleteMany({
-        where: {
-          OR: [{ sharedWith: input.userId }, { sharedBy: input.userId }],
-        },
-      });
-
-      await tx.notificationLog.deleteMany({
-        where: { userId: input.userId },
-      });
-
-      // Invites addressed to or claimed for the user belong to another inviter, so they do not cascade.
-      if (userEmails.length > 0) {
-        await tx.invite.deleteMany({
+    await this.prisma.$transaction(
+      async (tx) => {
+        await deleteCurrentAvatar(tx, { id: input.userId });
+        await tx.calendarSharing.deleteMany({
           where: {
-            OR: [
-              { email: { in: userEmails } },
-              { claimedForEmail: { in: userEmails } },
-            ],
+            OR: [{ sharedWith: input.userId }, { sharedBy: input.userId }],
           },
         });
-      }
 
-      await tx.user.delete({
-        where: { id: input.userId },
-      });
-    });
+        await tx.notificationLog.deleteMany({
+          where: { userId: input.userId },
+        });
+
+        // Invites addressed to or claimed for the user belong to another inviter, so they do not cascade.
+        if (userEmails.length > 0) {
+          await tx.invite.deleteMany({
+            where: {
+              OR: [
+                { email: { in: userEmails } },
+                { claimedForEmail: { in: userEmails } },
+              ],
+            },
+          });
+        }
+
+        await tx.user.delete({
+          where: { id: input.userId },
+        });
+      },
+      { timeout: 30_000 },
+    );
 
     logger.warn("Deleted user account", { userId: input.userId });
 

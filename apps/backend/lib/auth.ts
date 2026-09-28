@@ -8,6 +8,7 @@ import { oneTimeToken, jwt } from "better-auth/plugins";
 import type { Jwk } from "better-auth/plugins/jwt";
 import { createLogger } from "@workspace/logger";
 import { prisma } from "./prisma";
+import { withLegacyAvatarCleanup } from "./avatar-updates";
 import {
   env,
   isDeployedEnvironment,
@@ -478,7 +479,7 @@ export const auth = betterAuth({
     // In local/dev this can split state cookies across contexts.
     skipStateCookieCheck,
   },
-  database: prismaAdapter(prisma, {
+  database: prismaAdapter(withLegacyAvatarCleanup(prisma), {
     provider: "postgresql",
   }),
   secret: betterAuthSecret,

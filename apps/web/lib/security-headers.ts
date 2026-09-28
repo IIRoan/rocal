@@ -41,7 +41,7 @@ export function buildContentSecurityPolicy(env: SecurityHeaderEnv): string {
     // Inline styles come from React, next/font, and mail HTML in the srcdoc reader frame.
     ["style-src", ["'self'", "'unsafe-inline'"]],
     // https: covers avatar URLs and opted-in mail images; the reader frame's CSP still blocks them.
-    ["img-src", ["'self'", "data:", "blob:", "https:"]],
+    ["img-src", unique(["'self'", "data:", "blob:", "https:", apiOrigin])],
     ["font-src", ["'self'", "data:"]],
     [
       "connect-src",

@@ -14,8 +14,7 @@ interface PasswordOnlyValues {
 }
 
 interface UpdateProfileValues {
-  name?: string;
-  imageUrl?: string;
+  image: string | null;
 }
 
 interface AccountSettingsProps {

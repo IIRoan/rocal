@@ -142,6 +142,7 @@ function createMockAuthContext(
     consumePendingAuthPassword: jest.fn(() => null),
     peekPendingAuthPassword: jest.fn(() => null),
     clearPendingAuthPassword: jest.fn(),
+    refreshUser: jest.fn(async () => undefined),
     ...overrides,
   };
 }

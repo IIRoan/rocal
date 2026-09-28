@@ -6,6 +6,7 @@ import {
   type EventParticipantStatus,
   buildSolaceProfileAvatarPath,
   isReservedSystemEmail,
+  isSolaceUploadedAvatarPath,
   normalizeParticipantEmail,
   sanitizePublicImageUrl,
 } from "@workspace/calendar-core";
@@ -233,6 +234,7 @@ export function mapEventParticipant(
     normalizeParticipantEmail(participant.user?.email) ||
     "";
   const role = normalizeParticipantRole(participant.role);
+  const profileImage = participant.user?.image;
 
   return {
     id: participant.id,
@@ -241,9 +243,12 @@ export function mapEventParticipant(
     email,
     displayName:
       participant.displayName ?? participant.user?.name?.trim() ?? email,
-    image: sanitizePublicImageUrl(participant.user?.image)
-      ? buildSolaceProfileAvatarPath(email)
-      : null,
+    image:
+      isSolaceUploadedAvatarPath(profileImage)
+        ? profileImage
+        : sanitizePublicImageUrl(profileImage)
+          ? buildSolaceProfileAvatarPath(email)
+          : null,
     role,
     status: normalizeParticipantStatus(participant.status, role),
     createdAt: participant.createdAt,

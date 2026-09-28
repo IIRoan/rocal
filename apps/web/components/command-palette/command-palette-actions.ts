@@ -1,5 +1,6 @@
 import { createLogger } from "@workspace/logger";
 import type { QueryClient } from "@tanstack/react-query";
+import { solaceProfileImageQueryKey } from "@workspace/calendar-core";
 import type { UpdateSettingsRequest, UserSettings } from "@/lib/types/calendar";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { authClient, signOut } from "@/lib/auth-client";
@@ -141,20 +142,24 @@ export async function persistEncryptionPasswordReset(input: {
 }
 
 export async function persistProfileUpdate(input: {
-  imageUrl?: string;
+  image: string | null;
+  queryClient: QueryClient;
 }): Promise<
   { ok: true; image: string | null } | { ok: false; error: unknown }
 > {
   try {
-    const result = await authClient.updateUser({
-      image: input.imageUrl ?? null,
+    const { image } = input.image
+      ? await calendarApiService.uploadProfileAvatar({ image: input.image })
+      : await calendarApiService.removeProfileAvatar();
+    // Bypass Better Auth's cookie cache so every useSession consumer sees the new picture.
+    const session = await authClient.getSession({
+      query: { disableCookieCache: true },
     });
-    if (result?.error) {
-      throw new Error(
-        result.error.message || "Unable to update your profile.",
-      );
-    }
-    return { ok: true, image: input.imageUrl?.trim() || null };
+    authClient.$store.notify("$sessionSignal");
+    void input.queryClient.invalidateQueries({
+      queryKey: solaceProfileImageQueryKey(session.data?.user.email),
+    });
+    return { ok: true, image };
   } catch (error) {
     log.error("Failed to update profile:", error);
     return { ok: false, error };

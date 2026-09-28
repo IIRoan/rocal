@@ -29,6 +29,7 @@ export function BlobatarAvatar({
   title,
   animate,
   crossOrigin,
+  onImageLoadedChange,
 }: {
   email?: string | null;
   name?: string | null;
@@ -38,6 +39,7 @@ export function BlobatarAvatar({
   /** Hover for sidebar/profile; omit in dense lists (static `<img>`). */
   animate?: "hover" | "always";
   crossOrigin?: "" | "anonymous" | "use-credentials";
+  onImageLoadedChange?: (loaded: boolean) => void;
 }) {
   const seed = blobatarName(email, name);
   const label = title ?? name ?? email ?? undefined;
@@ -49,6 +51,9 @@ export function BlobatarAvatar({
           src={src}
           alt={label ?? "Avatar"}
           referrerPolicy="no-referrer"
+          onLoadingStatusChange={(status) =>
+            onImageLoadedChange?.(status === "loaded")
+          }
           {...(crossOrigin ? { crossOrigin } : {})}
         />
       ) : null}

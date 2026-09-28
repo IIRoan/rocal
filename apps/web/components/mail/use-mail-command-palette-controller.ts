@@ -214,12 +214,10 @@ export function useMailCommandPaletteController({
         dispatchBusy({ type: "setResettingEncryptionPassword", value }),
     });
 
-  const handleUpdateProfile = (input: {
-    name?: string;
-    imageUrl?: string;
-  }) =>
+  const handleUpdateProfile = (input: { image: string | null }) =>
     runMailProfileUpdate({
-      imageUrl: input.imageUrl,
+      image: input.image,
+      queryClient,
       setBusy: (value) =>
         dispatchBusy({ type: "setUpdatingProfile", value }),
       onImageUpdated: (image) =>

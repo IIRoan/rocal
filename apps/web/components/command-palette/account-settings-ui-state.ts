@@ -80,23 +80,18 @@ export function securityUiReducer(
 
 export type ProfileUiState = {
   showAvatarForm: boolean;
-  avatarUrl: string;
   message: SectionMessage;
 };
 
 export type ProfileUiAction =
-  | { type: "toggleAvatarForm"; imageUrl: string }
+  | { type: "toggleAvatarForm" }
   | { type: "closeAvatarForm" }
-  | { type: "setAvatarUrl"; value: string }
   | { type: "setMessage"; message: SectionMessage };
 
-export function createInitialProfileUiState(imageUrl?: string | null): ProfileUiState {
-  return {
-    showAvatarForm: false,
-    avatarUrl: imageUrl ?? "",
-    message: null,
-  };
-}
+export const initialProfileUiState: ProfileUiState = {
+  showAvatarForm: false,
+  message: null,
+};
 
 export function profileUiReducer(
   state: ProfileUiState,
@@ -107,13 +102,10 @@ export function profileUiReducer(
       return {
         ...state,
         showAvatarForm: !state.showAvatarForm,
-        avatarUrl: action.imageUrl,
         message: null,
       };
     case "closeAvatarForm":
       return { ...state, showAvatarForm: false, message: null };
-    case "setAvatarUrl":
-      return { ...state, avatarUrl: action.value };
     case "setMessage":
       return { ...state, message: action.message };
     default:

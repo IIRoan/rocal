@@ -84,10 +84,7 @@ export type MailCommandPaletteViewContentProps = {
   handleChangePassword: (values: PasswordValues) => Promise<void>;
   handleSetPassword: (values: NewPasswordValues) => Promise<void>;
   handleResetEncryptionPassword: (values: NewPasswordValues) => Promise<void>;
-  handleUpdateProfile: (values: {
-    name?: string;
-    imageUrl?: string;
-  }) => Promise<void>;
+  handleUpdateProfile: (values: { image: string | null }) => Promise<void>;
   mailboxes: JmapMailbox[];
   onCreateMailbox?: (name: string) => Promise<void>;
   onDeleteMailbox?: (id: string) => Promise<void>;

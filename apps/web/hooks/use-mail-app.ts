@@ -44,6 +44,7 @@ import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { useMailRealtime } from "@/hooks/use-mail-realtime";
 import { useRecentContacts } from "@/hooks/use-recent-contacts";
 import { peekCachedAuthPassword } from "@/lib/e2ee-password-cache";
+import { resolveAvatarUrl } from "@/lib/profile-picture";
 import { clearEncPasswordCookie, initEncPasswordFromCookie } from "@/lib/enc-password-cookie";
 import { bootstrapMailboxForAccount } from "@/lib/mail/account-bootstrap";
 import { mailDemoApiService } from "@/lib/mail/api-service";
@@ -3338,7 +3339,7 @@ export function useMailApp() {
     ? {
       name: session.user.name ?? "User",
       email: session.user.email ?? "",
-      avatar: session.user.image ?? undefined,
+      avatar: resolveAvatarUrl(session.user.image),
     }
     : null;
 

@@ -32,12 +32,18 @@ const SET_PASSWORD_ACTION: SettingsAccountAction = {
   destructive: false,
 };
 
-const CHANGE_PROFILE_PICTURE_ACTION: SettingsAccountAction = {
+const ADD_PROFILE_PICTURE_ACTION: SettingsAccountAction = {
   key: "change-profile-picture",
   icon: "image",
-  label: "Profile Picture",
-  description: "Set a URL for your profile picture.",
+  label: "Add Profile Picture",
+  description: "Choose a photo for your profile.",
   destructive: false,
+};
+
+const CHANGE_PROFILE_PICTURE_ACTION: SettingsAccountAction = {
+  ...ADD_PROFILE_PICTURE_ACTION,
+  label: "Change Profile Picture",
+  description: "Choose a new photo or remove the current one.",
 };
 
 const RESET_PREFERENCES_ACTION: SettingsAccountAction = {
@@ -68,10 +74,12 @@ export function getSettingsAccountActions({
   canSignOut,
   hasPasswordAccount,
   hasOAuthAccount,
+  hasProfilePicture = false,
 }: {
   canSignOut: boolean;
   hasPasswordAccount: boolean;
   hasOAuthAccount: boolean;
+  hasProfilePicture?: boolean;
 }): SettingsAccountAction[] {
   const authActions: SettingsAccountAction[] = [];
 
@@ -84,7 +92,9 @@ export function getSettingsAccountActions({
   return canSignOut
     ? [
         ...authActions,
-        CHANGE_PROFILE_PICTURE_ACTION,
+        hasProfilePicture
+          ? CHANGE_PROFILE_PICTURE_ACTION
+          : ADD_PROFILE_PICTURE_ACTION,
         RESET_PREFERENCES_ACTION,
         SIGN_OUT_ACTION,
         DELETE_ACCOUNT_ACTION,

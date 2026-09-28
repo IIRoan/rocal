@@ -70,6 +70,8 @@ import type {
   EventSearchCorpusParams,
   SolaceProfileLookupRequest,
   SolaceProfileLookupResponse,
+  UploadProfileAvatarRequest,
+  ProfileAvatarResponse,
 } from "@workspace/calendar-core";
 
 const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
@@ -809,6 +811,29 @@ export class CalendarApiService {
       );
     } catch (error) {
       throw this.transformError(error, "Failed to look up profile pictures");
+    }
+  }
+
+  async uploadProfileAvatar(
+    request: UploadProfileAvatarRequest,
+  ): Promise<ProfileAvatarResponse> {
+    try {
+      return await this.client.put<ProfileAvatarResponse>(
+        "/api/profiles/me/avatar",
+        request,
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to upload profile picture");
+    }
+  }
+
+  async removeProfileAvatar(): Promise<ProfileAvatarResponse> {
+    try {
+      return await this.client.delete<ProfileAvatarResponse>(
+        "/api/profiles/me/avatar",
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to remove profile picture");
     }
   }
 

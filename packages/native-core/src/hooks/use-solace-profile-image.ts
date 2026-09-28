@@ -2,15 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { createSolaceProfileLookupBatcher } from "@workspace/calendar-client";
 import {
   normalizeParticipantEmail,
-  resolveSolaceProfileAvatarUrl,
+  solaceProfileImageQueryKey,
 } from "@workspace/calendar-core";
 import { calendarApiService } from "../lib/api";
-import { API_BASE_URL } from "../lib/constants";
 
 const profileLookupBatcher = createSolaceProfileLookupBatcher((emails) =>
   calendarApiService.lookupSolaceProfiles({ emails }),
 );
 
+/** API-relative avatar path for an email; callers resolve it for their display size. */
 export function useSolaceProfileImage(
   email?: string | null,
   options?: { enabled?: boolean },
@@ -19,11 +19,8 @@ export function useSolaceProfileImage(
   const enabled = Boolean(normalized) && (options?.enabled ?? true);
 
   const query = useQuery({
-    queryKey: ["solace-profile-image", normalized],
-    queryFn: async () => {
-      const avatarPath = await profileLookupBatcher.get(normalized);
-      return resolveSolaceProfileAvatarUrl(avatarPath, API_BASE_URL);
-    },
+    queryKey: solaceProfileImageQueryKey(normalized),
+    queryFn: async () => (await profileLookupBatcher.get(normalized)) ?? null,
     enabled,
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,

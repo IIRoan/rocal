@@ -4,14 +4,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   extractLinkedAuthAccounts,
   getErrorMessage,
+  solaceProfileImageQueryKey,
   summarizeLinkedAuthAccounts,
   type LinkedAuthAccountLike,
 } from "@workspace/calendar-core";
 import { SettingsPage } from "../SettingsPage";
-import {
-  SettingsPasswordForm,
-  SettingsProfilePictureForm,
-} from "../SettingsAccountForms";
+import { SettingsPasswordForm } from "../SettingsAccountForms";
 import { BlobatarAvatar } from "../../BlobatarAvatar";
 import {
   SheetGroup,
@@ -27,6 +25,7 @@ import {
 import { useAuth } from "../../../providers/AuthProvider";
 import { useNativeUserSettings } from "../../../hooks/use-native-user-settings";
 import { calendarApiService } from "../../../lib/api";
+import { pickProfilePicture } from "../../../lib/profile-picture";
 import { useToast } from "../../../providers/ToastProvider";
 
 const PROFILE_ACTION_KEYS: SettingsAccountActionKey[] = [
@@ -38,7 +37,7 @@ const SESSION_ACTION_KEYS: SettingsAccountActionKey[] = ["sign-out", "delete-acc
 
 export function AccountSettingsContent() {
   const queryClient = useQueryClient();
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshUser } = useAuth();
   const { toast } = useToast();
   const { resetSettingsMutation } = useNativeUserSettings();
 
@@ -57,14 +56,18 @@ export function AccountSettingsContent() {
     () => summarizeLinkedAuthAccounts(accountsQuery.data ?? []),
     [accountsQuery.data],
   );
+  const [pictureLoaded, setPictureLoaded] = useState(false);
+  // A broken or still-loading picture shows the Blobatar, so treat it as no picture.
+  const hasProfilePicture = Boolean(user?.image) && pictureLoaded;
   const accountActions = useMemo(
     () =>
       getSettingsAccountActions({
         canSignOut: Boolean(user),
         hasPasswordAccount,
         hasOAuthAccount,
+        hasProfilePicture,
       }),
-    [hasOAuthAccount, hasPasswordAccount, user],
+    [hasOAuthAccount, hasPasswordAccount, hasProfilePicture, user],
   );
 
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -73,8 +76,6 @@ export function AccountSettingsContent() {
   const [isSettingPassword, setIsSettingPassword] = useState(false);
   const [isUpdatingProfilePicture, setIsUpdatingProfilePicture] =
     useState(false);
-  const [showProfilePictureForm, setShowProfilePictureForm] = useState(false);
-  const [profilePictureUrlInput, setProfilePictureUrlInput] = useState("");
   const [activePasswordSheet, setActivePasswordSheet] = useState<
     "change-password" | "set-password" | null
   >(null);
@@ -233,43 +234,57 @@ export function AccountSettingsContent() {
     toast,
   ]);
 
-  const handleSubmitProfilePicture = useCallback(async () => {
-    const trimmedUrl = profilePictureUrlInput.trim();
-    setIsUpdatingProfilePicture(true);
-    try {
-      const result = await authClient.updateUser({ image: trimmedUrl || null });
-      if ((result as { error?: { message?: string } })?.error) {
-        throw new Error(
-          (result as { error?: { message?: string } }).error?.message ??
-            "Unable to update profile picture.",
+  const saveProfilePicture = useCallback(
+    async (mode: "upload" | "remove") => {
+      try {
+        const image = mode === "upload" ? await pickProfilePicture() : null;
+        if (mode === "upload" && !image) return;
+        setIsUpdatingProfilePicture(true);
+        await (image
+          ? calendarApiService.uploadProfileAvatar({ image })
+          : calendarApiService.removeProfileAvatar());
+        await refreshUser();
+        void queryClient.invalidateQueries({
+          queryKey: solaceProfileImageQueryKey(user?.email),
+        });
+        toast(image ? "Profile picture updated" : "Profile picture removed");
+      } catch (error) {
+        toast(
+          getErrorMessage(error, "Failed to update profile picture"),
+          "error",
         );
+      } finally {
+        setIsUpdatingProfilePicture(false);
       }
-      setShowProfilePictureForm(false);
-      setProfilePictureUrlInput("");
-      toast("Profile picture updated");
-    } catch (error) {
-      toast(
-        getErrorMessage(error, "Failed to update profile picture"),
-        "error",
-      );
-    } finally {
-      setIsUpdatingProfilePicture(false);
+    },
+    [queryClient, refreshUser, toast, user?.email],
+  );
+
+  const handleChangeProfilePicture = useCallback(() => {
+    if (!hasProfilePicture) {
+      void saveProfilePicture("upload");
+      return;
     }
-  }, [profilePictureUrlInput, toast]);
+    Alert.alert("Profile picture", undefined, [
+      { text: "Choose Photo", onPress: () => void saveProfilePicture("upload") },
+      {
+        text: "Remove Photo",
+        style: "destructive",
+        onPress: () => void saveProfilePicture("remove"),
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  }, [hasProfilePicture, saveProfilePicture]);
 
   const handleAccountAction = useCallback(
     (key: (typeof accountActions)[number]["key"]) => {
       if (key === "change-password" || key === "set-password") {
-        setShowProfilePictureForm(false);
         setPasswordChangeError(null);
         setActivePasswordSheet(key);
         return;
       }
       if (key === "change-profile-picture") {
-        setActivePasswordSheet(null);
-        resetChangePasswordForm();
-        setProfilePictureUrlInput(user?.image ?? "");
-        setShowProfilePictureForm(true);
+        handleChangeProfilePicture();
         return;
       }
       if (key === "reset-preferences") {
@@ -283,11 +298,10 @@ export function AccountSettingsContent() {
       handleSignOut();
     },
     [
+      handleChangeProfilePicture,
       handleDeleteAccount,
       handleResetSettings,
       handleSignOut,
-      resetChangePasswordForm,
-      user?.image,
     ],
   );
 
@@ -340,6 +354,7 @@ export function AccountSettingsContent() {
                 name={user?.name}
                 src={user?.image}
                 size={40}
+                onImageLoadedChange={setPictureLoaded}
               />
             }
           />
@@ -376,19 +391,6 @@ export function AccountSettingsContent() {
             }}
             error={passwordChangeError}
             isPending={isChangingPassword || isSettingPassword}
-          />
-        ) : null}
-
-        {showProfilePictureForm ? (
-          <SettingsProfilePictureForm
-            value={profilePictureUrlInput}
-            onChange={setProfilePictureUrlInput}
-            onSubmit={() => void handleSubmitProfilePicture()}
-            onCancel={() => {
-              setShowProfilePictureForm(false);
-              setProfilePictureUrlInput("");
-            }}
-            isPending={isUpdatingProfilePicture}
           />
         ) : null}
 

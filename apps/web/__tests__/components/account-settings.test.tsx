@@ -26,14 +26,30 @@ jest.mock("lucide-react", () => {
     Loader2: Icon,
     ImageIcon: Icon,
     Pencil: Icon,
+    Plus: Icon,
+    Upload: Icon,
   };
 });
 
-jest.mock("@workspace/ui/components/ui/blobatar-avatar", () => ({
-  BlobatarAvatar: ({ email }: { email?: string }) => (
-    <div data-testid="blobatar-avatar">{email}</div>
-  ),
-}));
+jest.mock("@workspace/ui/components/ui/blobatar-avatar", () => {
+  const { useEffect } = jest.requireActual<typeof import("react")>("react");
+  return {
+    BlobatarAvatar: ({
+      email,
+      src,
+      onImageLoadedChange,
+    }: {
+      email?: string;
+      src?: string | null;
+      onImageLoadedChange?: (loaded: boolean) => void;
+    }) => {
+      useEffect(() => {
+        onImageLoadedChange?.(Boolean(src) && !src?.includes("broken"));
+      }, [onImageLoadedChange, src]);
+      return <div data-testid="blobatar-avatar">{email}</div>;
+    },
+  };
+});
 
 import { AccountSettings } from "../../components/command-palette/account-settings";
 
@@ -118,6 +134,49 @@ describe("AccountSettings", () => {
     });
 
     expect(handleDeleteAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["an uploaded picture", "/api/profiles/avatars/abcdefghijklmnopqrstuv", true],
+    ["a picture that fails to load", "https://broken.example.com/a.png", false],
+  ])("offers Remove only for %s", async (_label, accountImage, canRemove) => {
+    await act(async () => {
+      root.render(
+        <AccountSettings
+          goBack={() => {}}
+          saving={false}
+          handleReset={() => {}}
+          deletingAccount={false}
+          handleDeleteAccount={() => {}}
+          accountName="Roan"
+          accountEmail="roan@example.com"
+          accountImage={accountImage}
+          sessionLoading={false}
+          changingPassword={false}
+          handleChangePassword={async () => {}}
+          handleUpdateProfile={async () => {}}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const avatarButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label$="profile picture"]',
+    );
+    expect(avatarButton?.getAttribute("aria-label")).toBe(
+      canRemove ? "Change profile picture" : "Add profile picture",
+    );
+    if (canRemove) {
+      await act(async () => {
+        avatarButton?.click();
+        await Promise.resolve();
+      });
+    }
+
+    const buttonTexts = Array.from(container.querySelectorAll("button")).map(
+      (button) => button.textContent,
+    );
+    expect(buttonTexts.includes("Remove")).toBe(canRemove);
   });
 
   it("shows loading skeleton while session is loading", async () => {
