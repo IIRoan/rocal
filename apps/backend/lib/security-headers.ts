@@ -7,7 +7,7 @@ const AUTH_ERROR_PAGE_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'";
 const AUTH_ERROR_PAGE_PATH = `${BETTER_AUTH_BASE_PATH}/error`;
 /** Loaded as a no-cors `<img>`, which `same-site` would block on *.vercel.app previews. */
-const AVATAR_PATH_SUFFIX = "/profiles/avatar";
+const AVATAR_PATH = "/profiles/avatar";
 
 /** CORP can be `same-site` because web and API share a registrable domain and native ignores CORP. */
 export function buildSecurityHeaders(input: {
@@ -20,7 +20,7 @@ export function buildSecurityHeaders(input: {
     "Referrer-Policy": "no-referrer",
     "Content-Security-Policy":
       input.pathname === AUTH_ERROR_PAGE_PATH ? AUTH_ERROR_PAGE_CSP : JSON_API_CSP,
-    "Cross-Origin-Resource-Policy": input.pathname.endsWith(AVATAR_PATH_SUFFIX)
+    "Cross-Origin-Resource-Policy": input.pathname.includes(AVATAR_PATH)
       ? "cross-origin"
       : "same-site",
     "Permissions-Policy":

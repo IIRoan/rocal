@@ -53,6 +53,12 @@ describe("security headers", () => {
       ],
     ).toBe("cross-origin");
     expect(
+      buildSecurityHeaders({
+        isProduction: true,
+        pathname: "/api/profiles/avatars/aaaaaaaaaaaaaaaaaaaaaa",
+      })["Cross-Origin-Resource-Policy"],
+    ).toBe("cross-origin");
+    expect(
       buildSecurityHeaders({ isProduction: true, pathname: "/api/events" })[
         "Cross-Origin-Resource-Policy"
       ],

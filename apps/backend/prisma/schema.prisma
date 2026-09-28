@@ -16,6 +16,10 @@ model User {
   email          String             @unique
   emailVerified  Boolean            @default(false) @map("email_verified")
   image          String?
+  /// Opaque id of the uploaded profile picture; server-set, never client-supplied.
+  avatarId       String?            @unique @map("avatar_id")
+  /// Reserved upload or retired picture, retained until its bucket objects are deleted.
+  pendingAvatarId String?           @unique @map("pending_avatar_id")
   createdAt      DateTime           @default(now()) @map("created_at")
   updatedAt      DateTime           @updatedAt @map("updated_at")
   /// Set when the backend approves this account for a mailbox; null blocks provisioning.

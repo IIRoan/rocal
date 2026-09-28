@@ -20,8 +20,8 @@ describe("Settings screen account actions", () => {
       {
         key: "change-profile-picture",
         icon: "image",
-        label: "Profile Picture",
-        description: "Set a URL for your profile picture.",
+        label: "Add Profile Picture",
+        description: "Choose a photo for your profile.",
         destructive: false,
       },
       {
@@ -60,11 +60,25 @@ describe("Settings screen account actions", () => {
       })),
     ).toEqual([
       { key: "set-password", label: "Set Email Password" },
-      { key: "change-profile-picture", label: "Profile Picture" },
+      { key: "change-profile-picture", label: "Add Profile Picture" },
       { key: "reset-preferences", label: "Reset Preferences" },
       { key: "sign-out", label: "Sign Out" },
       { key: "delete-account", label: "Delete Account" },
     ]);
+  });
+
+  it("offers changing instead of adding once a profile picture shows", () => {
+    expect(
+      getSettingsAccountActions({
+        canSignOut: true,
+        hasPasswordAccount: true,
+        hasOAuthAccount: false,
+        hasProfilePicture: true,
+      }).find((action) => action.key === "change-profile-picture"),
+    ).toMatchObject({
+      label: "Change Profile Picture",
+      description: "Choose a new photo or remove the current one.",
+    });
   });
 
   it("omits sign out when there is no authenticated user", () => {

@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+
+jest.mock("../../lib/avatar-storage", () => ({
+  deleteAvatar: jest.fn(async () => undefined),
+}));
+
+import { deleteAvatar } from "../../lib/avatar-storage";
 import { NotFoundError } from "../../lib/errors";
 import { AccountService } from "../../services/account.service";
 
@@ -14,6 +20,7 @@ function createMockPrisma() {
       deleteMany: jest.fn(async () => ({ count: 1 })),
     },
     user: {
+      update: jest.fn(async () => ({ id: "user-1", avatarId: "avatar-1", pendingAvatarId: "pending-1" })),
       delete: jest.fn(async () => ({ id: "user-1" })),
     },
   };
@@ -24,11 +31,13 @@ function createMockPrisma() {
         () => Promise<{
           id: string;
           email: string;
+          avatarId?: string | null;
           mailDirectoryEntry: { email: string } | null;
         } | null>
       >(async () => ({
         id: "user-1",
         email: "Alice@solace.onl",
+        avatarId: "avatar-1",
         mailDirectoryEntry: { email: "alice@solace.onl" },
       })),
       delete: tx.user.delete,
@@ -187,6 +196,8 @@ describe("AccountService", () => {
         mailDirectoryEntry: { select: { email: true } },
       },
     });
+    expect(deleteAvatar).toHaveBeenCalledWith("avatar-1");
+    expect(deleteAvatar).toHaveBeenCalledWith("pending-1");
     expect(mockPrisma.prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(mockPrisma.tx.calendarSharing.deleteMany).toHaveBeenCalledWith({
       where: {
@@ -229,10 +240,17 @@ describe("AccountService", () => {
       new Error("Could not delete the linked Stalwart mailbox."),
     );
 
-    await expect(
-      service.deleteAccount({ userId: "user-1" }),
-    ).rejects.toThrow("Could not delete the linked Stalwart mailbox.");
+    await expect(service.deleteAccount({ userId: "user-1" })).rejects.toThrow(
+      "Could not delete the linked Stalwart mailbox.",
+    );
 
     expect(mockPrisma.prisma.$transaction).not.toHaveBeenCalled();
+  });
+  it("does not discard the account when deleting its avatar fails", async () => {
+    jest.mocked(deleteAvatar).mockRejectedValueOnce(new Error("delete failed"));
+    await expect(service.deleteAccount({ userId: "user-1" })).rejects.toThrow(
+      "delete failed",
+    );
+    expect(mockPrisma.tx.user.delete).not.toHaveBeenCalled();
   });
 });

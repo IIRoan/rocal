@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Image,
   InteractionManager,
+  PixelRatio,
+  StyleSheet,
   View,
   type StyleProp,
   type ViewStyle,
@@ -35,6 +37,7 @@ export function BlobatarAvatar({
   borderRadius,
   style,
   animate = false,
+  onImageLoadedChange,
 }: {
   email?: string | null;
   name?: string | null;
@@ -44,12 +47,16 @@ export function BlobatarAvatar({
   style?: StyleProp<ViewStyle>;
   /** Idle motion. Off in lists/settings — the animated adapter writes shared values during render. */
   animate?: boolean;
+  onImageLoadedChange?: (loaded: boolean) => void;
 }) {
   const [failed, setFailed] = useState(false);
   const [idleReady, setIdleReady] = useState(false);
-  const resolvedSrc = resolveSolaceProfileAvatarUrl(src, API_BASE_URL);
-  const lookedUp = useSolaceProfileImage(email, { enabled: !resolvedSrc });
-  const imageSrc = resolvedSrc || lookedUp;
+  const lookedUp = useSolaceProfileImage(email, { enabled: !src });
+  const imageSrc = resolveSolaceProfileAvatarUrl(
+    src || lookedUp,
+    API_BASE_URL,
+    PixelRatio.getPixelSizeForLayoutSize(size),
+  );
   const seed = blobatarName(email, name);
   const radius = borderRadius ?? size / 2;
 
@@ -93,24 +100,28 @@ export function BlobatarAvatar({
     return { uri: imageSrc };
   }, [imageSrc]);
 
-  if (imageSource && !failed) {
-    return (
-      <Image
-        source={imageSource}
-        accessibilityLabel={label}
-        onError={() => setFailed(true)}
-        style={{ width: size, height: size, borderRadius: radius }}
-      />
-    );
-  }
+  const showImage = imageSource && !failed;
 
+  // The Blobatar stays underneath so loading or broken pictures never show an empty circle.
   return (
     <View style={boxStyle}>
-      {animate && idleReady ? (
+      {animate && idleReady && !showImage ? (
         <AnimatedBlobatar {...blobatarProps} animate />
       ) : (
         <Blobatar {...blobatarProps} />
       )}
+      {showImage ? (
+        <Image
+          source={imageSource}
+          accessibilityLabel={label}
+          onLoad={() => onImageLoadedChange?.(true)}
+          onError={() => {
+            setFailed(true);
+            onImageLoadedChange?.(false);
+          }}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
     </View>
   );
 }

@@ -272,14 +272,9 @@ export function useCommandPaletteController({
     }
   };
 
-  const handleUpdateProfile = async ({
-    imageUrl,
-  }: {
-    name?: string;
-    imageUrl?: string;
-  }) => {
+  const handleUpdateProfile = async (input: { image: string | null }) => {
     dispatchBusy({ type: "setUpdatingProfile", value: true });
-    const result = await persistProfileUpdate({ imageUrl });
+    const result = await persistProfileUpdate({ ...input, queryClient });
     if (result.ok) {
       dispatchBusy({ type: "setLocalImageOverride", value: result.image });
     }

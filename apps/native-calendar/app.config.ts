@@ -80,6 +80,15 @@ const baseConfig = {
     "expo-web-browser",
     "expo-updates",
     "expo-sharing",
+    [
+      "expo-image-picker",
+      {
+        photosPermission:
+          "Solace uses your photo library only when you choose a profile picture.",
+        cameraPermission: false,
+        microphonePermission: false,
+      },
+    ],
     "expo-status-bar",
     "react-native-quick-crypto",
     [

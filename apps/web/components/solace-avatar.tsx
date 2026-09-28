@@ -1,12 +1,9 @@
 "use client";
 
 import { BlobatarAvatar } from "@workspace/ui/components/ui/blobatar-avatar";
-import {
-  isSolaceProfileAvatarUrl,
-  resolveSolaceProfileAvatarUrl,
-} from "@workspace/calendar-core";
+import { isSolaceProfileAvatarUrl } from "@workspace/calendar-core";
 import { useSolaceProfileImage } from "@/hooks/use-solace-profile-image";
-import { getApiBaseUrl } from "@/lib/api-url";
+import { resolveAvatarUrl } from "@/lib/profile-picture";
 
 export function SolaceAvatar({
   email,
@@ -23,7 +20,7 @@ export function SolaceAvatar({
   title?: string;
   animate?: "hover" | "always";
 }) {
-  const resolvedSrc = resolveSolaceProfileAvatarUrl(src, getApiBaseUrl());
+  const resolvedSrc = resolveAvatarUrl(src);
   const lookedUp = useSolaceProfileImage(email, { enabled: !resolvedSrc });
   const displaySrc = resolvedSrc || lookedUp;
 

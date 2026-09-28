@@ -101,6 +101,8 @@ export interface AuthContextValue {
   consumePendingAuthPassword: () => string | null;
   /** Clear any pending email/password sign-in password. */
   clearPendingAuthPassword: () => void;
+  /** Re-read the signed-in user from the server, bypassing the session cookie cache. */
+  refreshUser: () => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -651,6 +653,13 @@ export function AuthProvider({
     await deleteStoredPasskey(authClient, id);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const result = await authClient.getSession({
+      query: { disableCookieCache: true },
+    });
+    applySessionData(result?.data);
+  }, [applySessionData]);
+
   // ── Context value ────────────────────────────────────────────────────
 
   const value = useMemo<AuthContextValue>(
@@ -671,6 +680,7 @@ export function AuthProvider({
       consumePendingAuthPassword,
       peekPendingAuthPassword,
       clearPendingAuthPassword,
+      refreshUser,
     }),
     [
       user,
@@ -688,6 +698,7 @@ export function AuthProvider({
       consumePendingAuthPassword,
       peekPendingAuthPassword,
       clearPendingAuthPassword,
+      refreshUser,
     ],
   );
 
