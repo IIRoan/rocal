@@ -17,6 +17,8 @@ import {
   decryptMailMessage,
   decryptPgpMimeMessage,
   clearVaultCache,
+  holdVaultUnlock,
+  releaseVaultUnlock,
   isVaultLoaded,
   getLoadedVaultFingerprint,
   type MailDecryptResult,
@@ -336,6 +338,33 @@ describe("mail-crypto", () => {
 
       const runtime = buildRuntime();
       await expect(ensureVaultLoaded(runtime)).rejects.toThrow(/vault backup/i);
+    });
+
+    it("waits for a held unlock instead of failing before the E2EE session exists", async () => {
+      mockSuccessfulVaultLoad();
+      holdVaultUnlock();
+
+      const pending = ensureVaultLoaded(buildRuntime());
+      await Promise.resolve();
+      expect(mockMailFetch).not.toHaveBeenCalled();
+
+      releaseVaultUnlock();
+      await pending;
+      expect(mockMailFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("sign-out releases a held unlock so waiters settle", async () => {
+      mockMailFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        text: async () => "Unauthorized",
+      });
+      holdVaultUnlock();
+
+      const pending = ensureVaultLoaded(buildRuntime());
+      clearVaultCache();
+
+      await expect(pending).rejects.toThrow(/vault backup/i);
     });
 
     it("returns the cached vault on repeated calls (does not re-fetch)", async () => {

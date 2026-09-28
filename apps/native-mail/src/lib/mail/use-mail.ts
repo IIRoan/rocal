@@ -21,7 +21,10 @@ import {
   shouldEncryptOutgoingMail,
 } from "@workspace/calendar-core";
 import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
-import { MAILBOX_MESSAGES_PAGE_SIZE } from "./mail-pagination";
+import {
+  MAILBOX_MESSAGES_PAGE_SIZE,
+  mailboxPageMaxBodyValueBytes,
+} from "./mail-pagination";
 import {
   flattenMailboxMessagesCache,
   patchMailboxMessagesCache,
@@ -37,6 +40,7 @@ import {
   rollbackOptimisticMove,
   type MailMoveSnapshot,
 } from "./mail-move-cache";
+import { hasTruncatedBody } from "./mail-offline-snapshot";
 import type { JmapEmailMessage } from "./types";
 
 export type { MailMoveSnapshot } from "./mail-move-cache";
@@ -144,7 +148,11 @@ export function useMailboxMessages(
       const { messages, total } = await runtime!.client.getMailboxMessages(
         runtime!.session,
         mailboxId!,
-        { limit: pageSize, position: pageParam },
+        {
+          limit: pageSize,
+          position: pageParam,
+          maxBodyValueBytes: mailboxPageMaxBodyValueBytes(pageParam),
+        },
       );
       return {
         messages: sortMessagesByDate(messages),
@@ -218,11 +226,13 @@ export function useMailMessage(
   runtime: MailRuntime | undefined,
   messageId: string,
 ) {
-  const cached = useCachedMessage(messageId);
+  const listCopy = useCachedMessage(messageId);
+  // Offline-snapshot copies may carry capped bodies; the reader always gets the full message.
+  const cached = listCopy && !hasTruncatedBody(listCopy) ? listCopy : undefined;
   return useQuery<JmapEmailMessage | null>({
     queryKey: QUERY_KEYS.mailMessage(messageId),
     enabled: Boolean(messageId) && (Boolean(cached) || Boolean(runtime)),
-    initialData: cached ?? undefined,
+    initialData: cached,
     queryFn: async () => {
       if (cached) return cached;
       // Non-null: the query is only enabled once runtime (or a cached copy) exists.

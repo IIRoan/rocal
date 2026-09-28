@@ -149,6 +149,18 @@ export function isDraftMessage(
   return Boolean(message.mailboxIds?.[draftsMailboxId]);
 }
 
+/** Keeps the first occurrence of each message id, preserving order. */
+export function uniqueMessagesById(
+  messages: JmapEmailMessage[],
+): JmapEmailMessage[] {
+  const seen = new Set<string>();
+  return messages.filter((message) => {
+    if (seen.has(message.id)) return false;
+    seen.add(message.id);
+    return true;
+  });
+}
+
 export function sortMessagesByDate(
   messages: JmapEmailMessage[],
 ): JmapEmailMessage[] {

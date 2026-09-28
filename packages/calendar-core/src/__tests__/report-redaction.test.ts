@@ -50,6 +50,23 @@ describe("redactPII / sanitizeRequestUrl", () => {
     );
     expect(sanitizeRequestUrl("/mail?q=alice")).toBe("/mail?[redacted]");
   });
+
+  it("redacts email path params in URLs, including percent-encoded forms", () => {
+    expect(
+      sanitizeRequestUrl(
+        "http://cloudflared.roan.dev/api/mail/keys/testingproduction16%40solace.onl",
+      ),
+    ).toBe("http://cloudflared.roan.dev/api/mail/keys/[email]");
+    expect(
+      sanitizeRequestUrl("https://api.solace.onl/api/mail/keys/bob@solace.onl"),
+    ).toBe("https://api.solace.onl/api/mail/keys/[email]");
+  });
+
+  it("redacts percent-encoded emails from free text", () => {
+    expect(redactPII("key lookup failed for bob%40solace.onl")).toBe(
+      "key lookup failed for [email]",
+    );
+  });
 });
 
 describe("sanitizeContext", () => {

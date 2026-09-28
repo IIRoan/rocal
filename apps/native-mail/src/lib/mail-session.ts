@@ -1,3 +1,4 @@
+import type { QueryClient } from "@tanstack/react-query";
 import type { AuthLifecycle } from "@workspace/native-core/providers/AuthProvider";
 import {
   enforceFullEventEncryption,
@@ -5,7 +6,12 @@ import {
 } from "@workspace/native-core/lib/startup-crypto";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import { bootstrapMailboxForAccount } from "./mail/account-bootstrap";
-import { clearVaultCache, ensureVaultLoaded } from "./mail/mail-crypto";
+import {
+  clearVaultCache,
+  ensureVaultLoaded,
+  holdVaultUnlock,
+  releaseVaultUnlock,
+} from "./mail/mail-crypto";
 import { getMailAccountStatus, getMailConfig } from "./mail/mail-api";
 import {
   clearCachedPrivateKey,
@@ -13,15 +19,74 @@ import {
   clearMailVaultPassword,
   saveMailVaultPassword,
 } from "./mail/mail-password-cache";
-import { buildMailRuntime } from "./mail/mail-runtime";
+import { buildMailRuntime, type MailRuntime } from "./mail/mail-runtime";
 import { clearMailSettings } from "./mail/mail-settings-store";
 import { clearMailListSettings } from "./mail/mail-list-settings-store";
+import {
+  clearMailOfflineSnapshot,
+  loadMailOfflineSnapshot,
+} from "./mail/mail-offline-store";
+import { hydrateMailOfflineSnapshot } from "./mail/mail-offline-snapshot";
+import {
+  getMailSyncState,
+  resetMailSync,
+  setMailSyncState,
+} from "./mail/mail-sync";
+
+const RUNTIME_STALE_MS = 5 * 60_000;
+
+let restoredUserId: string | null = null;
+
+/** Seeds the cache from the encrypted snapshot before E2EE starts, so the mailbox opens without the loading screen. */
+export async function restoreMailSession(input: {
+  queryClient: QueryClient;
+  userId: string;
+}): Promise<boolean> {
+  const snapshot = await loadMailOfflineSnapshot(input.userId);
+  if (!snapshot) return false;
+  holdVaultUnlock();
+  // A sync that already ran this launch is newer than the snapshot; never rewind it.
+  if (getMailSyncState() === null) setMailSyncState(snapshot.emailState);
+  hydrateMailOfflineSnapshot(input.queryClient, snapshot);
+  restoredUserId = input.userId;
+  return true;
+}
+
+/** Runs behind an already-visible mailbox: refresh the runtime and unlock the vault in parallel. */
+async function finishRestoredMailSession(
+  input: AuthenticatedSessionInput,
+): Promise<void> {
+  const { queryClient } = input;
+  const restoredRuntime = queryClient.getQueryData<MailRuntime>(
+    QUERY_KEYS.mailRuntime(),
+  );
+  await Promise.all([
+    enforceFullEventEncryption(input),
+    queryClient.fetchQuery({
+      queryKey: QUERY_KEYS.mailRuntime(),
+      queryFn: buildMailRuntime,
+      staleTime: RUNTIME_STALE_MS,
+    }),
+    restoredRuntime
+      ? ensureVaultLoaded(restoredRuntime).then(() =>
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mailLabels() }),
+        )
+      : Promise.resolve(),
+  ]);
+}
 
 /** Mail startup: provision the mailbox on first sign-in, then connect and unlock the vault. */
 export async function prepareMailSession(
   input: AuthenticatedSessionInput,
 ): Promise<void> {
   const setPhase = (phase: string) => input.onPhaseChange?.(phase);
+
+  // The guard only calls this once E2EE bootstrap settled, so waiting vault unlocks can proceed.
+  releaseVaultUnlock();
+  if (restoredUserId === input.userId) {
+    await finishRestoredMailSession(input);
+    return;
+  }
 
   await enforceFullEventEncryption(input);
   if (input.isCancelled()) return;
@@ -73,8 +138,12 @@ export async function prepareMailSession(
   const runtime = await input.queryClient.fetchQuery({
     queryKey: QUERY_KEYS.mailRuntime(),
     queryFn: buildMailRuntime,
-    staleTime: 5 * 60_000,
+    staleTime: RUNTIME_STALE_MS,
   });
+  // Anchor sync before the first list loads so that list is never refetched just to set a baseline.
+  setMailSyncState(
+    await runtime.client.getEmailState(runtime.session).catch(() => null),
+  );
 
   setPhase("Unlocking encrypted mail…");
   await ensureVaultLoaded(runtime);
@@ -89,6 +158,9 @@ export const MAIL_AUTH_LIFECYCLE: AuthLifecycle = {
     await clearCachedPrivateKey();
     await clearMailSettings();
     await clearMailListSettings();
+    await clearMailOfflineSnapshot();
+    restoredUserId = null;
+    resetMailSync();
     clearVaultCache();
   },
 };

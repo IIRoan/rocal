@@ -70,5 +70,7 @@ export const SECURE_STORE_KEYS = {
   /** Message list density, read delay, and undo duration. Cleared on sign-out. */
   MAIL_LIST_SETTINGS: "MAIL_LIST_SETTINGS",
   SEARCH_INDEX_KEY: "SEARCH_INDEX_KEY",
+  /** AES-GCM key for the on-device mailbox snapshot. Cleared on sign-out. */
+  MAIL_OFFLINE_CACHE_KEY: "MAIL_OFFLINE_CACHE_KEY",
   SEARCH_INDEX_ENABLED: "SEARCH_INDEX_ENABLED",
 } as const;

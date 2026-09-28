@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { useQueries } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
+import { useQueries, type UseQueryResult } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import type { MailDecryptResult } from "./mail-crypto";
 import {
@@ -30,6 +30,25 @@ export function useConversationDecryptedPreviews(
     [messages],
   );
 
+  // A stable combine keeps the map (and every list row) unchanged until a decrypt actually lands.
+  const combineDecrypted = useCallback(
+    (results: UseQueryResult<MailDecryptResult>[]) => {
+      const map = new Map<string, DecryptedMailPreviewContent>();
+      for (let index = 0; index < encryptedMessages.length; index += 1) {
+        const message = encryptedMessages[index];
+        const data = results[index]?.data;
+        if (message && data) {
+          map.set(message.id, {
+            text: data.plaintext,
+            html: data.html,
+          });
+        }
+      }
+      return map;
+    },
+    [encryptedMessages],
+  );
+
   const decryptedById = useQueries({
     queries: encryptedMessages.map((message) => {
       const encryption = classifyMessageEncryption(message);
@@ -54,20 +73,7 @@ export function useConversationDecryptedPreviews(
         },
       };
     }),
-    combine: (results) => {
-      const map = new Map<string, DecryptedMailPreviewContent>();
-      for (let index = 0; index < encryptedMessages.length; index += 1) {
-        const message = encryptedMessages[index];
-        const data = results[index]?.data;
-        if (message && data) {
-          map.set(message.id, {
-            text: data.plaintext,
-            html: data.html,
-          });
-        }
-      }
-      return map;
-    },
+    combine: combineDecrypted,
   });
 
   return useMemo(() => {

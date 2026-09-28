@@ -1,8 +1,6 @@
 import {
   capIdentitiesForPicker,
-  resolveEncryptionInternalDomain,
   resolveMailServerPolicy,
-  shouldEncryptOutgoingMail,
   type MailServerPolicy,
 } from "@workspace/calendar-core";
 import {
@@ -48,21 +46,58 @@ export async function refreshMailRuntimePolicy(
   };
 }
 
+/** Serializable part of a runtime; the JMAP client is rebuilt from `config` on restore. */
+export type PersistedMailRuntime = Omit<MailRuntime, "client" | "pickerIdentities">;
+
+function createMailClient(config: MailRuntime["config"]): StalwartJmapClient {
+  const tokenManager = createServerMailTokenManager(
+    config.oauth.mailTokenEndpoint,
+  );
+  return new StalwartJmapClient({
+    baseUrl: config.discoveryBaseUrl,
+    getAccessToken: () => tokenManager.getAccessToken(),
+    fetcher: mailFetch,
+  });
+}
+
+export function toPersistedMailRuntime(
+  runtime: MailRuntime,
+): PersistedMailRuntime {
+  return {
+    config: runtime.config,
+    session: runtime.session,
+    accountId: runtime.accountId,
+    mailboxes: runtime.mailboxes,
+    identities: runtime.identities,
+    encryptedAtRest: runtime.encryptedAtRest,
+    mailServerPolicy: runtime.mailServerPolicy,
+  };
+}
+
+/** Rebuilds a usable runtime from a saved snapshot without any network round trip; tokens are fetched lazily on first call. */
+export function restoreMailRuntime(persisted: PersistedMailRuntime): MailRuntime {
+  const client = createMailClient(persisted.config);
+  client.setMailServerPolicy(
+    persisted.mailServerPolicy,
+    persisted.config.serverLimits ?? null,
+  );
+  return {
+    ...persisted,
+    client,
+    pickerIdentities: capIdentitiesForPicker(
+      persisted.identities,
+      persisted.mailServerPolicy,
+    ),
+  };
+}
+
 /**
  * Builds an authenticated JMAP runtime for the signed-in user after mailbox
  * provisioning has completed on either native or web.
  */
 export async function buildMailRuntime(): Promise<MailRuntime> {
   const config = await getMailConfig();
-
-  const tokenManager = createServerMailTokenManager(
-    config.oauth.mailTokenEndpoint,
-  );
-  const client = new StalwartJmapClient({
-    baseUrl: config.discoveryBaseUrl,
-    getAccessToken: () => tokenManager.getAccessToken(),
-    fetcher: mailFetch,
-  });
+  const client = createMailClient(config);
 
   const session = await client.discoverSession();
   const accountId = getPrimaryMailAccountId(session);

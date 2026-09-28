@@ -479,3 +479,38 @@ Patterns that fire diagnostics but are safe to suppress.
   https://github.com/pacocoursey/next-themes/issues/385. We filter that
   specific `console.error` in development only (same approach as the shadcn
   Next.js dark-mode docs).
+
+## react-doctor/no-giant-component — native MailScreen (resolved)
+
+- **File**: `apps/native-mail/app/mail/index.tsx` (`MailScreen`)
+- **Note**: Screen logic moved to `src/hooks/use-mail-list-controller.ts`, which
+  now composes `use-mail-account-state`, `use-mail-list-search`,
+  `use-mailbox-thread-rows`, `use-mail-list-selection`, `use-mail-bulk-actions`,
+  and `use-mail-row-handlers`. The screen is a gate (`MailScreenBody`) plus
+  `MailThreadList`, `MailListEmptyState`, and `MailBulkActionSheet`, and row
+  derivation lives in `lib/mail/thread-row-state.ts` (2026-09-28).
+
+## react-doctor/no-high-complexity-react-function — MailMessageRowComponent (resolved)
+
+- **File**: `apps/native-mail/src/components/mail/MailMessageRow.tsx`
+- **Note**: Row branches extracted into `MailRowTopLine`, `MailRowLabels`, and
+  `MailRowThreadList` subcomponents plus `useThreadExpansion`,
+  `useMailRowSelection`, and the `getRowIdentity` helper; the memoized
+  `MailMessageRow` API is unchanged (2026-09-28).
+
+## react-doctor/async-await-in-loop — jmap-client chunked requests (resolved)
+
+- **Files**: `apps/native-mail/src/lib/mail/jmap-client.ts`,
+  `apps/web/lib/mail/jmap-client.ts`
+- **Note**: Chunked `Email/get` fetches, the `call` method-call splitter, and the
+  web blob-upload refresh now run their independent units via `Promise.all`; the
+  splitter only runs when no method call references another's result, so chunks
+  are independent by construction. Tests assert concurrency and merged response
+  order (2026-09-28).
+
+## react-doctor/no-adjust-state-on-prop-change — mail list selection (resolved)
+
+- **File**: `apps/native-mail/src/hooks/use-mail-list-selection.ts`
+- **Note**: Selection no longer clears in an effect keyed on the mailbox id;
+  `handleSelectMailbox` (the only event that switches mailbox) clears it
+  alongside the cache invalidation (2026-09-28).

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -27,6 +27,7 @@ import {
 import {
   ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER,
   listPreviewSnippet,
+  messageNeedsDecryptedPreview,
 } from "../../lib/mail/mail-preview";
 import { getAllMessageLabels } from "../../lib/mail/use-labels";
 import type {
@@ -49,6 +50,9 @@ import { BlobatarAvatar } from "@workspace/native-core/components/BlobatarAvatar
 const EMPTY_LABELS: LabelDef[] = [];
 const EMPTY_IDENTITIES: JmapIdentity[] = [];
 const MAX_VISIBLE_LABELS = 2;
+const PREVIEW_LINE_HEIGHT = 19;
+
+type MailRowStyles = ReturnType<typeof createStyles>;
 
 function pulseSelect(entering: boolean) {
   void Haptics.impactAsync(
@@ -80,60 +84,73 @@ interface MailMessageRowProps {
   onToggleSelect?: (message: JmapEmailMessage) => void;
 }
 
-function MailMessageRowComponent({
+function getRowIdentity({
   message,
+  threadCount,
+  threadUnreadCount,
   threadMessages,
-  threadCount = 1,
-  threadUnreadCount = 0,
-  hasAttachments = false,
-  showRecipient = false,
-  labels = EMPTY_LABELS,
-  identities = EMPTY_IDENTITIES,
-  preview: previewOverride,
-  selectionActive = false,
-  selected = false,
-  timeFormat,
-  timezone,
-  density = "compact",
-  showLabelChips = true,
-  threadExpandable = false,
-  onPress,
-  onLongPress,
-  onToggleSelect,
-}: MailMessageRowProps) {
-  const { theme } = useTheme();
-  const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
-  const [threadExpanded, setThreadExpanded] = useState(false);
-  const comfortable = density === "comfortable";
-
+  showRecipient,
+}: {
+  message: JmapEmailMessage;
+  threadCount: number;
+  threadUnreadCount: number;
+  threadMessages?: JmapEmailMessage[];
+  showRecipient: boolean;
+}) {
   const read =
     threadCount > 1 ? threadUnreadCount === 0 : isMessageRead(message);
-  const flagged = isMessageFlagged(message);
-  const messageLabels = getAllMessageLabels(message, labels);
-  const addresses = showRecipient ? message.to : message.from;
   const threadSenders =
     threadCount > 1 && threadMessages?.length
       ? formatThreadSenders(threadMessages)
       : null;
-  const name = threadSenders ?? formatAddress(addresses);
-  const subject = message.subject?.trim() || "(no subject)";
-  const previewRaw = previewOverride?.trim() || listPreviewSnippet(message);
-  const preview =
-    previewRaw === ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER ? "" : previewRaw;
-  const visibleLabels = showLabelChips
-    ? messageLabels.slice(0, MAX_VISIBLE_LABELS)
-    : EMPTY_LABELS;
-  const extraLabelCount = showLabelChips
-    ? messageLabels.length - visibleLabels.length
-    : 0;
+  const addresses = showRecipient ? message.to : message.from;
+  return { read, addresses, name: threadSenders ?? formatAddress(addresses) };
+}
+
+function useThreadExpansion({
+  threadExpandable,
+  threadCount,
+  threadMessages,
+  message,
+}: {
+  threadExpandable: boolean;
+  threadCount: number;
+  threadMessages?: JmapEmailMessage[];
+  message: JmapEmailMessage;
+}) {
+  const [threadExpanded, setThreadExpanded] = useState(false);
   const canExpandThread =
     threadExpandable && threadCount > 1 && (threadMessages?.length ?? 0) > 1;
   const earlierMessages =
     canExpandThread && threadExpanded && threadMessages
       ? threadMessages.filter((entry) => entry.id !== message.id)
       : null;
+  const toggleThreadExpanded = useCallback(() => {
+    setThreadExpanded((prev) => !prev);
+  }, []);
+  return {
+    threadExpanded,
+    canExpandThread,
+    earlierMessages,
+    toggleThreadExpanded,
+  };
+}
 
+function useMailRowSelection({
+  message,
+  selected,
+  selectionActive,
+  onPress,
+  onLongPress,
+  onToggleSelect,
+}: {
+  message: JmapEmailMessage;
+  selected: boolean;
+  selectionActive: boolean;
+  onPress: (message: JmapEmailMessage) => void;
+  onLongPress?: (message: JmapEmailMessage) => void;
+  onToggleSelect?: (message: JmapEmailMessage) => void;
+}) {
   const selectedProgress = useSharedValue(selected ? 1 : 0);
 
   useEffect(() => {
@@ -160,10 +177,73 @@ function MailMessageRowComponent({
     onPress(message);
   };
 
+  const handleLongPress =
+    onLongPress || onToggleSelect ? applyToggle : undefined;
+
+  return { checkFillStyle, applyToggle, handleRowPress, handleLongPress };
+}
+
+function MailMessageRowComponent({
+  message,
+  threadMessages,
+  threadCount = 1,
+  threadUnreadCount = 0,
+  hasAttachments = false,
+  showRecipient = false,
+  labels = EMPTY_LABELS,
+  identities = EMPTY_IDENTITIES,
+  preview: previewOverride,
+  selectionActive = false,
+  selected = false,
+  timeFormat,
+  timezone,
+  density = "compact",
+  showLabelChips = true,
+  threadExpandable = false,
+  onPress,
+  onLongPress,
+  onToggleSelect,
+}: MailMessageRowProps) {
+  const { theme } = useTheme();
+  const skin = useMailSkin();
+  const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
+  const comfortable = density === "comfortable";
+
+  const { read, addresses, name } = getRowIdentity({
+    message,
+    threadCount,
+    threadUnreadCount,
+    threadMessages,
+    showRecipient,
+  });
+  const flagged = isMessageFlagged(message);
+  const messageLabels = getAllMessageLabels(message, labels);
+  const subject = message.subject?.trim() || "(no subject)";
+  const {
+    threadExpanded,
+    canExpandThread,
+    earlierMessages,
+    toggleThreadExpanded,
+  } = useThreadExpansion({
+    threadExpandable,
+    threadCount,
+    threadMessages,
+    message,
+  });
+  const { checkFillStyle, applyToggle, handleRowPress, handleLongPress } =
+    useMailRowSelection({
+      message,
+      selected,
+      selectionActive,
+      onPress,
+      onLongPress,
+      onToggleSelect,
+    });
+
   return (
     <Pressable
       onPress={handleRowPress}
-      onLongPress={onLongPress || onToggleSelect ? applyToggle : undefined}
+      onLongPress={handleLongPress}
       delayLongPress={350}
       style={({ pressed }) => [
         styles.row,
@@ -200,69 +280,21 @@ function MailMessageRowComponent({
       </Pressable>
 
       <View style={styles.content}>
-        <View style={styles.topLine}>
-          <View style={styles.senderLine}>
-            <Text
-              style={[styles.sender, !read && styles.senderUnread]}
-              numberOfLines={1}
-            >
-              {name}
-            </Text>
-            {canExpandThread ? (
-              <Pressable
-                onPress={() => setThreadExpanded((prev) => !prev)}
-                hitSlop={10}
-                style={({ pressed }) => [
-                  styles.threadToggle,
-                  pressed && styles.threadTogglePressed,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  threadExpanded
-                    ? "Collapse conversation"
-                    : `Show ${threadCount} messages`
-                }
-                accessibilityState={{ expanded: threadExpanded }}
-              >
-                <Text style={styles.threadCount}>{threadCount}</Text>
-                <Feather
-                  name={threadExpanded ? "chevron-up" : "chevron-down"}
-                  size={MAIL_ICON.rowMeta}
-                  color={skin.textTertiary}
-                />
-              </Pressable>
-            ) : threadCount > 1 ? (
-              <Text style={styles.threadCount}>{threadCount}</Text>
-            ) : null}
-            {!read ? <View style={styles.unreadDot} /> : null}
-            <MailIdentityBadge
-              message={message}
-              identities={identities}
-              compact
-            />
-          </View>
-          <View style={styles.meta}>
-            {flagged ? (
-              <FontAwesome
-                name="star"
-                size={MAIL_ICON.rowMeta - 2}
-                color={skin.accent}
-                accessibilityLabel="Starred"
-              />
-            ) : null}
-            {hasAttachments ? (
-              <Feather
-                name="paperclip"
-                size={MAIL_ICON.rowMeta - 1}
-                color={skin.textTertiary}
-                accessibilityLabel="Has attachments"
-              />
-            ) : null}
-            <Text style={styles.date}>
-              {formatMessageDate(message.receivedAt, { timeFormat, timezone })}
-            </Text>
-          </View>
-        </View>
+        <MailRowTopLine
+          name={name}
+          read={read}
+          message={message}
+          identities={identities}
+          threadCount={threadCount}
+          threadExpanded={threadExpanded}
+          canExpandThread={canExpandThread}
+          onToggleThreadExpanded={toggleThreadExpanded}
+          flagged={flagged}
+          hasAttachments={hasAttachments}
+          timeFormat={timeFormat}
+          timezone={timezone}
+          styles={styles}
+        />
 
         <Text
           style={[styles.subject, !read && styles.subjectUnread]}
@@ -271,69 +303,246 @@ function MailMessageRowComponent({
           {subject}
         </Text>
 
-        {preview ? (
-          <Text style={styles.preview} numberOfLines={comfortable ? 2 : 1}>
-            {preview}
-          </Text>
-        ) : null}
+        <MailRowPreview
+          message={message}
+          override={previewOverride}
+          comfortable={comfortable}
+          styles={styles}
+        />
 
-        {visibleLabels.length > 0 ? (
-          <View style={styles.labels}>
-            {visibleLabels.map((label) => (
-              <MailLabelChip
-                key={label.id}
-                name={label.name}
-                color={label.color}
-              />
-            ))}
-            {extraLabelCount > 0 ? (
-              <Text style={styles.labelOverflow}>+{extraLabelCount}</Text>
-            ) : null}
-          </View>
-        ) : null}
+        <MailRowLabels
+          messageLabels={messageLabels}
+          showLabelChips={showLabelChips}
+          styles={styles}
+        />
 
         {earlierMessages ? (
-          <View style={styles.threadList}>
-            {earlierMessages.map((entry) => {
-              const entryRead = isMessageRead(entry);
-              const entryName = formatAddress(
-                showRecipient ? entry.to : entry.from,
-              );
-              return (
-                <Pressable
-                  key={entry.id}
-                  onPress={() => onPress(entry)}
-                  disabled={selectionActive}
-                  style={({ pressed }) => [
-                    styles.threadItem,
-                    pressed && styles.threadItemPressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${entryRead ? "" : "Unread, "}${entryName}`}
-                >
-                  {!entryRead ? <View style={styles.unreadDot} /> : null}
-                  <Text
-                    style={[
-                      styles.threadItemSender,
-                      !entryRead && styles.senderUnread,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {entryName}
-                  </Text>
-                  <Text style={styles.date}>
-                    {formatMessageDate(entry.receivedAt, {
-                      timeFormat,
-                      timezone,
-                    })}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <MailRowThreadList
+            messages={earlierMessages}
+            showRecipient={showRecipient}
+            selectionActive={selectionActive}
+            timeFormat={timeFormat}
+            timezone={timezone}
+            onPress={onPress}
+            styles={styles}
+          />
         ) : null}
       </View>
     </Pressable>
+  );
+}
+
+function MailRowTopLine({
+  name,
+  read,
+  message,
+  identities,
+  threadCount,
+  threadExpanded,
+  canExpandThread,
+  onToggleThreadExpanded,
+  flagged,
+  hasAttachments,
+  timeFormat,
+  timezone,
+  styles,
+}: {
+  name: string;
+  read: boolean;
+  message: JmapEmailMessage;
+  identities: JmapIdentity[];
+  threadCount: number;
+  threadExpanded: boolean;
+  canExpandThread: boolean;
+  onToggleThreadExpanded: () => void;
+  flagged: boolean;
+  hasAttachments: boolean;
+  timeFormat: TimeFormat;
+  timezone?: string;
+  styles: MailRowStyles;
+}) {
+  const skin = useMailSkin();
+  return (
+    <View style={styles.topLine}>
+      <View style={styles.senderLine}>
+        <Text
+          style={[styles.sender, !read && styles.senderUnread]}
+          numberOfLines={1}
+        >
+          {name}
+        </Text>
+        {canExpandThread ? (
+          <Pressable
+            onPress={onToggleThreadExpanded}
+            hitSlop={10}
+            style={({ pressed }) => [
+              styles.threadToggle,
+              pressed && styles.threadTogglePressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              threadExpanded
+                ? "Collapse conversation"
+                : `Show ${threadCount} messages`
+            }
+            accessibilityState={{ expanded: threadExpanded }}
+          >
+            <Text style={styles.threadCount}>{threadCount}</Text>
+            <Feather
+              name={threadExpanded ? "chevron-up" : "chevron-down"}
+              size={MAIL_ICON.rowMeta}
+              color={skin.textTertiary}
+            />
+          </Pressable>
+        ) : threadCount > 1 ? (
+          <Text style={styles.threadCount}>{threadCount}</Text>
+        ) : null}
+        {!read ? <View style={styles.unreadDot} /> : null}
+        <MailIdentityBadge message={message} identities={identities} compact />
+      </View>
+      <View style={styles.meta}>
+        {flagged ? (
+          <FontAwesome
+            name="star"
+            size={MAIL_ICON.rowMeta - 2}
+            color={skin.accent}
+            accessibilityLabel="Starred"
+          />
+        ) : null}
+        {hasAttachments ? (
+          <Feather
+            name="paperclip"
+            size={MAIL_ICON.rowMeta - 1}
+            color={skin.textTertiary}
+            accessibilityLabel="Has attachments"
+          />
+        ) : null}
+        <Text style={styles.date}>
+          {formatMessageDate(message.receivedAt, { timeFormat, timezone })}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function MailRowPreview({
+  message,
+  override,
+  comfortable,
+  styles,
+}: {
+  message: JmapEmailMessage;
+  override?: string;
+  comfortable: boolean;
+  styles: MailRowStyles;
+}) {
+  const raw = override?.trim() || listPreviewSnippet(message);
+  const preview = raw === ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER ? "" : raw;
+  if (preview) {
+    return (
+      <Text style={styles.preview} numberOfLines={comfortable ? 2 : 1}>
+        {preview}
+      </Text>
+    );
+  }
+  // Hold the preview line while it decrypts so the row does not grow under the user's scroll.
+  if (!messageNeedsDecryptedPreview(message)) return null;
+  return (
+    <View
+      style={[
+        styles.previewPlaceholder,
+        comfortable && styles.previewPlaceholderComfortable,
+      ]}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    />
+  );
+}
+
+function MailRowLabels({
+  messageLabels,
+  showLabelChips,
+  styles,
+}: {
+  messageLabels: LabelDef[];
+  showLabelChips: boolean;
+  styles: MailRowStyles;
+}) {
+  const visibleLabels = showLabelChips
+    ? messageLabels.slice(0, MAX_VISIBLE_LABELS)
+    : EMPTY_LABELS;
+  const extraLabelCount = showLabelChips
+    ? messageLabels.length - visibleLabels.length
+    : 0;
+  if (visibleLabels.length === 0) {
+    return null;
+  }
+  return (
+    <View style={styles.labels}>
+      {visibleLabels.map((label) => (
+        <MailLabelChip key={label.id} name={label.name} color={label.color} />
+      ))}
+      {extraLabelCount > 0 ? (
+        <Text style={styles.labelOverflow}>+{extraLabelCount}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function MailRowThreadList({
+  messages,
+  showRecipient,
+  selectionActive,
+  timeFormat,
+  timezone,
+  onPress,
+  styles,
+}: {
+  messages: JmapEmailMessage[];
+  showRecipient: boolean;
+  selectionActive: boolean;
+  timeFormat: TimeFormat;
+  timezone?: string;
+  onPress: (message: JmapEmailMessage) => void;
+  styles: MailRowStyles;
+}) {
+  return (
+    <View style={styles.threadList}>
+      {messages.map((entry) => {
+        const entryRead = isMessageRead(entry);
+        const entryName = formatAddress(showRecipient ? entry.to : entry.from);
+        return (
+          <Pressable
+            key={entry.id}
+            onPress={() => onPress(entry)}
+            disabled={selectionActive}
+            style={({ pressed }) => [
+              styles.threadItem,
+              pressed && styles.threadItemPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`${entryRead ? "" : "Unread, "}${entryName}`}
+          >
+            {!entryRead ? <View style={styles.unreadDot} /> : null}
+            <Text
+              style={[
+                styles.threadItemSender,
+                !entryRead && styles.senderUnread,
+              ]}
+              numberOfLines={1}
+            >
+              {entryName}
+            </Text>
+            <Text style={styles.date}>
+              {formatMessageDate(entry.receivedAt, {
+                timeFormat,
+                timezone,
+              })}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -429,6 +638,12 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       gap: pad.tight + 2,
       flexShrink: 0,
     },
+    previewPlaceholder: {
+      height: PREVIEW_LINE_HEIGHT,
+    },
+    previewPlaceholderComfortable: {
+      height: PREVIEW_LINE_HEIGHT * 2,
+    },
     labels: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
@@ -475,7 +690,7 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
     },
     preview: {
       fontSize: 14,
-      lineHeight: 19,
+      lineHeight: PREVIEW_LINE_HEIGHT,
       color: skin.textTertiary,
     },
     labelOverflow: {

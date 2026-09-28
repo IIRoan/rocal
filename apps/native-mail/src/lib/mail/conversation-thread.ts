@@ -233,6 +233,27 @@ export function buildMailboxThreadRows(
   return rows;
 }
 
+export function sameItems<T>(left: readonly T[], right: readonly T[]): boolean {
+  return (
+    left === right ||
+    (left.length === right.length &&
+      left.every((item, index) => item === right[index]))
+  );
+}
+
+/** Rows are rebuilt on every page append; this tells whether a row actually changed. */
+export function sameMailConversation(
+  left: MailConversation,
+  right: MailConversation,
+): boolean {
+  return (
+    left === right ||
+    (left.id === right.id &&
+      left.latestMessage === right.latestMessage &&
+      sameItems(left.messages, right.messages))
+  );
+}
+
 export function getConversationForMessage(
   messages: JmapEmailMessage[],
   messageId: string | null | undefined,

@@ -122,7 +122,7 @@ const mockMailService = {
   deleteMailboxForUser: jest.fn(async () => undefined),
 };
 
-import { errorHandler } from "../../lib/errors";
+import { handleApiError, NotFoundError } from "../../lib/errors";
 import { auth } from "../../lib/auth";
 import { createMailRoutes, probeMailJmapProxyDiscovery } from "../../routes/mail";
 
@@ -134,7 +134,7 @@ function createApp(options?: {
   jmapRateLimit?: { requests: number; windowMs: number };
 }) {
   return new Elysia({ normalize: false })
-    .use(errorHandler)
+    .error(handleApiError)
     .use(createMailRoutes(mockMailService, options));
 }
 
@@ -835,6 +835,25 @@ describe("mailRoutes", () => {
       fingerprint: "FACECAFE12345678",
       source: "internal",
       trust: "verified",
+    });
+  });
+
+  it("returns a 404 envelope when no internal key exists", async () => {
+    mockMailService.getDirectoryKey.mockRejectedValueOnce(
+      new NotFoundError("No internal public key was found for that email."),
+    );
+
+    const response = await createApp().handle(
+      new Request("http://localhost/mail/keys/bob@solace.onl"),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(readJson(response)).resolves.toEqual({
+      error: "Not Found",
+      message: "No internal public key was found for that email.",
+      statusCode: 404,
+      requestId: expect.any(String),
+      timestamp: expect.any(String),
     });
   });
 });

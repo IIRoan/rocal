@@ -68,6 +68,9 @@ jobs:
           VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
           CERT_HOST: mail.solace.onl
           RENEW_BEFORE_DAYS: "14"
+          # Passed via env so untrusted context is never interpolated into the shell script.
+          EVENT_NAME: ${{ github.event_name }}
+          FORCE_INPUT: ${{ inputs.force }}
         run: |
           set -euo pipefail
           : "${STALWART_DATABASE_URL:?set Environment secret STALWART_DATABASE_URL on mail-vps}"
@@ -78,8 +81,8 @@ jobs:
           echo "Deploy target: ${VPS_SSH_USER}@${VPS_SSH_HOST}:${VPS_SSH_PORT}"
 
           FORCE_FLAG=""
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
-            && [ "${{ inputs.force }}" = "true" ]; then
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ] \
+            && [ "${FORCE_INPUT}" = "true" ]; then
             FORCE_FLAG="--force"
           fi
 

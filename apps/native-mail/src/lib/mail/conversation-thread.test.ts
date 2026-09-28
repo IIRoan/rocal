@@ -2,6 +2,7 @@ import {
   buildMailboxThreadRows,
   getConversationForMessage,
   mergeConversationSourceMessages,
+  sameMailConversation,
 } from "./conversation-thread";
 import type { JmapEmailMessage } from "./types";
 
@@ -94,5 +95,33 @@ describe("mailbox thread rows", () => {
       "inbound",
       "sent-reply",
     ]);
+  });
+});
+
+describe("sameMailConversation", () => {
+  const older = message({ id: "old", threadId: "t-old", receivedAt: "2026-05-01T10:00:00.000Z" });
+  const newer = message({ id: "new", threadId: "t-new", receivedAt: "2026-05-19T10:00:00.000Z" });
+
+  function firstRow(messages: JmapEmailMessage[]) {
+    const [row] = buildMailboxThreadRows(messages);
+    if (!row) throw new Error("expected a thread row");
+    return row;
+  }
+
+  it("treats rows rebuilt after an older page lands as unchanged", () => {
+    const before = firstRow([newer]);
+    const after = firstRow([newer, older]);
+
+    expect(after).not.toBe(before);
+    expect(sameMailConversation(before, after)).toBe(true);
+  });
+
+  it("flags a row whose message changed or gained a reply", () => {
+    const row = firstRow([newer]);
+    const read = firstRow([{ ...newer, keywords: { $seen: true } }]);
+    const reply = message({ id: "reply", threadId: "t-new", receivedAt: "2026-05-18T10:00:00.000Z" });
+
+    expect(sameMailConversation(row, read)).toBe(false);
+    expect(sameMailConversation(row, firstRow([newer, reply]))).toBe(false);
   });
 });

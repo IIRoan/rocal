@@ -1483,3 +1483,143 @@ describe("StalwartJmapClient", () => {
     });
   });
 });
+
+describe("parallel chunked JMAP requests", () => {
+  const session: JmapSession = {
+    apiUrl: "http://localhost:4001/api/mail/jmap/",
+    accounts: { account: { name: "alice@solace.onl" } },
+    primaryAccounts: { "urn:ietf:params:jmap:mail": "account" },
+  };
+
+  function trackConcurrency() {
+    let inFlight = 0;
+    let peak = 0;
+    return {
+      async run<T>(work: () => T): Promise<T> {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        inFlight -= 1;
+        return work();
+      },
+      getPeak: () => peak,
+    };
+  }
+
+  function parseMethodCalls(init?: RequestInit) {
+    return (
+      JSON.parse(String(init?.body)) as {
+        methodCalls: Array<[string, Record<string, unknown>, string]>;
+      }
+    ).methodCalls;
+  }
+
+  it("fetches message chunks in parallel and keeps result order", async () => {
+    const tracker = trackConcurrency();
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async (_input, init) =>
+      tracker.run(() => {
+        const ids = (parseMethodCalls(init)[0][1].ids ?? []) as string[];
+        return new Response(
+          JSON.stringify({
+            methodResponses: [
+              ["Email/get", { list: ids.map((id) => ({ id })) }, "c1"],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+    client.setMailServerPolicy(
+      resolveMailServerPolicy({ jmapSettings: { getMaxResults: 2 } }),
+    );
+
+    const messages = await client.getMessagesByIds(session, [
+      "m1",
+      "m2",
+      "m3",
+      "m4",
+    ]);
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(tracker.getPeak()).toBe(2);
+    expect(messages.map((message) => message.id)).toEqual([
+      "m1",
+      "m2",
+      "m3",
+      "m4",
+    ]);
+  });
+
+  it("splits independent bootstrap method calls into parallel requests", async () => {
+    const tracker = trackConcurrency();
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async (_input, init) =>
+      tracker.run(() => {
+        const method = parseMethodCalls(init)[0][0];
+        const lists: Record<string, unknown[]> = {
+          "x:AccountSettings/get": [
+            { encryptionAtRest: { "@type": "Aes256", publicKey: "pk-1" } },
+          ],
+          "x:Email/get": [{ uploadMax: 10 }],
+          "x:Jmap/get": [{ maxMethodCalls: 16 }],
+          "Mailbox/get": [
+            {
+              id: "inbox",
+              name: "Inbox",
+              role: "inbox",
+              parentId: null,
+              sortOrder: 0,
+            },
+          ],
+          "Identity/get": [
+            { id: "id-1", email: "alice@solace.onl", name: "Alice" },
+          ],
+        };
+        return new Response(
+          JSON.stringify({
+            methodResponses: [[method, { list: lists[method] ?? [] }, "c1"]],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+    client.setMailServerPolicy(
+      resolveMailServerPolicy({ jmapSettings: { maxMethodCalls: 1 } }),
+    );
+
+    const state = await client.bootstrapMailboxState(session);
+
+    expect(fetcher).toHaveBeenCalledTimes(5);
+    expect(tracker.getPeak()).toBe(5);
+    expect(state).toEqual({
+      accountSettings: {
+        encryptionAtRest: { "@type": "Aes256", publicKey: "pk-1" },
+      },
+      emailSettings: { uploadMax: 10 },
+      jmapSettings: { maxMethodCalls: 16 },
+      mailboxes: [
+        {
+          id: "inbox",
+          name: "Inbox",
+          role: "inbox",
+          parentId: null,
+          sortOrder: 0,
+        },
+      ],
+      identities: [{ id: "id-1", email: "alice@solace.onl", name: "Alice" }],
+    });
+  });
+});
