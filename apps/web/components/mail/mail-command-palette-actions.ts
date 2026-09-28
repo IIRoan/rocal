@@ -107,12 +107,16 @@ export async function runMailEncryptionPasswordReset(input: {
 }
 
 export async function runMailProfileUpdate(input: {
-  imageUrl?: string;
+  image: string | null;
+  queryClient: QueryClient;
   setBusy: (value: boolean) => void;
   onImageUpdated: (image: string | null) => void;
 }): Promise<void> {
   input.setBusy(true);
-  const result = await persistProfileUpdate({ imageUrl: input.imageUrl });
+  const result = await persistProfileUpdate({
+    image: input.image,
+    queryClient: input.queryClient,
+  });
   if (result.ok) {
     input.onImageUpdated(result.image);
   }

@@ -55,7 +55,13 @@ import {
   validateRecurrenceBodySchema,
 } from "./recurring.contract";
 import { updateSettingsBodySchema } from "./settings.contract";
-import { lookupProfilesBodySchema, profileAvatarQuerySchema } from "./profiles.contract";
+import {
+  lookupProfilesBodySchema,
+  profileAvatarIdParamsSchema,
+  profileAvatarQuerySchema,
+  profileAvatarSizeQuerySchema,
+  uploadProfileAvatarBodySchema,
+} from "./profiles.contract";
 import { putRecentContactsBodySchema } from "./recent-contacts.contract";
 import { putMailSettingsBodySchema } from "./mail-settings.contract";
 import {
@@ -107,6 +113,9 @@ const routeModelSchemas = {
   "mailSettings.putBody": putMailSettingsBodySchema,
   "profiles.lookupBody": lookupProfilesBodySchema,
   "profiles.avatarQuery": profileAvatarQuerySchema,
+  "profiles.avatarIdParams": profileAvatarIdParamsSchema,
+  "profiles.avatarSizeQuery": profileAvatarSizeQuerySchema,
+  "profiles.uploadAvatarBody": uploadProfileAvatarBodySchema,
   "recurring.validateBody": validateRecurrenceBodySchema,
   "recurring.previewBody": previewRecurrenceBodySchema,
   "recurring.editBody": editRecurringEventBodySchema,

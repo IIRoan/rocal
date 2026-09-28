@@ -40,6 +40,7 @@ import { useRecurringMovePrompt } from "@/hooks/use-recurring-move-prompt";
 import { RecurringScopeModal } from "@/components/command-palette/recurring-scope-modal";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { CALENDAR_HOME_PATH } from "@/lib/app-routes";
+import { resolveAvatarUrl } from "@/lib/profile-picture";
 import { readCalendarLinkSearchParams } from "./calendar-link-params";
 import {
   createContext,
@@ -170,7 +171,7 @@ function SidebarWithContext() {
       user={{
         name: session?.user.name || "Unknown User",
         email: session?.user.email || "",
-        avatar: session?.user.image || undefined,
+        avatar: resolveAvatarUrl(session?.user.image),
       }}
       onLogout={handleLogout}
       onOpenSettings={openPalette}
@@ -242,7 +243,7 @@ function MobileLayoutContent() {
         user={{
           name: session?.user.name || "Unknown User",
           email: session?.user.email || "",
-          avatar: session?.user.image || undefined,
+          avatar: resolveAvatarUrl(session?.user.image),
         }}
         onLogout={handleLogout}
         onOpenSettings={() => {

@@ -65,6 +65,8 @@ export default defineRailway(() => {
     alerts: { usage: { "80": {}, "95": {}, "100": {} } },
   });
   const stalwartBlobs = bucket("stalwart-blobs", { region: "ams" });
+  // Private; the Vercel API serves uploaded profile pictures through /api/profiles/avatars/:id.
+  const profilePictures = bucket("profile-pictures", { region: "ams" });
 
   const notifications = service("Solace Fiber Notification service", {
     source: solaceRepo,
@@ -221,6 +223,7 @@ export default defineRailway(() => {
       monitoringVolume,
       errexVolume,
       stalwartBlobs,
+      profilePictures,
     ],
   });
 });

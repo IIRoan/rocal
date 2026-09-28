@@ -5,6 +5,7 @@ import {
   normalizeSolaceProfileLookupEmails,
   resolveSolaceProfileAvatarUrl,
   sanitizePublicImageUrl,
+  solaceAvatarVariantSize,
   SOLACE_PROFILE_LOOKUP_MAX_EMAILS,
 } from "../solace-profiles";
 
@@ -70,5 +71,31 @@ describe("resolveSolaceProfileAvatarUrl", () => {
     ).toBe(
       "https://cloudflared.roan.dev/api/profiles/avatar?email=alice%40example.com",
     );
+  });
+
+  it("requests the smallest stored variant that covers the display size", () => {
+    const base = "https://api.solace.onl";
+    expect(
+      resolveSolaceProfileAvatarUrl("/api/profiles/avatars/abc", base, 80),
+    ).toBe(`${base}/api/profiles/avatars/abc?size=128`);
+    expect(
+      resolveSolaceProfileAvatarUrl(
+        "/api/profiles/avatar?email=alice%40example.com",
+        base,
+        2000,
+      ),
+    ).toBe(`${base}/api/profiles/avatar?email=alice%40example.com&size=512`);
+    expect(
+      resolveSolaceProfileAvatarUrl("https://cdn.example.com/a.png", base, 64),
+    ).toBe("https://cdn.example.com/a.png");
+  });
+});
+
+describe("solaceAvatarVariantSize", () => {
+  it("rounds up to a stored size and caps at the largest", () => {
+    expect(solaceAvatarVariantSize(1)).toBe(32);
+    expect(solaceAvatarVariantSize(64)).toBe(64);
+    expect(solaceAvatarVariantSize(65)).toBe(128);
+    expect(solaceAvatarVariantSize(4096)).toBe(512);
   });
 });

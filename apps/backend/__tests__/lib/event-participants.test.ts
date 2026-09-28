@@ -30,6 +30,30 @@ describe("mapEventParticipant", () => {
     );
   });
 
+  it("preserves opaque uploaded participant picture paths", () => {
+    const participant = mapEventParticipant({
+      id: "participant-1",
+      eventId: "event-1",
+      userId: "user-1",
+      email: "alice@example.com",
+      displayName: "Alice",
+      role: "attendee",
+      status: "pending",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      user: {
+        id: "user-1",
+        email: "alice@example.com",
+        name: "Alice",
+        image: "/api/profiles/avatars/aaaaaaaaaaaaaaaaaaaaaa",
+      },
+    });
+
+    expect(participant.image).toBe(
+      "/api/profiles/avatars/aaaaaaaaaaaaaaaaaaaaaa",
+    );
+  });
+
   it("drops unsafe participant profile image URLs", () => {
     const participant = mapEventParticipant({
       id: "participant-1",
