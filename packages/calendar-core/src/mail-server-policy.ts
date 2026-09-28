@@ -525,17 +525,13 @@ export class MailBlobUploadRegistry {
     if (!existing) {
       return;
     }
-    this.byBlobId.delete(oldBlobId);
-    this.byBlobId.set(next.blobId, {
-      ...existing,
-      blobId: next.blobId,
-      size: next.size,
-      uploadedAt: next.uploadedAt,
-    });
+    // Drafts still reference earlier ids, so every alias must resolve to the latest upload.
+    Object.assign(existing, next);
+    this.byBlobId.set(next.blobId, existing);
   }
 
   listRegistered(): RegisteredBlobUpload[] {
-    return [...this.byBlobId.values()];
+    return [...new Set(this.byBlobId.values())];
   }
 }
 

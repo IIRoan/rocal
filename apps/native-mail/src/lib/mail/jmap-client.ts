@@ -4,6 +4,7 @@
 import type {
   JmapEmailChanges,
   JmapEmailMessage,
+  JmapEmailPlacement,
   JmapIdentity,
   JmapMailbox,
   JmapSession,
@@ -884,9 +885,13 @@ export class StalwartJmapClient {
   async getMailboxMessages(
     session: JmapSession,
     mailboxId: string,
-    options: { limit?: number; position?: number } = {},
+    options: { limit?: number; position?: number; maxBodyValueBytes?: number } = {},
   ): Promise<{ messages: JmapEmailMessage[]; total: number }> {
-    const { limit = this.getDefaultMailboxPageSize(), position = 0 } = options;
+    const {
+      limit = this.getDefaultMailboxPageSize(),
+      position = 0,
+      maxBodyValueBytes,
+    } = options;
     const accountId = this.requirePrimaryAccountId(session);
     const envelope = await this.call(
       session,
@@ -923,6 +928,7 @@ export class StalwartJmapClient {
             fetchTextBodyValues: true,
             fetchHTMLBodyValues: true,
             fetchAllBodyValues: true,
+            ...(maxBodyValueBytes ? { maxBodyValueBytes } : {}),
           },
           "g1",
         ],
@@ -1132,44 +1138,82 @@ export class StalwartJmapClient {
     const includeBodies = options.includeBodies ?? true;
     const accountId = this.requirePrimaryAccountId(session);
     const chunkSize = this.getEmailGetChunkSize();
-    const chunks = chunkArray(ids, chunkSize);
-    const messages: JmapEmailMessage[] = [];
-
-    for (const chunk of chunks) {
-      const envelope = await this.call(
-        session,
-        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-        [
+    const results = await Promise.all(
+      chunkArray(ids, chunkSize).map(async (chunk) => {
+        const envelope = await this.call(
+          session,
+          ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
           [
-            "Email/get",
-            {
-              accountId,
-              ids: chunk,
-              properties: [
+            [
+              "Email/get",
+              {
+                accountId,
+                ids: chunk,
+                properties: [
+                  ...(includeBodies
+                    ? EMAIL_DETAIL_GET_PROPERTIES
+                    : EMAIL_LIST_GET_PROPERTIES),
+                ],
                 ...(includeBodies
-                  ? EMAIL_DETAIL_GET_PROPERTIES
-                  : EMAIL_LIST_GET_PROPERTIES),
-              ],
-              ...(includeBodies
-                ? {
-                    fetchTextBodyValues: true,
-                    fetchHTMLBodyValues: true,
-                    fetchAllBodyValues: true,
-                  }
-                : {}),
-            },
-            "c1",
+                  ? {
+                      fetchTextBodyValues: true,
+                      fetchHTMLBodyValues: true,
+                      fetchAllBodyValues: true,
+                    }
+                  : {}),
+              },
+              "c1",
+            ],
           ],
-        ],
-      );
-      const result = this.getMethodResult<{ list?: JmapEmailMessage[] }>(
-        envelope,
-        "Email/get",
-      );
-      messages.push(...(result.list ?? []));
+        );
+        return this.getMethodResult<{ list?: JmapEmailMessage[] }>(
+          envelope,
+          "Email/get",
+        );
+      }),
+    );
+
+    return results.flatMap((result) => result.list ?? []);
+  }
+
+  /** Only the fields other devices change when they move, delete, read or flag mail. */
+  async getEmailPlacements(
+    session: JmapSession,
+    ids: string[],
+  ): Promise<{ list: JmapEmailPlacement[]; notFound: string[] }> {
+    if (ids.length === 0) {
+      return { list: [], notFound: [] };
     }
 
-    return messages;
+    const accountId = this.requirePrimaryAccountId(session);
+    const results = await Promise.all(
+      chunkArray(ids, this.getEmailGetChunkSize()).map(async (chunk) => {
+        const envelope = await this.call(
+          session,
+          ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+          [
+            [
+              "Email/get",
+              {
+                accountId,
+                ids: chunk,
+                properties: ["id", "mailboxIds", "keywords"],
+              },
+              "c1",
+            ],
+          ],
+        );
+        return this.getMethodResult<{
+          list?: JmapEmailPlacement[];
+          notFound?: string[];
+        }>(envelope, "Email/get");
+      }),
+    );
+
+    return {
+      list: results.flatMap((result) => result.list ?? []),
+      notFound: results.flatMap((result) => result.notFound ?? []),
+    };
   }
 
   async getThreadMessages(
@@ -1196,6 +1240,59 @@ export class StalwartJmapClient {
     }>(threadEnvelope, "Thread/get");
     const emailIds = threadResult.list?.[0]?.emailIds ?? [];
     return this.getMessagesByIds(session, emailIds);
+  }
+
+  /** Loads several threads in two round trips instead of two per thread. */
+  async getThreadsMessages(
+    session: JmapSession,
+    threadIds: string[],
+  ): Promise<Map<string, JmapEmailMessage[]>> {
+    const byThread = new Map<string, JmapEmailMessage[]>();
+    if (threadIds.length === 0) {
+      return byThread;
+    }
+    const accountId = this.requirePrimaryAccountId(session);
+    const threadEnvelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Thread/get", { accountId, ids: threadIds }, "c1"]],
+    );
+    const threads =
+      this.getMethodResult<{
+        list?: { id: string; emailIds?: string[] }[];
+      }>(threadEnvelope, "Thread/get").list ?? [];
+    const messages = await this.getMessagesByIds(
+      session,
+      threads.flatMap((thread) => thread.emailIds ?? []),
+    );
+    const byId = new Map(messages.map((message) => [message.id, message]));
+    for (const thread of threads) {
+      byThread.set(
+        thread.id,
+        (thread.emailIds ?? []).flatMap((id) => {
+          const message = byId.get(id);
+          return message ? [message] : [];
+        }),
+      );
+    }
+    return byThread;
+  }
+
+  async getEmailState(session: JmapSession): Promise<string> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Email/get", { accountId, ids: [], properties: ["id"] }, "c1"]],
+    );
+    const result = this.getMethodResult<{ state?: string }>(
+      envelope,
+      "Email/get",
+    );
+    if (!result.state) {
+      throw new Error("JMAP Email/get did not return a state.");
+    }
+    return result.state;
   }
 
   async getEmailChanges(
@@ -1679,12 +1776,17 @@ export class StalwartJmapClient {
       return this.executeCall(session, using, methodCalls);
     }
 
-    const merged: JmapEnvelope = { methodResponses: [] };
-    for (const chunk of chunkJmapMethodCalls(methodCalls, maxMethodCalls)) {
-      const envelope = await this.executeCall(session, using, chunk);
-      merged.methodResponses!.push(...(envelope.methodResponses ?? []));
-    }
-    return merged;
+    // Chunks only run when no call references another's result, so the requests are independent.
+    const envelopes = await Promise.all(
+      chunkJmapMethodCalls(methodCalls, maxMethodCalls).map((chunk) =>
+        this.executeCall(session, using, chunk),
+      ),
+    );
+    return {
+      methodResponses: envelopes.flatMap(
+        (envelope) => envelope.methodResponses ?? [],
+      ),
+    };
   }
 
   private async executeCall(

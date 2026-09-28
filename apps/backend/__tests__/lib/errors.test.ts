@@ -26,7 +26,11 @@ import {
   errorString,
 } from "../../lib/errors";
 
-function invokeOnError(code: string, error: Error, request?: Request) {
+function invokeOnError(
+  code: string | number | undefined,
+  error: Error,
+  request?: Request,
+) {
   const set: {
     status?: number;
     headers: Record<string, string | number | undefined>;
@@ -187,6 +191,40 @@ describe("errors", () => {
         error: "Forbidden",
         message: "Access forbidden",
         statusCode: 403,
+      }),
+    });
+  });
+
+  it("resolves custom error labels from the error itself without changing responses", () => {
+    expect(
+      invokeOnError(undefined, new NotFoundError("Missing thing")),
+    ).toEqual({
+      set: expect.objectContaining({ status: 404 }),
+      result: expect.objectContaining({
+        error: "Not Found",
+        message: "Missing thing",
+        statusCode: 404,
+      }),
+    });
+
+    expect(
+      invokeOnError(undefined, new ValidationError("Bad input", "name")),
+    ).toEqual({
+      set: expect.objectContaining({ status: 400 }),
+      result: expect.objectContaining({
+        error: "Validation Error",
+        message: "Bad input",
+        statusCode: 400,
+        details: { field: "name" },
+      }),
+    });
+
+    expect(invokeOnError("UNKNOWN", new UnauthorizedError())).toEqual({
+      set: expect.objectContaining({ status: 401 }),
+      result: expect.objectContaining({
+        error: "Unauthorized",
+        message: "Unauthorized access",
+        statusCode: 401,
       }),
     });
   });

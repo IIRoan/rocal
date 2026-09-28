@@ -650,34 +650,37 @@ export class StalwartJmapClient {
     const uploadTtlMs = this.getUploadTtlMs();
     const now = Date.now();
 
-    for (const record of this.blobUploadRegistry.listRegistered()) {
-      if (!isBlobUploadExpired(record.uploadedAt, uploadTtlMs, now)) {
-        continue;
-      }
+    await runTasksWithConcurrencyLimit(
+      this.blobUploadRegistry.listRegistered().map((record) => async () => {
+        if (!isBlobUploadExpired(record.uploadedAt, uploadTtlMs, now)) {
+          return;
+        }
 
-      const refreshed =
-        record.source.kind === "text"
-          ? await this.uploadBlob(
-              session,
-              new Blob([record.source.text], {
-                type: record.source.contentType ?? "application/octet-stream",
-              }),
-              record.source.contentType ?? "application/octet-stream",
-            )
-          : await this.uploadBlob(
-              session,
-              new Blob([record.source.content.slice()], {
-                type: record.source.contentType,
-              }),
-              record.source.contentType,
-            );
+        const refreshed =
+          record.source.kind === "text"
+            ? await this.uploadBlob(
+                session,
+                new Blob([record.source.text], {
+                  type: record.source.contentType ?? "application/octet-stream",
+                }),
+                record.source.contentType ?? "application/octet-stream",
+              )
+            : await this.uploadBlob(
+                session,
+                new Blob([record.source.content.slice()], {
+                  type: record.source.contentType,
+                }),
+                record.source.contentType,
+              );
 
-      this.blobUploadRegistry.replaceBlobId(record.blobId, {
-        blobId: refreshed.blobId,
-        size: refreshed.size,
-        uploadedAt: Date.now(),
-      });
-    }
+        this.blobUploadRegistry.replaceBlobId(record.blobId, {
+          blobId: refreshed.blobId,
+          size: refreshed.size,
+          uploadedAt: Date.now(),
+        });
+      }),
+      this.mailServerPolicy?.maxConcurrentUploads ?? 1,
+    );
   }
 
   private async refreshOutgoingBlobReferences(
@@ -1510,43 +1513,41 @@ export class StalwartJmapClient {
     const includeBodies = options.includeBodies ?? true;
     const accountId = this.requirePrimaryAccountId(session);
     const chunkSize = this.getEmailGetChunkSize();
-    const chunks = chunkArray(ids, chunkSize);
-    const messages: JmapEmailMessage[] = [];
-
-    for (const chunk of chunks) {
-      const envelope = await this.call(
-        session,
-        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-        [
+    const results = await Promise.all(
+      chunkArray(ids, chunkSize).map(async (chunk) => {
+        const envelope = await this.call(
+          session,
+          ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
           [
-            "Email/get",
-            {
-              accountId,
-              ids: chunk,
-              properties: [
+            [
+              "Email/get",
+              {
+                accountId,
+                ids: chunk,
+                properties: [
+                  ...(includeBodies
+                    ? EMAIL_FULL_GET_PROPERTIES
+                    : EMAIL_LIST_GET_PROPERTIES),
+                ],
                 ...(includeBodies
-                  ? EMAIL_FULL_GET_PROPERTIES
-                  : EMAIL_LIST_GET_PROPERTIES),
-              ],
-              ...(includeBodies
-                ? {
-                    fetchTextBodyValues: true,
-                    fetchHTMLBodyValues: true,
-                  }
-                : {}),
-            },
-            "c1",
+                  ? {
+                      fetchTextBodyValues: true,
+                      fetchHTMLBodyValues: true,
+                    }
+                  : {}),
+              },
+              "c1",
+            ],
           ],
-        ],
-      );
-      const result = this.getMethodResult<{ list?: JmapEmailMessage[] }>(
-        envelope,
-        "Email/get",
-      );
-      messages.push(...(result.list ?? []));
-    }
+        );
+        return this.getMethodResult<{ list?: JmapEmailMessage[] }>(
+          envelope,
+          "Email/get",
+        );
+      }),
+    );
 
-    return messages;
+    return results.flatMap((result) => result.list ?? []);
   }
 
   async getThreadMessages(
@@ -2232,12 +2233,17 @@ export class StalwartJmapClient {
       return this.executeCall(session, using, methodCalls, allowRetry);
     }
 
-    const merged: JmapEnvelope = { methodResponses: [] };
-    for (const chunk of chunkJmapMethodCalls(methodCalls, maxMethodCalls)) {
-      const envelope = await this.executeCall(session, using, chunk, allowRetry);
-      merged.methodResponses!.push(...(envelope.methodResponses ?? []));
-    }
-    return merged;
+    // Chunks only run when no call references another's result, so the requests are independent.
+    const envelopes = await Promise.all(
+      chunkJmapMethodCalls(methodCalls, maxMethodCalls).map((chunk) =>
+        this.executeCall(session, using, chunk, allowRetry),
+      ),
+    );
+    return {
+      methodResponses: envelopes.flatMap(
+        (envelope) => envelope.methodResponses ?? [],
+      ),
+    };
   }
 
   private async executeCall(

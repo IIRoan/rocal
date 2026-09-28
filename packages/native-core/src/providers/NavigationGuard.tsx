@@ -16,6 +16,7 @@ import { API_BASE_URL } from "../lib/constants";
 import { hideLaunchSplash } from "../lib/launch-splash";
 import { captureException } from "../lib/reporting";
 import { resetPreSessionQueries } from "../lib/session-query-reset";
+import { restoreWithTimeout } from "../lib/session-restore";
 import {
   useNotificationExtensionSync,
   type NotificationExtensionSecrets,
@@ -33,6 +34,13 @@ export interface NavigationGuardProps {
   homeRoute: string;
   /** App-specific startup after the E2EE session is ready (encryption checks, mailbox unlock). */
   prepareSession: (input: AuthenticatedSessionInput) => Promise<void>;
+  /** Seeds the cache from an encrypted on-device copy; resolving true skips the loading screen while startup runs behind the app. */
+  restoreSession?: (
+    input: Pick<
+      AuthenticatedSessionInput,
+      "queryClient" | "userId" | "isCancelled"
+    >,
+  ) => Promise<boolean>;
   pushTapHandler: PushTapHandler;
   notificationExtensionSecrets: NotificationExtensionSecrets;
 }
@@ -42,6 +50,7 @@ export function NavigationGuard({
   children,
   homeRoute,
   prepareSession,
+  restoreSession,
   pushTapHandler,
   notificationExtensionSecrets,
 }: NavigationGuardProps) {
@@ -55,10 +64,25 @@ export function NavigationGuard({
   const [isPreparingStartupCrypto, setIsPreparingStartupCrypto] =
     useState(false);
   const [setupMessage, setSetupMessage] = useState(STARTUP_CRYPTO_INITIAL_PHASE);
+  const [restoreResult, setRestoreResult] = useState<{
+    userId: string;
+    restored: boolean;
+  } | null>(null);
+  const userId = user?.id ?? null;
+  const isRestorePending =
+    Boolean(restoreSession) &&
+    isAuthenticated &&
+    userId !== null &&
+    restoreResult?.userId !== userId;
+  const isRestored =
+    userId !== null &&
+    restoreResult?.userId === userId &&
+    restoreResult.restored;
 
+  // The splash covers the short restore so neither the loading screen nor an empty inbox flashes first.
   useEffect(() => {
-    if (!isLoading) hideLaunchSplash();
-  }, [isLoading]);
+    if (!isLoading && !isRestorePending) hideLaunchSplash();
+  }, [isLoading, isRestorePending]);
 
   useEffect(() => {
     const redirectPath = getAuthRedirectPath({
@@ -84,6 +108,7 @@ export function NavigationGuard({
     if (!isAuthenticated || !user) {
       setIsPreparingStartupCrypto(false);
       setSetupMessage(STARTUP_CRYPTO_INITIAL_PHASE);
+      setRestoreResult(null);
       clearSession();
       return;
     }
@@ -93,6 +118,16 @@ export function NavigationGuard({
     setSetupMessage(STARTUP_CRYPTO_INITIAL_PHASE);
 
     (async () => {
+      if (restoreSession) {
+        const restored = await restoreWithTimeout(
+          (isCancelled) =>
+            restoreSession({ queryClient, userId: user.id, isCancelled }),
+          () => cancelled,
+        );
+        if (cancelled) return;
+        setRestoreResult({ userId: user.id, restored });
+      }
+
       await bootstrap(user.id, API_BASE_URL);
       if (cancelled) return;
 
@@ -153,13 +188,20 @@ export function NavigationGuard({
     prepareSession,
     provider,
     queryClient,
+    restoreSession,
   ]);
 
+  const isStartupRunning = !isE2eeReady || isPreparingStartupCrypto;
   // Cover the still-mounted navigator so sign-in stays put during passkey and the home screen never flashes underneath.
   const isPreparingWorkspace =
-    isAuthenticated && !isLoading && (!isE2eeReady || isPreparingStartupCrypto);
+    isAuthenticated &&
+    !isLoading &&
+    !isRestorePending &&
+    !isRestored &&
+    isStartupRunning;
+  // Push taps can open content that needs decryption, so they still wait for the real startup.
   const isPushNavigationReady =
-    isAuthenticated && !isLoading && !isPreparingWorkspace;
+    isAuthenticated && !isLoading && !isStartupRunning;
 
   return (
     <View style={{ flex: 1 }}>

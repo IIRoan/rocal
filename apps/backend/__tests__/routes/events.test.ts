@@ -377,6 +377,45 @@ describe("eventsRoutes – color validation", () => {
       expect(mockPrisma.calendarEvent.create).not.toHaveBeenCalled();
     });
 
+    it("rejects object-shaped participant email (query operator injection)", async () => {
+      const response = await createApp().handle(
+        new Request("http://localhost/events/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...validEventBody,
+            participants: [
+              {
+                email: { $ne: "owner@example.com" },
+                role: "attendee",
+                status: "pending",
+              },
+            ],
+          }),
+        }),
+      );
+
+      await expectValidationError(response);
+      expect(mockPrisma.calendarEvent.create).not.toHaveBeenCalled();
+      expect(mockPrisma.eventParticipant.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("rejects object-shaped scalar fields (query operator injection)", async () => {
+      const response = await createApp().handle(
+        new Request("http://localhost/events/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...validEventBody,
+            calendarId: { $ne: "cal-1" },
+          }),
+        }),
+      );
+
+      await expectValidationError(response);
+      expect(mockPrisma.calendarEvent.create).not.toHaveBeenCalled();
+    });
+
     it("persists encrypted shadow fields when provided on create", async () => {
       mockPrisma.calendarEvent.create.mockResolvedValue({
         id: "event-enc-1",
@@ -663,6 +702,30 @@ describe("eventsRoutes – color validation", () => {
       );
 
       expect(response.status).toBe(200);
+    });
+
+    it("rejects object-shaped participant email on update (query operator injection)", async () => {
+      mockPrisma.calendarEvent.findFirst.mockResolvedValue(existingEvent);
+
+      const response = await createApp().handle(
+        new Request("http://localhost/events/event-1", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            participants: [
+              {
+                email: { $ne: "owner@example.com" },
+                role: "attendee",
+                status: "pending",
+              },
+            ],
+          }),
+        }),
+      );
+
+      await expectValidationError(response);
+      expect(mockPrisma.calendarEvent.update).not.toHaveBeenCalled();
+      expect(mockPrisma.eventParticipant.deleteMany).not.toHaveBeenCalled();
     });
 
     it("persists encrypted shadow fields on update", async () => {

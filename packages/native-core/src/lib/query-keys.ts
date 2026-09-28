@@ -27,6 +27,7 @@ export const QUERY_KEYS = {
   mailDecrypted: (messageId: string) =>
     ["mail", "decrypted", "v2", messageId] as const,
   mailLabels: () => ["mail", "labels"] as const,
+  mailThreadsAll: () => ["mail", "thread"] as const,
   mailThread: (threadId: string | null) => ["mail", "thread", threadId] as const,
   invites: () => ["invites"] as const,
   pushDevices: () => PUSH_DEVICES_QUERY_KEY,

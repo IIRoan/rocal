@@ -24,6 +24,8 @@ export const LOG_REDACTED_QUERY_PLACEHOLDER = "?[redacted]" as const;
 /** Order matters: bearer tokens before URLs avoids partial leaks. */
 export const LOG_PII_TEXT_PATTERNS = {
   email: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
+  /** encodeURIComponent emails appear in URL path params (mail key lookups take an email). */
+  encodedEmail: /[a-zA-Z0-9._%+-]+%40[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi,
   bearer: /Bearer\s+[A-Za-z0-9._~+/=-]+/gi,
   url: /https?:\/\/[^\s"'<>]+/gi,
 } as const;
@@ -47,17 +49,28 @@ function isRecord(value: unknown): value is UnknownRecord {
 export function redactPII(text: string): string {
   return text
     .replace(LOG_PII_TEXT_PATTERNS.email, LOG_REDACTED_EMAIL_PLACEHOLDER)
+    .replace(
+      LOG_PII_TEXT_PATTERNS.encodedEmail,
+      LOG_REDACTED_EMAIL_PLACEHOLDER,
+    )
     .replace(LOG_PII_TEXT_PATTERNS.bearer, LOG_REDACTED_BEARER_PLACEHOLDER)
     .replace(LOG_PII_TEXT_PATTERNS.url, LOG_REDACTED_URL_PLACEHOLDER);
 }
 
-/** Strip query strings from absolute or relative request URLs. */
+/** Strip query strings and redact email path params from absolute or relative request URLs. */
 export function sanitizeRequestUrl(url: string): string {
   try {
     const parsed = new URL(url);
     if (parsed.search) {
       parsed.search = LOG_REDACTED_QUERY_PLACEHOLDER;
     }
+    // Path params can carry PII (mail key lookups take an email); redact before logging.
+    parsed.pathname = parsed.pathname
+      .replace(LOG_PII_TEXT_PATTERNS.email, LOG_REDACTED_EMAIL_PLACEHOLDER)
+      .replace(
+        LOG_PII_TEXT_PATTERNS.encodedEmail,
+        LOG_REDACTED_EMAIL_PLACEHOLDER,
+      );
     return parsed.toString();
   } catch {
     const queryStart = url.indexOf("?");

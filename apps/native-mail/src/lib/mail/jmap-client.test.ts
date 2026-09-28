@@ -651,4 +651,189 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
       path: "/ids",
     });
   });
+
+  it("caps body values on mailbox pages only when asked", async () => {
+    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
+      jsonOk({
+        methodResponses: [
+          ["Email/query", { ids: [], total: 0 }, "q1"],
+          ["Email/get", { list: [] }, "g1"],
+        ],
+      }),
+    );
+    const client = createClient(fetcher);
+    await client.getMailboxMessages(session, "inbox", { position: 0 });
+    await client.getMailboxMessages(session, "inbox", {
+      position: 30,
+      maxBodyValueBytes: 32768,
+    });
+
+    const firstGet = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[1][1];
+    const olderGet = parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[1][1];
+    expect(firstGet).not.toHaveProperty("maxBodyValueBytes");
+    expect(olderGet).toMatchObject({
+      fetchAllBodyValues: true,
+      maxBodyValueBytes: 32768,
+    });
+  });
+
+  it("loads several threads with one Thread/get and one Email/get", async () => {
+    const fetcher = jest.fn(async (_url: string, init?: RequestInit) => {
+      const [method] = parseJmapRequest(init).methodCalls[0];
+      return jsonOk({
+        methodResponses:
+          method === "Thread/get"
+            ? [
+                [
+                  "Thread/get",
+                  {
+                    list: [
+                      { id: "t1", emailIds: ["m1", "m2"] },
+                      { id: "t2", emailIds: ["m3", "gone"] },
+                    ],
+                  },
+                  "c1",
+                ],
+              ]
+            : [
+                [
+                  "Email/get",
+                  { list: [{ id: "m3" }, { id: "m1" }, { id: "m2" }] },
+                  "c1",
+                ],
+              ],
+      });
+    });
+
+    const threads = await createClient(fetcher).getThreadsMessages(session, [
+      "t1",
+      "t2",
+    ]);
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1]).toEqual({
+      accountId: "acc1",
+      ids: ["t1", "t2"],
+    });
+    expect(
+      parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1].ids,
+    ).toEqual(["m1", "m2", "m3", "gone"]);
+    expect(threads.get("t1")?.map((message) => message.id)).toEqual(["m1", "m2"]);
+    expect(threads.get("t2")?.map((message) => message.id)).toEqual(["m3"]);
+  });
+
+  it("skips the network for an empty thread list", async () => {
+    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
+      jsonOk({ methodResponses: [] }),
+    );
+
+    const threads = await createClient(fetcher).getThreadsMessages(session, []);
+
+    expect(threads.size).toBe(0);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
+describe("StalwartJmapClient parallel chunked requests", () => {
+  const session: JmapSession = {
+    apiUrl: "http://localhost:4001/api/mail/jmap/",
+    accounts: { acc1: { name: "alice@solace.onl" } },
+    primaryAccounts: { "urn:ietf:params:jmap:mail": "acc1" },
+  };
+
+  function createClient(
+    fetcher: jest.MockedFunction<
+      (url: string, init?: RequestInit) => Promise<Response>
+    >,
+  ) {
+    return new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      getAccessToken: async () => "mail-access-token",
+      fetcher,
+    });
+  }
+
+  function trackConcurrency() {
+    let inFlight = 0;
+    let peak = 0;
+    return {
+      async run<T>(work: () => T): Promise<T> {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        inFlight -= 1;
+        return work();
+      },
+      getPeak: () => peak,
+    };
+  }
+
+  it("fetches message chunks in parallel and keeps result order", async () => {
+    const tracker = trackConcurrency();
+    const fetcher = jest.fn(async (_url: string, init?: RequestInit) =>
+      tracker.run(() => {
+        const ids = (parseJmapRequest(init).methodCalls[0][1].ids ??
+          []) as string[];
+        return jsonOk({
+          methodResponses: [
+            ["Email/get", { list: ids.map((id) => ({ id })) }, "c1"],
+          ],
+        });
+      }),
+    );
+    const client = createClient(fetcher);
+    client.setMailServerPolicy(
+      resolveMailServerPolicy({ jmapSettings: { getMaxResults: 2 } }),
+    );
+
+    const messages = await client.getMessagesByIds(session, [
+      "m1",
+      "m2",
+      "m3",
+      "m4",
+    ]);
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(tracker.getPeak()).toBe(2);
+    expect(messages.map((message) => message.id)).toEqual([
+      "m1",
+      "m2",
+      "m3",
+      "m4",
+    ]);
+  });
+
+  it("splits independent method calls into parallel requests", async () => {
+    const tracker = trackConcurrency();
+    const fetcher = jest.fn(async (_url: string, init?: RequestInit) =>
+      tracker.run(() => {
+        const method = parseJmapRequest(init).methodCalls[0][0];
+        return jsonOk({
+          methodResponses: [
+            [
+              method,
+              {
+                list:
+                  method === "x:Email/get"
+                    ? [{ getMaxResults: 50 }]
+                    : [{ maxMethodCalls: 16 }],
+              },
+              "c1",
+            ],
+          ],
+        });
+      }),
+    );
+    const client = createClient(fetcher);
+    client.setMailServerPolicy(
+      resolveMailServerPolicy({ jmapSettings: { maxMethodCalls: 1 } }),
+    );
+
+    const singletons = await client.getStalwartPolicySingletons(session);
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(tracker.getPeak()).toBe(2);
+    expect(singletons.emailSettings).toEqual({ getMaxResults: 50 });
+    expect(singletons.jmapSettings).toEqual({ maxMethodCalls: 16 });
+  });
 });

@@ -115,6 +115,11 @@ export type JmapEmailMessage = {
   "header:Authentication-Results"?: string[] | null;
 };
 
+export type JmapEmailPlacement = Pick<
+  JmapEmailMessage,
+  "id" | "mailboxIds" | "keywords"
+>;
+
 export type JmapEmailChanges = {
   oldState: string;
   newState: string;

@@ -96,6 +96,22 @@ type UnlockedVault = {
 
 let cachedVault: UnlockedVault | null = null;
 let vaultLoadingPromise: Promise<UnlockedVault> | null = null;
+let unlockGate: Promise<void> | null = null;
+let openUnlockGate: (() => void) | null = null;
+
+/** Warm starts render mail before the E2EE session exists; unlocks wait for it instead of failing. */
+export function holdVaultUnlock(): void {
+  if (unlockGate) return;
+  unlockGate = new Promise<void>((resolve) => {
+    openUnlockGate = resolve;
+  });
+}
+
+export function releaseVaultUnlock(): void {
+  openUnlockGate?.();
+  openUnlockGate = null;
+  unlockGate = null;
+}
 
 /**
  * Clears the in-memory vault cache.
@@ -105,6 +121,7 @@ export function clearVaultCache(): void {
   log.debug("[mail-crypto] clearVaultCache: clearing in-memory vault cache");
   cachedVault = null;
   vaultLoadingPromise = null;
+  releaseVaultUnlock();
 }
 
 async function streamToString(stream: unknown): Promise<string> {
@@ -309,6 +326,11 @@ export async function ensureVaultLoaded(
   if (cachedVault) {
     log.debug("[mail-crypto] ensureVaultLoaded: vault already loaded, returning cached");
     return cachedVault;
+  }
+
+  if (unlockGate) {
+    await unlockGate;
+    if (cachedVault) return cachedVault;
   }
 
   if (vaultLoadingPromise) {

@@ -22,6 +22,8 @@ import type { LabelDef, JmapEmailMessage } from "./types";
 /** @deprecated Legacy on-device store — migrated into the vault on first unlock. */
 const LEGACY_STORAGE_KEY = "mail_labels_v1";
 
+const NO_LABELS: LabelDef[] = [];
+
 /** Color palette available when creating a new label. */
 export const LABEL_COLOR_OPTIONS = [
   { value: "#ef4444", label: "Red" },
@@ -156,7 +158,7 @@ export function useLabels(options: UseLabelsOptions = {}) {
     retry: false,
   });
 
-  const labels = query.data ?? [];
+  const labels = query.data ?? NO_LABELS;
 
   const persistLabels = useCallback(
     async (updated: LabelDef[]) => {

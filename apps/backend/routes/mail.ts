@@ -21,7 +21,7 @@ import {
   createMailBridgePkcePair,
   getStalwartMailBridgeClientId,
 } from "../lib/mail-bridge-auth";
-import { errorMessage, RateLimitError } from "../lib/errors";
+import { errorMessage, NotFoundError, RateLimitError } from "../lib/errors";
 import {
   buildSafeJmapUpstreamUrl,
   fetchJmapUpstream,
@@ -782,10 +782,13 @@ export function createMailRoutes(
           allowRemoteResolve: Boolean(sessionUser),
         });
       } catch (err) {
-        logger.error("Failed to look up internal recipient key", {
-          recipientRef: logRef(params.email),
-          ...errorLogDetails(err),
-        });
+        // A missing key is an expected 404 (mailbox never provisioned or deleted); the global handler logs it once.
+        if (!(err instanceof NotFoundError)) {
+          logger.error("Failed to look up internal recipient key", {
+            recipientRef: logRef(params.email),
+            ...errorLogDetails(err),
+          });
+        }
         throw err;
       }
     })
