@@ -162,11 +162,11 @@ export function compactOfflineMessage(
   return changed ? { ...message, bodyValues: compacted } : message;
 }
 
-function isSavableQuery(query: Query): boolean {
+function isReconciledQuery(query: Query): boolean {
   return (
     query.state.status === "success" &&
     !query.state.isInvalidated &&
-    query.state.data != null
+    query.state.fetchStatus === "idle"
   );
 }
 
@@ -253,44 +253,46 @@ export function captureMailOfflineSnapshot(
   if (!account?.provisioned || !runtime) return null;
 
   const cache = queryClient.getQueryCache();
-  const lists = cache
+  const listQueries = cache
     .findAll({ queryKey: QUERY_KEYS.mailMessagesAll() })
-    .filter((query) => isMailboxListKey(query.queryKey) && isSavableQuery(query))
+    .filter(
+      (query) => isMailboxListKey(query.queryKey) && query.state.data != null,
+    )
     .sort(newestFirst)
-    .slice(0, MAX_LISTS)
-    .map((query): MailOfflineList => {
-      const data = query.state.data as MailboxMessagesCacheData;
-      return {
-        mailboxId: query.queryKey[2] as string,
-        total: listTotal(data),
-        messages: flattenMailboxMessagesCache(data)
-          .slice(0, MAX_MESSAGES_PER_LIST)
-          .map(compactOfflineMessage),
-      };
-    });
+    .slice(0, MAX_LISTS);
+  const lists = listQueries.map((query): MailOfflineList => {
+    const data = query.state.data as MailboxMessagesCacheData;
+    return {
+      mailboxId: query.queryKey[2] as string,
+      total: listTotal(data),
+      messages: flattenMailboxMessagesCache(data)
+        .slice(0, MAX_MESSAGES_PER_LIST)
+        .map(compactOfflineMessage),
+    };
+  });
 
   // Only threads of saved rows matter on launch; threads prefetched for older rows would crowd them out.
   const listThreadIds = new Set(
     lists.flatMap((list) => list.messages.map((entry) => entry.threadId)),
   );
-  const threads = cache
+  const threadQueries = cache
     .findAll({ queryKey: QUERY_KEYS.mailThreadsAll() })
     .filter(
       (query) =>
         isThreadKey(query.queryKey) &&
-        isSavableQuery(query) &&
+        query.state.data != null &&
         listThreadIds.has(query.queryKey[2] as string),
     )
     .sort(newestFirst)
-    .slice(0, MAX_THREADS)
-    .map(
-      (query): MailOfflineThread => ({
-        threadId: query.queryKey[2] as string,
-        messages: (query.state.data as JmapEmailMessage[]).map(
-          compactOfflineMessage,
-        ),
-      }),
-    );
+    .slice(0, MAX_THREADS);
+  const threads = threadQueries.map(
+    (query): MailOfflineThread => ({
+      threadId: query.queryKey[2] as string,
+      messages: (query.state.data as JmapEmailMessage[]).map(
+        compactOfflineMessage,
+      ),
+    }),
+  );
 
   const decrypted = captureDecrypted(queryClient, [
     ...lists.flatMap((list) => list.messages),
@@ -301,7 +303,10 @@ export function captureMailOfflineSnapshot(
     version: MAIL_OFFLINE_SNAPSHOT_VERSION,
     userId: input.userId,
     savedAt: input.now ?? Date.now(),
-    emailState: input.emailState,
+    // Retain stale mail for offline use, but never claim it already includes the latest server changes.
+    emailState: [...listQueries, ...threadQueries].every(isReconciledQuery)
+      ? input.emailState
+      : null,
     account,
     runtime: toPersistedMailRuntime(runtime),
     lists,
@@ -332,16 +337,21 @@ export function hydrateMailOfflineSnapshot(
     snapshot.savedAt,
   );
 
-  // Lists count as fresh: Email/changes from `emailState` decides whether they need a refetch.
+  // Only a reconciled snapshot can rely on Email/changes instead of a full refetch.
+  const listUpdatedAt = snapshot.emailState === null ? 0 : now;
   for (const list of snapshot.lists) {
     const data: MailboxMessagesInfiniteData = {
       pages: [{ messages: list.messages, total: list.total, position: 0 }],
       pageParams: [0],
     };
-    seed(QUERY_KEYS.mailMessages(list.mailboxId), data, now);
+    seed(QUERY_KEYS.mailMessages(list.mailboxId), data, listUpdatedAt);
   }
   for (const thread of snapshot.threads) {
-    seed(QUERY_KEYS.mailThread(thread.threadId), thread.messages, now);
+    seed(
+      QUERY_KEYS.mailThread(thread.threadId),
+      thread.messages,
+      listUpdatedAt,
+    );
   }
 
   // Labels keep their saved age; the session refreshes them once the vault unlocks.

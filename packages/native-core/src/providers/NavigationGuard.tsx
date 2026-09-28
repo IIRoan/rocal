@@ -16,6 +16,7 @@ import { API_BASE_URL } from "../lib/constants";
 import { hideLaunchSplash } from "../lib/launch-splash";
 import { captureException } from "../lib/reporting";
 import { resetPreSessionQueries } from "../lib/session-query-reset";
+import { restoreWithTimeout } from "../lib/session-restore";
 import {
   useNotificationExtensionSync,
   type NotificationExtensionSecrets,
@@ -35,22 +36,13 @@ export interface NavigationGuardProps {
   prepareSession: (input: AuthenticatedSessionInput) => Promise<void>;
   /** Seeds the cache from an encrypted on-device copy; resolving true skips the loading screen while startup runs behind the app. */
   restoreSession?: (
-    input: Pick<AuthenticatedSessionInput, "queryClient" | "userId">,
+    input: Pick<
+      AuthenticatedSessionInput,
+      "queryClient" | "userId" | "isCancelled"
+    >,
   ) => Promise<boolean>;
   pushTapHandler: PushTapHandler;
   notificationExtensionSecrets: NotificationExtensionSecrets;
-}
-
-/** A slow restore must never keep the launch splash up; it then falls back to the normal gate. */
-const RESTORE_TIMEOUT_MS = 1_500;
-
-function restoreWithTimeout(restore: Promise<boolean>): Promise<boolean> {
-  return Promise.race([
-    restore.catch(() => false),
-    new Promise<boolean>((resolve) => {
-      setTimeout(() => resolve(false), RESTORE_TIMEOUT_MS);
-    }),
-  ]);
 }
 
 /** Shared auth gate: redirects by session state and blocks the UI while E2EE and app startup run. */
@@ -128,7 +120,9 @@ export function NavigationGuard({
     (async () => {
       if (restoreSession) {
         const restored = await restoreWithTimeout(
-          restoreSession({ queryClient, userId: user.id }),
+          (isCancelled) =>
+            restoreSession({ queryClient, userId: user.id, isCancelled }),
+          () => cancelled,
         );
         if (cancelled) return;
         setRestoreResult({ userId: user.id, restored });

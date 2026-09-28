@@ -650,9 +650,8 @@ export class StalwartJmapClient {
     const uploadTtlMs = this.getUploadTtlMs();
     const now = Date.now();
 
-    // Each record re-uploads independently and is re-keyed by its own blob id, so refreshes run together.
-    await Promise.all(
-      this.blobUploadRegistry.listRegistered().map(async (record) => {
+    await runTasksWithConcurrencyLimit(
+      this.blobUploadRegistry.listRegistered().map((record) => async () => {
         if (!isBlobUploadExpired(record.uploadedAt, uploadTtlMs, now)) {
           return;
         }
@@ -680,6 +679,7 @@ export class StalwartJmapClient {
           uploadedAt: Date.now(),
         });
       }),
+      this.mailServerPolicy?.maxConcurrentUploads ?? 1,
     );
   }
 

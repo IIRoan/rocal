@@ -36,14 +36,19 @@ import {
 const RUNTIME_STALE_MS = 5 * 60_000;
 
 let restoredUserId: string | null = null;
+let restoreGeneration = 0;
 
 /** Seeds the cache from the encrypted snapshot before E2EE starts, so the mailbox opens without the loading screen. */
 export async function restoreMailSession(input: {
   queryClient: QueryClient;
   userId: string;
+  isCancelled: () => boolean;
 }): Promise<boolean> {
+  const generation = ++restoreGeneration;
   const snapshot = await loadMailOfflineSnapshot(input.userId);
-  if (!snapshot) return false;
+  if (!snapshot || input.isCancelled() || generation !== restoreGeneration) {
+    return false;
+  }
   holdVaultUnlock();
   // A sync that already ran this launch is newer than the snapshot; never rewind it.
   if (getMailSyncState() === null) setMailSyncState(snapshot.emailState);
@@ -153,13 +158,14 @@ export async function prepareMailSession(
 export const MAIL_AUTH_LIFECYCLE: AuthLifecycle = {
   onPasswordAuthenticated: (password) => saveMailVaultPassword(password),
   async onSignedOut() {
+    restoreGeneration += 1;
+    restoredUserId = null;
     await clearMailVaultPassword();
     await clearDerivedVaultKey();
     await clearCachedPrivateKey();
     await clearMailSettings();
     await clearMailListSettings();
     await clearMailOfflineSnapshot();
-    restoredUserId = null;
     resetMailSync();
     clearVaultCache();
   },

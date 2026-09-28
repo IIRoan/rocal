@@ -1267,6 +1267,78 @@ describe("StalwartJmapClient", () => {
     expect(uploaded.blobId).toBe("blob-1");
   });
 
+  it("respects upload concurrency when refreshing expired draft attachments", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000);
+    const fetcher = jest.fn<
+      (url: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            methodResponses: [
+              ["Email/set", { created: { draft1: { id: "draft" } } }, "c1"],
+            ],
+          }),
+        ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "https://mail.example.test",
+      accessToken: "token",
+      fetcher,
+    });
+    const session: JmapSession = {
+      apiUrl: "https://mail.example.test/jmap/",
+      accounts: { acc: {} },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "acc" },
+    };
+    let active = 0;
+    let peak = 0;
+    let uploadedCount = 0;
+    jest.spyOn(client, "uploadBlob").mockImplementation(async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      const blobId = `blob-${++uploadedCount}`;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      active -= 1;
+      return { blobId, size: 1, type: "text/plain" };
+    });
+    try {
+      const attachments = await Promise.all(
+        Array.from({ length: 5 }, () => client.uploadTextBlob(session, "x")),
+      );
+      peak = 0;
+      now.mockReturnValue(7_200_000);
+      client.setMailServerPolicy(
+        resolveMailServerPolicy({
+          jmapSettings: { maxConcurrentUploads: 4, uploadTtl: 3_600_000 },
+        }),
+      );
+
+      await expect(
+        client.saveDraft(session, {
+          draftsMailboxId: "drafts",
+          fromEmail: "alice@example.test",
+          to: [],
+          subject: "Draft",
+          textBody: "Hello",
+          attachments: attachments.map((attachment, index) => ({
+            ...attachment,
+            name: `attachment-${index}.txt`,
+          })),
+        }),
+      ).resolves.toBe("draft");
+
+      expect(peak).toBeLessThanOrEqual(4);
+      expect(uploadedCount).toBe(10);
+      const body = String(fetcher.mock.calls[0]?.[1]?.body);
+      expect(body).toContain('"blob-6"');
+      expect(body).toContain('"blob-10"');
+      expect(body).not.toContain('"blob-1"');
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it("rejects blob uploads that do not return a blob id", async () => {
     const client = new StalwartJmapClient({
       baseUrl: "http://localhost:4001/api/mail/jmap",

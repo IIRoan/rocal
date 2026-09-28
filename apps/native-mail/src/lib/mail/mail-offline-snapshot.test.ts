@@ -115,10 +115,16 @@ describe("captureMailOfflineSnapshot", () => {
     expect(JSON.stringify(snapshot)).not.toContain("secret-search-hit");
   });
 
-  it("skips lists that were invalidated and not refetched, so they never look fresh on next launch", async () => {
+  it("keeps invalidated lists offline but discards the sync baseline", async () => {
     const queryClient = seededClient();
-    queryClient.setQueryData(QUERY_KEYS.mailMessages("inbox"), listData([message("a")]));
-    queryClient.setQueryData(QUERY_KEYS.mailMessages("archive"), listData([message("b")]));
+    queryClient.setQueryData(
+      QUERY_KEYS.mailMessages("inbox"),
+      listData([message("a")]),
+    );
+    queryClient.setQueryData(
+      QUERY_KEYS.mailMessages("archive"),
+      listData([message("b")]),
+    );
     await queryClient.invalidateQueries({
       queryKey: QUERY_KEYS.mailMessages("archive"),
       refetchType: "none",
@@ -129,7 +135,61 @@ describe("captureMailOfflineSnapshot", () => {
       emailState: "s1",
     });
 
-    expect(snapshot?.lists.map((list) => list.mailboxId)).toEqual(["inbox"]);
+    expect(snapshot?.lists.map((list) => list.mailboxId).sort()).toEqual([
+      "archive",
+      "inbox",
+    ]);
+    expect(snapshot?.emailState).toBeNull();
+  });
+
+  it("keeps cached mail after a failed refetch and restores it stale", async () => {
+    const queryClient = seededClient();
+    const key = QUERY_KEYS.mailMessages("inbox");
+    queryClient.setQueryData(key, listData([message("a")]));
+    await expect(
+      queryClient.fetchQuery({
+        queryKey: key,
+        queryFn: async () => {
+          throw new Error("Offline");
+        },
+        retry: false,
+      }),
+    ).rejects.toThrow("Offline");
+
+    const snapshot = captureMailOfflineSnapshot(queryClient, {
+      userId: "u1",
+      emailState: "s2",
+    });
+    if (!snapshot) throw new Error("expected a snapshot");
+    expect(snapshot.lists[0]?.messages).toEqual([message("a")]);
+    expect(snapshot.emailState).toBeNull();
+    const restored = new QueryClient();
+    hydrateMailOfflineSnapshot(restored, snapshot);
+    expect(restored.getQueryData(key)).toEqual(listData([message("a")]));
+    expect(restored.getQueryState(key)?.dataUpdatedAt).toBe(0);
+  });
+
+  it("keeps invalidated thread siblings and requires a full reconciliation", async () => {
+    const queryClient = seededClient();
+    queryClient.setQueryData(
+      QUERY_KEYS.mailMessages("inbox"),
+      listData([message("a")]),
+    );
+    queryClient.setQueryData(QUERY_KEYS.mailThread("t-a"), [
+      message("a"),
+      message("b"),
+    ]);
+    await queryClient.invalidateQueries({
+      queryKey: QUERY_KEYS.mailThread("t-a"),
+      refetchType: "none",
+    });
+
+    const snapshot = captureMailOfflineSnapshot(queryClient, {
+      userId: "u1",
+      emailState: "s2",
+    });
+    expect(snapshot?.threads[0]?.messages).toHaveLength(2);
+    expect(snapshot?.emailState).toBeNull();
   });
 
   it("caps each list to one page", () => {
