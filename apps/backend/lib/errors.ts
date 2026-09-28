@@ -192,7 +192,8 @@ function resolveErrorCode(
   error: unknown,
   explicitCode?: string | number,
 ): string | number {
-  if (explicitCode !== undefined) {
+  // Elysia passes no code (or UNKNOWN) for thrown custom errors; resolve the label from the error itself.
+  if (explicitCode !== undefined && explicitCode !== "UNKNOWN") {
     return explicitCode;
   }
 
@@ -206,6 +207,43 @@ function resolveErrorCode(
 
   if (error instanceof ElysiaParseError) {
     return "PARSE";
+  }
+
+  // Labels below only feed logs; every class keeps its existing response mapping in the switch.
+  if (error instanceof NotFoundError) {
+    return "NOT_FOUND";
+  }
+
+  if (error instanceof ValidationError) {
+    return "VALIDATION_ERROR";
+  }
+
+  if (error instanceof UnauthorizedError) {
+    return "UNAUTHORIZED";
+  }
+
+  if (error instanceof ForbiddenError) {
+    return "FORBIDDEN";
+  }
+
+  if (error instanceof ConflictError) {
+    return "CONFLICT";
+  }
+
+  if (error instanceof RateLimitError) {
+    return "RATE_LIMIT";
+  }
+
+  if (error instanceof UpstreamServiceError) {
+    return "UPSTREAM_SERVICE";
+  }
+
+  if (error instanceof DatabaseError) {
+    return "DATABASE";
+  }
+
+  if (error instanceof NotificationError) {
+    return "NOTIFICATION";
   }
 
   if (

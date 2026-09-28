@@ -1267,6 +1267,78 @@ describe("StalwartJmapClient", () => {
     expect(uploaded.blobId).toBe("blob-1");
   });
 
+  it("respects upload concurrency when refreshing expired draft attachments", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000);
+    const fetcher = jest.fn<
+      (url: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            methodResponses: [
+              ["Email/set", { created: { draft1: { id: "draft" } } }, "c1"],
+            ],
+          }),
+        ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "https://mail.example.test",
+      accessToken: "token",
+      fetcher,
+    });
+    const session: JmapSession = {
+      apiUrl: "https://mail.example.test/jmap/",
+      accounts: { acc: {} },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "acc" },
+    };
+    let active = 0;
+    let peak = 0;
+    let uploadedCount = 0;
+    jest.spyOn(client, "uploadBlob").mockImplementation(async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      const blobId = `blob-${++uploadedCount}`;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      active -= 1;
+      return { blobId, size: 1, type: "text/plain" };
+    });
+    try {
+      const attachments = await Promise.all(
+        Array.from({ length: 5 }, () => client.uploadTextBlob(session, "x")),
+      );
+      peak = 0;
+      now.mockReturnValue(7_200_000);
+      client.setMailServerPolicy(
+        resolveMailServerPolicy({
+          jmapSettings: { maxConcurrentUploads: 4, uploadTtl: 3_600_000 },
+        }),
+      );
+
+      await expect(
+        client.saveDraft(session, {
+          draftsMailboxId: "drafts",
+          fromEmail: "alice@example.test",
+          to: [],
+          subject: "Draft",
+          textBody: "Hello",
+          attachments: attachments.map((attachment, index) => ({
+            ...attachment,
+            name: `attachment-${index}.txt`,
+          })),
+        }),
+      ).resolves.toBe("draft");
+
+      expect(peak).toBeLessThanOrEqual(4);
+      expect(uploadedCount).toBe(10);
+      const body = String(fetcher.mock.calls[0]?.[1]?.body);
+      expect(body).toContain('"blob-6"');
+      expect(body).toContain('"blob-10"');
+      expect(body).not.toContain('"blob-1"');
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it("rejects blob uploads that do not return a blob id", async () => {
     const client = new StalwartJmapClient({
       baseUrl: "http://localhost:4001/api/mail/jmap",
@@ -1480,6 +1552,146 @@ describe("StalwartJmapClient", () => {
         },
         "c1",
       ]);
+    });
+  });
+});
+
+describe("parallel chunked JMAP requests", () => {
+  const session: JmapSession = {
+    apiUrl: "http://localhost:4001/api/mail/jmap/",
+    accounts: { account: { name: "alice@solace.onl" } },
+    primaryAccounts: { "urn:ietf:params:jmap:mail": "account" },
+  };
+
+  function trackConcurrency() {
+    let inFlight = 0;
+    let peak = 0;
+    return {
+      async run<T>(work: () => T): Promise<T> {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        inFlight -= 1;
+        return work();
+      },
+      getPeak: () => peak,
+    };
+  }
+
+  function parseMethodCalls(init?: RequestInit) {
+    return (
+      JSON.parse(String(init?.body)) as {
+        methodCalls: Array<[string, Record<string, unknown>, string]>;
+      }
+    ).methodCalls;
+  }
+
+  it("fetches message chunks in parallel and keeps result order", async () => {
+    const tracker = trackConcurrency();
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async (_input, init) =>
+      tracker.run(() => {
+        const ids = (parseMethodCalls(init)[0][1].ids ?? []) as string[];
+        return new Response(
+          JSON.stringify({
+            methodResponses: [
+              ["Email/get", { list: ids.map((id) => ({ id })) }, "c1"],
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+    client.setMailServerPolicy(
+      resolveMailServerPolicy({ jmapSettings: { getMaxResults: 2 } }),
+    );
+
+    const messages = await client.getMessagesByIds(session, [
+      "m1",
+      "m2",
+      "m3",
+      "m4",
+    ]);
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(tracker.getPeak()).toBe(2);
+    expect(messages.map((message) => message.id)).toEqual([
+      "m1",
+      "m2",
+      "m3",
+      "m4",
+    ]);
+  });
+
+  it("splits independent bootstrap method calls into parallel requests", async () => {
+    const tracker = trackConcurrency();
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async (_input, init) =>
+      tracker.run(() => {
+        const method = parseMethodCalls(init)[0][0];
+        const lists: Record<string, unknown[]> = {
+          "x:AccountSettings/get": [
+            { encryptionAtRest: { "@type": "Aes256", publicKey: "pk-1" } },
+          ],
+          "x:Email/get": [{ uploadMax: 10 }],
+          "x:Jmap/get": [{ maxMethodCalls: 16 }],
+          "Mailbox/get": [
+            {
+              id: "inbox",
+              name: "Inbox",
+              role: "inbox",
+              parentId: null,
+              sortOrder: 0,
+            },
+          ],
+          "Identity/get": [
+            { id: "id-1", email: "alice@solace.onl", name: "Alice" },
+          ],
+        };
+        return new Response(
+          JSON.stringify({
+            methodResponses: [[method, { list: lists[method] ?? [] }, "c1"]],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+    client.setMailServerPolicy(
+      resolveMailServerPolicy({ jmapSettings: { maxMethodCalls: 1 } }),
+    );
+
+    const state = await client.bootstrapMailboxState(session);
+
+    expect(fetcher).toHaveBeenCalledTimes(5);
+    expect(tracker.getPeak()).toBe(5);
+    expect(state).toEqual({
+      accountSettings: {
+        encryptionAtRest: { "@type": "Aes256", publicKey: "pk-1" },
+      },
+      emailSettings: { uploadMax: 10 },
+      jmapSettings: { maxMethodCalls: 16 },
+      mailboxes: [
+        {
+          id: "inbox",
+          name: "Inbox",
+          role: "inbox",
+          parentId: null,
+          sortOrder: 0,
+        },
+      ],
+      identities: [{ id: "id-1", email: "alice@solace.onl", name: "Alice" }],
     });
   });
 });

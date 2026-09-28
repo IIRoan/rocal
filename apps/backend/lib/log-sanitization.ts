@@ -20,7 +20,7 @@ export {
 /** Redact common PII patterns (emails, bearer tokens, URLs) from free-form text. */
 export { redactPII };
 
-/** Strip query strings from request URLs before logging. */
+/** Strip query strings and redact email path params from request URLs before logging. */
 export { sanitizeRequestUrl };
 
 /**

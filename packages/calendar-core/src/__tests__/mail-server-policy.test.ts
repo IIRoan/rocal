@@ -186,6 +186,34 @@ describe("estimateOutgoingJmapMessageBytes", () => {
   });
 });
 
+describe("MailBlobUploadRegistry", () => {
+  it("resolves old draft references across repeated refreshes without uploading aliases twice", () => {
+    const registry = new MailBlobUploadRegistry();
+    registry.register({
+      blobId: "original",
+      size: 1,
+      type: "text/plain",
+      uploadedAt: 0,
+      source: { kind: "text", text: "x" },
+    });
+    registry.replaceBlobId("original", {
+      blobId: "second",
+      size: 1,
+      uploadedAt: 100,
+    });
+    registry.replaceBlobId("second", {
+      blobId: "third",
+      size: 1,
+      uploadedAt: 200,
+    });
+
+    expect(registry.get("original")?.blobId).toBe("third");
+    expect(registry.get("second")?.blobId).toBe("third");
+    expect(registry.get("third")?.uploadedAt).toBe(200);
+    expect(registry.listRegistered()).toHaveLength(1);
+  });
+});
+
 describe("jmapMethodCallsHaveDependencies", () => {
   it("detects resultOf references", () => {
     expect(

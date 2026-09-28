@@ -23,7 +23,11 @@ import { MailComposeProvider } from "../src/providers/MailComposeProvider";
 import { MailSelectionProvider } from "../src/providers/MailSelectionProvider";
 import { CommandPalette } from "../src/components/CommandPalette";
 import { MAIL_HOME_ROUTE, MAIL_PUSH_TAP_HANDLER } from "../src/lib/mail-routes";
-import { MAIL_AUTH_LIFECYCLE, prepareMailSession } from "../src/lib/mail-session";
+import {
+  MAIL_AUTH_LIFECYCLE,
+  prepareMailSession,
+  restoreMailSession,
+} from "../src/lib/mail-session";
 
 /** Mail pushes only carry ids, so the extension needs the session to fetch sender and subject, never the title key. */
 const NOTIFICATION_EXTENSION_SECRETS: NotificationExtensionSecrets = {
@@ -45,6 +49,7 @@ function RootLayout() {
                     <NavigationGuard
                       homeRoute={MAIL_HOME_ROUTE}
                       prepareSession={prepareMailSession}
+                      restoreSession={restoreMailSession}
                       pushTapHandler={MAIL_PUSH_TAP_HANDLER}
                       notificationExtensionSecrets={
                         NOTIFICATION_EXTENSION_SECRETS
