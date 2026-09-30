@@ -6,7 +6,7 @@ import type { MailboxMessagesInfiniteData } from "./mail-message-cache";
 import {
   captureMailOfflineSnapshot,
   compactOfflineMessage,
-  hasTruncatedBody,
+  hasIncompleteBody,
   hydrateMailOfflineSnapshot,
   isMailOfflineSnapshot,
   isMailOfflineSnapshotKey,
@@ -192,6 +192,30 @@ describe("captureMailOfflineSnapshot", () => {
     expect(snapshot?.emailState).toBeNull();
   });
 
+  it("attaches loaded bodies to body-less rows of saved messages only", () => {
+    const queryClient = seededClient();
+    const { bodyValues: _bodies, ...row } = message("a");
+    const { bodyValues: _other, ...otherRow } = message("b");
+    queryClient.setQueryData(
+      QUERY_KEYS.mailMessages("inbox"),
+      listData([row, otherRow]),
+    );
+    queryClient.setQueryData(QUERY_KEYS.mailMessage("a"), message("a", "opened"));
+    queryClient.setQueryData(
+      QUERY_KEYS.mailMessage("removed"),
+      message("removed", "gone"),
+    );
+
+    const snapshot = captureMailOfflineSnapshot(queryClient, {
+      userId: "u1",
+      emailState: null,
+    });
+
+    expect(snapshot?.lists[0]?.messages[0]?.bodyValues?.["1"]?.value).toBe("opened");
+    expect(snapshot?.lists[0]?.messages[1]?.bodyValues).toBeUndefined();
+    expect(JSON.stringify(snapshot)).not.toContain("gone");
+  });
+
   it("caps each list to one page", () => {
     const queryClient = seededClient();
     const many = Array.from({ length: 80 }, (_, index) => message(`m${index}`));
@@ -211,13 +235,18 @@ describe("compactOfflineMessage", () => {
   it("truncates oversized plaintext bodies and flags them", () => {
     const compacted = compactOfflineMessage(message("a", "x".repeat(20_000)));
     expect(compacted.bodyValues?.["1"]?.value).toHaveLength(16_000);
-    expect(hasTruncatedBody(compacted)).toBe(true);
+    expect(hasIncompleteBody(compacted)).toBe(true);
   });
 
   it("leaves small bodies untouched", () => {
     const original = message("a");
     expect(compactOfflineMessage(original)).toBe(original);
-    expect(hasTruncatedBody(original)).toBe(false);
+    expect(hasIncompleteBody(original)).toBe(false);
+  });
+
+  it("treats a row copy without body values as incomplete", () => {
+    const { bodyValues: _bodyValues, ...row } = message("a");
+    expect(hasIncompleteBody(row)).toBe(true);
   });
 
   it("keeps PGP ciphertext whole so previews can still decrypt", () => {
@@ -296,7 +325,7 @@ describe("snapshot guards", () => {
     expect(isMailOfflineSnapshotKey(QUERY_KEYS.mailDecrypted("a"))).toBe(true);
     expect(isMailOfflineSnapshotKey(QUERY_KEYS.mailLabels())).toBe(true);
     expect(isMailOfflineSnapshotKey(QUERY_KEYS.mailSearchMessages("inbox", 1))).toBe(false);
-    expect(isMailOfflineSnapshotKey(QUERY_KEYS.mailMessage("a"))).toBe(false);
+    expect(isMailOfflineSnapshotKey(QUERY_KEYS.mailMessage("a"))).toBe(true);
   });
 });
 

@@ -1,6 +1,6 @@
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
-import { hasTruncatedBody } from "./mail-offline-snapshot";
+import { hasIncompleteBody } from "./mail-offline-snapshot";
 import type { MailRuntime } from "./mail-runtime";
 import type { JmapEmailMessage } from "./types";
 
@@ -29,9 +29,9 @@ export function selectReaderPrefetchTargets(
   const messageIds: string[] = [];
   const threadIds = new Set<string>();
   for (const message of messages.slice(0, limit)) {
-    // Full list copies open straight from the list cache; only capped ones need the detail fetch.
+    // Only rows without a complete body need the detail fetch; older snapshot copies open straight from the list.
     if (
-      hasTruncatedBody(message) &&
+      hasIncompleteBody(message) &&
       needsFetch(queryClient, QUERY_KEYS.mailMessage(message.id))
     ) {
       messageIds.push(message.id);

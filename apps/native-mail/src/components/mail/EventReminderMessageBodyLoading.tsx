@@ -26,8 +26,8 @@ export function EventReminderMessageBodyLoading({
   const { theme, isDark } = useTheme();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const styles = useMemo(
-    () => createStyles(theme, isDark, windowWidth, windowHeight),
-    [theme, isDark, windowWidth, windowHeight],
+    () => createStyles(theme, windowWidth, windowHeight),
+    [theme, windowWidth, windowHeight],
   );
   const skeleton = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)";
 
@@ -76,7 +76,6 @@ export function EventReminderMessageBodyLoading({
 
 function createStyles(
   theme: ThemeTokens,
-  isDark: boolean,
   windowWidth: number,
   windowHeight: number,
 ) {
@@ -100,7 +99,7 @@ function createStyles(
       paddingHorizontal: theme.spacing["5"],
       paddingTop: theme.spacing["8"],
       paddingBottom: theme.spacing["6"],
-      backgroundColor: isDark ? "#1a1a1a" : "#ffffff",
+      backgroundColor: theme.colors.background,
     },
     containerAttached: {
       borderWidth: StyleSheet.hairlineWidth,

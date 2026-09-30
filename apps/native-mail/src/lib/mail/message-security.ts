@@ -187,12 +187,22 @@ export function extractPgpMimeCiphertextBlobId(
 export function classifyMessageEncryption(
   message: Pick<
     JmapEmailMessage,
-    "attachments" | "bodyStructure" | "bodyValues" | "htmlBody" | "textBody"
+    | "attachments"
+    | "bodyStructure"
+    | "bodyValues"
+    | "htmlBody"
+    | "textBody"
+    | "preview"
   >,
 ): MessageEncryptionState {
   const { text } = extractMessageBodies(message as JmapEmailMessage);
 
   if (text?.includes("-----BEGIN PGP MESSAGE-----")) {
+    return "inline_pgp";
+  }
+
+  // Row copies carry no body text, but the server preview still opens with the armor header.
+  if (!message.bodyValues && containsArmoredPgpMessage(message.preview)) {
     return "inline_pgp";
   }
 

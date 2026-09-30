@@ -35,6 +35,29 @@ describe("mergeConversationSourceMessages", () => {
     expect(merged[0]?.subject).toBe("Updated");
     expect(merged[0]?.bodyValues?.text?.value).toBe("Secret");
   });
+
+  it("keeps loaded body values when a later row has part ids but no bodies", () => {
+    const merged = mergeConversationSourceMessages(
+      [
+        message({
+          id: "m1",
+          receivedAt: "2026-05-19T10:00:00.000Z",
+          textBody: [{ partId: "text" }],
+          bodyValues: { text: { value: "Secret" } },
+        }),
+      ],
+      [
+        message({
+          id: "m1",
+          receivedAt: "2026-05-19T10:00:00.000Z",
+          textBody: [{ partId: "text" }],
+          bodyValues: undefined,
+        }),
+      ],
+    );
+
+    expect(merged[0]?.bodyValues?.text?.value).toBe("Secret");
+  });
 });
 
 describe("mailbox thread rows", () => {

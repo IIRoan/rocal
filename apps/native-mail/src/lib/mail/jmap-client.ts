@@ -217,6 +217,20 @@ const EMAIL_DETAIL_GET_PROPERTIES = [
   "header:Authentication-Results",
 ] as const;
 
+/** Mailbox rows and thread grouping: metadata only, so the server never reads message blobs for them. */
+const EMAIL_ROW_GET_PROPERTIES = [
+  ...EMAIL_GET_PROPERTIES.filter((property) => property !== "bodyValues"),
+  "preview",
+] as const;
+
+type EmailGetView = "detail" | "row" | "index";
+
+const EMAIL_GET_VIEW_PROPERTIES: Record<EmailGetView, readonly string[]> = {
+  detail: EMAIL_DETAIL_GET_PROPERTIES,
+  row: EMAIL_ROW_GET_PROPERTIES,
+  index: EMAIL_LIST_GET_PROPERTIES,
+};
+
 export type JmapPgpMimeCiphertext = {
   blobId: string;
   size: number;
@@ -309,7 +323,7 @@ function buildMessageBodyValues(input: {
 function buildFromHeader(
   fromEmail: string,
   fromName?: string | null,
-): Array<{ email: string; name?: string }> {
+): { email: string; name?: string }[] {
   const trimmedName = fromName?.trim();
   return [
     {
@@ -343,7 +357,7 @@ export function buildSendMessageMethodCalls(input: {
     ? toJmapAddressList(input.bcc)
     : undefined;
   const seenEnvelopeRecipients = new Set<string>();
-  const envelopeRecipients: Array<{ email: string }> = [];
+  const envelopeRecipients: { email: string }[] = [];
   for (const address of [
     ...toAddresses,
     ...(ccAddresses ?? []),
@@ -885,13 +899,9 @@ export class StalwartJmapClient {
   async getMailboxMessages(
     session: JmapSession,
     mailboxId: string,
-    options: { limit?: number; position?: number; maxBodyValueBytes?: number } = {},
+    options: { limit?: number; position?: number } = {},
   ): Promise<{ messages: JmapEmailMessage[]; total: number }> {
-    const {
-      limit = this.getDefaultMailboxPageSize(),
-      position = 0,
-      maxBodyValueBytes,
-    } = options;
+    const { limit = this.getDefaultMailboxPageSize(), position = 0 } = options;
     const accountId = this.requirePrimaryAccountId(session);
     const envelope = await this.call(
       session,
@@ -924,11 +934,7 @@ export class StalwartJmapClient {
               name: "Email/query",
               path: "/ids",
             },
-            properties: EMAIL_GET_PROPERTIES,
-            fetchTextBodyValues: true,
-            fetchHTMLBodyValues: true,
-            fetchAllBodyValues: true,
-            ...(maxBodyValueBytes ? { maxBodyValueBytes } : {}),
+            properties: EMAIL_ROW_GET_PROPERTIES,
           },
           "g1",
         ],
@@ -1121,7 +1127,7 @@ export class StalwartJmapClient {
       options,
     );
     const messages = await this.getMessagesByIds(session, ids, {
-      includeBodies: false,
+      view: "index",
     });
     return { messages, total, queryState };
   }
@@ -1129,13 +1135,13 @@ export class StalwartJmapClient {
   async getMessagesByIds(
     session: JmapSession,
     ids: string[],
-    options: { includeBodies?: boolean } = {},
+    options: { view?: EmailGetView } = {},
   ): Promise<JmapEmailMessage[]> {
     if (ids.length === 0) {
       return [];
     }
 
-    const includeBodies = options.includeBodies ?? true;
+    const view = options.view ?? "detail";
     const accountId = this.requirePrimaryAccountId(session);
     const chunkSize = this.getEmailGetChunkSize();
     const results = await Promise.all(
@@ -1149,12 +1155,8 @@ export class StalwartJmapClient {
               {
                 accountId,
                 ids: chunk,
-                properties: [
-                  ...(includeBodies
-                    ? EMAIL_DETAIL_GET_PROPERTIES
-                    : EMAIL_LIST_GET_PROPERTIES),
-                ],
-                ...(includeBodies
+                properties: [...EMAIL_GET_VIEW_PROPERTIES[view]],
+                ...(view === "detail"
                   ? {
                       fetchTextBodyValues: true,
                       fetchHTMLBodyValues: true,
@@ -1239,7 +1241,7 @@ export class StalwartJmapClient {
       list?: { id: string; emailIds?: string[] }[];
     }>(threadEnvelope, "Thread/get");
     const emailIds = threadResult.list?.[0]?.emailIds ?? [];
-    return this.getMessagesByIds(session, emailIds);
+    return this.getMessagesByIds(session, emailIds, { view: "row" });
   }
 
   /** Loads several threads in two round trips instead of two per thread. */
@@ -1264,6 +1266,7 @@ export class StalwartJmapClient {
     const messages = await this.getMessagesByIds(
       session,
       threads.flatMap((thread) => thread.emailIds ?? []),
+      { view: "row" },
     );
     const byId = new Map(messages.map((message) => [message.id, message]));
     for (const thread of threads) {

@@ -1,5 +1,10 @@
 import { useMemo } from "react";
-import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import {
   flattenMailboxMessagesCache,
@@ -10,6 +15,7 @@ import {
   getConversationForMessage,
   mergeConversationSourceMessages,
 } from "./conversation-thread";
+import { createBatchLoader } from "./batch-loader";
 import type { JmapEmailMessage } from "./types";
 import type { MailRuntime } from "./mail-runtime";
 
@@ -19,7 +25,7 @@ function getAllCachedMailboxMessages(
   queryClient: ReturnType<typeof useQueryClient>,
 ): JmapEmailMessage[] {
   const lists = queryClient.getQueriesData<MailboxMessagesCacheData>({
-    queryKey: ["mail", "messages"],
+    queryKey: QUERY_KEYS.mailMessagesAll(),
   });
 
   const byId = new Map<string, JmapEmailMessage>();
@@ -35,11 +41,23 @@ function getCachedThreadMessages(
   queryClient: ReturnType<typeof useQueryClient>,
 ): JmapEmailMessage[] {
   const lists = queryClient.getQueriesData<JmapEmailMessage[]>({
-    queryKey: ["mail", "thread"],
+    queryKey: QUERY_KEYS.mailThreadsAll(),
   });
   const byId = new Map<string, JmapEmailMessage>();
   for (const [, messages] of lists) {
     for (const message of messages ?? []) {
+      byId.set(message.id, message);
+    }
+  }
+  return [...byId.values()];
+}
+
+function combineThreadMessages(
+  queries: UseQueryResult<JmapEmailMessage[]>[],
+): JmapEmailMessage[] {
+  const byId = new Map<string, JmapEmailMessage>();
+  for (const query of queries) {
+    for (const message of query.data ?? []) {
       byId.set(message.id, message);
     }
   }
@@ -61,25 +79,26 @@ export function usePrefetchThreadMessages(
     return [...ids].slice(0, MAX_PREFETCH_THREADS);
   }, [messages]);
 
-  const queries = useQueries({
+  // One Thread/get + Email/get serves every thread query that starts in the same tick.
+  const loadThread = useMemo(
+    () =>
+      createBatchLoader<JmapEmailMessage[]>(
+        // Non-null: the queries below are only enabled once runtime exists.
+        (ids) => runtime!.client.getThreadsMessages(runtime!.session, ids),
+        [],
+      ),
+    [runtime],
+  );
+
+  return useQueries({
     queries: threadIds.map((threadId) => ({
       queryKey: QUERY_KEYS.mailThread(threadId),
-      queryFn: () =>
-        runtime!.client.getThreadMessages(runtime!.session, threadId),
+      queryFn: () => loadThread(threadId),
       enabled: Boolean(runtime),
       staleTime: 60_000,
     })),
+    combine: combineThreadMessages,
   });
-
-  return useMemo(() => {
-    const byId = new Map<string, JmapEmailMessage>();
-    for (const query of queries) {
-      for (const message of query.data ?? []) {
-        byId.set(message.id, message);
-      }
-    }
-    return [...byId.values()];
-  }, [queries]);
 }
 
 function filterMessagesToMailboxes(

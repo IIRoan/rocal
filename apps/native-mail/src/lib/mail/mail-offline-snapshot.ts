@@ -126,18 +126,21 @@ export function isMailOfflineSnapshotKey(key: QueryKey): boolean {
     key[1] === "runtime" ||
     key[1] === "labels" ||
     key[1] === "decrypted" ||
+    key[1] === "message" ||
     isMailboxListKey(key) ||
     isThreadKey(key)
   );
 }
 
-export function hasTruncatedBody(message: JmapEmailMessage): boolean {
-  return Object.values(message.bodyValues ?? {}).some(
-    (value) => value.isTruncated === true,
+/** Row copies carry no `bodyValues` at all, and snapshot copies may have capped ones; neither can render a reader. */
+export function hasIncompleteBody(message: JmapEmailMessage): boolean {
+  return (
+    !message.bodyValues ||
+    Object.values(message.bodyValues).some((value) => value.isTruncated === true)
   );
 }
 
-/** Caps large plaintext bodies; readers refetch truncated messages, and PGP ciphertext is kept whole so previews still decrypt. */
+/** Caps large plaintext bodies; readers refetch incomplete messages, and PGP ciphertext is kept whole so previews still decrypt. */
 export function compactOfflineMessage(
   message: JmapEmailMessage,
 ): JmapEmailMessage {
@@ -160,6 +163,19 @@ export function compactOfflineMessage(
     }
   }
   return changed ? { ...message, bodyValues: compacted } : message;
+}
+
+/** Rows carry no body text; attach the bodies of messages already opened or prefetched so they still open offline. */
+function withLoadedBody(
+  queryClient: QueryClient,
+  message: JmapEmailMessage,
+): JmapEmailMessage {
+  if (message.bodyValues) return compactOfflineMessage(message);
+  const detail = queryClient.getQueryData<JmapEmailMessage | null>(
+    QUERY_KEYS.mailMessage(message.id),
+  );
+  if (!detail?.bodyValues) return message;
+  return compactOfflineMessage({ ...message, bodyValues: detail.bodyValues });
 }
 
 function isReconciledQuery(query: Query): boolean {
@@ -267,7 +283,7 @@ export function captureMailOfflineSnapshot(
       total: listTotal(data),
       messages: flattenMailboxMessagesCache(data)
         .slice(0, MAX_MESSAGES_PER_LIST)
-        .map(compactOfflineMessage),
+        .map((entry) => withLoadedBody(queryClient, entry)),
     };
   });
 
@@ -288,8 +304,8 @@ export function captureMailOfflineSnapshot(
   const threads = threadQueries.map(
     (query): MailOfflineThread => ({
       threadId: query.queryKey[2] as string,
-      messages: (query.state.data as JmapEmailMessage[]).map(
-        compactOfflineMessage,
+      messages: (query.state.data as JmapEmailMessage[]).map((entry) =>
+        withLoadedBody(queryClient, entry),
       ),
     }),
   );

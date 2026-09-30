@@ -17,6 +17,28 @@ import {
 import type { MailRuntime } from "./mail-runtime";
 import type { JmapEmailMessage } from "./types";
 
+const directoryKeyLookups = new Map<string, Promise<string | undefined>>();
+
+export function clearSenderKeyCache(): void {
+  directoryKeyLookups.clear();
+}
+
+/** One directory lookup per sender; failures are forgotten so the next message retries. */
+function lookupDirectoryKey(email: string): Promise<string | undefined> {
+  let lookup = directoryKeyLookups.get(email);
+  if (!lookup) {
+    lookup = getRecipientKey(email).then(
+      (key) => key.publicKeyArmored,
+      () => {
+        directoryKeyLookups.delete(email);
+        return undefined;
+      },
+    );
+    directoryKeyLookups.set(email, lookup);
+  }
+  return lookup;
+}
+
 /** Best-effort sender key so decrypt can verify signatures, not only unwrap. */
 export async function resolveSenderVerificationKey(
   runtime: MailRuntime,
@@ -49,12 +71,7 @@ export async function resolveSenderVerificationKey(
     return undefined;
   }
 
-  try {
-    const key = await getRecipientKey(email);
-    return key.publicKeyArmored;
-  } catch {
-    return undefined;
-  }
+  return lookupDirectoryKey(email);
 }
 
 /** Decrypt an encrypted JMAP message and verify the sender signature when possible. */

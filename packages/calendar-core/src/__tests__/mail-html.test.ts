@@ -22,6 +22,13 @@ describe("buildEmailHtmlDocument", () => {
     expect(doc).toContain("border-left:3px solid");
   });
 
+  it("keeps page padding by default and drops it when flush is set", () => {
+    const options = { processedHtml: "<p>Hello</p>", isDark: false, blockRemoteImages: false };
+
+    expect(buildEmailHtmlDocument(options)).toContain("padding:16px 20px;");
+    expect(buildEmailHtmlDocument({ ...options, flush: true })).toContain("padding:0;");
+  });
+
   it("renders list markup in the email body", () => {
     const doc = buildEmailHtmlDocument({
       processedHtml: "<ul><li>one</li><li>two</li></ul>",
@@ -195,6 +202,19 @@ describe("processEmailHtml dark translation", () => {
     });
 
     expect(processed).toContain(`.h{color:${darkenTextColor("#0d0d0d")};background:url(cid:white-bg) #1a1a1a}`);
+  });
+
+  it("translates white onto a custom canvas and paints the page with it", () => {
+    const options = { isDark: true, canvasColor: "#1f1f1f" };
+    const processed = processEmailHtml({
+      ...options,
+      html: `<p style="background:#ffffff">Hi</p>`,
+      blockTrackingPixels: false,
+    });
+    const doc = buildEmailHtmlDocument({ ...options, processedHtml: processed, blockRemoteImages: false });
+
+    expect(processed).toContain("background:#1f1f1f");
+    expect(doc).toContain("body{background:#1f1f1f;");
   });
 
   it("translates legacy font colors", () => {

@@ -152,7 +152,12 @@ function mergeMailMessage(
   incoming: JmapEmailMessage,
 ): JmapEmailMessage {
   if (messageHasBodyPayload(incoming)) {
-    return { ...existing, ...incoming };
+    const merged = { ...existing, ...incoming };
+    // Rows carry part ids but no body text; they must not drop bodies the detail copy already loaded.
+    if (!incoming.bodyValues && existing.bodyValues) {
+      merged.bodyValues = existing.bodyValues;
+    }
+    return merged;
   }
   if (messageHasBodyPayload(existing)) {
     return {

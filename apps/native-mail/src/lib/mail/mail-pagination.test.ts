@@ -1,19 +1,7 @@
 import {
   MAILBOX_PREFETCH_AHEAD_ROWS,
-  OLDER_PAGE_MAX_BODY_VALUE_BYTES,
-  mailboxPageMaxBodyValueBytes,
   shouldPrefetchNextMailboxPage,
 } from "./mail-pagination";
-
-describe("mailboxPageMaxBodyValueBytes", () => {
-  it("keeps the first page whole so recent mail opens from the list copy", () => {
-    expect(mailboxPageMaxBodyValueBytes(0)).toBeUndefined();
-  });
-
-  it("caps bodies on older pages", () => {
-    expect(mailboxPageMaxBodyValueBytes(30)).toBe(OLDER_PAGE_MAX_BODY_VALUE_BYTES);
-  });
-});
 
 describe("shouldPrefetchNextMailboxPage", () => {
   const base = { rowCount: 90, hasNextPage: true, isFetchingNextPage: false };
