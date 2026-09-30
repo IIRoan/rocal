@@ -40,7 +40,7 @@ moderate on Vercel Hobby: website uses `HEAD` (no HTML body), API uses the cheap
 |-------|----------|----------|----------------|----------------|
 | Application | `solace.onl` (`HEAD`) | 2m | `< 3000ms`; ~720/day | Web frontend reachable |
 | Application | `api.solace.onl/api/health` | 1m | `< 5000ms`; ~1440/day | Backend API process |
-| Application | `api.solace.onl/api/health/mail-jmap` | 1m | `< 10000ms`; ~1440/day | JMAP discovery via API proxy (web/native path) |
+| Application | `api.solace.onl/api/health/mail-jmap` | 1m | `< 10000ms`; ~1440/day | API can reach Stalwart (one unauthenticated request, no token minting) |
 | Mail | `mail.solace.onl/jmap/session` | 30s | Discord after **2** fails (~1m) | Stalwart JMAP on the public mail edge |
 | Mail | `mail.solace.onl/slot-manager/status` | 30s | Discord after **2** fails (~1m) | Blue/green tunnels |
 

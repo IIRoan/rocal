@@ -124,7 +124,7 @@ const mockMailService = {
 
 import { handleApiError, NotFoundError } from "../../lib/errors";
 import { auth } from "../../lib/auth";
-import { createMailRoutes, probeMailJmapProxyDiscovery } from "../../routes/mail";
+import { createMailRoutes } from "../../routes/mail";
 
 const mockGetSession = jest.mocked(auth.api.getSession);
 
@@ -136,16 +136,6 @@ function createApp(options?: {
   return new Elysia({ normalize: false })
     .error(handleApiError)
     .use(createMailRoutes(mockMailService, options));
-}
-
-function createProbeAdminClient() {
-  return {
-    ensureOAuthClient: jest.fn(async () => undefined),
-    issueOAuthAccessToken: jest.fn(async () => ({
-      access_token: "probe-access-token",
-      expires_in: 1800,
-    })),
-  };
 }
 
 async function readJson(response: Response) {
@@ -306,62 +296,6 @@ describe("mailRoutes", () => {
 
     expect(limited.status).toBe(429);
     expect(proxyFetch).toHaveBeenCalledTimes(2);
-  });
-
-  it("probeMailJmapProxyDiscovery fails when upstream discovery is unavailable", async () => {
-    const proxyFetch = jest.fn<
-      (input: string, init?: RequestInit) => Promise<Response>
-    >(async () => new Response(null, { status: 503 }));
-
-    const result = await probeMailJmapProxyDiscovery({
-      username: "noreply@solace.onl",
-      password: "secret",
-      adminClient: createProbeAdminClient(),
-      mailService: mockMailService,
-      jmapFetch: proxyFetch,
-      jmapUpstreamBaseUrl: "http://stalwart.test",
-    });
-
-    expect(result).toEqual({ ok: false, status: 503 });
-  });
-
-  it("probeMailJmapProxyDiscovery succeeds when discovery returns a session", async () => {
-    const proxyFetch = jest.fn<
-      (input: string, init?: RequestInit) => Promise<Response>
-    >(async (url) => {
-      if (url.endsWith("/.well-known/jmap")) {
-        return new Response(null, {
-          status: 307,
-          headers: { Location: "/jmap/session" },
-        });
-      }
-      return new Response(
-        JSON.stringify({
-          apiUrl: "https://mail.solace.onl/jmap/",
-          accounts: {},
-          primaryAccounts: {},
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    });
-
-    const result = await probeMailJmapProxyDiscovery({
-      username: "noreply@solace.onl",
-      password: "secret",
-      adminClient: createProbeAdminClient(),
-      mailService: mockMailService,
-      jmapFetch: proxyFetch,
-      jmapUpstreamBaseUrl: "http://stalwart.test",
-    });
-
-    expect(result).toEqual({ ok: true });
-    expect(proxyFetch).toHaveBeenCalledTimes(2);
-    const probeHeaders = (proxyFetch.mock.calls[0]?.[1] as RequestInit)
-      ?.headers as Headers;
-    expect(probeHeaders.get("Authorization")).toBe("Bearer probe-access-token");
   });
 
   it("forwards client Bearer when a session cookie is also present", async () => {

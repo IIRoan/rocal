@@ -12,15 +12,6 @@ import { hasUserId, type AuthenticatedUser } from "../lib/auth-utils";
 import { auth } from "../lib/auth";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { defaultMailService } from "../lib/default-mail-service";
-import {
-  createStalwartAdminClient,
-  type StalwartAdminClient,
-} from "../lib/stalwart-admin";
-import {
-  buildStalwartMailBridgeRedirectUri,
-  createMailBridgePkcePair,
-  getStalwartMailBridgeClientId,
-} from "../lib/mail-bridge-auth";
 import { errorMessage, NotFoundError, RateLimitError } from "../lib/errors";
 import {
   buildSafeJmapUpstreamUrl,
@@ -637,85 +628,6 @@ function guardJmapProxyRate(
     }
     throw error;
   }
-}
-
-export type MailJmapProxyProbeResult =
-  | { ok: true }
-  | { ok: false; status: number };
-
-/** The health probe holds a password, but the proxy only relays bearers. */
-async function mintProbeBearer(input: {
-  username: string;
-  password: string;
-  adminClient: Pick<
-    StalwartAdminClient,
-    "ensureOAuthClient" | "issueOAuthAccessToken"
-  >;
-}): Promise<string> {
-  const clientId = getStalwartMailBridgeClientId();
-  const redirectUri = buildStalwartMailBridgeRedirectUri();
-  await input.adminClient.ensureOAuthClient({
-    clientId,
-    redirectUri,
-    description: "Solace mail backend bridge",
-  });
-  const { codeVerifier, codeChallenge } = await createMailBridgePkcePair();
-  const token = await input.adminClient.issueOAuthAccessToken({
-    accountName: input.username,
-    accountSecret: input.password,
-    clientId,
-    redirectUri,
-    codeVerifier,
-    codeChallenge,
-  });
-  return `Bearer ${token.access_token}`;
-}
-
-/** Exercises the same JMAP discovery proxy path browser/native clients use. */
-export async function probeMailJmapProxyDiscovery(input: {
-  username: string;
-  password: string;
-  mailService?: IMailService;
-  adminClient?: Pick<
-    StalwartAdminClient,
-    "ensureOAuthClient" | "issueOAuthAccessToken"
-  >;
-  jmapFetch?: JmapProxyFetcher;
-  jmapUpstreamBaseUrl?: string;
-}): Promise<MailJmapProxyProbeResult> {
-  const authorization = await mintProbeBearer({
-    username: input.username,
-    password: input.password,
-    adminClient: input.adminClient ?? createStalwartAdminClient(),
-  });
-  const response = await proxyJmapRequest({
-    request: new Request("http://healthcheck.local/mail/jmap/.well-known/jmap", {
-      method: "GET",
-      headers: {
-        Authorization: authorization,
-        Accept: "application/json",
-      },
-    }),
-    upstreamPath: "/.well-known/jmap",
-    upstreamBaseUrl: input.jmapUpstreamBaseUrl ?? env.stalwartBaseUrl,
-    fetcher: input.jmapFetch,
-    mailService: input.mailService ?? defaultMailService,
-  });
-
-  if (!response.ok) {
-    return { ok: false, status: response.status };
-  }
-
-  try {
-    const body = (await response.json()) as { apiUrl?: string };
-    if (!body.apiUrl?.trim()) {
-      return { ok: false, status: response.status };
-    }
-  } catch {
-    return { ok: false, status: response.status };
-  }
-
-  return { ok: true };
 }
 
 export function createMailRoutes(

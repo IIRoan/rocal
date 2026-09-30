@@ -100,7 +100,7 @@ endpoints:
       - "[RESPONSE_TIME] < 5000"
       - "[CERTIFICATE_EXPIRATION] > 336h"
 
-  # Same JMAP discovery path web/native use via the API proxy (catches proxy-only outages).
+  # API -> Stalwart reachability: one unauthenticated request, so it stays cheap on Vercel.
   - name: api-mail-jmap
     <<: *discord-alerts
     group: Application
