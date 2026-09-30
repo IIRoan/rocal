@@ -1,4 +1,9 @@
-import React, { Children, isValidElement, useMemo, type ReactNode } from "react";
+import React, {
+  Children,
+  isValidElement,
+  useMemo,
+  type ReactNode,
+} from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -93,10 +98,15 @@ export function SheetGroup({ children }: { children: ReactNode }) {
   const rows = Children.toArray(children);
   return (
     <View style={styles.group}>
-      {rows.map((row, index) => (
-        <View key={isValidElement(row) && row.key != null ? row.key : `row-${index}`}>
+      {Children.map(rows, (row, index) => (
+        <View>
           {index > 0 ? (
-            <View style={[styles.divider, { marginLeft: rowDividerInset(rows[index - 1]) }]} />
+            <View
+              style={[
+                styles.divider,
+                { marginLeft: rowDividerInset(rows[index - 1]) },
+              ]}
+            />
           ) : null}
           {row}
         </View>
@@ -132,7 +142,12 @@ export interface SheetItemProps {
   onPress?: () => void;
   accessibilityLabel?: string;
   accessibilityRole?: AccessibilityRole;
-  accessibilityState?: { selected?: boolean; checked?: boolean; disabled?: boolean };
+  accessibilityState?: {
+    selected?: boolean;
+    checked?: boolean;
+    disabled?: boolean;
+    expanded?: boolean;
+  };
 }
 
 /** One 48pt drawer row: leading icon or node, label with optional detail, trailing slot. */
@@ -165,7 +180,6 @@ export function SheetItem({
         : theme.colors.foreground;
   const iconColor = tone === "default" ? skin.textSecondary : toneColor;
 
-  const trailingAccessory = checked ? "check" : accessory;
   const leadingIcon = swatch ? (
     <SheetSwatch color={swatch} />
   ) : icon ? (
@@ -183,31 +197,31 @@ export function SheetItem({
         </Text>
         {detail ? (
           <Text
-            style={[styles.rowDetail, detailTone === "destructive" && styles.rowDetailDestructive]}
+            style={[
+              styles.rowDetail,
+              detailTone === "destructive" && styles.rowDetailDestructive,
+            ]}
             numberOfLines={2}
           >
             {detail}
           </Text>
         ) : null}
       </View>
-      {value && !pending ? (
-        <Text style={styles.rowValue} numberOfLines={1}>
-          {value}
-        </Text>
-      ) : null}
-      {pending ? (
-        <ActivityIndicator size="small" color={skin.textSecondary} />
-      ) : (
-        trailing ?? (trailingAccessory ? <SheetAccessory icon={trailingAccessory} /> : null)
-      )}
-      {chevron && !pending ? (
-        <Feather name="chevron-right" size={16} color={skin.textTertiary} />
-      ) : null}
+      <SheetItemTrailing
+        value={value}
+        pending={pending}
+        trailing={trailing}
+        accessory={accessory}
+        checked={checked}
+        chevron={chevron}
+      />
     </>
   );
 
   if (!onPress) {
-    return <View style={[styles.row, disabled && styles.disabled]}>{body}</View>;
+    return (
+      <View style={[styles.row, disabled && styles.disabled]}>{body}</View>
+    );
   }
 
   return (
@@ -227,6 +241,41 @@ export function SheetItem({
     >
       {body}
     </Pressable>
+  );
+}
+
+function SheetItemTrailing({
+  value,
+  pending,
+  trailing,
+  accessory,
+  checked,
+  chevron,
+}: Pick<
+  SheetItemProps,
+  "value" | "pending" | "trailing" | "accessory" | "checked" | "chevron"
+>) {
+  const { skin, styles } = useSheetListStyles();
+  const trailingAccessory = checked ? "check" : accessory;
+  return (
+    <>
+      {value && !pending ? (
+        <Text style={styles.rowValue} numberOfLines={1}>
+          {value}
+        </Text>
+      ) : null}
+      {pending ? (
+        <ActivityIndicator size="small" color={skin.textSecondary} />
+      ) : (
+        (trailing ??
+        (trailingAccessory ? (
+          <SheetAccessory icon={trailingAccessory} />
+        ) : null))
+      )}
+      {chevron && !pending ? (
+        <Feather name="chevron-right" size={16} color={skin.textTertiary} />
+      ) : null}
+    </>
   );
 }
 
@@ -266,7 +315,9 @@ export function SheetSwitchItem({
 /** Accent-colored trailing icon, e.g. an add affordance. */
 function SheetAccessory({ icon }: { icon: FeatherName }) {
   const { skin } = useSheetListStyles();
-  return <Feather name={icon} size={MAIL_ICON.sheetAccessory} color={skin.accent} />;
+  return (
+    <Feather name={icon} size={MAIL_ICON.sheetAccessory} color={skin.accent} />
+  );
 }
 
 /** Small rounded-square color chip, the Skiff calendar swatch. */
@@ -366,7 +417,9 @@ export function SheetButton({
       ) : (
         <>
           {icon ? <Feather name={icon} size={16} color={foreground} /> : null}
-          <Text style={[styles.buttonLabel, { color: foreground }]}>{label}</Text>
+          <Text style={[styles.buttonLabel, { color: foreground }]}>
+            {label}
+          </Text>
         </>
       )}
     </Pressable>
@@ -383,7 +436,12 @@ export function SheetMessage({
 }) {
   const { styles } = useSheetListStyles();
   return (
-    <Text style={[styles.message, tone === "destructive" && styles.messageDestructive]}>
+    <Text
+      style={[
+        styles.message,
+        tone === "destructive" && styles.messageDestructive,
+      ]}
+    >
       {text}
     </Text>
   );
@@ -403,7 +461,13 @@ export function SheetCenteredState({
   return (
     <View style={styles.centered}>
       {loading ? <ActivityIndicator color={skin.textSecondary} /> : null}
-      <Text style={[styles.message, styles.messageCentered, tone === "destructive" && styles.messageDestructive]}>
+      <Text
+        style={[
+          styles.message,
+          styles.messageCentered,
+          tone === "destructive" && styles.messageDestructive,
+        ]}
+      >
         {message}
       </Text>
     </View>

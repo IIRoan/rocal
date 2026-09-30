@@ -332,7 +332,7 @@ function jsonOk(body: unknown) {
 function parseJmapRequest(init?: RequestInit) {
   return JSON.parse(String(init?.body)) as {
     using: string[];
-    methodCalls: Array<[string, Record<string, any>, string]>;
+    methodCalls: [string, Record<string, any>, string][];
   };
 }
 
@@ -652,7 +652,7 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
     });
   });
 
-  it("caps body values on mailbox pages only when asked", async () => {
+  it("loads mailbox pages as metadata rows without reading message bodies", async () => {
     const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
       jsonOk({
         methodResponses: [
@@ -661,20 +661,31 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
         ],
       }),
     );
-    const client = createClient(fetcher);
-    await client.getMailboxMessages(session, "inbox", { position: 0 });
-    await client.getMailboxMessages(session, "inbox", {
-      position: 30,
-      maxBodyValueBytes: 32768,
-    });
+    await createClient(fetcher).getMailboxMessages(session, "inbox", { position: 0 });
 
-    const firstGet = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[1][1];
-    const olderGet = parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[1][1];
-    expect(firstGet).not.toHaveProperty("maxBodyValueBytes");
-    expect(olderGet).toMatchObject({
-      fetchAllBodyValues: true,
-      maxBodyValueBytes: 32768,
-    });
+    const get = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[1][1];
+    expect(get.properties).toEqual(
+      expect.arrayContaining(["preview", "bodyStructure", "threadId"]),
+    );
+    expect(get.properties).not.toContain("bodyValues");
+    expect(get).not.toHaveProperty("fetchAllBodyValues");
+    expect(get).not.toHaveProperty("fetchTextBodyValues");
+  });
+
+  it("loads thread messages as rows and opened messages with bodies", async () => {
+    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
+      jsonOk({ methodResponses: [["Email/get", { list: [] }, "c1"]] }),
+    );
+    const client = createClient(fetcher);
+    await client.getMessagesByIds(session, ["m1"], { view: "row" });
+    await client.getMessagesByIds(session, ["m1"]);
+
+    const rowGet = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1];
+    const detailGet = parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1];
+    expect(rowGet.properties).not.toContain("bodyValues");
+    expect(rowGet).not.toHaveProperty("fetchAllBodyValues");
+    expect(detailGet.properties).toContain("bodyValues");
+    expect(detailGet).toMatchObject({ fetchAllBodyValues: true });
   });
 
   it("loads several threads with one Thread/get and one Email/get", async () => {

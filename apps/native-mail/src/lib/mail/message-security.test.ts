@@ -81,6 +81,26 @@ describe("classifyMessageEncryption", () => {
     ).toBe("inline_pgp");
   });
 
+  it("detects inline PGP on a row copy from the server preview", () => {
+    expect(
+      classifyMessageEncryption(
+        message({ preview: "-----BEGIN PGP MESSAGE----- hQEMA" }),
+      ),
+    ).toBe("inline_pgp");
+  });
+
+  it("trusts body text over the preview once bodies are loaded", () => {
+    expect(
+      classifyMessageEncryption(
+        message({
+          preview: "-----BEGIN PGP MESSAGE-----",
+          textBody: [{ partId: "t" }],
+          bodyValues: { t: { value: "hello there" } },
+        }),
+      ),
+    ).toBe("plain");
+  });
+
   it("detects multipart/encrypted PGP MIME", () => {
     expect(
       classifyMessageEncryption(

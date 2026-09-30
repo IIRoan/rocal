@@ -1,5 +1,9 @@
-import { useCallback, useMemo } from "react";
-import { useQueries, type UseQueryResult } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo } from "react";
+import {
+  useQueries,
+  useQueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import type { MailDecryptResult } from "./mail-crypto";
 import {
@@ -12,6 +16,30 @@ import { decryptEncryptedMessage } from "./mail-sender-key";
 import type { JmapEmailMessage } from "./types";
 import type { MailRuntime } from "./mail-runtime";
 
+const MAX_CONCURRENT_PREVIEW_DECRYPTS = 2;
+let activePreviewDecrypts = 0;
+const queuedPreviewDecrypts: (() => void)[] = [];
+
+/** Keeps list previews from saturating the JS thread and network while the reader decrypts. */
+async function withPreviewDecryptSlot<T>(task: () => Promise<T>): Promise<T> {
+  if (activePreviewDecrypts >= MAX_CONCURRENT_PREVIEW_DECRYPTS) {
+    // The releasing task hands its slot over, so the count stays accurate.
+    await new Promise<void>((resolve) => queuedPreviewDecrypts.push(resolve));
+  } else {
+    activePreviewDecrypts += 1;
+  }
+  try {
+    return await task();
+  } finally {
+    const next = queuedPreviewDecrypts.shift();
+    if (next) {
+      next();
+    } else {
+      activePreviewDecrypts -= 1;
+    }
+  }
+}
+
 type SelectedDecryptedPreview = {
   messageId: string | null;
   decrypted: DecryptedMailPreviewContent | null;
@@ -22,6 +50,7 @@ export function useConversationDecryptedPreviews(
   messages: JmapEmailMessage[],
   selected?: SelectedDecryptedPreview,
 ): Record<string, string> {
+  const queryClient = useQueryClient();
   const selectedMessageId = selected?.messageId ?? null;
   const selectedDecrypted = selected?.decrypted ?? null;
 
@@ -49,39 +78,60 @@ export function useConversationDecryptedPreviews(
     [encryptedMessages],
   );
 
-  const decryptedById = useQueries({
-    queries: encryptedMessages.map((message) => {
-      const encryption = classifyMessageEncryption(message);
-      const hasSelectedDecrypt =
-        message.id === selectedMessageId &&
-        Boolean(selectedDecrypted?.text || selectedDecrypted?.html);
+  const queries = useMemo(
+    () =>
+      encryptedMessages.map((message) => {
+        const encryption = classifyMessageEncryption(message);
+        const hasSelectedDecrypt =
+          message.id === selectedMessageId &&
+          Boolean(selectedDecrypted?.text || selectedDecrypted?.html);
 
-      return {
-        queryKey: QUERY_KEYS.mailDecrypted(message.id),
-        enabled:
-          Boolean(runtime) &&
-          (encryption === "inline_pgp" || encryption === "pgp_mime") &&
-          !hasSelectedDecrypt,
-        retry: 1,
-        staleTime: Infinity,
-        gcTime: 5 * 60 * 1000,
-        queryFn: async (): Promise<MailDecryptResult> => {
-          if (!runtime) {
-            throw new Error("Runtime not available");
-          }
-          return decryptEncryptedMessage(runtime, message);
-        },
-      };
-    }),
+        return {
+          queryKey: QUERY_KEYS.mailDecrypted(message.id),
+          enabled:
+            Boolean(runtime) &&
+            (encryption === "inline_pgp" || encryption === "pgp_mime") &&
+            !hasSelectedDecrypt,
+          retry: 1,
+          staleTime: Infinity,
+          gcTime: 5 * 60 * 1000,
+          queryFn: async (): Promise<MailDecryptResult> => {
+            if (!runtime) {
+              throw new Error("Runtime not available");
+            }
+            return decryptEncryptedMessage(runtime, message);
+          },
+        };
+      }),
+    [encryptedMessages, runtime, selectedDecrypted, selectedMessageId],
+  );
+
+  const decryptedById = useQueries({
+    queries: queries.map((query) => ({ ...query, enabled: false })),
     combine: combineDecrypted,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    for (const query of queries) {
+      if (!query.enabled) continue;
+      // Queue before starting the shared query so the reader can decrypt immediately.
+      void withPreviewDecryptSlot(async () => {
+        if (!cancelled) await queryClient.prefetchQuery(query);
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [queries, queryClient]);
 
   return useMemo(() => {
     const previews: Record<string, string> = {};
     for (const message of encryptedMessages) {
       const selectedOverride =
         message.id === selectedMessageId ? selectedDecrypted : null;
-      const decrypted = selectedOverride ?? decryptedById.get(message.id) ?? null;
+      const decrypted =
+        selectedOverride ?? decryptedById.get(message.id) ?? null;
       if (!decrypted) {
         continue;
       }

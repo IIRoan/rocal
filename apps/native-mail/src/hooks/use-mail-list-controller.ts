@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQueryClient } from "@tanstack/react-query";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { useCommandPalette } from "@workspace/native-core/providers/CommandPaletteProvider";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
-import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import { useUserTimezone } from "@workspace/native-core/hooks/use-user-timezone";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
 import { sheetCompactBottomPadding } from "@workspace/native-core/components/sheet/sheet-padding";
@@ -43,7 +41,6 @@ const NO_MAILBOXES: JmapMailbox[] = [];
 export type MailListController = ReturnType<typeof useMailListController>;
 
 export function useMailListController() {
-  const queryClient = useQueryClient();
   const { open: openCommandPalette } = useCommandPalette();
   const { openCompose } = useMailCompose();
   const { toast } = useToast();
@@ -148,11 +145,8 @@ export function useMailListController() {
     (mailboxId: string) => {
       clearSelection();
       setSelectedMailboxId(mailboxId);
-      void queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.mailMessages(mailboxId),
-      });
     },
-    [clearSelection, queryClient, setSelectedMailboxId],
+    [clearSelection, setSelectedMailboxId],
   );
 
   const { emptyMailbox } = mutations;

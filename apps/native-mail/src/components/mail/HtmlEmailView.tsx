@@ -91,20 +91,25 @@ export function HtmlEmailView({
   const [webViewHeight, setWebViewHeight] = useState(400);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  const canvasColor = theme?.colors.background;
+
   const document = useMemo(() => {
     const processedHtml = processEmailHtml({
       html,
       isDark,
       blockTrackingPixels,
       blockRemoteImages,
+      canvasColor,
     });
     return buildEmailHtmlDocument({
       processedHtml,
       isDark,
       blockRemoteImages,
       mobileViewport: true,
+      canvasColor,
+      flush: true,
     });
-  }, [html, isDark, blockTrackingPixels, blockRemoteImages]);
+  }, [html, isDark, blockTrackingPixels, blockRemoteImages, canvasColor]);
 
   const fallbackText = useMemo(() => stripToPlainText(html), [html]);
 
@@ -137,7 +142,7 @@ export function HtmlEmailView({
     return false;
   };
 
-  const bg = isDark ? "#1a1a1a" : "#ffffff";
+  const bg = canvasColor ?? (isDark ? "#1a1a1a" : "#ffffff");
 
   return (
     <View style={[{ height: webViewHeight }, style]}>

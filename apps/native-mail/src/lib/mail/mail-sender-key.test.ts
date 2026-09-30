@@ -1,3 +1,21 @@
+import {
+  decryptMailMessage,
+  decryptPgpMimeMessage,
+  ensureVaultLoaded,
+} from "./mail-crypto";
+import { getRecipientKey } from "./mail-api";
+import {
+  clearSenderKeyCache,
+  decryptEncryptedMessage,
+  resolveSenderVerificationKey,
+} from "./mail-sender-key";
+import {
+  classifyMessageEncryption,
+  resolveInlinePgpArmoredCiphertext,
+} from "./message-security";
+import type { MailRuntime } from "./mail-runtime";
+import type { JmapEmailMessage } from "./types";
+
 jest.mock("./mail-crypto", () => ({
   ensureVaultLoaded: jest.fn(),
   decryptMailMessage: jest.fn(),
@@ -12,23 +30,6 @@ jest.mock("./message-security", () => ({
   classifyMessageEncryption: jest.fn(),
   resolveInlinePgpArmoredCiphertext: jest.fn(),
 }));
-
-import {
-  decryptMailMessage,
-  decryptPgpMimeMessage,
-  ensureVaultLoaded,
-} from "./mail-crypto";
-import { getRecipientKey } from "./mail-api";
-import {
-  decryptEncryptedMessage,
-  resolveSenderVerificationKey,
-} from "./mail-sender-key";
-import {
-  classifyMessageEncryption,
-  resolveInlinePgpArmoredCiphertext,
-} from "./message-security";
-import type { MailRuntime } from "./mail-runtime";
-import type { JmapEmailMessage } from "./types";
 
 function createRuntime(
   overrides: Partial<MailRuntime> = {},
@@ -57,6 +58,7 @@ function createRuntime(
 describe("resolveSenderVerificationKey", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    clearSenderKeyCache();
     (ensureVaultLoaded as jest.Mock).mockResolvedValue({
       vault: { publicKeyArmored: "self-public-key" },
     });
@@ -110,6 +112,32 @@ describe("resolveSenderVerificationKey", () => {
     await expect(
       resolveSenderVerificationKey(createRuntime(), "bob@solace.onl"),
     ).resolves.toBeUndefined();
+  });
+
+  it("looks a sender up once however many messages they sent", async () => {
+    const runtime = createRuntime();
+
+    const keys = await Promise.all([
+      resolveSenderVerificationKey(runtime, "bob@solace.onl"),
+      resolveSenderVerificationKey(runtime, "Bob@Solace.Onl"),
+    ]);
+    await resolveSenderVerificationKey(runtime, "bob@solace.onl");
+
+    expect(keys).toEqual(["bob-public-key", "bob-public-key"]);
+    expect(getRecipientKey).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a failed lookup on the next message", async () => {
+    (getRecipientKey as jest.Mock).mockRejectedValueOnce(new Error("offline"));
+    const runtime = createRuntime();
+
+    await expect(
+      resolveSenderVerificationKey(runtime, "bob@solace.onl"),
+    ).resolves.toBeUndefined();
+    await expect(
+      resolveSenderVerificationKey(runtime, "bob@solace.onl"),
+    ).resolves.toBe("bob-public-key");
+    expect(getRecipientKey).toHaveBeenCalledTimes(2);
   });
 });
 

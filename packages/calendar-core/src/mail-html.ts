@@ -9,6 +9,8 @@ export interface ProcessEmailHtmlOptions {
   isDark: boolean;
   blockTrackingPixels: boolean;
   blockRemoteImages?: boolean;
+  /** Dark canvas that email whites are translated onto; defaults to the reader canvas. */
+  canvasColor?: string;
 }
 
 export interface BuildEmailHtmlDocumentOptions {
@@ -16,6 +18,10 @@ export interface BuildEmailHtmlDocumentOptions {
   isDark: boolean;
   blockRemoteImages: boolean;
   mobileViewport?: boolean;
+  /** Page background behind the message; defaults to the reader canvas. */
+  canvasColor?: string;
+  /** Drops the page padding when the host already insets the message. */
+  flush?: boolean;
 }
 
 const DARK_CANVAS = "#1a1a1a";
@@ -129,11 +135,16 @@ function contrastRatio(first: Rgb, second: Rgb): number {
 }
 
 /** White lands on the dark canvas and black on the dark text color; hue is kept. */
-function invertLightness(rgb: Rgb): Rgb {
+function invertLightness(rgb: Rgb, canvasLightness = CANVAS_LIGHTNESS): Rgb {
   const [lightness, a, b] = toOklab(...rgb);
-  const inverted = CANVAS_LIGHTNESS + (1 - lightness) * (TEXT_LIGHTNESS - CANVAS_LIGHTNESS);
+  const inverted = canvasLightness + (1 - lightness) * (TEXT_LIGHTNESS - canvasLightness);
   const chroma = lightness > 0 ? Math.min(1, inverted / lightness) : 1;
   return fromOklab(inverted, a * chroma, b * chroma);
+}
+
+function canvasLightnessOf(canvas: string | undefined): number {
+  const rgb = canvas ? opaqueColor(canvas) : null;
+  return rgb ? toOklab(...rgb)[0] : CANVAS_LIGHTNESS;
 }
 
 function opaqueColor(token: string): Rgb | null {
@@ -142,17 +153,21 @@ function opaqueColor(token: string): Rgb | null {
 }
 
 /** Translates a background or border color for the dark reader. */
-export function darkenCssColor(token: string): string {
+export function darkenCssColor(token: string, canvasLightness = CANVAS_LIGHTNESS): string {
   const rgba = parseCssColor(token);
-  return rgba ? formatColor(invertLightness([rgba[0], rgba[1], rgba[2]]), rgba[3]) : token;
+  return rgba ? formatColor(invertLightness([rgba[0], rgba[1], rgba[2]], canvasLightness), rgba[3]) : token;
 }
 
 /** Translates a text color, then walks its lightness away from the translated background until it reaches AA contrast. */
-export function darkenTextColor(token: string, background = "#ffffff"): string {
+export function darkenTextColor(
+  token: string,
+  background = "#ffffff",
+  canvasLightness = CANVAS_LIGHTNESS,
+): string {
   const rgba = parseCssColor(token);
   if (!rgba) return token;
-  const darkBackground = invertLightness(opaqueColor(background) ?? WHITE);
-  const inverted = invertLightness([rgba[0], rgba[1], rgba[2]]);
+  const darkBackground = invertLightness(opaqueColor(background) ?? WHITE, canvasLightness);
+  const inverted = invertLightness([rgba[0], rgba[1], rgba[2]], canvasLightness);
   if (contrastRatio(inverted, darkBackground) >= MIN_TEXT_CONTRAST) return formatColor(inverted, rgba[3]);
   const [lightness, a, b] = toOklab(...inverted);
   const step = contrastRatio(WHITE, darkBackground) >= contrastRatio([0, 0, 0], darkBackground) ? 0.02 : -0.02;
@@ -164,14 +179,16 @@ export function darkenTextColor(token: string, background = "#ffffff"): string {
   return formatColor(candidate, rgba[3]);
 }
 
-function darkenCssColors(css: string, background: string): string {
+function darkenCssColors(css: string, background: string, canvasLightness: number): string {
   return css.replace(
     COLOR_DECLARATION_PATTERN,
     (_match, prefix: string, property: string, value: string) =>
       prefix +
       value.replace(COLOR_TOKEN_PATTERN, (token) => {
         if (token.toLowerCase().startsWith("url(")) return token;
-        return property.toLowerCase() === "color" ? darkenTextColor(token, background) : darkenCssColor(token);
+        return property.toLowerCase() === "color"
+          ? darkenTextColor(token, background, canvasLightness)
+          : darkenCssColor(token, canvasLightness);
       }),
   );
 }
@@ -195,28 +212,31 @@ function declaredBackground(attributes: string): string | null {
   return null;
 }
 
-function darkenTagColors(tag: string, background: string): string {
+function darkenTagColors(tag: string, background: string, canvasLightness: number): string {
   return tag
     .replace(STYLE_ATTRIBUTE_VALUE_PATTERN, (_match, prefix: string, double?: string, single?: string) =>
       double !== undefined
-        ? `${prefix}"${darkenCssColors(double, background)}"`
-        : `${prefix}'${darkenCssColors(single ?? "", background)}'`,
+        ? `${prefix}"${darkenCssColors(double, background, canvasLightness)}"`
+        : `${prefix}'${darkenCssColors(single ?? "", background, canvasLightness)}'`,
     )
     .replace(
       COLOR_ATTRIBUTE_VALUE_PATTERN,
       (_match, prefix: string, name: string, double?: string, single?: string, bare?: string) => {
         const token = attributeValue(double, single, bare);
-        const darkened = name.toLowerCase() === "bgcolor" ? darkenCssColor(token) : darkenTextColor(token, background);
+        const darkened =
+          name.toLowerCase() === "bgcolor"
+            ? darkenCssColor(token, canvasLightness)
+            : darkenTextColor(token, background, canvasLightness);
         return `${prefix}"${darkened}"`;
       },
     );
 }
 
 /** Tracks the background each element paints on so text is translated against it; images keep their own plates. */
-function darkenEmailColors(html: string): string {
+function darkenEmailColors(html: string, canvasLightness: number): string {
   const open: { name: string; background: string }[] = [];
   return html
-    .replace(STYLE_BLOCK_PATTERN, (block, css: string) => block.replace(css, () => darkenCssColors(css, "#ffffff")))
+    .replace(STYLE_BLOCK_PATTERN, (block, css: string) => block.replace(css, () => darkenCssColors(css, "#ffffff", canvasLightness)))
     .replace(
       MARKUP_TOKEN_PATTERN,
       (token, closing: string | undefined, rawName: string | undefined, attributes = "", selfClosing = "") => {
@@ -230,7 +250,7 @@ function darkenEmailColors(html: string): string {
         if (name === "img") return token;
         const background = declaredBackground(attributes) ?? open.at(-1)?.background ?? "#ffffff";
         if (!VOID_TAGS.has(name) && !selfClosing) open.push({ name, background });
-        return darkenTagColors(token, background);
+        return darkenTagColors(token, background, canvasLightness);
       },
     );
 }
@@ -240,6 +260,7 @@ export function processEmailHtml({
   isDark,
   blockTrackingPixels,
   blockRemoteImages = false,
+  canvasColor,
 }: ProcessEmailHtmlOptions): string {
   let processed = extractBodyHtml(html);
 
@@ -252,7 +273,7 @@ export function processEmailHtml({
   }
 
   if (isDark && !DARK_SCHEME_PATTERN.test(html)) {
-    processed = darkenEmailColors(processed);
+    processed = darkenEmailColors(processed, canvasLightnessOf(canvasColor));
   } else if (!isDark) {
     processed = processed.replace(
       /<meta[^>]*name=["'](?:color-scheme|supported-color-schemes)["'][^>]*\/?>/gi,
@@ -288,10 +309,12 @@ export function buildEmailHtmlDocument({
   isDark,
   blockRemoteImages,
   mobileViewport,
+  canvasColor,
+  flush,
 }: BuildEmailHtmlDocumentOptions): string {
   const csp = `<meta http-equiv="Content-Security-Policy" content="${buildEmailContentSecurityPolicy(!blockRemoteImages)}">`;
   const scheme = isDark ? "dark" : "light";
-  const bg = isDark ? DARK_CANVAS : "#fff";
+  const bg = canvasColor ?? (isDark ? DARK_CANVAS : "#fff");
   const fg = isDark ? DARK_TEXT : "#111";
   const linkColor = isDark ? "#8ab4f8" : "#2563eb";
   const quoteBorder = isDark ? "#444" : "#d4d4d4";
@@ -307,7 +330,7 @@ export function buildEmailHtmlDocument({
   const layoutStyles = `table{max-width:100%;table-layout:auto}td,th{overflow-wrap:break-word;word-break:normal}pre{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%}`;
   const richTextStyles = `ul,ol{margin:0 0 1em;padding-left:1.5em}ul{list-style-type:disc}ol{list-style-type:decimal}li{margin:0.25em 0}li>p{margin:0}blockquote{margin:0 0 1em;padding-left:12px;border-left:3px solid ${quoteBorder};color:${quoteColor}}a{color:${linkColor};text-decoration:underline}u{text-decoration:underline}s,strike,del{text-decoration:line-through}strong,b{font-weight:600}em,i{font-style:italic}`;
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8">${viewport}<meta name="color-scheme" content="${scheme}">${csp}<meta name="referrer" content="no-referrer"><base target="_blank"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;color-scheme:${scheme}}body{background:${bg};font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;font-size:14px;line-height:1.6;padding:16px 20px;color:${fg};overflow-wrap:break-word;overflow-x:hidden}img{max-width:100%;height:auto}${layoutStyles}${richTextStyles}p{margin:0 0 1em}p:last-child{margin:0}</style></head><body>${processedHtml}</body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">${viewport}<meta name="color-scheme" content="${scheme}">${csp}<meta name="referrer" content="no-referrer"><base target="_blank"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;color-scheme:${scheme}}body{background:${bg};font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;font-size:14px;line-height:1.6;padding:${flush ? "0" : "16px 20px"};color:${fg};overflow-wrap:break-word;overflow-x:hidden}img{max-width:100%;height:auto}${layoutStyles}${richTextStyles}p{margin:0 0 1em}p:last-child{margin:0}</style></head><body>${processedHtml}</body></html>`;
 }
 
 function extractBodyHtml(html: string): string {

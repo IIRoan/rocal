@@ -1,10 +1,5 @@
-import { useEffect, useMemo, useRef } from "react";
-import {
-  Animated,
-  StyleSheet,
-  View,
-  type ViewStyle,
-} from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Animated, StyleSheet, View, type ViewStyle } from "react-native";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useReduceMotion } from "@workspace/native-core/lib/use-reduce-motion";
@@ -18,7 +13,7 @@ type MessageDecryptingSkeletonProps = {
 };
 
 function useSkeletonPulse() {
-  const opacity = useRef(new Animated.Value(0.45)).current;
+  const [opacity] = useState(() => new Animated.Value(0.45));
   const reduceMotion = useReduceMotion();
 
   useEffect(() => {
@@ -53,7 +48,7 @@ export function MessageDecryptingSkeleton({
 }: MessageDecryptingSkeletonProps) {
   const { theme, isDark: themeIsDark } = useTheme();
   const isDark = isDarkProp ?? themeIsDark;
-  const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const pulse = useSkeletonPulse();
   const barColor = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)";
 
@@ -68,9 +63,9 @@ export function MessageDecryptingSkeleton({
     >
       <View style={styles.body}>
         <View style={styles.lines}>
-          {BODY_LINE_WIDTHS.map((widthRatio, index) => (
+          {BODY_LINE_WIDTHS.map((widthRatio) => (
             <Animated.View
-              key={`${widthRatio}-${index}`}
+              key={widthRatio}
               style={[
                 styles.line,
                 {
@@ -93,11 +88,13 @@ export function MessageDecryptingLoader(props: MessageDecryptingSkeletonProps) {
 }
 
 /** @deprecated Use MessageDecryptingSkeleton */
-export function MessageDecryptingIndicator(props: MessageDecryptingSkeletonProps) {
+export function MessageDecryptingIndicator(
+  props: MessageDecryptingSkeletonProps,
+) {
   return <MessageDecryptingSkeleton {...props} />;
 }
 
-function createStyles(theme: ThemeTokens, isDark: boolean) {
+function createStyles(theme: ThemeTokens) {
   return StyleSheet.create({
     container: {
       minHeight: 160,
@@ -105,7 +102,7 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       borderColor: theme.colors.border,
       borderRadius: theme.borderRadius.lg,
       overflow: "hidden",
-      backgroundColor: isDark ? "#1a1a1a" : "#ffffff",
+      backgroundColor: theme.colors.background,
     },
     containerAttached: {
       borderTopWidth: 0,

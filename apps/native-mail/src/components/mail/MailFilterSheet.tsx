@@ -1,14 +1,14 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, type ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import {
   DEFAULT_MAIL_LIST_FILTERS,
   MAIL_LIST_AGES,
@@ -32,8 +32,18 @@ import {
   BottomSheetScrollView,
   BottomSheetTitle,
 } from "@workspace/native-core/components/BottomSheet";
-import { MAIL_ICON, mailSpacing, useMailSkin, type MailSkin } from "@workspace/native-core/components/mail/mail-ui";
-import { Switch } from "@workspace/native-core/components/ui/Switch";
+import {
+  SheetButton,
+  SheetGroup,
+  SheetItem,
+  SheetSection,
+  SheetSwitchItem,
+  SheetTextField,
+} from "@workspace/native-core/components/sheet/SheetSections";
+import {
+  useMailSkin,
+  type MailSkin,
+} from "@workspace/native-core/components/mail/mail-ui";
 
 interface MailFilterSheetProps {
   visible: boolean;
@@ -46,6 +56,11 @@ interface MailFilterSheetProps {
   onDismiss: () => void;
 }
 
+type FilterDisclosureId = "received" | "labels" | "search";
+
+/** One tall stop, so a swipe up scrolls the list instead of resizing the sheet. */
+const FILTER_SHEET_SNAP_POINTS = [0.9];
+
 const SEARCH_FIELD_META = new Map(
   SEARCH_FILTER_FIELDS.map((entry) => [entry.field, entry]),
 );
@@ -54,6 +69,26 @@ function sameSearchFields(a: MailSearchFieldValues, b: MailSearchFieldValues) {
   return MAIL_SEARCH_TEXT_FIELDS.every(
     (field) => (a[field]?.trim() ?? "") === (b[field]?.trim() ?? ""),
   );
+}
+
+function doneLabel(
+  draftDirty: boolean,
+  activeCount: number,
+  resultCount: number,
+) {
+  if (draftDirty) return "Search";
+  if (activeCount === 0) return "Done";
+  return resultCount === 1
+    ? "Show 1 conversation"
+    : `Show ${resultCount} conversations`;
+}
+
+function labelsSummary(labels: LabelDef[], labelIds: ReadonlySet<string>) {
+  const selected = labels.filter((label) => labelIds.has(label.id));
+  if (selected.length === 0) return "Any";
+  return selected.length === 1
+    ? (selected[0]?.name ?? "1 selected")
+    : `${selected.length} selected`;
 }
 
 /** Combinable message list filters plus server-side field search (sender, recipient, subject, body, dates). */
@@ -72,9 +107,16 @@ export function MailFilterSheet({
   const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
   const [draftFields, setDraftFields] =
     useState<MailSearchFieldValues>(searchFields);
+  const [expanded, setExpanded] = useState<FilterDisclosureId | null>(null);
+  const selectedLabelIds = useMemo(
+    () => new Set(filters.labelIds),
+    [filters.labelIds],
+  );
   const draftDirty = !sameSearchFields(draftFields, searchFields);
+  const draftFieldCount = countMailSearchFieldValues(draftFields);
   const activeCount =
-    countActiveMailListFilters(filters) + countMailSearchFieldValues(searchFields);
+    countActiveMailListFilters(filters) +
+    countMailSearchFieldValues(searchFields);
 
   const commitAndDismiss = () => {
     if (draftDirty) onSearchFieldsChange(draftFields);
@@ -90,22 +132,28 @@ export function MailFilterSheet({
   const setDraftField = (field: MailSearchTextField, value: string) =>
     setDraftFields((prev) => ({ ...prev, [field]: value }));
 
-  const patch = (next: Partial<MailListFilters>) =>
+  const patch = (next: Partial<MailListFilters>) => {
+    void Haptics.selectionAsync();
     onFiltersChange({ ...filters, ...next });
+  };
 
   const toggleLabel = (labelId: string) =>
     patch({
-      labelIds: filters.labelIds.includes(labelId)
+      labelIds: selectedLabelIds.has(labelId)
         ? filters.labelIds.filter((id) => id !== labelId)
         : [...filters.labelIds, labelId],
     });
+
+  const toggleDisclosure = (id: FilterDisclosureId) => {
+    void Haptics.selectionAsync();
+    setExpanded((current) => (current === id ? null : id));
+  };
 
   return (
     <BottomSheet
       visible={visible}
       onDismiss={commitAndDismiss}
-      snapPoints={[0.7, 0.92]}
-      initialSnapIndex={0}
+      snapPoints={FILTER_SHEET_SNAP_POINTS}
     >
       <BottomSheetHeader>
         <View style={styles.headerRow}>
@@ -114,7 +162,10 @@ export function MailFilterSheet({
             <Pressable
               onPress={resetAll}
               hitSlop={8}
-              style={({ pressed }) => [styles.resetButton, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.resetButton,
+                pressed && styles.pressed,
+              ]}
               accessibilityRole="button"
               accessibilityLabel="Reset filters"
             >
@@ -124,51 +175,8 @@ export function MailFilterSheet({
         </View>
       </BottomSheetHeader>
 
-      <BottomSheetScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Search fields</Text>
-          <View style={styles.card}>
-            {MAIL_SEARCH_TEXT_FIELDS.map((field, index) => {
-              const meta = SEARCH_FIELD_META.get(field);
-              const value = draftFields[field] ?? "";
-              const isDate = meta?.type === "date";
-              const invalid =
-                isDate && value.trim().length > 0 && !isValidSearchDate(value);
-              return (
-                <View
-                  key={field}
-                  style={[styles.fieldRow, index > 0 && styles.rowDivider]}
-                >
-                  <Text style={styles.fieldLabel}>{meta?.label ?? field}</Text>
-                  <TextInput
-                    value={value}
-                    onChangeText={(text) => setDraftField(field, text)}
-                    onSubmitEditing={commitAndDismiss}
-                    placeholder={meta?.placeholder}
-                    placeholderTextColor={skin.textTertiary}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType={
-                      isDate
-                        ? "numbers-and-punctuation"
-                        : field === "from" || field === "to"
-                          ? "email-address"
-                          : "default"
-                    }
-                    returnKeyType="search"
-                    accessibilityLabel={`${meta?.label ?? field} search`}
-                    style={[styles.fieldInput, invalid && styles.fieldInputInvalid]}
-                  />
-                </View>
-              );
-            })}
-          </View>
-        </View>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Status</Text>
+      <BottomSheetScrollView contentContainerStyle={styles.content}>
+        <SheetSection title="Status">
           <View style={styles.segmentTrack} accessibilityRole="radiogroup">
             {MAIL_LIST_READ_STATES.map((option) => {
               const active = option.value === filters.readState;
@@ -185,166 +193,183 @@ export function MailFilterSheet({
                   accessibilityLabel={option.label}
                   accessibilityState={{ selected: active }}
                 >
-                  <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
+                  <Text
+                    style={[
+                      styles.segmentLabel,
+                      active && styles.segmentLabelActive,
+                    ]}
+                  >
                     {option.label}
                   </Text>
                 </Pressable>
               );
             })}
           </View>
-        </View>
+        </SheetSection>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Show only</Text>
-          <View style={styles.card}>
-            <ToggleRow
-              styles={styles}
-              theme={theme}
+        <SheetSection title="Show only">
+          <SheetGroup>
+            <SheetSwitchItem
               icon="star"
               label="Starred"
               value={filters.starred}
-              onChange={(starred) => patch({ starred })}
+              onValueChange={(starred) => patch({ starred })}
             />
-            <ToggleRow
-              styles={styles}
-              theme={theme}
+            <SheetSwitchItem
               icon="paperclip"
               label="Has attachments"
               value={filters.attachments}
-              onChange={(attachments) => patch({ attachments })}
-              divider
+              onValueChange={(attachments) => patch({ attachments })}
             />
-          </View>
-        </View>
+          </SheetGroup>
+        </SheetSection>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Received</Text>
-          <View style={styles.card}>
-            {MAIL_LIST_AGES.map((option, index) => {
+        <SheetSection title="Refine">
+          <FilterDisclosure
+            icon="clock"
+            label="Received"
+            value={
+              MAIL_LIST_AGES.find((option) => option.value === filters.age)
+                ?.label
+            }
+            expanded={expanded === "received"}
+            onToggle={() => toggleDisclosure("received")}
+          >
+            {MAIL_LIST_AGES.map((option) => {
               const active = option.value === filters.age;
               return (
-                <Pressable
+                <SheetItem
                   key={option.value}
+                  label={option.label}
+                  checked={active}
                   onPress={() => patch({ age: option.value })}
-                  style={({ pressed }) => [
-                    styles.row,
-                    index > 0 && styles.rowDivider,
-                    pressed && styles.rowPressed,
-                  ]}
                   accessibilityRole="radio"
-                  accessibilityLabel={option.label}
                   accessibilityState={{ selected: active }}
-                >
-                  <Text style={styles.rowLabel}>{option.label}</Text>
-                  {active ? (
-                    <Feather name="check" size={MAIL_ICON.sheetAccessory} color={skin.accent} />
-                  ) : null}
-                </Pressable>
+                />
               );
             })}
-          </View>
-        </View>
+          </FilterDisclosure>
 
-        {labels.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Labels</Text>
-            <View style={styles.card}>
-              {labels.map((label, index) => {
-                const active = filters.labelIds.includes(label.id);
+          {labels.length > 0 ? (
+            <FilterDisclosure
+              icon="tag"
+              label="Labels"
+              value={labelsSummary(labels, selectedLabelIds)}
+              expanded={expanded === "labels"}
+              onToggle={() => toggleDisclosure("labels")}
+            >
+              {labels.map((label) => {
+                const active = selectedLabelIds.has(label.id);
                 return (
-                  <Pressable
+                  <SheetItem
                     key={label.id}
+                    label={label.name}
+                    swatch={label.color}
+                    checked={active}
                     onPress={() => toggleLabel(label.id)}
-                    style={({ pressed }) => [
-                      styles.row,
-                      index > 0 && styles.rowDivider,
-                      pressed && styles.rowPressed,
-                    ]}
                     accessibilityRole="checkbox"
-                    accessibilityLabel={label.name}
                     accessibilityState={{ checked: active }}
-                  >
-                    <View style={styles.iconSlot}>
-                      <View style={[styles.labelDot, { backgroundColor: label.color }]} />
-                    </View>
-                    <Text style={styles.rowLabel} numberOfLines={1}>
-                      {label.name}
-                    </Text>
-                    {active ? (
-                      <Feather name="check" size={MAIL_ICON.sheetAccessory} color={skin.accent} />
-                    ) : null}
-                  </Pressable>
+                  />
                 );
               })}
-            </View>
-          </View>
-        ) : null}
+            </FilterDisclosure>
+          ) : null}
+
+          <FilterDisclosure
+            icon="search"
+            label="Search fields"
+            value={draftFieldCount === 0 ? "None" : `${draftFieldCount} set`}
+            expanded={expanded === "search"}
+            onToggle={() => toggleDisclosure("search")}
+          >
+            {MAIL_SEARCH_TEXT_FIELDS.map((field) => {
+              const meta = SEARCH_FIELD_META.get(field);
+              const label = meta?.label ?? field;
+              const value = draftFields[field] ?? "";
+              const isDate = meta?.type === "date";
+              const invalid =
+                isDate && value.trim().length > 0 && !isValidSearchDate(value);
+              return (
+                <View key={field} style={styles.fieldRow}>
+                  <Text style={styles.fieldLabel}>{label}</Text>
+                  <SheetTextField
+                    value={value}
+                    onChangeText={(text) => setDraftField(field, text)}
+                    onSubmitEditing={commitAndDismiss}
+                    placeholder={meta?.placeholder}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    clearButtonMode="while-editing"
+                    keyboardType={
+                      isDate
+                        ? "numbers-and-punctuation"
+                        : field === "from" || field === "to"
+                          ? "email-address"
+                          : "default"
+                    }
+                    returnKeyType="search"
+                    accessibilityLabel={`${label} search`}
+                    style={[
+                      styles.fieldInput,
+                      invalid && styles.fieldInputInvalid,
+                    ]}
+                  />
+                </View>
+              );
+            })}
+          </FilterDisclosure>
+        </SheetSection>
       </BottomSheetScrollView>
 
       <BottomSheetFooter>
-        <Pressable
+        <SheetButton
+          label={doneLabel(draftDirty, activeCount, resultCount)}
           onPress={commitAndDismiss}
-          style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}
-          accessibilityRole="button"
-        >
-          <Text style={styles.doneLabel}>
-            {draftDirty
-              ? "Search"
-              : activeCount === 0
-              ? "Done"
-              : resultCount === 1
-                ? "Show 1 conversation"
-                : `Show ${resultCount} conversations`}
-          </Text>
-        </Pressable>
+        />
       </BottomSheetFooter>
     </BottomSheet>
   );
 }
 
-function ToggleRow({
-  styles,
-  theme,
+/** Collapsed row that shows the current value and reveals its options in the same group when opened. */
+function FilterDisclosure({
   icon,
   label,
   value,
-  onChange,
-  divider,
+  expanded,
+  onToggle,
+  children,
 }: {
-  styles: ReturnType<typeof createStyles>;
-  theme: ThemeTokens;
   icon: keyof typeof Feather.glyphMap;
   label: string;
-  value: boolean;
-  onChange: (value: boolean) => void;
-  divider?: boolean;
+  value?: string;
+  expanded: boolean;
+  onToggle: () => void;
+  children: ReactNode;
 }) {
+  const skin = useMailSkin();
   return (
-    <Pressable
-      onPress={() => onChange(!value)}
-      style={({ pressed }) => [
-        styles.row,
-        divider && styles.rowDivider,
-        pressed && styles.rowPressed,
-      ]}
-      accessibilityRole="switch"
-      accessibilityLabel={label}
-      accessibilityState={{ checked: value }}
-    >
-      <View style={styles.iconSlot}>
-        <Feather name={icon} size={MAIL_ICON.sheet} color={theme.colors.mutedForeground} />
-      </View>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <View style={styles.switchSlot}>
-        <Switch value={value} />
-      </View>
-    </Pressable>
+    <SheetGroup>
+      <SheetItem
+        icon={icon}
+        label={label}
+        value={value}
+        onPress={onToggle}
+        accessibilityState={{ expanded }}
+        trailing={
+          <Feather
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={16}
+            color={skin.textTertiary}
+          />
+        }
+      />
+      {expanded ? children : null}
+    </SheetGroup>
   );
 }
 
 function createStyles(theme: ThemeTokens, skin: MailSkin) {
-  const pad = mailSpacing(theme);
-
   const view = {
     headerRow: {
       flexDirection: "row" as const,
@@ -361,12 +386,10 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       opacity: 0.6,
     },
     content: {
-      paddingHorizontal: pad.sheetH,
+      paddingHorizontal: theme.spacing["4"],
+      paddingTop: theme.spacing["3"],
       paddingBottom: theme.spacing["4"],
-      gap: theme.spacing["5"],
-    },
-    section: {
-      gap: theme.spacing["2"],
+      gap: theme.spacing["6"],
     },
     segmentTrack: {
       flexDirection: "row" as const,
@@ -385,51 +408,12 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
     segmentActive: {
       backgroundColor: theme.colors.background,
     },
-    card: {
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: skin.field,
-      overflow: "hidden" as const,
-    },
-    row: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: pad.rowGap,
-      minHeight: 48,
-      paddingHorizontal: pad.rowH,
-    },
-    rowDivider: {
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: skin.borderPrimary,
-    },
-    rowPressed: {
-      backgroundColor: skin.selected,
-    },
-    iconSlot: {
-      width: MAIL_ICON.sheet,
-      alignItems: "center" as const,
-    },
-    labelDot: {
-      width: 8,
-      height: 8,
-      borderRadius: theme.borderRadius.full,
-    },
     fieldRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: pad.rowGap,
+      gap: theme.spacing["3"],
       minHeight: 48,
-      paddingHorizontal: pad.rowH,
-    },
-    switchSlot: {
-      alignSelf: "stretch" as const,
-      justifyContent: "center" as const,
-    },
-    doneButton: {
-      minHeight: 48,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      borderRadius: theme.borderRadius.full,
-      backgroundColor: skin.cta,
+      paddingHorizontal: theme.spacing["4"],
     },
   } satisfies Record<string, ViewStyle>;
 
@@ -439,13 +423,6 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       lineHeight: 20,
       fontWeight: "500" as TextStyle["fontWeight"],
       color: skin.accent,
-    },
-    sectionTitle: {
-      paddingHorizontal: theme.spacing["1"],
-      fontSize: 13,
-      lineHeight: 18,
-      fontWeight: "500" as TextStyle["fontWeight"],
-      color: skin.textTertiary,
     },
     segmentLabel: {
       fontSize: 14,
@@ -466,24 +443,11 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
     fieldInput: {
       flex: 1,
       minHeight: 44,
+      paddingHorizontal: 0,
       paddingVertical: 0,
-      fontSize: 15,
-      color: theme.colors.foreground,
     },
     fieldInputInvalid: {
       color: theme.colors.destructive,
-    },
-    rowLabel: {
-      flex: 1,
-      fontSize: 15,
-      lineHeight: 20,
-      color: theme.colors.foreground,
-    },
-    doneLabel: {
-      fontSize: 16,
-      lineHeight: 21,
-      fontWeight: "600" as TextStyle["fontWeight"],
-      color: skin.ctaForeground,
     },
   } satisfies Record<string, TextStyle>;
 

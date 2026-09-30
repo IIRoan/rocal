@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -36,11 +36,12 @@ import { AttachmentPreviewModal } from "../../../src/components/mail/AttachmentP
 import { ConversationThreadStrip } from "../../../src/components/mail/ConversationThreadStrip";
 import { useAuth } from "@workspace/native-core/providers/AuthProvider";
 import { useMailCompose } from "../../../src/providers/MailComposeProvider";
-import { MAIL_HOME_ROUTE, mailMessageRoute } from "../../../src/lib/mail-routes";
 import {
-  MAIL_REPLY_FAB_SIZE,
-  MailReplyFab,
-} from "../../../src/components/mail/MailReplyFab";
+  MAIL_HOME_ROUTE,
+  mailMessageRoute,
+} from "../../../src/lib/mail-routes";
+import { MailReaderToolbar } from "../../../src/components/mail/MailReaderToolbar";
+import { mailBottomBarTotalHeight } from "../../../src/components/mail/mail-bottom-action-bar-layout";
 import { MailAttachmentCards } from "../../../src/components/mail/MailAttachmentCards";
 import { MailReaderHeader } from "../../../src/components/mail/MailReaderHeader";
 import { MailMessageHeader } from "../../../src/components/mail/MailMessageHeader";
@@ -51,7 +52,10 @@ import { useRecentContacts } from "@workspace/native-core/hooks/use-recent-conta
 import { useMailMessageContent } from "../../../src/hooks/use-mail-message-content";
 import { useMailMessageCalendar } from "../../../src/hooks/use-mail-message-calendar";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
-import { useMailMessageActions } from "../../../src/hooks/use-mail-message-actions";
+import {
+  useMailMessageActions,
+  type MailMessageActions,
+} from "../../../src/hooks/use-mail-message-actions";
 import { useMailDisplaySettings } from "../../../src/hooks/use-mail-settings";
 import {
   useLabels,
@@ -66,7 +70,7 @@ export default function MailMessageScreen() {
   const { openCompose } = useMailCompose();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const scrollBottomPad =
-    theme.spacing["8"] + MAIL_REPLY_FAB_SIZE + insets.bottom;
+    theme.spacing["4"] + mailBottomBarTotalHeight(insets.bottom);
   const { toast } = useToast();
   const { user } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -89,9 +93,12 @@ export default function MailMessageScreen() {
   const actions = useMailMessageActions({ messageId, message, runtime });
   const { settings: displaySettings } = useMailDisplaySettings();
   // Per-message override: never written back to the saved appearance setting.
-  const [originalLookMessageId, setOriginalLookMessageId] = useState<string | null>(null);
+  const [originalLookMessageId, setOriginalLookMessageId] = useState<
+    string | null
+  >(null);
   const showOriginalLook = originalLookMessageId === messageId;
-  const canShowOriginalLook = isDark && resolveMailContentIsDark(displaySettings);
+  const canShowOriginalLook =
+    isDark && resolveMailContentIsDark(displaySettings);
   const { recordUsage } = useRecentContacts();
   const recordedContactMessageRef = useRef<string | null>(null);
 
@@ -141,7 +148,7 @@ export default function MailMessageScreen() {
     }
   }, [content.isDecryptSuccess, refreshLabels]);
 
-  const { currentMailbox, preview } = actions;
+  const { preview } = actions;
   const { userSettings } = calendar;
   const timeFormat = useUserTimeFormat();
   const accountEmail =
@@ -157,111 +164,79 @@ export default function MailMessageScreen() {
   return (
     <AppScreen
       header={
-        <MailReaderHeader
-          mailboxName={
-            currentMailbox ? getMailboxDisplayName(currentMailbox) : "Mail"
-          }
-          mailboxIcon={
-            currentMailbox
-              ? (getMailboxIcon(
-                  currentMailbox,
-                ) as keyof typeof Feather.glyphMap)
-              : "mail"
-          }
-          onMore={
-            message ? () => actions.setActiveSheetView("menu") : undefined
-          }
-          moreDisabled={actions.isActionBusy}
-        />
+        <MailReaderNavigation actions={actions} hasMessage={Boolean(message)} />
       }
     >
-      {content.isMessageLoading && !message ? (
-        <CenteredLoader theme={theme} />
-      ) : content.isMessageError && !message ? (
-        <View style={styles.centered}>
-          <Feather
-            name="alert-triangle"
-            size={36}
-            color={theme.colors.destructive}
-          />
-          <Text style={styles.mutedText}>
-            {getErrorMessage(content.messageError, "Failed to load message")}
-          </Text>
-        </View>
-      ) : !message ? (
-        <View style={styles.centered}>
-          <Text style={styles.mutedText}>Message not found.</Text>
-        </View>
-      ) : (
-        <View style={styles.messageBody}>
-          <MailZoomScrollView
-            style={styles.messageScroll}
-            contentContainerStyle={[
-              styles.body,
-              { paddingBottom: scrollBottomPad },
-            ]}
-          >
-            <MailMessageHeader
-              message={message}
-              accountEmail={accountEmail}
-              accountName={user?.name?.trim() || undefined}
-              identities={runtime?.identities ?? []}
-              labels={getAllMessageLabels(message, labels)}
-              isFlagged={actions.isFlagged}
-              starDisabled={actions.isStarPending}
-              onToggleStar={actions.handleToggleStar}
-              encryption={content.encryption}
-              encryptedAtRest={Boolean(runtime?.encryptedAtRest)}
-              signatureVerificationState={
-                content.decryptResult?.signatureVerificationState
-              }
-              decryptionFailed={Boolean(content.decryptError)}
-              timeFormat={timeFormat}
-              timezone={userSettings?.timezone}
-            />
-
-            {content.isConversationLoading ? (
-              <ActivityIndicator
-                size="small"
-                color={theme.colors.mutedForeground}
-                style={{ marginBottom: theme.spacing["2"] }}
+      <MailReaderState content={content}>
+        {message && (
+          <View style={styles.messageBody}>
+            <MailZoomScrollView
+              style={styles.messageScroll}
+              contentContainerStyle={[
+                styles.body,
+                { paddingBottom: scrollBottomPad },
+              ]}
+            >
+              <MailMessageHeader
+                message={message}
+                accountEmail={accountEmail}
+                accountName={user?.name?.trim() || undefined}
+                identities={runtime?.identities ?? []}
+                labels={getAllMessageLabels(message, labels)}
+                isFlagged={actions.isFlagged}
+                starDisabled={actions.isStarPending}
+                onToggleStar={actions.handleToggleStar}
+                encryption={content.encryption}
+                encryptedAtRest={Boolean(runtime?.encryptedAtRest)}
+                signatureVerificationState={
+                  content.decryptResult?.signatureVerificationState
+                }
+                decryptionFailed={Boolean(content.decryptError)}
+                timeFormat={timeFormat}
+                timezone={userSettings?.timezone}
               />
-            ) : (
-              <ConversationThreadStrip
-                messages={content.conversationMessages}
-                activeMessageId={messageId}
-                accountEmail={user?.email ?? runtime?.session.username ?? null}
-                previews={content.conversationPreviews}
-                onSelectMessage={(id) => {
-                  if (id !== messageId) {
-                    replace(mailMessageRoute(id) as never);
+
+              {content.isConversationLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={theme.colors.mutedForeground}
+                  style={{ marginBottom: theme.spacing["2"] }}
+                />
+              ) : (
+                <ConversationThreadStrip
+                  messages={content.conversationMessages}
+                  activeMessageId={messageId}
+                  accountEmail={
+                    user?.email ?? runtime?.session.username ?? null
                   }
-                }}
+                  previews={content.conversationPreviews}
+                  onSelectMessage={(id) => {
+                    if (id !== messageId) {
+                      replace(mailMessageRoute(id) as never);
+                    }
+                  }}
+                />
+              )}
+
+              <MailMessageBody
+                messageId={messageId}
+                content={content}
+                calendar={calendar}
+                onOpenEvent={openEvent}
+                showOriginalLook={showOriginalLook}
               />
-            )}
 
-            <MailMessageBody
-              messageId={messageId}
-              content={content}
-              calendar={calendar}
-              onOpenEvent={openEvent}
-              showOriginalLook={showOriginalLook}
-            />
+              <MailAttachmentCards
+                attachments={content.displayAttachments}
+                downloadingBlobId={actions.downloadingBlobId}
+                onOpenAttachment={actions.handleOpenAttachment}
+              />
+            </MailZoomScrollView>
 
-            <MailAttachmentCards
-              attachments={content.displayAttachments}
-              downloadingBlobId={actions.downloadingBlobId}
-              onOpenAttachment={actions.handleOpenAttachment}
-            />
-          </MailZoomScrollView>
-
-          <MailReplyFab
-            bottomInset={insets.bottom}
-            disabled={actions.isActionBusy}
-            onPress={actions.handleReply}
-          />
-        </View>
-      )}
+            <MailReaderToolbar bottomInset={insets.bottom} actions={actions} />
+          </View>
+        )}
+      </MailReaderState>
 
       {preview && (
         <AttachmentPreviewModal
@@ -304,7 +279,8 @@ export default function MailMessageScreen() {
           canShowOriginalLook && content.htmlContent
             ? {
                 showing: showOriginalLook,
-                toggle: () => setOriginalLookMessageId(showOriginalLook ? null : messageId),
+                toggle: () =>
+                  setOriginalLookMessageId(showOriginalLook ? null : messageId),
               }
             : null
         }
@@ -312,6 +288,61 @@ export default function MailMessageScreen() {
         deleteLabel={deleteLabel}
       />
     </AppScreen>
+  );
+}
+
+function MailReaderNavigation({
+  actions,
+  hasMessage,
+}: {
+  actions: MailMessageActions;
+  hasMessage: boolean;
+}) {
+  const { currentMailbox } = actions;
+  return (
+    <MailReaderHeader
+      mailboxName={
+        currentMailbox ? getMailboxDisplayName(currentMailbox) : "Mail"
+      }
+      mailboxIcon={
+        currentMailbox
+          ? (getMailboxIcon(currentMailbox) as keyof typeof Feather.glyphMap)
+          : "mail"
+      }
+      onReply={hasMessage ? actions.handleReply : undefined}
+      replyDisabled={actions.isActionBusy}
+      onMore={hasMessage ? () => actions.setActiveSheetView("menu") : undefined}
+      moreDisabled={actions.isActionBusy}
+    />
+  );
+}
+
+function MailReaderState({
+  content,
+  children,
+}: {
+  content: ReturnType<typeof useMailMessageContent>;
+  children: ReactNode;
+}) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  if (content.message) return children;
+  if (content.isMessageLoading) return <CenteredLoader theme={theme} />;
+  return (
+    <View style={styles.centered}>
+      {content.isMessageError ? (
+        <Feather
+          name="alert-triangle"
+          size={36}
+          color={theme.colors.destructive}
+        />
+      ) : null}
+      <Text style={styles.mutedText}>
+        {content.isMessageError
+          ? getErrorMessage(content.messageError, "Failed to load message")
+          : "Message not found."}
+      </Text>
+    </View>
   );
 }
 
@@ -332,7 +363,7 @@ function createStyles(theme: ThemeTokens) {
     },
     body: {
       paddingHorizontal: theme.spacing["4"],
-      paddingTop: theme.spacing["2"],
+      paddingTop: theme.spacing["3"],
       gap: theme.spacing["4"],
     },
   } satisfies Record<string, ViewStyle>;

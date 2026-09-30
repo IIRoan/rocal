@@ -9,7 +9,10 @@ import {
 } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Feather, FontAwesome } from "@expo/vector-icons";
-import { enrichSelfMailRecipient, type TimeFormat } from "@workspace/calendar-core";
+import {
+  enrichSelfMailRecipient,
+  type TimeFormat,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { formatMessageDate } from "../../lib/mail/mail-helpers";
@@ -28,6 +31,8 @@ import { MailLabelChip } from "./MailLabelChip";
 import { MailSecurityIndicator } from "./MailSecurityIndicator";
 import { RecipientLinkList, RecipientSheet } from "./RecipientSheet";
 import {
+  MAIL_LAYOUT,
+  mailColors,
   useMailPalette,
   useMailSkin,
   type MailSkin,
@@ -50,7 +55,7 @@ export type MailMessageHeaderProps = {
   timezone?: string;
 };
 
-const AVATAR_SIZE = 36;
+const AVATAR_SIZE = MAIL_LAYOUT.avatarSize;
 /** No exit fade: siblings reflow at once, so a fading ghost would overlap the body below. */
 const detailsEntering = FadeIn.duration(200);
 
@@ -76,28 +81,13 @@ export function MailMessageHeader({
   const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  const sender = message.from?.[0]
-    ? enrichSelfMailRecipient(message.from[0], {
-        email: accountEmail,
-        name: accountName,
-      })
-    : null;
-  const senderName = sender?.name?.trim() || sender?.email || "Unknown sender";
-  const showSenderEmail = Boolean(
-    sender?.email && sender.name?.trim() && sender.name.trim() !== sender.email,
-  );
-  const recipientLine = formatReaderRecipientLine(
-    message.to,
-    message.cc,
-    accountEmail,
-  );
-  const hasExpandableDetails = Boolean(
-    showSenderEmail ||
-      message.to?.length ||
-      message.cc?.length ||
-      message.bcc?.length ||
-      message.receivedAt,
-  );
+  const {
+    sender,
+    senderName,
+    showSenderEmail,
+    recipientLine,
+    hasExpandableDetails,
+  } = getMessageHeaderDetails(message, accountEmail, accountName);
   const dateOptions = { timeFormat, timezone };
   const compactDate = formatMessageDate(message.receivedAt, dateOptions);
   const fullDate = formatMessageDate(message.receivedAt, {
@@ -112,12 +102,28 @@ export function MailMessageHeader({
           <Text style={styles.subject} selectable>
             {message.subject?.trim() || "(no subject)"}
           </Text>
-          <MailSecurityIndicator
-            encryption={encryption}
-            encryptedAtRest={encryptedAtRest}
-            signatureVerificationState={signatureVerificationState}
-            decryptionFailed={decryptionFailed}
-          />
+          <View style={styles.subjectActions}>
+            <MailSecurityIndicator
+              encryption={encryption}
+              encryptedAtRest={encryptedAtRest}
+              signatureVerificationState={signatureVerificationState}
+              decryptionFailed={decryptionFailed}
+            />
+            <Pressable
+              onPress={onToggleStar}
+              disabled={starDisabled}
+              hitSlop={8}
+              style={styles.starButton}
+              accessibilityRole="button"
+              accessibilityLabel={isFlagged ? "Unstar" : "Star"}
+            >
+              <FontAwesome
+                name={isFlagged ? "star" : "star-o"}
+                size={18}
+                color={isFlagged ? palette.star : skin.textTertiary}
+              />
+            </Pressable>
+          </View>
         </View>
 
         {labels.length > 0 ? (
@@ -169,99 +175,160 @@ export function MailMessageHeader({
             {compactDate ? (
               <Text style={styles.date}>{compactDate}</Text>
             ) : null}
-            <Pressable
-              onPress={onToggleStar}
-              disabled={starDisabled}
-              hitSlop={8}
-              style={styles.starButton}
-              accessibilityRole="button"
-              accessibilityLabel={isFlagged ? "Unstar" : "Star"}
-            >
-              <FontAwesome
-                name={isFlagged ? "star" : "star-o"}
-                size={16}
-                color={isFlagged ? palette.star : skin.textTertiary}
-              />
-            </Pressable>
           </View>
 
-          {recipientLine || hasExpandableDetails ? (
-            <Pressable
-              onPress={() => setDetailsOpen((open) => !open)}
-              disabled={!hasExpandableDetails}
-              hitSlop={{ top: 8, bottom: 8 }}
-              style={styles.recipientRow}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: detailsOpen }}
-              accessibilityLabel={
-                detailsOpen ? "Hide message details" : "Show message details"
-              }
-            >
-              <Text style={styles.recipientLine} numberOfLines={1}>
-                {recipientLine || "No recipients"}
-              </Text>
-              {hasExpandableDetails ? (
-                <Feather
-                  name={detailsOpen ? "chevron-up" : "chevron-down"}
-                  size={14}
-                  color={skin.textTertiary}
-                />
-              ) : null}
-            </Pressable>
-          ) : null}
+          <MessageDetailsToggle
+            styles={styles}
+            recipientLine={recipientLine}
+            hasExpandableDetails={hasExpandableDetails}
+            detailsOpen={detailsOpen}
+            onToggle={() => setDetailsOpen((open) => !open)}
+          />
         </View>
       </View>
 
       {detailsOpen ? (
-        <Animated.View
-          entering={detailsEntering}
-          style={styles.detailsBlock}
-        >
-          {showSenderEmail && sender ? (
-            <DetailsRow styles={styles} label="From">
-              <Text style={styles.detailsValue} selectable>
-                {sender.email}
-              </Text>
-            </DetailsRow>
-          ) : null}
-          {message.to?.length ? (
-            <DetailsRow styles={styles} label="To">
-              <RecipientLinkList
-                recipients={message.to}
-                currentUserEmail={accountEmail}
-                currentUserName={accountName}
-                textStyle={styles.detailsValue}
-              />
-            </DetailsRow>
-          ) : null}
-          {message.cc?.length ? (
-            <DetailsRow styles={styles} label="Cc">
-              <RecipientLinkList
-                recipients={message.cc}
-                currentUserEmail={accountEmail}
-                currentUserName={accountName}
-                textStyle={styles.detailsValue}
-              />
-            </DetailsRow>
-          ) : null}
-          {message.bcc?.length ? (
-            <DetailsRow styles={styles} label="Bcc">
-              <RecipientLinkList
-                recipients={message.bcc}
-                currentUserEmail={accountEmail}
-                currentUserName={accountName}
-                textStyle={styles.detailsValue}
-              />
-            </DetailsRow>
-          ) : null}
-          {fullDate ? (
-            <DetailsRow styles={styles} label="Date">
-              <Text style={styles.detailsValue}>{fullDate}</Text>
-            </DetailsRow>
-          ) : null}
-        </Animated.View>
+        <MessageDetails
+          styles={styles}
+          message={message}
+          accountEmail={accountEmail}
+          accountName={accountName}
+          senderEmail={showSenderEmail ? sender?.email : undefined}
+          fullDate={fullDate}
+        />
       ) : null}
     </View>
+  );
+}
+
+function MessageDetailsToggle({
+  styles,
+  recipientLine,
+  hasExpandableDetails,
+  detailsOpen,
+  onToggle,
+}: {
+  styles: HeaderStyles;
+  recipientLine: string;
+  hasExpandableDetails: boolean;
+  detailsOpen: boolean;
+  onToggle: () => void;
+}) {
+  const skin = useMailSkin();
+  return (
+    <>
+      {recipientLine || hasExpandableDetails ? (
+        <Pressable
+          onPress={onToggle}
+          disabled={!hasExpandableDetails}
+          hitSlop={{ top: 8, bottom: 8 }}
+          style={styles.recipientRow}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: detailsOpen }}
+          accessibilityLabel={
+            detailsOpen ? "Hide message details" : "Show message details"
+          }
+        >
+          <Text style={styles.recipientLine} numberOfLines={1}>
+            {recipientLine || "No recipients"}
+          </Text>
+          {hasExpandableDetails ? (
+            <Feather
+              name={detailsOpen ? "chevron-up" : "chevron-down"}
+              size={14}
+              color={skin.textTertiary}
+            />
+          ) : null}
+        </Pressable>
+      ) : null}
+    </>
+  );
+}
+
+function getMessageHeaderDetails(
+  message: JmapEmailMessage,
+  accountEmail?: string,
+  accountName?: string | null,
+) {
+  const sender = message.from?.[0]
+    ? enrichSelfMailRecipient(message.from[0], {
+        email: accountEmail,
+        name: accountName,
+      })
+    : null;
+  const senderName = sender?.name?.trim() || sender?.email || "Unknown sender";
+  const showSenderEmail = Boolean(
+    sender?.email && sender.name?.trim() && sender.name.trim() !== sender.email,
+  );
+  const recipientLine = formatReaderRecipientLine(
+    message.to,
+    message.cc,
+    accountEmail,
+  );
+  const hasExpandableDetails = Boolean(
+    showSenderEmail ||
+    message.to?.length ||
+    message.cc?.length ||
+    message.bcc?.length ||
+    message.receivedAt,
+  );
+  return {
+    sender,
+    senderName,
+    showSenderEmail,
+    recipientLine,
+    hasExpandableDetails,
+  };
+}
+
+function MessageDetails({
+  styles,
+  message,
+  accountEmail,
+  accountName,
+  senderEmail,
+  fullDate,
+}: {
+  styles: HeaderStyles;
+  message: JmapEmailMessage;
+  accountEmail?: string;
+  accountName?: string | null;
+  senderEmail?: string;
+  fullDate: string;
+}) {
+  return (
+    <Animated.View entering={detailsEntering} style={styles.detailsBlock}>
+      {senderEmail ? (
+        <DetailsRow styles={styles} label="From">
+          <Text style={styles.detailsValue} selectable>
+            {senderEmail}
+          </Text>
+        </DetailsRow>
+      ) : null}
+      {(
+        [
+          ["To", message.to],
+          ["Cc", message.cc],
+          ["Bcc", message.bcc],
+        ] as const
+      ).map(([label, recipients]) =>
+        recipients?.length ? (
+          <DetailsRow key={label} styles={styles} label={label}>
+            <RecipientLinkList
+              recipients={recipients}
+              currentUserEmail={accountEmail}
+              currentUserName={accountName}
+              textStyle={styles.detailsValue}
+            />
+          </DetailsRow>
+        ) : null,
+      )}
+      {fullDate ? (
+        <DetailsRow styles={styles} label="Date">
+          <Text style={styles.detailsValue}>{fullDate}</Text>
+        </DetailsRow>
+      ) : null}
+    </Animated.View>
   );
 }
 
@@ -314,14 +381,23 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
   const view = {
     root: {
       gap: theme.spacing["4"],
+      paddingBottom: theme.spacing["4"],
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: mailColors(theme).border,
     },
     subjectBlock: {
-      gap: theme.spacing["2"],
+      gap: theme.spacing["3"],
     },
     subjectRow: {
       flexDirection: "row" as const,
       alignItems: "flex-start" as const,
-      gap: theme.spacing["2"],
+      gap: theme.spacing["3"],
+    },
+    subjectActions: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["1"],
+      paddingTop: 1,
     },
     labelRow: {
       flexDirection: "row" as const,
@@ -330,7 +406,7 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
     },
     senderRow: {
       flexDirection: "row" as const,
-      alignItems: "flex-start" as const,
+      alignItems: "center" as const,
       gap: theme.spacing["3"],
     },
     senderColumn: {
@@ -384,13 +460,15 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
   const text = {
     subject: {
       ...skin.title,
+      fontSize: 24,
+      lineHeight: 30,
       flex: 1,
     },
     senderName: {
       flexShrink: 1,
-      fontSize: 15,
-      lineHeight: 20,
-      fontWeight: "700" as TextStyle["fontWeight"],
+      fontSize: 16,
+      lineHeight: 21,
+      fontWeight: "600" as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
     date: {

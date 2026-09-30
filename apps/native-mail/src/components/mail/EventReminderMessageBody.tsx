@@ -8,7 +8,6 @@ import {
   useWindowDimensions,
   View,
   type TextStyle,
-  type ViewStyle,
 } from "react-native";
 import type { EventReminderMailView } from "@workspace/calendar-core";
 import {
@@ -167,7 +166,7 @@ function createStyles(
       paddingHorizontal: theme.spacing["5"],
       paddingTop: theme.spacing["8"],
       paddingBottom: theme.spacing["6"],
-      backgroundColor: isDark ? "#1a1a1a" : "#ffffff",
+      backgroundColor: theme.colors.background,
     },
     containerAttached: {
       borderWidth: StyleSheet.hairlineWidth,

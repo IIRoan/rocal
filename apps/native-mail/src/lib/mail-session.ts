@@ -20,6 +20,7 @@ import {
   saveMailVaultPassword,
 } from "./mail/mail-password-cache";
 import { buildMailRuntime, type MailRuntime } from "./mail/mail-runtime";
+import { clearSenderKeyCache } from "./mail/mail-sender-key";
 import { clearMailSettings } from "./mail/mail-settings-store";
 import { clearMailListSettings } from "./mail/mail-list-settings-store";
 import {
@@ -168,5 +169,6 @@ export const MAIL_AUTH_LIFECYCLE: AuthLifecycle = {
     await clearMailOfflineSnapshot();
     resetMailSync();
     clearVaultCache();
+    clearSenderKeyCache();
   },
 };
