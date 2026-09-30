@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useState } from "react";
+import { ShieldCheck } from "lucide-react";
 import { getContactDisplayLabel } from "@workspace/calendar-core";
-import { Button } from "@workspace/ui/components/ui/button";
-import { Input } from "@workspace/ui/components/ui/input";
 import { useRecentContacts } from "@/hooks/use-recent-contacts";
 import {
   addTrustedSender,
@@ -11,92 +10,101 @@ import {
   TRUSTED_SENDER_DESCRIPTION,
   useMailDisplaySettings,
 } from "@/lib/mail/mail-display-settings";
+import {
+  PaletteButton,
+  PaletteEmptyState,
+  PaletteField,
+  PaletteIconBox,
+  PaletteSection,
+} from "../command-palette/palette-ui";
+import { PALETTE_INPUT_CLASS } from "../command-palette/palette-styles";
 
-export function TrustedSendersPanel({ className }: { className?: string }) {
+export function TrustedSendersPanel() {
   const { settings } = useMailDisplaySettings();
   const { payload } = useRecentContacts();
   const [newEmail, setNewEmail] = useState("");
+  const emailInputId = useId();
 
-  const contactsByEmail = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const contact of payload?.contacts ?? []) {
-      map.set(contact.email, getContactDisplayLabel(contact));
-    }
-    return map;
-  }, [payload?.contacts]);
+  const contactsByEmail = new Map<string, string>();
+  for (const contact of payload?.contacts ?? []) {
+    contactsByEmail.set(contact.email, getContactDisplayLabel(contact));
+  }
 
-  const trustedEntries = useMemo(
-    () =>
-      settings.trustedSenders.map((email) => ({
-        email,
-        label: contactsByEmail.get(email) ?? email,
-      })),
-    [contactsByEmail, settings.trustedSenders],
-  );
+  const trustedEntries = settings.trustedSenders.map((email) => ({
+    email,
+    label: contactsByEmail.get(email) ?? email,
+  }));
 
   return (
-    <div className={className}>
-      <p className="text-xs text-muted-foreground px-3 pt-1 pb-3">
+    <>
+      <p className="p-2 text-[13px] leading-[130%] text-muted-foreground">
         {TRUSTED_SENDER_DESCRIPTION}
       </p>
-
-      <form
-        className="flex gap-2 px-3 pb-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const trimmed = newEmail.trim();
-          if (!trimmed.includes("@")) return;
-          addTrustedSender(trimmed);
-          setNewEmail("");
-        }}
-      >
-        <Input
-          value={newEmail}
-          onChange={(event) => setNewEmail(event.target.value)}
-          placeholder="sender@example.com"
-          className="h-8 text-sm"
-          type="email"
-        />
-        <Button
-          type="submit"
-          size="sm"
-          variant="secondary"
-          disabled={!newEmail.trim().includes("@")}
+      <PaletteField label="Add a sender" htmlFor={emailInputId}>
+        <form
+          className="flex items-center gap-2"
+          action={() => {
+            const trimmed = newEmail.trim();
+            if (!trimmed.includes("@")) return;
+            addTrustedSender(trimmed);
+            setNewEmail("");
+          }}
         >
-          Add
-        </Button>
-      </form>
-
+          <input
+            id={emailInputId}
+            aria-label="Email address for trusted sender"
+            value={newEmail}
+            onChange={(event) => setNewEmail(event.target.value)}
+            placeholder="sender@example.com"
+            className={PALETTE_INPUT_CLASS}
+            type="email"
+            autoComplete="email"
+          />
+          <PaletteButton
+            type="submit"
+            variant="primary"
+            className="h-9"
+            disabled={!newEmail.trim().includes("@")}
+          >
+            Add
+          </PaletteButton>
+        </form>
+      </PaletteField>
       {trustedEntries.length === 0 ? (
-        <p className="px-3 pb-3 text-sm text-muted-foreground">
-          No trusted senders yet.
-        </p>
+        <PaletteEmptyState>No trusted senders yet.</PaletteEmptyState>
       ) : (
-        <ul className="max-h-52 overflow-y-auto px-2 pb-2 space-y-0.5">
-          {trustedEntries.map(({ email, label }) => (
-            <li
-              key={email}
-              className="flex items-center justify-between gap-2 rounded-md border border-border/50 px-2.5 py-2 text-sm"
-            >
-              <div className="min-w-0">
-                <div className="truncate">{label}</div>
-                {label !== email ? (
-                  <div className="truncate text-xs text-muted-foreground">
-                    {email}
-                  </div>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={() => removeTrustedSender(email)}
-                className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
+        <PaletteSection label="Your trusted senders">
+          <ul className="flex flex-col gap-px">
+            {trustedEntries.map(({ email, label }) => (
+              <li
+                key={email}
+                className="flex items-center gap-3 rounded-lg px-2 py-1.5"
               >
-                Remove
-              </button>
-            </li>
-          ))}
-        </ul>
+                <PaletteIconBox>
+                  <ShieldCheck className="size-4" />
+                </PaletteIconBox>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[15px] leading-[130%] text-foreground">
+                    {label}
+                  </div>
+                  {label !== email ? (
+                    <div className="truncate text-[13px] leading-[130%] text-muted-foreground">
+                      {email}
+                    </div>
+                  ) : null}
+                </div>
+                <PaletteButton
+                  variant="ghost"
+                  onClick={() => removeTrustedSender(email)}
+                  aria-label={`Remove ${label} from trusted senders`}
+                >
+                  Remove
+                </PaletteButton>
+              </li>
+            ))}
+          </ul>
+        </PaletteSection>
       )}
-    </div>
+    </>
   );
 }

@@ -135,7 +135,10 @@ export function CommandPalette({
 
   const paletteContent = (
     <>
-      <TransitionContainer viewKey={c.currentView}>
+      <TransitionContainer
+        viewKey={c.currentView}
+        navigationDepth={c.chrome.navHistory.length}
+      >
         <CommandPaletteViewContent
           open={open}
           onOpenChange={onOpenChange}

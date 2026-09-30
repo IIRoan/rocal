@@ -3,16 +3,19 @@
 import { useState } from "react";
 import { AlignLeft, Paperclip, X } from "lucide-react";
 import { SettingToggleRow } from "../command-palette/setting-toggle-row";
-import {
-  useMailComposeSettings,
-  type MailSignaturePosition,
-} from "@/lib/mail/compose-settings";
+import { useMailComposeSettings } from "@/lib/mail/compose-settings";
 import {
   PaletteButton,
   PaletteField,
+  PaletteSelect,
   PaletteView,
 } from "../command-palette/palette-ui";
 import { PALETTE_INPUT_CLASS } from "../command-palette/palette-styles";
+
+const SIGNATURE_POSITION_OPTIONS = [
+  { value: "above_quote", label: "Above quoted text" },
+  { value: "below_quote", label: "Below quoted text" },
+] as const;
 
 export function ComposeSettingsPanel({ goBack }: { goBack: () => void }) {
   const { settings, updateSettings } = useMailComposeSettings();
@@ -47,19 +50,15 @@ export function ComposeSettingsPanel({ goBack }: { goBack: () => void }) {
         htmlFor="mail-signature-position"
         hint="Where your signature appears in replies and forwards"
       >
-        <select
+        <PaletteSelect
           id="mail-signature-position"
+          label="Signature position"
           value={settings.signaturePosition}
-          onChange={(event) =>
-            updateSettings({
-              signaturePosition: event.target.value as MailSignaturePosition,
-            })
+          options={SIGNATURE_POSITION_OPTIONS}
+          onValueChange={(signaturePosition) =>
+            updateSettings({ signaturePosition })
           }
-          className={PALETTE_INPUT_CLASS}
-        >
-          <option value="above_quote">Above quoted text</option>
-          <option value="below_quote">Below quoted text</option>
-        </select>
+        />
       </PaletteField>
 
       <SettingToggleRow
