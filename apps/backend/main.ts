@@ -23,8 +23,8 @@ import { accountPublicRoutes } from "./routes/account-public";
 import { accountRoutes } from "./routes/account";
 import { inviteRoutes } from "./routes/invites";
 import { mailAccountRoutes } from "./routes/mail-account";
-import { mailRoutes, probeMailJmapProxyDiscovery } from "./routes/mail";
-import { isStalwartMailConfigured } from "./lib/stalwart-jmap-mailer";
+import { mailRoutes } from "./routes/mail";
+import { probeStalwartReachable } from "./lib/stalwart-reachability";
 import { noreplyEmail } from "./lib/email-client";
 import { mailSyncRoutes, defaultMailSyncService } from "./routes/mail-sync";
 import {
@@ -120,25 +120,13 @@ export const createAPI = (prefix = "") => {
     .get("/health/mail-jmap", {
       detail: {
         tags: ["Health"],
-        summary: "Mail JMAP proxy health",
+        summary: "Mail server reachability",
         description:
-          "Probes JMAP discovery through the backend mail proxy (same path as web/native clients). Fails when the API can reach Stalwart but the proxy path is broken.",
+          "Single unauthenticated request to Stalwart JMAP discovery. Fails when the API cannot reach the mail server.",
       },
     }, async ({ status }) => {
-      const username = process.env.STALWART_JMAP_USERNAME?.trim() || "";
-      const password = process.env.STALWART_JMAP_PASSWORD || "";
-      const from =
-        process.env.EMAIL_FROM?.trim() ||
-        process.env.AUTH_EMAIL_FROM?.trim() ||
-        "";
-
-      if (!isStalwartMailConfigured({ username, password, from })) {
-        return { status: "unconfigured" };
-      }
-
-      const probe = await probeMailJmapProxyDiscovery({
-        username,
-        password,
+      const probe = await probeStalwartReachable({
+        baseUrl: env.stalwartBaseUrl,
       });
 
       if (!probe.ok) {
