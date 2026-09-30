@@ -2,19 +2,33 @@
 
 import { Keyboard, ListFilter } from "lucide-react";
 import { SettingToggleRow } from "../command-palette/setting-toggle-row";
-import {
-  useMailListSettings,
-  type ListDensity,
-  type MarkAsReadDelay,
-} from "@/lib/mail/mail-list-settings";
+import { useMailListSettings } from "@/lib/mail/mail-list-settings";
 import { getMailShortcutHelpItems } from "@/hooks/use-mail-keyboard-shortcuts";
 import {
   PaletteField,
   PaletteSection,
   PaletteSectionLabel,
+  PaletteSelect,
   PaletteView,
 } from "../command-palette/palette-ui";
-import { PALETTE_INPUT_CLASS } from "../command-palette/palette-styles";
+
+const DENSITY_OPTIONS = [
+  { value: "compact", label: "Compact (more messages per screen)" },
+  { value: "comfortable", label: "Comfortable (more breathing room)" },
+] as const;
+
+const MARK_AS_READ_OPTIONS = [
+  { value: "instant", label: "Instantly" },
+  { value: "delayed", label: "After 3 seconds" },
+  { value: "never", label: "Never (manual only)" },
+] as const;
+
+const UNDO_DURATION_OPTIONS = [
+  { value: "3000", label: "3 seconds" },
+  { value: "5000", label: "5 seconds" },
+  { value: "10000", label: "10 seconds" },
+  { value: "15000", label: "15 seconds" },
+] as const;
 
 const KEY_CAP_CLASS =
   "rounded bg-muted px-1.5 font-mono text-[11px] text-muted-foreground";
@@ -31,17 +45,13 @@ export function MailListSettingsPanel({ goBack }: { goBack: () => void }) {
           htmlFor="mail-row-density"
           hint="How much space each message row takes in the list"
         >
-          <select
+          <PaletteSelect
             id="mail-row-density"
+            label="Row density"
             value={settings.density}
-            onChange={(event) =>
-              updateSettings({ density: event.target.value as ListDensity })
-            }
-            className={PALETTE_INPUT_CLASS}
-          >
-            <option value="compact">Compact (more messages per screen)</option>
-            <option value="comfortable">Comfortable (more breathing room)</option>
-          </select>
+            options={DENSITY_OPTIONS}
+            onValueChange={(density) => updateSettings({ density })}
+          />
         </PaletteField>
 
         <SettingToggleRow
@@ -50,7 +60,9 @@ export function MailListSettingsPanel({ goBack }: { goBack: () => void }) {
           description="Display colored label tags on each message row"
           checked={settings.showLabelChipsInList}
           onToggle={() =>
-            updateSettings({ showLabelChipsInList: !settings.showLabelChipsInList })
+            updateSettings({
+              showLabelChipsInList: !settings.showLabelChipsInList,
+            })
           }
         />
 
@@ -71,20 +83,15 @@ export function MailListSettingsPanel({ goBack }: { goBack: () => void }) {
           htmlFor="mail-mark-as-read-delay"
           hint="When a message is opened, how long before it's marked as read"
         >
-          <select
+          <PaletteSelect
             id="mail-mark-as-read-delay"
+            label="Mark as read delay"
             value={settings.markAsReadDelay}
-            onChange={(event) =>
-              updateSettings({
-                markAsReadDelay: event.target.value as MarkAsReadDelay,
-              })
+            options={MARK_AS_READ_OPTIONS}
+            onValueChange={(markAsReadDelay) =>
+              updateSettings({ markAsReadDelay })
             }
-            className={PALETTE_INPUT_CLASS}
-          >
-            <option value="instant">Instantly</option>
-            <option value="delayed">After 3 seconds</option>
-            <option value="never">Never (manual only)</option>
-          </select>
+          />
         </PaletteField>
       </PaletteSection>
 
@@ -94,21 +101,15 @@ export function MailListSettingsPanel({ goBack }: { goBack: () => void }) {
           htmlFor="mail-undo-toast-duration"
           hint="How long the undo button stays after deleting or archiving"
         >
-          <select
+          <PaletteSelect
             id="mail-undo-toast-duration"
+            label="Undo toast duration"
             value={String(settings.undoToastDurationMs)}
-            onChange={(event) =>
-              updateSettings({
-                undoToastDurationMs: Number(event.target.value),
-              })
+            options={UNDO_DURATION_OPTIONS}
+            onValueChange={(value) =>
+              updateSettings({ undoToastDurationMs: Number(value) })
             }
-            className={PALETTE_INPUT_CLASS}
-          >
-            <option value="3000">3 seconds</option>
-            <option value="5000">5 seconds</option>
-            <option value="10000">10 seconds</option>
-            <option value="15000">15 seconds</option>
-          </select>
+          />
         </PaletteField>
       </PaletteSection>
 
@@ -135,7 +136,9 @@ export function MailListSettingsPanel({ goBack }: { goBack: () => void }) {
                   className="flex items-center justify-between text-[13px]"
                 >
                   <span className="text-muted-foreground">{label}</span>
-                  <kbd className={KEY_CAP_CLASS}>{key === " " ? "Space" : key}</kbd>
+                  <kbd className={KEY_CAP_CLASS}>
+                    {key === " " ? "Space" : key}
+                  </kbd>
                 </div>
               ))}
               <div className="flex items-center justify-between text-[13px]">

@@ -140,7 +140,7 @@ describe("dialog centered animation keyframes", () => {
 
   const extractKeyframeBlock = (css: string, name: string) => {
     const pattern = new RegExp(
-      `@keyframes\\s+${name}\\s*\\{([\\s\\S]*?)\\n\\s*\\}`,
+      `@keyframes\\s+${name}\\s*\\{([\\s\\S]*?)\\n  \\}`,
       "m",
     );
     const match = css.match(pattern);
@@ -162,6 +162,23 @@ describe("dialog centered animation keyframes", () => {
         ]) {
           expect(css).not.toContain(`@keyframes ${removedKeyframe}`);
         }
+      });
+
+      it("keeps spotlight opening and closing at a fixed size", () => {
+        for (const name of ["dialogSpotlightEnter", "dialogSpotlightExit"]) {
+          const block = extractKeyframeBlock(css, name);
+          expect(block).not.toBeNull();
+          expect(block).toMatch(/\bopacity\s*:/);
+          expect(block).not.toMatch(
+            /\b(?:scale|transform|translate|width|height)\s*:/,
+          );
+        }
+        expect(css).toMatch(
+          /\.dialog-spotlight-animation\s*\{[^}]*animation:\s*dialogSpotlightEnter/,
+        );
+        expect(css).toMatch(
+          /\.dialog-spotlight-animation\[data-state="closed"\]\s*\{[^}]*animation:\s*dialogSpotlightExit/,
+        );
       });
 
       for (const keyframeName of [

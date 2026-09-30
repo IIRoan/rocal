@@ -17,21 +17,11 @@ import type { JmapEmailMessage } from "@/lib/mail/types";
 import { useSettings } from "@/hooks/use-settings";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { formatMessageDate } from "./mail-helpers";
+import { PaletteNavRow, PaletteSection } from "../command-palette/palette-ui";
 import { PALETTE_VIEW_STYLE } from "../command-palette/palette-styles";
 import type { MailPaletteItem } from "./mail-command-palette-items";
 
 type PaletteResult = UnifiedSearchResult<JmapEmailMessage>;
-
-function PaletteSection({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <section aria-label={label} className="flex flex-col gap-px pb-1">
-      <div className="px-2 pt-2 pb-1 text-[13px] font-[470] text-[var(--text-tertiary)]">
-        {label}
-      </div>
-      {children}
-    </section>
-  );
-}
 
 function PaletteRow({
   index,
@@ -148,6 +138,18 @@ export function MailCommandPaletteMainView({
   const hasQuery = query.trim().length > 0;
   const isEmpty =
     results.length === 0 && mainListItems.length === 0 && !unifiedSearchLoading;
+  const actionSections = hasQuery
+    ? [{ label: "Actions", items: mainListItems }]
+    : [
+        {
+          label: "Quick actions",
+          items: mainListItems.filter((item) => item.id === "compose"),
+        },
+        {
+          label: "Settings",
+          items: mainListItems.filter((item) => item.id !== "compose"),
+        },
+      ];
 
   useEffect(() => {
     listRef.current
@@ -156,10 +158,7 @@ export function MailCommandPaletteMainView({
   }, [selectedIndex]);
 
   return (
-    <div
-      className="flex flex-col"
-      style={PALETTE_VIEW_STYLE}
-    >
+    <div className="flex flex-col" style={PALETTE_VIEW_STYLE}>
       <div className="relative flex h-[52px] shrink-0 items-center gap-3 border-b border-[var(--border-secondary)] px-4">
         <Icons
           icon={Icon.Search}
@@ -178,7 +177,7 @@ export function MailCommandPaletteMainView({
           onChange={(e) => onQueryChange(e.target.value)}
           onPointerDown={() => setIsPointerFocused(true)}
           onBlur={() => setIsPointerFocused(false)}
-          className="h-full min-w-0 flex-1 border-0 bg-transparent text-[17px] leading-[130%] tracking-[-0.01em] text-[var(--text-primary)] shadow-none outline-none ring-0 placeholder:text-[var(--text-disabled)] focus:border-0 focus:shadow-none focus:ring-0 focus-visible:outline-none"
+          className="h-full min-w-0 flex-1 border-0 bg-transparent text-[15px] leading-[130%] text-[var(--text-primary)] shadow-none outline-none ring-0 placeholder:text-[var(--text-tertiary)] focus:border-0 focus:shadow-none focus:ring-0 focus-visible:outline-none"
         />
         {hasQuery ? (
           <IconButton
@@ -198,7 +197,11 @@ export function MailCommandPaletteMainView({
           )}
         />
       </div>
-      <div ref={listRef} id={listboxId} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5">
+      <div
+        ref={listRef}
+        id={listboxId}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5"
+      >
         {mailResults.length > 0 ? (
           <PaletteSection label="Messages">
             {mailResults.map((result, i) => (
@@ -235,28 +238,27 @@ export function MailCommandPaletteMainView({
             </Typography>
           </div>
         ) : null}
-        {mainListItems.length > 0 ? (
-          <PaletteSection label={hasQuery ? "Actions" : "Quick actions"}>
-            {mainListItems.map((item, i) => {
-              const index = results.length + i;
-              return (
-                <PaletteRow
-                  key={item.id}
-                  index={index}
-                  isSelected={index === selectedIndex}
-                  icon={<item.icon className="size-4" strokeWidth={2} />}
-                  title={item.label}
-                  meta={
-                    <Typography size={TypographySize.SMALL} color="disabled">
-                      {item.description}
-                    </Typography>
-                  }
-                  onSelect={() => onSelectItem(item)}
-                />
-              );
-            })}
-          </PaletteSection>
-        ) : null}
+        {actionSections.map((section) =>
+          section.items.length === 0 ? null : (
+            <PaletteSection key={section.label} label={section.label}>
+              {section.items.map((item) => {
+                const index = results.length + mainListItems.indexOf(item);
+                return (
+                  <PaletteNavRow
+                    key={item.id}
+                    index={index}
+                    isSelected={index === selectedIndex}
+                    icon={item.icon}
+                    label={item.label}
+                    description={item.description}
+                    trailing={item.id === "compose" ? null : undefined}
+                    onClick={() => onSelectItem(item)}
+                  />
+                );
+              })}
+            </PaletteSection>
+          ),
+        )}
         {isEmpty ? (
           <div className="flex flex-col items-center gap-1 px-4 py-10 text-center">
             <Typography size={TypographySize.MEDIUM} color="secondary">

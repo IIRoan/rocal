@@ -7,8 +7,16 @@ import type {
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 import { cn } from "@workspace/ui/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/ui/select";
 
-import { PALETTE_ROW_CLASS, PALETTE_VIEW_STYLE } from "./palette-styles";
+import { PALETTE_INPUT_CLASS, PALETTE_ROW_CLASS, PALETTE_VIEW_STYLE } from "./palette-styles";
 
 export function PaletteViewHeader({
   title,
@@ -25,7 +33,7 @@ export function PaletteViewHeader({
         type="button"
         onClick={onBack}
         aria-label="Back"
-        className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/25 sm:size-8"
       >
         <ChevronLeft className="size-4" strokeWidth={2} />
       </button>
@@ -67,7 +75,7 @@ export function PaletteSection({
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-px pb-2 last:pb-0">
+    <section aria-label={typeof label === "string" ? label : undefined} className="flex flex-col gap-px pb-2 last:pb-0">
       {label ? <PaletteSectionLabel>{label}</PaletteSectionLabel> : null}
       {children}
     </section>
@@ -111,6 +119,8 @@ export function PaletteNavRow({
   onClick,
   disabled,
   muted = false,
+  index,
+  isSelected = false,
 }: {
   icon?: ComponentType<{ className?: string; style?: CSSProperties }>;
   iconColor?: string;
@@ -121,13 +131,17 @@ export function PaletteNavRow({
   onClick: () => void;
   disabled?: boolean;
   muted?: boolean;
+  index?: number;
+  isSelected?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={cn(PALETTE_ROW_CLASS, "group")}
+      data-index={index}
+      aria-current={isSelected ? "true" : undefined}
+      className={cn(PALETTE_ROW_CLASS, "group", isSelected && "bg-muted")}
     >
       {Icon ? (
         <PaletteIconBox>
@@ -182,8 +196,63 @@ export function PaletteField({
   );
 }
 
+export type PaletteSelectOption<T extends string> = { value: T; label: string };
+
+export function PaletteSelect<T extends string>({
+  id,
+  label,
+  value,
+  options,
+  onValueChange,
+  disabled,
+}: {
+  id: string;
+  label: string;
+  value: T;
+  options: readonly PaletteSelectOption<T>[];
+  onValueChange: (value: T) => void;
+  disabled?: boolean;
+}) {
+  const selectedOption = options.find((option) => option.value === value);
+  return (
+    <Select
+      value={value}
+      disabled={disabled}
+      onValueChange={(nextValue) => {
+        const option = options.find((entry) => entry.value === nextValue);
+        if (option) onValueChange(option.value);
+      }}
+    >
+      <SelectTrigger
+        id={id}
+        aria-label={label}
+        className={cn(PALETTE_INPUT_CLASS, "cursor-pointer")}
+      >
+        <SelectValue>{selectedOption?.label}</SelectValue>
+      </SelectTrigger>
+      <SelectContent
+        sideOffset={4}
+        collisionPadding={8}
+        className="rounded-xl border-[var(--border-secondary)] bg-[var(--bg-l3-solid)] font-sans text-[var(--text-primary)] shadow-[var(--shadow-l2)]"
+      >
+        <SelectGroup>
+          {options.map((option) => (
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              className="min-h-11 rounded-lg text-[15px] focus:bg-[var(--bg-cell-hover)] hover:bg-[var(--bg-cell-hover)] sm:min-h-8 [&_svg]:text-primary"
+            >
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
+
 const BUTTON_VARIANT = {
-  primary: "bg-foreground text-background hover:opacity-90",
+  primary: "bg-primary text-primary-foreground hover:opacity-90",
   secondary: "bg-muted text-foreground hover:bg-muted/70",
   ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
   destructive: "bg-destructive/10 text-destructive hover:bg-destructive/15",
@@ -205,7 +274,7 @@ export function PaletteButton({
       type="button"
       disabled={disabled || loading}
       className={cn(
-        "inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-[470] transition-[background-color,opacity,color] disabled:pointer-events-none disabled:opacity-40",
+        "inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-[470] outline-none transition-[background-color,opacity,color] focus-visible:ring-2 focus-visible:ring-ring/25 disabled:pointer-events-none disabled:opacity-40 sm:min-h-8 sm:min-w-8",
         BUTTON_VARIANT[variant],
         className,
       )}
@@ -218,11 +287,11 @@ export function PaletteButton({
 }
 
 export function PaletteFormActions({ children }: { children: ReactNode }) {
-  return <div className="flex items-center justify-end gap-2 px-2 pt-2 pb-1">{children}</div>;
+  return <div className="flex flex-wrap items-center justify-end gap-2 px-2 pt-2 pb-1">{children}</div>;
 }
 
 export function PaletteEmptyState({ children }: { children: ReactNode }) {
   return (
-    <p className="px-2 py-8 text-center text-[13px] text-muted-foreground">{children}</p>
+    <div className="flex flex-col items-center gap-1 px-2 py-6 text-center text-[13px] leading-[130%] text-muted-foreground">{children}</div>
   );
 }

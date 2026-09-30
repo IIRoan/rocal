@@ -16,6 +16,7 @@ export type MailPaletteView =
   | "label-edit"
   | "composing"
   | "mail-display"
+  | "trusted-senders"
   | "mail-list"
   | "contacts"
   | "mail-settings";

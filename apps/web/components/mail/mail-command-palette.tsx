@@ -72,14 +72,17 @@ export function MailCommandPalette({
           variant="spotlight"
           showClose={false}
           aria-describedby={undefined}
-          className="flex w-[640px] flex-col overflow-hidden rounded-xl border-[var(--border-secondary)] bg-[var(--bg-l3-solid)] p-0 shadow-[var(--shadow-l3)]"
+          className="flex flex-col overflow-hidden rounded-xl border-[var(--border-secondary)] bg-[var(--bg-l3-solid)] p-0 shadow-[var(--shadow-l3)]"
           onKeyDown={c.handleKeyDown}
         >
           <div style={{ display: "contents" }}>
             <VisuallyHidden>
               <DialogTitle>Mail</DialogTitle>
             </VisuallyHidden>
-            <TransitionContainer viewKey={c.currentView}>
+            <TransitionContainer
+              viewKey={c.currentView}
+              navigationDepth={c.chrome.navHistory.length}
+            >
               <MailCommandPaletteViewContent
                 open={open}
                 currentView={c.currentView}

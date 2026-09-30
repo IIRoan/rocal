@@ -19,6 +19,7 @@ import type { MailPaletteView } from "./mail-command-palette-ui-state";
 import { MailDisplaySettingsPanel } from "./mail-display-settings-panel";
 import { MailListSettingsPanel } from "./mail-list-settings-panel";
 import { MailSettingsHub } from "./mail-settings-hub";
+import { TrustedSendersPanel } from "./trusted-senders-panel";
 import { MailboxManager } from "./mailbox-manager";
 import { LabelManager } from "./label-manager";
 import { MailCommandPaletteMainView } from "./mail-command-palette-main-view";
@@ -98,6 +99,8 @@ export type MailCommandPaletteViewContentProps = {
   onDeleteLabel?: (id: string) => Promise<void>;
 };
 
+const SELECTED_THEME_CHECK = <Check className="size-4 shrink-0 text-primary" />;
+
 function MailAppearanceView({ goBack }: { goBack: () => void }) {
   const { theme, setTheme } = useTheme();
   const currentTheme =
@@ -119,11 +122,7 @@ function MailAppearanceView({ goBack }: { goBack: () => void }) {
             icon={item.icon}
             label={item.label}
             onClick={() => setTheme(item.value)}
-            trailing={
-              currentTheme === item.value ? (
-                <Check className="size-4 shrink-0 text-foreground" />
-              ) : null
-            }
+            trailing={currentTheme === item.value ? SELECTED_THEME_CHECK : null}
           />
         ))}
       </PaletteSection>
@@ -198,14 +197,8 @@ function MailSecurityView({
 export function MailCommandPaletteViewContent(
   props: MailCommandPaletteViewContentProps,
 ) {
-  const {
-    open,
-    currentView,
-    goBack,
-    goForward,
-    localSettings,
-    updateSetting,
-  } = props;
+  const { open, currentView, goBack, goForward, localSettings, updateSetting } =
+    props;
 
   if (currentView === "main") {
     return (
@@ -279,33 +272,6 @@ export function MailCommandPaletteViewContent(
     );
   }
 
-  if (currentView === "mail-settings") {
-    return (
-      <MailSettingsHub
-        goBack={goBack}
-        onNavigate={(view) => goForward(view)}
-      />
-    );
-  }
-
-  if (
-    currentView === "mailboxes" ||
-    currentView === "mailbox-create" ||
-    currentView === "mailbox-edit"
-  ) {
-    return (
-      <MailboxManager
-        mailboxes={props.mailboxes}
-        currentView={currentView}
-        onBack={goBack}
-        onNavigateTo={(view) => goForward(view as MailPaletteView)}
-        onCreateMailbox={props.onCreateMailbox ?? (() => Promise.resolve())}
-        onDeleteMailbox={props.onDeleteMailbox ?? (() => Promise.resolve())}
-        onRenameMailbox={props.onRenameMailbox}
-      />
-    );
-  }
-
   if (currentView === "account") {
     return (
       <AccountSettings
@@ -338,6 +304,65 @@ export function MailCommandPaletteViewContent(
     return <InviteSettings goBack={goBack} />;
   }
 
+  return (
+    <MailPreferencesViewContent
+      currentView={currentView}
+      goBack={goBack}
+      goForward={goForward}
+      mailboxes={props.mailboxes}
+      onCreateMailbox={props.onCreateMailbox}
+      onDeleteMailbox={props.onDeleteMailbox}
+      onRenameMailbox={props.onRenameMailbox}
+      labels={props.labels}
+      onCreateLabel={props.onCreateLabel}
+      onUpdateLabel={props.onUpdateLabel}
+      onDeleteLabel={props.onDeleteLabel}
+    />
+  );
+}
+
+type MailPreferencesViewContentProps = Pick<
+  MailCommandPaletteViewContentProps,
+  | "currentView"
+  | "goBack"
+  | "goForward"
+  | "mailboxes"
+  | "onCreateMailbox"
+  | "onDeleteMailbox"
+  | "onRenameMailbox"
+  | "labels"
+  | "onCreateLabel"
+  | "onUpdateLabel"
+  | "onDeleteLabel"
+>;
+
+function MailPreferencesViewContent(props: MailPreferencesViewContentProps) {
+  const { currentView, goBack, goForward } = props;
+
+  if (currentView === "mail-settings") {
+    return (
+      <MailSettingsHub goBack={goBack} onNavigate={(view) => goForward(view)} />
+    );
+  }
+
+  if (
+    currentView === "mailboxes" ||
+    currentView === "mailbox-create" ||
+    currentView === "mailbox-edit"
+  ) {
+    return (
+      <MailboxManager
+        mailboxes={props.mailboxes}
+        currentView={currentView}
+        onBack={goBack}
+        onNavigateTo={(view) => goForward(view as MailPaletteView)}
+        onCreateMailbox={props.onCreateMailbox ?? (() => Promise.resolve())}
+        onDeleteMailbox={props.onDeleteMailbox ?? (() => Promise.resolve())}
+        onRenameMailbox={props.onRenameMailbox}
+      />
+    );
+  }
+
   if (
     currentView === "labels" ||
     currentView === "label-create" ||
@@ -361,7 +386,20 @@ export function MailCommandPaletteViewContent(
   }
 
   if (currentView === "mail-display") {
-    return <MailDisplaySettingsPanel goBack={goBack} />;
+    return (
+      <MailDisplaySettingsPanel
+        goBack={goBack}
+        onOpenTrustedSenders={() => goForward("trusted-senders")}
+      />
+    );
+  }
+
+  if (currentView === "trusted-senders") {
+    return (
+      <PaletteView title="Trusted senders" onBack={goBack}>
+        <TrustedSendersPanel />
+      </PaletteView>
+    );
   }
 
   if (currentView === "mail-list") {
