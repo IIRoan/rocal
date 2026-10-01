@@ -102,6 +102,7 @@ const baseConfig = {
   ],
   experiments: {
     typedRoutes: true,
+    reactCompiler: true,
     autolinkingModuleResolution: true,
   },
   extra: {
