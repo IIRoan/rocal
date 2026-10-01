@@ -13,6 +13,7 @@ import {
 } from "@workspace/native-core/lib/search/title-index-store";
 
 const REINDEX_INTERVAL_MS = 15 * 60 * 1000;
+const BODY_BACKFILL_DELAY_MS = 5 * 1000;
 
 export function useNativeTitleIndex() {
   const { user, isAuthenticated } = useAuth();
@@ -25,6 +26,8 @@ export function useNativeTitleIndex() {
   const [enabled, setEnabledState] = useState(true);
   const [documents, setDocuments] = useState<TitleIndexDocument[]>([]);
   const [isIndexing, setIsIndexing] = useState(false);
+  const [pendingBodies, setPendingBodies] = useState(0);
+  const [backfillActive, setBackfillActive] = useState(false);
   const inFlightRef = useRef(false);
 
   useEffect(() => {
@@ -62,7 +65,10 @@ export function useNativeTitleIndex() {
         accountId,
         runtime,
       });
-      setDocuments(next);
+      setDocuments(next.documents);
+      // Only chase the backlog while passes make progress, so a locked vault cannot loop.
+      setPendingBodies(next.pendingBodies);
+      setBackfillActive(next.pendingBodies > 0 && next.loadedBodies > 0);
     } catch {
       await refresh();
     } finally {
@@ -106,9 +112,16 @@ export function useNativeTitleIndex() {
     };
   }, [accountId, enabled, rebuild, refresh]);
 
+  useEffect(() => {
+    if (!backfillActive || isIndexing || !enabled) return;
+    const timeout = setTimeout(() => void rebuild(), BODY_BACKFILL_DELAY_MS);
+    return () => clearTimeout(timeout);
+  }, [backfillActive, enabled, isIndexing, rebuild]);
+
   return {
     documents,
     isIndexing,
+    pendingBodies,
     enabled,
     setEnabled,
     rebuild,

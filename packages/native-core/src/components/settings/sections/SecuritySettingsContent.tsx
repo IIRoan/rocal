@@ -223,7 +223,7 @@ export function SecuritySettingsContent() {
               key="title-index"
               icon="search"
               label="On-device search index"
-              detail="Keep encrypted titles of your mail and events on this device so older items stay searchable."
+              detail="Keep encrypted titles of your mail and events, and the start of each message, on this device so older items stay searchable."
               value={titleIndexEnabled}
               onValueChange={(value) => {
                 setTitleIndexEnabled(value);
