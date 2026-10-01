@@ -20,7 +20,10 @@ import {
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
-import { useToast } from "@workspace/native-core/providers/ToastProvider";
+import {
+  useToast,
+  useToastBottomOffset,
+} from "@workspace/native-core/providers/ToastProvider";
 import {
   getMailboxDisplayName,
   getMailboxIcon,
@@ -78,6 +81,7 @@ export default function MailMessageScreen() {
 
   const content = useMailMessageContent(messageId);
   const { runtime, message } = content;
+  useToastBottomOffset(message ? mailBottomBarTotalHeight(0) : 0);
   const { labels, createLabel, deleteLabel, refreshLabels } = useLabels({
     runtime,
     enabled: Boolean(runtime),

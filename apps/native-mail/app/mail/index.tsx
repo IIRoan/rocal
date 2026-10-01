@@ -30,6 +30,8 @@ import { MailAccountSheet } from "../../src/components/MailAccountSheet";
 import { MailListHeader } from "../../src/components/mail/MailListHeader";
 import { MailListBottomChrome } from "../../src/components/mail/MailListBottomChrome";
 import { MailListAnimatedFooter } from "../../src/components/mail/MailListAnimatedFooter";
+import { mailBottomBarTotalHeight } from "../../src/components/mail/mail-bottom-action-bar-layout";
+import { useToastBottomOffset } from "@workspace/native-core/providers/ToastProvider";
 import { MailSelectionAnimProvider } from "../../src/components/mail/mail-selection-anim";
 import {
   MAIL_ICON,
@@ -48,6 +50,9 @@ import {
 
 export default function MailScreen() {
   const controller = useMailListController();
+  useToastBottomOffset(
+    controller.selectionActive ? mailBottomBarTotalHeight(0) : 0,
+  );
 
   return (
     <MailSelectionAnimProvider active={controller.selectionActive}>

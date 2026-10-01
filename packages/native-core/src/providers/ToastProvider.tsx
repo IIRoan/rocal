@@ -3,11 +3,12 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -60,12 +61,17 @@ export interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
+const ToastBottomOffsetContext = createContext<
+  ((key: string, offset: number) => void) | null
+>(null);
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const TOAST_DURATION = 3200;
 const EXIT_DURATION = 220;
+const LIFT_DURATION = 220;
 const SWIPE_DISMISS_THRESHOLD = 50;
 const SWIPE_VELOCITY_THRESHOLD = 600;
 
@@ -272,6 +278,27 @@ let nextId = 0;
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const insets = useSafeAreaInsets();
+  const bottomOffsets = useRef(new Map<string, number>());
+  const liftY = useSharedValue(0);
+
+  const setBottomOffset = useCallback(
+    (key: string, offset: number) => {
+      if (offset > 0) {
+        bottomOffsets.current.set(key, offset);
+      } else {
+        bottomOffsets.current.delete(key);
+      }
+      liftY.value = withTiming(
+        Math.max(0, ...bottomOffsets.current.values()),
+        { duration: LIFT_DURATION },
+      );
+    },
+    [liftY],
+  );
+
+  const liftStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -liftY.value }],
+  }));
 
   const toast = useCallback(
     (
@@ -300,19 +327,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<ToastContextValue>(() => ({ toast }), [toast]);
 
-  const bottomOffset = insets.bottom + 16;
-
   return (
     <ToastContext.Provider value={value}>
-      {children}
-      <View
-        style={[styles.overlay, { bottom: bottomOffset }]}
+      <ToastBottomOffsetContext.Provider value={setBottomOffset}>
+        {children}
+      </ToastBottomOffsetContext.Provider>
+      <Animated.View
+        style={[styles.overlay, { bottom: insets.bottom + 16 }, liftStyle]}
         pointerEvents="box-none"
       >
         {toasts.map((item) => (
           <ToastItem key={item.id} item={item} onRemove={remove} />
         ))}
-      </View>
+      </Animated.View>
     </ToastContext.Provider>
   );
 }
@@ -327,6 +354,17 @@ export function useToast(): ToastContextValue {
     throw new Error("useToast must be used within a ToastProvider");
   }
   return ctx;
+}
+
+/** Lifts toasts by `offset` while the caller is mounted, to clear a docked bar; 0 means no lift. */
+export function useToastBottomOffset(offset: number): void {
+  const key = useId();
+  const setBottomOffset = useContext(ToastBottomOffsetContext);
+
+  useEffect(() => {
+    setBottomOffset?.(key, offset);
+    return () => setBottomOffset?.(key, 0);
+  }, [key, offset, setBottomOffset]);
 }
 
 // ---------------------------------------------------------------------------

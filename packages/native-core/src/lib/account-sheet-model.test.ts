@@ -2,6 +2,7 @@ import { settingsSectionPath } from "@workspace/calendar-core";
 import {
   accountSheetGroupDefs,
   buildAccountSheetGroups,
+  filterAccountSheetGroups,
 } from "./account-sheet-model";
 
 describe("buildAccountSheetGroups", () => {
@@ -43,5 +44,37 @@ describe("buildAccountSheetGroups", () => {
       "Calendars",
       "Calendar settings",
     ]);
+  });
+});
+
+describe("filterAccountSheetGroups", () => {
+  const groups = buildAccountSheetGroups(
+    accountSheetGroupDefs({
+      title: "Mail",
+      ids: ["mail", "mailboxes", "labels", "contacts"],
+    }),
+  );
+  const rowIds = (query: string) =>
+    filterAccountSheetGroups(groups, query).flatMap((group) =>
+      group.rows.map((row) => row.id),
+    );
+
+  it("returns every group for a blank query", () => {
+    expect(filterAccountSheetGroups(groups, "  ")).toEqual(groups);
+  });
+
+  it("matches on the label, ignoring case", () => {
+    expect(rowIds("SECURITY")).toContain("security");
+  });
+
+  it("matches on the description", () => {
+    expect(rowIds("passkeys")).toEqual(["security"]);
+  });
+
+  it("requires every word to match and drops empty groups", () => {
+    expect(rowIds("passkeys zzz")).toEqual([]);
+    expect(
+      filterAccountSheetGroups(groups, "folders").map((group) => group.title),
+    ).toEqual(["Mail"]);
   });
 });
