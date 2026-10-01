@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import type { UnifiedSearchResult } from "@workspace/calendar-core";
+import { isBodyOnlyMatch, type UnifiedSearchResult } from "@workspace/calendar-core";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   FilledVariant,
@@ -93,7 +93,7 @@ function ResultRow({
       isSelected={isSelected}
       icon={<Icons icon={isMail ? Icon.Envelope : Icon.Calendar} size={Size.MEDIUM} color="source" />}
       title={result.title || "(No subject)"}
-      subtitle={isMail ? (result.from ?? result.snippet) : result.snippet}
+      subtitle={isMail && !isBodyOnlyMatch(result.matchedFields) ? (result.from ?? result.snippet) : result.snippet}
       meta={
         <Typography size={TypographySize.SMALL} color="disabled">
           {formatMessageDate(

@@ -3,16 +3,41 @@ import type {
   TitleIndexShardPayload,
 } from "@workspace/calendar-core";
 import {
+  buildMailBodyExcerpt,
   decryptSearchShard,
   encryptSearchShard,
   eventToTitleIndexDocument,
   mailToTitleIndexDocument,
+  refreshMailBodyExcerpts,
+  runTasksWithConcurrencyLimit,
 } from "@workspace/calendar-core";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { mailDemoApiService } from "@/lib/mail/api-service";
 import { StalwartJmapClient } from "@/lib/mail/jmap-client";
+import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose";
+import { getEncryptionSession } from "@/lib/e2ee-payloads";
+import { getActiveE2eeSession } from "@/lib/e2ee-session";
+import {
+  getStoredDerivedVaultKey,
+  putStoredDerivedVaultKey,
+} from "@/lib/mail/derived-vault-key-storage";
+import { unwrapVaultSecret } from "@/lib/mail/vault-secret";
+import {
+  unlockEncryptedMailVault,
+  unlockEncryptedMailVaultWithDerivedKey,
+} from "@/lib/mail/vault-crypto";
+import { getStoredMailVault } from "@/lib/mail/vault-storage";
+import { mailCryptoWorkerClient } from "@/lib/mail/worker-client";
+import {
+  classifyMessageEncryption,
+  extractMessageBodies,
+} from "@/lib/mail/message-security";
 import { createMailOAuthTokenManager } from "@/lib/mail/oauth-client";
-import type { JmapEmailMessage, JmapMailbox, JmapSession } from "@/lib/mail/types";
+import type {
+  JmapEmailMessage,
+  JmapMailbox,
+  JmapSession,
+} from "@/lib/mail/types";
 import {
   BrowserSearchIndexStore,
   TITLE_INDEX_SHARD_ID,
@@ -30,12 +55,17 @@ export type PrivateTitleIndexSnapshot = {
   documents: TitleIndexDocument[];
   indexedAt: string | null;
   itemCount: number;
+  /** Mail whose body excerpt is not indexed yet. */
+  pendingBodies: number;
+  loadedBodies: number;
 };
 
 const EMPTY_SNAPSHOT: PrivateTitleIndexSnapshot = {
   documents: [],
   indexedAt: null,
   itemCount: 0,
+  pendingBodies: 0,
+  loadedBodies: 0,
 };
 
 function sortMailboxes(mailboxes: JmapMailbox[]): JmapMailbox[] {
@@ -102,7 +132,8 @@ async function loadMailTitleDocuments(
         position,
       });
       total = page.total;
-      if (page.ids.length === 0) break;
+      const pageSize = page.ids.length;
+      if (pageSize === 0) break;
 
       const messages = await client.getMessagesByIds(session, page.ids, {
         includeBodies: false,
@@ -110,12 +141,105 @@ async function loadMailTitleDocuments(
       for (const message of messages) {
         unique.set(message.id, mailToTitleIndexDocument(message));
       }
-      loadedForMailbox += page.ids.length;
-      position += page.ids.length;
+      loadedForMailbox += pageSize;
+      position += pageSize;
     }
   }
 
   return Array.from(unique.values());
+}
+
+async function messageBodyExcerpt(
+  client: StalwartJmapClient,
+  session: JmapSession,
+  message: JmapEmailMessage,
+  ensureVault: () => Promise<void>,
+): Promise<string> {
+  if (classifyMessageEncryption(message) === "plain") {
+    return buildMailBodyExcerpt(extractMessageBodies(message));
+  }
+  await ensureVault();
+  const decrypted = await decryptMessageForCompose({
+    client,
+    session,
+    message,
+    config: null,
+  });
+  return buildMailBodyExcerpt(decrypted);
+}
+
+async function loadMailVault(accountId: string): Promise<void> {
+  const encryptionSession = await getEncryptionSession();
+  if (encryptionSession?.userId !== accountId) {
+    throw new Error("Account encryption key is unavailable.");
+  }
+  const [remoteBackup, cachedKey] = await Promise.all([
+    mailDemoApiService.getAccountVaultBackup().catch(() => null),
+    getStoredDerivedVaultKey(accountId).catch(() => null),
+  ]);
+  const backup =
+    remoteBackup ??
+    (await getStoredMailVault(
+      (await mailDemoApiService.getAccountStatus()).email,
+    ));
+  if (!backup?.wrappedSecret) throw new Error("Mail vault is unavailable.");
+  const secret = await unwrapVaultSecret(backup.wrappedSecret);
+  if (!secret) throw new Error("Mail vault is locked.");
+  let vault = cachedKey
+    ? await unlockEncryptedMailVaultWithDerivedKey(
+        backup.encryptedVaultB64,
+        cachedKey,
+      ).catch(() => null)
+    : null;
+  if (!vault) {
+    vault = await unlockEncryptedMailVault(
+      backup.encryptedVaultB64,
+      secret,
+      backup.kdfParams,
+      (key) => {
+        void putStoredDerivedVaultKey(accountId, key).catch(() => undefined);
+      },
+    );
+  }
+  if (getActiveE2eeSession() !== encryptionSession) {
+    throw new Error("Account encryption session changed.");
+  }
+  await mailCryptoWorkerClient.loadVault({
+    privateKeyArmored: vault.encryptedPrivateKeyArmored,
+    privateKeyPassphrase: secret,
+    publicKeyArmored: vault.publicKeyArmored,
+  });
+}
+
+/** Decrypts one message at a time so indexing never holds several bodies in memory. */
+function createBodyLoader(
+  client: StalwartJmapClient,
+  session: JmapSession,
+  accountId: string,
+) {
+  let vaultReady: Promise<void> | undefined;
+  const ensureVault = () => (vaultReady ??= loadMailVault(accountId));
+  return async (batch: TitleIndexDocument[]): Promise<Map<string, string>> => {
+    const ids = batch.flatMap((document) =>
+      document.messageId ? [document.messageId] : [],
+    );
+    const messages = await client.getMessagesByIds(session, ids);
+    const excerpts = new Map<string, string>();
+    await runTasksWithConcurrencyLimit(
+      messages.map((message) => async () => {
+        try {
+          excerpts.set(
+            `mail:${message.id}`,
+            await messageBodyExcerpt(client, session, message, ensureVault),
+          );
+        } catch {
+          // Left out so the pass can tell unreadable messages from a locked vault.
+        }
+      }),
+      1,
+    );
+    return excerpts;
+  };
 }
 
 async function tryCreateMailClient(): Promise<{
@@ -162,6 +286,8 @@ export async function loadPrivateTitleIndex(
       documents: payload.documents,
       indexedAt: payload.indexedAt,
       itemCount: payload.documents.length,
+      pendingBodies: 0,
+      loadedBodies: 0,
     };
   } catch {
     return EMPTY_SNAPSHOT;
@@ -177,9 +303,24 @@ export async function rebuildPrivateTitleIndex(input: {
     tryCreateMailClient(),
   ]);
 
-  const mailDocuments = mailClient
+  const mailTitles = mailClient
     ? await loadMailTitleDocuments(mailClient.client, mailClient.session)
     : [];
+  const {
+    documents: mailDocuments,
+    pending: pendingBodies,
+    loaded: loadedBodies,
+  } = mailClient
+    ? await refreshMailBodyExcerpts({
+        documents: mailTitles,
+        previous: (await loadPrivateTitleIndex(input.accountId)).documents,
+        loadBodies: createBodyLoader(
+          mailClient.client,
+          mailClient.session,
+          input.accountId,
+        ),
+      })
+    : { documents: mailTitles, pending: 0, loaded: 0 };
 
   const documents = [...calendarDocuments, ...mailDocuments];
   const payload: TitleIndexShardPayload = {
@@ -203,6 +344,8 @@ export async function rebuildPrivateTitleIndex(input: {
     documents,
     indexedAt: payload.indexedAt,
     itemCount: documents.length,
+    pendingBodies,
+    loadedBodies,
   };
 }
 

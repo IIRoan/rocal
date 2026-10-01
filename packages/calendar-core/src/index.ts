@@ -24,6 +24,7 @@ export * from "./search-types";
 export * from "./mail-search-relevance";
 export * from "./search-index-crypto";
 export * from "./title-search-index";
+export * from "./mail-body-index";
 export * from "./color-utils";
 export * from "./date-utils";
 export * from "./timezone";

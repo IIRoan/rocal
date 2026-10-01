@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type TextInput } from "react-native";
 import { useRouter } from "expo-router";
-import type { TimeFormat } from "@workspace/calendar-core";
+import { isBodyOnlyMatch, type TimeFormat } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useCommandPalette } from "@workspace/native-core/providers/CommandPaletteProvider";
 import { useUserTimezone } from "@workspace/native-core/hooks/use-user-timezone";
@@ -152,7 +152,13 @@ export function CommandPalette() {
         ) : searching ? (
           <SheetCenteredState loading message="Searching…" />
         ) : (
-          <SheetCenteredState message="No matching messages." />
+          <SheetCenteredState
+            message={
+              titleIndex.pendingBodies > 0
+                ? `No matches yet. Still indexing message text (${titleIndex.pendingBodies} left).`
+                : "No matching messages."
+            }
+          />
         )}
       </SheetScroll>
     </BottomSheet>
@@ -163,6 +169,9 @@ function searchResultDetail(
   result: NativePaletteSearchResult,
   options: { timeFormat: TimeFormat; timezone?: string },
 ): string | undefined {
+  if (isBodyOnlyMatch(result.matchedFields) && result.snippet) {
+    return result.snippet;
+  }
   const date = formatMessageDate(result.timestamp, options);
   return [result.from, date].filter(Boolean).join(" · ") || undefined;
 }

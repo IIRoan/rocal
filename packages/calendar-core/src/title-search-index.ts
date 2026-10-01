@@ -2,6 +2,7 @@ import {
   normalizeSearchText,
   tokenizeSearchQuery,
 } from "./mail-search-relevance";
+import { isBodyOnlyMatch, mailBodySnippet } from "./mail-body-index";
 import type { CalendarEvent } from "./types";
 import type {
   UnifiedCalendarSearchResult,
@@ -36,6 +37,8 @@ export type TitleIndexDocument = {
   threadId?: string;
   mailboxIds?: string[];
   from?: string;
+  /** Decrypted message text excerpt; an empty string means indexed with nothing to match. */
+  body?: string;
   encryptionStatus: UnifiedSearchEncryptionStatus;
 };
 
@@ -105,8 +108,7 @@ function scoreText(
 
   if (exact + prefix === 0) return 0;
 
-  let score =
-    exact * weight + prefix * weight * PREFIX_MATCH_WEIGHT;
+  let score = exact * weight + prefix * weight * PREFIX_MATCH_WEIGHT;
   if (exact + prefix === queryTokens.length) score += weight;
   if (phrase && normalizedValue.includes(phrase)) score += weight * 2;
   if (phrase && normalizedValue === phrase) score += weight * 5;
@@ -184,13 +186,24 @@ export function scoreTitleIndexDocument(
     }
   }
 
+  let bodySnippet: string | undefined;
+  if (document.body) {
+    const bodyScore = scoreText(document.body, queryTokens, phrase, 2);
+    if (bodyScore > 0) {
+      matchedFields.push("body");
+      score += bodyScore;
+      bodySnippet = mailBodySnippet(document.body, queryTokens);
+    }
+  }
+
   if (score <= 0) return null;
 
+  const bodyOnly = isBodyOnlyMatch(matchedFields);
   return {
     document,
     score,
     matchedFields,
-    snippet: document.subtitle,
+    snippet: bodyOnly ? (bodySnippet ?? document.subtitle) : document.subtitle,
   };
 }
 
@@ -215,9 +228,7 @@ export function searchTitleIndex(
 }
 
 function stubCalendarEvent(document: TitleIndexDocument): CalendarEvent {
-  const start = document.timestamp
-    ? new Date(document.timestamp)
-    : new Date(0);
+  const start = document.timestamp ? new Date(document.timestamp) : new Date(0);
   return {
     id: document.eventId ?? document.id.replace(/^calendar:/, ""),
     title: document.title,

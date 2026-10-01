@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { format } from "date-fns";
 import { CalendarIcon, Loader2, Mail, MapPin, Paperclip } from "lucide-react";
-import type { UnifiedSearchResult } from "@workspace/calendar-core";
+import { isBodyOnlyMatch, type UnifiedSearchResult } from "@workspace/calendar-core";
 import { cn } from "@workspace/ui/lib/utils";
 import { MOTION_EASING } from "@workspace/ui/lib/motion";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
@@ -60,7 +60,7 @@ function SearchResultRow({
   const hasLocation =
     result.source === "calendar" && Boolean(result.event.location);
   const subtext =
-    result.source === "mail" && result.from
+    result.source === "mail" && result.from && !isBodyOnlyMatch(result.matchedFields)
       ? result.from
       : (result.snippet ?? null);
 
