@@ -43,6 +43,7 @@ export { RecurrenceEngine } from "@workspace/calendar-ics/recurrence";
 export * from "./calendar-event-link";
 export * from "./event-reminder-mail";
 export * from "./notification-settings";
+export * from "./encryption-notices";
 export * from "./settings-navigation";
 export * from "./push-device";
 export * from "./mail-calendar-invite";

@@ -89,7 +89,6 @@ import {
   formatRecurrenceLabel,
 } from "./event-detail-utils";
 import { EncryptionStatusIcon } from "../calendar/EncryptionStatusIcon";
-import { shouldShowEncryptionIcon } from "../calendar/timeline-event-content";
 import { resolveEventSheetViewActions } from "./event-sheet-view-actions";
 
 
@@ -734,7 +733,7 @@ export function EventSheet({
                 </Text>
                 <View style={styles.titleIcon}>
                   <EncryptionStatusIcon
-                    encrypted={shouldShowEncryptionIcon(event)}
+                    item={event}
                     color={theme.colors.mutedForeground}
                     size={16}
                   />

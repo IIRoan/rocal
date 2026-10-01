@@ -97,9 +97,9 @@ describe("EncryptionStatusBadge", () => {
     expect(button).not.toBeNull();
     expect(button?.querySelector("[data-icon='lock-open']")).not.toBeNull();
     expect(popover?.textContent).toContain(
-      "Stored as plaintext on the server.",
+      "Event details are readable to the server.",
     );
-    expect(popover?.textContent).toContain("Visible to server");
+    expect(popover?.textContent).toContain("Server can read");
     expect(popover?.textContent).not.toContain("Encrypted on server");
   });
 
@@ -115,7 +115,7 @@ describe("EncryptionStatusBadge", () => {
     });
 
     const badge = container.querySelector(
-      "span[aria-label='End-to-end encrypted']",
+      "span[aria-label^='End-to-end encrypted']",
     );
     const button = container.querySelector("button");
 
@@ -125,27 +125,31 @@ describe("EncryptionStatusBadge", () => {
     expect(badge?.querySelector("[data-icon='shield-check']")).not.toBeNull();
   });
 
-  it("renders force-full calendars with both protected and visible field lists", () => {
+  it("describes readable calendar names even when event encryption is required", () => {
     act(() => {
       root.render(
-        <EncryptionStatusBadge item={{ forceFullEncryption: true }} />,
+        <EncryptionStatusBadge
+          item={{ forceFullEncryption: true, encryptionState: "plaintext" }}
+          kind="calendar"
+          hidePlaintext={false}
+        />,
       );
     });
 
     const button = container.querySelector(
-      "button[aria-label='Force-encrypted calendar']",
+      "button[aria-label='Not encrypted']",
     );
     const popover = container.querySelector("[data-testid='popover']");
 
     expect(button).not.toBeNull();
     expect(popover?.textContent).toContain(
-      "Every event in this calendar is stored as ciphertext only.",
+      "The calendar name is readable to the server.",
     );
     expect(popover?.textContent).toContain("Calendar name");
-    expect(popover?.textContent).toContain("Start & end times");
-    expect(
-      popover?.querySelectorAll("[data-icon='shield-check']").length,
-    ).toBeGreaterThan(1);
+    expect(popover?.textContent).toContain(
+      "older plaintext events still need migration",
+    );
+    expect(popover?.textContent).not.toContain("Title");
   });
 
   it("renders legacy pending items with the expected server-visible fields", () => {
@@ -162,10 +166,9 @@ describe("EncryptionStatusBadge", () => {
 
     expect(button).not.toBeNull();
     expect(popover?.textContent).toContain(
-      "The older plaintext copy is removed the next time a signed-in device syncs.",
+      "An encrypted copy exists, but a readable copy may remain on the server.",
     );
-    expect(popover?.textContent).toContain("Plaintext copy until sync");
-    expect(popover?.textContent).toContain("Encrypted copy");
-    expect(popover?.querySelector("[data-icon='lock-open']")).not.toBeNull();
+    expect(popover?.textContent).toContain("Title");
+    expect(popover?.querySelector("[data-icon='shield-check']")).toBeNull();
   });
 });

@@ -126,7 +126,11 @@ describe("mail message security helpers", () => {
         hasVerifiedSignature: true,
         decryptionFailed: false,
       }),
-    ).toEqual(["E2EE encrypted", "Encrypted at rest", "Signature verified"]);
+    ).toEqual([
+      "PGP content detected",
+      "Mailbox encryption enabled",
+      "Signature verified",
+    ]);
   });
 
   it("resolves clean failure labels when local decryption fails", () => {
@@ -137,7 +141,7 @@ describe("mail message security helpers", () => {
         hasVerifiedSignature: false,
         decryptionFailed: true,
       }),
-    ).toEqual(["E2EE encrypted", "Decryption failed"]);
+    ).toEqual(["PGP content detected", "Decryption failed"]);
   });
 
   it("distinguishes unverifiable and failed PGP signatures", () => {

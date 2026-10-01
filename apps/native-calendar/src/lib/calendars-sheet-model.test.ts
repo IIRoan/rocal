@@ -71,7 +71,9 @@ describe("buildCalendarsSheetModel", () => {
     );
 
     expect(model.owned.map((entry) => entry.id)).toEqual(["own"]);
-    expect(model.holidays.map((entry) => entry.subscription.id)).toEqual(["nl"]);
+    expect(model.holidays.map((entry) => entry.subscription.id)).toEqual([
+      "nl",
+    ]);
     expect(model.feeds.map((entry) => entry.subscription.id)).toEqual(["feed"]);
     expect(model.feeds[0]?.calendar).toBe(hiddenFeedCalendar);
     expect(model.holidays[0]?.calendar).toBeUndefined();
@@ -89,13 +91,31 @@ describe("validateCalendarName", () => {
 });
 
 describe("row details", () => {
-  it("flags default, encrypted, and hidden owned calendars", () => {
+  it("flags default, encryption requirements, and hidden owned calendars", () => {
     expect(ownedCalendarDetail(calendar({}))).toBeUndefined();
     expect(
       ownedCalendarDetail(
-        calendar({ isDefault: true, forceFullEncryption: true, isVisible: false }),
+        calendar({
+          isDefault: true,
+          forceFullEncryption: true,
+          isVisible: false,
+        }),
       ),
-    ).toBe("Default · Encrypted · Hidden");
+    ).toBe("Default · Event encryption required · Hidden");
+  });
+
+  it("uses the actual name encryption state without requiring the event policy flag", () => {
+    expect(
+      ownedCalendarDetail(calendar({ encryptionState: "encrypted" })),
+    ).toBe("Name encrypted");
+    expect(
+      ownedCalendarDetail(
+        calendar({
+          encryptionState: "shadow_write",
+          forceFullEncryption: true,
+        }),
+      ),
+    ).toBe("Encryption pending");
   });
 
   it("shows last sync only for feeds, after the hidden flag", () => {
@@ -115,7 +135,12 @@ describe("row details", () => {
   it("reports a failed feed sync instead of the last sync time", () => {
     const [feed] = buildCalendarsSheetModel(
       [],
-      [{ ...subscription("feed", "Team", "subscribed"), lastErrorMessage: "404" }],
+      [
+        {
+          ...subscription("feed", "Team", "subscribed"),
+          lastErrorMessage: "404",
+        },
+      ],
     ).feeds;
     expect(feed && readOnlyCalendarDetail(feed)).toBe("Sync failed");
   });

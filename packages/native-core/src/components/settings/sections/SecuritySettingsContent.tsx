@@ -235,7 +235,7 @@ export function SecuritySettingsContent() {
                 key="reset-encryption"
                 icon="lock"
                 label="Reset encryption password"
-                detail="Update the password that protects your encryption keys on this device. Existing data is not re-encrypted."
+                detail="Update the password used to unlock your keys on new devices. Existing data is not re-encrypted."
                 pending={isResettingEncryptionPassword}
                 onPress={() => {
                   resetForm();

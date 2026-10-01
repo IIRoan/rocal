@@ -1,4 +1,8 @@
-import { containsArmoredPgpMessage, isCompleteArmoredPgpMessage } from "@workspace/calendar-core";
+import {
+  containsArmoredPgpMessage,
+  getMailSecurityNotice,
+  isCompleteArmoredPgpMessage,
+} from "@workspace/calendar-core";
 import type {
   JmapBodyStructure,
   JmapBodyValue,
@@ -120,13 +124,13 @@ export function resolveSecurityLabels(input: {
     input.messageState === "pgp_mime" ||
     input.messageState === "internal_e2ee"
   ) {
-    labels.push("E2EE encrypted");
+    labels.push("PGP content detected");
   } else if (input.messageState === "plain" && !input.accountEncryptedAtRest) {
-    labels.push("Plain");
+    labels.push("No message encryption detected");
   }
 
   if (input.accountEncryptedAtRest) {
-    labels.push("Encrypted at rest");
+    labels.push("Mailbox encryption enabled");
   }
 
   if (input.hasVerifiedSignature) {
@@ -146,37 +150,7 @@ export function resolveMessageSecurityLabel(input: {
   signatureVerificationState: MailSignatureVerificationState;
   decryptionFailed: boolean;
 }): string {
-  if (input.decryptionFailed) {
-    return "Decryption failed";
-  }
-
-  if (input.accountEncryptedAtRest) {
-    return "Stored encrypted at rest";
-  }
-
-  if (
-    input.messageState === "inline_pgp" ||
-    input.messageState === "pgp_mime" ||
-    input.messageState === "internal_e2ee"
-  ) {
-    if (input.signatureVerificationState === "failed") {
-      return "PGP encrypted, signature check failed";
-    }
-
-    if (input.signatureVerificationState === "unverified") {
-      return "PGP encrypted, signature not verified";
-    }
-
-    return input.signatureVerificationState === "verified"
-      ? "PGP encrypted & verified"
-      : "PGP encrypted";
-  }
-
-  if (input.messageState === "unknown_encrypted") {
-    return "Possibly encrypted";
-  }
-
-  return "Not encrypted";
+  return getMailSecurityNotice(input).label;
 }
 
 function collectTextPlainBlobIds(

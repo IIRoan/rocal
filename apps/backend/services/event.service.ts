@@ -1987,7 +1987,7 @@ export class EventService implements IEventService {
             events.some((event) => event.encryptionState === "encrypted")
           ) {
             throw new ValidationError(
-              "Fully encrypted events cannot be moved into a shared calendar until they are reopened and saved.",
+              "Events with encrypted details cannot be moved into a calendar with ICS sharing enabled.",
               "targetCalendarId",
             );
           }
@@ -2242,7 +2242,7 @@ export class EventService implements IEventService {
 
     if (event.encryptionState === "encrypted") {
       throw new ValidationError(
-        "Fully encrypted events cannot be exported as ICS.",
+        "Encrypted event details cannot be exported as ICS by the server.",
       );
     }
 

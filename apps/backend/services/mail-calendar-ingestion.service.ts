@@ -760,7 +760,7 @@ export class MailCalendarIngestionService {
 
     if (targetCalendar.forceFullEncryption) {
       summary.errors.push(
-        `Calendar "${targetCalendar.name}" requires full encryption; mailed ICS events were not imported because the server cannot create encrypted event payloads.`,
+        "This calendar requires encrypted event details; automatic server-side mail import is unavailable.",
       );
       return summary;
     }

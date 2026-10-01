@@ -7,13 +7,13 @@ import {
 
 export const EMAIL_REMINDER_SETTING = {
   label: "Email reminders",
-  description: "Send event reminders to your inbox, including the event title.",
+  description: "Send reminders to your inbox. Solace displays event details after you unlock your calendar.",
 } as const;
 
 export const APP_NOTIFICATION_SETTING = {
   label: "App notifications",
   description:
-    "Lock-screen alerts for event reminders and new mail. Reminders include the event title; new mail includes the sender and subject when they are available.",
+    "iPhone alerts for reminders and new mail. Your device decrypts event titles and fetches mail previews when available.",
 } as const;
 
 export const NOTIFICATION_SETTINGS_INTRO =
@@ -48,7 +48,7 @@ export const PUSH_DEVICES_SECTION = {
 } as const;
 
 export const EVENT_ENCRYPTION_HINT =
-  "Event title, description, and location stay ciphertext-only. Reminder emails and lock-screen alerts include the event title you set.";
+  "Event titles, descriptions and locations are encrypted on your device. Times, recurrence, reminders and participants remain readable to the server. Reminder details are resolved on your device; invitations share readable details.";
 
 export function formatNotificationChannelsSummary(settings?: {
   emailNotifications?: boolean | null;
