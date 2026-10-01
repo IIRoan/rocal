@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -30,6 +30,7 @@ import {
   messageNeedsDecryptedPreview,
 } from "../../lib/mail/mail-preview";
 import { getAllMessageLabels } from "../../lib/mail/use-labels";
+import { memoizeStyles } from "../../lib/memoize-styles";
 import type {
   JmapEmailMessage,
   JmapIdentity,
@@ -206,7 +207,7 @@ function MailMessageRowComponent({
 }: MailMessageRowProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
+  const styles = getStyles(theme, skin);
   const comfortable = density === "comfortable";
 
   const { read, addresses, name } = getRowIdentity({
@@ -547,6 +548,8 @@ function MailRowThreadList({
 }
 
 export const MailMessageRow = React.memo(MailMessageRowComponent);
+
+const getStyles = memoizeStyles(createStyles);
 
 function createStyles(theme: ThemeTokens, skin: MailSkin) {
   const pad = mailSpacing(theme);

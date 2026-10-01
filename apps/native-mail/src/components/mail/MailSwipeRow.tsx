@@ -14,6 +14,7 @@ import * as Haptics from "expo-haptics";
 import { Feather } from "@expo/vector-icons";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
+import { memoizeStyles } from "../../lib/memoize-styles";
 
 const ACTION_THRESHOLD = 88;
 const MAX_SWIPE = 140;
@@ -37,7 +38,7 @@ export function MailSwipeRow({
   onTrash,
 }: MailSwipeRowProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = getStyles(theme);
   const translateX = useSharedValue(0);
   const armed = useSharedValue(false);
   const canTrash = Boolean(onTrash);
@@ -154,6 +155,8 @@ export function MailSwipeRow({
     </View>
   );
 }
+
+const getStyles = memoizeStyles(createStyles);
 
 function createStyles(theme: ThemeTokens) {
   return StyleSheet.create({
