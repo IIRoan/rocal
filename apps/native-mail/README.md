@@ -7,7 +7,7 @@ This app is configured for Expo/EAS under the `astralgrove` org, project slug `s
 |                        | Production / preview | Development                        |
 | ---------------------- | -------------------- | ---------------------------------- |
 | App name               | Solace Mail | Mail Dev |
-| Icon                   | `assets/icon.png` (logo + label) | `assets/icon-dev.png` (logo + label + DEV) |
+| Icon                   | `assets/icon.png` (padded mail mark) | `assets/icon-dev.png` (padded mail mark + DEV badge) |
 | Deep-link scheme       | `solace-mail` | `solace-mail-dev` |
 | iOS bundle identifier  | `onl.solace.mail` | `onl.solace.mail.dev` |
 | Android application ID | `onl.solace.mail` | `onl.solace.mail.dev` |
@@ -42,7 +42,7 @@ Those scripts run `scripts/publish-update.ts`, which:
 1. Mirrors the matching build profile’s `env` (`APP_VARIANT`, associated-domains flags, public URLs, Sentry DSN, …)
 2. Looks up the latest finished EAS build for that profile and pins `runtimeVersion` to it (so fingerprint drift from local `node_modules` cannot orphan OTAs)
 
-Changing native modules, Expo plugins, or app `version` requires a **new native build**, not only an OTA.
+Changing app icons, native modules, Expo plugins, or app `version` requires a **new native build**, not only an OTA.
 
 ## Local env
 
