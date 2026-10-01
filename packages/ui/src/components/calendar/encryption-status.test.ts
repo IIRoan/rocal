@@ -1,130 +1,108 @@
 import { describe, expect, it } from "@jest/globals";
-
 import {
   getEncryptionStatusMeta,
   resolveEncryptionState,
 } from "./encryption-status";
 
-describe("resolveEncryptionState", () => {
-  it("treats ciphertext without an explicit state as encrypted", () => {
-    expect(resolveEncryptionState({ encryptedName: "ciphertext" })).toBe(
-      "encrypted",
-    );
-    expect(resolveEncryptionState({ encryptedContent: "ciphertext" })).toBe(
-      "encrypted",
-    );
-  });
-});
-
-describe("getEncryptionStatusMeta", () => {
-  it("labels legacy shadow-write items as encryption pending", () => {
+describe("calendar encryption notices", () => {
+  it("does not infer encrypted data from a calendar encryption requirement", () => {
     expect(
-      getEncryptionStatusMeta({ encryptionState: "shadow_write" }),
-    ).toEqual(
-      expect.objectContaining({
-        state: "pending",
-        label: "Encryption pending",
-        shortLabel: "Pending",
-      }),
-    );
-  });
-
-  it("keeps plaintext items labeled as not encrypted", () => {
-    expect(getEncryptionStatusMeta({})).toEqual(
-      expect.objectContaining({
-        state: "plaintext",
-        label: "Not encrypted",
-        shortLabel: "Plaintext",
-      }),
-    );
-  });
-
-  it("labels unsealed imported invitations as unencrypted on Solace", () => {
-    expect(
-      getEncryptionStatusMeta({
-        externalId: "google-event@example.com",
-        isSynced: false,
-        subscriptionId: null,
-      }),
-    ).toEqual(
-      expect.objectContaining({
-        state: "plaintext",
-        label: "Unencrypted on Solace",
-        originWarning: expect.stringContaining("Unencrypted at origin"),
-      }),
-    );
-  });
-
-  it("explains encrypted imported invitations separately from local events", () => {
-    expect(
-      getEncryptionStatusMeta({
-        encryptionState: "encrypted",
-        externalId: "google-event@example.com",
-        isSynced: false,
-        subscriptionId: null,
-      }),
-    ).toEqual(
-      expect.objectContaining({
-        label: "End-to-end encrypted",
-        description: expect.stringContaining("Encrypted on Solace"),
-        originWarning: expect.stringContaining("Unencrypted at origin"),
-      }),
-    );
-  });
-
-  it("keeps fully encrypted items labeled as encrypted", () => {
-    expect(getEncryptionStatusMeta({ encryptionState: "encrypted" })).toEqual(
-      expect.objectContaining({
-        state: "encrypted",
-        label: "End-to-end encrypted",
-        shortLabel: "Encrypted",
-      }),
-    );
-  });
-
-  it("surfaces force-full-encryption calendars with a dedicated state", () => {
-    expect(getEncryptionStatusMeta({ forceFullEncryption: true })).toEqual(
-      expect.objectContaining({
-        state: "force_full",
-        label: "Force-encrypted calendar",
-        shortLabel: "Locked",
-      }),
-    );
-  });
-
-  it("force-full takes precedence over plaintext encryption state", () => {
-    expect(
-      getEncryptionStatusMeta({
+      resolveEncryptionState({
         forceFullEncryption: true,
         encryptionState: "plaintext",
       }),
-    ).toEqual(expect.objectContaining({ state: "force_full" }));
-  });
-
-  it("force-full takes precedence over legacy shadow_write state", () => {
+    ).toBe("plaintext");
     expect(
-      getEncryptionStatusMeta({
+      resolveEncryptionState({
         forceFullEncryption: true,
         encryptionState: "shadow_write",
-        encryptedContent: "x",
       }),
-    ).toEqual(expect.objectContaining({ state: "force_full" }));
+    ).toBe("pending");
   });
-});
 
-describe("resolveEncryptionState force-full precedence", () => {
-  it("returns force_full when the flag is set", () => {
-    expect(resolveEncryptionState({ forceFullEncryption: true })).toBe(
-      "force_full",
+  it("respects an explicit plaintext state even when a ciphertext copy exists", () => {
+    expect(
+      resolveEncryptionState({
+        encryptionState: "plaintext",
+        encryptedContent: "ciphertext",
+      }),
+    ).toBe("plaintext");
+  });
+
+  it("does not assume ciphertext-only storage without an explicit state", () => {
+    expect(resolveEncryptionState({ encryptedName: "ciphertext" })).toBe(
+      "pending",
+    );
+    expect(resolveEncryptionState({ encryptedContent: "ciphertext" })).toBe(
+      "pending",
+    );
+    expect(resolveEncryptionState({ encryptedContent: " " })).toBe("plaintext");
+  });
+
+  it("discloses reminders, timezone and participants for encrypted events", () => {
+    const meta = getEncryptionStatusMeta({ encryptionState: "encrypted" });
+    expect(meta.protectedFields).toEqual(["Title", "Description", "Location"]);
+    expect(meta.visibleFields.join(" ")).toMatch(/timezone/i);
+    expect(meta.visibleFields.join(" ")).toMatch(/reminders/i);
+    expect(meta.visibleFields.join(" ")).toMatch(/participants/i);
+    expect(meta.description).not.toContain("server can't read");
+    expect(meta.originWarning).toContain("server and recipients");
+  });
+
+  it("discloses readable legacy copies without guaranteeing the next sync removes them", () => {
+    const meta = getEncryptionStatusMeta({ encryptionState: "shadow_write" });
+    expect(meta.state).toBe("pending");
+    expect(meta.description).toContain("readable copy may remain");
+    expect(meta.protectedFields).toEqual([]);
+    expect(meta.visibleFields).toContain("Title");
+    expect(meta.description).not.toContain("next time");
+  });
+
+  it("keeps plaintext invitation details readable until sealing", () => {
+    const meta = getEncryptionStatusMeta({
+      externalId: "external-invitation",
+      isSynced: false,
+    });
+    expect(meta.state).toBe("plaintext");
+    expect(meta.visibleFields).toContain("Title");
+  });
+
+  it("limits protection to the saved copy for invitations and imported files", () => {
+    const meta = getEncryptionStatusMeta({
+      encryptionState: "encrypted",
+      externalId: "external-invitation",
+      isSynced: false,
+    });
+    expect(meta.originWarning).toContain(
+      "not the original email or imported file",
     );
   });
 
-  it("ignores a falsy force flag", () => {
-    expect(
-      resolveEncryptionState({
-        forceFullEncryption: false,
-        encryptionState: "encrypted",
-      }),
-    ).toBe("encrypted");
+  it.each(["calendar", "category"] as const)(
+    "describes only the %s name as encrypted",
+    (kind) => {
+      const meta = getEncryptionStatusMeta(
+        { encryptionState: "encrypted", encryptedName: "ciphertext" },
+        kind,
+      );
+      expect(meta.label).toBe("Name encrypted");
+      expect(meta.protectedFields).toEqual([
+        kind === "calendar" ? "Calendar name" : "Category name",
+      ]);
+      expect(meta.visibleFields.join(" ")).not.toMatch(
+        /Title|Description|Start/,
+      );
+    },
+  );
+
+  it("shows the calendar requirement separately from name encryption", () => {
+    const meta = getEncryptionStatusMeta(
+      { forceFullEncryption: true, encryptionState: "plaintext" },
+      "calendar",
+    );
+    expect(meta.state).toBe("plaintext");
+    expect(meta.protectedFields).toEqual([]);
+    expect(meta.visibleFields).toContain("Calendar name");
+    expect(meta.policyNotice).toContain("older plaintext events");
   });
 });

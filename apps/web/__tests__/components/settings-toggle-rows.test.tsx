@@ -78,7 +78,9 @@ describe("settings toggle rows", () => {
     );
 
     expect(html).toContain("Event Encryption");
-    expect(html).toContain("ciphertext-only");
+    expect(html).toContain("encrypted on your device");
+    expect(html).toContain("participants remain readable to the server");
+    expect(html).toContain("invitations share readable details");
     expect(html).not.toContain("Full Event Encryption");
   });
 

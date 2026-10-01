@@ -1,4 +1,5 @@
 import {
+  getCalendarEncryptionNotice,
   partitionCalendarsByKind,
   type Calendar,
   type CalendarSubscription,
@@ -60,7 +61,9 @@ export function validateCalendarName(name: string): string | undefined {
 export function ownedCalendarDetail(calendar: Calendar): string | undefined {
   const parts: string[] = [];
   if (calendar.isDefault) parts.push("Default");
-  if (calendar.forceFullEncryption) parts.push("Encrypted");
+  const notice = getCalendarEncryptionNotice(calendar, "calendar");
+  if (notice.state !== "plaintext") parts.push(notice.label);
+  else if (calendar.forceFullEncryption) parts.push("Event encryption required");
   if (!calendar.isVisible) parts.push("Hidden");
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }

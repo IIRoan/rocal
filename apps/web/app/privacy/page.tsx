@@ -2,6 +2,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { ArrowLeft } from "lucide-react";
+import {
+  EVENT_ENCRYPTED_FIELDS,
+  EVENT_READABLE_METADATA,
+  EVENT_INVITATION_ENCRYPTION_HINT,
+  CALENDAR_ICS_SHARING_HINT,
+  MAIL_READABLE_METADATA,
+} from "@workspace/calendar-core";
 import { CALENDAR_HOME_PATH } from "@/lib/app-routes";
 
 export default function PrivacyPage() {
@@ -32,316 +39,154 @@ export default function PrivacyPage() {
               How Solace handles your data
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Solace is a passion project, not a business built on your data.
-              It includes a calendar and a private email client, both designed to
+              Solace is a passion project, not a business built on your data. It
+              includes a calendar and a private email client, both designed to
               help you manage your time and communication without ads,
               profiling, or data sales.
             </p>
           </div>
 
-          {/* Content sections */}
-          <div className="space-y-8 text-sm leading-7 text-muted-foreground">
-            <div>
-              <h2 className="text-base font-semibold text-foreground">
-                What Solace includes
-              </h2>
-              <p className="mt-2">
-                <span className="font-medium text-foreground/80">Calendar</span>{" "}
-                : schedule events, set reminders, share calendars, and organise
-                by category. Event content is encrypted on your device before it
-                leaves it, with the level of protection depending on whether the
-                event has reminders enabled.
-              </p>
-              <p className="mt-2">
-                <span className="font-medium text-foreground/80">Mail</span>: a
-                private email client connected to your own mailbox on Solace
-                servers. Messages are encrypted at rest, meaning stored content
-                is protected from server-level access. Because email is a legacy
-                protocol, messages from external providers like Gmail arrive in
-                plaintext first. This is unavoidable and explained in more
-                detail below.
-              </p>
-            </div>
-
+          <div className="flex flex-col gap-8 text-sm leading-7 text-muted-foreground">
             <div id="calendar-encryption">
               <h2 className="text-base font-semibold text-foreground">
-                Calendar: how encryption works
+                Calendar encryption
               </h2>
               <p className="mt-2">
-                Calendar content is encrypted on your device using a key derived
-                from your password. The server only ever receives ciphertext,
-                so it cannot read your event details. How much is encrypted depends
-                on whether the event has a reminder set.
+                Solace encrypts event titles, descriptions and locations on your
+                device before saving them. Enabling reminders does not make
+                these fields readable to the server.
               </p>
-              <p className="mt-3 font-medium text-foreground/80">
-                Without reminders
-              </p>
-              <p className="mt-1">
-                Everything is encrypted end-to-end. The server stores ciphertext
-                for all fields and has no way to read any of the event content.
-              </p>
-              <p className="mt-3 font-medium text-foreground/80">
-                With reminders
-              </p>
-              <p className="mt-1">
-                To send you a reminder email at the right time with the right
-                event details, the server needs to know when to send it and what
-                to say. This means the event title, date, and time are stored in
-                a form the server can read. Everything else, including description,
-                location, calendar name, and category, stays encrypted.
-              </p>
-              <div className="mt-3 rounded-lg border border-border/50 overflow-hidden">
+              <div className="mt-3 overflow-hidden rounded-lg border border-border/50">
                 <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border/50 bg-muted/30">
-                      <th className="px-3 py-2 text-left font-medium text-foreground/70">
-                        Field
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-foreground/70">
-                        No reminder
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-foreground/70">
-                        With reminder
-                      </th>
-                    </tr>
-                  </thead>
+                  <caption className="sr-only">
+                    Encrypted event content and readable metadata
+                  </caption>
                   <tbody className="divide-y divide-border/30">
-                    {[
-                      {
-                        field: "Event title",
-                        noReminder: "yes",
-                        withReminder: "no",
-                      },
-                      {
-                        field: "Event description",
-                        noReminder: "yes",
-                        withReminder: "yes",
-                      },
-                      {
-                        field: "Event location",
-                        noReminder: "yes",
-                        withReminder: "yes",
-                      },
-                      {
-                        field: "Date & time",
-                        noReminder: "yes",
-                        withReminder: "no",
-                      },
-                      {
-                        field: "Calendar name",
-                        noReminder: "yes",
-                        withReminder: "yes",
-                      },
-                      {
-                        field: "Category name",
-                        noReminder: "yes",
-                        withReminder: "yes",
-                      },
-                      {
-                        field: "Participants",
-                        noReminder: "no",
-                        withReminder: "no",
-                      },
-                      {
-                        field: "Account & login",
-                        noReminder: "no",
-                        withReminder: "no",
-                      },
-                    ].map(({ field, noReminder, withReminder }) => (
-                      <tr key={field}>
-                        <td className="px-3 py-2 text-foreground/80">
-                          {field}
-                        </td>
-                        <td className="px-3 py-2">
-                          {noReminder === "yes" ? (
-                            <span className="text-success font-medium">
-                              Encrypted
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground/60">
-                              Plaintext
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          {withReminder === "yes" ? (
-                            <span className="text-success font-medium">
-                              Encrypted
-                            </span>
-                          ) : (
-                            <span className="text-amber-600 dark:text-amber-400 font-medium">
-                              Plaintext
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    <tr>
+                      <th
+                        scope="row"
+                        className="px-3 py-2 text-left font-medium text-foreground"
+                      >
+                        End-to-end encrypted
+                      </th>
+                      <td className="px-3 py-2">
+                        {EVENT_ENCRYPTED_FIELDS.join(", ")}
+                      </td>
+                    </tr>
+                    <tr>
+                      <th
+                        scope="row"
+                        className="px-3 py-2 text-left font-medium text-foreground"
+                      >
+                        Server can read
+                      </th>
+                      <td className="px-3 py-2">
+                        {EVENT_READABLE_METADATA.join("; ")}
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
+              <p className="mt-3">
+                Owned calendar and category names are encrypted separately.
+                Colors, settings, ownership and sharing information remain
+                readable. Legacy names and events may remain readable until a
+                signed-in device finishes migrating them.
+              </p>
+              <p className="mt-3">
+                Reminder emails contain a generic notice; Solace resolves event
+                details on your device when you open the message. iPhone alerts
+                can show a title decrypted on the device when its keys are
+                available.
+              </p>
+            </div>
+
+            <div>
+              <h2 className="text-base font-semibold text-foreground">
+                Invitations, subscriptions and sharing
+              </h2>
+              <p className="mt-2">
+                {EVENT_INVITATION_ENCRYPTION_HINT} Invitation content is handled
+                by the server to send the email, even when your saved event is
+                encrypted. Participant names, email addresses and RSVP status
+                remain readable.
+              </p>
+              <p className="mt-3">
+                Imported invitations can be read by the server before your
+                device encrypts the calendar copy. The original email is
+                separate. Subscribed and public calendars are fetched by the
+                server, so their feed names, URLs and event details are
+                readable.
+              </p>
+              <p className="mt-3">{CALENDAR_ICS_SHARING_HINT}</p>
             </div>
 
             <div id="mail-encryption">
               <h2 className="text-base font-semibold text-foreground">
-                Mail: what encryption at rest covers
+                Mail encryption
               </h2>
               <p className="mt-2">
-                Your mailbox uses a key derived from your password to encrypt
-                each message using OpenPGP before writing it to disk. This means
-                stored message content is opaque to anyone with database or disk
-                access, and the server cannot decrypt it without your key.
+                Mailbox storage encryption protects incoming message content
+                after the mail server receives it. Ordinary incoming mail is
+                readable to the server before encryption. Transport encryption
+                between mail servers is separate from end-to-end encryption.
               </p>
-              <p className="mt-3 font-medium text-foreground/80">
-                The transit window
+              <p className="mt-3">{MAIL_READABLE_METADATA}</p>
+              <p className="mt-3">
+                Storage encryption is an account setting, not proof that every
+                message is encrypted. Older mail, drafts and sent copies may be
+                readable. Solace disables automatic storage encryption for
+                messages appended by the client.
               </p>
-              <p className="mt-1">
-                Email is a decades-old protocol that was not designed with
-                end-to-end encryption in mind. When someone sends you a message
-                from Gmail, Outlook, or any other external provider, that
-                message travels over SMTP and arrives at Solace in
-                plaintext. There is a brief window between arrival and
-                encryption where Solace can read the message content. Solace
-                encrypts it as soon as it is received, but this window exists.
-                There is no way to eliminate it while
-                supporting standard email from external senders.
+              <p className="mt-3">
+                When a sender encrypts with your OpenPGP public key before
+                sending, the content inside that payload is end-to-end
+                encrypted. Attachments outside the payload are not covered.
+                Detecting a PGP payload alone does not prove it was encrypted
+                before delivery. Signature verification is a separate check.
               </p>
-              <p className="mt-3 font-medium text-foreground/80">
-                What stays readable
-              </p>
-              <p className="mt-1">
-                Routing metadata, including sender, recipients, and headers, remains
-                readable to the server even after the message is encrypted. This
-                is necessary for delivery, display, and threading to work.
-              </p>
-              <div className="mt-3 rounded-lg border border-border/50 overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border/50 bg-muted/30">
-                      <th className="px-3 py-2 text-left font-medium text-foreground/70">
-                        Field
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-foreground/70">
-                        Protected
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-foreground/70 hidden sm:table-cell">
-                        Notes
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/30">
-                    {[
-                      {
-                        field: "Message body",
-                        status: "yes",
-                        note: "Encrypted in storage; readable at arrival from external senders",
-                      },
-                      {
-                        field: "Attachments",
-                        status: "yes",
-                        note: "PGP/MIME wraps the full message including attachments",
-                      },
-                      {
-                        field: "Subject",
-                        status: "partial",
-                        note: "Likely in stored blob; may remain in search indexes",
-                      },
-                      {
-                        field: "From header",
-                        status: "no",
-                        note: "Needed for display; may stay in admin/index layer",
-                      },
-                      {
-                        field: "To / Cc headers",
-                        status: "no",
-                        note: "Needed for delivery",
-                      },
-                      {
-                        field: "Bcc header",
-                        status: "partial",
-                        note: "Usually stripped by SMTP; envelope data may remain in logs",
-                      },
-                      {
-                        field: "Date, Message-ID headers",
-                        status: "no",
-                        note: "Used for sorting and threading",
-                      },
-                      {
-                        field: "Received headers",
-                        status: "no",
-                        note: "Routing metadata",
-                      },
-                      {
-                        field: "Envelope sender / recipient",
-                        status: "no",
-                        note: "SMTP transaction data; required for delivery",
-                      },
-                      {
-                        field: "Admin ability to decrypt",
-                        status: "no",
-                        note: "Private keys are yours; server cannot decrypt stored messages",
-                      },
-                    ].map(({ field, status, note }) => (
-                      <tr key={field}>
-                        <td className="px-3 py-2 text-foreground/80">
-                          {field}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          {status === "yes" && (
-                            <span className="text-success font-medium">
-                              Yes
-                            </span>
-                          )}
-                          {status === "no" && (
-                            <span className="text-muted-foreground/60">No</span>
-                          )}
-                          {status === "partial" && (
-                            <span className="text-amber-600 dark:text-amber-400 font-medium">
-                              Partial
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-muted-foreground/70 hidden sm:table-cell">
-                          {note}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div>
-              <h2 className="text-base font-semibold text-foreground">
-                Your password is your key
-              </h2>
-              <p className="mt-2">
-                Both calendar and mail encryption keys are derived from your
-                password. That means if you lose your password, you lose access
-                to your encrypted content. There is no recovery path, because
-                Solace never holds the encryption key. Keep your password somewhere
-                safe.
+              <p className="mt-3">
+                New mail vaults use a random secret sealed to your account
+                encryption key. The server stores encrypted vault backups.
+                Legacy vaults without that seal may use a server-derived secret
+                and need migration. The backend can still authenticate to the
+                mailbox, and invitation processing
+                reads readable mail content when available.
               </p>
             </div>
 
             <div>
               <h2 className="text-base font-semibold text-foreground">
-                What Solace does not do
+                Protecting your keys
               </h2>
               <p className="mt-2">
-                Solace does not use your data for advertising, resale, or profiling.
-                Your calendar and email are not a product. The app uses your
-                information only to show your schedule, deliver your reminders,
-                and keep your mailbox working.
+                Your password protects your encryption keys; it is not the mail
+                vault secret. Email sign-in uses your email password. Passkey
+                and social sign-in use a separate encryption password. Changing
+                that password rewraps your existing keys rather than
+                re-encrypting your content.
+              </p>
+              <p className="mt-3">
+                Keep your encryption password safe. A login reset alone cannot
+                recover encrypted content. An already unlocked device may let
+                you set a new encryption password while preserving your keys.
               </p>
             </div>
 
             <div>
               <h2 className="text-base font-semibold text-foreground">
-                Why this project exists
+                Other data
               </h2>
               <p className="mt-2">
-                Solace is built to respect the person using it: a calmer
-                calendar, a private inbox — useful, not built to extract value.
+                Contacts and mail settings are encrypted on your device before
+                syncing. Account details needed for sign-in and delivery, and
+                uploaded profile pictures, are not end-to-end encrypted.
+              </p>
+              <p className="mt-3">
+                Solace does not use your data for advertising, resale or
+                profiling. There are no third-party analytics or session replay
+                tools. Error reports go to Solace&apos;s own error tracker with
+                sensitive fields scrubbed.
               </p>
             </div>
           </div>

@@ -113,7 +113,7 @@ export function SettingsPasswordForm({
         }
         footer={
           isResetEncryption
-            ? "This updates the password that protects your encryption keys on this device. It does not re-encrypt existing data. You can only do this if you have a passkey or a social sign-in option."
+            ? "Choose a new encryption password for passkey or social sign-in. It protects your existing keys on new devices without re-encrypting your data."
             : isChangePassword
               ? "Update your email sign-in password. After email sign-in, Solace also uses it to protect your encryption keys."
               : "Add an email sign-in password to this account. This gives you an email/password sign-in option without changing your existing encrypted data."

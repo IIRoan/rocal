@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { CALENDAR_ICS_SHARING_HINT } from "@workspace/calendar-core";
 import {
   getErrorMessage,
   partitionCalendarsByKind,
@@ -308,6 +309,7 @@ export function CalendarManager({
                     </div>
                     <EncryptionStatusBadge
                       item={calendar}
+                      kind="calendar"
                       asIcon
                       className="opacity-80"
                     />
@@ -370,6 +372,7 @@ export function CalendarManager({
                         </div>
                         <EncryptionStatusBadge
                           item={calendar}
+                          kind="calendar"
                           asIcon
                           className="opacity-80"
                         />
@@ -436,6 +439,7 @@ export function CalendarManager({
                         </div>
                         <EncryptionStatusBadge
                           item={calendar}
+                          kind="calendar"
                           asIcon
                           className="opacity-80"
                         />
@@ -619,6 +623,8 @@ export function CalendarManager({
             {editingCalendar && (
               <EncryptionStatusBadge
                 item={editingCalendar}
+                kind="calendar"
+                hidePlaintext={false}
                 className="ml-auto"
                 showLabel
               />
@@ -717,7 +723,7 @@ export function CalendarManager({
                 <div className="flex-1 min-w-0">
                   <div className="text-sm">ICS sharing</div>
                   <div className="text-xs text-muted-foreground">
-                    Enable a private subscription link for this calendar.
+                    {CALENDAR_ICS_SHARING_HINT}
                   </div>
                 </div>
                 <ToggleIndicator checked={!!shareLinkInfo?.enabled} />
@@ -765,7 +771,6 @@ export function CalendarManager({
                   {shareLinkError}
                 </p>
               )}
-
             </div>
           </div>
 
@@ -874,7 +879,6 @@ export function CalendarManager({
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
       </>
     );
   }

@@ -29,26 +29,6 @@ export function timelineDisplayMinutes(
   return Math.max(durationMinutes, timelineMinEventMinutes(hourHeight));
 }
 
-export function shouldShowEncryptionIcon(item: {
-  encryptionState?: string | null;
-  encryptedContent?: string | null;
-  calendar?: { forceFullEncryption?: boolean | null } | null;
-}): boolean {
-  if (item.calendar?.forceFullEncryption) {
-    return true;
-  }
-
-  if (item.encryptionState === "encrypted") {
-    return true;
-  }
-
-  if (item.encryptionState === "shadow_write") {
-    return true;
-  }
-
-  return Boolean(item.encryptedContent);
-}
-
 export function timelineEventHeight(
   durationMinutes: number,
   hourHeight: number = KIT_HOUR_HEIGHT,

@@ -87,7 +87,7 @@ export function LabelsSettingsContent() {
       <SheetScroll>
         <SheetSection
           title="Labels"
-          footer="Labels stay in your encrypted mail vault on this device and sync with web."
+          footer="Label names and settings are encrypted on your device before syncing with web."
         >
           {!loaded && runtimeQuery.isLoading ? (
             <SheetCenteredState loading message="Loading labels…" />

@@ -131,7 +131,7 @@ export class CalendarSharingService implements ICalendarSharingService {
 
     if (encryptedEventCount > 0) {
       throw new ValidationError(
-        "This calendar contains fully encrypted events. Reopen and save those events before enabling sharing.",
+        "ICS sharing is unavailable while this calendar contains encrypted events.",
       );
     }
 
@@ -218,7 +218,7 @@ export class CalendarSharingService implements ICalendarSharingService {
       calendar.events.some((event) => event.encryptionState === "encrypted")
     ) {
       throw new ValidationError(
-        "This shared calendar contains fully encrypted events and cannot be exported.",
+        "This shared calendar contains encrypted event details and cannot be exported.",
       );
     }
 

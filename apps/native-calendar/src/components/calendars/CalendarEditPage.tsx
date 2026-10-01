@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Alert } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import type { Calendar, EventColor } from "@workspace/calendar-core";
-import { getErrorMessage, partitionCalendarsByKind } from "@workspace/calendar-core";
+import { CALENDAR_ICS_SHARING_HINT, getErrorMessage, partitionCalendarsByKind } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
 import {
@@ -253,7 +253,7 @@ function CalendarSharingSection({
   return (
     <SheetSection
       title="Sharing"
-      footer="Publishes a private ICS link for this calendar. Encrypted events must be reopened and saved before they appear in the feed."
+      footer={CALENDAR_ICS_SHARING_HINT}
     >
       <SheetGroup>
         <SheetSwitchItem
