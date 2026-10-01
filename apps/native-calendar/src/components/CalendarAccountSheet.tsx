@@ -9,6 +9,8 @@ import {
   buildAccountSheetGroups,
 } from "@workspace/native-core/lib/account-sheet-model";
 import { SETTINGS_HUB_ICONS } from "@workspace/native-core/lib/settings-nav-icons";
+import { SHARED_SETTINGS_SEARCH_ENTRIES } from "@workspace/native-core/lib/settings-search-entries";
+import { CALENDAR_SETTINGS_SEARCH_ENTRIES } from "../lib/settings-search-entries";
 import { CalendarsSheetContent } from "./calendars/CalendarsSheet";
 import { CalendarSettingsContent } from "./settings/sections/CalendarSettingsContent";
 import { CalendarAppearanceSettingsContent } from "./settings/sections/CalendarAppearanceSettingsContent";
@@ -30,6 +32,10 @@ const CALENDAR_ACCOUNT_SHEET_CONFIG: AccountSheetConfig = {
     }),
     LABELS,
   ),
+  searchEntries: [
+    ...SHARED_SETTINGS_SEARCH_ENTRIES,
+    ...CALENDAR_SETTINGS_SEARCH_ENTRIES,
+  ],
   pages: {
     ...SHARED_SETTINGS_SHEET_PAGES,
     appearance: CalendarAppearanceSettingsContent,

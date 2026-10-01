@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, type ComponentType, type ReactNode } from "react";
+import React, {
+  useCallback,
+  useMemo,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import {
   Pressable,
   StyleSheet,
@@ -10,22 +16,34 @@ import {
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
+import { settingsSectionPath } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
 import { useAuth } from "../providers/AuthProvider";
 import { useToast } from "../providers/ToastProvider";
 import { BottomSheet } from "./BottomSheet";
 import { BlobatarAvatar } from "./BlobatarAvatar";
-import { SheetPageStack, SheetSubPage, useSheetPageStack } from "./sheet/SheetPageStack";
 import {
+  SheetPageStack,
+  SheetSubPage,
+  useSheetPageStack,
+} from "./sheet/SheetPageStack";
+import {
+  SheetCenteredState,
   SheetGroup,
   SheetItem,
   SheetScroll,
+  SheetSearchField,
   SheetSection,
 } from "./sheet/SheetSections";
 import { SettingsSheetPageProvider } from "./settings/SettingsPage";
 import { settingsSheetPageTitle } from "./settings/sections";
-import type { AccountSheetGroup } from "../lib/account-sheet-model";
+import {
+  filterAccountSheetGroups,
+  filterAccountSheetSearchEntries,
+  type AccountSheetGroup,
+  type AccountSheetSearchEntry,
+} from "../lib/account-sheet-model";
 import { useDeferredSheetAction } from "../hooks/use-deferred-sheet-action";
 
 const ROOT_PAGE = "root";
@@ -33,6 +51,8 @@ const ROOT_PAGE = "root";
 /** App-specific drawer contents: which settings rows exist and which pages open in-sheet. */
 export interface AccountSheetConfig {
   groups: AccountSheetGroup[];
+  /** Individual settings inside the pages, so search can find them too. */
+  searchEntries?: AccountSheetSearchEntry[];
   pages: Record<string, ComponentType>;
   icons: Readonly<Record<string, keyof typeof Feather.glyphMap>>;
   labels?: Readonly<Record<string, string | undefined>>;
@@ -50,7 +70,11 @@ interface AccountSheetProps {
 }
 
 /** Account drawer: profile and settings that open in-sheet. */
-export function AccountSheet({ visible, config, onDismiss }: AccountSheetProps) {
+export function AccountSheet({
+  visible,
+  config,
+  onDismiss,
+}: AccountSheetProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -58,8 +82,32 @@ export function AccountSheet({ visible, config, onDismiss }: AccountSheetProps) 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { runAfterClose, onCloseComplete } = useDeferredSheetAction(onDismiss);
 
+  const [query, setQuery] = useState("");
+  const searching = query.trim().length > 0;
+  const visibleGroups = useMemo(
+    () => filterAccountSheetGroups(config.groups, query),
+    [config.groups, query],
+  );
+
+  const visibleEntries = useMemo(
+    () =>
+      filterAccountSheetSearchEntries(
+        (config.searchEntries ?? []).filter(
+          (entry) =>
+            config.pages[entry.pageId] ||
+            config.customPages?.isPage(entry.pageId),
+        ),
+        query,
+      ),
+    [config, query],
+  );
+
   const pageStack = useSheetPageStack(ROOT_PAGE, visible);
-  const { push: pushStackPage, pop: popPage, reset: resetPageStack } = pageStack;
+  const {
+    push: pushStackPage,
+    pop: popPage,
+    reset: resetPageStack,
+  } = pageStack;
 
   const pushPage = useCallback(
     (pagePath: string) => {
@@ -83,49 +131,88 @@ export function AccountSheet({ visible, config, onDismiss }: AccountSheetProps) 
 
   const rootList = (
     <SheetScroll>
-      <View style={styles.profile}>
-        <BlobatarAvatar
-          email={user?.email}
-          name={user?.name}
-          src={user?.image}
-          size={72}
-          borderRadius={theme.borderRadius.xl}
-        />
-        <Text style={styles.name} numberOfLines={1}>
-          {displayName}
-        </Text>
-        {user?.email ? (
-          <Pressable
-            onPress={() => void copyEmail()}
-            hitSlop={8}
-            style={({ pressed }) => [styles.emailRow, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Copy email address"
-          >
-            <Text style={styles.email} numberOfLines={1}>
-              {user.email}
-            </Text>
-            <Feather name="copy" size={13} color={theme.colors.mutedForeground} />
-          </Pressable>
-        ) : null}
-      </View>
+      {searching ? null : (
+        <View style={styles.profile}>
+          <BlobatarAvatar
+            email={user?.email}
+            name={user?.name}
+            src={user?.image}
+            size={72}
+            borderRadius={theme.borderRadius.xl}
+          />
+          <Text style={styles.name} numberOfLines={1}>
+            {displayName}
+          </Text>
+          {user?.email ? (
+            <Pressable
+              onPress={() => void copyEmail()}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.emailRow,
+                pressed && styles.pressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Copy email address"
+            >
+              <Text style={styles.email} numberOfLines={1}>
+                {user.email}
+              </Text>
+              <Feather
+                name="copy"
+                size={13}
+                color={theme.colors.mutedForeground}
+              />
+            </Pressable>
+          ) : null}
+        </View>
+      )}
 
-      {config.groups.map((group) => (
-        <SheetSection key={group.title} title={group.title}>
+      <SheetSearchField
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search settings"
+        accessibilityLabel="Search settings"
+      />
+
+      {visibleGroups.length === 0 && visibleEntries.length === 0 ? (
+        <SheetCenteredState message="No settings match your search." />
+      ) : (
+        visibleGroups.map((group) => (
+          <SheetSection key={group.title} title={group.title}>
+            <SheetGroup>
+              {group.rows.map((row) => (
+                <SheetItem
+                  key={row.id}
+                  label={row.label}
+                  detail={searching ? row.description : undefined}
+                  icon={config.icons[row.id] ?? "settings"}
+                  chevron
+                  onPress={() => pushPage(row.route)}
+                  accessibilityLabel={row.label}
+                />
+              ))}
+            </SheetGroup>
+          </SheetSection>
+        ))
+      )}
+
+      {visibleEntries.length > 0 ? (
+        <SheetSection title="Settings">
           <SheetGroup>
-            {group.rows.map((row) => (
+            {visibleEntries.map((entry) => (
               <SheetItem
-                key={row.id}
-                label={row.label}
-                icon={config.icons[row.id] ?? "settings"}
+                key={`${entry.pageId}:${entry.location}:${entry.label}`}
+                label={entry.label}
+                detail={entry.location}
+                icon={config.icons[entry.pageId] ?? "settings"}
                 chevron
-                onPress={() => pushPage(row.route)}
-                accessibilityLabel={row.label}
+                onPress={() => pushPage(settingsSectionPath(entry.pageId))}
+                accessibilityLabel={`${entry.label}, ${entry.location}`}
               />
             ))}
           </SheetGroup>
         </SheetSection>
-      ))}
+      ) : null}
     </SheetScroll>
   );
 
@@ -155,6 +242,7 @@ export function AccountSheet({ visible, config, onDismiss }: AccountSheetProps) 
       onDismiss={onDismiss}
       onCloseComplete={() => {
         resetPageStack();
+        setQuery("");
         onCloseComplete();
       }}
       snapPoints={[0.92]}

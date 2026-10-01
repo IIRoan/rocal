@@ -3,6 +3,7 @@ import React, {
   isValidElement,
   useMemo,
   type ReactNode,
+  type Ref,
 } from "react";
 import {
   ActivityIndicator,
@@ -348,17 +349,20 @@ export function SheetSearchField({
   onChangeText,
   placeholder = "Search",
   accessibilityLabel,
+  inputRef,
 }: {
   value: string;
   onChangeText: (value: string) => void;
   placeholder?: string;
   accessibilityLabel: string;
+  inputRef?: Ref<TextInput>;
 }) {
   const { skin, styles } = useSheetListStyles();
   return (
     <View style={styles.search}>
       <Feather name="search" size={16} color={skin.textTertiary} />
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}

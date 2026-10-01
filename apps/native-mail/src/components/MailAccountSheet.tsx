@@ -12,6 +12,8 @@ import {
   SETTINGS_HUB_ICONS,
   SETTINGS_MAIL_ICONS,
 } from "@workspace/native-core/lib/settings-nav-icons";
+import { SHARED_SETTINGS_SEARCH_ENTRIES } from "@workspace/native-core/lib/settings-search-entries";
+import { MAIL_SETTINGS_SEARCH_ENTRIES } from "../lib/settings-search-entries";
 import { ComposeSettingsContent } from "./settings/sections/ComposeSettingsContent";
 import { ContactsSettingsContent } from "./settings/sections/ContactsSettingsContent";
 import { LabelsSettingsContent } from "./settings/sections/LabelsSettingsContent";
@@ -27,6 +29,10 @@ const MAIL_ACCOUNT_SHEET_CONFIG: AccountSheetConfig = {
       ids: ["mail", "mailboxes", "labels", "contacts"],
     }),
   ),
+  searchEntries: [
+    ...SHARED_SETTINGS_SEARCH_ENTRIES,
+    ...MAIL_SETTINGS_SEARCH_ENTRIES,
+  ],
   pages: {
     ...SHARED_SETTINGS_SHEET_PAGES,
     composing: ComposeSettingsContent,
