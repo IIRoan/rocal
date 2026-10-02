@@ -381,7 +381,7 @@ describe("formatReplyAllRecipientFields", () => {
           ],
           cc: [{ email: "blair@example.com" }],
         }),
-        "me@example.com",
+        { fromEmail: "me@example.com" },
       ),
     ).toEqual({
       to: "sender@example.com",
@@ -398,11 +398,36 @@ describe("formatReplyAllRecipientFields", () => {
           to: [{ email: "alex@example.com" }],
           cc: [{ email: "blair@example.com" }],
         }),
-        "me@example.com",
+        { fromEmail: "me@example.com" },
       ),
     ).toEqual({
       to: "alex@example.com",
       cc: "blair@example.com",
+    });
+  });
+
+  it("replies to Reply-To and leaves out the SimpleLogin alias and other identities", () => {
+    expect(
+      formatReplyAllRecipientFields(
+        message({
+          id: "m-3",
+          from: [{ email: "shop@example.com" }],
+          replyTo: [{ email: "shop_at_example_com_x@simplelogin.co" }],
+          to: [{ email: "shop.x@alias.example.net" }],
+          cc: [{ email: "alex@example.com" }, { email: "work@example.com" }],
+          "header:X-Solace-SimpleLogin:asText": "forward",
+          "header:X-SimpleLogin-Envelope-To:asAddresses": [
+            { email: "shop.x@alias.example.net" },
+          ],
+        }),
+        {
+          fromEmail: "me@example.com",
+          identities: [{ email: "me@example.com" }, { email: "work@example.com" }],
+        },
+      ),
+    ).toEqual({
+      to: "shop_at_example_com_x@simplelogin.co",
+      cc: "alex@example.com",
     });
   });
 });

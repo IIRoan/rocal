@@ -6,6 +6,7 @@ import {
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
+import * as WebBrowser from "expo-web-browser";
 import { useAuth } from "@workspace/native-core/providers/AuthProvider";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import { getMailAccountStatus, getMailConfig } from "./mail-api";
@@ -16,9 +17,12 @@ import {
   type MailRuntime,
 } from "./mail-runtime";
 import {
+  getSimpleLoginForward,
   resolveEncryptionInternalDomain,
   resolveMailboxMessagesPageSize,
+  resolveMessageReplyFrom,
   shouldEncryptOutgoingMail,
+  SIMPLELOGIN_DONE_KEYWORD,
 } from "@workspace/calendar-core";
 import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
 import { MAILBOX_MESSAGES_PAGE_SIZE } from "./mail-pagination";
@@ -622,6 +626,59 @@ export function resolveComposeContext(
     draftsMailboxId,
     sentMailboxId: getPrimaryMailboxId(runtime.mailboxes, "sent"),
   };
+}
+
+/** Runs a SimpleLogin forward's alias action and marks the message as done. */
+export function useSimpleLoginAliasAction(runtime: MailRuntime | undefined) {
+  const queryClient = useQueryClient();
+  const setDone = (messageId: string, done: boolean) => {
+    const patch = (msg: JmapEmailMessage) => {
+      const keywords = { ...msg.keywords };
+      if (done) keywords[SIMPLELOGIN_DONE_KEYWORD] = true;
+      else delete keywords[SIMPLELOGIN_DONE_KEYWORD];
+      return { keywords };
+    };
+    patchMessageInCache(queryClient, messageId, patch);
+    patchSingleMessageInCache(queryClient, messageId, patch);
+  };
+
+  return useMutation({
+    mutationFn: async (message: JmapEmailMessage) => {
+      const action = getSimpleLoginForward(message)?.action;
+      if (!runtime || !action) {
+        throw new Error("Your mailbox is not connected.");
+      }
+      if (action.target.type === "https") {
+        await WebBrowser.openBrowserAsync(action.target.url);
+      } else {
+        // SimpleLogin only honours the command from the mailbox it forwards to.
+        const replyFrom = resolveMessageReplyFrom(runtime.identities, message);
+        const context = replyFrom
+          ? resolveComposeContext(runtime, replyFrom.identityId)
+          : null;
+        if (!context) {
+          throw new Error("Could not find the address this message was sent to.");
+        }
+        await runtime.client.ensureEncryptOnAppendDisabled(runtime.session);
+        await runtime.client.sendMessage(runtime.session, {
+          draftsMailboxId: context.draftsMailboxId,
+          sentMailboxId: context.sentMailboxId,
+          fromEmail: context.fromEmail,
+          fromName: context.fromName,
+          to: [action.target.to],
+          subject: action.target.subject,
+          textBody: action.target.body,
+          identityId: context.identityId,
+        });
+      }
+      await runtime.client
+        .setMessageKeyword(runtime.session, message.id, SIMPLELOGIN_DONE_KEYWORD, true)
+        .catch(() => undefined);
+      return action;
+    },
+    onMutate: (message) => setDone(message.id, true),
+    onError: (_error, message) => setDone(message.id, false),
+  });
 }
 
 export function useSendMessage(runtime: MailRuntime | undefined) {

@@ -1,3 +1,15 @@
+import {
+  resolveReplyAllRecipients,
+  resolveReplyRecipients,
+  type ReplyAllRecipients,
+} from "./mail-addresses";
+import {
+  getDeliveredToAddresses,
+  getSimpleLoginForward,
+  getSimpleLoginReplyNotice,
+  type MailSimpleLoginFields,
+} from "./mail-simplelogin";
+
 type ReplyIdentity = {
   id: string;
   email: string;
@@ -9,6 +21,8 @@ type ReplyRecipient = {
 };
 
 type ReplyRecipients = {
+  /** Topmost first; the mailbox Stalwart actually delivered to. */
+  deliveredTo?: ReplyRecipient[];
   to?: ReplyRecipient[];
   cc?: ReplyRecipient[];
   bcc?: ReplyRecipient[];
@@ -51,6 +65,23 @@ export function resolveReplyFrom(
 ): ReplyFromResolution | null {
   if (identities.length === 0 || !recipients) {
     return null;
+  }
+
+  // SimpleLogin only accepts replies from the mailbox it forwarded to, which To (the alias) never names.
+  for (const delivered of recipients.deliveredTo ?? []) {
+    const email = delivered.email?.trim();
+    if (!email) continue;
+    const identity =
+      identities.find(
+        (entry) => normalizeEmailAddress(entry.email) === normalizeEmailAddress(email),
+      ) ??
+      identities.find(
+        (entry) =>
+          normalizeBaseEmailAddress(entry.email) === normalizeBaseEmailAddress(email),
+      );
+    if (identity) {
+      return { identityId: identity.id };
+    }
   }
 
   const received: { email: string; name: string | undefined }[] = [
@@ -125,4 +156,74 @@ export function resolveReplyFrom(
   }
 
   return null;
+}
+
+type ReplySourceMessage = MailSimpleLoginFields & {
+  from?: ReplyRecipient[] | null;
+  to?: ReplyRecipient[] | null;
+  cc?: ReplyRecipient[] | null;
+  bcc?: ReplyRecipient[] | null;
+};
+
+/** Reply identity for a message: topmost Delivered-To identity, then To/Cc/Bcc matches. */
+export function resolveMessageReplyFrom(
+  identities: readonly ReplyIdentity[],
+  message: ReplySourceMessage,
+): ReplyFromResolution | null {
+  return resolveReplyFrom(identities, {
+    deliveredTo: getDeliveredToAddresses(message),
+    to: message.to ?? undefined,
+    cc: message.cc ?? undefined,
+    bcc: message.bcc ?? undefined,
+  });
+}
+
+/** Compose hints for replies to a verified SimpleLogin forward; empty otherwise. */
+export function getSimpleLoginReplyHints(input: {
+  message: ReplySourceMessage;
+  identities: readonly ReplyIdentity[];
+  fromEmail: string | null | undefined;
+  recipients: readonly string[];
+}): string[] {
+  const receivingId = resolveMessageReplyFrom(input.identities, input.message)?.identityId;
+  const notice = getSimpleLoginReplyNotice({
+    message: input.message,
+    recipients: input.recipients,
+    fromEmail: input.fromEmail,
+    receivingEmail: input.identities.find((identity) => identity.id === receivingId)?.email,
+  });
+  const hints: string[] = [];
+  if (notice.replyingThrough) {
+    hints.push(
+      `Replying through SimpleLogin. ${notice.replyingThrough.sender} sees ${notice.replyingThrough.alias}, not your address.`,
+    );
+  }
+  if (notice.requiredFrom) {
+    hints.push(`SimpleLogin only accepts replies from ${notice.requiredFrom}.`);
+  }
+  return hints;
+}
+
+/** Reply or reply-all recipients, never including the user's identities or the SimpleLogin alias. */
+export function resolveMessageReplyRecipients(
+  message: ReplySourceMessage,
+  input: {
+    mode: "reply" | "reply-all";
+    fromEmail?: string | null;
+    identities?: readonly { email: string }[];
+  },
+): ReplyAllRecipients {
+  const alias = getSimpleLoginForward(message)?.alias;
+  const recipientsInput = {
+    from: message.from,
+    replyTo: message.replyTo,
+    to: message.to,
+    cc: message.cc,
+    currentUserEmail: input.fromEmail,
+    identityEmails: (input.identities ?? []).map((identity) => identity.email),
+    excludeEmails: alias ? [alias] : [],
+  };
+  return input.mode === "reply-all"
+    ? resolveReplyAllRecipients(recipientsInput)
+    : { to: resolveReplyRecipients(recipientsInput), cc: [] };
 }

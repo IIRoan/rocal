@@ -1,6 +1,10 @@
 "use client";
 
-import { formatDateTimeLabel, resolveTimezone } from "@workspace/calendar-core";
+import {
+  formatDateTimeLabel,
+  getSimpleLoginForward,
+  resolveTimezone,
+} from "@workspace/calendar-core";
 import { cn } from "@workspace/ui/lib/utils";
 import { SenderAvatar } from "../mail-avatar";
 import {
@@ -9,6 +13,7 @@ import {
 } from "../recipient-popover";
 import { MailIdentityBadge } from "../mail-identity-badge";
 import { AuthResultsBadge } from "../auth-results-badge";
+import { SimpleLoginAliasBadge } from "./message-reader-simplelogin";
 import { MessageReaderHeaderAttachments } from "./message-reader-header-attachments";
 import { MessageReaderMobileActionsDrawer } from "./message-reader-mobile-actions-drawer";
 import type {
@@ -33,6 +38,7 @@ export function MessageReaderHeader({
     identities,
   } = props;
   const { senderEmail, enrichedSender } = view;
+  const simpleLoginForward = getSimpleLoginForward(message);
 
   return (
     <div className={cn("flex shrink-0 flex-col", isMobile ? "gap-1.5" : "gap-3")}>
@@ -60,8 +66,12 @@ export function MessageReaderHeader({
                     message={message}
                     identities={identities}
                   />
+                  {simpleLoginForward && (
+                    <SimpleLoginAliasBadge alias={simpleLoginForward.alias} />
+                  )}
                   <AuthResultsBadge
-                    authResultsHeaders={message["header:Authentication-Results"]}
+                    message={message}
+                    simpleLoginForward={simpleLoginForward !== null}
                   />
                 </>
               ) : (

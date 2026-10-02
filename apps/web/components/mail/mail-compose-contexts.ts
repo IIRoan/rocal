@@ -3,6 +3,7 @@
 import { createContext } from "react";
 import type { MailServerLimits } from "@workspace/calendar-core";
 import type { QuotedInlineAttachment } from "@/lib/mail/compose-editor-utils";
+import type { JmapEmailMessage } from "@/lib/mail/types";
 import type { ComposeMode, DraftSaveStatus } from "./mail-compose-types";
 
 export type MailComposeFieldsContextValue = {
@@ -28,6 +29,7 @@ export type MailComposeFieldsContextValue = {
   composeDraftId: string | null;
   clearCompose: () => void;
   composeMode: ComposeMode;
+  composeReplySource: JmapEmailMessage | null;
   quotedAttachments: QuotedInlineAttachment[];
   openNewCompose: () => void;
   composeSessionId: number;

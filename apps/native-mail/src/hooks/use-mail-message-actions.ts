@@ -13,6 +13,7 @@ import {
   releaseMarkAsReadSuppression,
   suppressMarkAsRead,
   useMailMutations,
+  useSimpleLoginAliasAction,
 } from "../lib/mail/use-mail";
 import { isSpamMailboxRole } from "../lib/mail/mail-helpers";
 import { useMailListSettings } from "./use-mail-list-settings";
@@ -52,6 +53,7 @@ export function useMailMessageActions({
     moveToMailbox,
     setMessageLabel,
   } = useMailMutations(runtime, null);
+  const simpleLoginAction = useSimpleLoginAliasAction(runtime);
   const { settings: listSettings, isLoaded: listSettingsLoaded } =
     useMailListSettings();
   const showMoveToast = useMailUndoToast(runtime);
@@ -311,6 +313,14 @@ export function useMailMessageActions({
     setMessageLabel.mutate({ messageId: message.id, labelId, assigned });
   };
 
+  const handleSimpleLoginAction = (target: JmapEmailMessage) => {
+    simpleLoginAction.mutate(target, {
+      onSuccess: (action) => toast(action.doneLabel, "success"),
+      onError: (error) =>
+        toast(getErrorMessage(error, "Could not reach SimpleLogin."), "error"),
+    });
+  };
+
   return {
     activeSheetView,
     setActiveSheetView,
@@ -340,6 +350,8 @@ export function useMailMessageActions({
     handleRestoreToInbox,
     handleReportSpam,
     handleSetLabel,
+    handleSimpleLoginAction,
+    isSimpleLoginPending: simpleLoginAction.isPending,
   };
 }
 

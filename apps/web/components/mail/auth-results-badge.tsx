@@ -1,42 +1,40 @@
 "use client";
 
-import { ShieldCheck, ShieldAlert, ShieldX, Shield } from "lucide-react";
+import { ShieldCheck, ShieldX, Shield } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/ui/tooltip";
 import {
-  normalizeJmapHeaderValues,
+  formatAuthResultsSummary,
+  getTrustedAuthResultsHeader,
+  hasAuthResults,
   parseAuthResults,
-  type MailAuthResult,
-} from "@/lib/mail/types";
+  resolveAuthBadgeTone,
+  type MailAuthResultsFields,
+} from "@workspace/calendar-core";
 
 export function AuthResultsBadge({
-  authResultsHeaders,
+  message,
+  simpleLoginForward = false,
 }: {
-  authResultsHeaders?: unknown;
+  message: MailAuthResultsFields;
+  simpleLoginForward?: boolean;
 }) {
-  const headers = normalizeJmapHeaderValues(authResultsHeaders);
-  if (headers.length === 0) return null;
+  const results = parseAuthResults(getTrustedAuthResultsHeader(message));
+  if (!hasAuthResults(results)) return null;
 
-  const results = parseAuthResults(headers);
+  const tone = resolveAuthBadgeTone(results);
+  const Icon = tone === "pass" ? ShieldCheck : tone === "fail" ? ShieldX : Shield;
+  const color =
+    tone === "pass"
+      ? "text-green-600 dark:text-green-500"
+      : tone === "fail"
+        ? "text-destructive"
+        : "text-muted-foreground";
 
-  if (results.spf === "none" && results.dkim === "none" && results.dmarc === "none") {
-    return null;
-  }
-
-  const allPass = results.spf === "pass" && results.dkim === "pass";
-  const anyFail = results.spf === "fail" || results.dkim === "fail" || results.dmarc === "fail";
-
-  const Icon = allPass ? ShieldCheck : anyFail ? ShieldX : Shield;
-  const color = allPass
-    ? "text-green-600 dark:text-green-500"
-    : anyFail
-      ? "text-destructive"
-      : "text-muted-foreground";
-
-  const tooltipText = buildTooltipText(results);
+  const tooltipText = formatAuthResultsSummary(results, { simpleLoginForward });
 
   return (
     <Tooltip>
@@ -54,18 +52,4 @@ export function AuthResultsBadge({
       </TooltipContent>
     </Tooltip>
   );
-}
-
-function buildTooltipText(results: MailAuthResult): string[] {
-  const lines: string[] = [];
-  if (results.spf !== "none") {
-    lines.push(`SPF: ${results.spf}`);
-  }
-  if (results.dkim !== "none") {
-    lines.push(`DKIM: ${results.dkim}`);
-  }
-  if (results.dmarc !== "none") {
-    lines.push(`DMARC: ${results.dmarc}`);
-  }
-  return lines.length > 0 ? lines : ["No authentication data"];
 }

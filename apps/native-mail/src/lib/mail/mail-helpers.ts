@@ -5,7 +5,7 @@ import {
   isCurrentUserMailAddress,
   isValidEmailAddress,
   parseAddressList,
-  resolveReplyAllRecipients,
+  resolveMessageReplyRecipients,
   resolveTimezone,
   validateComposeRecipients,
   type TimeFormat,
@@ -277,14 +277,12 @@ export function validateComposeInput(input: {
 }
 
 export function formatReplyAllRecipientFields(
-  message: Pick<JmapEmailMessage, "from" | "to" | "cc">,
-  currentUserEmail?: string | null,
+  message: JmapEmailMessage,
+  input: { fromEmail?: string | null; identities?: readonly { email: string }[] },
 ): { to: string; cc: string } {
-  const recipients = resolveReplyAllRecipients({
-    from: message.from,
-    to: message.to,
-    cc: message.cc,
-    currentUserEmail,
+  const recipients = resolveMessageReplyRecipients(message, {
+    mode: "reply-all",
+    ...input,
   });
   return {
     to: recipients.to.join(", "),

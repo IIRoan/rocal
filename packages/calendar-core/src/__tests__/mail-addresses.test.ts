@@ -140,6 +140,51 @@ describe("mail address parsing", () => {
     });
   });
 
+  it("replies to Reply-To before From, skipping own identities", () => {
+    expect(
+      resolveReplyRecipients({
+        from: [{ email: "alice@example.com" }],
+        replyTo: [{ email: "list@example.com" }],
+        to: [{ email: "me@solace.onl" }],
+        currentUserEmail: "me@solace.onl",
+      }),
+    ).toEqual(["list@example.com"]);
+    expect(
+      resolveReplyRecipients({
+        from: [{ email: "alice@example.com" }],
+        replyTo: [{ email: "alt@solace.onl" }],
+        currentUserEmail: "me@solace.onl",
+        identityEmails: ["alt@solace.onl"],
+      }),
+    ).toEqual(["alice@example.com"]);
+  });
+
+  it("treats a message from any identity as your own", () => {
+    expect(
+      resolveReplyRecipients({
+        from: [{ email: "alt@solace.onl" }],
+        replyTo: [{ email: "alt@solace.onl" }],
+        to: [{ email: "alice@example.com" }],
+        currentUserEmail: "me@solace.onl",
+        identityEmails: ["alt@solace.onl"],
+      }),
+    ).toEqual(["alice@example.com"]);
+  });
+
+  it("drops identities, excluded addresses and the reply target from reply-all Cc", () => {
+    expect(
+      resolveReplyAllRecipients({
+        from: [{ email: "alice@example.com" }],
+        replyTo: [{ email: "list@example.com" }],
+        to: [{ email: "alias@alias.example.net" }, { email: "list@example.com" }],
+        cc: [{ email: "alt@solace.onl" }, { email: "bob@example.com" }],
+        currentUserEmail: "me@solace.onl",
+        identityEmails: ["alt@solace.onl"],
+        excludeEmails: ["ALIAS@alias.example.net"],
+      }),
+    ).toEqual({ to: ["list@example.com"], cc: ["bob@example.com"] });
+  });
+
   it("uses original To/Cc when reply-all is used on a message you sent", () => {
     expect(
       resolveReplyAllRecipients({

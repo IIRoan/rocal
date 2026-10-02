@@ -39,6 +39,8 @@ import { useIsMobile } from "@workspace/ui/hooks";
 import type { JmapIdentity } from "@/lib/mail/types";
 import {
   canSendCompose,
+  getSimpleLoginReplyHints,
+  parsedAddressesToEmails,
   validateComposeRecipients,
   pickOutgoingAttachmentFiles,
 } from "@workspace/calendar-core";
@@ -171,6 +173,7 @@ export function ComposeForm({
     composeDraftId,
     clearCompose,
     composeMode,
+    composeReplySource,
     quotedAttachments,
     requestComposeClose,
   } = useMailCompose();
@@ -316,6 +319,18 @@ export function ComposeForm({
     bcc: composeBcc,
     subject: composeSubject,
   });
+  const simpleLoginHints = composeReplySource
+    ? getSimpleLoginReplyHints({
+        message: composeReplySource,
+        identities,
+        fromEmail,
+        recipients: parsedAddressesToEmails([
+          ...recipientValidation.to,
+          ...recipientValidation.cc,
+          ...recipientValidation.bcc,
+        ]),
+      })
+    : [];
   const showToError =
     toTouched &&
     composeTo.trim().length > 0 &&
@@ -687,6 +702,18 @@ export function ComposeForm({
           >
             <Minus className="size-3" />
           </button>
+        </div>
+      )}
+
+      {simpleLoginHints.length > 0 && (
+        <div
+          className={`flex shrink-0 flex-col gap-0.5 border-b border-border/50 py-2 text-[11px] text-muted-foreground ${
+            isMobile ? "px-3" : "px-4"
+          }`}
+        >
+          {simpleLoginHints.map((hint) => (
+            <p key={hint}>{hint}</p>
+          ))}
         </div>
       )}
 

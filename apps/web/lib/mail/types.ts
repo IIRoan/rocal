@@ -1,11 +1,14 @@
-import type {
-  MailAccountStatus as SharedMailAccountStatus,
-  MailDemoConfig,
-  MailDirectoryKey as SharedMailDirectoryKey,
-  MailOAuthConfig,
-  MailSignup as SharedMailSignup,
-  MailVaultBackup as SharedMailVaultBackup,
-  MailVaultKdfParams,
+import {
+  normalizeJmapHeaderValues,
+  type MailAccountStatus as SharedMailAccountStatus,
+  type MailAuthResultsFields,
+  type MailDemoConfig,
+  type MailDirectoryKey as SharedMailDirectoryKey,
+  type MailOAuthConfig,
+  type MailSignup as SharedMailSignup,
+  type MailSimpleLoginFields,
+  type MailVaultBackup as SharedMailVaultBackup,
+  type MailVaultKdfParams,
 } from "@workspace/calendar-core";
 import { z } from "zod";
 
@@ -95,7 +98,7 @@ export type MailAttachment = {
 
 export type JmapAttachment = Omit<MailAttachment, "content">;
 
-export type JmapEmailMessage = {
+export type JmapEmailMessage = MailSimpleLoginFields & MailAuthResultsFields & {
   id: string;
   threadId?: string;
   messageId?: string[];
@@ -117,63 +120,11 @@ export type JmapEmailMessage = {
   textBody?: JmapBodyPartRef[];
   htmlBody?: JmapBodyPartRef[];
   attachments?: JmapAttachment[];
-  /** JMAP header:* property — Authentication-Results header values */
-  "header:Authentication-Results"?: string[] | null;
   /** JMAP header:* property — Received header values */
   "header:Received"?: string[] | null;
   /** JMAP header:* property — DKIM-Signature header values */
   "header:DKIM-Signature"?: string[] | null;
 };
-
-export type MailAuthResult = {
-  spf: "pass" | "fail" | "none" | "unknown";
-  dkim: "pass" | "fail" | "none" | "unknown";
-  dmarc: "pass" | "fail" | "none" | "unknown";
-};
-
-/** JMAP header:* values are string arrays; some servers return a lone string. */
-export function normalizeJmapHeaderValues(
-  value: unknown,
-): string[] {
-  if (value == null) return [];
-  if (typeof value === "string") return value.length > 0 ? [value] : [];
-  if (Array.isArray(value)) {
-    return value.filter((entry): entry is string => typeof entry === "string");
-  }
-  return [];
-}
-
-export function parseAuthResults(
-  headers: unknown,
-): MailAuthResult {
-  const result: MailAuthResult = {
-    spf: "none",
-    dkim: "none",
-    dmarc: "none",
-  };
-
-  const normalized = normalizeJmapHeaderValues(headers);
-  if (normalized.length === 0) return result;
-
-  const combined = normalized.join("\n").toLowerCase();
-
-  const spfMatch = combined.match(/spf\s*=\s*(pass|fail|none|softfail|neutral|temperror|permerror)/);
-  if (spfMatch) {
-    result.spf = spfMatch[1] === "softfail" || spfMatch[1] === "neutral" ? "fail" : spfMatch[1] as MailAuthResult["spf"];
-  }
-
-  const dkimMatch = combined.match(/dkim\s*=\s*(pass|fail|none|temperror|permerror)/);
-  if (dkimMatch) {
-    result.dkim = dkimMatch[1] as MailAuthResult["dkim"];
-  }
-
-  const dmarcMatch = combined.match(/dmarc\s*=\s*(pass|fail|none|bestguesspass|temperror|permerror)/);
-  if (dmarcMatch) {
-    result.dmarc = dmarcMatch[1] === "bestguesspass" ? "pass" : dmarcMatch[1] as MailAuthResult["dmarc"];
-  }
-
-  return result;
-}
 
 export type MailRealtimeEvent = {
   type: "mail.changed";
@@ -298,7 +249,17 @@ const jmapEmailMessageSchema = z.object({
   textBody: z.array(jmapBodyPartRefSchema).optional(),
   htmlBody: z.array(jmapBodyPartRefSchema).optional(),
   attachments: z.array(jmapAttachmentSchema).optional(),
-  "header:Authentication-Results": jmapHeaderValuesSchema.optional(),
+  replyTo: jmapOptional(z.array(mailAddressSchema).optional()),
+  "header:Delivered-To:asAddresses:all": jmapOptional(
+    z.array(z.array(mailAddressSchema).nullable()).optional(),
+  ),
+  "header:X-Solace-SimpleLogin:asText": jmapOptional(z.string().optional()),
+  "header:X-SimpleLogin-Envelope-To:asAddresses": jmapOptional(
+    z.array(mailAddressSchema).optional(),
+  ),
+  "header:X-SimpleLogin-Unsub-Behaviour:asText": jmapOptional(z.string().optional()),
+  "header:List-Unsubscribe:asURLs": jmapOptional(z.array(z.string()).optional()),
+  "header:Authentication-Results:asText:all": jmapHeaderValuesSchema.optional(),
   "header:Received": jmapHeaderValuesSchema.optional(),
   "header:DKIM-Signature": jmapHeaderValuesSchema.optional(),
 });

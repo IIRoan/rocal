@@ -58,6 +58,8 @@ export * from "./mail-compose-settings";
 export * from "./mail-synced-settings";
 export * from "./mail-signature";
 export * from "./mail-reply-identity";
+export * from "./mail-simplelogin";
+export * from "./mail-auth-results";
 
 export * from "./recurring-event-target";
 export * from "./event-categories";

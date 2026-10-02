@@ -6,6 +6,8 @@ export type MailReplyContext = {
   threadId: string | null;
   inReplyTo?: string[];
   references?: string[];
+  /** Message being replied to; drives the SimpleLogin reply hints. */
+  sourceMessage?: JmapEmailMessage;
 };
 
 export type ComposeDraft = {
