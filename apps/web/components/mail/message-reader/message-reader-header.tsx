@@ -15,6 +15,7 @@ import { MailIdentityBadge } from "../mail-identity-badge";
 import { AuthResultsBadge } from "../auth-results-badge";
 import { MessageReaderHeaderAttachments } from "./message-reader-header-attachments";
 import { MessageReaderMobileActionsDrawer } from "./message-reader-mobile-actions-drawer";
+import { MessageReaderSimpleLoginLine } from "./message-reader-simplelogin";
 import type {
   MessageReaderController,
   MessageReaderViewModel,
@@ -131,6 +132,7 @@ export function MessageReaderHeader({
               />
             </div>
           )}
+          <MessageReaderSimpleLoginLine controller={controller} />
         </div>
       </div>
 
