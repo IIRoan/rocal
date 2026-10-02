@@ -14,7 +14,8 @@ import {
   parsedAddressesToEmails,
   capIdentitiesForPicker,
   resolveMailServerPolicy,
-  resolveReplyRecipients,
+  resolveMessageReplyFrom,
+  resolveMessageReplyRecipients,
   validateComposeRecipients,
   prepareOutgoingAttachments,
   validateUploadedAttachmentSet,
@@ -43,6 +44,7 @@ import { completeAuthNavigation } from "@/lib/auth-navigation";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { useMailRealtime } from "@/hooks/use-mail-realtime";
 import { useRecentContacts } from "@/hooks/use-recent-contacts";
+import { useSimpleLoginAliasAction } from "@/hooks/use-simplelogin-alias-action";
 import { peekCachedAuthPassword } from "@/lib/e2ee-password-cache";
 import { resolveAvatarUrl } from "@/lib/profile-picture";
 import { clearEncPasswordCookie, initEncPasswordFromCookie } from "@/lib/enc-password-cookie";
@@ -2153,12 +2155,16 @@ export function useMailApp() {
         const mailbox = await refreshActiveMailboxPolicy(activeMailbox, {
           force: true,
         });
-        let recipients = resolveReplyRecipients({
-          from: selectedMessage.from,
-          to: selectedMessage.to,
-          cc: selectedMessage.cc,
-          currentUserEmail: mailbox.email,
-        });
+        const replyFrom = resolveMessageReplyFrom(mailbox.identities, selectedMessage);
+        const identity =
+          mailbox.identities.find((entry) => entry.id === replyFrom?.identityId) ??
+          mailbox.identities[0];
+        const fromEmail = identity?.email ?? mailbox.email;
+        let recipients = resolveMessageReplyRecipients(selectedMessage, {
+          mode: "reply",
+          fromEmail,
+          identities: mailbox.identities,
+        }).to;
         if (recipients.length === 0) {
           recipients = resolveConversationReplyRecipients({
             messages: selectedConversationMessages,
@@ -2176,7 +2182,7 @@ export function useMailApp() {
           mailbox.mailboxes,
           "sent",
         );
-        const identityId = mailbox.identities[0]?.id;
+        const identityId = identity?.id;
         if (!draftsMailboxId || !identityId) {
           throw new Error("Missing draft mailbox or sending identity.");
         }
@@ -2231,7 +2237,7 @@ export function useMailApp() {
           {
             draftsMailboxId,
             sentMailboxId,
-            fromEmail: mailbox.email,
+            fromEmail,
             to: recipients,
             subject: subject.startsWith("Re: ") ? subject : `Re: ${subject}`,
             textBody,
@@ -2246,7 +2252,7 @@ export function useMailApp() {
           sendResult?.threadId ?? replyContext.threadId ?? null;
         appendConversationMessage(
           createOptimisticReplyMessage({
-            fromEmail: mailbox.email,
+            fromEmail,
             to: recipients,
             subject: subject.startsWith("Re: ") ? subject : `Re: ${subject}`,
             textBody: `${replyText}${quotedBody}`,
@@ -3119,6 +3125,40 @@ export function useMailApp() {
     }
   }, [handleDisconnect]);
 
+  const patchMessageKeyword = useCallback(
+    (msg: JmapEmailMessage, keyword: string, enabled: boolean) => {
+      const update = (keywords: Record<string, boolean>) => {
+        if (enabled) keywords[keyword] = true;
+        else delete keywords[keyword];
+        return keywords;
+      };
+      setActiveMailbox((cur) =>
+        cur
+          ? {
+            ...cur,
+            messages: patchMessagesKeywords(cur.messages, msg.id, update),
+          }
+          : cur,
+      );
+      setRelatedConversationMessages((cur) =>
+        patchMessagesKeywords(cur, msg.id, update),
+      );
+      setListThreadRelatedMessages((cur) =>
+        patchMessagesKeywords(cur, msg.id, update),
+      );
+      mergeMessageIntoMailboxCaches(
+        queryClient,
+        withMessageKeywords(msg, update),
+      );
+    },
+    [queryClient],
+  );
+
+  const handleSimpleLoginAction = useSimpleLoginAliasAction({
+    activeMailbox,
+    patchMessageKeyword,
+  });
+
   const handleToggleFlagged = useCallback(
     async (messageId?: string) => {
       const targetId = messageId ?? selectedMessageId;
@@ -3130,36 +3170,8 @@ export function useMailApp() {
         findCachedMailMessage(queryClient, targetId);
       if (!msg) return;
       const next = !(msg.keywords?.["$flagged"] === true);
-      const applyFlagged =
-        (flagged: boolean) => (keywords: Record<string, boolean>) => {
-          if (flagged) keywords["$flagged"] = true;
-          else delete keywords["$flagged"];
-          return keywords;
-        };
 
-      const patchAll = (flagged: boolean) => {
-        const update = applyFlagged(flagged);
-        setActiveMailbox((cur) =>
-          cur
-            ? {
-              ...cur,
-              messages: patchMessagesKeywords(cur.messages, targetId, update),
-            }
-            : cur,
-        );
-        setRelatedConversationMessages((cur) =>
-          patchMessagesKeywords(cur, targetId, update),
-        );
-        setListThreadRelatedMessages((cur) =>
-          patchMessagesKeywords(cur, targetId, update),
-        );
-        mergeMessageIntoMailboxCaches(
-          queryClient,
-          withMessageKeywords(msg, update),
-        );
-      };
-
-      patchAll(next);
+      patchMessageKeyword(msg, "$flagged", next);
       try {
         await activeMailbox.client.toggleFlagged(
           activeMailbox.session,
@@ -3169,12 +3181,13 @@ export function useMailApp() {
       } catch (error) {
         log.error("Failed to toggle flag", error);
         toast.error(getErrorMessage(error, "Could not update the star."));
-        patchAll(!next);
+        patchMessageKeyword(msg, "$flagged", !next);
       }
     },
     [
       activeMailbox,
       listThreadRelatedMessages,
+      patchMessageKeyword,
       queryClient,
       relatedConversationMessages,
       selectedMessageId,
@@ -3191,36 +3204,8 @@ export function useMailApp() {
         relatedConversationMessages.find((m) => m.id === messageId) ??
         findCachedMailMessage(queryClient, messageId);
       if (!msg) return;
-      const applyLabel =
-        (include: boolean) => (keywords: Record<string, boolean>) => {
-          if (include) keywords[keywordKey] = true;
-          else delete keywords[keywordKey];
-          return keywords;
-        };
 
-      const patchAll = (include: boolean) => {
-        const update = applyLabel(include);
-        setActiveMailbox((cur) =>
-          cur
-            ? {
-              ...cur,
-              messages: patchMessagesKeywords(cur.messages, messageId, update),
-            }
-            : cur,
-        );
-        setRelatedConversationMessages((cur) =>
-          patchMessagesKeywords(cur, messageId, update),
-        );
-        setListThreadRelatedMessages((cur) =>
-          patchMessagesKeywords(cur, messageId, update),
-        );
-        mergeMessageIntoMailboxCaches(
-          queryClient,
-          withMessageKeywords(msg, update),
-        );
-      };
-
-      patchAll(assigned);
+      patchMessageKeyword(msg, keywordKey, assigned);
       try {
         await activeMailbox.client.setMessageLabel(
           activeMailbox.session,
@@ -3231,12 +3216,13 @@ export function useMailApp() {
       } catch (error) {
         log.error("Failed to set message label", error);
         toast.error(getErrorMessage(error, "Could not update the label."));
-        patchAll(!assigned);
+        patchMessageKeyword(msg, keywordKey, !assigned);
       }
     },
     [
       activeMailbox,
       listThreadRelatedMessages,
+      patchMessageKeyword,
       queryClient,
       relatedConversationMessages,
     ],
@@ -3421,6 +3407,7 @@ export function useMailApp() {
     handleBulkMarkAsRead,
     handleToggleFlagged,
     handleSetMessageLabel,
+    handleSimpleLoginAction,
     handleCreateLabel,
     handleDeleteLabel,
     handleUpdateLabel,

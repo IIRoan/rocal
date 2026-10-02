@@ -4,52 +4,44 @@ import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import {
   formatAuthResultsSummary,
+  getTrustedAuthResultsHeader,
+  hasAuthResults,
   parseAuthResults,
-} from "../../lib/mail/auth-results";
+  resolveAuthBadgeTone,
+  type MailAuthResultsFields,
+} from "@workspace/calendar-core";
 
 type MailAuthResultsBadgeProps = {
-  authResultsHeaders?: unknown;
+  message: MailAuthResultsFields;
+  simpleLoginForward?: boolean;
 };
 
 export function MailAuthResultsBadge({
-  authResultsHeaders,
+  message,
+  simpleLoginForward = false,
 }: MailAuthResultsBadgeProps) {
   const { theme } = useTheme();
-  const results = useMemo(
-    () => parseAuthResults(authResultsHeaders),
-    [authResultsHeaders],
-  );
+  const trustedHeader = getTrustedAuthResultsHeader(message);
+  const results = useMemo(() => parseAuthResults(trustedHeader), [trustedHeader]);
 
-  if (
-    results.spf === "none" &&
-    results.dkim === "none" &&
-    results.dmarc === "none"
-  ) {
+  if (!hasAuthResults(results)) {
     return null;
   }
 
-  const allPass = results.spf === "pass" && results.dkim === "pass";
-  const anyFail =
-    results.spf === "fail" ||
-    results.dkim === "fail" ||
-    results.dmarc === "fail";
-  const icon = allPass ? "shield" : anyFail ? "alert-octagon" : "shield";
-  const color = allPass
-    ? ((theme.colors as unknown as Record<string, string>)["success"] ??
-      theme.colors.primaryBase)
-    : anyFail
-      ? theme.colors.destructive
-      : theme.colors.mutedForeground;
-  const summary = formatAuthResultsSummary(results);
+  const tone = resolveAuthBadgeTone(results);
+  const icon = tone === "fail" ? "alert-octagon" : "shield";
+  const color =
+    tone === "pass"
+      ? ((theme.colors as unknown as Record<string, string>)["success"] ??
+        theme.colors.primaryBase)
+      : tone === "fail"
+        ? theme.colors.destructive
+        : theme.colors.mutedForeground;
+  const summary = formatAuthResultsSummary(results, { simpleLoginForward });
 
   return (
     <Pressable
-      onPress={() =>
-        Alert.alert(
-          "Authentication",
-          summary.length > 0 ? summary.join("\n") : "No authentication data",
-        )
-      }
+      onPress={() => Alert.alert("Authentication", summary.join("\n"))}
       hitSlop={8}
       accessibilityRole="button"
       accessibilityLabel="Authentication results"

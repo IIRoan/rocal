@@ -1,6 +1,7 @@
 import {
   formatDateTimeLabel,
-  resolveReplyRecipients,
+  resolveMessageReplyFrom,
+  resolveMessageReplyRecipients,
   resolveTimezone,
   type TimeFormat,
 } from "@workspace/calendar-core";
@@ -17,7 +18,6 @@ import {
   sanitizeQuotedEmailHtml,
 } from "@/lib/mail/compose-editor-utils";
 import { readMailComposeSettings } from "@/lib/mail/compose-settings";
-import { resolveReplyFrom } from "@/lib/mail/reply-identity";
 import type { MailComposeState } from "./mail-compose-state";
 import {
   addressesToCsv,
@@ -53,16 +53,12 @@ export function formatQuotedMailDate(
 function resolveSeedIdentity(
   identities: JmapIdentity[],
   resolvedIdentityId: string | null,
-  message: Pick<JmapEmailMessage, "to" | "cc" | "bcc">,
+  message: JmapEmailMessage,
 ): string | null {
   const settings = readMailComposeSettings();
   let identityId = resolvedIdentityId;
   if (settings.autoSelectReplyIdentity) {
-    const resolved = resolveReplyFrom(identities, {
-      to: message.to,
-      cc: message.cc,
-      bcc: message.bcc,
-    });
+    const resolved = resolveMessageReplyFrom(identities, message);
     if (resolved) {
       identityId = resolved.identityId;
     }
@@ -92,12 +88,11 @@ export function buildReplySeed(
     currentIdentity?.id ?? null,
   );
   const currentIdentityEmail = currentIdentity?.email ?? null;
-  const replyRecipients = resolveReplyRecipients({
-    from: message.from,
-    to: message.to,
-    cc: message.cc,
-    currentUserEmail: currentIdentityEmail,
-  });
+  const replyRecipients = resolveMessageReplyRecipients(message, {
+    mode: "reply",
+    fromEmail: currentIdentityEmail,
+    identities,
+  }).to;
   const subject = message.subject ?? "";
   const { text, html } = extractMessageBodies(message);
   const body = plaintext ?? text ?? "";
@@ -142,7 +137,7 @@ export function buildReplySeed(
       composeBody: plainBody,
       composeHtmlBody: quotedHtml,
       composeAttachments: [],
-      composeReplyContext: buildReplyContext(message),
+      composeReplyContext: { ...buildReplyContext(message), sourceMessage: message },
       composeMode: "reply",
       quotedAttachments: mapQuotedAttachments(message),
       signatureAlreadyEmbedded: embedAboveQuote,

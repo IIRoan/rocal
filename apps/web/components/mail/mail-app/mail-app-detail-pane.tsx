@@ -45,6 +45,7 @@ export function MailAppDetailPane({
     handleMarkAsUnread,
     handleToggleFlagged,
     handleSetMessageLabel,
+    handleSimpleLoginAction,
     handleCreateLabel,
     handleUpdateLabel,
     handleDeleteLabel,
@@ -127,6 +128,7 @@ export function MailAppDetailPane({
                   )
                 : undefined
             }
+            onSimpleLoginAction={(message) => void handleSimpleLoginAction(message)}
             onCreateLabel={(name, color) => handleCreateLabel(name, color)}
             onUpdateLabel={(id, updates) => void handleUpdateLabel(id, updates)}
             onDeleteLabel={(id) => void handleDeleteLabel(id)}

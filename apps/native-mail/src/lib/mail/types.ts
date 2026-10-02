@@ -7,6 +7,8 @@
  */
 import type {
   MailAccountStatus as SharedMailAccountStatus,
+  MailAuthResultsFields,
+  MailSimpleLoginFields,
   MailDemoConfig as SharedMailDemoConfig,
   MailOAuthConfig as SharedMailOAuthConfig,
   MailSignup as SharedMailSignup,
@@ -91,7 +93,7 @@ export type JmapAttachment = {
   content?: MailAttachmentContent | null;
 };
 
-export type JmapEmailMessage = {
+export type JmapEmailMessage = MailSimpleLoginFields & MailAuthResultsFields & {
   id: string;
   threadId?: string;
   messageId?: string[];
@@ -111,8 +113,6 @@ export type JmapEmailMessage = {
   textBody?: JmapBodyPartRef[];
   htmlBody?: JmapBodyPartRef[];
   attachments?: JmapAttachment[];
-  /** JMAP header:* property — Authentication-Results header values */
-  "header:Authentication-Results"?: string[] | null;
 };
 
 export type JmapEmailPlacement = Pick<

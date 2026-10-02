@@ -273,38 +273,62 @@ type ReplyAddress = {
   email?: string | null;
 };
 
-/** Reply to the original sender minus self; on your own message, fall back to its To + Cc so the conversation continues. */
-export function resolveReplyRecipients(input: {
-  from?: ReplyAddress[];
-  to?: ReplyAddress[];
-  cc?: ReplyAddress[];
+export type ReplyRecipientsInput = {
+  from?: ReplyAddress[] | null;
+  replyTo?: ReplyAddress[] | null;
+  to?: ReplyAddress[] | null;
+  cc?: ReplyAddress[] | null;
   currentUserEmail?: string | null;
-}): string[] {
-  const currentUserEmail = input.currentUserEmail
-    ? normalizeEmailAddress(input.currentUserEmail)
-    : null;
+  /** All addresses the user sends from; never replied to. */
+  identityEmails?: readonly string[];
+  /** Other addresses never replied to, such as the SimpleLogin alias the message arrived on. */
+  excludeEmails?: readonly string[];
+};
 
-  const collectUnique = (entries: ReplyAddress[] | undefined): string[] => {
+function createReplyCollector(input: ReplyRecipientsInput) {
+  const self = new Set(
+    [input.currentUserEmail, ...(input.identityEmails ?? [])]
+      .filter((email): email is string => Boolean(email?.trim()))
+      .map(normalizeEmailAddress),
+  );
+  const excluded = new Set([
+    ...self,
+    ...(input.excludeEmails ?? []).map(normalizeEmailAddress),
+  ]);
+
+  const collect = (entries: (ReplyAddress[] | null | undefined)[]): string[] => {
     const seen = new Set<string>();
     const list: string[] = [];
-    for (const entry of entries ?? []) {
+    for (const entry of entries.flatMap((group) => group ?? [])) {
       const email = entry.email?.trim();
       if (!email) continue;
       const normalized = normalizeEmailAddress(email);
-      if (currentUserEmail && normalized === currentUserEmail) continue;
-      if (seen.has(normalized)) continue;
+      if (excluded.has(normalized) || seen.has(normalized)) continue;
       seen.add(normalized);
       list.push(normalized);
     }
     return list;
   };
 
-  const senderRecipients = collectUnique(input.from);
-  if (senderRecipients.length > 0) {
-    return senderRecipients;
-  }
+  const sentByUser = (input.from ?? []).some(
+    (entry) => entry.email?.trim() && self.has(normalizeEmailAddress(entry.email)),
+  );
 
-  return collectUnique([...(input.to ?? []), ...(input.cc ?? [])]);
+  /** Reply-To wins over From, as in RFC 5322 and Proton; empty for the user's own message. */
+  const senderTargets = (): string[] => {
+    if (sentByUser) return [];
+    const replyTo = collect([input.replyTo]);
+    return replyTo.length > 0 ? replyTo : collect([input.from]);
+  };
+
+  return { collect, senderTargets };
+}
+
+/** Reply to Reply-To, else the sender, minus self; on your own message, fall back to its To + Cc so the conversation continues. */
+export function resolveReplyRecipients(input: ReplyRecipientsInput): string[] {
+  const { collect, senderTargets } = createReplyCollector(input);
+  const targets = senderTargets();
+  return targets.length > 0 ? targets : collect([input.to, input.cc]);
 }
 
 export type ReplyAllRecipients = {
@@ -312,44 +336,14 @@ export type ReplyAllRecipients = {
   cc: string[];
 };
 
-/** Reply all: To is the sender and Cc is To + Cc minus self and To; on your own message, To and Cc are kept minus self. */
-export function resolveReplyAllRecipients(input: {
-  from?: ReplyAddress[];
-  to?: ReplyAddress[];
-  cc?: ReplyAddress[];
-  currentUserEmail?: string | null;
-}): ReplyAllRecipients {
-  const currentUserEmail = input.currentUserEmail
-    ? normalizeEmailAddress(input.currentUserEmail)
-    : null;
-
-  const collectUnique = (entries: ReplyAddress[] | undefined): string[] => {
-    const seen = new Set<string>();
-    const list: string[] = [];
-    for (const entry of entries ?? []) {
-      const email = entry.email?.trim();
-      if (!email) continue;
-      const normalized = normalizeEmailAddress(email);
-      if (currentUserEmail && normalized === currentUserEmail) continue;
-      if (seen.has(normalized)) continue;
-      seen.add(normalized);
-      list.push(normalized);
-    }
-    return list;
-  };
-
-  const senderRecipients = collectUnique(input.from);
-  if (senderRecipients.length > 0) {
-    const to = senderRecipients;
-    const toSet = new Set(to);
-    const cc = collectUnique([...(input.to ?? []), ...(input.cc ?? [])]).filter(
-      (email) => !toSet.has(email),
-    );
-    return { to, cc };
-  }
-
-  return {
-    to: collectUnique(input.to),
-    cc: collectUnique(input.cc),
-  };
+/** Reply all: To is the reply target and Cc is To + Cc minus self, excluded addresses and To; on your own message, To and Cc are kept minus self. */
+export function resolveReplyAllRecipients(input: ReplyRecipientsInput): ReplyAllRecipients {
+  const { collect, senderTargets } = createReplyCollector(input);
+  const targets = senderTargets();
+  const to = targets.length > 0 ? targets : collect([input.to]);
+  const toSet = new Set(to);
+  const cc = collect(targets.length > 0 ? [input.to, input.cc] : [input.cc]).filter(
+    (email) => !toSet.has(email),
+  );
+  return { to, cc };
 }

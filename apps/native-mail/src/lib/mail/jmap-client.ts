@@ -34,6 +34,8 @@ import {
   destroyMailboxMessagesInBatches,
   type MailMailboxRestore,
   parseJmapBlobUploadResponse,
+  AUTH_RESULTS_JMAP_PROPERTY,
+  SIMPLELOGIN_JMAP_PROPERTIES,
   type MailServerPolicy,
   type MailServerPolicyConfig,
 } from "@workspace/calendar-core";
@@ -214,7 +216,8 @@ const EMAIL_GET_PROPERTIES = [
 
 const EMAIL_DETAIL_GET_PROPERTIES = [
   ...EMAIL_GET_PROPERTIES,
-  "header:Authentication-Results",
+  ...SIMPLELOGIN_JMAP_PROPERTIES,
+  AUTH_RESULTS_JMAP_PROPERTY,
 ] as const;
 
 /** Mailbox rows and thread grouping: metadata only, so the server never reads message blobs for them. */
@@ -1688,6 +1691,31 @@ export class StalwartJmapClient {
               [messageId]: {
                 [`keywords/label:${labelId}`]: assigned ? true : null,
               },
+            },
+          },
+          "c1",
+        ],
+      ],
+    );
+  }
+
+  async setMessageKeyword(
+    session: JmapSession,
+    messageId: string,
+    keyword: string,
+    enabled: boolean,
+  ): Promise<void> {
+    const accountId = this.requirePrimaryAccountId(session);
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/set",
+          {
+            accountId,
+            update: {
+              [messageId]: { [`keywords/${keyword}`]: enabled ? true : null },
             },
           },
           "c1",

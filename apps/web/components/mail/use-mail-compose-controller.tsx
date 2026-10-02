@@ -503,6 +503,7 @@ export function useMailComposeController({
     composeDraftId: state.draftId,
     clearCompose,
     composeMode: state.composeMode,
+    composeReplySource: state.composeReplyContext?.sourceMessage ?? null,
     quotedAttachments: state.quotedAttachments,
     openNewCompose,
     composeSessionId: state.composeSessionId,

@@ -34,11 +34,13 @@ import {
   formatDateTimeLabel,
   getErrorMessage,
   getPlainTextSignature,
+  getSimpleLoginReplyHints,
   hasComposeUserContent,
   hasPlainTextSignatureBlock,
   prependPlainTextSignature,
   replacePlainTextSignatureBlock,
-  resolveReplyFrom,
+  resolveMessageReplyFrom,
+  resolveMessageReplyRecipients,
   resolveReplyRecipients,
   shouldWarnAboutMissingAttachment,
   validateComposeRecipients,
@@ -627,7 +629,8 @@ function ComposeSession({
       isReplyLike && composeSettings.autoSelectReplyIdentity
         ? (identities.find(
             (entry) =>
-              entry.id === resolveReplyFrom(identities, sourceMessage)?.identityId,
+              entry.id ===
+              resolveMessageReplyFrom(identities, sourceMessage)?.identityId,
           ) ?? null)
         : null;
     if (autoIdentity) {
@@ -647,12 +650,19 @@ function ComposeSession({
     if (params.mode === "reply") {
       seedCompose({
         ...EMPTY_COMPOSE_FIELDS,
-        to: getReplyRecipients(sourceMessage, fromEmail),
+        to: resolveMessageReplyRecipients(sourceMessage, {
+          mode: "reply",
+          fromEmail,
+          identities,
+        }).to.join(", "),
         subject: prefixSubject(sourceMessage.subject, "Re:"),
         body: withSeedSignature(buildReplyBody(sourceMessage, dateOptions)),
       });
     } else if (params.mode === "reply-all") {
-      const fields = formatReplyAllRecipientFields(sourceMessage, fromEmail);
+      const fields = formatReplyAllRecipientFields(sourceMessage, {
+        fromEmail,
+        identities,
+      });
       seedCompose({
         ...EMPTY_COMPOSE_FIELDS,
         to: fields.to,
@@ -762,6 +772,20 @@ function ComposeSession({
     [cc, to],
   );
   const canChooseIdentity = Boolean(composeContext) && identities.length > 1;
+  const parsedRecipients = validateComposeInput({ to, cc, bcc, subject });
+  const simpleLoginHints =
+    sourceMessage && (params.mode === "reply" || params.mode === "reply-all")
+      ? getSimpleLoginReplyHints({
+          message: sourceMessage,
+          identities,
+          fromEmail: composeContext?.fromEmail,
+          recipients: [
+            ...parsedRecipients.to,
+            ...parsedRecipients.cc,
+            ...parsedRecipients.bcc,
+          ],
+        })
+      : [];
 
   return (
     <>
@@ -885,6 +909,12 @@ function ComposeSession({
                   ) : null}
                 </>
               ) : null}
+
+              {simpleLoginHints.map((hint) => (
+                <Text key={hint} style={styles.noticeText}>
+                  {hint}
+                </Text>
+              ))}
 
               <View style={styles.fieldRow}>
                 <Text style={styles.fieldLabel}>Subject</Text>
