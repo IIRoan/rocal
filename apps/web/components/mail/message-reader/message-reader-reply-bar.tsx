@@ -1,6 +1,7 @@
 "use client";
 
 import { Paperclip, Reply, Smile, X } from "lucide-react";
+import { getSimpleLoginForward } from "@workspace/calendar-core";
 import { Button } from "@workspace/ui/components/ui/button";
 import {
   Button as SolaceButton,
@@ -43,6 +44,7 @@ export function MessageReaderReplyBar({
   } = controller;
   const { onSendReply, onForward } = props;
   const { senderEmail, senderName } = view;
+  const simpleLoginAlias = getSimpleLoginForward(controller.message)?.alias;
 
   return (
     <div className="shrink-0">
@@ -73,13 +75,21 @@ export function MessageReaderReplyBar({
             }
           }}
         >
-          <div className="flex items-center gap-1.5 pb-1">
+          <div className="flex min-w-0 items-center gap-1.5 pb-1">
             <Reply className="size-3.5 shrink-0 text-[var(--icon-secondary)]" />
-            <span className="text-xs text-[var(--text-secondary)]">
+            <span className="min-w-0 truncate text-xs text-[var(--text-secondary)]">
               Reply to{" "}
               <span className="font-medium text-[var(--text-primary)]">
                 {senderName || senderEmail}
               </span>
+              {simpleLoginAlias ? (
+                <>
+                  {" "}as{" "}
+                  <span className="font-medium text-[var(--text-primary)]">
+                    {simpleLoginAlias}
+                  </span>
+                </>
+              ) : null}
             </span>
           </div>
           <textarea

@@ -1,4 +1,8 @@
-import type { MailServerLimits, TimeFormat } from "@workspace/calendar-core";
+import type {
+  MailServerLimits,
+  SimpleLoginActionMode,
+  TimeFormat,
+} from "@workspace/calendar-core";
 import type {
   JmapEmailMessage,
   JmapIdentity,
@@ -43,7 +47,7 @@ export interface MessageReaderProps {
   onMarkAsUnread: () => void;
   onToggleFlagged?: () => void;
   onSetLabel?: (labelId: string, assigned: boolean) => void;
-  onSimpleLoginAction?: (message: JmapEmailMessage) => void;
+  onSimpleLoginAction?: (message: JmapEmailMessage, mode?: SimpleLoginActionMode) => void;
   onCreateLabel?: (name: string, color: string) => Promise<LabelDef | null>;
   onUpdateLabel?: (
     labelId: string,

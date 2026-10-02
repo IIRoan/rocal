@@ -12,6 +12,7 @@ import { Feather, FontAwesome } from "@expo/vector-icons";
 import {
   enrichSelfMailRecipient,
   getSimpleLoginForward,
+  type SimpleLoginActionMode,
   type TimeFormat,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -29,8 +30,8 @@ import { BlobatarAvatar } from "@workspace/native-core/components/BlobatarAvatar
 import { MailAuthResultsBadge } from "./MailAuthResultsBadge";
 import { MailIdentityBadge } from "./MailIdentityBadge";
 import { MailLabelChip } from "./MailLabelChip";
-import { MailSimpleLoginBadge } from "./MailSimpleLoginBadge";
 import { MailSecurityIndicator } from "./MailSecurityIndicator";
+import { MailSimpleLoginRow } from "./MailSimpleLoginRow";
 import { RecipientLinkList, RecipientSheet } from "./RecipientSheet";
 import {
   MAIL_LAYOUT,
@@ -49,6 +50,8 @@ export type MailMessageHeaderProps = {
   isFlagged: boolean;
   starDisabled?: boolean;
   onToggleStar: () => void;
+  simpleLoginPending: boolean;
+  onSimpleLoginAction: (message: JmapEmailMessage, mode: SimpleLoginActionMode) => void;
   encryption: MessageEncryptionState;
   encryptedAtRest: boolean;
   signatureVerificationState?: MailSignatureVerificationState;
@@ -70,6 +73,8 @@ export function MailMessageHeader({
   isFlagged,
   starDisabled,
   onToggleStar,
+  simpleLoginPending,
+  onSimpleLoginAction,
   encryption,
   encryptedAtRest,
   signatureVerificationState,
@@ -185,6 +190,12 @@ export function MailMessageHeader({
             hasExpandableDetails={hasExpandableDetails}
             detailsOpen={detailsOpen}
             onToggle={() => setDetailsOpen((open) => !open)}
+          />
+          <MailSimpleLoginRow
+            message={message}
+            identities={identities}
+            pending={simpleLoginPending}
+            onRun={onSimpleLoginAction}
           />
         </View>
       </View>
@@ -347,19 +358,15 @@ function SenderName({
   message: JmapEmailMessage;
   identities: JmapIdentity[];
 }) {
-  const simpleLoginForward = getSimpleLoginForward(message);
   return (
     <View style={styles.senderNameRow}>
       <Text style={styles.senderName} numberOfLines={1}>
         {name}
       </Text>
       <MailIdentityBadge message={message} identities={identities} compact />
-      {simpleLoginForward ? (
-        <MailSimpleLoginBadge alias={simpleLoginForward.alias} />
-      ) : null}
       <MailAuthResultsBadge
         message={message}
-        simpleLoginForward={simpleLoginForward !== null}
+        simpleLoginForward={getSimpleLoginForward(message) !== null}
       />
     </View>
   );

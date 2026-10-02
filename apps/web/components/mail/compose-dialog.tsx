@@ -39,11 +39,16 @@ import { useIsMobile } from "@workspace/ui/hooks";
 import type { JmapIdentity } from "@/lib/mail/types";
 import {
   canSendCompose,
-  getSimpleLoginReplyHints,
+  getSimpleLoginComposeNotice,
   parsedAddressesToEmails,
   validateComposeRecipients,
   pickOutgoingAttachmentFiles,
+  type SimpleLoginComposeNotice,
 } from "@workspace/calendar-core";
+import {
+  ComposeSimpleLoginRequiredFromRow,
+  ComposeSimpleLoginViaRow,
+} from "./compose-simplelogin-rows";
 import { RichTextEditor, type InlineImageUpload } from "./rich-text-editor";
 import { RichTextEditorToolbar } from "./rich-text-editor-toolbar";
 import { RecipientSuggestInput } from "./recipient-suggest-input";
@@ -85,6 +90,8 @@ export interface ComposeDialogProps {
     session: JmapSession;
   } | null;
 }
+
+const NO_SIMPLELOGIN_NOTICE: SimpleLoginComposeNotice = { via: null, requiredFrom: null };
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -319,8 +326,8 @@ export function ComposeForm({
     bcc: composeBcc,
     subject: composeSubject,
   });
-  const simpleLoginHints = composeReplySource
-    ? getSimpleLoginReplyHints({
+  const simpleLoginNotice = composeReplySource
+    ? getSimpleLoginComposeNotice({
         message: composeReplySource,
         identities,
         fromEmail,
@@ -330,7 +337,7 @@ export function ComposeForm({
           ...recipientValidation.bcc,
         ]),
       })
-    : [];
+    : NO_SIMPLELOGIN_NOTICE;
   const showToError =
     toTouched &&
     composeTo.trim().length > 0 &&
@@ -594,6 +601,15 @@ export function ComposeForm({
           )}
       </div>
 
+      {simpleLoginNotice.requiredFrom && (
+        <ComposeSimpleLoginRequiredFromRow
+          requiredFrom={simpleLoginNotice.requiredFrom}
+          isMobile={isMobile}
+          disabled={isBusy}
+          onSwitch={setSelectedIdentityId}
+        />
+      )}
+
       <div
         className={`flex items-center border-b shrink-0 transition-colors ${
           isMobile ? "h-9 gap-2 px-3" : "h-10 gap-3 px-4"
@@ -705,16 +721,8 @@ export function ComposeForm({
         </div>
       )}
 
-      {simpleLoginHints.length > 0 && (
-        <div
-          className={`flex shrink-0 flex-col gap-0.5 border-b border-border/50 py-2 text-[11px] text-muted-foreground ${
-            isMobile ? "px-3" : "px-4"
-          }`}
-        >
-          {simpleLoginHints.map((hint) => (
-            <p key={hint}>{hint}</p>
-          ))}
-        </div>
+      {simpleLoginNotice.via && (
+        <ComposeSimpleLoginViaRow via={simpleLoginNotice.via} isMobile={isMobile} />
       )}
 
       <div

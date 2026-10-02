@@ -34,7 +34,7 @@ import {
   formatDateTimeLabel,
   getErrorMessage,
   getPlainTextSignature,
-  getSimpleLoginReplyHints,
+  getSimpleLoginComposeNotice,
   hasComposeUserContent,
   hasPlainTextSignatureBlock,
   prependPlainTextSignature,
@@ -47,6 +47,7 @@ import {
   resolveComposeSendBodies,
   messageBodiesToComposeText,
   type ComposeTextFields,
+  type SimpleLoginComposeNotice,
   type TimeFormat,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -773,9 +774,9 @@ function ComposeSession({
   );
   const canChooseIdentity = Boolean(composeContext) && identities.length > 1;
   const parsedRecipients = validateComposeInput({ to, cc, bcc, subject });
-  const simpleLoginHints =
+  const simpleLoginNotice =
     sourceMessage && (params.mode === "reply" || params.mode === "reply-all")
-      ? getSimpleLoginReplyHints({
+      ? getSimpleLoginComposeNotice({
           message: sourceMessage,
           identities,
           fromEmail: composeContext?.fromEmail,
@@ -785,7 +786,7 @@ function ComposeSession({
             ...parsedRecipients.bcc,
           ],
         })
-      : [];
+      : NO_SIMPLELOGIN_NOTICE;
 
   return (
     <>
@@ -910,11 +911,39 @@ function ComposeSession({
                 </>
               ) : null}
 
-              {simpleLoginHints.map((hint) => (
-                <Text key={hint} style={styles.noticeText}>
-                  {hint}
-                </Text>
-              ))}
+              {simpleLoginNotice.via ? (
+                <View style={styles.fieldRow}>
+                  <Text style={styles.fieldLabel}>Via</Text>
+                  <Feather name="shuffle" size={14} color={skin.textTertiary} />
+                  <View style={styles.fieldValueStack}>
+                    <Text style={styles.viaAlias} numberOfLines={1} ellipsizeMode="middle">
+                      {simpleLoginNotice.via.alias}
+                    </Text>
+                    <Text style={styles.noticeInline} numberOfLines={2}>
+                      {simpleLoginNotice.via.detail}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {simpleLoginNotice.requiredFrom ? (
+                <Pressable
+                  style={({ pressed }) => [styles.fieldRow, pressed && styles.pressed]}
+                  onPress={() => {
+                    if (simpleLoginNotice.requiredFrom) {
+                      handleSelectIdentity(simpleLoginNotice.requiredFrom.identityId);
+                    }
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${simpleLoginNotice.requiredFrom.detail} Switch From.`}
+                >
+                  <Feather name="alert-circle" size={14} color={theme.colors.destructive} />
+                  <Text style={styles.requiredFromText}>
+                    {simpleLoginNotice.requiredFrom.detail}
+                  </Text>
+                  <Text style={styles.requiredFromAction}>Switch From</Text>
+                </Pressable>
+              ) : null}
 
               <View style={styles.fieldRow}>
                 <Text style={styles.fieldLabel}>Subject</Text>
@@ -991,6 +1020,8 @@ function ComposeSession({
 }
 
 const NO_IDENTITIES: JmapIdentity[] = [];
+
+const NO_SIMPLELOGIN_NOTICE: SimpleLoginComposeNotice = { via: null, requiredFrom: null };
 
 const EMPTY_COMPOSE_FIELDS: ComposeTextFields = {
   to: "",
@@ -1128,6 +1159,12 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: skin.borderTertiary,
     },
+    fieldValueStack: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+      paddingVertical: theme.spacing["2"],
+    },
     ccToggleHit: {
       width: LAYOUT_METRICS.hitSize,
       height: LAYOUT_METRICS.hitSize,
@@ -1165,6 +1202,22 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       paddingVertical: theme.spacing["2"],
       fontSize: skin.body.fontSize,
       color: theme.colors.foreground,
+    },
+    viaAlias: {
+      fontSize: skin.body.fontSize,
+      color: theme.colors.foreground,
+    },
+    requiredFromText: {
+      ...skin.meta,
+      flex: 1,
+      minWidth: 0,
+      paddingVertical: theme.spacing["2"],
+      color: theme.colors.destructive,
+    },
+    requiredFromAction: {
+      ...skin.meta,
+      fontWeight: "500" as TextStyle["fontWeight"],
+      color: theme.colors.primaryBase,
     },
     noticeInline: {
       ...skin.meta,

@@ -6,6 +6,7 @@ import {
   resolveAttachmentPreviewKind,
   resolveMarkAsReadDelayMs,
   type MailAttachmentPreviewKind,
+  type SimpleLoginActionMode,
 } from "@workspace/calendar-core";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
 import { useMailCompose } from "../providers/MailComposeProvider";
@@ -313,9 +314,14 @@ export function useMailMessageActions({
     setMessageLabel.mutate({ messageId: message.id, labelId, assigned });
   };
 
-  const handleSimpleLoginAction = (target: JmapEmailMessage) => {
-    simpleLoginAction.mutate(target, {
-      onSuccess: (action) => toast(action.doneLabel, "success"),
+  const handleSimpleLoginAction = (
+    target: JmapEmailMessage,
+    mode: SimpleLoginActionMode,
+  ) => {
+    simpleLoginAction.mutate({ message: target, mode }, {
+      onSuccess: (result) => {
+        if (result.mode === "run") toast(result.action.doneLabel, "success");
+      },
       onError: (error) =>
         toast(getErrorMessage(error, "Could not reach SimpleLogin."), "error"),
     });
