@@ -18,7 +18,6 @@ import { MessageReaderTitle } from "./message-reader-title";
 import { MessageReaderHeader } from "./message-reader-header";
 import { MessageReaderConversationStrip } from "./message-reader-conversation-strip";
 import { MessageReaderCalendarCards } from "./message-reader-calendar-cards";
-import { MessageReaderSimpleLoginBanner } from "./message-reader-simplelogin";
 import { MessageReaderBody } from "./message-reader-body";
 import { MessageReaderReplyBar } from "./message-reader-reply-bar";
 
@@ -72,7 +71,6 @@ export function MessageReaderShell({
       />
       <article className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         <MessageReaderHeader controller={controller} view={view} />
-        <MessageReaderSimpleLoginBanner controller={controller} />
         <MessageReaderCalendarCards controller={controller} view={view} />
         <div className="flex min-h-0 flex-1 flex-col">
           <MessageReaderBody controller={controller} view={view} />
