@@ -109,6 +109,8 @@ HAProxy routes to **blue** or **green** frps ports based on
 | blue  | 10025          | 18080           |
 | green | 11025          | 19080           |
 
+The DATA stage on port 25 runs the system Sieve script [`stalwart/sieve/solace-simplelogin.sieve`](stalwart/sieve/solace-simplelogin.sieve). It strips any `X-Solace-*` markers. For DKIM-verified SimpleLogin forwards it puts the original sender in From, the reverse alias in Reply-To, and adds `X-Solace-SimpleLogin: forward` for the apps. The plan embeds the file in `30-mta.ndjson`, and `tests/test_simplelogin_sieve.py` keeps them in sync. To roll back, set the `MtaStageData` `then` to `"false"`. Deleting the line does not reset it, because `update` only patches.
+
 ## Outbound mail (Solace / JMAP → Internet)
 
 Railway **blocks outbound SMTP ports** (25, 587, 465). Outbound mail uses an
