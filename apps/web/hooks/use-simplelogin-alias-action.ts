@@ -5,6 +5,7 @@ import {
   getSimpleLoginForward,
   resolveMessageReplyFrom,
   SIMPLELOGIN_DONE_KEYWORD,
+  type SimpleLoginActionMode,
 } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import {
@@ -27,20 +28,28 @@ export function useSimpleLoginAliasAction({
   ) => void;
 }) {
   return useCallback(
-    async (message: JmapEmailMessage) => {
+    async (message: JmapEmailMessage, mode: SimpleLoginActionMode = "run") => {
       const action = getSimpleLoginForward(message)?.action;
       if (!activeMailbox || !action) return;
       const { client, session, identities, mailboxes } = activeMailbox;
 
-      if (action.target.type === "https") {
-        window.open(action.target.url, "_blank", "noopener,noreferrer");
-        patchMessageKeyword(message, SIMPLELOGIN_DONE_KEYWORD, true);
+      const openAndMark = async (url: string, done: boolean) => {
+        window.open(url, "_blank", "noopener,noreferrer");
+        patchMessageKeyword(message, SIMPLELOGIN_DONE_KEYWORD, done);
         try {
-          await client.setMessageKeyword(session, message.id, SIMPLELOGIN_DONE_KEYWORD, true);
+          await client.setMessageKeyword(session, message.id, SIMPLELOGIN_DONE_KEYWORD, done);
         } catch (error) {
-          log.error("Failed to mark SimpleLogin action done", error);
-          patchMessageKeyword(message, SIMPLELOGIN_DONE_KEYWORD, false);
+          log.error("Failed to update SimpleLogin action state", error);
+          patchMessageKeyword(message, SIMPLELOGIN_DONE_KEYWORD, !done);
         }
+      };
+
+      if (mode === "undo") {
+        if (action.undo) await openAndMark(action.undo.url, false);
+        return;
+      }
+      if (action.target.type === "https") {
+        await openAndMark(action.target.url, true);
         return;
       }
 

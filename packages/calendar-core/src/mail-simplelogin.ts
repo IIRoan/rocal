@@ -28,9 +28,20 @@ export const SIMPLELOGIN_DONE_KEYWORD = "$unsubscribed";
 
 export type SimpleLoginActionKind = "alias-disable" | "contact-block" | "unsubscribe";
 
+export type SimpleLoginActionMode = "run" | "undo";
+
 export type SimpleLoginActionTarget =
   | { type: "mailto"; to: string; subject: string; body: string }
   | { type: "https"; url: string };
+
+/** SimpleLogin has no email command to reverse an action, so undo opens its dashboard. */
+export type SimpleLoginUndo = {
+  label: string;
+  confirmTitle: string;
+  confirmMessage: string;
+  confirmLabel: string;
+  url: string;
+};
 
 export type SimpleLoginAction = {
   kind: SimpleLoginActionKind;
@@ -40,6 +51,7 @@ export type SimpleLoginAction = {
   confirmTitle: string;
   confirmMessage: string;
   target: SimpleLoginActionTarget;
+  undo: SimpleLoginUndo | null;
 };
 
 export type SimpleLoginForward = {
@@ -47,9 +59,26 @@ export type SimpleLoginForward = {
   action: SimpleLoginAction | null;
 };
 
+const UNDO_COPY: Partial<Record<SimpleLoginActionKind, Omit<SimpleLoginUndo, "url">>> = {
+  "alias-disable": {
+    label: "Turn back on",
+    confirmTitle: "Turn this alias back on?",
+    confirmMessage:
+      "SimpleLogin only turns aliases back on from its dashboard. This opens it with the alias selected so you can switch it on.",
+    confirmLabel: "Open SimpleLogin",
+  },
+  "contact-block": {
+    label: "Unblock",
+    confirmTitle: "Unblock this sender?",
+    confirmMessage:
+      "SimpleLogin only unblocks senders from its dashboard. This opens it so you can unblock them in the alias's contacts.",
+    confirmLabel: "Open SimpleLogin",
+  },
+};
+
 const ACTION_COPY: Record<
   SimpleLoginActionKind,
-  Omit<SimpleLoginAction, "kind" | "target">
+  Omit<SimpleLoginAction, "kind" | "target" | "undo">
 > = {
   "alias-disable": {
     label: "Disable alias",
@@ -87,6 +116,23 @@ function emailDomain(email: string): string {
 export function isSimpleLoginReverseAlias(email: string | null | undefined): boolean {
   if (!email) return false;
   return emailDomain(normalizeEmailAddress(email)) === SIMPLELOGIN_REVERSE_ALIAS_DOMAIN;
+}
+
+function senderLabel(from: HeaderAddress[] | null | undefined): string {
+  const sender = from?.[0];
+  return sender?.name?.trim() || sender?.email?.trim() || "The sender";
+}
+
+/** Reader notice for a verified forward: what the sender sees and where it was sent. */
+export function getSimpleLoginForwardNotice(
+  forward: SimpleLoginForward,
+  from: HeaderAddress[] | null | undefined,
+): { label: string; alias: string | null; detail: string } {
+  return {
+    label: "Sent to your SimpleLogin alias",
+    alias: forward.alias,
+    detail: `${senderLabel(from)} only sees the alias. Replies go back through SimpleLogin.`,
+  };
 }
 
 function safeDecode(value: string): string | null {
@@ -135,6 +181,55 @@ function parseHttpsTarget(url: string): SimpleLoginActionTarget | null {
   return { type: "https", url };
 }
 
+const SIMPLELOGIN_DASHBOARD_URL = `https://${SIMPLELOGIN_APP_HOST}/dashboard/`;
+const UNSUBSCRIBE_DISABLE_ALIAS = 2;
+
+/** SimpleLogin signs but does not encrypt its `un.<base64url JSON [action, id]>.<signature>` subject. */
+function decodeUnsubscribeSubject(subject: string): { action: number; id: number } | null {
+  const encoded = subject.match(/^un\.([A-Za-z0-9_-]+)\./)?.[1];
+  if (!encoded) return null;
+  try {
+    const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const payload: unknown = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")));
+    if (
+      Array.isArray(payload) &&
+      typeof payload[0] === "number" &&
+      Number.isSafeInteger(payload[1]) &&
+      payload[1] > 0
+    ) {
+      return { action: payload[0], id: payload[1] };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function disabledAliasId(target: SimpleLoginActionTarget): number | null {
+  if (target.type === "mailto") {
+    const decoded = decodeUnsubscribeSubject(target.subject);
+    return decoded?.action === UNSUBSCRIBE_DISABLE_ALIAS ? decoded.id : null;
+  }
+  const id = target.url.match(/\/dashboard\/unsubscribe\/(\d+)(?:[/?#]|$)/)?.[1];
+  return id ? Number(id) : null;
+}
+
+function resolveUndo(
+  kind: SimpleLoginActionKind,
+  target: SimpleLoginActionTarget,
+  alias: string | null,
+): SimpleLoginUndo | null {
+  const copy = UNDO_COPY[kind];
+  if (!copy) return null;
+  const aliasId = kind === "alias-disable" ? disabledAliasId(target) : null;
+  const url = aliasId
+    ? `${SIMPLELOGIN_DASHBOARD_URL}?highlight_alias_id=${aliasId}`
+    : alias
+      ? `${SIMPLELOGIN_DASHBOARD_URL}?query=${encodeURIComponent(alias)}`
+      : SIMPLELOGIN_DASHBOARD_URL;
+  return { ...copy, url };
+}
+
 function resolveActionKind(behaviour: string | null | undefined): SimpleLoginActionKind {
   const normalized = behaviour?.trim().toLowerCase();
   if (normalized === "alias-disable") return "alias-disable";
@@ -166,7 +261,9 @@ export function getSimpleLoginForward(
   const kind = resolveActionKind(message["header:X-SimpleLogin-Unsub-Behaviour:asText"]);
   return {
     alias,
-    action: target ? { kind, ...ACTION_COPY[kind], target } : null,
+    action: target
+      ? { kind, ...ACTION_COPY[kind], target, undo: resolveUndo(kind, target, alias) }
+      : null,
   };
 }
 
@@ -197,11 +294,9 @@ export function getSimpleLoginReplyNotice(input: {
   const reverseAliasCount = input.recipients.filter(isSimpleLoginReverseAlias).length;
   if (reverseAliasCount === 0) return none;
 
-  const sender = input.message.from?.[0];
-  const senderLabel = sender?.name?.trim() || sender?.email?.trim() || "The sender";
   const replyingThrough =
     forward.alias && reverseAliasCount === input.recipients.length
-      ? { sender: senderLabel, alias: forward.alias }
+      ? { sender: senderLabel(input.message.from), alias: forward.alias }
       : null;
 
   const receiving = input.receivingEmail ? normalizeEmailAddress(input.receivingEmail) : null;

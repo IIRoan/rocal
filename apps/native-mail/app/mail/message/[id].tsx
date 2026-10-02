@@ -49,7 +49,6 @@ import { MailAttachmentCards } from "../../../src/components/mail/MailAttachment
 import { MailReaderHeader } from "../../../src/components/mail/MailReaderHeader";
 import { MailMessageHeader } from "../../../src/components/mail/MailMessageHeader";
 import { MailMessageBody } from "../../../src/components/mail/MailMessageBody";
-import { MailSimpleLoginBanner } from "../../../src/components/mail/MailSimpleLoginBanner";
 import { openCalendarEvent } from "../../../src/lib/open-calendar-event";
 import { MailMessageActionsSheet } from "../../../src/components/mail/MailMessageActionsSheet";
 import { useRecentContacts } from "@workspace/native-core/hooks/use-recent-contacts";
@@ -191,6 +190,8 @@ export default function MailMessageScreen() {
                 isFlagged={actions.isFlagged}
                 starDisabled={actions.isStarPending}
                 onToggleStar={actions.handleToggleStar}
+                simpleLoginPending={actions.isSimpleLoginPending}
+                onSimpleLoginAction={actions.handleSimpleLoginAction}
                 encryption={content.encryption}
                 encryptedAtRest={Boolean(runtime?.encryptedAtRest)}
                 signatureVerificationState={
@@ -199,13 +200,6 @@ export default function MailMessageScreen() {
                 decryptionFailed={Boolean(content.decryptError)}
                 timeFormat={timeFormat}
                 timezone={userSettings?.timezone}
-              />
-
-              <MailSimpleLoginBanner
-                message={message}
-                identities={runtime?.identities ?? []}
-                pending={actions.isSimpleLoginPending}
-                onRun={actions.handleSimpleLoginAction}
               />
 
               {content.isConversationLoading ? (

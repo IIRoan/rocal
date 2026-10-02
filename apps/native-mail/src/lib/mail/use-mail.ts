@@ -23,6 +23,7 @@ import {
   resolveMessageReplyFrom,
   shouldEncryptOutgoingMail,
   SIMPLELOGIN_DONE_KEYWORD,
+  type SimpleLoginActionMode,
 } from "@workspace/calendar-core";
 import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
 import { MAILBOX_MESSAGES_PAGE_SIZE } from "./mail-pagination";
@@ -628,7 +629,7 @@ export function resolveComposeContext(
   };
 }
 
-/** Runs a SimpleLogin forward's alias action and marks the message as done. */
+/** Runs or undoes a SimpleLogin forward's alias action and keeps the message's done keyword in sync. */
 export function useSimpleLoginAliasAction(runtime: MailRuntime | undefined) {
   const queryClient = useQueryClient();
   const setDone = (messageId: string, done: boolean) => {
@@ -643,10 +644,27 @@ export function useSimpleLoginAliasAction(runtime: MailRuntime | undefined) {
   };
 
   return useMutation({
-    mutationFn: async (message: JmapEmailMessage) => {
+    mutationFn: async ({
+      message,
+      mode,
+    }: {
+      message: JmapEmailMessage;
+      mode: SimpleLoginActionMode;
+    }) => {
       const action = getSimpleLoginForward(message)?.action;
       if (!runtime || !action) {
         throw new Error("Your mailbox is not connected.");
+      }
+      if (mode === "undo") {
+        if (!action.undo) throw new Error("SimpleLogin can't undo this here.");
+        await runtime.client.setMessageKeyword(
+          runtime.session,
+          message.id,
+          SIMPLELOGIN_DONE_KEYWORD,
+          false,
+        );
+        await WebBrowser.openBrowserAsync(action.undo.url);
+        return { action, mode };
       }
       if (action.target.type === "https") {
         await WebBrowser.openBrowserAsync(action.target.url);
@@ -674,10 +692,10 @@ export function useSimpleLoginAliasAction(runtime: MailRuntime | undefined) {
       await runtime.client
         .setMessageKeyword(runtime.session, message.id, SIMPLELOGIN_DONE_KEYWORD, true)
         .catch(() => undefined);
-      return action;
+      return { action, mode };
     },
-    onMutate: (message) => setDone(message.id, true),
-    onError: (_error, message) => setDone(message.id, false),
+    onMutate: ({ message, mode }) => setDone(message.id, mode === "run"),
+    onError: (_error, { message, mode }) => setDone(message.id, mode !== "run"),
   });
 }
 

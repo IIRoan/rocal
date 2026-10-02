@@ -3,12 +3,13 @@ import { describe, expect, it } from "@jest/globals";
 import {
   getDeliveredToAddresses,
   getSimpleLoginForward,
+  getSimpleLoginForwardNotice,
   getSimpleLoginReplyNotice,
   isSimpleLoginReverseAlias,
   type MailSimpleLoginFields,
 } from "../mail-simplelogin";
 import {
-  getSimpleLoginReplyHints,
+  getSimpleLoginComposeNotice,
   resolveMessageReplyFrom,
   resolveMessageReplyRecipients,
 } from "../mail-reply-identity";
@@ -122,6 +123,51 @@ describe("getSimpleLoginForward", () => {
     });
   });
 
+  it("links undo to the dashboard with the alias id from the signed subject", () => {
+    expect(getSimpleLoginForward(forwardMessage())?.action?.undo).toMatchObject({
+      label: "Turn back on",
+      url: "https://app.simplelogin.io/dashboard/?highlight_alias_id=13743602",
+    });
+    const https = getSimpleLoginForward(
+      forwardMessage({
+        "header:List-Unsubscribe:asURLs": ["https://app.simplelogin.io/dashboard/unsubscribe/42"],
+      }),
+    );
+    expect(https?.action?.undo?.url).toBe(
+      "https://app.simplelogin.io/dashboard/?highlight_alias_id=42",
+    );
+  });
+
+  it("falls back to an alias search when the alias id is unreadable", () => {
+    const pickUndoUrl = (subject: string) =>
+      getSimpleLoginForward(
+        forwardMessage({
+          "header:List-Unsubscribe:asURLs": [
+            `mailto:unsubscribe@simplelogin.co?subject=${subject}`,
+          ],
+        }),
+      )?.action?.undo?.url;
+    const search =
+      "https://app.simplelogin.io/dashboard/?query=shop.abc%40alias.example.net";
+    expect(pickUndoUrl("un.not-json.sig")).toBe(search);
+    expect(pickUndoUrl("un.WzMsIDk5XQ.sig")).toBe(search);
+    expect(pickUndoUrl("Unsubscribe")).toBe(search);
+  });
+
+  it("offers unblock for blocked senders and no undo for plain unsubscribes", () => {
+    const block = getSimpleLoginForward(
+      forwardMessage({ "header:X-SimpleLogin-Unsub-Behaviour:asText": "contact-block" }),
+    );
+    expect(block?.action?.undo).toMatchObject({
+      label: "Unblock",
+      url: "https://app.simplelogin.io/dashboard/?query=shop.abc%40alias.example.net",
+    });
+    const other = getSimpleLoginForward(
+      forwardMessage({ "header:X-SimpleLogin-Unsub-Behaviour:asText": null }),
+    );
+    expect(other?.action?.undo).toBeNull();
+  });
+
   it("reports no action when List-Unsubscribe is missing", () => {
     expect(
       getSimpleLoginForward(forwardMessage({ "header:List-Unsubscribe:asURLs": null })),
@@ -227,34 +273,53 @@ describe("getSimpleLoginReplyNotice", () => {
   });
 });
 
-describe("getSimpleLoginReplyHints", () => {
+describe("getSimpleLoginComposeNotice", () => {
   const identities = [
     { id: "me", email: "me@solace.onl" },
     { id: "other", email: "other@solace.onl" },
   ];
 
-  it("names the alias the sender sees and the mailbox SimpleLogin requires", () => {
+  it("names the alias the sender sees and the identity SimpleLogin requires", () => {
     expect(
-      getSimpleLoginReplyHints({
+      getSimpleLoginComposeNotice({
         message: forwardMessage(),
         identities,
         fromEmail: "other@solace.onl",
         recipients: [REVERSE_ALIAS],
       }),
-    ).toEqual([
-      "Replying through SimpleLogin. Example Shop sees shop.abc@alias.example.net, not your address.",
-      "SimpleLogin only accepts replies from me@solace.onl.",
-    ]);
+    ).toEqual({
+      via: {
+        alias: "shop.abc@alias.example.net",
+        detail: "Example Shop sees this alias, not your address.",
+      },
+      requiredFrom: {
+        identityId: "me",
+        email: "me@solace.onl",
+        detail: "SimpleLogin only accepts replies from me@solace.onl.",
+      },
+    });
   });
 
   it("is empty for ordinary replies", () => {
     expect(
-      getSimpleLoginReplyHints({
+      getSimpleLoginComposeNotice({
         message: forwardMessage({ "header:X-Solace-SimpleLogin:asText": null }),
         identities,
         fromEmail: "me@solace.onl",
         recipients: [REVERSE_ALIAS],
       }),
-    ).toEqual([]);
+    ).toEqual({ via: null, requiredFrom: null });
+  });
+});
+
+describe("getSimpleLoginForwardNotice", () => {
+  it("names the alias and the sender", () => {
+    const message = forwardMessage();
+    const forward = getSimpleLoginForward(message);
+    expect(forward && getSimpleLoginForwardNotice(forward, message.from)).toEqual({
+      label: "Sent to your SimpleLogin alias",
+      alias: "shop.abc@alias.example.net",
+      detail: "Example Shop only sees the alias. Replies go back through SimpleLogin.",
+    });
   });
 });

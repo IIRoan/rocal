@@ -178,30 +178,44 @@ export function resolveMessageReplyFrom(
   });
 }
 
-/** Compose hints for replies to a verified SimpleLogin forward; empty otherwise. */
-export function getSimpleLoginReplyHints(input: {
+export type SimpleLoginComposeNotice = {
+  /** Alias the recipient sees instead of the user's address. */
+  via: { alias: string; detail: string } | null;
+  /** Identity SimpleLogin accepts the reply from, set when the chosen From differs. */
+  requiredFrom: { identityId: string; email: string; detail: string } | null;
+};
+
+/** Compose notice for replies to a verified SimpleLogin forward; both parts null otherwise. */
+export function getSimpleLoginComposeNotice(input: {
   message: ReplySourceMessage;
   identities: readonly ReplyIdentity[];
   fromEmail: string | null | undefined;
   recipients: readonly string[];
-}): string[] {
+}): SimpleLoginComposeNotice {
   const receivingId = resolveMessageReplyFrom(input.identities, input.message)?.identityId;
+  const receiving = input.identities.find((identity) => identity.id === receivingId);
   const notice = getSimpleLoginReplyNotice({
     message: input.message,
     recipients: input.recipients,
     fromEmail: input.fromEmail,
-    receivingEmail: input.identities.find((identity) => identity.id === receivingId)?.email,
+    receivingEmail: receiving?.email,
   });
-  const hints: string[] = [];
-  if (notice.replyingThrough) {
-    hints.push(
-      `Replying through SimpleLogin. ${notice.replyingThrough.sender} sees ${notice.replyingThrough.alias}, not your address.`,
-    );
-  }
-  if (notice.requiredFrom) {
-    hints.push(`SimpleLogin only accepts replies from ${notice.requiredFrom}.`);
-  }
-  return hints;
+  return {
+    via: notice.replyingThrough
+      ? {
+          alias: notice.replyingThrough.alias,
+          detail: `${notice.replyingThrough.sender} sees this alias, not your address.`,
+        }
+      : null,
+    requiredFrom:
+      notice.requiredFrom && receiving
+        ? {
+            identityId: receiving.id,
+            email: notice.requiredFrom,
+            detail: `SimpleLogin only accepts replies from ${notice.requiredFrom}.`,
+          }
+        : null,
+  };
 }
 
 /** Reply or reply-all recipients, never including the user's identities or the SimpleLogin alias. */

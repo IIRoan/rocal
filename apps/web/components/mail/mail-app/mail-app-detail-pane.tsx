@@ -128,7 +128,7 @@ export function MailAppDetailPane({
                   )
                 : undefined
             }
-            onSimpleLoginAction={(message) => void handleSimpleLoginAction(message)}
+            onSimpleLoginAction={(message, mode) => void handleSimpleLoginAction(message, mode)}
             onCreateLabel={(name, color) => handleCreateLabel(name, color)}
             onUpdateLabel={(id, updates) => void handleUpdateLabel(id, updates)}
             onDeleteLabel={(id) => void handleDeleteLabel(id)}
