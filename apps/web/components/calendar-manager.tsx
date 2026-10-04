@@ -248,7 +248,7 @@ export function CalendarManager({
               className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus-visible:bg-accent/50 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 transition-colors"
             >
               <Globe className="size-4 text-muted-foreground shrink-0" />
-              <span className="text-sm">Public & External Feeds</span>
+              <span className="text-sm">Public &amp; External Feeds</span>
               <ChevronRight className="ml-auto size-3.5 text-muted-foreground/40 shrink-0" />
             </button>
 

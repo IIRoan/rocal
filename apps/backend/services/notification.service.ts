@@ -101,7 +101,7 @@ export class NotificationService implements INotificationService {
       };
     }
 
-    const notifications = await this.prisma.$queryRaw<NotificationRow[]>`
+    const notifications = (await this.prisma.$queryRaw`
       SELECT
         en.id,
         en.event_id AS "eventId",
@@ -119,7 +119,7 @@ export class NotificationService implements INotificationService {
       WHERE en.event_id = ${eventId}
         AND ce.user_id = ${userId}
       ORDER BY en.notification_type ASC, en.minutes_before ASC
-    `;
+    `) as NotificationRow[];
 
     return {
       success: true,

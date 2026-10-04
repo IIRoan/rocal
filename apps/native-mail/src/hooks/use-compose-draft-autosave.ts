@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { composeTextToHtml, hasComposeFormatting } from "@workspace/calendar-core";
+import { sanitizeContext } from "@workspace/calendar-core/report-redaction";
 import { createLogger } from "@workspace/logger";
 import { getPrimaryMailboxId } from "../lib/mail/mail-helpers";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
@@ -125,7 +126,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       setTimeout(() => input.setDraftSaveStatus("idle"), 2000);
       return { status: "saved", draftId: savedDraftId };
     } catch (error) {
-      log.error("Failed to auto-save draft", error);
+      log.error("Failed to auto-save draft", sanitizeContext({ error }));
       input.setDraftSaveStatus("error");
       setTimeout(() => input.setDraftSaveStatus("idle"), 3000);
       return { status: "failed" };

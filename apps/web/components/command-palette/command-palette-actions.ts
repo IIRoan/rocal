@@ -1,6 +1,7 @@
 import { createLogger } from "@workspace/logger";
 import type { QueryClient } from "@tanstack/react-query";
 import { solaceProfileImageQueryKey } from "@workspace/calendar-core";
+import { sanitizeContext } from "@workspace/calendar-core/report-redaction";
 import type { UpdateSettingsRequest, UserSettings } from "@/lib/types/calendar";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { authClient, signOut } from "@/lib/auth-client";
@@ -41,7 +42,7 @@ export async function persistSettingsUpdate(input: {
     await input.updateSettings(toUpdateSettingsRequest(input.next));
     return { ok: true };
   } catch (err) {
-    log.error("Failed to save settings:", err);
+    log.error("Failed to save settings", sanitizeContext({ error: err }));
     return { ok: false };
   }
 }
@@ -53,7 +54,7 @@ export async function persistSettingsReset(input: {
     await input.resetSettings();
     return { ok: true };
   } catch (err) {
-    log.error("Failed to reset settings:", err);
+    log.error("Failed to reset settings", sanitizeContext({ error: err }));
     return { ok: false };
   }
 }
@@ -71,7 +72,7 @@ export async function persistAccountDeletion(input: {
     }
     return { ok: true };
   } catch (err) {
-    log.error("Failed to delete account:", err);
+    log.error("Failed to delete account", sanitizeContext({ error: err }));
     return { ok: false };
   }
 }
@@ -93,7 +94,7 @@ export async function persistPasswordChange(input: {
     }
     return { ok: true };
   } catch (error) {
-    log.error("Failed to change password:", error);
+    log.error("Failed to change password", sanitizeContext({ error }));
     return { ok: false, error };
   }
 }
@@ -114,7 +115,7 @@ export async function persistPasswordSet(input: {
     await input.refetchAccounts?.();
     return { ok: true };
   } catch (error) {
-    log.error("Failed to set password:", error);
+    log.error("Failed to set password", sanitizeContext({ error }));
     return { ok: false, error };
   }
 }
@@ -136,7 +137,7 @@ export async function persistEncryptionPasswordReset(input: {
     }
     return { ok: true };
   } catch (error) {
-    log.error("Failed to reset encryption password:", error);
+    log.error("Failed to reset encryption password", sanitizeContext({ error }));
     return { ok: false, error };
   }
 }
@@ -161,7 +162,7 @@ export async function persistProfileUpdate(input: {
     });
     return { ok: true, image };
   } catch (error) {
-    log.error("Failed to update profile:", error);
+    log.error("Failed to update profile", sanitizeContext({ error }));
     return { ok: false, error };
   }
 }
