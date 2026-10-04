@@ -162,7 +162,7 @@ export function MobileEventCalendar({
     startTime.setMilliseconds(0);
 
     onEventEdit?.({
-      id: undefined as unknown as string,
+      id: "",
       title: "",
       start: startTime,
       end: addMinutesToDate(startTime, defaultEventDuration),

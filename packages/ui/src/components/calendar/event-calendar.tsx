@@ -220,7 +220,7 @@ export function EventCalendar({
     startTime.setMilliseconds(0);
 
     const newEvent: CalendarEvent = {
-      id: undefined as unknown as string,
+      id: "",
       title: "",
       start: startTime,
       end: addMinutesToDate(startTime, defaultEventDuration),

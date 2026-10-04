@@ -15,7 +15,9 @@ export const mailQueryKeys = {
     [...mailQueryKeys.all, "syncedSettings", userId] as const,
 } as const;
 
+import type { JmapEmailMessage } from "@/lib/mail/types";
+
 export type MailMailboxMessagesCache = {
-  messages: import("@/lib/mail/types").JmapEmailMessage[];
+  messages: JmapEmailMessage[];
   total: number;
 };

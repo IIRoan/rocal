@@ -92,10 +92,7 @@ export function getMonthQueryKey(month: string | null) {
   return [...EVENTS_QUERY_KEY, month] as const;
 }
 
-/**
- * Validate, deduplicate, and filter events to those intersecting `range`.
- * Ensures dates are proper Date objects and drops malformed entries.
- */
+/** Validate, deduplicate, and keep events intersecting `range`, dropping entries without proper Date objects. */
 function validateAndCleanEvents(
   items: CalendarEvent[],
   range: DateRange,

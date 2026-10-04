@@ -26,6 +26,7 @@ import {
   type SimpleLoginActionMode,
 } from "@workspace/calendar-core";
 import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
+import type { JmapAttachmentInput } from "./jmap-client";
 import { MAILBOX_MESSAGES_PAGE_SIZE } from "./mail-pagination";
 import {
   flattenMailboxMessagesCache,
@@ -594,7 +595,7 @@ export interface ComposeMessageInput {
   htmlBody?: string;
   identityId?: string | null;
   previousDraftId?: string | null;
-  attachments?: import("./jmap-client").JmapAttachmentInput[];
+  attachments?: JmapAttachmentInput[];
 }
 
 /** Identity plus drafts/sent mailboxes for sending, or `null` when the runtime is not ready or has no usable identity. */

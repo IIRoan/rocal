@@ -1796,7 +1796,7 @@ export class StalwartJmapClient {
 
   private async call(
     session: JmapSession,
-    using: string[],
+    capabilities: string[],
     methodCalls: JmapMethodCall[],
   ): Promise<JmapEnvelope> {
     const maxMethodCalls = this.getMaxMethodCalls();
@@ -1804,13 +1804,13 @@ export class StalwartJmapClient {
       methodCalls.length <= maxMethodCalls ||
       jmapMethodCallsHaveDependencies(methodCalls)
     ) {
-      return this.executeCall(session, using, methodCalls);
+      return this.executeCall(session, capabilities, methodCalls);
     }
 
     // Chunks only run when no call references another's result, so the requests are independent.
     const envelopes = await Promise.all(
       chunkJmapMethodCalls(methodCalls, maxMethodCalls).map((chunk) =>
-        this.executeCall(session, using, chunk),
+        this.executeCall(session, capabilities, chunk),
       ),
     );
     return {
@@ -1822,7 +1822,7 @@ export class StalwartJmapClient {
 
   private async executeCall(
     session: JmapSession,
-    using: string[],
+    capabilities: string[],
     methodCalls: JmapMethodCall[],
   ): Promise<JmapEnvelope> {
     const authorization = await this.getAuthorizationHeader();
@@ -1833,7 +1833,7 @@ export class StalwartJmapClient {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        using,
+        using: capabilities,
         methodCalls,
       }),
     });

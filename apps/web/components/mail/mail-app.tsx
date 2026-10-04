@@ -10,6 +10,13 @@ import {
 import { useMailAppContentController } from "./use-mail-app-content-controller";
 import { MailAppMainLayout } from "./mail-app/mail-app-main-layout";
 import { MailAppOverlays } from "./mail-app/mail-app-overlays";
+import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
+import type {
+  JmapIdentity,
+  JmapMailbox,
+  JmapSession,
+} from "@/lib/mail/types";
+import type { MailServerPolicy } from "@workspace/calendar-core";
 
 function MailComposeAutosave({
   activeMailbox,
@@ -17,12 +24,12 @@ function MailComposeAutosave({
   onDraftSaved,
 }: {
   activeMailbox: {
-    client: import("@/lib/mail/jmap-client").StalwartJmapClient;
-    session: import("@/lib/mail/types").JmapSession;
-    mailboxes: import("@/lib/mail/types").JmapMailbox[];
-    identities: import("@/lib/mail/types").JmapIdentity[];
+    client: StalwartJmapClient;
+    session: JmapSession;
+    mailboxes: JmapMailbox[];
+    identities: JmapIdentity[];
     email: string;
-    mailServerPolicy: import("@workspace/calendar-core").MailServerPolicy;
+    mailServerPolicy: MailServerPolicy;
   } | null;
   accountEmail: string;
   onDraftSaved: Parameters<typeof useComposeDraftAutosave>[0]["onDraftSaved"];
