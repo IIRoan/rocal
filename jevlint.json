@@ -1,0 +1,726 @@
+{
+  "minConfidence": 0.8,
+  "languages": {
+    "typescript": {},
+    "tsx": {},
+    "go": {}
+  },
+  "rules": [
+    {
+      "id": "comments-one-line",
+      "description": "Judge ONLY the selected comment's Source, not the surrounding ParentSource. Fail when that individual comment token contains a newline, including multi-line block comments or JSDoc. A comment with equal StartLine and EndLine always passes, even if it wraps visually or other comments in the parent span multiple lines. Adjacent separate one-line comments are not one multi-line token. Do not judge usefulness.",
+      "severity": "error",
+      "kinds": ["comment", "docComment"],
+      "minConfidence": 0.6,
+      "include": [
+        "apps/backend/**/*.ts",
+        "apps/gatus/**/*.ts",
+        "apps/errex/**/*.ts",
+        "apps/native-calendar/**/*.ts",
+        "apps/native-calendar/**/*.tsx",
+        "apps/native-mail/**/*.ts",
+        "apps/native-mail/**/*.tsx",
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "apps/notifications/**/*.go",
+        "packages/**/*.ts",
+        "packages/**/*.tsx",
+        "scripts/**/*.ts",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/.expo/**",
+        "**/.next/**",
+        "**/.turbo/**",
+        "**/__mocks__/**",
+        "**/__tests__/**",
+        "**/build/**",
+        "**/coverage/**",
+        "**/dist/**",
+        "**/generated/**",
+        "**/node_modules/**",
+        "**/output/**",
+        "**/*.d.ts",
+        "**/*.spec.*",
+        "**/*.test.*",
+        "**/*_test.go",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "no-commented-out-code",
+      "description": "Fail when a comment or doc comment contains source code that was commented out instead of deleted, including code commented out inside a block comment or kept as dead code for later reference. Prose explanations, warnings, and textual examples pass.",
+      "severity": "error",
+      "kinds": ["comment", "docComment"],
+      "minConfidence": 0.6,
+      "include": [
+        "apps/backend/**/*.ts",
+        "apps/gatus/**/*.ts",
+        "apps/errex/**/*.ts",
+        "apps/native-calendar/**/*.ts",
+        "apps/native-calendar/**/*.tsx",
+        "apps/native-mail/**/*.ts",
+        "apps/native-mail/**/*.tsx",
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "apps/notifications/**/*.go",
+        "packages/**/*.ts",
+        "packages/**/*.tsx",
+        "scripts/**/*.ts",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/.expo/**",
+        "**/.next/**",
+        "**/.turbo/**",
+        "**/__mocks__/**",
+        "**/__tests__/**",
+        "**/build/**",
+        "**/coverage/**",
+        "**/dist/**",
+        "**/generated/**",
+        "**/node_modules/**",
+        "**/output/**",
+        "**/*.d.ts",
+        "**/*.spec.*",
+        "**/*.test.*",
+        "**/*_test.go",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "todos-need-owner",
+      "description": "Fail TODO, FIXME, or HACK comments that name no owner and reference no issue. A TODO with an owner in parentheses, a named owner, or an issue or tracker reference such as an issue number passes. Comments that are not TODOs pass.",
+      "severity": "error",
+      "kinds": ["comment", "docComment"],
+      "minConfidence": 0.6,
+      "include": [
+        "apps/backend/**/*.ts",
+        "apps/gatus/**/*.ts",
+        "apps/errex/**/*.ts",
+        "apps/native-calendar/**/*.ts",
+        "apps/native-calendar/**/*.tsx",
+        "apps/native-mail/**/*.ts",
+        "apps/native-mail/**/*.tsx",
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "apps/notifications/**/*.go",
+        "packages/**/*.ts",
+        "packages/**/*.tsx",
+        "scripts/**/*.ts",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/.expo/**",
+        "**/.next/**",
+        "**/.turbo/**",
+        "**/__mocks__/**",
+        "**/__tests__/**",
+        "**/build/**",
+        "**/coverage/**",
+        "**/dist/**",
+        "**/generated/**",
+        "**/node_modules/**",
+        "**/output/**",
+        "**/*.d.ts",
+        "**/*.spec.*",
+        "**/*.test.*",
+        "**/*_test.go",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "thin-routes",
+      "description": "Backend HTTP handlers must remain adapters: resolve the session or verify the webhook signature, validate boundary input with the imported RouteModel schema, authorize through service-layer owner/share checks, call service methods, and shape the response. Fail handlers that query Prisma directly, perform domain decisions or multi-step transformations, trust a client-supplied user id, or skip required auth/input validation. Public routes may omit a session only when their signature/rate-limit policy is enforced. Thin upstream proxies pass.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.5,
+      "exceptions": [
+        "Authentication, authorization, and RouteModel validation may be provided by the route's surrounding middleware/configuration rather than repeated inside the handler; missing surrounding context alone is not a violation.",
+        "A handler may delegate ownership validation to its service, or relay a request through the established authenticated JMAP proxy."
+      ],
+      "include": ["apps/backend/routes/**/*.ts", "jevlint-fixtures/**"],
+      "exclude": [
+        "**/node_modules/**",
+        "**/generated/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "owner-scoped-data",
+      "description": "Fail an actual read or write of user-owned records that is neither scoped by a trusted userId/owner/share filter nor protected by an authorization helper. User ids passed to services by authenticated routes are trusted service inputs; do not require the service to resolve a session again. Possession of a client-supplied record id alone is not authorization. Functions that do not access records pass.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.5,
+      "exceptions": [
+        "A query filters by a userId argument or input.userId supplied by the trusted service caller.",
+        "An ID-only private helper is allowed only when its supplied code/context shows the prior ownership check; never assume an unseen caller authorized it. Explicitly public/system records are outside the rule."
+      ],
+      "include": ["apps/backend/services/**/*.ts", "jevlint-fixtures/**"],
+      "exclude": [
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "safe-user-url-fetch",
+      "description": "Any outbound request to a URL supplied by a user or read from user-controlled content must use the shared safeFetch helper, which validates addresses at connection time and revalidates redirects. Do not call fetch or another client directly on a user-controlled URL. Fixed, trusted service endpoints are not covered.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.6,
+      "exceptions": [
+        "The request targets trusted Stalwart/JMAP/provider configuration rather than a URL supplied by a user.",
+        "The function has no outbound request or already delegates to safeFetch."
+      ],
+      "include": [
+        "apps/backend/services/**/*.ts",
+        "apps/backend/routes/**/*.ts",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "privacy-safe-logging",
+      "description": "Never log user content, PII, credentials, tokens, raw URLs with secrets, raw Error objects, stacks, or upstream/database response bodies. Backend logs must use log-sanitization helpers such as logRef, errorLogDetails, sanitizeLogContext, and sanitizeRequestUrl. Web and native code must not send unsanitized user data to console or error reporting; scrub events and breadcrumbs with the shared redaction policy first.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.6,
+      "exceptions": [
+        "Sentry.captureException uses the app SDK configured with shared scrubErrorEvent/scrubBreadcrumb beforeSend hooks; do not require per-call scrubbing again.",
+        "There is no logging/reporting call, or it contains only static messages, status/count metadata, opaque request ids, or shared sanitization helper output."
+      ],
+      "include": [
+        "apps/backend/**/*.ts",
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "apps/native-calendar/src/**/*.ts",
+        "apps/native-calendar/src/**/*.tsx",
+        "apps/native-mail/src/**/*.ts",
+        "apps/native-mail/src/**/*.tsx",
+        "packages/native-core/src/**/*.ts",
+        "packages/native-core/src/**/*.tsx",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "e2ee-client-content",
+      "description": "At the event/calendar/category transport boundary, fail an explicit HTTP payload that sends plaintext title, description, location, or entity name instead of using the shared E2EE request builder, or appends plaintext sensitive fields to a ciphertext payload. CalendarApiService already invokes its E2eeProvider: calling its create/update methods with plaintext on-device input is allowed and must not require duplicate encryption in UI/hooks. Judge only visible transport/payload construction, not unrelated strings.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.6,
+      "exceptions": [
+        "UI/hooks delegate to CalendarApiService, which encrypts through its configured E2eeProvider before HTTP.",
+        "Transient invitationContent for invitation delivery, public subscription feed names, and participant addresses required by iMIP are documented exceptions.",
+        "The function does not construct or transmit an event/calendar/category content payload."
+      ],
+      "include": [
+        "packages/calendar-client/src/**/*.ts",
+        "apps/web/lib/e2ee-payloads.ts",
+        "apps/web/lib/e2ee-password-reset.ts",
+        "apps/web/lib/web-e2ee-provider.ts",
+        "packages/native-core/src/lib/native-e2ee-provider.ts",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "client-api-boundary",
+      "description": "App code must send requests to Solace backend routes through @workspace/calendar-client and its typed methods; do not add raw fetch, axios, ky, or a second client for first-party API routes. Fixed external service endpoints and mailbox calls through StalwartJmapClient are separate protocols. Keep documented browser-only transport exceptions inside the existing API adapter.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.6,
+      "exceptions": [
+        "The function has no first-party HTTP request, or uses/extends CalendarApiService, HttpClient, or a typed service re-exported from @workspace/calendar-client.",
+        "The existing browser-only ICS download adapter and Better Auth/passkey SDK protocol flows are established transport exceptions.",
+        "Development tooling and fixed health probes are not shipped app data requests."
+      ],
+      "include": [
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "apps/native-calendar/src/**/*.ts",
+        "apps/native-calendar/src/**/*.tsx",
+        "apps/native-mail/src/**/*.ts",
+        "apps/native-mail/src/**/*.tsx",
+        "packages/native-core/src/**/*.ts",
+        "packages/native-core/src/**/*.tsx",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "tanstack-data-architecture",
+      "description": "Server state belongs in TanStack Query domain hooks, with query keys from the project's key factory. Do not fetch server data in useEffect or copy query results into local state. When a mutation changes cached data, optimistically update the precise key, roll back on error, and narrowly invalidate on settle; never blanket-invalidate a root key. Decrypted cache data must be cleared on sign-out or account switch by the owning session layer, not redundantly in every hook. Local UI state may remain in React state or context.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.6,
+      "exceptions": [
+        "Encrypted on-device search indexes, secure storage, draft persistence, and local UI state are not server-state query caches.",
+        "Account/session teardown may intentionally clear the whole query client; ordinary domain mutations may not.",
+        "The function does not fetch server state or mutate a TanStack query cache."
+      ],
+      "include": [
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "apps/native-calendar/src/**/*.ts",
+        "apps/native-calendar/src/**/*.tsx",
+        "apps/native-mail/src/**/*.ts",
+        "apps/native-mail/src/**/*.tsx",
+        "packages/native-core/src/**/*.ts",
+        "packages/native-core/src/**/*.tsx",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "timezone-safe-calendar-code",
+      "description": "Calendar instants must be converted with the user's configured timezone and shared calendar-core helpers. Do not use local Date setters, start-of-day helpers, or date-fns formatting on event instants; preserve UTC ISO instants and distinguish all-day dates from timed events. Use the established all-day and wall-clock conversion helpers.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.6,
+      "exceptions": [
+        "Picker wall-clock Date carriers, date-only calendar grid navigation, all-day date components, and documented local-date helper implementations intentionally use local getters/setters.",
+        "Comparing absolute instants by getTime or formatting machine-wire UTC ISO timestamps does not require timezone conversion.",
+        "The function does not interpret or format a timed event instant."
+      ],
+      "include": [
+        "apps/web/components/event-editor/**/*.ts",
+        "apps/web/components/event-editor/**/*.tsx",
+        "apps/web/hooks/use-calendar-*.ts",
+        "apps/native-calendar/src/components/event/**/*.ts",
+        "apps/native-calendar/src/components/event/**/*.tsx",
+        "apps/native-calendar/src/hooks/use-event-*.ts",
+        "packages/calendar-core/src/**/*.ts",
+        "packages/calendar-ics/src/**/*.ts",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "secure-email-html",
+      "description": "Fail a received-email rendering boundary that inserts raw message HTML into dangerouslySetInnerHTML, an iframe, or a native WebView without the shared processEmailHtml/buildEmailHtmlDocument sanitization pipeline. Web iframes must not allow scripts; remote content is blocked unless the user explicitly opts in. Native WebViews must prevent message-authored scripts; trusted app-owned measurement code is separate. Functions that do not render email HTML pass.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.6,
+      "exceptions": [
+        "Already-sanitized signature/quote/editor fragments may be inserted by their established sanitizing wrappers.",
+        "Helper functions, attachment/file processing, message metadata, and trusted app-controlled HTML are not received-message rendering boundaries.",
+        "Sanitization may be delegated to processEmailHtml/buildEmailHtmlDocument; do not require each downstream helper to sanitize again."
+      ],
+      "include": [
+        "apps/web/components/mail/**/*.ts",
+        "apps/web/components/mail/**/*.tsx",
+        "apps/web/lib/mail/**/*.ts",
+        "apps/native-mail/src/components/mail/**/*.ts",
+        "apps/native-mail/src/components/mail/**/*.tsx",
+        "apps/native-mail/src/lib/mail/**/*.ts",
+        "packages/calendar-core/src/mail-html.ts",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "jmap-only-mail",
+      "description": "All mailbox operations must use Stalwart JMAP through StalwartJmapClient or the backend JMAP proxy. Do not add IMAP, POP3, SMTP, Resend, or alternate mail APIs. Backend mailbox access must run as the account owner, never with the provisioning token; outbound messages use the existing JMAP method builders.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.6,
+      "exceptions": [
+        "Mailbox provisioning/config/status, vault backup, recipient-key lookup, and access-token minting are backend control-plane HTTP operations, not mailbox-message operations.",
+        "Pure message parsing/crypto/formatting helpers do not need to perform a JMAP request.",
+        "The established JMAP protocol client may implement its own HTTP transport."
+      ],
+      "include": [
+        "apps/backend/routes/mail.ts",
+        "apps/backend/services/*mail*.ts",
+        "apps/backend/services/stalwart-*.ts",
+        "apps/backend/lib/stalwart-*.ts",
+        "apps/backend/lib/mail/**/*.ts",
+        "apps/web/lib/mail/**/*.ts",
+        "apps/native-mail/src/lib/mail/**/*.ts",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "type-safe-maintainable-code",
+      "description": "Keep function and type definitions strict: fail explicit any, as unknown as, @ts-ignore, or non-null assertions without a nearby comment explaining the runtime guarantee. A type assertion is not automatically unsafe: assertions backed by visible validation and deliberate platform adapters are allowed. Report only concrete violations present in the selected Source; inferred types and missing surrounding declarations alone are not failures.",
+      "severity": "error",
+      "kinds": ["function", "type"],
+      "minConfidence": 0.6,
+      "include": [
+        "apps/backend/**/*.ts",
+        "apps/gatus/**/*.ts",
+        "apps/errex/**/*.ts",
+        "apps/native-calendar/src/**/*.ts",
+        "apps/native-calendar/src/**/*.tsx",
+        "apps/native-mail/src/**/*.ts",
+        "apps/native-mail/src/**/*.tsx",
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "packages/**/*.ts",
+        "packages/**/*.tsx",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "react-effect-purpose",
+      "description": "Effects are for synchronizing with external systems, not for deriving React state or routing user interactions. Fail an effect that only copies props/query results into state, computes filtered/sorted/combined display data and calls a setter, chains state updates without external synchronization, or performs an interaction-specific action through a flag instead of its event handler. Compute derived values during render/select/useMemo and run interaction logic in handlers. Judge only visible unnecessary effects; do not ban useEffect itself.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.8,
+      "exceptions": [
+        "DOM/native widget synchronization, subscriptions, navigation/deep-link synchronization, encrypted local storage, and session bootstrap are external systems and may need effects.",
+        "An independently editable draft initialized from props is legitimate local state, not a mirrored derived value.",
+        "There is no effect, or the effect delegates necessary external synchronization to an established helper."
+      ],
+      "include": [
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "apps/native-calendar/**/*.ts",
+        "apps/native-calendar/**/*.tsx",
+        "apps/native-mail/**/*.ts",
+        "apps/native-mail/**/*.tsx",
+        "packages/native-core/src/**/*.ts",
+        "packages/native-core/src/**/*.tsx",
+        "packages/ui/src/**/*.ts",
+        "packages/ui/src/**/*.tsx",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/.expo/**",
+        "**/.next/**",
+        "**/node_modules/**",
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/__mocks__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "react-effect-lifecycle",
+      "description": "Fail an effect that installs a persistent listener, interval, subscription, observer, or connection without corresponding cleanup. Also fail asynchronous work inside an effect with changing dependencies that directly writes its result to React state without cancellation or an active/generation check: an older request can overwrite state for the new dependencies. Both then(setState) and awaiting a result before setState need this guard. React ignoring updates after unmount does not prevent dependency-change races. Cleanup must match the resource; a cancellation flag cannot clean up an installed listener.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.8,
+      "exceptions": [
+        "A query/domain hook owns cancellation or subscription cleanup; do not require its consumer to duplicate it.",
+        "One-shot synchronous external updates and effects that create no persistent resource or async state update need no cleanup.",
+        "There is no effect, or lifecycle management is visibly delegated to a helper that returns cleanup."
+      ],
+      "include": [
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "apps/native-calendar/**/*.ts",
+        "apps/native-calendar/**/*.tsx",
+        "apps/native-mail/**/*.ts",
+        "apps/native-mail/**/*.tsx",
+        "packages/native-core/src/**/*.ts",
+        "packages/native-core/src/**/*.tsx",
+        "packages/ui/src/**/*.ts",
+        "packages/ui/src/**/*.tsx",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/.expo/**",
+        "**/.next/**",
+        "**/node_modules/**",
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/__mocks__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "react-component-boundaries",
+      "description": "Keep React components focused on rendering and interaction composition. Fail a component definition created inside another rendering component and instantiated as JSX (its identity changes and state remounts), or a rendering component that visibly embeds a reusable domain algorithm such as parsing, encryption, recurrence expansion, or request construction instead of delegating to a hook/shared helper. Hand-parsing ICS/email with regex, split, and line-by-line state in a component is a domain algorithm even if the component is short. Calling a parsing/helper function is delegation and passes without needing its implementation. Require concrete code evidence, not an arbitrary function length or preference for more files.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.8,
+      "exceptions": [
+        "Small display formatting, JSX list mapping, local event handlers, render props, and callbacks passed to hooks are ordinary component composition.",
+        "A module-scoped component/helper is not a nested component; callback functions are not components unless instantiated as JSX.",
+        "A pure non-component domain helper is already separated from UI and passes."
+      ],
+      "include": [
+        "apps/web/**/*.tsx",
+        "apps/native-calendar/**/*.tsx",
+        "apps/native-mail/**/*.tsx",
+        "packages/native-core/src/**/*.tsx",
+        "packages/ui/src/**/*.tsx",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/.expo/**",
+        "**/.next/**",
+        "**/node_modules/**",
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/__mocks__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "react-immutable-state",
+      "description": "Fail in-place mutations of props, React state, or data returned from a server-state/domain query hook: assigning fields, push/splice/sort/reverse on the shared array, or editing an existing cached record. Produce a new object/array or update TanStack Query through setQueryData with immutable updater output. Judge the mutation's ownership, not the mere presence of sort/push.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.8,
+      "exceptions": [
+        "Mutating a newly allocated local array/object or an explicit copy is safe.",
+        "Refs, native shared values/worklets, and imperative external objects are not React state snapshots.",
+        "There is no mutation of React-owned or query-owned data."
+      ],
+      "include": [
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "apps/native-calendar/**/*.ts",
+        "apps/native-calendar/**/*.tsx",
+        "apps/native-mail/**/*.ts",
+        "apps/native-mail/**/*.tsx",
+        "packages/native-core/src/**/*.ts",
+        "packages/native-core/src/**/*.tsx",
+        "packages/ui/src/**/*.ts",
+        "packages/ui/src/**/*.tsx",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/.expo/**",
+        "**/.next/**",
+        "**/node_modules/**",
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/__mocks__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "query-domain-hooks",
+      "description": "TanStack useQuery/useInfiniteQuery/useMutation calls belong in named domain hooks, not directly in components or screens. Fail a React rendering component that calls these query primitives itself instead of consuming a domain hook. Domain hooks must use the existing query-key factory and typed client. Report visible placement/key violations only; names of imported hooks need no implementation repeated in the consumer.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.8,
+      "exceptions": [
+        "A named use-domain hook that owns the query/mutation is the intended boundary.",
+        "useQueryClient in a component for precise cache interaction is not a server-data query primitive.",
+        "There is no TanStack query/mutation primitive call in the rendering component."
+      ],
+      "include": [
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "apps/native-calendar/**/*.ts",
+        "apps/native-calendar/**/*.tsx",
+        "apps/native-mail/**/*.ts",
+        "apps/native-mail/**/*.tsx",
+        "packages/native-core/src/**/*.ts",
+        "packages/native-core/src/**/*.tsx",
+        "packages/ui/src/**/*.ts",
+        "packages/ui/src/**/*.tsx",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/.expo/**",
+        "**/.next/**",
+        "**/node_modules/**",
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/__mocks__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "typescript-untrusted-input",
+      "description": "A TypeScript annotation or assertion is not runtime validation. Fail treating JSON.parse, external response.json, decrypted/imported payloads, or an unknown caught/thrown value as a trusted domain type solely through a cast or annotation, then using/returning it without validating or narrowing. Keep boundary input unknown and use the project's strict Zod schema, a visible type guard, or instanceof Error before reading unknown error properties. Judge only a visible unchecked boundary, not every ordinary typed argument.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.8,
+      "exceptions": [
+        "Input is passed to an imported schema's parse/safeParse or a validation helper before use.",
+        "An established typed client already validates its response; its consumers need not duplicate validation.",
+        "Visible control-flow/type guards establish the required shape, or there is no external/unknown input boundary."
+      ],
+      "include": [
+        "apps/backend/**/*.ts",
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "apps/native-calendar/**/*.ts",
+        "apps/native-calendar/**/*.tsx",
+        "apps/native-mail/**/*.ts",
+        "apps/native-mail/**/*.tsx",
+        "packages/**/*.ts",
+        "packages/**/*.tsx",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/.expo/**",
+        "**/.next/**",
+        "**/node_modules/**",
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/__mocks__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "typescript-null-safety",
+      "description": "Use strictNullChecks and noUncheckedIndexedAccess habits even where legacy compiler settings are looser. Fail dereferencing an optional/nullable value, Array.find result, arbitrary array index, or dictionary lookup without a visible existence check, optional chaining/default, or other actual runtime guarantee. Do not hide absence with a cast/non-null assertion. Only report a concrete possibly-missing value that is dereferenced; returning an optional result is fine.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.8,
+      "exceptions": [
+        "The value is narrowed by a guard/early return, or a validated schema guarantees it.",
+        "A fixed tuple position, for-of element, or visibly bounded algorithm with a proven existing element is safe.",
+        "Optional chaining/coalescing handles absence, or there is no dereference of a possibly-missing value."
+      ],
+      "include": [
+        "apps/backend/**/*.ts",
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "apps/native-calendar/**/*.ts",
+        "apps/native-calendar/**/*.tsx",
+        "apps/native-mail/**/*.ts",
+        "apps/native-mail/**/*.tsx",
+        "packages/**/*.ts",
+        "packages/**/*.tsx",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/.expo/**",
+        "**/.next/**",
+        "**/node_modules/**",
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/__mocks__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    },
+    {
+      "id": "async-promise-handling",
+      "description": "Judge detached promises, not whether every async function has its own catch. An async function that awaits/returns a Promise or deliberately throws propagates rejection to its caller and PASSES without a local catch. Fail a visibly Promise-returning call that is neither awaited nor returned nor connected to an actual catch/rejection callback. JavaScript void only discards the value and does not handle rejection; void calling an async callee without catch fails. Check supplied callee signatures to prove a call is async; do not infer unknown-return-type calls are Promises. An empty catch only passes for a documented harmless cancellation/teardown case.",
+      "severity": "error",
+      "kinds": ["function"],
+      "minConfidence": 0.8,
+      "context": {
+        "callees": true
+      },
+      "exceptions": [
+        "The Promise is awaited or returned and failure intentionally propagates to its caller.",
+        "A background Promise has an actual catch/rejection callback, or the supplied helper explicitly handles errors internally.",
+        "A TanStack mutate (not mutateAsync) callback API owns its error lifecycle; synchronous/unknown-return-type calls are not proven floating promises."
+      ],
+      "include": [
+        "apps/backend/**/*.ts",
+        "apps/web/**/*.ts",
+        "apps/web/**/*.tsx",
+        "apps/native-calendar/**/*.ts",
+        "apps/native-calendar/**/*.tsx",
+        "apps/native-mail/**/*.ts",
+        "apps/native-mail/**/*.tsx",
+        "packages/**/*.ts",
+        "packages/**/*.tsx",
+        "jevlint-fixtures/**"
+      ],
+      "exclude": [
+        "**/.expo/**",
+        "**/.next/**",
+        "**/node_modules/**",
+        "**/generated/**",
+        "**/__tests__/**",
+        "**/__mocks__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "jevlint-fixtures/**"
+      ]
+    }
+  ]
+}

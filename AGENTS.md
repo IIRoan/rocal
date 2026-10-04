@@ -74,6 +74,7 @@ Default stance: **the server should not be able to read user content, and we sho
 - **Query keys come from a factory, never inline arrays.** Native: `packages/native-core/src/lib/query-keys.ts`; web mail: `apps/web/lib/mail/mail-query-keys.ts`. New keys go in a factory; migrate inline `["events"]`-style keys when you touch them. Keys shared across apps belong in `calendar-core` (like `PUSH_DEVICES_QUERY_KEY`). Same data = same key name on both platforms.
 - `useQuery`/`useMutation` live in domain hooks (`use-*.ts`), not directly in screens/components. Components consume hooks.
 - No `useEffect` + `fetch`/`setState` for server data; no copying query data into state.
+- Effects synchronize external systems, not derived values or user interactions: derive during render/`select`, act in event handlers, and clean up resources or guard stale async results when dependencies change. Editable drafts are local state, not mirrored server state.
 - Mutations on cached data: optimistic `onMutate` + `setQueryData` on the precise key, rollback on error, narrow `invalidateQueries` on settle. Never blanket-invalidate a root key (`["mail"]`, `["events"]`) — it refetches everything and loses scroll. Destructive moves/deletes may invalidate the affected list.
 - Decrypted content in the cache is cleared on sign-out/account switch (`queryClient.clear()`).
 - `enabled` guards for missing ids/sessions/keys; `select` for derived data; no `any` query types.
@@ -81,9 +82,11 @@ Default stance: **the server should not be able to read user content, and we sho
 ## 5. Code quality (MUST)
 
 - **TypeScript strict.** No new `any`, `as unknown as`, `@ts-ignore`, or non-null `!` without a comment explaining why. `apps/web` still has `strict: false` — code you touch must compile under strict; don't add to the debt.
+- Narrow `unknown` boundary inputs/errors before use; validate parsed/imported content with Zod, guard nullable/indexed results, and await/return promises or attach a rejection handler. `void` alone does not handle rejection.
 - **Share, don't duplicate.** Web and native currently duplicate `lib/mail/*` (JMAP client, message security, threads, invites), `use-recent-contacts`, `use-mail-calendar-invitation`, etc. New platform-agnostic logic MUST go in `packages/*`; when changing a duplicated file, fix both copies and prefer extracting it to a package.
 - Smallest correct diff; match surrounding naming, imports, and abstractions. No speculative abstractions, no dead code, no commented-out code, no TODOs without an owner/issue.
 - Pure logic out of components (hooks/`lib`), components small; follow React Doctor (runs as a hook on edits, blocking on warnings). Fix findings in files you touch instead of adding ignores to `react-doctor.config.json`.
+- Define components at module scope, not inside rendering components; update props/state/query snapshots immutably. Fresh local arrays and native shared values are not React state snapshots.
 - **Comments are one line, never more** (MUST) — including JSDoc: `/** One line. */`. Write one only for a non-obvious business rule, security reason, or a "why" the code cannot show; never to restate what the code does, and never a banner, section divider, changelog or design essay. If one line cannot explain it, the code needs renaming or splitting, not a paragraph.
 - Tests: add/adjust tests for real behavior, especially security boundaries (authz, sanitization, crypto, SSRF, log redaction) and bug fixes (regression test first). Jest everywhere; Go `go test` in notifications.
 - Dates/timezones: user's configured timezone is the source of truth (fallback `resolveTimezone()` → `Europe/Amsterdam`). Use `calendar-core` helpers (`wallClockToUtc`, `utcToPickerDate`, zoned day helpers); never `setHours`/`startOfDay`/`isToday`/`date-fns/format` on event times. No moment/dayjs/luxon (enforced).
@@ -129,6 +132,8 @@ Verify only — **don't start dev servers, builds, tunnels, EAS builds, OTA publ
 - `bun run typecheck` / `bun run typecheck:native` (native-core + both apps)
 - `bun run test` runs every workspace with a `test` script, packages included (or `test:backend|native|ui|notifications`, single file paths)
 - `bun run lint:react-doctor`; Prisma: `cd apps/backend && bun run db:generate`
+- Install jevlint with `go install github.com/codegirl-007/jevlint/cmd/jevlint@v0.1.0`
+- `bun run lint:jev` — jevlint checks privacy/API/data rules, comment hygiene, React effects/component boundaries/immutable state, strict TypeScript boundaries/null safety, and promise handling across the whole repo via Cloudflare Workers AI `clef`; sends source units to Cloudflare, so local-only, never CI. `lint:jev:changed` checks changed files, `lint:jev:full` also checks the whole repo, `lint:jev:eval --refresh-cache` verifies positive/negative/exception fixtures in `jevlint-fixtures/`. Parser errors abort the scan, not a clean pass. Needs `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_AUTH_TOKEN` in `.env` (see `.env.example`)
 
 CI (`.github/workflows/pr-tests.yml`) runs lint, both typechecks, and tests on every PR. API-level e2e against a deployed or local API: `cd apps/backend && E2E_API_URL=https://api.solace.onl bun run e2e:api`. Optional env: `E2E_WEB_URL` (web header checks), `E2E_COOKIE` (signed-in checks; reject-only, writes nothing), `E2E_RATE_LIMIT=1` (burns this IP's sign-in budget).
 
