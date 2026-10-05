@@ -58,9 +58,7 @@ export function WallpaperBackdrop() {
           fit="cover"
         />
       </div>
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_52%_50%_at_16%_38%,var(--background)_22%,transparent_64%)]" />
-      <div className="absolute inset-y-0 left-0 w-[42%] bg-gradient-to-r from-background/55 via-background/18 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 h-[22%] bg-gradient-to-t from-background via-background/40 to-transparent [mask-image:linear-gradient(to_right,black_0%,black_45%,transparent_78%)]" />
+      <div className="absolute inset-0 bg-background/40" />
     </div>
   );
 }

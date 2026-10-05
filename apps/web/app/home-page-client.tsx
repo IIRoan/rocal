@@ -5,7 +5,6 @@ import { useSession } from "@/lib/auth-client";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { completeAuthNavigation } from "@/lib/auth-navigation";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
-import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
 import { HOME_PATH } from "@/lib/app-routes";
 import {
@@ -13,16 +12,19 @@ import {
   PageLoadingOverlay,
 } from "@workspace/ui/components/ui";
 import { Button } from "@workspace/ui/components/ui/button";
-import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { WallpaperBackdrop } from "@/components/landing/wallpaper-backdrop";
+import { LandingNavbar } from "@/components/landing/landing-navbar";
+import { LandingSignInButton } from "@/components/landing/landing-sign-in-button";
 
 const PILLARS = [
   {
+    id: "calendar",
     title: "Calendar",
     body: "Shared schedules, recurring events, and reminders that actually arrive.",
   },
   {
+    id: "mail",
     title: "Mail",
     body: "Your own mailbox. Encrypted at rest. No ads, no profiling.",
   },
@@ -74,12 +76,6 @@ export function HomePageClient() {
           0,
         )
         .fromTo(
-          "[data-hero-nav]",
-          { autoAlpha: 0, y: -10 },
-          { autoAlpha: 1, y: 0, duration: 0.5 },
-          0.06,
-        )
-        .fromTo(
           ["[data-hero-heading]", "[data-hero-copy]", "[data-hero-cta]"],
           { autoAlpha: 0, y: 22 },
           {
@@ -115,9 +111,7 @@ export function HomePageClient() {
   );
 
   if (shouldShowLoadingOverlay) {
-    return (
-      <PageLoadingOverlay isLoading={true} messageContext="AUTH_FLOW" />
-    );
+    return <PageLoadingOverlay isLoading={true} messageContext="AUTH_FLOW" />;
   }
 
   const handleSignIn = () => {
@@ -131,41 +125,13 @@ export function HomePageClient() {
   return (
     <section
       ref={rootRef}
-      className="relative flex min-h-dvh flex-col overflow-hidden bg-background"
+      className="relative flex min-h-dvh flex-col overflow-clip bg-background"
     >
       <div data-hero-scrim className="absolute inset-0">
         <WallpaperBackdrop />
       </div>
 
-      <header
-        data-hero-nav
-        className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5 sm:px-8 lg:px-10"
-      >
-        <div className="flex items-center gap-2.5">
-          <Logo
-            width={26}
-            height={26}
-            className="text-primary"
-            aria-hidden
-          />
-          <span className="text-[15px] font-semibold tracking-tight text-foreground">
-            Solace
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="rounded-md bg-background/90 ring-1 ring-foreground/20">
-            <ThemeToggle />
-          </div>
-          <Button
-            size="sm"
-            className="ml-1"
-            onClick={handleSignIn}
-            disabled={isLeaving}
-          >
-            Sign in
-          </Button>
-        </div>
-      </header>
+      <LandingNavbar onSignIn={handleSignIn} isLeaving={isLeaving} />
 
       <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 pb-10 sm:px-8 lg:px-10">
         <div className="flex max-w-xl flex-1 flex-col justify-center pt-10 pb-16 sm:pt-16 lg:pt-20">
@@ -179,7 +145,7 @@ export function HomePageClient() {
 
           <p
             data-hero-copy
-            className="mt-6 max-w-lg text-base leading-relaxed text-pretty text-muted-foreground sm:text-lg"
+            className="mt-6 max-w-lg text-base leading-relaxed text-pretty text-foreground sm:text-lg"
           >
             Solace is a calm calendar and a private inbox: shared schedules,
             real notifications, and a mailbox that isn&apos;t a product. Not
@@ -187,27 +153,33 @@ export function HomePageClient() {
           </p>
 
           <div data-hero-cta className="mt-8 flex items-center gap-3">
+            <LandingSignInButton
+              onSignIn={handleSignIn}
+              isLeaving={isLeaving}
+            />
             <Button
               size="lg"
-              onClick={handleSignIn}
-              disabled={isLeaving}
+              variant="outline"
+              className="relative rounded-lg after:absolute after:inset-x-0 after:-inset-y-0.5"
+              asChild
             >
-              Sign in
-              <ArrowRight />
-            </Button>
-            <Button size="lg" variant="outline" asChild>
               <Link href="/privacy">Privacy</Link>
             </Button>
           </div>
         </div>
 
-        <ul className="grid gap-8 border-t border-border/50 py-10 sm:grid-cols-3 sm:gap-10">
+        <ul className="grid gap-8 border-t border-border/50 py-10 sm:grid-cols-2 sm:gap-10 lg:grid-cols-3">
           {PILLARS.map((pillar) => (
-            <li key={pillar.title} data-hero-pillar className="min-w-0">
-              <p className="text-sm font-semibold tracking-tight text-foreground">
+            <li
+              key={pillar.title}
+              id={pillar.id}
+              data-hero-pillar
+              className="min-w-0 scroll-mt-28"
+            >
+              <p className="text-base font-semibold tracking-tight text-foreground lg:text-sm">
                 {pillar.title}
               </p>
-              <p className="mt-2 text-sm leading-relaxed text-pretty text-muted-foreground">
+              <p className="mt-2 text-base leading-relaxed text-pretty text-foreground lg:text-sm">
                 {pillar.body}
               </p>
             </li>
@@ -217,12 +189,12 @@ export function HomePageClient() {
 
       <footer
         data-hero-footer
-        className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-5 text-xs text-muted-foreground sm:px-8 lg:px-10"
+        className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-start gap-1 px-6 py-5 text-sm text-foreground sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-8 lg:px-10"
       >
         <p>Solace. Private, for now.</p>
         <Link
           href="/privacy"
-          className="font-medium transition-colors hover:text-foreground"
+          className="inline-flex min-h-11 cursor-pointer items-center rounded-md font-medium outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 lg:min-h-0"
         >
           Privacy commitments
         </Link>
