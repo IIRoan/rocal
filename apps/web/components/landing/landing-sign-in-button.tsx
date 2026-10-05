@@ -17,7 +17,7 @@ export function LandingSignInButton({
       onClick={onSignIn}
       disabled={isLeaving}
     >
-      Sign in
+      Sign in 
       <ArrowRight aria-hidden data-icon="inline-end" />
     </Button>
   );
