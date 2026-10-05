@@ -58,6 +58,7 @@ export function WallpaperBackdrop() {
           fit="cover"
         />
       </div>
+      
       <div className="absolute inset-0 bg-background/40" />
     </div>
   );
