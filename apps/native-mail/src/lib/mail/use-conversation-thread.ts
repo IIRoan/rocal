@@ -165,8 +165,12 @@ export function useConversationThread(
   const threadQuery = useQuery({
     queryKey: QUERY_KEYS.mailThread(threadId),
     enabled: Boolean(runtime && threadId),
-    queryFn: () =>
-      runtime!.client.getThreadMessages(runtime!.session, threadId!),
+    queryFn: () => {
+      if (!runtime || !threadId) {
+        throw new Error("Mail is not ready yet.");
+      }
+      return runtime.client.getThreadMessages(runtime.session, threadId);
+    },
     staleTime: 60_000,
   });
 

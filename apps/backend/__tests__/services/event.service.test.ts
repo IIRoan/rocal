@@ -193,6 +193,32 @@ describe("EventService.search", () => {
     expect(countSql).toContain("FALSE");
     expect(countSql).not.toContain("OR e.title ILIKE '%' || $2 || '%'");
   });
+
+  it("loads participants only for events owned by the searching user", async () => {
+    const eventParticipantFindMany = jest.fn(async () => []);
+    const queryRawUnsafe = jest.fn<
+      (sql: string, ...params: Array<string | number | Date>) => Promise<any[]>
+    >(async () => [])
+      .mockResolvedValueOnce([{ id: "event-1", user_id: "user-1" }])
+      .mockResolvedValueOnce([{ total: 1 }]);
+    const prisma = {
+      $queryRawUnsafe: queryRawUnsafe,
+      eventParticipant: { findMany: eventParticipantFindMany },
+    };
+
+    await new EventService(prisma as never).search({
+      userId: "user-1",
+      query: "meeting",
+    });
+
+    expect(eventParticipantFindMany).toHaveBeenCalledWith({
+      where: {
+        eventId: { in: ["event-1"] },
+        event: { userId: "user-1" },
+      },
+      include: { user: { select: expect.any(Object) } },
+    });
+  });
 });
 
 describe("EventService.searchCorpus", () => {

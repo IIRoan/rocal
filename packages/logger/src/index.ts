@@ -217,7 +217,7 @@ export function installGlobalConsoleLogger(scope?: string): WorkspaceLogger {
 
       if (IS_BROWSER) {
         const scopeStr = scope ? ` <${scope}>` : "";
-        originalConsole[method]!(
+        originalConsole[method](
           `%c${timestamp()} %c${LEVEL_LABELS[level]}%c${scopeStr}`,
           CSS_COLORS.faint,
           CSS_COLORS[level as keyof typeof CSS_COLORS],
@@ -233,7 +233,7 @@ export function installGlobalConsoleLogger(scope?: string): WorkspaceLogger {
       const scopeStr = scope ? ` ${COLORS.faint}<${scope}>${COLORS.reset}` : "";
       const line =
         `${timeStr} ${levelStr}${scopeStr} ${normalizeArgs(args)}`.trimEnd();
-      originalConsole[method]!(line);
+      originalConsole[method](line);
     };
   };
 

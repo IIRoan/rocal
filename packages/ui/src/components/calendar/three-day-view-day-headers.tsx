@@ -63,8 +63,8 @@ export function ThreeDayViewDayHeaders({
             </span>
             <div
               className={cn(
-                "mx-auto mt-1 h-[2px] w-5 rounded-full transition-all",
-                today ? "bg-primary" : "w-0 bg-transparent",
+                "mx-auto mt-1 h-[2px] w-5 origin-center rounded-full transition-transform",
+                today ? "scale-x-100 bg-primary" : "scale-x-0 bg-transparent",
               )}
             />
           </div>

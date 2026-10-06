@@ -40,6 +40,25 @@ import { clearNotificationExtensionSecrets } from "../lib/notification-extension
 const AUTH_STATUS_TIMEOUT_MS = 3_000;
 const AUTH_STATUS_RETRY_DELAYS_MS = [0, 150, 400] as const;
 
+type AuthStatusPayload = {
+  authenticated: boolean;
+  hasPasskeys: boolean;
+  requiresPasskeyStepUp: boolean;
+};
+
+/** Guards the auth-status payload before it flips sign-in state. */
+function isAuthStatusPayload(value: unknown): value is AuthStatusPayload {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.authenticated === "boolean" &&
+    typeof record.hasPasskeys === "boolean" &&
+    typeof record.requiresPasskeyStepUp === "boolean"
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -154,6 +173,7 @@ export function AuthProvider({
     let response: Response;
 
     try {
+      // repo-rules-allow client-api-boundary: auth-status ping kept off the shared HttpClient so a 401 during the post-sign-in cookie race cannot fire onAuthError session clearing.
       response = await fetch(`${API_BASE_URL}/api/account/auth-status`, {
         credentials: "omit",
         headers: getAuthHeaders(),
@@ -167,11 +187,11 @@ export function AuthProvider({
       throw new Error("Unable to load authentication status.");
     }
 
-    return (await response.json()) as {
-      authenticated: boolean;
-      hasPasskeys: boolean;
-      requiresPasskeyStepUp: boolean;
-    };
+    const payload: unknown = await response.json();
+    if (!isAuthStatusPayload(payload)) {
+      throw new Error("Unable to load authentication status.");
+    }
+    return payload;
   }, []);
 
   // ── Auth actions ─────────────────────────────────────────────────────
@@ -252,8 +272,7 @@ export function AuthProvider({
           ? (data as { token: string }).token
           : null;
 
-      // Persist the cookie before flipping React auth state — otherwise E2EE
-      // bootstrap fires API calls without a Cookie header and 401 clears us.
+      // Persist the cookie before flipping React auth state — otherwise E2EE bootstrap fires API calls without a Cookie header and 401 clears us.
       if (authToken) {
         await ensureSessionTokenCookie(authToken, {
           preferSecure: API_BASE_URL.startsWith("https://"),
@@ -295,8 +314,7 @@ export function AuthProvider({
       setRequiresPasskeyStepUp(requiresStepUp);
       return requiresStepUp;
     } catch {
-      // Password/passkey authentication already succeeded. The status request
-      // is only a follow-up for step-up UI and must not undo the new session.
+      // Password/passkey authentication already succeeded. The status request is only a follow-up for step-up UI and must not undo the new session.
       setRequiresPasskeyStepUp(false);
       return false;
     }
@@ -332,8 +350,7 @@ export function AuthProvider({
     resetAuthMethodHints();
   }, [resetAuthMethodHints]);
 
-  // Register the clear-session callback so the HTTP layer can terminate
-  // sessions on 401/403 without a React hook.
+  // Register the clear-session callback so the HTTP layer can terminate sessions on 401/403 without a React hook.
   useEffect(() => {
     registerClearSession(clearSession);
     return () => {
@@ -519,8 +536,7 @@ export function AuthProvider({
 
     async function loadSession() {
       try {
-        // Legacy jars used a bare `"1"` chunk meta; Better Auth JSON.parses that
-        // to number 1 and crashes on Set-Cookie. Flatten before any auth I/O.
+        // Legacy jars used a bare `"1"` chunk meta; Better Auth JSON.parses that to number 1 and crashes on Set-Cookie. Flatten before any auth I/O.
         await healAuthCookieJar();
         if (ignore || loadId !== sessionLoadIdRef.current) return;
 

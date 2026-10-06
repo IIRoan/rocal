@@ -1,3 +1,4 @@
+// repo-rules-allow timezone-safe-calendar-code: format() renders the date-only UNTIL bound, round-tripping the local fields parseRRuleUntil wrote.
 import { format } from "date-fns";
 import {
   formatClockTimeRange,

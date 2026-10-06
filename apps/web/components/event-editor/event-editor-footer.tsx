@@ -71,7 +71,7 @@ export function EventEditorFooter({
           <Button
             size="sm"
             disabled={invitationResponsePending !== null}
-            onClick={() => void onInvitationResponse("accepted")}
+            onClick={() => onInvitationResponse("accepted")}
             className="gap-1"
           >
             {invitationResponsePending === "accepted" ? (
@@ -85,7 +85,7 @@ export function EventEditorFooter({
             size="sm"
             variant="outline"
             disabled={invitationResponsePending !== null}
-            onClick={() => void onInvitationResponse("tentative")}
+            onClick={() => onInvitationResponse("tentative")}
           >
             {invitationResponsePending === "tentative" && (
               <Loader2 className="size-4 animate-spin" />
@@ -96,7 +96,7 @@ export function EventEditorFooter({
             size="sm"
             variant="ghost"
             disabled={invitationResponsePending !== null}
-            onClick={() => void onInvitationResponse("declined")}
+            onClick={() => onInvitationResponse("declined")}
             className="text-muted-foreground"
           >
             {invitationResponsePending === "declined" && (
@@ -127,7 +127,7 @@ export function EventEditorFooter({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-28">
             <DropdownMenuItem
-              onClick={() => void onInvitationResponse("accepted")}
+              onClick={() => onInvitationResponse("accepted")}
               className={cn(invitationStatus === "accepted" && "font-medium")}
             >
               <Check
@@ -139,7 +139,7 @@ export function EventEditorFooter({
               Accept
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => void onInvitationResponse("tentative")}
+              onClick={() => onInvitationResponse("tentative")}
               className={cn(invitationStatus === "tentative" && "font-medium")}
             >
               <Check
@@ -153,7 +153,7 @@ export function EventEditorFooter({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"
-              onClick={() => void onInvitationResponse("declined")}
+              onClick={() => onInvitationResponse("declined")}
               className={cn(invitationStatus === "declined" && "font-medium")}
             >
               <Check

@@ -42,6 +42,8 @@ const SEMANTIC_COLOR_KEYS = [
   "accentForeground",
   "destructive",
   "destructiveForeground",
+  "success",
+  "overlay",
   "border",
   "input",
   "ring",

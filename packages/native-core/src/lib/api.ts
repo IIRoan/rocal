@@ -1,14 +1,4 @@
-/**
- * Singleton HTTP client and CalendarApiService instances for the native app.
- *
- * The `HttpClient` is configured with the backend base URL and a
- * `getHeaders` callback that injects auth cookies managed by
- * `@better-auth/expo`.
- *
- * The `CalendarApiService` starts with a `NoopE2eeProvider` and is
- * upgraded to the real native E2EE provider after bootstrap completes
- * (via `setE2eeProvider`).
- */
+/** Singleton HTTP client + API services; the E2EE provider is upgraded after bootstrap via setE2eeProvider. */
 import {
   AccountApiService,
   HttpClient,
@@ -123,7 +113,11 @@ export const httpClient = new HttpClient({
   credentials: "omit",
   getHeaders: getAuthHeadersAsync,
   onAuthError: () => {
-    void confirmExpiredSessionThenClear();
+    void confirmExpiredSessionThenClear().catch((error) => {
+      captureException(error, {
+        tags: { area: "auth", reason: "confirm-session-clear" },
+      });
+    });
   },
   onPasskeyStepUpRequired: triggerPasskeyStepUpRequired,
 });

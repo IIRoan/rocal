@@ -32,8 +32,7 @@ export function useCyclingMessage({
 
   const usedMessagesRef = useRef(new Set<string>());
 
-  // Written synchronously during render so the advance() closure always reads
-  // current values without capturing stale state.
+  // Written synchronously during render so the advance() closure always reads current values without capturing stale state.
   const messageArrayRef = useRef(messageArray);
   const currentMessageRef = useRef(currentMessage);
   messageArrayRef.current = messageArray;
@@ -97,9 +96,8 @@ export function useCyclingMessage({
     };
   }, [enabled, cycleInterval, initialDelay]);
 
-  // When the message pool changes (context or messages prop), reset state
-  // so the new pool starts fresh. The cycling effect does not need to restart
-  // because advance() reads messageArrayRef.current at call time.
+  // When the message pool changes (context or messages prop), reset state so the new pool starts fresh.
+  // The cycling effect does not need to restart because advance() reads messageArrayRef.current at call time.
   useEffect(() => {
     usedMessagesRef.current.clear();
     setCurrentMessage(getRandomMessage(messageArray));

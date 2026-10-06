@@ -29,7 +29,7 @@ export function AuthResultsBadge({
   const Icon = tone === "pass" ? ShieldCheck : tone === "fail" ? ShieldX : Shield;
   const color =
     tone === "pass"
-      ? "text-green-600 dark:text-green-500"
+      ? "text-success"
       : tone === "fail"
         ? "text-destructive"
         : "text-muted-foreground";

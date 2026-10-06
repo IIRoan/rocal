@@ -33,6 +33,7 @@ function Calendar({
     weekday: "size-8 p-0 text-xs font-medium text-muted-foreground/80",
     day_button:
       "relative flex size-8 items-center justify-center whitespace-nowrap rounded-full p-0 text-foreground group-[[data-selected]:not(.range-middle)]:[transition-property:color,background-color,border-radius,box-shadow] group-[[data-selected]:not(.range-middle)]:duration-150 group-data-disabled:pointer-events-none focus-visible:z-10 hover:not-in-data-selected:bg-accent group-data-selected:bg-accent hover:not-in-data-selected:text-foreground group-data-selected:text-accent-foreground group-data-disabled:text-foreground/30 group-data-disabled:line-through group-data-outside:text-foreground/30 group-data-selected:group-data-outside:text-accent-foreground outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] group-[.range-start:not(.range-end)]:rounded-e-full group-[.range-end:not(.range-start)]:rounded-s-full group-[.range-middle]:rounded-none group-[.range-middle]:group-data-selected:bg-accent group-[.range-middle]:group-data-selected:text-foreground",
+    // repo-rules-allow theme-tokens-only: range-edge cells are half-covered by the selection accent, which needs a hard-stop gradient.
     day: "group size-8 px-0 py-px text-sm relative before:absolute before:inset-y-px before:inset-x-0 [&.range-start:not(.range-end):before]:bg-linear-to-r before:from-transparent before:from-50% before:to-accent before:to-50% [&.range-end:not(.range-start):before]:bg-linear-to-l",
     range_start: "range-start",
     range_end: "range-end",

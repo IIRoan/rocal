@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { env } from "./env";
 import { createLogger } from "@workspace/logger";
 import { logRef } from "./log-sanitization";
@@ -13,6 +14,24 @@ export type StalwartJmapEnvelope = {
   eventSourceUrl?: string;
   uploadUrl?: string;
 };
+
+const stalwartJmapEnvelopeSchema = z.object({
+  methodResponses: z
+    .array(z.tuple([z.string(), z.record(z.unknown()), z.string()]))
+    .optional(),
+  primaryAccounts: z.record(z.string()).optional(),
+  accounts: z.record(z.unknown()).optional(),
+  eventSourceUrl: z.string().optional(),
+  uploadUrl: z.string().optional(),
+});
+
+/** Untrusted Stalwart JMAP envelope; a body that does not match reads as an empty envelope. */
+export function parseStalwartJmapEnvelope(
+  value: unknown,
+): StalwartJmapEnvelope {
+  const parsed = stalwartJmapEnvelopeSchema.safeParse(value);
+  return parsed.success ? parsed.data : {};
+}
 
 export type StalwartDomainRecord = {
   id: string;
@@ -1303,7 +1322,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
       );
     }
 
-    return (await response.json()) as StalwartJmapEnvelope;
+    return parseStalwartJmapEnvelope(await response.json());
   }
 
   async callJmap(input: {
@@ -1328,7 +1347,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
       );
     }
 
-    return (await response.json()) as StalwartJmapEnvelope;
+    return parseStalwartJmapEnvelope(await response.json());
   }
 
   private getMethodResult<T>(

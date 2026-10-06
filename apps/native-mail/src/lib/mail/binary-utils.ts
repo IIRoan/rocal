@@ -1,7 +1,4 @@
-/**
- * Binary helpers for mail (MIME parsing, attachment cache writes).
- * Chunked to avoid huge single-string allocations on large attachments.
- */
+/** Binary helpers for mail (MIME parsing, attachment cache writes), chunked to avoid huge string allocations. */
 
 const BASE64_CHUNK_SIZE = 0x8000;
 

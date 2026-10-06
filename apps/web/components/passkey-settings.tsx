@@ -1,10 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, Trash2, Key, Smartphone, Usb } from "lucide-react";
+import {
+  useAddPasskey,
+  useDeletePasskey,
+  usePasskeys,
+} from "@/hooks/use-passkeys";
 import {
   PaletteButton,
   PaletteEmptyState,
@@ -24,18 +27,25 @@ interface PasskeySettingsProps {
   startInAddMode?: boolean;
 }
 
+/** Better Auth passkey rows; the loader hook only guarantees a non-empty id. */
+type PasskeyRow = {
+  id: string;
+  name?: string | null;
+  deviceType?: string | null;
+  createdAt?: string | Date | null;
+};
+
 export function PasskeySettings({
   open,
   onBack,
   startInAddMode = false,
 }: PasskeySettingsProps) {
-  const queryClient = useQueryClient();
   const [showAddOverride, setShowAddPasskey] = useState<boolean | null>(null);
   const showAddPasskey = showAddOverride ?? startInAddMode;
   const [passkeyName, setPasskeyName] = useState("");
 
   // Passkey utility functions
-  const getDeviceIcon = (deviceType: string) => {
+  const getDeviceIcon = (deviceType?: string | null) => {
     switch (deviceType) {
       case "platform":
         return Smartphone;
@@ -46,89 +56,16 @@ export function PasskeySettings({
     }
   };
 
-  const { data: passkeys = [], isLoading: passkeyLoading } = useQuery({
-    queryKey: ["passkeys"],
-    queryFn: async () => {
-      const { data, error } = await authClient.passkey.listUserPasskeys();
-      if (error) {
-        throw new Error(error.message || "Failed to load passkeys");
-      }
-      return Array.isArray(data)
-        ? data.filter(
-            (passkey) => passkey && typeof passkey === "object" && passkey.id,
-          )
-        : [];
-    },
-    enabled: open,
-  });
+  const { data: passkeys = [], isLoading: passkeyLoading } = usePasskeys(open);
 
-  const addPasskeyMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const passkeyNameToAdd = name.trim();
-
-      const addOptions = {
-        name: passkeyNameToAdd,
-      };
-
-      const { data, error } = await authClient.passkey.addPasskey(addOptions);
-
-      // Check if there's an error message about "undefined has no properties"
-      // but the passkey might have been added successfully
-      if (error && error.message && error.message.includes("undefined")) {
-        // Refresh the passkey list to check if it was actually added
-        const { data: refreshedData } =
-          await authClient.passkey.listUserPasskeys();
-        const validPasskeys = Array.isArray(refreshedData)
-          ? refreshedData.filter(
-              (passkey) => passkey && typeof passkey === "object" && passkey.id,
-            )
-          : [];
-
-        // Check if the passkey was actually added by looking for it in the refreshed list
-        const wasAdded = validPasskeys.some(
-          (passkey) => passkey && passkey.name === passkeyNameToAdd,
-        );
-
-        if (wasAdded) {
-          return { success: true, name: passkeyNameToAdd };
-        } else {
-          throw new Error(error.message || "Failed to add passkey");
-        }
-      } else if (error) {
-        throw new Error(error.message || "Failed to add passkey");
-      }
-
-      return { success: true, name: passkeyNameToAdd };
-    },
-    onSuccess: (result: { success: boolean; name: string }) => {
-      queryClient.invalidateQueries({ queryKey: ["passkeys"] });
-      toast.success(`Passkey '${result.name}' added successfully`);
+  const addPasskeyMutation = useAddPasskey({
+    onAdded: () => {
       setShowAddPasskey(false);
       setPasskeyName("");
     },
-    onError: (err: any) => {
-      // As a final check, refresh the list and see if the passkey was added
-      // This logic was in the original catch block, but it's hard to replicate exactly in onError
-      // We'll rely on the mutationFn handling the specific "undefined" error case
-      toast.error(err.message || "Failed to add passkey");
-    },
   });
 
-  const deletePasskeyMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await authClient.passkey.deletePasskey({ id });
-      if (error) {
-        throw new Error(error.message || "Failed to delete passkey");
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["passkeys"] });
-      toast.success("Passkey deleted successfully!");
-    },
-    onError: (err: any) => {
-      toast.error(err.message || "Failed to delete passkey");
-    },
-  });
+  const deletePasskeyMutation = useDeletePasskey();
 
   const addPasskey = () => {
     if (!passkeyName.trim()) {
@@ -165,7 +102,7 @@ export function PasskeySettings({
             </PaletteEmptyState>
           ) : (
             <PaletteSection label="Your Passkeys">
-              {passkeys.flatMap((passkey: any) => {
+              {passkeys.flatMap((passkey: PasskeyRow) => {
                 if (!passkey?.id) return [];
 
                 const DeviceIcon = getDeviceIcon(passkey?.deviceType);

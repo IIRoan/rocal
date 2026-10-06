@@ -12,11 +12,18 @@ export const MAIL_LABEL_PRESET_COLORS = [
 
 export const MAIL_LABEL_CUSTOM_DEFAULT_COLOR = "#6366f1";
 
+/** Unknown label definitions use each platform's neutral theme color. */
+export const MAIL_LABEL_GHOST_COLOR = "";
+
 export function isValidLabelHex(value: string): boolean {
   return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value);
 }
 
-export function resolveLabelDisplayColor(color: string): string {
+export function resolveLabelDisplayColor(
+  color: string,
+  neutralColor = "var(--text-tertiary)",
+): string {
+  if (color === MAIL_LABEL_GHOST_COLOR) return neutralColor;
   if (isValidLabelHex(color)) return color;
   return (
     MAIL_LABEL_PRESET_COLORS.find((entry) => entry.value === color)?.hex ??

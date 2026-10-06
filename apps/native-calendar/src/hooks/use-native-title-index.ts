@@ -23,9 +23,13 @@ export function useNativeTitleIndex() {
 
   useEffect(() => {
     let cancelled = false;
-    void isNativeTitleIndexEnabled().then((value) => {
-      if (!cancelled) setEnabledState(value);
-    });
+    void isNativeTitleIndexEnabled()
+      .then((value) => {
+        if (!cancelled) setEnabledState(value);
+      })
+      .catch(() => {
+        // A failed read keeps the safe default (index on); the switch stays at its last value.
+      });
     const unsubscribe = subscribeNativeTitleIndexEnabled((value) => {
       setEnabledState(value);
     });
@@ -79,6 +83,7 @@ export function useNativeTitleIndex() {
     }
 
     let cancelled = false;
+    // repo-rules-allow async-promise-handling: refresh and rebuild never reject; readNativeTitleIndex catches internally and rebuild wraps its awaits.
     void (async () => {
       await refresh();
       if (!cancelled) await rebuild();

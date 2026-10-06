@@ -14,7 +14,7 @@ import {
   createPasswordEnvelope,
   decryptJsonPayload,
   encryptJsonPayload,
-  type EncryptedJsonPayload,
+  parseEncryptedJsonPayload,
 } from "./e2ee-crypto";
 import { clearPendingAuthPassword } from "./e2ee-password-cache";
 import { getActiveE2eeSession } from "./e2ee-session";
@@ -123,9 +123,14 @@ async function resolveEventSensitiveFields(
       throw new Error(`Encrypted event ${event.id} is missing ciphertext.`);
     }
 
+    const encryptedContent = parseEncryptedJsonPayload(event.encryptedContent);
+    if (!encryptedContent) {
+      throw new Error(`Encrypted event ${event.id} has a corrupt payload.`);
+    }
+
     const decrypted = await decryptJsonPayload<EventSensitiveFields>(
       accountKey,
-      JSON.parse(event.encryptedContent) as EncryptedJsonPayload,
+      encryptedContent,
       `event-content:v${event.encryptionKeyVersion ?? DEFAULT_ENCRYPTION_KEY_VERSION}`,
     );
     const title = decrypted.title.trim();

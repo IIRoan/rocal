@@ -14,7 +14,7 @@ import { createRoot, type Root } from "react-dom/client";
 const mockRouterReplace = jest.fn();
 const mockStartRouteTransition = jest.fn();
 const mockCompleteAuthNavigation = jest.fn();
-const mockRefetchSession = jest.fn();
+const mockRefetchSession = jest.fn(async () => undefined);
 let mockSearchParams = new URLSearchParams();
 
 jest.mock("next/image", () => ({
@@ -198,6 +198,7 @@ jest.mock("@/lib/auth-client", () => ({
 import { LoginForm } from "../../app/login/login-form-entry";
 import { accountApiService, inviteApiService } from "@/lib/api-clients";
 import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
+import { authSessionDataFixture } from "../mocks/auth-session";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import {
   clearAuthPasswords,
@@ -267,6 +268,8 @@ describe("LoginForm", () => {
     mockUseSession.mockReturnValue({
       data: null,
       isPending: false,
+      isRefetching: false,
+      error: null,
       refetch: mockRefetchSession,
     });
     mockGetSignupConfig.mockResolvedValue({
@@ -294,7 +297,10 @@ describe("LoginForm", () => {
     mockEmailSignIn.mockResolvedValue({});
     mockGetSession.mockResolvedValue({ data: null, error: null });
     mockEmailSignUp.mockResolvedValue({});
-    mockPasskeySignIn.mockResolvedValue({ user: { id: "user-1" } });
+    mockPasskeySignIn.mockResolvedValue({
+      data: authSessionDataFixture,
+      error: null,
+    });
     mockRequestPasswordReset.mockResolvedValue({});
     mockGetAuthStatus.mockResolvedValue({
       authenticated: true,
@@ -775,12 +781,10 @@ describe("LoginForm", () => {
     });
 
     expect(mockClearAuthPasswords).not.toHaveBeenCalled();
-    expect(mockPasskeySignIn).toHaveBeenCalledWith({
-      autoFocus: true,
-    });
+    expect(mockPasskeySignIn).toHaveBeenCalledWith();
   });
 
-  it("redirects after a successful auto-prompted passkey step-up even when the passkey response omits the user payload", async () => {
+  it("redirects after a successful auto-prompted passkey step-up", async () => {
     mockGetAuthStatus
       .mockResolvedValueOnce({
         authenticated: true,
@@ -792,7 +796,10 @@ describe("LoginForm", () => {
         hasPasskeys: true,
         requiresPasskeyStepUp: false,
       });
-    mockPasskeySignIn.mockResolvedValue({});
+    mockPasskeySignIn.mockResolvedValue({
+      data: authSessionDataFixture,
+      error: null,
+    });
 
     await renderForm();
 
@@ -816,9 +823,7 @@ describe("LoginForm", () => {
       await Promise.resolve();
     });
 
-    expect(mockPasskeySignIn).toHaveBeenCalledWith({
-      autoFocus: true,
-    });
+    expect(mockPasskeySignIn).toHaveBeenCalledWith();
     expect(mockCompleteAuthNavigation).toHaveBeenCalledWith("/calendar");
   });
 
@@ -837,14 +842,10 @@ describe("LoginForm", () => {
 
   it("recovers stale client sessions instead of redirecting from the login page", async () => {
     mockUseSession.mockReturnValue({
-      data: {
-        user: {
-          id: "user-1",
-          email: "roan@solace.onl",
-          name: "Roan",
-        },
-      },
+      data: authSessionDataFixture,
       isPending: false,
+      isRefetching: false,
+      error: null,
       refetch: mockRefetchSession,
     });
     mockReconcileAuthSession.mockResolvedValue({ status: "recovered" });
@@ -868,14 +869,10 @@ describe("LoginForm", () => {
 
   it("stays on login and prompts for passkey when step-up is required", async () => {
     mockUseSession.mockReturnValue({
-      data: {
-        user: {
-          id: "user-1",
-          email: "roan@solace.onl",
-          name: "Roan",
-        },
-      },
+      data: authSessionDataFixture,
       isPending: false,
+      isRefetching: false,
+      error: null,
       refetch: mockRefetchSession,
     });
     mockGetAuthStatus.mockResolvedValue({
@@ -896,9 +893,7 @@ describe("LoginForm", () => {
     });
 
     expect(mockCompleteAuthNavigation).not.toHaveBeenCalled();
-    expect(mockPasskeySignIn).toHaveBeenCalledWith({
-      autoFocus: true,
-    });
+    expect(mockPasskeySignIn).toHaveBeenCalledWith();
     expect(container.textContent).toContain("Verify your passkey");
     expect(container.textContent).toContain(
       "This device still needs to verify a passkey registered on another device.",

@@ -1,6 +1,4 @@
-/**
- * Backwards-compatible re-exports — prefer `app-layout` for new code.
- */
+/** Backwards-compatible re-exports; prefer `app-layout` for new code. */
 export {
   LAYOUT_ICON,
   LAYOUT_METRICS,

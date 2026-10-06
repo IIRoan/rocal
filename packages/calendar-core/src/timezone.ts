@@ -1,3 +1,4 @@
+// repo-rules-allow timezone-safe-calendar-code: startOfDay normalizes wall-clock picker days, never UTC event instants.
 import {
   addDays,
   eachDayOfInterval,
@@ -240,11 +241,7 @@ function getAllDayEventTimezone(
   return resolveTimezone(eventTimezone?.trim() || viewerTimezone);
 }
 
-/**
- * Returns the inclusive first/last calendar picker days covered by an event.
- * All-day events may end at exclusive midnight, inclusive 23:59:59, or UTC date
- * boundaries depending on how they were persisted.
- */
+/** Inclusive first/last picker days of an event; all-day ends may be exclusive midnight, 23:59:59, or UTC boundaries. */
 export function getInclusiveCalendarDayRange(
   start: Date,
   end: Date,

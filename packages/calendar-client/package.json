@@ -18,6 +18,7 @@
     "typescript": "^5.9.3"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./account-query-options": "./src/account-query-options.ts"
   }
 }

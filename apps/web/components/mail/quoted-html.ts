@@ -6,10 +6,7 @@ import type { Editor } from "@tiptap/react";
 
 export const QUOTED_HTML_MARKER = "data-quoted-html";
 
-/**
- * Atomic block node that carries verbatim quoted/forwarded email HTML.
- * See Bulwark webmail reference — layout-heavy emails survive 1:1 in the editor.
- */
+/** Atomic block node carrying verbatim quoted/forwarded email HTML so layout-heavy emails survive 1:1 in the editor. */
 export const QuotedHtml = TiptapNode.create({
   name: "quotedHtml",
   group: "block",
@@ -65,7 +62,7 @@ export const QuotedHtml = TiptapNode.create({
           height: auto;
         }
         a {
-          color: var(--primary, #b45309);
+          color: var(--primary);
         }
         body, div {
           font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

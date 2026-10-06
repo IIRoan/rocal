@@ -150,6 +150,30 @@ export async function encryptNameRequest<T extends NameRequest>(
   };
 }
 
+/** Wire shape of an encrypted name envelope; anything else is undecryptable. */
+export function isEncryptedJsonPayload(value: unknown): value is EncryptedJsonPayload {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    record.algorithm === "AES-GCM" &&
+    typeof record.iv === "string" &&
+    typeof record.ciphertext === "string" &&
+    typeof record.version === "number"
+  );
+}
+
+/** Corrupt persisted envelopes remain undecryptable so callers can use their fallback. */
+export function parseEncryptedJsonPayload(raw: string): EncryptedJsonPayload | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isEncryptedJsonPayload(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function decryptEntityName(
   e2ee: ContentDecrypter,
   keys: Pick<E2eeSessionKeys, "accountKey">,
@@ -161,10 +185,14 @@ export async function decryptEntityName(
   }
 
   try {
-    const payload = JSON.parse(record.encryptedName) as EncryptedJsonPayload;
+    const parsed = parseEncryptedJsonPayload(record.encryptedName);
+    if (!parsed) {
+      return null;
+    }
+
     const decrypted = await e2ee.decryptJsonPayload<{ name?: unknown }>(
       keys.accountKey,
-      payload,
+      parsed,
       encryptedNameAad(
         kind,
         record.encryptionKeyVersion ?? CONTENT_ENCRYPTION_KEY_VERSION,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useReducer } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import type { UnifiedSearchResult } from "@workspace/calendar-core";
 import { formatCalendarDayKey } from "@workspace/calendar-core";
@@ -29,11 +29,9 @@ import {
   persistSettingsReset,
   persistSettingsUpdate,
 } from "./command-palette-actions";
-import { authClient, useSession } from "@/lib/auth-client";
-import {
-  extractLinkedAuthAccounts,
-  summarizeLinkedAuthAccounts,
-} from "@workspace/calendar-core";
+import { useSession } from "@/lib/auth-client";
+import { summarizeLinkedAuthAccounts } from "@workspace/calendar-core";
+import { useLinkedAuthAccounts } from "@/hooks/use-linked-auth-accounts";
 import { useNumberedShortcuts, useIsMobile } from "@workspace/ui/hooks";
 import type { JmapEmailMessage } from "@/lib/mail/types";
 import { buildMailUrlFromIds } from "@/lib/mail/mail-url";
@@ -61,19 +59,7 @@ export function useCommandPaletteController({
   const queryClient = useQueryClient();
   const { data: session, isPending: sessionLoading } = useSession();
   const sessionUserId = session?.user?.id ?? null;
-  const accountsQuery = useQuery({
-    queryKey: ["auth", "accounts", sessionUserId],
-    queryFn: async () => {
-      if (typeof authClient.listAccounts !== "function") {
-        return [];
-      }
-
-      return extractLinkedAuthAccounts(await authClient.listAccounts());
-    },
-    enabled:
-      Boolean(sessionUserId) && typeof authClient.listAccounts === "function",
-    staleTime: 5 * 60 * 1000,
-  });
+  const accountsQuery = useLinkedAuthAccounts();
   const { setCurrentDate, setCurrentView: setCalendarView } =
     useCalendarContext();
 

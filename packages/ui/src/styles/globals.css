@@ -360,6 +360,7 @@
 }
 
 @layer base {
+  /* repo-rules-allow motion-compositor-only: the skeleton shimmer sweeps a gradient's background-position; the gradient element is the shared Skeleton in packages/ui, so a transform-based sweep would need a markup change there. */
   @keyframes shimmer {
     0% {
       background-position: -200% 0;
@@ -519,10 +520,6 @@
 
   .animate-scale-in {
     animation: scaleIn 0.2s ease-out;
-  }
-
-  .transition-smooth {
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .transition-bounce {
@@ -891,19 +888,6 @@
   }
 }
 
-@keyframes fieldExpandIn {
-  0% {
-    opacity: 0;
-    transform: translateY(-8px) scaleY(0.9);
-    max-height: 0;
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scaleY(1);
-    max-height: 500px;
-  }
-}
-
 @keyframes chipPop {
   0% {
     opacity: 0;
@@ -915,26 +899,6 @@
   100% {
     opacity: 1;
     transform: scale(1);
-  }
-}
-
-@keyframes subtleGlow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-  50% {
-    box-shadow: 0 0 16px 2px
-      color-mix(in oklch, var(--primary) 20%, transparent);
-  }
-}
-
-@keyframes shimmerHighlight {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
   }
 }
 
@@ -1007,7 +971,9 @@
   box-shadow:
     inset 0 1px 2px color-mix(in oklch, var(--foreground) 3%, transparent),
     0 1px 0 color-mix(in oklch, var(--background) 50%, transparent);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .input-premium:hover {
@@ -1055,7 +1021,11 @@
 .option-pill {
   background: color-mix(in oklch, var(--muted) 40%, transparent);
   border: 1px solid color-mix(in oklch, var(--border) 40%, transparent);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
@@ -1101,7 +1071,9 @@
     0 1px 2px color-mix(in oklch, var(--primary) 30%, transparent),
     0 4px 12px color-mix(in oklch, var(--primary) 20%, transparent),
     inset 0 1px 0 color-mix(in oklch, white 15%, transparent);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-action-primary:hover {
@@ -1123,7 +1095,9 @@
 .command-item-premium {
   border-radius: calc(var(--radius) - 2px);
   margin: 2px 4px;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
 }
 
@@ -1150,17 +1124,14 @@
   border-radius: 0 2px 2px 0;
   opacity: 0;
   transform: scaleY(0);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .command-item-premium[data-selected="true"]::before {
   opacity: 1;
   transform: scaleY(1);
-}
-
-.field-expand {
-  animation: fieldExpandIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  transform-origin: top;
 }
 
 .chip-pop {
@@ -1211,7 +1182,9 @@
 .icon-contrast {
   color: var(--muted-foreground);
   opacity: 0.8;
-  transition: all 0.15s ease;
+  transition:
+    color 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .icon-contrast:hover,
@@ -1249,7 +1222,7 @@
   font-size: 1.25rem;
   font-weight: 600;
   padding: 0.5rem 0;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
 .title-input-premium:focus {

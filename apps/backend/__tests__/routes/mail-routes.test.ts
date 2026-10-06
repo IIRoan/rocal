@@ -38,9 +38,7 @@ const mockMailService = {
   getDirectoryKey: jest.fn(),
   getMailboxStatusForUser: jest.fn(),
   bootstrapForUser: jest.fn(),
-  getVaultBackup: jest.fn(),
   getVaultBackupForUser: jest.fn(),
-  upsertVaultBackup: jest.fn(),
   upsertVaultBackupForUser: jest.fn(),
   deleteMailboxForUser: jest.fn(),
 };

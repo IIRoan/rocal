@@ -45,6 +45,7 @@ export function useNotificationExtensionSync({
       return;
     }
     if (!isAuthenticated) {
+      // repo-rules-allow async-promise-handling: clearNotificationExtensionSecrets catches every delete internally.
       void clearNotificationExtensionSecrets();
       return;
     }

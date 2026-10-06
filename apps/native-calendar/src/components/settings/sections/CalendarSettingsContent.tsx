@@ -1,10 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  getErrorMessage,
-  partitionCalendarsByKind,
-  type Calendar,
-} from "@workspace/calendar-core";
+import { partitionCalendarsByKind } from "@workspace/calendar-core";
 import { SettingsPage } from "@workspace/native-core/components/settings/SettingsPage";
 import {
   SheetCenteredState,
@@ -15,9 +10,10 @@ import {
   SheetSection,
 } from "@workspace/native-core/components/sheet/SheetSections";
 import { useNativeUserSettings } from "@workspace/native-core/hooks/use-native-user-settings";
-import { calendarApiService } from "@workspace/native-core/lib/api";
-import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
-import { useToast } from "@workspace/native-core/providers/ToastProvider";
+import {
+  useSetDefaultCalendar,
+  useSettingsCalendars,
+} from "../../../hooks/use-calendar-settings";
 import {
   WEEK_START_OPTIONS,
   WEEKDAY_OPTIONS,
@@ -29,19 +25,13 @@ import {
 } from "../../../lib/settings-working-days";
 
 export function CalendarSettingsContent() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
   const { settings, isLoading, pendingKeys, updateSetting } =
     useNativeUserSettings();
   const [pendingDefaultCalendarId, setPendingDefaultCalendarId] = useState<
     string | null
   >(null);
 
-  const { data: calendars = [] } = useQuery({
-    queryKey: QUERY_KEYS.calendars(),
-    queryFn: () => calendarApiService.getCalendars(),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: calendars = [] } = useSettingsCalendars();
 
   const { ownedCalendars } = useMemo(
     () => partitionCalendarsByKind(calendars),
@@ -63,42 +53,9 @@ export function CalendarSettingsContent() {
     [settings?.workingDays],
   );
 
-  const setDefaultCalendarMutation = useMutation({
-    mutationFn: (calendarId: string) =>
-      calendarApiService.updateCalendar(calendarId, { isDefault: true }),
-    onMutate: async (calendarId) => {
-      setPendingDefaultCalendarId(calendarId);
-      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.calendars() });
-      const previous = queryClient.getQueryData<Calendar[]>(
-        QUERY_KEYS.calendars(),
-      );
-      if (previous) {
-        queryClient.setQueryData<Calendar[]>(
-          QUERY_KEYS.calendars(),
-          previous.map((calendar) => ({
-            ...calendar,
-            isDefault: calendar.id === calendarId,
-          })),
-        );
-      }
-      return { previous };
-    },
-    onError: (error, _calendarId, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(QUERY_KEYS.calendars(), context.previous);
-      }
-      toast(
-        getErrorMessage(error, "Failed to update default calendar"),
-        "error",
-      );
-    },
-    onSettled: () => {
-      setPendingDefaultCalendarId(null);
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
-      queryClient.invalidateQueries({ queryKey: ["events"] });
-    },
-  });
+  const setDefaultCalendarMutation = useSetDefaultCalendar(
+    setPendingDefaultCalendarId,
+  );
 
   const handleToggleWorkingDay = useCallback(
     (day: number) => {

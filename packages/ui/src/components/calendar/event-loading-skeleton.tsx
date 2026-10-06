@@ -15,7 +15,7 @@ export function EventLoadingSkeleton({ className }: EventLoadingSkeletonProps) {
   return (
     <div
       className={cn(
-        "absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-[1px]",
+        "absolute inset-0 z-10 flex items-center justify-center bg-background/50",
         className,
       )}
     >

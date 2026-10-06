@@ -95,10 +95,10 @@ export function MessageReaderHeaderAttachments({
                     size="xs"
                     type="button"
                     onClick={
-                      canPreview
-                        ? () => onPreviewAttachment!(attachment)
-                        : canDownload
-                          ? () => onDownloadAttachment!(attachment)
+                      canPreview && onPreviewAttachment
+                        ? () => onPreviewAttachment(attachment)
+                        : canDownload && onDownloadAttachment
+                          ? () => onDownloadAttachment(attachment)
                           : undefined
                     }
                     onMouseEnter={() =>
@@ -191,12 +191,12 @@ export function MessageReaderHeaderAttachments({
                         </div>
                       </div>
                     )}
-                    {canPreview && canDownload && (
+                    {canPreview && canDownload && onDownloadAttachment && (
                       <Button
                         variant="secondary"
                         size="xs"
                         type="button"
-                        onClick={() => onDownloadAttachment!(attachment)}
+                        onClick={() => onDownloadAttachment(attachment)}
                         aria-label={`Download ${name}`}
                         className={cn(
                           "cursor-pointer px-1.5",

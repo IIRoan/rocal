@@ -141,21 +141,11 @@ function tokenMatchesInText(normalizedValue: string, token: string): boolean {
   return pattern.test(` ${normalizedValue} `);
 }
 
-/**
- * Prefix and fuzzy matches contribute less score than exact matches so a
- * partial or typo-tolerant result still ranks below an exact match for the
- * same query.
- */
+/** Prefix/fuzzy hits weigh below exact matches so partial or typo results rank under an exact hit. */
 const PREFIX_MATCH_WEIGHT = 0.75;
 const FUZZY_MATCH_WEIGHT = 0.5;
 
-/**
- * Max edits tolerated for a token of a given length, mirroring the "AUTO"
- * fuzziness convention (e.g. Elasticsearch): tokens up to 2 chars must
- * match exactly or by prefix (general edit-distance is too noisy at that
- * length — e.g. "me" would fuzzy-match "re"), 3-5 char tokens tolerate one
- * edit, longer tokens tolerate two.
- */
+/** Elasticsearch-AUTO fuzziness: 1-2 char tokens match exactly, 3-5 tolerate one edit, longer two. */
 function fuzzyMatchThreshold(tokenLength: number): number {
   if (tokenLength <= 2) return 0;
   if (tokenLength <= 5) return 1;
@@ -176,39 +166,27 @@ function levenshteinDistance(a: string, b: string): number {
     currentRow[0] = i;
     for (let j = 1; j <= bLen; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      currentRow[j] = Math.min(
-        previousRow[j]! + 1,
-        currentRow[j - 1]! + 1,
-        previousRow[j - 1]! + cost,
-      );
+      // Both rows span 0..bLen and fill left to right, so every indexed read below is already written.
+      currentRow[j] = Math.min(previousRow[j]! + 1, currentRow[j - 1]! + 1, previousRow[j - 1]! + cost);
     }
     previousRow = currentRow;
   }
 
-  return previousRow[bLen]!;
+  return previousRow[bLen]!; // The final row is fully written through bLen.
 }
 
 function splitToWords(normalizedValue: string): string[] {
   return normalizedValue.split(/[\s@._+-]+/).filter(Boolean);
 }
 
-/**
- * Prefix fallback for when a query token has no exact match — e.g. "hi"
- * should still find "hii" or "him", mirroring the wildcard suffix the app
- * already sends to the server (see toJmapTextQuery). Requires the word to
- * be strictly longer than the token so it doesn't re-detect exact matches.
- */
+/** Prefix fallback mirroring the server wildcard (toJmapTextQuery); longer words avoid re-detecting exact matches. */
 function prefixTokenMatchesWords(words: string[], token: string): boolean {
   return words.some(
     (word) => word.length > token.length && word.startsWith(token),
   );
 }
 
-/**
- * Typo-tolerant fallback for when a query token has no exact or prefix
- * match in the field text — e.g. "meesage" should still find "message".
- * Only checked once those checks fail, so it never weakens better matches.
- */
+/** Typo-tolerant last resort (e.g. "meesage" → "message"), checked after exact and prefix so it never weakens them. */
 function fuzzyTokenMatchesWords(words: string[], token: string): boolean {
   const maxDistance = fuzzyMatchThreshold(token.length);
   if (maxDistance === 0) return false;
@@ -372,10 +350,7 @@ export function sortMailMessagesBySearchRelevance<T extends MailSearchScorableMe
   return ranked.map((entry) => entry.message);
 }
 
-/**
- * Strips JMAP wildcard suffixes from a text filter so client-side relevance
- * ranking uses the same tokens the user typed.
- */
+/** Strips JMAP wildcard suffixes so client-side ranking scores the tokens the user typed. */
 export function extractTextQueryFromJmapFilter(
   filter: Record<string, unknown>,
 ): string | undefined {

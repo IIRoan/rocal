@@ -13,6 +13,7 @@ import {
 export function roundToNextHour(date: Date): Date {
   const d = new Date(date);
   if (d.getMinutes() > 0 || d.getSeconds() > 0 || d.getMilliseconds() > 0) {
+    // repo-rules-allow timezone-safe-calendar-code: rounds the device's current local time into a default picker wall-clock value, not an event instant.
     d.setHours(d.getHours() + 1, 0, 0, 0);
   }
   return d;

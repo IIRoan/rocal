@@ -16,7 +16,7 @@ Solace is a privacy-first calendar + mail product: one web app and two native ap
 | `apps/stalwart`       | Stalwart mail server, JMAP desired-state plan, VPS HAProxy/frp (`vps/README.md`). Deploy VPS scripts → Railway image → Gatus.             |
 | `apps/gatus`, `apps/errex` | Status page; self-hosted Sentry-compatible error tracker. Railway IaC in `.railway/railway.ts` (web + API stay on Vercel).           |
 | `packages/calendar-core`   | Shared types, Zod schemas, date/timezone helpers, search index, sanitizers — **all logic both apps need goes here**.               |
-| `packages/calendar-client` | Typed HTTP client for the backend (used by web and native).                                                                       |
+| `packages/calendar-client` | Typed HTTP client and shared account query/mutation options (used by web and native).                                             |
 | `packages/e2ee`            | E2EE primitives (AES-GCM-256, RSA-OAEP-4096, HMAC-SHA-256) with platform crypto providers.                                        |
 | `packages/ui`, `design-tokens` | Shared web UI (shadcn + calendar views); mail uses a Nightwatch reimplementation in `packages/ui/src/solace` (`data-solace` only). Tokens for web CSS vars and native `ThemeProvider`. |
 | `packages/calendar-ics`, `logger`, `eslint-config`, `typescript-config`, `runtime` | ICS/recurrence, logging, lint rules, TS configs, runtime helpers.                     |
@@ -71,7 +71,7 @@ Default stance: **the server should not be able to read user content, and we sho
 ## 4. Data layer: TanStack Query (MUST)
 
 - Server state lives in TanStack Query; UI state in local state or React Context. **No other state library** (enforced).
-- **Query keys come from a factory, never inline arrays.** Native: `packages/native-core/src/lib/query-keys.ts`; web mail: `apps/web/lib/mail/mail-query-keys.ts`. New keys go in a factory; migrate inline `["events"]`-style keys when you touch them. Keys shared across apps belong in `calendar-core` (like `PUSH_DEVICES_QUERY_KEY`). Same data = same key name on both platforms.
+- **Query keys come from a factory, never inline arrays.** Native: `packages/native-core/src/lib/query-keys.ts`; web mail: `apps/web/lib/mail/mail-query-keys.ts`; other web keys: `apps/web/lib/query-keys.ts`. New keys go in a factory; migrate inline `["events"]`-style keys when you touch them. Keys shared across apps belong in `calendar-core` (like `PUSH_DEVICES_QUERY_KEY`). Same data = same key name on both platforms.
 - `useQuery`/`useMutation` live in domain hooks (`use-*.ts`), not directly in screens/components. Components consume hooks.
 - No `useEffect` + `fetch`/`setState` for server data; no copying query data into state.
 - Effects synchronize external systems, not derived values or user interactions: derive during render/`select`, act in event handlers, and clean up resources or guard stale async results when dependencies change. Editable drafts are local state, not mirrored server state.
@@ -133,6 +133,7 @@ Verify only — **don't start dev servers, builds, tunnels, EAS builds, OTA publ
 - `bun run typecheck` / `bun run typecheck:native` (native-core + both apps)
 - `bun run test` runs every workspace with a `test` script, packages included (or `test:backend|native|ui|notifications`, single file paths)
 - `bun run lint:react-doctor`; Prisma: `cd apps/backend && bun run db:generate`
+- Native OTA wrappers share `scripts/native-publish-update.ts`; keep build-profile validation and runtime pinning there.
 - `bun run check:rules` — offline AST/regex repo rules in `scripts/repo-rules/` (privacy, API, data, comments, strict TypeScript, React, WCAG, theme tokens, cross-browser motion; list in its `README.md`). Each rule self-tests its bad/good examples first. Narrow with `--rule=<id>`, file paths, or `--counts`. A reviewed exception is `// repo-rules-allow <rule-id>: <reason>` on the line or the line above; never allow-comment to silence a real violation.
 
 CI (`.github/workflows/pr-tests.yml`) runs lint, both typechecks, and tests on every PR. API-level e2e against a deployed or local API: `cd apps/backend && E2E_API_URL=https://api.solace.onl bun run e2e:api`. Optional env: `E2E_WEB_URL` (web header checks), `E2E_COOKIE` (signed-in checks; reject-only, writes nothing), `E2E_RATE_LIMIT=1` (burns this IP's sign-in budget).

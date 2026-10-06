@@ -41,6 +41,8 @@ export {
   encryptNameRequest,
   hydrateEncryptedName,
   hydrateEncryptedNameWithoutSession,
+  isEncryptedJsonPayload,
+  parseEncryptedJsonPayload,
   shouldEncryptEventContent,
 } from "./payloads";
 export type {

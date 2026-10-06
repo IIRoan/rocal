@@ -50,6 +50,7 @@ import {
   isSolaceEventReminderEmail,
 } from "@/lib/mail/calendar-event-link";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { webQueryKeys } from "@/lib/query-keys";
 import { useMailCalendarInvitation } from "@/hooks/use-mail-calendar-invitation";
 import {
   initialMessageReaderChromeState,
@@ -198,8 +199,8 @@ export function useMessageReaderController(props: MessageReaderProps) {
   const calendarEventLinkSource = message
     ? getCalendarEventLinkSource(message, plaintext)
     : null;
-  const linkedCalendarEventId = calendarEventLinkSource
-    ? extractLinkedCalendarEventId(message!, plaintext)
+  const linkedCalendarEventId = message && calendarEventLinkSource
+    ? extractLinkedCalendarEventId(message, plaintext)
     : null;
   const calendarInvitation = useMailCalendarInvitation({
     message,
@@ -237,8 +238,9 @@ export function useMessageReaderController(props: MessageReaderProps) {
     isError: isLinkedEventError,
     error: linkedEventQueryError,
   } = useQuery({
-    queryKey: ["events", "detail", linkedCalendarEventId],
+    queryKey: webQueryKeys.eventDetail(linkedCalendarEventId),
     enabled: Boolean(isEventReminderEmail && linkedCalendarEventId),
+    // TanStack only runs queryFn while enabled, so linkedCalendarEventId is guaranteed set here.
     queryFn: () => calendarApiService.getEvent(linkedCalendarEventId!),
   });
   const linkedCalendarEvent = ((): LinkedCalendarEventState | null => {

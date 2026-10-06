@@ -28,9 +28,12 @@ export {
   resolveInlineColorValue,
 } from "./color-utils";
 
-/**
- * Get CSS classes for border radius based on event position in multi-day events
- */
+/** True for ghost previews that mergePreviewCalendarEvents injected with an isPreview flag. */
+export function isPreviewEvent(event: CalendarEvent): boolean {
+  return (event as CalendarEvent & { isPreview?: boolean }).isPreview === true;
+}
+
+/** Border-radius classes for an event's position in a multi-day span. */
 export function getBorderRadiusClasses(
   isFirstDay: boolean,
   isLastDay: boolean,
@@ -59,10 +62,7 @@ export function getBorderRadiusClasses(
     : "rounded-none";
 }
 
-/**
- * Events rendered in the all-day header row of timeline views.
- * Includes true all-day events and timed events that span multiple calendar days.
- */
+/** All-day header row: true all-day events plus timed events spanning multiple days. */
 export function isAllDayRowEvent(
   event: CalendarEvent,
   timezone?: string,
@@ -70,9 +70,7 @@ export function isAllDayRowEvent(
   return event.allDay === true || isMultiDayEvent(event, timezone);
 }
 
-/**
- * Border segment flags for a multi-day or all-day event on a specific calendar day.
- */
+/** Border segment flags for an event on a specific calendar day. */
 export function getEventSegmentForCalendarDay(
   event: CalendarEvent,
   calendarDay: Date,
@@ -86,9 +84,6 @@ export function getEventSegmentForCalendarDay(
   };
 }
 
-/**
- * Check if an event is a multi-day event
- */
 export function isMultiDayEvent(
   event: CalendarEvent,
   timezone?: string,
@@ -109,11 +104,7 @@ export function isMultiDayEvent(
   return !isSameDay(eventStart, eventEnd);
 }
 
-/**
- * Normalize an event's interval for overlap checks.
- * - For day-level granularity: compare on day boundaries and treat end as endOfDay
- * - For time-level granularity: use actual start/end
- */
+/** Interval for overlap checks: day granularity compares day boundaries; time granularity uses the actual instants. */
 export function getEventInterval(
   event: CalendarEvent,
   granularity: "day" | "time" = "day",
@@ -148,10 +139,6 @@ export function getEventInterval(
   return { start, end };
 }
 
-/**
- * Check if an event overlaps a target range [start, end]
- * Uses day-level or time-level semantics.
- */
 export function eventOverlapsRange(
   event: CalendarEvent,
   rangeStart: Date,
@@ -181,9 +168,6 @@ export function eventOverlapsRange(
   return start < rEnd && end > rStart;
 }
 
-/**
- * Check if an event overlaps a calendar picker day in the user's timezone.
- */
 export function calendarDayOverlapsEvent(
   event: CalendarEvent,
   calendarDay: Date,
@@ -194,9 +178,6 @@ export function calendarDayOverlapsEvent(
 
 export { getTimedTimelineEventsForDay };
 
-/**
- * Filter events for a specific day
- */
 export function getEventsForDay(
   events: CalendarEvent[],
   day: Date,
@@ -219,9 +200,7 @@ export function getEventsForDay(
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 }
 
-/**
- * Sort events with multi-day events first, then by start time
- */
+/** Multi-day events first, then by start time. */
 export function sortEvents(
   events: CalendarEvent[],
   timezone?: string,
@@ -237,9 +216,7 @@ export function sortEvents(
   });
 }
 
-/**
- * Get multi-day events that span across a specific day (but don't start on that day)
- */
+/** Multi-day events spanning a day without starting on it. */
 export function getSpanningEventsForDay(
   events: CalendarEvent[],
   day: Date,
@@ -275,9 +252,7 @@ export function getSpanningEventsForDay(
   });
 }
 
-/**
- * Get all events visible on a specific day (starting, ending, or spanning)
- */
+/** Events starting, ending, or spanning the day. */
 export function getAllEventsForDay(
   events: CalendarEvent[],
   day: Date,
@@ -297,9 +272,6 @@ export function getAllEventsForDay(
   );
 }
 
-/**
- * Get all events for a day (for agenda view)
- */
 export function getAgendaEventsForDay(
   events: CalendarEvent[],
   day: Date,
@@ -326,18 +298,12 @@ export function getAgendaEventsForDay(
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 }
 
-/**
- * Add hours to a date
- */
 export function addHoursToDate(date: Date, hours: number): Date {
   const result = new Date(date);
   result.setHours(result.getHours() + hours);
   return result;
 }
 
-/**
- * Add minutes to a date
- */
 export function addMinutesToDate(date: Date, minutes: number): Date {
   const result = new Date(date);
   result.setMinutes(result.getMinutes() + minutes);

@@ -96,7 +96,7 @@ export function MessageReaderHeader({
               </span>
             )}
           </div>
-          {(message.to?.length ?? 0) > 0 && (
+          {message.to && message.to.length > 0 && (
             <div
               className={cn(
                 "min-w-0 text-muted-foreground",
@@ -107,14 +107,14 @@ export function MessageReaderHeader({
             >
               <span>To:</span>
               <RecipientPopoverList
-                recipients={message.to!}
+                recipients={message.to}
                 currentUserEmail={accountEmail}
                 currentUserName={accountName}
                 className="min-w-0 text-foreground/80"
               />
             </div>
           )}
-          {(message.cc?.length ?? 0) > 0 && (
+          {message.cc && message.cc.length > 0 && (
             <div
               className={cn(
                 "min-w-0 text-muted-foreground",
@@ -125,7 +125,7 @@ export function MessageReaderHeader({
             >
               <span>CC:</span>
               <RecipientPopoverList
-                recipients={message.cc!}
+                recipients={message.cc}
                 currentUserEmail={accountEmail}
                 currentUserName={accountName}
                 className="min-w-0 text-foreground/80"
@@ -143,7 +143,7 @@ export function MessageReaderHeader({
       )}
 
       {decryptError && (
-        <div className="rounded-md border border-amber-200/60 bg-amber-50/60 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 mt-3">
+        <div className="mt-3 rounded-md border border-destructive/60 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {decryptError}
         </div>
       )}

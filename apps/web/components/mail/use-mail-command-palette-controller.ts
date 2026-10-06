@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useReducer, useState, type KeyboardEvent } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import type { UnifiedSearchResult } from "@workspace/calendar-core";
-import {
-  extractLinkedAuthAccounts,
-  summarizeLinkedAuthAccounts,
-} from "@workspace/calendar-core";
+import { summarizeLinkedAuthAccounts } from "@workspace/calendar-core";
 import { authClient, useSession } from "@/lib/auth-client";
+import { useLinkedAuthAccounts } from "@/hooks/use-linked-auth-accounts";
 import { useSettings } from "@/hooks/use-settings";
 import { usePrivateSearchIndexControls } from "@/hooks/use-private-search-index-controls";
 import { useUnifiedSearch } from "@/hooks/use-unified-search";
@@ -87,16 +85,7 @@ export function useMailCommandPaletteController({
   const sessionUserId = session?.user?.id ?? null;
   const { settings, updateSettings } = useSettings();
   const queryClient = useQueryClient();
-  const accountsQuery = useQuery({
-    queryKey: ["auth", "accounts", sessionUserId],
-    queryFn: async () => {
-      if (typeof authClient.listAccounts !== "function") return [];
-      return extractLinkedAuthAccounts(await authClient.listAccounts());
-    },
-    enabled:
-      Boolean(sessionUserId) && typeof authClient.listAccounts === "function",
-    staleTime: 5 * 60 * 1000,
-  });
+  const accountsQuery = useLinkedAuthAccounts();
   const linkedAccounts = accountsQuery.data ?? [];
   const { hasOAuthAccount, hasPasswordAccount } =
     summarizeLinkedAuthAccounts(linkedAccounts);

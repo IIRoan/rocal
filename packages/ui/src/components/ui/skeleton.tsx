@@ -23,8 +23,9 @@ function Skeleton({
     <div
       data-slot="skeleton"
       className={cn(
-        "bg-gradient-to-r from-accent/80 via-accent to-accent/80 rounded-md",
+        "bg-accent rounded-md",
         variant === "shimmer" &&
+          // repo-rules-allow theme-tokens-only: shimmer sweep is inherently a moving accent gradient, not a flat surface.
           "bg-gradient-to-r from-accent/40 via-accent/80 to-accent/40 bg-[length:200%_100%]",
         variant === "wave" && "relative overflow-hidden bg-accent",
         animationClass,
@@ -33,6 +34,7 @@ function Skeleton({
       {...props}
     >
       {variant === "wave" && (
+        // repo-rules-allow theme-tokens-only: wave highlight streak must read lighter than the surface in both themes, which no token provides.
         <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent [animation:wave_2.4s_ease-in-out_infinite]" />
       )}
     </div>

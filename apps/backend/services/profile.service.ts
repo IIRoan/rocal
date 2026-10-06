@@ -121,6 +121,7 @@ export class ProfileService implements IProfileService {
     size?: number,
   ): Promise<ProfileAvatarImage | null> {
     // Only ids still attached to an account resolve, so replaced pictures stop serving even if an object lingers.
+    // repo-rules-allow owner-scoped-data: avatarId is an opaque public identifier; this lookup requires it still be attached to an account.
     const owner = await this.prisma.user.findUnique({
       where: { avatarId },
       select: { id: true },

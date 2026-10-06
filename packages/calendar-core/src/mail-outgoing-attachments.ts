@@ -166,10 +166,7 @@ function parsePreparedAttachment(
   return parsed.data;
 }
 
-/**
- * Reads compose attachments into memory and rejects empty or incomplete files
- * before any network upload begins.
- */
+/** Reads attachments into memory, rejecting empty or incomplete files before any network upload. */
 export async function prepareOutgoingAttachments(
   files: ReadableAttachmentFile[],
   options?: { maxBytes?: number },
@@ -274,6 +271,7 @@ export function validateUploadedBlob(input: {
   }
 
   return {
+    // superRefine rejects an empty blob id before safeParse succeeds, so the non-null is guaranteed.
     blobId: parsed.data.blobId!,
     size: parsed.data.size ?? input.expectedSize,
   };
@@ -300,7 +298,7 @@ export function validateUploadedAttachmentSet(
   }
 
   for (let index = 0; index < parsedExpected.data.length; index += 1) {
-    const source = parsedExpected.data[index]!;
+    const source = parsedExpected.data[index]!; // The length equality check above guarantees both array slots exist.
     const result = parsedUploaded.data[index]!;
     if (result.size !== source.size) {
       throw new Error(

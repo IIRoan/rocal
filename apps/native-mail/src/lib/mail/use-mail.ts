@@ -148,9 +148,12 @@ export function useMailboxMessages(
     },
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
-      const { messages, total } = await runtime!.client.getMailboxMessages(
-        runtime!.session,
-        mailboxId!,
+      if (!runtime || !mailboxId) {
+        throw new Error("Your mailbox is not connected.");
+      }
+      const { messages, total } = await runtime.client.getMailboxMessages(
+        runtime.session,
+        mailboxId,
         {
           limit: pageSize,
           position: pageParam,
@@ -186,12 +189,14 @@ export function useMailboxFieldSearch(
     enabled: Boolean(runtime && mailboxId && filter),
     staleTime: 30_000,
     queryFn: async ({ pageParam }) => {
-      // Non-null: the query is only enabled once runtime, mailbox, and filter exist.
+      if (!runtime || !mailboxId || !filter) {
+        throw new Error("Your mailbox is not connected.");
+      }
       const { messages, total } =
-        await runtime!.client.searchMailboxMessagesWithFilter(
-          runtime!.session,
-          mailboxId!,
-          filter!,
+        await runtime.client.searchMailboxMessagesWithFilter(
+          runtime.session,
+          mailboxId,
+          filter,
           pageSize,
           pageParam,
         );
@@ -343,6 +348,12 @@ export function useMailMutations(
 ) {
   const queryClient = useQueryClient();
 
+  /** Mutations are only reachable with a connected mailbox, but a race must reject cleanly instead of crashing. */
+  const requireRuntime = () => {
+    if (!runtime) throw new Error("Your mailbox is not connected.");
+    return runtime;
+  };
+
   const invalidateMessages = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mailMessagesAll() });
   }, [queryClient]);
@@ -352,7 +363,8 @@ export function useMailMutations(
       if (suppressMarkAsReadIds.has(messageId)) {
         return Promise.resolve();
       }
-      return runtime!.client.markAsRead(runtime!.session, messageId);
+      const rt = requireRuntime();
+      return rt.client.markAsRead(rt.session, messageId);
     },
     onMutate: (messageId) => {
       if (suppressMarkAsReadIds.has(messageId)) return;
@@ -367,12 +379,14 @@ export function useMailMutations(
   });
 
   const toggleFlagged = useMutation({
-    mutationFn: (input: { messageId: string; flagged: boolean }) =>
-      runtime!.client.toggleFlagged(
-        runtime!.session,
+    mutationFn: (input: { messageId: string; flagged: boolean }) => {
+      const rt = requireRuntime();
+      return rt.client.toggleFlagged(
+        rt.session,
         input.messageId,
         input.flagged,
-      ),
+      );
+    },
     onMutate: (input) => {
       patchMessageInCache(queryClient, input.messageId, (msg) => ({
         keywords: { ...msg.keywords, $flagged: input.flagged },
@@ -387,8 +401,10 @@ export function useMailMutations(
   });
 
   const markAsUnread = useMutation({
-    mutationFn: (messageId: string) =>
-      runtime!.client.markAsUnread(runtime!.session, messageId),
+    mutationFn: (messageId: string) => {
+      const rt = requireRuntime();
+      return rt.client.markAsUnread(rt.session, messageId);
+    },
     onMutate: (messageId) => {
       patchMessageInCache(queryClient, messageId, (msg) => {
         const keywords = { ...msg.keywords };
@@ -405,12 +421,14 @@ export function useMailMutations(
   });
 
   const moveToTrash = useMutation({
-    mutationFn: (messageId: string) =>
-      runtime!.client.moveToTrash(
-        runtime!.session,
+    mutationFn: (messageId: string) => {
+      const rt = requireRuntime();
+      return rt.client.moveToTrash(
+        rt.session,
         messageId,
         resolveTrashMailboxId(runtime),
-      ),
+      );
+    },
     onMutate: (messageId) =>
       beginOptimisticMove(
         queryClient,
@@ -424,8 +442,10 @@ export function useMailMutations(
   });
 
   const deleteMessage = useMutation({
-    mutationFn: (messageId: string) =>
-      runtime!.client.deleteMessage(runtime!.session, messageId),
+    mutationFn: (messageId: string) => {
+      const rt = requireRuntime();
+      return rt.client.deleteMessage(rt.session, messageId);
+    },
     onMutate: (messageId) =>
       beginOptimisticMove(queryClient, [messageId], null),
     onError: (_error, _messageId, snapshot) =>
@@ -435,12 +455,14 @@ export function useMailMutations(
   });
 
   const moveToMailbox = useMutation({
-    mutationFn: (input: { messageId: string; targetMailboxId: string }) =>
-      runtime!.client.moveToMailbox(
-        runtime!.session,
+    mutationFn: (input: { messageId: string; targetMailboxId: string }) => {
+      const rt = requireRuntime();
+      return rt.client.moveToMailbox(
+        rt.session,
         input.messageId,
         input.targetMailboxId,
-      ),
+      );
+    },
     onMutate: (input) =>
       beginOptimisticMove(
         queryClient,
@@ -454,13 +476,15 @@ export function useMailMutations(
   });
 
   const setMessageLabel = useMutation({
-    mutationFn: (input: { messageId: string; labelId: string; assigned: boolean }) =>
-      runtime!.client.setMessageLabel(
-        runtime!.session,
+    mutationFn: (input: { messageId: string; labelId: string; assigned: boolean }) => {
+      const rt = requireRuntime();
+      return rt.client.setMessageLabel(
+        rt.session,
         input.messageId,
         input.labelId,
         input.assigned,
-      ),
+      );
+    },
     onMutate: (input) => {
       const keywordKey = `label:${input.labelId}` as const;
       patchMessageInCache(queryClient, input.messageId, (msg) => {
@@ -486,8 +510,10 @@ export function useMailMutations(
   });
 
   const bulkMarkAsRead = useMutation({
-    mutationFn: (messageIds: string[]) =>
-      runtime!.client.bulkMarkAsRead(runtime!.session, messageIds),
+    mutationFn: (messageIds: string[]) => {
+      const rt = requireRuntime();
+      return rt.client.bulkMarkAsRead(rt.session, messageIds);
+    },
     onMutate: (messageIds) => {
       patchManyMessagesInCache(queryClient, messageIds, (msg) => ({
         keywords: { ...msg.keywords, $seen: true },
@@ -497,8 +523,10 @@ export function useMailMutations(
   });
 
   const bulkMarkAsUnread = useMutation({
-    mutationFn: (messageIds: string[]) =>
-      runtime!.client.bulkMarkAsUnread(runtime!.session, messageIds),
+    mutationFn: (messageIds: string[]) => {
+      const rt = requireRuntime();
+      return rt.client.bulkMarkAsUnread(rt.session, messageIds);
+    },
     onMutate: (messageIds) => {
       patchManyMessagesInCache(queryClient, messageIds, (msg) => {
         const keywords = { ...msg.keywords };
@@ -515,12 +543,14 @@ export function useMailMutations(
   };
 
   const bulkMoveToTrash = useMutation({
-    mutationFn: (messageIds: string[]) =>
-      runtime!.client.bulkMoveToTrash(
-        runtime!.session,
+    mutationFn: (messageIds: string[]) => {
+      const rt = requireRuntime();
+      return rt.client.bulkMoveToTrash(
+        rt.session,
         messageIds,
         resolveBulkTrashTarget(),
-      ),
+      );
+    },
     onMutate: (messageIds) =>
       beginOptimisticMove(queryClient, messageIds, resolveBulkTrashTarget()),
     onError: (_error, _messageIds, snapshot) =>
@@ -531,12 +561,14 @@ export function useMailMutations(
   });
 
   const bulkMoveToMailbox = useMutation({
-    mutationFn: (input: { messageIds: string[]; targetMailboxId: string }) =>
-      runtime!.client.bulkMoveToMailbox(
-        runtime!.session,
+    mutationFn: (input: { messageIds: string[]; targetMailboxId: string }) => {
+      const rt = requireRuntime();
+      return rt.client.bulkMoveToMailbox(
+        rt.session,
         input.messageIds,
         input.targetMailboxId,
-      ),
+      );
+    },
     onMutate: (input) =>
       beginOptimisticMove(
         queryClient,
@@ -550,8 +582,10 @@ export function useMailMutations(
   });
 
   const bulkDestroyMessages = useMutation({
-    mutationFn: (messageIds: string[]) =>
-      runtime!.client.bulkDestroyMessages(runtime!.session, messageIds),
+    mutationFn: (messageIds: string[]) => {
+      const rt = requireRuntime();
+      return rt.client.bulkDestroyMessages(rt.session, messageIds);
+    },
     onMutate: (messageIds) =>
       beginOptimisticMove(queryClient, messageIds, null),
     onError: (_error, _messageIds, snapshot) =>
@@ -561,8 +595,10 @@ export function useMailMutations(
   });
 
   const emptyMailbox = useMutation({
-    mutationFn: (targetMailboxId: string) =>
-      runtime!.client.emptyMailbox(runtime!.session, targetMailboxId),
+    mutationFn: (targetMailboxId: string) => {
+      const rt = requireRuntime();
+      return rt.client.emptyMailbox(rt.session, targetMailboxId);
+    },
     onSettled: (_count, _error, targetMailboxId) =>
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.mailMessages(targetMailboxId),

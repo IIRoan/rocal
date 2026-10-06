@@ -35,9 +35,7 @@ export type EventEditorFooterProps = {
   invitationResponsePending: EventEditorInvitationResponseStatus | null;
   invitationStatus: EventEditorInvitationResponseStatus | null;
   isViewMode: boolean;
-  onInvitationResponse: (
-    status: EventEditorInvitationResponseStatus,
-  ) => void | Promise<void>;
+  onInvitationResponse: (status: EventEditorInvitationResponseStatus) => void;
   onBack?: () => void;
   onClose?: () => void;
 };

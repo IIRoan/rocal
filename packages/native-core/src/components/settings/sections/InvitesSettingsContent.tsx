@@ -2,12 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { InviteRecord } from "@workspace/calendar-client";
-import {
-  getErrorMessage,
-  getInviteCreateFeedback,
-} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { SettingsPage } from "../SettingsPage";
 import {
@@ -23,9 +18,13 @@ import {
 import { useMailSkin, type MailSkin } from "../../mail/mail-ui";
 import { useTheme } from "../../../providers/ThemeProvider";
 import { useToast } from "../../../providers/ToastProvider";
-import { inviteApiService } from "../../../lib/api";
 import { APP_BASE_URL } from "../../../lib/constants";
-import { QUERY_KEYS } from "../../../lib/query-keys";
+import {
+  useCreateInvite,
+  useInvites,
+  useRevokeInvite,
+  type InviteFeedback,
+} from "../../../hooks/use-invites";
 import {
   INVITE_STATUS_LABELS,
   isInviteRecordActive,
@@ -33,55 +32,22 @@ import {
   resolveInviteCopyValue,
 } from "../../../lib/invite-settings";
 
-type Feedback = {
-  tone: "success" | "warning" | "error";
-  text: string;
-};
-
 export function InvitesSettingsContent() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [feedback, setFeedback] = useState<InviteFeedback | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
-  const invitesQuery = useQuery({
-    queryKey: QUERY_KEYS.invites(),
-    queryFn: () => inviteApiService.listInvites(),
-    staleTime: 30_000,
+  const invitesQuery = useInvites();
+
+  const createMutation = useCreateInvite({
+    onCreated: () => setEmail(""),
+    onFeedback: setFeedback,
   });
 
-  const createMutation = useMutation({
-    mutationFn: (emailAddress: string) =>
-      inviteApiService.createInvite(emailAddress),
-    onSuccess: (data, emailAddress) => {
-      setEmail("");
-      const result = getInviteCreateFeedback(emailAddress, data);
-      setFeedback({ tone: result.tone, text: result.text });
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.invites() });
-    },
-    onError: (error) => {
-      setFeedback({
-        tone: "error",
-        text: getErrorMessage(error, "Failed to create invite."),
-      });
-    },
-  });
-
-  const revokeMutation = useMutation({
-    mutationFn: (id: string) => inviteApiService.revokeInvite(id),
-    onSuccess: () => {
-      setRevokingId(null);
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.invites() });
-      toast("Invite revoked");
-    },
-    onError: (error) => {
-      setRevokingId(null);
-      setFeedback({
-        tone: "error",
-        text: getErrorMessage(error, "Failed to revoke invite."),
-      });
-    },
+  const revokeMutation = useRevokeInvite({
+    onRevoked: () => setRevokingId(null),
+    onFeedback: setFeedback,
   });
 
   const invites = useMemo(

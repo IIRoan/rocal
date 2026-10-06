@@ -8,6 +8,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { TitleIndexDocument } from "@workspace/calendar-core";
+import { createLogger } from "@workspace/logger";
 import { useSession } from "@/lib/auth-client";
 import { PRIVATE_SEARCH_INDEX_CHANGE_EVENT } from "@/hooks/use-private-search-index-controls";
 import {
@@ -21,6 +22,7 @@ import {
 
 const ENABLED_KEY = "search:private-content-index-enabled";
 const PAUSED_KEY = "search:private-content-index-paused";
+const log = createLogger("private-title-index");
 const REINDEX_INTERVAL_MS = 15 * 60 * 1000;
 const BODY_BACKFILL_DELAY_MS = 5 * 1000;
 const getServerEncryptionSession = () => null;
@@ -104,7 +106,9 @@ export function usePrivateTitleIndex() {
     void (async () => {
       await refreshFromStore();
       if (!cancelled && canIndex) await rebuild();
-    })();
+    })().catch((error) => {
+      log.warn("Failed to refresh the private title index", error);
+    });
 
     if (!canIndex) return undefined;
 

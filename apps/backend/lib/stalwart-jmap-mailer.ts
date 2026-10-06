@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 const DEFAULT_STALWART_JMAP_URL = "https://mail.solace.onl";
 const JMAP_USING = [
   "urn:ietf:params:jmap:core",
@@ -24,6 +26,36 @@ type JmapSession = {
   primaryAccounts?: Record<string, string>;
   accounts?: Record<string, unknown>;
 };
+
+const jmapEnvelopeSchema = z.object({
+  methodResponses: z
+    .array(z.tuple([z.string(), z.record(z.unknown()), z.string()]))
+    .optional(),
+});
+
+const jmapSessionSchema = z.object({
+  apiUrl: z.string().optional(),
+  uploadUrl: z.string().optional(),
+  primaryAccounts: z.record(z.string()).optional(),
+  accounts: z.record(z.unknown()).optional(),
+});
+
+const blobUploadResponseSchema = z.object({
+  blobId: z.string().optional(),
+  size: z.number().optional(),
+});
+
+/** Untrusted JMAP response envelope; a body that does not match reads as an empty envelope. */
+function parseJmapEnvelope(value: unknown): JmapEnvelope {
+  const parsed = jmapEnvelopeSchema.safeParse(value);
+  return parsed.success ? parsed.data : {};
+}
+
+/** Untrusted JMAP session document; a body that does not match reads as an empty session. */
+function parseJmapSession(value: unknown): JmapSession {
+  const parsed = jmapSessionSchema.safeParse(value);
+  return parsed.success ? parsed.data : {};
+}
 
 export type JmapMailbox = {
   id: string;
@@ -218,7 +250,7 @@ async function discoverSession(
       lastStatus = response.status;
       continue;
     }
-    const session = (await response.json()) as JmapSession;
+    const session = parseJmapSession(await response.json());
     const mailAccountId =
       primaryAccountId(session, "urn:ietf:params:jmap:mail") ??
       primaryAccountId(session, "urn:stalwart:jmap") ??
@@ -262,7 +294,7 @@ async function jmapCall(
   }
 
   try {
-    return JSON.parse(raw) as JmapEnvelope;
+    return parseJmapEnvelope(JSON.parse(raw));
   } catch {
     throw new Error("Stalwart JMAP returned a non-JSON response");
   }
@@ -346,15 +378,16 @@ async function uploadAttachment(
       `Stalwart blob upload failed (${String(response.status)})`,
     );
   }
-  const parsed = JSON.parse(raw) as { blobId?: string; size?: number };
-  if (!parsed.blobId) {
+  const parsed = blobUploadResponseSchema.safeParse(JSON.parse(raw));
+  const blobId = parsed.success ? parsed.data.blobId : undefined;
+  if (!blobId) {
     throw new Error("Stalwart blob upload did not return a blobId");
   }
   return {
-    blobId: parsed.blobId,
+    blobId,
     type,
     name: attachment.filename,
-    size: parsed.size ?? bytes.byteLength,
+    size: (parsed.success ? parsed.data.size : undefined) ?? bytes.byteLength,
   };
 }
 

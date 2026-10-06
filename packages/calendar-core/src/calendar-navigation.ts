@@ -44,16 +44,11 @@ export interface PrefetchCalendarDateRangeOptions {
   timezone?: string | null;
 }
 
-/**
- * Visible calendar days in the three-day view (yesterday, center, tomorrow).
- */
+/** Visible three-day-view days: yesterday, the center date, and tomorrow. */
 export function getThreeDayCalendarDays(baseDate: Date): [Date, Date, Date] {
   return [addDays(baseDate, -1), new Date(baseDate), addDays(baseDate, 1)];
 }
 
-/**
- * Compute the base date for any calendar page offset.
- */
 export function getCalendarPageDate(
   currentDate: Date,
   view: CalendarView,
@@ -75,9 +70,6 @@ export function getCalendarPageDate(
   }
 }
 
-/**
- * Compute the next/previous date when navigating a calendar view.
- */
 export function navigateCalendarDate(
   currentDate: Date,
   view: CalendarView,
@@ -86,9 +78,6 @@ export function navigateCalendarDate(
   return getCalendarPageDate(currentDate, view, direction);
 }
 
-/**
- * Returns the timezone-aware fetch range for a calendar view centered on baseDate.
- */
 export function getTimezoneAwareCalendarDateRange({
   baseDate,
   view,
@@ -154,9 +143,7 @@ export function getTimezoneAwareCalendarDateRange({
   };
 }
 
-/**
- * Compute one fetch window covering the current page and nearby swipe pages.
- */
+/** One fetch window covering the current page and nearby swipe pages. */
 export function getSurroundingCalendarDateRange({
   currentDate,
   view,
@@ -189,9 +176,6 @@ export function getSurroundingCalendarDateRange({
   return { start: start ?? currentDate, end: end ?? currentDate };
 }
 
-/**
- * Returns the fetch range for the adjacent calendar page (prev/next prefetch).
- */
 export function getPrefetchCalendarDateRange({
   currentDate,
   view,
@@ -209,9 +193,7 @@ export function getPrefetchCalendarDateRange({
   });
 }
 
-/**
- * Stable key used to animate calendar view transitions when the visible period changes.
- */
+/** Stable per-period key that drives calendar view transition animations. */
 export function getCalendarViewAnimationKey(
   view: CalendarView,
   currentDate: Date,

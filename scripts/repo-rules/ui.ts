@@ -157,7 +157,7 @@ export const uiRules: Rule[] = [
     check(file) {
       const findings = matchLines(
         file,
-        /["'`(\s:,]#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b(?![-\w])|\b(?:rgba?|hsla?|oklch|oklab)\(\s*\d/,
+        /["'`(\s:,]#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|(?=[0-9a-fA-F]*[a-fA-F])[0-9a-fA-F]{4}|[0-9a-fA-F]{3})\b(?![-\w])|\b(?:rgba?|hsla?|oklch|oklab)\(\s*\d/,
         (match) => `raw color ${match[0].trim()}; use a theme token (bg-primary, theme.colors.*)`,
       );
       findings.push(
@@ -172,10 +172,11 @@ export const uiRules: Rule[] = [
       bad: [
         'const a = <span className="bg-orange-500 text-white" />;',
         'const b = { color: "#ef5a3c" };',
+        'const b = { color: "#fff3" };',
         "const c = { backgroundColor: 'rgba(0, 0, 0, 0.4)' };",
         'const d = <div className="bg-gradient-to-r backdrop-blur-md" />;',
       ],
-      good: ['const a = <span className="bg-primary text-primary-foreground" />;', "const b = { color: theme.colors.primaryBase };", 'const c = <a href="#main" />;'],
+      good: ['const a = <span className="bg-primary text-primary-foreground" />;', "const b = { color: theme.colors.primaryBase };", 'const c = <a href="#main" />;', "// Upstream issue #9151 forced this fallback."],
     },
   },
   {
@@ -189,7 +190,7 @@ export const uiRules: Rule[] = [
         (match) => `${match[0]} animates layout properties; transition only transform/opacity (transition-transform, transition-opacity)`,
       );
       findings.push(
-        ...matchLines(file, new RegExp(`\\btransition(?:-property)?\\s*:\\s*[^;]*\\b(?:${LAYOUT_PROPERTIES})\\b`), () => "CSS transition on a layout property; animate transform/opacity"),
+        ...matchLines(file, new RegExp(`\\btransition(?:-property)?\\s*:[^;\n]*\\b(?:${LAYOUT_PROPERTIES})\\b`), () => "CSS transition on a layout property; animate transform/opacity"),
         ...matchLines(file, /\b(?:min-|max-)?h-screen\b|\b100vh\b/, (match) => `${match[0]} breaks under mobile browser toolbars; use dvh (h-dvh)`),
         ...matchLines(file, /\bactive:scale-|\bwhileTap\b/, (match) => `${match[0]} press-scale; give feedback with color/opacity`),
       );
@@ -205,7 +206,7 @@ export const uiRules: Rule[] = [
     examples: {
       path: "apps/web/components/drawer.tsx",
       bad: ['const a = <div className="transition-all" />;', 'const b = <div className="transition-[height] duration-200" />;', 'const c = <main className="h-screen" />;', 'const d = <button className="active:scale-95" />;'],
-      good: ['const a = <div className="transition-transform duration-200" />;', 'const c = <main className="h-dvh" />;'],
+      good: ['const a = <div className="transition-transform duration-200" />;', 'const c = <main className="h-dvh" />;', 'const a = { color: "[transition-property:color,opacity]",\nlayout: "inset-0" };'],
     },
   },
   {

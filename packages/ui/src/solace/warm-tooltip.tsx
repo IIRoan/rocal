@@ -19,6 +19,7 @@ import React, {
   type Ref,
 } from "react";
 import { createPortal } from 'react-dom';
+// repo-rules-allow motion-shared-helpers: the Nightwatch warm tooltip is built on motion/react springs, velocity, and AnimatePresence; porting it to the shared WAAPI helpers is a separate refactor.
 import {
   AnimatePresence,
   LazyMotion,

@@ -8,6 +8,9 @@ jest.mock("../../lib/e2ee-api-service", () => ({
 }));
 
 jest.mock("../../lib/e2ee-crypto", () => ({
+  ...jest.requireActual<typeof import("../../lib/e2ee-crypto")>(
+    "../../lib/e2ee-crypto",
+  ),
   createBlindIndexTokens: jest.fn(),
   createPasswordEnvelope: jest.fn(),
   decryptJsonPayload: jest.fn(),

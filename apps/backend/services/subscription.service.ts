@@ -382,7 +382,7 @@ export class SubscriptionService implements ISubscriptionService {
             isSynced: false,
           },
         })
-      ).map((event) => [event.externalId!, event]),
+      ).map((event) => [event.externalId, event]),
     );
 
     for (const parsedEvent of parseResult.events) {
@@ -539,8 +539,9 @@ export class SubscriptionService implements ISubscriptionService {
         },
       });
 
+      // Synced events without a UID key on "" so they still reach the delete sweep below.
       const currentEventsByUid = new Map(
-        currentEvents.map((event) => [event.externalId!, event]),
+        currentEvents.map((event) => [event.externalId ?? "", event]),
       );
 
       const newEventUids = new Set(

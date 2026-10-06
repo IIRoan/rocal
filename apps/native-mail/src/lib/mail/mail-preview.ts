@@ -98,10 +98,7 @@ export function buildMailPreviewSnippet(
   return "";
 }
 
-/**
- * Inbox-row snippet. Hides the "Encrypted message" placeholder so the list
- * can show decrypted text once it lands, instead of a useless always-on label.
- */
+/** Inbox-row snippet that hides the "Encrypted message" placeholder so decrypted text can replace it. */
 export function listPreviewSnippet(
   message: JmapEmailMessage,
   decrypted?: DecryptedMailPreviewContent | null,

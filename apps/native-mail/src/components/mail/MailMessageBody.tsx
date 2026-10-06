@@ -96,13 +96,15 @@ export function MailMessageBody({
   const respondToCalendarInvite = (
     status: "accepted" | "declined" | "tentative",
   ) => {
-    void calendarInvitation.handleInvitationResponse(status).then((result) => {
-      if (result.ok) {
-        toast(result.message, "success");
-        return;
-      }
-      toast(result.error, "error");
-    });
+    void calendarInvitation.handleInvitationResponse(status)
+      .then((result) => {
+        if (result.ok) {
+          toast(result.message, "success");
+          return;
+        }
+        toast(result.error, "error");
+      })
+      .catch(() => toast("Couldn't send your RSVP.", "error"));
   };
 
   return (
@@ -140,7 +142,7 @@ export function MailMessageBody({
       ) : null}
 
       {content.isDecrypting ? (
-        <MessageDecryptingSkeleton attachedBelowBanner isDark={isDark} />
+        <MessageDecryptingSkeleton attachedBelowBanner />
       ) : decryptError ? (
         <DecryptErrorCard
           theme={theme}

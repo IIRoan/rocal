@@ -27,7 +27,7 @@ export function MobileMailHeader({
   const { toggleSidebar } = useSidebar();
 
   return (
-    <header className="shrink-0 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <header className="shrink-0 border-b border-border/60 bg-background">
       <div className="safe-area-inset-top px-4 pb-3 pt-3">
         <div className="flex items-center gap-3">
           <Button

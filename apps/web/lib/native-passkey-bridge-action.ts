@@ -144,9 +144,7 @@ export async function runNativePasskeyBridgeAction(
       };
     }
 
-    const signInResult = await authClient.signIn.passkey({
-      autoFocus: true,
-    });
+    const signInResult = await authClient.signIn.passkey();
 
     if (signInResult.error) {
       return resolvePasskeyClientError(signInResult.error, input);

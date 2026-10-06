@@ -49,7 +49,7 @@ interface CalendarContextType {
   calendars: Calendar[];
   setCalendars: (calendars: Calendar[]) => void;
   addCalendar: (calendarData: CreateCalendarData) => Promise<void>;
-  toggleCalendarVisibility: (calendarId: string) => Promise<void>;
+  toggleCalendarVisibility: (calendarId: string) => void;
   isCalendarVisible: (calendarId: string) => boolean;
   getVisibleCalendars: () => Calendar[];
   refreshCalendars: () => Promise<void>;
@@ -361,7 +361,7 @@ export function CalendarProvider({
   );
 
   const toggleCalendarVisibility = useCallback(
-    async (calendarId: string) => {
+    (calendarId: string) => {
       const currentVisibility = resolveCalendarVisibility(
         calendarId,
         getCalendarVisibilitySnapshot(),

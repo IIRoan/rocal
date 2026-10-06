@@ -91,11 +91,7 @@ function buildAlternativeBodyParts(input: {
   ];
 }
 
-/**
- * Builds a MIME payload for PGP encryption. Rich-text compose bodies are wrapped
- * in multipart/alternative (text/plain + text/html). Attachments use
- * multipart/mixed with the body part as the first subpart.
- */
+/** PGP MIME payload: rich text as multipart/alternative, attachments as multipart/mixed with the body first. */
 export function buildOutgoingMimeMessage(input: {
   text: string;
   html?: string;

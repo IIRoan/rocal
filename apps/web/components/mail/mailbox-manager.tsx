@@ -102,7 +102,14 @@ function MailboxRow({
   return (
     <div className="flex items-center gap-1 rounded-lg pr-1 transition-colors hover:bg-muted">
       {onOpen ? (
-        <button type="button" onClick={onOpen} className={cn(bodyClass, "cursor-pointer outline-none")}>
+        <button
+          type="button"
+          onClick={onOpen}
+          className={cn(
+            bodyClass,
+            "cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+          )}
+        >
           {content}
         </button>
       ) : (
@@ -139,9 +146,10 @@ function MailboxForm({
   const trimmed = name.trim();
   const canSave = Boolean(onSubmit) && trimmed.length > 0 && trimmed !== initialName && !saving;
 
-  const run = (action: () => Promise<void>) => {
+  // Handles rejection itself; the returned promise never rejects.
+  const run = (action: () => Promise<void>): void => {
     setStatus("saving");
-    return action()
+    void action()
       .then(() => {
         setStatus("idle");
         onBack();
@@ -150,7 +158,7 @@ function MailboxForm({
   };
 
   const submit = () => {
-    if (canSave && onSubmit) void run(() => onSubmit(trimmed));
+    if (canSave && onSubmit) run(() => onSubmit(trimmed));
   };
 
   return (
@@ -192,7 +200,7 @@ function MailboxForm({
             variant={confirmDelete ? "destructive" : "ghost"}
             className="mr-auto"
             disabled={saving}
-            onClick={() => (confirmDelete ? void run(onDelete) : setConfirmDelete(true))}
+            onClick={() => (confirmDelete ? run(onDelete) : setConfirmDelete(true))}
           >
             {confirmDelete ? "Confirm delete" : "Delete mailbox"}
           </PaletteButton>

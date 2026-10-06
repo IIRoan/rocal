@@ -7,7 +7,10 @@ import { PaletteNavRow, PaletteSection, PaletteView } from "./palette-ui";
 
 interface AppearanceSettingsProps {
   localSettings: UserSettings;
-  updateSetting: (key: keyof UserSettings, value: any) => void;
+  updateSetting: <K extends keyof UserSettings>(
+    key: K,
+    value: UserSettings[K],
+  ) => void;
   goBack: () => void;
 }
 

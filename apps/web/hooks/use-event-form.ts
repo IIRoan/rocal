@@ -24,9 +24,12 @@ import {
   type RecurrenceEditScope,
 } from "@workspace/calendar-core";
 import { RecurrenceEngine } from "@workspace/calendar-core";
-import type { RecurrenceRule } from "@/lib/types/calendar";
+import type {
+  RecurrenceRule,
+  UserSettings,
+  CreateNotificationRequest,
+} from "@/lib/types/calendar";
 import type { EventNotification } from "@workspace/ui/components/calendar";
-import type { UserSettings } from "@/lib/types/calendar";
 import { isApiError } from "@/lib/types/calendar";
 import {
   formatTimeForInput,
@@ -213,10 +216,15 @@ interface UseEventFormReturn {
   loadEventData: (event: CalendarEvent) => void;
   resetForm: () => void;
   handleEventSave: (
-    calendarData: any,
+    calendarData: Pick<
+      UseCalendarDataReturn,
+      "createEvent" | "updateEvent" | "editRecurringEvent"
+    >,
     recurringScope?: RecurrenceEditScope,
   ) => Promise<void>;
-  handleEventDelete: (calendarData: any) => Promise<void>;
+  handleEventDelete: (
+    calendarData: Pick<UseCalendarDataReturn, "deleteEvent">,
+  ) => Promise<void>;
   handleRecurringDelete: (
     calendarData: Pick<UseCalendarDataReturn, "deleteRecurringEvent">,
     scope: RecurrenceDeleteScope,
@@ -311,7 +319,7 @@ export function useEventForm({
       title,
     }: {
       eventId: string;
-      data: any[];
+      data: CreateNotificationRequest["notifications"];
       title?: string | null;
     }) =>
       calendarApiService.updateEventNotifications(eventId, data, {
@@ -529,7 +537,13 @@ export function useEventForm({
   );
 
   const handleEventSave = useCallback(
-    async (calendarData: any, recurringScope?: RecurrenceEditScope) => {
+    async (
+      calendarData: Pick<
+        UseCalendarDataReturn,
+        "createEvent" | "updateEvent" | "editRecurringEvent"
+      >,
+      recurringScope?: RecurrenceEditScope,
+    ) => {
       const validationError = validateEventForm(
         eventTitle,
         eventCalendarId,
@@ -619,7 +633,7 @@ export function useEventForm({
         timezone,
         allDay: eventAllDay,
         location: eventLocation.trim(),
-        color: calendarColor as any,
+        color: calendarColor,
         calendarId: eventCalendarId,
         categoryId: eventCategoryId || null,
         userId: selectedEvent?.userId || "demo-user",
@@ -727,7 +741,7 @@ export function useEventForm({
                 description:
                   "Notification settings could not be updated right now.",
                 position: "bottom-left",
-              } as any);
+              });
             }
           }
         }
@@ -878,29 +892,28 @@ export function useEventForm({
     ],
   );
 
-  const handleEventDelete = useCallback<(calendarData: any) => Promise<void>>(
-    async (calendarData: any) => {
-      if (!selectedEvent?.id) return;
+  const handleEventDelete = useCallback<
+    (calendarData: Pick<UseCalendarDataReturn, "deleteEvent">) => Promise<void>
+  >(async (calendarData) => {
+    if (!selectedEvent?.id) return;
 
-      setEventSaving(true);
-      try {
-        await calendarData.deleteEvent(selectedEvent.id);
-        toast.success(`Event "${eventTitle}" deleted`);
-        onEventSaved?.();
+    setEventSaving(true);
+    try {
+      await calendarData.deleteEvent(selectedEvent.id);
+      toast.success(`Event "${eventTitle}" deleted`);
+      onEventSaved?.();
 
-        setTimeout(() => {
-          onClose();
-          resetForm();
-        }, 100);
-      } catch (error: any) {
-        log.error("Failed to delete event:", error);
-        toast.error("Failed to delete event");
-      } finally {
-        setEventSaving(false);
-      }
-    },
-    [selectedEvent, eventTitle, onEventSaved, onClose, resetForm],
-  );
+      setTimeout(() => {
+        onClose();
+        resetForm();
+      }, 100);
+    } catch (error) {
+      log.error("Failed to delete event:", error);
+      toast.error("Failed to delete event");
+    } finally {
+      setEventSaving(false);
+    }
+  }, [selectedEvent, eventTitle, onEventSaved, onClose, resetForm]);
 
   const handleRecurringDelete = useCallback(
     async (

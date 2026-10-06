@@ -1,4 +1,4 @@
-import { type Rule, sourceUnder } from "./engine";
+import { type Rule, matchLines, sourceUnder } from "./engine";
 
 const COMMENTED_SOURCE = sourceUnder(["apps/", "packages/", "scripts/"], /\.(tsx?|go)$/);
 
@@ -17,17 +17,23 @@ const commentLines = (text: string) =>
 export const commentRules: Rule[] = [
   {
     id: "comments-one-line",
-    summary: "Every comment, including JSDoc, is a single line; a multi-line block comment means the code needs renaming or splitting.",
+    summary: "Every comment, including JSDoc, is a single line: no multi-line blocks and no // pair wrapping one sentence.",
     files: COMMENTED_SOURCE,
-    check: (file) =>
-      file
+    check: (file) => [
+      ...file
         .comments()
         .filter((comment) => comment.block && comment.endLine > comment.line)
         .map((comment) => ({ line: comment.line, message: "multi-line comment; keep it to one line (`/** Why. */`)" })),
+      ...matchLines(
+        file,
+        /^[ \t]*\/\/[^\n]*[^.!?:;\s][ \t]*\n[ \t]*\/\/[ \t]*(?!(?:eslint-|@ts-|prettier-|istanbul |c8 |go:|nolint|#region|#endregion|repo-rules-allow ))[a-z]/gm,
+        () => "comment wrapped onto the next line; make it one line or two standalone comments",
+      ),
+    ],
     examples: {
       path: "apps/backend/lib/example.ts",
-      bad: ["/**\n * Loads a user.\n */\nexport function load() {}", "/* first\n   second */\nconst a = 1;"],
-      good: ["/** Loads a user. */\nexport function load() {}", "// one\n// two\nconst a = 1;"],
+      bad: ["/**\n * Loads a user.\n */\nexport function load() {}", "/* first\n   second */\nconst a = 1;", "// Loads the vault from\n// the offline store.\nexport {};"],
+      good: ["/** Loads a user. */\nexport function load() {}", "// First standalone note.\n// Second standalone note.\nconst a = 1;", "// Keep the memo\n// eslint-disable-next-line no-console\nexport {};"],
     },
   },
   {

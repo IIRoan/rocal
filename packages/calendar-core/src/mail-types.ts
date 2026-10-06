@@ -1,8 +1,4 @@
-/**
- * Whether a message is plaintext, server-side encrypted-at-rest, or end-to-end
- * (PGP / internal) encrypted. Only `plain` messages can be rendered fully
- * on-device; encrypted messages require the secure web client to decrypt.
- */
+/** plain renders on-device; the encrypted states need the secure client to decrypt. */
 export type MessageEncryptionState =
   | "plain"
   | "inline_pgp"

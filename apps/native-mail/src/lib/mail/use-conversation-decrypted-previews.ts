@@ -116,9 +116,10 @@ export function useConversationDecryptedPreviews(
     for (const query of queries) {
       if (!query.enabled) continue;
       // Queue before starting the shared query so the reader can decrypt immediately.
+      // Prefetch failures land in the query cache, where the reader surfaces them.
       void withPreviewDecryptSlot(async () => {
         if (!cancelled) await queryClient.prefetchQuery(query);
-      });
+      }).catch(() => undefined);
     }
     return () => {
       cancelled = true;

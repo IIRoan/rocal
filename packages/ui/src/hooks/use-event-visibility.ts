@@ -13,10 +13,7 @@ interface EventVisibilityResult {
   getVisibleEventCount: (totalEvents: number) => number;
 }
 
-/**
- * Hook for calculating event visibility based on container height
- * Uses ResizeObserver for efficient updates
- */
+/** Visible event count derived from container height, kept current with a ResizeObserver. */
 export function useEventVisibility({
   eventHeight,
   eventGap,

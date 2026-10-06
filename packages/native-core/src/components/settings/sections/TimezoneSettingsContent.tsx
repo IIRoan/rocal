@@ -1,9 +1,4 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type {
-  UserSettings,
-  UpdateSettingsRequest,
-} from "@workspace/calendar-core";
 import { SettingsPage, useSettingsBack } from "../SettingsPage";
 import {
   SheetGroup,
@@ -13,8 +8,7 @@ import {
   SheetSearchField,
   SheetSection,
 } from "../../sheet/SheetSections";
-import { calendarApiService } from "../../../lib/api";
-import { QUERY_KEYS } from "../../../lib/query-keys";
+import { useNativeUserSettings } from "../../../hooks/use-native-user-settings";
 
 interface TimezoneEntry {
   value: string;
@@ -97,51 +91,20 @@ const SECTION_DATA = Object.entries(TIMEZONE_GROUPS).map(([title, data]) => ({
 
 export function TimezoneSettingsContent() {
   const goBack = useSettingsBack();
-  const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
 
-  const { data: settings } = useQuery({
-    queryKey: QUERY_KEYS.settings(),
-    queryFn: () => calendarApiService.getUserSettings(),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { settings, updateSetting } = useNativeUserSettings();
 
   const currentTimezone =
     settings?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const updateSettingsMutation = useMutation({
-    mutationFn: (update: UpdateSettingsRequest) =>
-      calendarApiService.updateUserSettings(update),
-    onMutate: async (update) => {
-      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.settings() });
-      const previous = queryClient.getQueryData<UserSettings>(
-        QUERY_KEYS.settings(),
-      );
-      if (previous) {
-        queryClient.setQueryData<UserSettings>(QUERY_KEYS.settings(), {
-          ...previous,
-          ...update,
-        });
-      }
-      return { previous };
-    },
-    onError: (_err, _update, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(QUERY_KEYS.settings(), context.previous);
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
-    },
-  });
-
   const handleSelect = useCallback(
     (timezone: string) => {
-      updateSettingsMutation.mutate({ timezone });
+      updateSetting({ timezone });
       goBack();
     },
-    [updateSettingsMutation, goBack],
+    [updateSetting, goBack],
   );
 
   const filteredTimezones = useMemo(() => {

@@ -11,10 +11,7 @@ function shouldInstallNativeCrypto() {
   return Platform.OS === "ios" || Platform.OS === "android";
 }
 
-/**
- * OpenPGP.js 6 calls this exact check while evaluating the module, so WebCrypto
- * must be installed before any `import "openpgp"`.
- */
+/** OpenPGP.js 6 runs this exact check while evaluating the module, so WebCrypto must be installed before any import "openpgp". */
 export function hasUsableWebCrypto(
   cryptoRef: { subtle?: unknown } | null | undefined = globalThis.crypto,
 ): boolean {

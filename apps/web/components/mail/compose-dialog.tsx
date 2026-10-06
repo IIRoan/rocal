@@ -116,7 +116,7 @@ function DraftSaveIndicator({
   if (status === "saved") {
     return (
       <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-        <Check className="size-3 text-emerald-600" />
+        <Check className="size-3 text-success" />
         Draft saved
       </span>
     );
@@ -449,7 +449,15 @@ export function ComposeForm({
         return;
       }
     }
-    await onSend({ skipAttachmentCheck });
+    try {
+      await onSend({ skipAttachmentCheck });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not send the message.",
+      );
+    }
   }
 
   const applySignaturePreview = () => {
@@ -773,7 +781,7 @@ export function ComposeForm({
             placeholder="Write your message…"
             disabled={isBusy}
             aria-label="Message body"
-            className="min-h-0 flex-1 resize-none bg-transparent p-2 font-mono text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/40"
+            className="min-h-0 flex-1 resize-none rounded-sm bg-transparent p-2 font-mono text-sm leading-relaxed text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring/40 placeholder:text-muted-foreground/40"
           />
         ) : (
           <RichTextEditor
@@ -802,6 +810,7 @@ export function ComposeForm({
           {signatureIdentity.htmlSignature ? (
             <div
               className="break-words [&_a]:text-primary [&_a]:underline"
+              // repo-rules-allow secure-email-html: signature HTML is sanitized by sanitizeSignatureHtml before insertion.
               dangerouslySetInnerHTML={{
                 __html: sanitizeSignatureHtml(signatureIdentity.htmlSignature),
               }}

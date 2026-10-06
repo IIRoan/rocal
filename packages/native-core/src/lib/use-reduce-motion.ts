@@ -8,11 +8,14 @@ export function useReduceMotion(): boolean {
   useEffect(() => {
     let cancelled = false;
 
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (!cancelled) {
-        setReduceMotion(enabled);
-      }
-    });
+    void AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (!cancelled) {
+          setReduceMotion(enabled);
+        }
+      })
+      // A failed read keeps the default (motion allowed) — the safe fallback for visuals.
+      .catch(() => undefined);
 
     const subscription = AccessibilityInfo.addEventListener(
       "reduceMotionChanged",

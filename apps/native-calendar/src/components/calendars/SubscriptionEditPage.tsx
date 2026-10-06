@@ -199,7 +199,11 @@ function SubscriptionEditForm({
             label="Copy source URL"
             detail={subscription.url}
             icon="copy"
-            onPress={() => void handleCopySource()}
+            onPress={() =>
+              void handleCopySource().catch(() =>
+                toast("Could not copy source URL", "error"),
+              )
+            }
           />
         </SheetGroup>
       </SheetSection>

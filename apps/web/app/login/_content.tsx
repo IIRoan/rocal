@@ -86,12 +86,13 @@ async function requestPasswordResetForLogin(email: string, redirectTo: string) {
       notice:
         "If an account exists for that email, Solace sent a password reset link for your email sign-in password.",
     };
-  } catch (err: any) {
+  } catch (err) {
     log.error("Password reset request failed:", err);
     return {
-      errorMessage:
-        err.message ||
+      errorMessage: getErrorMessage(
+        err,
         "Unable to send a password reset link for your email sign-in password.",
+      ),
       notice: null,
     };
   }
@@ -422,23 +423,27 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     }
 
     emailCheckTimerRef.current = setTimeout(() => {
-      void fetchSignupEmailAvailability(trimmed).then((result) => {
-        if (cancelled) {
-          return;
-        }
+      void fetchSignupEmailAvailability(trimmed)
+        .then((result) => {
+          if (cancelled) {
+            return;
+          }
 
-        if (!result) {
-          dispatchEmailAvailability({ type: "set-result", availability: null });
-          return;
-        }
+          if (!result) {
+            dispatchEmailAvailability({ type: "set-result", availability: null });
+            return;
+          }
 
-        dispatchEmailAvailability({
-          type: "set-result",
-          availability: result.available
-            ? { available: true }
-            : { available: false, message: result.message },
+          dispatchEmailAvailability({
+            type: "set-result",
+            availability: result.available
+              ? { available: true }
+              : { available: false, message: result.message },
+          });
+        })
+        .catch((error) => {
+          log.error("Failed to check email availability:", error);
         });
-      });
     }, FIELD_VALIDATION_DEBOUNCE_MS);
 
     return () => {
@@ -468,31 +473,35 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     }
 
     inviteValidateTimerRef.current = setTimeout(() => {
-      void fetchInviteTokenValidation(trimmed).then((result) => {
-        if (cancelled) {
-          return;
-        }
+      void fetchInviteTokenValidation(trimmed)
+        .then((result) => {
+          if (cancelled) {
+            return;
+          }
 
-        if (result.valid) {
+          if (result.valid) {
+            dispatchInviteValidation({
+              type: "set-result",
+              validation: {
+                valid: true,
+                inviterName: result.inviterName,
+              },
+            });
+            return;
+          }
+
+          const invalid = result as { valid: false; reason: string };
           dispatchInviteValidation({
             type: "set-result",
             validation: {
-              valid: true,
-              inviterName: result.inviterName,
+              valid: false,
+              reason: invalid.reason ?? "Invalid token",
             },
           });
-          return;
-        }
-
-        const invalid = result as { valid: false; reason: string };
-        dispatchInviteValidation({
-          type: "set-result",
-          validation: {
-            valid: false,
-            reason: invalid.reason ?? "Invalid token",
-          },
+        })
+        .catch((error) => {
+          log.error("Failed to validate the invite token:", error);
         });
-      });
     }, FIELD_VALIDATION_DEBOUNCE_MS);
 
     return () => {
@@ -612,8 +621,14 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     if (!isPending) {
       let cancelled = false;
       queueMicrotask(() => {
-        if (!cancelled) {
-          void handleSessionRedirectRef.current?.();
+        if (cancelled) {
+          return;
+        }
+        const handleSessionRedirect = handleSessionRedirectRef.current;
+        if (handleSessionRedirect) {
+          void handleSessionRedirect().catch((error) => {
+            log.error("Session redirect check failed:", error);
+          });
         }
       });
       return () => {
@@ -690,9 +705,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     dispatchChrome({ type: "start-passkey-auth" });
 
     try {
-      const result = await authClient.signIn.passkey({
-        autoFocus: true,
-      });
+      const result = await authClient.signIn.passkey();
 
       if (result?.error) {
         if (isPasskeyAuthCancelled(result.error)) {
@@ -769,9 +782,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
       });
     }
 
-    // The credential response is authoritative. Auth status is a
-    // non-destructive follow-up used only to decide whether passkey step-up is
-    // required; a delayed or unavailable status endpoint must not undo login.
+    // The credential response is authoritative. Auth status is a non-destructive follow-up used only to decide whether passkey step-up is required; a delayed or unavailable status endpoint must not undo login.
     const authStatus = await waitForSettledAuthStatusForLogin({
       allowPasskeyStepUp: true,
     });
@@ -928,7 +939,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
           email: normalizedEmail,
           password,
         });
-      } catch (err: any) {
+      } catch (err) {
         const recoveredSession =
           await findAuthenticatedSessionForEmail(normalizedEmail);
 
@@ -965,7 +976,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
     try {
       await finalizePasswordAuth(password);
-    } catch (err: any) {
+    } catch (err) {
       log.error("Email auth failed:", err);
       dispatchChrome({
         type: "set-error",
@@ -1036,8 +1047,6 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     <>
       <section className="flex min-h-[100dvh]">
         <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-12 lg:w-1/2 lg:px-16 xl:px-24">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-secondary/30 via-background to-background" />
-
           <div className="relative z-10 mx-auto w-full max-w-md">
             <div className="mb-10 flex items-center justify-between">
               <Logo
@@ -1458,6 +1467,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
               loading="eager"
               unoptimized
             />
+            {/* repo-rules-allow theme-tokens-only: photo scrim over the wallpaper image for depth, not a styled UI surface. */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
           </div>
         </div>

@@ -36,8 +36,7 @@ function normalizeBaseUrl(baseUrl: string): string {
 
 const logger = createLogger("backend:mail-jmap-proxy");
 
-// Deliberately loose: real clients are chatty, and this only has to make
-// bearer guessing against Stalwart impractical.
+// Deliberately loose: real clients are chatty, and this only has to make bearer guessing against Stalwart impractical.
 const JMAP_PROXY_RATE_LIMIT = { requests: 1200, windowMs: 60_000 };
 
 function classifyJmapProxyOperation(upstreamPath: string): string {
@@ -201,9 +200,9 @@ function summarizeBearerToken(
     }
   };
 
-  // Bounded by the `parts.length < 2` guard above.
-  const header = decodePart(parts[0]!);
-  const payload = decodePart(parts[1]!);
+  const [headerPart, payloadPart] = parts;
+  const header = headerPart ? decodePart(headerPart) : null;
+  const payload = payloadPart ? decodePart(payloadPart) : null;
   const exp = typeof payload?.exp === "number" ? payload.exp : null;
   const nowSec = Math.floor(Date.now() / 1000);
 
@@ -298,8 +297,7 @@ async function proxyJmapRequest(input: {
   const timingStart = performance.now();
   const clientAuthorization = input.request.headers.get("authorization");
 
-  // Only Stalwart bearers may be relayed; forwarding Basic would turn the
-  // proxy into a credential-stuffing oracle against the mail server.
+  // Only Stalwart bearers may be relayed; forwarding Basic would turn the proxy into a credential-stuffing oracle against the mail server.
   if (clientAuthorization && !/^Bearer\s/i.test(clientAuthorization)) {
     return Response.json(
       {
@@ -317,11 +315,7 @@ async function proxyJmapRequest(input: {
     ? "client-bearer"
     : "missing";
 
-  // Prefer a client-supplied Stalwart Bearer when present. After we stopped
-  // resetting the bridge password on every isolate cold-start, these tokens
-  // stay valid and skipping session mint saves ~200–400ms of getSession+cache
-  // work on every JMAP call. Fall back to session mint when there is no
-  // bearer, or after an upstream 401 (retryWithFreshToken).
+  // Prefer a client-supplied Stalwart Bearer when present. After we stopped resetting the bridge password on every isolate cold-start, these tokens stay valid and skipping session mint saves ~200–400ms of getSession+cache work on every JMAP call. Fall back to session mint when there is no bearer, or after an upstream 401 (retryWithFreshToken).
   const shouldMintFromSession =
     Boolean(input.retryWithFreshToken) || !clientAuthorization;
 
@@ -337,9 +331,7 @@ async function proxyJmapRequest(input: {
       if (user) {
         const email = user.email?.trim();
         if (email) {
-          // Only invalidate after a session-minted token itself 401'd.
-          // Invalidating on client-bearer fallback wiped the warm cache and
-          // forced a full Stalwart OAuth mint on every proxied call.
+          // Only invalidate after a session-minted token itself 401'd. Invalidating on client-bearer fallback wiped the warm cache and forced a full Stalwart OAuth mint on every proxied call.
           if (
             input.retryWithFreshToken &&
             input.previousAuthSource === "session"
@@ -483,8 +475,7 @@ async function proxyJmapRequest(input: {
     ? Number(responseContentLengthHeader)
     : null;
 
-  // Threshold is intentionally low so we can see the 1–3s Vercel→Stalwart
-  // outliers the browser reports even when auth is already free.
+  // Threshold is intentionally low so we can see the 1–3s Vercel→Stalwart outliers the browser reports even when auth is already free.
   if (upstreamMs >= 400) {
     const slowPayload = {
       event: "jmap_proxy_slow_upstream",

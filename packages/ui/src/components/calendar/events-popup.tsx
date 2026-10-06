@@ -120,11 +120,7 @@ export function EventsPopup({
             );
 
             return (
-              <div
-                key={event.id}
-                className="cursor-pointer"
-                onClick={() => handleEventClick(event)}
-              >
+              <div key={event.id}>
                 <EventItem
                   event={event}
                   view="agenda"
@@ -132,6 +128,8 @@ export function EventsPopup({
                   isLastDay={isLastDay}
                   timezone={timezone}
                   timeFormat={timeFormat}
+                  className="cursor-pointer"
+                  onClick={() => handleEventClick(event)}
                 />
               </div>
             );

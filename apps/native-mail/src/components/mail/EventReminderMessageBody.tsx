@@ -31,20 +31,21 @@ export function EventReminderMessageBody({
   onOpenEvent,
   attachedBelowBanner = false,
 }: EventReminderMessageBodyProps) {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const styles = useMemo(
-    () => createStyles(theme, isDark, windowWidth, windowHeight),
-    [theme, isDark, windowWidth, windowHeight],
+    () => createStyles(theme, windowWidth, windowHeight),
+    [theme, windowWidth, windowHeight],
   );
 
-  const openSettings = () => {
-    void Linking.openURL("https://solace.onl/settings");
+  const openFooterLink = (url: string) => {
+    // A device without a handler for the URL just no-ops the tap.
+    void Linking.openURL(url).catch(() => undefined);
   };
 
-  const openPrivacy = () => {
-    void Linking.openURL("https://solace.onl/privacy");
-  };
+  const openSettings = () => openFooterLink("https://solace.onl/settings");
+
+  const openPrivacy = () => openFooterLink("https://solace.onl/privacy");
 
   return (
     <View
@@ -142,7 +143,6 @@ function ReminderDetail({
 
 function createStyles(
   theme: ThemeTokens,
-  isDark: boolean,
   windowWidth: number,
   windowHeight: number,
 ) {
@@ -185,13 +185,13 @@ function createStyles(
       lineHeight: 29,
       fontWeight: theme.typography.fontWeight.bold as TextStyle["fontWeight"],
       letterSpacing: -0.22,
-      color: isDark ? "#ffffff" : "#000000",
+      color: theme.colors.foreground,
     },
     subtitle: {
       marginTop: 6,
       fontSize: 15,
       lineHeight: 20,
-      color: isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.50)",
+      color: theme.colors.mutedForeground,
     },
     details: {
       marginTop: 28,
@@ -207,13 +207,13 @@ function createStyles(
         .semibold as TextStyle["fontWeight"],
       letterSpacing: 0.66,
       textTransform: "uppercase",
-      color: isDark ? "rgba(255,255,255,0.40)" : "#999999",
+      color: theme.colors.mutedForeground,
     },
     detailValue: {
       fontSize: 16,
       lineHeight: 22,
       fontWeight: theme.typography.fontWeight.normal as TextStyle["fontWeight"],
-      color: isDark ? "#e5e5e5" : "#1a1a1a",
+      color: theme.colors.foreground,
     },
     openButton: {
       alignSelf: "flex-start",
@@ -221,8 +221,8 @@ function createStyles(
       borderRadius: 12,
       borderWidth: 1,
       borderBottomWidth: 2,
-      borderColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)",
-      backgroundColor: isDark ? "#2a2a2a" : "#ffffff",
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.popover,
       paddingHorizontal: 20,
       paddingVertical: 12,
     },
@@ -234,11 +234,11 @@ function createStyles(
       lineHeight: 15,
       fontWeight: theme.typography.fontWeight
         .medium as TextStyle["fontWeight"],
-      color: isDark ? "#ffffff" : "#000000",
+      color: theme.colors.foreground,
     },
     divider: {
       height: StyleSheet.hairlineWidth,
-      backgroundColor: isDark ? "#333333" : "#e5e5e5",
+      backgroundColor: theme.colors.border,
       marginTop: 36,
       marginBottom: 20,
     },
@@ -248,13 +248,13 @@ function createStyles(
       lineHeight: 17,
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
-      color: "#a8a8a8",
+      color: theme.colors.mutedForeground,
     },
     footerCopy: {
       marginBottom: 4,
       fontSize: 12,
       lineHeight: 18,
-      color: "#a8a8a8",
+      color: theme.colors.mutedForeground,
     },
     footerLinks: {
       flexDirection: "row",
@@ -264,12 +264,12 @@ function createStyles(
     footerLink: {
       fontSize: 12,
       lineHeight: 18,
-      color: "#a8a8a8",
+      color: theme.colors.mutedForeground,
       textDecorationLine: "underline",
     },
     footerSeparator: {
       fontSize: 12,
-      color: "#a8a8a8",
+      color: theme.colors.mutedForeground,
     },
   });
 }

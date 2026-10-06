@@ -17,6 +17,34 @@ export function createSolaceProfileLookupBatcher(
   let queue = new Map<string, ProfileLookupWaiter[]>();
   let timer: ReturnType<typeof setTimeout> | null = null;
 
+  const resolvePending = async (
+    pending: Map<string, ProfileLookupWaiter[]>,
+    chunks: string[][],
+  ): Promise<void> => {
+    try {
+      const images = new Map<string, string>();
+      for (const chunk of chunks) {
+        const response = await lookup(chunk);
+        for (const profile of response.profiles) {
+          images.set(profile.email, profile.image);
+        }
+      }
+
+      for (const [email, waiters] of pending) {
+        const image = images.get(email) ?? null;
+        for (const waiter of waiters) {
+          waiter.resolve(image);
+        }
+      }
+    } catch (error) {
+      for (const waiters of pending.values()) {
+        for (const waiter of waiters) {
+          waiter.reject(error);
+        }
+      }
+    }
+  };
+
   const flush = () => {
     timer = null;
     const pending = queue;
@@ -31,30 +59,7 @@ export function createSolaceProfileLookupBatcher(
       chunks.push(emails.slice(index, index + SOLACE_PROFILE_LOOKUP_MAX_EMAILS));
     }
 
-    void (async () => {
-      try {
-        const images = new Map<string, string>();
-        for (const chunk of chunks) {
-          const response = await lookup(chunk);
-          for (const profile of response.profiles) {
-            images.set(profile.email, profile.image);
-          }
-        }
-
-        for (const [email, waiters] of pending) {
-          const image = images.get(email) ?? null;
-          for (const waiter of waiters) {
-            waiter.resolve(image);
-          }
-        }
-      } catch (error) {
-        for (const waiters of pending.values()) {
-          for (const waiter of waiters) {
-            waiter.reject(error);
-          }
-        }
-      }
-    })();
+    void resolvePending(pending, chunks);
   };
 
   return {

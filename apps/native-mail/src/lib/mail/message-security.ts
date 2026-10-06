@@ -1,11 +1,4 @@
-/**
- * Message body extraction and encryption classification.
- *
- * Ported from the web app's `lib/mail/message-security.ts` (the crypto-free
- * subset). Used to decide whether a message can be rendered on-device
- * (plaintext / encrypted-at-rest) or must be opened in the secure web client
- * (PGP end-to-end encrypted).
- */
+/** Message body extraction and encryption classification, ported from the web app's crypto-free subset. */
 import { containsArmoredPgpMessage, isCompleteArmoredPgpMessage } from "@workspace/calendar-core";
 import type {
   JmapAttachment,
@@ -148,8 +141,8 @@ export async function resolveInlinePgpArmoredCiphertext(input: {
   fetchBlob: (blobId: string) => Promise<string>;
 }): Promise<string> {
   const { text } = extractMessageBodies(input.message as JmapEmailMessage);
-  if (isCompleteArmoredPgpMessage(text)) {
-    return text!.trim();
+  if (text && isCompleteArmoredPgpMessage(text)) {
+    return text.trim();
   }
 
   const blobId =
@@ -169,14 +162,7 @@ export async function resolveInlinePgpArmoredCiphertext(input: {
   throw new Error("No armored PGP body found in this message.");
 }
 
-/**
- * Extracts the blobId of the PGP/MIME ciphertext part.
- *
- * RFC 3156 structure:
- *   multipart/encrypted
- *     └─ subParts[0]: application/pgp-encrypted  (version notice)
- *     └─ subParts[1]: application/octet-stream   (armored ciphertext)
- */
+/** BlobId of the PGP/MIME ciphertext part; RFC 3156 puts it at `subParts[1]` of multipart/encrypted. */
 export function extractPgpMimeCiphertextBlobId(
   bodyStructure: JmapBodyStructure | undefined,
 ): string | null {
@@ -238,13 +224,7 @@ export function isEncryptedState(state: MessageEncryptionState): boolean {
   return state !== "plain";
 }
 
-/**
- * Returns true for raw PGP control parts that should not be shown as
- * user-visible attachments (e.g. `encrypted.asc`, `application/pgp-encrypted`).
- *
- * Mirrors the filtering the web app applies when it replaces raw attachments
- * with decrypted ones after PGP/MIME decryption.
- */
+/** True for raw PGP control parts (`encrypted.asc`, `application/pgp-encrypted`) that must not show as attachments. */
 export function messageHasVisibleAttachments(message: {
   attachments?: { name?: string | null; type?: string | null }[];
 }): boolean {
@@ -263,10 +243,7 @@ export function isHiddenAttachment(attachment: { name?: string | null; type?: st
   );
 }
 
-/**
- * Resolves which attachments to show in the message reader.
- * PGP/MIME uses decrypted attachments only (empty while decrypting / on failure).
- */
+/** Attachments to show in the reader; PGP/MIME shows decrypted attachments only. */
 export function resolveDisplayAttachments(input: {
   encryption: MessageEncryptionState;
   isDecrypting: boolean;

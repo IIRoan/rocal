@@ -287,7 +287,9 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     cancelPendingSave();
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
-      void saveDraft();
+      void saveDraft().catch((error) => {
+        log.error("Failed to auto-save draft", error);
+      });
     }, AUTOSAVE_DEBOUNCE_MS) as ReturnType<typeof setTimeout>;
 
     return cancelPendingSave;
@@ -309,7 +311,9 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     const handleBeforeUnload = () => {
       const bridge = getMailComposeBridge();
       if (!bridge?.isComposeDirty() || !bridge.hasUserContent()) return;
-      void flushDraftSave();
+      void flushDraftSave().catch((error) => {
+        log.error("Failed to flush draft save before unload", error);
+      });
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);

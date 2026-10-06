@@ -81,6 +81,7 @@ export function ThreeDayViewTimeGrid({
           )}
         >
           {(processedDayEvents[dayIndex] ?? []).map((positionedEvent) => (
+            // repo-rules-allow wcag-keyboard-access: positioning wrapper that only stops click propagation; the inner DraggableEvent button is the keyboard target
             <div
               key={
                 positionedEvent.event?.id ??

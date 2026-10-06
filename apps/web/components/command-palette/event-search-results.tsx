@@ -8,6 +8,7 @@ import {
 } from "@workspace/calendar-core";
 import {
   EncryptionStatusBadge,
+  getColorSwatchValue,
   type CalendarEvent,
 } from "@workspace/ui/components/calendar";
 
@@ -17,20 +18,6 @@ interface EventSearchResultsProps {
   onSelect: (event: CalendarEvent) => void;
   selectedIndex: number;
   baseIndex: number;
-}
-
-const COLOR_MAP: Record<string, string> = {
-  blue: "bg-blue-500",
-  orange: "bg-orange-500",
-  violet: "bg-violet-500",
-  rose: "bg-rose-500",
-  emerald: "bg-emerald-500",
-};
-
-function getColorClass(color?: string | null) {
-  if (!color) return "bg-primary";
-  if (COLOR_MAP[color]) return COLOR_MAP[color];
-  return "bg-primary";
 }
 
 export function EventSearchResults({
@@ -99,7 +86,10 @@ export function EventSearchResults({
             }`}
           >
             <div
-              className={`size-2 rounded-full shrink-0 ${getColorClass(eventColor)}`}
+              className="size-2 rounded-full shrink-0"
+              style={{
+                backgroundColor: getColorSwatchValue(eventColor || "default"),
+              }}
             />
             <div className="flex-1 min-w-0">
               <span className="text-sm truncate block">{event.title}</span>

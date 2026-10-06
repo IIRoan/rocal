@@ -19,6 +19,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+// repo-rules-allow timezone-safe-calendar-code: format() renders the picker's local wall-clock carriers, never event instants.
 import { format } from "date-fns";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";

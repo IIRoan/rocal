@@ -1,11 +1,16 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   isValidLabelHex,
+  MAIL_LABEL_GHOST_COLOR,
   normalizeLabelColorInput,
   resolveLabelDisplayColor,
 } from "../mail-label-colors";
 
 describe("mail-label-colors", () => {
+  it("resolves ghost labels to the platform's neutral theme token", () => {
+    expect(resolveLabelDisplayColor(MAIL_LABEL_GHOST_COLOR)).toBe("var(--text-tertiary)");
+    expect(resolveLabelDisplayColor(MAIL_LABEL_GHOST_COLOR, "native-neutral")).toBe("native-neutral");
+  });
   it("resolves preset color names to hex", () => {
     expect(resolveLabelDisplayColor("blue")).toBe("#3b82f6");
     expect(resolveLabelDisplayColor("#22c55e")).toBe("#22c55e");

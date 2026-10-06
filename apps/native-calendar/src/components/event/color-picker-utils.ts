@@ -1,8 +1,6 @@
 import type { CalendarColor } from "@workspace/design-tokens";
 
-/**
- * The 12 known calendar colors from the design token palette.
- */
+/** The 12 known calendar colors from the design token palette. */
 export const CALENDAR_COLORS: readonly CalendarColor[] = [
   "blue",
   "orange",

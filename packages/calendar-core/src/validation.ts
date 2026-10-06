@@ -60,10 +60,7 @@ function validateParticipants(
   return errors;
 }
 
-/**
- * Validates event data before submission.
- * Returns an array of error messages (empty if valid).
- */
+/** Returns submission error messages; empty when valid. */
 export function validateEventData(
   event: CreateEventRequest | UpdateEventRequest,
 ): string[] {
@@ -124,10 +121,7 @@ export function validateEventData(
   return errors;
 }
 
-/**
- * Validates category data before submission.
- * Returns an array of error messages (empty if valid).
- */
+/** Returns submission error messages; empty when valid. */
 export function validateCategoryData(
   category: CreateCategoryRequest | UpdateCategoryRequest,
 ): string[] {

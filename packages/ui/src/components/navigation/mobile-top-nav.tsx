@@ -147,7 +147,7 @@ export function MobileTopNav({
   return (
     <div
         className={cn(
-          "sticky top-0 z-[45] border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden",
+          "sticky top-0 z-[45] border-b border-border/60 bg-background lg:hidden",
           className,
         )}
       >

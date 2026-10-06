@@ -1,7 +1,4 @@
-/**
- * Non-fatal issues from a mutation that succeeded partially.
- * Clients should surface these to the user so nothing fails silently.
- */
+/** Non-fatal issues from a partially successful mutation; surface them so nothing fails silently. */
 export type OperationWarning = {
   code: string;
   message: string;

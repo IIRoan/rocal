@@ -54,9 +54,10 @@ function readProperty(lines: string[], name: string): string | null {
     const [propertyName] = entry.split(/[:;]/, 1);
     return propertyName?.toUpperCase() === prefix;
   });
-  const separatorIndex = line?.indexOf(":") ?? -1;
+  if (!line) return null;
+  const separatorIndex = line.indexOf(":");
   return separatorIndex >= 0
-    ? unescapeIcsText(line!.slice(separatorIndex + 1))
+    ? unescapeIcsText(line.slice(separatorIndex + 1))
     : null;
 }
 

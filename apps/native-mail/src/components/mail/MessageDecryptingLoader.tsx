@@ -9,7 +9,6 @@ const PULSE_REST_OPACITY = 0.7;
 
 type MessageDecryptingSkeletonProps = {
   attachedBelowBanner?: boolean;
-  isDark?: boolean;
 };
 
 function useSkeletonPulse() {
@@ -44,13 +43,11 @@ function useSkeletonPulse() {
 
 export function MessageDecryptingSkeleton({
   attachedBelowBanner = false,
-  isDark: isDarkProp,
 }: MessageDecryptingSkeletonProps) {
-  const { theme, isDark: themeIsDark } = useTheme();
-  const isDark = isDarkProp ?? themeIsDark;
+  const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const pulse = useSkeletonPulse();
-  const barColor = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)";
+  const barColor = theme.colors.muted;
 
   return (
     <View

@@ -381,7 +381,12 @@ export function NativePasskeyBridgeContent() {
         callbackUrl: summarizeUrl(callbackURL),
       });
       setError(result.message);
-    });
+    })
+      .catch((error) => {
+        emitLog("error", "Passkey bridge action threw", { mode, error });
+        setError(copy.failureMessage);
+        setIsWorking(false);
+      });
   }
 
   const showWaiting =
@@ -390,8 +395,6 @@ export function NativePasskeyBridgeContent() {
   return (
     <section className="flex min-h-[100dvh]">
       <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-12">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-secondary/30 via-background to-background" />
-
         <div className="relative z-10 mx-auto w-full max-w-md">
           <div className="mb-10 flex items-center justify-between">
             <Logo

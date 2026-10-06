@@ -71,31 +71,7 @@ const mockMailService = {
     source: "internal",
     trust: "verified",
   })),
-  getVaultBackup: jest.fn(async () => ({
-    email: "alice@solace.onl",
-    vaultVersion: 1,
-    encryptedVaultB64: "vault-b64",
-    kdf: "argon2id",
-    kdfParams: {
-      saltB64: "salt-b64",
-      memoryKiB: 65536,
-      iterations: 3,
-      parallelism: 4,
-    },
-  })),
   getVaultBackupForUser: jest.fn(async () => ({
-    email: "alice@solace.onl",
-    vaultVersion: 1,
-    encryptedVaultB64: "vault-b64",
-    kdf: "argon2id",
-    kdfParams: {
-      saltB64: "salt-b64",
-      memoryKiB: 65536,
-      iterations: 3,
-      parallelism: 4,
-    },
-  })),
-  upsertVaultBackup: jest.fn(async () => ({
     email: "alice@solace.onl",
     vaultVersion: 1,
     encryptedVaultB64: "vault-b64",

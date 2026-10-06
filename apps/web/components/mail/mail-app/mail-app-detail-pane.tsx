@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@workspace/ui/lib/utils";
+import { createLogger } from "@workspace/logger";
 import { Typography, TypographySize } from "@workspace/ui/solace";
 import {
   MAIL_READER_MOTION_CLASS,
@@ -9,6 +10,8 @@ import {
 import { ComposeForm } from "../compose-dialog";
 import { MessageReader } from "../message-reader";
 import type { MailAppContentController } from "../use-mail-app-content-controller";
+
+const log = createLogger("mail-app-detail-pane");
 
 export function MailAppDetailPane({
   controller,
@@ -115,23 +118,53 @@ export function MailAppDetailPane({
             currentMailboxId={activeMailbox.selectedMailboxId}
             onReply={handleReply}
             onForward={handleForward}
-            onDelete={() => void handleDeleteMessage()}
-            onMove={(targetId) => void handleMoveMessage(targetId)}
-            onMarkAsUnread={() => void handleMarkAsUnread()}
-            onToggleFlagged={() => void handleToggleFlagged(selectedMessage.id)}
+            onDelete={() =>
+              void handleDeleteMessage().catch((error) =>
+                log.error("Failed to delete message", error),
+              )
+            }
+            onMove={(targetId) =>
+              void handleMoveMessage(targetId).catch((error) =>
+                log.error("Failed to move message", error),
+              )
+            }
+            onMarkAsUnread={() =>
+              void handleMarkAsUnread().catch((error) =>
+                log.error("Failed to mark message as unread", error),
+              )
+            }
+            onToggleFlagged={() =>
+              void handleToggleFlagged(selectedMessage.id).catch((error) =>
+                log.error("Failed to toggle flagged", error),
+              )
+            }
             onSetLabel={(labelId, assigned) =>
               selectedMessage
                 ? void handleSetMessageLabel(
                     selectedMessage.id,
                     labelId,
                     assigned,
+                  ).catch((error) =>
+                    log.error("Failed to set message label", error),
                   )
                 : undefined
             }
-            onSimpleLoginAction={(message, mode) => void handleSimpleLoginAction(message, mode)}
+            onSimpleLoginAction={(message, mode) =>
+              void handleSimpleLoginAction(message, mode).catch((error) =>
+                log.error("Failed to run SimpleLogin action", error),
+              )
+            }
             onCreateLabel={(name, color) => handleCreateLabel(name, color)}
-            onUpdateLabel={(id, updates) => void handleUpdateLabel(id, updates)}
-            onDeleteLabel={(id) => void handleDeleteLabel(id)}
+            onUpdateLabel={(id, updates) =>
+              void handleUpdateLabel(id, updates).catch((error) =>
+                log.error("Failed to update label", error),
+              )
+            }
+            onDeleteLabel={(id) =>
+              void handleDeleteLabel(id).catch((error) =>
+                log.error("Failed to delete label", error),
+              )
+            }
             labels={labels}
             timeFormat={timeFormat}
             timezone={timezone}
@@ -144,15 +177,35 @@ export function MailAppDetailPane({
             onLoadAttachmentPreview={loadAttachmentHoverPreview}
             onPreviewAttachment={handlePreviewAttachment}
             onDownloadAttachment={handleDownloadAttachment}
-            onUntrash={() => void handleUntrash()}
-            onReportSpam={() => void handleReportSpam()}
-            onNotSpam={() => void handleNotSpam()}
-            onConversationMessageDelete={(id) => void handleDeleteMessage(id)}
+            onUntrash={() =>
+              void handleUntrash().catch((error) =>
+                log.error("Failed to move out of trash", error),
+              )
+            }
+            onReportSpam={() =>
+              void handleReportSpam().catch((error) =>
+                log.error("Failed to report spam", error),
+              )
+            }
+            onNotSpam={() =>
+              void handleNotSpam().catch((error) =>
+                log.error("Failed to move out of spam", error),
+              )
+            }
+            onConversationMessageDelete={(id) =>
+              void handleDeleteMessage(id).catch((error) =>
+                log.error("Failed to delete message", error),
+              )
+            }
             onConversationMessageMarkUnread={(id) =>
-              void handleMarkAsUnread(id)
+              void handleMarkAsUnread(id).catch((error) =>
+                log.error("Failed to mark message as unread", error),
+              )
             }
             onConversationMessageMove={(id, mailboxId) =>
-              void handleMoveMessage(mailboxId, id)
+              void handleMoveMessage(mailboxId, id).catch((error) =>
+                log.error("Failed to move message", error),
+              )
             }
             accountEmail={activeMailbox?.email ?? accountEmail}
             accountName={accountDisplayName}
@@ -183,7 +236,7 @@ export function MailAppDetailPane({
           key={composeSessionId}
           identities={activeMailbox.pickerIdentities}
           fallbackFromEmail={activeMailbox.email ?? accountEmail}
-          onClose={() => void handleDismissCompose()}
+          onClose={() => handleDismissCompose()}
           onSend={handleFullComposeSend}
           onImageUpload={handleComposeImageUpload}
           activeMailbox={

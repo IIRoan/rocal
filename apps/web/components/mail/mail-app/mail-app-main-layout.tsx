@@ -5,6 +5,9 @@ import {
   SidebarInset,
 } from "@workspace/ui/components/ui/sidebar";
 import { SolaceTheme } from "@workspace/ui/solace";
+import { toast } from "sonner";
+import { getErrorMessage } from "@workspace/calendar-core";
+import { createLogger } from "@workspace/logger";
 import { MailSidebar } from "../mail-sidebar";
 import { MobileMailHeader } from "../mail-app-mobile-header";
 import { MailAppListColumn } from "./mail-app-list-column";
@@ -15,6 +18,8 @@ import {
   MAIL_READER_EASING,
   MAIL_READER_TRANSITION_MS,
 } from "./mail-reader-transition";
+
+const log = createLogger("mail-app-main-layout");
 
 export function MailAppMainLayout({
   controller,
@@ -54,8 +59,16 @@ export function MailAppMainLayout({
         onOpenPalette={() => setIsPaletteOpen(true)}
         onOpenSearch={() => setIsPaletteOpen(true)}
         onOpenMailboxes={handleOpenMailboxesPalette}
-        onSignOut={() => void handleSignOut()}
-        onReorderMailboxes={(reordered) => void handleReorderMailboxes(reordered)}
+        onSignOut={() =>
+          void handleSignOut().catch((error) =>
+            log.error("Failed to sign out", error),
+          )
+        }
+        onReorderMailboxes={(reordered) =>
+          void handleReorderMailboxes(reordered).catch((error) =>
+            log.error("Failed to reorder mailboxes", error),
+          )
+        }
         isBusy={isBusy}
         labels={labels}
         activeLabelId={activeLabelId}
@@ -73,7 +86,13 @@ export function MailAppMainLayout({
                   disabled: isBusy || isRefreshing,
                   spinning: isRefreshing,
                 }}
-                onRefresh={() => void handleManualRefresh()}
+                onRefresh={() =>
+                  void handleManualRefresh().catch((error) =>
+                    toast.error(
+                      getErrorMessage(error, "Could not refresh mail."),
+                    ),
+                  )
+                }
                 onCompose={() => handleOpenCompose()}
               />
             )}

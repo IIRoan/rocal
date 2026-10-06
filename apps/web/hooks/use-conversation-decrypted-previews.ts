@@ -109,10 +109,7 @@ export function useConversationDecryptedPreviews(
         Boolean(selectedDecrypted?.text || selectedDecrypted?.html);
 
       return {
-        queryKey: [
-          ...mailQueryKeys.message(message.id),
-          "decrypted-preview",
-        ] as const,
+        queryKey: mailQueryKeys.decryptedPreview(message.id),
         enabled: Boolean(client && session) && !hasSelectedDecrypt,
         retry: 1,
         staleTime: Infinity,

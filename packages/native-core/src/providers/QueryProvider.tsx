@@ -1,15 +1,7 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-/**
- * Shared QueryClient instance.
- *
- * - `staleTime` of 60 s avoids redundant refetches on tab switches.
- * - `gcTime` (formerly `cacheTime`) of 10 min keeps data around for
- *   offline access.
- * - `retry` is set to 1 because the HttpClient already retries
- *   transient errors internally.
- */
+/** Shared QueryClient: 60 s staleTime avoids refetch churn, 10 min gcTime keeps data for offline, retry 1 because HttpClient already retries. */
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

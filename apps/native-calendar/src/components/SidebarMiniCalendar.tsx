@@ -25,7 +25,7 @@ import Animated, {
   type WithSpringConfig,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   addMonths,
   differenceInCalendarMonths,
@@ -56,6 +56,7 @@ import {
 } from "./calendar/month-grid-utils";
 import { useCurrentDateTime } from "./calendar/useCurrentDateTime";
 import { useCalendars } from "../hooks/use-calendar-management";
+import { useMiniCalendarMonthEvents } from "../hooks/use-mini-calendar-month-events";
 import {
   getMiniCalendarPagerWindow,
   rubberBandPagerPosition,
@@ -277,20 +278,10 @@ export function SidebarMiniCalendar({
     });
   }, [epochMonth, resolvedTimezone, weekStartDay, windowEndIndex, windowStartIndex]);
 
-  const monthEventQueries = useMemo(
-    () =>
-      monthWindow.map(({ range }) => ({
-        queryKey: QUERY_KEYS.events(
-          range.start.toISOString(),
-          range.end.toISOString(),
-        ),
-        queryFn: () => calendarApiService.getEvents(range.start, range.end),
-        staleTime: MINI_CALENDAR_STALE_TIME,
-      })),
-    [monthWindow],
+  const eventQueries = useMiniCalendarMonthEvents(
+    monthWindow,
+    MINI_CALENDAR_STALE_TIME,
   );
-
-  const eventQueries = useQueries({ queries: monthEventQueries });
   const secondPreviousMonthEvents = eventQueries[0]?.data;
   const previousMonthEvents = eventQueries[1]?.data;
   const currentMonthEvents = eventQueries[2]?.data;

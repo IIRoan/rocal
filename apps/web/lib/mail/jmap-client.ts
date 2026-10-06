@@ -58,6 +58,30 @@ type JmapMethodError = {
   properties?: string[];
 };
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/** Hostile JMAP bodies: only trust a session that carries the account maps we index into. */
+function isJmapSessionRecord(value: unknown): value is JmapSession {
+  const record = asRecord(value);
+  return (
+    asRecord(record?.accounts) !== null &&
+    asRecord(record?.primaryAccounts) !== null
+  );
+}
+
+function isJmapEnvelopeRecord(value: unknown): value is JmapEnvelope {
+  const record = asRecord(value);
+  return (
+    record !== null &&
+    (record.methodResponses === undefined ||
+      Array.isArray(record.methodResponses))
+  );
+}
+
 function getSubmissionAccountId(
   session: JmapSession,
   mailAccountId: string,
@@ -124,6 +148,7 @@ function normalizeBaseUrl(baseUrl: string): string {
 }
 
 function defaultFetcher(input: string, init?: RequestInit): Promise<Response> {
+  // repo-rules-allow client-api-boundary: JMAP protocol transport to the mail server, not a Solace API route.
   return globalThis.fetch(input, {
     ...init,
     credentials: init?.credentials ?? "include",
@@ -138,12 +163,12 @@ async function readHttpErrorDetail(response: Response): Promise<string> {
     }
 
     try {
-      const parsed = JSON.parse(text) as Record<string, unknown>;
+      const parsed = asRecord(JSON.parse(text));
       const parts = [
-        typeof parsed.message === "string" ? parsed.message : null,
-        typeof parsed.title === "string" ? parsed.title : null,
-        typeof parsed.detail === "string" ? parsed.detail : null,
-        typeof parsed.error === "string" ? parsed.error : null,
+        typeof parsed?.message === "string" ? parsed.message : null,
+        typeof parsed?.title === "string" ? parsed.title : null,
+        typeof parsed?.detail === "string" ? parsed.detail : null,
+        typeof parsed?.error === "string" ? parsed.error : null,
       ].filter((part): part is string => Boolean(part));
 
       if (parts.length > 0) {
@@ -790,8 +815,10 @@ export class StalwartJmapClient {
     if (!response.ok) {
       let detail = "";
       try {
-        const body = (await response.json()) as { message?: string };
-        if (body.message) detail = ` — ${body.message}`;
+        const body = asRecord(await response.json());
+        if (typeof body?.message === "string" && body.message) {
+          detail = ` — ${body.message}`;
+        }
       } catch {
         /* ignore parse failure */
       }
@@ -806,10 +833,12 @@ export class StalwartJmapClient {
       );
     }
 
-    return normalizeJmapSession(
-      (await response.json()) as JmapSession,
-      this.baseUrl,
-    );
+    const session = await response.json();
+    if (!isJmapSessionRecord(session)) {
+      throw new Error("Mail server returned an unreadable JMAP session.");
+    }
+
+    return normalizeJmapSession(session, this.baseUrl);
   }
 
   async getAccountSettings(
@@ -828,10 +857,7 @@ export class StalwartJmapClient {
     return result.list?.[0] ?? { encryptionAtRest: { "@type": "Disabled" } };
   }
 
-  /**
-   * Stalwart encryptOnAppend re-encrypts JMAP submissions with the user's PGP
-   * key, which breaks external delivery. Solace handles internal encryption.
-   */
+  /** Stalwart encryptOnAppend re-encrypts JMAP submissions with the user's PGP key, which breaks external delivery; Solace handles internal encryption. */
   async ensureEncryptOnAppendDisabled(session: JmapSession): Promise<void> {
     const settings = await this.getAccountSettings(session);
     if (!isStalwartEncryptOnAppendEnabled(settings)) {
@@ -970,15 +996,7 @@ export class StalwartJmapClient {
     return result.list ?? [];
   }
 
-  /**
-   * One HTTP round-trip for the mail app bootstrap metadata that used to be
-   * four parallel POSTs (account settings, policy singletons, mailboxes,
-   * identities). Cuts open-mail latency through the Vercel→Stalwart proxy.
-   *
-   * Policy singletons (`x:Email/get`, `x:Jmap/get`) are optional — many
-   * user tokens cannot read them (same as getStalwartPolicySingletons).
-   * Missing/errored policy methods must not fail mailbox load.
-   */
+  /** One round-trip for bootstrap metadata; policy singletons are optional and must not fail mailbox load. */
   async bootstrapMailboxState(session: JmapSession): Promise<{
     accountSettings: Record<string, unknown>;
     emailSettings: Record<string, unknown> | null;
@@ -2323,7 +2341,12 @@ export class StalwartJmapClient {
       );
     }
 
-    return (await response.json()) as JmapEnvelope;
+    const envelope = await response.json();
+    if (!isJmapEnvelopeRecord(envelope)) {
+      throw new Error("JMAP response was not readable.");
+    }
+
+    return envelope;
   }
 
   private getMethodResult<T>(envelope: JmapEnvelope, methodName: string): T {

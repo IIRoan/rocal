@@ -160,7 +160,8 @@ export function EventEditor({
       setShowRecurringSaveModal(true);
       return;
     }
-    void saveEvent(calendarData);
+    // saveEvent toasts every failure path itself.
+    void saveEvent(calendarData).catch(() => undefined);
   }
 
   function handleEventDelete() {
@@ -171,7 +172,8 @@ export function EventEditor({
       toast.error("Synced calendar events cannot be deleted.");
       return;
     }
-    void deleteEvent(calendarData);
+    // deleteEvent toasts every failure path itself.
+    void deleteEvent(calendarData).catch(() => undefined);
   }
 
   function handleInvitationResponse(
@@ -180,6 +182,7 @@ export function EventEditor({
     if (!selectedEvent?.id) {
       return;
     }
+    // respondToEventInvitation toasts every failure path itself.
     void respondToEventInvitation({
       event: selectedEvent,
       status,
@@ -189,7 +192,7 @@ export function EventEditor({
       onEventSaved,
       onClose: () => onOpenChange(false),
       setPending: setInviteResponsePending,
-    });
+    }).catch(() => undefined);
   }
 
   const canEditSelectedEvent = selectedEvent
@@ -227,7 +230,8 @@ export function EventEditor({
       handleEventDelete={handleEventDelete}
       handleEventDownloadIcs={() => {
         if (selectedEvent?.id) {
-          void downloadEventIcs(selectedEvent.id);
+          // downloadEventIcs toasts every failure path itself.
+          void downloadEventIcs(selectedEvent.id).catch(() => undefined);
         }
       }}
       handleEventSave={handleEventSave}
@@ -255,7 +259,12 @@ export function EventEditor({
               onOpenChange={setShowRecurringDeleteModal}
               action="delete"
               eventTitle={selectedEvent.title}
-              onSelect={(scope) => void deleteRecurring(calendarData, scope)}
+              // deleteRecurring toasts every failure path itself.
+              onSelect={(scope) =>
+                void deleteRecurring(calendarData, scope).catch(
+                  () => undefined,
+                )
+              }
               loading={eventSaving}
             />
             <RecurringScopeModal
@@ -263,9 +272,10 @@ export function EventEditor({
               onOpenChange={setShowRecurringSaveModal}
               action="edit"
               eventTitle={eventTitle}
+              // saveEvent toasts every failure path itself.
               onSelect={(scope) => {
                 setShowRecurringSaveModal(false);
-                void saveEvent(calendarData, scope);
+                void saveEvent(calendarData, scope).catch(() => undefined);
               }}
               loading={eventSaving}
             />

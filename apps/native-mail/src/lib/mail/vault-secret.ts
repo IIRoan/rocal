@@ -1,7 +1,7 @@
 import {
   createE2eeModule,
   type E2eeModule,
-  type EncryptedJsonPayload,
+  parseEncryptedJsonPayload,
 } from "@workspace/e2ee";
 import * as ExpoCrypto from "expo-crypto";
 import { getActiveE2eeSession } from "@workspace/native-core/lib/e2ee-session";
@@ -74,10 +74,13 @@ export async function unwrapVaultSecret(
   }
 
   try {
-    const payload = JSON.parse(wrappedSecret) as EncryptedJsonPayload;
+    const parsed = parseEncryptedJsonPayload(wrappedSecret);
+    if (!parsed) {
+      return null;
+    }
     const { secret } = await e2ee.decryptJsonPayload<{ secret: string }>(
       session.accountKey,
-      payload,
+      parsed,
       VAULT_SECRET_AAD,
     );
     return secret || null;

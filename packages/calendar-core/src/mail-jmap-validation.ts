@@ -49,6 +49,7 @@ export function parseJmapBlobUploadResponse(
   }
 
   return {
+    // superRefine rejects an empty blob id before safeParse succeeds, so the non-null is guaranteed.
     blobId: parsed.data.blobId!,
     size: parsed.data.size ?? expectedSize,
     type: parsed.data.type,
@@ -129,8 +130,9 @@ export function parseSendMessageResults(input: {
   }
 
   return {
+    // The superRefines reject created results without ids, so created/draft1/s1 all exist here.
     emailId: email.data.created!.draft1!.id!.trim(),
-    threadId: email.data.created!.draft1!.threadId ?? null,
-    submissionId: submission.data.created!.s1!.id!.trim(),
+    threadId: email.data.created!.draft1!.threadId ?? null, // Same superRefine guarantee as the emailId line above.
+    submissionId: submission.data.created!.s1!.id!.trim(), // Same superRefine guarantee as the emailId line above.
   };
 }

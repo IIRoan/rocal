@@ -32,9 +32,11 @@ export function getPaddedCalendarMonthRange(
   const last = endOfMonth(date);
 
   const start = new Date(first);
+  // repo-rules-allow timezone-safe-calendar-code: date-only wall-clock carrier; getZonedDayUtcBounds converts it to zoned UTC bounds.
   start.setDate(start.getDate() - paddingDays);
 
   const end = new Date(last);
+  // repo-rules-allow timezone-safe-calendar-code: date-only wall-clock carrier; getZonedDayUtcBounds converts it to zoned UTC bounds.
   end.setDate(end.getDate() + paddingDays);
   const resolvedTimezone = resolveTimezone(timezone);
   return {

@@ -1,14 +1,11 @@
-/**
- * Labels for mail messages on native.
- *
- * Label definitions ({ id, name, color }) live in the encrypted mail vault
- * (same store as the web client). Label *assignments* are stored on the server
- * as `keywords/label:<id>` on each email.
- */
+/** Label definitions ({ id, name, color }) live in the encrypted vault; assignments are `keywords/label:<id>`. */
 import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as SecureStore from "expo-secure-store";
 import * as ExpoCrypto from "expo-crypto";
+import {
+  MAIL_LABEL_PRESET_COLORS,
+} from "@workspace/calendar-core";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import {
   ensureVaultLoaded,
@@ -17,70 +14,36 @@ import {
   saveVaultLabels,
 } from "./mail-crypto";
 import type { MailRuntime } from "./mail-runtime";
-import type { LabelDef, JmapEmailMessage } from "./types";
+import type { LabelDef } from "./types";
 
 /** @deprecated Legacy on-device store — migrated into the vault on first unlock. */
 const LEGACY_STORAGE_KEY = "mail_labels_v1";
 
 const NO_LABELS: LabelDef[] = [];
 
-/** Color palette available when creating a new label. */
-export const LABEL_COLOR_OPTIONS = [
-  { value: "#ef4444", label: "Red" },
-  { value: "#f97316", label: "Orange" },
-  { value: "#f59e0b", label: "Amber" },
-  { value: "#22c55e", label: "Green" },
-  { value: "#14b8a6", label: "Teal" },
-  { value: "#3b82f6", label: "Blue" },
-  { value: "#6366f1", label: "Indigo" },
-  { value: "#a855f7", label: "Purple" },
-  { value: "#ec4899", label: "Pink" },
-];
+/** Same palette as web, so a label keeps its color whichever client created it. */
+export const LABEL_COLOR_OPTIONS = MAIL_LABEL_PRESET_COLORS.map(
+  ({ hex, label }) => ({ value: hex, label }),
+);
 
-/** Resolve label definitions for keywords present on a message. */
-export function getMessageLabels(
-  message: JmapEmailMessage,
-  labels: LabelDef[],
-): LabelDef[] {
-  if (!message.keywords) return [];
-  const result: LabelDef[] = [];
-  for (const label of labels) {
-    if (message.keywords[`label:${label.id}`] === true) {
-      result.push(label);
-    }
-  }
-  return result;
-}
+export { getAllMessageLabels, getMessageLabels } from "@workspace/calendar-core";
 
-/**
- * Also detect keywords with `label:` prefix that belong to labels
- * not yet known locally (e.g. created on web). Returns a "ghost"
- * label with the keyword-derived id so the badge is still visible.
- */
-export function getAllMessageLabels(
-  message: JmapEmailMessage,
-  knownLabels: LabelDef[],
-): LabelDef[] {
-  if (!message.keywords) return [];
-  const known = getMessageLabels(message, knownLabels);
-  const knownIds = new Set(known.map((l) => l.id));
-
-  for (const key of Object.keys(message.keywords)) {
-    if (!key.startsWith("label:")) continue;
-    const id = key.slice(6);
-    if (knownIds.has(id)) continue;
-    known.push({ id, name: id, color: "#6b7280" });
-  }
-
-  return known;
+function isLabelDef(value: unknown): value is LabelDef {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.name === "string" &&
+    typeof candidate.color === "string"
+  );
 }
 
 async function loadLegacyLocalLabels(): Promise<LabelDef[]> {
   try {
     const raw = await SecureStore.getItemAsync(LEGACY_STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as LabelDef[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(isLabelDef) : [];
   } catch {
     return [];
   }
@@ -124,8 +87,7 @@ async function loadLabelsFromVault(runtime: MailRuntime): Promise<LabelDef[]> {
     try {
       await ensureVaultLoaded(runtime);
     } catch {
-      // Vault unlock is optional for listing mail — label names may be missing
-      // until the user opens an encrypted message or creates a label.
+      // Vault unlock is optional for listing mail — label names may be missing until the user opens an encrypted message or creates a label.
       return [];
     }
   }
@@ -140,11 +102,7 @@ type UseLabelsOptions = {
   enabled?: boolean;
 };
 
-/**
- * Hook that provides label definitions + CRUD helpers.
- * Labels are stored in the encrypted vault (shared with web) and synced via
- * the server vault backup. Assignments use `keywords/label:<id>` on messages.
- */
+/** Label definitions plus CRUD helpers; definitions live in the encrypted vault, assignments in JMAP keywords. */
 export function useLabels(options: UseLabelsOptions = {}) {
   const { runtime = null, enabled = true } = options;
   const queryClient = useQueryClient();
@@ -152,7 +110,12 @@ export function useLabels(options: UseLabelsOptions = {}) {
 
   const query = useQuery({
     queryKey: QUERY_KEYS.mailLabels(),
-    queryFn: () => loadLabelsFromVault(runtime!),
+    queryFn: () => {
+      if (!runtime) {
+        throw new Error("Mail is not ready yet.");
+      }
+      return loadLabelsFromVault(runtime);
+    },
     enabled: canLoad,
     staleTime: Infinity,
     retry: false,
@@ -196,7 +159,8 @@ export function useLabels(options: UseLabelsOptions = {}) {
 
   const refreshLabels = useCallback(() => {
     if (canLoad) {
-      void query.refetch();
+      // A failed refresh leaves the previously loaded labels in place.
+      void query.refetch().catch(() => undefined);
     }
   }, [canLoad, query]);
 

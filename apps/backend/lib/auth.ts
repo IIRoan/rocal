@@ -174,8 +174,7 @@ async function getSuccessfulEndpointResponse<T>(
     return null;
   }
 
-  // Narrow without relying on `instanceof Response` (Vercel/Bun typecheck
-  // does not always treat the global Response constructor as a type guard).
+  // Narrow without relying on `instanceof Response` (Vercel/Bun typecheck does not always treat the global Response constructor as a type guard).
   if (
     typeof returned === "object" &&
     "ok" in returned &&
@@ -187,7 +186,9 @@ async function getSuccessfulEndpointResponse<T>(
       return null;
     }
 
-    return (await response.clone().json()) as T;
+    // Better Auth's own response body; the caller's `T` describes this endpoint's payload.
+    const payload: unknown = await response.clone().json();
+    return payload as T;
   }
 
   return returned as T;
@@ -391,12 +392,13 @@ const inviteRequiredPlugin = {
         },
         handler: createAuthMiddleware(async (ctx): Promise<void> => {
           const response = await getSuccessfulEndpointResponse<{
-            user?: { email?: string };
+            user?: { id?: string; email?: string };
           }>(ctx.context.returned);
 
+          const userId = response?.user?.id?.trim();
           const email = response?.user?.email?.trim().toLowerCase();
-          if (email) {
-            await inviteService.markInviteAccepted(email);
+          if (userId && email) {
+            await inviteService.markInviteAccepted({ userId, email });
           }
         }),
       },

@@ -107,9 +107,11 @@ export function SignInScreen() {
           "Password accepted, but passkeys are unavailable on this device. Sign in from a device that can verify your passkey.",
         );
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       const message =
-        err?.message ?? "Sign-in failed. Please check your credentials.";
+        err instanceof Error && err.message
+          ? err.message
+          : "Sign-in failed. Please check your credentials.";
       log.error("Sign-in failed", err);
       captureException(err, { tags: { area: "sign-in" } });
       setServerError(message);
@@ -156,9 +158,11 @@ export function SignInScreen() {
       );
       toast("Password reset link sent");
       setIsResetMode(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const message =
-        err?.message ?? "Unable to send a password reset link right now.";
+        err instanceof Error && err.message
+          ? err.message
+          : "Unable to send a password reset link right now.";
       log.error("Password reset request failed", err);
       setServerError(message);
     } finally {

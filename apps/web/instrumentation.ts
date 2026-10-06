@@ -28,8 +28,7 @@ export async function register() {
         if (typeof chunk === "string") {
           const cleanStr = chunk.replace(/\x1B\[\d+m/g, "").trim();
 
-          // Match Next.js HTTP request logs (e.g., "GET /... 200 in ...ms")
-          // as well as other Next.js internal logs like "✓ Compiled"
+          // Match Next.js HTTP request logs (e.g., "GET /... 200 in ...ms") as well as other Next.js internal logs like "✓ Compiled"
           if (
             cleanStr.startsWith("GET ") ||
             cleanStr.startsWith("POST ") ||

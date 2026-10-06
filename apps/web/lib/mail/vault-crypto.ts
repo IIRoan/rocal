@@ -144,6 +144,48 @@ export async function createEncryptedMailVault(
   };
 }
 
+function isVaultEnvelope(value: unknown): value is VaultEnvelope {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    record.version === 1 &&
+    record.algorithm === "AES-GCM-256" &&
+    typeof record.ivB64 === "string" &&
+    typeof record.ciphertextB64 === "string"
+  );
+}
+
+function isUserKeyVault(value: unknown): value is UserKeyVault {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.userId === "string" &&
+    typeof record.email === "string" &&
+    typeof record.publicKeyArmored === "string" &&
+    typeof record.publicKeyFingerprint === "string" &&
+    typeof record.encryptedPrivateKeyArmored === "string" &&
+    typeof record.kdfParams === "object" &&
+    record.kdfParams !== null &&
+    typeof record.vaultVersion === "number"
+  );
+}
+
+function parseVaultEnvelope(raw: string): VaultEnvelope {
+  const parsed: unknown = JSON.parse(raw);
+  if (!isVaultEnvelope(parsed)) {
+    throw new Error("Invalid mail vault envelope");
+  }
+  return parsed;
+}
+
+function parseUserKeyVault(raw: string): UserKeyVault {
+  const parsed: unknown = JSON.parse(raw);
+  if (!isUserKeyVault(parsed)) {
+    throw new Error("Invalid mail vault content");
+  }
+  return parsed;
+}
+
 /** Unlock with a locally cached AES key, skipping the argon2id pass. */
 export async function unlockEncryptedMailVaultWithDerivedKey(
   encryptedVaultB64: string,
@@ -151,16 +193,9 @@ export async function unlockEncryptedMailVaultWithDerivedKey(
 ): Promise<UserKeyVault> {
   try {
     const cryptoRef = getCryptoRef();
-    const envelope = JSON.parse(
+    const envelope = parseVaultEnvelope(
       decodeUtf8(base64ToBytes(encryptedVaultB64)),
-    ) as VaultEnvelope;
-
-    if (envelope.version !== 1) {
-      throw new Error(`Unsupported vault envelope version: ${envelope.version}`);
-    }
-    if (envelope.algorithm !== "AES-GCM-256") {
-      throw new Error(`Unsupported vault algorithm: ${envelope.algorithm}`);
-    }
+    );
 
     const key = await cryptoRef.subtle.importKey(
       "raw",
@@ -178,7 +213,7 @@ export async function unlockEncryptedMailVaultWithDerivedKey(
       toBufferSource(base64ToBytes(envelope.ciphertextB64)),
     );
 
-    return JSON.parse(decodeUtf8(new Uint8Array(plaintext))) as UserKeyVault;
+    return parseUserKeyVault(decodeUtf8(new Uint8Array(plaintext)));
   } catch {
     throw new Error("Failed to decrypt mail vault with derived key");
   }
@@ -192,9 +227,9 @@ export async function unlockEncryptedMailVault(
 ): Promise<UserKeyVault> {
   try {
     const cryptoRef = getCryptoRef();
-    const envelope = JSON.parse(
+    const envelope = parseVaultEnvelope(
       decodeUtf8(base64ToBytes(encryptedVaultB64)),
-    ) as VaultEnvelope;
+    );
     const key = await deriveVaultKey(passphrase, kdfParams, onDerivedKey);
     const plaintext = await cryptoRef.subtle.decrypt(
       {
@@ -205,7 +240,7 @@ export async function unlockEncryptedMailVault(
       toBufferSource(base64ToBytes(envelope.ciphertextB64)),
     );
 
-    return JSON.parse(decodeUtf8(new Uint8Array(plaintext))) as UserKeyVault;
+    return parseUserKeyVault(decodeUtf8(new Uint8Array(plaintext)));
   } catch {
     throw new Error("Failed to decrypt mail vault");
   }

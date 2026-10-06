@@ -314,6 +314,7 @@ export class MailSyncService {
       return cached;
     }
 
+    // repo-rules-allow owner-scoped-data: directoryEntryId only comes from getAuthorizedDirectoryEntry after its userId check.
     const syncState = await this.prisma.mailJmapSyncState.findUnique({
       where: { directoryEntryId },
       select: mailSyncStateSelect,

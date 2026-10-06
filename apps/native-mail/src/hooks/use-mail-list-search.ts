@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   DEFAULT_MAIL_LIST_FILTERS,
   buildMailboxFieldSearchFilter,
@@ -30,10 +30,13 @@ export function useMailListSearch({
     revision: number;
   }>({ fields: {}, revision: 0 });
 
-  useEffect(() => {
+  // Reset during render when the mailbox changes, so stale filters never apply to the new list.
+  const [renderedMailboxId, setRenderedMailboxId] = useState(mailboxId);
+  if (renderedMailboxId !== mailboxId) {
+    setRenderedMailboxId(mailboxId);
     setListFilters(DEFAULT_MAIL_LIST_FILTERS);
     setFieldSearch((prev) => ({ fields: {}, revision: prev.revision + 1 }));
-  }, [mailboxId]);
+  }
 
   const fieldSearchActive = hasMailSearchFieldValues(fieldSearch.fields);
   const fieldSearchFilter = useMemo(

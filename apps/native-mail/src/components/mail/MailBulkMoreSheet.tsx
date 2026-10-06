@@ -1,5 +1,6 @@
 import React from "react";
 import { MailSheetList } from "./MailSheetList";
+import { useMailPalette } from "@workspace/native-core/components/mail/mail-ui";
 import { SheetRow } from "@workspace/native-core/components/sheet";
 
 interface MailBulkMoreSheetProps {
@@ -25,6 +26,8 @@ export function MailBulkMoreSheet({
   onMove,
   onDeleteForever,
 }: MailBulkMoreSheetProps) {
+  const palette = useMailPalette();
+
   return (
     <MailSheetList>
       {showStar ? (
@@ -35,7 +38,7 @@ export function MailBulkMoreSheet({
           variant="mail"
           icon="star"
           label="Unstar"
-          iconColor="#fbbf24"
+          iconColor={palette.star}
           onPress={onUnstar}
           showDivider={showStar}
         />

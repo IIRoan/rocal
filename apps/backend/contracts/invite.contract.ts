@@ -96,5 +96,5 @@ export interface IInviteService {
   checkSignupAllowed(
     email: string,
   ): Promise<{ allowed: boolean; reason?: string }>;
-  markInviteAccepted(email: string): Promise<void>;
+  markInviteAccepted(input: { userId: string; email: string }): Promise<void>;
 }

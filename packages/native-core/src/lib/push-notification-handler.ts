@@ -10,11 +10,7 @@ const FOREGROUND_NOTIFICATION_BEHAVIOR: Notifications.NotificationBehavior = {
 
 let registered = false;
 
-/**
- * Register the iOS foreground notification handler as early as possible.
- * expo-notifications discards remote alerts when no handler responds within
- * ~3 seconds, so this must run before the router and other heavy startup work.
- */
+/** Register early: expo-notifications discards alerts when no handler responds within ~3s. */
 export function registerForegroundPushNotificationHandler(): void {
   if (registered || Platform.OS !== "ios") {
     return;
@@ -23,13 +19,9 @@ export function registerForegroundPushNotificationHandler(): void {
   registered = true;
   Notifications.setNotificationHandler({
     handleNotification: async () => FOREGROUND_NOTIFICATION_BEHAVIOR,
-    handleError: (notificationId, error) => {
+    handleError: () => {
       if (__DEV__) {
-        console.warn(
-          "[push] foreground notification handler failed",
-          notificationId,
-          error,
-        );
+        console.warn("[push] foreground notification handler failed");
       }
     },
   });

@@ -19,10 +19,7 @@ export interface UseKeyboardShortcutsOptions {
   ignoreInputs?: boolean;
 }
 
-/**
- * Hook for handling keyboard shortcuts in dropdown menus and other components
- * Supports both Ctrl (Windows/Linux) and Cmd (Mac) modifier keys
- */
+/** Menu keyboard shortcuts; Ctrl and Cmd are treated as the same modifier. */
 export function useKeyboardShortcuts(
   shortcuts: KeyboardShortcut[],
   options: UseKeyboardShortcutsOptions = {},
@@ -85,9 +82,7 @@ export function useKeyboardShortcuts(
   }, [enabled, target, handleKeyDown]);
 }
 
-/**
- * Simplified hook for dropdown shortcuts that automatically handles Cmd/Ctrl modifiers
- */
+/** Dropdown shortcuts that always require Cmd/Ctrl and swallow the default action. */
 export function useDropdownShortcuts(
   shortcuts: Array<{ key: string; action: () => void }>,
   enabled: boolean = true,
@@ -106,9 +101,7 @@ export function useDropdownShortcuts(
   useKeyboardShortcuts(keyboardShortcuts, { enabled, ignoreInputs: true });
 }
 
-/**
- * Hook for numbered shortcuts (1-9) with Cmd/Ctrl modifier
- */
+/** Numbered 1-9 shortcuts that require Cmd/Ctrl. */
 export function useNumberedShortcuts(
   actions: Array<() => void>,
   enabled: boolean = true,

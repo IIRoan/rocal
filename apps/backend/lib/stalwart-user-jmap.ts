@@ -1,7 +1,8 @@
 import { env } from "./env";
-import type {
-  StalwartJmapEnvelope,
-  StalwartJmapMethodCall,
+import {
+  parseStalwartJmapEnvelope,
+  type StalwartJmapEnvelope,
+  type StalwartJmapMethodCall,
 } from "./stalwart-admin";
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
@@ -80,7 +81,7 @@ export class StalwartUserJmapClient implements StalwartUserJmapClientLike {
       );
     }
 
-    return (await response.json()) as StalwartJmapEnvelope;
+    return parseStalwartJmapEnvelope(await response.json());
   }
 }
 

@@ -252,7 +252,7 @@ export function SidebarCalendar({
                           className={cn(
                             "rounded-full",
                             isMobile ? "w-1 h-1" : "w-1 h-1",
-                            isSelected && "dark:bg-black bg-white",
+                            isSelected && "bg-primary-foreground",
                           )}
                           style={{
                             backgroundColor: isSelected

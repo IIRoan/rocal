@@ -359,8 +359,8 @@ function MailBulkActionSheet({
             showMove={controller.bulkMoveTargets.length > 0}
             showDeleteForever={controller.isInTrash || controller.isInSpam}
             onDeleteForever={controller.handleBulkDeleteForever}
-            onStar={() => void controller.handleBulkStar()}
-            onUnstar={() => void controller.handleBulkUnstar()}
+            onStar={controller.handleBulkStar}
+            onUnstar={controller.handleBulkUnstar}
             onLabels={() => controller.setActiveSheetView("bulkLabel")}
             onMove={() => controller.setActiveSheetView("bulkMove")}
           />
@@ -377,9 +377,7 @@ function MailBulkActionSheet({
           <MailBulkLabelsSheet
             labels={controller.labels}
             onBack={() => controller.setActiveSheetView("bulkMore")}
-            onApplyLabel={(labelId) =>
-              void controller.handleBulkApplyLabel(labelId)
-            }
+            onApplyLabel={controller.handleBulkApplyLabel}
           />
         </MailSheetPanel>
       ) : null}

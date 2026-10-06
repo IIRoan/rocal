@@ -44,7 +44,10 @@ export function MailSwipeRow({
   const canTrash = Boolean(onTrash);
 
   const pulse = useCallback(() => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Haptics are unavailable on some devices; a dropped pulse is harmless.
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+      () => undefined,
+    );
   }, []);
 
   const runTrash = useCallback(() => {
@@ -146,7 +149,10 @@ export function MailSwipeRow({
           accessibilityActions={accessibilityActions}
           onAccessibilityAction={(e) => {
             if (e.nativeEvent.actionName === "toggleRead") onToggleRead();
-            if (e.nativeEvent.actionName === "trash") void onTrash?.();
+            // The trash handler toasts its own failures; the row only needs it started.
+            if (e.nativeEvent.actionName === "trash") {
+              void Promise.resolve(onTrash?.()).catch(() => undefined);
+            }
           }}
         >
           {children}

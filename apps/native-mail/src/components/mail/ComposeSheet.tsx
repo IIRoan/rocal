@@ -491,19 +491,25 @@ function ComposeSession({
   }, [draftId, leaveCompose, moveToTrash, params.mode, runtime]);
 
   const saveAndLeave = useCallback(async () => {
-    const result = await saveDraft();
-    if (result.status === "failed") {
-      // Stay open (reopening a swiped-away sheet) so a failed save never silently drops the message.
+    try {
+      const result = await saveDraft();
+      if (result.status === "failed") {
+        // Stay open (reopening a swiped-away sheet) so a failed save never silently drops the message.
+        toast("Couldn't save draft", "error");
+        sheetRef.current?.snapTo(0);
+        return;
+      }
+      if (result.status === "empty") {
+        leaveClean();
+        return;
+      }
+      toast("Draft saved", "success");
+      leaveCompose();
+    } catch {
+      // saveDraft reports its own failures; this only guards the leave path.
       toast("Couldn't save draft", "error");
       sheetRef.current?.snapTo(0);
-      return;
     }
-    if (result.status === "empty") {
-      leaveClean();
-      return;
-    }
-    toast("Draft saved", "success");
-    leaveCompose();
   }, [leaveClean, leaveCompose, saveDraft, toast]);
 
   const handleCancel = useCallback(() => {
@@ -694,7 +700,7 @@ function ComposeSession({
 
         let cancelled = false;
         setIsDraftDecrypting(true);
-        void (async () => {
+        const decryptSeededDraft = async () => {
           let plaintext = "";
           try {
             if (encryption === "inline_pgp") {
@@ -727,7 +733,8 @@ function ComposeSession({
               seedCompose({ ...headers, body: plaintext });
             }
           }
-        })();
+        };
+        void decryptSeededDraft();
 
         return () => {
           cancelled = true;

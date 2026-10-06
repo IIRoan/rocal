@@ -10,11 +10,14 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
 import { Button } from "@workspace/ui/components/ui/button";
+import { createLogger } from "@workspace/logger";
 import { getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
 import { MailCommandPalette } from "../mail-command-palette";
 import { ComposeDialog } from "../compose-dialog";
 import { AttachmentPreviewDialog } from "../attachment-preview-dialog";
 import type { MailAppContentController } from "../use-mail-app-content-controller";
+
+const log = createLogger("mail-app-overlays");
 
 export function MailAppOverlays({
   controller,
@@ -64,16 +67,24 @@ export function MailAppOverlays({
         onRenameMailbox={(id, name) => handleRenameMailbox(id, name)}
         labels={labels}
         onCreateLabel={(name, color) => handleCreateLabel(name, color)}
-        onUpdateLabel={(id, updates) => void handleUpdateLabel(id, updates)}
+        onUpdateLabel={(id, updates) =>
+          void handleUpdateLabel(id, updates).catch((error) =>
+            log.error("Failed to update label", error),
+          )
+        }
         onDeleteLabel={(id) => handleDeleteLabel(id)}
         messages={activeMailbox?.messages ?? []}
-        onSelectMessage={(id) => void openMessageById(id)}
+        onSelectMessage={(id) =>
+          void openMessageById(id).catch((error) =>
+            log.error("Failed to open message", error),
+          )
+        }
       />
 
       <ComposeDialog
         identities={activeMailbox?.pickerIdentities ?? []}
         fallbackFromEmail={activeMailbox?.email ?? accountEmail}
-        onClose={() => void handleDismissCompose()}
+        onClose={() => handleDismissCompose()}
         onSend={handleSendMessage}
         onImageUpload={handleComposeImageUpload}
         activeMailbox={
@@ -131,7 +142,9 @@ export function MailAppOverlays({
               disabled={isBusy}
               onClick={() => {
                 patchListChrome({ emptyFolderOpen: false });
-                void handleEmptyMailbox();
+                void handleEmptyMailbox().catch((error) =>
+                  log.error("Failed to empty folder", error),
+                );
               }}
             >
               {emptyFolderLabel}

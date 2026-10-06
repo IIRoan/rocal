@@ -1,16 +1,30 @@
 import { toast } from "sonner";
 import { createLogger } from "@workspace/logger";
+import {
+  getErrorMessage,
+  type Calendar,
+  type CreateCalendarRequest,
+  type UpdateCalendarRequest,
+} from "@workspace/calendar-core";
+import type { UseCalendarDataReturn } from "@/hooks/use-calendar-data";
 import { PRESET_COLORS } from "./navigation-config";
 
 const log = createLogger("calendar-utils");
 
 const ALLOWED_COLOR_VALUES = PRESET_COLORS.map((c) => c.value);
 
+type CalendarValidationErrors = { name?: string; color?: string };
+
+type CalendarData = Pick<
+  UseCalendarDataReturn,
+  "createCalendar" | "updateCalendar" | "deleteCalendar"
+>;
+
 export const validateCalendarForm = (
   calendarName: string,
   calendarColor: string,
-  calendars: any[],
-  editingCalendar?: any,
+  calendars: Calendar[],
+  editingCalendar?: Calendar | null,
 ) => {
   const errors: { name?: string; color?: string } = {};
 
@@ -49,10 +63,10 @@ export const handleCalendarCreate = async (
   calendarName: string,
   calendarColor: string,
   calendarIsDefault: boolean,
-  calendars: any[],
-  calendarData: any,
+  calendars: Calendar[],
+  calendarData: Pick<CalendarData, "createCalendar">,
   setters: {
-    setCalendarValidationErrors: (errors: any) => void;
+    setCalendarValidationErrors: (errors: CalendarValidationErrors) => void;
     setCalendarSaving: (saving: boolean) => void;
     setCalendarName: (name: string) => void;
     setCalendarColor: (color: string) => void;
@@ -82,9 +96,9 @@ export const handleCalendarCreate = async (
     setters.setCalendarIsDefault(false);
     setters.setCalendarValidationErrors({});
     goBack();
-  } catch (error: any) {
+  } catch (error: unknown) {
     log.error("Failed to create calendar:", error);
-    if (error.message && error.message.includes("already exists")) {
+    if (getErrorMessage(error, "").includes("already exists")) {
       setters.setCalendarValidationErrors({
         name: "A calendar with this name already exists",
       });
@@ -100,13 +114,13 @@ export const handleCalendarUpdate = async (
   calendarName: string,
   calendarColor: string,
   calendarIsDefault: boolean,
-  calendars: any[],
-  editingCalendar: any,
-  calendarData: any,
+  calendars: Calendar[],
+  editingCalendar: Calendar | null,
+  calendarData: Pick<CalendarData, "updateCalendar">,
   setters: {
-    setCalendarValidationErrors: (errors: any) => void;
+    setCalendarValidationErrors: (errors: CalendarValidationErrors) => void;
     setCalendarSaving: (saving: boolean) => void;
-    setEditingCalendar: (calendar: any) => void;
+    setEditingCalendar: (calendar: Calendar | null) => void;
   },
   goBack: () => void,
 ) => {
@@ -137,13 +151,14 @@ export const handleCalendarUpdate = async (
     toast.success(`Calendar "${calendarName}" updated`);
     setters.setEditingCalendar(null);
     goBack();
-  } catch (error: any) {
+  } catch (error: unknown) {
     log.error("Failed to update calendar:", error);
-    if (error.message && error.message.includes("already exists")) {
+    const message = getErrorMessage(error, "");
+    if (message.includes("already exists")) {
       setters.setCalendarValidationErrors({
         name: "A calendar with this name already exists",
       });
-    } else if (error.message && error.message.includes("Color must be")) {
+    } else if (message.includes("Color must be")) {
       setters.setCalendarValidationErrors({
         color: "Please select a valid color",
       });
@@ -156,19 +171,18 @@ export const handleCalendarUpdate = async (
 };
 
 export const handleCalendarDelete = async (
-  calendar: any,
-  calendarData: any,
+  calendar: Calendar,
+  calendarData: Pick<CalendarData, "deleteCalendar">,
   setCalendarSaving: (saving: boolean) => void,
   goBack: () => void,
 ) => {
   setCalendarSaving(true);
   try {
-    // Use deleteCalendarAdvanced to properly handle associated events
-    // Default action is "delete_events" which will remove all events in the calendar
+    // "delete_events" is the advanced delete action that also removes every event in the calendar.
     await calendarData.deleteCalendar(calendar.id, "delete_events");
     toast.success(`Calendar "${calendar.name}" deleted`);
     goBack();
-  } catch (error: any) {
+  } catch (error: unknown) {
     log.error("Failed to delete calendar:", error);
     toast.error("Failed to delete calendar");
   } finally {
@@ -180,8 +194,8 @@ export const resetCalendarForm = (setters: {
   setCalendarName: (name: string) => void;
   setCalendarColor: (color: string) => void;
   setCalendarIsDefault: (isDefault: boolean) => void;
-  setEditingCalendar: (calendar: any) => void;
-  setCalendarValidationErrors: (errors: any) => void;
+  setEditingCalendar: (calendar: Calendar | null) => void;
+  setCalendarValidationErrors: (errors: CalendarValidationErrors) => void;
 }) => {
   setters.setCalendarName("");
   setters.setCalendarColor("blue");

@@ -19,10 +19,11 @@ export class NotificationService implements INotificationService {
   private async reconcileEventReminderField(
     tx: PrismaClient | Prisma.TransactionClient,
     eventId: string,
+    userId: string,
     reminderMinutes: number | null,
   ): Promise<void> {
     await tx.calendarEvent.update({
-      where: { id: eventId },
+      where: { id: eventId, userId },
       data: {
         reminder: reminderMinutes,
         updatedAt: new Date(),
@@ -282,7 +283,12 @@ export class NotificationService implements INotificationService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await this.reconcileEventReminderField(tx, event.id, reminderMinutes);
+      await this.reconcileEventReminderField(
+        tx,
+        event.id,
+        userId,
+        reminderMinutes,
+      );
       await tx.eventNotification.deleteMany({ where: { eventId } });
       if (notificationsToCreate.length > 0) {
         await tx.eventNotification.createMany({
@@ -352,7 +358,7 @@ export class NotificationService implements INotificationService {
       const result = await tx.eventNotification.deleteMany({
         where: { eventId },
       });
-      await this.reconcileEventReminderField(tx, event.id, null);
+      await this.reconcileEventReminderField(tx, event.id, userId, null);
       return result;
     });
 

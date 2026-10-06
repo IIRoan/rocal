@@ -1,7 +1,4 @@
-/**
- * Cache downloaded mail attachments with correct file extensions and MIME types
- * so iOS/Android share sheets and WebView previews recognise the file format.
- */
+/** Caches downloaded attachments with the file extension and MIME type share sheets and previews expect. */
 import * as FileSystem from "expo-file-system/legacy";
 import { Linking, Platform } from "react-native";
 import * as Sharing from "expo-sharing";

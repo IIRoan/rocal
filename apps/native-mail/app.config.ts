@@ -21,9 +21,7 @@ const baseConfig = {
   icon: isDev ? "./assets/icon-dev.png" : "./assets/icon.png",
   scheme: isDev ? "solace-mail-dev" : "solace-mail",
   userInterfaceStyle: "automatic",
-  // Prefer a stable runtime so OTAs keep matching installed binaries.
-  // Override with EAS_UPDATE_RUNTIME_VERSION when publishing for an existing
-  // fingerprint-based build (see scripts/publish-update.ts).
+  // Prefer a stable runtime so OTAs keep matching installed binaries. Override with EAS_UPDATE_RUNTIME_VERSION when publishing for an existing fingerprint-based build (see scripts/publish-update.ts).
   runtimeVersion:
     process.env.EAS_UPDATE_RUNTIME_VERSION?.trim() ||
     ({

@@ -1,13 +1,7 @@
 import { StyleSheet, type TextStyle, type ViewStyle } from "react-native";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
-/**
- * Solace native layout system — single source for screen shells, headers,
- * spacing, borders, and icon metrics. Calendar and mail tab surfaces share
- * the same chrome; stack/form screens use the same tokens with different
- * header variants via {@link NavigationHeader}.
- */
-
+/** Solace native layout system; calendar and mail tab surfaces share the same chrome tokens. */
 export const LAYOUT_ICON = {
   menu: 22,
   search: 20,

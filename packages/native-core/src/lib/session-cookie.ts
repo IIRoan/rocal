@@ -124,10 +124,7 @@ function parseCookieStore(
   }
 }
 
-/**
- * Rewrite a legacy digit chunk-meta jar (`"1"` + `_0`) into a plain JSON object
- * so Better Auth never sees `JSON.parse("1") === 1`.
- */
+/** Rewrite legacy digit chunk-meta ("1" + _0) into a plain jar so Better Auth never sees JSON.parse("1") === 1. */
 export async function healAuthCookieJar(): Promise<void> {
   const rawMeta = await readRawSecureValue(COOKIE_STORE_KEY);
   if (!rawMeta || !/^\d+$/.test(rawMeta)) {
@@ -235,8 +232,7 @@ export async function ensureSessionTokenCookie(
 
   const raw = await readChunkedSecureValue(COOKIE_STORE_KEY);
   const existing = getSessionTokenCookieValue(raw);
-  // Keep Better Auth's Set-Cookie value. The email payload `token` is not
-  // always the same string as the signed cookie, and overwriting it 401s.
+  // Keep Better Auth's Set-Cookie value. The email payload `token` is not always the same string as the signed cookie, and overwriting it 401s.
   if (existing) {
     setFallbackSessionToken(existing);
     return true;

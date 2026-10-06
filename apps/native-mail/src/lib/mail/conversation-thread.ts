@@ -73,8 +73,8 @@ export function buildMailConversations(
 
   const find = (id: string): string => {
     ensureParent(id);
-    const parent = parents.get(id)!;
-    if (parent === id) {
+    const parent = parents.get(id);
+    if (parent === undefined || parent === id) {
       return id;
     }
     const root = find(parent);

@@ -63,8 +63,13 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
 export class MailDemoApiService {
   constructor(private readonly baseUrl: string = getApiBaseUrl()) {}
 
+  private request(path: string, init: RequestInit): Promise<Response> {
+    // repo-rules-allow client-api-boundary: Solace mail endpoints (config/account/vault/keys/sync) are not exposed by @workspace/calendar-client.
+    return fetch(`${this.baseUrl}${path}`, init);
+  }
+
   async getConfig(): Promise<MailDemoConfig> {
-    const response = await fetch(`${this.baseUrl}/api/mail/config`, {
+    const response = await this.request("/api/mail/config", {
       method: "GET",
       credentials: "include",
     });
@@ -73,7 +78,7 @@ export class MailDemoApiService {
   }
 
   async getAccountStatus(): Promise<MailAccountStatus> {
-    const response = await fetch(`${this.baseUrl}/api/mail/account/`, {
+    const response = await this.request("/api/mail/account/", {
       method: "GET",
       credentials: "include",
     });
@@ -84,7 +89,7 @@ export class MailDemoApiService {
   async bootstrapAccountMailbox(
     request: MailBootstrapRequest,
   ): Promise<MailSignupResponse> {
-    const response = await fetch(`${this.baseUrl}/api/mail/account/bootstrap`, {
+    const response = await this.request("/api/mail/account/bootstrap", {
       method: "POST",
       credentials: "include",
       headers: {
@@ -97,20 +102,17 @@ export class MailDemoApiService {
   }
 
   async getAccountVaultBackup(): Promise<MailVaultBackupRecord> {
-    const response = await fetch(
-      `${this.baseUrl}/api/mail/account/vault-backup`,
-      {
-        method: "GET",
-        credentials: "include",
-      },
-    );
+    const response = await this.request("/api/mail/account/vault-backup", {
+      method: "GET",
+      credentials: "include",
+    });
 
     return parseJsonResponse<MailVaultBackupRecord>(response);
   }
 
   async getRecipientKey(email: string): Promise<MailDirectoryKey> {
-    const response = await fetch(
-      `${this.baseUrl}/api/mail/keys/${encodeURIComponent(email)}`,
+    const response = await this.request(
+      `/api/mail/keys/${encodeURIComponent(email)}`,
       {
         method: "GET",
         credentials: "include",
@@ -123,24 +125,21 @@ export class MailDemoApiService {
   async upsertAccountVaultBackup(
     request: Omit<MailVaultBackupRecord, "email">,
   ): Promise<MailVaultBackupRecord> {
-    const response = await fetch(
-      `${this.baseUrl}/api/mail/account/vault-backup`,
-      {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(request),
+    const response = await this.request("/api/mail/account/vault-backup", {
+      method: "PUT",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify(request),
+    });
 
     return parseJsonResponse<MailVaultBackupRecord>(response);
   }
 
   async syncAccount(accountId: string): Promise<MailSyncResponse> {
-    const response = await fetch(
-      `${this.baseUrl}/api/mail/sync?accountId=${encodeURIComponent(accountId)}`,
+    const response = await this.request(
+      `/api/mail/sync?accountId=${encodeURIComponent(accountId)}`,
       {
         method: "GET",
         credentials: "include",

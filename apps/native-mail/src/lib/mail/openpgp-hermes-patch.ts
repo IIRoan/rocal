@@ -1,22 +1,4 @@
-// ---------------------------------------------------------------------------
-// Hermes `Symbol.species` polyfill for openpgp's `PacketList`.
-//
-// Hermes does NOT implement `Symbol.species` for Array subclasses. openpgp's
-// `PacketList extends Array`, and several internal code paths rely on native
-// Array methods returning a `PacketList` rather than a plain `Array` — e.g.
-// `Message.verify()` does:
-//
-//     packets = packets.concat(await readToEnd(packets.stream, ...));
-//     const onePassSigList = packets.filterByTag(enums.packet.onePassSignature);
-//
-// On Hermes `packets.concat(...)` returns a plain `Array`, so the subsequent
-// `packets.filterByTag(...)` throws "filterByTag is not a function". The same
-// applies to `slice`, `filter`, `splice`, `map`, etc.
-//
-// This patch overrides those array-returning methods on `PacketList.prototype`
-// so their results are re-wrapped as `PacketList` instances, emulating
-// `Symbol.species` and keeping openpgp's assumptions intact on Hermes.
-// ---------------------------------------------------------------------------
+// Hermes omits Symbol.species for Array subclasses, so openpgp's PacketList loses filterByTag() after concat(); re-wrap results.
 
 type ArrayLikeConstructor = {
   new (): unknown[];
@@ -34,13 +16,7 @@ const ARRAY_METHODS = [
   "flatMap",
 ] as const;
 
-/**
- * Patches an Array subclass so that its inherited array-returning methods
- * return instances of the subclass instead of plain Arrays. Idempotent.
- *
- * @returns `true` if the patch was applied, `false` if it was already applied
- * or the class was not provided.
- */
+/** Re-wraps an Array subclass's array-returning methods as the subclass; idempotent, `false` when already patched. */
 export function applyHermesPacketListPatch(
   PacketList: ArrayLikeConstructor | undefined | null,
 ): boolean {

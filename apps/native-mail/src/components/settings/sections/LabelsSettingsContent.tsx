@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { getErrorMessage } from "@workspace/calendar-core";
+import { getErrorMessage, MAIL_LABEL_CUSTOM_DEFAULT_COLOR } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { SettingsPage } from "@workspace/native-core/components/settings/SettingsPage";
 import { useMailSkin, MAIL_ICON, type MailSkin } from "@workspace/native-core/components/mail/mail-ui";
@@ -37,7 +37,7 @@ export function LabelsSettingsContent() {
     enabled: provisioned,
   });
   const [name, setName] = useState("");
-  const [color, setColor] = useState(LABEL_COLOR_OPTIONS[5]?.value ?? "#3b82f6");
+  const [color, setColor] = useState(MAIL_LABEL_CUSTOM_DEFAULT_COLOR);
   const [busy, setBusy] = useState(false);
 
   const handleCreate = async () => {

@@ -4,11 +4,12 @@ import {
   pickerDateToAllDayUtcRange,
   resolveTimezone,
 } from "@workspace/calendar-core";
+import type { Calendar } from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import type { EventNotification } from "@workspace/ui/components/calendar";
 
 export const resetEventForm = (
-  calendars: any[],
+  calendars: Calendar[],
   setters: {
     setSelectedEvent: (event: CalendarEvent | null) => void;
     setEventViewMode: (mode: "view" | "edit") => void;

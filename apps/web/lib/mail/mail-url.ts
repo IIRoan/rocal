@@ -84,9 +84,15 @@ export function decodeMailMessageToken(token: string): string | null {
   }
 
   try {
-    const payload = JSON.parse(fromBase64Url(trimmed)) as MailMessageTokenPayload;
-    if (payload?.v === 1 && typeof payload.id === "string" && payload.id.trim()) {
-      return payload.id.trim();
+    const payload: unknown = JSON.parse(fromBase64Url(trimmed));
+    if (
+      payload !== null &&
+      typeof payload === "object" &&
+      (payload as MailMessageTokenPayload).v === 1 &&
+      typeof (payload as { id?: unknown }).id === "string" &&
+      (payload as { id: string }).id.trim()
+    ) {
+      return (payload as { id: string }).id.trim();
     }
   } catch {
     // Fall back to legacy raw tokens below.

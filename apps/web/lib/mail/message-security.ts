@@ -183,10 +183,7 @@ export function extractTextBodyBlobId(
   return collectTextPlainBlobIds(bodyStructure)[0] ?? null;
 }
 
-/**
- * Resolves inline PGP ciphertext, preferring a complete armored body value and
- * falling back to the text/plain blob when bodyValues were truncated.
- */
+/** Resolve inline PGP ciphertext, preferring a complete armored body value and falling back to the text/plain blob when bodyValues were truncated. */
 export async function resolveInlinePgpArmoredCiphertext(input: {
   message: Pick<
     JmapEmailMessage,
@@ -195,8 +192,8 @@ export async function resolveInlinePgpArmoredCiphertext(input: {
   fetchBlob: (blobId: string) => Promise<string>;
 }): Promise<string> {
   const { text } = extractMessageBodies(input.message as JmapEmailMessage);
-  if (isCompleteArmoredPgpMessage(text)) {
-    return text!.trim();
+  if (text && isCompleteArmoredPgpMessage(text)) {
+    return text.trim();
   }
 
   const blobId =
@@ -248,10 +245,7 @@ function collectBodyStructureBlobIds(
   return blobIds;
 }
 
-/**
- * Returns the first blob id that should contain armored ciphertext when JMAP
- * body values are omitted for encrypted-at-rest messages.
- */
+/** First blob id that should hold armored ciphertext when JMAP omits body values for encrypted-at-rest messages. */
 export function extractEncryptedBodyBlobId(
   message: Pick<JmapEmailMessage, "bodyStructure" | "bodyValues" | "textBody">,
 ): string | null {

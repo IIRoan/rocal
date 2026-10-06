@@ -2,6 +2,7 @@
 
 import { Paperclip, Reply, Smile, X } from "lucide-react";
 import { getSimpleLoginForward } from "@workspace/calendar-core";
+import { createLogger } from "@workspace/logger";
 import { Button } from "@workspace/ui/components/ui/button";
 import {
   Button as SolaceButton,
@@ -17,6 +18,8 @@ import type {
   MessageReaderViewModel,
 } from "../use-message-reader-controller";
 import { COMMON_EMOJI } from "./constants";
+
+const log = createLogger("message-reader-reply-bar");
 
 export function MessageReaderReplyBar({
   controller,
@@ -108,7 +111,9 @@ export function MessageReaderReplyBar({
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 e.preventDefault();
-                void handleSendReply();
+                void handleSendReply().catch((error) =>
+                  log.error("Failed to send reply", error),
+                );
               }
             }}
             placeholder="Write your reply…"
@@ -209,7 +214,11 @@ export function MessageReaderReplyBar({
                 (Boolean(onSendReply) && !replyText.trim())
               }
               icon={Icon.Send}
-              onClick={() => void handleSendReply()}
+              onClick={() =>
+                void handleSendReply().catch((error) =>
+                  log.error("Failed to send reply", error),
+                )
+              }
               size={Size.SMALL}
             >
               Send

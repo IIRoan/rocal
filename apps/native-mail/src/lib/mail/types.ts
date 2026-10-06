@@ -1,10 +1,4 @@
-/**
- * Mail types for the native app.
- *
- * These mirror the web app's `lib/mail/types.ts` but contain only the
- * declarations the native client needs (no zod runtime schemas), re-using the
- * shared contract types from `@workspace/calendar-core` where available.
- */
+/** Native mail types: the web `lib/mail/types.ts` subset the native client needs, reusing calendar-core contracts. */
 import type {
   MailAccountStatus as SharedMailAccountStatus,
   MailAuthResultsFields,
@@ -129,14 +123,7 @@ export type JmapEmailChanges = {
   destroyed: string[];
 };
 
-/**
- * Whether a message is plaintext, server-side encrypted-at-rest, or end-to-end
- * (PGP) encrypted. Only `plain` messages can be rendered fully on-device; PGP
- * messages require the secure web client to decrypt.
- *
- * Re-exported from `@workspace/calendar-core` so web and native share one
- * canonical definition.
- */
+/** Plaintext, server-side encrypted-at-rest, or end-to-end PGP; re-exported from calendar-core. */
 export type MessageEncryptionState = SharedMessageEncryptionState;
 
 export type LabelDef = {

@@ -66,6 +66,7 @@ export function WeekViewTimeGrid({
           data-today={isTodayInTimezone(day, timezone) || undefined}
         >
           {(processedDayEvents[dayIndex] ?? []).map((positionedEvent) => (
+            // repo-rules-allow wcag-keyboard-access: positioning wrapper that only stops click propagation; the inner event button is the keyboard target
             <div
               key={
                 positionedEvent.event?.id ??

@@ -192,7 +192,8 @@ function WheelColumn({
   );
 
   const tick = useCallback(() => {
-    void Haptics.selectionAsync();
+    // A missed haptic tick is imperceptible, so the failure needs no recovery.
+    void Haptics.selectionAsync().catch(() => undefined);
   }, []);
 
   // Only scroll for outside changes; changes that came from this wheel already match committedValue.

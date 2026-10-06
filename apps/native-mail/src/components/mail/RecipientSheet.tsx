@@ -52,9 +52,13 @@ export function RecipientSheet({
   const displayName = recipient.name?.trim() || recipient.email;
 
   const handleCopy = async () => {
-    await Clipboard.setStringAsync(recipient.email);
-    toast("Copied");
-    setOpen(false);
+    try {
+      await Clipboard.setStringAsync(recipient.email);
+      toast("Copied");
+      setOpen(false);
+    } catch {
+      toast("Could not copy email", "error");
+    }
   };
 
   const handleEmail = () => {

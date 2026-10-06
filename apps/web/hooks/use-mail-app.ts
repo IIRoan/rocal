@@ -275,10 +275,14 @@ export function useMailApp() {
 
   // Init password from encrypted cookie (cross-tab / post-refresh)
   useEffect(() => {
-    void initEncPasswordFromCookie().then(() => {
-      const pw = peekCachedAuthPassword();
-      if (pw) setCachedAuthPassword(pw);
-    });
+    void initEncPasswordFromCookie()
+      .then(() => {
+        const pw = peekCachedAuthPassword();
+        if (pw) setCachedAuthPassword(pw);
+      })
+      .catch((error) => {
+        log.warn("Failed to restore the encrypted password cookie", error);
+      });
   }, []);
 
   useEffect(() => {
@@ -722,7 +726,9 @@ export function useMailApp() {
           setIsMessageBodyLoading(false);
         }
       }
-    })();
+    })().catch((error) => {
+      log.error("Failed to load message body", error);
+    });
 
     return () => {
       cancelled = true;
@@ -761,15 +767,19 @@ export function useMailApp() {
       client: mailbox.client,
       session: mailbox.session,
       messageIds: neighborIds,
-    }).then(() => {
-      if (cancelled) return;
-      for (const messageId of neighborIds) {
-        const loaded = findCachedMailMessage(queryClient, messageId);
-        if (loaded && messageHasLoadedBody(loaded)) {
-          applyLoadedMessage(loaded);
+    })
+      .then(() => {
+        if (cancelled) return;
+        for (const messageId of neighborIds) {
+          const loaded = findCachedMailMessage(queryClient, messageId);
+          if (loaded && messageHasLoadedBody(loaded)) {
+            applyLoadedMessage(loaded);
+          }
         }
-      }
-    });
+      })
+      .catch((error) => {
+        log.warn("Failed to prefetch message bodies", error);
+      });
 
     return () => {
       cancelled = true;
@@ -962,7 +972,9 @@ export function useMailApp() {
         );
         setSelectedMessageIsDecrypting(false);
       }
-    })();
+    })().catch((error) => {
+      log.warn("Failed to decrypt message", error);
+    });
     return () => {
       cancelled = true;
     };
@@ -1046,7 +1058,9 @@ export function useMailApp() {
           setSelectedMessageDecryptedAttachments(null);
         }
       }
-    })();
+    })().catch((error) => {
+      log.warn("Failed to load calendar invite attachment", error);
+    });
 
     return () => {
       cancelled = true;
@@ -2601,7 +2615,7 @@ export function useMailApp() {
       setActiveMailbox((cur) => (cur ? { ...cur, mailboxes: withOrder } : cur));
       const updates = withOrder.map((m) => ({
         id: m.id,
-        sortOrder: m.sortOrder!,
+        sortOrder: m.sortOrder ?? 0,
       }));
       try {
         await activeMailbox.client.updateMailboxSortOrders(

@@ -1,10 +1,4 @@
-/**
- * Native mail HTTP API helpers.
- *
- * All requests target the backend (`API_BASE_URL`) and must include the
- * Better Auth session cookie manually, since React Native's `fetch` does not
- * attach cookies automatically (mirrors the calendar `HttpClient` pattern).
- */
+/** Native mail HTTP helpers; requests carry the Better Auth session cookie manually since RN fetch does not. */
 import type {
   MailAccountStatus,
   MailBootstrapRequest,
@@ -32,15 +26,13 @@ export class MailApiError extends Error {
   }
 }
 
-/**
- * `fetch` wrapper that injects the native Better Auth headers.
- * Exposed so the JMAP client can reuse the same authenticated transport.
- */
+/** `fetch` wrapper that injects the native Better Auth headers; shared with the JMAP client transport. */
 export function mailFetch(input: string, init?: RequestInit): Promise<Response> {
   const headers: Record<string, string> = {
     ...((init?.headers as Record<string, string> | undefined) ?? {}),
     ...getAuthHeaders(),
   };
+  // repo-rules-allow client-api-boundary: Solace mail API + JMAP transport with native Better Auth headers.
   return fetch(input, { ...init, headers, credentials: "omit" });
 }
 
@@ -165,11 +157,7 @@ async function fetchMailAccessToken(
 
 const TOKEN_EXPIRY_SKEW_MS = 30_000;
 
-/**
- * Creates a server-minted access-token provider. The browser-only silent
- * OAuth (iframe) path used by the web app is intentionally omitted — native
- * always exchanges the session cookie for a token at `mailTokenEndpoint`.
- */
+/** Server-minted access-token provider; the browser-only OAuth iframe path is intentionally omitted on native. */
 export function createServerMailTokenManager(mailTokenEndpoint: string) {
   let token: MailAccessToken | null = null;
   let inflight: Promise<string> | null = null;

@@ -6,15 +6,12 @@ import {
   StyleSheet,
   type ViewStyle,
 } from "react-native";
-import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import type { Passkey as AuthPasskey } from "@better-auth/passkey/client";
 import {
   EVENT_ENCRYPTION_HINT,
-  extractLinkedAuthAccounts,
   getErrorMessage,
   summarizeLinkedAuthAccounts,
-  type LinkedAuthAccountLike,
 } from "@workspace/calendar-core";
 import { SettingsPage } from "../SettingsPage";
 import { SettingsPasswordForm } from "../SettingsAccountForms";
@@ -28,6 +25,7 @@ import {
 } from "../../sheet/SheetSections";
 import { authClient } from "../../../lib/auth-client";
 import { getAuthCapabilities } from "../../../lib/auth-capabilities";
+import { useLinkedAuthAccounts } from "../../../hooks/use-linked-auth-accounts";
 import { formatStoredPasskeyDescription } from "../../../lib/passkey-auth";
 import {
   isPasskeyBridgeOriginSecure,
@@ -51,21 +49,11 @@ export function SecuritySettingsContent() {
   const { theme } = useTheme();
   const skin = useMailSkin();
   const styles = useMemo(() => createStyles(skin), [skin]);
-  const { user, registerPasskey, deletePasskey } = useAuth();
+  const { registerPasskey, deletePasskey } = useAuth();
   const { toast } = useToast();
   const { resetEncryptionPassword } = useE2ee();
   const passkeysQuery = authClient.useListPasskeys();
-  const accountsQuery = useQuery({
-    queryKey: ["auth", "accounts", user?.id ?? null],
-    queryFn: async (): Promise<LinkedAuthAccountLike[]> => {
-      if (typeof authClient.listAccounts !== "function") {
-        return [];
-      }
-      return extractLinkedAuthAccounts(await authClient.listAccounts());
-    },
-    enabled: Boolean(user?.id) && typeof authClient.listAccounts === "function",
-    staleTime: 5 * 60 * 1000,
-  });
+  const accountsQuery = useLinkedAuthAccounts();
 
   const authCapabilities = useMemo(() => {
     const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
@@ -109,9 +97,13 @@ export function SecuritySettingsContent() {
 
   useEffect(() => {
     let cancelled = false;
-    void isNativeTitleIndexEnabled().then((value) => {
-      if (!cancelled) setTitleIndexEnabled(value);
-    });
+    void isNativeTitleIndexEnabled()
+      .then((value) => {
+        if (!cancelled) setTitleIndexEnabled(value);
+      })
+      .catch(() => {
+        // A failed read keeps the safe default (index on); the switch stays at its last value.
+      });
     const unsubscribe = subscribeNativeTitleIndexEnabled(setTitleIndexEnabled);
     return () => {
       cancelled = true;
@@ -227,7 +219,9 @@ export function SecuritySettingsContent() {
               value={titleIndexEnabled}
               onValueChange={(value) => {
                 setTitleIndexEnabled(value);
-                void setNativeTitleIndexEnabled(value);
+                void setNativeTitleIndexEnabled(value).catch(() =>
+                  toast("Could not save the search index setting.", "error"),
+                );
               }}
             />
             {canResetEncryption ? (

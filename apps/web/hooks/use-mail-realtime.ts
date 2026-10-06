@@ -30,9 +30,7 @@ export function useMailRealtime(input: {
     await onSyncRef.current(result);
   }, [input.accountId]);
 
-  // Single effect: runs initial sync, then opens the SSE EventSource to receive
-  // server-pushed mail.changed signals. Debounces rapid signals before calling sync.
-  // The server polls JMAP every 30 s per connected client, so no client-side polling needed.
+  // Single effect: runs initial sync, then opens the SSE EventSource to receive server-pushed mail.changed signals. Debounces rapid signals before calling sync. The server polls JMAP every 30 s per connected client, so no client-side polling needed.
   useEffect(() => {
     if (!input.enabled || !input.accountId || typeof window === "undefined") {
       return;

@@ -25,7 +25,10 @@ const selectedCheck = <Check className="size-4 shrink-0 text-foreground" />;
 
 interface TimeRegionSettingsProps {
   localSettings: UserSettings;
-  updateSetting: (key: keyof UserSettings, value: any) => void;
+  updateSetting: <K extends keyof UserSettings>(
+    key: K,
+    value: UserSettings[K],
+  ) => void;
   goBack: () => void;
   goForward: (view: string) => void;
   currentView: string;

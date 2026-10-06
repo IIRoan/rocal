@@ -250,14 +250,21 @@ describe("InviteService", () => {
       claimedForEmail: "friend@solace.onl",
     });
 
-    await service.markInviteAccepted("Friend@solace.onl");
+    await service.markInviteAccepted({
+      userId: "user-1",
+      email: "Friend@solace.onl",
+    });
 
     expect(prisma.invite.update).toHaveBeenCalledWith({
       where: { id: "invite-1" },
       data: { status: "accepted" },
     });
     expect(prisma.user.updateMany).toHaveBeenCalledWith({
-      where: { email: "friend@solace.onl", mailboxApprovedAt: null },
+      where: {
+        id: "user-1",
+        email: "friend@solace.onl",
+        mailboxApprovedAt: null,
+      },
       data: { mailboxApprovedAt: expect.any(Date) },
     });
   });
@@ -265,7 +272,10 @@ describe("InviteService", () => {
   it("approves nobody when there is no invite to accept", async () => {
     prisma.invite.findFirst.mockResolvedValueOnce(null);
 
-    await service.markInviteAccepted("stranger@solace.onl");
+    await service.markInviteAccepted({
+      userId: "user-1",
+      email: "stranger@solace.onl",
+    });
 
     expect(prisma.user.updateMany).not.toHaveBeenCalled();
   });

@@ -78,6 +78,12 @@ html.dark,
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .endpoint-group-header .text-green-600::before {
+    animation: none;
+  }
+}
+
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

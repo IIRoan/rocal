@@ -274,7 +274,7 @@ export function MobileCalendarSkeleton({ className }: { className?: string }) {
         <Skeleton className="h-full w-full rounded-lg" variant="wave" />
       </div>
 
-      <div className="border-t border-border bg-background/95 backdrop-blur safe-area-inset-bottom">
+      <div className="border-t border-border bg-background safe-area-inset-bottom">
         <div className="flex justify-around py-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex flex-col items-center gap-1 p-2">

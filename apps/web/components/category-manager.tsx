@@ -79,6 +79,14 @@ function CategoriesListView({
   const categoriesQuery = useCategories();
   const categories = categoriesQuery.data ?? [];
 
+  const handleRetry = async () => {
+    try {
+      await categoriesQuery.refetch();
+    } catch {
+      // TanStack refetch reports failures in its result object instead of rejecting.
+    }
+  };
+
   return (
     <PaletteView title="Categories" onBack={onBack}>
       <PaletteSection label="Actions">
@@ -99,7 +107,7 @@ function CategoriesListView({
                 "Failed to load categories",
               )}
             </p>
-            <PaletteButton onClick={() => void categoriesQuery.refetch()}>
+            <PaletteButton onClick={() => void handleRetry()}>
               <RotateCw className="size-3.5" />
               Try again
             </PaletteButton>

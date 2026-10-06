@@ -54,7 +54,6 @@ const mockMailService = {
     encryptionAtRestEnabled: true,
   })),
   getDirectoryKey: jest.fn(),
-  getVaultBackup: jest.fn(),
   getVaultBackupForUser: jest.fn(async () => ({
     email: "alice@solace.onl",
     vaultVersion: 1,
@@ -67,7 +66,6 @@ const mockMailService = {
       parallelism: 4,
     },
   })),
-  upsertVaultBackup: jest.fn(),
   upsertVaultBackupForUser: jest.fn(async () => ({
     email: "alice@solace.onl",
     vaultVersion: 2,

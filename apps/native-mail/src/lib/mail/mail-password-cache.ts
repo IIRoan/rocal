@@ -1,22 +1,11 @@
-/**
- * Persists the user's login password in the platform-secure store so that
- * the mail vault can be unlocked even after the app is restarted (in-memory
- * `pendingAuthPasswordRef` in AuthProvider is lost on restart).
- *
- * The password is written on successful sign-in / sign-up and cleared on
- * sign-out. It is stored under `MAIL_VAULT_PASSWORD` in `expo-secure-store`
- * (iOS Keychain / Android Keystore) — never in plaintext storage.
- */
+/** Persists the login password and derived keys in expo-secure-store so the vault can unlock after a restart. */
 import * as SecureStore from "expo-secure-store";
 import { createLogger } from "@workspace/logger";
 import { SECURE_STORE_KEYS } from "@workspace/native-core/lib/constants";
 
 const log = createLogger("native:mail-password-cache");
 
-/**
- * Saves the login password so the mail vault can be unlocked on future app
- * launches. Called by AuthProvider after a successful sign-in or sign-up.
- */
+/** Saves the login password so the vault can unlock on later launches; called after sign-in and sign-up. */
 export async function saveMailVaultPassword(password: string): Promise<void> {
   if (!password) {
     log.debug("[mail-password-cache] saveMailVaultPassword: skipped — empty password");
@@ -34,10 +23,7 @@ export async function saveMailVaultPassword(password: string): Promise<void> {
   }
 }
 
-/**
- * Loads the persisted login password. Returns `null` if nothing is stored or
- * if SecureStore is unavailable.
- */
+/** Loads the persisted login password, or `null` when nothing is stored. */
 export async function loadMailVaultPassword(): Promise<string | null> {
   try {
     const value = await SecureStore.getItemAsync(SECURE_STORE_KEYS.MAIL_VAULT_PASSWORD);
@@ -56,9 +42,7 @@ export async function loadMailVaultPassword(): Promise<string | null> {
   }
 }
 
-/**
- * Clears the persisted password. Called by AuthProvider on sign-out.
- */
+/** Clears the persisted login password; called on sign-out. */
 export async function clearMailVaultPassword(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.MAIL_VAULT_PASSWORD);
@@ -75,11 +59,7 @@ export async function clearMailVaultPassword(): Promise<void> {
 // Derived vault key (pre-computed argon2id output)
 // ---------------------------------------------------------------------------
 
-/**
- * Caches the backend-computed vault decryption key (argon2id output).
- * Persisting this key in SecureStore avoids running argon2id locally on
- * subsequent app sessions — Hermes cannot run argon2id efficiently.
- */
+/** Caches the backend-computed argon2id vault key so Hermes never reruns argon2id on later sessions. */
 export async function saveDerivedVaultKey(derivedKeyB64: string): Promise<void> {
   if (!derivedKeyB64) return;
   try {
@@ -93,9 +73,7 @@ export async function saveDerivedVaultKey(derivedKeyB64: string): Promise<void> 
   }
 }
 
-/**
- * Loads the cached vault decryption key. Returns `null` if not stored.
- */
+/** Loads the cached vault decryption key, or `null` when absent. */
 export async function loadDerivedVaultKey(): Promise<string | null> {
   try {
     const value = await SecureStore.getItemAsync(SECURE_STORE_KEYS.MAIL_VAULT_DERIVED_KEY);
@@ -114,9 +92,7 @@ export async function loadDerivedVaultKey(): Promise<string | null> {
   }
 }
 
-/**
- * Clears the cached derived vault key. Called on sign-out.
- */
+/** Clears the cached derived vault key; called on sign-out. */
 export async function clearDerivedVaultKey(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.MAIL_VAULT_DERIVED_KEY);
@@ -135,16 +111,7 @@ export async function clearDerivedVaultKey(): Promise<void> {
 
 const PGP_KEY_CHUNK_SIZE = 1800;
 
-/**
- * Caches the unprotected (passphrase-free) armored PGP private key.
- *
- * The key is stored in 1 800-char chunks so no single item exceeds SecureStore's
- * ~2 KB limit. On the next app session, the cached key is used directly —
- * skipping the ~14 s S2K derivation that happens when decrypting an
- * encrypted PGP key on Hermes.
- *
- * The key is protected at rest by the iOS Keychain / Android Keystore.
- */
+/** Caches the unprotected armored PGP key in 1 800-char chunks to fit SecureStore's ~2 KB item limit. */
 export async function saveCachedPrivateKey(armoredKey: string): Promise<void> {
   if (!armoredKey) return;
   try {
@@ -173,10 +140,7 @@ export async function saveCachedPrivateKey(armoredKey: string): Promise<void> {
   }
 }
 
-/**
- * Loads the cached unprotected armored PGP private key.
- * Returns `null` if not cached or if any chunk is missing / corrupted.
- */
+/** Loads the cached armored PGP key, or `null` when a chunk is missing or corrupt. */
 export async function loadCachedPrivateKey(): Promise<string | null> {
   try {
     const countStr = await SecureStore.getItemAsync(
@@ -211,9 +175,7 @@ export async function loadCachedPrivateKey(): Promise<string | null> {
   }
 }
 
-/**
- * Clears the cached PGP private key. Called on sign-out.
- */
+/** Clears the cached PGP private key; called on sign-out. */
 export async function clearCachedPrivateKey(): Promise<void> {
   try {
     const countStr = await SecureStore.getItemAsync(

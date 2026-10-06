@@ -100,6 +100,7 @@ export function EventEditorView({
           <DrawerContent
             responsive
             responsiveHeight="92dvh"
+            // repo-rules-allow motion-compositor-only: vaul's responsive drawer snaps between real sheet heights, which transform cannot express.
             className="rounded-t-[20px] bg-popover border-none flex flex-col gap-0 overflow-hidden pb-0 transition-[max-height,bottom] duration-200 ease-out"
           >
             <DrawerTitle className="sr-only">{dialogTitle}</DrawerTitle>

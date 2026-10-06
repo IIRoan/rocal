@@ -38,6 +38,7 @@ export const metadata: Metadata = {
     "apple-mobile-web-app-title": "Solace",
     "mobile-web-app-capable": "yes",
     "application-name": "Solace",
+    // repo-rules-allow theme-tokens-only: OS metadata tile color for Windows, not a styled UI surface.
     "msapplication-TileColor": "#000000",
     "msapplication-tap-highlight": "no",
   },
@@ -47,7 +48,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  userScalable: false,
+  // repo-rules-allow theme-tokens-only: browser-chrome color metadata; CSS tokens cannot be referenced here.
   themeColor: "#000000",
 };
 

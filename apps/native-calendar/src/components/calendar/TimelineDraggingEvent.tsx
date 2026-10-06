@@ -39,7 +39,7 @@ export function TimelineDraggingEvent(props: DraggingEventProps) {
       minHeight: TIMELINE_MIN_EVENT_HEIGHT_PX,
       ...Platform.select({
         ios: {
-          shadowColor: "#000",
+          shadowColor: theme.colors.overlay,
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.18,
           shadowRadius: 8,
@@ -50,7 +50,7 @@ export function TimelineDraggingEvent(props: DraggingEventProps) {
         default: {},
       }),
     }),
-    [theme.borderRadius.sm],
+    [theme.borderRadius.sm, theme.colors.overlay],
   );
 
   return (
