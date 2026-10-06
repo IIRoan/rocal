@@ -44,11 +44,7 @@ function remapLoopbackUrlForBrowser(urlString: string): string {
   }
 }
 
-/**
- * Resolve the API base URL.
- *
- * Priority: NEXT_PUBLIC_API_URL env var → env fallback.
- */
+/** API base URL precedence: NEXT_PUBLIC_API_URL, then browser origin on port 4001, then localhost. */
 export const getApiBaseUrl = () => {
   const configuredUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -66,11 +62,7 @@ export const getApiBaseUrl = () => {
   return "http://localhost:4001";
 };
 
-/**
- * Resolve the app (frontend) base URL.
- *
- * Priority: NEXT_PUBLIC_APP_URL → browser origin → env fallback.
- */
+/** App base URL precedence: NEXT_PUBLIC_APP_URL, then browser origin, then localhost. */
 export const getAppBaseUrl = () => {
   const configuredUrl = process.env.NEXT_PUBLIC_APP_URL;
   if (configuredUrl) {

@@ -1,29 +1,15 @@
-/**
- * Shared loading primitives used across the app to standardize loading states.
- *
- * - LoadingScreen  — full-page gate (SafeAreaView + centered spinner + optional label)
- * - CenteredLoader — spinner centered inside any flex container
- * - InlineLoader   — horizontal row with a small spinner + optional label
- */
+/** Shared loading primitives: full-page gate, flex-centered spinner, inline row. */
 import { useMemo } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { ThemeTokens } from "@workspace/design-tokens";
-
-// ─── LoadingScreen ────────────────────────────────────────────────────────────
 
 interface LoadingScreenProps {
   message?: string;
   theme: ThemeTokens;
 }
 
-/**
- * Full-page loading state. Use as an early return when an entire screen is
- * waiting for initial data.
- *
- * @example
- * if (isLoading) return <LoadingScreen theme={theme} message="Loading settings…" />;
- */
+/** Full-page gate; return early with it while a whole screen waits for data. */
 export function LoadingScreen({ message, theme }: LoadingScreenProps) {
   const styles = useMemo(() => createLoadingScreenStyles(theme), [theme]);
   return (
@@ -51,8 +37,6 @@ function createLoadingScreenStyles(theme: ThemeTokens) {
   });
 }
 
-// ─── CenteredLoader ───────────────────────────────────────────────────────────
-
 interface CenteredLoaderProps {
   message?: string;
   size?: "small" | "large";
@@ -60,13 +44,7 @@ interface CenteredLoaderProps {
   theme: ThemeTokens;
 }
 
-/**
- * Centered spinner inside a flex container. Use inside scroll views, bottom
- * sheets, or partial content areas that are waiting for data.
- *
- * @example
- * {isDecrypting && <CenteredLoader theme={theme} message="Decrypting message…" />}
- */
+/** Centered spinner for flex containers (scroll views, sheets) waiting on data. */
 export function CenteredLoader({
   message,
   size = "large",
@@ -101,21 +79,13 @@ function createCenteredLoaderStyles(theme: ThemeTokens) {
   });
 }
 
-// ─── InlineLoader ─────────────────────────────────────────────────────────────
-
 interface InlineLoaderProps {
   message?: string;
   color?: string;
   theme: ThemeTokens;
 }
 
-/**
- * Horizontal loading row with a small spinner and optional text. Use inside
- * list sections or settings rows while a sub-resource loads.
- *
- * @example
- * {subscriptionsLoading && <InlineLoader theme={theme} message="Loading subscriptions…" />}
- */
+/** Horizontal spinner + optional text for list sections while a sub-resource loads. */
 export function InlineLoader({ message, color, theme }: InlineLoaderProps) {
   const styles = useMemo(() => createInlineLoaderStyles(theme), [theme]);
   return (

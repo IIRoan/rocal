@@ -15,10 +15,7 @@ interface AppScreenProps {
   edges?: Edge[];
 }
 
-/**
- * Standard full-screen shell: safe area + optional header/footer + flex body.
- * Use on every route instead of ad-hoc SafeAreaView wrappers.
- */
+/** Standard screen shell; use on every route instead of ad-hoc SafeAreaView wrappers. */
 export function AppScreen({
   children,
   header,

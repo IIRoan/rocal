@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { createLogger } from "@workspace/logger";
 import { useSession } from "@/lib/auth-client";
 import { reconcileAuthSession } from "@/lib/auth-local-state";
 import { accountApiService } from "@/lib/api-clients";
@@ -15,6 +16,8 @@ type PasskeyGate =
   | { status: "pending" }
   | { status: "ok"; userId: string }
   | { status: "redirecting"; userId: string };
+
+const log = createLogger("auth-session-guard");
 
 async function reconcileCurrentUserSession(input: {
   isCancelled: () => boolean;
@@ -57,10 +60,7 @@ function isPasskeyGateBlocking(
   return gate.userId !== userId || gate.status === "redirecting";
 }
 
-/**
- * Keeps Better Auth's client session cache aligned with the server session.
- * Mirrors the native AuthProvider startup reconciliation flow.
- */
+/** Keeps Better Auth's client session cache aligned with the server session, mirroring the native AuthProvider startup flow. */
 export function AuthSessionGuard({ children }: { children: ReactNode }) {
   const { data: session, isPending, refetch: refetchSession } = useSession();
   const pathname = usePathname();
@@ -81,7 +81,11 @@ export function AuthSessionGuard({ children }: { children: ReactNode }) {
 
     if (!userId) {
       lastReconciledUserIdRef.current = null;
-      void reconcileAuthSession({ hasClientSession: false });
+      void reconcileAuthSession({ hasClientSession: false }).catch((error) => {
+        log.warn("Auth artifact cleanup failed during session guard", {
+          error,
+        });
+      });
       return;
     }
 
@@ -103,6 +107,9 @@ export function AuthSessionGuard({ children }: { children: ReactNode }) {
 
         lastReconciledUserIdRef.current =
           outcome === "recovered" ? null : userId;
+      })
+      .catch((error) => {
+        log.warn("Session reconciliation failed", { error });
       })
       .finally(() => {
         isRecoveringRef.current = false;

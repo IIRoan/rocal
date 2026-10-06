@@ -86,13 +86,14 @@ export function AppDebugSettingsSection() {
       ].join("\n");
       await Clipboard.setStringAsync(body);
       Alert.alert("Copied", "Diagnostics are on the clipboard.");
-    })();
+    })().catch(() => Alert.alert("Copy failed", "Could not copy diagnostics."));
   };
 
   const onPingApi = () => {
     void (async () => {
       setHealth("checking");
       try {
+        // repo-rules-allow client-api-boundary: fixed API health-check endpoint, not exposed by @workspace/calendar-client.
         const response = await fetch(`${API_BASE_URL}/api/health`, {
           method: "GET",
         });
@@ -108,7 +109,8 @@ export function AppDebugSettingsSection() {
           error instanceof Error ? error.message : "Request failed.",
         );
       }
-    })();
+      // Every await sits in the try/catch above, so this promise never rejects.
+    })().catch(() => undefined);
   };
 
   const onClearSessionCookies = () => {
@@ -133,7 +135,8 @@ export function AppDebugSettingsSection() {
                   error instanceof Error ? error.message : "Could not clear.",
                 );
               }
-            })();
+              // Every await sits in the try/catch above, so this promise never rejects.
+            })().catch(() => undefined);
           },
         },
       ],
@@ -154,7 +157,8 @@ export function AppDebugSettingsSection() {
       );
       await flushReporting(2_000);
       Alert.alert("Sent", "Test event queued for Errex.");
-    })();
+      // flushReporting races allSettled with a timer, so this promise never rejects.
+    })().catch(() => undefined);
   };
 
   const healthLabel =

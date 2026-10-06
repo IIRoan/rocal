@@ -23,9 +23,7 @@ export { redactPII };
 /** Strip query strings and redact email path params from request URLs before logging. */
 export { sanitizeRequestUrl };
 
-/**
- * Short stable identifier for correlating logs without storing raw PII.
- */
+/** Short stable identifier for correlating logs without storing raw PII. */
 export function logRef(value: string): string {
   const normalized = value.trim().toLowerCase();
   if (!normalized) {
@@ -41,9 +39,7 @@ export function logRef(value: string): string {
 /** Backend redaction hashes identifier keys with {@link logRef}. */
 export const BACKEND_REDACTION_OPTIONS = { hashValue: logRef } as const;
 
-/**
- * Safe error fields for structured logging — no stacks, no nested user payloads.
- */
+/** Safe error fields for structured logging — no stacks, no nested user payloads. */
 export function errorLogDetails(error: unknown): SafeLogErrorDetails {
   return {
     errorName: error instanceof Error ? error.name : undefined,
@@ -51,9 +47,7 @@ export function errorLogDetails(error: unknown): SafeLogErrorDetails {
   };
 }
 
-/**
- * Sanitize a structured log context object before writing to logs.
- */
+/** Sanitize a structured log context object before writing to logs. */
 export function sanitizeLogContext(
   context: Record<string, unknown>,
 ): Record<string, unknown> {

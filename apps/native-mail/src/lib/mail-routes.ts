@@ -42,6 +42,8 @@ export const MAIL_PUSH_TAP_HANDLER: PushTapHandler = {
         queryKey: QUERY_KEYS.mailMessage(messageId),
       });
     }
-    void queryClient.invalidateQueries({ queryKey: ["mail", "messages"] });
+    void queryClient.invalidateQueries({
+      queryKey: QUERY_KEYS.mailMessagesAll(),
+    });
   },
 };

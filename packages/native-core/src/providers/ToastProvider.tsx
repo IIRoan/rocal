@@ -88,7 +88,7 @@ function getVariantConfig(
 } {
   switch (variant) {
     case "success":
-      return { icon: "check", iconColor: "#16a34a" };
+      return { icon: "check", iconColor: theme.colors.success };
     case "error":
       return { icon: "x-circle", iconColor: theme.colors.destructive };
     case "info":
@@ -204,6 +204,7 @@ function ToastItem({
             borderRadius: theme.borderRadius.xl,
             ...Platform.select({
               ios: {
+                // repo-rules-allow theme-tokens-only: RN shadowColor is a platform literal with no theme token.
                 shadowColor: "#000",
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.08,

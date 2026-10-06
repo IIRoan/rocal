@@ -1,8 +1,4 @@
-/**
- * Bundle the API for Vercel Bun Functions.
- * Workspace packages export raw `.ts` — bundling avoids runtime ResolveMessage.
- * Target is Bun only (see vercel.json `bunVersion`).
- */
+/** Bundle the API for Vercel Bun Functions — workspace packages export raw `.ts`, so bundling avoids runtime ResolveMessage. */
 import { cpSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 

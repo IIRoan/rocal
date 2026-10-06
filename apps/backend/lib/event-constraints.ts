@@ -54,10 +54,7 @@ export function validateEventReminderMinutes(
   return value;
 }
 
-/**
- * Validates optional event fields when present (used in update operations).
- * Returns the validated reminder value if provided.
- */
+/** Validates optional event fields present in update operations; returns the validated reminder value. */
 export function validateOptionalEventFields(fields: {
   title?: string | null;
   description?: string | null;

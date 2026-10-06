@@ -9,10 +9,7 @@ export function handleBetterAuthRequest(request: Request) {
   return auth.handler(request);
 }
 
-/**
- * Better Auth as native Elysia routes (not `.mount()`).
- * Elysia 2 AOT cannot compile mounted sub-apps.
- */
+/** Better Auth as native Elysia routes — Elysia 2 AOT cannot compile mounted sub-apps. */
 export function createBetterAuthPlugin(localAuthBasePath: string) {
   return new Elysia({ name: "better-auth" })
     .all(localAuthBasePath, ({ request }) => handleBetterAuthRequest(request))

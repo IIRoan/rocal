@@ -12,9 +12,6 @@ export function resolveRequestId(request: Request | undefined): string {
   return crypto.randomUUID();
 }
 
-/**
- * Assigns a request id for log correlation and echoes it on every response.
- */
 export const requestContext = new Elysia({ name: "request-context" })
   .derive(({ request }) => ({
     requestId: resolveRequestId(request),

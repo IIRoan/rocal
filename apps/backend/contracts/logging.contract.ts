@@ -1,11 +1,4 @@
-/**
- * Backend log sanitization policy — **single source of truth**.
- *
- * Key lists live in `logging.policy.mjs`; placeholders and PII patterns in `calendar-core/report-redaction`.
- *
- * When adding new log context fields that may contain user data, update
- * `logging.policy.mjs` first, then use helpers from `lib/log-sanitization.ts`.
- */
+/** Backend log sanitization policy — add user-data field keys to `logging.policy.mjs` first; PII patterns live in `calendar-core/report-redaction`. */
 
 import {
   LOG_HASH_FIELD_KEYS,
@@ -37,18 +30,13 @@ export type LogUrlFieldKey = (typeof LOG_URL_FIELD_KEYS)[number];
 /** Length of the hex prefix returned by `logRef()`. */
 export const LOG_REF_HASH_LENGTH = 12;
 
-/**
- * Safe structured error payload for logs — no stack traces, no nested payloads.
- */
+/** Safe structured error payload for logs — no stack traces, no nested payloads. */
 export type SafeLogErrorDetails = {
   errorName?: string;
   message: string;
 };
 
-/**
- * Rules every backend logger call should follow.
- * Documented here so agents and humans share one reference.
- */
+/** Rules every backend logger call should follow, kept here so agents and humans share one reference. */
 export type LogSanitizationPolicy = {
   /** Never log raw Error objects, stacks, or upstream response bodies. */
   neverLog: readonly string[];

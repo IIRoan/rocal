@@ -95,12 +95,6 @@ export class NotificationCalculator {
     };
   }
 
-  /**
-   * Calculate exact notification time based on event start time and minutes before
-   * @param eventStart - The start time of the event
-   * @param minutesBefore - Minutes before the event to send notification
-   * @returns The exact notification time
-   */
   static calculateNotificationTime(
     eventStart: Date,
     minutesBefore: number,
@@ -118,13 +112,6 @@ export class NotificationCalculator {
     );
   }
 
-  /**
-   * Calculate notification time with validation
-   * @param eventStart - The start time of the event
-   * @param minutesBefore - Minutes before the event to send notification
-   * @param currentTime - Current time for validation (defaults to now)
-   * @returns Result object with notification time and validation status
-   */
   static calculateNotificationTimeWithValidation(
     eventStart: Date,
     minutesBefore: number,
@@ -161,12 +148,6 @@ export class NotificationCalculator {
     }
   }
 
-  /**
-   * Validate that notification time is in the future
-   * @param notificationTime - The calculated notification time
-   * @param currentTime - Current time for comparison (defaults to now)
-   * @returns True if notification time is valid (in future)
-   */
   static validateNotificationTime(
     notificationTime: Date,
     currentTime: Date = new Date(),
@@ -186,11 +167,6 @@ export class NotificationCalculator {
     return roundedNotificationTime > roundedCurrentTime;
   }
 
-  /**
-   * Round date to minute precision (remove seconds and milliseconds)
-   * @param date - Date to round
-   * @returns Date rounded to the nearest minute
-   */
   static roundToMinute(date: Date): Date {
     if (!date || isNaN(date.getTime())) {
       throw new Error("Invalid date provided");
@@ -215,13 +191,6 @@ export class NotificationCalculator {
     return `${lookup("year")}-${lookup("month")}-${lookup("day")}T${lookup("hour")}:${lookup("minute")}:${lookup("second")}`;
   }
 
-  /**
-   * Calculate multiple notification times for an event
-   * @param eventStart - The start time of the event
-   * @param notificationConfigs - Array of notification configurations
-   * @param currentTime - Current time for validation (defaults to now)
-   * @returns Array of notification time results
-   */
   static calculateMultipleNotificationTimes(
     eventStart: Date,
     notificationConfigs: NotificationConfig[],
@@ -237,12 +206,6 @@ export class NotificationCalculator {
     }));
   }
 
-  /**
-   * Check if an event start time allows for valid notifications
-   * @param eventStart - The start time of the event
-   * @param currentTime - Current time for comparison (defaults to now)
-   * @returns True if event is in the future
-   */
   static isEventInFuture(
     eventStart: Date,
     currentTime: Date = new Date(),
@@ -258,12 +221,6 @@ export class NotificationCalculator {
     return eventStart > currentTime;
   }
 
-  /**
-   * Get the maximum valid minutes before for an event
-   * @param eventStart - The start time of the event
-   * @param currentTime - Current time for comparison (defaults to now)
-   * @returns Maximum minutes before that would result in a future notification
-   */
   static getMaxValidMinutesBefore(
     eventStart: Date,
     currentTime: Date = new Date(),
@@ -279,12 +236,6 @@ export class NotificationCalculator {
     return Math.max(0, maxMinutes - 1);
   }
 
-  /**
-   * Format time difference for display purposes
-   * @param notificationTime - The notification time
-   * @param eventStart - The event start time
-   * @returns Human-readable time difference string
-   */
   static formatTimeDifference(
     notificationTime: Date,
     eventStart: Date,

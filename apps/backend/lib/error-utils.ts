@@ -1,7 +1,4 @@
-/**
- * Error string helpers shared by API errors and log sanitization.
- * Kept separate from `errors.ts` to avoid a circular import with log-sanitization.
- */
+/** Error string helpers shared by API errors and log sanitization; separate from `errors.ts` to avoid a circular import. */
 
 /** Human-readable message from an unknown error; uses `fallback` when not an Error. */
 export function errorMessage(error: unknown, fallback = "Unknown error"): string {

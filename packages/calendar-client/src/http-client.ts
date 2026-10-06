@@ -17,10 +17,7 @@ export interface HttpClientConfig {
   retryDelay?: number;
   /** Fetch credentials mode. Defaults to "include". */
   credentials?: RequestCredentials;
-  /**
-   * Optional callback that returns extra headers to merge into every request.
-   * Useful for platform-specific auth headers (e.g. Bearer tokens on native).
-   */
+  /** Extra headers merged into every request, for platform-specific auth (e.g. Bearer tokens on native). */
   getHeaders?: () => Record<string, string> | Promise<Record<string, string>>;
   /** Optional callback invoked when the API returns 401. */
   onAuthError?: (statusCode: 401) => void;

@@ -57,14 +57,7 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-/**
- * Builds a full email HTML document matching the event-reminder.html style:
- * logo at top, clean minimal layout, white button with border, footer with links.
- *
- * Security: `bodyHtml` and `footerHtml` MUST contain only pre-escaped HTML fragments.
- * Every caller is responsible for running user-supplied strings through `escapeHtml`
- * before embedding them in these arguments. Do not pass raw user input here.
- */
+/** Builds email HTML; `bodyHtml`/`footerHtml` must be pre-escaped — every caller runs user strings through `escapeHtml` first. */
 function buildEmailHtml({
   title,
   previewText,

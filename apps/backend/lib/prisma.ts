@@ -64,6 +64,7 @@ export const prisma =
   });
 
 // Setup Prisma logging events
+// Prisma's generated client type omits the $on event hooks the runtime client exposes.
 if (isDevelopment) {
   const prismaWithEvents = prisma as unknown as PrismaEventClient;
   prismaWithEvents.$on("query", (e) => {

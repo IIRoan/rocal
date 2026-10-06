@@ -615,13 +615,7 @@ function isAllDayEvent(
   );
 }
 
-/**
- * Returns the IANA timezone attached to an event's start/end date by node-ical.
- * Returns undefined for "floating" events (RFC 5545 §3.3.5) — those have no
- * timezone and are meant to be interpreted in the viewer's local time. Callers
- * should fall back to the user's configured timezone rather than UTC so that
- * floating events are stored as close to local intent as possible.
- */
+/** IANA timezone attached to the event's start, or undefined for "floating" events (RFC 5545 §3.3.5), which callers store in the user's configured timezone. */
 function getEventTimezone(
   event: Pick<ical.VEvent, "start" | "end">,
 ): string | undefined {

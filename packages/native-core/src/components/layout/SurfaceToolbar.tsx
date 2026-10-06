@@ -14,10 +14,7 @@ interface SurfaceToolbarProps {
   dense?: boolean;
 }
 
-/**
- * Three-column header row for primary tab surfaces (calendar, mail list).
- * Leading/trailing slots are fixed width; center grows and centers content.
- */
+/** Three-column header row; leading/trailing slots are fixed width, center grows and centers. */
 export function SurfaceToolbar({
   leading,
   center,

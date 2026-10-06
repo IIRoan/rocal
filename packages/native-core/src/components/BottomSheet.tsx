@@ -582,6 +582,7 @@ function createStyles(theme: ThemeTokens) {
       borderTopRightRadius: SHEET_RADIUS,
       ...(Platform.OS === "ios"
         ? {
+            // repo-rules-allow theme-tokens-only: RN shadowColor is a platform literal with no theme token.
             shadowColor: "#000",
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.18,
@@ -619,6 +620,7 @@ function createStyles(theme: ThemeTokens) {
 
 const backdropStyles = StyleSheet.create({
   overlay: {
+    // repo-rules-allow theme-tokens-only: modal scrim; no dim-overlay token exists and black dims correctly in both themes.
     backgroundColor: "#000",
   },
 });

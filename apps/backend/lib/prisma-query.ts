@@ -1,9 +1,6 @@
 import { ValidationError } from "./errors";
 
-/**
- * Prisma string equality filter that blocks operator injection when request
- * values reach query builders without strict string typing.
- */
+/** Prisma string equality filter that blocks operator injection when untyped request values reach query builders. */
 export function prismaStringEquals(
   value: unknown,
   field = "id",

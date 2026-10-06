@@ -49,7 +49,7 @@ export function BlobatarAvatar({
   animate?: boolean;
   onImageLoadedChange?: (loaded: boolean) => void;
 }) {
-  const [failed, setFailed] = useState(false);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const [idleReady, setIdleReady] = useState(false);
   const lookedUp = useSolaceProfileImage(email, { enabled: !src });
   const imageSrc = resolveSolaceProfileAvatarUrl(
@@ -59,10 +59,6 @@ export function BlobatarAvatar({
   );
   const seed = blobatarName(email, name);
   const radius = borderRadius ?? size / 2;
-
-  useEffect(() => {
-    setFailed(false);
-  }, [imageSrc]);
 
   useEffect(() => {
     if (!animate) {
@@ -100,6 +96,8 @@ export function BlobatarAvatar({
     return { uri: imageSrc };
   }, [imageSrc]);
 
+  // A failure only applies to the src that failed, so a new src starts clean without an effect.
+  const failed = imageSrc !== null && failedSrc === imageSrc;
   const showImage = imageSource && !failed;
 
   // The Blobatar stays underneath so loading or broken pictures never show an empty circle.
@@ -116,7 +114,7 @@ export function BlobatarAvatar({
           accessibilityLabel={label}
           onLoad={() => onImageLoadedChange?.(true)}
           onError={() => {
-            setFailed(true);
+            setFailedSrc(imageSrc);
             onImageLoadedChange?.(false);
           }}
           style={StyleSheet.absoluteFill}

@@ -18,7 +18,7 @@ export function isWebCryptoAvailable(): boolean {
   return supportsSubtleCrypto({ runtime: detectRuntime() });
 }
 
-// Web CryptoProvider wrapping the global crypto object
+// DOM Crypto implements every provider method with narrower signatures; the loose shared interface needs this bridge.
 const webCrypto: CryptoProvider =
   globalThis.crypto as unknown as CryptoProvider;
 

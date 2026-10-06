@@ -1,8 +1,4 @@
-/**
- * Web-specific E2EE provider that wraps the existing web E2EE modules
- * to satisfy the platform-agnostic E2eeProvider interface from
- * @workspace/calendar-client.
- */
+/** Web E2EE modules wrapped for the platform-agnostic E2eeProvider interface from @workspace/calendar-client. */
 import type { E2eeProvider } from "@workspace/calendar-client";
 import type {
   Calendar,
