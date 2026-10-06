@@ -153,5 +153,9 @@ export async function fetchJmapUpstream(
     }
   }
 
-  return response!;
+  if (!response) {
+    throw new JmapProxyPathError("No upstream response.");
+  }
+
+  return response;
 }

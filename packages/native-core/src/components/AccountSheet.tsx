@@ -145,7 +145,9 @@ export function AccountSheet({
           </Text>
           {user?.email ? (
             <Pressable
-              onPress={() => void copyEmail()}
+              onPress={() =>
+                void copyEmail().catch(() => toast("Could not copy email"))
+              }
               hitSlop={8}
               style={({ pressed }) => [
                 styles.emailRow,

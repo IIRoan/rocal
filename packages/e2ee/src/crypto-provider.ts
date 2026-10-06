@@ -1,34 +1,34 @@
-/**
- * Platform-agnostic abstraction over the Web Crypto API.
- *
- * On web, pass `window.crypto` directly.
- * On React Native, wrap `expo-crypto` / `react-native-quick-crypto`
- * to satisfy this interface.
- */
+/** Web Crypto algorithm descriptor, opaque because DOM and React Native declare different shapes for it. */
+type CryptoAlgorithm = object | string;
+
+/** Key material accepted by `importKey`; the platform decides between raw bytes and a JWK. */
+type CryptoKeyData = BufferSource | JsonWebKey;
+
+/** Platform-agnostic abstraction over the Web Crypto API: pass `window.crypto` on web, or wrap expo-crypto / react-native-quick-crypto on React Native. */
 export interface CryptoProvider {
   randomUUID(): string;
   getRandomValues(buffer: Uint8Array): Uint8Array;
   subtle: {
     generateKey(
-      algorithm: any,
+      algorithm: CryptoAlgorithm,
       extractable: boolean,
       keyUsages: string[],
     ): Promise<CryptoKey>;
     importKey(
       format: string,
-      keyData: any,
-      algorithm: any,
+      keyData: CryptoKeyData,
+      algorithm: CryptoAlgorithm,
       extractable: boolean,
       keyUsages: string[],
     ): Promise<CryptoKey>;
     exportKey(format: string, key: CryptoKey): Promise<ArrayBuffer>;
     encrypt(
-      algorithm: any,
+      algorithm: CryptoAlgorithm,
       key: CryptoKey,
       data: BufferSource,
     ): Promise<ArrayBuffer>;
     decrypt(
-      algorithm: any,
+      algorithm: CryptoAlgorithm,
       key: CryptoKey,
       data: BufferSource,
     ): Promise<ArrayBuffer>;
@@ -36,26 +36,26 @@ export interface CryptoProvider {
       format: string,
       key: CryptoKey,
       wrappingKey: CryptoKey,
-      algorithm: any,
+      algorithm: CryptoAlgorithm,
     ): Promise<ArrayBuffer>;
     unwrapKey(
       format: string,
       wrappedKey: BufferSource,
       unwrappingKey: CryptoKey,
-      unwrapAlgo: any,
-      unwrappedKeyAlgo: any,
+      unwrapAlgo: CryptoAlgorithm,
+      unwrappedKeyAlgo: CryptoAlgorithm,
       extractable: boolean,
       keyUsages: string[],
     ): Promise<CryptoKey>;
     sign(
-      algorithm: any,
+      algorithm: CryptoAlgorithm,
       key: CryptoKey,
       data: BufferSource,
     ): Promise<ArrayBuffer>;
     deriveKey(
-      algorithm: any,
+      algorithm: CryptoAlgorithm,
       baseKey: CryptoKey,
-      derivedKeyType: any,
+      derivedKeyType: CryptoAlgorithm,
       extractable: boolean,
       keyUsages: string[],
     ): Promise<CryptoKey>;

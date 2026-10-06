@@ -33,9 +33,7 @@ interface NavigationHeaderProps {
   bordered?: boolean;
 }
 
-/**
- * Unified navigation header for stack screens, mail reader, compose, and forms.
- */
+/** Unified navigation header for stack screens, mail reader, compose, and forms. */
 export function NavigationHeader({
   variant = "stack",
   title,

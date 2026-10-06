@@ -1,10 +1,4 @@
-/**
- * Errex/Sentry bootstrap for the Bun API (local + Vercel).
- * No-ops when SENTRY_DSN is unset so local/dev stays quiet by default.
- *
- * `@sentry/bun` rejects non-numeric DSN project ids; errex uses string names.
- * We init with a numeric stand-in and tunnel to `/api/<project>/envelope/`.
- */
+/** Errex/Sentry bootstrap for the Bun API; no-ops without SENTRY_DSN, and tunnels envelopes because `@sentry/bun` rejects errex's string project ids. */
 import * as Sentry from "@sentry/bun";
 import {
   scrubBreadcrumb,

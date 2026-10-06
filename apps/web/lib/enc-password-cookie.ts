@@ -1,14 +1,4 @@
-/**
- * Encrypted password cookie — shared across calendar and mail.
- *
- * The password (used to derive both calendar and mail encryption keys) is
- * stored in a browser cookie as AES-GCM ciphertext. The symmetric key for
- * that encryption is kept in localStorage, so the cookie cannot be decrypted
- * without also having the device key. Both are cleared on sign-out.
- *
- * The module also maintains an in-memory copy so hot reads remain synchronous
- * after the async init has run.
- */
+/** The password is stored AES-GCM encrypted in a cookie; its key lives in localStorage and both clear on sign-out. */
 
 import {
   storePendingAuthPassword,
@@ -22,10 +12,22 @@ let _memoryPassword: string | null = null;
 
 // ─── Device key ───────────────────────────────────────────────────────────────
 
+function isJsonWebKey(value: unknown): value is JsonWebKey {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as Record<string, unknown>).kty === "string"
+  );
+}
+
 async function getOrCreateDeviceKey(): Promise<CryptoKey> {
   const stored = localStorage.getItem(DEVICE_KEY_STORAGE_KEY);
   if (stored) {
     try {
+      const parsed: unknown = JSON.parse(atob(stored));
+      if (!isJsonWebKey(parsed)) {
+        throw new Error("Corrupt device key record");
+      }
       return await crypto.subtle.importKey(
         "jwk",
         JSON.parse(atob(stored)) as JsonWebKey,
@@ -71,10 +73,7 @@ function expireCookie(): void {
   document.cookie = `${COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict`;
 }
 
-/**
- * Remove a persisted encryption cookie when its device key is missing.
- * This happens after manual cookie clears or browser profile resets.
- */
+/** Remove a persisted cookie when its device key is missing (manual clear or profile reset). */
 export function clearOrphanedEncPasswordCookie(): void {
   if (typeof window === "undefined") return;
 
@@ -88,10 +87,7 @@ export function clearOrphanedEncPasswordCookie(): void {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/**
- * Encrypt the password with the device key and write it to the shared cookie.
- * Also updates the in-memory cache so subsequent sync reads see the value.
- */
+/** Encrypt the password with the device key, write the cookie, and update the in-memory cache. */
 export async function setEncPasswordCookie(password: string): Promise<void> {
   if (typeof window === "undefined") return;
 
@@ -112,21 +108,12 @@ export async function setEncPasswordCookie(password: string): Promise<void> {
   writeCookie(btoa(String.fromCharCode(...combined)));
 }
 
-/**
- * Synchronous read of the in-memory cache.
- * Returns null until initEncPasswordFromCookie() has resolved.
- */
+/** Synchronous in-memory read; returns null until initEncPasswordFromCookie() resolves. */
 export function peekEncPassword(): string | null {
   return _memoryPassword;
 }
 
-/**
- * Decrypt the cookie using the device key and populate both the cookie module
- * memory cache and the shared auth-password memory cache (so existing callers
- * of peekCachedAuthPassword() see the value without any changes on their side).
- *
- * Safe to call multiple times — no-ops if the memory cache is already set.
- */
+/** Decrypt the cookie into the memory caches; no-ops once the memory cache is set. */
 export async function initEncPasswordFromCookie(): Promise<void> {
   if (typeof window === "undefined") return;
   if (_memoryPassword !== null) return;
@@ -149,8 +136,7 @@ export async function initEncPasswordFromCookie(): Promise<void> {
     );
     const password = new TextDecoder().decode(decrypted);
     _memoryPassword = password;
-    // Populate the shared auth-password memory cache so peekCachedAuthPassword()
-    // works without needing any changes in calendar/mail bootstrap code.
+    // Populate the shared auth-password memory cache so peekCachedAuthPassword() callers need no changes.
     storePendingAuthPassword(password);
   } catch {
     // Cookie or device key is corrupt/mismatched — clean up.
@@ -158,11 +144,7 @@ export async function initEncPasswordFromCookie(): Promise<void> {
   }
 }
 
-/**
- * Remove the cookie, the device key, and the in-memory cache.
- * Also clears the shared auth-password memory cache via clearAuthPasswords().
- * Call this on every sign-out path.
- */
+/** Remove cookie, device key, and memory caches; call on every sign-out path. */
 export function clearEncPasswordCookie(): void {
   _memoryPassword = null;
   if (typeof window === "undefined") return;

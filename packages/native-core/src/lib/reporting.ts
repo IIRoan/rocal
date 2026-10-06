@@ -58,6 +58,7 @@ async function sendEnvelope(
   body: string,
   options: ErrexReportingOptions,
 ): Promise<void> {
+  // repo-rules-allow client-api-boundary: Sentry-envelope POST to the self-hosted Errex tunnel, not a Solace API route.
   const response = await fetch(options.tunnel, {
     method: "POST",
     headers: {
@@ -76,9 +77,10 @@ function queueReport(task: () => Promise<void>): void {
     // Reporting must never affect app behavior.
   });
   pendingReports.add(report);
-  void report.finally(() => {
-    pendingReports.delete(report);
-  });
+  // report is already caught above, so the finalizer chain cannot reject.
+  void report
+    .finally(() => pendingReports.delete(report))
+    .catch(() => undefined);
 }
 
 export function captureException(error: unknown, context?: ExceptionContext): void {

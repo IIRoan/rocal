@@ -24,6 +24,11 @@ function canAnimate(element: Element) {
   return typeof element.animate === "function";
 }
 
+/** Reduced motion keeps the end state but skips the movement, matching Reanimated's default on native. */
+function motionDuration(duration: number) {
+  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : duration;
+}
+
 /** Fades and slides `element` in from `offset` using only opacity and transform, which Firefox and Safari composite off the main thread. */
 export function slideFadeIn(
   element: HTMLElement,
@@ -38,7 +43,7 @@ export function slideFadeIn(
     to.transform = "none";
   }
   return element.animate([from, to], {
-    duration: options.duration,
+    duration: motionDuration(options.duration),
     easing: options.easing ?? MOTION_EASING.reveal,
   });
 }
@@ -57,7 +62,7 @@ export function slideFadeOut(
     to.transform = offsetTransform(offset);
   }
   return element.animate([from, to], {
-    duration: options.duration,
+    duration: motionDuration(options.duration),
     easing: options.easing ?? MOTION_EASING.exit,
     fill: "forwards",
   });

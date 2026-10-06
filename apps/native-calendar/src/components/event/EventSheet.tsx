@@ -11,7 +11,6 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   CalendarEvent,
   CreateEventRequest,
@@ -34,28 +33,24 @@ import { useRecentContacts } from "@workspace/native-core/hooks/use-recent-conta
 import { useReminderTitleEncryptor } from "../../hooks/use-reminder-title-encryptor";
 import { useEventReminders } from "../../hooks/use-event-reminders";
 import { useCategories } from "../../hooks/use-categories";
+import { calendarApiService } from "@workspace/native-core/lib/api";
 import { shareEventIcs } from "../../lib/event-ics-share";
 import { checkEventRecurrence } from "../../lib/event-recurrence-validation";
 import { resolveCalendarSwatchColor } from "../../lib/calendar-color-utils";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
-import { extractRecentContactEntries } from "@workspace/native-core/lib/record-recent-contacts";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
-import { toastOperationWarnings } from "@workspace/native-core/lib/operation-warnings";
-import { persistEventReminderNotifications } from "../../lib/event-reminder-notifications";
-import { calendarApiService } from "@workspace/native-core/lib/api";
-import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
+import { isOptimisticId } from "../../lib/optimistic-events";
 import {
-  buildOptimisticEvent,
-  commitOptimisticEvent,
-  findCachedEvent,
-  generateOptimisticId,
-  invalidateEventRanges,
-  isOptimisticId,
-  optimisticallyInsertEvent,
-  optimisticallyRemoveEvent,
-  rollbackFromSnapshot,
-  type CacheSnapshot,
-} from "../../lib/optimistic-events";
+  useCreateEventMutation,
+  useDeleteEventMutation,
+  useRespondToInvitationMutation,
+  useUpdateEventMutation,
+} from "../../hooks/use-event-sheet-mutations";
+import {
+  useEventSheetCalendars,
+  useEventSheetEvent,
+  useEventSheetSettings,
+} from "../../hooks/use-event-sheet-queries";
 import {
   BottomSheet,
   BottomSheetClose,
@@ -170,15 +165,12 @@ export function EventSheet({
 }: EventSheetProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const queryClient = useQueryClient();
   const { user } = useAuth();
   const { recordUsage } = useRecentContacts();
   const encryptReminderTitle = useReminderTitleEncryptor();
   const { toast } = useToast();
   const bottomSheetRef = useRef<BottomSheetHandle>(null);
   const formRef = useRef<EventFormHandle>(null);
-  const createSnapshotRef = useRef<CacheSnapshot>([]);
-  const deleteSnapshotRef = useRef<CacheSnapshot>([]);
 
   const [viewMode, setViewMode] = useState<"view" | "edit">("view");
   // The body mounts once the open animation runs so rendering the form never delays the tap response.
@@ -244,193 +236,49 @@ export function EventSheet({
     onDismiss();
   }, [onDismiss]);
 
-  const cachedEvent = eventId
-    ? findCachedEvent(queryClient, eventId)
-    : undefined;
-
-  const { data: fetchedEvent, isLoading: eventLoading } = useQuery({
-    queryKey: QUERY_KEYS.eventDetail(eventId ?? ""),
-    queryFn: () => calendarApiService.getEvent(eventId!),
-    enabled: !!eventId && visible,
-    placeholderData: cachedEvent,
-  });
+  const { data: fetchedEvent, isLoading: eventLoading } = useEventSheetEvent(
+    eventId,
+    visible,
+  );
   const event = fetchedEvent;
 
-  const { data: calendars, isLoading: calendarsLoading } = useQuery({
-    queryKey: QUERY_KEYS.calendars(),
-    queryFn: () => calendarApiService.getCalendars(),
-    enabled: visible,
-  });
-  const { data: settings } = useQuery({
-    queryKey: QUERY_KEYS.settings(),
-    queryFn: () => calendarApiService.getUserSettings(),
-    enabled: visible,
-  });
+  const { data: calendars, isLoading: calendarsLoading } =
+    useEventSheetCalendars(visible);
+  const { data: settings } = useEventSheetSettings(visible);
   const { data: categories } = useCategories(visible);
   const resolvedTimezone = resolveTimezone(settings?.timezone);
   const timeFormat = useUserTimeFormat();
   const { reminders: eventReminders, isLoading: remindersLoading } =
     useEventReminders(eventId, event?.reminder, visible && !isCreate);
 
-  const createMutation = useMutation({
-    mutationFn: ({ request }: EventFormSubmission) =>
-      calendarApiService.createEvent(request),
-    onMutate: async ({ request }: EventFormSubmission) => {
-      const tempId = generateOptimisticId();
-      const optimisticEvent = buildOptimisticEvent(
-        request,
-        user?.id ?? "",
-        tempId,
-      );
-      createSnapshotRef.current = await optimisticallyInsertEvent(
-        queryClient,
-        optimisticEvent,
-      );
-      setServerErrors([]);
-      dismissSheet();
-      return { tempId };
-    },
-    onSuccess: (savedEvent, { request, reminders }, context) => {
-      commitOptimisticEvent(queryClient, context.tempId, savedEvent);
-      void invalidateEventRanges(queryClient, savedEvent);
-      // Reminders are a separate round trip that never throws, so they stay off the timeline's critical path.
-      void persistEventReminderNotifications(
-        savedEvent.id,
-        request.title,
-        reminders,
-        encryptReminderTitle,
-      ).then(() =>
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.eventNotifications(savedEvent.id),
-        }),
-      );
-      const entries = extractRecentContactEntries(
-        request.participants,
-        user?.email,
-      );
-      if (entries.length > 0) {
-        recordUsage(entries, "calendar");
-      }
-      toast("Event created");
-      toastOperationWarnings(toast, savedEvent);
-    },
-    onError: (err: unknown) => {
-      rollbackFromSnapshot(queryClient, createSnapshotRef.current);
-      toast(getErrorMessage(err, "Failed to create event"), "error");
-    },
+  const createMutation = useCreateEventMutation({
+    userId: user?.id,
+    userEmail: user?.email,
+    encryptReminderTitle,
+    recordUsage,
+    onDismiss: dismissSheet,
+    onServerErrors: setServerErrors,
   });
 
-  const updateMutation = useMutation({
-    mutationFn: async ({ request, reminders }: EventFormSubmission) => {
-      const saved = editScope
-        ? await calendarApiService.editRecurringEvent(eventId!, {
-            editScope,
-            occurrenceDate: editOccurrenceDate,
-            updates: request,
-          })
-        : await calendarApiService.updateEvent(eventId!, request);
-      await persistEventReminderNotifications(
-        saved.id,
-        request.title,
-        reminders,
-        encryptReminderTitle,
-      );
-      return saved;
-    },
-    onSuccess: (savedEvent, { request }) => {
-      queryClient.invalidateQueries({ queryKey: ["events"] });
-      if (eventId) {
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.eventDetail(eventId),
-        });
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.eventNotifications(eventId),
-        });
-      }
-      const entries = extractRecentContactEntries(
-        request.participants,
-        user?.email,
-      );
-      if (entries.length > 0) {
-        recordUsage(entries, "calendar");
-      }
-      setServerErrors([]);
-      toast("Event updated");
-      toastOperationWarnings(toast, savedEvent);
-      dismissSheet();
-    },
-    onError: (err: unknown) => {
-      setServerErrors([getErrorMessage(err, "Failed to update event")]);
-    },
+  const updateMutation = useUpdateEventMutation({
+    eventId,
+    editScope,
+    editOccurrenceDate,
+    userEmail: user?.email,
+    encryptReminderTitle,
+    recordUsage,
+    onDismiss: dismissSheet,
+    onServerErrors: setServerErrors,
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async ({
-      scope,
-      occurrenceDate,
-    }: {
-      scope?: RecurrenceDeleteScope;
-      occurrenceDate?: string;
-    }) => {
-      if (scope) {
-        return calendarApiService.deleteRecurringEvent(
-          eventId!,
-          scope,
-          occurrenceDate,
-        );
-      }
-      return calendarApiService.deleteEvent(eventId!);
-    },
-    onMutate: async () => {
-      if (eventId) {
-        deleteSnapshotRef.current = await optimisticallyRemoveEvent(
-          queryClient,
-          eventId,
-        );
-        dismissSheet();
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["events"] });
-      if (eventId) {
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.eventDetail(eventId),
-        });
-      }
-      toast("Event deleted");
-    },
-    onError: (err: unknown) => {
-      rollbackFromSnapshot(queryClient, deleteSnapshotRef.current);
-      toast(getErrorMessage(err, "Failed to delete event"), "error");
-    },
+  const deleteMutation = useDeleteEventMutation({
+    eventId,
+    onDismiss: dismissSheet,
   });
 
-  const rsvpMutation = useMutation({
-    mutationFn: (status: "accepted" | "declined" | "tentative") =>
-      calendarApiService.respondToInvitation(eventId!, status),
-    onSuccess: (result, status) => {
-      if (eventId) {
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.eventDetail(eventId),
-        });
-      }
-      queryClient.invalidateQueries({ queryKey: ["events"] });
-      if ("deleted" in result && result.deleted) {
-        toast("Invitation declined");
-        dismissSheet();
-        return;
-      }
-      toast(
-        status === "accepted"
-          ? "Invitation accepted"
-          : status === "tentative"
-            ? "Marked as maybe"
-            : "Invitation declined",
-      );
-    },
-    onError: (err: unknown) => {
-      toast(getErrorMessage(err, "Failed to respond to invitation"), "error");
-    },
+  const rsvpMutation = useRespondToInvitationMutation({
+    eventId,
+    onDismiss: dismissSheet,
   });
 
   const submitEvent = useCallback(

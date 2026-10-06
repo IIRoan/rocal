@@ -12,10 +12,7 @@ const log = createLogger("auth-local-state");
 
 export type AuthRecoveryReason = "session-mismatch" | "login-page-reconcile";
 
-/**
- * Remove Solace-specific client artifacts that should never survive sign-out
- * or a fresh unauthenticated visit.
- */
+/** Remove client artifacts that must never survive sign-out or an unauthenticated visit. */
 export function clearSolaceClientAuthArtifacts(): void {
   clearAuthPasswords();
   clearEncPasswordCookie();
@@ -23,18 +20,13 @@ export function clearSolaceClientAuthArtifacts(): void {
   clearLocalMailSettings();
 }
 
-/**
- * Drop encryption artifacts left behind when the auth session is gone but a
- * prior device's cookie or key material is still present.
- */
+/** Drop encryption artifacts left when the session is gone but a prior device's key material remains. */
 export function clearOrphanedClientAuthArtifacts(): void {
   clearOrphanedEncPasswordCookie();
   clearLocalMailSettings();
 }
 
-/**
- * Best-effort server sign-out plus a full local auth artifact wipe.
- */
+/** Best-effort server sign-out plus a full local auth artifact wipe. */
 export async function signOutAndClearLocalState(): Promise<void> {
   try {
     await signOut();
@@ -53,12 +45,7 @@ export type AuthSessionReconciliation =
   | { status: "recovered" }
   | { status: "unavailable" };
 
-/**
- * Validate Better Auth's cached client session against its durable server-side
- * session. A failed validation never signs out: network failures are not proof
- * that the session is invalid, and a stale local session can be replaced by the
- * next successful sign-in without revoking a newly issued server session.
- */
+/** Server-side session check; failures never sign out because a network error is not proof the session is invalid. */
 export async function reconcileAuthSession(input: {
   hasClientSession: boolean;
   reason?: AuthRecoveryReason;

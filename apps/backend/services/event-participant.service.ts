@@ -53,11 +53,7 @@ type SyncEventParticipantsInput = {
 type SyncEventParticipantsResult = {
   changed: boolean;
   participants: EventParticipant[];
-  /**
-   * Call this AFTER the surrounding database transaction has committed.
-   * Dispatching emails inside an uncommitted transaction risks sending
-   * invitations for events that never persisted.
-   */
+  /** Call only after the surrounding transaction commits: sending inside an uncommitted transaction would invite attendees to events that never persisted. */
   sendPendingInvitations: () => Promise<OperationWarning[]>;
 };
 
@@ -139,12 +135,9 @@ export class EventParticipantService {
         entry,
       ]),
     );
-    const participantByEmail = new Map(
-      resolvedInputs.map((participant) => [participant.email, participant]),
-    );
 
-    return emails.map((email) => {
-      const participant = participantByEmail.get(email)!;
+    return resolvedInputs.map((participant) => {
+      const email = participant.email;
       const matchedUser = userByEmail.get(email);
       const matchedDirectory = directoryByEmail.get(email);
       const role = participant.role === "organizer" ? "organizer" : "attendee";
@@ -304,11 +297,7 @@ export class EventParticipantService {
     };
   }
 
-  /**
-   * Prepares a closure that sends email invitations to new attendees.
-   * Separating this from the DB writes ensures invitations are only dispatched
-   * after the caller's transaction has committed.
-   */
+  /** Prepares the invitation sender for new attendees; it must run only after the caller's transaction committed. */
   private async buildInvitationSender(
     input: SyncEventParticipantsInput,
     resolvedParticipants: ResolvedParticipant[],
@@ -322,6 +311,7 @@ export class EventParticipantService {
       return async () => [];
     }
 
+    const invitationEvent = input.invitationEvent;
     const client = this.getClient(input.tx);
     const owner = await this.resolveOwner(client, input.ownerUserId);
     const newInvitees = resolvedParticipants.filter(
@@ -338,11 +328,11 @@ export class EventParticipantService {
     const icsContent = buildIcsEventFile({
       calendar: {
         name: input.calendarName || "Solace",
-        timezone: resolveTimezone(input.invitationEvent.timezone),
+        timezone: resolveTimezone(invitationEvent.timezone),
         method: "REQUEST",
       },
       event: {
-        ...input.invitationEvent,
+        ...invitationEvent,
         participants: resolvedParticipants.map((p) => ({
           email: p.email,
           displayName: p.displayName,
@@ -361,12 +351,12 @@ export class EventParticipantService {
             ...buildEventInvitationEmail({
               attendeeName: invitee.displayName,
               inviterName: owner.name,
-              eventTitle: input.invitationEvent!.title,
-              eventDescription: input.invitationEvent!.description,
-              eventLocation: input.invitationEvent!.location,
-              start: input.invitationEvent!.start,
-              end: input.invitationEvent!.end,
-              allDay: !!input.invitationEvent!.allDay,
+              eventTitle: invitationEvent.title,
+              eventDescription: invitationEvent.description,
+              eventLocation: invitationEvent.location,
+              start: invitationEvent.start,
+              end: invitationEvent.end,
+              allDay: !!invitationEvent.allDay,
               openUrl: new URL(
                 `/calendar?eventId=${encodeURIComponent(input.eventId)}`,
                 env.frontendUrl.replace(/\/+$/, "") + "/",

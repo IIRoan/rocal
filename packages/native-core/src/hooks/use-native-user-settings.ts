@@ -63,7 +63,7 @@ export function useNativeUserSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
-      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
       toast("Settings reset to defaults");
     },
     onError: (error) => {

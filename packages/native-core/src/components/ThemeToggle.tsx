@@ -9,11 +9,6 @@ import {
 import { useTheme, type ThemePreference } from "../providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
-/**
- * A compact theme toggle button that cycles through light → dark → system.
- * Renders a sun (☀), moon (☾), or auto (◐) icon depending on the current
- * preference.
- */
 export function ThemeToggle() {
   const { theme, themePreference, setThemePreference } = useTheme();
   const styles = createStyles(theme);

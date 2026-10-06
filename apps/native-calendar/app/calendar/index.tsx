@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  keepPreviousData,
-  useQuery,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   buildPaddedCalendarMonthRanges,
-  getErrorMessage,
   parseWorkingDays,
   createCalendarMap,
   createVisibleCalendarIdSet,
@@ -19,12 +13,13 @@ import { isTimelineCalendarView } from "../../src/lib/calendar-views";
 import { useCalendarView } from "../../src/providers/CalendarViewProvider";
 import { calendarApiService } from "@workspace/native-core/lib/api";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
+import { readCachedEventsForRange } from "../../src/lib/optimistic-events";
 import {
-  optimisticallyPatchEvent,
-  readCachedEventsForRange,
-  rollbackFromSnapshot,
-} from "../../src/lib/optimistic-events";
-import { useToast } from "@workspace/native-core/providers/ToastProvider";
+  useCalendarScreenCalendars,
+  useCalendarScreenEvents,
+  useCalendarScreenSettings,
+  useMoveCalendarEvent,
+} from "../../src/hooks/use-calendar-screen-queries";
 import { getSurroundingCalendarDateRange } from "../../src/components/calendar/navigation-utils";
 import { AppScreen } from "@workspace/native-core/components/layout";
 import { CalendarTopToolbar } from "../../src/components/calendar/CalendarTopToolbar";
@@ -42,7 +37,6 @@ import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-fo
 
 export default function CalendarScreen() {
   const { openEventSheet } = useSheet();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const {
     activeView,
@@ -63,14 +57,8 @@ export default function CalendarScreen() {
   const closeCalendars = useCallback(() => setCalendarsOpen(false), []);
   const closeAccount = useCallback(() => setAccountOpen(false), []);
 
-  const { data: settings, isPending: settingsPending } = useQuery({
-    queryKey: QUERY_KEYS.settings(),
-    queryFn: () => calendarApiService.getUserSettings(),
-    placeholderData: () =>
-      queryClient.getQueryData<
-        Awaited<ReturnType<typeof calendarApiService.getUserSettings>>
-      >(QUERY_KEYS.settings()),
-  });
+  const { data: settings, isPending: settingsPending } =
+    useCalendarScreenSettings();
   const settingsLoading = settingsPending && !settings;
   const resolvedTimezone = resolveTimezone(settings?.timezone);
   const {
@@ -89,14 +77,7 @@ export default function CalendarScreen() {
     [settings?.workingDays],
   );
 
-  const { data: calendars } = useQuery({
-    queryKey: QUERY_KEYS.calendars(),
-    queryFn: () => calendarApiService.getCalendars(),
-    placeholderData: () =>
-      queryClient.getQueryData<
-        Awaited<ReturnType<typeof calendarApiService.getCalendars>>
-      >(QUERY_KEYS.calendars()),
-  });
+  const { data: calendars } = useCalendarScreenCalendars();
 
   const detailDateRange = useMemo(
     () =>
@@ -121,18 +102,13 @@ export default function CalendarScreen() {
     [queryClient, detailDateRange],
   );
 
-  const { data: detailEventsData, isLoading: detailEventsLoading } = useQuery({
-    queryKey: QUERY_KEYS.events(
-      detailDateRange.start.toISOString(),
-      detailDateRange.end.toISOString(),
-    ),
-    queryFn: () =>
-      calendarApiService.getEvents(detailDateRange.start, detailDateRange.end),
-    enabled: !settingsLoading,
-    initialData: detailSeed?.data,
-    initialDataUpdatedAt: detailSeed?.updatedAt,
-    placeholderData: keepPreviousData,
-  });
+  const { data: detailEventsData, isLoading: detailEventsLoading } =
+    useCalendarScreenEvents({
+      start: detailDateRange.start,
+      end: detailDateRange.end,
+      enabled: !settingsLoading,
+      seed: detailSeed,
+    });
 
   useEffect(() => {
     for (const range of buildPaddedCalendarMonthRanges(currentDate, {
@@ -156,42 +132,7 @@ export default function CalendarScreen() {
     }
   }, [settings?.defaultView, setActiveView]);
 
-  const moveEventMutation = useMutation({
-    mutationFn: ({ eventId, start, end, recurrenceEdit }: KitEventMove) => {
-      if (recurrenceEdit) {
-        return calendarApiService.editRecurringEvent(
-          recurrenceEdit.parentEventId,
-          {
-            editScope: "this_only",
-            occurrenceDate: recurrenceEdit.occurrenceDate,
-            updates: { start, end },
-          },
-        );
-      }
-
-      return calendarApiService.updateEvent(eventId, {
-        start,
-        end,
-        timezone: resolvedTimezone,
-      });
-    },
-    onMutate: async ({ eventId, start, end }) => {
-      const snapshot = await optimisticallyPatchEvent(queryClient, eventId, {
-        start: new Date(start),
-        end: new Date(end),
-      });
-      return { snapshot };
-    },
-    onError: (err: unknown, _vars, context) => {
-      if (context?.snapshot) {
-        rollbackFromSnapshot(queryClient, context.snapshot);
-      }
-      toast(getErrorMessage(err, "Failed to move event"), "error");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["events"] });
-    },
-  });
+  const moveEventMutation = useMoveCalendarEvent(resolvedTimezone);
 
   const calendarList = useMemo(() => calendars ?? [], [calendars]);
   const calendarMap = useMemo(

@@ -1,9 +1,4 @@
-/**
- * Pin Prisma's native query engine before PrismaClient loads.
- * Engines are copied next to the Bun bundle by `build-vercel.ts`.
- *
- * Avoids `import.meta` so Jest (CJS) can parse this module.
- */
+/** Pin Prisma's native query engine before PrismaClient loads; avoids `import.meta` so Jest (CJS) can parse this module. */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -14,10 +9,7 @@ function firstExisting(...candidates: string[]): string | undefined {
   return candidates.find((path) => existsSync(path));
 }
 
-/**
- * On Vercel, engines ship beside the Bun bundle under `dist/vercel/`.
- * Local/Railway/Jest use Prisma's default engine discovery.
- */
+/** Vercel ships engines beside the Bun bundle under `dist/vercel/`; local/Railway/Jest use Prisma's default discovery. */
 if (!process.env.PRISMA_QUERY_ENGINE_LIBRARY && process.env.VERCEL) {
   const cwd = process.cwd();
   const roots = [

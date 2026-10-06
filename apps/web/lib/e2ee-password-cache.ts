@@ -1,10 +1,7 @@
 const PENDING_AUTH_PASSWORD_KEY = "solace:e2ee:pending-auth-password";
 const CACHED_AUTH_PASSWORD_KEY = "solace:e2ee:cached-auth-password";
 
-/**
- * In-memory only. Persisted unlock still goes through the encrypted cookie +
- * device key in `enc-password-cookie.ts` — never web storage for the plaintext.
- */
+/** In-memory only; persisted unlock stays in the encrypted cookie, never web storage. */
 const authPasswordMemory = new Map<string, string>();
 
 function removeAuthPasswordKey(key: string): void {

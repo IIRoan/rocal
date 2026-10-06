@@ -4,10 +4,7 @@ import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:user-setup");
 
-/**
- * Ensures user has default calendars set up.
- * Creates a default "Personal" calendar if the user has no calendars.
- */
+/** Creates a default "Personal" calendar when the user has none. */
 export async function ensureUserCalendars(userId: string) {
   try {
     // Check if user already has calendars

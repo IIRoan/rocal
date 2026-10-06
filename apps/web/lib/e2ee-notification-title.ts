@@ -10,6 +10,7 @@ import { getActiveE2eeSession } from "./e2ee-session";
 const notificationKeys = new WeakMap<CryptoKey, Promise<CryptoKey>>();
 
 function webCrypto(): CryptoProvider {
+  // DOM Crypto implements every provider method with narrower signatures; the loose shared interface needs this bridge.
   return globalThis.crypto as unknown as CryptoProvider;
 }
 

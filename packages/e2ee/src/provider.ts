@@ -13,13 +13,7 @@ import type {
 } from "@workspace/calendar-core";
 import { hydrateEncryptedNameWithoutSession } from "./payloads";
 
-/**
- * Platform-agnostic interface for E2EE operations.
- *
- * The CalendarApiService delegates all encryption/decryption to an
- * implementation of this interface so that web and native apps can each
- * provide their own crypto backend.
- */
+/** Platform-agnostic interface for E2EE operations; web and native each supply their own crypto backend. */
 export interface E2eeProvider {
   /** With an active session the body carries ciphertext only; plaintext content is removed. */
   attachEventEncryptionShadow<
@@ -50,28 +44,16 @@ export interface E2eeProvider {
   /** Resolves once any pending bootstrap settles. */
   hasActiveSession(): Promise<boolean>;
 
-  /**
-   * Decrypt a single encrypted event for display.
-   * If no E2EE session is active, returns a placeholder event.
-   */
+  /** Decrypt a single encrypted event for display, or return a placeholder when no E2EE session is active. */
   hydrateEncryptedEvent(event: CalendarEvent): Promise<CalendarEvent>;
 
-  /**
-   * Decrypt multiple encrypted events for display.
-   */
   hydrateEncryptedEvents(events: CalendarEvent[]): Promise<CalendarEvent[]>;
 
-  /**
-   * Generate blind index tokens for a search query.
-   * Returns an empty array if no E2EE session is active.
-   */
+  /** Blind index tokens for a search query; empty when no E2EE session is active. */
   createBlindIndexTokens(value: string): Promise<string[]>;
 }
 
-/**
- * A no-op E2EE provider that passes data through unchanged.
- * Used when E2EE is not configured or not available.
- */
+/** No-op provider that passes data through unchanged when E2EE is not configured. */
 export class NoopE2eeProvider implements E2eeProvider {
   async attachEventEncryptionShadow<
     T extends CreateEventRequest | UpdateEventRequest,

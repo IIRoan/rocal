@@ -1,10 +1,4 @@
-/**
- * Centralized environment configuration for the backend.
- *
- * All URL and port values are read from environment variables.
- * Fallbacks exist only as a safety net for local development when
- * `.env` is missing — they should never be relied upon in production.
- */
+/** Centralized backend env config: URL/port values come from environment variables, and the fallbacks are a local-dev safety net only. */
 
 const DEV_BACKEND_URL = "http://localhost:4001";
 const DEV_FRONTEND_URL = "http://localhost:4000";
@@ -129,11 +123,7 @@ export const env = {
     `${process.env.BACKEND_URL || DEV_BACKEND_URL}/api/internal/stalwart/webhook`,
 
 
-  /**
-   * 256-bit base64-encoded HMAC master key used to derive each user's Stalwart
-   * bridge password. Kept separate from the vault key so leaking one does not
-   * also hand over mail at rest; rotating it self-heals on the next mint.
-   */
+  /** 256-bit base64 HMAC master key for per-user Stalwart bridge passwords; kept apart from the vault key so leaking one does not also expose mail at rest. */
   mailBridgeHmacKey: process.env.MAIL_BRIDGE_HMAC_KEY?.trim() || "",
 
   /** Railway S3 bucket for uploaded profile pictures; uploads are disabled until all are set. */

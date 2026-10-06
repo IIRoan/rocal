@@ -7,16 +7,23 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("./sentry.server.config");
 
-    // Cast process to any to avoid edge runtime parsing issues in Next.js
-    // where any literal process.stdout usage causes static analysis failures
-    const proc = process as any;
+    // Indirect access only: a literal process.stdout reference breaks Next.js edge static analysis.
+    const proc = process as {
+      stdout?: {
+        write: (
+          chunk: string | Uint8Array,
+          encoding?: BufferEncoding,
+          cb?: (error?: Error | null) => void,
+        ) => boolean;
+      };
+    };
     if (proc.stdout) {
       const originalStdoutWrite = proc.stdout.write.bind(proc.stdout);
 
       proc.stdout.write = (
         chunk: string | Uint8Array,
-        encoding?: any,
-        cb?: any,
+        encoding?: BufferEncoding,
+        cb?: (error?: Error | null) => void,
       ) => {
         if (typeof chunk === "string") {
           const cleanStr = chunk.replace(/\x1B\[\d+m/g, "").trim();
@@ -38,14 +45,17 @@ export async function register() {
             cleanStr.startsWith("ready ")
           ) {
             if (cleanStr.includes("⨯ ")) {
+              // repo-rules-allow client-safe-logging: re-emits a Next.js server log line (method, path, status), not user data.
               console.error(cleanStr);
             } else if (
               cleanStr.startsWith("wait ") ||
               cleanStr.startsWith("ready ") ||
               cleanStr.startsWith("○ ")
             ) {
+              // repo-rules-allow client-safe-logging: re-emits a Next.js server log line (method, path, status), not user data.
               console.info(cleanStr);
             } else {
+              // repo-rules-allow client-safe-logging: re-emits a Next.js server log line (method, path, status), not user data.
               console.log(cleanStr);
             }
             return true;

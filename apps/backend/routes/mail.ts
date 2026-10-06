@@ -48,6 +48,13 @@ function classifyJmapProxyOperation(upstreamPath: string): string {
   return "other";
 }
 
+/** Narrow a parsed JSON body to a plain record for log summaries; arrays and primitives yield an empty record. */
+function asJsonRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 function summarizeJmapRequestBody(
   requestBody: ArrayBuffer | undefined,
 ): Record<string, unknown> {
@@ -56,13 +63,13 @@ function summarizeJmapRequestBody(
   }
 
   try {
-    const parsed = JSON.parse(
+    const parsed: unknown = JSON.parse(
       Buffer.from(requestBody).toString("utf8"),
-    ) as {
-      methodCalls?: unknown[];
-      using?: string[];
-    };
-    const rawCalls = parsed.methodCalls ?? [];
+    );
+    const body = asJsonRecord(parsed);
+    const rawCalls = Array.isArray(body.methodCalls)
+      ? (body.methodCalls as unknown[])
+      : [];
     const methodCalls = rawCalls
       .map((call) => (Array.isArray(call) ? call[0] : null))
       .filter((method): method is string => typeof method === "string");
@@ -74,7 +81,7 @@ function summarizeJmapRequestBody(
     return {
       bodyPresent: true,
       bodyLength: requestBody.byteLength,
-      using: parsed.using,
+      using: body.using,
       methodCalls,
       methodCallDetails,
     };
@@ -185,14 +192,16 @@ function summarizeBearerToken(
         normalized.length + ((4 - (normalized.length % 4)) % 4),
         "=",
       );
-      return JSON.parse(
+      const parsed: unknown = JSON.parse(
         Buffer.from(padded, "base64").toString("utf8"),
-      ) as Record<string, unknown>;
+      );
+      return asJsonRecord(parsed);
     } catch {
       return null;
     }
   };
 
+  // Bounded by the `parts.length < 2` guard above.
   const header = decodePart(parts[0]!);
   const payload = decodePart(parts[1]!);
   const exp = typeof payload?.exp === "number" ? payload.exp : null;
@@ -222,7 +231,7 @@ function summarizeUpstreamErrorBody(
   }
 
   try {
-    const parsed = JSON.parse(body) as Record<string, unknown>;
+    const parsed = asJsonRecord(JSON.parse(body));
     return {
       bodyPresent: true,
       bodyLength: body.length,

@@ -1,10 +1,4 @@
-/**
- * Shared Sentry/errex options for Solace web (client, Node, edge).
- *
- * Official `@sentry/*` SDKs require a *numeric* DSN project id. Errex uses a
- * string project name (`solace`), so we keep the real DSN in env, feed the SDK
- * a numeric stand-in, and `tunnel` envelopes to `/api/solace/envelope/`.
- */
+/** Errex uses a string project id, so we feed the SDK a numeric stand-in DSN and tunnel envelopes to /api/solace/envelope/. */
 import {
   scrubBreadcrumb,
   scrubErrorEvent,

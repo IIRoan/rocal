@@ -153,11 +153,7 @@ export function resolveParticipantInputs(input: {
   return [...deduped.values()];
 }
 
-/**
- * Owned Solace events treat the local invite list as source of truth.
- * Stalwart may invent principals (e.g. admin@solace.onl as owner); never adopt
- * those as new invitees. Only refresh RSVP status for people already invited.
- */
+/** Owned Solace events trust the local invite list: Stalwart may invent principals (e.g. admin@solace.onl), so only refresh RSVP status for people already invited. */
 export function reconcileOwnedEventParticipantsFromRemote(input: {
   owner?:
     | {
@@ -274,10 +270,7 @@ export function sortEventParticipants(participants: EventParticipant[]) {
   });
 }
 
-/**
- * Map and sort participants on any event-shaped object.
- * Replaces the repeated `sortEventParticipants((event.participants ?? []).map(...))` pattern.
- */
+/** Map and sort participants on any event-shaped object, replacing the repeated map/sort pattern. */
 export function mapAndSortParticipants(
   event: { participants?: EventParticipantRecord[] | null },
 ): EventParticipant[] {

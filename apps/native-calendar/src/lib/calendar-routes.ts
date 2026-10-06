@@ -33,6 +33,6 @@ export const CALENDAR_PUSH_TAP_HANDLER: PushTapHandler = {
         queryKey: QUERY_KEYS.eventDetail(eventId),
       });
     }
-    void queryClient.invalidateQueries({ queryKey: ["events"] });
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
   },
 };

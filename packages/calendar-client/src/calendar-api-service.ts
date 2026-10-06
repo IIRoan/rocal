@@ -101,9 +101,7 @@ export class CalendarApiService {
     this.e2ee = e2eeProvider ?? new NoopE2eeProvider();
   }
 
-  /**
-   * Replace the E2EE provider at runtime (e.g. after auth bootstrap).
-   */
+  /** Replace the E2EE provider at runtime (e.g. after auth bootstrap). */
   setE2eeProvider(provider: E2eeProvider): void {
     this.e2ee = provider;
   }

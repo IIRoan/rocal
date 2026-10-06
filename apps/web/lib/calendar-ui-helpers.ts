@@ -1,7 +1,4 @@
-/**
- * @deprecated Import directly from "@workspace/calendar-core" instead.
- * This file is a thin re-export for backwards compatibility.
- */
+/** @deprecated Thin backwards-compat re-export; import from "@workspace/calendar-core" directly. */
 export {
   partitionCalendarsByKind,
   getErrorMessage,

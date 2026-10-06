@@ -1,7 +1,4 @@
-/**
- * @deprecated Import `CalendarApiService` from "@workspace/calendar-client" instead.
- * This file provides a web-specific default instance for backwards compatibility.
- */
+/** @deprecated Import CalendarApiService from "@workspace/calendar-client"; this file only adds the web default instance. */
 export { CalendarApiService } from "@workspace/calendar-client";
 
 import { CalendarApiService } from "@workspace/calendar-client";
@@ -10,13 +7,11 @@ import { WebE2eeProvider } from "./web-e2ee-provider";
 import { getApiBaseUrl } from "./api-url";
 import type { ApiError } from "./types/calendar";
 
-/**
- * Web-specific extension of CalendarApiService that adds browser-only
- * methods like ICS file download.
- */
+/** Web-specific CalendarApiService extension with browser-only ICS download. */
 class WebCalendarApiService extends CalendarApiService {
   async downloadEventICS(id: string): Promise<void> {
     const apiBaseUrl = getApiBaseUrl().replace(/\/+$/, "");
+    // repo-rules-allow client-api-boundary: browser blob download of an ICS file; the typed client has no blob-returning method.
     const response = await fetch(
       `${apiBaseUrl}/api/events/${encodeURIComponent(id)}/ics`,
       {

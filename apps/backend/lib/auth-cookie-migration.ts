@@ -74,10 +74,7 @@ function parseCookieNames(cookieHeader: string | null): string[] {
     });
 }
 
-/**
- * Cookie names that may still be host-scoped from before cross-subdomain
- * Domain switched to the eTLD+1 (e.g. api.solace.onl → solace.onl).
- */
+/** Cookie names that may still be host-scoped from before the cross-subdomain Domain switch (api.solace.onl → solace.onl). */
 export function collectLegacyAuthCookieNames(input: {
   request?: Request;
   isProduction: boolean;
@@ -172,12 +169,7 @@ function writeExpiredCookie(
   }
 }
 
-/**
- * Expire Better Auth cookies that were previously scoped to the API hostname
- * (Domain=api.example.com) after switching to eTLD+1 cross-subdomain cookies
- * (Domain=example.com). Browsers only clear a cookie when Domain matches, so
- * Better Auth's normal sign-out is not enough during the cutover.
- */
+/** Expire auth cookies still scoped to the API hostname (Domain=api.example.com): browsers only clear a cookie when Domain matches, so normal sign-out is not enough during the eTLD+1 cutover. */
 export function expireLegacyHostScopedAuthCookies(
   target: ExpireTarget,
   options?: {
