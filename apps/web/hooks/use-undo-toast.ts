@@ -34,7 +34,9 @@ export function useUndoToast(
             const pending = pendingUndoRef.current;
             if (pending) {
               pendingUndoRef.current = null;
-              void pending.undo();
+              void Promise.resolve(pending.undo()).catch(() => {
+                toast.error("Could not undo this action.");
+              });
             }
           },
         },

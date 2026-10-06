@@ -126,7 +126,7 @@ export function MessageReaderBody({
       )}
       <HtmlEmailRenderer
         key={view.message.id}
-        html={showQuote ? displayHtml! : cleanHtml}
+        html={showQuote ? displayHtml : cleanHtml}
         blockRemoteImages={blockRemoteImages}
         blockTrackingPixels={blockTrackingPixels}
         isDark={isDark}

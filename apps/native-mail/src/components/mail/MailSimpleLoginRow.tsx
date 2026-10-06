@@ -77,9 +77,13 @@ export function MailSimpleLoginRow({
   const close = () => setOpen(false);
 
   const copyAlias = async (value: string) => {
-    await Clipboard.setStringAsync(value);
-    toast("Alias copied");
-    close();
+    try {
+      await Clipboard.setStringAsync(value);
+      toast("Alias copied");
+      close();
+    } catch {
+      toast("Could not copy alias", "error");
+    }
   };
 
   return (

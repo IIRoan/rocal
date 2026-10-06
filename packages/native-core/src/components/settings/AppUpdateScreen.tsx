@@ -143,10 +143,12 @@ export function AppUpdateScreen() {
 
   const onPrimary = () => {
     if (phase === "available" || phase === "error") {
+      // repo-rules-allow async-promise-handling: install() catches internally in AppUpdateProvider.
       void install();
       return;
     }
     if (phase === "ready") {
+      // repo-rules-allow async-promise-handling: restart() catches internally in AppUpdateProvider.
       void restart();
     }
   };

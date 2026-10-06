@@ -155,10 +155,7 @@ export async function fetchMailMessageById(
   }
 
   return queryClient.fetchQuery({
-    queryKey: [
-      ...mailQueryKeys.message(input.messageId),
-      requireBody ? "full" : "preview",
-    ],
+    queryKey: mailQueryKeys.messageWithBody(input.messageId, requireBody),
     queryFn: async () => {
       const [message] = await input.client.getMessagesByIds(
         input.session,

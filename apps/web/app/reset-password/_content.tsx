@@ -84,8 +84,8 @@ export default function ResetPasswordContent() {
   };
 
   return (
-    <section className="flex min-h-[100dvh] items-center justify-center bg-gradient-to-br from-secondary/20 via-background to-background px-6 py-10">
-      <div className="w-full max-w-md rounded-2xl border border-border/60 bg-background/95 p-6 shadow-xl backdrop-blur">
+    <section className="flex min-h-[100dvh] items-center justify-center bg-background px-6 py-10">
+      <div className="w-full max-w-md rounded-2xl border border-border/60 bg-background p-6 shadow-xl">
         <div className="mb-8 flex items-center justify-between">
           <Logo
             width={40}

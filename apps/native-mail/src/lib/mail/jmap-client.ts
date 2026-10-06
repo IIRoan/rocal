@@ -1,6 +1,4 @@
-/**
- * JMAP client for Stalwart (native). Same as web `lib/mail/jmap-client.ts`; bearer token from oauth-token-manager.
- */
+/** JMAP client for Stalwart (native copy of web `lib/mail/jmap-client.ts`); bearer token from oauth-token-manager. */
 import type {
   JmapEmailChanges,
   JmapEmailMessage,
@@ -48,6 +46,31 @@ type JmapMethodCall = [string, Record<string, unknown>, string];
 type JmapEnvelope = {
   methodResponses?: [string, Record<string, unknown>, string][];
 };
+
+function isJmapSession(value: unknown): value is JmapSession {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.apiUrl === "string" &&
+    typeof record.accounts === "object" &&
+    record.accounts !== null &&
+    typeof record.primaryAccounts === "object" &&
+    record.primaryAccounts !== null
+  );
+}
+
+function isJmapEnvelope(value: unknown): value is JmapEnvelope {
+  if (typeof value !== "object" || value === null) return false;
+  const { methodResponses } = value as { methodResponses?: unknown };
+  return methodResponses === undefined || Array.isArray(methodResponses);
+}
+
+/** JMAP error bodies carry `{ message }`; anything else is ignored. */
+function errorMessageFromBody(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) return null;
+  const { message } = value as { message?: unknown };
+  return typeof message === "string" ? message : null;
+}
 
 type JmapMethodError = {
   type?: string;
@@ -120,6 +143,7 @@ function normalizeBaseUrl(baseUrl: string): string {
 }
 
 function defaultFetcher(input: string, init?: RequestInit): Promise<Response> {
+  // repo-rules-allow client-api-boundary: JMAP protocol transport to the mail server, not a Solace API route.
   return globalThis.fetch(input, init);
 }
 
@@ -613,8 +637,8 @@ export class StalwartJmapClient {
     if (!response.ok) {
       let detail = "";
       try {
-        const body = (await response.json()) as { message?: string };
-        if (body.message) detail = ` — ${body.message}`;
+        const detailMessage = errorMessageFromBody(await response.json());
+        if (detailMessage) detail = ` — ${detailMessage}`;
       } catch {
         /* ignore parse failure */
       }
@@ -629,10 +653,12 @@ export class StalwartJmapClient {
       );
     }
 
-    return normalizeJmapSession(
-      (await response.json()) as JmapSession,
-      this.baseUrl,
-    );
+    const sessionPayload: unknown = await response.json();
+    if (!isJmapSession(sessionPayload)) {
+      throw new Error("Mail server returned an invalid JMAP session.");
+    }
+
+    return normalizeJmapSession(sessionPayload, this.baseUrl);
   }
 
   async getAccountSettings(
@@ -651,10 +677,7 @@ export class StalwartJmapClient {
     return result.list?.[0] ?? { encryptionAtRest: { "@type": "Disabled" } };
   }
 
-  /**
-   * Stalwart encryptOnAppend re-encrypts JMAP submissions with the user's PGP
-   * key, which breaks external delivery. Solace handles internal encryption.
-   */
+  /** Stalwart's encryptOnAppend re-encrypts submissions with the user's PGP key, breaking external delivery. */
   async ensureEncryptOnAppendDisabled(session: JmapSession): Promise<void> {
     const settings = await this.getAccountSettings(session);
     if (!isStalwartEncryptOnAppendEnabled(settings)) {
@@ -1854,7 +1877,12 @@ export class StalwartJmapClient {
       );
     }
 
-    return (await response.json()) as JmapEnvelope;
+    const envelopePayload: unknown = await response.json();
+    if (!isJmapEnvelope(envelopePayload)) {
+      throw new Error("JMAP response envelope was not an object.");
+    }
+
+    return envelopePayload;
   }
 
   private getMethodResult<T>(envelope: JmapEnvelope, methodName: string): T {

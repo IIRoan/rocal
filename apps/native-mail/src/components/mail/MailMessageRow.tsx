@@ -56,11 +56,12 @@ const PREVIEW_LINE_HEIGHT = 19;
 type MailRowStyles = ReturnType<typeof createStyles>;
 
 function pulseSelect(entering: boolean) {
+  // Haptics are unavailable on some devices; a dropped pulse is harmless.
   void Haptics.impactAsync(
     entering
       ? Haptics.ImpactFeedbackStyle.Medium
       : Haptics.ImpactFeedbackStyle.Light,
-  );
+  ).catch(() => undefined);
 }
 
 interface MailMessageRowProps {

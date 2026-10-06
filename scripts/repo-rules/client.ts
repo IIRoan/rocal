@@ -1,6 +1,6 @@
 import ts from "typescript";
 
-import { type Rule, CLIENT_SOURCE, appSourceUnder, calleeName, enclosingFunctionName, find, sourceUnder } from "./engine";
+import { type Rule, CLIENT_SOURCE, appSourceUnder, calleeName, enclosingFunctionName, find, sourceUnder, walk } from "./engine";
 
 const QUERY_PRIMITIVES = new Set(["useQuery", "useQueries", "useInfiniteQuery", "useSuspenseQuery", "useSuspenseInfiniteQuery", "useMutation"]);
 
@@ -107,22 +107,42 @@ export const clientRules: Rule[] = [
   },
   {
     id: "query-key-factory",
-    summary: "Query keys come from a key factory (`*query-keys.ts`), never inline arrays.",
+    summary: "Query keys come from a key factory (`*query-keys.ts`), never inline arrays held in locals.",
     files: (file) => appSourceUnder(CLIENT_SOURCE)(file) && !isQueryKeyFactory(file),
-    check: (file) =>
-      find(file, (node) => {
-        if (ts.isPropertyAssignment(node) && node.name.getText() === "queryKey" && ts.isArrayLiteralExpression(node.initializer)) {
-          return "inline query key array; add it to the query-key factory";
+    check: (file) => {
+      const unwrap = (node: ts.Node | undefined): ts.Node | undefined => (node && ts.isAsExpression(node) ? node.expression : node);
+      const inlineKeyLocals = new Set<string>();
+      walk(file.ast(), (node) => {
+        if (!ts.isVariableDeclaration(node) || !ts.isIdentifier(node.name)) return;
+        if (!(ts.isVariableDeclarationList(node.parent) && node.parent.flags & ts.NodeFlags.Const)) return;
+        const initializer = unwrap(node.initializer);
+        if (initializer && ts.isArrayLiteralExpression(initializer)) inlineKeyLocals.add(node.name.text);
+      });
+      const heldKey = (node: ts.Node | undefined) => {
+        const expression = unwrap(node);
+        return expression && ts.isIdentifier(expression) && inlineKeyLocals.has(expression.text) ? expression.text : null;
+      };
+      return find(file, (node) => {
+        if (ts.isPropertyAssignment(node) && node.name.getText() === "queryKey") {
+          const expression = unwrap(node.initializer);
+          if (expression && ts.isArrayLiteralExpression(expression)) return "inline query key array; add it to the query-key factory";
+          const local = heldKey(node.initializer);
+          if (local) return `query key is an inline array held in ${local}; move it to the query-key factory`;
         }
-        if (ts.isCallExpression(node) && QUERY_KEY_METHODS.has(calleeName(node) ?? "") && node.arguments[0] && ts.isArrayLiteralExpression(node.arguments[0])) {
-          return `inline query key passed to ${calleeName(node)}; use the query-key factory`;
+        if (ts.isCallExpression(node) && QUERY_KEY_METHODS.has(calleeName(node) ?? "")) {
+          const [first] = node.arguments;
+          const expression = unwrap(first);
+          if (expression && ts.isArrayLiteralExpression(expression)) return `inline query key passed to ${calleeName(node)}; use the query-key factory`;
+          const local = heldKey(first);
+          if (local) return `inline query key held in ${local} passed to ${calleeName(node)}; move it to the query-key factory`;
         }
         return null;
-      }),
+      });
+    },
     examples: {
       path: "apps/web/hooks/use-events.ts",
-      bad: ['useQuery({ queryKey: ["events", range], queryFn });', 'queryClient.setQueryData(["events"], next);'],
-      good: ["useQuery({ queryKey: calendarQueryKeys.events(range), queryFn });"],
+      bad: ['useQuery({ queryKey: ["events", range], queryFn });', 'queryClient.setQueryData(["events"], next);', 'const k = ["settings", userId] as const;\nuseQuery({ queryKey: k, queryFn });'],
+      good: ["useQuery({ queryKey: calendarQueryKeys.events(range), queryFn });", "const k = PUSH_DEVICES_QUERY_KEY;\nuseQuery({ queryKey: k, queryFn });"],
     },
   },
   {

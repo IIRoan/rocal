@@ -99,6 +99,7 @@ jest.mock("@workspace/ui/components/ui/visually-hidden", () => ({
 }));
 
 import { E2eeBootstrap } from "../../components/e2ee-bootstrap";
+import { authSessionDataFixture } from "../mocks/auth-session";
 import type { E2eeBootstrapResponse } from "../../lib/types/calendar";
 import { useSession, signOut } from "@/lib/auth-client";
 import {
@@ -202,8 +203,11 @@ describe("E2eeBootstrap component", () => {
     });
 
     mockUseSession.mockReturnValue({
-      data: { user: { id: "user-1" } },
+      data: authSessionDataFixture,
       isPending: false,
+      isRefetching: false,
+      error: null,
+      refetch: jest.fn(async () => undefined),
     });
     mockEnsureE2eeBootstrap.mockResolvedValue({
       activated: false,
@@ -507,6 +511,9 @@ describe("E2eeBootstrap component", () => {
     mockUseSession.mockReturnValue({
       data: null,
       isPending: false,
+      isRefetching: false,
+      error: null,
+      refetch: jest.fn(async () => undefined),
     });
 
     await renderComponent();
@@ -521,6 +528,9 @@ describe("E2eeBootstrap component", () => {
     mockUseSession.mockReturnValue({
       data: null,
       isPending: false,
+      isRefetching: false,
+      error: null,
+      refetch: jest.fn(async () => undefined),
     });
 
     await act(async () => {

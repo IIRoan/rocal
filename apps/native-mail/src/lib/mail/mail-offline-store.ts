@@ -32,6 +32,19 @@ function additionalData(userId: string): string {
   return `mail-offline:v1:${userId}`;
 }
 
+function isEncryptedSearchShard(value: unknown): value is EncryptedSearchShard {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    record.version === 1 &&
+    record.algorithm === "AES-GCM" &&
+    typeof record.iv === "string" &&
+    typeof record.ciphertext === "string" &&
+    typeof record.updatedAt === "string" &&
+    typeof record.itemCount === "number"
+  );
+}
+
 async function readKey(): Promise<CryptoKey | null> {
   const stored = await SecureStore.getItemAsync(
     SECURE_STORE_KEYS.MAIL_OFFLINE_CACHE_KEY,
@@ -65,10 +78,14 @@ export async function loadMailOfflineSnapshot(
       await clearMailOfflineSnapshot();
       return null;
     }
-    const shard = JSON.parse(
+    const raw: unknown = JSON.parse(
       await FileSystem.readAsStringAsync(path),
-    ) as EncryptedSearchShard;
-    const snapshot = await decryptSearchShard<unknown>(key, shard, {
+    );
+    if (!isEncryptedSearchShard(raw)) {
+      await clearMailOfflineSnapshot();
+      return null;
+    }
+    const snapshot = await decryptSearchShard<unknown>(key, raw, {
       additionalData: additionalData(userId),
     });
     if (!isMailOfflineSnapshot(snapshot) || snapshot.userId !== userId) {

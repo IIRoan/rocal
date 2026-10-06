@@ -43,10 +43,28 @@ export interface E2eeSession {
   apiBaseUrl: string;
 }
 
+/** Shape guard for the bootstrap payload; a malformed response is treated as no bootstrap. */
+function isE2eeBootstrapResponse(value: unknown): value is E2eeBootstrapResponse {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record.enabled !== "boolean" || !Array.isArray(record.devices)) {
+    return false;
+  }
+  return record.devices.every(
+    (device) =>
+      typeof device === "object" &&
+      device !== null &&
+      typeof (device as Record<string, unknown>).deviceId === "string",
+  );
+}
+
 export async function fetchE2eeBootstrap(
   apiBaseUrl: string,
 ): Promise<E2eeBootstrapResponse | null> {
   const bootstrapUrl = getE2eeApiUrl(apiBaseUrl, "/bootstrap");
+  // repo-rules-allow client-api-boundary: E2EE bootstrap endpoint; @workspace/calendar-client does not expose it.
   const response = await fetch(bootstrapUrl, {
     credentials: "omit",
     headers: getAuthHeaders(),
@@ -60,7 +78,8 @@ export async function fetchE2eeBootstrap(
     return null;
   }
 
-  return (await response.json()) as E2eeBootstrapResponse;
+  const payload: unknown = await response.json();
+  return isE2eeBootstrapResponse(payload) ? payload : null;
 }
 
 export async function readStoredDevice(bootstrapData: E2eeBootstrapResponse) {
@@ -108,6 +127,7 @@ export async function registerDeviceForSession({
   );
   const exportedPrivateKeyJson = JSON.stringify(exportedPrivateKey);
 
+  // repo-rules-allow client-api-boundary: E2EE device-registration endpoint; @workspace/calendar-client does not expose it.
   const deviceResponse = await fetch(getE2eeApiUrl(apiBaseUrl, "/device"), {
     method: "PUT",
     credentials: "omit",
@@ -190,6 +210,7 @@ export async function putPasswordEnvelope({
     password,
   );
 
+  // repo-rules-allow client-api-boundary: E2EE password-envelope endpoint; @workspace/calendar-client does not expose it.
   const response = await fetch(getE2eeApiUrl(apiBaseUrl, "/password"), {
     method: "PUT",
     credentials: "omit",

@@ -133,7 +133,8 @@ export function MailFilterSheet({
     setDraftFields((prev) => ({ ...prev, [field]: value }));
 
   const patch = (next: Partial<MailListFilters>) => {
-    void Haptics.selectionAsync();
+    // Haptics are unavailable on some devices; a dropped tick is harmless.
+    void Haptics.selectionAsync().catch(() => undefined);
     onFiltersChange({ ...filters, ...next });
   };
 
@@ -145,7 +146,8 @@ export function MailFilterSheet({
     });
 
   const toggleDisclosure = (id: FilterDisclosureId) => {
-    void Haptics.selectionAsync();
+    // Haptics are unavailable on some devices; a dropped tick is harmless.
+    void Haptics.selectionAsync().catch(() => undefined);
     setExpanded((current) => (current === id ? null : id));
   };
 

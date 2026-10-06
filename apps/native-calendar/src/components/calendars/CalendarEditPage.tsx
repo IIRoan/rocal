@@ -223,6 +223,7 @@ function CalendarSharingSection({
   calendarId: string;
   onCopied: () => void;
 }) {
+  const { toast } = useToast();
   const shareLinkQuery = useCalendarShareLink(calendarId);
   const { enable, disable } = useCalendarShareLinkActions(calendarId);
   const shareLink = shareLinkQuery.data;
@@ -270,7 +271,9 @@ function CalendarSharingSection({
             label="Copy link"
             detail={shareLink.shareUrl}
             icon="copy"
-            onPress={() => void handleCopy()}
+            onPress={() =>
+              void handleCopy().catch(() => toast("Could not copy link", "error"))
+            }
           />
         ) : null}
         {shareLink?.enabled ? (

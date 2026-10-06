@@ -5,6 +5,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   CALENDARS_QUERY_KEY,
   CATEGORIES_QUERY_KEY,
+  EVENTS_QUERY_KEY,
+  SETTINGS_QUERY_KEY,
 } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import { calendarApiService } from "@/lib/calendar-api-service";
@@ -43,10 +45,10 @@ type BootstrapGateState = {
 function clearCalendarQueries(
   queryClient: ReturnType<typeof useQueryClient>,
 ): void {
-  queryClient.removeQueries({ queryKey: ["events"] });
+  queryClient.removeQueries({ queryKey: EVENTS_QUERY_KEY });
   queryClient.removeQueries({ queryKey: CALENDARS_QUERY_KEY });
   queryClient.removeQueries({ queryKey: CATEGORIES_QUERY_KEY });
-  queryClient.removeQueries({ queryKey: ["settings"] });
+  queryClient.removeQueries({ queryKey: SETTINGS_QUERY_KEY });
 }
 
 async function backfillEncryptedNames(
@@ -71,7 +73,7 @@ async function refreshEncryptedQueries(
   void backfillEncryptedNames(queryClient).catch(() => undefined);
 
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["events"] }),
+    queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY }),
     queryClient.invalidateQueries({ queryKey: CALENDARS_QUERY_KEY }),
     queryClient.invalidateQueries({ queryKey: CATEGORIES_QUERY_KEY }),
   ]);
@@ -200,7 +202,7 @@ async function runEncryptionPasswordSetup(input: {
     };
   }
 
-  void setEncPasswordCookie(password);
+  await setEncPasswordCookie(password);
   await refreshEncryptedQueries(queryClient);
   return { ok: true };
 }
@@ -229,7 +231,7 @@ async function runEncryptionPasswordUnlock(input: {
     };
   }
 
-  void setEncPasswordCookie(password);
+  await setEncPasswordCookie(password);
   await refreshEncryptedQueries(queryClient);
   return { ok: true };
 }
@@ -402,33 +404,41 @@ export function E2eeBootstrap() {
 
     dispatchGate({ type: "start-submit" });
 
-    const outcome = await runEncryptionPasswordSetup({
-      userId,
-      password: gate.password,
-      confirmPassword: gate.confirmPassword,
-      queryClient,
-    });
+    try {
+      const outcome = await runEncryptionPasswordSetup({
+        userId,
+        password: gate.password,
+        confirmPassword: gate.confirmPassword,
+        queryClient,
+      });
 
-    dispatchGate({ type: "end-submit" });
+      if (outcome.ok === false) {
+        if (outcome.error === "Encryption session is not ready on this device.") {
+          log.warn("Failed to refresh encrypted data for password setup", {
+            userId,
+          });
+          dispatchGate({
+            type: "set-error",
+            error:
+              "Could not save your encryption password and refresh encrypted data.",
+          });
+          return;
+        }
 
-    if (outcome.ok === false) {
-      if (outcome.error === "Encryption session is not ready on this device.") {
-        log.warn("Failed to refresh encrypted data for password setup", {
-          userId,
-        });
-        dispatchGate({
-          type: "set-error",
-          error:
-            "Could not save your encryption password and refresh encrypted data.",
-        });
+        dispatchGate({ type: "set-error", error: outcome.error });
         return;
       }
 
-      dispatchGate({ type: "set-error", error: outcome.error });
-      return;
+      dispatchGate({ type: "success-hide" });
+    } catch (error) {
+      log.warn("Failed to set the E2EE password", { userId, error });
+      dispatchGate({
+        type: "set-error",
+        error: "Could not set your encryption password. Please try again.",
+      });
+    } finally {
+      dispatchGate({ type: "end-submit" });
     }
-
-    dispatchGate({ type: "success-hide" });
   }
 
   async function handleUnlock() {
@@ -438,28 +448,39 @@ export function E2eeBootstrap() {
 
     dispatchGate({ type: "start-submit" });
 
-    const outcome = await runEncryptionPasswordUnlock({
-      userId,
-      password: gate.password,
-      queryClient,
-    });
+    try {
+      const outcome = await runEncryptionPasswordUnlock({
+        userId,
+        password: gate.password,
+        queryClient,
+      });
 
-    dispatchGate({ type: "end-submit" });
-
-    if (outcome.ok === false) {
-      if (
-        outcome.error.includes("did not unlock") ||
-        outcome.error.includes("didn't match")
-      ) {
-        log.warn("Failed to unlock E2EE password envelope", {
-          userId,
-        });
+      if (outcome.ok === false) {
+        if (
+          outcome.error.includes("did not unlock") ||
+          outcome.error.includes("didn't match")
+        ) {
+          log.warn("Failed to unlock E2EE password envelope", {
+            userId,
+          });
+        }
+        dispatchGate({ type: "set-error", error: outcome.error });
+        return;
       }
-      dispatchGate({ type: "set-error", error: outcome.error });
-      return;
-    }
 
-    dispatchGate({ type: "success-hide" });
+      dispatchGate({ type: "success-hide" });
+    } catch (error) {
+      log.warn("Failed to unlock the E2EE password envelope", {
+        userId,
+        error,
+      });
+      dispatchGate({
+        type: "set-error",
+        error: "Could not unlock encryption. Please try again.",
+      });
+    } finally {
+      dispatchGate({ type: "end-submit" });
+    }
   }
 
   async function handleSignOut() {
@@ -494,7 +515,8 @@ export function E2eeBootstrap() {
       }
       onSubmit={handleSubmit}
       onSignOut={() => {
-        void handleSignOut();
+        // runEncryptionGateSignOut logs its own failures, so this promise never rejects.
+        void handleSignOut().catch(() => undefined);
       }}
       onRetryBootstrap={rerunBootstrap}
     />

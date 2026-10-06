@@ -122,8 +122,8 @@ export function createValidatingLookup(
           return;
         }
 
-        // `all: true` selects Node's array-returning lookup overload, which the single-signature typings cannot express.
         if (typeof options === "object" && options?.all) {
+          // `all: true` selects Node's array-returning lookup overload, which the single-signature typings cannot express.
           (callback as unknown as (err: null, addresses: LookupAddress[]) => void)(
             null,
             wanted,

@@ -32,9 +32,12 @@ export function useNativeTitleIndex() {
 
   useEffect(() => {
     let cancelled = false;
-    void isNativeTitleIndexEnabled().then((value) => {
-      if (!cancelled) setEnabledState(value);
-    });
+    // If the stored preference cannot be read, keep the enabled default.
+    void isNativeTitleIndexEnabled()
+      .then((value) => {
+        if (!cancelled) setEnabledState(value);
+      })
+      .catch(() => undefined);
     const unsubscribe = subscribeNativeTitleIndexEnabled((value) => {
       setEnabledState(value);
     });
@@ -97,10 +100,12 @@ export function useNativeTitleIndex() {
     }
 
     let cancelled = false;
-    void (async () => {
+    // A failed index read only delays this pass; the interval retries.
+    const syncIndex = async () => {
       await refresh();
       if (!cancelled) await rebuild();
-    })();
+    };
+    void syncIndex().catch(() => undefined);
 
     const interval = setInterval(() => {
       void rebuild();

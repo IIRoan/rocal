@@ -87,11 +87,13 @@ function AddContactForm({
           onClick={() => {
             const email = normalizeEmailAddress(newEmail);
             if (!email) return;
-            void onSave(email, newName.trim() || undefined).then((saved) => {
-              if (!saved) return;
-              setNewEmail("");
-              setNewName("");
-            });
+            void onSave(email, newName.trim() || undefined)
+              .then((saved) => {
+                if (!saved) return;
+                setNewEmail("");
+                setNewName("");
+              })
+              .catch(() => toast.error("Could not save the contact."));
           }}
         >
           Save contact
@@ -203,7 +205,9 @@ function ContactDetailView({
           disabled={isRemoving}
           onClick={() => {
             setIsRemoving(true);
-            void onRemove().finally(() => setIsRemoving(false));
+            void onRemove()
+              .catch(() => toast.error("Could not remove the contact."))
+              .finally(() => setIsRemoving(false));
           }}
         >
           <Trash2 className="size-3.5" />
@@ -217,12 +221,14 @@ function ContactDetailView({
               displayName,
               phone,
               notes,
-            }).then((saved) => {
-              if (saved) {
-                toast.success("Contact saved.");
-                onBack();
-              }
             })
+              .then((saved) => {
+                if (saved) {
+                  toast.success("Contact saved.");
+                  onBack();
+                }
+              })
+              .catch(() => toast.error("Could not save the contact."))
           }
         >
           {isSaving ? "Saving" : "Save"}

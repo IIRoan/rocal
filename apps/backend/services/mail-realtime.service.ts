@@ -323,7 +323,9 @@ export class MailRealtimeService {
 
     const timeoutId = setTimeout(() => {
       this.flushTimerByAccountId.delete(accountId);
-      void this.flushAccount(accountId);
+      void this.flushAccount(accountId).catch((error) => {
+        logger.warn("Mail realtime flush failed", errorLogDetails(error));
+      });
     }, this.input.notificationThrottleMs ?? 750);
 
     this.flushTimerByAccountId.set(accountId, timeoutId);
@@ -429,6 +431,7 @@ export class MailRealtimeService {
       return;
     }
 
+    const syncProvider = this.input.syncProvider;
     const intervalMs = this.input.receiptPollIntervalMs ?? 30_000;
     const poll = () => {
       if (this.receiptPollRunning) {
@@ -436,8 +439,8 @@ export class MailRealtimeService {
       }
 
       this.receiptPollRunning = true;
-      void this.input
-        .syncProvider!.syncKnownChangedAccounts()
+      void syncProvider
+        .syncKnownChangedAccounts()
         .then((results) => {
           const receivedAt = new Date().toISOString();
           for (const result of results) {
@@ -476,7 +479,14 @@ export class MailRealtimeService {
 
     const abortController = new AbortController();
     this.listenersByAccountId.set(accountId, { abortController });
-    void this.listenForever(accountId, owner, abortController.signal);
+    void this.listenForever(accountId, owner, abortController.signal).catch(
+      (error) => {
+        logger.error("Stalwart JMAP EventSource listener failed", {
+          accountId,
+          ...errorLogDetails(error),
+        });
+      },
+    );
   }
 
   private async listenForever(

@@ -354,10 +354,7 @@ export async function resolveOutgoingMessageBody(input: {
   };
 }
 
-/**
- * Re-encrypt the vault (AES-GCM wrapper and inner PGP private key) under a new
- * passphrase, sealing it to the user's E2EE key when one is supplied.
- */
+/** Re-encrypt the vault (AES-GCM wrapper and inner PGP private key) under a new passphrase, sealing it to the user's E2EE key when one is supplied. */
 async function rekeyVault(input: {
   unlockedVault: UserKeyVault;
   oldPassphrase: string;
@@ -406,10 +403,7 @@ async function rekeyVault(input: {
   }
 }
 
-/**
- * Move a legacy vault off the server-derived passphrase onto a random secret
- * sealed to the user's E2EE key, so the server can no longer open it.
- */
+/** Move a legacy vault off the server-derived passphrase onto a random secret sealed to the user's E2EE key, so the server can no longer open it. */
 export async function sealVaultToAccountKey(input: {
   unlockedVault: UserKeyVault;
   currentPassphrase: string;
@@ -518,8 +512,7 @@ export function mergeConversationSourceMessages(
       const existing = byId.get(message.id);
       byId.set(
         message.id,
-        // Keep keywords from the first copy so later thread fetches don't
-        // wipe optimistic $seen / $flagged on the mailbox list row.
+        // Keep keywords from the first copy so later thread fetches don't wipe optimistic $seen / $flagged on the mailbox list row.
         existing
           ? mergeMailMessagePreservingKeywords(existing, message)
           : message,
@@ -596,8 +589,7 @@ export function messagesLikelyMatch(
     return false;
   }
 
-  // Messages must be within 5 minutes of each other (handles clock drift
-  // between the optimistic Date.now() timestamp and server receipt time)
+  // Messages must be within 5 minutes of each other (handles clock drift between the optimistic Date.now() timestamp and server receipt time)
   if (left.receivedAt && right.receivedAt) {
     const diff = Math.abs(
       new Date(left.receivedAt).getTime() -
@@ -607,8 +599,7 @@ export function messagesLikelyMatch(
   }
 
   // Compare a normalised prefix of the text body (if both have one).
-  // Normalise CRLF→LF because the server follows RFC 2822 CRLF but the
-  // optimistic message is built from a JS template literal using \n.
+  // Normalise CRLF→LF because the server follows RFC 2822 CRLF but the optimistic message is built from a JS template literal using \n.
   const leftText = (left.bodyValues?.text?.value ?? "")
     .replace(/\r\n/g, "\n")
     .slice(0, 200)

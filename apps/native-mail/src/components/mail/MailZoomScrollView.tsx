@@ -26,11 +26,7 @@ type MailZoomScrollViewProps = {
   contentContainerStyle?: StyleProp<ViewStyle>;
 };
 
-/**
- * Message body scroller with pinch-zoom + pan when zoomed.
- * iOS uses UIScrollView zoom (native feel). Android uses a Reanimated
- * pinch/pan layer because RN ScrollView zoom is iOS-only.
- */
+/** Pinch-zoom body scroller: native UIScrollView zoom on iOS, Reanimated pinch/pan on Android. */
 export function MailZoomScrollView({
   children,
   style,

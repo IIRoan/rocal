@@ -113,7 +113,7 @@ describe("NotificationService reminder field updates", () => {
     ]);
 
     expect(prisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "event-1" },
+      where: { id: "event-1", userId: "user-1" },
       data: expect.objectContaining({
         reminder: 10,
       }),
@@ -140,7 +140,7 @@ describe("NotificationService reminder field updates", () => {
     ]);
 
     expect(prisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "event-1" },
+      where: { id: "event-1", userId: "user-1" },
       data: expect.objectContaining({
         reminder: 30,
       }),
@@ -171,7 +171,7 @@ describe("NotificationService reminder field updates", () => {
     ]);
 
     expect(prisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "event-1" },
+      where: { id: "event-1", userId: "user-1" },
       data: expect.objectContaining({
         reminder: null,
       }),
@@ -195,7 +195,7 @@ describe("NotificationService reminder field updates", () => {
     ]);
 
     expect(prisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "event-1" },
+      where: { id: "event-1", userId: "user-1" },
       data: expect.objectContaining({
         reminder: 15,
       }),
@@ -213,7 +213,7 @@ describe("NotificationService reminder field updates", () => {
       where: { eventId: "event-1" },
     });
     expect(prisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "event-1" },
+      where: { id: "event-1", userId: "user-1" },
       data: expect.objectContaining({
         reminder: null,
       }),

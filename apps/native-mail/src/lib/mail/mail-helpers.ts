@@ -229,10 +229,10 @@ export function getMailboxIcon(mailbox: JmapMailbox): string {
 export function getInitials(address: MailAddress[] | undefined): string {
   const first = address?.[0];
   const source = first?.name?.trim() || first?.email || "?";
-  const parts = source.split(/[\s@.]+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0]!.charAt(0).toUpperCase();
-  return (parts[0]!.charAt(0) + parts[1]!.charAt(0)).toUpperCase();
+  const [firstPart, secondPart] = source.split(/[\s@.]+/).filter(Boolean);
+  if (!firstPart) return "?";
+  if (!secondPart) return firstPart.charAt(0).toUpperCase();
+  return (firstPart.charAt(0) + secondPart.charAt(0)).toUpperCase();
 }
 
 export { isValidEmailAddress };

@@ -61,12 +61,16 @@ export function parseRRule(rrule: string | null): ParsedRule | null {
   let count = 10;
   let until = "";
 
-  if (map.has("COUNT")) {
+  const countValue = map.get("COUNT");
+  if (countValue !== undefined) {
     endCondition = "count";
-    count = parseInt(map.get("COUNT")!, 10) || 10;
-  } else if (map.has("UNTIL")) {
-    endCondition = "until";
-    until = map.get("UNTIL")!;
+    count = parseInt(countValue, 10) || 10;
+  } else {
+    const untilValue = map.get("UNTIL");
+    if (untilValue !== undefined) {
+      endCondition = "until";
+      until = untilValue;
+    }
   }
 
   return { frequency, interval, byDay, endCondition, count, until };

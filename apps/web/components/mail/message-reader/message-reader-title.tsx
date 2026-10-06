@@ -59,8 +59,8 @@ export function MessageReaderTitle({
                 className={cn(
                   "size-4 transition-colors",
                   isFlagged
-                    ? "fill-amber-400 text-amber-400"
-                    : "text-[var(--icon-disabled)] hover:text-amber-400",
+                    ? "fill-warning text-warning"
+                    : "text-[var(--icon-disabled)] hover:text-warning",
                 )}
                 strokeWidth={2}
               />
@@ -90,7 +90,7 @@ export function MessageReaderTitle({
                 title={label.name}
                 className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
                 style={{
-                  backgroundColor: `${displayColor}22`,
+                  backgroundColor: `color-mix(in srgb, ${displayColor} 13%, transparent)`,
                   color: displayColor,
                 }}
               >

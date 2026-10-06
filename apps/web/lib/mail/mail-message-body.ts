@@ -1,9 +1,6 @@
 import type { JmapEmailMessage } from "./types";
 
-/**
- * True when body payload is present. `bodyStructure` alone does not count —
- * list/thread metadata may include it without bodyValues.
- */
+/** True when a body payload is present; `bodyStructure` alone does not count because list/thread metadata includes it without bodyValues. */
 export function messageHasLoadedBody(message: JmapEmailMessage): boolean {
   return Boolean(
     message.bodyValues ||
@@ -37,10 +34,7 @@ export function mergeMailMessage(
   return { ...existing, ...incoming };
 }
 
-/**
- * Merge a body/metadata fetch without clobbering local keyword state.
- * Optimistic $seen / $flagged updates must survive slower Email/get responses.
- */
+/** Merge a body/metadata fetch without clobbering local keyword state, so optimistic $seen/$flagged updates survive slower Email/get responses. */
 export function mergeMailMessagePreservingKeywords(
   existing: JmapEmailMessage,
   incoming: JmapEmailMessage,

@@ -10,6 +10,9 @@ jest.mock("../../lib/e2ee-bootstrap", () => ({
 }));
 
 jest.mock("../../lib/e2ee-crypto", () => ({
+  ...jest.requireActual<typeof import("../../lib/e2ee-crypto")>(
+    "../../lib/e2ee-crypto",
+  ),
   decryptJsonPayload: jest.fn(),
   encryptJsonPayload: jest.fn(),
 }));
@@ -75,6 +78,13 @@ const samplePayload: RecentContactsPayload = {
   ],
 };
 
+const encryptedPayload = {
+  version: 1,
+  algorithm: "AES-GCM",
+  iv: "iv",
+  ciphertext: "ciphertext",
+};
+
 describe("e2ee-recent-contacts", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -88,12 +98,12 @@ describe("e2ee-recent-contacts", () => {
     });
     mockDecryptJsonPayload.mockResolvedValue(samplePayload);
     mockGetRecentContacts.mockResolvedValue({
-      encryptedContent: JSON.stringify({ version: 1 }),
+      encryptedContent: JSON.stringify(encryptedPayload),
       encryptionKeyVersion: 1,
       updatedAt: "2026-06-19T10:00:00.000Z",
     });
     mockPutRecentContacts.mockResolvedValue({
-      encryptedContent: JSON.stringify({ version: 1 }),
+      encryptedContent: JSON.stringify(encryptedPayload),
       encryptionKeyVersion: 1,
       updatedAt: "2026-06-19T11:00:00.000Z",
     });
@@ -114,7 +124,7 @@ describe("e2ee-recent-contacts", () => {
     expect(mockGetRecentContacts).toHaveBeenCalled();
     expect(mockDecryptJsonPayload).toHaveBeenCalledWith(
       activeSession.accountKey,
-      { version: 1 },
+      encryptedPayload,
       "recent-contacts:v1",
     );
     expect(payload).toEqual(samplePayload);
@@ -122,6 +132,19 @@ describe("e2ee-recent-contacts", () => {
 
   it("returns an empty payload when the backend has no record", async () => {
     mockGetRecentContacts.mockResolvedValue(null);
+
+    const payload = await loadRecentContacts();
+
+    expect(payload).toEqual({ version: 1, contacts: [] });
+    expect(mockDecryptJsonPayload).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty payload when the stored record is corrupt", async () => {
+    mockGetRecentContacts.mockResolvedValue({
+      encryptedContent: JSON.stringify({ version: 1 }),
+      encryptionKeyVersion: 1,
+      updatedAt: "2026-06-19T10:00:00.000Z",
+    });
 
     const payload = await loadRecentContacts();
 

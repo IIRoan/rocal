@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  RECENT_CONTACTS_QUERY_KEY,
   addManualContact,
   createEmptyRecentContactsPayload,
   filterContactsList,
@@ -22,7 +23,6 @@ import {
   saveRecentContactsCrypto,
 } from "../lib/e2ee-recent-contacts";
 
-const RECENT_CONTACTS_QUERY_KEY = ["recent-contacts", "v2"] as const;
 const RECORD_DEBOUNCE_MS = 500;
 
 export function useRecentContacts(options?: {
@@ -35,7 +35,7 @@ export function useRecentContacts(options?: {
   const queryClient = useQueryClient();
   const recordTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingEntriesRef = useRef<
-    Array<{ entries: RecentContactUsageInput[]; context: RecentContactContext }>
+    { entries: RecentContactUsageInput[]; context: RecentContactContext }[]
   >([]);
 
   const isAvailable = isEnabled;
@@ -153,7 +153,8 @@ export function useRecentContacts(options?: {
 
       recordTimerRef.current = setTimeout(() => {
         recordTimerRef.current = null;
-        void flushPendingRecords();
+        // A failed flush drops this debounced batch; recents re-record on next use.
+        void flushPendingRecords().catch(() => undefined);
       }, RECORD_DEBOUNCE_MS);
     },
     [flushPendingRecords, isAvailable],

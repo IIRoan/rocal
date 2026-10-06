@@ -35,6 +35,7 @@ export class CalendarSharingService implements ICalendarSharingService {
   private async createUniqueShareToken(): Promise<string> {
     for (let attempt = 0; attempt < 5; attempt++) {
       const token = generateShareToken();
+      // repo-rules-allow owner-scoped-data: Share tokens must be unique across all calendars.
       const existing = await this.prisma.calendar.findFirst({
         where: { icsShareToken: token },
         select: { id: true },
@@ -199,6 +200,7 @@ export class CalendarSharingService implements ICalendarSharingService {
       throw new NotFoundError("Shared calendar not found");
     }
 
+    // repo-rules-allow owner-scoped-data: The unguessable token is the public capability for this enabled feed.
     const calendar = await this.prisma.calendar.findFirst({
       where: { icsShareToken: cleanToken, icsShareEnabled: true },
       include: {

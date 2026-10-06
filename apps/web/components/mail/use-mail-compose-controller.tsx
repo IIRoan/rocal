@@ -238,9 +238,11 @@ export function useMailComposeController({
     }
     if (!closingRef.current) {
       closingRef.current = true;
-      void saveDraftAndClose(afterClose).finally(() => {
-        closingRef.current = false;
-      });
+      void saveDraftAndClose(afterClose)
+        .catch(() => toast.error("Couldn't save draft"))
+        .finally(() => {
+          closingRef.current = false;
+        });
     }
     return false;
   };

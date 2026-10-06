@@ -7,11 +7,7 @@ import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useSheet } from "../../src/providers/SheetProvider";
 import { CALENDAR_HOME_ROUTE } from "../../src/lib/calendar-routes";
 
-/**
- * Event detail screen — used for deep links (e.g. `solace://event/{id}`).
- * Opens the EventSheet in view mode immediately via the root-level provider
- * and lands the user on the calendar so the sheet sits on the right surface.
- */
+/** Deep-link screen: opens the EventSheet in view mode on the calendar surface, not a bare route. */
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme } = useTheme();

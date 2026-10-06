@@ -29,14 +29,7 @@ try {
   WebView = null;
 }
 
-/**
- * Injected after page load:
- *  1. Scales wide (table-heavy) emails down to fit device width using CSS transform.
- *  2. Reports the resulting visual height back via postMessage so the host View
- *     can resize to exactly match the content — enabling a single outer ScrollView
- *     with no internal WebView scroll (the Vymo/auto-height approach).
- *  3. Re-runs after images load so height stays correct (smoother scroll).
- */
+/** Injected after load: scale wide tables to device width, then report the visual height so the host can resize. */
 const FIT_AND_REPORT_SCRIPT = `
 (function() {
   var lastH = 0;
@@ -74,7 +67,7 @@ const FIT_AND_REPORT_SCRIPT = `
 interface HtmlEmailViewProps {
   html: string;
   isDark: boolean;
-  theme?: ThemeTokens;
+  theme: ThemeTokens;
   blockRemoteImages?: boolean;
   blockTrackingPixels?: boolean;
   style?: ViewStyle;
@@ -90,8 +83,9 @@ export function HtmlEmailView({
 }: HtmlEmailViewProps) {
   const [webViewHeight, setWebViewHeight] = useState(400);
   const [isLoaded, setIsLoaded] = useState(false);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const canvasColor = theme?.colors.background;
+  const canvasColor = theme.colors.background;
 
   const document = useMemo(() => {
     const processedHtml = processEmailHtml({
@@ -115,10 +109,8 @@ export function HtmlEmailView({
 
   if (!WebView) {
     return (
-      <View style={[styles.fallback, isDark && styles.fallbackDark, style]}>
-        <Text style={[styles.fallbackText, isDark && styles.fallbackTextDark]}>
-          {fallbackText}
-        </Text>
+      <View style={[styles.fallback, style]}>
+        <Text style={styles.fallbackText}>{fallbackText}</Text>
       </View>
     );
   }
@@ -142,7 +134,7 @@ export function HtmlEmailView({
     return false;
   };
 
-  const bg = canvasColor ?? (isDark ? "#1a1a1a" : "#ffffff");
+  const bg = theme.colors.background;
 
   return (
     <View style={[{ height: webViewHeight }, style]}>
@@ -182,7 +174,7 @@ export function HtmlEmailView({
             { backgroundColor: bg },
           ]}
         >
-          <ActivityIndicator color={theme?.colors.primaryBase} />
+          <ActivityIndicator color={theme.colors.primaryBase} />
         </View>
       )}
     </View>
@@ -203,25 +195,21 @@ function stripToPlainText(html: string): string {
     .trim();
 }
 
-const styles = StyleSheet.create({
-  fallback: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "#fff",
-  },
-  fallbackDark: {
-    backgroundColor: "#1a1a1a",
-  },
-  fallbackText: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: "#111",
-  },
-  fallbackTextDark: {
-    color: "#e0e0e0",
-  },
-  loader: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
+function createStyles(theme: ThemeTokens) {
+  return StyleSheet.create({
+    fallback: {
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: theme.colors.background,
+    },
+    fallbackText: {
+      fontSize: 14,
+      lineHeight: 22,
+      color: theme.colors.foreground,
+    },
+    loader: {
+      alignItems: "center",
+      justifyContent: "center",
+    },
+  });
+}

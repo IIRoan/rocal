@@ -2,11 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { calendarApiService } from "../lib/calendar-api-service";
+import { webQueryKeys } from "../lib/query-keys";
 import type { CalendarEvent as ApiCalendarEvent } from "../lib/types/calendar";
 
 export function useEventSearch(query: string, enabled = true) {
   return useQuery({
-    queryKey: ["events", "search", query],
+    queryKey: webQueryKeys.eventSearch(query),
     queryFn: async ({ signal }) => {
       const result = await calendarApiService.searchEvents(
         { q: query, limit: 15 },

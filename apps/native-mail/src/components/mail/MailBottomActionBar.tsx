@@ -24,10 +24,7 @@ interface MailBottomActionBarProps {
   children: React.ReactNode;
 }
 
-/**
- * Fixed bottom dock for mail list bulk actions and message reader.
- * Always absolutely positioned so both screens share identical layout.
- */
+/** Absolutely positioned bottom dock shared by the mail list bulk actions and the reader. */
 export function MailBottomActionBar({
   bottomInset,
   children,

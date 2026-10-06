@@ -426,7 +426,7 @@ describe("notificationsRoutes", () => {
       where: { eventId: "event-create" },
     });
     expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "event-1" },
+      where: { id: "event-1", userId: "user-1" },
       data: {
         reminder: 10,
         updatedAt: expect.any(Date),
@@ -526,7 +526,7 @@ describe("notificationsRoutes", () => {
 
     expect(deleteResponse.status).toBe(200);
     expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "event-1" },
+      where: { id: "event-1", userId: "user-1" },
       data: {
         reminder: null,
         updatedAt: expect.any(Date),
@@ -590,7 +590,7 @@ describe("notificationsRoutes", () => {
 
     expect(response.status).toBe(200);
     expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "event-1" },
+      where: { id: "event-1", userId: "user-1" },
       data: {
         reminder: 15,
         updatedAt: expect.any(Date),
@@ -632,7 +632,7 @@ describe("notificationsRoutes", () => {
 
     expect(response.status).toBe(200);
     expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "event-1" },
+      where: { id: "event-1", userId: "user-1" },
       data: {
         reminder: 15,
         updatedAt: expect.any(Date),

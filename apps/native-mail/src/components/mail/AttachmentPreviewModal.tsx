@@ -60,7 +60,6 @@ interface AttachmentPreviewModalProps {
   name: string;
   kind: MailAttachmentPreviewKind;
   theme: ThemeTokens;
-  isDark: boolean;
   loadCached: () => Promise<CachedAttachment>;
   onClose: () => void;
   onShare: (cached: CachedAttachment) => void;
@@ -72,7 +71,6 @@ export function AttachmentPreviewModal({
   name,
   kind,
   theme,
-  isDark,
   loadCached,
   onClose,
   onShare,
@@ -92,9 +90,15 @@ export function AttachmentPreviewModal({
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
-    void loadPreview(kind, loadCached).then((result) => {
-      if (!cancelled) setLoaded(result);
-    });
+    const load = async () => {
+      try {
+        const result = await loadPreview(kind, loadCached);
+        if (!cancelled) setLoaded(result);
+      } catch {
+        // loadPreview folds its own errors into the result, so nothing is left to report.
+      }
+    };
+    void load();
     return () => {
       cancelled = true;
     };
@@ -214,7 +218,7 @@ export function AttachmentPreviewModal({
                   originWhitelist={["file://"]}
                   source={{ uri: cached.uri }}
                   style={styles.flex}
-                  backgroundColor={isDark ? "#1a1a1a" : "#ffffff"}
+                  backgroundColor={theme.colors.card}
                   allowFileAccess
                   allowingReadAccessToURL={cached.uri}
                 />
@@ -258,7 +262,7 @@ function createStyles(theme: ThemeTokens) {
     backdrop: {
       flex: 1,
       justifyContent: "flex-end",
-      backgroundColor: "rgba(0,0,0,0.42)",
+      backgroundColor: theme.colors.overlay + "6B",
     },
     sheet: {
       backgroundColor: theme.colors.card,

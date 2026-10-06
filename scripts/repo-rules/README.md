@@ -30,7 +30,7 @@ Add it to the matching module (`repository`, `comments`, `backend`, `client`, `t
 | `no-pii-tracking-config` | Error reporting never sends default PII, never enables IP tracking, and the query cache is never persisted. |
 | `no-committed-secrets` | Only `.env*.example` files (and the public web production env) and no private keys may be committed. |
 | `no-alternate-mail-transport` | Mail runs over JMAP only: no SMTP/IMAP/POP3 URLs or Resend, and the provisioning token stays in the admin client. |
-| `comments-one-line` | Every comment, including JSDoc, is a single line. |
+| `comments-one-line` | Every comment, including JSDoc, is a single line: no multi-line blocks, no `//` pair wrapping one sentence. |
 | `no-commented-out-code` | Delete dead code instead of commenting it out. |
 | `todos-need-owner` | TODO, FIXME, HACK, and XXX comments name an owner `TODO(name)` or reference an issue. |
 | `thin-routes` | Backend routes may hand the Prisma client to a service constructor but never query it, and never import zod. |

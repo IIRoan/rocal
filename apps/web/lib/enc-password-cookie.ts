@@ -30,7 +30,7 @@ async function getOrCreateDeviceKey(): Promise<CryptoKey> {
       }
       return await crypto.subtle.importKey(
         "jwk",
-        JSON.parse(atob(stored)) as JsonWebKey,
+        parsed,
         { name: "AES-GCM", length: 256 },
         true,
         ["encrypt", "decrypt"],

@@ -273,6 +273,7 @@ function SheetBackdrop({
   maxOpacity,
   onPress,
 }: BottomSheetBackdropProps & { maxOpacity: number; onPress: () => void }) {
+  const { theme } = useTheme();
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
       animatedIndex.value,
@@ -283,7 +284,7 @@ function SheetBackdrop({
   }));
 
   return (
-    <Animated.View style={[style, backdropStyles.overlay, animatedStyle]}>
+    <Animated.View style={[style, { backgroundColor: theme.colors.overlay }, animatedStyle]}>
       <Pressable
         style={StyleSheet.absoluteFill}
         onPress={onPress}
@@ -582,8 +583,7 @@ function createStyles(theme: ThemeTokens) {
       borderTopRightRadius: SHEET_RADIUS,
       ...(Platform.OS === "ios"
         ? {
-            // repo-rules-allow theme-tokens-only: RN shadowColor is a platform literal with no theme token.
-            shadowColor: "#000",
+            shadowColor: theme.colors.overlay,
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.18,
             shadowRadius: 24,
@@ -617,13 +617,6 @@ function createStyles(theme: ThemeTokens) {
     },
   });
 }
-
-const backdropStyles = StyleSheet.create({
-  overlay: {
-    // repo-rules-allow theme-tokens-only: modal scrim; no dim-overlay token exists and black dims correctly in both themes.
-    backgroundColor: "#000",
-  },
-});
 
 function createHeaderStyles(theme: ThemeTokens) {
   return StyleSheet.create({

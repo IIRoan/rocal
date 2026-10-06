@@ -8,6 +8,7 @@ import {
   isUserDeclinedInvitationEvent,
 } from "@workspace/calendar-core";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { EVENTS_QUERY_KEY } from "@/hooks/use-calendar-events-loader";
 import {
   extractMailCalendarInvite,
   hasCalendarInvitationMetadata,
@@ -75,10 +76,15 @@ export function useMailCalendarInvitation({
     queryKey: mailCalendarInviteUid
       ? invitationByExternalIdQueryKey(mailCalendarInviteUid)
       : ["invitations", "by-external-id", "disabled"],
-    queryFn: () =>
-      calendarApiService.getInvitationByExternalId(mailCalendarInviteUid!, {
-        syncRemote: false,
-      }),
+    queryFn: async () => {
+      if (!mailCalendarInviteUid) {
+        throw new Error("Invitation uid is unavailable.");
+      }
+      return calendarApiService.getInvitationByExternalId(
+        mailCalendarInviteUid,
+        { syncRemote: false },
+      );
+    },
     enabled: Boolean(enabled && mailCalendarInviteUid),
   });
 
@@ -111,7 +117,7 @@ export function useMailCalendarInvitation({
             : null;
           if (cancelled) return;
 
-          void queryClient.invalidateQueries({ queryKey: ["events"] });
+          void queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
           await refetchInvitation();
           const event = await calendarApiService.getInvitationByExternalId(
             mailCalendarInviteUid,
@@ -158,7 +164,7 @@ export function useMailCalendarInvitation({
           const sealed = await calendarApiService.sealImportedInvitationIfNeeded(
             existing,
           );
-          void queryClient.invalidateQueries({ queryKey: ["events"] });
+          void queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
           setInviteDeclined(false);
           setCalendarInviteEvent({
             eventId: mailCalendarInviteUid,
@@ -195,7 +201,7 @@ export function useMailCalendarInvitation({
         );
         if (cancelled) return;
 
-        void queryClient.invalidateQueries({ queryKey: ["events"] });
+        void queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
 
         const sealed = event
           ? await calendarApiService.sealImportedInvitationIfNeeded(event)
@@ -222,7 +228,17 @@ export function useMailCalendarInvitation({
               : "Unable to load invitation details.",
         });
       }
-    })();
+    })().catch((error) => {
+      setCalendarInviteEvent({
+        eventId: mailCalendarInviteUid,
+        event: null,
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to load invitation details.",
+      });
+    });
 
     return () => {
       cancelled = true;
@@ -297,7 +313,7 @@ export function useMailCalendarInvitation({
               loading: false,
               error: null,
             });
-            void queryClient.invalidateQueries({ queryKey: ["events"] });
+            void queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
             await invalidateInvitationLookup();
             toast.success("Invitation declined.");
             return;
@@ -325,7 +341,7 @@ export function useMailCalendarInvitation({
           const sealed =
             await calendarApiService.sealImportedInvitationIfNeeded(event);
 
-          void queryClient.invalidateQueries({ queryKey: ["events"] });
+          void queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
           await invalidateInvitationLookup();
           setInviteDeclined(false);
           setCalendarInviteEvent({
@@ -346,7 +362,7 @@ export function useMailCalendarInvitation({
           calendarInviteResponseEventId,
           status,
         );
-        void queryClient.invalidateQueries({ queryKey: ["events"] });
+        void queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         await invalidateInvitationLookup();
         if ("deleted" in result && result.deleted) {
           setInviteDeclined(true);
@@ -402,7 +418,7 @@ export function useMailCalendarInvitation({
     setCancelProcessPending(true);
     try {
       await calendarApiService.deleteEvent(calendarCancellationEventId);
-      void queryClient.invalidateQueries({ queryKey: ["events"] });
+      void queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
       await invalidateInvitationLookup();
       setInviteCancelled(true);
       setCalendarInviteEvent({

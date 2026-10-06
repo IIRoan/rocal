@@ -71,8 +71,10 @@ export function useCreateEventMutation(input: {
     },
     onSuccess: (savedEvent, { request, reminders }, context) => {
       commitOptimisticEvent(queryClient, context.tempId, savedEvent);
+      // repo-rules-allow async-promise-handling: invalidateEventRanges returns invalidateQueries, which never rejects.
       void invalidateEventRanges(queryClient, savedEvent);
       // Reminders are a separate round trip that never throws, so they stay off the timeline's critical path.
+      // repo-rules-allow async-promise-handling: persistEventReminderNotifications catches internally, so this chain never rejects.
       void persistEventReminderNotifications(
         savedEvent.id,
         request.title,
@@ -128,13 +130,16 @@ export function useUpdateEventMutation(input: {
 
   return useMutation({
     mutationFn: async ({ request, reminders }: EventFormSubmission) => {
+      if (!eventId) {
+        throw new Error("An existing event is required to update it.");
+      }
       const saved = editScope
-        ? await calendarApiService.editRecurringEvent(eventId!, {
+        ? await calendarApiService.editRecurringEvent(eventId, {
             editScope,
             occurrenceDate: editOccurrenceDate,
             updates: request,
           })
-        : await calendarApiService.updateEvent(eventId!, request);
+        : await calendarApiService.updateEvent(eventId, request);
       await persistEventReminderNotifications(
         saved.id,
         request.title,
@@ -188,14 +193,17 @@ export function useDeleteEventMutation(input: {
       scope?: RecurrenceDeleteScope;
       occurrenceDate?: string;
     }) => {
+      if (!eventId) {
+        throw new Error("An existing event is required to delete it.");
+      }
       if (scope) {
         return calendarApiService.deleteRecurringEvent(
-          eventId!,
+          eventId,
           scope,
           occurrenceDate,
         );
       }
-      return calendarApiService.deleteEvent(eventId!);
+      return calendarApiService.deleteEvent(eventId);
     },
     onMutate: async () => {
       if (eventId) {
@@ -231,8 +239,12 @@ export function useRespondToInvitationMutation(input: {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (status: "accepted" | "declined" | "tentative") =>
-      calendarApiService.respondToInvitation(eventId!, status),
+    mutationFn: async (status: "accepted" | "declined" | "tentative") => {
+      if (!eventId) {
+        throw new Error("An existing event is required to respond to it.");
+      }
+      return calendarApiService.respondToInvitation(eventId, status);
+    },
     onSuccess: (result, status) => {
       if (eventId) {
         queryClient.invalidateQueries({

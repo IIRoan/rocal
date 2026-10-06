@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
+import { createLogger } from "@workspace/logger";
 import {
   buildMailUrl,
   locationsEqual,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/mail/mail-url";
 import type { JmapMailbox } from "@/lib/mail/types";
 
+const log = createLogger("mail-url-sync");
 const MAIL_URL_CHANGED_EVENT = "mail:url-changed";
 
 type UseMailUrlSyncInput = {
@@ -125,7 +127,9 @@ export function useMailUrlSync({
       initializedRef.current = true;
     }
 
-    void applyRouteFromUrl();
+    void applyRouteFromUrl().catch((error) => {
+      log.warn("Failed to apply the mail route from the URL", error);
+    });
   }, [activeMailbox, applyRouteFromUrl, browserLocation]);
 
   useEffect(() => {

@@ -30,10 +30,7 @@ function prefetchKey(userId: string, config: MailDemoConfig): string {
   ].join("|");
 }
 
-/**
- * Warm the mail OAuth token and JMAP discovery as soon as the session/config
- * are known, so handleSignIn does not start from a cold network.
- */
+/** Warm the mail OAuth token and JMAP discovery as soon as session/config are known, so handleSignIn does not start cold. */
 export function ensureMailOpenPrefetch(input: {
   userId: string;
   config: MailDemoConfig;

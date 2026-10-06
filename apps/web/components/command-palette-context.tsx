@@ -112,10 +112,7 @@ export function CommandPaletteProvider({
         ? { ...event, isPreview: true }
         : null;
 
-    // The desktop popover positions itself relative to the preview event in the
-    // timeline. This must be committed in the same render as opening the editor;
-    // if we defer it in a transition, the first layout pass falls back to the
-    // raw click point and can overlap the event until a later recompute.
+    // The desktop popover positions itself relative to the preview event in the timeline. This must be committed in the same render as opening the editor; if we defer it in a transition, the first layout pass falls back to the raw click point and can overlap the event until a later recompute.
     setPreviewEvent(nextPreviewEvent);
     setEventToEdit(event || null);
     setEventEditorMode(options?.mode || "modal");

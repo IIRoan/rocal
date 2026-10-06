@@ -147,13 +147,13 @@ export function useCalendarPresentation({
     };
 
     if ("requestIdleCallback" in window) {
-      const id = (window as any).requestIdleCallback(runDeferredPrefetch, {
+      const id = window.requestIdleCallback(runDeferredPrefetch, {
         timeout: 400,
       });
 
       return () => {
         if ("cancelIdleCallback" in window) {
-          (window as any).cancelIdleCallback(id);
+          window.cancelIdleCallback(id);
         }
       };
     }

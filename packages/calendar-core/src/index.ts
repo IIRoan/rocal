@@ -16,6 +16,7 @@ export * from "./outgoing-mime";
 export * from "./mail-outgoing-attachments";
 export * from "./mail-hidden-mailboxes";
 export * from "./mail-label-colors";
+export * from "./mail-message-labels";
 export * from "./mail-list-view-filter";
 export * from "./mail-jmap-validation";
 export * from "./mail-server-limits";

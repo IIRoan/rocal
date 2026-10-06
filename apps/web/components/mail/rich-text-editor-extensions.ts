@@ -88,12 +88,13 @@ export const richTextEditorExtensions = [
   TableRow,
   TableHeader.configure({
     HTMLAttributes: {
-      style:
+      style: // repo-rules-allow theme-tokens-only: ships verbatim in the outgoing email HTML; mail clients ignore CSS variables.
         "padding:6px 8px;border:1px solid #ccc;background-color:#f5f5f5;color:#1f2937;text-align:left;",
     },
   }),
   TableCell.configure({
     HTMLAttributes: {
+      // repo-rules-allow theme-tokens-only: style ships verbatim in the outgoing email HTML; mail clients ignore CSS variables.
       style: "padding:6px 8px;border:1px solid #ccc;vertical-align:top;",
     },
   }),

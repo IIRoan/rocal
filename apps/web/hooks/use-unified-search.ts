@@ -13,6 +13,7 @@ import {
 } from "@workspace/calendar-core";
 import type { CalendarEvent as UiCalendarEvent } from "@workspace/ui/components/calendar";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { webQueryKeys } from "@/lib/query-keys";
 import type { CalendarEvent as ApiCalendarEvent } from "@/lib/types/calendar";
 import { mailDemoApiService } from "@/lib/mail/api-service";
 import { StalwartJmapClient } from "@/lib/mail/jmap-client";
@@ -145,7 +146,10 @@ export function useUnifiedSearch({
     canSearch && includeMail && mailMessages.length === 0;
 
   const calendarQuery = useQuery({
-    queryKey: ["unified-search", "calendar", normalizedQuery, perSourceLimit],
+    queryKey: webQueryKeys.unifiedSearchCalendar(
+      normalizedQuery,
+      perSourceLimit,
+    ),
     queryFn: async ({ signal }) => {
       const result = await calendarApiService.searchEvents(
         { q: normalizedQuery, limit: perSourceLimit },
@@ -158,7 +162,7 @@ export function useUnifiedSearch({
     placeholderData: (previous) => previous,
   });
   const mailQuery = useQuery({
-    queryKey: ["unified-search", "mail-corpus"],
+    queryKey: webQueryKeys.unifiedSearchMailCorpus(),
     queryFn: loadSharedMailSearchMessages,
     enabled: shouldLoadSharedMailMessages,
     staleTime: 5 * 60_000,

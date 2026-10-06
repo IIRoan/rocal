@@ -1,5 +1,3 @@
-import { addDays, addMonths, addWeeks, addYears, isSameDay } from "date-fns";
-
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
 
 export interface RecurrenceRule {
@@ -100,6 +98,41 @@ function partsToTimestamp(parts: DateParts, milliseconds: number): number {
   );
 }
 
+function addUtcDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+}
+
+function getUtcDaysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+}
+
+function addUtcMonths(date: Date, months: number): Date {
+  const targetMonth = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1),
+  );
+  const day = Math.min(
+    date.getUTCDate(),
+    getUtcDaysInMonth(targetMonth.getUTCFullYear(), targetMonth.getUTCMonth()),
+  );
+  return new Date(
+    Date.UTC(
+      targetMonth.getUTCFullYear(),
+      targetMonth.getUTCMonth(),
+      day,
+      date.getUTCHours(),
+      date.getUTCMinutes(),
+      date.getUTCSeconds(),
+      date.getUTCMilliseconds(),
+    ),
+  );
+}
+
+function addUtcYears(date: Date, years: number): Date {
+  return addUtcMonths(date, years * 12);
+}
+
 export class RecurrenceEngine {
   static parseRecurrenceRule(recurrenceJson: string): RecurrenceRule | null {
     try {
@@ -171,7 +204,7 @@ export class RecurrenceEngine {
     ) {
       const isException = exceptions.some(
         (ex) =>
-          isSameDay(ex.exceptionDate, currentOccurrenceInstant),
+          this.isSameRuleDay(ex.exceptionDate, currentOccurrenceInstant, timezone),
       );
       if (!isException) {
         instances.push({
@@ -203,7 +236,7 @@ export class RecurrenceEngine {
       ) {
         const isException = exceptions.some(
           (ex) =>
-            isSameDay(ex.exceptionDate, currentOccurrenceInstant),
+            this.isSameRuleDay(ex.exceptionDate, currentOccurrenceInstant, timezone),
         );
         if (!isException) {
           instances.push({
@@ -252,6 +285,20 @@ export class RecurrenceEngine {
     return guess;
   }
 
+  private static isSameRuleDay(
+    left: Date,
+    right: Date,
+    timezone?: string,
+  ): boolean {
+    const leftDate = this.toRuleContextDate(left, timezone);
+    const rightDate = this.toRuleContextDate(right, timezone);
+    return (
+      leftDate.getUTCFullYear() === rightDate.getUTCFullYear() &&
+      leftDate.getUTCMonth() === rightDate.getUTCMonth() &&
+      leftDate.getUTCDate() === rightDate.getUTCDate()
+    );
+  }
+
   private static getNextOccurrence(
     currentDate: Date,
     rule: RecurrenceRule,
@@ -259,73 +306,80 @@ export class RecurrenceEngine {
     switch (rule.frequency) {
       case "daily":
         if (rule.byWeekDay && rule.byWeekDay.length > 0) {
-          let nextDate = addDays(currentDate, 1);
+          let nextDate = addUtcDays(currentDate, 1);
           const maxDays = 14;
           let daysChecked = 0;
 
           while (daysChecked < maxDays) {
-            if (rule.byWeekDay.includes(nextDate.getDay())) {
+            if (rule.byWeekDay.includes(nextDate.getUTCDay())) {
               return nextDate;
             }
-            nextDate = addDays(nextDate, 1);
+            nextDate = addUtcDays(nextDate, 1);
             daysChecked++;
           }
 
-          return addDays(currentDate, rule.interval);
+          return addUtcDays(currentDate, rule.interval);
         } else {
-          return addDays(currentDate, rule.interval);
+          return addUtcDays(currentDate, rule.interval);
         }
 
       case "weekly":
         if (rule.byWeekDay && rule.byWeekDay.length > 0) {
-          let nextDate = addDays(currentDate, 1);
+          let nextDate = addUtcDays(currentDate, 1);
           const maxDays = rule.interval * 7;
           let daysChecked = 0;
 
           while (daysChecked < maxDays) {
-            if (rule.byWeekDay.includes(nextDate.getDay())) {
+            if (rule.byWeekDay.includes(nextDate.getUTCDay())) {
               return nextDate;
             }
-            nextDate = addDays(nextDate, 1);
+            nextDate = addUtcDays(nextDate, 1);
             daysChecked++;
           }
 
-          return addWeeks(currentDate, rule.interval);
+          return addUtcDays(currentDate, rule.interval * 7);
         } else {
-          return addWeeks(currentDate, rule.interval);
+          return addUtcDays(currentDate, rule.interval * 7);
         }
 
       case "monthly":
         if (rule.byMonthDay && rule.byMonthDay.length > 0) {
-          const nextDate = addMonths(currentDate, rule.interval);
-          const targetDay = rule.byMonthDay[0];
-          nextDate.setDate(Math.min(targetDay!, this.getDaysInMonth(nextDate)));
+          const nextDate = addUtcMonths(currentDate, rule.interval);
+          const targetDay = rule.byMonthDay[0] ?? 1;
+          nextDate.setUTCDate(
+            Math.min(
+              targetDay,
+              getUtcDaysInMonth(nextDate.getUTCFullYear(), nextDate.getUTCMonth()),
+            ),
+          );
           return nextDate;
         } else {
-          return addMonths(currentDate, rule.interval);
+          return addUtcMonths(currentDate, rule.interval);
         }
 
       case "yearly":
         if (rule.byMonth && rule.byMonth.length > 0) {
-          const nextDate = addYears(currentDate, rule.interval);
-          nextDate.setMonth((rule.byMonth?.[0] ?? 1) - 1);
+          const nextDate = addUtcYears(currentDate, rule.interval);
+          nextDate.setUTCMonth((rule.byMonth?.[0] ?? 1) - 1);
           if (rule.byMonthDay && rule.byMonthDay.length > 0) {
-            nextDate.setDate(
-              Math.min(rule.byMonthDay[0]!, this.getDaysInMonth(nextDate)),
+            nextDate.setUTCDate(
+              Math.min(
+                rule.byMonthDay[0] ?? 1,
+                getUtcDaysInMonth(
+                  nextDate.getUTCFullYear(),
+                  nextDate.getUTCMonth(),
+                ),
+              ),
             );
           }
           return nextDate;
         } else {
-          return addYears(currentDate, rule.interval);
+          return addUtcYears(currentDate, rule.interval);
         }
 
       default:
         return currentDate;
     }
-  }
-
-  private static getDaysInMonth(date: Date): number {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   }
 
   static validateRecurrenceRule(rule: RecurrenceRule): string[] {

@@ -20,6 +20,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+// repo-rules-allow timezone-safe-calendar-code: format() renders the picker's local month-grid navigation state, never event instants.
 import { format } from "date-fns";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
@@ -190,7 +191,9 @@ export function PickerSheet({
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: "rgba(0,0,0,0.42)" },
+            {
+              backgroundColor: theme.colors.overlay + "6B",
+            },
             overlayStyle,
           ]}
         />
@@ -335,7 +338,13 @@ export function CalendarGrid({
           paddingHorizontal: 4,
         }}
       >
-        <Pressable onPress={prevMonth} hitSlop={12} style={{ padding: 8 }}>
+        <Pressable
+          onPress={prevMonth}
+          hitSlop={12}
+          style={{ padding: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Previous month"
+        >
           <Feather
             name="chevron-left"
             size={18}
@@ -352,7 +361,13 @@ export function CalendarGrid({
         >
           {monthLabel}
         </Text>
-        <Pressable onPress={nextMonth} hitSlop={12} style={{ padding: 8 }}>
+        <Pressable
+          onPress={nextMonth}
+          hitSlop={12}
+          style={{ padding: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Next month"
+        >
           <Feather
             name="chevron-right"
             size={18}

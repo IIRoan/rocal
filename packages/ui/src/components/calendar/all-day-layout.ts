@@ -27,14 +27,14 @@ function clipEventToVisibleDays(
 ): Omit<AllDayPlacement, "lane"> | null {
   if (days.length === 0) return null;
 
-  const firstVisible = days[0]!;
+  const firstVisible = days[0]!; // The empty-days early return above guarantees both indices exist.
   const lastVisible = days[days.length - 1]!;
   const { firstDay, lastDay } = getEventCalendarDayRange(event, timezone);
 
   let startIndex = 0;
   while (
     startIndex < days.length &&
-    comparePickerDays(days[startIndex]!, firstDay) < 0
+    comparePickerDays(days[startIndex]!, firstDay) < 0 // Bounded by the days.length loop guard.
   ) {
     startIndex += 1;
   }
@@ -42,7 +42,7 @@ function clipEventToVisibleDays(
   let endIndex = days.length - 1;
   while (
     endIndex >= 0 &&
-    comparePickerDays(days[endIndex]!, lastDay) > 0
+    comparePickerDays(days[endIndex]!, lastDay) > 0 // Starts at the last index and only decreases.
   ) {
     endIndex -= 1;
   }
@@ -69,10 +69,7 @@ function rangesOverlap(
   return leftStart < rightStart + rightSpan && rightStart < leftStart + leftSpan;
 }
 
-/**
- * Pack all-day / multi-day events into non-overlapping lanes across a visible
- * day range so a single card can span consecutive columns.
- */
+/** Packs all-day/multi-day events into non-overlapping lanes so one card can span consecutive columns. */
 export function layoutAllDayRowEvents(
   events: CalendarEvent[],
   days: Date[],
@@ -82,7 +79,7 @@ export function layoutAllDayRowEvents(
     return { placements: [], laneCount: 0 };
   }
 
-  const firstVisible = days[0]!;
+  const firstVisible = days[0]!; // The empty-days early return above guarantees both indices exist.
   const lastVisible = days[days.length - 1]!;
   const drafts: Array<Omit<AllDayPlacement, "lane">> = [];
 
@@ -131,7 +128,7 @@ export function layoutAllDayRowEvents(
       laneOccupancy.push([]);
     }
 
-    laneOccupancy[lane]!.push({
+    laneOccupancy[lane]!.push({ // lane is a found index or freshly appended above, so it always exists.
       startIndex: draft.startIndex,
       span: draft.span,
     });

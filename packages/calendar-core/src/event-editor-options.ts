@@ -1,3 +1,4 @@
+// repo-rules-allow timezone-safe-calendar-code: formats the wall-clock picker date only; presets never derive from a UTC instant.
 import { format } from "date-fns";
 import type { RecurrenceRule } from "./types";
 

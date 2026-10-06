@@ -1,4 +1,4 @@
-import type { E2eeModule } from "@workspace/e2ee";
+import { parseEncryptedJsonPayload, type E2eeModule } from "@workspace/e2ee";
 import {
   createEmptyRecentContactsPayload,
   sanitizeRecentContactsPayload,
@@ -9,19 +9,6 @@ import { calendarApiService } from "./api";
 const ENCRYPTION_KEY_VERSION = 1;
 const RECENT_CONTACTS_AAD = `recent-contacts:v${ENCRYPTION_KEY_VERSION}`;
 
-function parseEncryptedPayload(encryptedContent: string) {
-  try {
-    return JSON.parse(encryptedContent) as {
-      version: number;
-      algorithm: "AES-GCM";
-      iv: string;
-      ciphertext: string;
-    };
-  } catch {
-    return null;
-  }
-}
-
 export async function loadRecentContactsCrypto(
   accountKey: CryptoKey,
   e2ee: E2eeModule,
@@ -31,7 +18,7 @@ export async function loadRecentContactsCrypto(
     return createEmptyRecentContactsPayload();
   }
 
-  const encryptedPayload = parseEncryptedPayload(record.encryptedContent);
+  const encryptedPayload = parseEncryptedJsonPayload(record.encryptedContent);
   if (!encryptedPayload) {
     return createEmptyRecentContactsPayload();
   }

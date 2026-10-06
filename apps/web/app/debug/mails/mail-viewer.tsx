@@ -20,7 +20,7 @@ export function MailViewer({ previews }: { previews: EmailPreview[] }) {
   const categories = [...new Set(previews.map((p) => p.category))];
 
   return (
-    <div className="flex h-[calc(100vh-65px)]">
+    <div className="flex h-[calc(100dvh-65px)]">
       {/* Sidebar */}
       <aside className="w-64 shrink-0 border-r border-border/60 overflow-y-auto bg-muted/20">
         {categories.map((cat) => (
@@ -94,7 +94,7 @@ export function MailViewer({ previews }: { previews: EmailPreview[] }) {
         {/* Email render */}
         <div className="flex-1 overflow-auto bg-muted/30 p-8">
           <div
-            className={`mx-auto transition-[max-width] duration-300 ${
+            className={`mx-auto ${
               width === "mobile" ? "max-w-[375px]" : "max-w-[680px]"
             }`}
           >

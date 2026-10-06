@@ -75,17 +75,21 @@ export function AppUpdateSettingsSection() {
       return;
     }
     if (action === "ready") {
+      // repo-rules-allow async-promise-handling: restart() catches internally in AppUpdateProvider.
       void restart();
       return;
     }
     if (action === "available" || action === "error") {
+      // repo-rules-allow async-promise-handling: install() catches internally in AppUpdateProvider.
       void install();
       return;
     }
+    // repo-rules-allow async-promise-handling: check() returns an outcome instead of rejecting and the rest is sync.
     void (async () => {
       const outcome = await check("user");
       presentUpdateCheckAlert(outcome, {
         showDiagnostics,
+        // repo-rules-allow async-promise-handling: install() catches internally in AppUpdateProvider.
         install: () => void install(),
         alert: Alert.alert,
       });
@@ -151,7 +155,9 @@ export function AppUpdateSettingsSection() {
           <Feather name="external-link" size={16} color={skin.textSecondary} />
         }
         onPress={() => {
-          void Linking.openURL(EXPO_UPDATES_URL);
+          void Linking.openURL(EXPO_UPDATES_URL).catch(() =>
+            Alert.alert("Could not open", "Open the Expo updates page in a browser."),
+          );
         }}
         accessibilityRole="link"
         accessibilityLabel="Browse Expo updates"

@@ -110,6 +110,7 @@ export function useCalendarShareLinkActions(calendarId: string) {
         regenerate ? { regenerate: true } : undefined,
       ),
     onSuccess: (_link, regenerate) => {
+      // repo-rules-allow async-promise-handling: invalidate wraps invalidateQueries, which never rejects.
       void invalidate();
       toast(regenerate ? "Share link regenerated" : "Share link enabled");
     },
@@ -119,6 +120,7 @@ export function useCalendarShareLinkActions(calendarId: string) {
   const disable = useMutation({
     mutationFn: () => calendarApiService.disableCalendarShareLink(calendarId),
     onSuccess: () => {
+      // repo-rules-allow async-promise-handling: invalidate wraps invalidateQueries, which never rejects.
       void invalidate();
       toast("Share link disabled");
     },

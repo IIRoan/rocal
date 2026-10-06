@@ -88,22 +88,36 @@ export function LabelPickerPanel({
   const handleCreate = async () => {
     if (!onCreateLabel || !newLabelName.trim()) return;
     patch({ isSavingLabel: true });
-    await onCreateLabel(
-      newLabelName.trim(),
-      normalizeLabelColorInput(newLabelColor),
-    ).finally(() => patch({ isSavingLabel: false }));
+    // Callee label handlers report save failures to the user; nothing more to do here.
+    try {
+      await onCreateLabel(
+        newLabelName.trim(),
+        normalizeLabelColorInput(newLabelColor),
+      );
+    } catch {
+      return;
+    } finally {
+      patch({ isSavingLabel: false });
+    }
     patch({ newLabelName: "", newLabelColor: DEFAULT_LABEL_COLOR });
   };
 
   const handleSaveEdit = async () => {
     if (!onUpdateLabel || !editingLabelId || !editName.trim()) return;
     patch({ isSavingEdit: true });
-    await Promise.resolve(
-      onUpdateLabel(editingLabelId, {
-        name: editName.trim(),
-        color: normalizeLabelColorInput(editColor),
-      }),
-    ).finally(() => patch({ isSavingEdit: false }));
+    // Callee label handlers report save failures to the user; nothing more to do here.
+    try {
+      await Promise.resolve(
+        onUpdateLabel(editingLabelId, {
+          name: editName.trim(),
+          color: normalizeLabelColorInput(editColor),
+        }),
+      );
+    } catch {
+      return;
+    } finally {
+      patch({ isSavingEdit: false });
+    }
     cancelEditing();
   };
 

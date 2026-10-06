@@ -14,11 +14,14 @@ import {
   DropdownItem,
 } from "@workspace/ui/solace";
 import { cn } from "@workspace/ui/lib/utils";
+import { createLogger } from "@workspace/logger";
 import { MailNotificationBanner } from "../mail-notification-banner";
 import type {
   MessageReaderController,
   MessageReaderViewModel,
 } from "../use-message-reader-controller";
+
+const log = createLogger("message-reader-calendar-cards");
 
 export function MessageReaderCalendarCards({
   controller,
@@ -76,7 +79,11 @@ export function MessageReaderCalendarCards({
                   <Button
                     size="xs"
                     disabled={inviteResponsePending !== null}
-                    onClick={() => void handleInvitationResponse("accepted")}
+                    onClick={() =>
+                      void handleInvitationResponse("accepted").catch((error) =>
+                        log.error("Failed to respond to invitation", error),
+                      )
+                    }
                     className="gap-1"
                   >
                     {inviteResponsePending === "accepted" ? (
@@ -90,7 +97,11 @@ export function MessageReaderCalendarCards({
                     size="xs"
                     variant="outline"
                     disabled={inviteResponsePending !== null}
-                    onClick={() => void handleInvitationResponse("tentative")}
+                    onClick={() =>
+                      void handleInvitationResponse("tentative").catch((error) =>
+                        log.error("Failed to respond to invitation", error),
+                      )
+                    }
                   >
                     {inviteResponsePending === "tentative" && (
                       <Loader2 className="size-3 animate-spin" />
@@ -101,7 +112,11 @@ export function MessageReaderCalendarCards({
                     size="xs"
                     variant="ghost"
                     disabled={inviteResponsePending !== null}
-                    onClick={() => void handleInvitationResponse("declined")}
+                    onClick={() =>
+                      void handleInvitationResponse("declined").catch((error) =>
+                        log.error("Failed to respond to invitation", error),
+                      )
+                    }
                     className="text-muted-foreground"
                   >
                     {inviteResponsePending === "declined" && (
@@ -131,18 +146,30 @@ export function MessageReaderCalendarCards({
                   <DropdownItem
                     label="Accept"
                     active={invitationStatus === "accepted"}
-                    onSelect={() => void handleInvitationResponse("accepted")}
+                    onSelect={() =>
+                      void handleInvitationResponse("accepted").catch((error) =>
+                        log.error("Failed to respond to invitation", error),
+                      )
+                    }
                   />
                   <DropdownItem
                     label="Maybe"
                     active={invitationStatus === "tentative"}
-                    onSelect={() => void handleInvitationResponse("tentative")}
+                    onSelect={() =>
+                      void handleInvitationResponse("tentative").catch((error) =>
+                        log.error("Failed to respond to invitation", error),
+                      )
+                    }
                   />
                   <DropdownDivider />
                   <DropdownItem
                     label="Decline"
                     destructive
-                    onSelect={() => void handleInvitationResponse("declined")}
+                    onSelect={() =>
+                      void handleInvitationResponse("declined").catch((error) =>
+                        log.error("Failed to respond to invitation", error),
+                      )
+                    }
                   />
                 </Dropdown>
               )}
@@ -198,7 +225,11 @@ export function MessageReaderCalendarCards({
                 size="xs"
                 variant="outline"
                 disabled={cancelProcessPending}
-                onClick={() => void handleCancelRemove()}
+                onClick={() =>
+                  void handleCancelRemove().catch((error) =>
+                    log.error("Failed to remove cancelled event", error),
+                  )
+                }
                 className="ml-auto gap-1 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 {cancelProcessPending ? (

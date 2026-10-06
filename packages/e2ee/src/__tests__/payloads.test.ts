@@ -8,6 +8,7 @@ import {
   encryptEventContentRequest,
   encryptNameRequest,
   hydrateEncryptedName,
+  parseEncryptedJsonPayload,
   shouldEncryptEventContent,
   type E2eeSessionKeys,
 } from "../payloads";
@@ -20,6 +21,24 @@ beforeAll(async () => {
     accountKey: await e2ee.generateAccountKey(),
     blindIndexKey: await e2ee.generateBlindIndexKey(),
   };
+});
+
+describe("parseEncryptedJsonPayload", () => {
+  const payload = { algorithm: "AES-GCM", version: 1, iv: "iv", ciphertext: "ciphertext" };
+
+  it("accepts a stored encrypted envelope", () => {
+    expect(parseEncryptedJsonPayload(JSON.stringify(payload))).toEqual(payload);
+  });
+
+  it.each([
+    "not json", "null", "[]", '"string"', "{}",
+    JSON.stringify({ ...payload, algorithm: "AES-CBC" }),
+    JSON.stringify({ ...payload, version: "1" }),
+    JSON.stringify({ ...payload, iv: null }),
+    JSON.stringify({ ...payload, ciphertext: 1 }),
+  ])("returns null for an undecryptable envelope: %s", (raw) => {
+    expect(parseEncryptedJsonPayload(raw)).toBeNull();
+  });
 });
 
 describe("encryptEventContentRequest", () => {

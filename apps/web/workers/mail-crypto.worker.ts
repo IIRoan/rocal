@@ -174,50 +174,80 @@ async function handleDeriveVaultKey(payload: {
   return { keyB64 };
 }
 
-self.onmessage = async (event: MessageEvent) => {
-  const { requestId, type, payload } = event.data as {
-    requestId: number;
-    type: string;
-    payload?: any;
-  };
+type MailCryptoWorkerRequest =
+  | {
+      requestId: number;
+      type: "GENERATE_PGP_KEYPAIR";
+      payload: Parameters<typeof handleGenerateKeyPair>[0];
+    }
+  | {
+      requestId: number;
+      type: "REENCRYPT_PRIVATE_KEY";
+      payload: Parameters<typeof handleReEncryptPrivateKey>[0];
+    }
+  | {
+      requestId: number;
+      type: "LOAD_ACTIVE_VAULT";
+      payload: Parameters<typeof handleLoadActiveVault>[0];
+    }
+  | {
+      requestId: number;
+      type: "DECRYPT_PGP_MESSAGE";
+      payload: Parameters<typeof handleDecryptMessage>[0];
+    }
+  | {
+      requestId: number;
+      type: "ENCRYPT_FOR_RECIPIENTS";
+      payload: Parameters<typeof handleEncryptForRecipients>[0];
+    }
+  | { requestId: number; type: "CLEAR_ACTIVE_VAULT" }
+  | {
+      requestId: number;
+      type: "DERIVE_VAULT_KEY";
+      payload: Parameters<typeof handleDeriveVaultKey>[0];
+    };
+
+self.onmessage = async (event: MessageEvent<MailCryptoWorkerRequest>) => {
+  const request = event.data;
+  const commandType = request.type;
 
   try {
     let result: unknown;
 
-    switch (type) {
+    switch (request.type) {
       case "GENERATE_PGP_KEYPAIR":
-        result = await handleGenerateKeyPair(payload);
+        result = await handleGenerateKeyPair(request.payload);
         break;
       case "REENCRYPT_PRIVATE_KEY":
-        result = await handleReEncryptPrivateKey(payload);
+        result = await handleReEncryptPrivateKey(request.payload);
         break;
       case "LOAD_ACTIVE_VAULT":
-        result = await handleLoadActiveVault(payload);
+        result = await handleLoadActiveVault(request.payload);
         break;
       case "DECRYPT_PGP_MESSAGE":
-        result = await handleDecryptMessage(payload);
+        result = await handleDecryptMessage(request.payload);
         break;
       case "ENCRYPT_FOR_RECIPIENTS":
-        result = await handleEncryptForRecipients(payload);
+        result = await handleEncryptForRecipients(request.payload);
         break;
       case "CLEAR_ACTIVE_VAULT":
         result = clearActiveVault();
         break;
       case "DERIVE_VAULT_KEY":
-        result = await handleDeriveVaultKey(payload);
+        result = await handleDeriveVaultKey(request.payload);
         break;
       default:
-        throw new Error(`Unknown mail crypto worker command: ${type}`);
+        throw new Error(`Unknown mail crypto worker command: ${commandType}`);
     }
 
     self.postMessage({
-      requestId,
-      type: `${type}_RESULT`,
+      requestId: request.requestId,
+      type: `${request.type}_RESULT`,
       payload: result,
     });
   } catch (error) {
     self.postMessage({
-      requestId,
+      requestId: request.requestId,
       error: error instanceof Error ? error.message : "Unknown worker error",
     });
   }

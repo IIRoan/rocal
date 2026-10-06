@@ -72,11 +72,7 @@ export interface ProfileAvatarResponse {
   image: string | null;
 }
 
-/**
- * Allow only publicly fetchable HTTPS image URLs.
- * Drops credentials, private/link-local hosts, and non-https schemes so
- * avatars cannot be used as tracking beacons against internal addresses.
- */
+/** Only public HTTPS URLs; credentials and private hosts are dropped so avatars cannot beacon internal addresses. */
 export function sanitizePublicImageUrl(
   value: string | null | undefined,
 ): string | null {

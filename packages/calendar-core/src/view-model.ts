@@ -3,11 +3,7 @@ import { isAwaitingUserInvitationResponse } from "./types";
 
 // ─── Decorated Event Type ────────────────────────────────────────────────────
 
-/**
- * A CalendarEvent decorated with resolved display properties.
- * The color is resolved from the event's own color or its calendar's color.
- * Nullable fields are normalized to undefined for easier UI consumption.
- */
+/** CalendarEvent with a resolved color (event or calendar) and nulls normalized to undefined. */
 export interface DecoratedCalendarEvent extends Omit<
   CalendarEvent,
   "description" | "location" | "categoryId" | "reminder" | "color"
@@ -39,18 +35,12 @@ export type CalendarOverlayContext =
 
 // ─── Functions ───────────────────────────────────────────────────────────────
 
-/**
- * Creates a Map of calendar ID → Calendar for fast lookups.
- */
 export function createCalendarMap(
   calendars: Calendar[],
 ): Map<string, Calendar> {
   return new Map(calendars.map((calendar) => [calendar.id, calendar]));
 }
 
-/**
- * Returns a Set of calendar IDs that are currently visible.
- */
 export function createVisibleCalendarIdSet(
   calendars: Calendar[],
   isCalendarVisible: (calendarId: string) => boolean,
@@ -79,10 +69,6 @@ function decorateCalendarEvent(
   } as DecoratedCalendarEvent;
 }
 
-/**
- * Filters events to only those belonging to visible calendars,
- * then decorates each event with resolved display properties.
- */
 export function transformCalendarEvents(
   events: CalendarEvent[],
   calendarMap: Map<string, Calendar>,
@@ -97,10 +83,7 @@ export function transformCalendarEvents(
     .map((event) => decorateCalendarEvent(event, calendarMap));
 }
 
-/**
- * Merges preview (ghost) events into the base event list.
- * Preview events are shown in the timeline while creating via popover.
- */
+/** Merges preview (ghost) events, shown in the timeline while creating via popover. */
 export function mergePreviewCalendarEvents({
   baseEvents,
   calendarMap,
@@ -131,9 +114,6 @@ export function mergePreviewCalendarEvents({
   return mergedEvents;
 }
 
-/**
- * Ensures a preview event has a calendarId, falling back to the provided default.
- */
 export function normalizePreviewEventCalendarId(
   event: DecoratedCalendarEvent | null,
   fallbackCalendarId: string,
@@ -152,17 +132,12 @@ export function normalizePreviewEventCalendarId(
   };
 }
 
-/**
- * Determines the loading state for the calendar UI based on
- * which data sources are still loading.
- */
 export function resolveCalendarLoadingState(input: CalendarLoadingStateInput) {
   const isStructureLoading =
     input.settingsLoading ||
     (input.calendarsLoading && input.calendarCount === 0) ||
     (input.categoriesLoading && input.categoryCount === 0);
-  // Callers must pass eventsLoading=true until the first events query has
-  // settled, including the window before that query is enabled.
+  // Callers must pass eventsLoading=true until the first events query has settled, including the window before that query is enabled.
   const isInitialEventsLoading = input.eventsLoading && input.eventCount === 0;
   const isAllInitialLoading = isStructureLoading || isInitialEventsLoading;
   const overlayContext: CalendarOverlayContext | undefined =

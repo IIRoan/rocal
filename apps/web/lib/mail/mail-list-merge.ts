@@ -13,10 +13,7 @@ export function sortMessagesByReceivedAt(
   );
 }
 
-/**
- * Merge a refreshed first page with already-loaded messages without discarding
- * tail pages or reintroducing stale drafts (Bulwark refreshCurrentMailbox pattern).
- */
+/** Merge a refreshed first page with loaded messages without discarding tail pages or reintroducing stale drafts. */
 export function mergeRefreshedMailboxMessages(
   currentMessages: JmapEmailMessage[],
   refreshedFirstPage: JmapEmailMessage[],

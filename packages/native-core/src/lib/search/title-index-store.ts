@@ -38,6 +38,18 @@ function additionalData(accountId: string): string {
   return `title:${accountId}`;
 }
 
+/** Guards the on-disk shard envelope before it reaches decryptSearchShard. */
+function isEncryptedSearchShard(value: unknown): value is EncryptedSearchShard {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.version === 1 &&
+    candidate.algorithm === "AES-GCM" &&
+    typeof candidate.iv === "string" &&
+    typeof candidate.ciphertext === "string"
+  );
+}
+
 export async function isNativeTitleIndexEnabled(): Promise<boolean> {
   const stored = await SecureStore.getItemAsync(
     SECURE_STORE_KEYS.SEARCH_INDEX_ENABLED,
@@ -81,7 +93,9 @@ export async function loadNativeTitleIndex(
     if (!info.exists) return [];
 
     const raw = await FileSystem.readAsStringAsync(path);
-    const shard = JSON.parse(raw) as EncryptedSearchShard;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isEncryptedSearchShard(parsed)) return [];
+    const shard = parsed;
     const key = await getOrCreateKey();
     const payload = await decryptSearchShard<TitleIndexShardPayload>(
       key,

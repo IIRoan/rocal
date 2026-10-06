@@ -42,14 +42,7 @@ export function monthKey(date: Date): string {
   return getCalendarMonthKey(date);
 }
 
-/**
- * Map any view range to a padded fetch range that fully contains it.
- *
- * Uses the midpoint of the range to determine the primary anchor month.
- * If the view range extends beyond that month's padded fetch range (e.g.
- * a 30-day agenda view), the range is expanded to also cover the end
- * month's padded range.
- */
+/** Map a view range to a padded fetch range containing it, expanding past the anchor month when the view outruns it. */
 export function toFetchRange(viewRange: DateRange): DateRange {
   const midpoint = new Date(
     (viewRange.start.getTime() + viewRange.end.getTime()) / 2,
@@ -134,8 +127,7 @@ export function useCalendarEventsLoader(
     preloadMonthsAhead = 2,
   } = options;
 
-  // Which calendar month to show.  Set exclusively by `setMonth`, which is
-  // called by CalendarDateSync from `currentDate` in the calendar context.
+  // Which calendar month to show.  Set exclusively by `setMonth`, which is called by CalendarDateSync from `currentDate` in the calendar context.
   const [activeMonth, setActiveMonth] = useState<string | null>(null);
 
   // Stable fetch range derived from the active month string.
@@ -147,7 +139,7 @@ export function useCalendarEventsLoader(
 
   const queryClient = useQueryClient();
 
-  const eventsQuery = useQuery({
+  const eventsQuery = useQuery<CalendarEvent[], ApiError>({
     queryKey: getMonthQueryKey(activeMonth),
     queryFn: async () => {
       if (!fetchRange) return [];
@@ -192,12 +184,12 @@ export function useCalendarEventsLoader(
     };
 
     if ("requestIdleCallback" in window) {
-      const idleId = (window as any).requestIdleCallback(runPrefetch, {
+      const idleId = window.requestIdleCallback(runPrefetch, {
         timeout: 500,
       });
       return () => {
         if ("cancelIdleCallback" in window) {
-          (window as any).cancelIdleCallback(idleId);
+          window.cancelIdleCallback(idleId);
         }
       };
     }
@@ -212,11 +204,7 @@ export function useCalendarEventsLoader(
     setActiveMonth((prev) => (prev === key ? prev : key));
   }, []);
 
-  /**
-   * No-op kept for backward compatibility with EventCalendar's
-   * `onDateRangeChange` prop.  Month selection is driven exclusively
-   * by CalendarDateSync → setMonth.
-   */
+  /** No-op kept for EventCalendar's onDateRangeChange; month selection is driven by CalendarDateSync → setMonth. */
   const setDateRange = useCallback((_dateRange: DateRange) => {}, []);
 
   const refetchEvents = useCallback(
@@ -270,10 +258,9 @@ export function useCalendarEventsLoader(
 
   return {
     events: eventsQuery.data ?? [],
-    // `isLoading` is false for disabled queries, so the workspace overlay
-    // would dismiss before the first month fetch even starts.
+    // isLoading is false for disabled queries, so the overlay would dismiss before the first month fetch starts.
     eventsLoading: !fetchRange || eventsQuery.isPending,
-    eventsError: eventsQuery.error as unknown as ApiError | null,
+    eventsError: eventsQuery.error,
     currentDateRange: fetchRange,
     setDateRange,
     setMonth,

@@ -324,9 +324,7 @@ export function buildEmailHtmlDocument({
   const viewport = mobileViewport
     ? `<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">`
     : "";
-  // break-word (not anywhere / word-break:break-word): break only over-long
-  // tokens, and keep each word's min-content width so table columns are not
-  // crushed to a single character (vertical "Qty"/"Total" / stacked €960.00).
+  // break-word (not anywhere / word-break:break-word): break only over-long tokens, and keep each word's min-content width so table columns are not crushed to a single character (vertical "Qty"/"Total" / stacked €960.00).
   const layoutStyles = `table{max-width:100%;table-layout:auto}td,th{overflow-wrap:break-word;word-break:normal}pre{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%}`;
   const richTextStyles = `ul,ol{margin:0 0 1em;padding-left:1.5em}ul{list-style-type:disc}ol{list-style-type:decimal}li{margin:0.25em 0}li>p{margin:0}blockquote{margin:0 0 1em;padding-left:12px;border-left:3px solid ${quoteBorder};color:${quoteColor}}a{color:${linkColor};text-decoration:underline}u{text-decoration:underline}s,strike,del{text-decoration:line-through}strong,b{font-weight:600}em,i{font-style:italic}`;
 

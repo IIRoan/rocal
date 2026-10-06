@@ -7,10 +7,7 @@ export interface UseRefreshGestureOptions {
   enabled?: boolean;
 }
 
-/**
- * Capture browser refresh gestures (F5, Ctrl/Cmd+R, pull-to-refresh) and run
- * a JMAP-level refresh instead of reloading the full page.
- */
+/** Capture refresh gestures (F5, Ctrl/Cmd+R, pull-to-refresh) and run a JMAP-level refresh instead of a full page reload. */
 export function useRefreshGesture({
   onRefresh,
   enabled = true,

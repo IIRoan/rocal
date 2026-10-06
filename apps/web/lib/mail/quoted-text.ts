@@ -3,11 +3,7 @@ export type QuoteSplit = {
   quote: string | null;
 };
 
-/**
- * Regex patterns that identify the beginning of a quoted reply block in
- * plaintext email bodies. Ordered from most-specific to least-specific so the
- * first match wins.
- */
+/** Quote-start patterns ordered most-specific first; the first match wins. */
 const PLAINTEXT_QUOTE_STARTERS: RegExp[] = [
   // App-generated separator: "\n\n---\nOn <date>, <email> wrote:"
   // Handles optional trailing whitespace on the --- line and optional extra blank lines
@@ -26,17 +22,11 @@ const PLAINTEXT_QUOTE_STARTERS: RegExp[] = [
   /\nFrom:\s*.{1,200}\n(?:Sent|Date):\s*.{1,200}\nTo:\s*.{1,200}\n/,
 ];
 
-/**
- * Split a plaintext email body from its quoted chain.
- *
- * Returns `{ body, quote }` where `body` is the new-message text and `quote`
- * is the collapsed chain (or `null` if no quote was detected).
- */
+/** Split a plaintext body from its quoted chain; `quote` is null when no quote is detected. */
 export function splitPlaintextQuote(text: string): QuoteSplit {
   if (!text) return { body: text, quote: null };
 
-  // Normalise CRLF → LF and bare CR → LF so patterns work regardless of
-  // email line-ending style (JMAP spec §4.1.4 requires CRLF in bodyValues)
+  // Normalise CRLF → LF and bare CR → LF so patterns work regardless of email line-ending style (JMAP spec §4.1.4 requires CRLF in bodyValues)
   const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 
   for (const pattern of PLAINTEXT_QUOTE_STARTERS) {
@@ -53,16 +43,7 @@ export function splitPlaintextQuote(text: string): QuoteSplit {
   return { body: normalized, quote: null };
 }
 
-/**
- * Strip quoted reply blocks from an HTML email string.
- *
- * Detects Gmail (`class="gmail_quote"`), Apple Mail, and standard
- * `<blockquote type="cite">` patterns and removes them from the DOM.
- *
- * Falls back gracefully when `DOMParser` is unavailable (SSR): returns the
- * original HTML but still sets `hasQuote` so the caller can offer a reveal
- * button without breaking the initial render.
- */
+/** Strip quoted reply blocks from HTML (Gmail, Apple Mail, blockquote[type=cite]); without DOMParser it returns the original HTML and still flags hasQuote. */
 export function splitHtmlQuote(html: string): {
   html: string;
   hasQuote: boolean;

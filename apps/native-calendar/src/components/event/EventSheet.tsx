@@ -301,6 +301,7 @@ export function EventSheet({
   );
 
   const handleSubmit = useCallback(
+    // repo-rules-allow async-promise-handling: submitEvent awaits only checkEventRecurrence, which catches internally; mutate() reports via onError.
     (submission: EventFormSubmission) => void submitEvent(submission),
     [submitEvent],
   );
@@ -999,12 +1000,12 @@ function createStyles(theme: ThemeTokens) {
 
     modalOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
+      backgroundColor: theme.colors.overlay + "80",
       justifyContent: "center" as const,
       alignItems: "center" as const,
     },
     modalContent: {
-      width: "85%" as unknown as number,
+      width: "85%",
       backgroundColor: theme.colors.card,
       borderRadius: theme.borderRadius.lg,
       padding: 16,

@@ -133,7 +133,7 @@ export function GlobalLoadingScreen({
       <div
         data-motion-skip="true"
         className={cn(
-          "fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm",
+          "fixed inset-0 z-50 flex items-center justify-center bg-background",
           className,
         )}
       >
@@ -152,7 +152,7 @@ export function GlobalLoadingScreen({
     <div
       data-motion-skip="true"
       className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm",
+        "fixed inset-0 z-50 flex items-center justify-center bg-background",
         className,
       )}
     >
@@ -184,7 +184,7 @@ export function GlobalLoadingScreen({
         <div className="w-full max-w-sm">
           <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary [animation:pulse_1.4s_ease-in-out_infinite]"
+              className="h-full rounded-full bg-primary [animation:pulse_1.4s_ease-in-out_infinite]"
               style={{ width: "75%", animationDuration: "1.4s" }}
             />
           </div>
@@ -288,7 +288,7 @@ export function LoadingOverlay({
     <div data-motion-skip="true" className={cn("relative", className)}>
       {children}
       {isLoading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background rounded-lg">
           <div className="flex items-center space-x-2">
             <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent [animation:spin_1s_linear_infinite]" />
             <span className="text-sm font-medium">{message}</span>

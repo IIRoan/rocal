@@ -1,10 +1,6 @@
 import Link from "@tiptap/extension-link";
 
-/**
- * Link mark that stores href exactly as typed — no autolink, no defaultProtocol,
- * no URL normalization. Uses getAttribute("href") when parsing DOM so relative
- * paths are not resolved against the page origin.
- */
+/** Link mark storing href exactly as typed: no autolink, normalization, or protocol resolution, so relative hrefs survive round-trips. */
 export const LiteralLink = Link.extend({
   addOptions() {
     return {

@@ -399,7 +399,7 @@ function buildUtcDateFromTimeZoneDateParts(
   }
 
   if (endOfDay) {
-    normalized.setMilliseconds(999);
+    normalized.setUTCMilliseconds(999);
   }
 
   return normalized;
@@ -742,6 +742,7 @@ export function parseICSFile(
         continue;
       }
 
+      // ical's component types carry no index signature, so read the raw record fields.
       const metadata = component as unknown as UnknownRecord;
       result.calendarName =
         result.calendarName ??

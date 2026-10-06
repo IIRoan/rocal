@@ -22,7 +22,7 @@ const PRIMITIVES = {
 } as const;
 
 const SURFACE_CLASS =
-  "z-50 overflow-hidden rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-l3-solid)] text-[var(--text-primary)] shadow-[var(--shadow-l2)] outline-none";
+  "z-50 overflow-hidden rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-l3-solid)] text-[var(--text-primary)] shadow-[var(--shadow-l2)] outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--border-secondary)]";
 
 const MENU_SURFACE_CLASS = cn(
   SURFACE_CLASS,
@@ -30,7 +30,7 @@ const MENU_SURFACE_CLASS = cn(
 );
 
 const ITEM_CLASS =
-  "group/item flex h-8 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2 text-left text-[15px] leading-[130%] text-[var(--text-primary)] outline-none transition-colors data-[highlighted]:bg-[var(--bg-cell-hover)] data-[state=open]:bg-[var(--bg-cell-hover)] data-[disabled]:pointer-events-none data-[disabled]:opacity-40";
+  "group/item flex h-8 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2 text-left text-[15px] leading-[130%] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-cell-hover)] focus-visible:bg-[var(--bg-cell-hover)] data-[highlighted]:bg-[var(--bg-cell-hover)] data-[state=open]:bg-[var(--bg-cell-hover)] data-[disabled]:pointer-events-none data-[disabled]:opacity-40";
 
 const DESTRUCTIVE_ITEM_CLASS =
   "text-[var(--text-destructive)] data-[highlighted]:bg-[var(--cta-destructive-hover)]";

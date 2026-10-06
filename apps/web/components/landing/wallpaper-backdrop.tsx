@@ -6,17 +6,11 @@ import { useSyncExternalStore } from "react";
 
 const WALLPAPER_SRC = "/wallpaper.jpg";
 
-const DARK_PALETTE = {
-  colorBack: "#212121",
-  colorFront: "#5c4a2c",
-  colorHighlight: "#f0d9a0",
-} as const;
+// repo-rules-allow theme-tokens-only: hand-tuned ImageDithering shader uniforms; the shader takes literal colors, not CSS surfaces.
+const DARK_PALETTE = { colorBack: "#212121", colorFront: "#5c4a2c", colorHighlight: "#f0d9a0" } as const;
 
-const LIGHT_PALETTE = {
-  colorBack: "#f8f8f8",
-  colorFront: "#5a4a36",
-  colorHighlight: "#8a7050",
-} as const;
+// repo-rules-allow theme-tokens-only: hand-tuned ImageDithering shader uniforms; the shader takes literal colors, not CSS surfaces.
+const LIGHT_PALETTE = { colorBack: "#f8f8f8", colorFront: "#5a4a36", colorHighlight: "#8a7050" } as const;
 
 const subscribeNoop = () => () => {};
 const getClientSnapshot = () => true;

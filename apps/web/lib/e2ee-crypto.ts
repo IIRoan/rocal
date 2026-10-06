@@ -8,6 +8,8 @@ export type {
   PasswordEnvelopePayload,
 } from "@workspace/e2ee";
 export {
+  isEncryptedJsonPayload,
+  parseEncryptedJsonPayload,
   PASSWORD_KDF_ALGORITHM,
   PASSWORD_WRAP_ALGORITHM,
   DEFAULT_PASSWORD_KDF_ITERATIONS,
@@ -19,8 +21,7 @@ export function isWebCryptoAvailable(): boolean {
 }
 
 // DOM Crypto implements every provider method with narrower signatures; the loose shared interface needs this bridge.
-const webCrypto: CryptoProvider =
-  globalThis.crypto as unknown as CryptoProvider;
+const webCrypto: CryptoProvider = globalThis.crypto as unknown as CryptoProvider;
 
 // Create the E2EE module instance with web crypto
 const e2eeModule = createE2eeModule(webCrypto);

@@ -128,12 +128,8 @@ export interface IMailService {
     email: string,
     options?: { allowRemoteResolve?: boolean },
   ): Promise<MailDirectoryKeyResult>;
-  getVaultBackup(email: string): Promise<MailVaultBackupResult>;
   getVaultBackupForUser(
     input: GetMailVaultBackupForUserInput,
-  ): Promise<MailVaultBackupResult>;
-  upsertVaultBackup(
-    input: UpsertMailVaultBackupInput,
   ): Promise<MailVaultBackupResult>;
   upsertVaultBackupForUser(
     input: UpsertMailVaultBackupForUserInput,

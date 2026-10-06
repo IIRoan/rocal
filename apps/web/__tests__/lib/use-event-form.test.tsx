@@ -38,6 +38,7 @@ jest.mock("@workspace/logger", () => ({
 
 import { calendarApiService } from "../../lib/calendar-api-service";
 import { useEventForm } from "../../hooks/use-event-form";
+import type { UseCalendarDataReturn } from "../../hooks/use-calendar-data";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -220,6 +221,8 @@ describe("useEventForm reminder hydration", () => {
       title: "Reminder reshuffle",
     };
     const calendarData = {
+      createEvent: jest.fn<UseCalendarDataReturn["createEvent"]>(),
+      editRecurringEvent: jest.fn<UseCalendarDataReturn["editRecurringEvent"]>(),
       updateEvent: jest.fn(async (_eventId: string, event: any) => ({
         ...futureEvent,
         ...event,
@@ -305,6 +308,8 @@ describe("useEventForm reminder hydration", () => {
       title: "Last reminder removal",
     };
     const calendarData = {
+      createEvent: jest.fn<UseCalendarDataReturn["createEvent"]>(),
+      editRecurringEvent: jest.fn<UseCalendarDataReturn["editRecurringEvent"]>(),
       updateEvent: jest.fn(async (_eventId: string, event: any) => ({
         ...futureEvent,
         ...event,
@@ -375,6 +380,8 @@ describe("useEventForm reminder hydration", () => {
       "2099-04-30T23:59:59.999Z",
     ] as const;
     const calendarData = {
+      createEvent: jest.fn<UseCalendarDataReturn["createEvent"]>(),
+      editRecurringEvent: jest.fn<UseCalendarDataReturn["editRecurringEvent"]>(),
       updateEvent: jest.fn(async (_eventId: string, event: any) => ({
         ...futureEvent,
         ...event,
@@ -510,6 +517,8 @@ describe("useEventForm reminder hydration", () => {
 
   it("sends empty location, description, and participants when those values are cleared", async () => {
     const calendarData = {
+      createEvent: jest.fn<UseCalendarDataReturn["createEvent"]>(),
+      editRecurringEvent: jest.fn<UseCalendarDataReturn["editRecurringEvent"]>(),
       updateEvent: jest.fn(async (_eventId: string, event: any) => ({
         ...baseEvent,
         ...event,
@@ -587,11 +596,12 @@ describe("useEventForm reminder hydration", () => {
 
     it("saves through editRecurringEvent with the selected scope and pre-edit occurrence", async () => {
       const calendarData = {
+        createEvent: jest.fn<UseCalendarDataReturn["createEvent"]>(),
         editRecurringEvent: jest.fn(async () => ({
           ...occurrence,
           id: "series-2",
         })),
-        updateEvent: jest.fn(),
+        updateEvent: jest.fn<UseCalendarDataReturn["updateEvent"]>(),
       };
 
       await act(async () => {
@@ -615,7 +625,8 @@ describe("useEventForm reminder hydration", () => {
 
     it("keeps plain updates for saves without a scope", async () => {
       const calendarData = {
-        editRecurringEvent: jest.fn(),
+        createEvent: jest.fn<UseCalendarDataReturn["createEvent"]>(),
+        editRecurringEvent: jest.fn<UseCalendarDataReturn["editRecurringEvent"]>(),
         updateEvent: jest.fn(async (_id: string, event: any) => ({
           ...occurrence,
           ...event,
@@ -647,8 +658,9 @@ describe("useEventForm reminder hydration", () => {
       });
 
       const calendarData = {
+        createEvent: jest.fn<UseCalendarDataReturn["createEvent"]>(),
         editRecurringEvent: jest.fn(async () => ({ ...occurrence })),
-        updateEvent: jest.fn(),
+        updateEvent: jest.fn<UseCalendarDataReturn["updateEvent"]>(),
       };
 
       await act(async () => {
@@ -688,6 +700,7 @@ describe("useEventForm reminder hydration", () => {
   describe("event categories", () => {
     function makeCalendarData() {
       return {
+        editRecurringEvent: jest.fn<UseCalendarDataReturn["editRecurringEvent"]>(),
         createEvent: jest.fn(async (event: any) => ({
           ...baseEvent,
           ...event,

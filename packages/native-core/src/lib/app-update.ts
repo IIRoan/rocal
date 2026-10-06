@@ -28,10 +28,7 @@ export function resolveAppUpdatePhase(
   return "idle";
 }
 
-/**
- * Settings CTA — Later only hides the full-screen dispatch.
- * A waiting bundle or failed download can still be installed this session.
- */
+/** Settings CTA: Later only hides the full-screen dispatch; a pending bundle or failed download can still be installed this session. */
 export function resolveAppUpdateAction(
   snapshot: AppUpdateSnapshot,
 ): AppUpdatePhase {
@@ -161,11 +158,11 @@ export function presentUpdateCheckAlert(
     alert: (
       title: string,
       body: string,
-      buttons?: Array<{
+      buttons?: {
         text: string;
         style?: "cancel" | "destructive" | "default";
         onPress?: () => void;
-      }>,
+      }[],
     ) => void;
   },
 ): void {

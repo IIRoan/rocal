@@ -54,10 +54,12 @@ export class AccountService implements IAccountService {
     const { localPart, normalizedEmail, domain } = desiredEmail.value;
 
     const [existingUser, existingMailbox] = await Promise.all([
+      // repo-rules-allow owner-scoped-data: Email availability is a global uniqueness check, not a user-owned read.
       this.prisma.user.findUnique({
         where: { email: normalizedEmail },
         select: { id: true },
       }),
+      // repo-rules-allow owner-scoped-data: Email availability is a global uniqueness check, not a user-owned read.
       this.prisma.mailDirectoryEntry.findUnique({
         where: { email: normalizedEmail },
         select: { id: true },

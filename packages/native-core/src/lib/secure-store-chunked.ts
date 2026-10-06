@@ -83,11 +83,7 @@ async function deleteBaChunks(baseKey: string, count: number) {
   );
 }
 
-/**
- * Read a value written by Better Auth's adapter and/or our legacy `_N` chunks.
- * Legacy meta keys are bare digits like `"1"` — never return that raw to callers
- * that JSON.parse the cookie jar (Better Auth then tries to set properties on `1`).
- */
+/** Read Better Auth/legacy chunked values; bare digit meta must never surface raw or Better Auth sets properties on 1 and crashes. */
 export function getChunkedSecureValueSync(baseKey: string) {
   try {
     const raw = SecureStore.getItem(baseKey);
@@ -132,13 +128,19 @@ export function setChunkedSecureValueSync(baseKey: string, value: string) {
 
   if (previousLegacyCount) {
     for (let index = 0; index < previousLegacyCount; index += 1) {
-      void SecureStore.deleteItemAsync(legacyChunkKey(baseKey, index));
+      // Best-effort cleanup; a failed delete only leaves a stale chunk nobody reads.
+      void SecureStore.deleteItemAsync(legacyChunkKey(baseKey, index)).catch(
+        () => undefined,
+      );
     }
   }
 
   if (previousBaCount && value.length <= LEGACY_CHUNK_SIZE) {
     for (let i = 0; i < previousBaCount; i += 1) {
-      void SecureStore.deleteItemAsync(`${baseKey}.${i}`);
+      // Best-effort cleanup; a failed delete only leaves a stale chunk nobody reads.
+      void SecureStore.deleteItemAsync(`${baseKey}.${i}`).catch(
+        () => undefined,
+      );
     }
   }
 }
@@ -222,6 +224,21 @@ function cookieJarHasSessionToken(raw: string | null) {
   }
 }
 
+/** A Better Auth cookie jar maps cookie names to { value, expires } entries. */
+type CookieJar = Record<string, { value: string; expires: string | null }>;
+
+function isCookieJar(value: unknown): value is CookieJar {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  return Object.values(value).every(
+    (entry) =>
+      typeof entry === "object" &&
+      entry !== null &&
+      typeof (entry as Record<string, unknown>).value === "string",
+  );
+}
+
 function restoreSessionTokenIntoJar(value: string, previousJoined: string | null) {
   if (
     !value ||
@@ -244,15 +261,14 @@ function restoreSessionTokenIntoJar(value: string, previousJoined: string | null
       null;
     if (previousJoined) {
       try {
-        const previous = JSON.parse(previousJoined) as Record<
-          string,
-          { value: string; expires: string | null }
-        >;
-        const name = Object.keys(previous).find((key) =>
-          key.includes("session_token"),
-        );
-        if (name && typeof previous[name]?.value === "string") {
-          restored = { name, entry: previous[name] };
+        const previous: unknown = JSON.parse(previousJoined);
+        if (isCookieJar(previous)) {
+          const name = Object.keys(previous).find((key) =>
+            key.includes("session_token"),
+          );
+          if (name) {
+            restored = { name, entry: previous[name] };
+          }
         }
       } catch {
         // Previous value was not a jar.
@@ -280,15 +296,7 @@ function restoreSessionTokenIntoJar(value: string, previousJoined: string | null
   }
 }
 
-/**
- * Storage for `@better-auth/expo`.
- *
- * Better Auth wraps this in its own `storageAdapter` (BA chunk markers). We must:
- * - reassemble legacy `_N` meta keys (`"1"`) so BA never JSON.parses a number
- * - leave BA chunk markers untouched for BA's adapter
- * - scrub leftover legacy chunks when BA writes a fresh value
- * - keep a session_token if Set-Cookie Max-Age=0 clears land after a fresh login
- */
+/** Better Auth storage: reassemble legacy chunks, leave BA markers to its adapter, scrub legacy leftovers, keep session_token across Max-Age=0 races. */
 export const authSecureStore = {
   getItem: (key: string) => {
     try {
@@ -319,7 +327,10 @@ export const authSecureStore = {
       SecureStore.setItem(key, next);
       if (previousLegacyCount) {
         for (let index = 0; index < previousLegacyCount; index += 1) {
-          void SecureStore.deleteItemAsync(legacyChunkKey(key, index));
+          // Best-effort cleanup; a failed delete only leaves a stale chunk nobody reads.
+          void SecureStore.deleteItemAsync(legacyChunkKey(key, index)).catch(
+            () => undefined,
+          );
         }
       }
     } catch {

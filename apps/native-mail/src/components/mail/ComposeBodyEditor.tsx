@@ -66,16 +66,20 @@ type EditorMessage =
 
 function parseEditorMessage(raw: string): EditorMessage | null {
   try {
-    const parsed = JSON.parse(raw) as EditorMessage;
-    if (parsed?.type === "change" && typeof parsed.html === "string") {
-      return parsed;
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const message = parsed as { type?: unknown; html?: unknown };
+    if (message.type === "change") {
+      return typeof message.html === "string"
+        ? { type: "change", html: message.html }
+        : null;
     }
     if (
-      parsed?.type === "ready" ||
-      parsed?.type === "focus" ||
-      parsed?.type === "blur"
+      message.type === "ready" ||
+      message.type === "focus" ||
+      message.type === "blur"
     ) {
-      return parsed;
+      return { type: message.type };
     }
     return null;
   } catch {
@@ -96,7 +100,7 @@ function buildEditorDocument(input: {
 <html>
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     html, body {
       margin: 0;

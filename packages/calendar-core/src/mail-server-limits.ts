@@ -121,8 +121,7 @@ function resolveAttachmentSizeBytes(
     return source.configLimits.maxAttachmentSizeBytes;
   }
 
-  // When only blob-upload limits are known, attachment cap stays unknown so
-  // maxOutgoingAttachmentBytes is not incorrectly capped below the upload limit.
+  // When only blob-upload limits are known, attachment cap stays unknown so maxOutgoingAttachmentBytes is not incorrectly capped below the upload limit.
   if (hasBlobUploadLimitSource(source)) {
     return null;
   }

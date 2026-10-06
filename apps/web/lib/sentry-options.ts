@@ -38,8 +38,7 @@ export function getWebSentryOptions() {
   }
 
   const { key, host, project } = parsed;
-  // Numeric projectId satisfies SDK DSN validation; tunnel targets the real
-  // errex project path and carries sentry_key for ERREX_REQUIRE_AUTH.
+  // Numeric projectId satisfies SDK DSN validation; tunnel targets the real errex project path and carries sentry_key for ERREX_REQUIRE_AUTH.
   const sdkDsn = `https://${key}@${host}/1`;
   const tunnel = `https://${host}/api/${encodeURIComponent(project)}/envelope/?sentry_key=${encodeURIComponent(key)}`;
 

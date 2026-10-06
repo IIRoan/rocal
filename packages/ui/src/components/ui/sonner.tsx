@@ -36,11 +36,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "inline-flex h-8 shrink-0 items-center justify-center rounded-md bg-muted px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent",
           closeButton:
             "absolute right-2 top-2 rounded-md p-0.5 text-muted-foreground/50 transition-colors hover:text-foreground",
-          success:
-            "[&_[data-icon]]:text-emerald-600 dark:[&_[data-icon]]:text-emerald-400",
+          success: "[&_[data-icon]]:text-success",
           error: "[&_[data-icon]]:text-destructive",
-          warning:
-            "[&_[data-icon]]:text-amber-600 dark:[&_[data-icon]]:text-amber-400",
+          warning: "[&_[data-icon]]:text-warning",
           info: "[&_[data-icon]]:text-primary",
         },
       }}

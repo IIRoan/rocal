@@ -1,9 +1,4 @@
-/**
- * Last-known session token from a successful sign-in / getSession.
- * Cookie-jar races (Better Auth applying Max-Age=0 Set-Cookie after we persist)
- * can empty SecureStore while React still has a valid session. Headers fall
- * back to this token so the first post-login API calls are not 401s.
- */
+/** Last-known token: cookie-jar races can empty SecureStore mid-session, so early headers fall back to it instead of 401ing. */
 let fallbackSessionToken: string | null = null;
 
 export function setFallbackSessionToken(token: string | null | undefined) {

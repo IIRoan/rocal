@@ -2,6 +2,7 @@
 
 import React, { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { nativeMailLightTheme } from "@workspace/design-tokens";
 import { HtmlEmailView } from "./HtmlEmailView";
 
 let mockWebViewHtml: string | null = null;
@@ -50,7 +51,15 @@ describe("HtmlEmailView", () => {
   });
 
   it("blocks remote images when the caller does not opt in", () => {
-    act(() => root.render(<HtmlEmailView html={EMAIL_HTML} isDark={false} />));
+    act(() =>
+      root.render(
+        <HtmlEmailView
+          html={EMAIL_HTML}
+          isDark={false}
+          theme={nativeMailLightTheme}
+        />,
+      ),
+    );
 
     expect(mockWebViewHtml).toContain("Hello");
     expect(mockWebViewHtml).not.toContain(REMOTE_IMAGE_URL);
@@ -60,7 +69,12 @@ describe("HtmlEmailView", () => {
   it("loads remote images only when explicitly allowed", () => {
     act(() =>
       root.render(
-        <HtmlEmailView html={EMAIL_HTML} isDark={false} blockRemoteImages={false} />,
+        <HtmlEmailView
+          html={EMAIL_HTML}
+          isDark={false}
+          theme={nativeMailLightTheme}
+          blockRemoteImages={false}
+        />,
       ),
     );
 

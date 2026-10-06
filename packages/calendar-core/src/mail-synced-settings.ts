@@ -79,12 +79,15 @@ export function createMailSettingsCipher<Key, Payload>(
       JSON.stringify(
         await e2ee.encryptJsonPayload(accountKey, settings, MAIL_SYNCED_SETTINGS_AAD),
       ),
-    decrypt: async (encryptedContent) =>
-      e2ee.decryptJsonPayload<unknown>(
+    decrypt: async (encryptedContent) => {
+      // repo-rules-allow typescript-untrusted-input: re-parse of the envelope this cipher serialized; AES-GCM auth inside decryptJsonPayload rejects tampering and callers catch failures.
+      const envelope = JSON.parse(encryptedContent) as Payload;
+      return e2ee.decryptJsonPayload<unknown>(
         accountKey,
-        JSON.parse(encryptedContent) as Payload,
+        envelope,
         MAIL_SYNCED_SETTINGS_AAD,
-      ),
+      );
+    },
   };
 }
 

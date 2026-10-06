@@ -1,16 +1,4 @@
-/**
- * Minimal MIME parser for PGP/MIME decrypted payloads.
- *
- * Handles the subset of MIME that email clients actually produce:
- *   - multipart/mixed, multipart/alternative, multipart/related, multipart/signed
- *   - text/plain and text/html parts
- *   - quoted-printable and base64 content-transfer-encodings
- *   - attachment extraction (disposition === "attachment" and not related)
- *
- * Uses NO Blob, ReadableStream, or any API unavailable in React Native / Hermes.
- * This replaces postal-mime, which internally calls `new Blob([ArrayBuffer])` —
- * an operation not supported by React Native's native Blob implementation.
- */
+/** MIME parser for decrypted PGP/MIME payloads, avoiding Blob/ReadableStream APIs that Hermes lacks. */
 
 import { decodeBase64ToBytes } from "./binary-utils";
 import type { JmapAttachment } from "./types";

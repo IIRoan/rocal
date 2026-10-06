@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import { resolveLabelDisplayColor } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useMailSkin, type MailSkin } from "@workspace/native-core/components/mail/mail-ui";
 
@@ -17,7 +18,7 @@ export function MailLabelChip({ name, color }: MailLabelChipProps) {
 
   return (
     <View style={styles.chip}>
-      <View style={[styles.dot, { backgroundColor: color }]} />
+      <View style={[styles.dot, { backgroundColor: resolveLabelDisplayColor(color, theme.colors.mutedForeground) }]} />
       <Text style={styles.label} numberOfLines={1}>
         {name}
       </Text>

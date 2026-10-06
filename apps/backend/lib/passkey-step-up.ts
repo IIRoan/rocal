@@ -89,6 +89,19 @@ function encodeStepUpCookieValue(input: {
   return `${encoded}.${signStepUpPayload(encoded)}`;
 }
 
+/** Cookie payload shape: user id, session id, and expiry in epoch seconds. */
+function isStepUpCookiePayload(value: unknown): value is StepUpCookiePayload {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.u === "string" &&
+    typeof record.s === "string" &&
+    typeof record.e === "number"
+  );
+}
+
 function parseStepUpCookieValue(raw: string): StepUpCookiePayload | null {
   const separator = raw.lastIndexOf(".");
   if (separator <= 0) {
@@ -109,20 +122,16 @@ function parseStepUpCookieValue(raw: string): StepUpCookiePayload | null {
   }
 
   try {
-    const payload = JSON.parse(
+    const parsed: unknown = JSON.parse(
       Buffer.from(encoded, "base64url").toString("utf8"),
-    ) as StepUpCookiePayload;
-    if (
-      typeof payload.u !== "string" ||
-      typeof payload.s !== "string" ||
-      typeof payload.e !== "number"
-    ) {
+    );
+    if (!isStepUpCookiePayload(parsed)) {
       return null;
     }
-    if (payload.e < Math.floor(Date.now() / 1000)) {
+    if (parsed.e < Math.floor(Date.now() / 1000)) {
       return null;
     }
-    return payload;
+    return parsed;
   } catch {
     return null;
   }

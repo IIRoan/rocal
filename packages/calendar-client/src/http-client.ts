@@ -30,6 +30,23 @@ export interface RequestOptions extends RequestInit {
   retries?: number;
 }
 
+/** Parsed JSON error body, or null when the body is not JSON at all (callers then fall back to the raw text). */
+function asJsonRecord(text: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return parsed && typeof parsed === "object"
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return null;
+  }
+}
+
+/** Non-empty string field, or undefined when the API sent something else. */
+function asNonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 export class HttpClient {
   private baseURL: string;
   private timeout: number;
@@ -57,14 +74,30 @@ export class HttpClient {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  private isRetryableError(error: any): boolean {
+  private errorName(error: unknown): string {
+    return error instanceof Error ? error.name : "";
+  }
+
+  /** Status from either `status` (Response-like) or `statusCode` (ApiError). */
+  private errorStatus(error: unknown): number | undefined {
+    if (typeof error !== "object" || error === null) {
+      return undefined;
+    }
+    const record = error as { status?: unknown; statusCode?: unknown };
+    if (typeof record.status === "number") {
+      return record.status;
+    }
+    return typeof record.statusCode === "number" ? record.statusCode : undefined;
+  }
+
+  private isRetryableError(error: unknown): boolean {
     // Retry on network errors and timeouts
-    if (error.name === "TypeError" || error.name === "AbortError") {
+    const name = this.errorName(error);
+    if (name === "TypeError" || name === "AbortError") {
       return true;
     }
 
-    // Resolve the status from either `status` (Response-like) or `statusCode` (ApiError)
-    const status: number | undefined = error.status ?? error.statusCode;
+    const status = this.errorStatus(error);
 
     // Retry on 5xx server errors
     if (status !== undefined && status >= 500 && status < 600) {
@@ -95,23 +128,18 @@ export class HttpClient {
       const errorText = await response.text();
       this.logHttpError(response, errorText);
 
-      let errorData: any;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = {
-          error: "HTTP Error",
-          message:
-            errorText || response.statusText || `HTTP ${response.status}`,
-        };
-      }
+      const parsed = asJsonRecord(errorText);
+      const fallbackMessage = parsed
+        ? response.statusText
+        : errorText || response.statusText;
 
       const apiError: ApiError = {
-        error: errorData.error || "HTTP Error",
+        error: asNonEmptyString(parsed?.error) ?? "HTTP Error",
         message:
-          errorData.message || response.statusText || `HTTP ${response.status}`,
+          asNonEmptyString(parsed?.message) ??
+          (fallbackMessage || `HTTP ${response.status}`),
         statusCode: response.status,
-        details: errorData.details || [],
+        details: parsed?.details ?? [],
       };
 
       this.logHttpError(response, {
@@ -144,7 +172,7 @@ export class HttpClient {
     // Resolve platform-specific headers once per request
     const extraHeaders = this.getHeaders ? await this.getHeaders() : {};
 
-    let lastError: any;
+    let lastError: unknown;
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       const controller = new AbortController();
@@ -174,8 +202,7 @@ export class HttpClient {
         signal: controller.signal,
         credentials: this.credentials,
         headers: {
-          // Only set JSON Content-Type when a body is present. Empty DELETE/GET
-          // with application/json makes Elysia try to parse and return 400 PARSE.
+          // Only set JSON Content-Type when a body is present. Empty DELETE/GET with application/json makes Elysia try to parse and return 400 PARSE.
           ...(hasBody ? { "Content-Type": "application/json" } : {}),
           ...extraHeaders,
           ...(fetchOptions as RequestInit).headers,
@@ -230,9 +257,10 @@ export class HttpClient {
           return {} as T;
         }
 
-        const data = await response.json();
-        return this.transformDates(data);
-      } catch (error: any) {
+        const data: unknown = await response.json();
+        // The caller's `T` is the declared contract for this endpoint's payload.
+        return this.transformDates(data) as T;
+      } catch (error) {
         clearTimeout(timeoutId);
         if (abortListener && externalSignal) {
           externalSignal.removeEventListener("abort", abortListener);
@@ -241,8 +269,9 @@ export class HttpClient {
         lastError = error;
 
         // Don't retry authentication errors
-        if (error?.statusCode === 401 || error?.statusCode === 403) {
-          if (error.statusCode === 401) {
+        const statusCode = this.errorStatus(error);
+        if (statusCode === 401 || statusCode === 403) {
+          if (statusCode === 401) {
             this.onAuthError?.(401);
           }
           if (isPasskeyStepUpRequiredError(error)) {
@@ -265,21 +294,23 @@ export class HttpClient {
     throw lastError;
   }
 
-  private transformDates(obj: any): any {
-    if (obj === null || obj === undefined) {
-      return obj;
+  private transformDates(value: unknown): unknown {
+    if (value === null || value === undefined) {
+      return value;
     }
 
-    if (Array.isArray(obj)) {
-      return obj.map((item) => this.transformDates(item));
+    if (Array.isArray(value)) {
+      return value.map((item) => this.transformDates(item));
     }
 
-    if (typeof obj === "object") {
-      const transformed: any = {};
-      for (const [key, value] of Object.entries(obj)) {
-        if (key === "blindIndexTokens" && typeof value === "string") {
+    if (typeof value === "object") {
+      const transformed: Record<string, unknown> = {};
+      for (const [key, item] of Object.entries(
+        value as Record<string, unknown>,
+      )) {
+        if (key === "blindIndexTokens" && typeof item === "string") {
           try {
-            const parsed = JSON.parse(value);
+            const parsed = JSON.parse(item);
             transformed[key] = Array.isArray(parsed) ? parsed : [];
           } catch {
             transformed[key] = [];
@@ -294,25 +325,25 @@ export class HttpClient {
             key === "updatedAt" ||
             key === "syncedAt" ||
             key === "lastSeenAt") &&
-          typeof value === "string"
+          typeof item === "string"
         ) {
-          const dateValue = new Date(value);
+          const dateValue = new Date(item);
           transformed[key] = dateValue;
         } else {
-          transformed[key] = this.transformDates(value);
+          transformed[key] = this.transformDates(item);
         }
       }
       return transformed;
     }
 
-    return obj;
+    return value;
   }
 
   async get<T>(url: string, options?: RequestOptions): Promise<T> {
     return this.makeRequest<T>(url, { ...options, method: "GET" });
   }
 
-  async post<T>(url: string, data?: any, options?: RequestOptions): Promise<T> {
+  async post<T>(url: string, data?: unknown, options?: RequestOptions): Promise<T> {
     return this.makeRequest<T>(url, {
       ...options,
       method: "POST",
@@ -320,7 +351,7 @@ export class HttpClient {
     });
   }
 
-  async put<T>(url: string, data?: any, options?: RequestOptions): Promise<T> {
+  async put<T>(url: string, data?: unknown, options?: RequestOptions): Promise<T> {
     return this.makeRequest<T>(url, {
       ...options,
       method: "PUT",

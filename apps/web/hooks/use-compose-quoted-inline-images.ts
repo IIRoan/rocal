@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { createLogger } from "@workspace/logger";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import type { JmapSession } from "@/lib/mail/types";
 import {
@@ -19,6 +20,8 @@ type ActiveMailbox = {
   session: JmapSession;
 };
 
+const log = createLogger("compose-quoted-inline-images");
+
 export function useComposeQuotedInlineImages(input: {
   enabled: boolean;
   setHtmlBody: Dispatch<SetStateAction<string>>;
@@ -26,7 +29,8 @@ export function useComposeQuotedInlineImages(input: {
   activeMailbox: ActiveMailbox | null;
 }) {
   useEffect(() => {
-    if (!input.enabled || !input.activeMailbox) return;
+    const activeMailbox = input.activeMailbox;
+    if (!input.enabled || !activeMailbox) return;
     if (input.quotedAttachments.length === 0) return;
 
     const inlineAttachments = input.quotedAttachments.filter(
@@ -64,8 +68,8 @@ export function useComposeQuotedInlineImages(input: {
             continue;
           }
           try {
-            const blob = await input.activeMailbox!.client.downloadBlob(
-              input.activeMailbox!.session,
+            const blob = await activeMailbox.client.downloadBlob(
+              activeMailbox.session,
               attachment.blobId,
               attachment.name || "inline",
               attachment.type || "application/octet-stream",
@@ -100,7 +104,9 @@ export function useComposeQuotedInlineImages(input: {
       } finally {
         finishHydration();
       }
-    })();
+    })().catch((error) => {
+      log.error("Failed to hydrate quoted inline images", error);
+    });
 
     return () => {
       cancelled = true;

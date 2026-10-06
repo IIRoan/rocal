@@ -17,7 +17,6 @@ import { authEmailFrom, mailer } from "../lib/email-client";
 import { env } from "../lib/env";
 import { sendEventRsvpReply } from "../lib/event-rsvp-reply";
 import { errorMessage } from "../lib/errors";
-import { errorLogDetails } from "../lib/log-sanitization";
 import {
   resolveAcceptedInvitationTargetCalendar,
   resolveInvitationStagingCalendar,
@@ -483,27 +482,6 @@ export class MailCalendarIngestionService {
     return mailbox?.stalwartAccountId ?? null;
   }
 
-  private patchParsedEventAttendeeStatus(
-    parsedEvent: ParsedIcsEvent,
-    userEmail: string | null,
-    status?: MailInvitationAttendeeStatus,
-  ): ParsedIcsEvent {
-    if (!status || !userEmail) {
-      return parsedEvent;
-    }
-
-    return {
-      ...parsedEvent,
-      participants: (parsedEvent.participants ?? []).map((participant) => ({
-        ...participant,
-        status:
-          participant.email.trim().toLowerCase() === userEmail
-            ? status
-            : participant.status,
-      })),
-    };
-  }
-
   private async cancelEvents(
     userId: string,
     parsedEvents: ParsedIcsEvent[],
@@ -555,26 +533,10 @@ export class MailCalendarIngestionService {
     );
     const pendingInvitationDispatchers: Array<() => Promise<OperationWarning[]>> = [];
     const sendSchedulingMessages = options.sendSchedulingMessages ?? false;
-    const userEmail = options.attendeeStatus
-      ? (
-          await this.prisma.user.findUnique({
-            where: { id: userId },
-            select: { email: true },
-          })
-        )?.email
-          ?.trim()
-          .toLowerCase() ?? null
-      : null;
-
     let created = 0;
     let updated = 0;
 
     for (const parsedEvent of parsedEvents) {
-      const syncedParsedEvent = this.patchParsedEventAttendeeStatus(
-        parsedEvent,
-        userEmail,
-        options.attendeeStatus,
-      );
       const existingEvent = existingByExternalId.get(parsedEvent.uid);
       if (
         existingEvent &&
@@ -583,9 +545,9 @@ export class MailCalendarIngestionService {
       ) {
         continue;
       }
-      let remoteEventId = existingEvent?.stalwartEventId ?? null;
+      const remoteEventId = existingEvent?.stalwartEventId ?? null;
       const shouldMoveToTargetCalendar =
-        Boolean(existingEvent) && existingEvent!.calendarId !== calendar.id;
+        existingEvent !== undefined && existingEvent.calendarId !== calendar.id;
 
 
       if (!existingEvent) {
@@ -596,8 +558,7 @@ export class MailCalendarIngestionService {
           parsedEvent,
           encryptionPayload,
         );
-        let createdEvent;
-        createdEvent = await this.prisma.calendarEvent.create({
+        const createdEvent = await this.prisma.calendarEvent.create({
           data: {
             ...localEventData,
             title: localEventData.title ?? parsedEvent.title,

@@ -9,6 +9,7 @@ import {
   type TextStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+// repo-rules-allow timezone-safe-calendar-code: format() renders month names from a fixed nominal 2024 date, never event times.
 import { format } from "date-fns";
 import type {
   RecurrenceFrequency,

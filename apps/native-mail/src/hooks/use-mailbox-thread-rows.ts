@@ -170,11 +170,14 @@ export function useMailboxThreadRows({
   const refetchCompanionMessages = companionMessagesQuery.refetch;
   const handlePullRefresh = useCallback(() => {
     setPullRefreshing(true);
+    // allSettled never rejects, so the catch only backstops the spinner reset.
     void Promise.allSettled([
       refetchRuntime(),
       refetchActiveMessages(),
       refetchCompanionMessages(),
-    ]).finally(() => setPullRefreshing(false));
+    ])
+      .finally(() => setPullRefreshing(false))
+      .catch(() => undefined);
   }, [refetchActiveMessages, refetchCompanionMessages, refetchRuntime]);
 
   return {

@@ -23,8 +23,8 @@ export function MessageListLabelChips({
             className="inline-flex max-w-[5.5rem] items-center gap-0.5 rounded px-1 py-px text-[10px] font-medium leading-none"
             style={{
               color: displayColor,
-              backgroundColor: `${displayColor}1a`,
-              border: `1px solid ${displayColor}40`,
+              backgroundColor: `color-mix(in srgb, ${displayColor} 10%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${displayColor} 25%, transparent)`,
             }}
           >
             <span

@@ -1,3 +1,4 @@
+// repo-rules-allow timezone-safe-calendar-code: format only renders documented wall-clock picker dates (formatPickerDate), never UTC event instants.
 import { addDays, differenceInCalendarDays, format } from "date-fns";
 
 import type { CalendarEvent } from "./types";
@@ -110,9 +111,7 @@ export function getPickerDateRangeDisplay(
   };
 }
 
-/**
- * Compact inclusive date range for multi-day calendar chips, e.g. "Aug 26 – Aug 28".
- */
+/** Compact inclusive range for multi-day chips, e.g. "Aug 26 – Aug 28". */
 export function formatEventSpanLabel(
   event: EventDateInput,
   timezone?: string | null,

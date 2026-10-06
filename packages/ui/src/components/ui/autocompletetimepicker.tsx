@@ -11,8 +11,7 @@ import { useAutocompleteTimepicker } from "@workspace/ui/hooks/use-autocomplete-
 const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const INPUT_STYLES =
-  "w-7 bg-transparent text-center text-sm font-medium outline-none border-none shadow-none " +
-  "focus:outline-none focus:ring-0 focus:shadow-none " +
+  "w-7 bg-transparent text-center text-sm font-medium border-none shadow-none outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:text-primary " +
   "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
 interface TimePickerProps {
@@ -239,7 +238,7 @@ function TimeInput({
         aria-label="Hours"
         value={hours}
         onChange={handleHoursChange}
-        className={cn(INPUT_STYLES, "focus:text-primary")}
+        className={INPUT_STYLES}
         autoComplete="off"
         maxLength={2}
       />
@@ -255,7 +254,6 @@ function TimeInput({
         onKeyDown={handleKeyDown}
         className={cn(
           INPUT_STYLES,
-          "focus:text-primary",
           hours.length < 2 && "opacity-50",
         )}
         autoComplete="off"
@@ -347,7 +345,7 @@ export function ShadcnAutocomleteTimePicker({
       aria-expanded={open}
       aria-controls={timePickerContentId}
       className={cn(
-        "outline-none text-foreground font-semibold active:opacity-70 transition-opacity",
+        "outline-none text-foreground font-semibold active:opacity-70 transition-opacity focus-visible:ring-ring/50 focus-visible:ring-[3px] rounded-sm",
         className,
       )}
     >

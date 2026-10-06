@@ -176,10 +176,7 @@ function wrapStyledHtml(html: string): string {
   return current;
 }
 
-/**
- * Convert editor / draft HTML back into native compose markdown-lite.
- * Handles `<strong>`/`<b>`, `<em>`/`<i>`, `<u>`, lists, and execCommand spans.
- */
+/** Convert editor/draft HTML back into compose markdown-lite (strong/em/u, lists, execCommand spans). */
 export function htmlToComposeText(html: string): string {
   if (!html.trim()) return "";
 
@@ -217,10 +214,7 @@ export function messageBodiesToComposeText(bodies: {
   return text;
 }
 
-/**
- * Resolve the plaintext + optional HTML parts native compose sends.
- * HTML is only produced when the body has formatting and the message is not encrypted.
- */
+/** Plaintext plus HTML, but HTML only for formatted, unencrypted bodies. */
 export function resolveComposeSendBodies(input: {
   body: string;
   bodyWithSignature: string;

@@ -54,6 +54,7 @@ export function fadeInMailReaderContent(
   ) {
     return null;
   }
+  // repo-rules-allow motion-shared-helpers: fade helper with pane-movement and reduced-motion guards (READER-TRANSITION.md); slideFadeIn has neither and always sets visibility.
   return element.animate(
     MAIL_READER_CONTENT_FADE_KEYFRAMES,
     MAIL_READER_CONTENT_FADE_OPTIONS,

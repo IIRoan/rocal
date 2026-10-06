@@ -71,7 +71,7 @@ export function RichTextEditor({
     editable: true,
     editorProps: {
       attributes: {
-        class: "tiptap min-h-32 px-1 py-2 text-sm leading-relaxed outline-none",
+        class: "tiptap min-h-32 rounded-sm px-1 py-2 text-sm leading-relaxed outline-none focus-visible:ring-1 focus-visible:ring-ring/40",
       },
       handleDrop: (view, event) => {
         const upload = onImageUploadRef.current;
@@ -83,14 +83,17 @@ export function RichTextEditor({
         event.preventDefault();
         event.stopPropagation();
         for (const file of imageFiles) {
-          void upload(file).then((result) => {
-            if (!result) return;
-            const pos = view.posAtCoords({
-              left: event.clientX,
-              top: event.clientY,
-            })?.pos;
-            insertUploadedImage(result, file, pos);
-          });
+          // onImageUpload (handleComposeImageUpload) reports upload failures itself and returns null.
+          void upload(file)
+            .then((result) => {
+              if (!result) return;
+              const pos = view.posAtCoords({
+                left: event.clientX,
+                top: event.clientY,
+              })?.pos;
+              insertUploadedImage(result, file, pos);
+            })
+            .catch(() => undefined);
         }
         return true;
       },
@@ -103,11 +106,14 @@ export function RichTextEditor({
         if (imageFiles.length === 0) return false;
         event.preventDefault();
         for (const file of imageFiles) {
-          void upload(file).then((result) => {
-            if (result) {
-              insertUploadedImage(result, file);
-            }
-          });
+          // onImageUpload (handleComposeImageUpload) reports upload failures itself and returns null.
+          void upload(file)
+            .then((result) => {
+              if (result) {
+                insertUploadedImage(result, file);
+              }
+            })
+            .catch(() => undefined);
         }
         return true;
       },

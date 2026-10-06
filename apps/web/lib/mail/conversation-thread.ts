@@ -78,7 +78,7 @@ export function buildMailConversations(
 
   const find = (id: string): string => {
     ensureParent(id);
-    const parent = parents.get(id)!;
+    const parent = parents.get(id) ?? id;
     if (parent === id) {
       return id;
     }

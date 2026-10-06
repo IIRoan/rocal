@@ -172,6 +172,7 @@ export function UnifiedSearchResults({
     );
     const animations = items.map((item, index) =>
       typeof item.animate === "function"
+        // repo-rules-allow motion-shared-helpers: staggered per-row delay with backwards fill and cancel cleanup; slideFadeIn supports none of these.
         ? item.animate(ROW_ENTER_KEYFRAMES, {
             ...ROW_ENTER_OPTIONS,
             delay: Math.min(index, ROW_STAGGER_LIMIT) * ROW_STAGGER_MS,

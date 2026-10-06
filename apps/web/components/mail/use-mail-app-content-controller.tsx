@@ -9,6 +9,9 @@ import {
   type RefObject,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { getErrorMessage } from "@workspace/calendar-core";
+import { createLogger } from "@workspace/logger";
 import { useIsMobile } from "@workspace/ui/hooks";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useMailUrlSync } from "@/hooks/use-mail-url-sync";
@@ -41,6 +44,8 @@ import {
 } from "./mail-app-list-chrome-state";
 import { MAIL_READER_TRANSITION_MS } from "./mail-app/mail-reader-transition";
 import { useDeferredReaderPane } from "./mail-app/use-deferred-reader-pane";
+
+const log = createLogger("mail-app-content-controller");
 
 export type MailAppContentController = ReturnType<
   typeof useMailAppContentController
@@ -128,7 +133,10 @@ export function useMailAppContentController(
 
   useRefreshGesture({
     enabled: Boolean(activeMailbox && session?.user),
-    onRefresh: () => void handleManualRefresh(),
+    onRefresh: () =>
+      void handleManualRefresh().catch((error) =>
+        toast.error(getErrorMessage(error, "Could not refresh mail.")),
+      ),
   });
 
   const { settings } = useSettings();
@@ -189,10 +197,11 @@ export function useMailAppContentController(
     isFetching: isSearching,
     isError: isSearchError,
   } = useQuery<JmapEmailMessage[]>({
-    queryKey: [
-      ...mailQueryKeys.inlineSearch(mailboxId, trimmedDebouncedMailListSearch),
+    queryKey: mailQueryKeys.inlineSearchWithFilters(
+      mailboxId,
+      trimmedDebouncedMailListSearch,
       advancedFilters,
-    ],
+    ),
     queryFn: async () => {
       if (!activeMailbox || !mailboxId) return [];
 
@@ -314,14 +323,18 @@ export function useMailAppContentController(
         return;
       }
       editingDraftIdRef.current = id;
-      void handleEditDraft(message);
+      void handleEditDraft(message).catch((error) =>
+        log.error("Failed to open draft", error),
+      );
       return;
     }
 
     editingDraftIdRef.current = null;
     // Re-opening the message that is sliding out keeps it open.
     setClosingMessageId(null);
-    void openMessageById(id, message ?? undefined);
+    void openMessageById(id, message ?? undefined).catch((error) =>
+      log.error("Failed to open message", error),
+    );
   };
 
   const handleSelectMessage = (id: string | null) => {
@@ -332,12 +345,16 @@ export function useMailAppContentController(
     registerComposeCloseActions({
       dismiss: handleDismissCompose,
       discardDraft: (draftId) => {
-        void handleDiscardDraft(draftId);
+        void handleDiscardDraft(draftId).catch((error) =>
+          log.error("Failed to discard draft", error),
+        );
       },
       openDraft: (draftId) => {
         closeComposeThen(() => {
           editingDraftIdRef.current = draftId;
-          void handleEditDraft({ id: draftId });
+          void handleEditDraft({ id: draftId }).catch((error) =>
+            log.error("Failed to open draft", error),
+          );
         });
       },
     });
@@ -347,7 +364,9 @@ export function useMailAppContentController(
   const handleSelectMailbox = (mailboxIdToSelect: string) => {
     closeComposeThen(() => {
       patchListChrome({ activeLabelId: null });
-      void refreshMailboxMessages(mailboxIdToSelect);
+      void refreshMailboxMessages(mailboxIdToSelect).catch((error) =>
+        log.error("Failed to load mailbox messages", error),
+      );
     });
   };
 
@@ -371,7 +390,7 @@ export function useMailAppContentController(
 
   const handleCloseMessage = () => {
     if (selectedIsDraft) {
-      void handleDismissCompose();
+      handleDismissCompose();
       return;
     }
     if (isMobile || !selectedMessageId) {
@@ -387,7 +406,7 @@ export function useMailAppContentController(
     onSelectMailbox: handleSelectMailbox,
     onSelectMessageId: setSelectedMessageId,
     openMessageById: (id) => {
-      void handleSelectMessage(id);
+      handleSelectMessage(id);
     },
   });
 
@@ -405,7 +424,10 @@ export function useMailAppContentController(
     (m) => m.role?.toLowerCase() === "archive",
   );
   const handleArchive = archiveMailbox
-    ? () => void handleMoveMessage(archiveMailbox.id)
+    ? () =>
+        void handleMoveMessage(archiveMailbox.id).catch((error) =>
+          log.error("Failed to move message", error),
+        )
     : undefined;
 
   const { settings: listSettings } = useMailListSettings();
@@ -418,19 +440,38 @@ export function useMailAppContentController(
       replyAll: () => handleReply(),
       forward: () => handleForward(),
       archive: () => handleArchive?.(),
-      deleteMessage: () => void handleDeleteMessage(),
-      toggleFlagged: () => void handleToggleFlagged(selectedMessage?.id),
+      deleteMessage: () =>
+        void handleDeleteMessage().catch((error) =>
+          log.error("Failed to delete message", error),
+        ),
+      toggleFlagged: () =>
+        void handleToggleFlagged(selectedMessage?.id).catch((error) =>
+          log.error("Failed to toggle flagged", error),
+        ),
       toggleReadUnread: () => {
         if (selectedMessage?.keywords?.["$seen"]) {
-          void handleMarkAsUnread();
+          void handleMarkAsUnread().catch((error) =>
+            log.error("Failed to mark message as unread", error),
+          );
         } else {
-          void handleMarkAsRead();
+          void handleMarkAsRead().catch((error) =>
+            log.error("Failed to mark message as read", error),
+          );
         }
       },
-      markAsRead: () => void handleMarkAsRead(),
-      markAsUnread: () => void handleMarkAsUnread(),
+      markAsRead: () =>
+        void handleMarkAsRead().catch((error) =>
+          log.error("Failed to mark message as read", error),
+        ),
+      markAsUnread: () =>
+        void handleMarkAsUnread().catch((error) =>
+          log.error("Failed to mark message as unread", error),
+        ),
       compose: () => handleOpenCompose(),
-      refresh: () => void handleManualRefresh(),
+      refresh: () =>
+        void handleManualRefresh().catch((error) =>
+          toast.error(getErrorMessage(error, "Could not refresh mail.")),
+        ),
       closeMessage: handleCloseMessage,
       focusSearch: () => {
         if (!isMobile) {

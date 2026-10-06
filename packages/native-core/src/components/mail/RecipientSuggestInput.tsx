@@ -168,8 +168,7 @@ export function RecipientSuggestInput({
     if (suppressOpenRef.current || selectingRef.current) {
       return;
     }
-    // Keep the panel from closing on blur while the user scrolls/taps the
-    // list — do not reopen here, or a tap-to-select races setOpen(true).
+    // Keep the panel from closing on blur while the user scrolls/taps the list — do not reopen here, or a tap-to-select races setOpen(true).
     listInteractionRef.current = true;
     clearBlurTimer();
   }, [clearBlurTimer]);

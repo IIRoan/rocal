@@ -77,7 +77,7 @@ export function useMiniCalendarMonthData({
 
     const timeoutId = window.setTimeout(() => {
       if ("requestIdleCallback" in window) {
-        (window as any).requestIdleCallback(run, { timeout: 300 });
+        window.requestIdleCallback(run, { timeout: 300 });
       } else {
         run();
       }

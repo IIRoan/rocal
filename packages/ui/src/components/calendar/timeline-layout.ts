@@ -108,6 +108,7 @@ function buildOverlapClusters(
   function find(event: CalendarEvent): CalendarEvent {
     let root = event;
     while (parent.get(root) !== root) {
+      // Every event is seeded as its own parent, so the chain never resolves to undefined.
       root = parent.get(root)!;
     }
     return root;
@@ -127,7 +128,7 @@ function buildOverlapClusters(
 
   for (let i = 0; i < events.length; i++) {
     for (let j = i + 1; j < events.length; j++) {
-      const left = events[i]!;
+      const left = events[i]!; // Both indices are bounded by their loop guards.
       const right = events[j]!;
 
       if (

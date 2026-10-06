@@ -12,7 +12,7 @@ export function EmailFrame({ html }: { html: string }) {
 
     function measure() {
       try {
-        const doc = iframe!.contentDocument;
+        const doc = iframe.contentDocument;
         if (doc?.documentElement) {
           const h =
             doc.documentElement.scrollHeight || doc.body?.scrollHeight || 400;
@@ -30,7 +30,7 @@ export function EmailFrame({ html }: { html: string }) {
     const handleLoad = () => {
       measure();
       try {
-        const doc = iframe!.contentDocument;
+        const doc = iframe.contentDocument;
         if (doc?.body) {
           observer = new ResizeObserver(measure);
           observer.observe(doc.body);

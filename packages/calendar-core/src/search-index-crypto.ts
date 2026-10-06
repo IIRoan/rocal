@@ -125,5 +125,6 @@ export async function decryptSearchShard<T>(
     base64UrlToBytes(shard.ciphertext),
   );
 
+  // repo-rules-allow typescript-untrusted-input: plaintext is AES-GCM authenticated on-device data written by encryptSearchShard; callers catch failures and rebuild the index.
   return JSON.parse(textDecoder.decode(plaintext)) as T;
 }

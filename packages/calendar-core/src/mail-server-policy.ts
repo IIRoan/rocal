@@ -156,6 +156,7 @@ export function parseStalwartDuration(value: unknown): number | null {
   }
 
   const amount = Number(match[1]);
+  // The [smhd] regex group guarantees the unit key exists and matches.
   const unit = DURATION_UNIT_MS[match[2]!];
   if (!unit || !Number.isFinite(amount) || amount <= 0) {
     return null;
@@ -461,6 +462,7 @@ export async function runTasksWithConcurrencyLimit<T>(
     while (nextIndex < tasks.length) {
       const currentIndex = nextIndex;
       nextIndex += 1;
+      // nextIndex only advances synchronously, so the while bound keeps currentIndex in range.
       results[currentIndex] = await tasks[currentIndex]!();
     }
   }

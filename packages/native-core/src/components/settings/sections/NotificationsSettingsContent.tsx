@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { Platform } from "react-native";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   APP_NOTIFICATION_IOS_ONLY_HINT,
   APP_NOTIFICATION_PERMISSION_HINT,
@@ -14,8 +14,6 @@ import {
   formatPushDeviceLastSeen,
   getErrorMessage,
   getPushDevicesListStatus,
-  type UpdateSettingsRequest,
-  type UserSettings,
 } from "@workspace/calendar-core";
 import { SettingsPage } from "../SettingsPage";
 import {
@@ -28,6 +26,8 @@ import {
 } from "../../sheet/SheetSections";
 import { calendarApiService } from "../../../lib/api";
 import { QUERY_KEYS } from "../../../lib/query-keys";
+import { useNativeUserSettings } from "../../../hooks/use-native-user-settings";
+import { usePushDevices } from "../../../hooks/use-push-devices";
 import { usePushNotifications } from "../../../providers/PushProvider";
 import { useToast } from "../../../providers/ToastProvider";
 
@@ -35,80 +35,31 @@ export function NotificationsSettingsContent() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { permissionDenied, refreshRegistration } = usePushNotifications();
-  const [pendingKeys, setPendingKeys] = useState<Set<string>>(new Set());
   const [isSendingTest, setIsSendingTest] = useState(false);
 
-  const { data: settings } = useQuery({
-    queryKey: QUERY_KEYS.settings(),
-    queryFn: () => calendarApiService.getUserSettings(),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { settings, pendingKeys, updateSetting } = useNativeUserSettings();
 
   const emailEnabled = settings?.emailNotifications ?? true;
   const appEnabled = settings?.pushNotifications ?? true;
 
-  const devicesQuery = useQuery({
-    queryKey: QUERY_KEYS.pushDevices(),
-    queryFn: () => calendarApiService.listPushDevices(),
-    staleTime: 30_000,
-    enabled: appEnabled,
-  });
-
-  const updateSettingsMutation = useMutation({
-    mutationFn: (update: UpdateSettingsRequest) =>
-      calendarApiService.updateUserSettings(update),
-    onMutate: async (update) => {
-      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.settings() });
-      const previous = queryClient.getQueryData<UserSettings>(
-        QUERY_KEYS.settings(),
-      );
-      if (previous) {
-        queryClient.setQueryData<UserSettings>(QUERY_KEYS.settings(), {
-          ...previous,
-          ...update,
-        });
-      }
-      const keys = Object.keys(update);
-      setPendingKeys((prev) => {
-        const next = new Set(prev);
-        for (const key of keys) next.add(key);
-        return next;
-      });
-      return { previous };
-    },
-    onError: (_err, _update, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(QUERY_KEYS.settings(), context.previous);
-      }
-    },
-    onSettled: (_data, _error, update) => {
-      const keys = Object.keys(update);
-      setPendingKeys((prev) => {
-        const next = new Set(prev);
-        for (const key of keys) next.delete(key);
-        return next;
-      });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
-    },
-  });
-
-  const updateSetting = useCallback(
-    (update: UpdateSettingsRequest) => {
-      updateSettingsMutation.mutate(update);
-    },
-    [updateSettingsMutation],
-  );
+  const devicesQuery = usePushDevices(appEnabled);
 
   const handleAppNotificationsChange = useCallback(
     (enabled: boolean) => {
       if (enabled) {
-        void refreshRegistration().then(() => {
-          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pushDevices() });
-        });
+        void refreshRegistration()
+          .then(() => {
+            queryClient.invalidateQueries({
+              queryKey: QUERY_KEYS.pushDevices(),
+            });
+          })
+          .catch(() => {
+            toast("Could not refresh push registration.", "error");
+          });
       }
       updateSetting({ pushNotifications: enabled });
     },
-    [queryClient, refreshRegistration, updateSetting],
+    [queryClient, refreshRegistration, toast, updateSetting],
   );
 
   const handleSendTest = useCallback(async () => {

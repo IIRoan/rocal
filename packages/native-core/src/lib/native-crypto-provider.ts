@@ -27,10 +27,7 @@ function missingSubtleMessage() {
     : `crypto.subtle is unavailable on ${runtimeName}: rebuild the development client so react-native-quick-crypto is linked at app entry.`;
 }
 
-/**
- * Resolve the native `crypto.subtle` implementation, or `null` when the runtime
- * does not provide a usable one (the common case on Hermes).
- */
+/** Resolve the native crypto.subtle, or null when the runtime lacks a usable one (common on Hermes). */
 function resolveSubtleCrypto(): SubtleCrypto | null {
   const cryptoRef = globalThis.crypto;
   if (!cryptoRef?.subtle) {
@@ -53,28 +50,29 @@ function createSubtleCryptoProvider(subtle: SubtleCrypto): CryptoProvider {
     },
     subtle: {
       generateKey: (
+        // Algorithm descriptor forwarded verbatim; the runtime rejects unknown algorithms inside subtle.generateKey.
         algorithm: any,
         _extractable: boolean,
         keyUsages: string[],
       ) =>
-        // Always generate extractable keys on native. The e2ee module creates
-        // RSA wrapping keys with extractable:false, but we must persist them to
-        // SecureStore (the secure enclave IS the key store here). The native
-        // WebCrypto runtime enforces the flag strictly, so without this override
-        // exportKey("jwk", privateKey) throws InvalidAccessError.
+        // Always generate extractable keys on native. The e2ee module creates RSA wrapping keys with extractable:false, but we must persist them to SecureStore (the secure enclave IS the key store here). The native WebCrypto runtime enforces the flag strictly, so without this override exportKey("jwk", privateKey) throws InvalidAccessError.
         subtle.generateKey(
           algorithm,
           true,
           keyUsages as KeyUsage[],
+          // quick-crypto types the return as CryptoKey | CryptoKeyPair; e2ee only requests single symmetric keys here.
         ) as unknown as Promise<CryptoKey>,
       importKey: (
         format: string,
+        // Key bytes or JWK forwarded verbatim; the runtime validates the data against the format.
         keyData: any,
+        // Algorithm descriptor forwarded verbatim; the runtime rejects unknown algorithms inside subtle.importKey.
         algorithm: any,
         extractable: boolean,
         keyUsages: string[],
       ) =>
         subtle.importKey(
+          // Fixed WebCrypto key-format names from e2ee; quick-crypto's ImportFormat union is narrower than the provider's string.
           format as any,
           keyData,
           algorithm,
@@ -82,27 +80,36 @@ function createSubtleCryptoProvider(subtle: SubtleCrypto): CryptoProvider {
           keyUsages as KeyUsage[],
         ),
       exportKey: (format: string, key: CryptoKey) =>
+        // Fixed WebCrypto key-format name; quick-crypto types the result as ArrayBuffer | JWK, so callers read the runtime value.
         subtle.exportKey(format as any, key) as unknown as Promise<ArrayBuffer>,
+      // Algorithm descriptor forwarded verbatim; the runtime rejects unknown algorithms inside subtle.encrypt.
       encrypt: (algorithm: any, key: CryptoKey, data: BufferSource) =>
         subtle.encrypt(algorithm, key, data),
+      // Algorithm descriptor forwarded verbatim; the runtime rejects unknown algorithms inside subtle.decrypt.
       decrypt: (algorithm: any, key: CryptoKey, data: BufferSource) =>
         subtle.decrypt(algorithm, key, data),
       wrapKey: (
         format: string,
         key: CryptoKey,
         wrappingKey: CryptoKey,
+        // Algorithm descriptor forwarded verbatim; the runtime rejects unknown algorithms inside subtle.wrapKey.
         algorithm: any,
-      ) => subtle.wrapKey(format as any, key, wrappingKey, algorithm),
+      ) =>
+        // Fixed WebCrypto key-format name from e2ee; quick-crypto's ImportFormat union is narrower than the provider's string.
+        subtle.wrapKey(format as any, key, wrappingKey, algorithm),
       unwrapKey: (
         format: string,
         wrappedKey: BufferSource,
         unwrappingKey: CryptoKey,
+        // Algorithm descriptor forwarded verbatim; the runtime rejects unknown algorithms inside subtle.unwrapKey.
         unwrapAlgo: any,
+        // Algorithm descriptor forwarded verbatim; the runtime rejects unknown algorithms inside subtle.unwrapKey.
         unwrappedKeyAlgo: any,
         extractable: boolean,
         keyUsages: string[],
       ) =>
         subtle.unwrapKey(
+          // Fixed WebCrypto key-format names from e2ee; quick-crypto's ImportFormat union is narrower than the provider's string.
           format as any,
           wrappedKey,
           unwrappingKey,
@@ -111,11 +118,14 @@ function createSubtleCryptoProvider(subtle: SubtleCrypto): CryptoProvider {
           extractable,
           keyUsages as KeyUsage[],
         ),
+      // Algorithm descriptor forwarded verbatim; the runtime rejects unknown algorithms inside subtle.sign.
       sign: (algorithm: any, key: CryptoKey, data: BufferSource) =>
         subtle.sign(algorithm, key, data),
       deriveKey: (
+        // Algorithm descriptor forwarded verbatim; the runtime rejects unknown algorithms inside subtle.deriveKey.
         algorithm: any,
         baseKey: CryptoKey,
+        // Algorithm descriptor forwarded verbatim; the runtime rejects unknown algorithms inside subtle.deriveKey.
         derivedKeyType: any,
         extractable: boolean,
         keyUsages: string[],

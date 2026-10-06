@@ -29,9 +29,12 @@ export function useMailboxPagePrefetch(query: NextPageQuery, rowCount: number) {
         return;
       }
       requestedRef.current = true;
-      void fetchNextPage().finally(() => {
-        requestedRef.current = false;
-      });
+      // A failed prefetch just stops loading ahead; pull-to-refresh retries it.
+      void fetchNextPage()
+        .finally(() => {
+          requestedRef.current = false;
+        })
+        .catch(() => undefined);
     };
   }, [fetchNextPage, hasNextPage, isFetchingNextPage, rowCount]);
 

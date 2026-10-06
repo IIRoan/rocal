@@ -106,14 +106,30 @@ export function base64UrlToArrayBuffer(value: string): ArrayBuffer {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function parseEncryptedBinaryPayload(value: string): EncryptedBinaryPayload {
-  const parsed = JSON.parse(value) as Partial<EncryptedBinaryPayload>;
+/** Wire shape of a wrapped key envelope; `version` defaults to 1 when the sender omits it. */
+function isEncryptedPayloadFields(
+  value: unknown,
+): value is {
+  version?: number;
+  algorithm: "AES-GCM";
+  iv: string;
+  ciphertext: string;
+} {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    record.algorithm === "AES-GCM" &&
+    typeof record.iv === "string" &&
+    typeof record.ciphertext === "string"
+  );
+}
 
-  if (
-    parsed.algorithm !== "AES-GCM" ||
-    typeof parsed.iv !== "string" ||
-    typeof parsed.ciphertext !== "string"
-  ) {
+function parseEncryptedBinaryPayload(value: string): EncryptedBinaryPayload {
+  const parsed: unknown = JSON.parse(value);
+
+  if (!isEncryptedPayloadFields(parsed)) {
     throw new Error("Invalid encrypted key payload");
   }
 
@@ -252,6 +268,7 @@ export function createE2eeModule(crypto: CryptoProvider): E2eeModule {
   // -- public API -----------------------------------------------------------
 
   async function generateWrappingKeyPair(): Promise<CryptoKeyPair> {
+    // The provider interface types only the single-key case; RSA key generation returns a pair.
     return (await crypto.subtle.generateKey(RSA_WRAP_ALGORITHM, false, [
       "wrapKey",
       "unwrapKey",
@@ -472,7 +489,9 @@ export function createE2eeModule(crypto: CryptoProvider): E2eeModule {
       base64UrlToArrayBuffer(payload.ciphertext),
     );
 
-    return JSON.parse(textDecoder.decode(plaintext)) as T;
+    const decoded: unknown = JSON.parse(textDecoder.decode(plaintext));
+    // AES-GCM authenticates the plaintext, so its shape is whatever this device encrypted.
+    return decoded as T;
   }
 
   async function createBlindIndexTokens(

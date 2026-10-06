@@ -258,8 +258,7 @@ function resolveErrorCode(
   return "UNKNOWN";
 }
 
-// Error handling middleware — must be registered with `.error(handleApiError)` on the
-// root app *before* route definitions so thrown errors are formatted consistently.
+// Error handling middleware — must be registered with `.error(handleApiError)` on the root app *before* route definitions so thrown errors are formatted consistently.
 export function handleApiError({
   code,
   error,

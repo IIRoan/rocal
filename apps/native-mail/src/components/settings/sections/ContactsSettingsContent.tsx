@@ -3,6 +3,7 @@ import { Alert, StyleSheet } from "react-native";
 import {
   formatContactContextSummary,
   getContactDisplayLabel,
+  getErrorMessage,
   normalizeEmailAddress,
   type RecentContactEntry,
 } from "@workspace/calendar-core";
@@ -19,10 +20,12 @@ import {
   SheetTextField,
 } from "@workspace/native-core/components/sheet/SheetSections";
 import { useRecentContacts } from "@workspace/native-core/hooks/use-recent-contacts";
+import { useToast } from "@workspace/native-core/providers/ToastProvider";
 
 const AVATAR_SIZE = 28;
 
 export function ContactsSettingsContent() {
+  const { toast } = useToast();
   const {
     payload,
     filterContacts,
@@ -95,9 +98,16 @@ export function ContactsSettingsContent() {
                 text: "Remove",
                 style: "destructive",
                 onPress: () => {
-                  void removeContact(selectedContact.email).then(() => {
-                    setSelectedEmail(null);
-                  });
+                  void removeContact(selectedContact.email)
+                    .then(() => {
+                      setSelectedEmail(null);
+                    })
+                    .catch((error) => {
+                      toast(
+                        getErrorMessage(error, "Could not remove contact."),
+                        "error",
+                      );
+                    });
                 },
               },
             ],
@@ -127,6 +137,9 @@ export function ContactsSettingsContent() {
         setNewName("");
         setIsAdding(false);
         setSelectedEmail(email);
+      })
+      .catch((error) => {
+        toast(getErrorMessage(error, "Could not add contact."), "error");
       })
       .finally(() => setIsSaving(false));
   };
@@ -259,6 +272,7 @@ function ContactDetailScreen({
   const [displayName, setDisplayName] = useState(contact.displayName ?? "");
   const [phone, setPhone] = useState(contact.phone ?? "");
   const [notes, setNotes] = useState(contact.notes ?? "");
+  const { toast } = useToast();
   const summary = formatContactContextSummary(contact);
   const label = getContactDisplayLabel(contact);
 
@@ -319,6 +333,8 @@ function ContactDetailScreen({
               displayName,
               phone,
               notes,
+            }).catch((error) => {
+              toast(getErrorMessage(error, "Could not save contact."), "error");
             })
           }
         />

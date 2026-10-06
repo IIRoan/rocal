@@ -296,6 +296,7 @@ function LoadingBoard({
         <div className="relative h-px w-full overflow-hidden bg-border/40">
           <div
             ref={sweepRef}
+            // repo-rules-allow theme-tokens-only: the sweep highlight is inherently a moving gradient between transparent and primary.
             className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/80 to-transparent"
           />
         </div>

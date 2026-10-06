@@ -46,6 +46,48 @@ type VaultEnvelope = {
   ciphertextB64: string;
 };
 
+function isUserKeyVault(value: unknown): value is UserKeyVault {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.userId === "string" &&
+    typeof record.email === "string" &&
+    typeof record.publicKeyArmored === "string" &&
+    typeof record.publicKeyFingerprint === "string" &&
+    typeof record.encryptedPrivateKeyArmored === "string" &&
+    typeof record.kdfParams === "object" &&
+    record.kdfParams !== null &&
+    typeof record.vaultVersion === "number"
+  );
+}
+
+function parseVaultEnvelope(raw: string): VaultEnvelope {
+  const parsed: unknown = JSON.parse(raw);
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("Invalid mail vault envelope");
+  }
+  const record = parsed as Record<string, unknown>;
+  if (record.version !== 1) {
+    throw new Error(`Unsupported vault envelope version: ${String(record.version)}`);
+  }
+  if (record.algorithm !== "AES-GCM-256") {
+    throw new Error(`Unsupported vault algorithm: ${String(record.algorithm)}`);
+  }
+  const { ivB64, ciphertextB64 } = record;
+  if (typeof ivB64 !== "string" || typeof ciphertextB64 !== "string") {
+    throw new Error("Invalid mail vault envelope");
+  }
+  return { version: 1, algorithm: "AES-GCM-256", ivB64, ciphertextB64 };
+}
+
+function parseUserKeyVault(raw: string): UserKeyVault {
+  const parsed: unknown = JSON.parse(raw);
+  if (!isUserKeyVault(parsed)) {
+    throw new Error("Invalid mail vault content");
+  }
+  return parsed;
+}
+
 // ---------------------------------------------------------------------------
 // Binary helpers (avoid Buffer.from where possible for Hermes compat)
 // ---------------------------------------------------------------------------
@@ -174,11 +216,7 @@ export function deriveArgon2id(
 // Key derivation — native Argon2id when linked, noble otherwise
 // ---------------------------------------------------------------------------
 
-/**
- * Derives a 32-byte AES-GCM key from the given passphrase and KDF params
- * using argon2id. Output is byte-for-byte identical to the web vault-crypto
- * module for the same inputs.
- */
+/** Derives a 32-byte AES-GCM key with argon2id, byte-identical to the web vault-crypto module. */
 async function deriveVaultKeyBytes(
   passphrase: string,
   params: MailVaultKdfParams,
@@ -257,15 +295,7 @@ export async function aesGcmEncrypt(
 // Public API
 // ---------------------------------------------------------------------------
 
-/**
- * Unlocks an AES-GCM encrypted mail vault using a pre-computed AES-GCM key.
- *
- * Used by the native app when the backend returns the argon2id-derived key
- * directly (bypassing the expensive argon2id derivation on the JS thread).
- *
- * @param encryptedVaultB64 - Base64-encoded JSON envelope from the vault backup
- * @param derivedKeyBase64  - 32-byte AES-GCM key as base64url (from backend)
- */
+/** Unlocks the vault with a backend-derived AES key, skipping the expensive argon2id pass. */
 export async function unlockEncryptedMailVaultWithDerivedKey(
   encryptedVaultB64: string,
   derivedKeyBase64: string,
@@ -275,15 +305,9 @@ export async function unlockEncryptedMailVaultWithDerivedKey(
   });
 
   try {
-    const envelopeJson = decodeUtf8(base64ToBytes(encryptedVaultB64));
-    const envelope = JSON.parse(envelopeJson) as VaultEnvelope;
-
-    if (envelope.version !== 1) {
-      throw new Error(`Unsupported vault envelope version: ${envelope.version}`);
-    }
-    if (envelope.algorithm !== "AES-GCM-256") {
-      throw new Error(`Unsupported vault algorithm: ${envelope.algorithm}`);
-    }
+    const envelope = parseVaultEnvelope(
+      decodeUtf8(base64ToBytes(encryptedVaultB64)),
+    );
 
     const keyBytes = base64ToBytes(derivedKeyBase64);
     const ivBytes = base64ToBytes(envelope.ivB64);
@@ -296,7 +320,7 @@ export async function unlockEncryptedMailVaultWithDerivedKey(
     });
 
     const plaintextBinary = await aesGcmDecrypt(keyBytes, ivBytes, ciphertextWithTag);
-    const vault = JSON.parse(plaintextBinary) as UserKeyVault;
+    const vault = parseUserKeyVault(plaintextBinary);
 
     log.debug("[vault-crypto] unlockEncryptedMailVaultWithDerivedKey: SUCCESS, email=%s", vault.email);
     return vault;
@@ -307,10 +331,7 @@ export async function unlockEncryptedMailVaultWithDerivedKey(
   }
 }
 
-/**
- * Drop-in replacement for the web's `unlockEncryptedMailVault` from
- * `vault-crypto.ts`, but using pure-JS crypto that works in Hermes.
- */
+/** Web's `unlockEncryptedMailVault`, reimplemented with pure-JS crypto that runs under Hermes. */
 export async function unlockEncryptedMailVault(
   encryptedVaultB64: string,
   passphrase: string,
@@ -324,18 +345,10 @@ export async function unlockEncryptedMailVault(
 
   try {
     // 1. Parse the outer envelope
-    const envelopeJson = decodeUtf8(base64ToBytes(encryptedVaultB64));
     log.debug("[vault-crypto] unlockEncryptedMailVault: parsed outer base64 envelope");
-    const envelope = JSON.parse(envelopeJson) as VaultEnvelope;
-
-    if (envelope.version !== 1) {
-      throw new Error(`Unsupported vault envelope version: ${envelope.version}`);
-    }
-    if (envelope.algorithm !== "AES-GCM-256") {
-      throw new Error(`Unsupported vault algorithm: ${envelope.algorithm}`);
-    }
-
-    log.debug("[vault-crypto] unlockEncryptedMailVault: envelope version=1, algorithm=AES-GCM-256, deriving key...");
+    const envelope = parseVaultEnvelope(
+      decodeUtf8(base64ToBytes(encryptedVaultB64)),
+    );
 
     // 2. Derive the AES-GCM key from the passphrase using pure-JS argon2id
     const keyBytes = await deriveVaultKeyBytes(passphrase, kdfParams);
@@ -351,7 +364,7 @@ export async function unlockEncryptedMailVault(
     });
 
     const plaintextBinary = await aesGcmDecrypt(keyBytes, ivBytes, ciphertextWithTag);
-    const vault = JSON.parse(plaintextBinary) as UserKeyVault;
+    const vault = parseUserKeyVault(plaintextBinary);
 
     log.debug("[vault-crypto] unlockEncryptedMailVault: SUCCESS, email=%s vaultVersion=%d",
       vault.email, vault.vaultVersion);
@@ -363,12 +376,7 @@ export async function unlockEncryptedMailVault(
   }
 }
 
-/**
- * Creates an AES-GCM encrypted mail vault sealed with argon2id.
- *
- * Byte-for-byte compatible with the web's `createEncryptedMailVault`.
- * Primarily used in tests and future native-side provisioning flows.
- */
+/** Seals a vault with argon2id; byte-compatible with the web's `createEncryptedMailVault`. */
 export async function createEncryptedMailVault(
   vault: UserKeyVault,
   passphrase: string,

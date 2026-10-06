@@ -1,8 +1,4 @@
-/**
- * Bridge to the secure web mail client for operations that require browser-only
- * E2EE crypto (decrypting PGP message bodies and composing encrypted mail),
- * which Hermes/React Native cannot perform on-device.
- */
+/** Bridge to the web mail client for browser-only E2EE crypto that Hermes cannot run on-device. */
 import * as WebBrowser from "expo-web-browser";
 import { APP_BASE_URL } from "@workspace/native-core/lib/constants";
 

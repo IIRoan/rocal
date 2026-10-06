@@ -21,7 +21,8 @@ import { LabelColorPicker } from "./label-color-picker";
 
 export type LabelManagerView = "labels" | "label-create" | "label-edit";
 
-const DEFAULT_LABEL_COLOR = "#3b82f6";
+// "blue" resolves to the shared mail label preset hex in calendar-core.
+const DEFAULT_LABEL_COLOR = resolveLabelDisplayColor("blue");
 
 interface LabelManagerProps {
   labels: LabelDef[];
@@ -64,9 +65,10 @@ function LabelForm({
     !saving &&
     (trimmed !== initialName || color !== initialColor);
 
-  const run = (action: () => Promise<void>) => {
+  // Handles rejection itself; the returned promise never rejects.
+  const run = (action: () => Promise<void>): void => {
     setStatus("saving");
-    return action()
+    void action()
       .then(() => {
         setStatus("idle");
         onBack();
@@ -75,7 +77,7 @@ function LabelForm({
   };
 
   const submit = () => {
-    if (canSave) void run(() => onSubmit(trimmed, normalizeLabelColorInput(color)));
+    if (canSave) run(() => onSubmit(trimmed, normalizeLabelColorInput(color)));
   };
 
   return (
@@ -114,7 +116,7 @@ function LabelForm({
             className="mr-auto"
             disabled={saving}
             onClick={() =>
-              confirmDelete ? void run(onDelete) : setConfirmDelete(true)
+              confirmDelete ? run(onDelete) : setConfirmDelete(true)
             }
           >
             {confirmDelete ? "Confirm delete" : "Delete label"}

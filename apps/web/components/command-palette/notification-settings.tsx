@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Mail, Bell, Send, Smartphone } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { UserSettings } from "@/lib/types/calendar";
 import {
@@ -19,6 +19,7 @@ import {
   type PushDeviceSummary,
 } from "@workspace/calendar-core";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { usePushDevices } from "@/hooks/use-push-devices";
 import { SettingToggleRow } from "./setting-toggle-row";
 import {
   PaletteIconBox,
@@ -31,7 +32,10 @@ const TEXT_BLOCK_CLASS = "p-2 text-[13px] leading-[130%] text-muted-foreground";
 
 interface NotificationSettingsProps {
   localSettings: UserSettings;
-  updateSetting: (key: keyof UserSettings, value: any) => void;
+  updateSetting: <K extends keyof UserSettings>(
+    key: K,
+    value: UserSettings[K],
+  ) => void;
   goBack: () => void;
 }
 
@@ -44,12 +48,7 @@ export function NotificationSettings({
   const queryClient = useQueryClient();
   const appEnabled = localSettings.pushNotifications !== false;
 
-  const devicesQuery = useQuery({
-    queryKey: PUSH_DEVICES_QUERY_KEY,
-    queryFn: () => calendarApiService.listPushDevices(),
-    staleTime: 30_000,
-    enabled: appEnabled,
-  });
+  const devicesQuery = usePushDevices(appEnabled);
 
   const handleSendTest = () => {
     if (isSendingTest) return;
@@ -88,7 +87,10 @@ export function NotificationSettings({
 
 type NotificationSettingsViewProps = {
   localSettings: UserSettings;
-  updateSetting: (key: keyof UserSettings, value: any) => void;
+  updateSetting: <K extends keyof UserSettings>(
+    key: K,
+    value: UserSettings[K],
+  ) => void;
   goBack: () => void;
   isSendingTest: boolean;
   onSendTest: () => void;

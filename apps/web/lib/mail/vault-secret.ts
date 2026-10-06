@@ -1,5 +1,4 @@
-import type { EncryptedJsonPayload } from "@workspace/e2ee";
-import { decryptJsonPayload, encryptJsonPayload } from "@/lib/e2ee-crypto";
+import { decryptJsonPayload, encryptJsonPayload, parseEncryptedJsonPayload } from "@/lib/e2ee-crypto";
 import { getEncryptionSession } from "@/lib/e2ee-payloads";
 
 /** Binds the sealed secret to its purpose so it cannot be replayed elsewhere. */
@@ -49,7 +48,10 @@ export async function unwrapVaultSecret(
   }
 
   try {
-    const payload = JSON.parse(wrappedSecret) as EncryptedJsonPayload;
+    const payload = parseEncryptedJsonPayload(wrappedSecret);
+    if (!payload) {
+      return null;
+    }
     const { secret } = await decryptJsonPayload<{ secret: string }>(
       session.accountKey,
       payload,

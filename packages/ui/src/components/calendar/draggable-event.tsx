@@ -8,6 +8,7 @@ import { differenceInDays } from "date-fns";
 
 import { CalendarEvent, type CalendarView } from "./types";
 import { EventItem } from "./event-item";
+import { isPreviewEvent } from "./utils";
 import { useCalendarDnd } from "./calendar-dnd-context";
 
 interface DraggableEventProps {
@@ -52,7 +53,7 @@ export function DraggableEvent({
     y: number;
   } | null>(null);
 
-  const isPreview = !!(event as any).isPreview;
+  const isPreview = isPreviewEvent(event);
 
   const eventStart = new Date(event.start);
   const eventEnd = new Date(event.end);

@@ -32,13 +32,18 @@ function parseStoredCalendarView(raw: string | null): CalendarView | null {
   }
 
   try {
-    const parsed = JSON.parse(raw) as Partial<StoredCalendarView>;
+    const parsed: unknown = JSON.parse(raw);
+    const stored =
+      typeof parsed === "object" && parsed !== null
+        ? (parsed as { view?: unknown; expires?: unknown })
+        : null;
     if (
-      isCalendarView(parsed.view) &&
-      typeof parsed.expires === "number" &&
-      parsed.expires > Date.now()
+      stored &&
+      isCalendarView(stored.view) &&
+      typeof stored.expires === "number" &&
+      stored.expires > Date.now()
     ) {
-      return parsed.view;
+      return stored.view;
     }
   } catch {
     if (isCalendarView(raw)) {

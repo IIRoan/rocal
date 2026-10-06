@@ -78,7 +78,7 @@ function TabButton({
     >
       <div
         className={cn(
-          "flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-150",
+          "flex items-center justify-center w-7 h-7 rounded-lg transition-colors duration-150",
           isActive && "bg-primary/10",
           !isActive && "active:bg-accent/50",
         )}
@@ -171,9 +171,9 @@ export function MobileBottomNav({
       className={cn("fixed bottom-0 left-0 right-0 z-50 lg:hidden", className)}
     >
       <div className="relative">
-        <div className="absolute -top-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+        <div className="absolute -top-px left-0 right-0 h-px bg-border/50" />
 
-        <div className="bg-background/90 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80">
+        <div className="bg-background">
           <div className="pb-[env(safe-area-inset-bottom)]">
             <div className="flex items-center h-12">
               <TabButton
@@ -207,7 +207,7 @@ export function MobileBottomNav({
                   align="center"
                   side="top"
                   sideOffset={8}
-                  className="w-44 p-1.5 rounded-2xl shadow-xl border-border/50 bg-popover/95 backdrop-blur-xl"
+                  className="w-44 p-1.5 rounded-2xl shadow-xl border-border/50 bg-popover"
                 >
                   <div className="space-y-0.5">
                     {VIEW_OPTIONS.map(({ value, label, icon: Icon }) => {
@@ -221,7 +221,7 @@ export function MobileBottomNav({
                             setIsViewOpen(false);
                           }}
                           className={cn(
-                            "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all",
+                            "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors",
                             isActive
                               ? "bg-primary/10 text-primary"
                               : "hover:bg-accent/60 active:bg-accent",

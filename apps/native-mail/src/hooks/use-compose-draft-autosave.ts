@@ -182,7 +182,9 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     }
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
-      void saveDraft();
+      void saveDraft().catch((error) =>
+        log.error("Draft autosave failed unexpectedly", sanitizeContext({ error })),
+      );
     }, AUTOSAVE_DEBOUNCE_MS);
 
     return () => {
@@ -214,7 +216,8 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
         });
       };
       const inflight = inflightSaveRef.current;
-      if (inflight) void inflight.finally(refreshDrafts);
+      // The save promise never rejects, so either settle path refreshes the Drafts list the same way.
+      if (inflight) void inflight.then(refreshDrafts, refreshDrafts);
       else refreshDrafts();
     },
     [queryClient],

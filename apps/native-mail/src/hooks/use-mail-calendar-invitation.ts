@@ -53,6 +53,13 @@ export function useMailCalendarInvitation({
     JmapAttachment[] | null
   >(null);
 
+  // Reset during render when the message changes, so a declined invite never sticks to the next one.
+  const [renderedMessageId, setRenderedMessageId] = useState(message?.id);
+  if (renderedMessageId !== message?.id) {
+    setRenderedMessageId(message?.id);
+    setInviteDeclined(false);
+  }
+
   const hasCalendarInvitationHint = useMemo(
     () => (message ? hasCalendarInvitationMetadata(message) : false),
     [message],
@@ -75,7 +82,7 @@ export function useMailCalendarInvitation({
 
     let cancelled = false;
 
-    void (async () => {
+    const loadCalendarAttachments = async () => {
       try {
         const loaded = await Promise.all(
           candidates.map(async (candidate) => {
@@ -106,7 +113,8 @@ export function useMailCalendarInvitation({
           setLoadedCalendarAttachments(inlineAttachments);
         }
       }
-    })();
+    };
+    void loadCalendarAttachments();
 
     return () => {
       cancelled = true;
@@ -133,16 +141,19 @@ export function useMailCalendarInvitation({
     queryKey: mailCalendarInviteUid
       ? invitationByExternalIdQueryKey(mailCalendarInviteUid)
       : ["invitations", "by-external-id", "disabled"],
-    queryFn: () =>
-      calendarApiService.getInvitationByExternalId(mailCalendarInviteUid!, {
-        syncRemote: false,
-      }),
+    queryFn: () => {
+      if (!mailCalendarInviteUid) {
+        throw new Error("Invitation not found.");
+      }
+      return calendarApiService.getInvitationByExternalId(
+        mailCalendarInviteUid,
+        {
+          syncRemote: false,
+        },
+      );
+    },
     enabled: Boolean(enabled && mailCalendarInviteUid),
   });
-
-  useEffect(() => {
-    setInviteDeclined(false);
-  }, [message?.id]);
 
   useEffect(() => {
     if (!enabled || !mailCalendarInviteUid || isInvitationFetching) {
@@ -151,7 +162,7 @@ export function useMailCalendarInvitation({
 
     let cancelled = false;
 
-    void (async () => {
+    const resolveInviteEvent = async () => {
       try {
         const existing = existingInvitation ?? null;
         if (cancelled) return;
@@ -272,7 +283,8 @@ export function useMailCalendarInvitation({
               : "Unable to load invitation details.",
         });
       }
-    })();
+    };
+    void resolveInviteEvent();
 
     return () => {
       cancelled = true;
@@ -406,7 +418,7 @@ export function useMailCalendarInvitation({
         }
 
         const result = await calendarApiService.respondToInvitation(
-          calendarInviteResponseEventId!,
+          calendarInviteResponseEventId,
           status,
         );
         void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });

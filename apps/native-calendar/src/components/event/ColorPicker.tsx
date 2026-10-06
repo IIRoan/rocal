@@ -104,6 +104,7 @@ function createStyles(theme: ThemeTokens) {
     checkmark: {
       fontSize: 16,
       fontWeight: theme.typography.fontWeight.bold as TextStyle["fontWeight"],
+      // repo-rules-allow theme-tokens-only: white reads on every palette swatch; no theme token contrasts with arbitrary swatch colors.
       color: "#ffffff",
     },
   } satisfies Record<string, TextStyle>;

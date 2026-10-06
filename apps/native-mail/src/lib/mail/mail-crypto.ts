@@ -1,18 +1,4 @@
-/**
- * Native mail crypto orchestrator.
- *
- * This module handles the full lifecycle of the mail vault on native:
- *
- *   1. Fetch the encrypted vault backup from the backend.
- *   2. Unseal its passphrase with the user's E2EE account key.
- *   3. Decrypt PGP-encrypted mail messages in-process using openpgp.js.
- *   4. For PGP/MIME messages, parse the decrypted MIME body with postal-mime.
- *
- * The web app performs the same steps in a Web Worker; we replicate the logic
- * here so the native app never opens a webview for crypto operations.
- *
- * Debug log prefix: [mail-crypto]
- */
+/** Native mail vault lifecycle: fetch the encrypted backup, unseal its passphrase with the E2EE key, decrypt PGP mail in-process. */
 import * as openpgp from "openpgp";
 import { createLogger } from "@workspace/logger";
 import { mailFetch, upsertAccountVaultBackup } from "./mail-api";
@@ -44,6 +30,7 @@ import type {
   MailVaultKdfParams,
 } from "./types";
 import { looksLikeMimeMessage, containsArmoredPgpMessage, MAX_PGP_DECRYPT_LAYERS, mergeSignatureVerificationState, resolveLayerSignatureVerificationState } from "@workspace/calendar-core";
+import type { MailVaultBackup } from "@workspace/calendar-core";
 import type { MailRuntime } from "./mail-runtime";
 
 const log = createLogger("mail-crypto");
@@ -73,16 +60,18 @@ export type MailSignatureVerificationState =
   | "verified"
   | "failed";
 
-type VaultBackupRecord = {
-  email: string;
-  vaultVersion: number;
-  encryptedVaultB64: string;
-  kdf: string;
-  kdfParams: MailVaultKdfParams;
-  /** Vault passphrase sealed to the E2EE account key; null while legacy. */
-  wrappedSecret?: string | null;
-  wrapAlgorithm?: string | null;
-};
+function isVaultBackupRecord(value: unknown): value is MailVaultBackup {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.email === "string" &&
+    typeof record.vaultVersion === "number" &&
+    typeof record.encryptedVaultB64 === "string" &&
+    typeof record.kdf === "string" &&
+    typeof record.kdfParams === "object" &&
+    record.kdfParams !== null
+  );
+}
 
 type UnlockedVault = {
   vault: UserKeyVault;
@@ -113,10 +102,7 @@ export function releaseVaultUnlock(): void {
   unlockGate = null;
 }
 
-/**
- * Clears the in-memory vault cache.
- * Call this on sign-out or when the vault needs to be re-loaded.
- */
+/** Clears the in-memory vault cache; call on sign-out or when the vault must reload. */
 export function clearVaultCache(): void {
   log.debug("[mail-crypto] clearVaultCache: clearing in-memory vault cache");
   cachedVault = null;
@@ -136,7 +122,7 @@ async function streamToString(stream: unknown): Promise<string> {
 // Backend API helpers (native auth headers via mailFetch)
 // ---------------------------------------------------------------------------
 
-async function fetchVaultBackup(): Promise<VaultBackupRecord> {
+async function fetchVaultBackup(): Promise<MailVaultBackup> {
   const url = `${API_BASE_URL.replace(/\/+$/, "")}/api/mail/account/vault-backup`;
   log.debug("[mail-crypto] fetchVaultBackup: GET %s", url);
 
@@ -149,7 +135,11 @@ async function fetchVaultBackup(): Promise<VaultBackupRecord> {
     );
   }
 
-  const record = (await response.json()) as VaultBackupRecord;
+  const payload: unknown = await response.json();
+  if (!isVaultBackupRecord(payload)) {
+    throw new Error("Invalid mail vault backup response");
+  }
+  const record = payload;
   log.debug("[mail-crypto] fetchVaultBackup: received backup for email=%s kdf=%s", record.email, record.kdf);
   return record;
 }
@@ -195,10 +185,7 @@ async function rekeyVault(input: {
   }
 }
 
-/**
- * Move a legacy vault off the server-derived passphrase onto a random secret
- * sealed to the user's E2EE key, so the server can no longer open it.
- */
+/** Moves a legacy vault off the server-derived passphrase onto a random secret sealed to the E2EE key. */
 async function sealVaultToAccountKey(input: {
   unlockedVault: UserKeyVault;
   currentPassphrase: string;
@@ -228,15 +215,7 @@ async function sealVaultToAccountKey(input: {
 // Vault unlock helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Decrypts the PGP private key stored inside the vault.
- *
- * The private key is protected by the vault secret sealed to the account key.
- *
- * After a successful S2K decryption the unprotected armored key is written to
- * SecureStore so subsequent app sessions can bypass the expensive (~14 s on
- * Hermes) S2K derivation entirely.
- */
+/** Decrypts the vault's PGP private key and caches the unprotected key so later sessions skip the ~14 s Hermes S2K. */
 async function decryptVaultPrivateKey(
   vault: UserKeyVault,
   passphrase: string,
@@ -312,13 +291,7 @@ async function loadCachedPrivateKeyForVault(
 // Public API
 // ---------------------------------------------------------------------------
 
-/**
- * Ensures the mail vault is loaded and the PGP private key is ready for
- * decryption. Results are cached in memory for the app session.
- *
- * The passphrase is a random secret sealed to the user's E2EE account key, so
- * this only succeeds on a signed-in device. Throws otherwise.
- */
+/** Loads and caches the vault for the session; the passphrase is sealed to the E2EE key, so it only works signed in. */
 export async function ensureVaultLoaded(
   runtime: MailRuntime,
   fallbackPassword?: string | null,
@@ -345,10 +318,7 @@ export async function ensureVaultLoaded(
     log.debug("[mail-crypto] ensureVaultLoaded: vault loaded and cached successfully");
     return cachedVault;
   } catch (err) {
-    console.error(
-      "[mail-crypto] ensureVaultLoaded: vault unlock FAILED:",
-      err instanceof Error ? err.message : String(err),
-    );
+    log.error("[mail-crypto] ensureVaultLoaded: vault unlock failed");
     vaultLoadingPromise = null;
     throw err;
   }
@@ -364,7 +334,7 @@ async function doLoadVault(
   );
 
   log.debug("[mail-crypto] doLoadVault: step 1 — fetching vault backup");
-  let backup: VaultBackupRecord;
+  let backup: MailVaultBackup;
   try {
     backup = await fetchVaultBackup();
   } catch (err) {
@@ -387,8 +357,7 @@ async function doLoadVault(
     backup.kdfParams.parallelism,
   );
 
-  // Preferred path: the passphrase is sealed to this user's E2EE key, so only
-  // a signed-in device can open the vault.
+  // Preferred path: the passphrase is sealed to this user's E2EE key, so only a signed-in device can open the vault.
   if (backup.wrappedSecret) {
     const sealedSecret = await unwrapVaultSecret(backup.wrappedSecret);
     if (sealedSecret) {
@@ -422,18 +391,7 @@ async function doLoadVault(
   );
 }
 
-/**
- * Decrypts a PGP-armored mail message body using the vault's private key.
- *
- * The vault is loaded (and cached) on first use. If the vault cannot be
- * unlocked with any available passphrase this throws — callers should catch
- * and display an appropriate "re-authenticate" prompt.
- *
- * @param runtime     The active MailRuntime (provides config + auth token).
- * @param messageId   For logging/correlation only.
- * @param armoredMessage  Armored PGP message (inline or MIME).
- * @param senderPublicKeyArmored  Optional sender public key for signature verification.
- */
+/** Decrypts an armored PGP mail body with the vault key; throws when no passphrase can unlock the vault. */
 export async function decryptMailMessage(
   runtime: MailRuntime,
   messageId: string,
@@ -467,11 +425,7 @@ export async function decryptMailMessage(
   };
 }
 
-/**
- * Encrypts a plaintext body for one or more recipient public keys.
- * The sender's own public key is always included by callers so sent mail
- * remains readable on this device.
- */
+/** Encrypts a plaintext body for the recipient keys; callers add the sender key so sent mail stays readable here. */
 export async function encryptForRecipients(input: {
   plaintext: string;
   recipientPublicKeysArmored: string[];
@@ -497,21 +451,7 @@ export async function encryptForRecipients(input: {
   return { armoredMessage };
 }
 
-/**
- * Decrypts a PGP/MIME message (RFC 3156).
- *
- * PGP/MIME structure:
- *   multipart/encrypted
- *     subParts[0]: application/pgp-encrypted  (version notice, ignored)
- *     subParts[1]: application/octet-stream   (the armored PGP ciphertext blob)
- *
- * Steps:
- *   1. Extract the ciphertext blobId from bodyStructure.subParts[1].
- *   2. Fetch the armored ciphertext via JMAP download URL.
- *   3. Decrypt with openpgp using the vault private key.
- *   4. Parse the decrypted MIME payload with postal-mime.
- *   5. Return both text and HTML from the parsed MIME.
- */
+/** Decrypts an RFC 3156 PGP/MIME message: ciphertext lives in `bodyStructure.subParts[1]`, body is postal-mime parsed. */
 export async function decryptPgpMimeMessage(
   runtime: MailRuntime,
   messageId: string,
@@ -592,11 +532,7 @@ export async function decryptPgpMimeMessage(
 // Shared PGP decrypt core
 // ---------------------------------------------------------------------------
 
-/**
- * Decrypts an armored PGP message using the cached vault private key.
- * Returns raw plaintext (no MIME parsing). Used by both inline PGP and
- * PGP/MIME paths.
- */
+/** Decrypts an armored PGP message with the vault key and returns raw plaintext, shared by the inline and PGP/MIME paths. */
 async function decryptArmoredMessage(
   runtime: MailRuntime,
   messageId: string,
@@ -607,10 +543,7 @@ async function decryptArmoredMessage(
   try {
     unlockedVault = await ensureVaultLoaded(runtime);
   } catch (err) {
-    console.error(
-      `[mail-crypto] decryptArmoredMessage: ensureVaultLoaded FAILED for id=${messageId}:`,
-      err instanceof Error ? err.message : String(err),
-    );
+    log.error("[mail-crypto] decryptArmoredMessage: vault unlock failed");
     throw err;
   }
 
@@ -695,18 +628,12 @@ async function decryptArmoredMessage(
   };
 }
 
-/**
- * Returns `true` if the vault is currently loaded in memory.
- * Useful for UI indicators (e.g., showing a lock icon when vault is locked).
- */
+/** True while the vault is unlocked in memory; drives lock indicators in the UI. */
 export function isVaultLoaded(): boolean {
   return cachedVault !== null;
 }
 
-/**
- * Returns the fingerprint of the loaded vault's public key, or `null` if
- * the vault is not loaded.
- */
+/** Fingerprint of the loaded vault's public key, or `null` while the vault is locked. */
 export function getLoadedVaultFingerprint(): string | null {
   return cachedVault?.vault.publicKeyFingerprint ?? null;
 }
@@ -716,10 +643,7 @@ export function getVaultLabels(): LabelDef[] {
   return cachedVault?.vault.labels ?? [];
 }
 
-/**
- * Persists updated label definitions into the encrypted vault backup so web and
- * native stay in sync.
- */
+/** Persists label definitions into the encrypted vault backup so web and native stay in sync. */
 export async function saveVaultLabels(labels: LabelDef[]): Promise<void> {
   if (!cachedVault) {
     throw new Error("Mail vault is not loaded");

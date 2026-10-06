@@ -131,6 +131,7 @@ function PdfPageCanvas({
     <div className="flex flex-col items-center gap-2">
       <canvas
         ref={canvasRef}
+        // repo-rules-allow theme-tokens-only: PDF pages are white paper documents; the canvas must not follow the theme.
         className="rounded-md border border-border/60 bg-white shadow-sm"
       />
       <div className="text-muted-foreground text-xs">Page {pageNumber}</div>
@@ -170,7 +171,8 @@ export function PdfAttachmentThumbnail({ url }: { url: string }) {
       void loadingTask
         .promise.then(async (document) => {
           if (cancelled) {
-            void document.destroy();
+            // Best-effort cleanup of a cancelled document; destroy failure is harmless here.
+            void document.destroy().catch(() => undefined);
             return;
           }
 
@@ -211,7 +213,17 @@ export function PdfAttachmentThumbnail({ url }: { url: string }) {
             setIsLoading(false);
           }
         });
-    })();
+    })().catch((loadError) => {
+      if (cancelled) {
+        return;
+      }
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Could not render this PDF preview.",
+      );
+      setIsLoading(false);
+    });
 
     return () => {
       cancelled = true;
@@ -224,6 +236,7 @@ export function PdfAttachmentThumbnail({ url }: { url: string }) {
     <div className="relative flex min-h-40 w-full items-center justify-center rounded-md border border-border/60 bg-background">
       <canvas
         ref={canvasRef}
+        // repo-rules-allow theme-tokens-only: PDF pages are white paper documents; the canvas must not follow the theme.
         className={`mx-auto rounded-md border border-border/60 bg-white shadow-sm ${
           isLoading || error ? "invisible" : ""
         }`}
@@ -269,7 +282,8 @@ function PdfAttachmentPreview({ preview }: { preview: Extract<MailAttachmentPrev
       void loadingTask.promise
       .then((document) => {
         if (cancelled) {
-          void document.destroy();
+          // Best-effort cleanup of a cancelled document; destroy failure is harmless here.
+          void document.destroy().catch(() => undefined);
           return;
         }
         setPdfDocument(document);
@@ -290,7 +304,17 @@ function PdfAttachmentPreview({ preview }: { preview: Extract<MailAttachmentPrev
           setIsLoadingDocument(false);
         }
       });
-    })();
+    })().catch((loadError) => {
+      if (cancelled) {
+        return;
+      }
+      setPdfError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Could not load this PDF preview.",
+      );
+      setIsLoadingDocument(false);
+    });
 
     return () => {
       cancelled = true;
@@ -300,7 +324,8 @@ function PdfAttachmentPreview({ preview }: { preview: Extract<MailAttachmentPrev
 
   useEffect(() => {
     return () => {
-      void pdfDocument?.destroy();
+      // Best-effort teardown of the loaded document on unmount; destroy failure is harmless here.
+      void pdfDocument?.destroy().catch(() => undefined);
     };
   }, [pdfDocument]);
 

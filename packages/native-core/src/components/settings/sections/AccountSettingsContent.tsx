@@ -1,12 +1,10 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { Alert } from "react-native";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
-  extractLinkedAuthAccounts,
   getErrorMessage,
   solaceProfileImageQueryKey,
   summarizeLinkedAuthAccounts,
-  type LinkedAuthAccountLike,
 } from "@workspace/calendar-core";
 import { SettingsPage } from "../SettingsPage";
 import { SettingsPasswordForm } from "../SettingsAccountForms";
@@ -24,6 +22,7 @@ import {
 } from "../../../lib/settings-screen-utils";
 import { useAuth } from "../../../providers/AuthProvider";
 import { useNativeUserSettings } from "../../../hooks/use-native-user-settings";
+import { useLinkedAuthAccounts } from "../../../hooks/use-linked-auth-accounts";
 import { calendarApiService } from "../../../lib/api";
 import { pickProfilePicture } from "../../../lib/profile-picture";
 import { useToast } from "../../../providers/ToastProvider";
@@ -41,17 +40,7 @@ export function AccountSettingsContent() {
   const { toast } = useToast();
   const { resetSettingsMutation } = useNativeUserSettings();
 
-  const accountsQuery = useQuery({
-    queryKey: ["auth", "accounts", user?.id ?? null],
-    queryFn: async (): Promise<LinkedAuthAccountLike[]> => {
-      if (typeof authClient.listAccounts !== "function") {
-        return [];
-      }
-      return extractLinkedAuthAccounts(await authClient.listAccounts());
-    },
-    enabled: Boolean(user?.id) && typeof authClient.listAccounts === "function",
-    staleTime: 5 * 60 * 1000,
-  });
+  const accountsQuery = useLinkedAuthAccounts();
   const { hasPasswordAccount, hasOAuthAccount } = useMemo(
     () => summarizeLinkedAuthAccounts(accountsQuery.data ?? []),
     [accountsQuery.data],

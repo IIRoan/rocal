@@ -16,6 +16,7 @@ export function MessageDecryptingSkeleton({
   className,
   label = "Decrypting message",
 }: MessageDecryptingSkeletonProps) {
+  // repo-rules-allow theme-tokens-only: bars sit on the fixed white/black email-document surface, so they cannot follow theme tokens.
   const bar = isDark ? "bg-white/10" : "bg-black/[0.06]";
 
   return (

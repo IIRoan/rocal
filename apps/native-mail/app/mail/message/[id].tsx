@@ -160,9 +160,12 @@ export default function MailMessageScreen() {
     runtime?.session.username?.trim().toLowerCase() ??
     undefined;
   const openEvent = (eventId: string) => {
-    void openCalendarEvent(eventId).then((opened) => {
-      if (!opened) toast("Install Solace Calendar to open this event", "error");
-    });
+    void openCalendarEvent(eventId).then(
+      (opened) => {
+        if (!opened) toast("Install Solace Calendar to open this event", "error");
+      },
+      () => toast("Could not open this event.", "error"),
+    );
   };
 
   return (
@@ -250,7 +253,6 @@ export default function MailMessageScreen() {
           name={preview.attachment.name ?? "attachment"}
           kind={preview.kind}
           theme={theme}
-          isDark={isDark}
           loadCached={actions.loadPreview}
           onClose={actions.closePreview}
           onShare={async (cached) => {

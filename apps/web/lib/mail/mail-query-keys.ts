@@ -27,6 +27,8 @@ export const mailQueryKeys = {
       ...mailQueryKeys.message(messageId),
       requireBody ? "full" : "preview",
     ] as const,
+  decryptedPreview: (messageId: string) =>
+    [...mailQueryKeys.message(messageId), "decrypted-preview"] as const,
   hiddenMailboxIds: () => [...mailQueryKeys.all, "hiddenMailboxIds"] as const,
   syncedSettings: (userId: string | null) =>
     [...mailQueryKeys.all, "syncedSettings", userId] as const,

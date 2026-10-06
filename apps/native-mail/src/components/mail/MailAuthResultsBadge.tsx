@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { Alert, Pressable } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
+import { useMailPalette } from "@workspace/native-core/components/mail/mail-ui";
 import {
   formatAuthResultsSummary,
   getTrustedAuthResultsHeader,
@@ -21,6 +22,7 @@ export function MailAuthResultsBadge({
   simpleLoginForward = false,
 }: MailAuthResultsBadgeProps) {
   const { theme } = useTheme();
+  const palette = useMailPalette();
   const trustedHeader = getTrustedAuthResultsHeader(message);
   const results = useMemo(() => parseAuthResults(trustedHeader), [trustedHeader]);
 
@@ -32,8 +34,7 @@ export function MailAuthResultsBadge({
   const icon = tone === "fail" ? "alert-octagon" : "shield";
   const color =
     tone === "pass"
-      ? ((theme.colors as unknown as Record<string, string>)["success"] ??
-        theme.colors.primaryBase)
+      ? palette.success
       : tone === "fail"
         ? theme.colors.destructive
         : theme.colors.mutedForeground;

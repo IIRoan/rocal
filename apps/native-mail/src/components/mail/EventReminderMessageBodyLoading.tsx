@@ -23,13 +23,13 @@ type EventReminderMessageBodyLoadingProps = {
 export function EventReminderMessageBodyLoading({
   attachedBelowBanner = false,
 }: EventReminderMessageBodyLoadingProps) {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const styles = useMemo(
     () => createStyles(theme, windowWidth, windowHeight),
     [theme, windowWidth, windowHeight],
   );
-  const skeleton = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)";
+  const skeleton = theme.colors.muted;
 
   return (
     <View

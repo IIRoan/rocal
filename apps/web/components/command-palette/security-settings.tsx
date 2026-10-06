@@ -14,7 +14,10 @@ import {
 
 interface SecuritySettingsProps {
   localSettings: UserSettings;
-  updateSetting: (key: keyof UserSettings, value: any) => void;
+  updateSetting: <K extends keyof UserSettings>(
+    key: K,
+    value: UserSettings[K],
+  ) => void;
   goBack: () => void;
   goForward: (view: string) => void;
   hasPasswordAccount?: boolean;

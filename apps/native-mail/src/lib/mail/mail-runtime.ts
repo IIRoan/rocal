@@ -91,10 +91,7 @@ export function restoreMailRuntime(persisted: PersistedMailRuntime): MailRuntime
   };
 }
 
-/**
- * Builds an authenticated JMAP runtime for the signed-in user after mailbox
- * provisioning has completed on either native or web.
- */
+/** Builds an authenticated JMAP runtime for the signed-in user once mailbox provisioning completed. */
 export async function buildMailRuntime(): Promise<MailRuntime> {
   const config = await getMailConfig();
   const client = createMailClient(config);

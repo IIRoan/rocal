@@ -20,7 +20,8 @@ function isCookieJar(raw: string): boolean {
 
 function deleteSecureKey(key: string): void {
   try {
-    void SecureStore.deleteItemAsync(key);
+    // Best-effort cleanup; a failed delete only leaves a stale keychain entry.
+    void SecureStore.deleteItemAsync(key).catch(() => undefined);
   } catch {
     // Best-effort cleanup.
   }
@@ -59,11 +60,7 @@ function healCookieJar(baseKey: string): void {
   }
 }
 
-/**
- * Heal corrupt auth Keychain entries before Expo Router / Better Auth load.
- * iOS Keychain can survive app delete; legacy `"1"` chunk meta makes Better
- * Auth JSON.parse a number and crash when setting cookies.
- */
+/** Heal corrupt auth Keychain entries before Better Auth loads; iOS Keychain survives app delete and legacy chunk meta crashes cookie parsing. */
 export function healAuthStorageAtBoot(): void {
   try {
     healCookieJar(COOKIE_STORE_KEY);

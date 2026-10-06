@@ -5,6 +5,12 @@ jest.mock("../../lib/prisma", () => ({
   prisma: {
     user: {
       findUnique: jest.fn(async (): Promise<any> => ({ id: "user-1" })),
+      update: jest.fn(async (): Promise<any> => ({
+        id: "user-1",
+        avatarId: null,
+        pendingAvatarId: null,
+        image: null,
+      })),
       delete: jest.fn(async (): Promise<any> => ({ id: "user-1" })),
     },
     mailDirectoryEntry: {
@@ -48,6 +54,7 @@ const mockGetSession = jest.mocked(auth.api.getSession);
 const mockPrisma = prisma as unknown as {
   user: {
     findUnique: jest.Mock<() => Promise<any>>;
+    update: jest.Mock<() => Promise<any>>;
     delete: jest.Mock<() => Promise<any>>;
   };
   mailDirectoryEntry: {

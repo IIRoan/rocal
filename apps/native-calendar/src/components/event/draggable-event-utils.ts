@@ -1,8 +1,6 @@
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 import { resolveTimezone, wallClockToUtc } from "@workspace/calendar-core";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
 /** Minimum long-press duration (ms) to activate drag */
 export const LONG_PRESS_DURATION_MS = 400;
 
@@ -20,8 +18,6 @@ export const DRAG_OPACITY = 0.85;
 
 /** Spring config for snap-back animation */
 export const SPRING_CONFIG = { damping: 20, stiffness: 200 };
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface DropTarget {
   /** The new date for the event */
@@ -41,26 +37,14 @@ export interface DragResult {
   newEnd: Date;
 }
 
-// ─── Pure helpers ────────────────────────────────────────────────────────────
-
-/**
- * Compute the duration in milliseconds between two dates.
- */
 export function getEventDurationMs(start: Date, end: Date): number {
   return end.getTime() - start.getTime();
 }
 
-/**
- * Snap a raw minute value to the nearest SNAP_INTERVAL_MINUTES boundary.
- */
 export function snapToInterval(rawMinutes: number): number {
   return Math.round(rawMinutes / SNAP_INTERVAL_MINUTES) * SNAP_INTERVAL_MINUTES;
 }
 
-/**
- * Given a vertical offset (pixels) within the timeline grid, compute the
- * snapped hour and minute.
- */
 export function yOffsetToTime(
   yOffset: number,
   hourHeight: number,
@@ -77,10 +61,6 @@ export function yOffsetToTime(
   };
 }
 
-/**
- * Given a horizontal offset (pixels) and the array of column dates,
- * determine which column (date) the offset falls in.
- */
 export function xOffsetToColumnIndex(
   xOffset: number,
   columnWidth: number,
@@ -90,10 +70,6 @@ export function xOffsetToColumnIndex(
   return Math.max(0, Math.min(index, columnCount - 1));
 }
 
-/**
- * Compute the new start and end times for a rescheduled event,
- * preserving the original duration.
- */
 export function computeRescheduledTimes(
   event: DecoratedCalendarEvent,
   dropTarget: DropTarget,
@@ -115,10 +91,7 @@ export function computeRescheduledTimes(
   return { newStart, newEnd };
 }
 
-/**
- * Find the column index for a given event start date within the visible
- * column dates. Returns 0 if not found.
- */
+/** Returns 0 when the event's day is not among the visible columns, so drags stay in view. */
 export function findEventColumnIndex(
   eventStart: Date,
   columnDates: Date[],

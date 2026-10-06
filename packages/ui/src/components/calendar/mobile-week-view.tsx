@@ -119,16 +119,17 @@ export function MobileWeekView({
 
       const allDayEvents = processedDayEvents[dayIndex] ?? [];
       const overlapping = allDayEvents
-        .filter((pe) => {
-          if (!pe.event) return false;
+        .flatMap((pe) => {
+          if (!pe.event) return [];
           const otherStart = new Date(pe.event.start);
           const otherEnd = new Date(pe.event.end);
           return areIntervalsOverlapping(
             { start: eventStart, end: eventEnd },
             { start: otherStart, end: otherEnd },
-          );
+          )
+            ? [pe.event]
+            : [];
         })
-        .map((pe) => pe.event!)
         .sort(
           (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
         );
@@ -204,6 +205,7 @@ export function MobileWeekView({
             >
               {(processedDayEvents[dayIndex] ?? []).map(
                 (positionedEvent, index) => (
+                  // repo-rules-allow wcag-keyboard-access: positioning wrapper that only stops click propagation; the inner event button is the keyboard target
                   <div
                     key={positionedEvent.event?.id || index}
                     className="absolute z-10 h-full"

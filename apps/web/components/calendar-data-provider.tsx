@@ -38,13 +38,7 @@ export function CalendarDataProvider({ children }: CalendarDataProviderProps) {
   );
 }
 
-/**
- * Syncs the calendar context's currentDate to the data layer's active month.
- * Must be rendered inside both CalendarDataProvider and CalendarProvider.
- *
- * This is the ONLY thing that controls which month's data is fetched.
- * The EventCalendar onDateRangeChange callbacks are no-ops.
- */
+/** Syncs the calendar context currentDate to the data layer's active month; this is the only month-fetch control, and onDateRangeChange callbacks are no-ops. */
 export function CalendarDateSync() {
   const { currentDate } = useCalendarContext();
   const { setMonth } = useSharedCalendarData();

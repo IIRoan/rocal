@@ -4,6 +4,9 @@ import {
   normalizeEmailAddress,
 } from "./mail-addresses";
 
+/** Shared React Query key for the encrypted recent-contacts record. */
+export const RECENT_CONTACTS_QUERY_KEY = ["recent-contacts"] as const;
+
 export type RecentContactContext = "mail" | "calendar";
 
 export type RecentContactEntry = {

@@ -41,7 +41,7 @@ export async function downloadEventIcs(eventId: string): Promise<void> {
 export async function respondToEventInvitation(input: {
   event: CalendarEvent;
   status: EventEditorInvitationResponseStatus;
-  refetchEvents: () => unknown;
+  refetchEvents: () => Promise<unknown>;
   queryClient: QueryClient;
   loadEventData: (event: CalendarEvent) => void;
   onEventSaved?: () => void;
@@ -54,7 +54,8 @@ export async function respondToEventInvitation(input: {
       input.event.id,
       input.status,
     );
-    void input.refetchEvents();
+    // Best-effort refresh; the cache also refetches when the affected queries invalidate.
+    void input.refetchEvents().catch(() => undefined);
     if ("deleted" in result && result.deleted) {
       if (input.event.externalId) {
         void input.queryClient.invalidateQueries({

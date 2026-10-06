@@ -85,10 +85,12 @@ export class InviteService implements IInviteService {
     email: string,
   ): Promise<void> {
     const [existingUser, existingInvite] = await Promise.all([
+      // repo-rules-allow owner-scoped-data: The email is checked globally to prevent duplicate accounts.
       this.prisma.user.findUnique({
         where: { email },
         select: { id: true },
       }),
+      // repo-rules-allow owner-scoped-data: This invite is limited to the authenticated inviter.
       this.prisma.invite.findFirst({
         where: {
           invitedById,
@@ -111,6 +113,7 @@ export class InviteService implements IInviteService {
   }
 
   private async findInviteByToken(token: string) {
+    // repo-rules-allow owner-scoped-data: The random invite token is the authorization capability.
     return this.prisma.invite.findUnique({
       where: { token },
       include: {
@@ -124,6 +127,7 @@ export class InviteService implements IInviteService {
       Date.now() - CLAIM_WINDOW_MINUTES * 60 * 1000,
     );
 
+    // repo-rules-allow owner-scoped-data: Sign-up is authorized by an active claimed invite for this email.
     return this.prisma.invite.findFirst({
       where: {
         claimedForEmail: normalizedEmail,
@@ -168,6 +172,7 @@ export class InviteService implements IInviteService {
   }
 
   async listInvites(input: ListInvitesInput): Promise<ListInvitesResult> {
+    // repo-rules-allow owner-scoped-data: invitedById comes from the authenticated route user.
     const invites = await this.prisma.invite.findMany({
       where: { invitedById: input.invitedById },
       orderBy: { createdAt: "desc" },
@@ -177,6 +182,7 @@ export class InviteService implements IInviteService {
   }
 
   async revokeInvite(input: RevokeInviteInput): Promise<RevokeInviteResult> {
+    // repo-rules-allow owner-scoped-data: Ownership is verified against input.invitedById below before mutation.
     const invite = await this.prisma.invite.findUnique({
       where: { id: input.id },
       select: { id: true, invitedById: true, status: true },
@@ -200,6 +206,7 @@ export class InviteService implements IInviteService {
       return { success: true };
     }
 
+    // repo-rules-allow owner-scoped-data: Ownership was verified against input.invitedById above.
     await this.prisma.invite.update({
       where: { id: input.id },
       data: { status: "revoked" },
@@ -239,6 +246,7 @@ export class InviteService implements IInviteService {
   }
 
   async claimInviteToken(input: ClaimInviteInput): Promise<ClaimInviteResult> {
+    // repo-rules-allow owner-scoped-data: The random invite token is the authorization capability.
     const invite = await this.prisma.invite.findUnique({
       where: { token: input.token },
     });
@@ -264,6 +272,7 @@ export class InviteService implements IInviteService {
       };
     }
 
+    // repo-rules-allow owner-scoped-data: The email is checked globally to prevent duplicate accounts.
     const existingUser = await this.prisma.user.findUnique({
       where: { email: chosenEmail },
       select: { id: true },
@@ -275,6 +284,7 @@ export class InviteService implements IInviteService {
       };
     }
 
+    // repo-rules-allow owner-scoped-data: invite.id came from the supplied random token above.
     const result = await this.prisma.invite.updateMany({
       where: { id: invite.id, status: "pending" },
       data: {
@@ -322,20 +332,24 @@ export class InviteService implements IInviteService {
     return { allowed: true };
   }
 
-  async markInviteAccepted(email: string): Promise<void> {
-    const normalizedEmail = normalizeEmail(email);
+  async markInviteAccepted(input: { userId: string; email: string }): Promise<void> {
+    const normalizedEmail = normalizeEmail(input.email);
     const invite = await this.findClaimedInviteForEmail(normalizedEmail);
 
     if (invite) {
-      // Accepting the invite is the approval: an invited account may provision
-      // a mailbox, an uninvited one may not.
+      // Accepting the invite approves this account for mailbox provisioning.
       await this.prisma.$transaction([
+        // repo-rules-allow owner-scoped-data: The accepted signup email resolves the claimed invite.
         this.prisma.invite.update({
           where: { id: invite.id },
           data: { status: "accepted" },
         }),
         this.prisma.user.updateMany({
-          where: { email: normalizedEmail, mailboxApprovedAt: null },
+          where: {
+            id: input.userId,
+            email: normalizedEmail,
+            mailboxApprovedAt: null,
+          },
           data: { mailboxApprovedAt: new Date() },
         }),
       ]);

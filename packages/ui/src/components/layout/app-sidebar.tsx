@@ -103,7 +103,7 @@ export function AppSidebar({
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="outline-none cursor-pointer">
+                <button type="button" className="outline-none cursor-pointer focus-visible:ring-[3px] focus-visible:ring-ring/50">
                   <BlobatarAvatar
                     email={user?.email}
                     name={user?.name}
@@ -199,7 +199,7 @@ export function AppSidebar({
                   <button
                     key={calendar.id}
                     type="button"
-                    onClick={() => void toggleCalendarVisibility(calendar.id)}
+                    onClick={() => toggleCalendarVisibility(calendar.id)}
                     aria-pressed={isVisible}
                     className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-colors ${
                       isVisible
@@ -242,7 +242,7 @@ export function AppSidebar({
                       <button
                         key={calendar.id}
                         type="button"
-                        onClick={() => void toggleCalendarVisibility(calendar.id)}
+                        onClick={() => toggleCalendarVisibility(calendar.id)}
                         aria-pressed={isVisible}
                         className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-colors ${
                           isVisible
@@ -287,7 +287,7 @@ export function AppSidebar({
                       <button
                         key={calendar.id}
                         type="button"
-                        onClick={() => void toggleCalendarVisibility(calendar.id)}
+                        onClick={() => toggleCalendarVisibility(calendar.id)}
                         aria-pressed={isVisible}
                         className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-colors ${
                           isVisible
@@ -431,7 +431,7 @@ function AppSidebarDesktop({
                   >
                     <SidebarIconButton
                       label={calendar.name}
-                      onClick={() => void toggleCalendarVisibility(calendar.id)}
+                      onClick={() => toggleCalendarVisibility(calendar.id)}
                     >
                       <span
                         className="size-2.5 rounded-full shrink-0 transition-opacity"
@@ -470,7 +470,7 @@ function AppSidebarDesktop({
                       <SidebarMenuItem key={calendar.id}>
                         <SidebarMenuButton
                           onClick={() =>
-                            void toggleCalendarVisibility(calendar.id)
+                            toggleCalendarVisibility(calendar.id)
                           }
                           className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-pointer select-none ${
                             isVisible
@@ -504,7 +504,7 @@ function AppSidebarDesktop({
                       <SidebarMenuItem key={calendar.id}>
                         <SidebarMenuButton
                           onClick={() =>
-                            void toggleCalendarVisibility(calendar.id)
+                            toggleCalendarVisibility(calendar.id)
                           }
                           className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-pointer select-none ${
                             isVisible
@@ -538,7 +538,7 @@ function AppSidebarDesktop({
                       <SidebarMenuItem key={calendar.id}>
                         <SidebarMenuButton
                           onClick={() =>
-                            void toggleCalendarVisibility(calendar.id)
+                            toggleCalendarVisibility(calendar.id)
                           }
                           className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-pointer select-none ${
                             isVisible

@@ -26,7 +26,10 @@ const SELECT_TRIGGER_CLASS = "h-8 rounded-lg bg-muted text-[15px] shadow-none";
 
 interface CalendarDefaultsSettingsProps {
   localSettings: UserSettings;
-  updateSetting: (key: keyof UserSettings, value: any) => void;
+  updateSetting: <K extends keyof UserSettings>(
+    key: K,
+    value: UserSettings[K],
+  ) => void;
   goBack: () => void;
   workingDaysList: number[];
 }

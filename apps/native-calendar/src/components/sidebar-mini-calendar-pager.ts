@@ -1,12 +1,4 @@
-/**
- * Numeric pager model for the sidebar mini calendar.
- *
- * The strip position is an absolute month coordinate (page units), not an
- * offset into a recycled 3-page strip. Committing a swipe re-centers the
- * rendered month window around the new month; the strip itself is never
- * re-positioned, so a recycle cannot flash a wrong-month frame between the
- * React tree commit and any animated value update.
- */
+/** Strip position is an absolute month coordinate; committing a swipe re-centers the window and never re-positions the strip, so a recycle cannot flash a wrong-month frame. */
 
 /** Months rendered on each side of the committed month. */
 export const MINI_CALENDAR_WINDOW_RADIUS = 2;
@@ -18,10 +10,6 @@ export interface MiniCalendarPagerWindow {
   end: number;
 }
 
-/**
- * Rendered page window for a committed absolute index. The committed page
- * always sits at the window's center.
- */
 export function getMiniCalendarPagerWindow(
   committedIndex: number,
   radius: number,
@@ -29,10 +17,7 @@ export function getMiniCalendarPagerWindow(
   return { start: committedIndex - radius, end: committedIndex + radius };
 }
 
-/**
- * Clamps a dragged strip position to the rendered window with rubber-band
- * resistance past either edge. Worklet-safe: only reads its parameters.
- */
+/** Rubber-band clamp to the rendered window; worklet-safe, reads only its parameters. */
 export function rubberBandPagerPosition(
   raw: number,
   minIndex: number,

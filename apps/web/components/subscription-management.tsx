@@ -2,19 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { calendarApiService } from "@/lib/calendar-api-service";
 import { getErrorMessage } from "@/lib/calendar-ui-helpers";
 import { useCalendarData } from "@/hooks/use-calendar-data";
-import { EVENTS_QUERY_KEY } from "@/hooks/use-calendar-events-loader";
+import {
+  useCreateSubscriptionMutation,
+  useDeleteSubscriptionMutation,
+  useSubscriptions,
+  useSyncSubscriptionMutation,
+  useUpdateSubscriptionMutation,
+} from "@/hooks/use-subscriptions";
 import { useCalendarContext } from "@workspace/ui/components/calendar";
 import type {
-  ApiError,
   Calendar,
   CalendarSubscription,
-  CreateSubscriptionRequest,
-  DeleteSubscriptionResponse,
-  SyncSubscriptionResponse,
-  UpdateSubscriptionRequest,
 } from "@/lib/types/calendar";
 import {
   NATIONAL_HOLIDAY_CALENDARS,
@@ -22,7 +22,6 @@ import {
   isLikelyIcsFeedUrl,
   normalizeSubscriptionFeedUrl,
 } from "@workspace/calendar-ics";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
@@ -111,7 +110,6 @@ export function SubscriptionManagement({
   onNavigateTo,
   initialEditCalendarId,
 }: SubscriptionManagementProps) {
-  const queryClient = useQueryClient();
   const { calendars, refetchCalendars } = useCalendarData();
   const { toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
 
@@ -161,13 +159,7 @@ export function SubscriptionManagement({
     data: subscriptions = [],
     isLoading: isLoadingSubscriptions,
     error: queryError,
-  } = useQuery<CalendarSubscription[], ApiError>({
-    queryKey: ["subscriptions"],
-    queryFn: () => calendarApiService.getSubscriptions(),
-    enabled: open,
-    initialData: () =>
-      queryClient.getQueryData<CalendarSubscription[]>(["subscriptions"]),
-  });
+  } = useSubscriptions(open);
 
   useEffect(() => {
     if (queryError) {
@@ -225,71 +217,33 @@ export function SubscriptionManagement({
     });
   };
 
-  const createMutation = useMutation({
-    mutationFn: (data: CreateSubscriptionRequest) =>
-      calendarApiService.createSubscription(data),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
-      await refetchCalendars();
-      await queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
-      toast.success("Read-only calendar added successfully.");
+  const createMutation = useCreateSubscriptionMutation({
+    refetchCalendars,
+    onCreated: () => {
       setNewSubscription({ name: "", url: "", color: "indigo" });
       setValidationErrors({});
       goBackToMain();
     },
-    onError: (error: ApiError) =>
-      toast.error(getErrorMessage(error, "Failed to create subscription")),
   });
 
-  const deleteMutation = useMutation<
-    DeleteSubscriptionResponse,
-    ApiError,
-    string
-  >({
-    mutationFn: (id: string) => calendarApiService.deleteSubscription(id),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
-      await refetchCalendars();
-      await queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
-      toast.success("Subscription removed.");
+  const deleteMutation = useDeleteSubscriptionMutation({
+    refetchCalendars,
+    onDeleted: () => {
       if (currentView === "subscriptions-edit") goBackToMain();
     },
-    onError: (error: ApiError) =>
-      toast.error(getErrorMessage(error, "Failed to remove subscription")),
   });
 
-  const syncMutation = useMutation<SyncSubscriptionResponse, ApiError, string>({
-    mutationFn: (id: string) => calendarApiService.syncSubscription(id),
-    onSuccess: async (_: SyncSubscriptionResponse, id: string) => {
-      await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
-      await refetchCalendars();
-      await queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
-      const sub = subscriptions.find((subscription) => subscription.id === id);
-      toast.success(`Synced "${sub?.name || "subscription"}"`);
-    },
-    onError: (error: ApiError) =>
-      toast.error(getErrorMessage(error, "Failed to sync subscription")),
+  const syncMutation = useSyncSubscriptionMutation({
+    refetchCalendars,
+    subscriptions,
   });
-  const updateMutation = useMutation<
-    CalendarSubscription,
-    ApiError,
-    {
-      id: string;
-      request: UpdateSubscriptionRequest;
-    }
-  >({
-    mutationFn: ({ id, request }) =>
-      calendarApiService.updateSubscription(id, request),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
-      await refetchCalendars();
-      await queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
-      toast.success("Calendar updated.");
+
+  const updateMutation = useUpdateSubscriptionMutation({
+    refetchCalendars,
+    onUpdated: () => {
       setEditValidationErrors({});
       goBackToMain();
     },
-    onError: (error: ApiError) =>
-      toast.error(getErrorMessage(error, "Failed to update calendar")),
   });
 
   const loading =

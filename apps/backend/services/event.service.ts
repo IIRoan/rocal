@@ -145,7 +145,7 @@ export class EventService implements IEventService {
     return resolveTimezone(userSettings?.timezone);
   }
 
-  private async buildParticipantMap(eventIds: string[]) {
+  private async buildParticipantMap(userId: string, eventIds: string[]) {
     if (eventIds.length === 0) {
       return new Map<string, ReturnType<typeof mapEventParticipant>[]>();
     }
@@ -154,6 +154,7 @@ export class EventService implements IEventService {
       await this.prisma.eventParticipant.findMany({
         where: {
           eventId: { in: eventIds },
+          event: { userId },
         },
         include: {
           user: { select: EVENT_PARTICIPANT_USER_SELECT },
@@ -225,16 +226,19 @@ export class EventService implements IEventService {
     );
   }
 
-  private async purgeInvitationEventRecord(eventId: string): Promise<void> {
+  private async purgeInvitationEventRecord(
+    userId: string,
+    eventId: string,
+  ): Promise<void> {
     const eventIdFilter = prismaStringEquals(eventId, "eventId");
     await this.prisma.eventNotification.deleteMany({
-      where: { eventId: eventIdFilter },
+      where: { eventId: eventIdFilter, event: { userId } },
     });
     await this.prisma.notificationLog.deleteMany({
-      where: { eventId: eventIdFilter },
+      where: { eventId: eventIdFilter, userId },
     });
     await this.prisma.calendarEvent.delete({
-      where: { id: eventIdFilter.equals },
+      where: { id: eventIdFilter.equals, userId },
     });
   }
 
@@ -248,7 +252,7 @@ export class EventService implements IEventService {
         eventIds.push(event.id);
       }
     }
-    const participantMap = await this.buildParticipantMap(eventIds);
+    const participantMap = await this.buildParticipantMap(userId, eventIds);
 
     return events.reduce<Record<string, unknown>[]>((acc, event) => {
       const participants =
@@ -1086,8 +1090,7 @@ export class EventService implements IEventService {
         }
       }
 
-      // Don't normalize all-day boundaries here — the client sends them in the
-      // user's timezone and re-applying setHours() on the server would shift dates.
+      // Don't normalize all-day boundaries here — the client sends them in the user's timezone and re-applying setHours() on the server would shift dates.
 
       if (recurrence) {
         try {
@@ -1222,9 +1225,7 @@ export class EventService implements IEventService {
           },
         });
       } catch (error) {
-        // Background Stalwart list sync can insert a plaintext shell between
-        // remote create and local insert (unique on userId+stalwartEventId).
-        // Adopt that shell instead of failing the user create.
+        // Background Stalwart list sync can insert a plaintext shell between remote create and local insert (unique on userId+stalwartEventId). Adopt that shell instead of failing the user create.
         const uniqueTarget =
           error &&
           typeof error === "object" &&
@@ -1354,7 +1355,7 @@ export class EventService implements IEventService {
         id.includes("_") &&
         id.match(/_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
       ) {
-        const parentEventId = id.split("_")[0]!;
+        const parentEventId = id.slice(0, id.indexOf("_"));
         logger.info(
           `Redirecting edit request from instance ${id} to parent ${parentEventId}`,
         );
@@ -1791,7 +1792,7 @@ export class EventService implements IEventService {
         warnings.push(reminderScheduleWarning("update"));
       }
 
-      const participantMap = await this.buildParticipantMap([updatedEvent.id]);
+      const participantMap = await this.buildParticipantMap(userId, [updatedEvent.id]);
 
       return {
         ...updatedEvent,
@@ -1826,7 +1827,7 @@ export class EventService implements IEventService {
         id.includes("_") &&
         id.match(/_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
       ) {
-        const parentEventId = id.split("_")[0]!;
+        const parentEventId = id.slice(0, id.indexOf("_"));
         logger.info(
           `Redirecting delete request from instance ${id} to parent ${parentEventId}`,
         );
@@ -1865,7 +1866,7 @@ export class EventService implements IEventService {
             eventId: id,
             status: "declined",
           });
-          await this.purgeInvitationEventRecord(id);
+          await this.purgeInvitationEventRecord(userId, id);
           return {
             success: true,
             message: "Invitation declined and removed from your calendar",
@@ -1877,13 +1878,13 @@ export class EventService implements IEventService {
 
       const [deletedNotifications] = await this.prisma.$transaction([
         this.prisma.eventNotification.deleteMany({
-          where: { eventId: id },
+          where: { eventId: id, event: { userId } },
         }),
         this.prisma.notificationLog.deleteMany({
-          where: { eventId: id },
+          where: { eventId: id, userId },
         }),
         this.prisma.calendarEvent.delete({
-          where: { id },
+          where: { id, userId },
         }),
       ]);
       logger.ok(

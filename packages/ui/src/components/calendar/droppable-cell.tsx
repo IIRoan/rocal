@@ -44,6 +44,7 @@ export function DroppableCell({
       : null;
 
   return (
+    // repo-rules-allow wcag-keyboard-access: dense drag-drop grid cell; keyboard event creation uses the create button and shortcuts, not one tab stop per cell
     <div
       ref={setNodeRef}
       onClick={onClick}

@@ -146,6 +146,7 @@ export function NavigationGuard({
 
       if (cancelled) return;
 
+      // repo-rules-allow async-promise-handling: resetPreSessionQueries is Promise.all of resetQueries, which never rejects.
       void resetPreSessionQueries(queryClient);
 
       // Silent on failure; the next launch retries the remaining rows.

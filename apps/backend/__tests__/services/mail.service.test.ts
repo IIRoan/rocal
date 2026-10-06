@@ -1061,7 +1061,17 @@ describe("MailService", () => {
   });
 
   it("upserts encrypted vault backups and keeps the seal when an update omits it", async () => {
-    const result = await service.upsertVaultBackup({
+    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValueOnce({
+      id: "entry-1",
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      stalwartAccountId: "acct-1",
+      stalwartPublicKeyId: "pk-1",
+      publicKeyFingerprint: "ABCD1234EF567890",
+      userId: "user-1",
+    });
+    const result = await service.upsertVaultBackupForUser({
+      userId: "user-1",
       email: "  Alice@Solace.Onl  ",
       vaultVersion: 2,
       encryptedVaultB64: "vault-b64-updated",
@@ -1075,7 +1085,7 @@ describe("MailService", () => {
     });
 
     expect(mockPrisma.mailDirectoryEntry.update).toHaveBeenCalledWith({
-      where: { email: "alice@solace.onl" },
+      where: { id: "entry-1", userId: "user-1" },
       data: {
         vaultBackup: {
           upsert: {
@@ -1137,9 +1147,12 @@ describe("MailService", () => {
     });
   });
 
-  it("throws when a vault backup is requested for an unknown mailbox", async () => {
+  it("throws when a vault backup is requested for an unlinked mailbox", async () => {
     await expect(
-      service.getVaultBackup("missing@solace.onl"),
+      service.getVaultBackupForUser({
+        userId: "user-1",
+        email: "missing@solace.onl",
+      }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 

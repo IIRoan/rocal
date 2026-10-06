@@ -4,7 +4,10 @@ import React, { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { calendarApiService } from "@/lib/calendar-api-service";
-import { CALENDAR_ICS_SHARING_HINT } from "@workspace/calendar-core";
+import {
+  CALENDAR_ICS_SHARING_HINT,
+  SUBSCRIPTIONS_QUERY_KEY,
+} from "@workspace/calendar-core";
 import {
   getErrorMessage,
   partitionCalendarsByKind,
@@ -87,7 +90,7 @@ export function CalendarManager({
   // Prefetch subscriptions so the synced-calendar edit screen opens populated without a Feed URL flash.
   useEffect(() => {
     void queryClient.prefetchQuery({
-      queryKey: ["subscriptions"],
+      queryKey: SUBSCRIPTIONS_QUERY_KEY,
       queryFn: () => calendarApiService.getSubscriptions(),
     });
   }, [queryClient]);
@@ -198,6 +201,10 @@ export function CalendarManager({
     }
 
     await handleDisableShareLink();
+  };
+
+  const handleToggleVisibility = (calendarId: string) => {
+    toggleCalendarVisibility(calendarId);
   };
 
   const handleConfirmRegenerate = async () => {
@@ -317,7 +324,7 @@ export function CalendarManager({
                   </button>
                   <button
                     type="button"
-                    onClick={() => void toggleCalendarVisibility(calendar.id)}
+                    onClick={() => handleToggleVisibility(calendar.id)}
                     aria-label={
                       isVisible
                         ? `Hide ${calendar.name}`
@@ -381,7 +388,7 @@ export function CalendarManager({
                       <button
                         type="button"
                         onClick={() =>
-                          void toggleCalendarVisibility(calendar.id)
+                          handleToggleVisibility(calendar.id)
                         }
                         aria-label={
                           isVisible
@@ -448,7 +455,7 @@ export function CalendarManager({
                       <button
                         type="button"
                         onClick={() =>
-                          void toggleCalendarVisibility(calendar.id)
+                          handleToggleVisibility(calendar.id)
                         }
                         aria-label={
                           isVisible
@@ -714,7 +721,10 @@ export function CalendarManager({
                 aria-checked={!!shareLinkInfo?.enabled}
                 onClick={() => {
                   if (shareLinkLoading) return;
-                  void handleToggleShareLink(!shareLinkInfo?.enabled);
+                  // handleToggleShareLink's callees report every failure via toast, so it never rejects.
+                  void handleToggleShareLink(!shareLinkInfo?.enabled).catch(
+                    () => undefined,
+                  );
                 }}
                 disabled={shareLinkLoading}
                 className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus-visible:bg-accent/50 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60"
@@ -870,7 +880,8 @@ export function CalendarManager({
               <Button
                 size="sm"
                 onClick={() => {
-                  void handleConfirmRegenerate();
+                  // handleEnableShareLink reports every failure via toast, so this never rejects.
+                  void handleConfirmRegenerate().catch(() => undefined);
                 }}
                 disabled={shareLinkLoading}
               >

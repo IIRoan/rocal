@@ -58,6 +58,8 @@ export interface ThemeTokens {
     accentForeground: string;
     destructive: string;
     destructiveForeground: string;
+    success: string;
+    overlay: string;
     border: string;
     input: string;
     ring: string;
@@ -187,6 +189,9 @@ const shadows: Record<string, ShadowTokenValue> = {
   },
 };
 
+const SUCCESS_LIGHT = "#00a05e";
+const SUCCESS_DARK = "#19c77f";
+
 export const lightTheme: ThemeTokens = {
   colors: {
     primary: {
@@ -218,6 +223,8 @@ export const lightTheme: ThemeTokens = {
     accentForeground: "oklch(0.2435 0 0)",
     destructive: "oklch(0.6271 0.1936 33.339)",
     destructiveForeground: "oklch(1 0 0)",
+    success: SUCCESS_LIGHT,
+    overlay: "#000000",
     border: "oklch(0.86 0 0)",
     input: "oklch(0.8822 0 0)",
     ring: "oklch(0.4341 0.0392 41.9938)",
@@ -275,6 +282,8 @@ export const darkTheme: ThemeTokens = {
     accentForeground: "oklch(0.9491 0 0)",
     destructive: "oklch(0.6271 0.1936 33.339)",
     destructiveForeground: "oklch(1 0 0)",
+    success: SUCCESS_DARK,
+    overlay: "#000000",
     border: "oklch(0.3 0.0115 91.7467)",
     input: "oklch(0.4017 0 0)",
     ring: "oklch(0.9247 0.0524 66.1732)",
@@ -339,29 +348,29 @@ function oklchToHex(oklchStr: string): string {
   return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${bVal.toString(16).padStart(2, "0")}`;
 }
 
-function convertColors<T>(obj: T): T {
-  if (typeof obj === "string") {
-    return oklchToHex(obj) as unknown as T;
+function convertColors(value: unknown): unknown {
+  if (typeof value === "string") {
+    return oklchToHex(value);
   }
-  if (Array.isArray(obj)) {
-    return obj.map(convertColors) as unknown as T;
+  if (Array.isArray(value)) {
+    return value.map((item) => convertColors(item));
   }
-  if (obj !== null && typeof obj === "object") {
+  if (value !== null && typeof value === "object") {
     const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = convertColors(value);
+    for (const [key, entry] of Object.entries(value)) {
+      result[key] = convertColors(entry);
     }
-    return result as T;
+    return result;
   }
-  return obj;
+  return value;
 }
 
 export function toNativeTheme(tokens: ThemeTokens): ThemeTokens {
   return {
     ...tokens,
-    colors: convertColors(tokens.colors),
+    colors: convertColors(tokens.colors) as ThemeTokens["colors"],
     // shadows may contain rgba — convertColors handles passthrough
-    shadows: convertColors(tokens.shadows),
+    shadows: convertColors(tokens.shadows) as ThemeTokens["shadows"],
   };
 }
 
@@ -396,7 +405,7 @@ export const mailLightPalette: MailPaletteTokens = {
   cellActive: "#ebebeb",
   cellUnread: "#ffffff",
   surface: "#ffffff",
-  success: "#00a05e",
+  success: SUCCESS_LIGHT,
   warning: "#f59e0b",
   star: "#fbbf24",
   ctaPrimary: "#000000",
@@ -412,7 +421,7 @@ export const mailDarkPalette: MailPaletteTokens = {
   cellActive: "#313131",
   cellUnread: "#242424",
   surface: "#1f1f1f",
-  success: "#19c77f",
+  success: SUCCESS_DARK,
   warning: "#f59e0b",
   star: "#fbbf24",
   ctaPrimary: "#ffffff",

@@ -1,5 +1,6 @@
 import { useEffect, createContext, use, useMemo, useRef } from "react";
 import { getAccountTimezoneSeed } from "@workspace/calendar-core";
+import { webQueryKeys } from "@/lib/query-keys";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import type { UserSettings, UpdateSettingsRequest, ApiError } from "@/lib/types/calendar";
 import { useSession } from "@/lib/auth-client";
@@ -29,12 +30,9 @@ export function useSettingsState(): SettingsContextValue {
   const queryClient = useQueryClient();
   const seededSettingsId = useRef<string | null>(null);
 
-  // Include the user ID in the key so each user gets their own cache entry.
-  // staleTime: Infinity means data is never re-fetched automatically, so
-  // scoping by userId prevents a logged-out user's settings from bleeding into
-  // the next user's session.
+  // Scope indefinitely cached settings to the signed-in user to prevent cross-account reuse.
   const settingsQueryKey = useMemo(
-    () => ["settings", session?.user?.id ?? null] as const,
+    () => webQueryKeys.settings(session?.user?.id ?? null),
     [session?.user?.id],
   );
 

@@ -27,6 +27,7 @@ function EventReminderBodyShell({
       className={cn(
         "flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--border-secondary)]",
         "min-h-[max(var(--event-reminder-min-fill),calc(min(100cqw,var(--event-reminder-max-width))*var(--event-reminder-height-ratio)))]",
+        // repo-rules-allow theme-tokens-only: replica of the outgoing reminder email document; mail clients ignore CSS variables.
         isDark ? "bg-[#1a1a1a] [color-scheme:dark]" : "bg-white [color-scheme:light]",
         className,
       )}
@@ -63,7 +64,10 @@ export function EventReminderMessageBody({
       isDark={isDark}
       className={className}
     >
-      <Link href="/calendar" className="mb-7 inline-block outline-none">
+      <Link
+        href="/calendar"
+        className="mb-7 inline-block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+      >
         <Image
           src="/favicon-192x192.png"
           alt="Solace"
@@ -77,6 +81,7 @@ export function EventReminderMessageBody({
       <h1
         className={cn(
           "m-0 text-[22px] font-bold leading-[130%] tracking-[-0.01em]",
+          // repo-rules-allow theme-tokens-only: replica of the outgoing reminder email document; mail clients ignore CSS variables.
           isDark ? "text-white" : "text-black",
         )}
       >
@@ -85,6 +90,7 @@ export function EventReminderMessageBody({
       <p
         className={cn(
           "mt-1.5 text-[15px] leading-[130%]",
+          // repo-rules-allow theme-tokens-only: replica of the outgoing reminder email document; mail clients ignore CSS variables.
           isDark ? "text-white/55" : "text-black/50",
         )}
       >
@@ -125,8 +131,9 @@ export function EventReminderMessageBody({
           href={eventUrl}
           className={cn(
             "inline-block rounded-xl border px-5 py-3 text-[15px] font-medium leading-none no-underline transition-colors",
+            // repo-rules-allow theme-tokens-only: replica of the outgoing reminder email document; mail clients ignore CSS variables.
             isDark
-              ? "border-white/15 bg-[#2a2a2a] text-white hover:bg-[#333]"
+              ? "border-white/15 bg-[#2a2a2a] text-white hover:bg-[#333]" // repo-rules-allow theme-tokens-only: replica of the outgoing reminder email document; mail clients ignore CSS variables.
               : "border-black/12 border-b-2 bg-white text-black hover:bg-black/[0.02]",
           )}
         >
@@ -207,6 +214,7 @@ export function EventReminderMessageBodyLoading({
   isDark = false,
   className,
 }: EventReminderMessageBodyLoadingProps) {
+  // repo-rules-allow theme-tokens-only: skeleton sits on the fixed email-document surface of the reminder replica; mail clients ignore CSS variables.
   const skeleton = isDark ? "bg-white/10" : "bg-black/[0.06]";
 
   return (
@@ -260,6 +268,7 @@ function ReminderDetail({
       <div
         className={cn(
           "mb-1 text-[11px] font-semibold uppercase leading-[14px] tracking-[0.06em]",
+          // repo-rules-allow theme-tokens-only: replica of the outgoing reminder email document; mail clients ignore CSS variables.
           isDark ? "text-white/40" : "text-[#999]",
         )}
       >

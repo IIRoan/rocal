@@ -16,6 +16,7 @@ import {
   getEventColorClasses,
   getEventColorStyles,
   isHexColor,
+  isPreviewEvent,
   resolveInlineColorValue,
 } from "./utils";
 import { EncryptionStatusBadge } from "./encryption-status";
@@ -65,17 +66,18 @@ function EventWrapper({
     : new Date(event.end);
 
   const isEventInPast = isPast(displayEnd);
-  const isPreview = !!(event as any).isPreview;
+  const isPreview = isPreviewEvent(event);
   const isInvitationGhost = isAwaitingUserInvitationResponse(event);
 
   if (isPreview) {
     // Hex colors derive a translucent fill; named colors use their class at reduced opacity so the ghost reads in both themes.
     const colorIsHex = isHexColor(event.color || "");
+    const hexColor = colorIsHex ? event.color : null;
 
     return (
       <div
         className={cn(
-          "flex h-full w-full overflow-hidden text-left font-medium transition-[color,background-color,border-color,opacity] duration-200 ease-out outline-none select-none",
+          "flex h-full w-full overflow-hidden text-left font-medium transition-[color,background-color,border-color,opacity] duration-200 ease-out select-none",
           "min-h-[20px] sm:min-h-[24px]",
           "px-[2px] sm:px-2",
           "border-2 border-dashed rounded-md",
@@ -85,11 +87,11 @@ function EventWrapper({
           className,
         )}
         style={
-          colorIsHex
+          hexColor
             ? {
-                borderColor: event.color!,
-                backgroundColor: `${event.color}33`,
-                color: event.color,
+                borderColor: hexColor,
+                backgroundColor: `${hexColor}33`,
+                color: hexColor,
                 opacity: 0.85,
               }
             : { opacity: 0.85 }
@@ -112,7 +114,7 @@ function EventWrapper({
         "data-dragging:cursor-grabbing data-dragging:shadow-lg data-dragging:z-20",
         "data-past-event:opacity-65",
         "data-invitation-ghost:border data-invitation-ghost:border-dashed data-invitation-ghost:border-current/60 data-invitation-ghost:bg-transparent data-invitation-ghost:opacity-75",
-        "hover:brightness-[1.04] hover:shadow-sm hover:ring-1 hover:ring-black/10 dark:hover:ring-white/15 hover:z-10",
+        "hover:brightness-[1.04] hover:shadow-sm hover:ring-1 hover:ring-black/10 dark:hover:ring-foreground/15 hover:z-10",
         "touch-manipulation",
         compact
           ? "min-h-0 px-1"
@@ -358,7 +360,7 @@ export function EventItem({
           "data-invitation-ghost:border data-invitation-ghost:border-dashed data-invitation-ghost:border-current/60 data-invitation-ghost:bg-muted/20 data-invitation-ghost:opacity-75",
           className,
         )}
-        style={{ ["--ev-accent" as any]: accentColor }}
+        style={{ "--ev-accent": accentColor } as React.CSSProperties}
         data-past-event={isPast(new Date(event.end)) || undefined}
         data-invitation-ghost={isInvitationGhost || undefined}
         data-event-id={event.id}

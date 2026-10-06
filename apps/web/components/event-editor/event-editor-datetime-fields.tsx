@@ -20,13 +20,13 @@ import {
 } from "@workspace/ui/components/ui/popover";
 import { ShadcnAutocomleteTimePicker } from "@workspace/ui/components/ui/autocompletetimepicker";
 import { cn } from "@workspace/ui/lib/utils";
-import { format } from "date-fns";
-import { Check, ChevronDown, Clock, Repeat } from "lucide-react";
 import {
   findRepeatPreset,
+  formatPickerDate,
   getRepeatPresets,
   resolveTimeFormat,
 } from "@workspace/calendar-core";
+import { Check, ChevronDown, Clock, Repeat } from "lucide-react";
 
 import { getRecurringRuleSummary } from "@/lib/event-editor-view-model";
 import type { RecurrenceRule, UserSettings } from "@/lib/types/calendar";
@@ -70,10 +70,10 @@ function DateChip({
   const trigger = (
     <button
       type="button"
-      aria-label={`${label}: ${format(value, "EEEE, MMMM d")}`}
+      aria-label={`${label}: ${formatPickerDate(value, "EEEE, MMMM d")}`}
       className={cn(chipClass(desktop), muted && "text-muted-foreground")}
     >
-      {format(value, "EEE, MMM d")}
+      {formatPickerDate(value, "EEE, MMM d")}
     </button>
   );
   const calendar = (
@@ -210,8 +210,8 @@ export function EventEditorDateTimeFields({
   const [customRepeatOpen, setCustomRepeatOpen] = useState(false);
   const timeFormat = resolveTimeFormat(localSettings?.timeFormat);
   const sameDay =
-    format(eventForm.eventStartDate, "yyyy-MM-dd") ===
-    format(eventForm.eventEndDate, "yyyy-MM-dd");
+    formatPickerDate(eventForm.eventStartDate, "yyyy-MM-dd") ===
+    formatPickerDate(eventForm.eventEndDate, "yyyy-MM-dd");
   const showCustomRepeat =
     eventForm.isRecurring &&
     eventForm.recurrenceRule !== null &&

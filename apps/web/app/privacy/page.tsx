@@ -16,8 +16,6 @@ export default function PrivacyPage() {
     <section className="min-h-[100dvh] flex">
       {/* Left side - Content */}
       <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-12 lg:w-1/2 lg:px-16 xl:px-24">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-secondary/30 via-background to-background" />
-
         <div className="relative z-10 mx-auto w-full max-w-md">
           {/* Logo + Theme toggle */}
           <div className="mb-10 flex items-center justify-between">
@@ -216,6 +214,7 @@ export default function PrivacyPage() {
             loading="eager"
             unoptimized
           />
+          {/* repo-rules-allow theme-tokens-only: photo scrim over the wallpaper image for depth, not a styled UI surface. */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
         </div>
       </div>

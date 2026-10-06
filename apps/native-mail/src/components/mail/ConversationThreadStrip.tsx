@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -42,9 +42,12 @@ export function ConversationThreadStrip({
   const [expanded, setExpanded] = useState(false);
   const threadKey = messages[0]?.threadId ?? messages[0]?.id ?? "";
 
-  useEffect(() => {
+  // Reset during render when the thread changes, so the strip starts collapsed.
+  const [renderedThreadKey, setRenderedThreadKey] = useState(threadKey);
+  if (renderedThreadKey !== threadKey) {
+    setRenderedThreadKey(threadKey);
     setExpanded(false);
-  }, [threadKey]);
+  }
 
   if (messages.length <= 1) {
     return null;

@@ -11,13 +11,12 @@ import {
   Users,
   RotateCcw,
 } from "lucide-react";
-import {
-  getErrorMessage,
-  getInviteCreateFeedback,
-} from "@workspace/calendar-core";
-import { inviteApiService } from "@/lib/api-clients";
 import type { InviteRecord } from "@workspace/calendar-client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useCreateInvite,
+  useInvites,
+  useRevokeInvite,
+} from "@/hooks/use-invites";
 import { format } from "date-fns";
 import {
   PaletteButton,
@@ -151,47 +150,16 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
   const [message, setMessage] = useState<SectionMessage>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
-  const queryClient = useQueryClient();
+  const { data, isLoading, refetch } = useInvites();
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["invites"],
-    queryFn: () => inviteApiService.listInvites(),
-    staleTime: 30_000,
+  const createMutation = useCreateInvite({
+    onCreated: () => setEmail(""),
+    onFeedback: setMessage,
   });
 
-  const createMutation = useMutation({
-    mutationFn: (emailAddress: string) =>
-      inviteApiService.createInvite(emailAddress),
-    onSuccess: (data, emailAddress) => {
-      setEmail("");
-      const feedback = getInviteCreateFeedback(emailAddress, data);
-      setMessage({
-        kind: feedback.tone === "warning" ? "warning" : "success",
-        text: feedback.text,
-      });
-      queryClient.invalidateQueries({ queryKey: ["invites"] });
-    },
-    onError: (err: unknown) => {
-      setMessage({
-        kind: "error",
-        text: getErrorMessage(err, "Failed to create invite."),
-      });
-    },
-  });
-
-  const revokeMutation = useMutation({
-    mutationFn: (id: string) => inviteApiService.revokeInvite(id),
-    onSuccess: () => {
-      setRevokingId(null);
-      queryClient.invalidateQueries({ queryKey: ["invites"] });
-    },
-    onError: (err: unknown) => {
-      setRevokingId(null);
-      setMessage({
-        kind: "error",
-        text: getErrorMessage(err, "Failed to revoke invite."),
-      });
-    },
+  const revokeMutation = useRevokeInvite({
+    onRevoked: () => setRevokingId(null),
+    onFeedback: setMessage,
   });
 
   function handleCreate(e: React.FormEvent) {

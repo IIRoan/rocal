@@ -204,8 +204,7 @@ export class EventParticipantService {
       (participant) => !reservedIds.includes(participant.id),
     );
 
-    // Build a lookup keyed by the best available email, skipping entries
-    // that have neither a participant email nor a linked user email.
+    // Build a lookup keyed by the best available email, skipping entries that have neither a participant email nor a linked user email.
     const existingByEmail = new Map(
       retainedExisting
         .map((participant) => {
@@ -281,8 +280,7 @@ export class EventParticipantService {
           },
         },
       }),
-      // Build the invitation-sending closure now (while we have the resolved data)
-      // but return it to the caller so emails are sent AFTER the DB transaction commits.
+      // Build the invitation-sending closure now (while we have the resolved data) but return it to the caller so emails are sent AFTER the DB transaction commits.
       this.buildInvitationSender(input, resolvedParticipants, existingByEmail),
     ]);
 

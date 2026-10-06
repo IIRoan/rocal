@@ -221,6 +221,7 @@ export function invalidateEventRanges(
   const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
   while (cursor <= endDate) {
     months.add(monthKey(cursor));
+    // repo-rules-allow timezone-safe-calendar-code: wall-clock month-key enumeration, matching monthKey's local getters, not an event instant.
     cursor.setMonth(cursor.getMonth() + 1);
   }
   for (const month of months) {
@@ -325,14 +326,14 @@ export function useCalendarData(
 
   // --- Queries ---
 
-  const calendarsQuery = useQuery({
+  const calendarsQuery = useQuery<Calendar[], ApiError>({
     queryKey: CALENDARS_QUERY_KEY,
     queryFn: () => calendarApiService.getCalendars(),
     enabled: autoRefetch,
     staleTime: cacheTimeout,
   });
 
-  const categoriesQuery = useQuery({
+  const categoriesQuery = useQuery<EventCategory[], ApiError>({
     queryKey: CATEGORIES_QUERY_KEY,
     queryFn: () => calendarApiService.getCategories(),
     enabled: autoRefetch,
@@ -477,8 +478,7 @@ export function useCalendarData(
       calendar: UpdateCalendarRequest;
     }) => calendarApiService.updateCalendar(id, calendar),
     onSuccess: () => {
-      // Only refresh calendar metadata — visibility/name/color changes don't
-      // alter server-side events, so there is no need to re-fetch events here.
+      // Only refresh calendar metadata — visibility/name/color changes don't alter server-side events, so there is no need to re-fetch events here.
       queryClient.invalidateQueries({ queryKey: CALENDARS_QUERY_KEY });
     },
   });
@@ -549,7 +549,6 @@ export function useCalendarData(
   }, [refetchEvents, calendarsQuery, categoriesQuery]);
 
   const clearCache = useCallback(() => {
-    queryClient.invalidateQueries();
     queryClient.clear();
   }, [queryClient]);
 
@@ -701,12 +700,10 @@ export function useCalendarData(
       categoriesLoading: categoriesQuery.isLoading,
 
       // Error states
-      error: (eventsError ||
-        calendarsQuery.error ||
-        categoriesQuery.error) as unknown as ApiError | null,
+      error: eventsError || calendarsQuery.error || categoriesQuery.error,
       eventsError,
-      calendarsError: calendarsQuery.error as unknown as ApiError | null,
-      categoriesError: categoriesQuery.error as unknown as ApiError | null,
+      calendarsError: calendarsQuery.error,
+      categoriesError: categoriesQuery.error,
 
       // Actions
       refetch,

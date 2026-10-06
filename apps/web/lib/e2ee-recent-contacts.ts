@@ -10,7 +10,7 @@ import { waitForPendingE2eeBootstrap } from "./e2ee-bootstrap";
 import {
   decryptJsonPayload,
   encryptJsonPayload,
-  type EncryptedJsonPayload,
+  parseEncryptedJsonPayload,
 } from "./e2ee-crypto";
 import { getActiveE2eeSession } from "./e2ee-session";
 import { calendarApiService } from "./calendar-api-service";
@@ -34,16 +34,6 @@ async function getEncryptionSession() {
   return session;
 }
 
-function parseEncryptedPayload(
-  encryptedContent: string,
-): EncryptedJsonPayload | null {
-  try {
-    return JSON.parse(encryptedContent) as EncryptedJsonPayload;
-  } catch {
-    return null;
-  }
-}
-
 export async function loadRecentContacts(): Promise<RecentContactsPayload | null> {
   const session = await getEncryptionSession();
   if (!session) {
@@ -55,7 +45,7 @@ export async function loadRecentContacts(): Promise<RecentContactsPayload | null
     return createEmptyRecentContactsPayload();
   }
 
-  const encryptedPayload = parseEncryptedPayload(record.encryptedContent);
+  const encryptedPayload = parseEncryptedJsonPayload(record.encryptedContent);
   if (!encryptedPayload) {
     return createEmptyRecentContactsPayload();
   }

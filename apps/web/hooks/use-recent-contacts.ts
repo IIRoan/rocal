@@ -2,7 +2,9 @@
 
 import { useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createLogger } from "@workspace/logger";
 import {
+  RECENT_CONTACTS_QUERY_KEY,
   addManualContact,
   createEmptyRecentContactsPayload,
   filterContactsList,
@@ -23,8 +25,8 @@ import {
   saveRecentContacts,
 } from "@/lib/e2ee-recent-contacts";
 
-const RECENT_CONTACTS_QUERY_KEY = ["recent-contacts"] as const;
 const RECORD_DEBOUNCE_MS = 500;
+const log = createLogger("recent-contacts");
 
 export function useRecentContacts(options?: {
   query?: string;
@@ -131,7 +133,9 @@ export function useRecentContacts(options?: {
 
     recordTimerRef.current = setTimeout(() => {
       recordTimerRef.current = null;
-      void flushPendingRecords();
+      void flushPendingRecords().catch((error) => {
+        log.warn("Failed to record recent contact usage", error);
+      });
     }, RECORD_DEBOUNCE_MS);
   }
 

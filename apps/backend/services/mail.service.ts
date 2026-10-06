@@ -520,11 +520,7 @@ export class MailService implements IMailService {
       description: "Solace mail backend bridge",
     });
 
-    // Do NOT reset the Stalwart account password on every mint. Each Vercel
-    // isolate used to call setAccountPassword once, which invalidated OAuth
-    // tokens held by other isolates and caused a 401→remint storm (~1–3s per
-    // JMAP call). Prefer logging in with the deterministic bridge secret and
-    // only set the password if authentication fails.
+    // Do NOT reset the Stalwart account password on every mint. Each Vercel isolate used to call setAccountPassword once, which invalidated OAuth tokens held by other isolates and caused a 401→remint storm (~1–3s per JMAP call). Prefer logging in with the deterministic bridge secret and only set the password if authentication fails.
     const mint = () =>
       this.adminClient.issueOAuthAccessToken({
         accountName: mailbox.email,
@@ -815,6 +811,7 @@ export class MailService implements IMailService {
       return;
     }
 
+    // repo-rules-allow owner-scoped-data: This global lookup prevents deletion of any existing mailbox account.
     const existingEntry = await this.prisma.mailDirectoryEntry.findUnique({
       where: { stalwartAccountId: accountId },
       select: { id: true },
@@ -1177,6 +1174,7 @@ export class MailService implements IMailService {
   }
 
   private async mailboxHasVaultBackup(mailboxId: string): Promise<boolean> {
+    // repo-rules-allow owner-scoped-data: mailboxId comes from findOrAttachMailboxForUser after verifying this user.
     const entry = await this.prisma.mailDirectoryEntry.findUnique({
       where: { id: mailboxId },
       select: {
@@ -1484,50 +1482,6 @@ export class MailService implements IMailService {
     };
   }
 
-  async getVaultBackup(email: string): Promise<MailVaultBackupResult> {
-    const normalizedEmail = normalizeEmail(email);
-    const entry = await this.prisma.mailDirectoryEntry.findUnique({
-      where: { email: normalizedEmail },
-      select: {
-        email: true,
-        vaultBackup: {
-          select: {
-            vaultVersion: true,
-            encryptedVaultB64: true,
-            kdf: true,
-            kdfSaltB64: true,
-            kdfMemoryKiB: true,
-            kdfIterations: true,
-            kdfParallelism: true,
-            wrappedSecret: true,
-            wrapAlgorithm: true,
-          },
-        },
-      },
-    });
-
-    if (!entry?.vaultBackup) {
-      throw new NotFoundError(
-        "No encrypted vault backup was found for that mailbox.",
-      );
-    }
-
-    return {
-      email: entry.email,
-      vaultVersion: entry.vaultBackup.vaultVersion,
-      encryptedVaultB64: entry.vaultBackup.encryptedVaultB64,
-      kdf: entry.vaultBackup.kdf,
-      kdfParams: {
-        saltB64: entry.vaultBackup.kdfSaltB64,
-        memoryKiB: entry.vaultBackup.kdfMemoryKiB,
-        iterations: entry.vaultBackup.kdfIterations,
-        parallelism: entry.vaultBackup.kdfParallelism,
-      },
-      wrappedSecret: entry.vaultBackup.wrappedSecret,
-      wrapAlgorithm: entry.vaultBackup.wrapAlgorithm,
-    };
-  }
-
   async getVaultBackupForUser(
     input: GetMailVaultBackupForUserInput,
   ): Promise<MailVaultBackupResult> {
@@ -1544,7 +1498,7 @@ export class MailService implements IMailService {
     }
 
     const entry = await this.prisma.mailDirectoryEntry.findUnique({
-      where: { id: mailbox.id },
+      where: { id: mailbox.id, userId: input.userId },
       select: {
         email: true,
         vaultBackup: {
@@ -1585,10 +1539,12 @@ export class MailService implements IMailService {
     };
   }
 
-  async upsertVaultBackup(
-    input: UpsertMailVaultBackupInput,
+  private async upsertVaultBackupForMailbox(
+    input: Omit<UpsertMailVaultBackupInput, "email"> & {
+      userId: string;
+      mailboxId: string;
+    },
   ): Promise<MailVaultBackupResult> {
-    const normalizedEmail = normalizeEmail(input.email);
     const encryptedVaultB64 = input.encryptedVaultB64.trim();
 
     if (!encryptedVaultB64) {
@@ -1601,7 +1557,7 @@ export class MailService implements IMailService {
     assertVaultParams(input.kdf, input.kdfParams);
 
     const record = await this.prisma.mailDirectoryEntry.update({
-      where: { email: normalizedEmail },
+      where: { id: input.mailboxId, userId: input.userId },
       data: {
         vaultBackup: {
           upsert: {
@@ -1685,8 +1641,9 @@ export class MailService implements IMailService {
       );
     }
 
-    return this.upsertVaultBackup({
-      email: mailbox.email,
+    return this.upsertVaultBackupForMailbox({
+      userId: input.userId,
+      mailboxId: mailbox.id,
       vaultVersion: input.vaultVersion,
       encryptedVaultB64: input.encryptedVaultB64,
       kdf: input.kdf,

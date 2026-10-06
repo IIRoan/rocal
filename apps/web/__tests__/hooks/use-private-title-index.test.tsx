@@ -11,6 +11,7 @@ import {
   jest,
 } from "@jest/globals";
 import { useSession } from "@/lib/auth-client";
+import { authSessionDataFixture } from "../mocks/auth-session";
 import {
   clearActiveE2eeSession,
   setActiveE2eeSession,
@@ -71,7 +72,13 @@ describe("usePrivateTitleIndex", () => {
     clearActiveE2eeSession();
     window.localStorage.clear();
     setEnabled(true);
-    jest.mocked(useSession).mockReturnValue({ data: { user: { id: "u1" } } });
+    jest.mocked(useSession).mockReturnValue({
+      data: { ...authSessionDataFixture, user: { ...authSessionDataFixture.user, id: "u1" } },
+      isPending: false,
+      isRefetching: false,
+      error: null,
+      refetch: jest.fn(async () => undefined),
+    });
     jest.mocked(loadPrivateTitleIndex).mockResolvedValue(snapshot);
     jest.mocked(rebuildPrivateTitleIndex).mockResolvedValue(snapshot);
     root = createRoot(document.createElement("div"));

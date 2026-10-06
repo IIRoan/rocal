@@ -7,9 +7,7 @@ export type PartitionedCalendars = {
   subscribedCalendars: Calendar[];
 };
 
-/**
- * Partitions calendars into owned, public holiday, and subscribed groups.
- */
+/** Partitions calendars into owned, public holiday, and subscribed groups. */
 export function partitionCalendarsByKind(
   calendars: Calendar[],
 ): PartitionedCalendars {
@@ -42,17 +40,11 @@ export function partitionCalendarsByKind(
   };
 }
 
-/**
- * Calendars shown in navigation sidebars (excludes the hidden mail-invitation staging calendar).
- */
+/** Sidebar list that hides the mail-invitation staging calendar. */
 export function listSidebarCalendars(calendars: Calendar[]): Calendar[] {
   return calendars.filter((calendar) => !isMailInvitationStagingCalendar(calendar));
 }
 
-/**
- * Extracts a human-readable error message from an unknown error value.
- * Falls back to the provided default message.
- */
 export function getErrorMessage(error: unknown, fallback: string): string {
   if (error && typeof error === "object" && "message" in error) {
     const message = (error as { message?: unknown }).message;

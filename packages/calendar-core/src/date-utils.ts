@@ -39,14 +39,18 @@ export function getDefaultCalendarDateRange({
       break;
     case "day":
       start = new Date(baseDate);
+      // repo-rules-allow timezone-safe-calendar-code: legacy local-tz range for shipped callers; zoned code uses getTimezoneAwareCalendarDateRange.
       start.setHours(0, 0, 0, 0);
       end = new Date(baseDate);
+      // repo-rules-allow timezone-safe-calendar-code: legacy local-tz range for shipped callers; zoned code uses getTimezoneAwareCalendarDateRange.
       end.setHours(23, 59, 59, 999);
       break;
     case "3day":
       start = addDays(baseDate, -1);
+      // repo-rules-allow timezone-safe-calendar-code: legacy local-tz range for shipped callers; zoned code uses getTimezoneAwareCalendarDateRange.
       start.setHours(0, 0, 0, 0);
       end = addDays(baseDate, 1);
+      // repo-rules-allow timezone-safe-calendar-code: legacy local-tz range for shipped callers; zoned code uses getTimezoneAwareCalendarDateRange.
       end.setHours(23, 59, 59, 999);
       break;
     case "agenda":
@@ -102,6 +106,7 @@ export function getWorkingDayShade(
 export function roundToNextHour(date: Date): Date {
   const d = new Date(date);
   if (d.getMinutes() > 0 || d.getSeconds() > 0 || d.getMilliseconds() > 0) {
+    // repo-rules-allow timezone-safe-calendar-code: builds a picker wall-clock default for the event form, never a stored event instant.
     d.setHours(d.getHours() + 1, 0, 0, 0);
   }
   return d;
@@ -119,12 +124,14 @@ export function toLocalISOString(date: Date): string {
 
 export function startOfLocalDay(date: Date): Date {
   const d = new Date(date);
+  // repo-rules-allow timezone-safe-calendar-code: documented local-day helper; callers pass wall-clock picker dates.
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
 export function endOfLocalDay(date: Date): Date {
   const d = new Date(date);
+  // repo-rules-allow timezone-safe-calendar-code: documented local-day helper; callers pass wall-clock picker dates.
   d.setHours(23, 59, 0, 0);
   return d;
 }

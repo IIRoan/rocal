@@ -47,7 +47,7 @@ function PaletteRow({
       data-index={index}
       onClick={onSelect}
       className={cn(
-        "flex w-full cursor-pointer items-center gap-3 rounded-lg px-2 text-left outline-none transition-colors",
+        "flex w-full cursor-pointer items-center gap-3 rounded-lg px-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60",
         subtitle ? "min-h-12 py-1.5" : "min-h-11 sm:min-h-9",
         isSelected ? "bg-[var(--bg-cell-hover)]" : "hover:bg-[var(--bg-cell-hover)]",
       )}
