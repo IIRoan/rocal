@@ -149,7 +149,7 @@ describe("EventEditorBody", () => {
     container.remove();
   });
 
-  it("renders event participants in view mode", async () => {
+  it.each([true, false])("renders event details (desktop: %s)", async (desktop) => {
     await act(async () => {
       root.render(
         <EventEditorBody
@@ -169,7 +169,7 @@ describe("EventEditorBody", () => {
               updatedAt: new Date("2026-05-27T09:00:00.000Z"),
             },
           ]}
-          desktop={true}
+          desktop={desktop}
           isViewMode={true}
           localSettings={{ timeFormat: "24h" } as any}
           onSubmit={() => {}}
@@ -246,6 +246,9 @@ describe("EventEditorBody", () => {
     expect(
       container.querySelector('[data-testid="solace-avatar"]'),
     ).not.toBeNull();
+    const heading = container.querySelector("h3");
+    expect(heading?.textContent).toBe("Planning sync");
+    expect(heading?.previousElementSibling).toBeNull();
   });
 
   it("shows a cancelled banner for cancelled events in view mode", async () => {

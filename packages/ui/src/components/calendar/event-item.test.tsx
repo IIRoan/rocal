@@ -11,7 +11,7 @@ import {
 import { createRoot, type Root } from "react-dom/client";
 
 jest.mock("./encryption-status", () => ({
-  EncryptionStatusBadge: () => null,
+  EncryptionStatusBadge: () => <span aria-label="End-to-end encrypted" />,
 }));
 
 import { EventItem } from "./event-item";
@@ -72,4 +72,33 @@ describe("EventItem", () => {
     expect(button?.className).toContain("hover:ring-1");
     expect(button?.className).toContain("hover:ring-black/10");
   });
+
+  it.each([
+    { view: "month", height: undefined, showTime: false },
+    { view: "week", height: 60, showTime: true },
+    { view: "week", height: 28, showTime: true },
+    { view: "week", height: 18, showTime: true },
+    { view: "day", height: 60, showTime: true },
+    { view: "agenda", height: undefined, showTime: true },
+  ] as const)(
+    "keeps encryption icons out of $view events at height $height",
+    (props) => {
+      act(() => {
+        root.render(
+          <EventItem
+            {...props}
+            event={{ ...eventFixture(), encryptionState: "encrypted" }}
+            timeFormat="24h"
+            timezone="UTC"
+            onClick={() => undefined}
+          />,
+        );
+      });
+
+      expect(container.textContent).toContain("Planning");
+      expect(
+        container.querySelector('[aria-label="End-to-end encrypted"]'),
+      ).toBeNull();
+    },
+  );
 });

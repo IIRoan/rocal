@@ -11,7 +11,6 @@ import {
 } from "@workspace/calendar-core";
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
-import { EncryptionStatusBadge } from "./encryption-status";
 import { EventItem } from "./event-item";
 import { getEventSegmentForCalendarDay, isAllDayRowEvent, isMultiDayEvent } from "./utils";
 import { WeekCellsHeight, StartHour } from "./constants";
@@ -138,7 +137,6 @@ export function DayView({
                     onView={onEventView}
                   >
                     <div className="flex min-w-0 items-center gap-1">
-                      <EncryptionStatusBadge item={event} asIcon />
                       <span
                         className={cn(
                           "min-w-0 flex-1 truncate font-semibold",
