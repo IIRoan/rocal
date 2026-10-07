@@ -159,11 +159,6 @@ export function EventEditorReadView({
       )}
 
       <div className="flex items-start gap-3">
-        <span
-          aria-hidden
-          className="mt-1.5 h-5 w-1 shrink-0 rounded-full"
-          style={{ backgroundColor: swatch }}
-        />
         <h3
           className={cn(
             "min-w-0 flex-1 break-words text-xl font-semibold leading-snug text-foreground",

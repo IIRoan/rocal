@@ -569,9 +569,6 @@ export function EventSheet({
               ) : null}
 
               <View style={styles.viewTitleRow}>
-                <View
-                  style={[styles.titleBar, { backgroundColor: calendarSwatch }]}
-                />
                 <Text
                   style={[
                     styles.viewEventTitle,
@@ -896,12 +893,6 @@ function createStyles(theme: ThemeTokens) {
       alignItems: "flex-start" as const,
       gap: 12,
       marginBottom: 12,
-    },
-    titleBar: {
-      width: 4,
-      height: 20,
-      marginTop: 5,
-      borderRadius: theme.borderRadius.full,
     },
     titleIcon: {
       height: 30,
