@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { isCancelledCalendarEvent, type TimeFormat } from "@workspace/calendar-core";
 import { CalendarEvent, type CalendarView } from "./types";
-import { EncryptionStatusBadge } from "./encryption-status";
 import { EventItem } from "./event-item";
 import { cn } from "../../lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -111,7 +110,6 @@ export function EventDots({
                     style={getEventColorStyles(event.color)}
                   >
                     <span className="flex items-center gap-1 min-w-0 truncate">
-                      <EncryptionStatusBadge item={event} asIcon />
                       <span
                         className={cn(
                           "truncate",
@@ -170,7 +168,6 @@ export function EventDots({
               >
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm flex items-center gap-1.5 min-w-0">
-                    <EncryptionStatusBadge item={event} asIcon />
                     <span
                       className={cn(
                         "truncate",

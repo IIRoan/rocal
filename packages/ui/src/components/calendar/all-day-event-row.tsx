@@ -11,7 +11,6 @@ import {
 
 import { cn } from "../../lib/utils";
 import { layoutAllDayRowEvents } from "./all-day-layout";
-import { EncryptionStatusBadge } from "./encryption-status";
 import { EventItem } from "./event-item";
 import { isMultiDayEvent } from "./utils";
 import type { CalendarEvent } from "./types";
@@ -106,7 +105,6 @@ export function AllDayEventRow({
                     strokeWidth={2.25}
                   />
                 ) : null}
-                <EncryptionStatusBadge item={event} asIcon />
                 <span
                   className={cn(
                     "min-w-0 flex-1 truncate font-semibold leading-tight tracking-tight",
