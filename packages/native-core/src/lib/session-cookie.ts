@@ -1,13 +1,18 @@
 import { AUTH_STORAGE_PREFIX, API_BASE_URL } from "./constants";
+import { AUTH_SESSION_LIFETIME_SECONDS } from "@workspace/calendar-core";
+import { getSetCookie } from "@better-auth/expo/client";
+import { captureException } from "./reporting";
 import {
   getChunkedSecureValueSync,
   readChunkedSecureValue,
   readRawSecureValue,
+  setChunkedSecureValueSync,
   writeChunkedSecureValue,
 } from "./secure-store-chunked";
 import {
   fallbackSessionCookieHeader,
   setFallbackSessionToken,
+  getFallbackSessionToken,
 } from "./session-token-fallback";
 
 type CookieEntry = { value: string; expires: string | null };
@@ -15,8 +20,6 @@ type CookieEntry = { value: string; expires: string | null };
 const COOKIE_STORE_KEY = `${AUTH_STORAGE_PREFIX}_cookie`;
 const SESSION_TOKEN_COOKIE_PATTERN = "session_token";
 export const PASSKEY_STEP_UP_COOKIE_NAME = "solace-passkey-step-up";
-const PASSKEY_STEP_UP_COOKIE_VALUE = "verified";
-const PASSKEY_STEP_UP_MAX_AGE_MS = 60 * 60 * 24 * 30 * 1000;
 
 function asCookieStore(
   value: unknown,
@@ -42,7 +45,7 @@ function parseCookieEntries(
     }
 
     return Object.entries(parsed).filter(([name, entry]) => {
-      if (entry.expires && new Date(entry.expires) < now) return false;
+      if (entry.expires && new Date(entry.expires) <= now) return false;
       return Boolean(name) && typeof entry?.value === "string";
     });
   } catch {
@@ -94,17 +97,6 @@ export async function rememberSessionTokenFromJar(): Promise<string | null> {
   return fromJar;
 }
 
-export function hasPasskeyStepUpCookie(
-  raw: string | null | undefined,
-  now: Date = new Date(),
-): boolean {
-  return parseCookieEntries(raw, now).some(
-    ([name, entry]) =>
-      name === PASSKEY_STEP_UP_COOKIE_NAME &&
-      entry.value === PASSKEY_STEP_UP_COOKIE_VALUE,
-  );
-}
-
 function readCookieStoreRaw(): string {
   return getChunkedSecureValueSync(COOKIE_STORE_KEY) ?? "{}";
 }
@@ -134,34 +126,6 @@ export async function healAuthCookieJar(): Promise<void> {
   const reassembled = await readChunkedSecureValue(COOKIE_STORE_KEY);
   const jar = parseCookieStore(reassembled);
   await writeChunkedSecureValue(COOKIE_STORE_KEY, JSON.stringify(jar));
-}
-
-export async function persistPasskeyStepUpCookie(): Promise<void> {
-  const raw = (await readChunkedSecureValue(COOKIE_STORE_KEY)) ?? "{}";
-  const cookies = parseCookieStore(raw);
-  cookies[PASSKEY_STEP_UP_COOKIE_NAME] = {
-    value: PASSKEY_STEP_UP_COOKIE_VALUE,
-    expires: new Date(Date.now() + PASSKEY_STEP_UP_MAX_AGE_MS).toISOString(),
-  };
-
-  await writeChunkedSecureValue(COOKIE_STORE_KEY, JSON.stringify(cookies));
-}
-
-export async function waitForPasskeyStepUpCookie(
-  timeoutMs = 3_000,
-  pollIntervalMs = 50,
-): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() < deadline) {
-    if (hasPasskeyStepUpCookie(readCookieStoreRaw())) {
-      return true;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-  }
-
-  return hasPasskeyStepUpCookie(readCookieStoreRaw());
 }
 
 export function getSessionCookie(): string {
@@ -211,7 +175,7 @@ export async function persistSessionTokenCookie(
   setFallbackSessionToken(trimmed);
 
   const preferSecure = options?.preferSecure ?? true;
-  const maxAgeMs = options?.maxAgeMs ?? 60 * 60 * 24 * 30 * 1000;
+  const maxAgeMs = options?.maxAgeMs ?? AUTH_SESSION_LIFETIME_SECONDS * 1000;
   const raw = (await readChunkedSecureValue(COOKIE_STORE_KEY)) ?? "{}";
   const cookies = parseCookieStore(raw);
   const name = resolveSessionTokenCookieName(cookies, preferSecure);
@@ -240,4 +204,41 @@ export async function ensureSessionTokenCookie(
 
   await persistSessionTokenCookie(trimmed, options);
   return true;
+}
+
+export async function persistRenewedSessionCookie(
+  headers: Headers,
+  requestHeaders: Headers,
+): Promise<void> {
+  try {
+    const updates = headers.get("set-cookie");
+    if (!updates) return;
+    const raw = await readChunkedSecureValue(COOKIE_STORE_KEY);
+    const current =
+      getSessionTokenCookieValue(raw) ?? getFallbackSessionToken();
+    const sentToken = requestHeaders
+      .get("cookie")
+      ?.split(";")
+      .map((entry) => entry.trim())
+      .find((entry) =>
+        entry.split("=")[0]?.includes(SESSION_TOKEN_COOKIE_PATTERN),
+      )
+      ?.split("=")
+      .slice(1)
+      .join("=");
+    if (!current || current !== sentToken) return;
+    const latestRaw = readCookieStoreRaw();
+    if (
+      (getSessionTokenCookieValue(latestRaw) ??
+        getFallbackSessionToken()) !== current
+    )
+      return;
+    const renewed = getSetCookie(updates, latestRaw);
+    if (getSessionTokenCookieValue(renewed) !== current) return;
+    setChunkedSecureValueSync(COOKIE_STORE_KEY, renewed);
+  } catch (error) {
+    captureException(error, {
+      tags: { area: "auth", reason: "session-renewal-cookie" },
+    });
+  }
 }

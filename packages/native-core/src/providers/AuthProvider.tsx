@@ -7,7 +7,11 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
+import {
+  AUTH_SESSION_LIFETIME_SECONDS,
+  AUTH_SESSION_REFRESH_INTERVAL_SECONDS,
+} from "@workspace/calendar-core";
 import { authClient } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { API_BASE_URL } from "../lib/constants";
@@ -26,6 +30,7 @@ import {
   ensureSessionTokenCookie,
   healAuthCookieJar,
   rememberSessionTokenFromJar,
+  persistRenewedSessionCookie,
   waitForSessionCookie,
 } from "../lib/session-cookie";
 import {
@@ -171,17 +176,20 @@ export function AuthProvider({
       AUTH_STATUS_TIMEOUT_MS,
     );
     let response: Response;
+    const requestHeaders = new Headers(getAuthHeaders());
 
     try {
       // repo-rules-allow client-api-boundary: auth-status ping kept off the shared HttpClient so a 401 during the post-sign-in cookie race cannot fire onAuthError session clearing.
       response = await fetch(`${API_BASE_URL}/api/account/auth-status`, {
         credentials: "omit",
-        headers: getAuthHeaders(),
+        headers: requestHeaders,
         signal: controller.signal,
       });
     } finally {
       clearTimeout(timeoutId);
     }
+
+    await persistRenewedSessionCookie(response.headers, requestHeaders);
 
     if (!response.ok) {
       throw new Error("Unable to load authentication status.");
@@ -228,7 +236,7 @@ export function AuthProvider({
       setSession({
         token,
         userId: typedData.user.id,
-        expiresAt: new Date(Date.now() + 60 * 60 * 24 * 30 * 1000),
+        expiresAt: new Date(Date.now() + AUTH_SESSION_LIFETIME_SECONDS * 1000),
       });
       return true;
     },
@@ -343,6 +351,7 @@ export function AuthProvider({
   }, [fetchAuthStatus]);
 
   const clearSession = useCallback(() => {
+    sessionLoadIdRef.current += 1;
     hasLiveSessionRef.current = false;
     setFallbackSessionToken(null);
     setUser(null);
@@ -368,6 +377,7 @@ export function AuthProvider({
   }, []);
 
   const completePasskeyStepUp = useCallback(async () => {
+    sessionLoadIdRef.current += 1;
     if (!authCapabilities.supportsPasskeys) {
       throw new Error(
         authCapabilities.passkeyMessage ??
@@ -486,6 +496,7 @@ export function AuthProvider({
 
   const signUp = useCallback(
     async (name: string, email: string, password: string) => {
+      sessionLoadIdRef.current += 1;
       setEmailPasswordAuthHints(password);
       const result = await authClient.signUp.email({
         name,
@@ -517,12 +528,21 @@ export function AuthProvider({
   );
 
   const signOut = useCallback(async () => {
+    sessionLoadIdRef.current += 1;
+    hasLiveSessionRef.current = false;
+    // Capture before clearing the fallback so logout requests still authenticate when the jar is empty.
+    const logoutHeaders = getAuthHeaders();
+    setFallbackSessionToken(null);
     await Promise.all([
-      unregisterNativePushDevice(),
+      unregisterNativePushDevice(logoutHeaders),
       clearNotificationExtensionSecrets(),
     ]);
     try {
-      await authClient.signOut();
+      await authClient.signOut(
+        logoutHeaders.cookie
+          ? { fetchOptions: { headers: { cookie: logoutHeaders.cookie } } }
+          : undefined,
+      );
     } catch {
       // Best-effort — clear local state regardless.
     }
@@ -577,7 +597,56 @@ export function AuthProvider({
     };
   }, [applySessionData, clearSession, fetchAuthStatus]);
 
+  const userId = user?.id ?? null;
+  useEffect(() => {
+    if (!userId || isLoading) return;
+    let cancelled = false;
+    let inflight = false;
+    async function refresh() {
+      if (
+        inflight || cancelled || !hasLiveSessionRef.current ||
+        AppState.currentState !== "active"
+      ) return;
+      inflight = true;
+      const loadId = sessionLoadIdRef.current;
+      try {
+        const result = await authClient.getSession({
+          query: { disableCookieCache: true },
+          fetchOptions: {
+            onSuccess() {
+              if (
+                cancelled || loadId !== sessionLoadIdRef.current ||
+                !hasLiveSessionRef.current
+              ) {
+                throw new Error("Session changed while renewing.");
+              }
+            },
+          },
+        });
+        if (cancelled || loadId !== sessionLoadIdRef.current || result?.error) return;
+        if (result?.data?.user.id === userId) applySessionData(result.data);
+        else if (!result?.data) clearSession();
+      } catch {
+        // A network failure does not invalidate the existing session.
+      } finally {
+        inflight = false;
+      }
+    }
+    const timer = setInterval(() => {
+      void refresh();
+    }, AUTH_SESSION_REFRESH_INTERVAL_SECONDS * 1000);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refresh();
+    });
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [userId, isLoading, applySessionData, clearSession]);
+
   const signInWithPasskey = useCallback(async () => {
+    sessionLoadIdRef.current += 1;
     if (!authCapabilities.supportsPasskeys) {
       throw new Error(
         authCapabilities.passkeyMessage ??

@@ -4,6 +4,7 @@ import { expo } from "@better-auth/expo";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { passkey } from "@better-auth/passkey";
 import { createAuthMiddleware } from "@better-auth/core/api";
+import { APIError } from "@better-auth/core/error";
 import { oneTimeToken, jwt } from "better-auth/plugins";
 import type { Jwk } from "better-auth/plugins/jwt";
 import { createLogger } from "@workspace/logger";
@@ -14,7 +15,11 @@ import {
   isDeployedEnvironment,
   resolveBetterAuthSecret,
 } from "./env";
-import { BETTER_AUTH_BASE_PATH } from "./auth-constants";
+import {
+  BETTER_AUTH_BASE_PATH,
+  AUTH_SESSION_LIFETIME_SECONDS,
+  AUTH_SESSION_UPDATE_AGE_SECONDS,
+} from "./auth-constants";
 import {
   buildPasswordResetEmail,
   buildPasswordUpdatedEmail,
@@ -26,6 +31,7 @@ import { getAuthTrustedOrigins } from "./origin-policy";
 import {
   clearPasskeyStepUpCookie,
   setVerifiedPasskeyStepUpCookie,
+  renewVerifiedPasskeyStepUpCookie,
 } from "./passkey-step-up";
 import { expireLegacyHostScopedAuthCookies } from "./auth-cookie-migration";
 import { inviteService } from "./invite-service";
@@ -151,17 +157,6 @@ const getRpId = (url: string) => {
   }
 };
 
-const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, "");
-
-const resolveFrontendRouteUrl = (
-  input: string | undefined,
-  fallbackPath: string,
-) =>
-  new URL(
-    input?.trim() || fallbackPath,
-    frontendUrl.replace(/\/+$/, "") + "/",
-  ).toString();
-
 const passwordSecurityUrl = new URL(
   "/login",
   frontendUrl.replace(/\/+$/, "") + "/",
@@ -170,7 +165,7 @@ const passwordSecurityUrl = new URL(
 async function getSuccessfulEndpointResponse<T>(
   returned: unknown,
 ): Promise<T | null> {
-  if (!returned) {
+  if (!returned || returned instanceof APIError) {
     return null;
   }
 
@@ -304,7 +299,8 @@ const passkeyStepUpPlugin = {
       {
         matcher(context: { path?: string }) {
           return Boolean(
-            context.path && setPasskeyStepUpPaths.has(context.path),
+            context.path &&
+              (setPasskeyStepUpPaths.has(context.path) || context.path === "/get-session"),
           );
         },
         handler: createAuthMiddleware(async (ctx) => {
@@ -312,18 +308,23 @@ const passkeyStepUpPlugin = {
             ctx.context.returned,
           );
           if (response && ctx.context.responseHeaders) {
-            const session = ctx.context.session as
+            const session = (ctx.context.newSession ?? ctx.context.session) as
               | { session?: { id?: string }; user?: { id?: string } }
               | undefined;
             const userId = session?.user?.id;
             const sessionId = session?.session?.id;
             if (userId && sessionId) {
-              setVerifiedPasskeyStepUpCookie(
-                {
-                  headers: ctx.context.responseHeaders as Headers,
-                },
-                { userId, sessionId },
-              );
+              const target = { headers: ctx.context.responseHeaders as Headers };
+              const requestHeaders = ctx.request?.headers ?? ctx.headers;
+              if (ctx.path === "/get-session" && requestHeaders) {
+                renewVerifiedPasskeyStepUpCookie(
+                  { headers: requestHeaders },
+                  target,
+                  { userId, sessionId },
+                );
+              } else if (ctx.path && setPasskeyStepUpPaths.has(ctx.path)) {
+                setVerifiedPasskeyStepUpCookie(target, { userId, sessionId });
+              }
             }
           }
         }),
@@ -506,6 +507,8 @@ export const auth = betterAuth({
     },
   },
   session: {
+    expiresIn: AUTH_SESSION_LIFETIME_SECONDS,
+    updateAge: AUTH_SESSION_UPDATE_AGE_SECONDS,
     storeSessionInDatabase: true,
     cookieCache: {
       enabled: true,

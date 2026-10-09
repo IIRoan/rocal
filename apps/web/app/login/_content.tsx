@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef, useReducer } from "react";
+import { useState, useEffect, useEffectEvent, useRef, useReducer } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
 import { createLogger } from "@workspace/logger";
 import { getAppBaseUrl, resolveAuthRedirectTarget } from "@/lib/api-url";
-import { completeAuthNavigation } from "@/lib/auth-navigation";
+import {
+  completeAuthNavigation,
+  isAuthNavigationPending,
+} from "@/lib/auth-navigation";
 import { Key, Eye, EyeOff, ArrowRight, Check, X, Ticket } from "lucide-react";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { getErrorMessage } from "@workspace/calendar-core";
@@ -512,15 +515,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
   }, [inviteToken, isSignUp]);
 
   function redirectAfterAuth() {
-    const target = getRedirectTarget();
-    router.startRouteTransition({
-      messageContext: "AUTH_FLOW",
-      minimumVisibleMs: 120,
-    });
-    completeAuthNavigation(target.href);
-  }
-
-  function redirectAfterCompletedAuth() {
+    if (isAuthNavigationPending()) return;
     const target = getRedirectTarget();
     router.startRouteTransition({
       messageContext: "AUTH_FLOW",
@@ -544,98 +539,98 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     return waitForSettledAuthStatus(refreshAuthStatus, options);
   }
 
-  const handleSessionRedirectRef = useRef<(() => Promise<void>) | null>(null);
-
-  async function handleSessionRedirect() {
-    if (!session?.user) {
-      setLoginSessionUi((ui) => ({
-        ...ui,
-        requiresPasskeyStepUp: false,
-      }));
-      hasAutoPromptedStepUpRef.current = false;
-      return;
-    }
-
-    const reconciliation = await reconcileAuthSession({
-      hasClientSession: true,
-      reason: "login-page-reconcile",
-    });
-
-    if (reconciliation.status === "recovered") {
-      await refetchSession?.({
-        query: { disableCookieCache: true },
-      });
-      setLoginSessionUi({
-        overlayVisible: false,
-        overlayFading: true,
-        requiresPasskeyStepUp: false,
-      });
-      hasAutoPromptedStepUpRef.current = false;
-      return;
-    }
-
-    if (reconciliation.status === "unauthenticated") {
-      return;
-    }
-
-    const authStatus = await waitForSettledAuthStatusForLogin({
-      allowPasskeyStepUp: true,
-    });
-    const requiresStepUp = Boolean(
-      authStatus?.authenticated && authStatus.requiresPasskeyStepUp,
-    );
-    const awaitingStepUpStatus =
-      stepUpRequired &&
-      (!authStatus ||
-        (authStatus.authenticated && authStatus.requiresPasskeyStepUp));
-
-    if (requiresStepUp || awaitingStepUpStatus) {
-      setLoginSessionUi({
-        overlayVisible: false,
-        overlayFading: true,
-        requiresPasskeyStepUp: true,
-      });
-
-      if (!hasAutoPromptedStepUpRef.current) {
-        if (isPasskeySupported) {
-          triggerAutoPasskeyStepUp();
-        } else {
-          dispatchChrome({
-            type: "set-notice",
-            notice:
-              "This device still needs to verify your passkey. Continue from a device that can complete passkey verification.",
-          });
-        }
+  const handleSessionRedirect = useEffectEvent(
+    async (isCancelled: () => boolean) => {
+      if (isAuthNavigationPending() || emailLoading || passkeyLoading) return;
+      if (!session?.user) {
+        setLoginSessionUi((ui) => ({
+          ...ui,
+          requiresPasskeyStepUp: false,
+        }));
+        hasAutoPromptedStepUpRef.current = false;
+        return;
       }
-      return;
-    }
 
-    redirectAfterAuth();
-  }
+      const reconciliation = await reconcileAuthSession({
+        hasClientSession: true,
+        reason: "login-page-reconcile",
+      });
 
+      if (isCancelled()) return;
+
+      if (reconciliation.status === "recovered") {
+        await refetchSession?.({
+          query: { disableCookieCache: true },
+        });
+        if (isCancelled()) return;
+        setLoginSessionUi({
+          overlayVisible: false,
+          overlayFading: true,
+          requiresPasskeyStepUp: false,
+        });
+        hasAutoPromptedStepUpRef.current = false;
+        return;
+      }
+
+      if (reconciliation.status === "unauthenticated") {
+        return;
+      }
+
+      const authStatus = await waitForSettledAuthStatusForLogin({
+        allowPasskeyStepUp: true,
+      });
+      if (isCancelled()) return;
+      const requiresStepUp = Boolean(
+        authStatus?.authenticated && authStatus.requiresPasskeyStepUp,
+      );
+      const awaitingStepUpStatus =
+        stepUpRequired &&
+        (!authStatus ||
+          (authStatus.authenticated && authStatus.requiresPasskeyStepUp));
+
+      if (requiresStepUp || awaitingStepUpStatus) {
+        setLoginSessionUi({
+          overlayVisible: false,
+          overlayFading: true,
+          requiresPasskeyStepUp: true,
+        });
+
+        if (!hasAutoPromptedStepUpRef.current) {
+          if (isPasskeySupported) {
+            triggerAutoPasskeyStepUp();
+          } else {
+            dispatchChrome({
+              type: "set-notice",
+              notice:
+                "This device still needs to verify your passkey. Continue from a device that can complete passkey verification.",
+            });
+          }
+        }
+        return;
+      }
+
+      redirectAfterAuth();
+    },
+  );
+
+  const sessionUserId = session?.user?.id ?? null;
+  const sessionId = session?.session?.id ?? null;
   useEffect(() => {
-    handleSessionRedirectRef.current = handleSessionRedirect;
-  });
-
-  useEffect(() => {
-    if (!isPending) {
+    if (!isPending && !emailLoading && !passkeyLoading) {
       let cancelled = false;
       queueMicrotask(() => {
         if (cancelled) {
           return;
         }
-        const handleSessionRedirect = handleSessionRedirectRef.current;
-        if (handleSessionRedirect) {
-          void handleSessionRedirect().catch((error) => {
-            log.error("Session redirect check failed:", error);
-          });
-        }
+        void handleSessionRedirect(() => cancelled).catch((error) => {
+          log.error("Session redirect check failed:", error);
+        });
       });
       return () => {
         cancelled = true;
       };
     }
-  }, [session, isPending]);
+  }, [sessionUserId, sessionId, isPending, emailLoading, passkeyLoading]);
 
   useEffect(() => {
     if (!isPending && !isCheckingSession && !session?.user) {
@@ -739,7 +734,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
         return;
       }
 
-      redirectAfterCompletedAuth();
+      redirectAfterAuth();
       dispatchChrome({ type: "finish-passkey-auth" });
     } catch (error) {
       if (isPasskeyAuthCancelled(error)) {
@@ -800,7 +795,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
       return false;
     }
 
-    redirectAfterCompletedAuth();
+    redirectAfterAuth();
     return true;
   }
 

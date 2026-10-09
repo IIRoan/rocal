@@ -16,6 +16,7 @@ const mockStartRouteTransition = jest.fn();
 const mockCompleteAuthNavigation = jest.fn();
 const mockRefetchSession = jest.fn(async () => undefined);
 let mockSearchParams = new URLSearchParams();
+let mockAuthNavigationPending = false;
 
 jest.mock("next/image", () => ({
   __esModule: true,
@@ -142,6 +143,7 @@ jest.mock("@/lib/auth-navigation", () => ({
   completeAuthNavigation: (
     ...args: Parameters<typeof mockCompleteAuthNavigation>
   ) => mockCompleteAuthNavigation(...args),
+  isAuthNavigationPending: () => mockAuthNavigationPending,
 }));
 
 jest.mock("@/lib/calendar-api-service", () => ({
@@ -319,6 +321,8 @@ describe("LoginForm", () => {
       }
     ).PublicKeyCredential = function PublicKeyCredential() {} as any;
     mockCompleteAuthNavigation.mockReset();
+    mockAuthNavigationPending = false;
+    mockCompleteAuthNavigation.mockImplementation(() => { mockAuthNavigationPending = true; });
     mockRefetchSession.mockReset();
     mockRefetchSession.mockResolvedValue(undefined as never);
     mockClearOrphanedClientAuthArtifacts.mockClear();
@@ -865,6 +869,34 @@ describe("LoginForm", () => {
       query: { disableCookieCache: true },
     });
     expect(mockCompleteAuthNavigation).not.toHaveBeenCalled();
+  });
+
+  it("lets password sign-in finish once when Better Auth publishes the session early", async () => {
+    let finishStatus = () => {};
+    mockGetAuthStatus.mockReturnValue(new Promise((resolve) => {
+      finishStatus = () => resolve({ authenticated: true, hasPasskeys: false, requiresPasskeyStepUp: false });
+    }));
+    await renderForm();
+    const emailInput = container.querySelector<HTMLInputElement>("#email");
+    const passwordInput = container.querySelector<HTMLInputElement>("#password");
+    const form = container.querySelector("form");
+    if (!emailInput || !passwordInput || !form) throw new Error("Missing login form");
+    act(() => {
+      setInputValue(emailInput, "fixture@solace.onl");
+      setInputValue(passwordInput, "FixturePassword1!");
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    expect(mockGetAuthStatus).toHaveBeenCalledTimes(1);
+    mockUseSession.mockReturnValue({ data: authSessionDataFixture, isPending: false, isRefetching: false, error: null, refetch: mockRefetchSession });
+    await renderForm();
+    expect(mockReconcileAuthSession).not.toHaveBeenCalled();
+    expect(mockGetAuthStatus).toHaveBeenCalledTimes(1);
+    await act(async () => finishStatus());
+    await renderForm();
+    expect(mockCompleteAuthNavigation).toHaveBeenCalledTimes(1);
+    expect(mockGetAuthStatus).toHaveBeenCalledTimes(1);
   });
 
   it("stays on login and prompts for passkey when step-up is required", async () => {

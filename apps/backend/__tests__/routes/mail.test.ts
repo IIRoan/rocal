@@ -121,7 +121,7 @@ async function readJson(response: Response) {
 describe("mailRoutes", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetSession.mockResolvedValue(undefined as never);
+    mockGetSession.mockResolvedValue({ headers: new Headers(), response: null } as never);
   });
 
   it("proxies JMAP discovery through the backend", async () => {
@@ -357,10 +357,10 @@ describe("mailRoutes", () => {
   });
 
   it("does not invalidate the token cache when falling back from client Bearer", async () => {
-    mockGetSession.mockResolvedValue({
+    mockGetSession.mockResolvedValue({ headers: new Headers(), response: {
       session: { id: "session-1", userId: "user-1" },
       user: { id: "user-1", email: "alice@solace.onl" },
-    } as never);
+    } } as never);
     // No session cookie → client bearer is tried first, then session fallback.
     const proxyFetch = jest
       .fn<(input: string, init?: RequestInit) => Promise<Response>>()
@@ -404,10 +404,10 @@ describe("mailRoutes", () => {
   });
 
   it("mints a session mail token when the proxy request has no Bearer", async () => {
-    mockGetSession.mockResolvedValue({
+    mockGetSession.mockResolvedValue({ headers: new Headers(), response: {
       session: { id: "session-1", userId: "user-1" },
       user: { id: "user-1", email: "alice@solace.onl" },
-    } as never);
+    } } as never);
     const proxyFetch = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>
     >(
@@ -667,7 +667,7 @@ describe("mailRoutes", () => {
   });
 
   it("exchanges the authenticated session for a backend-issued mail token", async () => {
-    mockGetSession.mockResolvedValue({
+    mockGetSession.mockResolvedValue({ headers: new Headers(), response: {
       session: {
         id: "session-1",
         userId: "user-1",
@@ -676,7 +676,7 @@ describe("mailRoutes", () => {
         id: "user-1",
         email: "alice@solace.onl",
       },
-    } as never);
+    } } as never);
     const response = await createApp().handle(
       new Request("http://localhost/mail/oauth/access-token", {
         headers: {
@@ -698,7 +698,7 @@ describe("mailRoutes", () => {
   });
 
   it("returns a backend token error when the mail bridge rejects the session", async () => {
-    mockGetSession.mockResolvedValue({
+    mockGetSession.mockResolvedValue({ headers: new Headers(), response: {
       session: {
         id: "session-1",
         userId: "user-1",
@@ -707,7 +707,7 @@ describe("mailRoutes", () => {
         id: "user-1",
         email: "alice@solace.onl",
       },
-    } as never);
+    } } as never);
     mockMailService.getAccessTokenForUser.mockRejectedValueOnce(
       new Error("Stalwart mailbox login was rejected."),
     );

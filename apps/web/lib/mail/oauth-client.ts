@@ -1,9 +1,5 @@
 import type { MailOAuthConfig } from "./types";
-import { createLogger } from "@workspace/logger";
-
-const log = createLogger("mail-oauth");
-
-const MAIL_OAUTH_TOKEN_EXPIRY_SKEW_MS = 30000;
+import { createMailAccessTokenManager } from "@workspace/calendar-client";
 
 type StoredMailOAuthTokens = {
   accessToken: string;
@@ -49,18 +45,6 @@ function parseMailOAuthResponse(payload: unknown): StoredMailOAuthTokens {
   };
 }
 
-function isAccessTokenFresh(tokens: StoredMailOAuthTokens | null): boolean {
-  if (!tokens?.accessToken) {
-    return false;
-  }
-
-  if (!tokens.expiresAtMs) {
-    return true;
-  }
-
-  return Date.now() + MAIL_OAUTH_TOKEN_EXPIRY_SKEW_MS < tokens.expiresAtMs;
-}
-
 /** The browser sends its session cookie; the backend mints the Stalwart token. */
 async function fetchMailTokenFromServer(
   mailTokenEndpoint: string,
@@ -81,52 +65,7 @@ async function fetchMailTokenFromServer(
 }
 
 export function createMailOAuthTokenManager(config: MailOAuthConfig) {
-  let tokens: StoredMailOAuthTokens | null = null;
-  let inflight: Promise<string> | null = null;
-
-  const mintFreshToken = async () => {
-    tokens = await fetchMailTokenFromServer(config.mailTokenEndpoint);
-    log.info("Minted mail access token via server exchange", {
-      expiresAtMs: tokens.expiresAtMs,
-      secondsUntilExpiry:
-        tokens.expiresAtMs != null
-          ? Math.round((tokens.expiresAtMs - Date.now()) / 1000)
-          : null,
-    });
-    return tokens.accessToken;
-  };
-
-  return {
-    async getAccessToken(): Promise<string> {
-      if (isAccessTokenFresh(tokens)) {
-        return tokens.accessToken;
-      }
-
-      if (inflight) {
-        log.debug("Waiting for in-flight mail access token request");
-        return inflight;
-      }
-
-      inflight = mintFreshToken();
-
-      try {
-        const accessToken = await inflight;
-        log.debug("Resolved mail access token", {
-          expiresAtMs: tokens?.expiresAtMs ?? null,
-          secondsUntilExpiry:
-            tokens?.expiresAtMs != null
-              ? Math.round((tokens.expiresAtMs - Date.now()) / 1000)
-              : null,
-        });
-        return accessToken;
-      } finally {
-        inflight = null;
-      }
-    },
-    clear() {
-      log.warn("Cleared cached mail access token");
-      tokens = null;
-      inflight = null;
-    },
-  };
+  return createMailAccessTokenManager(() =>
+    fetchMailTokenFromServer(config.mailTokenEndpoint),
+  );
 }

@@ -40,6 +40,7 @@ export * from "./calendar-helpers";
 export * from "./calendar-month-ranges";
 export * from "./calendar-navigation";
 export * from "./auth-accounts";
+export * from "./auth-session";
 export * from "./passkey-step-up";
 export { RecurrenceEngine } from "@workspace/calendar-ics/recurrence";
 export * from "./calendar-event-link";

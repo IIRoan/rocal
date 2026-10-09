@@ -23,6 +23,7 @@ export interface HttpClientConfig {
   onAuthError?: (statusCode: 401) => void;
   /** Optional callback invoked when passkey step-up is required. */
   onPasskeyStepUpRequired?: () => void;
+  onResponseHeaders?: (headers: Headers, requestHeaders: Headers) => void | Promise<void>;
 }
 
 export interface RequestOptions extends RequestInit {
@@ -58,6 +59,7 @@ export class HttpClient {
     | Promise<Record<string, string>>;
   private onAuthError?: (statusCode: 401) => void;
   private onPasskeyStepUpRequired?: () => void;
+  private onResponseHeaders?: HttpClientConfig["onResponseHeaders"];
 
   constructor(config: HttpClientConfig) {
     this.baseURL = config.baseURL;
@@ -68,6 +70,7 @@ export class HttpClient {
     this.getHeaders = config.getHeaders;
     this.onAuthError = config.onAuthError;
     this.onPasskeyStepUpRequired = config.onPasskeyStepUpRequired;
+    this.onResponseHeaders = config.onResponseHeaders;
   }
 
   private async delay(ms: number): Promise<void> {
@@ -126,7 +129,6 @@ export class HttpClient {
   private async parseErrorResponse(response: Response): Promise<ApiError> {
     try {
       const errorText = await response.text();
-      this.logHttpError(response, errorText);
 
       const parsed = asJsonRecord(errorText);
       const fallbackMessage = parsed
@@ -216,6 +218,8 @@ export class HttpClient {
           externalSignal.removeEventListener("abort", abortListener);
           abortListener = null;
         }
+
+        await this.onResponseHeaders?.(response.headers, new Headers(requestOptions.headers));
 
         if (!response.ok) {
           const retryAfterHeader = response.headers.get("retry-after");
