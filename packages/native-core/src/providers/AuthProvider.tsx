@@ -530,13 +530,19 @@ export function AuthProvider({
   const signOut = useCallback(async () => {
     sessionLoadIdRef.current += 1;
     hasLiveSessionRef.current = false;
+    // Capture before clearing the fallback so logout requests still authenticate when the jar is empty.
+    const logoutHeaders = getAuthHeaders();
     setFallbackSessionToken(null);
     await Promise.all([
-      unregisterNativePushDevice(),
+      unregisterNativePushDevice(logoutHeaders),
       clearNotificationExtensionSecrets(),
     ]);
     try {
-      await authClient.signOut();
+      await authClient.signOut(
+        logoutHeaders.cookie
+          ? { fetchOptions: { headers: { cookie: logoutHeaders.cookie } } }
+          : undefined,
+      );
     } catch {
       // Best-effort — clear local state regardless.
     }
