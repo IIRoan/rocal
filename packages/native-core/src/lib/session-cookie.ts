@@ -227,13 +227,14 @@ export async function persistRenewedSessionCookie(
       .slice(1)
       .join("=");
     if (!current || current !== sentToken) return;
-    const renewed = getSetCookie(updates, raw ?? undefined);
-    if (getSessionTokenCookieValue(renewed) !== current) return;
+    const latestRaw = readCookieStoreRaw();
     if (
-      (getSessionTokenCookieValue(readCookieStoreRaw()) ??
+      (getSessionTokenCookieValue(latestRaw) ??
         getFallbackSessionToken()) !== current
     )
       return;
+    const renewed = getSetCookie(updates, latestRaw);
+    if (getSessionTokenCookieValue(renewed) !== current) return;
     setChunkedSecureValueSync(COOKIE_STORE_KEY, renewed);
   } catch (error) {
     captureException(error, {

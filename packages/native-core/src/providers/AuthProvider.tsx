@@ -530,6 +530,7 @@ export function AuthProvider({
   const signOut = useCallback(async () => {
     sessionLoadIdRef.current += 1;
     hasLiveSessionRef.current = false;
+    setFallbackSessionToken(null);
     await Promise.all([
       unregisterNativePushDevice(),
       clearNotificationExtensionSecrets(),

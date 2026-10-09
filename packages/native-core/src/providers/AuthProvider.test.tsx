@@ -9,6 +9,10 @@ import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { waitForSessionCookie } from "../lib/session-cookie";
 import { signInWithBrowserPasskey } from "../lib/passkey-browser-bridge";
 import { unregisterNativePushDevice } from "../lib/push-notifications";
+import {
+  getFallbackSessionToken,
+  setFallbackSessionToken,
+} from "../lib/session-token-fallback";
 import { AuthProvider, useAuth } from "./AuthProvider";
 
 jest.mock("react-native", () => ({
@@ -69,12 +73,6 @@ jest.mock("../lib/session-cookie", () => ({
   healAuthCookieJar: jest.fn(async () => undefined),
   rememberSessionTokenFromJar: jest.fn(async () => "session-token"),
   persistRenewedSessionCookie: jest.fn(async () => undefined),
-}));
-
-jest.mock("../lib/session-token-fallback", () => ({
-  setFallbackSessionToken: jest.fn(),
-  getFallbackSessionToken: jest.fn(() => null),
-  fallbackSessionCookieHeader: jest.fn(() => ""),
 }));
 
 jest.mock("../lib/push-notifications", () => ({
@@ -185,6 +183,7 @@ describe("AuthProvider", () => {
   }
 
   beforeEach(() => {
+    setFallbackSessionToken(null);
     AppState.currentState = "active";
     global.fetch = mockFetch as typeof fetch;
     capturedAuth = null;
@@ -430,6 +429,41 @@ describe("AuthProvider", () => {
     expect(getAuth().isAuthenticated).toBe(true);
     jest.useRealTimers();
   });
+
+  it.each(["push unregister", "signed-out cleanup"])(
+    "clears the fallback token before waiting for %s even when server sign-out fails",
+    async (phase) => {
+      mockGetSession.mockResolvedValue(createAuthResult());
+      await renderProvider();
+      expect(getFallbackSessionToken()).toBe("session-token");
+      let finishCleanup: () => void = () => {};
+      const cleanup = new Promise<void>((resolve) => {
+        finishCleanup = resolve;
+      });
+      if (phase === "push unregister") {
+        mockUnregisterNativePushDevice.mockImplementationOnce(() => cleanup);
+      } else {
+        mockOnSignedOut.mockImplementationOnce(() => cleanup);
+      }
+      mockSignOut.mockRejectedValueOnce(new Error("Fixture sign-out unavailable"));
+      let pendingLogout: Promise<void> | undefined;
+      await act(async () => {
+        pendingLogout = getAuth().signOut();
+      });
+      try {
+        if (phase === "signed-out cleanup") {
+          expect(mockOnSignedOut).toHaveBeenCalledTimes(1);
+        }
+        expect(getFallbackSessionToken()).toBeNull();
+      } finally {
+        await act(async () => {
+          finishCleanup();
+          await pendingLogout;
+        });
+      }
+      expect(getAuth().isAuthenticated).toBe(false);
+    },
+  );
 
   it("ignores a renewal response that arrives after sign-out", async () => {
     jest.useFakeTimers();
