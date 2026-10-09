@@ -195,4 +195,41 @@ describe("session cookie helpers", () => {
     const stored: Record<string, { value: string; expires: string }> = JSON.parse(jest.mocked(writeChunkedSecureValue).mock.calls[0]?.[1] ?? "{}");
     expect(stored["__Secure-better-auth.session_token"]?.expires).toBe("2026-10-23T12:00:00.000Z");
   });
+
+  it.each(["better-auth.session_data", PASSKEY_STEP_UP_COOKIE_NAME])(
+    "preserves a concurrently updated %s cookie when renewing the session",
+    async (cookieName) => {
+      const original = {
+        "better-auth.session_token": { value: "current-token", expires: null },
+        [cookieName]: { value: "old-cookie", expires: null },
+      };
+      const snapshot = JSON.stringify(original);
+      let jar = snapshot;
+      let completeRead: (value: string) => void = () => {};
+      jest.mocked(readChunkedSecureValue).mockImplementationOnce(() =>
+        new Promise<string>((resolve) => {
+          completeRead = resolve;
+        }),
+      );
+      jest.mocked(getChunkedSecureValueSync).mockImplementation(() => jar);
+      jest.mocked(setChunkedSecureValueSync).mockImplementation((_key, value) => {
+        jar = value;
+      });
+      const pending = persistRenewedSessionCookie(
+        new Headers({ "set-cookie": "better-auth.session_token=current-token; Max-Age=1209600" }),
+        new Headers({ cookie: "better-auth.session_token=current-token" }),
+      );
+      jar = JSON.stringify({
+        ...original,
+        [cookieName]: { value: "new-cookie", expires: null },
+      });
+      completeRead(snapshot);
+      await pending;
+      const stored: Record<string, { value: string; expires: string | null }> =
+        JSON.parse(jar);
+      expect(stored[cookieName]?.value).toBe("new-cookie");
+      expect(stored["better-auth.session_token"]?.value).toBe("current-token");
+      expect(stored["better-auth.session_token"]?.expires).not.toBeNull();
+    },
+  );
 });
