@@ -2,7 +2,7 @@ import * as Linking from "expo-linking";
 import { createLogger } from "@workspace/logger";
 import type { PasskeyRouteClient } from "./passkey-auth";
 import { AUTH_SIGN_IN_ROUTE, SETTINGS_ROUTE } from "./auth-routing";
-import { persistPasskeyStepUpCookie } from "./session-cookie";
+import { getSessionCookie, persistRenewedSessionCookie } from "./session-cookie";
 import { API_BASE_URL, APP_BASE_URL } from "./constants";
 
 export type BrowserPasskeyMode = "sign-in" | "register";
@@ -376,10 +376,13 @@ async function completePasskeyStepUpCookie(
   client: PasskeyRouteClient,
 ): Promise<void> {
   log.debug("Completing native passkey step-up cookie");
+  const requestHeaders = new Headers({ cookie: getSessionCookie() });
   const result = await client.$fetch(PASSKEY_BRIDGE_COMPLETE_STEP_UP_PATH, {
     method: "POST",
     body: {},
     throw: false,
+    onSuccess: ({ response }: { response: Response }) =>
+      persistRenewedSessionCookie(response.headers, requestHeaders),
   });
 
   if (!result.data) {
@@ -388,8 +391,6 @@ async function completePasskeyStepUpCookie(
       result.error?.message ?? "Unable to finish passkey verification.",
     );
   }
-
-  await persistPasskeyStepUpCookie();
 }
 
 async function verifyOneTimeToken(

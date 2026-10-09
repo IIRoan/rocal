@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useEffectEvent,
   useState,
   useCallback,
   useMemo,
@@ -40,7 +41,11 @@ import {
 import { toast } from "sonner";
 import { createLogger } from "@workspace/logger";
 import { useSession, signOut } from "@/lib/auth-client";
-import { completeAuthNavigation } from "@/lib/auth-navigation";
+import {
+  beginAuthNavigation,
+  completeAuthNavigation,
+  isAuthNavigationPending,
+} from "@/lib/auth-navigation";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { useMailRealtime } from "@/hooks/use-mail-realtime";
 import { useRecentContacts } from "@/hooks/use-recent-contacts";
@@ -285,18 +290,22 @@ export function useMailApp() {
       });
   }, []);
 
+  const hasSession = Boolean(session?.user);
+  const redirectToLogin = useEffectEvent(() => {
+    if (isAuthNavigationPending()) return;
+    const currentPath =
+      typeof window !== "undefined"
+        ? `${window.location.pathname}${window.location.search}`
+        : "/mail";
+    router.startRouteTransition({ messageContext: "AUTH_FLOW" });
+    completeAuthNavigation(`/login?next=${encodeURIComponent(currentPath)}`);
+  });
+
   useEffect(() => {
-    if (!isSessionPending && !session?.user) {
-      const currentPath =
-        typeof window !== "undefined"
-          ? `${window.location.pathname}${window.location.search}`
-          : "/mail";
-      router.startRouteTransition({
-        messageContext: "AUTH_FLOW",
-      });
-      completeAuthNavigation(`/login?next=${encodeURIComponent(currentPath)}`);
+    if (!isSessionPending && !hasSession) {
+      redirectToLogin();
     }
-  }, [isSessionPending, session?.user, router]);
+  }, [isSessionPending, hasSession]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1478,9 +1487,7 @@ export function useMailApp() {
       accountDisplayName,
       accountEmail,
       accountUserId,
-      cachedAuthPassword,
       config,
-      loginPassword,
       mailboxEmail,
       mailboxStatus,
       queryClient,
@@ -3130,12 +3137,14 @@ export function useMailApp() {
   }, []);
 
   const handleSignOut = useCallback(async () => {
-    await handleDisconnect();
-    clearEncPasswordCookie();
+    const finishNavigation = beginAuthNavigation("/");
+    if (!finishNavigation) return;
     try {
+      await handleDisconnect();
+      clearEncPasswordCookie();
       await signOut();
     } finally {
-      completeAuthNavigation("/");
+      finishNavigation();
     }
   }, [handleDisconnect]);
 

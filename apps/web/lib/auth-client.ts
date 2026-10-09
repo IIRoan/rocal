@@ -2,10 +2,12 @@ import { createAuthClient } from "better-auth/react";
 import { passkeyClient } from "@better-auth/passkey/client";
 import { oneTimeTokenClient } from "better-auth/client/plugins";
 import { getApiBaseUrl } from "./api-url";
+import { AUTH_SESSION_REFRESH_INTERVAL_SECONDS } from "@workspace/calendar-core";
 
 const baseAuthClient = createAuthClient({
   baseURL: getApiBaseUrl(),
   basePath: "/api/auth",
+  sessionOptions: { refetchInterval: AUTH_SESSION_REFRESH_INTERVAL_SECONDS },
   plugins: [passkeyClient(), oneTimeTokenClient()],
 });
 

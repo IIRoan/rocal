@@ -8,6 +8,13 @@ import type {
 } from "./types";
 import { API_BASE_URL } from "@workspace/native-core/lib/constants";
 import { getAuthHeaders } from "@workspace/native-core/lib/api";
+import { persistRenewedSessionCookie } from "@workspace/native-core/lib/session-cookie";
+import {
+  createMailAccessTokenManager,
+  type MailAccessToken,
+} from "@workspace/calendar-client";
+
+export type { MailAccessToken } from "@workspace/calendar-client";
 
 function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/, "");
@@ -27,13 +34,15 @@ export class MailApiError extends Error {
 }
 
 /** `fetch` wrapper that injects the native Better Auth headers; shared with the JMAP client transport. */
-export function mailFetch(input: string, init?: RequestInit): Promise<Response> {
+export async function mailFetch(input: string, init?: RequestInit): Promise<Response> {
   const headers: Record<string, string> = {
     ...((init?.headers as Record<string, string> | undefined) ?? {}),
     ...getAuthHeaders(),
   };
   // repo-rules-allow client-api-boundary: Solace mail API + JMAP transport with native Better Auth headers.
-  return fetch(input, { ...init, headers, credentials: "omit" });
+  const response = await fetch(input, { ...init, headers, credentials: "omit" });
+  await persistRenewedSessionCookie(response.headers, new Headers(headers));
+  return response;
 }
 
 async function parseJson<T>(response: Response): Promise<T> {
@@ -122,11 +131,6 @@ type MailTokenResponse = {
   message?: string;
 };
 
-export type MailAccessToken = {
-  accessToken: string;
-  expiresAtMs: number | null;
-};
-
 async function fetchMailAccessToken(
   mailTokenEndpoint: string,
 ): Promise<MailAccessToken> {
@@ -155,37 +159,8 @@ async function fetchMailAccessToken(
   return { accessToken: payload.access_token, expiresAtMs };
 }
 
-const TOKEN_EXPIRY_SKEW_MS = 30_000;
-
-/** Server-minted access-token provider; the browser-only OAuth iframe path is intentionally omitted on native. */
 export function createServerMailTokenManager(mailTokenEndpoint: string) {
-  let token: MailAccessToken | null = null;
-  let inflight: Promise<string> | null = null;
-
-  const isFresh = () =>
-    token?.accessToken != null &&
-    (token.expiresAtMs == null ||
-      Date.now() + TOKEN_EXPIRY_SKEW_MS < token.expiresAtMs);
-
-  const mint = async () => {
-    token = await fetchMailAccessToken(mailTokenEndpoint);
-    return token.accessToken;
-  };
-
-  return {
-    async getAccessToken(): Promise<string> {
-      if (isFresh() && token) return token.accessToken;
-      if (inflight) return inflight;
-      inflight = mint();
-      try {
-        return await inflight;
-      } finally {
-        inflight = null;
-      }
-    },
-    clear() {
-      token = null;
-      inflight = null;
-    },
-  };
+  return createMailAccessTokenManager(() =>
+    fetchMailAccessToken(mailTokenEndpoint),
+  );
 }

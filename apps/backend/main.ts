@@ -3,7 +3,7 @@ import { unauthorizedBody } from "./lib/api-error-response";
 import { cors } from "@elysia/cors";
 import { installGlobalConsoleLogger } from "@workspace/logger";
 import { initSentry } from "./lib/sentry";
-import { auth } from "./lib/auth";
+import { getRequestAuthSession } from "./lib/auth-session";
 import { BETTER_AUTH_BASE_PATH } from "./lib/auth-constants";
 import { env } from "./lib/env";
 import { e2eeRoutes } from "./routes/e2ee";
@@ -145,11 +145,9 @@ export const createAPI = (prefix = "") => {
         description:
           "Returns the authenticated user when a Better Auth session cookie is present. Returns a null user payload when no session is active.",
       },
-    }, async ({ request }) => {
+    }, async ({ request, set }) => {
       try {
-        const session = await auth.api.getSession({
-          headers: request.headers as Headers,
-        });
+        const session = await getRequestAuthSession(request, set.headers);
         return session ? { user: session.user } : { user: null };
       } catch {
         return { user: null };
@@ -163,10 +161,8 @@ export const createAPI = (prefix = "") => {
           "Returns the current user object and fails with 401 when the Better Auth session is missing or invalid.",
         security: sessionCookieAuthSecurity,
       },
-    }, async ({ request, status }) => {
-      const session = await auth.api.getSession({
-        headers: request.headers as Headers,
-      });
+    }, async ({ request, status, set }) => {
+      const session = await getRequestAuthSession(request, set.headers);
 
       if (!session) {
         return status(401, unauthorizedBody());

@@ -6,11 +6,19 @@ import {
   clearPasskeyStepUpCookie,
   getPasskeyStepUpStatus,
   hasVerifiedPasskeyStepUp,
+  renewVerifiedPasskeyStepUpCookie,
   setVerifiedPasskeyStepUpCookie,
 } from "../../lib/passkey-step-up";
 
 describe("passkey step-up cookies", () => {
   const binding = { userId: "user-1", sessionId: "session-1" };
+  const lifetimeSeconds = 14 * 24 * 60 * 60;
+
+  function verifiedRequest(headers: Headers) {
+    return new Request("http://localhost", {
+      headers: { cookie: headers.getSetCookie().map((cookie) => cookie.split(";")[0]).join("; ") },
+    });
+  }
 
   beforeEach(() => {
     clearPasskeyPresenceCache();
@@ -39,6 +47,37 @@ describe("passkey step-up cookies", () => {
 
     expect(cookieHeader).toContain(`${PASSKEY_STEP_UP_COOKIE_NAME}=`);
     expect(cookieHeader).toContain("Max-Age=0");
+  });
+
+  it("keeps verification for two weeks and rejects it exactly at expiry", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2026-10-08T12:00:00Z"));
+    const headers = new Headers();
+    setVerifiedPasskeyStepUpCookie({ headers }, binding);
+    expect(headers.get("set-cookie")).toContain(`Max-Age=${lifetimeSeconds}`);
+    const request = verifiedRequest(headers);
+    jest.advanceTimersByTime((lifetimeSeconds - 1) * 1000);
+    expect(hasVerifiedPasskeyStepUp(request, binding)).toBe(true);
+    jest.advanceTimersByTime(1000);
+    expect(hasVerifiedPasskeyStepUp(request, binding)).toBe(false);
+  });
+
+  it("renews valid verification daily without writing on every request", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2026-10-08T12:00:00Z"));
+    const initial = new Headers();
+    setVerifiedPasskeyStepUpCookie({ headers: initial }, binding);
+    const request = verifiedRequest(initial);
+    const renewed = new Headers();
+    renewVerifiedPasskeyStepUpCookie(request, { headers: renewed }, binding);
+    expect(renewed.has("set-cookie")).toBe(false);
+    jest.advanceTimersByTime(24 * 60 * 60 * 1000);
+    renewVerifiedPasskeyStepUpCookie(request, { headers: renewed }, binding);
+    expect(renewed.has("set-cookie")).toBe(true);
+    jest.advanceTimersByTime(13 * 24 * 60 * 60 * 1000);
+    expect(hasVerifiedPasskeyStepUp(verifiedRequest(renewed), binding)).toBe(true);
+    const headers = new Headers();
+    renewVerifiedPasskeyStepUpCookie(request, { headers }, binding);
+    renewVerifiedPasskeyStepUpCookie(verifiedRequest(renewed), { headers }, { ...binding, sessionId: "other-session" });
+    expect(headers.has("set-cookie")).toBe(false);
   });
 
   it("detects a verified step-up cookie bound to the session", () => {

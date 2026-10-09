@@ -26,12 +26,20 @@ export type AuthStatusResponse = {
 };
 
 export class AccountApiService {
+  private signupConfigRequest: Promise<AccountSignupConfigResponse> | null =
+    null;
+
   constructor(private readonly client: HttpClient) {}
 
-  async getSignupConfig(): Promise<AccountSignupConfigResponse> {
-    return this.client.get<AccountSignupConfigResponse>(
-      "/api/account/signup-config",
-    );
+  getSignupConfig(): Promise<AccountSignupConfigResponse> {
+    if (!this.signupConfigRequest) {
+      this.signupConfigRequest = this.client
+        .get<AccountSignupConfigResponse>("/api/account/signup-config")
+        .finally(() => {
+          this.signupConfigRequest = null;
+        });
+    }
+    return this.signupConfigRequest;
   }
 
   async checkEmailAvailability(

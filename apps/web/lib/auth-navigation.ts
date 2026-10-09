@@ -5,11 +5,43 @@ import { LOGIN_PATH } from "@/lib/app-routes";
 const PASSKEY_BRIDGE_PATH = "/passkey/native";
 const RESET_PASSWORD_PATH = "/reset-password";
 
-export function completeAuthNavigation(href: string) {
-  window.location.replace(href);
+let pendingNavigation: { completed: boolean } | null = null;
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) pendingNavigation = null;
+  });
 }
 
-export function isPasskeyStepUpExemptPath(pathname: string | null | undefined): boolean {
+export function isAuthNavigationPending(): boolean {
+  return pendingNavigation !== null;
+}
+
+/** Reserve the redirect before auth changes so session guards cannot navigate ahead of cleanup. */
+export function beginAuthNavigation(href: string): (() => void) | null {
+  if (pendingNavigation) return null;
+  const navigation = { completed: false };
+  pendingNavigation = navigation;
+
+  return () => {
+    if (pendingNavigation !== navigation || navigation.completed) return;
+    navigation.completed = true;
+    try {
+      window.location.replace(href);
+    } catch (error) {
+      pendingNavigation = null;
+      throw error;
+    }
+  };
+}
+
+export function completeAuthNavigation(href: string) {
+  beginAuthNavigation(href)?.();
+}
+
+export function isPasskeyStepUpExemptPath(
+  pathname: string | null | undefined,
+): boolean {
   if (!pathname) {
     return false;
   }
