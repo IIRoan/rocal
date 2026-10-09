@@ -10,9 +10,12 @@ import {
   jest,
 } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+let mockPathname = "/calendar";
 
 jest.mock("next/navigation", () => ({
-  usePathname: () => "/calendar",
+  usePathname: () => mockPathname,
 }));
 
 jest.mock("@/lib/auth-client", () => ({
@@ -58,11 +61,17 @@ const mockRedirectToPasskeyStepUpLogin = jest.mocked(
 describe("AuthSessionGuard", () => {
   let container: HTMLDivElement;
   let root: Root;
+  let queryClient: QueryClient;
 
   beforeEach(() => {
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
+    mockPathname = "/calendar";
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    mockReconcileAuthSession.mockReset();
     mockUseSession.mockReturnValue({
       data: {
         user: { id: "user-1" },
@@ -82,6 +91,100 @@ describe("AuthSessionGuard", () => {
       root.unmount();
     });
     container.remove();
+    queryClient.clear();
+  });
+
+  async function renderGuard(strict = false) {
+    const content = (
+      <QueryClientProvider client={queryClient}>
+        <AuthSessionGuard>
+          <div>Calendar</div>
+        </AuthSessionGuard>
+      </QueryClientProvider>
+    );
+    await act(async () => {
+      root.render(
+        strict ? <React.StrictMode>{content}</React.StrictMode> : content,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+  }
+
+  it("shares the startup check in Strict Mode without a second durable session read", async () => {
+    mockGetAuthStatus.mockResolvedValue({
+      authenticated: true,
+      hasPasskeys: false,
+      requiresPasskeyStepUp: false,
+    });
+    await renderGuard(true);
+    expect(mockGetAuthStatus).toHaveBeenCalledTimes(1);
+    expect(mockReconcileAuthSession).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Calendar");
+  });
+
+  it("lets the login page own its session and passkey checks", async () => {
+    mockPathname = "/login";
+    await renderGuard();
+    expect(mockGetAuthStatus).not.toHaveBeenCalled();
+    expect(mockReconcileAuthSession).not.toHaveBeenCalled();
+  });
+
+  it("keeps durable session recovery when auth status is unavailable", async () => {
+    mockGetAuthStatus.mockRejectedValue(new Error("offline"));
+    await renderGuard();
+    expect(mockReconcileAuthSession).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("Calendar");
+  });
+
+  it("refetches a stale client session when the durable session is gone", async () => {
+    mockGetAuthStatus.mockResolvedValue({
+      authenticated: false,
+      hasPasskeys: false,
+      requiresPasskeyStepUp: false,
+    });
+    mockReconcileAuthSession.mockResolvedValue({ status: "recovered" });
+    const refetch = jest.fn(async () => undefined);
+    mockUseSession.mockReturnValue({
+      data: { user: { id: "user-1" } },
+      isPending: false,
+      refetch,
+    } as never);
+    await renderGuard(true);
+    expect(mockReconcileAuthSession).toHaveBeenCalledTimes(1);
+    expect(refetch).toHaveBeenCalledWith({
+      query: { disableCookieCache: true },
+    });
+  });
+
+  it("checks passkey state again for a new session on the same account", async () => {
+    mockGetAuthStatus.mockResolvedValue({
+      authenticated: true,
+      hasPasskeys: true,
+      requiresPasskeyStepUp: false,
+    });
+    mockUseSession.mockReturnValue({
+      data: { user: { id: "user-1" }, session: { id: "session-1" } },
+      isPending: false,
+      refetch: jest.fn(),
+    } as never);
+    await renderGuard();
+    mockGetAuthStatus.mockResolvedValue({
+      authenticated: true,
+      hasPasskeys: true,
+      requiresPasskeyStepUp: true,
+    });
+    mockUseSession.mockReturnValue({
+      data: { user: { id: "user-1" }, session: { id: "session-2" } },
+      isPending: false,
+      refetch: jest.fn(),
+    } as never);
+    await renderGuard();
+    expect(mockGetAuthStatus).toHaveBeenCalledTimes(2);
+    expect(mockRedirectToPasskeyStepUpLogin).toHaveBeenCalledTimes(1);
+    expect(container.textContent).not.toContain("Calendar");
   });
 
   it("sends authenticated users to login when passkey step-up is required", async () => {
@@ -91,15 +194,7 @@ describe("AuthSessionGuard", () => {
       requiresPasskeyStepUp: true,
     });
 
-    await act(async () => {
-      root.render(
-        <AuthSessionGuard>
-          <div>Calendar</div>
-        </AuthSessionGuard>,
-      );
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    await renderGuard();
 
     expect(mockRedirectToPasskeyStepUpLogin).toHaveBeenCalledTimes(1);
     expect(container.textContent).not.toContain("Calendar");
@@ -113,15 +208,7 @@ describe("AuthSessionGuard", () => {
       requiresPasskeyStepUp: false,
     });
 
-    await act(async () => {
-      root.render(
-        <AuthSessionGuard>
-          <div>Calendar</div>
-        </AuthSessionGuard>,
-      );
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    await renderGuard();
 
     expect(mockRedirectToPasskeyStepUpLogin).not.toHaveBeenCalled();
     expect(container.textContent).toContain("Calendar");

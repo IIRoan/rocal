@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useSession } from "@/lib/auth-client";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { completeAuthNavigation } from "@/lib/auth-navigation";
@@ -45,20 +51,23 @@ export function HomePageClient() {
   );
   const rootRef = useRef<HTMLElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const hasSession = Boolean(session?.user);
   const shouldShowLoadingOverlay =
     FORCE_LOADING_DESIGN_PREVIEW ||
     !hasHydrated ||
     isPending ||
-    Boolean(session?.user);
+    hasSession;
+
+  const redirectToHome = useEffectEvent(() => {
+    router.startRouteTransition({ messageContext: "AUTH_FLOW" });
+    completeAuthNavigation(HOME_PATH);
+  });
 
   useEffect(() => {
-    if (!isPending && session?.user) {
-      router.startRouteTransition({
-        messageContext: "AUTH_FLOW",
-      });
-      completeAuthNavigation(HOME_PATH);
+    if (!isPending && hasSession) {
+      redirectToHome();
     }
-  }, [isPending, session?.user, router]);
+  }, [isPending, hasSession]);
 
   useGSAP(
     () => {

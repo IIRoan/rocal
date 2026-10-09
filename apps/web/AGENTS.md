@@ -1,3 +1,5 @@
+Auth uses rolling 14-day app and passkey sessions; Better Auth checks hourly and on focus/reconnect, with renewal cookies forwarded by the API.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

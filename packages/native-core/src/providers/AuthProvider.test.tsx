@@ -2,6 +2,7 @@
 
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { AppState } from "react-native";
 
 import { authClient } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
@@ -11,6 +12,7 @@ import { unregisterNativePushDevice } from "../lib/push-notifications";
 import { AuthProvider, useAuth } from "./AuthProvider";
 
 jest.mock("react-native", () => ({
+  AppState: { currentState: "active", addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
   Platform: {
     OS: "ios",
   },
@@ -66,6 +68,7 @@ jest.mock("../lib/session-cookie", () => ({
   ensureSessionTokenCookie: jest.fn(async () => true),
   healAuthCookieJar: jest.fn(async () => undefined),
   rememberSessionTokenFromJar: jest.fn(async () => "session-token"),
+  persistRenewedSessionCookie: jest.fn(async () => undefined),
 }));
 
 jest.mock("../lib/session-token-fallback", () => ({
@@ -182,6 +185,7 @@ describe("AuthProvider", () => {
   }
 
   beforeEach(() => {
+    AppState.currentState = "active";
     global.fetch = mockFetch as typeof fetch;
     capturedAuth = null;
     container = document.createElement("div");
@@ -232,6 +236,7 @@ describe("AuthProvider", () => {
       root.unmount();
     });
     container.remove();
+    jest.useRealTimers();
   });
 
   it("stores the email sign-in password as the pending encryption password", async () => {
@@ -409,6 +414,104 @@ describe("AuthProvider", () => {
     expect(mockOnSignedOut).toHaveBeenCalled();
     expect(getAuth().lastAuthMethod).toBe("unknown");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
+  });
+
+  it("renews hourly and on resume, retaining the session on network failure", async () => {
+    jest.useFakeTimers();
+    mockGetSession.mockResolvedValue(createAuthResult());
+    await renderProvider();
+    mockGetSession.mockRejectedValueOnce(new Error("Offline"));
+    await act(async () => { await jest.advanceTimersByTimeAsync(60 * 60 * 1000); });
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(mockSignOut).not.toHaveBeenCalled();
+    const listener = jest.mocked(AppState.addEventListener).mock.calls.at(-1)?.[1];
+    await act(async () => { listener?.("active"); });
+    expect(mockGetSession).toHaveBeenCalledTimes(3);
+    expect(getAuth().isAuthenticated).toBe(true);
+    jest.useRealTimers();
+  });
+
+  it("ignores a renewal response that arrives after sign-out", async () => {
+    jest.useFakeTimers();
+    mockGetSession.mockResolvedValue(createAuthResult());
+    await renderProvider();
+    let completeRefresh: (result: ReturnType<typeof createAuthResult>) => void = () => {};
+    mockGetSession.mockImplementationOnce(() => new Promise((resolve) => { completeRefresh = resolve; }));
+    await act(async () => { await jest.advanceTimersByTimeAsync(60 * 60 * 1000); });
+    const onSuccess = mockGetSession.mock.calls.at(-1)?.[0]?.fetchOptions?.onSuccess;
+    expect(onSuccess).toBeDefined();
+    await act(async () => { await getAuth().signOut(); });
+    expect(() => onSuccess?.({
+      data: createSessionData(),
+      response: {} as Response,
+      request: { url: "https://api.solace.test/api/auth/get-session", headers: new Headers(), body: null, method: "GET", signal: new AbortController().signal },
+    })).toThrow("Session changed while renewing.");
+    await act(async () => { completeRefresh(createAuthResult()); });
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(getAuth().user).toBeNull();
+    const count = mockGetSession.mock.calls.length;
+    await act(async () => { await jest.advanceTimersByTimeAsync(60 * 60 * 1000); });
+    expect(mockGetSession).toHaveBeenCalledTimes(count);
+    jest.useRealTimers();
+  });
+
+  it("pauses hourly refresh while backgrounded and renews immediately on resume", async () => {
+    jest.useFakeTimers();
+    mockGetSession.mockResolvedValue(createAuthResult());
+    await renderProvider();
+    AppState.currentState = "background";
+    await act(async () => { await jest.advanceTimersByTimeAsync(2 * 60 * 60 * 1000); });
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+    expect(getAuth().isAuthenticated).toBe(true);
+    AppState.currentState = "active";
+    const listener = jest.mocked(AppState.addEventListener).mock.calls.at(-1)?.[1];
+    await act(async () => { listener?.("active"); });
+    expect(mockGetSession).toHaveBeenCalledTimes(2);
+    expect(getAuth().isLoading).toBe(false);
+  });
+
+  it("shares overlapping resume and timer refreshes", async () => {
+    jest.useFakeTimers();
+    mockGetSession.mockResolvedValue(createAuthResult());
+    await renderProvider();
+    let completeRefresh: (result: ReturnType<typeof createAuthResult>) => void = () => {};
+    mockGetSession.mockImplementationOnce(() => new Promise((resolve) => { completeRefresh = resolve; }));
+    const listener = jest.mocked(AppState.addEventListener).mock.calls.at(-1)?.[1];
+    await act(async () => {
+      listener?.("active");
+      listener?.("active");
+      await jest.advanceTimersByTimeAsync(60 * 60 * 1000);
+    });
+    expect(mockGetSession).toHaveBeenCalledTimes(2);
+    await act(async () => { completeRefresh(createAuthResult()); });
+    await act(async () => { listener?.("active"); });
+    expect(mockGetSession).toHaveBeenCalledTimes(3);
+    expect(getAuth().isAuthenticated).toBe(true);
+  });
+
+  it("retains a live session when background validation returns a server error", async () => {
+    jest.useFakeTimers();
+    mockGetSession.mockResolvedValue(createAuthResult());
+    await renderProvider();
+    mockGetSession.mockResolvedValueOnce({ data: null, error: { status: 503, message: "Fixture unavailable" } } as never);
+    await act(async () => { await jest.advanceTimersByTimeAsync(60 * 60 * 1000); });
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(getAuth().user?.id).toBe("user-1");
+    expect(getAuth().isLoading).toBe(false);
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it("clears a revoked session and stops background renewal", async () => {
+    jest.useFakeTimers();
+    mockGetSession.mockResolvedValue(createAuthResult());
+    await renderProvider();
+    mockGetSession.mockResolvedValueOnce({ data: null, error: null });
+    await act(async () => { await jest.advanceTimersByTimeAsync(60 * 60 * 1000); });
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(getAuth().user).toBeNull();
+    const count = mockGetSession.mock.calls.length;
+    await act(async () => { await jest.advanceTimersByTimeAsync(60 * 60 * 1000); });
+    expect(mockGetSession).toHaveBeenCalledTimes(count);
   });
 
   it("opens passkey verification after password sign-in without clearing the pending password", async () => {

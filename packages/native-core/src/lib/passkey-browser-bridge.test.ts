@@ -7,14 +7,15 @@ import {
   signInWithBrowserPasskey,
 } from "./passkey-browser-bridge";
 import type { PasskeyRouteClient } from "./passkey-auth";
-import { persistPasskeyStepUpCookie } from "./session-cookie";
+import { persistRenewedSessionCookie } from "./session-cookie";
 
 jest.mock("expo-linking", () => ({
   createURL: jest.fn((path: string) => `solace://${path.replace(/^\//, "")}`),
 }));
 
 jest.mock("./session-cookie", () => ({
-  persistPasskeyStepUpCookie: jest.fn(async () => undefined),
+  getSessionCookie: () => "better-auth.session_token=fixture-token",
+  persistRenewedSessionCookie: jest.fn(async () => undefined),
 }));
 
 function createNoopSubscription() {
@@ -25,7 +26,11 @@ function createRouteClient(
   responses: { data: unknown; error: { message?: string } | null }[],
 ): PasskeyRouteClient & { $fetch: jest.Mock } {
   return {
-    $fetch: jest.fn(async () => responses.shift()),
+    $fetch: jest.fn(async (_path: string, options?: { onSuccess?: (context: { response: Response }) => Promise<void> }) => {
+      const result = responses.shift();
+      if (result?.data && options?.onSuccess) await options.onSuccess({ response: new Response(null, { headers: { "set-cookie": "solace-passkey-step-up=fixture-signed; Max-Age=1209600" } }) });
+      return result;
+    }),
   } as PasskeyRouteClient & { $fetch: jest.Mock };
 }
 
@@ -145,9 +150,12 @@ describe("passkey browser bridge", () => {
         method: "POST",
         body: {},
         throw: false,
+        onSuccess: expect.any(Function),
       },
     );
-    expect(persistPasskeyStepUpCookie).toHaveBeenCalled();
+    expect(persistRenewedSessionCookie).toHaveBeenCalledWith(expect.any(Headers), expect.any(Headers));
+    const received = jest.mocked(persistRenewedSessionCookie).mock.calls.at(-1)?.[0];
+    expect(received?.get("set-cookie")).toContain("fixture-signed");
   });
 
   it("registers a passkey through the browser bridge", async () => {

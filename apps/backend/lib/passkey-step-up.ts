@@ -1,9 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import { env } from "./env";
+import {
+  AUTH_SESSION_LIFETIME_SECONDS,
+  AUTH_SESSION_UPDATE_AGE_SECONDS,
+} from "./auth-constants";
 
 export const PASSKEY_STEP_UP_COOKIE_NAME = "solace-passkey-step-up";
-const PASSKEY_STEP_UP_TTL_SECONDS = 12 * 60 * 60;
 const PASSKEY_PRESENCE_CACHE_TTL_MS = 60_000;
 
 type CachedPasskeyPresence = {
@@ -83,7 +86,7 @@ function encodeStepUpCookieValue(input: {
   const payload: StepUpCookiePayload = {
     u: input.userId,
     s: input.sessionId,
-    e: Math.floor(Date.now() / 1000) + PASSKEY_STEP_UP_TTL_SECONDS,
+    e: Math.floor(Date.now() / 1000) + AUTH_SESSION_LIFETIME_SECONDS,
   };
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${encoded}.${signStepUpPayload(encoded)}`;
@@ -128,7 +131,7 @@ function parseStepUpCookieValue(raw: string): StepUpCookiePayload | null {
     if (!isStepUpCookiePayload(parsed)) {
       return null;
     }
-    if (parsed.e < Math.floor(Date.now() / 1000)) {
+    if (parsed.e <= Math.floor(Date.now() / 1000)) {
       return null;
     }
     return parsed;
@@ -143,7 +146,7 @@ export function getPasskeyStepUpCookieAttributes() {
     path: "/",
     sameSite: normalizeCookieSameSite(env.cookieSameSite),
     secure: env.isProduction,
-    maxAge: PASSKEY_STEP_UP_TTL_SECONDS,
+    maxAge: AUTH_SESSION_LIFETIME_SECONDS,
     ...(env.isProduction
       ? {
           domain: getCookieDomain(env.backendUrl),
@@ -241,22 +244,46 @@ function parseCookies(cookieHeader: string | null): Record<string, string> {
   );
 }
 
-export function hasVerifiedPasskeyStepUp(
-  request: Request,
+function verifiedPasskeyStepUpPayload(
+  request: Pick<Request, "headers">,
   binding: { userId: string; sessionId: string },
-): boolean {
+): StepUpCookiePayload | null {
   const cookies = parseCookies(request.headers.get("cookie"));
   const raw = cookies[PASSKEY_STEP_UP_COOKIE_NAME];
   if (!raw) {
-    return false;
+    return null;
   }
 
   const payload = parseStepUpCookieValue(raw);
   if (!payload) {
-    return false;
+    return null;
   }
 
-  return payload.u === binding.userId && payload.s === binding.sessionId;
+  return payload.u === binding.userId && payload.s === binding.sessionId
+    ? payload
+    : null;
+}
+
+export function hasVerifiedPasskeyStepUp(
+  request: Request,
+  binding: { userId: string; sessionId: string },
+): boolean {
+  return verifiedPasskeyStepUpPayload(request, binding) !== null;
+}
+
+export function renewVerifiedPasskeyStepUpCookie(
+  request: Pick<Request, "headers">,
+  target: PasskeyStepUpCookieTarget,
+  binding: { userId: string; sessionId: string },
+): void {
+  const payload = verifiedPasskeyStepUpPayload(request, binding);
+  if (
+    payload &&
+    payload.e - AUTH_SESSION_LIFETIME_SECONDS + AUTH_SESSION_UPDATE_AGE_SECONDS <=
+      Math.floor(Date.now() / 1000)
+  ) {
+    setVerifiedPasskeyStepUpCookie(target, binding);
+  }
 }
 
 function readCachedPasskeyPresence(userId: string): boolean | undefined {
