@@ -6,7 +6,7 @@ import { AppState } from "react-native";
 
 import { authClient } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
-import { waitForSessionCookie } from "../lib/session-cookie";
+import { getSessionCookie, waitForSessionCookie } from "../lib/session-cookie";
 import { signInWithBrowserPasskey } from "../lib/passkey-browser-bridge";
 import { unregisterNativePushDevice } from "../lib/push-notifications";
 import {
@@ -413,6 +413,35 @@ describe("AuthProvider", () => {
     expect(mockOnSignedOut).toHaveBeenCalled();
     expect(getAuth().lastAuthMethod).toBe("unknown");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
+  });
+
+  it("authenticates logout requests with the fallback token when the cookie jar is empty", async () => {
+    mockGetSession.mockResolvedValue(createAuthResult());
+    await renderProvider();
+    expect(getFallbackSessionToken()).toBe("session-token");
+    jest.mocked(getSessionCookie).mockImplementation(() => {
+      const fallback = getFallbackSessionToken();
+      return fallback ? `better-auth.session_token=${fallback}` : "";
+    });
+
+    try {
+      await act(async () => {
+        await getAuth().signOut();
+      });
+    } finally {
+      jest.mocked(getSessionCookie).mockImplementation(
+        () => "better-auth.session=token",
+      );
+    }
+
+    const cookie = "better-auth.session_token=session-token";
+    expect(mockUnregisterNativePushDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ cookie }),
+    );
+    expect(mockSignOut).toHaveBeenCalledWith({
+      fetchOptions: { headers: { cookie } },
+    });
+    expect(getFallbackSessionToken()).toBeNull();
   });
 
   it("renews hourly and on resume, retaining the session on network failure", async () => {

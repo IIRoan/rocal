@@ -198,13 +198,15 @@ export async function registerNativePushDevice(input: {
   return registerInFlight;
 }
 
-export async function unregisterNativePushDevice(): Promise<void> {
+export async function unregisterNativePushDevice(
+  authHeaders?: Record<string, string>,
+): Promise<void> {
   const token = await loadStoredPushToken();
   if (!token) {
     return;
   }
   try {
-    await calendarApiService.unregisterPushDevice(token);
+    await calendarApiService.unregisterPushDevice(token, authHeaders);
   } catch {
     // Best-effort — local cleanup still runs if the API is unreachable.
   }
