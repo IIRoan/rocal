@@ -1,4 +1,6 @@
 export { HttpClient } from "./http-client";
+export { createMailAccessTokenManager } from "./mail-access-token";
+export type { MailAccessToken } from "./mail-access-token";
 export type { HttpClientConfig, RequestOptions } from "./http-client";
 
 export { AccountApiService } from "./account-api-service";

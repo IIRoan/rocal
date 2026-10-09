@@ -70,8 +70,11 @@ describe("mailRoutes passkey step-up", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetSession.mockResolvedValue({
-      user: { id: "user-1", email: "alice@solace.onl" },
-      session: { id: "session-1", userId: "user-1" },
+      headers: new Headers(),
+      response: {
+        user: { id: "user-1", email: "alice@solace.onl" },
+        session: { id: "session-1", userId: "user-1" },
+      },
     } as never);
     mockHasVerifiedPasskeyStepUp.mockReturnValue(false);
     mockGetPasskeyStepUpStatus.mockResolvedValue({

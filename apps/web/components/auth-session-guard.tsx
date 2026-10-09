@@ -1,86 +1,56 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { createLogger } from "@workspace/logger";
 import { useSession } from "@/lib/auth-client";
 import { reconcileAuthSession } from "@/lib/auth-local-state";
-import { accountApiService } from "@/lib/api-clients";
+import { useAuthStatus } from "@/hooks/use-auth-status";
+import { LOGIN_PATH } from "@/lib/app-routes";
 import {
   isPasskeyStepUpExemptPath,
   redirectToPasskeyStepUpLogin,
 } from "@/lib/auth-navigation";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 
-type PasskeyGate =
-  | { status: "pending" }
-  | { status: "ok"; userId: string }
-  | { status: "redirecting"; userId: string };
-
 const log = createLogger("auth-session-guard");
-
-async function reconcileCurrentUserSession(input: {
-  isCancelled: () => boolean;
-  refetchSession?: (args: {
-    query: { disableCookieCache: boolean };
-  }) => Promise<unknown>;
-}): Promise<"recovered" | "reconciled"> {
-  if (input.isCancelled()) {
-    return "reconciled";
-  }
-
-  const result = await reconcileAuthSession({
-    hasClientSession: true,
-    reason: "session-mismatch",
-  });
-
-  if (input.isCancelled() || result.status !== "recovered") {
-    return "reconciled";
-  }
-
-  await input.refetchSession?.({
-    query: { disableCookieCache: true },
-  });
-  return "recovered";
-}
-
-function isPasskeyGateBlocking(
-  shouldHold: boolean,
-  userId: string | null,
-  gate: PasskeyGate,
-): boolean {
-  if (!shouldHold || !userId) {
-    return false;
-  }
-
-  if (gate.status === "pending") {
-    return true;
-  }
-
-  return gate.userId !== userId || gate.status === "redirecting";
-}
 
 /** Keeps Better Auth's client session cache aligned with the server session, mirroring the native AuthProvider startup flow. */
 export function AuthSessionGuard({ children }: { children: ReactNode }) {
   const { data: session, isPending, refetch: refetchSession } = useSession();
   const pathname = usePathname();
-  const lastReconciledUserIdRef = useRef<string | null>(null);
-  const isRecoveringRef = useRef(false);
-  const [passkeyGate, setPasskeyGate] = useState<PasskeyGate>({
-    status: "pending",
-  });
+  const recoveryRef = useRef<{
+    userId: string;
+    sessionId: string | null;
+    promise: ReturnType<typeof reconcileAuthSession>;
+  } | null>(null);
 
   const userId = session?.user?.id ?? null;
+  const sessionId = session?.session?.id ?? null;
+  const isLoginPath =
+    pathname === LOGIN_PATH || Boolean(pathname?.startsWith(`${LOGIN_PATH}/`));
   const shouldHoldForPasskeyCheck =
     !isPending && Boolean(userId) && !isPasskeyStepUpExemptPath(pathname);
+  const authStatus = useAuthStatus(
+    userId,
+    sessionId,
+    shouldHoldForPasskeyCheck,
+  );
+  const needsRecovery =
+    !shouldHoldForPasskeyCheck ||
+    authStatus.isError ||
+    authStatus.data?.authenticated === false;
+  const requiresStepUp = Boolean(
+    authStatus.data?.authenticated && authStatus.data.requiresPasskeyStepUp,
+  );
 
   useEffect(() => {
-    if (isPending || isRecoveringRef.current) {
+    if (isPending || isLoginPath) {
       return;
     }
 
     if (!userId) {
-      lastReconciledUserIdRef.current = null;
+      recoveryRef.current = null;
       void reconcileAuthSession({ hasClientSession: false }).catch((error) => {
         log.warn("Auth artifact cleanup failed during session guard", {
           error,
@@ -89,78 +59,49 @@ export function AuthSessionGuard({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (lastReconciledUserIdRef.current === userId) {
-      return;
-    }
+    if (!needsRecovery) return;
 
     let cancelled = false;
-    isRecoveringRef.current = true;
-
-    void reconcileCurrentUserSession({
-      isCancelled: () => cancelled,
-      refetchSession,
-    })
-      .then((outcome) => {
-        if (cancelled) {
-          return;
-        }
-
-        lastReconciledUserIdRef.current =
-          outcome === "recovered" ? null : userId;
+    if (
+      recoveryRef.current?.userId !== userId ||
+      recoveryRef.current.sessionId !== sessionId
+    ) {
+      recoveryRef.current = {
+        userId,
+        sessionId,
+        promise: reconcileAuthSession({
+          hasClientSession: true,
+          reason: "session-mismatch",
+        }),
+      };
+    }
+    void recoveryRef.current.promise
+      .then(async (result) => {
+        if (cancelled || result.status !== "recovered") return;
+        await refetchSession?.({ query: { disableCookieCache: true } });
       })
       .catch((error) => {
         log.warn("Session reconciliation failed", { error });
-      })
-      .finally(() => {
-        isRecoveringRef.current = false;
       });
 
     return () => {
       cancelled = true;
     };
-  }, [isPending, refetchSession, userId]);
+  }, [
+    isPending,
+    isLoginPath,
+    needsRecovery,
+    refetchSession,
+    userId,
+    sessionId,
+  ]);
 
   useEffect(() => {
-    if (!shouldHoldForPasskeyCheck || !userId) {
-      return;
-    }
+    if (shouldHoldForPasskeyCheck && requiresStepUp)
+      redirectToPasskeyStepUpLogin();
+  }, [shouldHoldForPasskeyCheck, requiresStepUp]);
 
-    if (passkeyGate.status !== "pending" && passkeyGate.userId === userId) {
-      return;
-    }
-
-    let cancelled = false;
-
-    void accountApiService
-      .getAuthStatus()
-      .then((authStatus) => {
-        if (cancelled) {
-          return;
-        }
-
-        const requiresStepUp =
-          authStatus.authenticated && authStatus.requiresPasskeyStepUp;
-        setPasskeyGate(
-          requiresStepUp
-            ? { status: "redirecting", userId }
-            : { status: "ok", userId },
-        );
-        if (requiresStepUp) {
-          redirectToPasskeyStepUpLogin();
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPasskeyGate({ status: "ok", userId });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [passkeyGate, shouldHoldForPasskeyCheck, userId]);
-
-  if (isPasskeyGateBlocking(shouldHoldForPasskeyCheck, userId, passkeyGate)) {
+  if (shouldHoldForPasskeyCheck && (authStatus.isPending || requiresStepUp)) {
     return (
       <PageLoadingOverlay
         isLoading={true}

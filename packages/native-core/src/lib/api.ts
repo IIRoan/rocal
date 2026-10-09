@@ -12,6 +12,7 @@ import {
   getSessionCookie,
   getSessionCookieAsync,
   persistSessionTokenCookie,
+  persistRenewedSessionCookie,
   waitForSessionCookie,
 } from "./session-cookie";
 import { triggerSessionClear } from "./session-clear";
@@ -76,6 +77,7 @@ async function confirmExpiredSessionThenClear() {
       if (result?.data?.user) {
         sessionConfirmed = true;
       }
+      if (result?.error) getSessionErrored = true;
     } catch (error) {
       getSessionErrored = true;
       captureException(error, {
@@ -87,9 +89,9 @@ async function confirmExpiredSessionThenClear() {
       return;
     }
 
-    if (getSessionErrored && fallback) {
+    if (getSessionErrored) {
       captureMessage(
-        "401 with fallback token; getSession failed, keeping session",
+        "Session validation unavailable after 401; retaining local session",
         { level: "warning", tags: { area: "auth" } },
       );
       return;
@@ -120,6 +122,7 @@ export const httpClient = new HttpClient({
     });
   },
   onPasskeyStepUpRequired: triggerPasskeyStepUpRequired,
+  onResponseHeaders: persistRenewedSessionCookie,
 });
 
 export const calendarApiService = new CalendarApiService(

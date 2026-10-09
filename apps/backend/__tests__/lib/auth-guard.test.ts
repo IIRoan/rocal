@@ -4,7 +4,7 @@ import { Elysia } from "elysia";
 jest.mock("../../lib/auth", () => ({
   auth: {
     api: {
-      getSession: jest.fn(async (): Promise<any> => null),
+      getSession: jest.fn(),
     },
   },
 }));
@@ -29,9 +29,7 @@ import {
 } from "../../lib/passkey-step-up";
 import { requireAuth } from "../../lib/auth-guard";
 
-const mockGetSession = auth.api.getSession as unknown as jest.Mock<
-  () => Promise<any>
->;
+const mockGetSession = jest.mocked(auth.api.getSession);
 const mockHasVerifiedPasskeyStepUp =
   hasVerifiedPasskeyStepUp as jest.MockedFunction<
     typeof hasVerifiedPasskeyStepUp
@@ -49,7 +47,7 @@ describe("requireAuth", () => {
   });
 
   it("returns 401 when no session is available", async () => {
-    mockGetSession.mockResolvedValue(null);
+    mockGetSession.mockResolvedValue({ headers: new Headers(), response: null } as never);
 
     const response = await authApp.handle(
       new Request("http://localhost/protected"),
@@ -63,10 +61,10 @@ describe("requireAuth", () => {
   });
 
   it("resolves routeUser from better-auth session", async () => {
-    mockGetSession.mockResolvedValue({
+    mockGetSession.mockResolvedValue({ headers: new Headers(), response: {
       user: { id: "user-2", email: "fallback@example.com" },
       session: { id: "session-2" },
-    });
+    } } as never);
 
     const response = await authApp.handle(
       new Request("http://localhost/protected"),
@@ -77,10 +75,10 @@ describe("requireAuth", () => {
   });
 
   it("returns 403 when passkey step-up is required", async () => {
-    mockGetSession.mockResolvedValue({
+    mockGetSession.mockResolvedValue({ headers: new Headers(), response: {
       user: { id: "user-1", email: "user@example.com" },
       session: { id: "session-1" },
-    });
+    } } as never);
     mockGetPasskeyStepUpStatus.mockResolvedValueOnce({
       hasPasskeys: true,
       isPasskeyStepUpVerified: false,
@@ -101,10 +99,10 @@ describe("requireAuth", () => {
   });
 
   it("skips passkey database checks when the verification cookie is present", async () => {
-    mockGetSession.mockResolvedValue({
+    mockGetSession.mockResolvedValue({ headers: new Headers(), response: {
       user: { id: "user-1", email: "user@example.com" },
       session: { id: "session-1" },
-    });
+    } } as never);
     mockHasVerifiedPasskeyStepUp.mockReturnValueOnce(true);
 
     const response = await authApp.handle(
@@ -113,5 +111,17 @@ describe("requireAuth", () => {
 
     expect(response.status).toBe(200);
     expect(mockGetPasskeyStepUpStatus).not.toHaveBeenCalled();
+  });
+
+  it("forwards renewed cookies without performing a second session read", async () => {
+    const cookies = ["session_token=fixture; Max-Age=1209600; HttpOnly", "solace-passkey-step-up=fixture-verification; Max-Age=1209600; HttpOnly"];
+    const headers = new Headers();
+    for (const cookie of cookies) headers.append("set-cookie", cookie);
+    mockGetSession.mockResolvedValue({ headers, response: { user: { id: "user-1" }, session: { id: "session-1" } } } as never);
+    const response = await authApp.handle(new Request("http://localhost/protected"));
+    expect(response.status).toBe(200);
+    expect(response.headers.getSetCookie()).toEqual(cookies);
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+    expect(mockGetSession).toHaveBeenCalledWith({ headers: expect.any(Headers), returnHeaders: true });
   });
 });

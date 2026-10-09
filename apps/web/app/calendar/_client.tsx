@@ -3,7 +3,10 @@
 import { useSession } from "@/lib/auth-client";
 import { useSearchParams } from "next/navigation";
 import { createLogger } from "@workspace/logger";
-import { completeAuthNavigation } from "@/lib/auth-navigation";
+import {
+  completeAuthNavigation,
+  isAuthNavigationPending,
+} from "@/lib/auth-navigation";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import {
   FORCE_LOADING_DESIGN_PREVIEW,
@@ -46,6 +49,7 @@ import {
   createContext,
   use,
   useEffect,
+  useEffectEvent,
   useRef,
   Suspense,
   useSyncExternalStore,
@@ -316,21 +320,26 @@ export function CalendarShell({ children }: { children: ReactNode }) {
     openPalette,
     initialQuery,
   } = useCommandPalette();
-  const showAuthGate = isPending || !session?.user;
+  const hasSession = Boolean(session?.user);
+  const showAuthGate = isPending || !hasSession;
+  const redirectToLogin = useEffectEvent(() => {
+    if (isAuthNavigationPending()) return;
+    const currentPath =
+      typeof window !== "undefined"
+        ? `${window.location.pathname}${window.location.search}`
+        : CALENDAR_HOME_PATH;
+    const loginPath = "/login";
+    router.startRouteTransition({ messageContext: "AUTH_FLOW" });
+    completeAuthNavigation(
+      `${loginPath}?next=${encodeURIComponent(currentPath)}`,
+    );
+  });
 
   useEffect(() => {
-    if (!isPending && !session?.user) {
-      const currentPath =
-        typeof window !== "undefined"
-          ? `${window.location.pathname}${window.location.search}`
-          : CALENDAR_HOME_PATH;
-      const loginPath = "/login";
-      router.startRouteTransition({ messageContext: "AUTH_FLOW" });
-      completeAuthNavigation(
-        `${loginPath}?next=${encodeURIComponent(currentPath)}`,
-      );
+    if (!isPending && !hasSession) {
+      redirectToLogin();
     }
-  }, [isPending, session?.user, router]);
+  }, [isPending, hasSession]);
 
   const keyboardPaletteValue = { openPalette };
 

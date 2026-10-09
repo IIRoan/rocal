@@ -1,6 +1,6 @@
 /** Jest settings shared by native-core and both native apps. */
 const nativeJestTransformIgnorePatterns = [
-  "/node_modules/(?!(@noble/|.*/@noble/)(?:hashes|curves|ciphers)/|blobatar|@blobatar/|react-native-svg/)",
+  "/node_modules/(?!(@noble/|.*/@noble/)(?:hashes|curves|ciphers)/|@better-auth/|better-auth/|better-call/|@better-fetch/|nanostores/|jose/|rou3/|blobatar|@blobatar/|react-native-svg/)",
 ];
 
 function nativeJestModuleNameMapper(repoRoot) {

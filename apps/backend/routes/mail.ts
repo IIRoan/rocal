@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import type { IMailService } from "../contracts/mail.contract";
 import { createLogger } from "@workspace/logger";
-import { prisma } from "../lib/prisma";
 import { env } from "../lib/env";
 import { requireAuth } from "../lib/auth-guard";
 import {
@@ -9,7 +8,7 @@ import {
   unauthorizedBody,
 } from "../lib/api-error-response";
 import { hasUserId, type AuthenticatedUser } from "../lib/auth-utils";
-import { auth } from "../lib/auth";
+import { getRequestAuthSession } from "../lib/auth-session";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { defaultMailService } from "../lib/default-mail-service";
 import { errorMessage, NotFoundError, RateLimitError } from "../lib/errors";
@@ -29,10 +28,6 @@ type JmapProxyFetcher = (
   input: string,
   init?: RequestInit,
 ) => Promise<Response>;
-
-function normalizeBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/\/+$/, "");
-}
 
 const logger = createLogger("backend:mail-jmap-proxy");
 
@@ -261,11 +256,10 @@ function summarizeUpstreamErrorBody(
 
 async function resolveSessionUserForProxy(
   request: Request,
+  responseHeaders: Record<string, unknown>,
 ): Promise<AuthenticatedUser | null> {
   try {
-    const session = await auth.api.getSession({
-      headers: request.headers as Headers,
-    });
+    const session = await getRequestAuthSession(request, responseHeaders);
 
     if (hasUserId(session?.user) && typeof session.user.id === "string") {
       const email = session.user.email?.trim();
@@ -283,6 +277,7 @@ async function resolveSessionUserForProxy(
 }
 
 async function proxyJmapRequest(input: {
+  responseHeaders: Record<string, unknown>;
   request: Request;
   upstreamPath: string;
   upstreamBaseUrl: string;
@@ -326,7 +321,7 @@ async function proxyJmapRequest(input: {
     const authStart = performance.now();
     try {
       const sessionStart = performance.now();
-      const user = await resolveSessionUserForProxy(input.request);
+      const user = await resolveSessionUserForProxy(input.request, input.responseHeaders);
       sessionMs = performance.now() - sessionStart;
       if (user) {
         const email = user.email?.trim();
@@ -663,8 +658,8 @@ export function createMailRoutes(
         description:
           "Returns the stored OpenPGP public key directory entry for an internal mailbox.",
       },
-    }, async ({ params, request }) => {
-      const sessionUser = await resolveSessionUserForProxy(request);
+    }, async ({ params, request, set }) => {
+      const sessionUser = await resolveSessionUserForProxy(request, set.headers);
       const rateLimitKey = sessionUser?.id
         ? `user:${sessionUser.id}`
         : `ip:${getClientIp(request)}`;
@@ -711,9 +706,10 @@ export function createMailRoutes(
         description:
           "Forwards JMAP discovery to the configured Stalwart instance so browser clients can operate without direct cross-origin access.",
       },
-    }, ({ request }) =>
+    }, ({ request, set }) =>
       guardJmapProxyRate(request, jmapRateLimit) ??
       proxyJmapRequest({
+        responseHeaders: set.headers,
         request,
         upstreamPath: "/.well-known/jmap",
         upstreamBaseUrl: jmapUpstreamBaseUrl,
@@ -727,9 +723,10 @@ export function createMailRoutes(
         description:
           "Forwards authenticated JMAP calls to Stalwart while keeping private-key operations in the browser.",
       },
-    }, ({ request }) =>
+    }, ({ request, set }) =>
       guardJmapProxyRate(request, jmapRateLimit) ??
       proxyJmapRequest({
+        responseHeaders: set.headers,
         request,
         upstreamPath: "/jmap/",
         upstreamBaseUrl: jmapUpstreamBaseUrl,
@@ -743,9 +740,10 @@ export function createMailRoutes(
         description:
           "Forwards authenticated JMAP calls to Stalwart while keeping private-key operations in the browser.",
       },
-    }, ({ request }) =>
+    }, ({ request, set }) =>
       guardJmapProxyRate(request, jmapRateLimit) ??
       proxyJmapRequest({
+        responseHeaders: set.headers,
         request,
         upstreamPath: "/jmap/",
         upstreamBaseUrl: jmapUpstreamBaseUrl,
@@ -759,9 +757,10 @@ export function createMailRoutes(
         description:
           "Forwards nested JMAP download, upload, and event-source requests to Stalwart through the backend proxy.",
       },
-    }, ({ params, request }) =>
+    }, ({ params, request, set }) =>
       guardJmapProxyRate(request, jmapRateLimit) ??
       proxyJmapRequest({
+        responseHeaders: set.headers,
         request,
         upstreamPath: `/jmap/${params["*"]}`,
         upstreamBaseUrl: jmapUpstreamBaseUrl,

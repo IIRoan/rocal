@@ -113,7 +113,7 @@ describe("accountRoutes", () => {
   });
 
   it("returns an uncached unauthenticated auth-status response", async () => {
-    mockGetSession.mockResolvedValueOnce(undefined as never);
+    mockGetSession.mockResolvedValueOnce({ headers: new Headers(), response: null } as never);
 
     const response = await createApp().handle(
       new Request("http://localhost/account/auth-status"),
@@ -124,6 +124,7 @@ describe("accountRoutes", () => {
     expect(mockGetSession).toHaveBeenCalledWith({
       headers: expect.any(Headers),
       query: { disableCookieCache: true },
+      returnHeaders: true,
     });
     await expect(readJson(response)).resolves.toEqual({
       authenticated: false,

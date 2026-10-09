@@ -13,7 +13,34 @@ import { createRoot, type Root } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const mockToggleSidebar = jest.fn();
+let mockAuthNavigationPending = false;
 const mockUseIsMobile = jest.fn(() => false);
+const mockUseSmoothRouter =
+  jest.fn<typeof import("../../hooks/use-smooth-router").useSmoothRouter>();
+const mockNextRouter = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  forward: jest.fn(),
+  prefetch: jest.fn(),
+  refresh: jest.fn(),
+};
+
+jest.mock("next/navigation", () => ({
+  useRouter: () => mockNextRouter,
+  usePathname: () => globalThis.window.location.pathname,
+  useSearchParams: () => new URLSearchParams(globalThis.window.location.search),
+}));
+
+jest.mock("@/lib/auth-navigation", () => ({
+  completeAuthNavigation: jest.fn(),
+  isAuthNavigationPending: () => mockAuthNavigationPending,
+  beginAuthNavigation: (href: string) => {
+    if (mockAuthNavigationPending) return null;
+    mockAuthNavigationPending = true;
+    return () => mockCompleteAuthNavigation(href);
+  },
+}));
 
 // jsdom does not implement matchMedia
 Object.defineProperty(window, "matchMedia", {
@@ -303,16 +330,24 @@ jest.mock("../../hooks/use-settings", () => ({
 }));
 
 jest.mock("../../components/mail/mail-sidebar", () => ({
-  MailSidebar: ({ activeMailbox, onSelectMailbox, onCompose }: any) =>
+  MailSidebar: ({ activeMailbox, onSelectMailbox, onCompose, onSignOut }: {
+    activeMailbox: { mailboxes: { id: string; name: string }[] } | null;
+    onSelectMailbox: (id: string) => void;
+    onCompose: () => void;
+    onSignOut: () => void;
+  }) =>
     activeMailbox ? (
       <nav>
-        {activeMailbox.mailboxes.map((m: any) => (
+        {activeMailbox.mailboxes.map((m) => (
           <button key={m.id} onClick={() => onSelectMailbox(m.id)}>
             {m.name}
           </button>
         ))}
         <button onClick={onCompose} aria-label="Compose">
           Compose
+        </button>
+        <button onClick={onSignOut} aria-label="Sign out">
+          Sign out
         </button>
       </nav>
     ) : null,
@@ -441,20 +476,13 @@ jest.mock("../../components/mail/compose-dialog", () => {
 });
 
 jest.mock("../../hooks/use-smooth-router", () => ({
-  useSmoothRouter: () => ({
-    push: jest.fn(),
-    replace: jest.fn(),
-    back: jest.fn(),
-    forward: jest.fn(),
-    prefetch: jest.fn(),
-    refresh: jest.fn(),
-    startRouteTransition: jest.fn(),
-    finishRouteTransition: jest.fn(),
-    isRouteTransitionActive: false,
-  }),
+  useSmoothRouter: () => mockUseSmoothRouter(),
 }));
 
 import { MailApp } from "../../components/mail/mail-app";
+import { RouteTransitionProvider } from "@/components/route-transition-provider";
+import { completeAuthNavigation } from "@/lib/auth-navigation";
+import { authSessionDataFixture } from "../mocks/auth-session";
 import { authClient, useSession } from "@/lib/auth-client";
 import { peekCachedAuthPassword } from "../../lib/e2ee-password-cache";
 import {
@@ -473,6 +501,8 @@ import { toast } from "sonner";
 const mockToast = jest.mocked(toast);
 const mockUseSession = jest.mocked(useSession);
 const mockGetSession = jest.mocked(authClient.getSession);
+const mockSignOut = jest.mocked(authClient.signOut);
+const mockCompleteAuthNavigation = jest.mocked(completeAuthNavigation);
 const mockPeekCachedAuthPassword = jest.mocked(peekCachedAuthPassword);
 const mockInitEncPasswordFromCookie = jest.mocked(initEncPasswordFromCookie);
 const mockClearEncPasswordCookie = jest.mocked(clearEncPasswordCookie);
@@ -573,6 +603,7 @@ async function waitForExpectation(
 
 describe("MailApp", () => {
   beforeEach(async () => {
+    mockAuthNavigationPending = false;
     clearMailOpenPrefetch();
     await resetMailVaultDatabase();
     container = document.createElement("div");
@@ -588,6 +619,23 @@ describe("MailApp", () => {
     mockToastError.mockReset();
     mockToggleSidebar.mockReset();
     mockUseIsMobile.mockReturnValue(false);
+    mockUseSmoothRouter.mockReset();
+    mockUseSmoothRouter.mockReturnValue({
+      ...mockNextRouter,
+      startRouteTransition: jest.fn(),
+      finishRouteTransition: jest.fn(),
+      isRouteTransitionActive: false,
+    });
+    mockSignOut.mockReset();
+    mockCompleteAuthNavigation.mockReset();
+    mockCompleteAuthNavigation.mockImplementation(() => {
+      // Stop a broken passive-effect loop before it can hang the test runner.
+      if (mockCompleteAuthNavigation.mock.calls.length > 3) {
+        throw new Error(
+          "Mail auth navigation repeated before the page could unload",
+        );
+      }
+    });
     localStorage.removeItem("mail:composeSettings");
 
     const sessionPayload = {
@@ -802,20 +850,107 @@ describe("MailApp", () => {
       root.unmount();
     });
     container.remove();
+    window.history.replaceState(null, "", "/");
     await resetMailVaultDatabase();
     jest.clearAllMocks();
   });
 
-  async function renderApp() {
+  async function renderApp(withRouteTransitions = false, strict = false) {
     await act(async () => {
-      root.render(
+      const app = (
         <QueryClientProvider client={queryClient}>
           <MailApp />
-        </QueryClientProvider>,
+        </QueryClientProvider>
+      );
+      const content = withRouteTransitions ? (
+        <RouteTransitionProvider>{app}</RouteTransitionProvider>
+      ) : app;
+      root.render(
+        strict ? <React.StrictMode>{content}</React.StrictMode> : content,
       );
       await Promise.resolve();
     });
   }
+
+  function enableRealRouteTransitions() {
+    const { useSmoothRouter } = jest.requireActual<
+      typeof import("../../hooks/use-smooth-router")
+    >("../../hooks/use-smooth-router");
+    mockUseSmoothRouter.mockImplementation(useSmoothRouter);
+  }
+
+  function setMailSession(
+    data: typeof authSessionDataFixture | null,
+    isPending = false,
+  ) {
+    mockUseSession.mockReturnValue({
+      data,
+      isPending,
+      isRefetching: false,
+      error: null,
+      refetch: jest.fn(() => Promise.resolve()),
+    });
+  }
+
+  it("redirects Mail once when the session disappears with the real router and Strict Mode", async () => {
+    enableRealRouteTransitions();
+    window.history.replaceState(null, "", "/mail?mbox=inbox");
+    await renderApp(true, true);
+    expect(mockCompleteAuthNavigation).not.toHaveBeenCalled();
+
+    setMailSession(null);
+    await renderApp(true, true);
+    expect(mockCompleteAuthNavigation.mock.calls).toEqual([
+      ["/login?next=%2Fmail%3Fmbox%3Dinbox"],
+    ]);
+    await renderApp(true, true);
+    expect(mockCompleteAuthNavigation).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for Mail auth to resolve before redirecting and preserves the mailbox URL", async () => {
+    enableRealRouteTransitions();
+    window.history.replaceState(null, "", "/mail?mbox=drafts");
+    setMailSession(null, true);
+    await renderApp(true);
+    expect(mockCompleteAuthNavigation).not.toHaveBeenCalled();
+
+    setMailSession(null);
+    await renderApp(true);
+    expect(mockCompleteAuthNavigation.mock.calls).toEqual([
+      ["/login?next=%2Fmail%3Fmbox%3Ddrafts"],
+    ]);
+  });
+
+  it("completes Mail logout and clears the mailbox without restarting auth navigation", async () => {
+    enableRealRouteTransitions();
+    window.history.replaceState(null, "", "/mail?mbox=inbox");
+    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
+    mockSignOut.mockResolvedValue({ data: { success: true }, error: null });
+    await renderApp(true, true);
+    await waitForExpectation(() =>
+      expect(container.querySelector('button[aria-label="Sign out"]')).not.toBeNull(),
+    );
+    const button = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Sign out"]',
+    );
+    if (!button) throw new Error("Missing sign-out button");
+
+    await act(async () => {
+      button.click();
+      await Promise.resolve();
+      setMailSession(null);
+    });
+    await renderApp(true, true);
+
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
+    expect(mockWorkerClient.clear).toHaveBeenCalled();
+    expect(mockCompleteAuthNavigation.mock.calls).toEqual([["/"]]);
+    expect(container.textContent).not.toContain("Encrypted hello");
+
+    await renderApp(true, true);
+    expect(mockCompleteAuthNavigation).toHaveBeenCalledTimes(1);
+  });
 
   it("auto-provisions and opens the mailbox on first visit", async () => {
     mockApi.getAccountStatus.mockResolvedValueOnce({

@@ -1,6 +1,6 @@
 import { Elysia, status } from "elysia";
 import { createLogger } from "@workspace/logger";
-import { auth } from "./auth";
+import { getRequestAuthSession } from "./auth-session";
 import {
   PASSKEY_STEP_UP_REQUIRED_CODE,
   PASSKEY_STEP_UP_REQUIRED_MESSAGE,
@@ -17,9 +17,8 @@ import {
 const logger = createLogger("backend:auth-guard");
 
 type AuthParentContext = {
-  authenticatedUser?: AuthenticatedUser | null;
-  user?: AuthenticatedUser | null;
   request: Request;
+  set: { headers: Record<string, unknown> };
 };
 
 type AuthenticatedSession = {
@@ -31,9 +30,7 @@ async function resolveAuthenticatedSession(
   ctx: AuthParentContext,
 ): Promise<AuthenticatedSession | null> {
   try {
-    const authData = await auth.api.getSession({
-      headers: ctx.request.headers as Headers,
-    });
+    const authData = await getRequestAuthSession(ctx.request, ctx.set.headers);
 
     if (
       hasUserId(authData?.user) &&
@@ -47,23 +44,6 @@ async function resolveAuthenticatedSession(
     }
   } catch (error) {
     logger.debug("Session resolution failed", errorLogDetails(error));
-  }
-
-  if (
-    hasUserId(ctx.authenticatedUser) &&
-    typeof ctx.authenticatedUser.id === "string"
-  ) {
-    return {
-      user: ctx.authenticatedUser,
-      sessionId: "",
-    };
-  }
-
-  if (hasUserId(ctx.user) && typeof ctx.user.id === "string") {
-    return {
-      user: ctx.user,
-      sessionId: "",
-    };
   }
 
   return null;

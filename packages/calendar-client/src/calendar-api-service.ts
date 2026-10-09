@@ -1205,12 +1205,14 @@ export class CalendarApiService {
 
   async unregisterPushDevice(
     token?: string,
+    headers?: Record<string, string>,
   ): Promise<PushDeviceUnregisterResult> {
     try {
       return await this.client.delete<PushDeviceUnregisterResult>(
         "/api/push/devices",
         {
           body: JSON.stringify(token ? { token } : {}),
+          ...(headers ? { headers } : {}),
         },
       );
     } catch (error) {

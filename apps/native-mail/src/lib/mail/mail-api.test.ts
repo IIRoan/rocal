@@ -104,3 +104,4 @@ describe("createServerMailTokenManager", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+jest.mock("@workspace/native-core/lib/session-cookie", () => ({ persistRenewedSessionCookie: jest.fn(async () => undefined) }));

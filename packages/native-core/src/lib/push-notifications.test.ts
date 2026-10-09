@@ -148,8 +148,12 @@ describe("push device registration", () => {
     });
     expect(mockSecureStore[SECURE_STORE_KEYS.PUSH_TOKEN]).toBe(token);
 
-    await unregisterNativePushDevice();
-    expect(calendarApiService.unregisterPushDevice).toHaveBeenCalledWith(token);
+    const authHeaders = { cookie: "better-auth.session_token=session-token" };
+    await unregisterNativePushDevice(authHeaders);
+    expect(calendarApiService.unregisterPushDevice).toHaveBeenCalledWith(
+      token,
+      authHeaders,
+    );
     expect(mockSecureStore[SECURE_STORE_KEYS.PUSH_TOKEN]).toBeUndefined();
   });
 
