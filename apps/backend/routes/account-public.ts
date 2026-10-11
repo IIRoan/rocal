@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { auth } from "../lib/auth";
+import { getRequestAuthSession } from "../lib/auth-session";
 import { env } from "../lib/env";
 import { RateLimitError } from "../lib/errors";
 import { getPasskeyStepUpStatus } from "../lib/passkey-step-up";
@@ -54,10 +54,7 @@ export const accountPublicRoutes = new Elysia({
     },
   }, async ({ request, set }) => {
     set.headers["Cache-Control"] = "no-store, max-age=0";
-    const session = await auth.api.getSession({
-      headers: request.headers as Headers,
-      query: { disableCookieCache: true },
-    });
+    const session = await getRequestAuthSession(request, set.headers, { disableCookieCache: true });
   
     if (!session?.user?.id) {
       return {

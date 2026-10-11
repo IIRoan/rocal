@@ -4,16 +4,20 @@ import { createLogger } from "@workspace/logger";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 
 import { signOutAndClearLocalState } from "@/lib/auth-local-state";
+import { beginAuthNavigation } from "@/lib/auth-navigation";
 import { createDraftCalendarEvent } from "@/lib/calendar-event-drafts";
 
 const log = createLogger("dashboard-user-actions");
 
 async function handleLogout() {
+  const finishNavigation = beginAuthNavigation("/");
+  if (!finishNavigation) return;
   try {
     await signOutAndClearLocalState();
-    window.location.href = "/";
   } catch (error) {
     log.error("Logout failed:", error);
+  } finally {
+    finishNavigation();
   }
 }
 

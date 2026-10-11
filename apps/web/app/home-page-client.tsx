@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
@@ -51,20 +52,23 @@ export function HomePageClient() {
   );
   const rootRef = useRef<HTMLElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const hasSession = Boolean(session?.user);
   const shouldShowLoadingOverlay =
     FORCE_LOADING_DESIGN_PREVIEW ||
     !hasHydrated ||
     isPending ||
-    Boolean(session?.user);
+    hasSession;
+
+  const redirectToHome = useEffectEvent(() => {
+    router.startRouteTransition({ messageContext: "AUTH_FLOW" });
+    completeAuthNavigation(HOME_PATH);
+  });
 
   useEffect(() => {
-    if (!isPending && session?.user) {
-      router.startRouteTransition({
-        messageContext: "AUTH_FLOW",
-      });
-      completeAuthNavigation(HOME_PATH);
+    if (!isPending && hasSession) {
+      redirectToHome();
     }
-  }, [isPending, session?.user, router]);
+  }, [isPending, hasSession]);
 
   useLayoutEffect(() => {
     const root = rootRef.current;

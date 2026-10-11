@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
-import { completeAuthNavigation } from "@/lib/auth-navigation";
+import {
+  beginAuthNavigation,
+  completeAuthNavigation,
+  isAuthNavigationPending,
+} from "@/lib/auth-navigation";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { MOTION_EASING, revealSequence } from "@workspace/ui/lib/motion";
@@ -43,27 +47,30 @@ export function HomeAppClient() {
   );
 
   const handleSignOut = () => {
+    const finishNavigation = beginAuthNavigation("/login");
+    if (!finishNavigation) return;
     void signOutAndClearLocalState()
-      .then(() => {
-        completeAuthNavigation("/login");
-      })
-      .catch(() => {
-        completeAuthNavigation("/login");
-      });
+      .then(finishNavigation)
+      .catch(finishNavigation);
   };
 
+  const hasSession = Boolean(session?.user);
+  const redirectToLogin = useEffectEvent(() => {
+    if (isAuthNavigationPending()) return;
+    router.startRouteTransition({ messageContext: "AUTH_FLOW" });
+    completeAuthNavigation("/login");
+  });
+
   useEffect(() => {
-    if (!isPending && !session?.user) {
-      router.startRouteTransition({ messageContext: "AUTH_FLOW" });
-      completeAuthNavigation("/login");
+    if (!isPending && !hasSession) {
+      redirectToLogin();
     }
-  }, [isPending, session?.user, router]);
+  }, [isPending, hasSession]);
 
   // Keyed on sign-in state, not the user object, so session refetches on focus don't replay the entrance.
-  const signedIn = !!session?.user;
   useLayoutEffect(() => {
     const container = containerRef.current;
-    if (!container || prefersReducedMotion || isPending || !signedIn) return;
+    if (!container || prefersReducedMotion || isPending || !hasSession) return;
     return revealSequence(container, [
       {
         selector: "[data-home-header]",
@@ -87,7 +94,7 @@ export function HomeAppClient() {
         easing: MOTION_EASING.soft,
       },
     ]);
-  }, [isPending, signedIn, prefersReducedMotion]);
+  }, [isPending, hasSession, prefersReducedMotion]);
 
   if (isPending || !session?.user) {
     return null;

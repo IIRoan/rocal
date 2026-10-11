@@ -10,6 +10,7 @@ interface PasskeyFetchOptions {
   body?: Record<string, unknown>;
   query?: Record<string, string>;
   throw: false;
+  onSuccess?: (context: { response: Response }) => Promise<void>;
 }
 
 interface PasskeyFetchResult<T> {
