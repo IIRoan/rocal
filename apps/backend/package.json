@@ -35,10 +35,10 @@
     "typescript-eslint": "^8.24.1"
   },
   "dependencies": {
-    "@better-auth/core": "^1.6.13",
-    "@better-auth/expo": "^1.6.13",
-    "@better-auth/passkey": "^1.6.13",
-    "@better-auth/utils": "^0.4.1",
+    "@better-auth/core": "^1.7.7",
+    "@better-auth/expo": "^1.7.7",
+    "@better-auth/passkey": "^1.7.7",
+    "@better-auth/utils": "^0.4.2",
     "@better-fetch/fetch": "^1.1.21",
     "@elysia/cors": "2.0.0-beta.1",
     "@prisma/client": "^6.12.0",
@@ -47,7 +47,7 @@
     "@workspace/calendar-ics": "workspace:*",
     "@workspace/logger": "0.10.0",
     "@workspace/runtime": "workspace:*",
-    "better-auth": "^1.6.13",
+    "better-auth": "^1.7.7",
     "better-call": "^2.0.2",
     "elysia": "2.0.0-beta.10",
     "exact-mirror": "^1.2.2",
