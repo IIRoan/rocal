@@ -17,11 +17,9 @@ import type {
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
-import {
-  EventEditorChip,
-  createEditorFieldStyle,
-} from "./EventEditorPrimitives";
-import { OptionSheet, type OptionSheetItem } from "./EventPickerSheets";
+import { EventEditorChip } from "./EventEditorPrimitives";
+import { createEditorFieldStyle } from "./event-editor-styles";
+import { OptionSheet, type OptionSheetItem } from "./OptionSheet";
 
 const WEEKDAYS = [
   { index: 1, short: "M", long: "Monday" },

@@ -3,7 +3,7 @@
 import { useReducer, type ReactNode } from "react";
 import { AlertTriangle, Check, RotateCcw, Trash2 } from "lucide-react";
 
-import { AnimatedCollapse } from "./account-settings-shared";
+import { AnimatedCollapse } from "@workspace/ui/components/ui/animated-collapse";
 import {
   dangerZoneUiReducer,
   initialDangerZoneUiState,

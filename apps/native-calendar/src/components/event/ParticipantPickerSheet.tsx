@@ -22,7 +22,7 @@ import { RecipientSuggestInput } from "@workspace/native-core/components/mail/Re
 import { BlobatarAvatar } from "@workspace/native-core/components/BlobatarAvatar";
 import { SheetActions, SheetPrimaryButton } from "@workspace/native-core/components/sheet";
 import { PickerSheet } from "./EventPickerSheets";
-import { createEditorFieldStyle } from "./EventEditorPrimitives";
+import { createEditorFieldStyle } from "./event-editor-styles";
 
 const FIELD_ICON_SIZE = 16;
 const FIELD_ICON_GAP = 10;

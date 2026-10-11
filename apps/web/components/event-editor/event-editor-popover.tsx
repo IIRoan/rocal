@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
-import { gsap } from "@workspace/ui/lib/gsap";
+import { moveFrom } from "@workspace/ui/lib/motion";
 
 import { useEffectEvent } from "./use-effect-event";
 import { useEventEditorPopoverPosition } from "./use-event-editor-popover-position";
@@ -63,46 +63,26 @@ export function EventEditorPopover({
     }
 
     const previousPosition = appliedPositionRef.current;
-
+    appliedPositionRef.current = position;
     if (
       !previousPosition ||
       prefersReducedMotion ||
-      !allowPositionAnimationRef.current
+      !allowPositionAnimationRef.current ||
+      (previousPosition.top === position.top &&
+        previousPosition.left === position.left)
     ) {
-      gsap.set(popover, {
-        top: position.top,
-        left: position.left,
-        maxHeight: position.maxHeight,
-      });
-    } else if (
-      previousPosition.top !== position.top ||
-      previousPosition.left !== position.left ||
-      previousPosition.maxHeight !== position.maxHeight
-    ) {
-      gsap.killTweensOf(popover);
-      gsap.fromTo(
-        popover,
-        {
-          top: previousPosition.top,
-          left: previousPosition.left,
-          maxHeight: previousPosition.maxHeight,
-        },
-        {
-          top: position.top,
-          left: position.left,
-          maxHeight: position.maxHeight,
-          duration: 0.22,
-          ease: "power2.out",
-          overwrite: "auto",
-        },
-      );
+      return;
     }
 
-    appliedPositionRef.current = position;
-
-    return () => {
-      gsap.killTweensOf(popover);
-    };
+    const animation = moveFrom(
+      popover,
+      {
+        x: previousPosition.left - position.left,
+        y: previousPosition.top - position.top,
+      },
+      { duration: 220 },
+    );
+    return () => animation?.cancel();
   }, [open, popoverRef, position, prefersReducedMotion]);
 
   React.useEffect(() => {

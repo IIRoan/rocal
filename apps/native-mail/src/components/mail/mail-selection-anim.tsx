@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { createContext, use, useEffect, type ReactNode } from "react";
 import { type SharedValue, useSharedValue } from "react-native-reanimated";
+import { afterPaint } from "@workspace/calendar-core";
 import { runSelectionTransition } from "./mail-selection-anim-utils";
 
 const MailSelectionAnimContext = createContext<SharedValue<number> | null>(
@@ -16,7 +17,9 @@ export function MailSelectionAnimProvider({
   const progress = useSharedValue(active ? 1 : 0);
 
   useEffect(() => {
-    runSelectionTransition(progress, active);
+    const transition = () => runSelectionTransition(progress, active);
+    // Leaving selection mode is an exit, so only entering waits for the selection chrome to paint.
+    return active ? afterPaint(transition) : transition();
   }, [active, progress]);
 
   return (
@@ -27,7 +30,7 @@ export function MailSelectionAnimProvider({
 }
 
 export function useSelectionProgress(): SharedValue<number> {
-  const progress = useContext(MailSelectionAnimContext);
+  const progress = use(MailSelectionAnimContext);
   if (!progress) {
     throw new Error(
       "useSelectionProgress must be used within MailSelectionAnimProvider",

@@ -10,9 +10,9 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { getErrorMessage } from "@workspace/calendar-core";
+import { afterPaint, getErrorMessage } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
-import { useIsMobile } from "@workspace/ui/hooks";
+import { useIsMobile, usePaintedValue } from "@workspace/ui/hooks";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useMailUrlSync } from "@/hooks/use-mail-url-sync";
 import { useSettings } from "@/hooks/use-settings";
@@ -43,7 +43,6 @@ import {
   type MailAppListChromeState,
 } from "./mail-app-list-chrome-state";
 import { MAIL_READER_TRANSITION_MS } from "./mail-app/mail-reader-transition";
-import { useDeferredReaderPane } from "./mail-app/use-deferred-reader-pane";
 
 const log = createLogger("mail-app-content-controller");
 
@@ -479,9 +478,9 @@ export function useMailAppContentController(
           suppressSearchShortcutInputRef.current = true;
           requestAnimationFrame(() => {
             searchInputRef.current?.focus({ preventScroll: true });
-            requestAnimationFrame(() => {
-              suppressSearchShortcutInputRef.current = false;
-            });
+          });
+          afterPaint(() => {
+            suppressSearchShortcutInputRef.current = false;
           });
         }
       },
@@ -512,7 +511,7 @@ export function useMailAppContentController(
     !isMobile &&
     (isFullCompose ||
       (Boolean(selectedMessage) && !selectedIsDraft && !isReaderClosing));
-  const showDesktopDetailPane = useDeferredReaderPane(wantsDesktopDetailPane);
+  const showDesktopDetailPane = usePaintedValue(wantsDesktopDetailPane);
   const desktopDetailPanePending = wantsDesktopDetailPane && !showDesktopDetailPane;
   // Drives the list layout and reader interactivity: flips with the slide on open, at the click on close.
   const desktopDetailPaneActive = wantsDesktopDetailPane && showDesktopDetailPane;

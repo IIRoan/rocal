@@ -2,11 +2,10 @@
 
 import type { Dispatch } from "react";
 
-import {
-  AnimatedCollapse,
-  FieldInput,
-  InlineMessage,
-} from "./account-settings-shared";
+import { AnimatedCollapse } from "@workspace/ui/components/ui/animated-collapse";
+
+import { FieldInput } from "./account-settings-field-input";
+import { InlineMessage } from "./account-settings-inline-message";
 import { submitAccountSecurityPassword } from "./account-settings-security-submit";
 import type {
   SecurityForm,

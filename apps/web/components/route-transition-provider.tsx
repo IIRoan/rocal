@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { afterPaint } from "@workspace/calendar-core";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 
 type RouteLoadingMessageContext = NonNullable<
@@ -41,8 +42,6 @@ interface OverlayState {
 type OverlayTimerRefs = {
   hideTimerRef: { current: number | null };
   unmountTimerRef: { current: number | null };
-  firstFrameRef: { current: number | null };
-  secondFrameRef: { current: number | null };
 };
 
 const DEFAULT_MESSAGE_CONTEXT: RouteLoadingMessageContext = "PAGE_LOAD";
@@ -77,14 +76,6 @@ function clearOverlayTimers(refs: OverlayTimerRefs) {
     window.clearTimeout(refs.unmountTimerRef.current);
     refs.unmountTimerRef.current = null;
   }
-  if (refs.firstFrameRef.current !== null) {
-    window.cancelAnimationFrame(refs.firstFrameRef.current);
-    refs.firstFrameRef.current = null;
-  }
-  if (refs.secondFrameRef.current !== null) {
-    window.cancelAnimationFrame(refs.secondFrameRef.current);
-    refs.secondFrameRef.current = null;
-  }
 }
 
 function RouteTransitionRouteTracker({
@@ -104,8 +95,6 @@ function RouteTransitionRouteTracker({
   const currentRouteKeyRef = useRef<string | null>(null);
   const previousRouteKeyRef = useRef<string | null>(null);
   const didHydrateRef = useRef(false);
-  const firstFrameRef = useRef<number | null>(null);
-  const secondFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     currentRouteKeyRef.current = routeKey;
@@ -125,22 +114,7 @@ function RouteTransitionRouteTracker({
       return;
     }
 
-    firstFrameRef.current = window.requestAnimationFrame(() => {
-      secondFrameRef.current = window.requestAnimationFrame(() => {
-        finishRouteTransitionEvent();
-      });
-    });
-
-    return () => {
-      if (firstFrameRef.current !== null) {
-        window.cancelAnimationFrame(firstFrameRef.current);
-        firstFrameRef.current = null;
-      }
-      if (secondFrameRef.current !== null) {
-        window.cancelAnimationFrame(secondFrameRef.current);
-        secondFrameRef.current = null;
-      }
-    };
+    return afterPaint(() => finishRouteTransitionEvent());
   }, [overlayState.mounted, routeKey]);
 
   useEffect(() => {
@@ -249,8 +223,6 @@ function RouteTransitionRouteTracker({
 export function RouteTransitionProvider({ children }: { children: ReactNode }) {
   const hideTimerRef = useRef<number | null>(null);
   const unmountTimerRef = useRef<number | null>(null);
-  const firstFrameRef = useRef<number | null>(null);
-  const secondFrameRef = useRef<number | null>(null);
   const [overlayState, setOverlayState] = useState<OverlayState>({
     mounted: false,
     active: false,
@@ -263,8 +235,6 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
     clearOverlayTimers({
       hideTimerRef,
       unmountTimerRef,
-      firstFrameRef,
-      secondFrameRef,
     });
     const startedAt = Date.now();
 
@@ -292,8 +262,6 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
     clearOverlayTimers({
       hideTimerRef,
       unmountTimerRef,
-      firstFrameRef,
-      secondFrameRef,
     });
 
     if (!overlayState.mounted) {
@@ -343,11 +311,9 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
       clearOverlayTimers({
         hideTimerRef,
         unmountTimerRef,
-        firstFrameRef,
-        secondFrameRef,
       });
     };
-  }, [firstFrameRef, hideTimerRef, secondFrameRef, unmountTimerRef]);
+  }, [hideTimerRef, unmountTimerRef]);
 
   const contextValue: RouteTransitionContextValue = {
     isRouteTransitionActive: overlayState.mounted,

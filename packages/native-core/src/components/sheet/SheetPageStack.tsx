@@ -1,9 +1,10 @@
 import React, {
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -27,6 +28,7 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { afterPaint } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { SheetScrollFocusProvider } from "../BottomSheet";
@@ -72,31 +74,46 @@ export function useSheetPageStack(rootPage: string, active: boolean) {
     [commitPop, position],
   );
 
+  const cancelSlideInRef = useRef<(() => void) | null>(null);
+
   const push = useCallback(
     (nextPage: string) => {
       if (nextPage === page) {
         return;
       }
-      const next = pushSheetPage(stack, nextPage);
-      setStack(next);
+      // Stop a running pop now; its commit would otherwise drop the page being pushed.
       cancelAnimation(position);
-      position.value = withTiming(next.length - 1, {
-        duration: PAGE_SLIDE_MS,
-        easing: PAGE_SLIDE_EASING,
-      });
+      setStack(pushSheetPage(stack, nextPage));
     },
     [page, position, stack],
   );
+
+  useEffect(() => {
+    if (position.value >= topIndex) {
+      return;
+    }
+    const cancel = afterPaint(() => {
+      position.value = withTiming(topIndex, {
+        duration: PAGE_SLIDE_MS,
+        easing: PAGE_SLIDE_EASING,
+      });
+    });
+    cancelSlideInRef.current = cancel;
+    return cancel;
+  }, [position, topIndex]);
 
   const pop = useCallback(() => {
     if (stack.length <= 1) {
       return;
     }
+    // A back press during the deferred slide-in must not be overridden by it.
+    cancelSlideInRef.current?.();
     cancelAnimation(position);
     animatePopTo(popSheetPage(stack, rootPage).length - 1);
   }, [animatePopTo, position, rootPage, stack]);
 
   const reset = useCallback(() => {
+    cancelSlideInRef.current?.();
     cancelAnimation(position);
     position.value = 0;
     setStack([rootPage]);
@@ -127,7 +144,7 @@ const SheetPageNavigatorContext = createContext<SheetPageNavigator | null>(null)
 
 /** In-sheet navigation for pages rendered by a SheetPageStack. */
 export function useSheetPageNavigator(): SheetPageNavigator {
-  const context = useContext(SheetPageNavigatorContext);
+  const context = use(SheetPageNavigatorContext);
   if (!context) {
     throw new Error("useSheetPageNavigator must be used inside a SheetPageStack");
   }
@@ -189,6 +206,7 @@ export function SheetPageStack({
         <View style={styles.pageStack}>
           {stack.slice(firstRenderedIndex).map((pageId, offset) => {
             const index = firstRenderedIndex + offset;
+            const page = renderPage(pageId);
             return (
               <SheetPageSlot
                 key={`${index}:${pageId}`}
@@ -200,7 +218,7 @@ export function SheetPageStack({
                 style={styles.pageSlot}
                 overlayStyle={styles.pageSlotOverlay}
               >
-                {renderPage(pageId)}
+                {page}
               </SheetPageSlot>
             );
           })}

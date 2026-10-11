@@ -9,6 +9,7 @@ import React, {
   useCallback,
 } from "react";
 import useEmblaCarousel from "embla-carousel-react";
+import { afterPaint } from "@workspace/calendar-core";
 import {
   MobileEventCalendar,
   MobileEventCalendarProps,
@@ -135,16 +136,11 @@ export function MobileCalendarWrapper({
     };
   }, [emblaApi]);
 
-  // After currentDate changes from a swipe, recenter carousel to slide 1 instantly.
-  // Use a double-RAF to ensure React has flushed DOM updates before recentering.
   useEffect(() => {
     if (!emblaApi || !isScrollingRef.current) return;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!emblaApi) return;
-        emblaApi.scrollTo(1, true);
-        isScrollingRef.current = false;
-      });
+    return afterPaint(() => {
+      emblaApi.scrollTo(1, true);
+      isScrollingRef.current = false;
     });
   }, [currentDate, emblaApi]);
 

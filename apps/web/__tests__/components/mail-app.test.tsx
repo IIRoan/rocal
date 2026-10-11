@@ -98,6 +98,9 @@ jest.mock("@workspace/ui/components/ui/button", () => ({
 jest.mock("@workspace/ui/hooks", () => ({
   useIsMobile: () => mockUseIsMobile(),
   usePrefersReducedMotion: () => true,
+  usePaintedValue: jest.requireActual<typeof import("@workspace/ui/hooks")>(
+    "@workspace/ui/hooks",
+  ).usePaintedValue,
 }));
 
 jest.mock("@workspace/ui/components/ui/app-skeletons", () => ({

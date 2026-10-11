@@ -3,11 +3,10 @@
 import { useReducer, useRef, useState } from "react";
 import { Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 
-import {
-  AccountAvatar,
-  AnimatedCollapse,
-  InlineMessage,
-} from "./account-settings-shared";
+import { AnimatedCollapse } from "@workspace/ui/components/ui/animated-collapse";
+
+import { AccountAvatar } from "./account-settings-shared";
+import { InlineMessage } from "./account-settings-inline-message";
 import { getAccountSettingsErrorMessage } from "./account-settings-utils";
 import {
   initialProfileUiState,
@@ -155,6 +154,7 @@ export function AccountProfileSection({
           type="file"
           accept="image/*"
           hidden
+          aria-label="Upload profile picture"
           onChange={(event) => {
             const file = event.target.files?.[0];
             event.target.value = "";

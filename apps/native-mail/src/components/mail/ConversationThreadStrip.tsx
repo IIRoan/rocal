@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -7,9 +7,11 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
+import { useFadeInAfterPaint } from "@workspace/native-core/hooks/use-fade-in-after-paint";
 import { Feather } from "@expo/vector-icons";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import type { TimeFormat } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
 import { useUserTimezone } from "@workspace/native-core/hooks/use-user-timezone";
@@ -17,8 +19,6 @@ import { formatAddress, formatMessageDate } from "../../lib/mail/mail-helpers";
 import { listPreviewSnippet } from "../../lib/mail/mail-preview";
 import type { JmapEmailMessage } from "../../lib/mail/types";
 import { BlobatarAvatar } from "@workspace/native-core/components/BlobatarAvatar";
-
-const listEntering = FadeIn.duration(180);
 
 interface ConversationThreadStripProps {
   messages: JmapEmailMessage[];
@@ -36,18 +36,14 @@ export function ConversationThreadStrip({
   onSelectMessage,
 }: ConversationThreadStripProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
   const timezone = useUserTimezone();
   const timeFormat = useUserTimeFormat();
-  const [expanded, setExpanded] = useState(false);
   const threadKey = messages[0]?.threadId ?? messages[0]?.id ?? "";
-
-  // Reset during render when the thread changes, so the strip starts collapsed.
-  const [renderedThreadKey, setRenderedThreadKey] = useState(threadKey);
-  if (renderedThreadKey !== threadKey) {
-    setRenderedThreadKey(threadKey);
-    setExpanded(false);
-  }
+  // Expansion belongs to one thread, so switching threads starts collapsed.
+  const [expandedThreadKey, setExpandedThreadKey] = useState<string | null>(null);
+  const expanded = expandedThreadKey === threadKey;
+  const listFade = useFadeInAfterPaint(180, expanded);
 
   if (messages.length <= 1) {
     return null;
@@ -63,7 +59,7 @@ export function ConversationThreadStrip({
   return (
     <View style={styles.container}>
       <Pressable
-        onPress={() => setExpanded((open) => !open)}
+        onPress={() => setExpandedThreadKey(expanded ? null : threadKey)}
         style={({ pressed }) => [
           styles.header,
           pressed && styles.headerPressed,
@@ -89,64 +85,22 @@ export function ConversationThreadStrip({
       </Pressable>
 
       {expanded ? (
-        <Animated.ScrollView
-          entering={listEntering}
-          style={styles.list}
-          nestedScrollEnabled
-        >
-          {messages.map((threadMessage) => {
-            const isActive = threadMessage.id === activeMessageId;
-            const sender = formatAddress(threadMessage.from);
-            const preview =
-              (previews?.[threadMessage.id] ??
-                listPreviewSnippet(threadMessage)).slice(0, 120) ||
-              "(No body)";
-            const isRead =
-              threadMessage.keywords?.["$seen"] === true ||
-              (accountEmail
-                ? threadMessage.from?.[0]?.email?.toLowerCase() ===
-                  accountEmail.toLowerCase()
-                : false);
-
-            return (
-              <Pressable
-                key={threadMessage.id}
-                onPress={() => onSelectMessage(threadMessage.id)}
-                style={[styles.row, isActive && styles.rowActive]}
-                accessibilityRole="button"
-                accessibilityLabel={`Open message from ${sender}`}
-              >
-                {!isRead ? (
-                  <View style={styles.unreadDot} />
-                ) : (
-                  <View style={styles.readSpacer} />
-                )}
-                <BlobatarAvatar
-                  email={threadMessage.from?.[0]?.email}
-                  name={threadMessage.from?.[0]?.name}
-                  size={20}
-                />
-                <View style={styles.rowContent}>
-                  <Text
-                    style={[styles.sender, isActive && styles.senderActive]}
-                    numberOfLines={1}
-                  >
-                    {sender}
-                  </Text>
-                  <Text style={styles.preview} numberOfLines={1}>
-                    {preview}
-                  </Text>
-                </View>
-                <Text style={styles.date}>
-                  {formatMessageDate(threadMessage.receivedAt, {
-                    timeFormat,
-                    timezone,
-                  })}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </Animated.ScrollView>
+        // Rows grow inside the message's own scroller; a nested scroller or list breaks zoom and windowing there.
+        <Animated.View style={[styles.list, listFade]}>
+          {messages.map((threadMessage) => (
+            <ThreadRow
+              key={threadMessage.id}
+              message={threadMessage}
+              active={threadMessage.id === activeMessageId}
+              accountEmail={accountEmail}
+              preview={previews?.[threadMessage.id]}
+              timeFormat={timeFormat}
+              timezone={timezone}
+              styles={styles}
+              onSelect={onSelectMessage}
+            />
+          ))}
+        </Animated.View>
       ) : null}
 
       {expanded && ownCount > 0 ? (
@@ -157,6 +111,71 @@ export function ConversationThreadStrip({
     </View>
   );
 }
+
+function ThreadRow({
+  message,
+  active,
+  accountEmail,
+  preview,
+  timeFormat,
+  timezone,
+  styles,
+  onSelect,
+}: {
+  message: JmapEmailMessage;
+  active: boolean;
+  accountEmail?: string | null;
+  preview?: string;
+  timeFormat: TimeFormat;
+  timezone?: string;
+  styles: ThreadStripStyles;
+  onSelect: (messageId: string) => void;
+}) {
+  const sender = formatAddress(message.from);
+  const snippet =
+    (preview ?? listPreviewSnippet(message)).slice(0, 120) || "(No body)";
+  const isRead =
+    message.keywords?.["$seen"] === true ||
+    (accountEmail
+      ? message.from?.[0]?.email?.toLowerCase() === accountEmail.toLowerCase()
+      : false);
+
+  return (
+    <Pressable
+      onPress={() => onSelect(message.id)}
+      style={[styles.row, active && styles.rowActive]}
+      accessibilityRole="button"
+      accessibilityLabel={`Open message from ${sender}`}
+    >
+      {!isRead ? (
+        <View style={styles.unreadDot} />
+      ) : (
+        <View style={styles.readSpacer} />
+      )}
+      <BlobatarAvatar
+        email={message.from?.[0]?.email}
+        name={message.from?.[0]?.name}
+        size={20}
+      />
+      <View style={styles.rowContent}>
+        <Text
+          style={[styles.sender, active && styles.senderActive]}
+          numberOfLines={1}
+        >
+          {sender}
+        </Text>
+        <Text style={styles.preview} numberOfLines={1}>
+          {snippet}
+        </Text>
+      </View>
+      <Text style={styles.date}>
+        {formatMessageDate(message.receivedAt, { timeFormat, timezone })}
+      </Text>
+    </Pressable>
+  );
+}
+
+type ThreadStripStyles = ReturnType<typeof createStyles>;
 
 function createStyles(theme: ThemeTokens) {
   const view = {
@@ -175,7 +194,6 @@ function createStyles(theme: ThemeTokens) {
       opacity: 0.85,
     },
     list: {
-      maxHeight: 160,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: theme.colors.border + "60",
     },

@@ -18,7 +18,10 @@
         "rules": ["react-doctor/no-giant-component"]
       },
       {
-        "files": ["**/components/mail/AttachmentPreviewModal.tsx"],
+        "files": [
+          "**/components/mail/AttachmentPreviewModal.tsx",
+          "**/components/BlobatarAvatar.tsx"
+        ],
         "rules": ["react-doctor/rn-prefer-expo-image"]
       },
       {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useReducer } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useReducer } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
@@ -29,8 +29,8 @@ import {
   reconcileAuthSession,
 } from "@/lib/auth-local-state";
 import { isPasskeyAuthCancelled } from "@/lib/native-passkey-bridge";
-import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
-import { usePrefersReducedMotion } from "@workspace/ui/hooks";
+import { AnimatedCollapse } from "@workspace/ui/components/ui/animated-collapse";
+import { MOTION_EASING, slideFadeIn } from "@workspace/ui/lib/motion";
 import {
   createInitialLoginFormFields,
   emailAvailabilityUiReducer,
@@ -186,89 +186,6 @@ function normalizeFormValue(value: string): string {
   return value.trim().toLowerCase();
 }
 
-// ─── AnimatedCollapse ─────────────────────────────────────────────────────────
-
-function AnimatedCollapse({
-  isOpen,
-  children,
-}: {
-  isOpen: boolean;
-  children: React.ReactNode;
-}) {
-  const [shouldRender, setShouldRender] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const tweenRef = useRef<gsap.core.Tween | null>(null);
-  const prefersReducedMotion = usePrefersReducedMotion();
-
-  useGSAP(
-    () => {
-      if (isOpen && !shouldRender) {
-        setShouldRender(true);
-        return;
-      }
-
-      const el = containerRef.current;
-      if (!el) return;
-      tweenRef.current?.kill();
-
-      if (prefersReducedMotion) {
-        if (isOpen) {
-          gsap.set(el, { autoAlpha: 1, height: "auto", overflow: "visible" });
-        } else {
-          gsap.set(el, { autoAlpha: 0, height: 0, overflow: "hidden" });
-          setShouldRender(false);
-        }
-        return;
-      }
-
-      if (isOpen) {
-        const targetHeight = el.scrollHeight;
-        tweenRef.current = gsap.fromTo(
-          el,
-          { height: 0, autoAlpha: 0, y: -6, overflow: "hidden" },
-          {
-            height: targetHeight,
-            autoAlpha: 1,
-            y: 0,
-            duration: 0.22,
-            ease: "power2.out",
-            overwrite: true,
-            onComplete: () =>
-              gsap.set(el, {
-                height: "auto",
-                overflow: "visible",
-                clearProps: "y",
-              }),
-          },
-        );
-      } else {
-        tweenRef.current = gsap.to(el, {
-          height: 0,
-          autoAlpha: 0,
-          y: -4,
-          overflow: "hidden",
-          duration: 0.16,
-          ease: "power2.in",
-          overwrite: true,
-          onComplete: () => setShouldRender(false),
-        });
-      }
-    },
-    { dependencies: [isOpen, shouldRender] },
-  );
-
-  if (!isOpen && !shouldRender) return null;
-
-  return (
-    <div
-      ref={containerRef}
-      style={{ height: 0, overflow: "hidden", opacity: 0 }}
-    >
-      {children}
-    </div>
-  );
-}
-
 // ─── Password Requirements ─────────────────────────────────────────────────────
 
 interface PasswordRequirement {
@@ -376,7 +293,6 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
   const titleRef = useRef<HTMLDivElement>(null);
   const hasAutoPromptedStepUpRef = useRef(false);
-  const prefersReducedMotion = usePrefersReducedMotion();
 
   const {
     data: session,
@@ -687,19 +603,18 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     };
   }, []);
 
-  // Animate the title in when auth mode switches
-  useGSAP(
-    () => {
-      const el = titleRef.current;
-      if (!el || prefersReducedMotion) return;
-      gsap.fromTo(
-        el,
-        { opacity: 0, y: 8 },
-        { opacity: 1, y: 0, duration: 0.22, ease: "power2.out" },
-      );
-    },
-    { dependencies: [authMode] },
-  );
+  // The first title is already painted (SSR); only a switch of auth mode animates it in.
+  const animatedAuthModeRef = useRef(authMode);
+  useLayoutEffect(() => {
+    const el = titleRef.current;
+    if (!el || animatedAuthModeRef.current === authMode) return;
+    animatedAuthModeRef.current = authMode;
+    const animation = slideFadeIn(el, { y: 8 }, {
+      duration: 220,
+      easing: MOTION_EASING.soft,
+    });
+    return () => animation?.cancel();
+  }, [authMode]);
 
   async function handlePasskeyStepUp() {
     dispatchChrome({ type: "start-passkey-auth" });

@@ -11,10 +11,8 @@ import {
 } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
 
-import {
-  SurfaceMotionProvider,
-  shouldPreserveTransformAnimation,
-} from "./surface-motion-provider";
+import { shouldPreserveTransformAnimation } from "../lib/surface-motion";
+import { SurfaceMotionProvider } from "./surface-motion-provider";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -82,7 +80,15 @@ describe("SurfaceMotionProvider", () => {
 
   beforeEach(() => {
     cancel = jest.fn();
-    animate = jest.fn(() => ({ cancel }) as Partial<Animation> as Animation);
+    animate = jest.fn(
+      () =>
+        ({
+          cancel,
+          pause: jest.fn(),
+          play: jest.fn(),
+          addEventListener: jest.fn(),
+        }) as Partial<Animation> as Animation,
+    );
     // jsdom has no WAAPI; the stub records what the provider asks the compositor to run.
     HTMLElement.prototype.animate =
       animate as unknown as HTMLElement["animate"];
@@ -167,5 +173,52 @@ describe("SurfaceMotionProvider", () => {
     await flushFrame();
 
     expect(animate).not.toHaveBeenCalled();
+  });
+
+  it("holds a CSS dialog entrance on its first frame until it has painted", async () => {
+    const node = document.createElement("div");
+    node.className = "dialog-center-animation";
+    node.setAttribute("data-slot", "dialog-content");
+    node.setAttribute("data-state", "open");
+    document.body.appendChild(node);
+    await act(async () => {});
+
+    expect(node.hasAttribute("data-motion-pending")).toBe(true);
+    await flushFrame();
+    expect(node.hasAttribute("data-motion-pending")).toBe(true);
+    await flushFrame();
+    expect(node.hasAttribute("data-motion-pending")).toBe(false);
+  });
+
+  it("releases a held entrance at once when the surface closes, so its exit plays", async () => {
+    const node = document.createElement("div");
+    node.setAttribute("data-surface-motion", "");
+    node.setAttribute("data-state", "open");
+    document.body.appendChild(node);
+    await act(async () => {});
+    expect(node.hasAttribute("data-motion-pending")).toBe(true);
+
+    node.setAttribute("data-state", "closed");
+    await act(async () => {});
+
+    expect(node.hasAttribute("data-motion-pending")).toBe(false);
+  });
+
+  it("settles surfaces already on screen when the provider starts instead of replaying them", async () => {
+    act(() => root.unmount());
+    const node = surface("animate-in fade-in-0", "open");
+    const dialog = document.createElement("div");
+    dialog.className = "dialog-spotlight-animation";
+    dialog.setAttribute("data-slot", "dialog-content");
+    dialog.setAttribute("data-state", "open");
+    document.body.append(node, dialog);
+    root = createRoot(container);
+    act(() => {
+      root.render(React.createElement(SurfaceMotionProvider));
+    });
+    await flushFrame();
+
+    expect(animate).not.toHaveBeenCalled();
+    expect(dialog.hasAttribute("data-motion-pending")).toBe(false);
   });
 });

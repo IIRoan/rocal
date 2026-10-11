@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Image,
-  InteractionManager,
   PixelRatio,
   StyleSheet,
   View,
@@ -9,7 +8,6 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Blobatar } from "@blobatar/react-native";
-import { AnimatedBlobatar } from "@blobatar/react-native/animated";
 import { isSolaceProfileAvatarUrl, resolveSolaceProfileAvatarUrl } from "@workspace/calendar-core";
 import { useSolaceProfileImage } from "../hooks/use-solace-profile-image";
 import { getAuthHeaders } from "../lib/api";
@@ -36,7 +34,6 @@ export function BlobatarAvatar({
   size,
   borderRadius,
   style,
-  animate = false,
   onImageLoadedChange,
 }: {
   email?: string | null;
@@ -45,12 +42,9 @@ export function BlobatarAvatar({
   size: number;
   borderRadius?: number;
   style?: StyleProp<ViewStyle>;
-  /** Idle motion. Off in lists/settings — the animated adapter writes shared values during render. */
-  animate?: boolean;
   onImageLoadedChange?: (loaded: boolean) => void;
 }) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const [idleReady, setIdleReady] = useState(false);
   const lookedUp = useSolaceProfileImage(email, { enabled: !src });
   const imageSrc = resolveSolaceProfileAvatarUrl(
     src || lookedUp,
@@ -60,27 +54,11 @@ export function BlobatarAvatar({
   const seed = blobatarName(email, name);
   const radius = borderRadius ?? size / 2;
 
-  useEffect(() => {
-    if (!animate) {
-      return;
-    }
-    const task = InteractionManager.runAfterInteractions(() => {
-      setIdleReady(true);
-    });
-    return () => task.cancel();
-  }, [animate]);
-
   const boxStyle = [
     { width: size, height: size, borderRadius: radius, overflow: "hidden" as const },
     style,
   ];
   const label = name || email || "Avatar";
-  const blobatarProps = {
-    name: seed,
-    size,
-    traits: EMAIL_BLOBATAR_TRAITS,
-    title: label,
-  };
   const imageSource = useMemo(() => {
     if (!imageSrc) {
       return null;
@@ -103,11 +81,12 @@ export function BlobatarAvatar({
   // The Blobatar stays underneath so loading or broken pictures never show an empty circle.
   return (
     <View style={boxStyle}>
-      {animate && idleReady && !showImage ? (
-        <AnimatedBlobatar {...blobatarProps} animate />
-      ) : (
-        <Blobatar {...blobatarProps} />
-      )}
+      <Blobatar
+        name={seed}
+        size={size}
+        traits={EMAIL_BLOBATAR_TRAITS}
+        title={label}
+      />
       {showImage ? (
         <Image
           source={imageSource}

@@ -1,8 +1,9 @@
 import React, {
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
+  useEffectEvent,
   useId,
   useMemo,
   useRef,
@@ -17,11 +18,13 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { afterPaint } from "@workspace/calendar-core";
 import * as Haptics from "expo-haptics";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "./ThemeProvider";
+import { LAYER_Z } from "../lib/app-layout";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -131,7 +134,7 @@ function ToastItem({
     scale.value = withTiming(0.92, { duration: EXIT_DURATION });
   }, [item.id, onRemove, opacity, scale, translateY]);
 
-  useEffect(() => {
+  const show = useEffectEvent(() => {
     translateY.value = withSpring(0, {
       damping: 24,
       stiffness: 320,
@@ -140,15 +143,25 @@ function ToastItem({
     opacity.value = withTiming(1, { duration: 200 });
     scale.value = withSpring(1, { damping: 20, stiffness: 300 });
 
+    // Haptics are best-effort; a device without them still shows the toast.
     if (item.variant === "error") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
     } else if (item.variant === "success") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
     }
 
-    const timer = setTimeout(() => triggerDismiss(), item.duration);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return setTimeout(() => triggerDismiss(), item.duration);
+  });
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cancelShow = afterPaint(() => {
+      timer = show();
+    });
+    return () => {
+      cancelShow();
+      clearTimeout(timer);
+    };
   }, []);
 
   const panGesture = Gesture.Pan()
@@ -350,7 +363,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 // ---------------------------------------------------------------------------
 
 export function useToast(): ToastContextValue {
-  const ctx = useContext(ToastContext);
+  const ctx = use(ToastContext);
   if (!ctx) {
     throw new Error("useToast must be used within a ToastProvider");
   }
@@ -360,7 +373,7 @@ export function useToast(): ToastContextValue {
 /** Lifts toasts by `offset` while the caller is mounted, to clear a docked bar; 0 means no lift. */
 export function useToastBottomOffset(offset: number): void {
   const key = useId();
-  const setBottomOffset = useContext(ToastBottomOffsetContext);
+  const setBottomOffset = use(ToastBottomOffsetContext);
 
   useEffect(() => {
     setBottomOffset?.(key, offset);
@@ -377,8 +390,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     right: 16,
-    zIndex: 9999,
-    elevation: 9999,
+    zIndex: LAYER_Z.toast,
     alignItems: "stretch",
     pointerEvents: "box-none",
     gap: 8,

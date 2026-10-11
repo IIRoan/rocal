@@ -68,3 +68,4 @@ export * from "./mail-list-settings";
 export * from "./mail-search-filter";
 export * from "./mail-jmap-email-set";
 export * from "./calendar-view-days";
+export * from "./after-paint";

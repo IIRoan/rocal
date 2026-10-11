@@ -4,7 +4,8 @@
     "target": "ES2022",
     "lib": [
       "DOM",
-      "ES2022"
+      "ES2022",
+      "ES2023.Array"
     ],
     "types": [
       "jest",
