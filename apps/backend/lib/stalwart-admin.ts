@@ -2,6 +2,7 @@ import { z } from "zod";
 import { env } from "./env";
 import { createLogger } from "@workspace/logger";
 import { logRef } from "./log-sanitization";
+import { withStalwartGate } from "./stalwart-gate";
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -157,7 +158,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
   }) {
     this.baseUrl = normalizeBaseUrl(baseUrl);
     this.adminToken = adminToken.trim();
-    this.fetcher = fetcher;
+    this.fetcher = withStalwartGate(fetcher);
   }
 
   private readonly adminToken: string;

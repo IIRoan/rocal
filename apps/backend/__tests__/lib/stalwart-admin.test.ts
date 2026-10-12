@@ -41,6 +41,24 @@ describe("StalwartAdminClient", () => {
     });
   });
 
+  it("sends the backend gate key on admin calls when configured", async () => {
+    process.env.STALWART_GATE_KEY = "g".repeat(64);
+    fetcher.mockResolvedValue(
+      jsonResponse({
+        methodResponses: [["x:Domain/query", { ids: [] }, "c1"]],
+      }),
+    );
+
+    try {
+      await client.resolveDomainByName("solace.onl").catch(() => undefined);
+      const headers = new Headers(fetcher.mock.calls[0]?.[1]?.headers);
+      expect(headers.get("X-Solace-Gate")).toBe("g".repeat(64));
+      expect(headers.get("Authorization")).toBe("Bearer token-1");
+    } finally {
+      delete process.env.STALWART_GATE_KEY;
+    }
+  });
+
   it("resolves a domain by name through the JMAP registry", async () => {
     fetcher.mockResolvedValueOnce(
       jsonResponse({
