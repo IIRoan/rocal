@@ -2,7 +2,7 @@
 
 import { useReducer } from "react";
 
-import { InlineMessage } from "./account-settings-shared";
+import { InlineMessage } from "./account-settings-inline-message";
 import { AccountSecurityActions } from "./account-settings-security-actions";
 import type { SecurityAccessKind } from "./account-settings-types";
 import { AccountSecurityForm } from "./account-settings-security-form";

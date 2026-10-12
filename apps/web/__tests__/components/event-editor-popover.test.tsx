@@ -15,14 +15,6 @@ jest.mock("@workspace/ui/hooks", () => ({
   usePrefersReducedMotion: () => true,
 }));
 
-jest.mock("@workspace/ui/lib/gsap", () => ({
-  gsap: {
-    fromTo: jest.fn(),
-    killTweensOf: jest.fn(),
-    set: jest.fn(),
-  },
-}));
-
 import { EventEditorPopover } from "../../components/event-editor/event-editor-popover";
 
 (

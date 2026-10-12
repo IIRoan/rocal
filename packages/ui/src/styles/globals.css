@@ -28,6 +28,11 @@
     animation: none !important;
   }
 
+  /* CSS entrances wait on their first keyframe until the content has painted (`holdUntilPainted` in lib/motion). */
+  [data-motion-pending] {
+    animation-play-state: paused !important;
+  }
+
   /* Radix surfaces use `forceMount`, so CSS (not the motion provider) owns hiding the closed state. */
   [data-slot$="-overlay"][data-state="closed"],
   [data-slot$="-content"][data-state="closed"] {
@@ -412,17 +417,6 @@
     }
   }
 
-  @keyframes dialogPop {
-    0% {
-      opacity: 0;
-      transform: translate(-50%, -50%) scale(0.75) translateY(8px);
-    }
-    100% {
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1) translateY(0);
-    }
-  }
-
   * {
     @apply border-border outline-ring/50;
   }
@@ -665,60 +659,8 @@
     }
   }
 
-  @keyframes slide-fade-in-left {
-    from {
-      opacity: 0;
-      transform: translateX(16px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-
-  @keyframes slide-fade-in-right {
-    from {
-      opacity: 0;
-      transform: translateX(-16px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-
-  @keyframes slide-fade-out-left {
-    from {
-      opacity: 1;
-      transform: translateX(0);
-    }
-    to {
-      opacity: 0;
-      transform: translateX(-16px);
-    }
-  }
-
-  @keyframes slide-fade-out-right {
-    from {
-      opacity: 1;
-      transform: translateX(0);
-    }
-    to {
-      opacity: 0;
-      transform: translateX(16px);
-    }
-  }
-
   .animate-slide-fade {
     will-change: opacity, transform;
-  }
-
-  .enter-left {
-    animation: slide-fade-in-left 180ms cubic-bezier(0.2, 0, 0, 1);
-  }
-
-  .enter-right {
-    animation: slide-fade-in-right 180ms cubic-bezier(0.2, 0, 0, 1);
   }
 
   @media (max-width: 768px) {
@@ -855,51 +797,6 @@
 
 .animate-slide-in-right {
   animation: slideInFromRight 200ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes modalEnter {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.92) translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1) translateY(0);
-  }
-}
-
-@keyframes modalExit {
-  0% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.95) translateY(-8px);
-  }
-}
-
-@keyframes overlayEnter {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes chipPop {
-  0% {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  60% {
-    transform: scale(1.05);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 .modal-premium {
@@ -1132,10 +1029,6 @@
 .command-item-premium[data-selected="true"]::before {
   opacity: 1;
   transform: scaleY(1);
-}
-
-.chip-pop {
-  animation: chipPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 .modal-scroll::-webkit-scrollbar {

@@ -19,6 +19,9 @@ import { TransitionContainer } from "@/components/command-palette/transition-con
 const animate = jest.fn(
   (_frames: Keyframe[], _options: KeyframeAnimationOptions) => ({
     cancel: jest.fn(),
+    pause: jest.fn(),
+    play: jest.fn(),
+    addEventListener: jest.fn(),
   }),
 );
 const motionPreference = Object.assign(new EventTarget(), { matches: false });

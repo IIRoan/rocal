@@ -1,17 +1,24 @@
 /** Gate shown while the encrypted workspace is prepared after sign-in; owns its mount lifecycle so it can fade into the app. */
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Animated,
+import { useEffect, useMemo, useState } from "react";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import Animated, {
   Easing,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+  cancelAnimation,
+  interpolate,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
 import { useReduceMotion } from "../lib/use-reduce-motion";
+import { afterPaint } from "@workspace/calendar-core";
+import { usePaintedValue } from "../hooks/use-painted-value";
 
 const logoSource = require("../assets/logo.png");
 
@@ -23,13 +30,14 @@ interface WorkspaceLoadingScreenProps {
   message: string;
 }
 
+const WEEKDAY_FORMAT = new Intl.DateTimeFormat(undefined, { weekday: "long" });
+const MONTH_FORMAT = new Intl.DateTimeFormat(undefined, { month: "long" });
+
 function getDateParts(now: Date) {
   return {
-    weekday: new Intl.DateTimeFormat(undefined, { weekday: "long" })
-      .format(now)
-      .toUpperCase(),
+    weekday: WEEKDAY_FORMAT.format(now).toUpperCase(),
     day: now.getDate().toString().padStart(2, "0"),
-    month: new Intl.DateTimeFormat(undefined, { month: "long" }).format(now),
+    month: MONTH_FORMAT.format(now),
     year: now.getFullYear().toString(),
   };
 }
@@ -44,11 +52,13 @@ export function WorkspaceLoadingScreen({
   const styles = useMemo(() => createStyles(theme), [theme]);
   const reduceMotion = useReduceMotion();
 
-  const [mounted, setMounted] = useState(active);
-  const screenOpacity = useRef(new Animated.Value(active ? 1 : 0)).current;
-  const logoPulse = useRef(new Animated.Value(0)).current;
-  const sweep = useRef(new Animated.Value(0)).current;
-  const messageOpacity = useRef(new Animated.Value(1)).current;
+  const [mounted, setMounted] = useState(false);
+  if (active && !mounted) {
+    setMounted(true);
+  }
+  const logoPulse = useSharedValue(0);
+  const sweep = useSharedValue(0);
+  const messageOpacity = useSharedValue(1);
 
   const [now, setNow] = useState(() => new Date());
   const { weekday, day, month, year } = useMemo(() => getDateParts(now), [now]);
@@ -59,92 +69,74 @@ export function WorkspaceLoadingScreen({
     return () => clearInterval(id);
   }, []);
 
-  // Children render underneath once `active` clears, so fading this layer out reveals the app.
-  useEffect(() => {
-    if (active) {
-      setMounted(true);
-      screenOpacity.setValue(1);
-      return;
-    }
-    Animated.timing(screenOpacity, {
-      toValue: 0,
-      duration: FADE_OUT_MS,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished) setMounted(false);
-    });
-  }, [active, screenOpacity]);
+  // Covering is immediate; once `active` clears, the layer fades only after the app underneath has drawn.
+  const revealing = usePaintedValue(!active) && !active;
+  const screenOpacity = useDerivedValue(
+    () =>
+      revealing
+        ? withTiming(
+            0,
+            { duration: FADE_OUT_MS, easing: Easing.out(Easing.cubic) },
+            (finished) => {
+              if (finished) scheduleOnRN(setMounted, false);
+            },
+          )
+        : 1,
+    [revealing],
+  );
 
   useEffect(() => {
     if (!mounted || reduceMotion) {
-      logoPulse.setValue(0);
+      logoPulse.value = 0;
       return;
     }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(logoPulse, {
-          toValue: 1,
-          duration: 1200,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoPulse, {
-          toValue: 0,
-          duration: 1200,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
+    const pulse = { duration: 1200, easing: Easing.inOut(Easing.sin) };
+    logoPulse.value = withRepeat(
+      withSequence(withTiming(1, pulse), withTiming(0, pulse)),
+      -1,
     );
-    loop.start();
-    return () => loop.stop();
+    return () => cancelAnimation(logoPulse);
   }, [logoPulse, mounted, reduceMotion]);
 
   useEffect(() => {
-    sweep.setValue(reduceMotion ? 0.5 : 0);
+    sweep.value = reduceMotion ? 0.5 : 0;
     if (!mounted || reduceMotion) return;
-    const loop = Animated.loop(
-      Animated.timing(sweep, {
-        toValue: 1,
-        duration: 2200,
-        easing: Easing.inOut(Easing.sin),
-        useNativeDriver: true,
-      }),
+    sweep.value = withRepeat(
+      withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      false,
     );
-    loop.start();
-    return () => loop.stop();
+    return () => cancelAnimation(sweep);
   }, [sweep, mounted, reduceMotion]);
 
   useEffect(() => {
     if (reduceMotion) {
-      messageOpacity.setValue(1);
+      messageOpacity.value = 1;
       return;
     }
-    messageOpacity.setValue(0.35);
-    Animated.timing(messageOpacity, {
-      toValue: 1,
-      duration: 320,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    }).start();
+    messageOpacity.value = 0.35;
+    return afterPaint(() => {
+      messageOpacity.value = withTiming(1, {
+        duration: 320,
+        easing: Easing.out(Easing.quad),
+      });
+    });
   }, [message, messageOpacity, reduceMotion]);
 
-  if (!mounted) return null;
-
   const sweepTravel = width * 0.62;
-  const logoOpacity = logoPulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0.55],
-  });
-  const logoScale = logoPulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.06],
-  });
-  const sweepTranslate = sweep.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-sweepTravel, sweepTravel],
-  });
+  const screenStyle = useAnimatedStyle(() => ({ opacity: screenOpacity.value }));
+  const logoStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(logoPulse.value, [0, 1], [1, 0.55]),
+    transform: [{ scale: interpolate(logoPulse.value, [0, 1], [1, 1.06]) }],
+  }));
+  const sweepStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: interpolate(sweep.value, [0, 1], [-sweepTravel, sweepTravel]) },
+    ],
+  }));
+  const messageStyle = useAnimatedStyle(() => ({ opacity: messageOpacity.value }));
+
+  if (!mounted) return null;
 
   const giantSize = Math.min(Math.max(width * 0.58, 160), 280);
   const monthSize = Math.min(Math.max(width * 0.1, 28), 46);
@@ -154,7 +146,7 @@ export function WorkspaceLoadingScreen({
       style={[
         StyleSheet.absoluteFill,
         styles.screen,
-        { opacity: screenOpacity },
+        screenStyle,
       ]}
     >
       <View
@@ -170,10 +162,7 @@ export function WorkspaceLoadingScreen({
           <View style={styles.brand}>
             <Animated.Image
               source={logoSource}
-              style={[
-                styles.logo,
-                { opacity: logoOpacity, transform: [{ scale: logoScale }] },
-              ]}
+              style={[styles.logo, logoStyle]}
             />
             <Text style={styles.wordmark}>SOLACE</Text>
           </View>
@@ -200,7 +189,7 @@ export function WorkspaceLoadingScreen({
 
         <View style={styles.footer}>
           <Animated.Text
-            style={[styles.status, { opacity: messageOpacity }]}
+            style={[styles.status, messageStyle]}
             numberOfLines={1}
           >
             {message.replace(/…$/, "")}
@@ -209,10 +198,8 @@ export function WorkspaceLoadingScreen({
             <Animated.View
               style={[
                 styles.sweep,
-                {
-                  backgroundColor: theme.colors.primaryBase,
-                  transform: [{ translateX: sweepTranslate }],
-                },
+                { backgroundColor: theme.colors.primaryBase },
+                sweepStyle,
               ]}
             />
           </View>

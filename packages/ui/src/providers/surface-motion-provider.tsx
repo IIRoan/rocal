@@ -2,11 +2,17 @@
 
 import * as React from "react";
 import {
+  holdUntilPainted,
   MOTION_EASING,
+  MOTION_PENDING_ATTRIBUTE,
   slideFadeIn,
   slideFadeOut,
   type MotionOffset,
 } from "../lib/motion";
+import {
+  getClassNames,
+  shouldPreserveTransformAnimation,
+} from "../lib/surface-motion";
 import { usePrefersReducedMotion } from "../hooks/use-prefers-reduced-motion";
 
 const TARGET_SELECTOR = [
@@ -19,27 +25,21 @@ const TARGET_SELECTOR = [
   "[class*='slide-out-to-']",
 ].join(",");
 
+/** Surfaces whose entrance is a CSS keyframe (globals.css, vaul); the provider only holds it on its first frame until painted. */
+const CSS_ENTRANCE_SELECTOR = [
+  "[data-slot='dialog-content'].dialog-center-animation",
+  "[data-slot='dialog-content'].dialog-spotlight-animation",
+  "[data-surface-motion]",
+  "[data-vaul-drawer]",
+].join(",");
+
+const OBSERVED_SELECTOR = `${TARGET_SELECTOR},${CSS_ENTRANCE_SELECTOR}`;
+
 const SKIP_SELECTOR = [
   "[data-motion-skip='true']",
   "[data-slot='skeleton']",
 ].join(",");
 
-const LAYOUT_TRANSFORM_CLASS_PATTERN = /(?:^|\s)-?translate-(?:x|y)-/;
-
-function getClassNames(node: HTMLElement) {
-  return node.getAttribute("class") ?? "";
-}
-
-export function shouldPreserveTransformAnimation(
-  node: HTMLElement,
-  classNames = getClassNames(node),
-) {
-  if (node.getAttribute("data-slot") === "dialog-content") {
-    return true;
-  }
-
-  return LAYOUT_TRANSFORM_CLASS_PATTERN.test(classNames);
-}
 
 function parseDurationMs(classNames: string, fallback: number) {
   const arbitraryMatch = classNames.match(/duration-\[(\d+(?:\.\d+)?)ms\]/);
@@ -230,7 +230,7 @@ function toSurfacePhase(state: string | null): "open" | "closed" | null {
 }
 
 function scanTargets(root: ParentNode) {
-  return Array.from(root.querySelectorAll<HTMLElement>(TARGET_SELECTOR));
+  return Array.from(root.querySelectorAll<HTMLElement>(OBSERVED_SELECTOR));
 }
 
 function shouldSkipNode(node: HTMLElement) {
@@ -358,50 +358,55 @@ export function SurfaceMotionProvider() {
       );
     };
 
+    const cssPhase = new WeakMap<HTMLElement, "open" | "closed">();
+    const heldEntrances = new WeakMap<HTMLElement, () => void>();
+
+    const syncCssEntrance = (node: HTMLElement) => {
+      const phase = toSurfacePhase(node.getAttribute("data-state"));
+      if (!phase || cssPhase.get(node) === phase) return;
+      cssPhase.set(node, phase);
+      // A close must play its exit at once, so it drops any hold still waiting for paint.
+      heldEntrances.get(node)?.();
+      heldEntrances.delete(node);
+      if (phase === "open" && !prefersReducedMotion) {
+        heldEntrances.set(node, holdUntilPainted(node));
+      }
+    };
+
     const processNode = (node: HTMLElement) => {
       if (shouldSkipNode(node)) {
         play(node, null);
         return;
       }
 
+      if (node.matches(CSS_ENTRANCE_SELECTOR)) syncCssEntrance(node);
+      if (!node.matches(TARGET_SELECTOR)) return;
       const classNames = getClassNames(node);
       syncSurfaceState(node, classNames);
       animateReveal(node, classNames);
     };
 
+    // Content already on screen when the provider starts has painted; replaying its entrance would flash it.
     for (const node of scanTargets(document)) {
-      processNode(node);
+      const phase = toSurfacePhase(node.getAttribute("data-state"));
+      if (phase) {
+        previousPhase.set(node, phase);
+        cssPhase.set(node, phase);
+      } else {
+        revealed.add(node);
+      }
     }
 
-    // Batch mutations into one rAF flush so a busy calendar commit doesn't process every attribute change synchronously.
-    const pendingNodes = new Set<HTMLElement>();
-    let flushHandle: number | null = null;
-
-    const flush = () => {
-      flushHandle = null;
-      const updates = Array.from(pendingNodes);
-      pendingNodes.clear();
-
-      for (const node of updates) {
-        if (node.isConnected) processNode(node);
-      }
-    };
-
-    const queueNode = (node: HTMLElement) => {
-      pendingNodes.add(node);
-      if (flushHandle === null) {
-        flushHandle = requestAnimationFrame(flush);
-      }
-    };
-
+    // Mutation callbacks run before the next paint, so every entrance is prepared before its first frame.
     const observer = new MutationObserver((records) => {
+      const updates = new Set<HTMLElement>();
       for (const record of records) {
         if (record.type === "attributes") {
           if (
             record.target instanceof HTMLElement &&
-            record.target.matches(TARGET_SELECTOR)
+            record.target.matches(OBSERVED_SELECTOR)
           ) {
-            queueNode(record.target);
+            updates.add(record.target);
           }
           continue;
         }
@@ -411,14 +416,18 @@ export function SurfaceMotionProvider() {
             continue;
           }
 
-          if (added.matches(TARGET_SELECTOR)) {
-            queueNode(added);
+          if (added.matches(OBSERVED_SELECTOR)) {
+            updates.add(added);
           }
 
           for (const descendant of scanTargets(added)) {
-            queueNode(descendant);
+            updates.add(descendant);
           }
         }
+      }
+
+      for (const node of updates) {
+        if (node.isConnected) processNode(node);
       }
     });
 
@@ -431,10 +440,11 @@ export function SurfaceMotionProvider() {
 
     return () => {
       observer.disconnect();
-      if (flushHandle !== null) {
-        cancelAnimationFrame(flushHandle);
+      for (const node of document.querySelectorAll<HTMLElement>(
+        `[${MOTION_PENDING_ATTRIBUTE}]`,
+      )) {
+        node.removeAttribute(MOTION_PENDING_ATTRIBUTE);
       }
-      pendingNodes.clear();
     };
   }, [prefersReducedMotion]);
 

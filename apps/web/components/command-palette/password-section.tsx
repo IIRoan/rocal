@@ -3,7 +3,7 @@
 import { useId, useReducer } from "react";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { Lock, RotateCcw } from "lucide-react";
-import { InlineMessage } from "./account-settings-shared";
+import { InlineMessage } from "./account-settings-inline-message";
 import {
   initialSecurityUiState,
   securityUiReducer,

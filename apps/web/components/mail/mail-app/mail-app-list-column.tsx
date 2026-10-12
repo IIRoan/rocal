@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { cn } from "@workspace/ui/lib/utils";
+import { playAfterPaint } from "@workspace/ui/lib/motion";
 import { toast } from "sonner";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
@@ -92,6 +93,7 @@ export function MailAppListColumn({
       MAIL_LIST_SWAP_KEYFRAMES,
       desktopDetailPaneActive ? MAIL_LIST_OPEN_FADE_OPTIONS : MAIL_READER_ANIMATION_OPTIONS,
     );
+    if (!desktopDetailPaneActive) playAfterPaint(fade);
     return () => fade.cancel();
   }, [desktopDetailPaneActive, prefersReducedMotion]);
 

@@ -1,3 +1,5 @@
+import { playAfterPaint } from "@workspace/ui/lib/motion";
+
 export const MAIL_READER_TRANSITION_MS = 360;
 
 /** One curve shared by the reader slide, the list width and the WAAPI list fade so all land on the same frame. */
@@ -54,9 +56,13 @@ export function fadeInMailReaderContent(
   ) {
     return null;
   }
-  // repo-rules-allow motion-shared-helpers: fade helper with pane-movement and reduced-motion guards (READER-TRANSITION.md); slideFadeIn has neither and always sets visibility.
-  return element.animate(
-    MAIL_READER_CONTENT_FADE_KEYFRAMES,
-    MAIL_READER_CONTENT_FADE_OPTIONS,
+  // The pane can start sliding while the fade waits for paint, so the movement guard runs again then.
+  return playAfterPaint(
+    // repo-rules-allow motion-shared-helpers: fade helper with pane-movement and reduced-motion guards (READER-TRANSITION.md); slideFadeIn has neither and always sets visibility.
+    element.animate(
+      MAIL_READER_CONTENT_FADE_KEYFRAMES,
+      MAIL_READER_CONTENT_FADE_OPTIONS,
+    ),
+    () => !isMailReaderPaneMoving(element),
   );
 }

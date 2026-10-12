@@ -12,6 +12,9 @@ export const LAYOUT_ICON = {
   action: 18,
 } as const;
 
+/** Sheets sit above list chrome (zIndex 20), toasts above sheets. */
+export const LAYER_Z = { sheet: 40, toast: 50 } as const;
+
 export const LAYOUT_METRICS = {
   /** Width of leading/trailing header slots (back, menu, search). */
   sideSlot: 38,

@@ -61,15 +61,6 @@ jest.mock("@workspace/logger", () => ({
   }),
 }));
 
-jest.mock("@workspace/ui/lib/gsap", () => ({
-  gsap: {
-    fromTo: jest.fn(),
-    set: jest.fn(),
-    to: jest.fn(),
-  },
-  useGSAP: jest.fn(),
-}));
-
 jest.mock("@workspace/ui/hooks", () => ({
   usePrefersReducedMotion: () => true,
 }));

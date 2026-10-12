@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef, useSyncExternalStore } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import {
@@ -10,7 +10,7 @@ import {
 } from "@/lib/auth-navigation";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
-import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
+import { MOTION_EASING, revealSequence } from "@workspace/ui/lib/motion";
 import { CALENDAR_HOME_PATH, MAIL_HOME_PATH } from "@/lib/app-routes";
 import { CalendarDays, Mail, ChevronRight, LogOut } from "lucide-react";
 import { signOutAndClearLocalState } from "@/lib/auth-local-state";
@@ -67,41 +67,34 @@ export function HomeAppClient() {
     }
   }, [isPending, hasSession]);
 
-  useGSAP(
-    () => {
-      if (prefersReducedMotion || isPending || !session?.user) return;
-
-      const ctx = gsap.context(() => {
-        gsap.from("[data-home-header]", {
-          opacity: 0,
-          y: -8,
-          duration: 0.4,
-          ease: "power2.out",
-        });
-        gsap.from("[data-home-greeting]", {
-          opacity: 0,
-          y: 10,
-          duration: 0.45,
-          delay: 0.08,
-          ease: "power2.out",
-        });
-        gsap.from("[data-home-nav-item]", {
-          opacity: 0,
-          y: 8,
-          duration: 0.35,
-          stagger: 0.07,
-          delay: 0.18,
-          ease: "power2.out",
-        });
-      }, containerRef);
-
-      return () => ctx.revert();
-    },
-    {
-      scope: containerRef,
-      dependencies: [isPending, session?.user, prefersReducedMotion],
-    },
-  );
+  // Keyed on sign-in state, not the user object, so session refetches on focus don't replay the entrance.
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container || prefersReducedMotion || isPending || !hasSession) return;
+    return revealSequence(container, [
+      {
+        selector: "[data-home-header]",
+        offset: { y: -8 },
+        duration: 400,
+        easing: MOTION_EASING.soft,
+      },
+      {
+        selector: "[data-home-greeting]",
+        offset: { y: 10 },
+        duration: 450,
+        delay: 80,
+        easing: MOTION_EASING.soft,
+      },
+      {
+        selector: "[data-home-nav-item]",
+        offset: { y: 8 },
+        duration: 350,
+        delay: 180,
+        stagger: 70,
+        easing: MOTION_EASING.soft,
+      },
+    ]);
+  }, [isPending, hasSession, prefersReducedMotion]);
 
   if (isPending || !session?.user) {
     return null;

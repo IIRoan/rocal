@@ -3,6 +3,7 @@
 import {
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -11,7 +12,7 @@ import { useSession } from "@/lib/auth-client";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { completeAuthNavigation } from "@/lib/auth-navigation";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
-import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
+import { revealSequence } from "@workspace/ui/lib/motion";
 import { HOME_PATH } from "@/lib/app-routes";
 import {
   FORCE_LOADING_DESIGN_PREVIEW,
@@ -69,55 +70,28 @@ export function HomePageClient() {
     }
   }, [isPending, hasSession]);
 
-  useGSAP(
-    () => {
-      if (prefersReducedMotion || shouldShowLoadingOverlay) {
-        return;
-      }
-
-      const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
-
-      timeline
-        .fromTo(
-          "[data-hero-scrim]",
-          { autoAlpha: 0 },
-          { autoAlpha: 1, duration: 0.7 },
-          0,
-        )
-        .fromTo(
-          ["[data-hero-heading]", "[data-hero-copy]", "[data-hero-cta]"],
-          { autoAlpha: 0, y: 22 },
-          {
-            autoAlpha: 1,
-            y: 0,
-            duration: 0.62,
-            stagger: 0.09,
-          },
-          0.12,
-        )
-        .fromTo(
-          "[data-hero-pillar]",
-          { autoAlpha: 0, y: 16 },
-          {
-            autoAlpha: 1,
-            y: 0,
-            duration: 0.5,
-            stagger: 0.08,
-          },
-          0.42,
-        )
-        .fromTo(
-          "[data-hero-footer]",
-          { autoAlpha: 0 },
-          { autoAlpha: 1, duration: 0.4 },
-          0.58,
-        );
-    },
-    {
-      scope: rootRef,
-      dependencies: [prefersReducedMotion, shouldShowLoadingOverlay],
-    },
-  );
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root || prefersReducedMotion || shouldShowLoadingOverlay) return;
+    return revealSequence(root, [
+      { selector: "[data-hero-scrim]", offset: null, duration: 700 },
+      {
+        selector: "[data-hero-heading], [data-hero-copy], [data-hero-cta]",
+        offset: { y: 22 },
+        duration: 620,
+        delay: 120,
+        stagger: 90,
+      },
+      {
+        selector: "[data-hero-pillar]",
+        offset: { y: 16 },
+        duration: 500,
+        delay: 420,
+        stagger: 80,
+      },
+      { selector: "[data-hero-footer]", offset: null, duration: 400, delay: 580 },
+    ]);
+  }, [prefersReducedMotion, shouldShowLoadingOverlay]);
 
   if (shouldShowLoadingOverlay) {
     return <PageLoadingOverlay isLoading={true} messageContext="AUTH_FLOW" />;

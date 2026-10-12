@@ -24,6 +24,17 @@ const ICON_TAG = /(Icon|^Feather|^Ionicons|^MaterialIcons|^Lucide\w*)$/;
 
 const textOf = (node: ts.JsxAttribute | undefined) => node?.initializer?.getText() ?? "";
 
+const REANIMATED_ENTERING_PRESET = /^(FadeIn|SlideIn|ZoomIn|BounceIn|FlipIn|LightSpeedIn|PinwheelIn|RollIn|RotateIn|StretchIn)\w*$/;
+
+function isFrameRequest(node: ts.CallExpression) {
+  return /^(window\.)?requestAnimationFrame$/.test(node.expression.getText());
+}
+
+function containsFrameRequest(node: ts.Node): boolean {
+  if (ts.isCallExpression(node) && isFrameRequest(node)) return true;
+  return ts.forEachChild(node, (child) => containsFrameRequest(child) || undefined) ?? false;
+}
+
 function onlyIconChildren(children: ts.NodeArray<ts.JsxChild>) {
   const meaningful = children.filter((child) => !(ts.isJsxText(child) && child.text.trim() === ""));
   return (
@@ -239,6 +250,47 @@ export const uiRules: Rule[] = [
       path: "apps/web/components/drawer.tsx",
       bad: ['import { gsap } from "gsap";', 'import { motion } from "motion/react";', "element.animate([{ opacity: 0 }, { opacity: 1 }], 200);", "LayoutAnimation.easeInEaseOut();", "Animated.timing(value, { toValue: 1 }).start();"],
       good: ['import { gsap } from "@workspace/ui/lib/gsap";', "slideFadeIn(element, { y: 8 }, { duration: 200 });", "Animated.timing(value, { toValue: 1, useNativeDriver: true }).start();"],
+    },
+  },
+  {
+    id: "motion-after-paint",
+    summary: "Entrances start once their content has painted: two-frame waits use afterPaint (@workspace/calendar-core), native mount fades use useFadeInAfterPaint instead of Reanimated `entering` presets, and GSAP (which starts in the render frame) is reserved for the logo spinner loop.",
+    files: ALL_UI_CODE,
+    check: (file) =>
+      find(file, (node) => {
+        if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+          const source = node.moduleSpecifier.text;
+          if (/(^|\/)lib\/gsap$/.test(source) && !/(^|\/)logo-spinner\.tsx$/.test(file.path)) {
+            return "GSAP tweens start in the render frame; use slideFadeIn/revealSequence from @workspace/ui/lib/motion";
+          }
+          const bindings = node.importClause?.namedBindings;
+          const preset = source === "react-native-reanimated" && bindings && ts.isNamedImports(bindings)
+            ? bindings.elements.find((element) => REANIMATED_ENTERING_PRESET.test(element.name.text))
+            : undefined;
+          if (preset) return `${preset.name.text} plays in the render frame; use useFadeInAfterPaint from native-core`;
+        }
+        if (ts.isJsxAttribute(node) && node.name.getText() === "entering") {
+          return "`entering` animations start in the render frame; use useFadeInAfterPaint from native-core";
+        }
+        if (ts.isCallExpression(node) && isFrameRequest(node) && node.arguments[0] && containsFrameRequest(node.arguments[0])) {
+          return "hand-rolled two-frame wait; use afterPaint from @workspace/calendar-core";
+        }
+        return null;
+      }),
+    examples: {
+      path: "apps/web/components/panel.tsx",
+      bad: [
+        "requestAnimationFrame(() => requestAnimationFrame(() => setOpen(true)));",
+        "const view = <Animated.View entering={fade} />;",
+        'import { FadeIn } from "react-native-reanimated";',
+        'import { gsap } from "@workspace/ui/lib/gsap";',
+      ],
+      good: [
+        "afterPaint(() => setOpen(true));",
+        "requestAnimationFrame(() => input.focus());",
+        'import { useAnimatedStyle } from "react-native-reanimated";',
+        "const fadeIn = useFadeInAfterPaint(200);",
+      ],
     },
   },
   {

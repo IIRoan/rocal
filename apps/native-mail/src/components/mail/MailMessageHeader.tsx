@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -7,7 +7,8 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
+import { useFadeInAfterPaint } from "@workspace/native-core/hooks/use-fade-in-after-paint";
 import { Feather, FontAwesome } from "@expo/vector-icons";
 import {
   enrichSelfMailRecipient,
@@ -61,8 +62,6 @@ export type MailMessageHeaderProps = {
 };
 
 const AVATAR_SIZE = MAIL_LAYOUT.avatarSize;
-/** No exit fade: siblings reflow at once, so a fading ghost would overlap the body below. */
-const detailsEntering = FadeIn.duration(200);
 
 export function MailMessageHeader({
   message,
@@ -85,7 +84,7 @@ export function MailMessageHeader({
   const { theme } = useTheme();
   const skin = useMailSkin();
   const palette = useMailPalette();
-  const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
+  const styles = createStyles(theme, skin);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const {
@@ -309,8 +308,10 @@ function MessageDetails({
   senderEmail?: string;
   fullDate: string;
 }) {
+  // No exit fade: siblings reflow at once, so a fading ghost would overlap the body below.
+  const fadeIn = useFadeInAfterPaint(200);
   return (
-    <Animated.View entering={detailsEntering} style={styles.detailsBlock}>
+    <Animated.View style={[styles.detailsBlock, fadeIn]}>
       {senderEmail ? (
         <DetailsRow styles={styles} label="From">
           <Text style={styles.detailsValue} selectable>
