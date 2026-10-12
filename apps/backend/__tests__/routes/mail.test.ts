@@ -178,6 +178,42 @@ describe("mailRoutes", () => {
     expect(mockGetSession).not.toHaveBeenCalled();
   });
 
+  it("sends only the server gate key upstream and never returns it", async () => {
+    process.env.STALWART_GATE_KEY = "g".repeat(64);
+    const proxyFetch = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(JSON.stringify({ accounts: {} }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", "X-Solace-Gate": "echo" },
+        }),
+    );
+
+    try {
+      const response = await createApp({
+        jmapFetch: proxyFetch,
+        jmapUpstreamBaseUrl: "https://gate.test",
+      }).handle(
+        new Request("http://localhost/mail/jmap/jmap/session", {
+          headers: {
+            Authorization: "Bearer mail-access-token",
+            "X-Solace-Gate": "forged",
+          },
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.has("X-Solace-Gate")).toBe(false);
+      const upstreamHeaders = new Headers(
+        (proxyFetch.mock.calls[0]?.[1] as RequestInit)?.headers,
+      );
+      expect(upstreamHeaders.get("X-Solace-Gate")).toBe("g".repeat(64));
+    } finally {
+      delete process.env.STALWART_GATE_KEY;
+    }
+  });
+
   it("follows same-origin JMAP discovery redirects server-side", async () => {
     const proxyFetch = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>

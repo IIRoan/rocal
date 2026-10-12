@@ -160,6 +160,32 @@ describe("sendTransactionalEmailViaStalwart", () => {
     expect(sendBody).not.toContain("secret");
   });
 
+  it("sends the backend gate key on JMAP calls when configured", async () => {
+    process.env.STALWART_GATE_KEY = "g".repeat(64);
+    const mock = jest.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response("down", { status: 503 }),
+    );
+
+    try {
+      await sendTransactionalEmailViaStalwart(
+        {
+          baseUrl: "https://gate.test",
+          username: "noreply@solace.onl",
+          password: "secret",
+          from: "noreply@solace.onl",
+          fromName: "Solace",
+        },
+        { to: "user@example.com", subject: "Hello", text: "Hi", html: "<p>Hi</p>" },
+        // Bun's fetch type carries statics (preconnect) a jest mock lacks.
+        mock as unknown as typeof fetch,
+      ).catch(() => undefined);
+      const headers = new Headers(mock.mock.calls[0]?.[1]?.headers);
+      expect(headers.get("X-Solace-Gate")).toBe("g".repeat(64));
+    } finally {
+      delete process.env.STALWART_GATE_KEY;
+    }
+  });
+
   it("fails closed when the identity is missing", async () => {
     const fetcher = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);

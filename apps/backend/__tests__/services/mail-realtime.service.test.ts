@@ -705,6 +705,42 @@ describe("mail realtime service", () => {
     expect(signals[0]?.aborted).toBe(true);
   });
 
+  it("sends the backend gate key on the EventSource when configured", async () => {
+    process.env.STALWART_GATE_KEY = "g".repeat(64);
+    const fetcher = jest.fn(
+      async (_url: string, init?: RequestInit): Promise<Response> => {
+        await new Promise<void>((resolve) => {
+          init?.signal?.addEventListener("abort", () => resolve(), { once: true });
+        });
+        throw new Error("aborted");
+      },
+    );
+    const service = createService({
+      eventSourceUrl: EVENT_SOURCE_URL,
+      tokens: createTokens(),
+      fetcher: fetcher as unknown as typeof fetch,
+      reconnectDelayMs: 60_000,
+    });
+
+    try {
+      const unsubscribe = service.subscribe({
+        subscriberId: "sub-1",
+        accountIds: ["acct-1"],
+        owner: OWNER,
+        onEvent: () => undefined,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const headers = new Headers(fetcher.mock.calls[0]?.[1]?.headers);
+      expect(headers.get("X-Solace-Gate")).toBe("g".repeat(64));
+      expect(headers.get("Authorization")).toBe("Bearer owner-token");
+      unsubscribe();
+    } finally {
+      delete process.env.STALWART_GATE_KEY;
+    }
+  });
+
   it("aborts active EventSource listeners when stopped", async () => {
     let capturedSignal: AbortSignal | undefined;
     const fetcher = jest.fn(
