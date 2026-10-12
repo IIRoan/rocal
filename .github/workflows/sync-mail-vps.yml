@@ -115,10 +115,16 @@ jobs:
           VPS_SSH_USER: ${{ secrets.VPS_SSH_USER }}
           VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
           ADMIN_ALLOW_IP: ${{ secrets.ADMIN_ALLOW_IP }}
+          FRP_TOKEN: ${{ secrets.FRP_TOKEN }}
+          FRP_RELAY_STCP_KEY: ${{ secrets.FRP_RELAY_STCP_KEY }}
         run: |
           set -euo pipefail
           : "${VPS_SSH_PRIVATE_KEY:?set Environment secret VPS_SSH_PRIVATE_KEY on mail-vps}"
           : "${ADMIN_ALLOW_IP:?set Environment secret ADMIN_ALLOW_IP on mail-vps}"
+          if [[ "${APPLY_FRP}" == "1" ]]; then
+            : "${FRP_TOKEN:?set Environment secret FRP_TOKEN on mail-vps}"
+            : "${FRP_RELAY_STCP_KEY:?set Environment secret FRP_RELAY_STCP_KEY on mail-vps}"
+          fi
           while IFS= read -r line; do
             [[ -z "$line" ]] && continue
             if ! printf '%s' "$line" | grep -Eq '^[0-9a-fA-F.:/]+$'; then
@@ -134,10 +140,12 @@ jobs:
 
           KEY="$(mktemp)"
           ALLOW="$(mktemp)"
-          trap 'rm -f "$KEY" "$ALLOW"' EXIT
+          FRP_SECRETS="$(mktemp)"
+          trap 'rm -f "$KEY" "$ALLOW" "$FRP_SECRETS"' EXIT
           printf '%s\n' "$VPS_SSH_PRIVATE_KEY" >"$KEY"
           printf '%s\n' "$ADMIN_ALLOW_IP" >"$ALLOW"
-          chmod 600 "$KEY" "$ALLOW"
+          printf 'FRP_TOKEN=%s\nFRP_RELAY_STCP_KEY=%s\n' "$FRP_TOKEN" "$FRP_RELAY_STCP_KEY" >"$FRP_SECRETS"
+          chmod 600 "$KEY" "$ALLOW" "$FRP_SECRETS"
 
           SSH=(ssh -i "$KEY" -p "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes
                -o PubkeyAcceptedAlgorithms=+ssh-rsa,rsa-sha2-512,rsa-sha2-256
@@ -150,15 +158,19 @@ jobs:
           "${SSH[@]}" "${USER}@${HOST}" "rm -rf '$REMOTE_DIR' && mkdir -p '$REMOTE_DIR'"
           "${SCP[@]}" -r "${STAGE}/." "${USER}@${HOST}:${REMOTE_DIR}/"
           "${SCP[@]}" "$ALLOW" "${USER}@${HOST}:/tmp/admin-allow.lst.new"
+          if [[ "${APPLY_FRP}" == "1" ]]; then
+            "${SCP[@]}" -p "$FRP_SECRETS" "${USER}@${HOST}:${REMOTE_DIR}.frp-secrets"
+          fi
 
           "${SSH[@]}" "${USER}@${HOST}" bash -s <<REMOTE
           set -euo pipefail
+          trap 'rm -rf ${REMOTE_DIR} ${REMOTE_DIR}.frp-secrets /tmp/admin-allow.lst.new' EXIT
           chmod +x ${REMOTE_DIR}/apply-vps-repo.sh
           sudo -n env \
             APPLY_ALLOWLIST=/tmp/admin-allow.lst.new \
             APPLY_FRP=${APPLY_FRP:-0} \
+            APPLY_FRP_SECRETS=${REMOTE_DIR}.frp-secrets \
             APPLY_SYSTEMD=0 \
             ${REMOTE_DIR}/apply-vps-repo.sh ${REMOTE_DIR}
-          rm -rf ${REMOTE_DIR} /tmp/admin-allow.lst.new
           echo "mail VPS apply complete"
           REMOTE

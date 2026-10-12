@@ -103,11 +103,29 @@ if [[ -f "${SRC}/gatus-monitor.sh" && ! -L "${SRC}/gatus-monitor.sh" ]]; then
   install -m 755 "${SRC}/gatus-monitor.sh" /usr/local/bin/gatus-monitor.sh
 fi
 
+render_frp_config() {
+  sed -e "s|__FRP_TOKEN__|${FRP_TOKEN}|g" -e "s|__FRP_RELAY_STCP_KEY__|${FRP_RELAY_STCP_KEY}|g" "$1" >"$2"
+  if grep -q '__FRP_' "$2"; then
+    echo "unrendered frp placeholder in $1" >&2
+    exit 1
+  fi
+}
+
 if [[ "$APPLY_FRP" == "1" ]]; then
   echo "==> Installing frp configs (APPLY_FRP=1)"
+  FRP_SECRETS="${APPLY_FRP_SECRETS:?APPLY_FRP=1 needs APPLY_FRP_SECRETS (file with FRP_TOKEN= and FRP_RELAY_STCP_KEY=)}"
+  FRP_TOKEN="$(sed -n 's/^FRP_TOKEN=//p' "$FRP_SECRETS")"
+  FRP_RELAY_STCP_KEY="$(sed -n 's/^FRP_RELAY_STCP_KEY=//p' "$FRP_SECRETS")"
+  for secret in "$FRP_TOKEN" "$FRP_RELAY_STCP_KEY"; do
+    if [[ ! "$secret" =~ ^[A-Za-z0-9]{32,}$ ]]; then
+      echo "FRP_TOKEN and FRP_RELAY_STCP_KEY must be 32+ alphanumeric characters" >&2
+      exit 1
+    fi
+  done
   if [[ -f "${SRC}/frps.toml" && ! -L "${SRC}/frps.toml" ]]; then
     install -d -m 755 /etc/frp
-    install -m 644 "${SRC}/frps.toml" /etc/frp/frps.toml
+    render_frp_config "${SRC}/frps.toml" "${STAGE}/frps.toml"
+    install -m 600 "${STAGE}/frps.toml" /etc/frp/frps.toml
     if systemctl is-active --quiet frps; then
       systemctl reload frps 2>/dev/null || systemctl restart frps
       echo "    frps refreshed"
@@ -115,7 +133,8 @@ if [[ "$APPLY_FRP" == "1" ]]; then
   fi
   if [[ -f "${SRC}/frpc-relay.toml" && ! -L "${SRC}/frpc-relay.toml" ]]; then
     install -d -m 755 /etc/frp
-    install -m 644 "${SRC}/frpc-relay.toml" /etc/frp/frpc-relay.toml
+    render_frp_config "${SRC}/frpc-relay.toml" "${STAGE}/frpc-relay.toml"
+    install -m 600 "${STAGE}/frpc-relay.toml" /etc/frp/frpc-relay.toml
     if systemctl is-active --quiet frpc-relay; then
       systemctl reload frpc-relay 2>/dev/null || systemctl restart frpc-relay
       echo "    frpc-relay refreshed"

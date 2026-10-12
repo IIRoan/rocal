@@ -132,6 +132,7 @@ export default defineRailway(() => {
       BUCKET_REGION: preserve(),
       BUCKET_SECRET_ACCESS_KEY: preserve(),
       FRPC_SLOT: preserve(),
+      FRPC_RELAY_STCP_KEY: preserve(),
       FRPC_TOKEN: preserve(),
       FRPS_ADDR: preserve(),
       PGDATABASE: preserve(),

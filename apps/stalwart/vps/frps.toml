@@ -12,7 +12,8 @@ webServer.port = 7500
 
 [auth]
 method = "token"
-token = "cf13775d89f50d978b5f82c13330aa866d064fef0143593c6afb82b2256b4c6b"
+# Rendered by apply-vps-repo.sh from the mail-vps FRP_TOKEN secret; never commit the value.
+token = "__FRP_TOKEN__"
 
 # Only allow the ports frpc registers.
 [[allowPorts]]

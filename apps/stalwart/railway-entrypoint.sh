@@ -9,7 +9,6 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${HOME}/.cache}"
 FRPC_LOG_FILE="${FRPC_LOG_FILE:-/tmp/frpc.log}"
 FRPC_STANDBY_LOG_FILE="${FRPC_STANDBY_LOG_FILE:-/tmp/frpc-standby.log}"
 FRPC_RELAY_LOG_FILE="${FRPC_RELAY_LOG_FILE:-/tmp/frpc-relay.log}"
-FRPC_RELAY_STCP_KEY="${FRPC_RELAY_STCP_KEY:-relay-stcp-secret}"
 FRPC_RELAY_LOCAL_PORT="${FRPC_RELAY_LOCAL_PORT:-2525}"
 FRPC_STANDBY_ENABLED="${FRPC_STANDBY_ENABLED:-true}"
 RELAY_ROUTE_ID="${RELAY_ROUTE_ID:-ivnbzc1aaba9}"
@@ -628,6 +627,7 @@ cleanup() {
 
 [ -n "${FRPS_ADDR:-}" ] && [ -n "${FRPC_TOKEN:-}" ] || die "FRPS_ADDR and FRPC_TOKEN are required."
 [ -n "${SLOT_MANAGER_TOKEN:-}" ] || die "SLOT_MANAGER_TOKEN is required for safe slot coordination."
+[ -n "${FRPC_RELAY_STCP_KEY:-}" ] || die "FRPC_RELAY_STCP_KEY is required for the outbound relay tunnel."
 trap cleanup EXIT
 trap 'exit 0' TERM INT
 

@@ -432,6 +432,20 @@ class ProcessAndHealthTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("SLOT_MANAGER_TOKEN is required", result.stderr)
 
+    def test_missing_relay_stcp_key_fails_instead_of_public_default(self):
+        env = {"PATH": os.environ["PATH"], "PGHOST": "test", "PGUSER": "test", "PGPASSWORD": "test",
+               "FRPS_ADDR": "test", "FRPC_TOKEN": "test", "SLOT_MANAGER_TOKEN": "test"}
+        result = subprocess.run(["sh", str(ROOT / "railway-entrypoint.sh")], env=env,
+                                capture_output=True, text=True, timeout=3)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("FRPC_RELAY_STCP_KEY is required", result.stderr)
+
+    def test_vps_frp_configs_commit_placeholders_not_secrets(self):
+        for name in ("frps.toml", "frpc-relay.toml"):
+            text = (ROOT / "vps" / name).read_text()
+            self.assertIn('token = "__FRP_TOKEN__"', text)
+        self.assertIn('secretKey = "__FRP_RELAY_STCP_KEY__"', (ROOT / "vps" / "frpc-relay.toml").read_text())
+
     def test_health_requires_same_tunnel_alive_and_ready_and_fresh_state(self):
         source = (ROOT / "railway-entrypoint.sh").read_text()
         code = "def ready():" + source.split("def ready():", 1)[1].split("\ndef handle(conn):", 1)[0]
