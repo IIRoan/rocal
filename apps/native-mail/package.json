@@ -26,8 +26,8 @@
     "ios": "APP_VARIANT=development expo run:ios"
   },
   "dependencies": {
-    "@better-auth/expo": "^1.6.13",
-    "@better-auth/passkey": "^1.6.13",
+    "@better-auth/expo": "^1.7.7",
+    "@better-auth/passkey": "^1.7.7",
     "@blobatar/react-native": "^2.5.0",
     "@expo/vector-icons": "^15.0.2",
     "@gorhom/bottom-sheet": "^5.2.14",
@@ -40,7 +40,7 @@
     "@workspace/logger": "workspace:*",
     "@workspace/native-core": "workspace:*",
     "@workspace/runtime": "workspace:*",
-    "better-auth": "^1.6.13",
+    "better-auth": "^1.7.7",
     "blobatar": "^2.5.0",
     "date-fns": "^4.1.0",
     "expo": "~57.0.13",
