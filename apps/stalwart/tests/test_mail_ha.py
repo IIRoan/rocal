@@ -440,6 +440,15 @@ class ProcessAndHealthTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("FRPC_RELAY_STCP_KEY is required", result.stderr)
 
+    def test_short_gate_key_fails_before_any_service_is_started(self):
+        env = {"PATH": os.environ["PATH"], "PGHOST": "test", "PGUSER": "test", "PGPASSWORD": "test",
+               "FRPS_ADDR": "test", "FRPC_TOKEN": "test", "SLOT_MANAGER_TOKEN": "test",
+               "FRPC_RELAY_STCP_KEY": "test", "STALWART_GATE_KEY": "short"}
+        result = subprocess.run(["sh", str(ROOT / "railway-entrypoint.sh")], env=env,
+                                capture_output=True, text=True, timeout=3)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("STALWART_GATE_KEY (32+ characters) is required", result.stderr)
+
     def test_vps_frp_configs_commit_placeholders_not_secrets(self):
         for name in ("frps.toml", "frpc-relay.toml"):
             text = (ROOT / "vps" / name).read_text()

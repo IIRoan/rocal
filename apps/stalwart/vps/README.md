@@ -36,7 +36,7 @@ All systemd units should be enabled (`systemctl enable`) for boot.
 
 - **Role:** Public TCP/HTTP edge; TLS on :443; PROXY v2 to frps mail backends.
 - **Ports:** 25, 80 (HTTPS redirect), 443.
-  - **Public mail:** `/jmap`, `/.well-known`, `/api/discover`, `/api/auth`, `/auth/*` (OIDC token exchange for Solace).
+  - **Public mail:** `/jmap`, `/.well-known`, `/api/discover`, `/api/auth`, `/auth/*` for third-party clients and the notifications worker. The Solace API reaches Stalwart through the Railway backend gate instead (see [README.md](../README.md)).
   - **Allowlisted only:** `/admin`, `/login`, `/logo`, `/account`, `/oauth`, and other `/api/*`.
   - Non-allowlisted hits to `/` or admin surfaces return a small **HTML 404** (not an empty body — empty 404s made browsers download a `.bin`).
   - Allowlist file: `/etc/haproxy/admin-allow.lst` from GitHub Environment secret `ADMIN_ALLOW_IP` on `IIRoan/rocal` `mail-vps` (never in git).

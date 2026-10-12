@@ -119,7 +119,11 @@ export default defineRailway(() => {
     healthcheck: "/healthz/ready",
     healthcheckTimeout: 300,
     replicas: { "europe-west4-drams3a": 1 },
-    networking: { privateNetworkEndpoint: "stalwart" },
+    networking: {
+      privateNetworkEndpoint: "stalwart",
+      // Solace API only: the key-gated backend gate (apps/stalwart/backend-gate.cfg).
+      serviceDomains: { "stalwart-mail-production.up.railway.app": { port: 8081 } },
+    },
     deploy: {
       ipv6EgressEnabled: true,
       drainingSeconds: 120,
@@ -143,6 +147,7 @@ export default defineRailway(() => {
       PORT: preserve(),
       SLOT_MANAGER_TOKEN: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
+      STALWART_GATE_KEY: preserve(),
       STALWART_MAIL_INGEST_WEBHOOK_SECRET: preserve(),
       STALWART_RECOVERY_MODE: preserve(),
       STALWART_TOKEN: preserve(),
