@@ -194,7 +194,8 @@ or unknown/occupied slots must not fall back to uncoordinated binding.
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `FRPS_ADDR` | yes | VPS IP or hostname |
-| `FRPC_TOKEN` | yes | frp auth token (must match `vps/frps.toml`) |
+| `FRPC_TOKEN` | yes | frp auth token (must match `FRP_TOKEN` in GitHub Environment `mail-vps`) |
+| `FRPC_RELAY_STCP_KEY` | yes | Relay STCP secret (must match `FRP_RELAY_STCP_KEY` in `mail-vps`); missing key fails boot |
 | `STALWART_ADMIN_TOKEN` | yes | Plan apply + relay route at startup |
 | `SLOT_MANAGER_TOKEN` | yes | Protocol v2 slot leases, preemption, and promotion; missing token fails boot |
 | `PORT` | yes | Set to `8090` — Railway healthcheck port |
