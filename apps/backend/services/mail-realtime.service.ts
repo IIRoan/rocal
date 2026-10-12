@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { MailSyncResult } from "./mail-sync.service";
 import { coalescePendingMailSync } from "../lib/inbound-mail-push";
 import { errorLogDetails } from "../lib/log-sanitization";
+import { withStalwartGate } from "../lib/stalwart-gate";
 import type { MailAccessTokenProvider } from "../lib/stalwart-user-jmap";
 
 export type MailChangedEvent = {
@@ -536,7 +537,7 @@ export class MailRealtimeService {
     owner: MailboxOwner,
     signal: AbortSignal,
   ): Promise<void> {
-    const fetcher = this.input.fetcher ?? fetch;
+    const fetcher = withStalwartGate(this.input.fetcher ?? fetch);
     const url = buildSseRequestUrl(this.input.eventSourceUrl);
     const open = async () => {
       const token = await this.input.tokens.getAccessTokenForUser(owner);

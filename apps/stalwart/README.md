@@ -2,8 +2,12 @@
 
 Stalwart mail server runs on [Railway](https://railway.app). A public VPS
 (`mail.solace.onl` / `193.180.211.139`) owns the MX, TLS certificates, and
-inbound ports. Railway containers connect **outbound** to the VPS over frp — no
-inbound connections to Railway are required.
+inbound ports. Railway containers connect **outbound** to the VPS over frp. The
+only inbound Railway path is the key-gated backend gate
+(`stalwart-mail-production.up.railway.app` → HAProxy `:8081`,
+[`backend-gate.cfg`](backend-gate.cfg)), used by the Solace API so app mail does
+not depend on the VPS's upstream. Third-party clients and the notifications worker
+keep using `mail.solace.onl`.
 
 Desired state for Stalwart objects lives in [`stalwart/plan/`](stalwart/plan/).
 WebUI edits are overwritten on the next Railway boot. This tree lives in the Solace
@@ -29,6 +33,7 @@ flowchart TB
     subgraph Internet
         MTA[Remote MTAs / mail clients]
         RCPT[Recipient mail servers]
+        API[Solace API<br/>Vercel]
     end
 
     subgraph VPS["VPS (193.180.211.139)"]
@@ -48,11 +53,14 @@ flowchart TB
         FRPC[frpc<br/>TCP proxies]
         REL[frpc relay visitor<br/>STCP :2525]
         HEALTH[Health server<br/>:8090]
+        GATE[Backend gate<br/>HAProxy :8081]
         SW --> REL
         FRPC --> SW
+        GATE -->|"PROXY v2"| SW
     end
 
     MTA --> HAP
+    API -->|"HTTPS + X-Solace-Gate<br/>Railway domain"| GATE
     FRPS <-->|"TCP tunnels<br/>HAProxy PROXY v2 passthrough"| FRPC
     FRPS <-->|"STCP tunnel"| REL
     REL -->|"SMTP + SASL"| FREL
@@ -184,6 +192,7 @@ or unknown/occupied slots must not fall back to uncoordinated binding.
 | `scripts/test-relay-route.sh` | Offline tests for relay-route helpers |
 | `railway-entrypoint.sh` | Stalwart + health server + frpc + plan apply + relay IP |
 | `frpc-supervisor.py` | Child processes, expiring slot leases, nonblocking standby/recovery, live health snapshot |
+| `backend-gate.cfg` | HAProxy gate for the Solace API: key check, path allowlist, `X-Real-IP` → PROXY v2 to Stalwart `:8080` |
 | `Dockerfile` | Mail image (Railway `rootDirectory: apps/stalwart`) |
 | [`vps/README.md`](vps/README.md) | VPS services, cutover, cert sync |
 | `../../.github/workflows/sync-haproxy-cert.yml` | Weekly / on-demand HAProxy cert sync |
@@ -197,6 +206,7 @@ or unknown/occupied slots must not fall back to uncoordinated binding.
 | `FRPC_TOKEN` | yes | frp auth token (must match `FRP_TOKEN` in GitHub Environment `mail-vps`) |
 | `FRPC_RELAY_STCP_KEY` | yes | Relay STCP secret (must match `FRP_RELAY_STCP_KEY` in `mail-vps`); missing key fails boot |
 | `STALWART_ADMIN_TOKEN` | yes | Plan apply + relay route at startup |
+| `STALWART_GATE_KEY` | yes | Backend gate key (32+ chars, same value as Vercel `STALWART_GATE_KEY`); only its SHA-256 reaches HAProxy; missing key fails boot |
 | `SLOT_MANAGER_TOKEN` | yes | Protocol v2 slot leases, preemption, and promotion; missing token fails boot |
 | `PORT` | yes | Set to `8090` — Railway healthcheck port |
 | `PGHOST`, `PGPASSWORD`, etc. | yes | PostgreSQL (Railway plugin) |
@@ -208,6 +218,7 @@ or unknown/occupied slots must not fall back to uncoordinated binding.
 | `FRPC_STANDBY_VACANT_TIMEOUT_SECONDS` | no | Nonblocking claim window (default `300` seconds); on expiry defer for 30 seconds and retry, never force bind |
 | `FRPC_READY_TIMEOUT_SECONDS` | no | Primary boot / standby registration deadline (default `120` seconds); standby failure releases its lease and retries |
 | `STALWART_HTTP_PORT` | no | Stalwart HTTP/JMAP port (default `8080`) |
+| `STALWART_GATE_PORT` | no | Backend gate port, the Railway domain's target (default `8081`) |
 | `RELAY_ROUTE_ID` | no | Stalwart MtaRoute id (default `ivnbzc1aaba9`) |
 | `RELAY_BIND_ADDR` | no | Override container private IP for relay route |
 | `PG_POOL_MAX_CONNECTIONS` | no | Stalwart → Postgres pool size (default `32`, matching JMAP's 32 concurrent requests) |
@@ -227,6 +238,8 @@ launches, expiry, failed coordination, standby/relay retries, failover, and heal
 publication. For the optional loopback-only frp integration test, set
 `FRPC_TEST_BINARY` and `FRPS_TEST_BINARY` to existing version-matched binaries.
 It uses temporary ports/configs and dummy credentials; it does not access mail.
+For the backend gate test, set `HAPROXY_TEST_BINARY`; it runs `backend-gate.cfg`
+in front of a loopback PROXY v2 stub.
 
 ## Status page
 
