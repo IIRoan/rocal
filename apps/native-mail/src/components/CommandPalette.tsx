@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type TextInput } from "react-native";
 import { useRouter } from "expo-router";
 import { isBodyOnlyMatch, type TimeFormat } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useCommandPalette } from "@workspace/native-core/providers/CommandPaletteProvider";
+import { useDeferredSheetAction } from "@workspace/native-core/hooks/use-deferred-sheet-action";
 import { useUserTimezone } from "@workspace/native-core/hooks/use-user-timezone";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
 import { BottomSheet } from "@workspace/native-core/components/BottomSheet";
@@ -37,7 +38,7 @@ const SEARCH_HINT = "Search by subject, sender or message text.";
 export function CommandPalette() {
   const { theme } = useTheme();
   const { isOpen, close } = useCommandPalette();
-  const router = useRouter();
+  const { push } = useRouter();
   const inputRef = useRef<TextInput>(null);
   const timezone = useUserTimezone();
   const timeFormat = useUserTimeFormat();
@@ -74,36 +75,25 @@ export function CommandPalette() {
       limit: SEARCH_LIMIT,
     });
 
-  const results = useMemo(
-    () =>
-      searchEnabled
-        ? mergePaletteSearchResults({
-            titleDocuments: titleIndex.documents,
-            query: trimmedQuery,
-            messages: mailSearchData?.messages ?? [],
-            limit: SEARCH_LIMIT,
-          })
-        : [],
-    [
-      mailSearchData?.messages,
-      searchEnabled,
-      titleIndex.documents,
-      trimmedQuery,
-    ],
-  );
+  const results = searchEnabled
+    ? mergePaletteSearchResults({
+        titleDocuments: titleIndex.documents,
+        query: trimmedQuery,
+        messages: mailSearchData?.messages ?? [],
+        limit: SEARCH_LIMIT,
+      })
+    : [];
 
-  const handleCloseComplete = useCallback(() => {
+  const { runAfterClose, onCloseComplete } = useDeferredSheetAction(close);
+
+  const handleCloseComplete = () => {
     setQuery("");
     setDebouncedQuery("");
-  }, []);
+    onCloseComplete();
+  };
 
-  const handleResultPress = useCallback(
-    (result: NativePaletteSearchResult) => {
-      close();
-      router.push(mailMessageRoute(result.messageId) as never);
-    },
-    [close, router],
-  );
+  const handleResultPress = (result: NativePaletteSearchResult) =>
+    runAfterClose(() => push(mailMessageRoute(result.messageId) as never));
 
   const searching =
     query.trim().length >= SEARCH_MIN_LENGTH &&

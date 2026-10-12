@@ -177,53 +177,45 @@ export function CommandPalette() {
   }, [navigate]);
 
   const runAction = useCallback(
-    (action: CommandAction) => {
-      if (action.id === "new-calendar" || action.id === "manage-calendars") {
-        const openCreatePage = action.id === "new-calendar";
-        runAfterClose(() => {
-          if (openCreatePage) pushCalendarsPage(CALENDAR_CREATE_PAGE);
+    (action: CommandAction) =>
+      runAfterClose(() => {
+        if (action.id === "new-calendar" || action.id === "manage-calendars") {
+          if (action.id === "new-calendar") pushCalendarsPage(CALENDAR_CREATE_PAGE);
           setCalendarsOpen(true);
-        });
-        return;
-      }
-      if (action.id === "add-passkey") {
-        runAfterClose(() => runCommonAction(action));
-        return;
-      }
-      close();
-      if (runCommonAction(action)) return;
-      switch (action.id) {
-        case "new-event":
-          openEventSheet({ type: "create" });
-          break;
-        case "go-today": {
-          const timezone = resolveTimezone(
-            queryClient.getQueryData<UserSettings>(QUERY_KEYS.settings())?.timezone,
-          );
-          const today = utcToPickerDate(new Date(), timezone);
-          setCurrentDate(today);
-          setSelectedDate(today);
-          navigateToCalendar();
-          break;
+          return;
         }
-        case "view-week":
-        case "view-day":
-        case "view-3day":
-        case "view-month":
-        case "view-agenda":
-          if (action.view) setActiveView(action.view);
-          navigateToCalendar();
-          break;
-        case "open-calendar":
-          navigateToCalendar();
-          break;
-        case "open-settings":
-          push(SETTINGS_ROUTE as never);
-          break;
-      }
-    },
+        if (runCommonAction(action)) return;
+        switch (action.id) {
+          case "new-event":
+            openEventSheet({ type: "create" });
+            break;
+          case "go-today": {
+            const timezone = resolveTimezone(
+              queryClient.getQueryData<UserSettings>(QUERY_KEYS.settings())?.timezone,
+            );
+            const today = utcToPickerDate(new Date(), timezone);
+            setCurrentDate(today);
+            setSelectedDate(today);
+            navigateToCalendar();
+            break;
+          }
+          case "view-week":
+          case "view-day":
+          case "view-3day":
+          case "view-month":
+          case "view-agenda":
+            if (action.view) setActiveView(action.view);
+            navigateToCalendar();
+            break;
+          case "open-calendar":
+            navigateToCalendar();
+            break;
+          case "open-settings":
+            push(SETTINGS_ROUTE as never);
+            break;
+        }
+      }),
     [
-      close,
       openEventSheet,
       pushCalendarsPage,
       queryClient,
@@ -238,27 +230,27 @@ export function CommandPalette() {
   );
 
   const handleSearchResultPress = useCallback(
-    (result: NativePaletteSearchResult) => {
-      close();
-      const start = new Date(result.event.start);
-      if (!Number.isNaN(start.getTime()) && start.getTime() !== 0) {
-        const day = utcToPickerDate(
-          start,
-          resolveTimezone(
-            queryClient.getQueryData<UserSettings>(QUERY_KEYS.settings())?.timezone,
-          ),
-        );
-        setCurrentDate(day);
-        setSelectedDate(day);
-      }
-      openEventSheet({ type: "view", eventId: result.eventId });
-      navigateToCalendar();
-    },
+    (result: NativePaletteSearchResult) =>
+      runAfterClose(() => {
+        const start = new Date(result.event.start);
+        if (!Number.isNaN(start.getTime()) && start.getTime() !== 0) {
+          const day = utcToPickerDate(
+            start,
+            resolveTimezone(
+              queryClient.getQueryData<UserSettings>(QUERY_KEYS.settings())?.timezone,
+            ),
+          );
+          setCurrentDate(day);
+          setSelectedDate(day);
+        }
+        openEventSheet({ type: "view", eventId: result.eventId });
+        navigateToCalendar();
+      }),
     [
-      close,
       navigateToCalendar,
       openEventSheet,
       queryClient,
+      runAfterClose,
       setCurrentDate,
       setSelectedDate,
     ],

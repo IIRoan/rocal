@@ -59,4 +59,5 @@ Add it to the matching module (`repository`, `comments`, `backend`, `client`, `t
 | `theme-tokens-only` | Colors come from theme tokens: no hex/rgb/hsl literals, raw palette or white/black classes, gradients, or backdrop blur outside palette and email-template files. |
 | `motion-compositor-only` | Motion animates only transform/opacity: no `transition-all`, layout transitions or keyframes; `dvh` not `100vh`; no press-scale. |
 | `motion-shared-helpers` | WAAPI via `@workspace/ui/lib/motion`, GSAP via `@workspace/ui/lib/gsap`, no `motion/react`, no `LayoutAnimation`, native driver for core `Animated`. |
+| `motion-after-paint` | Entrances wait for their content to paint: `afterPaint` (calendar-core) instead of nested `requestAnimationFrame`, `useFadeInAfterPaint` instead of Reanimated `entering` presets, GSAP only in the logo spinner loop. |
 | `motion-reduced-motion` | Stylesheets that declare animations honor `prefers-reduced-motion`. |

@@ -10,7 +10,7 @@ How the desktop reader pane opens and closes next to the message list, and why i
 | `mail-app-main-layout.tsx` | `@container` wrapper. Sets `--mail-reader-ms` and `--mail-reader-ease` for the CSS side. |
 | `mail-app-detail-pane.tsx` | Reader pane: `absolute right-0`, final width, slides with `translate`. |
 | `mail-app-list-column.tsx` | List column: switches width, runs the WAAPI list fade. |
-| `use-deferred-reader-pane.ts` | Moves the reader two frames after the heavy render, on open and on close. |
+| `usePaintedValue` (`@workspace/ui/hooks`) | Moves the reader once the heavy render has painted, on open and on close. |
 | `../use-mail-app-content-controller.tsx` | `wantsDesktopDetailPane` (the request) → `showDesktopDetailPane` (reader position, deferred), `desktopDetailPanePending` (open requested, not sliding yet) and `desktopDetailPaneActive` (list layout and reader interactivity). Unmounts on close once the slide has finished (`closingMessageId`). |
 | `../message-reader/message-reader-shell.tsx` | Content fade when switching messages inside an open reader. |
 | `../message-reader/message-reader-body.tsx` | Body skeleton while the body loads or decrypts, then a fade in place. |
@@ -36,7 +36,7 @@ How the desktop reader pane opens and closes next to the message list, and why i
 
 **Close**
 This mirrors the open: the heavy render goes first, the slide second.
-1. Click → `wantsDesktopDetailPane` and `desktopDetailPaneActive` become false. The reader turns `inert` but stays in place, covering the list. Underneath it, the list jumps to `w-full` (no width transition) and the rows switch to inline, with the selected row anchored. The list fade (`0.4 → 1`, full duration) starts here.
+1. Click → `wantsDesktopDetailPane` and `desktopDetailPaneActive` become false. The reader turns `inert` but stays in place, covering the list. Underneath it, the list jumps to `w-full` (no width transition) and the rows switch to inline, with the selected row anchored. The list fade (`0.4 → 1`, full duration) is prepared here and plays once that list has painted (`playAfterPaint`), together with the slide.
 2. Two animation frames later `showDesktopDetailPane` becomes false and the reader slides out over an already-painted list.
 3. `visibility` switches to hidden at the end of the transition. The controller's unmount timer starts when the slide starts (`showDesktopDetailPane` false), not at the click, so the message never disappears from a pane that is still on screen. Opening any message during a close, including the one closing, cancels the close.
 
@@ -45,14 +45,14 @@ This mirrors the open: the heavy render goes first, the slide second.
 - **Reader.** The shell renders right away from the list metadata (subject, sender, date). Only the body area waits. While the body loads or decrypts, `MessageDecryptingSkeleton` fills the same `flex-1` box the body will use, so the swap doesn't move anything. When the body arrives, it fades in place.
 - **Iframe.** An iframe paints nothing until its document loads. The frame sits on `mailBodySurfaceClassName`, which uses the same background as the email document, and stays at `opacity-0` until the first `load`, then fades in. `HtmlEmailRenderer` is keyed by message id, so each message fades in once. Toggling quoted text or remote images reloads the frame in place without a fade.
 - **List.** Rows change height when they switch between inline and stacked. On every `narrow` flip, `message-list-virtualized.tsx` works out the row starts for both layouts from `getRowHeight` and moves `scrollTop` by the difference. The clicked row stays under the cursor, or the top row stays put when the selected row is off-screen.
-- All of these fades go through `fadeInMailReaderContent`. It skips the fade when motion is reduced or `isMailReaderPaneMoving` is true (an `[inert]` ancestor, or a running transition on `[data-mail-reader-pane]`). Content that arrives during the slide just appears, which is hard to notice while the pane is moving.
+- All of these fades go through `fadeInMailReaderContent`. It holds the fade until the content has painted (`playAfterPaint`), and skips it when motion is reduced or `isMailReaderPaneMoving` is true (an `[inert]` ancestor, or a running transition on `[data-mail-reader-pane]`). Content that arrives during the slide just appears, which is hard to notice while the pane is moving.
 
 ## Firefox (Linux) fixes, and the rules they imply
 
 Opening used to stutter in Firefox while closing was smooth. The fixes:
 
 1. **Only animate `translate` and `opacity` on things you can see moving.** Firefox runs these on the compositor, so they stay smooth while React and layout keep the main thread busy. The visible slide is the reader's `translate`. The list width transition is hidden underneath it.
-2. **Start the slide two frames late, in both directions** (`useDeferredReaderPane`). The heavy first render of the message used to land in the first frames of the open slide, and Firefox dropped them. Rendering first and then sliding fixed the "stuck, then jump" start. Close does the same with the full-width list re-render: it happens under the still-covering reader, then the reader slides.
+2. **Start the slide two frames late, in both directions** (`usePaintedValue`). The heavy first render of the message used to land in the first frames of the open slide, and Firefox dropped them. Rendering first and then sliding fixed the "stuck, then jump" start. Close does the same with the full-width list re-render: it happens under the still-covering reader, then the reader slides.
 3. **Keep the pending reader visible off-screen**, not `invisible`. Firefox skips drawing hidden content, so it had to draw the whole reader (iframe included) in the first animation frame.
 4. **No opacity animations inside the sliding panel while it opens.** Reader fades use `fadeInMailReaderContent`, which skips the fade while the pane is pending, closed or sliding. Opacity layers stacked on a moving layer that contains an iframe stutter in Firefox.
 5. **Keep the list fade short on open** (`MAIL_LIST_OPEN_FADE_OPTIONS`, half the duration). The rows lay out again every frame while narrowing, so Firefox has to redo the whole fade on every frame. Close fades static content, so it keeps the full length.

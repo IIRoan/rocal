@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
 
-/** Dismisses a sheet and runs the action once it has finished closing, so navigation never races the close animation. */
+/** Dismisses a sheet and runs the action once it has unmounted. */
 export function useDeferredSheetAction(onDismiss: () => void) {
   const pendingRef = useRef<(() => void) | null>(null);
 

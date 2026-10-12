@@ -38,20 +38,17 @@ export function CalendarDrawerSheet({
   );
 
   const handleDayPress = useCallback(
-    (date: Date) => {
-      setCurrentDate(date);
-      setSelectedDate(date);
-      onDismiss();
-    },
-    [onDismiss, setCurrentDate, setSelectedDate],
+    (date: Date) =>
+      runAfterClose(() => {
+        setCurrentDate(date);
+        setSelectedDate(date);
+      }),
+    [runAfterClose, setCurrentDate, setSelectedDate],
   );
 
   const handleViewChange = useCallback(
-    (view: NativeCalendarView) => {
-      setActiveView(view);
-      onDismiss();
-    },
-    [onDismiss, setActiveView],
+    (view: NativeCalendarView) => runAfterClose(() => setActiveView(view)),
+    [runAfterClose, setActiveView],
   );
 
   return (

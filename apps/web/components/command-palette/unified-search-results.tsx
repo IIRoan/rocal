@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { CalendarIcon, Loader2, Mail, MapPin, Paperclip } from "lucide-react";
 import { isBodyOnlyMatch, type UnifiedSearchResult } from "@workspace/calendar-core";
 import { cn } from "@workspace/ui/lib/utils";
-import { MOTION_EASING } from "@workspace/ui/lib/motion";
+import { MOTION_EASING, slideFadeIn } from "@workspace/ui/lib/motion";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import type { JmapEmailMessage } from "@/lib/mail/types";
 
@@ -128,17 +128,8 @@ function SearchResultRow({
 }
 
 
-const ROW_ENTER_KEYFRAMES: Keyframe[] = [
-  { opacity: 0, transform: "translateY(3px) scale(0.96)" },
-  { opacity: 1, transform: "none" },
-];
-
-const ROW_ENTER_OPTIONS: KeyframeAnimationOptions = {
-  duration: 110,
-  easing: MOTION_EASING.soft,
-  fill: "backwards",
-};
-
+const ROW_ENTER_OFFSET = { y: 3, scale: 0.96 };
+const ROW_ENTER_MS = 110;
 const ROW_STAGGER_MS = 15;
 const ROW_STAGGER_LIMIT = 12;
 
@@ -171,13 +162,11 @@ export function UnifiedSearchResults({
       container.querySelectorAll<HTMLElement>("[data-source-row]"),
     );
     const animations = items.map((item, index) =>
-      typeof item.animate === "function"
-        // repo-rules-allow motion-shared-helpers: staggered per-row delay with backwards fill and cancel cleanup; slideFadeIn supports none of these.
-        ? item.animate(ROW_ENTER_KEYFRAMES, {
-            ...ROW_ENTER_OPTIONS,
-            delay: Math.min(index, ROW_STAGGER_LIMIT) * ROW_STAGGER_MS,
-          })
-        : null,
+      slideFadeIn(item, ROW_ENTER_OFFSET, {
+        duration: ROW_ENTER_MS,
+        easing: MOTION_EASING.soft,
+        delay: Math.min(index, ROW_STAGGER_LIMIT) * ROW_STAGGER_MS,
+      }),
     );
     return () => {
       for (const animation of animations) animation?.cancel();

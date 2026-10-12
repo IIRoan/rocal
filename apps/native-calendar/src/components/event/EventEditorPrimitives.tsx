@@ -5,16 +5,25 @@ import {
   Text,
   View,
   type StyleProp,
-  type TextStyle,
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
+import { EDITOR_CONTROL_HEIGHT } from "./event-editor-styles";
 
 type FeatherName = React.ComponentProps<typeof Feather>["name"];
 
-export const EDITOR_CONTROL_HEIGHT = 44;
+export function EventEditorPairArrow({ color }: { color: string }) {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Feather name="arrow-right" size={16} color={color} />
+    </View>
+  );
+}
 
 export function EventEditorRow({
   icon,
@@ -89,10 +98,7 @@ export function EventEditorChip({
       {swatch ? (
         <View style={[styles.swatch, { backgroundColor: swatch }]} />
       ) : null}
-      <Text
-        style={[styles.chipText, { color: textColor }]}
-        numberOfLines={1}
-      >
+      <Text style={[styles.chipText, { color: textColor }]} numberOfLines={1}>
         {label}
       </Text>
       {trailingIcon ? (
@@ -180,21 +186,21 @@ export function EventEditorFieldButton({
 /** Unfilled row aligned with field icons, for toggles and pickers that read as settings. */
 export function EventEditorListRow({
   icon,
-  leading,
+  swatchColor,
   label,
   muted = false,
   onPress,
-  trailing,
+  children,
   accessibilityLabel,
   accessibilityRole = "button",
   accessibilityState,
 }: {
   icon?: FeatherName;
-  leading?: ReactNode;
+  swatchColor?: string;
   label: string;
   muted?: boolean;
   onPress: () => void;
-  trailing?: ReactNode;
+  children?: ReactNode;
   accessibilityLabel?: string;
   accessibilityRole?: "button" | "switch";
   accessibilityState?: { checked?: boolean };
@@ -203,17 +209,23 @@ export function EventEditorListRow({
   const styles = useMemo(() => createPrimitiveStyles(theme), [theme]);
   return (
     <Pressable
-      style={({ pressed }) => [styles.listRow, pressed && styles.listRowPressed]}
+      style={({ pressed }) => [
+        styles.listRow,
+        pressed && styles.listRowPressed,
+      ]}
       onPress={onPress}
       accessibilityRole={accessibilityRole}
       accessibilityState={accessibilityState}
       accessibilityLabel={accessibilityLabel ?? label}
     >
       <View style={styles.listRowIcon}>
-        {leading ??
-          (icon ? (
-            <Feather name={icon} size={16} color={theme.colors.mutedForeground} />
-          ) : null)}
+        {swatchColor ? (
+          <View
+            style={[styles.listRowSwatch, { backgroundColor: swatchColor }]}
+          />
+        ) : icon ? (
+          <Feather name={icon} size={16} color={theme.colors.mutedForeground} />
+        ) : null}
       </View>
       <Text
         style={[styles.listRowText, muted && styles.listRowTextMuted]}
@@ -221,33 +233,9 @@ export function EventEditorListRow({
       >
         {label}
       </Text>
-      {trailing}
+      {children}
     </Pressable>
   );
-}
-
-/** Borderless text input style for use inside EventEditorField. */
-export function createEditorInputStyle(theme: ThemeTokens): TextStyle {
-  return {
-    flex: 1,
-    minWidth: 0,
-    minHeight: EDITOR_CONTROL_HEIGHT,
-    paddingVertical: 0,
-    fontSize: theme.typography.fontSize.sm.size,
-    color: theme.colors.foreground,
-  };
-}
-
-/** Filled field style with a visible resting background so empty fields stay findable. */
-export function createEditorFieldStyle(theme: ThemeTokens): TextStyle {
-  return {
-    minHeight: EDITOR_CONTROL_HEIGHT,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.accent + "66",
-    paddingHorizontal: theme.spacing["3"],
-    fontSize: theme.typography.fontSize.sm.size,
-    color: theme.colors.foreground,
-  };
 }
 
 function createPrimitiveStyles(theme: ThemeTokens) {
@@ -338,6 +326,11 @@ function createPrimitiveStyles(theme: ThemeTokens) {
     listRowIcon: {
       width: 16,
       alignItems: "center",
+    },
+    listRowSwatch: {
+      width: 10,
+      height: 10,
+      borderRadius: theme.borderRadius.full,
     },
     listRowText: {
       flex: 1,
