@@ -17,30 +17,78 @@ function parseLegacyChunkCount(raw: string | null | undefined) {
   return Number.isFinite(count) && count > 0 ? count : null;
 }
 
-function parseBaChunkCount(raw: string | null | undefined) {
+type BaChunkGroup = { count: number; slot: 0 | 1 | null };
+type BaChunkMarker = BaChunkGroup & { fallbackCount: number | null };
+
+function parseBaChunkCount(value: string | undefined, limit: number) {
+  if (value === undefined) return null;
+  const count = Number(value);
+  return Number.isInteger(count) && count > 0 && count <= limit ? count : null;
+}
+
+function parseBaChunkMarker(
+  raw: string | null | undefined,
+): BaChunkMarker | null {
   if (!raw?.startsWith(BA_CHUNK_MARKER)) return null;
-  const count = Number(raw.slice(BA_CHUNK_MARKER.length));
-  return Number.isInteger(count) && count > 0 ? count : null;
-}
-
-function readBetterAuthChunksSync(baseKey: string, count: number) {
-  let value = "";
-  for (let i = 0; i < count; i += 1) {
-    const chunk = SecureStore.getItem(`${baseKey}.${i}`);
-    if (chunk == null) return null;
-    value += chunk;
-  }
-  return value;
-}
-
-async function readBetterAuthChunksAsync(baseKey: string, count: number) {
-  const chunks = await Promise.all(
-    Array.from({ length: count }, (_, i) =>
-      SecureStore.getItemAsync(`${baseKey}.${i}`),
-    ),
+  const parts = raw.slice(BA_CHUNK_MARKER.length).split(":");
+  if (parts.length > 3) return null;
+  const [countValue, slotValue, fallbackCountValue] = parts;
+  // Older non-auth values use the same marker without Expo's current chunk cap.
+  const count = parseBaChunkCount(
+    countValue,
+    slotValue === undefined ? Infinity : 100,
   );
-  if (chunks.some((chunk) => chunk == null)) return null;
-  return chunks.join("");
+  if (count === null) return null;
+  if (slotValue === undefined)
+    return { count, slot: null, fallbackCount: null };
+  if (slotValue !== "0" && slotValue !== "1") return null;
+  const fallbackCount = parseBaChunkCount(fallbackCountValue, 100);
+  if (fallbackCountValue !== undefined && fallbackCount === null) return null;
+  return { count, slot: slotValue === "0" ? 0 : 1, fallbackCount };
+}
+
+function baChunkGroups(marker: BaChunkMarker): BaChunkGroup[] {
+  if (marker.slot === null || marker.fallbackCount === null) return [marker];
+  return [
+    marker,
+    { count: marker.fallbackCount, slot: marker.slot === 0 ? 1 : 0 },
+  ];
+}
+
+function baChunkKey(
+  baseKey: string,
+  slot: BaChunkGroup["slot"],
+  index: number,
+) {
+  return slot === null ? `${baseKey}.${index}` : `${baseKey}.${slot}.${index}`;
+}
+
+function readBetterAuthChunksSync(baseKey: string, marker: BaChunkMarker) {
+  for (const group of baChunkGroups(marker)) {
+    const chunks: string[] = [];
+    for (let i = 0; i < group.count; i += 1) {
+      const chunk = SecureStore.getItem(baChunkKey(baseKey, group.slot, i));
+      if (!chunk) break;
+      chunks.push(chunk);
+    }
+    if (chunks.length === group.count) return chunks.join("");
+  }
+  return null;
+}
+
+async function readBetterAuthChunksAsync(
+  baseKey: string,
+  marker: BaChunkMarker,
+) {
+  for (const group of baChunkGroups(marker)) {
+    const chunks = await Promise.all(
+      Array.from({ length: group.count }, (_, i) =>
+        SecureStore.getItemAsync(baChunkKey(baseKey, group.slot, i)),
+      ),
+    );
+    if (chunks.every((chunk) => !!chunk)) return chunks.join("");
+  }
+  return null;
 }
 
 function readLegacyChunksSync(baseKey: string, count: number) {
@@ -75,10 +123,12 @@ async function deleteLegacyChunks(baseKey: string, count: number) {
   );
 }
 
-async function deleteBaChunks(baseKey: string, count: number) {
+async function deleteBaChunks(baseKey: string, marker: BaChunkMarker) {
   await Promise.all(
-    Array.from({ length: count }, (_, i) =>
-      SecureStore.deleteItemAsync(`${baseKey}.${i}`),
+    baChunkGroups(marker).flatMap((group) =>
+      Array.from({ length: group.count }, (_, i) =>
+        SecureStore.deleteItemAsync(baChunkKey(baseKey, group.slot, i)),
+      ),
     ),
   );
 }
@@ -89,9 +139,9 @@ export function getChunkedSecureValueSync(baseKey: string) {
     const raw = SecureStore.getItem(baseKey);
     if (raw == null) return null;
 
-    const baCount = parseBaChunkCount(raw);
-    if (baCount) {
-      return readBetterAuthChunksSync(baseKey, baCount);
+    if (raw.startsWith(BA_CHUNK_MARKER)) {
+      const marker = parseBaChunkMarker(raw);
+      return marker ? readBetterAuthChunksSync(baseKey, marker) : null;
     }
 
     const legacyCount = parseLegacyChunkCount(raw);
@@ -109,7 +159,7 @@ export function getChunkedSecureValueSync(baseKey: string) {
 export function setChunkedSecureValueSync(baseKey: string, value: string) {
   const previousRaw = SecureStore.getItem(baseKey);
   const previousLegacyCount = parseLegacyChunkCount(previousRaw);
-  const previousBaCount = parseBaChunkCount(previousRaw);
+  const previousBaMarker = parseBaChunkMarker(previousRaw);
 
   if (value.length <= LEGACY_CHUNK_SIZE) {
     SecureStore.setItem(baseKey, value);
@@ -135,13 +185,12 @@ export function setChunkedSecureValueSync(baseKey: string, value: string) {
     }
   }
 
-  if (previousBaCount && value.length <= LEGACY_CHUNK_SIZE) {
-    for (let i = 0; i < previousBaCount; i += 1) {
-      // Best-effort cleanup; a failed delete only leaves a stale chunk nobody reads.
-      void SecureStore.deleteItemAsync(`${baseKey}.${i}`).catch(
-        () => undefined,
-      );
-    }
+  if (
+    previousBaMarker &&
+    (previousBaMarker.slot !== null || value.length <= LEGACY_CHUNK_SIZE)
+  ) {
+    // Slotted keys differ from the legacy-format keys just written above.
+    void deleteBaChunks(baseKey, previousBaMarker).catch(() => undefined);
   }
 }
 
@@ -153,9 +202,9 @@ export async function readChunkedSecureValue(baseKey: string) {
   const raw = await SecureStore.getItemAsync(baseKey);
   if (raw == null) return null;
 
-  const baCount = parseBaChunkCount(raw);
-  if (baCount) {
-    return readBetterAuthChunksAsync(baseKey, baCount);
+  if (raw.startsWith(BA_CHUNK_MARKER)) {
+    const marker = parseBaChunkMarker(raw);
+    return marker ? readBetterAuthChunksAsync(baseKey, marker) : null;
   }
 
   const legacyCount = parseLegacyChunkCount(raw);
@@ -169,7 +218,7 @@ export async function readChunkedSecureValue(baseKey: string) {
 export async function writeChunkedSecureValue(baseKey: string, value: string) {
   const previousRaw = await SecureStore.getItemAsync(baseKey);
   const previousLegacyCount = parseLegacyChunkCount(previousRaw);
-  const previousBaCount = parseBaChunkCount(previousRaw);
+  const previousBaMarker = parseBaChunkMarker(previousRaw);
 
   if (value.length <= LEGACY_CHUNK_SIZE) {
     await SecureStore.setItemAsync(baseKey, value);
@@ -190,15 +239,18 @@ export async function writeChunkedSecureValue(baseKey: string, value: string) {
     await deleteLegacyChunks(baseKey, previousLegacyCount);
   }
 
-  if (previousBaCount && value.length <= LEGACY_CHUNK_SIZE) {
-    await deleteBaChunks(baseKey, previousBaCount);
+  if (
+    previousBaMarker &&
+    (previousBaMarker.slot !== null || value.length <= LEGACY_CHUNK_SIZE)
+  ) {
+    await deleteBaChunks(baseKey, previousBaMarker);
   }
 }
 
 export async function deleteChunkedSecureValue(baseKey: string) {
   const raw = await SecureStore.getItemAsync(baseKey);
   const legacyCount = parseLegacyChunkCount(raw);
-  const baCount = parseBaChunkCount(raw);
+  const baMarker = parseBaChunkMarker(raw);
 
   await SecureStore.deleteItemAsync(baseKey);
 
@@ -206,8 +258,8 @@ export async function deleteChunkedSecureValue(baseKey: string) {
     await deleteLegacyChunks(baseKey, legacyCount);
   }
 
-  if (baCount) {
-    await deleteBaChunks(baseKey, baCount);
+  if (baMarker) {
+    await deleteBaChunks(baseKey, baMarker);
   }
 }
 
@@ -304,13 +356,28 @@ export const authSecureStore = {
       if (raw == null) return null;
 
       // Let Better Auth's storageAdapter join its own chunks.
-      if (parseBaChunkCount(raw)) {
+      if (raw.startsWith(BA_CHUNK_MARKER)) {
         return raw;
       }
 
       const legacyCount = parseLegacyChunkCount(raw);
       if (legacyCount) {
         return readLegacyChunksSync(key, legacyCount) ?? "{}";
+      }
+
+      return raw;
+    } catch {
+      return "{}";
+    }
+  },
+  getItemAsync: async (key: string): Promise<string | null> => {
+    try {
+      const raw = await SecureStore.getItemAsync(key);
+      if (raw == null || raw.startsWith(BA_CHUNK_MARKER)) return raw;
+
+      const legacyCount = parseLegacyChunkCount(raw);
+      if (legacyCount) {
+        return (await readLegacyChunksAsync(key, legacyCount)) ?? "{}";
       }
 
       return raw;
@@ -335,6 +402,16 @@ export const authSecureStore = {
       }
     } catch {
       // Ignore write failures — auth will surface as signed-out.
+    }
+  },
+  setItemAsync: async (key: string, value: string): Promise<void> => {
+    const previousRaw = await SecureStore.getItemAsync(key);
+    const previousLegacyCount = parseLegacyChunkCount(previousRaw);
+    const previousJoined = await readChunkedSecureValue(key);
+    const next = restoreSessionTokenIntoJar(value, previousJoined);
+    await SecureStore.setItemAsync(key, next);
+    if (previousLegacyCount) {
+      await deleteLegacyChunks(key, previousLegacyCount);
     }
   },
 };
