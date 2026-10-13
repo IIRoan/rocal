@@ -100,7 +100,7 @@ Secrets: Environment **`mail-vps`** (see [HAProxy TLS cert sync](#haproxy-tls-ce
 ### Postfix
 
 - **Role:** Authenticated submission relay; delivers to the internet from the VPS IP.
-- **Listen:** `127.0.0.1:2525` (STCP from Railway), `0.0.0.0:587` (optional direct access)
+- **Listen:** `127.0.0.1:2525` (STCP from Railway), `127.0.0.1:587` (manual tests on the VPS); nothing listens publicly
 - **SASL user:** `relay-client@mail.solace.onl`
 - **Repo:** `vps/postfix-main.cf`, `vps/postfix-master.cf`
 
@@ -218,7 +218,7 @@ Allow: 22, 25, 80, 443, 7000 (frp control from Railway).
 
 Port 80 must be open so HAProxy can 301 to HTTPS and send HSTS. Do not leave it firewalled/black-holed.
 
-Port 2525 is **not** exposed publicly — only reachable via the STCP tunnel.
+Ports 587 and 2525 are **not** exposed publicly — Postfix binds them to loopback and Railway reaches 2525 only via the STCP tunnel.
 
 ## HAProxy TLS cert sync
 

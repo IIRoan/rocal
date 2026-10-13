@@ -1,6 +1,7 @@
 # Postfix master.cf for the VPS outbound relay.
 127.0.0.1:smtp inet n   -       n       -       -       smtpd
-submission inet n       -       n       -       -       smtpd
+# Loopback only: Railway relays over the STCP tunnel on 2525, so nothing outside the VPS needs 587.
+127.0.0.1:submission inet n   -       n       -       -       smtpd
   -o syslog_name=postfix/submission
   -o smtpd_forbid_unauth_pipelining=no
   -o smtpd_tls_security_level=encrypt
