@@ -9,11 +9,11 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${HOME}/.cache}"
 FRPC_LOG_FILE="${FRPC_LOG_FILE:-/tmp/frpc.log}"
 FRPC_STANDBY_LOG_FILE="${FRPC_STANDBY_LOG_FILE:-/tmp/frpc-standby.log}"
 FRPC_RELAY_LOG_FILE="${FRPC_RELAY_LOG_FILE:-/tmp/frpc-relay.log}"
-FRPC_RELAY_STCP_KEY="${FRPC_RELAY_STCP_KEY:-relay-stcp-secret}"
 FRPC_RELAY_LOCAL_PORT="${FRPC_RELAY_LOCAL_PORT:-2525}"
 FRPC_STANDBY_ENABLED="${FRPC_STANDBY_ENABLED:-true}"
 RELAY_ROUTE_ID="${RELAY_ROUTE_ID:-ivnbzc1aaba9}"
 STALWART_HTTP_PORT="${STALWART_HTTP_PORT:-8080}"
+STALWART_GATE_PORT="${STALWART_GATE_PORT:-8081}"
 HEALTH_PORT="${PORT:-8090}"
 HEALTH_STATE_PATH="${HEALTH_STATE_PATH:-/tmp/railway-health.json}"
 PG_POOL_MAX_CONNECTIONS="${PG_POOL_MAX_CONNECTIONS:-32}"
@@ -248,6 +248,7 @@ state = {
     "stalwart_pid": int(os.environ.get("STALWART_PID", "0") or 0),
     "frpc_state_path": os.environ.get("FRPC_STATE_PATH", "/tmp/frpc-state.json"),
     "http_port": int(os.environ.get("STALWART_HTTP_PORT", "8080")),
+    "gate_port": int(os.environ.get("STALWART_GATE_PORT", "8081")),
     "relay_port": int(os.environ.get("FRPC_RELAY_LOCAL_PORT", "2525")),
 }
 with open(path + ".tmp", "w", encoding="utf-8") as handle:
@@ -332,7 +333,7 @@ def ready():
     if not any(tunnel.get("ready") and pid_alive(tunnel.get("pid"))
                for tunnel in tunnels.get("slots", {}).values()):
         return False
-    for port in (25, state.get("http_port", 8080), state.get("relay_port", 2525)):
+    for port in (25, state.get("http_port", 8080), state.get("gate_port", 8081), state.get("relay_port", 2525)):
         if not port_open(port):
             return False
     return True
@@ -389,6 +390,12 @@ start_stalwart() {
 	STALWART_PID=$!
 	log info "Stalwart pid=${STALWART_PID}."
 	wait_for_stalwart_ports
+}
+
+start_gate() {
+	run_as_stalwart haproxy -db -f /usr/local/share/stalwart/backend-gate.cfg &
+	GATE_PID=$!
+	log info "Backend gate pid=${GATE_PID} on :${STALWART_GATE_PORT}."
 }
 
 write_frpc_relay_config() {
@@ -616,7 +623,7 @@ PY
 
 cleanup() {
 	trap - EXIT TERM INT
-	for child in "${FRPC_SUPERVISOR_PID:-}" "${STALWART_PID:-}" "${HEALTH_PID:-}"; do
+	for child in "${FRPC_SUPERVISOR_PID:-}" "${GATE_PID:-}" "${STALWART_PID:-}" "${HEALTH_PID:-}"; do
 		[ -z "$child" ] || kill "$child" 2>/dev/null || true
 	done
 	[ -z "${FRPC_SUPERVISOR_PID:-}" ] || wait "$FRPC_SUPERVISOR_PID" 2>/dev/null || true
@@ -628,6 +635,12 @@ cleanup() {
 
 [ -n "${FRPS_ADDR:-}" ] && [ -n "${FRPC_TOKEN:-}" ] || die "FRPS_ADDR and FRPC_TOKEN are required."
 [ -n "${SLOT_MANAGER_TOKEN:-}" ] || die "SLOT_MANAGER_TOKEN is required for safe slot coordination."
+[ -n "${FRPC_RELAY_STCP_KEY:-}" ] || die "FRPC_RELAY_STCP_KEY is required for the outbound relay tunnel."
+STALWART_GATE_KEY="${STALWART_GATE_KEY:-}"
+[ "${#STALWART_GATE_KEY}" -ge 32 ] || die "STALWART_GATE_KEY (32+ characters) is required for the backend gate."
+STALWART_GATE_KEY_SHA256="$(printf '%s' "$STALWART_GATE_KEY" | sha256sum | cut -d' ' -f1)"
+unset STALWART_GATE_KEY
+export STALWART_GATE_KEY_SHA256 STALWART_GATE_PORT STALWART_HTTP_PORT
 trap cleanup EXIT
 trap 'exit 0' TERM INT
 
@@ -636,6 +649,7 @@ prepare_blob_volume
 resolve_slot
 start_health_server
 start_stalwart
+start_gate
 sleep "${STALWART_BOOT_DELAY_SECONDS:-3}"
 start_frpc
 activate_slot
@@ -664,6 +678,9 @@ while :; do
 	fi
 	if ! kill -0 "$FRPC_SUPERVISOR_PID" 2>/dev/null; then
 		die "frpc supervisor exited."
+	fi
+	if ! kill -0 "$GATE_PID" 2>/dev/null; then
+		die "Backend gate exited."
 	fi
 	sleep 5
 done

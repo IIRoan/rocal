@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { withStalwartGate } from "./stalwart-gate";
 
 const DEFAULT_STALWART_JMAP_URL = "https://mail.solace.onl";
 const JMAP_USING = [
@@ -200,7 +201,7 @@ async function jmapFetch(
   url: string,
   init: RequestInit,
 ): Promise<Response> {
-  return fetcher(url, {
+  return withStalwartGate(fetcher)(url, {
     ...init,
     signal: init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });

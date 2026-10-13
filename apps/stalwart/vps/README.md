@@ -36,7 +36,7 @@ All systemd units should be enabled (`systemctl enable`) for boot.
 
 - **Role:** Public TCP/HTTP edge; TLS on :443; PROXY v2 to frps mail backends.
 - **Ports:** 25, 80 (HTTPS redirect), 443.
-  - **Public mail:** `/jmap`, `/.well-known`, `/api/discover`, `/api/auth`, `/auth/*` (OIDC token exchange for Solace).
+  - **Public mail:** `/jmap`, `/.well-known`, `/api/discover`, `/api/auth`, `/auth/*` for third-party clients and the notifications worker. The Solace API reaches Stalwart through the Railway backend gate instead (see [README.md](../README.md)).
   - **Allowlisted only:** `/admin`, `/login`, `/logo`, `/account`, `/oauth`, and other `/api/*`.
   - Non-allowlisted hits to `/` or admin surfaces return a small **HTML 404** (not an empty body — empty 404s made browsers download a `.bin`).
   - Allowlist file: `/etc/haproxy/admin-allow.lst` from GitHub Environment secret `ADMIN_ALLOW_IP` on `IIRoan/rocal` `mail-vps` (never in git).
@@ -89,12 +89,12 @@ Secrets: Environment **`mail-vps`** (see [HAProxy TLS cert sync](#haproxy-tls-ce
 
 - **Role:** Accepts inbound frp tunnels from Railway.
 - **Port:** 7000 (control); dynamic proxy ports whitelisted in `vps/frps.toml`
-- **Repo:** `vps/frps.toml` → `/etc/frp/frps.toml`
+- **Repo:** `vps/frps.toml` → `/etc/frp/frps.toml` (mode 600; `__FRP_TOKEN__` rendered from `mail-vps` secret `FRP_TOKEN` by **Sync mail VPS** with `apply_frp`)
 
 ### frpc-relay
 
 - **Role:** STCP proxy exposing Postfix `127.0.0.1:2525` to Railway relay visitors.
-- **Repo:** `vps/frpc-relay.toml` → `/etc/frp/frpc-relay.toml`
+- **Repo:** `vps/frpc-relay.toml` → `/etc/frp/frpc-relay.toml` (mode 600; token and `__FRP_RELAY_STCP_KEY__` rendered from `mail-vps` secrets)
 - **Required** for outbound mail from Railway (see [OUTBOUND_RELAY.md](OUTBOUND_RELAY.md))
 
 ### Postfix
@@ -243,6 +243,8 @@ GitHub Environment **`mail-vps`** (`master`/`main` only) holds:
 | `VPS_SSH_USER` | default `Roan` |
 | `VPS_SSH_PORT` | default `22` |
 | `ADMIN_ALLOW_IP` | Operator egress IP/CIDR for public `/admin` + admin OAuth surfaces (written to `/etc/haproxy/admin-allow.lst`; never in git) |
+| `FRP_TOKEN` | frps auth token (32+ alphanumeric); same value as Railway `FRPC_TOKEN`; never in git |
+| `FRP_RELAY_STCP_KEY` | Relay STCP secret (32+ alphanumeric); same value as Railway `FRPC_RELAY_STCP_KEY`; never in git |
 
 Public mailbox `/account` and `/login` are blocked except for the allowlisted IP (admin OAuth only). JMAP (`/jmap`) stays public for Solace clients.
 

@@ -21,6 +21,7 @@ export const LOG_OMIT_FIELD_KEYS = Object.freeze([
   "authorization",
   "cookie",
   "cookies",
+  "x-solace-gate",
   "encryptedVaultB64",
   "publicKeyArmored",
   "mime",

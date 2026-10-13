@@ -7,7 +7,7 @@ ARG BUILD_TIMESTAMP=2026-09-08-v0.16.21
 USER root
 
 RUN apt-get update \
-    && apt-get install -yq --no-install-recommends curl iproute2 postgresql-client python3 util-linux xz-utils \
+    && apt-get install -yq --no-install-recommends curl haproxy iproute2 postgresql-client python3 util-linux xz-utils \
     && curl -fsSL "https://github.com/fatedier/frp/releases/download/v${FRPC_VERSION}/frp_${FRPC_VERSION}_linux_amd64.tar.gz" \
         | tar xz -C /tmp \
     && mv "/tmp/frp_${FRPC_VERSION}_linux_amd64/frpc" /usr/local/bin/frpc \
@@ -24,19 +24,22 @@ RUN apt-get update \
 
 COPY railway-entrypoint.sh /usr/local/bin/railway-entrypoint.sh
 COPY frpc-supervisor.py /usr/local/bin/frpc-supervisor.py
+COPY backend-gate.cfg /usr/local/share/stalwart/backend-gate.cfg
 COPY stalwart/plan /usr/local/share/stalwart/plan
 COPY stalwart/cli-schema.json /usr/local/share/stalwart/cli-schema.json
 COPY stalwart/cli-schema.latest /usr/local/share/stalwart/cli-schema.latest
 RUN sed -i 's/\r$//' /usr/local/bin/railway-entrypoint.sh \
     && chmod 755 /usr/local/bin/railway-entrypoint.sh \
     && chown stalwart:stalwart /usr/local/bin/railway-entrypoint.sh \
-    && chown -R stalwart:stalwart /usr/local/share/stalwart
+    && chown -R stalwart:stalwart /usr/local/share/stalwart \
+    && STALWART_GATE_PORT=8081 STALWART_HTTP_PORT=8080 STALWART_GATE_KEY_SHA256=0 \
+        haproxy -c -q -f /usr/local/share/stalwart/backend-gate.cfg
 
 USER root
 
 # Fewer jemalloc arenas plus idle-time page release, to keep RSS from creeping up over weeks.
 ENV _RJEM_MALLOC_CONF=background_thread:true,narenas:2
 
-EXPOSE 25 8080 8090
+EXPOSE 25 8080 8081 8090
 
 ENTRYPOINT ["/usr/local/bin/railway-entrypoint.sh"]
