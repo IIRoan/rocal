@@ -1,4 +1,4 @@
-"""Offline regression coverage for slot cutover and frpc recovery."""
+"""Offline regression coverage for the VPS slot-manager and the container tunnel boot/shutdown."""
 
 import concurrent.futures
 import importlib.util
@@ -6,10 +6,10 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
-import sys
 import tempfile
-import time
+import tomllib
 import types
 import unittest
 from unittest.mock import patch
@@ -25,7 +25,20 @@ def load(name, path):
 
 
 manager = load("slot_manager", ROOT / "vps/stalwart-slot-manager.py")
-supervisor = load("frpc_supervisor", ROOT / "frpc-supervisor.py")
+ENTRYPOINT = (ROOT / "railway-entrypoint.sh").read_text()
+
+
+def shell_functions(*names):
+    return "".join(re.search(rf"^{name}\(\) \{{\n.*?^\}}\n", ENTRYPOINT, re.M | re.S).group(0) for name in names)
+
+
+def render_frpc_config(path, **overrides):
+    env = {"PATH": os.environ["PATH"], "FRPC_CONFIG": str(path), "FRPS_ADDR": "127.0.0.1", "FRPC_TOKEN": "test-only",
+           "FRPC_ADMIN_PORT": "7400", "FRPC_RELAY_STCP_KEY": "relay-test", "FRPC_RELAY_LOCAL_PORT": "2525",
+           "STALWART_HTTP_PORT": "8080", "FRPC_OWNER": "owner", "RECOVERY_MODE": "false", **overrides}
+    subprocess.run(["sh", "-euc", shell_functions("write_frpc_group_proxy", "write_frpc_config") + "write_frpc_config"],
+                   env=env, check=True)
+    return Path(path).read_text()
 
 
 class CoordinationFixture(unittest.TestCase):
@@ -166,275 +179,10 @@ class CoordinationTests(CoordinationFixture):
         self.assertFalse(manager.read_status()["greenPreempted"])
 
 
-class FakeTunnel:
-    next_pid = 100
-
-    def __init__(self, name, *_):
-        self.name = name
-        self.lease_until = self.renew_at = self.started_at = self.retry_at = 0
-        self.ready = self.alive_value = False
-        self.will_ready = True
-        self.starts = 0
-        self.stops = 0
-        self.pid = 0
-
-    def alive(self):
-        return self.alive_value
-
-    def start(self):
-        self.starts += 1
-        FakeTunnel.next_pid += 1
-        self.pid = FakeTunnel.next_pid
-        self.alive_value = True
-        self.ready = False
-        self.started_at = supervisor.time.monotonic()
-        return True
-
-    def stop(self):
-        self.stops += 1
-        self.alive_value = self.ready = False
-
-    def check_ready(self):
-        self.ready = self.alive_value and self.will_ready
-
-    def snapshot(self):
-        return {"pid": self.pid if self.alive_value else 0, "ready": self.alive_value and self.ready}
-
-
-class SupervisorTests(CoordinationFixture):
-    def setUp(self):
-        super().setUp()
-        self.requests = []
-        self.fail_paths = set()
-        self.slow_paths = {}
-        self.gate = Path(self.tmp.name, "gate.json")
-        self.state = Path(self.tmp.name, "health.json")
-        env = patch.dict(os.environ, {"FRPC_SLOT": "green", "FRPC_STATE_PATH": str(self.state),
-                                     "HEALTH_STATE_PATH": str(self.gate), "FRPC_STANDBY_ENABLED": "true"})
-        env.start()
-        self.addCleanup(env.stop)
-        for name, value in {"Tunnel": FakeTunnel, "log": lambda *_: None,
-                            "time": types.SimpleNamespace(monotonic=lambda: self.now)}.items():
-            p = patch.object(supervisor, name, value)
-            p.start()
-            self.addCleanup(p.stop)
-        self.api = types.SimpleNamespace(owner="incumbent", request=self.api_request)
-        self.s = supervisor.Supervisor(self.api)
-
-    def api_request(self, path, slot=None, timeout=2):
-        self.requests.append((path, slot))
-        self.now += self.slow_paths.get(path, 0)
-        if path in self.fail_paths:
-            return None
-        if path == "/status":
-            return manager.read_status()
-        code, result = manager.coordinate_slot(path, slot, self.api.owner)
-        return result if code == 200 else None
-
-    def step(self, seconds=1):
-        self.now += seconds
-        self.s.tick()
-
-    def boot(self, standby=True):
-        self.s.tick()
-        self.step()
-        self.assertTrue(json.loads(self.state.read_text())["boot_ready"])
-        self.active = "green"
-        self.s.standby_enabled = standby
-        self.gate.write_text('{"ready":true}')
-        self.step()
-        self.step()
-
-    def test_happy_path_holds_both_slots_only_after_gate(self):
-        self.s.tick()
-        self.assertEqual(self.s.slots["blue"].starts, 0)
-        self.step()
-        self.active = "green"
-        self.gate.write_text('{"ready":true}')
-        self.step()
-        self.assertTrue(all(t.alive() for t in self.s.slots.values()))
-
-    def test_primary_crash_keeps_standby_and_publishes_replacement_pid(self):
-        self.boot()
-        primary = self.s.slots["green"]
-        old_pid = primary.pid
-        primary.alive_value = False
-        primary.will_ready = False
-        self.step()
-        snapshot = json.loads(self.state.read_text())
-        self.assertNotEqual(snapshot["slots"]["green"]["pid"], old_pid)
-        self.assertFalse(snapshot["slots"]["green"]["ready"])
-        self.assertTrue(snapshot["slots"]["blue"]["ready"])
-        primary.will_ready = True
-        self.step(121)
-        self.step(6)
-        self.step()
-        self.assertTrue(json.loads(self.state.read_text())["slots"]["green"]["ready"])
-
-    def test_relay_late_recovery_updates_state_without_other_restart(self):
-        self.boot()
-        self.s.relay.alive_value = False
-        self.s.relay.will_ready = False
-        self.step(5)
-        self.assertFalse(json.loads(self.state.read_text())["relay"]["ready"])
-        self.s.relay.will_ready = True
-        self.step()
-        self.assertTrue(json.loads(self.state.read_text())["relay"]["ready"])
-
-    def test_relay_soft_timeout_does_not_postpone_retry_forever(self):
-        self.boot()
-        self.s.relay.will_ready = False
-        self.step(31)
-        self.assertFalse(self.s.relay.alive())
-        self.step(1)
-        self.s.relay.will_ready = True
-        self.step(4)
-        self.assertTrue(self.s.relay.ready)
-
-    def test_repeated_relay_crashes_are_bounded_during_boot(self):
-        self.s.relay.will_ready = False
-        self.s.tick()
-        for _ in range(5):
-            self.s.relay.alive_value = False
-            self.step(5)
-        with self.assertRaisesRegex(RuntimeError, "Relay readiness"):
-            self.step(5)
-
-    def test_repeated_primary_crashes_do_not_reset_boot_deadline(self):
-        self.s.slots["green"].will_ready = False
-        self.s.tick()
-        for _ in range(23):
-            self.s.slots["green"].alive_value = False
-            self.step(5)
-        with self.assertRaisesRegex(RuntimeError, "Primary proxy readiness"):
-            self.step(5)
-
-    def test_standby_timeout_is_soft_and_retried(self):
-        self.boot()
-        standby = self.s.slots["blue"]
-        standby.will_ready = False
-        # Keep leases renewed while readiness times out.
-        for _ in range(25):
-            self.step(5)
-        self.assertGreaterEqual(standby.stops, 1)
-        self.assertTrue(self.s.slots["green"].ready)
-        standby.will_ready = True
-        self.step(6)
-        self.step()
-        self.assertTrue(standby.ready)
-
-    def test_preempt_releases_then_abandoned_deploy_allows_retry(self):
-        self.boot()
-        self.active = "green"
-        self.request("/preempt", slot="blue", owner="peer")
-        self.step()
-        self.assertFalse(self.s.slots["blue"].alive())
-        self.assertEqual(self.request("/lease/claim", slot="blue", owner="peer"), 200)
-        for _ in range(20):
-            self.step(5)
-        self.assertTrue(self.s.slots["blue"].alive())
-
-    def test_preempt_after_failover_releases_original_primary(self):
-        self.boot()
-        self.active = "blue"
-        self.request("/preempt", slot="green", owner="peer")
-        self.step()
-        self.assertFalse(self.s.slots["green"].alive())
-        self.assertTrue(self.s.slots["blue"].alive())
-
-    def test_standby_restart_does_not_block_peer_preemption(self):
-        self.boot()
-        standby = self.s.slots["blue"]
-        standby.alive_value = False
-        standby.will_ready = False
-        before = self.now
-        self.step()
-        self.assertEqual(self.now, before + 1)
-        self.request("/preempt", slot="blue", owner="peer")
-        self.step()
-        self.assertFalse(standby.alive())
-
-    def test_disabled_standby_never_claims_second_slot(self):
-        self.boot(standby=False)
-        self.assertEqual(self.s.slots["blue"].starts, 0)
-        self.assertNotIn(("/lease/claim", "blue"), self.requests)
-
-    def test_failed_preempt_never_launches_primary(self):
-        self.fail_paths.add("/preempt")
-        self.s.tick()
-        self.assertFalse(self.s.bound)
-        with self.assertRaisesRegex(RuntimeError, "vacancy deadline"):
-            self.step(60)
-        self.assertEqual(self.s.slots["green"].starts, 0)
-
-    def test_unknown_status_never_launches(self):
-        self.fail_paths.add("/status")
-        self.s.tick()
-        self.assertFalse(self.s.bound)
-
-    def test_old_slot_manager_is_rejected(self):
-        with patch.object(manager, "read_status", return_value={"active": "blue"}):
-            with self.assertRaisesRegex(RuntimeError, "protocol v2"):
-                self.s.tick()
-        self.assertFalse(self.s.bound)
-
-    def test_late_lease_response_is_not_permission_to_launch(self):
-        self.slow_paths["/lease/claim"] = 30
-        self.s.tick()
-        self.assertFalse(self.s.bound)
-        self.assertEqual(self.s.slots["green"].starts, 0)
-
-    def test_api_outage_stops_before_server_lease_expiry(self):
-        self.boot()
-        self.fail_paths.update({"/status", "/lease/renew"})
-        self.step(26)
-        self.assertTrue(all(not t.alive() for t in self.s.slots.values()))
-
-
-class ProcessAndHealthTests(unittest.TestCase):
-    def test_expired_pending_launch_never_starts_a_process(self):
-        tunnel = supervisor.Tunnel("blue", "unused", "unused", 7400)
-        tunnel.lease_until = time.monotonic() - 1
-        with patch.object(supervisor.subprocess, "Popen") as spawn:
-            self.assertFalse(tunnel.start())
-        spawn.assert_not_called()
-
-    def test_start_returns_promptly_and_reaps_child_on_stop(self):
-        with tempfile.TemporaryDirectory(prefix="solace-frpc-process-") as tmp:
-            tunnel = supervisor.Tunnel("blue", "import time; print('started', flush=True); time.sleep(60)",
-                                       str(Path(tmp, "frpc.log")))
-            with patch.dict(os.environ, {"FRPC_BINARY": sys.executable}):
-                started = time.monotonic()
-                tunnel.start()
-                process = tunnel.process
-                try:
-                    self.assertLess(time.monotonic() - started, 1)
-                    self.assertTrue(tunnel.alive())
-                finally:
-                    tunnel.stop()
-                self.assertIsNotNone(process.poll())
-
-    def test_ready_uses_current_status_not_successful_old_log(self):
-        tunnel = supervisor.Tunnel("blue", "unused", "unused", 7400)
-        with patch.object(tunnel, "alive", return_value=True), patch.object(
-            supervisor.urllib.request, "urlopen",
-            return_value=io.BytesIO(b'{"tcp":[{"name":"smtp-blue","status":"running"},'
-                                   b'{"name":"https-blue","status":"error"}]}'),
-        ):
-            tunnel.check_ready()
-        self.assertFalse(tunnel.ready)
-
-    def test_missing_token_fails_before_any_service_is_started(self):
-        env = {"PATH": os.environ["PATH"], "PGHOST": "test", "PGUSER": "test", "PGPASSWORD": "test",
-               "FRPS_ADDR": "test", "FRPC_TOKEN": "test"}
-        result = subprocess.run(["sh", str(ROOT / "railway-entrypoint.sh")], env=env,
-                                capture_output=True, text=True, timeout=3)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("SLOT_MANAGER_TOKEN is required", result.stderr)
-
+class EntrypointTests(unittest.TestCase):
     def test_missing_relay_stcp_key_fails_instead_of_public_default(self):
         env = {"PATH": os.environ["PATH"], "PGHOST": "test", "PGUSER": "test", "PGPASSWORD": "test",
-               "FRPS_ADDR": "test", "FRPC_TOKEN": "test", "SLOT_MANAGER_TOKEN": "test"}
+               "FRPS_ADDR": "test", "FRPC_TOKEN": "test"}
         result = subprocess.run(["sh", str(ROOT / "railway-entrypoint.sh")], env=env,
                                 capture_output=True, text=True, timeout=3)
         self.assertNotEqual(result.returncode, 0)
@@ -442,8 +190,7 @@ class ProcessAndHealthTests(unittest.TestCase):
 
     def test_short_gate_key_fails_before_any_service_is_started(self):
         env = {"PATH": os.environ["PATH"], "PGHOST": "test", "PGUSER": "test", "PGPASSWORD": "test",
-               "FRPS_ADDR": "test", "FRPC_TOKEN": "test", "SLOT_MANAGER_TOKEN": "test",
-               "FRPC_RELAY_STCP_KEY": "test", "STALWART_GATE_KEY": "short"}
+               "FRPS_ADDR": "test", "FRPC_TOKEN": "test", "FRPC_RELAY_STCP_KEY": "test", "STALWART_GATE_KEY": "short"}
         result = subprocess.run(["sh", str(ROOT / "railway-entrypoint.sh")], env=env,
                                 capture_output=True, text=True, timeout=3)
         self.assertNotEqual(result.returncode, 0)
@@ -455,26 +202,39 @@ class ProcessAndHealthTests(unittest.TestCase):
             self.assertIn('token = "__FRP_TOKEN__"', text)
         self.assertIn('secretKey = "__FRP_RELAY_STCP_KEY__"', (ROOT / "vps" / "frpc-relay.toml").read_text())
 
-    def test_health_requires_same_tunnel_alive_and_ready_and_fresh_state(self):
-        source = (ROOT / "railway-entrypoint.sh").read_text()
-        code = "def ready():" + source.split("def ready():", 1)[1].split("\ndef handle(conn):", 1)[0]
-        with tempfile.TemporaryDirectory(prefix="solace-health-") as tmp:
-            path = Path(tmp, "state.json")
-            state = {"ready": True, "stalwart_pid": 1, "frpc_state_path": str(path)}
-            namespace = {"json": json, "time": time, "load_state": lambda: state,
-                         "pid_alive": lambda pid: pid in (1, 2, 4, 5), "port_open": lambda _: True}
-            exec(code, namespace)
-            snapshot = {"updated": time.monotonic(), "supervisor_pid": 5,
-                        "relay": {"pid": 2, "ready": True},
-                        "slots": {"blue": {"pid": 3, "ready": True}, "green": {"pid": 4, "ready": False}}}
-            supervisor.atomic_json(path, snapshot)
-            self.assertFalse(namespace["ready"]())
-            snapshot["slots"]["green"]["ready"] = True
-            supervisor.atomic_json(path, snapshot)
-            self.assertTrue(namespace["ready"]())
-            snapshot["updated"] -= 20
-            supervisor.atomic_json(path, snapshot)
-            self.assertFalse(namespace["ready"]())
+    def test_frpc_joins_fixed_group_ports_under_per_container_names(self):
+        with tempfile.TemporaryDirectory(prefix="solace-frpc-config-") as tmp:
+            config = tomllib.loads(render_frpc_config(Path(tmp, "frpc.toml")))
+            proxies = {proxy["name"]: proxy for proxy in config["proxies"]}
+            self.assertEqual({name: (proxy["remotePort"], proxy["loadBalancer"]["group"])
+                              for name, proxy in proxies.items()},
+                             {"smtp-owner": (10025, "smtp"), "http-owner": (18080, "http")})
+            self.assertEqual(config["visitors"][0]["bindPort"], 2525)
+            recovery = tomllib.loads(render_frpc_config(Path(tmp, "frpc.toml"), RECOVERY_MODE="true"))
+            self.assertEqual([proxy["name"] for proxy in recovery["proxies"]], ["http-owner"])
+
+    def test_shutdown_leaves_tunnel_groups_before_stopping_stalwart(self):
+        with tempfile.TemporaryDirectory(prefix="solace-shutdown-") as tmp:
+            order = Path(tmp, "order")
+            script = ("write_health_state() { :; }\n" + shell_functions("cleanup") +
+                      'fake() { trap \'echo "$1" >>"$ORDER"; exit 0\' TERM; while :; do sleep 0.05; done; }\n'
+                      "fake frpc & FRPC_PID=$!\nfake stalwart & STALWART_PID=$!\nsleep 0.3\ncleanup\nwait\n")
+            subprocess.run(["sh", "-euc", script], env={"PATH": os.environ["PATH"], "ORDER": str(order),
+                                                        "FRPC_DRAIN_SECONDS": "0.2"}, check=True, timeout=10)
+            self.assertEqual(order.read_text().split(), ["frpc", "stalwart"])
+
+    def test_health_requires_ready_state_and_live_stalwart_and_frpc(self):
+        code = "def ready():" + ENTRYPOINT.split("def ready():", 1)[1].split("\ndef handle(conn):", 1)[0]
+        state = {"ready": True, "stalwart_pid": 1, "frpc_pid": 2}
+        alive = {1, 2}
+        namespace = {"load_state": lambda: state, "pid_alive": lambda pid: pid in alive, "port_open": lambda _: True}
+        exec(code, namespace)
+        self.assertTrue(namespace["ready"]())
+        alive.discard(2)
+        self.assertFalse(namespace["ready"]())
+        alive.add(2)
+        state["ready"] = False
+        self.assertFalse(namespace["ready"]())
 
 
 if __name__ == "__main__":
