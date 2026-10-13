@@ -30,8 +30,9 @@ export default defineRailway(() => {
     checkSuites: false,
   });
 
+  // PGDATA is …/pgdata18 (set via CLI); …/pgdata is the pre-upgrade PG17 cluster, kept for rollback.
   const postgresApp = database("Postgres", "postgres", {
-    image: "ghcr.io/railwayapp-templates/postgres-ssl:17",
+    image: "ghcr.io/railwayapp-templates/postgres-ssl:18",
     output: "DATABASE_URL",
     defaultMountPath: "/var/lib/postgresql/data",
     region: "europe-west4-drams3a",
