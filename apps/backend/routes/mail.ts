@@ -634,10 +634,10 @@ export function createMailRoutes(
     jmapRateLimit?: RateLimitConfig;
   } = {},
 ) {
-  const jmapFetch = withStalwartGate(options.jmapFetch ?? fetch);
   const jmapRateLimit = options.jmapRateLimit ?? JMAP_PROXY_RATE_LIMIT;
   const jmapUpstreamBaseUrl =
     options.jmapUpstreamBaseUrl ?? env.stalwartBaseUrl;
+  const jmapFetch = withStalwartGate(options.jmapFetch ?? fetch, jmapUpstreamBaseUrl);
   const authDetail = authenticatedRouteDetail("Mail");
 
   return new Elysia({

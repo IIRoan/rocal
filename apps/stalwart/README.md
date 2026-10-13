@@ -41,17 +41,15 @@ flowchart TB
         FRPS[frps :7000]
         PF[Postfix<br/>127.0.0.1:2525]
         FREL[frpc-relay<br/>STCP proxy]
-        SLOT[stalwart-slot-manager<br/>stalwart-slot-watcher]
         HAP --> FRPS
         FREL --> PF
         PF --> RCPT
-        SLOT --> HAP
     end
 
     subgraph Railway["Railway container"]
         SW[Stalwart<br/>:25 :8080]
-        FRPC[frpc<br/>TCP proxies]
-        REL[frpc relay visitor<br/>STCP :2525]
+        FRPC[frpc<br/>smtp + http group proxies]
+        REL[frpc relay visitor<br/>STCP :2525, same process]
         HEALTH[Health server<br/>:8090]
         GATE[Backend gate<br/>HAProxy :8081]
         SW --> REL
@@ -61,7 +59,7 @@ flowchart TB
 
     MTA --> HAP
     API -->|"HTTPS + X-Solace-Gate<br/>Railway domain"| GATE
-    FRPS <-->|"TCP tunnels<br/>HAProxy PROXY v2 passthrough"| FRPC
+    FRPS <-->|"TCP load-balancing groups<br/>HAProxy PROXY v2 passthrough"| FRPC
     FRPS <-->|"STCP tunnel"| REL
     REL -->|"SMTP + SASL"| FREL
     SW -->|"JMAP / SMTP submit"| SW
@@ -104,18 +102,21 @@ sequenceDiagram
 
     C->>H: SMTP :25 / HTTPS :443
     Note over H: TLS termination on :443<br/>one PROXY v2 header from HAProxy; frpc must not add another
-    H->>F: Forward to localhost frps port<br/>(blue or green slot)
+    H->>F: Forward to the localhost frps group port
     F->>S: frpc TCP proxy → Stalwart listener
     S-->>C: Mail delivery / JMAP
 ```
 
-HAProxy routes to **blue** or **green** frps ports based on
-`/etc/haproxy/stalwart-active-slot`. Railway's `FRPC_SLOT=auto` picks the **inactive** side so a new deploy tunnels up before the VPS switches traffic. `frpc-supervisor.py` owns both slot processes and the relay visitor. After the health gate opens it attempts a **warm standby frpc** on the vacated slot (`FRPC_STANDBY_ENABLED`, default on), without blocking crash recovery. The next deploy preempts and claims the inactive slot through slot-manager protocol v2. The incumbent stops that slot's process and acknowledges release before the peer can claim it, including after watcher failover changes which slot is active. frpc logs are mirrored to Railway stderr (`[frpc-blue]` / `[frpc-green]`).
+Every container runs one frpc that registers its proxies into frp **load-balancing
+groups** on fixed frps ports, so HAProxy has a single backend per protocol and frps
+spreads connections over whichever containers are registered. Proxy names carry a
+per-container id (`smtp-<uuid>`, `http-<uuid>`) because frps requires unique names.
+frpc logs go straight to the container's stderr.
 
-| Slot  | SMTP frps port | HTTPS frps port |
-|-------|----------------|-----------------|
-| blue  | 10025          | 18080           |
-| green | 11025          | 19080           |
+| Group  | frps port | Container port |
+|--------|-----------|----------------|
+| `smtp` | 10025     | 25             |
+| `http` | 18080     | 8080           |
 
 The DATA stage on port 25 runs the system Sieve script [`stalwart/sieve/solace-simplelogin.sieve`](stalwart/sieve/solace-simplelogin.sieve). It strips any `X-Solace-*` markers. For DKIM-verified SimpleLogin forwards it puts the original sender in From, the reverse alias in Reply-To, and adds `X-Solace-SimpleLogin: forward` for the apps. The plan embeds the file in `30-mta.ndjson`, and `tests/test_simplelogin_sieve.py` keeps them in sync. To roll back, set the `MtaStageData` `then` to `"false"`. Deleting the line does not reset it, because `update` only patches.
 
@@ -142,45 +143,67 @@ sequenceDiagram
     P->>R: Deliver from VPS public IP
 ```
 
-## Blue/green deploys
+## Zero-downtime deploys
 
 ```mermaid
 sequenceDiagram
-    participant R as Railway new container
-    participant H as Health :8090
-    participant V as VPS slot-manager
-    participant X as HAProxy
+    participant N as New container
+    participant O as Old container
+    participant F as frps groups (VPS)
 
-    R->>R: Start Stalwart + frpc supervisor
-    R->>V: POST /preempt {inactive slot, owner}
-    Note over V: Incumbent stops inactive frpc, then POSTs /lease/release
-    R->>V: POST /lease/claim {slot, owner} until reserved + vacant
-    R->>R: Start primary frpc + relay (leases renewed throughout boot)
-    H-->>R: 503 until all checks pass
-    R->>R: smtp + https proxies online, relay up
-    R->>V: POST /preempt/clear {slot, owner}
-    R->>V: POST /activate {slot, owner}
-    V->>X: Warm target, verify JMAP, exclusive cutover
-    R->>H: 200 OK
-    R->>V: Best-effort /lease/claim on vacated slot
-    R->>R: Start standby without waiting in supervise loop
-    Note over R: Health gate opens only after VPS cutover succeeds
-    Note over X: slot-watcher only fails over if active tunnel dies
+    N->>N: Stalwart + gate up, plan applied, relay route set
+    N->>F: frpc registers smtp/http proxies (join groups)
+    Note over F: frps now spreads connections over old + new
+    N->>N: Health 200 → platform retires the old container
+    O->>F: SIGTERM: health 503, frpc exits first (leave groups)
+    O->>O: Drain FRPC_DRAIN_SECONDS, then stop Stalwart
 ```
 
+Joining the groups is the last boot step, so a registered container is a ready one; there
+is no slot coordination with the VPS and no deploy order between VPS and image. If frpc
+cannot register within `FRPC_READY_TIMEOUT_SECONDS` (for example a blue/green proxy still
+holds the port), boot fails and the platform keeps the old container. For a few seconds
+both containers serve. They share Postgres and the blob store but no cache coordinator,
+so a client may briefly see state cached on the other container; long-lived IMAP IDLE /
+JMAP push connections on the old container drop and clients reconnect.
+
 Railway probes `GET /healthz/ready` on `PORT` (8090). Healthcheck, overlap, and drain live in the repo-root [`.railway/railway.ts`](../../.railway/railway.ts).
+Readiness needs a ready boot state, live Stalwart and frpc processes, and open
+:25/:8080/:8081/relay ports. It deliberately does not probe the VPS, so a tunnel blip
+never marks the container (and with it the VPS-independent API gate) unhealthy.
 
-Readiness requires Stalwart, relay, and **either** live slot process with currently
-running proxies from its loopback frpc `/api/status` endpoint. The entrypoint owns
-the boot gate; the supervisor alone atomically publishes current child PIDs and
-readiness. Recovery never closes the gate solely because primary died, and late
-proxy/relay recovery is reflected automatically. Snapshots older than 15 seconds
-are unhealthy.
+### One-time cutover from blue/green slots
 
-**Rollout order:** deploy the VPS slot-manager/switch scripts first, verify
-`GET /slot-manager/status` reports `protocolVersion: 2`, then deploy the Railway
-image, then Gatus. Missing credentials, old manager versions, failed preemption,
-or unknown/occupied slots must not fall back to uncoordinated binding.
+The group ports reuse the blue slot's ports, which the old image's tunnels may hold.
+
+1. On Railway `stalwart-mail` set `FRPC_STANDBY_ENABLED=false` and
+   `RAILWAY_DEPLOYMENT_OVERLAP_SECONDS=600`, let it redeploy, and repeat until
+   `/slot-manager/status` reports `active: green` with blue unoccupied.
+2. Deploy this image. It joins the groups on the blue ports (10025/18080).
+3. Within the overlap window run `sudo stalwart-switch-slot blue` on the VPS (or POST
+   `{"slot":"blue"}` to `/slot-manager/activate` with `SLOT_MANAGER_TOKEN`); it probes the new
+   container on 18080 and moves HAProxy's weight to it. The VPS sync from this change has
+   already stopped `stalwart-slot-watcher`, which cannot see group proxies and would fail back.
+4. After the old container is gone, ship the VPS cleanup (single HAProxy server per
+   backend, slot-manager/watcher retired) and drop `FRPC_SLOT`, `FRPC_STANDBY_ENABLED`,
+   `SLOT_MANAGER_TOKEN` and the overlap override from Railway.
+
+### Tunnel mutual TLS (one-time rollout)
+
+frps only accepts TLS from clients holding a cert signed by the Solace frp CA, and frpc
+pins that CA (`serverName = "frps.solace"`), so a leaked `FRPC_TOKEN` or an
+intercepted connection can no longer register proxies. Roll out in this order;
+each step keeps the old side working:
+
+1. `sh apps/stalwart/scripts/frp-tls-certs.sh <new dir>` and set the five `FRP_TLS_*`
+   secrets on `mail-vps` as it prints. Store `ca.key` offline.
+2. Set `FRPC_TLS_CERT` and `FRPC_TLS_KEY` on Railway `stalwart-mail` and let it redeploy:
+   frpc presents the client cert, which today's frps ignores.
+3. Run **Sync mail VPS** with `apply_frp`: frps now requires TLS plus a client cert, and
+   `frpc-relay` uses one too. Tunnels drop for a few seconds while frps restarts.
+4. Set `FRPC_TLS_CA` on Railway and let it redeploy: frpc now also verifies frps.
+
+Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all four steps.
 
 ## Repository layout
 
@@ -190,8 +213,8 @@ or unknown/occupied slots must not fall back to uncoordinated binding.
 | `scripts/stalwart-plan.sh` | apply / dry-run / snapshot / drift / dns-publish |
 | `scripts/sync-haproxy-cert.py` | Export Stalwart ACME cert → HAProxy PEM |
 | `scripts/test-relay-route.sh` | Offline tests for relay-route helpers |
-| `railway-entrypoint.sh` | Stalwart + health server + frpc + plan apply + relay IP |
-| `frpc-supervisor.py` | Child processes, expiring slot leases, nonblocking standby/recovery, live health snapshot |
+| `scripts/frp-tls-certs.sh` | Mints the frp CA, frps server cert and frpc client cert for tunnel mutual TLS |
+| `railway-entrypoint.sh` | Stalwart + health server + plan apply + relay IP, then frpc joins the tunnel groups; SIGTERM leaves them before stopping Stalwart |
 | `backend-gate.cfg` | HAProxy gate for the Solace API: key check, path allowlist, `X-Real-IP` → PROXY v2 to Stalwart `:8080` |
 | `Dockerfile` | Mail image (Railway `rootDirectory: apps/stalwart`) |
 | [`vps/README.md`](vps/README.md) | VPS services, cutover, cert sync |
@@ -207,16 +230,14 @@ or unknown/occupied slots must not fall back to uncoordinated binding.
 | `FRPC_RELAY_STCP_KEY` | yes | Relay STCP secret (must match `FRP_RELAY_STCP_KEY` in `mail-vps`); missing key fails boot |
 | `STALWART_ADMIN_TOKEN` | yes | Plan apply + relay route at startup |
 | `STALWART_GATE_KEY` | yes | Backend gate key (32+ chars, same value as Vercel `STALWART_GATE_KEY`); only its SHA-256 reaches HAProxy; missing key fails boot |
-| `SLOT_MANAGER_TOKEN` | yes | Protocol v2 slot leases, preemption, and promotion; missing token fails boot |
 | `PORT` | yes | Set to `8090` — Railway healthcheck port |
 | `PGHOST`, `PGPASSWORD`, etc. | yes | PostgreSQL (Railway plugin) |
 | `BUCKET` / `BUCKET_*` | yes | Railway bucket refs for S3 BlobStore |
 | `STALWART_MAIL_INGEST_WEBHOOK_SECRET` | no | HMAC for Solace `message-ingest.ham` webhook (omit from plan if unset; live HMAC is kept) |
-| `FRPC_SLOT` | no | `blue`, `green`, or `auto` (default) |
-| `FRPC_STANDBY_ENABLED` | no | Also tunnel the vacated slot after promote (default `true`) |
-| `FRPC_PRIMARY_VACANT_TIMEOUT_SECONDS` | no | Elapsed-time deadline for preempt + primary claim (default `60` seconds); timeout fails boot |
-| `FRPC_STANDBY_VACANT_TIMEOUT_SECONDS` | no | Nonblocking claim window (default `300` seconds); on expiry defer for 30 seconds and retry, never force bind |
-| `FRPC_READY_TIMEOUT_SECONDS` | no | Primary boot / standby registration deadline (default `120` seconds); standby failure releases its lease and retries |
+| `FRPC_READY_TIMEOUT_SECONDS` | no | Deadline for frpc's proxies to register and the relay visitor to listen (default `120` seconds); timeout fails boot |
+| `FRPC_DRAIN_SECONDS` | no | Wait between leaving the tunnel groups and stopping Stalwart on SIGTERM (default `10`) |
+| `FRPC_TLS_CERT`, `FRPC_TLS_KEY` | rollout | Base64 PEM client cert/key from `scripts/frp-tls-certs.sh`; required once frps enforces mutual TLS |
+| `FRPC_TLS_CA` | rollout | Base64 PEM of the frp CA; set after frps has the new server cert, then frpc verifies frps |
 | `STALWART_HTTP_PORT` | no | Stalwart HTTP/JMAP port (default `8080`) |
 | `STALWART_GATE_PORT` | no | Backend gate port, the Railway domain's target (default `8081`) |
 | `RELAY_ROUTE_ID` | no | Stalwart MtaRoute id (default `ivnbzc1aaba9`) |
@@ -233,11 +254,13 @@ sh apps/stalwart/scripts/test-relay-route.sh
 shellcheck apps/stalwart/railway-entrypoint.sh apps/stalwart/vps/stalwart-switch-slot.sh
 ```
 
-Run these from the monorepo root. The default suite covers ownership, pending
-launches, expiry, failed coordination, standby/relay retries, failover, and health
-publication. For the optional loopback-only frp integration test, set
-`FRPC_TEST_BINARY` and `FRPS_TEST_BINARY` to existing version-matched binaries.
-It uses temporary ports/configs and dummy credentials; it does not access mail.
+Run these from the monorepo root. The default suite covers the rendered frpc config,
+shutdown order (leave the groups, then stop Stalwart), health, boot-time secret checks,
+and the VPS slot-manager until it is retired. For the optional loopback-only frp
+integration test, set `FRPC_TEST_BINARY` and `FRPS_TEST_BINARY` to existing
+version-matched binaries; it overlaps two containers in one group and checks that the
+old one leaves without a failed connection. It uses temporary ports/configs and dummy
+credentials; it does not access mail.
 For the backend gate test, set `HAPROXY_TEST_BINARY`; it runs `backend-gate.cfg`
 in front of a loopback PROXY v2 stub.
 

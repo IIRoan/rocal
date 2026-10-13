@@ -207,7 +207,7 @@ def write_ssh_key(private_key: str) -> Path:
     return path
 
 
-def deploy_pem(pem: str, host: str, user: str, port: int, key_path: Path) -> None:
+def deploy_pem(pem: str, host: str, user: str, port: int, key_path: Path, known_hosts: Path) -> None:
     remote_tmp = "/tmp/mail.solace.onl.pem"
     ssh_opts = [
         "-i",
@@ -217,7 +217,9 @@ def deploy_pem(pem: str, host: str, user: str, port: int, key_path: Path) -> Non
         "-o",
         "IdentitiesOnly=yes",
         "-o",
-        "StrictHostKeyChecking=accept-new",
+        f"UserKnownHostsFile={known_hosts}",
+        "-o",
+        "StrictHostKeyChecking=yes",
         "-o",
         "PreferredAuthentications=publickey",
     ]
@@ -348,16 +350,24 @@ def main() -> int:
     ssh_key = os.environ.get("VPS_SSH_PRIVATE_KEY", "").strip()
     if not ssh_key:
         raise SystemExit("VPS_SSH_PRIVATE_KEY is required to deploy")
+    # This push carries HAProxy's TLS private key, so the VPS host key must be pinned, never trusted on first use.
+    known_hosts_entries = os.environ.get("VPS_SSH_KNOWN_HOSTS", "").strip()
+    if not known_hosts_entries:
+        raise SystemExit("VPS_SSH_KNOWN_HOSTS is required to deploy (ssh-keyscan output for the VPS)")
 
     vps_host = os.environ.get("VPS_SSH_HOST", "").strip() or host
     vps_user = os.environ.get("VPS_SSH_USER", "").strip() or "gh-cert-sync"
     vps_port = int(os.environ.get("VPS_SSH_PORT", "").strip() or "22")
     key_path = write_ssh_key(ssh_key)
+    with tempfile.NamedTemporaryFile("w", delete=False) as handle:
+        known_hosts = Path(handle.name)
+        handle.write(known_hosts_entries + "\n")
     try:
         print(f"Deploying to {vps_user}@{vps_host}:{vps_port} …")
-        deploy_pem(pem, vps_host, vps_user, vps_port, key_path)
+        deploy_pem(pem, vps_host, vps_user, vps_port, key_path, known_hosts)
     finally:
         key_path.unlink(missing_ok=True)
+        known_hosts.unlink(missing_ok=True)
 
     print("Verifying live certificate after deploy …")
     new_not_after = live_certificate_not_after(host)

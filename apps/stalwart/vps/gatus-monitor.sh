@@ -17,7 +17,6 @@ SERVICES = (
     "frpc-relay",
     "postfix",
     "stalwart-slot-manager",
-    "stalwart-slot-watcher",
 )
 SLOT_PORTS = {
     "blue": (10025, 18080),

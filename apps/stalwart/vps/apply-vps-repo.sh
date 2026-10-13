@@ -113,7 +113,7 @@ render_frp_config() {
 
 if [[ "$APPLY_FRP" == "1" ]]; then
   echo "==> Installing frp configs (APPLY_FRP=1)"
-  FRP_SECRETS="${APPLY_FRP_SECRETS:?APPLY_FRP=1 needs APPLY_FRP_SECRETS (file with FRP_TOKEN= and FRP_RELAY_STCP_KEY=)}"
+  FRP_SECRETS="${APPLY_FRP_SECRETS:?APPLY_FRP=1 needs APPLY_FRP_SECRETS (file with FRP_TOKEN=, FRP_RELAY_STCP_KEY= and FRP_TLS_*=)}"
   FRP_TOKEN="$(sed -n 's/^FRP_TOKEN=//p' "$FRP_SECRETS")"
   FRP_RELAY_STCP_KEY="$(sed -n 's/^FRP_RELAY_STCP_KEY=//p' "$FRP_SECRETS")"
   for secret in "$FRP_TOKEN" "$FRP_RELAY_STCP_KEY"; do
@@ -122,6 +122,25 @@ if [[ "$APPLY_FRP" == "1" ]]; then
       exit 1
     fi
   done
+  # A bad cert here would keep frps from starting and take mail down, so check the set before installing it.
+  for pair in FRP_TLS_CA:ca.crt FRP_TLS_SERVER_CERT:server.crt FRP_TLS_SERVER_KEY:server.key \
+              FRP_TLS_CLIENT_CERT:client.crt FRP_TLS_CLIENT_KEY:client.key; do
+    value="$(sed -n "s/^${pair%%:*}=//p" "$FRP_SECRETS")"
+    if [[ -z "$value" ]] || ! printf '%s' "$value" | base64 -d >"${STAGE}/${pair#*:}" 2>/dev/null; then
+      echo "${pair%%:*} must be a base64-encoded PEM (scripts/frp-tls-certs.sh)" >&2
+      exit 1
+    fi
+  done
+  openssl verify -CAfile "${STAGE}/ca.crt" "${STAGE}/server.crt" "${STAGE}/client.crt" >/dev/null
+  for name in server client; do
+    if [[ "$(openssl x509 -noout -pubkey -in "${STAGE}/${name}.crt")" != "$(openssl pkey -pubout -in "${STAGE}/${name}.key")" ]]; then
+      echo "FRP_TLS_${name^^}_KEY does not match FRP_TLS_${name^^}_CERT" >&2
+      exit 1
+    fi
+  done
+  install -d -m 700 /etc/frp/tls
+  install -m 600 "${STAGE}/ca.crt" "${STAGE}/server.crt" "${STAGE}/server.key" \
+    "${STAGE}/client.crt" "${STAGE}/client.key" /etc/frp/tls/
   if [[ -f "${SRC}/frps.toml" && ! -L "${SRC}/frps.toml" ]]; then
     install -d -m 755 /etc/frp
     render_frp_config "${SRC}/frps.toml" "${STAGE}/frps.toml"
@@ -153,21 +172,20 @@ if [[ "$APPLY_SYSTEMD" == "1" ]]; then
     fi
   done
   systemctl daemon-reload
-  for unit in stalwart-slot-manager stalwart-slot-watcher; do
-    if systemctl is-enabled --quiet "$unit" 2>/dev/null || systemctl is-active --quiet "$unit"; then
-      systemctl restart "$unit"
-      echo "    restarted $unit"
-    fi
-  done
+  if systemctl is-enabled --quiet stalwart-slot-manager 2>/dev/null || systemctl is-active --quiet stalwart-slot-manager; then
+    systemctl restart stalwart-slot-manager
+    echo "    restarted stalwart-slot-manager"
+  fi
 else
   echo "==> Skipping systemd unit install (set APPLY_SYSTEMD=1 to enable)"
-  for unit in stalwart-slot-manager stalwart-slot-watcher; do
-    if systemctl is-active --quiet "$unit"; then
-      systemctl restart "$unit"
-      echo "    restarted $unit (binary/script refresh)"
-    fi
-  done
+  if systemctl is-active --quiet stalwart-slot-manager; then
+    systemctl restart stalwart-slot-manager
+    echo "    restarted stalwart-slot-manager (binary/script refresh)"
+  fi
 fi
+
+# Group tunnels register per-container proxy names the watcher cannot see, so it would fail back to the old slot mid-cutover.
+systemctl disable --now stalwart-slot-watcher 2>/dev/null || true
 
 if [[ -x /usr/local/bin/haproxy-sync-active-slot.sh ]]; then
   /usr/local/bin/haproxy-sync-active-slot.sh || true

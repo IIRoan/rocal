@@ -89,6 +89,7 @@ Secrets: Environment **`mail-vps`** (see [HAProxy TLS cert sync](#haproxy-tls-ce
 
 - **Role:** Accepts inbound frp tunnels from Railway.
 - **Port:** 7000 (control); dynamic proxy ports whitelisted in `vps/frps.toml`
+- **TLS:** forced, with client certs checked against the Solace frp CA in `/etc/frp/tls/` (installed by `apply_frp` from the `FRP_TLS_*` secrets; rollout order in [README.md](../README.md#tunnel-mutual-tls-one-time-rollout))
 - **Repo:** `vps/frps.toml` → `/etc/frp/frps.toml` (mode 600; `__FRP_TOKEN__` rendered from `mail-vps` secret `FRP_TOKEN` by **Sync mail VPS** with `apply_frp`)
 
 ### frpc-relay
@@ -100,7 +101,7 @@ Secrets: Environment **`mail-vps`** (see [HAProxy TLS cert sync](#haproxy-tls-ce
 ### Postfix
 
 - **Role:** Authenticated submission relay; delivers to the internet from the VPS IP.
-- **Listen:** `127.0.0.1:2525` (STCP from Railway), `0.0.0.0:587` (optional direct access)
+- **Listen:** `127.0.0.1:2525` (STCP from Railway), `127.0.0.1:587` (manual tests on the VPS); nothing listens publicly
 - **SASL user:** `relay-client@mail.solace.onl`
 - **Repo:** `vps/postfix-main.cf`, `vps/postfix-master.cf`
 
@@ -124,6 +125,7 @@ Secrets: Environment **`mail-vps`** (see [HAProxy TLS cert sync](#haproxy-tls-ce
 ### stalwart-slot-watcher
 
 - **Role:** Failover-only — promotes the other slot when the active tunnel dies.
+- **Status:** stopped by `apply-vps-repo.sh`; it identifies tunnels by blue/green proxy names, which the group tunnels do not use, so it would fail back to a retiring slot.
 - **Repo:** `vps/stalwart-slot-watcher.py` → `/usr/local/bin/stalwart-slot-watcher`
 
 ### gatus-monitor (optional)
@@ -218,7 +220,7 @@ Allow: 22, 25, 80, 443, 7000 (frp control from Railway).
 
 Port 80 must be open so HAProxy can 301 to HTTPS and send HSTS. Do not leave it firewalled/black-holed.
 
-Port 2525 is **not** exposed publicly — only reachable via the STCP tunnel.
+Ports 587 and 2525 are **not** exposed publicly — Postfix binds them to loopback and Railway reaches 2525 only via the STCP tunnel.
 
 ## HAProxy TLS cert sync
 
@@ -242,9 +244,11 @@ GitHub Environment **`mail-vps`** (`master`/`main` only) holds:
 | `VPS_SSH_HOST` | default `mail.solace.onl` |
 | `VPS_SSH_USER` | default `Roan` |
 | `VPS_SSH_PORT` | default `22` |
+| `VPS_SSH_KNOWN_HOSTS` | Pinned VPS host key for every deploy workflow: `ssh-keyscan -t ed25519 -p <port> <VPS_SSH_HOST>`, after checking its `ssh-keygen -lf -` fingerprint against `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the VPS |
 | `ADMIN_ALLOW_IP` | Operator egress IP/CIDR for public `/admin` + admin OAuth surfaces (written to `/etc/haproxy/admin-allow.lst`; never in git) |
 | `FRP_TOKEN` | frps auth token (32+ alphanumeric); same value as Railway `FRPC_TOKEN`; never in git |
 | `FRP_RELAY_STCP_KEY` | Relay STCP secret (32+ alphanumeric); same value as Railway `FRPC_RELAY_STCP_KEY`; never in git |
+| `FRP_TLS_CA`, `FRP_TLS_SERVER_CERT`, `FRP_TLS_SERVER_KEY`, `FRP_TLS_CLIENT_CERT`, `FRP_TLS_CLIENT_KEY` | Base64 PEMs from `scripts/frp-tls-certs.sh` for frps and `frpc-relay`; `apply_frp` refuses to run without a matching set |
 
 Public mailbox `/account` and `/login` are blocked except for the allowlisted IP (admin OAuth only). JMAP (`/jmap`) stays public for Solace clients.
 

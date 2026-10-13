@@ -17,7 +17,7 @@ defaults, so the config uses a space and CSS hides them.
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `PORT` | auto | Public listen port (proxy + Gatus) |
-| `SLOT_MANAGER_TOKEN` | yes | Bearer token for `/slot-manager/status` and Prometheus proxy |
+| `prometheus_user`, `prometheus_password` | yes | Stalwart `/metrics/prometheus` Basic auth |
 | `DISCORD_WEBHOOK_URL` | yes | Discord webhook for Gatus downtime and scrape failures |
 
 ## Alerting (two layers)
@@ -42,11 +42,10 @@ moderate on Vercel Hobby: website uses `HEAD` (no HTML body), API uses the cheap
 | Application | `api.solace.onl/api/health` | 1m | `< 5000ms`; ~1440/day | Backend API process |
 | Application | `api.solace.onl/api/health/mail-jmap` | 1m | `< 10000ms`; ~1440/day | API can reach Stalwart (one unauthenticated request, no token minting) |
 | Mail | `mail.solace.onl/jmap/session` | 30s | Discord after **2** fails (~1m) | Stalwart JMAP on the public mail edge |
-| Mail | `mail.solace.onl/slot-manager/status` | 30s | Discord after **2** fails (~1m) | Blue/green tunnels |
 
 ### Stalwart Metrics group
 
-Both monitors scrape `mail.solace.onl/slot-manager/metrics/prometheus` once each
+Both monitors scrape Stalwart's own `mail.solace.onl/metrics/prometheus` once each
 (every **2m**). Conditions are combined so we do not fan out 6–8 scrapes of the same URL.
 
 | Monitor | What it checks |
@@ -67,7 +66,7 @@ cd apps/gatus
 docker build -t solace-gatus .
 docker run --rm -p 8080:8080 \
   -e PORT=8080 \
-  -e SLOT_MANAGER_TOKEN=your-token \
+  -e prometheus_user=prometheus -e prometheus_password=your-password \
   -e DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/... \
   solace-gatus
 ```

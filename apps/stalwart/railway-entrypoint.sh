@@ -6,21 +6,18 @@ set -eu
 export HOME="${HOME:-/tmp}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${HOME}/.cache}"
 
-FRPC_LOG_FILE="${FRPC_LOG_FILE:-/tmp/frpc.log}"
-FRPC_STANDBY_LOG_FILE="${FRPC_STANDBY_LOG_FILE:-/tmp/frpc-standby.log}"
-FRPC_RELAY_LOG_FILE="${FRPC_RELAY_LOG_FILE:-/tmp/frpc-relay.log}"
+FRPC_CONFIG="${FRPC_CONFIG:-/tmp/frpc.toml}"
+FRPC_ADMIN_PORT="${FRPC_ADMIN_PORT:-7400}"
+FRPC_TLS_DIR="${FRPC_TLS_DIR:-/tmp/frp-tls}"
 FRPC_RELAY_LOCAL_PORT="${FRPC_RELAY_LOCAL_PORT:-2525}"
-FRPC_STANDBY_ENABLED="${FRPC_STANDBY_ENABLED:-true}"
 RELAY_ROUTE_ID="${RELAY_ROUTE_ID:-ivnbzc1aaba9}"
 STALWART_HTTP_PORT="${STALWART_HTTP_PORT:-8080}"
 STALWART_GATE_PORT="${STALWART_GATE_PORT:-8081}"
 HEALTH_PORT="${PORT:-8090}"
 HEALTH_STATE_PATH="${HEALTH_STATE_PATH:-/tmp/railway-health.json}"
 PG_POOL_MAX_CONNECTIONS="${PG_POOL_MAX_CONNECTIONS:-32}"
-FRPC_STATE_PATH="${FRPC_STATE_PATH:-/tmp/frpc-state.json}"
-FRPC_SUPERVISOR_PID=""
+FRPC_PID=""
 FRPC_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
-export FRPC_OWNER FRPC_STATE_PATH
 
 log() {
 	printf '%s [%s] %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$1" "$2" >&2
@@ -86,34 +83,6 @@ case "${STALWART_RECOVERY_MODE:-}" in
 	1|true|TRUE|yes|YES) RECOVERY_MODE=true ;;
 esac
 
-json_get() {
-	printf '%s\n' "$2" | sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p"
-}
-
-resolve_slot() {
-	FRPC_SLOT="${FRPC_SLOT:-auto}"
-
-	if [ "$FRPC_SLOT" != "auto" ]; then
-		log info "FRPC_SLOT=${FRPC_SLOT} (from environment)."
-		return 0
-	fi
-
-	active="$(curl -fsS --connect-timeout 3 --max-time 5 \
-		"${SLOT_MANAGER_URL:-https://mail.solace.onl/slot-manager}/active" \
-		2>/dev/null || true)"
-	current="$(json_get active "$active")"
-
-	case "$current" in
-		blue) FRPC_SLOT=green ;;
-		green) FRPC_SLOT=blue ;;
-		*)
-			die "Could not read active slot; refusing to guess a slot."
-			;;
-	esac
-
-	log info "FRPC_SLOT=${FRPC_SLOT} (inactive side of active=${current})."
-}
-
 write_store_config() {
 	mkdir -p /etc/stalwart
 	cat > /etc/stalwart/config.json <<EOF
@@ -135,43 +104,28 @@ write_store_config() {
 EOF
 }
 
-other_slot() {
-	case "$1" in
-		blue) printf '%s\n' green ;;
-		green) printf '%s\n' blue ;;
-		*) return 1 ;;
-	esac
-}
+write_frpc_group_proxy() {
+	cat >> "$FRPC_CONFIG" <<EOF
 
-frpc_slot_ports() {
-	case "$1" in
-		blue)
-			smtp=10025
-			https=10443
-			admin=18080
-			;;
-		green)
-			smtp=11025
-			https=11443
-			admin=19080
-			;;
-		*) return 1 ;;
-	esac
+[[proxies]]
+name = "$1-${FRPC_OWNER}"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = $2
+remotePort = $3
+loadBalancer.group = "$1"
+# Only our own clients join; frps already demands the token, so it doubles as the group key.
+loadBalancer.groupKey = "${FRPC_TOKEN}"
+EOF
 }
 
 write_frpc_config() {
-	slot="$1"
-	config_path="$2"
-	suffix="$slot"
-	frpc_slot_ports "$slot" || die "FRPC slot must be blue or green (got ${slot})."
-	case "$slot" in blue) admin_port=7400 ;; green) admin_port=7401 ;; esac
-
-	cat > "$config_path" <<EOF
+	cat > "$FRPC_CONFIG" <<EOF
 serverAddr = "${FRPS_ADDR}"
 serverPort = ${FRPS_PORT:-7000}
 loginFailExit = false
 webServer.addr = "127.0.0.1"
-webServer.port = ${admin_port}
+webServer.port = ${FRPC_ADMIN_PORT}
 
 [auth]
 method = "token"
@@ -185,35 +139,36 @@ dialServerTimeout = 10
 dialServerKeepAlive = 60
 EOF
 
-	# HAProxy already sends PROXY v2; do not add a second header here.
-	if [ "$RECOVERY_MODE" != "true" ]; then
-		cat >> "$config_path" <<EOF
-
-[[proxies]]
-name = "smtp-${suffix}"
-type = "tcp"
-localIP = "127.0.0.1"
-localPort = 25
-remotePort = ${smtp}
+	# Rolled out in stages (README "Tunnel mutual TLS"): client cert first, then frps requires it, then frpc pins the CA.
+	if [ -n "${FRPC_TLS_CERT:-}" ]; then
+		cat >> "$FRPC_CONFIG" <<EOF
+tls.certFile = "${FRPC_TLS_DIR}/client.crt"
+tls.keyFile = "${FRPC_TLS_DIR}/client.key"
+EOF
+	fi
+	if [ -n "${FRPC_TLS_CA:-}" ]; then
+		cat >> "$FRPC_CONFIG" <<EOF
+tls.trustedCaFile = "${FRPC_TLS_DIR}/ca.crt"
+tls.serverName = "frps.solace"
 EOF
 	fi
 
-	cat >> "$config_path" <<EOF
+	cat >> "$FRPC_CONFIG" <<EOF
 
-[[proxies]]
-name = "https-${suffix}"
-type = "tcp"
-localIP = "127.0.0.1"
-localPort = ${STALWART_HTTP_PORT}
-remotePort = ${https}
-
-[[proxies]]
-name = "http-admin-${suffix}"
-type = "tcp"
-localIP = "127.0.0.1"
-localPort = ${STALWART_HTTP_PORT}
-remotePort = ${admin}
+[[visitors]]
+name = "relay-postfix-visitor"
+type = "stcp"
+serverName = "relay-postfix"
+secretKey = "${FRPC_RELAY_STCP_KEY}"
+bindAddr = "0.0.0.0"
+bindPort = ${FRPC_RELAY_LOCAL_PORT}
 EOF
+
+	# Every container joins the same frps groups, so a deploy overlaps old and new; HAProxy already sends PROXY v2.
+	if [ "$RECOVERY_MODE" != "true" ]; then
+		write_frpc_group_proxy smtp 25 10025
+	fi
+	write_frpc_group_proxy http "${STALWART_HTTP_PORT}" 18080
 }
 
 port_listening() {
@@ -246,7 +201,7 @@ state = {
     "ready": ready,
     "recovery_mode": os.environ.get("RECOVERY_MODE") == "true",
     "stalwart_pid": int(os.environ.get("STALWART_PID", "0") or 0),
-    "frpc_state_path": os.environ.get("FRPC_STATE_PATH", "/tmp/frpc-state.json"),
+    "frpc_pid": int(os.environ.get("FRPC_PID", "0") or 0),
     "http_port": int(os.environ.get("STALWART_HTTP_PORT", "8080")),
     "gate_port": int(os.environ.get("STALWART_GATE_PORT", "8081")),
     "relay_port": int(os.environ.get("FRPC_RELAY_LOCAL_PORT", "2525")),
@@ -265,7 +220,6 @@ import json
 import os
 import socket
 import threading
-import time
 
 port = int(os.environ["HEALTH_PORT"])
 state_path = os.environ["HEALTH_STATE_PATH"]
@@ -316,22 +270,8 @@ def ready():
     state = load_state()
     if not state.get("ready"):
         return False
-    if not pid_alive(state.get("stalwart_pid")):
-        return False
-    try:
-        with open(state["frpc_state_path"], encoding="utf-8") as handle:
-            tunnels = json.load(handle)
-    except (OSError, ValueError, KeyError):
-        return False
-    if time.monotonic() - tunnels.get("updated", 0) > 15:
-        return False
-    if not pid_alive(tunnels.get("supervisor_pid")):
-        return False
-    relay = tunnels.get("relay", {})
-    if not relay.get("ready") or not pid_alive(relay.get("pid")):
-        return False
-    if not any(tunnel.get("ready") and pid_alive(tunnel.get("pid"))
-               for tunnel in tunnels.get("slots", {}).values()):
+    # Tunnel reachability is checked once at boot; probing the VPS here would also take down the VPS-independent gate.
+    if not pid_alive(state.get("stalwart_pid")) or not pid_alive(state.get("frpc_pid")):
         return False
     for port in (25, state.get("http_port", 8080), state.get("gate_port", 8081), state.get("relay_port", 2525)):
         if not port_open(port):
@@ -396,26 +336,6 @@ start_gate() {
 	run_as_stalwart haproxy -db -f /usr/local/share/stalwart/backend-gate.cfg &
 	GATE_PID=$!
 	log info "Backend gate pid=${GATE_PID} on :${STALWART_GATE_PORT}."
-}
-
-write_frpc_relay_config() {
-	FRPC_RELAY_CONFIG="${FRPC_RELAY_CONFIG:-/tmp/frpc-relay.toml}"
-	cat > "$FRPC_RELAY_CONFIG" <<EOF
-serverAddr = "${FRPS_ADDR}"
-serverPort = ${FRPS_PORT:-7000}
-
-[auth]
-method = "token"
-token = "${FRPC_TOKEN}"
-
-[[visitors]]
-name = "relay-postfix-visitor"
-type = "stcp"
-serverName = "relay-postfix"
-secretKey = "${FRPC_RELAY_STCP_KEY}"
-bindAddr = "0.0.0.0"
-bindPort = ${FRPC_RELAY_LOCAL_PORT}
-EOF
 }
 
 detect_container_ip() {
@@ -537,7 +457,7 @@ apply_stalwart_plan() {
 	: >"$err_log"
 	while [ "$i" -lt "$max_attempts" ]; do
 		applied=""
-		# Public URL is the proven CLI path (cached schema + JMAP). Local URLs reload this slot.
+		# Public URL is the proven CLI path (cached schema + JMAP). Local URLs reload this container.
 		for try_url in "$public_url" "$private_url" "$ipv4_loopback_url"; do
 			if ! curl -fsSL --max-time 2 \
 				-H "Authorization: Bearer ${STALWART_ADMIN_TOKEN}" \
@@ -568,65 +488,60 @@ apply_stalwart_plan() {
 }
 
 mark_health_ready() {
-	export STALWART_PID STALWART_HTTP_PORT FRPC_RELAY_LOCAL_PORT RECOVERY_MODE
+	export STALWART_PID STALWART_HTTP_PORT FRPC_RELAY_LOCAL_PORT RECOVERY_MODE FRPC_PID
 	write_health_state true
 	log info "Railway health gate open (Stalwart + frpc + relay ready)."
 }
 
-activate_slot() {
-	log info "Requesting VPS promotion for slot=${FRPC_SLOT}."
-	if curl -fsS --connect-timeout 5 --max-time 90 \
-		-X POST "${SLOT_MANAGER_URL:-https://mail.solace.onl/slot-manager}/activate" \
-		-H "Authorization: Bearer ${SLOT_MANAGER_TOKEN}" \
-		-H "Content-Type: application/json" \
-		-d "{\"slot\":\"${FRPC_SLOT}\",\"owner\":\"${FRPC_OWNER}\"}" >/dev/null; then
-		log info "VPS promoted slot=${FRPC_SLOT}."
-		return 0
-	fi
+write_frpc_tls() {
+	mkdir -p "$FRPC_TLS_DIR" && chmod 700 "$FRPC_TLS_DIR" || return 1
+	[ -z "${FRPC_TLS_CERT:-}" ] || printf '%s' "$FRPC_TLS_CERT" | base64 -d >"${FRPC_TLS_DIR}/client.crt" || return 1
+	[ -z "${FRPC_TLS_KEY:-}" ] || (umask 077 && printf '%s' "$FRPC_TLS_KEY" | base64 -d >"${FRPC_TLS_DIR}/client.key") || return 1
+	[ -z "${FRPC_TLS_CA:-}" ] || printf '%s' "$FRPC_TLS_CA" | base64 -d >"${FRPC_TLS_DIR}/ca.crt" || return 1
+}
 
-	die "VPS slot promotion failed; refusing to open Railway health gate."
+frpc_proxies_running() {
+	curl -fsS --max-time 1 "http://127.0.0.1:${FRPC_ADMIN_PORT}/api/status" 2>/dev/null | python3 -c '
+import json, sys
+proxies = json.load(sys.stdin).get("tcp", [])
+sys.exit(0 if proxies and all(proxy.get("status") == "running" for proxy in proxies) else 1)
+' 2>/dev/null
 }
 
 start_frpc() {
-	FRPC_CONFIG="${FRPC_CONFIG:-/tmp/frpc.toml}"
-	FRPC_STANDBY_CONFIG="${FRPC_STANDBY_CONFIG:-/tmp/frpc-standby.toml}"
-	write_frpc_config "$FRPC_SLOT" "$FRPC_CONFIG"
-	write_frpc_config "$(other_slot "$FRPC_SLOT")" "$FRPC_STANDBY_CONFIG"
-	write_frpc_relay_config
-	export FRPC_SLOT RECOVERY_MODE FRPC_LOG_FILE FRPC_STANDBY_LOG_FILE FRPC_RELAY_LOG_FILE
-	export FRPC_CONFIG FRPC_STANDBY_CONFIG
-	export FRPC_RELAY_CONFIG FRPC_RELAY_LOCAL_PORT FRPC_STANDBY_ENABLED HEALTH_STATE_PATH
-	python3 /usr/local/bin/frpc-supervisor.py &
-	FRPC_SUPERVISOR_PID=$!
+	write_frpc_tls || die "FRPC_TLS_* must be base64-encoded PEM."
+	write_frpc_config
+	/usr/local/bin/frpc -c "$FRPC_CONFIG" >&2 &
+	FRPC_PID=$!
 
-	# Leases and children remain supervised during plan apply and promotion.
-	while kill -0 "$FRPC_SUPERVISOR_PID" 2>/dev/null; do
-		if python3 - "$FRPC_STATE_PATH" "$FRPC_OWNER" <<'PY'
-import json
-import sys
-try:
-    with open(sys.argv[1], encoding="utf-8") as handle:
-        state = json.load(handle)
-    sys.exit(0 if state.get("boot_ready") and state.get("owner") == sys.argv[2] else 1)
-except (OSError, ValueError):
-    sys.exit(1)
-PY
-		then
-			apply_stalwart_plan
-			update_relay_route || die "Relay route update failed; refusing to open health gate."
+	i=0
+	max_wait="${FRPC_READY_TIMEOUT_SECONDS:-120}"
+	while [ "$i" -lt "$max_wait" ]; do
+		kill -0 "$FRPC_PID" 2>/dev/null || die "frpc exited before its proxies were running."
+		if frpc_proxies_running && port_listening "$FRPC_RELAY_LOCAL_PORT"; then
+			log info "frpc pid=${FRPC_PID} joined the tunnel groups; relay visitor on :${FRPC_RELAY_LOCAL_PORT}."
 			return 0
 		fi
+		i=$((i + 1))
 		sleep 1
 	done
-	die "frpc supervisor exited before boot readiness."
+	# "port already used" here means a non-group (blue/green) proxy still holds the VPS port.
+	die "frpc proxies were not running within ${max_wait}s."
 }
 
 cleanup() {
 	trap - EXIT TERM INT
-	for child in "${FRPC_SUPERVISOR_PID:-}" "${GATE_PID:-}" "${STALWART_PID:-}" "${HEALTH_PID:-}"; do
+	write_health_state false || true
+	# Leave the tunnel groups first so frps sends new connections to the other container, then drain.
+	if [ -n "$FRPC_PID" ] && kill "$FRPC_PID" 2>/dev/null; then
+		wait "$FRPC_PID" 2>/dev/null || true
+		if [ -n "${STALWART_PID:-}" ] && kill -0 "$STALWART_PID" 2>/dev/null; then
+			sleep "${FRPC_DRAIN_SECONDS:-10}"
+		fi
+	fi
+	for child in "${GATE_PID:-}" "${STALWART_PID:-}" "${HEALTH_PID:-}"; do
 		[ -z "$child" ] || kill "$child" 2>/dev/null || true
 	done
-	[ -z "${FRPC_SUPERVISOR_PID:-}" ] || wait "$FRPC_SUPERVISOR_PID" 2>/dev/null || true
 }
 
 # --- main ---
@@ -634,7 +549,6 @@ cleanup() {
 [ -n "$PGHOST" ] && [ -n "$PGUSER" ] && [ -n "$PGPASSWORD" ] || die "Missing PostgreSQL credentials."
 
 [ -n "${FRPS_ADDR:-}" ] && [ -n "${FRPC_TOKEN:-}" ] || die "FRPS_ADDR and FRPC_TOKEN are required."
-[ -n "${SLOT_MANAGER_TOKEN:-}" ] || die "SLOT_MANAGER_TOKEN is required for safe slot coordination."
 [ -n "${FRPC_RELAY_STCP_KEY:-}" ] || die "FRPC_RELAY_STCP_KEY is required for the outbound relay tunnel."
 STALWART_GATE_KEY="${STALWART_GATE_KEY:-}"
 [ "${#STALWART_GATE_KEY}" -ge 32 ] || die "STALWART_GATE_KEY (32+ characters) is required for the backend gate."
@@ -646,13 +560,14 @@ trap 'exit 0' TERM INT
 
 write_store_config
 prepare_blob_volume
-resolve_slot
 start_health_server
 start_stalwart
 start_gate
 sleep "${STALWART_BOOT_DELAY_SECONDS:-3}"
+apply_stalwart_plan
+update_relay_route || die "Relay route update failed; refusing to open health gate."
+# Joining the tunnel groups is the last boot step: from here the VPS sends this container traffic.
 start_frpc
-activate_slot
 mark_health_ready
 
 i=0
@@ -665,7 +580,7 @@ while [ "$i" -lt 30 ]; do
 done
 [ "$i" -lt 30 ] || die "Health gate did not return 200 after readiness."
 
-log info "Running (Railway health :${HEALTH_PORT}/healthz/ready; slot=${FRPC_SLOT}; Stalwart :${STALWART_HTTP_PORT})."
+log info "Running (Railway health :${HEALTH_PORT}/healthz/ready; Stalwart :${STALWART_HTTP_PORT})."
 
 while :; do
 	if ! kill -0 "$STALWART_PID" 2>/dev/null; then
@@ -676,8 +591,8 @@ while :; do
 	if ! kill -0 "$HEALTH_PID" 2>/dev/null; then
 		die "Health listener exited."
 	fi
-	if ! kill -0 "$FRPC_SUPERVISOR_PID" 2>/dev/null; then
-		die "frpc supervisor exited."
+	if ! kill -0 "$FRPC_PID" 2>/dev/null; then
+		die "frpc exited."
 	fi
 	if ! kill -0 "$GATE_PID" 2>/dev/null; then
 		die "Backend gate exited."

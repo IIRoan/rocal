@@ -4,6 +4,7 @@ import { withStalwartGate } from "../../lib/stalwart-gate";
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
 const KEY = "a".repeat(64);
+const GATE = "https://gate.test";
 
 function sentHeaders(fetcher: jest.Mock<Fetcher>): Headers {
   const [, init] = fetcher.mock.calls[0] as [string, RequestInit | undefined];
@@ -19,7 +20,7 @@ describe("withStalwartGate", () => {
     process.env.STALWART_GATE_KEY = KEY;
     const fetcher = jest.fn<Fetcher>(async () => new Response(null));
 
-    await withStalwartGate(fetcher)("https://gate.test/jmap/", {
+    await withStalwartGate(fetcher, GATE)("https://gate.test/jmap/", {
       method: "POST",
       headers: { Authorization: "Bearer user" },
     });
@@ -34,7 +35,7 @@ describe("withStalwartGate", () => {
     process.env.STALWART_GATE_KEY = KEY;
     const fetcher = jest.fn<Fetcher>(async () => new Response(null));
 
-    await withStalwartGate(fetcher)("https://gate.test/jmap/", {
+    await withStalwartGate(fetcher, GATE)("https://gate.test/jmap/", {
       headers: { "X-Solace-Gate": "forged" },
     });
 
@@ -45,16 +46,26 @@ describe("withStalwartGate", () => {
     const fetcher = jest.fn<Fetcher>(async () => new Response(null));
     const init: RequestInit = { method: "GET" };
 
-    await withStalwartGate(fetcher)("https://mail.solace.onl/jmap/session", init);
+    await withStalwartGate(fetcher, GATE)("https://gate.test/jmap/session", init);
 
-    expect(fetcher).toHaveBeenCalledWith("https://mail.solace.onl/jmap/session", init);
+    expect(fetcher).toHaveBeenCalledWith("https://gate.test/jmap/session", init);
+  });
+
+  it("only sends the key to a configured Stalwart origin", async () => {
+    process.env.STALWART_GATE_KEY = KEY;
+    const fetcher = jest.fn<Fetcher>(async () => new Response(null));
+
+    await withStalwartGate(fetcher, GATE)("https://mail.solace.onl/jmap/session");
+    await withStalwartGate(fetcher, GATE)("https://gate.test.evil.example/jmap/session");
+
+    expect(fetcher.mock.calls.every(([, init]) => !new Headers(init?.headers).has("X-Solace-Gate"))).toBe(true);
   });
 
   it("never sends the key over plain http", async () => {
     process.env.STALWART_GATE_KEY = KEY;
     const fetcher = jest.fn<Fetcher>(async () => new Response(null));
 
-    await withStalwartGate(fetcher)("http://stalwart.test/jmap/session");
+    await withStalwartGate(fetcher, "http://stalwart.test")("http://stalwart.test/jmap/session");
 
     expect(sentHeaders(fetcher).has("X-Solace-Gate")).toBe(false);
   });

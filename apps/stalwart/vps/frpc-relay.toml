@@ -1,5 +1,9 @@
 serverAddr = "127.0.0.1"
 serverPort = 7000
+transport.tls.serverName = "frps.solace"
+transport.tls.certFile = "/etc/frp/tls/client.crt"
+transport.tls.keyFile = "/etc/frp/tls/client.key"
+transport.tls.trustedCaFile = "/etc/frp/tls/ca.crt"
 
 [auth]
 method = "token"

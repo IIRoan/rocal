@@ -158,7 +158,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
   }) {
     this.baseUrl = normalizeBaseUrl(baseUrl);
     this.adminToken = adminToken.trim();
-    this.fetcher = withStalwartGate(fetcher);
+    this.fetcher = withStalwartGate(fetcher, this.baseUrl);
   }
 
   private readonly adminToken: string;
