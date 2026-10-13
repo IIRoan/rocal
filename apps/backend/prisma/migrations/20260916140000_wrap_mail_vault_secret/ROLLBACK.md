@@ -9,7 +9,7 @@ alone loses access to every vault that has already moved.**
 Take a dump and keep it until `vault-wrap-progress` shows `legacy: 0` and mail
 has been opened on web and native:
 
-    docker run --rm postgres:17-alpine pg_dump --format=custom \
+    docker run --rm postgres:18-alpine pg_dump --format=custom \
       --no-owner --no-privileges "$DATABASE_URL" > vault-rekey-$(date +%F).dump
 
 ## Checking progress
@@ -24,7 +24,7 @@ only once it reaches zero.
 Restore just the vault table from the dump taken before the deploy, then deploy
 the previous commit:
 
-    docker run --rm -i postgres:17-alpine pg_restore --data-only \
+    docker run --rm -i postgres:18-alpine pg_restore --data-only \
       --table=mail_vault_backup --dbname "$DATABASE_URL" < vault-rekey-<date>.dump
 
 Any mail label changes made after the dump are lost; mail itself is untouched,
