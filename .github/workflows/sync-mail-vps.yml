@@ -6,10 +6,6 @@ on:
     paths:
       - "apps/stalwart/vps/haproxy.cfg"
       - "apps/stalwart/vps/apply-vps-repo.sh"
-      - "apps/stalwart/vps/haproxy-sync-active-slot.sh"
-      - "apps/stalwart/vps/stalwart-switch-slot.sh"
-      - "apps/stalwart/vps/stalwart-slot-manager.py"
-      - "apps/stalwart/vps/stalwart-slot-watcher.py"
       - "apps/stalwart/vps/gatus-monitor.sh"
       - "apps/stalwart/vps/frps.toml"
       - "apps/stalwart/vps/frpc-relay.toml"
@@ -72,10 +68,6 @@ jobs:
           allow=(
             apply-vps-repo.sh
             haproxy.cfg
-            haproxy-sync-active-slot.sh
-            stalwart-switch-slot.sh
-            stalwart-slot-manager.py
-            stalwart-slot-watcher.py
             gatus-monitor.sh
           )
           APPLY_FRP=0
@@ -101,9 +93,7 @@ jobs:
               exit 1
             fi
           done
-          chmod 755 "${STAGE}/apply-vps-repo.sh" \
-            "${STAGE}/stalwart-switch-slot.sh" \
-            "${STAGE}/haproxy-sync-active-slot.sh"
+          chmod 755 "${STAGE}/apply-vps-repo.sh"
           if [[ -f "${STAGE}/gatus-monitor.sh" ]]; then
             chmod 755 "${STAGE}/gatus-monitor.sh"
           fi
@@ -183,7 +173,6 @@ jobs:
             APPLY_ALLOWLIST=/tmp/admin-allow.lst.new \
             APPLY_FRP=${APPLY_FRP:-0} \
             APPLY_FRP_SECRETS=${REMOTE_DIR}.frp-secrets \
-            APPLY_SYSTEMD=0 \
             ${REMOTE_DIR}/apply-vps-repo.sh ${REMOTE_DIR}
           echo "mail VPS apply complete"
           REMOTE
