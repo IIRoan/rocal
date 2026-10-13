@@ -55,6 +55,7 @@ Security model: **merge-time gates + narrow deploy**, not a manual Actions click
 | No `pull_request` trigger | Fork PRs never receive `mail-vps` secrets |
 | Explicit file allowlist | Only known basenames are copied (not a recursive `vps/` dump) |
 | `apply-vps-repo.sh` default-deny | Skips frp config installs unless opted in |
+| `apply-vps-repo.sh` hook guard | Refuses to run while haproxy's systemd unit still calls a retired slot script |
 | Manual `workflow_dispatch` | Owner-only fallback (e.g. re-run without a new commit) |
 
 #### Required GitHub settings

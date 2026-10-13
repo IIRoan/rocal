@@ -55,6 +55,12 @@ shopt -u nullglob
 
 require_file haproxy.cfg
 
+# Retiring the slot scripts below would break any haproxy unit hook that still calls them, so stop before touching anything.
+if systemctl cat haproxy 2>/dev/null | grep -q 'haproxy-sync-active-slot\|stalwart-switch-slot'; then
+  echo "haproxy's systemd unit still calls a blue/green slot script; remove that drop-in, then re-run" >&2
+  exit 1
+fi
+
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
