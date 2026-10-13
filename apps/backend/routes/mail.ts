@@ -23,6 +23,7 @@ import {
   type RateLimitConfig,
 } from "../lib/rate-limit";
 import { logRef, redactPII, sanitizeRequestUrl, errorLogDetails } from "../lib/log-sanitization";
+import { withStalwartGate } from "../lib/stalwart-gate";
 
 type JmapProxyFetcher = (
   input: string,
@@ -633,7 +634,7 @@ export function createMailRoutes(
     jmapRateLimit?: RateLimitConfig;
   } = {},
 ) {
-  const jmapFetch = options.jmapFetch ?? fetch;
+  const jmapFetch = withStalwartGate(options.jmapFetch ?? fetch);
   const jmapRateLimit = options.jmapRateLimit ?? JMAP_PROXY_RATE_LIMIT;
   const jmapUpstreamBaseUrl =
     options.jmapUpstreamBaseUrl ?? env.stalwartBaseUrl;

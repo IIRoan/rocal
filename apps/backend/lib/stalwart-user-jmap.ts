@@ -4,6 +4,7 @@ import {
   type StalwartJmapEnvelope,
   type StalwartJmapMethodCall,
 } from "./stalwart-admin";
+import { withStalwartGate } from "./stalwart-gate";
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -35,7 +36,7 @@ export class StalwartUserJmapClient implements StalwartUserJmapClientLike {
   }) {
     this.baseUrl = input.baseUrl.replace(/\/+$/, "");
     this.tokens = input.tokens;
-    this.fetcher = input.fetcher ?? fetch;
+    this.fetcher = withStalwartGate(input.fetcher ?? fetch);
   }
 
   private readonly baseUrl: string;

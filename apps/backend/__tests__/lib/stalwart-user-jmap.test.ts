@@ -56,6 +56,26 @@ describe("StalwartUserJmapClient", () => {
     });
   });
 
+  it("sends the backend gate key when configured", async () => {
+    process.env.STALWART_GATE_KEY = "g".repeat(64);
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () => Response.json({ methodResponses: [] }));
+
+    try {
+      await new StalwartUserJmapClient({
+        baseUrl: "https://gate.test",
+        tokens: createTokens(["owner-token"]),
+        fetcher,
+      }).callJmap(CALL);
+      const headers = new Headers(fetcher.mock.calls[0]?.[1]?.headers);
+      expect(headers.get("X-Solace-Gate")).toBe("g".repeat(64));
+      expect(headers.get("Authorization")).toBe("Bearer owner-token");
+    } finally {
+      delete process.env.STALWART_GATE_KEY;
+    }
+  });
+
   it("invalidates the cached token and retries once on a 401", async () => {
     const tokens = createTokens(["stale-token", "fresh-token"]);
     let attempts = 0;
