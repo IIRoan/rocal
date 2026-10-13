@@ -4,6 +4,7 @@ import concurrent.futures
 import importlib.util
 import io
 import json
+import base64
 import os
 from pathlib import Path
 import re
@@ -35,9 +36,10 @@ def shell_functions(*names):
 def render_frpc_config(path, **overrides):
     env = {"PATH": os.environ["PATH"], "FRPC_CONFIG": str(path), "FRPS_ADDR": "127.0.0.1", "FRPC_TOKEN": "test-only",
            "FRPC_ADMIN_PORT": "7400", "FRPC_RELAY_STCP_KEY": "relay-test", "FRPC_RELAY_LOCAL_PORT": "2525",
-           "STALWART_HTTP_PORT": "8080", "FRPC_OWNER": "owner", "RECOVERY_MODE": "false", **overrides}
-    subprocess.run(["sh", "-euc", shell_functions("write_frpc_group_proxy", "write_frpc_config") + "write_frpc_config"],
-                   env=env, check=True)
+           "STALWART_HTTP_PORT": "8080", "FRPC_OWNER": "owner", "RECOVERY_MODE": "false",
+           "FRPC_TLS_DIR": str(Path(path).parent / "tls"), **overrides}
+    script = shell_functions("write_frpc_tls", "write_frpc_group_proxy", "write_frpc_config")
+    subprocess.run(["sh", "-euc", script + "write_frpc_tls\nwrite_frpc_config"], env=env, check=True)
     return Path(path).read_text()
 
 
@@ -212,6 +214,19 @@ class EntrypointTests(unittest.TestCase):
             self.assertEqual(config["visitors"][0]["bindPort"], 2525)
             recovery = tomllib.loads(render_frpc_config(Path(tmp, "frpc.toml"), RECOVERY_MODE="true"))
             self.assertEqual([proxy["name"] for proxy in recovery["proxies"]], ["http-owner"])
+
+    def test_frpc_tls_settings_follow_the_staged_rollout(self):
+        pem = base64.b64encode(b"pem").decode()
+        with tempfile.TemporaryDirectory(prefix="solace-frpc-tls-") as tmp:
+            path = Path(tmp, "frpc.toml")
+            self.assertNotIn("tls", tomllib.loads(render_frpc_config(path))["transport"])
+            client_only = tomllib.loads(render_frpc_config(path, FRPC_TLS_CERT=pem, FRPC_TLS_KEY=pem))["transport"]["tls"]
+            self.assertEqual(set(client_only), {"certFile", "keyFile"})
+            pinned = tomllib.loads(render_frpc_config(path, FRPC_TLS_CERT=pem, FRPC_TLS_KEY=pem,
+                                                      FRPC_TLS_CA=pem))["transport"]["tls"]
+            self.assertEqual(pinned["serverName"], "frps.solace")
+            self.assertEqual(Path(pinned["trustedCaFile"]).read_bytes(), b"pem")
+            self.assertEqual(Path(pinned["keyFile"]).stat().st_mode & 0o777, 0o600)
 
     def test_shutdown_leaves_tunnel_groups_before_stopping_stalwart(self):
         with tempfile.TemporaryDirectory(prefix="solace-shutdown-") as tmp:
