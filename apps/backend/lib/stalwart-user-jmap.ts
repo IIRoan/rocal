@@ -36,7 +36,7 @@ export class StalwartUserJmapClient implements StalwartUserJmapClientLike {
   }) {
     this.baseUrl = input.baseUrl.replace(/\/+$/, "");
     this.tokens = input.tokens;
-    this.fetcher = withStalwartGate(input.fetcher ?? fetch);
+    this.fetcher = withStalwartGate(input.fetcher ?? fetch, this.baseUrl);
   }
 
   private readonly baseUrl: string;

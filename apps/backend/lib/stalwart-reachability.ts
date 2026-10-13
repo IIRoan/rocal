@@ -10,7 +10,7 @@ export async function probeStalwartReachable(input: {
   fetcher?: ReachabilityFetcher;
   timeoutMs?: number;
 }): Promise<{ ok: true } | { ok: false; status: number }> {
-  const fetcher = withStalwartGate(input.fetcher ?? fetch);
+  const fetcher = withStalwartGate(input.fetcher ?? fetch, input.baseUrl);
 
   try {
     const response = await fetcher(
