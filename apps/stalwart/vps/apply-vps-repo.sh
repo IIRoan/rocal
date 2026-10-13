@@ -172,21 +172,20 @@ if [[ "$APPLY_SYSTEMD" == "1" ]]; then
     fi
   done
   systemctl daemon-reload
-  for unit in stalwart-slot-manager stalwart-slot-watcher; do
-    if systemctl is-enabled --quiet "$unit" 2>/dev/null || systemctl is-active --quiet "$unit"; then
-      systemctl restart "$unit"
-      echo "    restarted $unit"
-    fi
-  done
+  if systemctl is-enabled --quiet stalwart-slot-manager 2>/dev/null || systemctl is-active --quiet stalwart-slot-manager; then
+    systemctl restart stalwart-slot-manager
+    echo "    restarted stalwart-slot-manager"
+  fi
 else
   echo "==> Skipping systemd unit install (set APPLY_SYSTEMD=1 to enable)"
-  for unit in stalwart-slot-manager stalwart-slot-watcher; do
-    if systemctl is-active --quiet "$unit"; then
-      systemctl restart "$unit"
-      echo "    restarted $unit (binary/script refresh)"
-    fi
-  done
+  if systemctl is-active --quiet stalwart-slot-manager; then
+    systemctl restart stalwart-slot-manager
+    echo "    restarted stalwart-slot-manager (binary/script refresh)"
+  fi
 fi
+
+# Group tunnels register per-container proxy names the watcher cannot see, so it would fail back to the old slot mid-cutover.
+systemctl disable --now stalwart-slot-watcher 2>/dev/null || true
 
 if [[ -x /usr/local/bin/haproxy-sync-active-slot.sh ]]; then
   /usr/local/bin/haproxy-sync-active-slot.sh || true

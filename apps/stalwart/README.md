@@ -180,8 +180,10 @@ The group ports reuse the blue slot's ports, which the old image's tunnels may h
    `RAILWAY_DEPLOYMENT_OVERLAP_SECONDS=600`, let it redeploy, and repeat until
    `/slot-manager/status` reports `active: green` with blue unoccupied.
 2. Deploy this image. It joins the groups on the blue ports (10025/18080).
-3. Within the overlap window run `sudo stalwart-switch-slot blue` on the VPS; it probes
-   the new container on 18080 and moves HAProxy's weight to it.
+3. Within the overlap window run `sudo stalwart-switch-slot blue` on the VPS (or POST
+   `{"slot":"blue"}` to `/slot-manager/activate` with `SLOT_MANAGER_TOKEN`); it probes the new
+   container on 18080 and moves HAProxy's weight to it. The VPS sync from this change has
+   already stopped `stalwart-slot-watcher`, which cannot see group proxies and would fail back.
 4. After the old container is gone, ship the VPS cleanup (single HAProxy server per
    backend, slot-manager/watcher retired) and drop `FRPC_SLOT`, `FRPC_STANDBY_ENABLED`,
    `SLOT_MANAGER_TOKEN` and the overlap override from Railway.

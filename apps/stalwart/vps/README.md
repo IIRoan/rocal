@@ -125,6 +125,7 @@ Secrets: Environment **`mail-vps`** (see [HAProxy TLS cert sync](#haproxy-tls-ce
 ### stalwart-slot-watcher
 
 - **Role:** Failover-only — promotes the other slot when the active tunnel dies.
+- **Status:** stopped by `apply-vps-repo.sh`; it identifies tunnels by blue/green proxy names, which the group tunnels do not use, so it would fail back to a retiring slot.
 - **Repo:** `vps/stalwart-slot-watcher.py` → `/usr/local/bin/stalwart-slot-watcher`
 
 ### gatus-monitor (optional)
