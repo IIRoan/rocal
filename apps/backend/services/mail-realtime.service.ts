@@ -537,7 +537,7 @@ export class MailRealtimeService {
     owner: MailboxOwner,
     signal: AbortSignal,
   ): Promise<void> {
-    const fetcher = withStalwartGate(this.input.fetcher ?? fetch);
+    const fetcher = withStalwartGate(this.input.fetcher ?? fetch, this.input.eventSourceUrl);
     const url = buildSseRequestUrl(this.input.eventSourceUrl);
     const open = async () => {
       const token = await this.input.tokens.getAccessTokenForUser(owner);
