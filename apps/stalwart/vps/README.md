@@ -17,15 +17,9 @@ flowchart LR
     subgraph Mail
         PF[Postfix]
     end
-    subgraph SlotMgmt
-        MGR[stalwart-slot-manager :9081]
-        WCH[stalwart-slot-watcher]
-    end
 
     HAP --> FRPS
     FREL --> PF
-    WCH --> MGR
-    MGR --> HAP
 ```
 
 ## Services
@@ -42,7 +36,7 @@ All systemd units should be enabled (`systemctl enable`) for boot.
   - Allowlist file: `/etc/haproxy/admin-allow.lst` from GitHub Environment secret `ADMIN_ALLOW_IP` on `IIRoan/rocal` `mail-vps` (never in git).
   - Loopback Admin UI remains on `127.0.0.1:8080` via SSH tunnel.
 - **Repo:** `vps/haproxy.cfg` → `/etc/haproxy/haproxy.cfg`
-- **Active slot:** `/etc/haproxy/stalwart-active-slot` (`blue` or `green`)
+- **Backends:** one server each, the frps group ports `127.0.0.1:10025` (smtp) and `127.0.0.1:18080` (http)
 - **TLS cert:** `/etc/haproxy/certs/mail.solace.onl.pem` (HAProxy terminates HTTPS). This file is **separate** from Stalwart’s ACME-managed certificates (used for SMTP STARTTLS on :25). Renewing Stalwart ACME does **not** update HAProxy.
   - One-shot: `vps/install-haproxy-cert.sh`
   - Automated: GitHub Action + [`scripts/sync-haproxy-cert.py`](../scripts/sync-haproxy-cert.py) (see [HAProxy TLS cert sync](#haproxy-tls-cert-sync))
@@ -60,7 +54,7 @@ Security model: **merge-time gates + narrow deploy**, not a manual Actions click
 | Environment `mail-vps` | Secrets only; deployment branches limited to `master`/`main` |
 | No `pull_request` trigger | Fork PRs never receive `mail-vps` secrets |
 | Explicit file allowlist | Only known basenames are copied (not a recursive `vps/` dump) |
-| `apply-vps-repo.sh` default-deny | Skips frp/systemd unit installs unless opted in |
+| `apply-vps-repo.sh` default-deny | Skips frp config installs unless opted in |
 | Manual `workflow_dispatch` | Owner-only fallback (e.g. re-run without a new commit) |
 
 #### Required GitHub settings
@@ -105,82 +99,21 @@ Secrets: Environment **`mail-vps`** (see [HAProxy TLS cert sync](#haproxy-tls-ce
 - **SASL user:** `relay-client@mail.solace.onl`
 - **Repo:** `vps/postfix-main.cf`, `vps/postfix-master.cf`
 
-### stalwart-slot-manager
-
-- **Role:** HTTP API for active slot; triggers HAProxy runtime reconfiguration. Also proxies `GET /metrics/prometheus` to the active slot's local HTTP port so Gatus scrapes never hit the warming slot during cutover. Tracks **slot preempt** flags so a new Railway deploy can ask the incumbent to drop its warm-standby frpc before binding the inactive slot.
-- **Port:** 127.0.0.1:9081 (public via HAProxy `/slot-manager/`)
-- **Repo:** `vps/stalwart-slot-manager.py` → `/usr/local/bin/stalwart-slot-manager.py`
-- **Invokes:** `/usr/local/bin/stalwart-switch-slot` (no `.sh` suffix — see [Blue/green cutover](#bluegreen-cutover))
-- **Auth POSTs:** `/activate`, `/preempt`, `/preempt/clear`, `/lease/claim`, `/lease/reclaim`, `/lease/renew`, `/lease/release` (Bearer `SLOT_MANAGER_TOKEN`; JSON `slot` + per-container `owner`)
-- **Prometheus proxy:** `GET /metrics/prometheus` (Bearer `SLOT_MANAGER_TOKEN` from Gatus). The manager scrapes the active slot locally with Stalwart WebUI basic auth from `/etc/stalwart-slot-manager.env`: set `PROMETHEUS_USER` + `PROMETHEUS_PASSWORD` (same values as Gatus `prometheus_user` / `prometheus_password`) or pre-encoded `PROMETHEUS_BASIC_AUTH`.
-- **Status:** `GET /status` reports `protocolVersion: 2`, `blueOccupied` / `greenOccupied` (null if unknown), `bluePreempted` / `greenPreempted`, and per-slot `Owner` / `PreemptOwner`
-- **State:** atomic owner-scoped records in `/run/stalwart-slot-preempt/`. Leases expire after 30 seconds; abandoned preempt requests expire after 90 seconds. Claims require a vacant frps dashboard result and no competing lease, including pending launches. Release acknowledgement follows process termination. An expired lease does not override an online proxy.
-
-### stalwart-switch-slot
-
-- **Role:** HAProxy blue/green cutover when Railway calls `POST /slot-manager/activate`.
-- **Repo:** `vps/stalwart-switch-slot.sh` → **`/usr/local/bin/stalwart-switch-slot`** (not `stalwart-switch-slot.sh`)
-- **Gotcha:** `stalwart-slot-manager.py` and `stalwart-slot-watcher.py` default to the path **without** `.sh`. Installing only to `stalwart-switch-slot.sh` leaves the old script in place and restores deploy-time 503s.
-
-### stalwart-slot-watcher
-
-- **Role:** Failover-only — promotes the other slot when the active tunnel dies.
-- **Status:** stopped by `apply-vps-repo.sh`; it identifies tunnels by blue/green proxy names, which the group tunnels do not use, so it would fail back to a retiring slot.
-- **Repo:** `vps/stalwart-slot-watcher.py` → `/usr/local/bin/stalwart-slot-watcher`
-
 ### gatus-monitor (optional)
 
 - **Role:** JSON health snapshot for Gatus SSH probes from Railway (`status.solace.onl`).
 - **Repo:** `vps/gatus-monitor.sh` → `/usr/local/bin/gatus-monitor.sh`
 - **Setup:** See [apps/gatus/README.md](../../gatus/README.md)
-- **JMAP diagnostics:** reports `jmap.tunnel.ms` (frp → Stalwart) and `jmap.edge.ms` (HAProxy → frp → Stalwart)
+- **Reports:** service states, online members per frp group (`smtp`, `http`; two during a deploy), JMAP through the group port, and the Postfix queue
 
-## Blue/green cutover
+## Tunnel groups
 
-Railway picks the **inactive** slot (`FRPC_SLOT=auto`), starts frpc, then calls
-`POST /slot-manager/activate` **before** opening the Railway health gate. The VPS
-`stalwart-switch-slot` script:
-
-1. Leaves the **incumbent** at 100% weight and warms the target at 1%.
-2. Probes JMAP directly on the target frp port (`127.0.0.1:18080` or `:19080`).
-3. Temporarily gives both slots 100% weight, confirms target HAProxy health,
-   then checks the public edge (`https://mail.solace.onl/jmap/session`).
-4. Flips to exclusive weights (target 100%, incumbent 0%) and keeps the old slot
-   `ready` (not `maint`) so a warm standby tunnel can health-check.
-
-After promotion and the Railway health gate, `frpc-supervisor.py` claims the
-vacated slot and starts standby (`FRPC_STANDBY_ENABLED`, default on).
-`stalwart-slot-watcher` can then fail over if the active tunnel drops. Standby
-registration and retries are nonblocking, so primary/relay recovery continues.
-
-**Deploy race (dual-slot occupancy):** the live container holds both slots. The next
-deploy's inactive slot may still be the incumbent's standby. Before binding, the new
-container `POST /preempt`s that slot with its owner ID. The incumbent stops the
-inactive slot's process and acknowledges `/lease/release`, even if that process
-was originally its primary before watcher failover. The new deploy must then
-successfully `/lease/claim` before launch. A pending standby launch already holds
-a lease, so observing empty ports alone cannot let a peer bind early. Only the
-preempt owner can clear its request; claiming retains exclusive ownership after
-clear. The primary claim deadline is 60 elapsed seconds by default.
-
-The supervisor renews leases every five seconds and stops a tunnel before its
-lease expires if coordination is unavailable. Standby retries after failed binds,
-abandoned preemption, or a peer leaving; it never preempts another owner.
-`/lease/reclaim` supports a previously owned active slot after lease expiry or a
-VPS reboot, but still requires confirmed vacancy. The manager shares the watcher's
-switch lock so two promotions cannot interleave.
-
-**Deploy VPS first:** install/restart slot-manager and install the switch script,
-verify authenticated `/status` reports `protocolVersion: 2`, then deploy the
-Railway image, then Gatus. Old entrypoints can still `/activate` a slot without a
-v2 lease during this migration. New entrypoints reject old managers and missing
-tokens; they never bind on coordination failure.
-
-This avoids `<NOSRV>` / 503 windows when the old Railway container retires mid-cutover.
-Typical cutover time is ~5s.
-
-`stalwart-slot-watcher` is **failover-only** — it does not participate in normal
-deploys. See [README.md](../README.md) for the full sequence.
+frps exposes two group ports on loopback: `10025` (smtp) and `18080` (http). Each
+Stalwart container's frpc registers one proxy per group under a per-container name, and
+frps spreads connections across every registered container. HAProxy has a single server
+per backend pointing at those ports, so a deploy needs no VPS action: the new container
+joins the groups, the old one leaves them on SIGTERM, and the port never goes empty. The
+container side is described in [README.md](../README.md#zero-downtime-deploys).
 
 ## Operations
 
@@ -195,22 +128,16 @@ Allowlist updates: set Environment secret `ADMIN_ALLOW_IP` on `mail-vps`, then r
 
 ```bash
 # Service status
-systemctl status haproxy frps frpc-relay postfix stalwart-slot-manager stalwart-slot-watcher
+systemctl status haproxy frps frpc-relay postfix
 
-# Active slot
-cat /etc/haproxy/stalwart-active-slot
+# Containers registered in the tunnel groups (two during a deploy)
+curl -s http://127.0.0.1:7500/api/proxy/tcp | python3 -m json.tool | grep -E '"(name|status)"'
 
-# Manual slot switch
-sudo /usr/local/bin/stalwart-switch-slot blue
-sudo /usr/local/bin/stalwart-switch-slot green
-
-# Install / update VPS scripts from repo checkout
-sudo install -m 755 vps/stalwart-switch-slot.sh /usr/local/bin/stalwart-switch-slot
-sudo install -m 644 vps/stalwart-slot-manager.py /usr/local/bin/stalwart-slot-manager.py
+# Health snapshot (same JSON Gatus reads)
+/usr/local/bin/gatus-monitor.sh
 
 # Config validation
 sudo haproxy -c -f /etc/haproxy/haproxy.cfg && sudo systemctl reload haproxy
-sudo /usr/local/bin/haproxy-sync-active-slot.sh
 sudo postfix check && sudo systemctl reload postfix
 ```
 
