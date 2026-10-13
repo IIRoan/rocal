@@ -114,12 +114,14 @@ jobs:
           VPS_SSH_HOST: ${{ secrets.VPS_SSH_HOST }}
           VPS_SSH_USER: ${{ secrets.VPS_SSH_USER }}
           VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
           ADMIN_ALLOW_IP: ${{ secrets.ADMIN_ALLOW_IP }}
           FRP_TOKEN: ${{ secrets.FRP_TOKEN }}
           FRP_RELAY_STCP_KEY: ${{ secrets.FRP_RELAY_STCP_KEY }}
         run: |
           set -euo pipefail
           : "${VPS_SSH_PRIVATE_KEY:?set Environment secret VPS_SSH_PRIVATE_KEY on mail-vps}"
+          : "${VPS_SSH_KNOWN_HOSTS:?set Environment secret VPS_SSH_KNOWN_HOSTS on mail-vps (ssh-keyscan output for the VPS)}"
           : "${ADMIN_ALLOW_IP:?set Environment secret ADMIN_ALLOW_IP on mail-vps}"
           if [[ "${APPLY_FRP}" == "1" ]]; then
             : "${FRP_TOKEN:?set Environment secret FRP_TOKEN on mail-vps}"
@@ -141,18 +143,19 @@ jobs:
           KEY="$(mktemp)"
           ALLOW="$(mktemp)"
           FRP_SECRETS="$(mktemp)"
-          trap 'rm -f "$KEY" "$ALLOW" "$FRP_SECRETS"' EXIT
+          KNOWN_HOSTS="$(mktemp)"
+          trap 'rm -f "$KEY" "$ALLOW" "$FRP_SECRETS" "$KNOWN_HOSTS"' EXIT
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" >"$KNOWN_HOSTS"
           printf '%s\n' "$VPS_SSH_PRIVATE_KEY" >"$KEY"
           printf '%s\n' "$ADMIN_ALLOW_IP" >"$ALLOW"
           printf 'FRP_TOKEN=%s\nFRP_RELAY_STCP_KEY=%s\n' "$FRP_TOKEN" "$FRP_RELAY_STCP_KEY" >"$FRP_SECRETS"
           chmod 600 "$KEY" "$ALLOW" "$FRP_SECRETS"
 
+          # A fresh runner has no known_hosts, so pin the VPS host key instead of trusting the first answer.
           SSH=(ssh -i "$KEY" -p "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes
-               -o PubkeyAcceptedAlgorithms=+ssh-rsa,rsa-sha2-512,rsa-sha2-256
-               -o StrictHostKeyChecking=accept-new)
+               -o UserKnownHostsFile="$KNOWN_HOSTS" -o StrictHostKeyChecking=yes)
           SCP=(scp -i "$KEY" -P "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes
-               -o PubkeyAcceptedAlgorithms=+ssh-rsa,rsa-sha2-512,rsa-sha2-256
-               -o StrictHostKeyChecking=accept-new)
+               -o UserKnownHostsFile="$KNOWN_HOSTS" -o StrictHostKeyChecking=yes)
 
           REMOTE_DIR="/tmp/rocal-vps-$$"
           "${SSH[@]}" "${USER}@${HOST}" "rm -rf '$REMOTE_DIR' && mkdir -p '$REMOTE_DIR'"

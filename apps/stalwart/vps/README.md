@@ -242,6 +242,7 @@ GitHub Environment **`mail-vps`** (`master`/`main` only) holds:
 | `VPS_SSH_HOST` | default `mail.solace.onl` |
 | `VPS_SSH_USER` | default `Roan` |
 | `VPS_SSH_PORT` | default `22` |
+| `VPS_SSH_KNOWN_HOSTS` | Pinned VPS host key for every deploy workflow: `ssh-keyscan -t ed25519 -p <port> <VPS_SSH_HOST>`, after checking its `ssh-keygen -lf -` fingerprint against `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the VPS |
 | `ADMIN_ALLOW_IP` | Operator egress IP/CIDR for public `/admin` + admin OAuth surfaces (written to `/etc/haproxy/admin-allow.lst`; never in git) |
 | `FRP_TOKEN` | frps auth token (32+ alphanumeric); same value as Railway `FRPC_TOKEN`; never in git |
 | `FRP_RELAY_STCP_KEY` | Relay STCP secret (32+ alphanumeric); same value as Railway `FRPC_RELAY_STCP_KEY`; never in git |
