@@ -118,6 +118,11 @@ jobs:
           ADMIN_ALLOW_IP: ${{ secrets.ADMIN_ALLOW_IP }}
           FRP_TOKEN: ${{ secrets.FRP_TOKEN }}
           FRP_RELAY_STCP_KEY: ${{ secrets.FRP_RELAY_STCP_KEY }}
+          FRP_TLS_CA: ${{ secrets.FRP_TLS_CA }}
+          FRP_TLS_SERVER_CERT: ${{ secrets.FRP_TLS_SERVER_CERT }}
+          FRP_TLS_SERVER_KEY: ${{ secrets.FRP_TLS_SERVER_KEY }}
+          FRP_TLS_CLIENT_CERT: ${{ secrets.FRP_TLS_CLIENT_CERT }}
+          FRP_TLS_CLIENT_KEY: ${{ secrets.FRP_TLS_CLIENT_KEY }}
         run: |
           set -euo pipefail
           : "${VPS_SSH_PRIVATE_KEY:?set Environment secret VPS_SSH_PRIVATE_KEY on mail-vps}"
@@ -126,6 +131,9 @@ jobs:
           if [[ "${APPLY_FRP}" == "1" ]]; then
             : "${FRP_TOKEN:?set Environment secret FRP_TOKEN on mail-vps}"
             : "${FRP_RELAY_STCP_KEY:?set Environment secret FRP_RELAY_STCP_KEY on mail-vps}"
+            for secret in FRP_TLS_CA FRP_TLS_SERVER_CERT FRP_TLS_SERVER_KEY FRP_TLS_CLIENT_CERT FRP_TLS_CLIENT_KEY; do
+              : "${!secret:?set Environment secret ${secret} on mail-vps (apps/stalwart/scripts/frp-tls-certs.sh)}"
+            done
           fi
           while IFS= read -r line; do
             [[ -z "$line" ]] && continue
@@ -148,7 +156,9 @@ jobs:
           printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" >"$KNOWN_HOSTS"
           printf '%s\n' "$VPS_SSH_PRIVATE_KEY" >"$KEY"
           printf '%s\n' "$ADMIN_ALLOW_IP" >"$ALLOW"
-          printf 'FRP_TOKEN=%s\nFRP_RELAY_STCP_KEY=%s\n' "$FRP_TOKEN" "$FRP_RELAY_STCP_KEY" >"$FRP_SECRETS"
+          printf 'FRP_TOKEN=%s\nFRP_RELAY_STCP_KEY=%s\nFRP_TLS_CA=%s\nFRP_TLS_SERVER_CERT=%s\nFRP_TLS_SERVER_KEY=%s\nFRP_TLS_CLIENT_CERT=%s\nFRP_TLS_CLIENT_KEY=%s\n' \
+            "$FRP_TOKEN" "$FRP_RELAY_STCP_KEY" "$FRP_TLS_CA" "$FRP_TLS_SERVER_CERT" "$FRP_TLS_SERVER_KEY" \
+            "$FRP_TLS_CLIENT_CERT" "$FRP_TLS_CLIENT_KEY" >"$FRP_SECRETS"
           chmod 600 "$KEY" "$ALLOW" "$FRP_SECRETS"
 
           # A fresh runner has no known_hosts, so pin the VPS host key instead of trusting the first answer.

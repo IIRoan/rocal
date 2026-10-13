@@ -89,6 +89,7 @@ Secrets: Environment **`mail-vps`** (see [HAProxy TLS cert sync](#haproxy-tls-ce
 
 - **Role:** Accepts inbound frp tunnels from Railway.
 - **Port:** 7000 (control); dynamic proxy ports whitelisted in `vps/frps.toml`
+- **TLS:** forced, with client certs checked against the Solace frp CA in `/etc/frp/tls/` (installed by `apply_frp` from the `FRP_TLS_*` secrets; rollout order in [README.md](../README.md#tunnel-mutual-tls-one-time-rollout))
 - **Repo:** `vps/frps.toml` → `/etc/frp/frps.toml` (mode 600; `__FRP_TOKEN__` rendered from `mail-vps` secret `FRP_TOKEN` by **Sync mail VPS** with `apply_frp`)
 
 ### frpc-relay
@@ -246,6 +247,7 @@ GitHub Environment **`mail-vps`** (`master`/`main` only) holds:
 | `ADMIN_ALLOW_IP` | Operator egress IP/CIDR for public `/admin` + admin OAuth surfaces (written to `/etc/haproxy/admin-allow.lst`; never in git) |
 | `FRP_TOKEN` | frps auth token (32+ alphanumeric); same value as Railway `FRPC_TOKEN`; never in git |
 | `FRP_RELAY_STCP_KEY` | Relay STCP secret (32+ alphanumeric); same value as Railway `FRPC_RELAY_STCP_KEY`; never in git |
+| `FRP_TLS_CA`, `FRP_TLS_SERVER_CERT`, `FRP_TLS_SERVER_KEY`, `FRP_TLS_CLIENT_CERT`, `FRP_TLS_CLIENT_KEY` | Base64 PEMs from `scripts/frp-tls-certs.sh` for frps and `frpc-relay`; `apply_frp` refuses to run without a matching set |
 
 Public mailbox `/account` and `/login` are blocked except for the allowlisted IP (admin OAuth only). JMAP (`/jmap`) stays public for Solace clients.
 

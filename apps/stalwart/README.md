@@ -186,6 +186,23 @@ The group ports reuse the blue slot's ports, which the old image's tunnels may h
    backend, slot-manager/watcher retired) and drop `FRPC_SLOT`, `FRPC_STANDBY_ENABLED`,
    `SLOT_MANAGER_TOKEN` and the overlap override from Railway.
 
+### Tunnel mutual TLS (one-time rollout)
+
+frps only accepts TLS from clients holding a cert signed by the Solace frp CA, and frpc
+pins that CA (`serverName = "frps.solace"`), so a leaked `FRPC_TOKEN` or an
+intercepted connection can no longer register proxies. Roll out in this order;
+each step keeps the old side working:
+
+1. `sh apps/stalwart/scripts/frp-tls-certs.sh <new dir>` and set the five `FRP_TLS_*`
+   secrets on `mail-vps` as it prints. Store `ca.key` offline.
+2. Set `FRPC_TLS_CERT` and `FRPC_TLS_KEY` on Railway `stalwart-mail` and let it redeploy:
+   frpc presents the client cert, which today's frps ignores.
+3. Run **Sync mail VPS** with `apply_frp`: frps now requires TLS plus a client cert, and
+   `frpc-relay` uses one too. Tunnels drop for a few seconds while frps restarts.
+4. Set `FRPC_TLS_CA` on Railway and let it redeploy: frpc now also verifies frps.
+
+Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all four steps.
+
 ## Repository layout
 
 | Path | Purpose |
@@ -194,6 +211,7 @@ The group ports reuse the blue slot's ports, which the old image's tunnels may h
 | `scripts/stalwart-plan.sh` | apply / dry-run / snapshot / drift / dns-publish |
 | `scripts/sync-haproxy-cert.py` | Export Stalwart ACME cert → HAProxy PEM |
 | `scripts/test-relay-route.sh` | Offline tests for relay-route helpers |
+| `scripts/frp-tls-certs.sh` | Mints the frp CA, frps server cert and frpc client cert for tunnel mutual TLS |
 | `railway-entrypoint.sh` | Stalwart + health server + plan apply + relay IP, then frpc joins the tunnel groups; SIGTERM leaves them before stopping Stalwart |
 | `backend-gate.cfg` | HAProxy gate for the Solace API: key check, path allowlist, `X-Real-IP` → PROXY v2 to Stalwart `:8080` |
 | `Dockerfile` | Mail image (Railway `rootDirectory: apps/stalwart`) |
@@ -216,6 +234,8 @@ The group ports reuse the blue slot's ports, which the old image's tunnels may h
 | `STALWART_MAIL_INGEST_WEBHOOK_SECRET` | no | HMAC for Solace `message-ingest.ham` webhook (omit from plan if unset; live HMAC is kept) |
 | `FRPC_READY_TIMEOUT_SECONDS` | no | Deadline for frpc's proxies to register and the relay visitor to listen (default `120` seconds); timeout fails boot |
 | `FRPC_DRAIN_SECONDS` | no | Wait between leaving the tunnel groups and stopping Stalwart on SIGTERM (default `10`) |
+| `FRPC_TLS_CERT`, `FRPC_TLS_KEY` | rollout | Base64 PEM client cert/key from `scripts/frp-tls-certs.sh`; required once frps enforces mutual TLS |
+| `FRPC_TLS_CA` | rollout | Base64 PEM of the frp CA; set after frps has the new server cert, then frpc verifies frps |
 | `STALWART_HTTP_PORT` | no | Stalwart HTTP/JMAP port (default `8080`) |
 | `STALWART_GATE_PORT` | no | Backend gate port, the Railway domain's target (default `8081`) |
 | `RELAY_ROUTE_ID` | no | Stalwart MtaRoute id (default `ivnbzc1aaba9`) |

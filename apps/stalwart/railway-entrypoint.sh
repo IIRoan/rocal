@@ -8,6 +8,7 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${HOME}/.cache}"
 
 FRPC_CONFIG="${FRPC_CONFIG:-/tmp/frpc.toml}"
 FRPC_ADMIN_PORT="${FRPC_ADMIN_PORT:-7400}"
+FRPC_TLS_DIR="${FRPC_TLS_DIR:-/tmp/frp-tls}"
 FRPC_RELAY_LOCAL_PORT="${FRPC_RELAY_LOCAL_PORT:-2525}"
 RELAY_ROUTE_ID="${RELAY_ROUTE_ID:-ivnbzc1aaba9}"
 STALWART_HTTP_PORT="${STALWART_HTTP_PORT:-8080}"
@@ -136,6 +137,23 @@ tcpMux = true
 tcpMuxKeepaliveInterval = 10
 dialServerTimeout = 10
 dialServerKeepAlive = 60
+EOF
+
+	# Rolled out in stages (README "Tunnel mutual TLS"): client cert first, then frps requires it, then frpc pins the CA.
+	if [ -n "${FRPC_TLS_CERT:-}" ]; then
+		cat >> "$FRPC_CONFIG" <<EOF
+tls.certFile = "${FRPC_TLS_DIR}/client.crt"
+tls.keyFile = "${FRPC_TLS_DIR}/client.key"
+EOF
+	fi
+	if [ -n "${FRPC_TLS_CA:-}" ]; then
+		cat >> "$FRPC_CONFIG" <<EOF
+tls.trustedCaFile = "${FRPC_TLS_DIR}/ca.crt"
+tls.serverName = "frps.solace"
+EOF
+	fi
+
+	cat >> "$FRPC_CONFIG" <<EOF
 
 [[visitors]]
 name = "relay-postfix-visitor"
@@ -475,6 +493,13 @@ mark_health_ready() {
 	log info "Railway health gate open (Stalwart + frpc + relay ready)."
 }
 
+write_frpc_tls() {
+	mkdir -p "$FRPC_TLS_DIR" && chmod 700 "$FRPC_TLS_DIR" || return 1
+	[ -z "${FRPC_TLS_CERT:-}" ] || printf '%s' "$FRPC_TLS_CERT" | base64 -d >"${FRPC_TLS_DIR}/client.crt" || return 1
+	[ -z "${FRPC_TLS_KEY:-}" ] || (umask 077 && printf '%s' "$FRPC_TLS_KEY" | base64 -d >"${FRPC_TLS_DIR}/client.key") || return 1
+	[ -z "${FRPC_TLS_CA:-}" ] || printf '%s' "$FRPC_TLS_CA" | base64 -d >"${FRPC_TLS_DIR}/ca.crt" || return 1
+}
+
 frpc_proxies_running() {
 	curl -fsS --max-time 1 "http://127.0.0.1:${FRPC_ADMIN_PORT}/api/status" 2>/dev/null | python3 -c '
 import json, sys
@@ -484,6 +509,7 @@ sys.exit(0 if proxies and all(proxy.get("status") == "running" for proxy in prox
 }
 
 start_frpc() {
+	write_frpc_tls || die "FRPC_TLS_* must be base64-encoded PEM."
 	write_frpc_config
 	/usr/local/bin/frpc -c "$FRPC_CONFIG" >&2 &
 	FRPC_PID=$!
