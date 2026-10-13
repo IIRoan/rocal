@@ -90,5 +90,5 @@ ss -tlnp | grep 2525
 ## Optional: `mailsend.solace.onl`
 
 A DNS A record for `mailsend.solace.onl` → VPS IP is optional. Postfix also
-listens on `0.0.0.0:587` for direct submission from outside Railway (e.g. manual
-tests from the VPS). This is **not** the path used by Railway containers.
+listens on `127.0.0.1:587` for manual submission tests on the VPS itself; it is
+not reachable from outside and is **not** the path used by Railway containers.
