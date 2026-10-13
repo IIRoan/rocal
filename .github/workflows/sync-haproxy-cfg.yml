@@ -40,9 +40,7 @@ jobs:
           set -euo pipefail
           STAGE="$(mktemp -d)"
           echo "STAGE=${STAGE}" >>"$GITHUB_ENV"
-          for f in apply-vps-repo.sh haproxy.cfg haproxy-sync-active-slot.sh \
-                   stalwart-switch-slot.sh stalwart-slot-manager.py stalwart-slot-watcher.py \
-                   gatus-monitor.sh; do
+          for f in apply-vps-repo.sh haproxy.cfg gatus-monitor.sh; do
             src="apps/stalwart/vps/${f}"
             if [[ -f "$src" && ! -L "$src" ]]; then
               install -m 644 "$src" "${STAGE}/${f}"
@@ -51,8 +49,7 @@ jobs:
               exit 1
             fi
           done
-          chmod 755 "${STAGE}/apply-vps-repo.sh" "${STAGE}/stalwart-switch-slot.sh" \
-            "${STAGE}/haproxy-sync-active-slot.sh"
+          chmod 755 "${STAGE}/apply-vps-repo.sh"
           [[ -f "${STAGE}/gatus-monitor.sh" ]] && chmod 755 "${STAGE}/gatus-monitor.sh"
 
       - name: Deploy via apply-vps-repo.sh
@@ -103,7 +100,7 @@ jobs:
           "${SSH[@]}" "${USER}@${HOST}" bash -s <<REMOTE
           set -euo pipefail
           chmod +x ${REMOTE_DIR}/apply-vps-repo.sh
-          sudo -n env APPLY_ALLOWLIST=/tmp/admin-allow.lst.new APPLY_FRP=0 APPLY_SYSTEMD=0 \
+          sudo -n env APPLY_ALLOWLIST=/tmp/admin-allow.lst.new APPLY_FRP=0 \
             ${REMOTE_DIR}/apply-vps-repo.sh ${REMOTE_DIR}
           rm -rf ${REMOTE_DIR} /tmp/admin-allow.lst.new
           echo "HAProxy + VPS artifacts installed."

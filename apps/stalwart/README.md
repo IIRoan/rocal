@@ -160,10 +160,9 @@ sequenceDiagram
 ```
 
 Joining the groups is the last boot step, so a registered container is a ready one; there
-is no slot coordination with the VPS and no deploy order between VPS and image. If frpc
-cannot register within `FRPC_READY_TIMEOUT_SECONDS` (for example a blue/green proxy still
-holds the port), boot fails and the platform keeps the old container. For a few seconds
-both containers serve. They share Postgres and the blob store but no cache coordinator,
+is no coordination with the VPS and no deploy order between VPS and image. If frpc cannot
+register within `FRPC_READY_TIMEOUT_SECONDS`, boot fails and the platform keeps the old
+container. For a few seconds both containers serve. They share Postgres and the blob store but no cache coordinator,
 so a client may briefly see state cached on the other container; long-lived IMAP IDLE /
 JMAP push connections on the old container drop and clients reconnect.
 
@@ -171,22 +170,6 @@ Railway probes `GET /healthz/ready` on `PORT` (8090). Healthcheck, overlap, and 
 Readiness needs a ready boot state, live Stalwart and frpc processes, and open
 :25/:8080/:8081/relay ports. It deliberately does not probe the VPS, so a tunnel blip
 never marks the container (and with it the VPS-independent API gate) unhealthy.
-
-### One-time cutover from blue/green slots
-
-The group ports reuse the blue slot's ports, which the old image's tunnels may hold.
-
-1. On Railway `stalwart-mail` set `FRPC_STANDBY_ENABLED=false` and
-   `RAILWAY_DEPLOYMENT_OVERLAP_SECONDS=600`, let it redeploy, and repeat until
-   `/slot-manager/status` reports `active: green` with blue unoccupied.
-2. Deploy this image. It joins the groups on the blue ports (10025/18080).
-3. Within the overlap window run `sudo stalwart-switch-slot blue` on the VPS (or POST
-   `{"slot":"blue"}` to `/slot-manager/activate` with `SLOT_MANAGER_TOKEN`); it probes the new
-   container on 18080 and moves HAProxy's weight to it. The VPS sync from this change has
-   already stopped `stalwart-slot-watcher`, which cannot see group proxies and would fail back.
-4. After the old container is gone, ship the VPS cleanup (single HAProxy server per
-   backend, slot-manager/watcher retired) and drop `FRPC_SLOT`, `FRPC_STANDBY_ENABLED`,
-   `SLOT_MANAGER_TOKEN` and the overlap override from Railway.
 
 ### Tunnel mutual TLS (one-time rollout)
 
@@ -251,12 +234,12 @@ Use the **private** Postgres hostname (`*.railway.internal`). Message bodies liv
 ```sh
 python3 -B -m unittest discover -s apps/stalwart/tests -v
 sh apps/stalwart/scripts/test-relay-route.sh
-shellcheck apps/stalwart/railway-entrypoint.sh apps/stalwart/vps/stalwart-switch-slot.sh
+shellcheck apps/stalwart/railway-entrypoint.sh apps/stalwart/vps/apply-vps-repo.sh
 ```
 
 Run these from the monorepo root. The default suite covers the rendered frpc config,
-shutdown order (leave the groups, then stop Stalwart), health, boot-time secret checks,
-and the VPS slot-manager until it is retired. For the optional loopback-only frp
+shutdown order (leave the groups, then stop Stalwart), health, and boot-time secret
+checks. For the optional loopback-only frp
 integration test, set `FRPC_TEST_BINARY` and `FRPS_TEST_BINARY` to existing
 version-matched binaries; it overlaps two containers in one group and checks that the
 old one leaves without a failed connection. It uses temporary ports/configs and dummy

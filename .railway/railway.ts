@@ -127,7 +127,8 @@ export default defineRailway(() => {
     deploy: {
       ipv6EgressEnabled: true,
       drainingSeconds: 120,
-      overlapSeconds: 90,
+      // Old and new containers share the frp tunnel groups during overlap; keep it short.
+      overlapSeconds: 10,
     },
     env: {
       BUCKET: preserve(),
@@ -135,7 +136,6 @@ export default defineRailway(() => {
       BUCKET_ENDPOINT: preserve(),
       BUCKET_REGION: preserve(),
       BUCKET_SECRET_ACCESS_KEY: preserve(),
-      FRPC_SLOT: preserve(),
       FRPC_RELAY_STCP_KEY: preserve(),
       FRPC_TLS_CA: preserve(),
       FRPC_TLS_CERT: preserve(),
@@ -148,7 +148,6 @@ export default defineRailway(() => {
       PGPORT: preserve(),
       PGUSER: preserve(),
       PORT: preserve(),
-      SLOT_MANAGER_TOKEN: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
       STALWART_GATE_KEY: preserve(),
       STALWART_MAIL_INGEST_WEBHOOK_SECRET: preserve(),
@@ -180,7 +179,6 @@ export default defineRailway(() => {
     env: {
       DISCORD_WEBHOOK_URL: preserve(),
       PORT: preserve(),
-      SLOT_MANAGER_TOKEN: preserve(),
       prometheus_password: preserve(),
       prometheus_user: preserve(),
     },

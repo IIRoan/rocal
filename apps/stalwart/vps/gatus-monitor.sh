@@ -9,35 +9,18 @@ import subprocess
 import sys
 import urllib.request
 
-ACTIVE_SLOT_FILE = os.environ.get("ACTIVE_SLOT_FILE", "/etc/haproxy/stalwart-active-slot")
 FRPS_DASHBOARD = os.environ.get("FRPS_DASHBOARD_URL", "http://127.0.0.1:7500")
 SERVICES = (
     "haproxy",
     "frps",
     "frpc-relay",
     "postfix",
-    "stalwart-slot-manager",
 )
-SLOT_PORTS = {
-    "blue": (10025, 18080),
-    "green": (11025, 19080),
-}
-FRP_PROXIES = {
-    "blue": ("smtp-blue", "https-blue"),
-    "green": ("smtp-green", "https-green"),
-}
+GROUP_HTTP_PORT = 18080
+GROUPS = ("smtp", "http")
 
 
-def read_active_slot() -> str:
-    try:
-        with open(ACTIVE_SLOT_FILE, encoding="utf-8") as handle:
-            slot = handle.read().strip()
-            return slot if slot in {"blue", "green"} else "blue"
-    except OSError:
-        return "blue"
-
-
-def slot_http_ready(port: int) -> bool:
+def http_ready(port: int) -> bool:
     # HTTP listeners require PROXY v2; a bare TCP connect logs network.proxy-error end-of-stream.
     try:
         result = subprocess.run(
@@ -57,14 +40,6 @@ def slot_http_ready(port: int) -> bool:
     except OSError:
         return False
     return result.returncode == 0
-
-
-def slot_occupied(slot: str) -> bool:
-    proxies = fetch_frp_proxies()
-    names = FRP_PROXIES[slot]
-    if proxies:
-        return any(proxies.get(name) == "online" for name in names)
-    return slot_http_ready(SLOT_PORTS[slot][1])
 
 
 def service_active(unit: str) -> str:
@@ -122,40 +97,31 @@ def postfix_queue_count() -> int | None:
 
 
 def main() -> int:
-    active = read_active_slot()
     proxies = fetch_frp_proxies()
     services = {name: service_active(name) for name in SERVICES}
     queue = postfix_queue_count()
-
-    tunnels: dict[str, dict[str, object]] = {}
-    for slot in ("blue", "green"):
-        proxy_names = FRP_PROXIES[slot]
-        tunnels[slot] = {
-            "occupied": slot_occupied(slot),
-            "http": proxies.get(proxy_names[1], "unknown") == "online" if proxies else slot_http_ready(SLOT_PORTS[slot][1]),
-            "proxies": {
-                name: proxies.get(name, "unknown") for name in proxy_names
-            },
-        }
+    # Containers register as <group>-<container id>; a deploy briefly shows two members.
+    members = {
+        group: sum(1 for name, state in proxies.items() if name.startswith(f"{group}-") and state == "online")
+        for group in GROUPS
+    }
+    http = http_ready(GROUP_HTTP_PORT)
 
     unhealthy_services = [
         name for name, state in services.items() if state != "active"
     ]
-    active_tunnel = tunnels.get(active, {})
-    active_proxies = active_tunnel.get("proxies", {})
-    proxy_down = any(status != "online" for status in active_proxies.values()) if active_proxies else False
 
     status = "healthy"
-    if unhealthy_services or not active_tunnel.get("http") or proxy_down:
+    if not all(members.values()):
         status = "degraded"
-    if unhealthy_services or not active_tunnel.get("occupied"):
+    if unhealthy_services or not http:
         status = "unhealthy"
 
     payload = {
         "status": status,
-        "activeSlot": active,
         "services": services,
-        "tunnels": tunnels,
+        "groupMembers": members,
+        "http": http,
         "postfixQueue": queue,
         "unhealthyServices": unhealthy_services,
     }

@@ -21,51 +21,11 @@ method = "token"
 # Rendered by apply-vps-repo.sh from the mail-vps FRP_TOKEN secret; never commit the value.
 token = "__FRP_TOKEN__"
 
-# Only allow the ports frpc registers.
+# Only allow the tunnel group ports that every Stalwart container registers.
 [[allowPorts]]
 start = 10025
 end = 10025
 
 [[allowPorts]]
-start = 11025
-end = 11025
-
-[[allowPorts]]
-start = 10465
-end = 10465
-
-[[allowPorts]]
-start = 11465
-end = 11465
-
-[[allowPorts]]
-start = 10587
-end = 10587
-
-[[allowPorts]]
-start = 11587
-end = 11587
-
-[[allowPorts]]
-start = 10993
-end = 10993
-
-[[allowPorts]]
-start = 11993
-end = 11993
-
-[[allowPorts]]
-start = 10443
-end = 10443
-
-[[allowPorts]]
-start = 11443
-end = 11443
-
-[[allowPorts]]
 start = 18080
 end = 18080
-
-[[allowPorts]]
-start = 19080
-end = 19080
