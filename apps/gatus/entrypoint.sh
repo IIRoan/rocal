@@ -59,22 +59,23 @@ inject_basic_auth() {
 	mv /data/config.yaml.tmp /data/config.yaml
 }
 
-inject_slot_manager_token() {
-	if [ -z "${SLOT_MANAGER_TOKEN:-}" ]; then
-		echo "SLOT_MANAGER_TOKEN is not set; slot-manager monitors will fail auth." >&2
+inject_prometheus_auth() {
+	if [ -z "${prometheus_user:-}" ] || [ -z "${prometheus_password:-}" ]; then
+		echo "prometheus_user/prometheus_password are not set; Stalwart metrics monitors will fail auth." >&2
 		return 0
 	fi
 
 	python3 - <<'PY'
+import base64
 import os
 import pathlib
 
 config_path = pathlib.Path("/data/config.yaml")
-marker = "__SLOT_MANAGER_TOKEN__"
+marker = "__PROMETHEUS_BASIC_AUTH__"
 config = config_path.read_text()
 if marker not in config:
-    raise SystemExit("SLOT_MANAGER_TOKEN placeholder missing from Gatus config")
-token = os.environ["SLOT_MANAGER_TOKEN"]
+    raise SystemExit("Prometheus auth placeholder missing from Gatus config")
+token = base64.b64encode(f"{os.environ['prometheus_user']}:{os.environ['prometheus_password']}".encode()).decode()
 config_path.write_text(config.replace(marker, token))
 PY
 }
@@ -132,7 +133,7 @@ append_vps_ssh_endpoints() {
 write_base_config
 inject_theme_css
 inject_basic_auth
-inject_slot_manager_token
+inject_prometheus_auth
 
 if [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
 	echo "DISCORD_WEBHOOK_URL is not set; Discord downtime alerts are disabled." >&2

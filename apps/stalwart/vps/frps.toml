@@ -10,6 +10,12 @@ proxyBindAddr = "127.0.0.1"
 webServer.addr = "127.0.0.1"
 webServer.port = 7500
 
+# Mutual TLS: only clients holding a cert from the Solace frp CA (scripts/frp-tls-certs.sh) may connect.
+transport.tls.force = true
+transport.tls.certFile = "/etc/frp/tls/server.crt"
+transport.tls.keyFile = "/etc/frp/tls/server.key"
+transport.tls.trustedCaFile = "/etc/frp/tls/ca.crt"
+
 [auth]
 method = "token"
 # Rendered by apply-vps-repo.sh from the mail-vps FRP_TOKEN secret; never commit the value.

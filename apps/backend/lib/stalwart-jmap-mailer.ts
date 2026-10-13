@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { withStalwartGate } from "./stalwart-gate";
 
+type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
+
 const DEFAULT_STALWART_JMAP_URL = "https://mail.solace.onl";
 const JMAP_USING = [
   "urn:ietf:params:jmap:core",
@@ -197,11 +199,11 @@ function assertJmapSuccess(envelope: JmapEnvelope, context: string): void {
 }
 
 async function jmapFetch(
-  fetcher: typeof fetch,
+  fetcher: Fetcher,
   url: string,
   init: RequestInit,
 ): Promise<Response> {
-  return withStalwartGate(fetcher)(url, {
+  return fetcher(url, {
     ...init,
     signal: init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
@@ -223,7 +225,7 @@ function methodResult<T>(envelope: JmapEnvelope, method: string): T {
 }
 
 async function discoverSession(
-  fetcher: typeof fetch,
+  fetcher: Fetcher,
   config: StalwartJmapMailerConfig,
   authorization: string,
 ): Promise<{
@@ -273,7 +275,7 @@ async function discoverSession(
 }
 
 async function jmapCall(
-  fetcher: typeof fetch,
+  fetcher: Fetcher,
   apiUrl: string,
   authorization: string,
   methodCalls: JmapMethodCall[],
@@ -302,7 +304,7 @@ async function jmapCall(
 }
 
 async function loadSendContext(
-  fetcher: typeof fetch,
+  fetcher: Fetcher,
   apiUrl: string,
   authorization: string,
   mailAccountId: string,
@@ -352,7 +354,7 @@ export function resolveUploadUrl(template: string, accountId: string): string {
 }
 
 async function uploadAttachment(
-  fetcher: typeof fetch,
+  fetcher: Fetcher,
   uploadUrl: string,
   authorization: string,
   accountId: string,
@@ -477,10 +479,11 @@ export async function sendTransactionalEmailViaStalwart(
   fetcher: typeof fetch = fetch,
 ): Promise<string> {
   const authorization = basicAuthHeader(config.username, config.password);
-  const session = await discoverSession(fetcher, config, authorization);
+  const gatedFetch = withStalwartGate(fetcher, config.baseUrl);
+  const session = await discoverSession(gatedFetch, config, authorization);
   const [context, attachments] = await Promise.all([
     loadSendContext(
-      fetcher,
+      gatedFetch,
       session.apiUrl,
       authorization,
       session.mailAccountId,
@@ -489,7 +492,7 @@ export async function sendTransactionalEmailViaStalwart(
     Promise.all(
       (message.attachments ?? []).map((attachment) =>
         uploadAttachment(
-          fetcher,
+          gatedFetch,
           session.uploadUrl,
           authorization,
           session.mailAccountId,
@@ -500,7 +503,7 @@ export async function sendTransactionalEmailViaStalwart(
   ]);
 
   const envelope = await jmapCall(
-    fetcher,
+    gatedFetch,
     session.apiUrl,
     authorization,
     buildSendCalls({

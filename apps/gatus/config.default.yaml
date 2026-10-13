@@ -54,13 +54,13 @@ ui:
       success-threshold: 2
       send-on-resolved: true
 
-# Prometheus scrape via slot-manager so HAProxy never hits the warming slot.
+# Stalwart's own exporter through the public edge (Basic auth from prometheus_user/prometheus_password).
 # Keep a single shared URL — do not add more endpoints that scrape this same path.
 .prometheus: &prometheus
   <<: *discord-alerts
-  url: https://mail.solace.onl/slot-manager/metrics/prometheus
+  url: https://mail.solace.onl/metrics/prometheus
   headers:
-    Authorization: "Bearer __SLOT_MANAGER_TOKEN__"
+    Authorization: "Basic __PROMETHEUS_BASIC_AUTH__"
   client:
     timeout: 15s
   ui:
@@ -130,20 +130,6 @@ endpoints:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 5000"
       - "[CERTIFICATE_EXPIRATION] > 336h"
-
-  - name: slot-blue-green
-    <<: *discord-alerts-soft
-    group: Mail
-    url: https://mail.solace.onl/slot-manager/status
-    interval: 30s
-    ui:
-      <<: *endpoint-ui
-    client:
-      timeout: 10s
-    headers:
-      Authorization: "Bearer __SLOT_MANAGER_TOKEN__"
-    conditions:
-      - "[STATUS] == 200"
 
   # Combined Prometheus scrapes (not Vercel). 2m keeps exporter shape fresh without spam.
   - name: stalwart-metrics
