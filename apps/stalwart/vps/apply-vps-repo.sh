@@ -10,7 +10,6 @@ SRC="${1:?usage: apply-vps-repo.sh <staged-vps-dir>}"
 SRC="$(cd "$SRC" && pwd)"
 
 APPLY_FRP="${APPLY_FRP:-0}"
-APPLY_SYSTEMD="${APPLY_SYSTEMD:-0}"
 
 HAPROXY_CFG_DST=/etc/haproxy/haproxy.cfg
 ALLOW_DST=/etc/haproxy/admin-allow.lst
@@ -19,15 +18,9 @@ ALLOW_SRC="${APPLY_ALLOWLIST:-}"
 ALLOWED_FILES=(
   apply-vps-repo.sh
   haproxy.cfg
-  haproxy-sync-active-slot.sh
-  stalwart-switch-slot.sh
-  stalwart-slot-manager.py
-  stalwart-slot-watcher.py
   gatus-monitor.sh
   frps.toml
   frpc-relay.toml
-  stalwart-slot-manager.service
-  stalwart-slot-watcher.service
   frps.service
   frpc-relay.service
 )
@@ -61,10 +54,6 @@ done
 shopt -u nullglob
 
 require_file haproxy.cfg
-require_file stalwart-switch-slot.sh
-require_file stalwart-slot-manager.py
-require_file stalwart-slot-watcher.py
-require_file haproxy-sync-active-slot.sh
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
@@ -94,11 +83,18 @@ fi
 systemctl reload haproxy
 echo "    haproxy reloaded"
 
-echo "==> Installing slot / ops scripts"
-install -m 755 "${SRC}/stalwart-switch-slot.sh" /usr/local/bin/stalwart-switch-slot
-install -m 755 "${SRC}/haproxy-sync-active-slot.sh" /usr/local/bin/haproxy-sync-active-slot.sh
-install -m 644 "${SRC}/stalwart-slot-manager.py" /usr/local/bin/stalwart-slot-manager.py
-install -m 644 "${SRC}/stalwart-slot-watcher.py" /usr/local/bin/stalwart-slot-watcher.py
+# Containers now share frp load-balancing groups; the blue/green slot services are gone.
+echo "==> Retiring blue/green slot services"
+for unit in stalwart-slot-manager stalwart-slot-watcher; do
+  systemctl disable --now "$unit" 2>/dev/null || true
+  rm -f "/etc/systemd/system/${unit}.service"
+done
+systemctl daemon-reload
+rm -f /usr/local/bin/stalwart-switch-slot /usr/local/bin/haproxy-sync-active-slot.sh \
+  /usr/local/bin/stalwart-slot-manager.py /usr/local/bin/stalwart-slot-watcher.py \
+  /etc/haproxy/stalwart-active-slot
+
+echo "==> Installing ops scripts"
 if [[ -f "${SRC}/gatus-monitor.sh" && ! -L "${SRC}/gatus-monitor.sh" ]]; then
   install -m 755 "${SRC}/gatus-monitor.sh" /usr/local/bin/gatus-monitor.sh
 fi
@@ -163,32 +159,4 @@ else
   echo "==> Skipping frp configs (set APPLY_FRP=1 to enable)"
 fi
 
-if [[ "$APPLY_SYSTEMD" == "1" ]]; then
-  echo "==> Installing systemd units (APPLY_SYSTEMD=1)"
-  for unit in stalwart-slot-manager stalwart-slot-watcher; do
-    src_unit="${SRC}/${unit}.service"
-    if [[ -f "$src_unit" && ! -L "$src_unit" ]]; then
-      install -m 644 "$src_unit" "/etc/systemd/system/${unit}.service"
-    fi
-  done
-  systemctl daemon-reload
-  if systemctl is-enabled --quiet stalwart-slot-manager 2>/dev/null || systemctl is-active --quiet stalwart-slot-manager; then
-    systemctl restart stalwart-slot-manager
-    echo "    restarted stalwart-slot-manager"
-  fi
-else
-  echo "==> Skipping systemd unit install (set APPLY_SYSTEMD=1 to enable)"
-  if systemctl is-active --quiet stalwart-slot-manager; then
-    systemctl restart stalwart-slot-manager
-    echo "    restarted stalwart-slot-manager (binary/script refresh)"
-  fi
-fi
-
-# Group tunnels register per-container proxy names the watcher cannot see, so it would fail back to the old slot mid-cutover.
-systemctl disable --now stalwart-slot-watcher 2>/dev/null || true
-
-if [[ -x /usr/local/bin/haproxy-sync-active-slot.sh ]]; then
-  /usr/local/bin/haproxy-sync-active-slot.sh || true
-fi
-
-echo "==> Done. Active slot: $(cat /etc/haproxy/stalwart-active-slot 2>/dev/null || echo unknown)"
+echo "==> Done."

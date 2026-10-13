@@ -1,9 +1,5 @@
-"""Offline regression coverage for the VPS slot-manager and the container tunnel boot/shutdown."""
+"""Offline regression coverage for the container's tunnel boot and shutdown."""
 
-import concurrent.futures
-import importlib.util
-import io
-import json
 import base64
 import os
 from pathlib import Path
@@ -11,21 +7,9 @@ import re
 import subprocess
 import tempfile
 import tomllib
-import types
 import unittest
-from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def load(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-manager = load("slot_manager", ROOT / "vps/stalwart-slot-manager.py")
 ENTRYPOINT = (ROOT / "railway-entrypoint.sh").read_text()
 
 
@@ -41,144 +25,6 @@ def render_frpc_config(path, **overrides):
     script = shell_functions("write_frpc_tls", "write_frpc_group_proxy", "write_frpc_config")
     subprocess.run(["sh", "-euc", script + "write_frpc_tls\nwrite_frpc_config"], env=env, check=True)
     return Path(path).read_text()
-
-
-class CoordinationFixture(unittest.TestCase):
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory(prefix="solace-ha-test-")
-        self.addCleanup(self.tmp.cleanup)
-        self.now = 1000
-        self.active = "blue"
-        self.proxies = {}
-        for name, value in {
-            "PREEMPT_DIR": self.tmp.name,
-            "time": types.SimpleNamespace(time=lambda: self.now),
-            "read_active_slot": lambda: self.active,
-            "fetch_frp_proxies": lambda: self.proxies,
-        }.items():
-            p = patch.object(manager, name, value)
-            p.start()
-            self.addCleanup(p.stop)
-
-    def request(self, action, slot="green", owner="new"):
-        return manager.coordinate_slot(action, slot, owner)[0]
-
-
-class CoordinationTests(CoordinationFixture):
-    def post(self, path, body, authorized=True):
-        raw = json.dumps(body).encode()
-        handler = object.__new__(manager.Handler)
-        handler.path = path
-        handler.headers = {"Content-Length": str(len(raw)), "Authorization": "Bearer test" if authorized else ""}
-        handler.rfile = io.BytesIO(raw)
-        responses = []
-        handler._send = lambda code, payload: responses.append((code, payload))
-        with patch.object(manager, "AUTH_TOKEN", "test"), patch.dict(
-            os.environ, {"SLOT_SWITCH_LOCK": str(Path(self.tmp.name, "switch.lock"))}
-        ):
-            handler.do_POST()
-        return responses[0][0]
-
-    def test_activation_is_owner_checked_and_renewal_survives_switch(self):
-        self.request("/preempt")
-        self.request("/lease/claim")
-
-        def switch(*args, **kwargs):
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                renewed = pool.submit(self.request, "/lease/renew").result(timeout=1)
-            self.assertEqual(renewed, 200)
-            self.assertEqual(self.request("/preempt", owner="peer"), 409)
-            self.active = "green"
-
-        with patch.object(manager.subprocess, "run", side_effect=switch) as run:
-            self.assertEqual(self.post("/activate", {"slot": "green", "owner": "wrong"}), 409)
-            run.assert_not_called()
-            self.assertEqual(self.post("/activate", {"slot": "green", "owner": "new"}), 200)
-        self.assertFalse(manager.read_status()["greenPreempted"])
-
-    def test_old_entrypoint_can_activate_unleased_slot_during_vps_first_rollout(self):
-        with patch.object(manager.subprocess, "run") as run:
-            self.assertEqual(self.post("/activate", {"slot": "green"}), 200)
-            run.assert_called_once()
-
-    def test_lease_http_requires_auth_and_owner(self):
-        self.assertEqual(self.post("/lease/claim", {"slot": "green", "owner": "new"}, False), 401)
-        self.assertEqual(self.post("/preempt", {"slot": "green"}), 400)
-        self.assertEqual(self.post("/preempt", {"slot": [], "owner": "new"}), 400)
-
-    def test_pending_standby_launch_must_acknowledge_before_peer_claim(self):
-        self.assertEqual(self.request("/lease/claim", owner="incumbent"), 200)
-        self.assertEqual(self.request("/preempt"), 200)
-        self.assertEqual(self.request("/lease/claim"), 409)
-        self.assertEqual(self.request("/lease/renew", owner="incumbent"), 409)
-        self.assertEqual(self.request("/lease/release", owner="incumbent"), 200)
-        self.assertEqual(self.request("/lease/claim"), 200)
-        self.assertEqual(self.request("/preempt/clear"), 200)
-        self.assertEqual(self.request("/lease/claim", owner="incumbent"), 409)
-
-    def test_preempt_before_standby_claim_prevents_launch(self):
-        self.assertEqual(self.request("/preempt"), 200)
-        self.assertEqual(self.request("/lease/claim", owner="incumbent"), 409)
-
-    def test_abandoned_preempt_expires(self):
-        self.request("/preempt")
-        self.now += manager.PREEMPT_SECONDS + 1
-        self.assertFalse(manager.read_status()["greenPreempted"])
-        self.assertEqual(self.request("/lease/claim", owner="incumbent"), 200)
-
-    def test_expired_lease_never_overrides_online_proxy(self):
-        self.request("/lease/claim", owner="dead")
-        self.proxies = {"smtp-green": "online"}
-        self.now += manager.LEASE_SECONDS + 1
-        self.assertEqual(self.request("/lease/claim"), 409)
-        self.proxies = {}
-        self.assertEqual(self.request("/lease/claim"), 200)
-
-    def test_unknown_occupancy_fails_closed(self):
-        self.proxies = None
-        self.assertIsNone(manager.read_status()["greenOccupied"])
-        self.assertEqual(self.request("/lease/claim"), 409)
-
-    def test_owner_scopes_clear_and_release(self):
-        self.request("/preempt")
-        self.request("/lease/claim")
-        self.assertEqual(self.request("/preempt/clear", owner="stale"), 409)
-        self.assertEqual(self.request("/lease/release", owner="stale"), 409)
-        self.assertEqual(manager.read_status()["greenOwner"], "new")
-
-    def test_primary_and_standby_claims_are_serialized(self):
-        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-            results = list(pool.map(lambda n: self.request("/lease/claim", owner=str(n)), range(8)))
-        self.assertEqual(results.count(200), 1)
-
-    def test_active_slot_cannot_be_preempted(self):
-        self.assertEqual(self.request("/preempt", slot="blue"), 409)
-
-    def test_former_primary_can_release_after_watcher_failover(self):
-        self.request("/lease/claim", owner="incumbent")
-        self.active = "green"
-        self.assertEqual(self.request("/lease/renew", owner="incumbent"), 200)
-        self.active = "blue"
-        self.request("/preempt")
-        self.assertEqual(self.request("/lease/renew", owner="incumbent"), 409)
-
-    def test_last_owner_can_reclaim_active_slot_after_lease_expiry(self):
-        self.request("/lease/claim")
-        self.active = "green"
-        self.now += manager.LEASE_SECONDS + 1
-        self.assertEqual(self.request("/lease/renew"), 409)
-        self.assertEqual(self.request("/lease/claim", owner="stranger"), 409)
-        self.assertEqual(self.request("/lease/reclaim"), 200)
-
-    def test_reclaim_after_vps_reboot_requires_vacancy(self):
-        self.proxies = {"http-admin-blue": "online"}
-        self.assertEqual(self.request("/lease/reclaim", slot="blue"), 409)
-        self.proxies = {}
-        self.assertEqual(self.request("/lease/reclaim", slot="blue"), 200)
-
-    def test_legacy_boolean_flag_does_not_latch_preemption(self):
-        Path(self.tmp.name, "green").write_text("1\n")
-        self.assertFalse(manager.read_status()["greenPreempted"])
 
 
 class EntrypointTests(unittest.TestCase):
