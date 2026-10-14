@@ -104,8 +104,8 @@ pub async fn seed(config: &SeedConfig<'_>) -> Result<SeedManifest> {
             .expect_status(200)?;
         user.session_cookies.extend(session_cookies(&second));
 
-        if index == 0 {
-            user.passkey = Some(register_passkey(&mut agent, config.origin).await?);
+        if index < 2 {
+            user.passkey = Some(register_passkey(&mut agent, config.origin, index == 1).await?);
         }
         seed_e2ee(&mut agent).await?;
         seed_calendar_data(&mut agent, &mut user).await?;
@@ -190,12 +190,17 @@ async fn insert_root_and_invites(db: &mut PgConnection) -> Result<Vec<String>> {
     Ok(tokens)
 }
 
-async fn register_passkey(agent: &mut Agent, origin: &str) -> Result<SoftPasskey> {
+/// Alice's passkey is a single-device key with a counter; Bob's is a synced one like iCloud Keychain's.
+async fn register_passkey(agent: &mut Agent, origin: &str, synced: bool) -> Result<SoftPasskey> {
     let rp_id = url::Url::parse(origin)
         .ok()
         .and_then(|url| url.host_str().map(str::to_owned))
         .unwrap_or_else(|| "localhost".into());
-    let mut passkey = SoftPasskey::new(&rp_id)?;
+    let mut passkey = if synced {
+        SoftPasskey::new_synced(&rp_id)?
+    } else {
+        SoftPasskey::new(&rp_id)?
+    };
     let options = agent
         .get("/api/auth/passkey/generate-register-options")
         .await?

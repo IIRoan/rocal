@@ -176,6 +176,22 @@ Point better-auth-rs at a copy of the test database and prove four things:
 
 Also prove that it builds against SeaORM 2.0.4 and maps onto the existing tables and snake_case columns. If it fails, run the same four checks on the primitives design. If that fails too, stop. Check the JWT plugin logs in this step as well.
 
+**Result (2026-10-14): go, on the primitives design.**
+
+- **better-auth-rs `1.0.0-alpha.3` fails.** It builds against SeaORM 2.0.4 (the published crate is not pinned to rc.37; its compatibility target is TypeScript `better-auth@1.6.29`), but it can't use the existing schema:
+  - every core timestamp is `DateTimeUtc`, and decoding our `TIMESTAMP(3)` columns fails (`TIMESTAMPTZ is not compatible with SQL type TIMESTAMP`), so sign-in returns 500;
+  - the session entity needs an `active` column that every session query filters on;
+  - the passkey entity is fixed to a `passkeys` table with snake_case columns and a required `credential` column holding a serialized webauthn-rs passkey. Our rows have only the COSE key, so existing passkeys can't authenticate;
+  - the session cookie is read and written as the raw token, not Better Auth's `token.HMAC`, so sessions don't work in either direction.
+- **The primitives design passes all four checks** (axum, SeaORM 2.0.4 over the existing tables including the camelCase `passkey` columns, RustCrypto HMAC/scrypt, webauthn-rs-core 0.5). It ran against a copy of a database seeded through the TypeScript backend:
+  1. every TypeScript-issued session cookie validates (seven sessions, three users);
+  2. the TypeScript scrypt passwords sign in, and wrong passwords get 401;
+  3. TypeScript-registered passkeys authenticate: a single-device key with a counter, and a synced key (backup-eligible, backed up, counter always 0). The `Credential` is rebuilt from the stored COSE key, counter and device type;
+  4. the real `@better-auth/expo/client` signs in and reads the session for the `solace` and `solace-mail` schemes. Only the React Native and Expo native modules are stubbed. An untrusted scheme gets the same 403 `INVALID_ORIGIN` as on TypeScript.
+
+  In the other direction, Rust-issued sessions validate on the TypeScript backend, and the same passkeys keep working there after Rust bumped their counters. webauthn-rs-core needs OpenSSL, so the Dockerfile needs `libssl-dev`, and local builds without system headers need `OPENSSL_DIR`.
+- **JWT log check: not conclusive yet.** Vercel keeps about an hour of runtime logs for `solace-api`. In that window there were 0 hits on `/api/auth/token` and `/api/auth/jwks`; the `requestPath:` filter was verified against `/api/health`. The repo has no caller either. A read-only sampler checks every 40 minutes while this work runs. The plugin stays unported unless a hit appears.
+
 ### 3. Test suite against the current backend
 
 Build `solace-api-tests`. By default it starts the Rust server in-process on a random port, with a fresh database cloned from a template database. With `API_BASE_URL` set, it targets a running backend, and state checks read `TEST_DATABASE_URL`.

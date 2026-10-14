@@ -13,6 +13,8 @@ use crate::{Error, Result};
 
 const FLAG_USER_PRESENT: u8 = 0x01;
 const FLAG_USER_VERIFIED: u8 = 0x04;
+const FLAG_BACKUP_ELIGIBLE: u8 = 0x08;
+const FLAG_BACKED_UP: u8 = 0x10;
 const FLAG_ATTESTED_CREDENTIAL: u8 = 0x40;
 
 /// A passkey held by the test; serializable so seeded passkeys can be used again by another run.
@@ -24,6 +26,9 @@ pub struct SoftPasskey {
     pub sign_count: u32,
     pub rp_id: String,
     pub user_handle: Option<String>,
+    /// A synced passkey like iCloud Keychain's: backup eligible and backed up, its counter always 0.
+    #[serde(default)]
+    pub synced: bool,
 }
 
 impl SoftPasskey {
@@ -41,6 +46,14 @@ impl SoftPasskey {
             sign_count: 0,
             rp_id: rp_id.to_owned(),
             user_handle: None,
+            synced: false,
+        })
+    }
+
+    pub fn new_synced(rp_id: &str) -> Result<Self> {
+        Ok(Self {
+            synced: true,
+            ..Self::new(rp_id)?
         })
     }
 
@@ -102,7 +115,9 @@ impl SoftPasskey {
         let challenge = options["challenge"]
             .as_str()
             .ok_or_else(|| Error::Unexpected("authentication options lack a challenge".into()))?;
-        self.sign_count += 1;
+        if !self.synced {
+            self.sign_count += 1;
+        }
         let client_data = client_data_json("webauthn.get", challenge, origin);
         let auth_data = self.authenticator_data(FLAG_USER_PRESENT | FLAG_USER_VERIFIED);
         let mut signed = auth_data.clone();
@@ -125,6 +140,11 @@ impl SoftPasskey {
     }
 
     fn authenticator_data(&self, flags: u8) -> Vec<u8> {
+        let flags = if self.synced {
+            flags | FLAG_BACKUP_ELIGIBLE | FLAG_BACKED_UP
+        } else {
+            flags
+        };
         let mut data = Sha256::digest(self.rp_id.as_bytes()).to_vec();
         data.push(flags);
         data.extend_from_slice(&self.sign_count.to_be_bytes());
