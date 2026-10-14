@@ -73,6 +73,10 @@ apps/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges 
 apps/backend/__tests__/lib/ssrf-host-policy.test.ts	ssrf-host-policy › blocks metadata and private IPv4-mapped addresses	suite:subscriptions::create_refuses_private_and_loopback_literals_before_connecting
 apps/backend/__tests__/lib/ssrf-host-policy.test.ts	ssrf-host-policy › maps dotted IPv4-mapped IPv6 to IPv4	unit:solace-server::integrations::safe_fetch::host_policy::tests::dotted_ipv4_mapped_ipv6_canonicalizes_to_ipv4
 apps/backend/__tests__/lib/ssrf-host-policy.test.ts	ssrf-host-policy › maps hex IPv4-mapped IPv6 to IPv4	unit:solace-server::integrations::safe_fetch::host_policy::tests::hex_ipv4_mapped_ipv6_canonicalizes_to_ipv4
+apps/backend/__tests__/routes/e2ee.test.ts	e2eeRoutes › rejects unexpected device fields	suite:e2ee::device_fields_are_validated
+apps/backend/__tests__/routes/e2ee.test.ts	e2eeRoutes › returns bootstrap metadata for the authenticated user	suite:e2ee::a_new_account_has_no_key_material
+apps/backend/__tests__/routes/e2ee.test.ts	e2eeRoutes › returns raw records for password reset re-encryption	suite:e2ee::the_reset_snapshot_returns_raw_owned_records_for_re_encryption
+apps/backend/__tests__/routes/e2ee.test.ts	e2eeRoutes › upserts a device registration with trimmed values	suite:e2ee::device_registration_trims_values_and_applies_defaults
 apps/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'amber'	suite:subscriptions::update_accepts_every_named_color_and_hex_colors
 apps/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'blue'	suite:subscriptions::update_accepts_every_named_color_and_hex_colors
 apps/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'cyan'	suite:subscriptions::update_accepts_every_named_color_and_hex_colors
@@ -96,6 +100,13 @@ apps/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color
 apps/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › rejects invalid color 'navy'	suite:subscriptions::update_rejects_invalid_colors_listing_every_allowed_one
 apps/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › rejects invalid color 'rgb(0,0,0)'	suite:subscriptions::update_rejects_invalid_colors_listing_every_allowed_one
 apps/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › rejects update for non-existent subscription	suite:subscriptions::missing_and_foreign_feeds_are_not_found
+apps/backend/__tests__/services/e2ee.service.test.ts	E2eeService › includes the password envelope in bootstrap responses	suite:e2ee::the_password_envelope_is_created_then_rotated_in_place
+apps/backend/__tests__/services/e2ee.service.test.ts	E2eeService › parses blind-index tokens from bootstrap rows and falls back to empty arrays	suite:e2ee::unreadable_blind_index_tokens_become_an_empty_list
+apps/backend/__tests__/services/e2ee.service.test.ts	E2eeService › rejects invalid key versions before writing to prisma	suite:e2ee::device_fields_are_validated
+apps/backend/__tests__/services/e2ee.service.test.ts	E2eeService › rejects weak password KDF settings before writing to prisma	suite:e2ee::password_envelope_fields_are_validated
+apps/backend/__tests__/services/e2ee.service.test.ts	E2eeService › returns reset snapshot records for writable encrypted items	suite:e2ee::the_reset_snapshot_returns_raw_owned_records_for_re_encryption
+apps/backend/__tests__/services/e2ee.service.test.ts	E2eeService › trims and defaults device registration fields on upsert	suite:e2ee::device_registration_trims_values_and_applies_defaults
+apps/backend/__tests__/services/e2ee.service.test.ts	E2eeService › trims and defaults password envelope fields on upsert	suite:e2ee::the_password_envelope_is_created_then_rotated_in_place
 apps/backend/__tests__/services/subscription.service.test.ts	SubscriptionService › delete › deletes synced events and the sync-only calendar when deleteEvents is true	suite:subscriptions::delete_with_delete_events_removes_events_and_the_calendar
 apps/backend/__tests__/services/subscription.service.test.ts	SubscriptionService › delete › keeps events and converts the calendar when deleteEvents is false	suite:subscriptions::delete_keeps_events_and_turns_the_calendar_into_an_owned_one
 apps/backend/__tests__/services/subscription.service.test.ts	SubscriptionService › rejects redirects to private networks when creating subscriptions	unit:solace-server::subscriptions::service::tests::create_fetches_with_the_redirect_time_and_size_caps

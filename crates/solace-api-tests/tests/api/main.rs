@@ -6,4 +6,6 @@
 #[allow(dead_code)]
 mod helpers;
 mod settings;
+
+mod e2ee;
 mod subscriptions;
