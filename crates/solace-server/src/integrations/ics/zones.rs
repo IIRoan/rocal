@@ -311,15 +311,22 @@ pub fn offset_ms(zone: &TimeZone, ms: i64) -> Option<i64> {
 
 /// The calendar date of `ms` in `zone`, as Temporal's `PlainDate.toString()` writes it.
 pub fn plain_date_in(zone: &TimeZone, ms: i64) -> Option<String> {
-    let instant = Timestamp::from_millisecond(ms).ok()?;
-    let date = instant.to_zoned(zone.clone()).date();
-    let year = i64::from(date.year());
+    let (year, month, day) = date_in(zone, ms)?;
     let year = if (0..=9999).contains(&year) {
         format!("{year:04}")
     } else {
         format!("{}{:06}", if year < 0 { '-' } else { '+' }, year.abs())
     };
-    Some(format!("{year}-{:02}-{:02}", date.month(), date.day()))
+    Some(format!("{year}-{month:02}-{day:02}"))
+}
+
+/// The calendar date of `ms` in `zone`.
+pub fn date_in(zone: &TimeZone, ms: i64) -> Option<(i64, i8, i8)> {
+    let date = Timestamp::from_millisecond(ms)
+        .ok()?
+        .to_zoned(zone.clone())
+        .date();
+    Some((i64::from(date.year()), date.month(), date.day()))
 }
 
 /// The first zone in Bun's list whose mid-January and mid-July offsets are exactly the two given ones.

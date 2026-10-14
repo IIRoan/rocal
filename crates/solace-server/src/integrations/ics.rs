@@ -59,6 +59,15 @@ pub enum Frequency {
 }
 
 impl Frequency {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Daily => "daily",
+            Self::Weekly => "weekly",
+            Self::Monthly => "monthly",
+            Self::Yearly => "yearly",
+        }
+    }
+
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "daily" => Some(Self::Daily),

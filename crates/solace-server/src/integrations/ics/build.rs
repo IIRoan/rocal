@@ -188,8 +188,11 @@ fn date_time_stamp(ms: i64) -> String {
 fn date_stamp_in(ms: i64, zone: &str) -> String {
     let resolved = normalize_timezone(Some(zone)).unwrap_or_else(|| "UTC".into());
     zones::lookup(&resolved)
-        .and_then(|tz| zones::plain_date_in(&tz, ms))
-        .map_or_else(|| date_stamp(ms), |date| date.replace('-', ""))
+        .and_then(|tz| zones::date_in(&tz, ms))
+        .map_or_else(
+            || date_stamp(ms),
+            |(year, month, day)| format!("{year}{month:02}{day:02}"),
+        )
 }
 
 fn next_day(stamp: &str) -> String {
@@ -205,11 +208,7 @@ fn next_day(stamp: &str) -> String {
 }
 
 fn rrule(rule: &RecurrenceRule) -> String {
-    let frequency = serde_json::to_value(rule.frequency)
-        .ok()
-        .and_then(|value| value.as_str().map(str::to_uppercase))
-        .unwrap_or_default();
-    let mut segments = vec![format!("FREQ={frequency}")];
+    let mut segments = vec![format!("FREQ={}", rule.frequency.as_str().to_uppercase())];
     if rule.interval > 1 {
         segments.push(format!("INTERVAL={}", rule.interval));
     }
