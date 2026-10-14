@@ -15,6 +15,7 @@ mod encrypted_blobs;
 mod invites;
 mod mail_account;
 mod mail_jmap;
+mod mail_sync;
 mod passkeys;
 mod settings;
 mod stalwart_webhook;
