@@ -193,3 +193,28 @@ pub fn hex(bytes: usize) -> String {
 pub fn ok<T>(result: Result<T>) -> T {
     result.unwrap_or_else(|error| panic!("{error}"))
 }
+
+/// A Zod rejection: Zod v3's message and the path of the first issue.
+pub fn expect_invalid(response: &ApiResponse, message: &str, path: &str) -> Value {
+    let body = ok(response.expect_error(400, "Validation Error", message));
+    assert_eq!(body["details"]["issues"][0]["path"], json!(path), "{body}");
+    body
+}
+
+/// A service-level validation error: message plus `details.field`.
+pub fn expect_field_error(response: &ApiResponse, message: &str, field: &str) -> Value {
+    let body = ok(response.expect_error(400, "Validation Error", message));
+    assert_eq!(body["details"], json!({ "field": field }), "{body}");
+    assert!(body["requestId"].is_string(), "{body}");
+    body
+}
+
+/// A request DTO as the JSON body to send.
+pub fn json_body<T: serde::Serialize>(value: &T) -> Value {
+    serde_json::to_value(value).expect("request DTO serializes")
+}
+
+/// Bytes of a file in `crates/solace-api-tests/fixtures`.
+pub fn fixture(name: &str) -> Vec<u8> {
+    std::fs::read(format!("{}/fixtures/{name}", env!("CARGO_MANIFEST_DIR"))).expect("fixture")
+}
