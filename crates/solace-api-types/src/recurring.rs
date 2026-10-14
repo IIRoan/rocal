@@ -122,8 +122,9 @@ pub struct RecurringUpdates {
     pub location: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
+    /// Any number; stored truncated to whole minutes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reminder: Option<i32>,
+    pub reminder: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recurrence: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

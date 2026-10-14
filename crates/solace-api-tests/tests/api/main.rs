@@ -10,4 +10,5 @@ mod helpers;
 mod event_fixtures;
 mod events;
 mod events_list;
+mod recurring;
 mod settings;
