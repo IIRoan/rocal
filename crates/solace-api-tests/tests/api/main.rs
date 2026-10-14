@@ -5,4 +5,6 @@
 // Shared by every domain module; no single module uses every helper.
 #[allow(dead_code)]
 mod helpers;
+
+mod calendars;
 mod settings;
