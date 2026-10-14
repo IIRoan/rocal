@@ -6,11 +6,16 @@ mod account_public;
 mod auth_limits;
 mod auth_passwords;
 mod auth_sessions;
+mod calendar_sharing;
+mod calendars;
+mod categories;
 mod e2e_security;
 mod edges;
-// Shared by every domain module; no single module uses every helper.
-#[allow(dead_code)]
-mod helpers;
+mod encrypted_blobs;
 mod invites;
 mod passkeys;
 mod settings;
+
+// Shared by every domain module; no single module uses every helper.
+#[allow(dead_code)]
+mod helpers;
