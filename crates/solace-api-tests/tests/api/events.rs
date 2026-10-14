@@ -156,6 +156,13 @@ async fn an_encrypted_event_is_stored_as_ciphertext_only() {
         (&None, &None)
     );
     assert_eq!(created.created_at, created.updated_at);
+    for stamp in [&created.created_at, &created.calendar.created_at] {
+        let bytes = stamp.0.as_bytes();
+        assert!(
+            bytes.len() == 24 && bytes[10] == b'T' && bytes[19] == b'.' && bytes[23] == b'Z',
+            "toISOString shape: {stamp:?}"
+        );
+    }
     let participants = created.participants.clone().expect("participants");
     assert_eq!(participants.len(), 1, "the owner becomes the organizer");
     assert_eq!(
