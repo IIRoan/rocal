@@ -1,39 +1,12 @@
-//! The JavaScript `Date` semantics node-ical relies on, with the host time zone pinned to UTC as on Vercel.
+//! The JavaScript `Date` rules node-ical relies on, over jiff's calendar, with the host time zone pinned to UTC as on Vercel.
+
+use jiff::civil::{Date, DateTime};
+use jiff::tz::TimeZone;
+use jiff::{Span, Timestamp};
 
 pub const MS_PER_DAY: i64 = 86_400_000;
-/// `Date` values are clipped to ±8.64e15 ms.
-const MAX_TIME: i64 = 8_640_000_000_000_000;
 
-/// Days since 1970-01-01 of a proleptic Gregorian date (month 1-12).
-pub fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
-    let year = if month <= 2 { year - 1 } else { year };
-    let era = year.div_euclid(400);
-    let year_of_era = year - era * 400;
-    let month_index = (month + 9) % 12;
-    let day_of_year = (153 * month_index + 2) / 5 + day - 1;
-    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
-    era * 146_097 + day_of_era - 719_468
-}
-
-fn civil_from_days(days: i64) -> (i64, i64, i64) {
-    let days = days + 719_468;
-    let era = days.div_euclid(146_097);
-    let day_of_era = days - era * 146_097;
-    let year_of_era =
-        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let month_index = (5 * day_of_year + 2) / 153;
-    let day = day_of_year - (153 * month_index + 2) / 5 + 1;
-    let month = if month_index < 10 {
-        month_index + 3
-    } else {
-        month_index - 9
-    };
-    let year = year_of_era + era * 400 + i64::from(month <= 2);
-    (year, month, day)
-}
-
-/// `MakeDate(MakeDay(..), MakeTime(..))` with `TimeClip`: out-of-range fields roll over, out-of-range results are `NaN`.
+/// `MakeDate(MakeDay(..), MakeTime(..))`: out-of-range fields roll over; instants beyond jiff's ±9999 years are `NaN`.
 pub fn make_date(
     year: i64,
     month_index: i64,
@@ -43,15 +16,28 @@ pub fn make_date(
     second: i64,
     millisecond: i64,
 ) -> Option<i64> {
-    let year = year.checked_add(month_index.div_euclid(12))?;
-    let month = month_index.rem_euclid(12) + 1;
-    let days = days_from_civil(year, month, 1).checked_add(day - 1)?;
-    let time = hour * 3_600_000 + minute * 60_000 + second * 1000 + millisecond;
-    clip(days.checked_mul(MS_PER_DAY)?.checked_add(time)?)
+    let start = Date::new(i16::try_from(year).ok()?, 1, 1)
+        .ok()?
+        .at(0, 0, 0, 0);
+    let time = Span::new()
+        .try_hours(hour)
+        .and_then(|span| span.try_minutes(minute))
+        .and_then(|span| span.try_seconds(second))
+        .and_then(|span| span.try_milliseconds(millisecond))
+        .ok()?;
+    // Spans carry one sign, and month 00 or day 00 step backwards, so each part is added on its own.
+    let civil = start
+        .checked_add(Span::new().try_months(month_index).ok()?)
+        .and_then(|civil| civil.checked_add(Span::new().try_days(day - 1)?))
+        .and_then(|civil| civil.checked_add(time))
+        .ok()?;
+    let instant = TimeZone::UTC.to_timestamp(civil).ok()?;
+    Some(instant.as_millisecond())
 }
 
+/// `TimeClip`, bounded by the instants jiff represents.
 pub fn clip(ms: i64) -> Option<i64> {
-    (ms.abs() <= MAX_TIME).then_some(ms)
+    Timestamp::from_millisecond(ms).ok().map(|_| ms)
 }
 
 /// `Date.UTC(...)` and, with the host in UTC, `new Date(y, m, d, ...)`: years 0-99 mean 1900-1999.
@@ -84,38 +70,35 @@ pub struct Fields {
     pub millisecond: i64,
 }
 
+/// The UTC wall time, saturating at jiff's bounds (time values come from [`make_date`] and [`clip`], so only arithmetic on their edge reaches them).
+fn civil(ms: i64) -> DateTime {
+    let instant = Timestamp::from_millisecond(ms).unwrap_or(if ms < 0 {
+        Timestamp::MIN
+    } else {
+        Timestamp::MAX
+    });
+    TimeZone::UTC.to_datetime(instant)
+}
+
 pub fn fields(ms: i64) -> Fields {
-    let days = ms.div_euclid(MS_PER_DAY);
-    let time = ms.rem_euclid(MS_PER_DAY);
-    let (year, month, day) = civil_from_days(days);
+    let civil = civil(ms);
     Fields {
-        year,
-        month,
-        day,
-        hour: time / 3_600_000,
-        minute: time / 60_000 % 60,
-        second: time / 1000 % 60,
-        millisecond: time % 1000,
+        year: i64::from(civil.year()),
+        month: i64::from(civil.month()),
+        day: i64::from(civil.day()),
+        hour: i64::from(civil.hour()),
+        minute: i64::from(civil.minute()),
+        second: i64::from(civil.second()),
+        millisecond: i64::from(civil.millisecond()),
     }
 }
 
-/// `toISOString()`, including the six-digit years JavaScript writes outside 0000-9999.
+/// `toISOString()`.
 pub fn iso_string(ms: i64) -> String {
-    let f = fields(ms);
-    let year = if (0..=9999).contains(&f.year) {
-        format!("{:04}", f.year)
-    } else if f.year < 0 {
-        format!("-{:06}", -f.year)
-    } else {
-        format!("+{:06}", f.year)
-    };
-    format!(
-        "{year}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
-        f.month, f.day, f.hour, f.minute, f.second, f.millisecond
-    )
+    civil(ms).strftime("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()
 }
 
-/// `new Date(string)` for the ECMAScript date-time string format; other shapes are `NaN`.
+/// `new Date(string)` for the ECMAScript date-time string format, which is narrower than jiff's ISO 8601 parser; other shapes are `NaN`.
 pub fn parse_date_string(text: &str) -> Option<i64> {
     let bytes = text.as_bytes();
     let digits = |from: usize, len: usize| -> Option<i64> {
@@ -203,9 +186,12 @@ pub fn parse_date_string(text: &str) -> Option<i64> {
     clip(ms - offset_minutes * 60_000)
 }
 
+/// Days in a month; 0 for years jiff cannot represent.
 pub fn days_in_month(year: i64, month: i64) -> i64 {
-    days_from_civil(year + i64::from(month == 12), month % 12 + 1, 1)
-        - days_from_civil(year, month, 1)
+    let (Ok(year), Ok(month)) = (i16::try_from(year), i8::try_from(month)) else {
+        return 0;
+    };
+    Date::new(year, month, 1).map_or(0, |date| i64::from(date.days_in_month()))
 }
 
 #[cfg(test)]
@@ -218,6 +204,10 @@ mod tests {
         assert_eq!(
             date_utc(2024, 12, 1, 0, 0, 0).map(iso_string).as_deref(),
             Some("2025-01-01T00:00:00.000Z")
+        );
+        assert_eq!(
+            date_utc(2024, -1, 0, 25, 61, 61).map(iso_string).as_deref(),
+            Some("2023-12-01T02:02:01.000Z")
         );
         assert_eq!(
             date_utc(1, 0, 1, 0, 0, 0).map(iso_string).as_deref(),
@@ -241,5 +231,6 @@ mod tests {
         assert_eq!(parse_date_string("20240201T103000"), None);
         assert_eq!(parse_date_string("2024-02-30"), None);
         assert_eq!(fields(-1).millisecond, 999);
+        assert_eq!((days_in_month(2024, 2), days_in_month(2023, 2)), (29, 28));
     }
 }
