@@ -3,6 +3,7 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
 mod deploy_test;
+mod jest_destinations;
 mod test_env;
 mod ts_backend;
 
@@ -20,6 +21,8 @@ tasks:
   test-env stalwart-key   mint a Stalwart API key for the solace-provisioner test account
   deploy-test <service> <path>
                           deploy committed files under <path> to a test-* service in Railway's test environment
+  jest-destinations [--complete]
+                          check crates/solace-api-tests/jest/*.tsv against the Jest case list
   ts-backend --checkout <dir> [--database <name>] [--port <port>]
                           run the current TypeScript backend against the test env";
 
@@ -31,6 +34,7 @@ async fn main() -> anyhow::Result<()> {
         ["test-env", rest @ ..] => test_env::run(rest).await,
         ["ts-backend", rest @ ..] => ts_backend::run(rest).await,
         ["deploy-test", rest @ ..] => deploy_test::run(rest),
+        ["jest-destinations", rest @ ..] => jest_destinations::run(rest),
         _ => {
             eprintln!("{USAGE}");
             std::process::exit(2);

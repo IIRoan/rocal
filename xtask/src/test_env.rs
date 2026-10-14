@@ -191,7 +191,11 @@ pub async fn apply_migrations(db: &mut PgConnection) -> anyhow::Result<usize> {
 /// Stalwart reveals a key once and allows five per account, so the key is cached and only re-minted when it stops working.
 pub async fn provision_key(env: &TestEnv) -> anyhow::Result<String> {
     let host = url_host_port(&env.stalwart_url);
-    let cache = crate::repo_root().join(format!("target/solace-test-env/provision-key-{host}"));
+    // Shared by every checkout and worktree, so one checkout never revokes the key another backend runs with.
+    let home = std::env::var("HOME").context("HOME")?;
+    let cache = std::path::PathBuf::from(home).join(format!(
+        ".local/share/solace-test-tools/provision-keys/{host}"
+    ));
     if let Ok(key) = std::fs::read_to_string(&cache) {
         let mut request = reqwest::Client::new()
             .get(format!("{}/jmap/session", env.stalwart_url))

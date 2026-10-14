@@ -170,6 +170,42 @@ impl ApiResponse {
         self.json()
     }
 
+    /// Decodes into the shared DTO and fails unless re-encoding it gives back the exact JSON, so DTOs can't drop or reshape fields.
+    pub fn dto<T: DeserializeOwned + serde::Serialize>(&self) -> Result<T> {
+        let raw: Value = self.json()?;
+        let decoded: T = serde_json::from_value(raw.clone()).map_err(|source| Error::Body {
+            status: self.status.as_u16(),
+            source,
+            body: self.text(),
+        })?;
+        let encoded = serde_json::to_value(&decoded)?;
+        if encoded != raw {
+            return Err(Error::Unexpected(format!(
+                "DTO {} does not round-trip.\n  wire: {raw}\n   dto: {encoded}",
+                std::any::type_name::<T>()
+            )));
+        }
+        Ok(decoded)
+    }
+
+    /// Fails unless this is the error envelope with this status, error label and message.
+    pub fn expect_error(&self, status: u16, error: &str, message: &str) -> Result<Value> {
+        let body = self.value()?;
+        let matches = self.status.as_u16() == status
+            && body["statusCode"] == serde_json::json!(status)
+            && body["error"] == serde_json::json!(error)
+            && body["message"] == serde_json::json!(message)
+            && body["timestamp"].is_string();
+        if matches {
+            Ok(body)
+        } else {
+            Err(Error::Unexpected(format!(
+                "expected {status} {error:?} {message:?}, got {}: {body}",
+                self.status.as_u16()
+            )))
+        }
+    }
+
     pub fn text(&self) -> String {
         String::from_utf8_lossy(&self.body).into_owned()
     }

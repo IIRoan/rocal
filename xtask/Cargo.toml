@@ -10,7 +10,7 @@ publish.workspace = true
 anyhow.workspace = true
 reqwest.workspace = true
 serde_json.workspace = true
-solace-api-tests = { path = "../crates/solace-api-tests" }
+solace-api-tests.workspace = true
 sqlx.workspace = true
 tokio.workspace = true
 
