@@ -144,6 +144,35 @@ impl TestApp {
             .map(str::to_owned)
     }
 
+    /// A Stalwart account without encryption at rest, so tests can read app mail sent to `local_part`.
+    pub async fn plain_mailbox(&self, local_part: &str) {
+        let domain = self
+            .stalwart_admin(
+                &["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
+                json!([
+                    ["x:Domain/query", {"filter": {"name": self.env.mail_domain}}, "q"]
+                ]),
+            )
+            .await;
+        let domain_id = domain["methodResponses"][0][1]["ids"][0].clone();
+        let created = self
+            .stalwart_admin(
+                &["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
+                json!([["x:Account/set", {"create": {"a": {
+                    "@type": "User",
+                    "name": local_part,
+                    "domainId": domain_id,
+                    "roles": {"@type": "User"},
+                    "credentials": {"0": {"@type": "Password", "secret": format!("solace-test-{}", hex(12))}},
+                }}}, "s"]]),
+            )
+            .await;
+        assert!(
+            created["methodResponses"][0][1]["created"]["a"]["id"].is_string(),
+            "plain mailbox not created: {created}"
+        );
+    }
+
     /// Messages in a mailbox, newest first, with subject, from, to and text body.
     pub async fn mailbox_messages(&self, local_part: &str) -> Vec<Value> {
         let Some(account_id) = self.stalwart_account_id(local_part).await else {

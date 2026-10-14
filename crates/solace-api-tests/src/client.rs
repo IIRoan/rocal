@@ -84,6 +84,18 @@ impl Agent {
         });
     }
 
+    /// Replaces the value of every stored cookie called `name`, keeping its domain; stores a host-only one if none exists.
+    pub fn replace_cookie(&mut self, name: &str, value: &str) {
+        let mut found = false;
+        for cookie in self.cookies.iter_mut().filter(|cookie| cookie.name == name) {
+            cookie.value = value.to_owned();
+            found = true;
+        }
+        if !found {
+            self.set_cookie(name, value);
+        }
+    }
+
     pub fn clear_cookies(&mut self) {
         self.cookies.clear();
     }
