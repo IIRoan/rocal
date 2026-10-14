@@ -9,6 +9,7 @@
     "test:coverage": "jest -c jest.config.cjs --coverage --runInBand"
   },
   "dependencies": {
+    "@workspace/api-contracts": "workspace:*",
     "@workspace/calendar-core": "workspace:*",
     "@workspace/e2ee": "workspace:*",
     "@workspace/logger": "workspace:*"

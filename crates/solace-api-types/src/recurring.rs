@@ -16,17 +16,23 @@ pub struct RecurrenceRule {
     pub frequency: String,
     pub interval: i32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub count: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub until: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub timezone: Option<String>,
     /// 0 is Sunday.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub by_week_day: Option<Vec<i32>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub by_month_day: Option<Vec<i32>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub by_month: Option<Vec<i32>>,
 }
 
@@ -53,6 +59,7 @@ pub struct RecurrenceValidation {
     pub description: Option<String>,
     /// The parsed rule; absent when it could not be parsed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub rule: Option<RecurrenceRule>,
 }
 

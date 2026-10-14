@@ -71,14 +71,18 @@ pub struct Event {
     pub calendar: EventCalendar,
     /// Absent only on whole-series recurring edits that carry no participants.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub participants: Option<Vec<EventParticipant>>,
     /// Set on recurring series rows in a list: `false` for the series row itself, `true` for generated instances.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub is_recurring_instance: Option<bool>,
     /// Present on recurring series rows and their instances in a list.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub recurrence_exceptions: Option<Vec<RecurrenceException>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub warnings: Option<Vec<OperationWarning>>,
 }
 
@@ -257,6 +261,7 @@ pub struct BulkEventResult {
     pub events_processed: i64,
     pub action: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub created_events: Option<Vec<Event>>,
 }
 
@@ -282,6 +287,7 @@ pub struct InvitationImportSummary {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InvitationDeclined {
+    #[schema(schema_with = crate::common::always_true)]
     pub declined: bool,
 }
 
@@ -296,6 +302,7 @@ pub enum RsvpResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RsvpDeleted {
+    #[schema(schema_with = crate::common::always_true)]
     pub deleted: bool,
 }
 

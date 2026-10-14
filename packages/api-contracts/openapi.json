@@ -351,10 +351,7 @@
             "type": "string"
           },
           "createdEvents": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "$ref": "#/components/schemas/Event"
             }
@@ -581,14 +578,7 @@
         ],
         "properties": {
           "_count": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/SyncLogCount"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/SyncLogCount"
           },
           "calendar": {
             "$ref": "#/components/schemas/SubscribedCalendar"
@@ -1911,10 +1901,7 @@
             "type": "boolean"
           },
           "isRecurringInstance": {
-            "type": [
-              "boolean",
-              "null"
-            ],
+            "type": "boolean",
             "description": "Set on recurring series rows in a list: `false` for the series row itself, `true` for generated instances."
           },
           "isSynced": {
@@ -1937,10 +1924,7 @@
             ]
           },
           "participants": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "$ref": "#/components/schemas/EventParticipant"
             },
@@ -1954,10 +1938,7 @@
             "description": "A JSON recurrence rule, stored as text."
           },
           "recurrenceExceptions": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "$ref": "#/components/schemas/RecurrenceException"
             },
@@ -2041,10 +2022,7 @@
             "$ref": "#/components/schemas/UserId"
           },
           "warnings": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "$ref": "#/components/schemas/OperationWarning"
             }
@@ -2549,16 +2527,10 @@
         ],
         "properties": {
           "calendarName": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "errors": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string"
             },
@@ -2573,10 +2545,7 @@
             "format": "int64"
           },
           "fileName": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "Legacy imports only."
           },
           "success": {
@@ -2654,7 +2623,10 @@
         ],
         "properties": {
           "declined": {
-            "type": "boolean"
+            "type": "boolean",
+            "enum": [
+              true
+            ]
           }
         }
       },
@@ -2782,10 +2754,7 @@
             "type": "string"
           },
           "warnings": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "$ref": "#/components/schemas/OperationWarning"
             },
@@ -2793,8 +2762,73 @@
           }
         }
       },
+      "InviteClaimRefused": {
+        "type": "object",
+        "required": [
+          "success",
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          }
+        }
+      },
+      "InviteClaimResult": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/InviteClaimed"
+          },
+          {
+            "$ref": "#/components/schemas/InviteClaimRefused"
+          }
+        ],
+        "description": "`POST /api/account/invite/claim`: the claimed invite, or why it cannot be claimed."
+      },
+      "InviteClaimed": {
+        "type": "object",
+        "required": [
+          "success",
+          "inviteId"
+        ],
+        "properties": {
+          "inviteId": {
+            "$ref": "#/components/schemas/InviteId"
+          },
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      },
       "InviteId": {
         "type": "string"
+      },
+      "InviteInvalid": {
+        "type": "object",
+        "required": [
+          "valid",
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          }
+        }
       },
       "InviteList": {
         "type": "object",
@@ -2818,6 +2852,43 @@
           "accepted",
           "revoked"
         ]
+      },
+      "InviteValid": {
+        "type": "object",
+        "required": [
+          "valid",
+          "inviteId",
+          "email",
+          "inviterName"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "inviteId": {
+            "$ref": "#/components/schemas/InviteId"
+          },
+          "inviterName": {
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      },
+      "InviteValidation": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/InviteValid"
+          },
+          {
+            "$ref": "#/components/schemas/InviteInvalid"
+          }
+        ],
+        "description": "`GET /api/account/invite/validate`: whether a token can still be used to sign up."
       },
       "LegacyIcsImportRequest": {
         "type": "object",
@@ -3709,15 +3780,8 @@
         ],
         "properties": {
           "data": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NotificationUpdateData",
-                "description": "Absent for recurring instances and synced events, which have no reminders."
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/NotificationUpdateData",
+            "description": "Absent for recurring instances and synced events, which have no reminders."
           },
           "message": {
             "type": "string"
@@ -3742,10 +3806,7 @@
             "type": "string"
           },
           "target": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           }
         }
       },
@@ -4222,30 +4283,21 @@
         ],
         "properties": {
           "byMonth": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "integer",
               "format": "int32"
             }
           },
           "byMonthDay": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "integer",
               "format": "int32"
             }
           },
           "byWeekDay": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "integer",
               "format": "int32"
@@ -4253,10 +4305,7 @@
             "description": "0 is Sunday."
           },
           "count": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "frequency": {
@@ -4268,16 +4317,10 @@
             "format": "int32"
           },
           "timezone": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "until": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -4314,15 +4357,8 @@
             }
           },
           "rule": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/RecurrenceRule",
-                "description": "The parsed rule; absent when it could not be parsed."
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/RecurrenceRule",
+            "description": "The parsed rule; absent when it could not be parsed."
           },
           "valid": {
             "type": "boolean"
@@ -4590,7 +4626,10 @@
         ],
         "properties": {
           "deleted": {
-            "type": "boolean"
+            "type": "boolean",
+            "enum": [
+              true
+            ]
           }
         }
       },
@@ -5084,40 +5123,25 @@
         ],
         "properties": {
           "errors": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string"
             }
           },
           "eventsAdded": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int64"
           },
           "eventsDeleted": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int64"
           },
           "eventsUpdated": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int64"
           },
           "message": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "status": {
             "type": "string"
@@ -5442,6 +5466,136 @@
               "string",
               "null"
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "browserNotifications": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "compactView": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "defaultCalendarId": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CalendarId",
+                "description": "`null` clears the default calendar."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "defaultEventDuration": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "defaultView": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`month`, `week`, `day` or `agenda`."
+          },
+          "emailNotifications": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "eventEncryptionMode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`hybrid` or `full`."
+          },
+          "pushNotifications": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "reminderSound": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "showDeclinedEvents": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "showWeekNumbers": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "theme": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`light`, `dark` or `system`."
+          },
+          "timeFormat": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`12h` or `24h`."
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "weekStartDay": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "0 is Sunday."
+          },
+          "workingDays": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A JSON array of weekday numbers as text."
+          },
+          "workingHoursEnd": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "workingHoursStart": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Minutes after midnight."
           }
         },
         "additionalProperties": false

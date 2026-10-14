@@ -2,6 +2,24 @@
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use utoipa::openapi::schema::{Object, ObjectBuilder, Type};
+
+fn literal_bool(value: bool) -> Object {
+    ObjectBuilder::new()
+        .schema_type(Type::Boolean)
+        .enum_values(Some([value]))
+        .build()
+}
+
+/// Schema of a `bool` the API always sends as `true`, so TypeScript can narrow on it.
+pub(crate) fn always_true() -> Object {
+    literal_bool(true)
+}
+
+/// Schema of a `bool` the API always sends as `false`, so TypeScript can narrow on it.
+pub(crate) fn always_false() -> Object {
+    literal_bool(false)
+}
 
 /// A UTC instant as JavaScript's `toISOString()` writes it: three fractional digits and `Z`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema)]
@@ -38,6 +56,7 @@ pub struct OperationWarning {
     pub code: String,
     pub message: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub target: Option<String>,
 }
 

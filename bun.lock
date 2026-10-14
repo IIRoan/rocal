@@ -286,6 +286,7 @@
       "name": "@workspace/calendar-client",
       "version": "0.1.0",
       "dependencies": {
+        "@workspace/api-contracts": "workspace:*",
         "@workspace/calendar-core": "workspace:*",
         "@workspace/e2ee": "workspace:*",
         "@workspace/logger": "workspace:*",

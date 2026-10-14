@@ -31,6 +31,7 @@ pub struct CalendarSubscription {
     pub updated_at: Timestamp,
     pub calendar: SubscribedCalendar,
     #[serde(rename = "_count", default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub count: Option<SyncLogCount>,
 }
 
@@ -117,14 +118,19 @@ pub struct DeleteSubscriptionResponse {
 pub struct SubscriptionSyncResult {
     pub status: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub message: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub events_added: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub events_updated: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub events_deleted: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub errors: Option<Vec<String>>,
 }
 
@@ -187,10 +193,13 @@ pub struct ImportIcsResponse {
     pub events_total: i64,
     /// Legacy imports only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub file_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub calendar_name: Option<String>,
     /// Per-event problems; absent when there were none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub errors: Option<Vec<String>>,
 }

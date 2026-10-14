@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { INVITES_QUERY_KEY, PUSH_DEVICES_QUERY_KEY } from "@workspace/calendar-core";
-import type { CreateInviteResponse } from "./invite-api-service";
+import type { InviteRecord } from "./invite-api-service";
 import {
   createInviteMutationOptions,
   invitesQueryOptions,
@@ -9,9 +9,9 @@ import {
   revokeInviteMutationOptions,
 } from "./account-query-options";
 
-const invite: CreateInviteResponse = {
+const invite: InviteRecord = {
   id: "invite-1", token: "token", email: "friend@example.com", status: "pending",
-  expiresAt: "2099-01-01T00:00:00Z", createdAt: "2026-10-06T00:00:00Z", invitedById: "user-1",
+  expiresAt: "2099-01-01T00:00:00Z", createdAt: new Date("2026-10-06T00:00:00Z"), invitedById: "user-1",
 };
 
 describe("shared account query options", () => {

@@ -104,7 +104,7 @@ export function useUpdateSubscriptionMutation(
   const { refetchCalendars, onUpdated } = input;
 
   return useMutation<
-    CalendarSubscription,
+    Omit<CalendarSubscription, "_count">,
     ApiError,
     { id: string; request: UpdateSubscriptionRequest }
   >({

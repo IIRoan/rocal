@@ -73,6 +73,7 @@ pub struct NotificationUpdateResult {
     pub message: String,
     /// Absent for recurring instances and synced events, which have no reminders.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub data: Option<NotificationUpdateData>,
 }
 

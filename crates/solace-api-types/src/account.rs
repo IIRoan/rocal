@@ -62,6 +62,7 @@ pub struct Invite {
     pub invited_by_id: UserId,
     /// Present only when the invite mail could not be delivered.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub warnings: Option<Vec<OperationWarning>>,
 }
 
@@ -82,6 +83,56 @@ pub struct CreateInviteRequest {
 pub struct ClaimInviteRequest {
     pub token: String,
     pub chosen_email: String,
+}
+
+/// `GET /api/account/invite/validate`: whether a token can still be used to sign up.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(untagged)]
+pub enum InviteValidation {
+    Valid(InviteValid),
+    Invalid(InviteInvalid),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InviteValid {
+    #[schema(schema_with = crate::common::always_true)]
+    pub valid: bool,
+    pub invite_id: InviteId,
+    pub email: String,
+    pub inviter_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InviteInvalid {
+    #[schema(schema_with = crate::common::always_false)]
+    pub valid: bool,
+    pub reason: String,
+}
+
+/// `POST /api/account/invite/claim`: the claimed invite, or why it cannot be claimed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(untagged)]
+pub enum InviteClaimResult {
+    Claimed(InviteClaimed),
+    Refused(InviteClaimRefused),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InviteClaimed {
+    #[schema(schema_with = crate::common::always_true)]
+    pub success: bool,
+    pub invite_id: InviteId,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InviteClaimRefused {
+    #[schema(schema_with = crate::common::always_false)]
+    pub success: bool,
+    pub reason: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
