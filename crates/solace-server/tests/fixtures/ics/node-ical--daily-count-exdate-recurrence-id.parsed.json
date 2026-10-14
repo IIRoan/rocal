@@ -1,0 +1,101 @@
+{
+  "UTC": {
+    "events": [
+      {
+        "uid": "0000001",
+        "sourceUid": "0000001",
+        "title": "Treasure Hunting",
+        "start": "2015-07-06T19:00:00.000Z",
+        "end": "2015-07-06T20:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "count": 10,
+          "timezone": "America/Los_Angeles"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":10,\"timezone\":\"America/Los_Angeles\"}"
+      },
+      {
+        "uid": "0000001::RECURRENCE::2015-07-07T19:00:00.000Z",
+        "sourceUid": "0000001",
+        "recurrenceId": "2015-07-07T19:00:00.000Z",
+        "title": "More Treasure Hunting",
+        "start": "2015-07-09T22:00:00.000Z",
+        "end": "2015-07-07T23:00:00.000Z",
+        "allDay": false,
+        "location": "The other island",
+        "timezone": "America/Los_Angeles"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {
+        "uid": "0000001",
+        "sourceUid": "0000001",
+        "title": "Treasure Hunting",
+        "start": "2015-07-06T19:00:00.000Z",
+        "end": "2015-07-06T20:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "count": 10,
+          "timezone": "America/Los_Angeles"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":10,\"timezone\":\"America/Los_Angeles\"}"
+      },
+      {
+        "uid": "0000001::RECURRENCE::2015-07-07T19:00:00.000Z",
+        "sourceUid": "0000001",
+        "recurrenceId": "2015-07-07T19:00:00.000Z",
+        "title": "More Treasure Hunting",
+        "start": "2015-07-09T22:00:00.000Z",
+        "end": "2015-07-07T23:00:00.000Z",
+        "allDay": false,
+        "location": "The other island",
+        "timezone": "America/Los_Angeles"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {
+        "uid": "0000001",
+        "sourceUid": "0000001",
+        "title": "Treasure Hunting",
+        "start": "2015-07-06T19:00:00.000Z",
+        "end": "2015-07-06T20:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "count": 10,
+          "timezone": "America/Los_Angeles"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":10,\"timezone\":\"America/Los_Angeles\"}"
+      },
+      {
+        "uid": "0000001::RECURRENCE::2015-07-07T19:00:00.000Z",
+        "sourceUid": "0000001",
+        "recurrenceId": "2015-07-07T19:00:00.000Z",
+        "title": "More Treasure Hunting",
+        "start": "2015-07-09T22:00:00.000Z",
+        "end": "2015-07-07T23:00:00.000Z",
+        "allDay": false,
+        "location": "The other island",
+        "timezone": "America/Los_Angeles"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

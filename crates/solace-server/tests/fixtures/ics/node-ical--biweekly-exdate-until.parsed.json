@@ -1,0 +1,143 @@
+{
+  "UTC": {
+    "events": [
+      {
+        "uid": "98765432-ABCD-DCBB-999A-987765432123",
+        "sourceUid": "98765432-ABCD-DCBB-999A-987765432123",
+        "title": "Example of comma-separated exdates",
+        "start": "2017-02-16T15:00:00.000Z",
+        "end": "2017-02-17T01:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 2,
+          "until": "2017-08-14T04:59:59.000Z",
+          "byWeekDay": [
+            1,
+            4
+          ],
+          "timezone": "US/Central"
+        },
+        "timezone": "US/Central",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":2,\"until\":\"2017-08-14T04:59:59.000Z\",\"byWeekDay\":[1,4],\"timezone\":\"US/Central\"}"
+      },
+      {
+        "uid": "1234567-ABCD-ABCD-ABCD-123456789012",
+        "sourceUid": "1234567-ABCD-ABCD-ABCD-123456789012",
+        "title": "Example of exdate with bad times",
+        "start": "2017-08-14T14:00:00.000Z",
+        "end": "2017-08-15T00:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 2,
+          "byWeekDay": [
+            1,
+            2
+          ],
+          "timezone": "Etc/UTC"
+        },
+        "timezone": "Etc/UTC",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":2,\"byWeekDay\":[1,2],\"timezone\":\"Etc/UTC\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "ical",
+    "calendarTimezone": "Europe/Kiev"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {
+        "uid": "98765432-ABCD-DCBB-999A-987765432123",
+        "sourceUid": "98765432-ABCD-DCBB-999A-987765432123",
+        "title": "Example of comma-separated exdates",
+        "start": "2017-02-16T15:00:00.000Z",
+        "end": "2017-02-17T01:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 2,
+          "until": "2017-08-14T04:59:59.000Z",
+          "byWeekDay": [
+            1,
+            4
+          ],
+          "timezone": "US/Central"
+        },
+        "timezone": "US/Central",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":2,\"until\":\"2017-08-14T04:59:59.000Z\",\"byWeekDay\":[1,4],\"timezone\":\"US/Central\"}"
+      },
+      {
+        "uid": "1234567-ABCD-ABCD-ABCD-123456789012",
+        "sourceUid": "1234567-ABCD-ABCD-ABCD-123456789012",
+        "title": "Example of exdate with bad times",
+        "start": "2017-08-14T14:00:00.000Z",
+        "end": "2017-08-15T00:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 2,
+          "byWeekDay": [
+            1,
+            2
+          ],
+          "timezone": "Etc/UTC"
+        },
+        "timezone": "Etc/UTC",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":2,\"byWeekDay\":[1,2],\"timezone\":\"Etc/UTC\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "ical",
+    "calendarTimezone": "Europe/Kiev"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {
+        "uid": "98765432-ABCD-DCBB-999A-987765432123",
+        "sourceUid": "98765432-ABCD-DCBB-999A-987765432123",
+        "title": "Example of comma-separated exdates",
+        "start": "2017-02-16T15:00:00.000Z",
+        "end": "2017-02-17T01:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 2,
+          "until": "2017-08-14T04:59:59.000Z",
+          "byWeekDay": [
+            1,
+            4
+          ],
+          "timezone": "US/Central"
+        },
+        "timezone": "US/Central",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":2,\"until\":\"2017-08-14T04:59:59.000Z\",\"byWeekDay\":[1,4],\"timezone\":\"US/Central\"}"
+      },
+      {
+        "uid": "1234567-ABCD-ABCD-ABCD-123456789012",
+        "sourceUid": "1234567-ABCD-ABCD-ABCD-123456789012",
+        "title": "Example of exdate with bad times",
+        "start": "2017-08-14T14:00:00.000Z",
+        "end": "2017-08-15T00:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 2,
+          "byWeekDay": [
+            1,
+            2
+          ],
+          "timezone": "Etc/UTC"
+        },
+        "timezone": "Etc/UTC",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":2,\"byWeekDay\":[1,2],\"timezone\":\"Etc/UTC\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "ical",
+    "calendarTimezone": "Europe/Kiev"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "UTC": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: duplicate DTEND encountered, line=DTEND:20240101T120000Z"
+    ],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: duplicate DTEND encountered, line=DTEND:20240101T120000Z"
+    ],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: duplicate DTEND encountered, line=DTEND:20240101T120000Z"
+    ],
+    "method": "PUBLISH"
+  }
+}

@@ -1,0 +1,22 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Solace Calendar//Calendar Export//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Team\; Calendar\, "Ops"
+X-WR-CALDESC:Line one\nLine two \\ done
+X-WR-TIMEZONE:Europe/Amsterdam
+BEGIN:VEVENT
+UID:planning-1@example.com
+DTSTAMP:20261014T123456Z
+CREATED:20240101T080000Z
+LAST-MODIFIED:20240102T091530Z
+SUMMARY:Planning\, review\; and \\ backslash
+DTSTART:20240201T100000Z
+DTEND:20240201T113000Z
+DESCRIPTION:Agenda:\n1. Budget\, Q3\; Q4\n2. Hiring \\ onboarding\n\n3. ⚙
+ ️ Tooling — émoji 🎉 and 漢字 text that is long enough to force f
+ olding across several lines of output
+LOCATION:Room A\; Floor 2\, Building "North"
+END:VEVENT
+END:VCALENDAR

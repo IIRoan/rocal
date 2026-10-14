@@ -8,6 +8,7 @@ pub mod calendars;
 pub mod categories;
 pub mod config;
 pub mod db;
+pub mod e2ee;
 pub mod email;
 pub mod entity_metadata;
 pub mod error;
@@ -63,6 +64,7 @@ fn api() -> OpenApiRouter<AppState> {
         .merge(recent_contacts::routes())
         .merge(push_devices::routes())
         .merge(profiles::routes())
+        .merge(e2ee::routes())
 }
 
 /// Every route's OpenAPI entry, without a database.

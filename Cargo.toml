@@ -54,6 +54,8 @@ base64 = "0.22"
 ciborium = "0.2"
 cookie = "0.18"
 hmac = "0.13"
+# `localeCompare(…, { sensitivity: "base" })`: ICU4X has the same CLDR root collation as Bun's ICU, and its base crates are already in the tree through `url`.
+icu_collator = "2"
 p256 = { version = "0.14", features = ["ecdsa"] }
 percent-encoding = "2"
 rand = "0.10"
@@ -68,7 +70,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 webp = { version = "0.3", default-features = false }
 # SigV4-presigned requests to the S3-compatible avatar bucket over the existing reqwest client.
 rusty-s3 = { version = "0.10", default-features = false, features = ["rustcrypto"] }
-# IANA time zone validation with the tzdb bundled, so it does not depend on the image's zoneinfo.
+# Time zones (validation, ICS feeds, recurrence, reminders) with the tzdb bundled, so results don't depend on the image's zoneinfo.
 jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
 serde = { version = "1", features = ["derive"] }
 # Objects keep insertion order, so issues name unknown keys in the order clients sent them.

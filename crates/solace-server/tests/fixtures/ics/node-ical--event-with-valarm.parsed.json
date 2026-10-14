@@ -1,0 +1,50 @@
+{
+  "UTC": {
+    "events": [
+      {
+        "uid": "eb9e1bd2-ceba-499f-be77-f02773954c72",
+        "sourceUid": "eb9e1bd2-ceba-499f-be77-f02773954c72",
+        "title": "Event with an alarm",
+        "description": "This is an event with an alarm.",
+        "start": "2013-04-18T18:00:00.000Z",
+        "end": "2013-04-18T19:00:00.000Z",
+        "allDay": false,
+        "timezone": "America/Los_Angeles"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {
+        "uid": "eb9e1bd2-ceba-499f-be77-f02773954c72",
+        "sourceUid": "eb9e1bd2-ceba-499f-be77-f02773954c72",
+        "title": "Event with an alarm",
+        "description": "This is an event with an alarm.",
+        "start": "2013-04-18T18:00:00.000Z",
+        "end": "2013-04-18T19:00:00.000Z",
+        "allDay": false,
+        "timezone": "America/Los_Angeles"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {
+        "uid": "eb9e1bd2-ceba-499f-be77-f02773954c72",
+        "sourceUid": "eb9e1bd2-ceba-499f-be77-f02773954c72",
+        "title": "Event with an alarm",
+        "description": "This is an event with an alarm.",
+        "start": "2013-04-18T18:00:00.000Z",
+        "end": "2013-04-18T19:00:00.000Z",
+        "allDay": false,
+        "timezone": "America/Los_Angeles"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

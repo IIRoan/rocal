@@ -1,0 +1,53 @@
+{
+  "UTC": {
+    "events": [
+      {
+        "uid": "text-escaped-backslashes",
+        "sourceUid": "text-escaped-backslashes",
+        "title": "C:\\\new\\\notes",
+        "description": "Write \\\n or \\\n for a literal escape.\nNext line.\nLast line.",
+        "start": "2025-01-01T10:00:00.000Z",
+        "end": "2025-01-01T11:00:00.000Z",
+        "allDay": false,
+        "location": "Folder\\, room; desk",
+        "timezone": "Etc/UTC"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {
+        "uid": "text-escaped-backslashes",
+        "sourceUid": "text-escaped-backslashes",
+        "title": "C:\\\new\\\notes",
+        "description": "Write \\\n or \\\n for a literal escape.\nNext line.\nLast line.",
+        "start": "2025-01-01T10:00:00.000Z",
+        "end": "2025-01-01T11:00:00.000Z",
+        "allDay": false,
+        "location": "Folder\\, room; desk",
+        "timezone": "Etc/UTC"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {
+        "uid": "text-escaped-backslashes",
+        "sourceUid": "text-escaped-backslashes",
+        "title": "C:\\\new\\\notes",
+        "description": "Write \\\n or \\\n for a literal escape.\nNext line.\nLast line.",
+        "start": "2025-01-01T10:00:00.000Z",
+        "end": "2025-01-01T11:00:00.000Z",
+        "allDay": false,
+        "location": "Folder\\, room; desk",
+        "timezone": "Etc/UTC"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

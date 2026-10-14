@@ -1,0 +1,9 @@
+prefix	source	license	fetched
+live--google-dutch-holidays	https://calendar.google.com/calendar/ical/en.dutch%23holiday%40group.v.calendar.google.com/public/basic.ics	public feed	2026-10-14
+live--icloud-holidays-nl	https://calendars.icloud.com/holidays/nl_nl.ics	public feed	2026-10-14
+live--icloud-holidays-us	https://calendars.icloud.com/holidays/us_en.ics	public feed	2026-10-14
+live--thunderbird-dutch-holidays	https://www.thunderbird.net/media/caldata/autogen/DutchHolidays.ics (a Solace national-holiday feed)	public feed	2026-10-14
+node-ical--	https://github.com/jens-maus/node-ical/tree/master/test/fixtures (real-world bug reports: Exchange, Outlook Web App, Google, Apple, Zimbra, SabreDAV, Meetup, TripIt)	Apache-2.0	2026-10-14
+icalendar--	https://github.com/collective/icalendar/tree/main/src/icalendar/tests/calendars	BSD-2-Clause	2026-10-14
+synthetic--	written for this port to pin node-ical quirks the samples above do not reach	-	2026-10-14
+*.parsed.json, builder/*.ics, export/*.ics	generate.ts against the TypeScript backend under Bun 1.4.3 (Vercel's runtime), host TZ=UTC	-	2026-10-14
