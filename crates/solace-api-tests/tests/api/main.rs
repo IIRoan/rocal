@@ -8,4 +8,5 @@ mod helpers;
 mod settings;
 
 mod e2ee;
+mod push_devices;
 mod subscriptions;
