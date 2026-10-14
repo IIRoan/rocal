@@ -30,6 +30,8 @@ pub enum Backend {
 
 pub struct TestApp {
     pub base_url: String,
+    /// The backend's own idea of its URL (`BACKEND_URL`), which it puts in links it hands out.
+    pub public_api_url: String,
     pub origin: String,
     pub mode: Mode,
     pub backend: Backend,
@@ -62,6 +64,10 @@ impl TestApp {
             Ok("rust") => Backend::Rust,
             _ => Backend::TypeScript,
         };
+        let public_api_url = std::env::var("TEST_PUBLIC_API_URL").unwrap_or_else(|_| match mode {
+            Mode::Development => base_url.trim_end_matches('/').to_owned(),
+            Mode::Production => "https://api.solace.test".into(),
+        });
         let origin = std::env::var("TEST_WEB_ORIGIN").unwrap_or_else(|_| {
             match mode {
                 Mode::Development => DEVELOPMENT_WEB_ORIGIN,
@@ -89,6 +95,7 @@ impl TestApp {
 
         Self {
             base_url,
+            public_api_url,
             origin,
             mode,
             backend,

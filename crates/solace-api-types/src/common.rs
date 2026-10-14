@@ -31,6 +31,16 @@ pub struct SuccessMessage {
     pub message: String,
 }
 
+/// A non-fatal problem attached to a successful mutation, such as an invite mail that could not be delivered.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OperationWarning {
+    pub code: String,
+    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+}
+
 /// Declares opaque string ids that TypeScript still sees as `string`.
 #[macro_export]
 macro_rules! id_types {

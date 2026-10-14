@@ -133,7 +133,10 @@ async fn enabling_issues_a_public_url_and_keeps_its_token() {
             calendar_id: calendar.id.clone(),
             calendar_name: "Team".into(),
             enabled: true,
-            share_url: Some(format!("{}/api/calendars/shared/{token}", app.base_url)),
+            share_url: Some(format!(
+                "{}/api/calendars/shared/{token}",
+                app.public_api_url
+            )),
         }
     );
     assert_eq!(
@@ -384,7 +387,7 @@ async fn the_feed_serves_top_level_plaintext_events_as_ics() {
         "X-WR-CALNAME:Team\\, Feed\\; Ü".into(),
         format!("X-WR-CALDESC:Shared calendar from {}", user.name),
         "X-WR-TIMEZONE:America/New_York".into(),
-        format!("URL:{}/api/calendars/shared/{token}", app.base_url),
+        format!("URL:{}/api/calendars/shared/{token}", app.public_api_url),
     ];
     expected.extend(stamped(
         "ext-uid-123@example.com".into(),
@@ -442,7 +445,10 @@ async fn the_feed_token_may_carry_an_ics_suffix_and_spaces() {
         let response = feed(&app, &requested).await;
         assert_eq!(response.status.as_u16(), 200, "{requested}");
         let unfolded = response.text().replace("\r\n ", "");
-        let url = format!("URL:{}/api/calendars/shared/{source}\r\n", app.base_url);
+        let url = format!(
+            "URL:{}/api/calendars/shared/{source}\r\n",
+            app.public_api_url
+        );
         assert!(
             unfolded.contains(&url),
             "the feed links the token as requested: {unfolded}"

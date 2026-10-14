@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::{InviteId, Timestamp, UserId};
+use crate::common::{InviteId, OperationWarning, Timestamp, UserId};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -61,7 +61,7 @@ pub struct Invite {
     pub invited_by_id: UserId,
     /// Present only when the invite mail could not be delivered.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub warnings: Option<Vec<String>>,
+    pub warnings: Option<Vec<OperationWarning>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
