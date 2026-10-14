@@ -287,3 +287,19 @@ async fn unknown_routes_and_methods_are_not_found() {
         "Better Auth's router answers unknown paths with an empty 404"
     );
 }
+
+#[tokio::test]
+async fn only_the_auth_error_page_may_use_inline_styles() {
+    let app = TestApp::spawn().await;
+    let response = ok(app
+        .anonymous()
+        .get("/api/auth/error")
+        .await
+        .expect_status(200));
+    assert_eq!(header(&response, "content-type"), Some("text/html"));
+    assert_eq!(
+        header(&response, "content-security-policy"),
+        Some("default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'")
+    );
+    assert!(response.text().starts_with("<!DOCTYPE html>"));
+}

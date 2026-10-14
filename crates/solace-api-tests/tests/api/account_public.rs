@@ -389,3 +389,88 @@ async fn public_invite_routes_allow_thirty_requests_a_minute_per_client() {
         .expect_status(200));
     ok(app.anonymous().get(&path).await.expect_status(200));
 }
+
+#[tokio::test]
+async fn auth_status_forwards_session_cookie_changes() {
+    let app = TestApp::spawn().await;
+    let user = app.user().await;
+    sqlx::query("UPDATE session SET expires_at = now() + interval '13 days' WHERE user_id = $1")
+        .bind(&user.id)
+        .execute(&app.db)
+        .await
+        .expect("age session");
+    let data = app.auth_cookie("session_data");
+    let mut agent = app.anonymous();
+    for (name, value) in user
+        .agent
+        .cookies()
+        .iter()
+        .filter(|(name, _)| *name != data)
+    {
+        agent.set_cookie(name, value);
+    }
+    let response = ok(agent
+        .get("/api/account/auth-status")
+        .await
+        .expect_status(200));
+    assert_eq!(
+        crate::helpers::set_cookies_named(&response, &app.session_cookie()).len(),
+        1,
+        "renewal forwarded"
+    );
+
+    sqlx::query("UPDATE session SET expires_at = now() - interval '1 minute' WHERE user_id = $1")
+        .bind(&user.id)
+        .execute(&app.db)
+        .await
+        .expect("expire session");
+    let response = ok(agent
+        .get("/api/account/auth-status")
+        .await
+        .expect_status(200));
+    let cleared = crate::helpers::set_cookies_named(&response, &app.session_cookie());
+    assert!(
+        cleared.iter().any(|c| c.contains("Max-Age=0")),
+        "clears forwarded: {:?}",
+        response.set_cookies()
+    );
+    let status: AuthStatus = ok(response.dto());
+    assert!(!status.authenticated);
+}
+
+#[tokio::test]
+async fn only_one_of_two_concurrent_claims_wins() {
+    let app = TestApp::spawn().await;
+    let token = app.invite_token().await;
+    let claim = |email: String| {
+        let token = token.clone();
+        let mut agent = app.anonymous();
+        async move {
+            ok(agent
+                .post(
+                    "/api/account/invite/claim",
+                    json!({"token": token, "chosenEmail": email}),
+                )
+                .await
+                .expect_status(200)
+                .value())
+        }
+    };
+    let domain = app.env.mail_domain.clone();
+    let (a, b) = tokio::join!(
+        claim(format!("race-a{}@{domain}", hex(4))),
+        claim(format!("race-b{}@{domain}", hex(4)))
+    );
+    let wins = [&a, &b]
+        .iter()
+        .filter(|r| r["success"] == json!(true))
+        .count();
+    assert_eq!(wins, 1, "{a} {b}");
+    let loser = if a["success"] == json!(true) { &b } else { &a };
+    let reason = loser["reason"].as_str().unwrap_or_default();
+    assert!(
+        reason == "This invite is no longer available."
+            || reason == "This invite has already been claimed.",
+        "{loser}"
+    );
+}

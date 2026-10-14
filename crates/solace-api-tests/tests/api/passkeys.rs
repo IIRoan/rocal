@@ -485,6 +485,16 @@ async fn accounts_with_a_passkey_need_step_up_after_a_password_sign_in() {
     expect_step_up_required(&ok(password_only.get("/api/settings").await));
     password_only.set_cookie(STEP_UP_COOKIE, &format!("{}x", borrowed));
     expect_step_up_required(&ok(password_only.get("/api/settings").await));
+    let sid = session_id(&mut password_only).await;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_secs() as i64;
+    for (user_id, expires) in [("someone-else", now + 86_400), (user.id.as_str(), now - 1)] {
+        let forged = forge_step_up(&app.env.better_auth_secret, user_id, &sid, expires);
+        password_only.set_cookie(STEP_UP_COOKIE, &forged);
+        expect_step_up_required(&ok(password_only.get("/api/settings").await));
+    }
 
     let mut passkey_agent = app.anonymous();
     ok(passkey_sign_in(&mut passkey_agent, &mut passkey, &app.origin).await);

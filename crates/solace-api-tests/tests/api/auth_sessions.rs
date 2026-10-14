@@ -771,10 +771,27 @@ async fn me_and_user_report_the_session_user() {
 #[tokio::test]
 async fn production_expires_legacy_host_scoped_cookies_except_for_expo() {
     let app = TestApp::spawn().await;
-    if app.mode != Mode::Production {
+    let user = app.user().await;
+    if app.mode == Mode::Development {
+        let mut browser = app.anonymous();
+        let response = ok(browser
+            .post(
+                "/api/auth/sign-in/email",
+                json!({"email": user.email, "password": user.password}),
+            )
+            .await
+            .expect_status(200));
+        let cleared: Vec<_> = response
+            .set_cookies()
+            .into_iter()
+            .filter(|c| c.starts_with("better-auth.") && c.contains("Max-Age=0"))
+            .collect();
+        assert!(
+            cleared.is_empty(),
+            "no legacy clears outside production: {cleared:?}"
+        );
         return;
     }
-    let user = app.user().await;
     let body = json!({"email": user.email, "password": user.password});
     let mut browser = app.anonymous();
     let response = ok(browser
@@ -818,4 +835,56 @@ async fn production_expires_legacy_host_scoped_cookies_except_for_expo() {
         "a name-keyed Expo jar would lose its new session: {expired:?}"
     );
     assert!(expo.cookie(&app.session_cookie()).is_some());
+}
+
+#[tokio::test]
+async fn app_routes_forward_every_renewal_cookie() {
+    let app = TestApp::spawn().await;
+    let user = app.user().await;
+    sqlx::query("UPDATE session SET expires_at = now() + interval '13 days' WHERE user_id = $1")
+        .bind(&user.id)
+        .execute(&app.db)
+        .await
+        .expect("age session");
+    let data = app.auth_cookie("session_data");
+    let mut agent = app.anonymous();
+    for (name, value) in user
+        .agent
+        .cookies()
+        .iter()
+        .filter(|(name, _)| *name != data)
+    {
+        agent.set_cookie(name, value);
+    }
+    let response = ok(agent.get("/api/settings").await.expect_status(200));
+    let renewed = set_cookies_named(&response, &app.session_cookie());
+    assert_eq!(renewed.len(), 1, "{:?}", response.set_cookies());
+    assert!(renewed[0].contains("Max-Age=1209600"));
+    if app.backend == Backend::TypeScript {
+        assert!(
+            response.set_cookies().len() >= 2,
+            "the renewed token and the refreshed cookie cache both arrive: {:?}",
+            response.set_cookies()
+        );
+    }
+}
+
+#[tokio::test]
+async fn sign_up_refuses_reserved_system_addresses() {
+    let app = TestApp::spawn().await;
+    let mut agent = app.anonymous();
+    for email in ["admin@solace.onl", "postmaster@solace.onl"] {
+        let response = ok(agent
+            .post(
+                "/api/auth/sign-up/email",
+                json!({"email": email, "password": "solace-test-password", "name": "Reserved"}),
+            )
+            .await);
+        assert_eq!(response.status.as_u16(), 403, "{email}");
+        assert_eq!(
+            ok(response.value()),
+            json!({"message": "That email address is reserved."}),
+            "{email}"
+        );
+    }
 }
