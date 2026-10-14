@@ -120,10 +120,10 @@ export interface components {
             createdAt: components["schemas"]["Timestamp"];
             expiresAt: components["schemas"]["Timestamp"];
             id: components["schemas"]["SessionId"];
-            ipAddress?: string | null;
+            ipAddress: string | null;
             token: string;
             updatedAt: components["schemas"]["Timestamp"];
-            userAgent?: string | null;
+            userAgent: string | null;
             userId: components["schemas"]["UserId"];
         };
         AuthStatus: {
@@ -137,13 +137,13 @@ export interface components {
             email: string;
             emailVerified: boolean;
             id: components["schemas"]["UserId"];
-            image?: string | null;
+            image: string | null;
             name: string;
             updatedAt: components["schemas"]["Timestamp"];
         };
         AvatarResponse: {
             /** @description `/api/profiles/avatars/<id>`, or null once removed. */
-            image?: string | null;
+            image: string | null;
         };
         /** @description Query of `GET /api/profiles/avatars/:avatarId`; `size` is rounded up to a stored variant. */
         AvatarSizeQuery: {
@@ -166,16 +166,16 @@ export interface components {
         };
         Calendar: {
             /** @description A JSON array of blind-index tokens, stored as text. */
-            blindIndexTokens?: string | null;
+            blindIndexTokens: string | null;
             color: string;
             createdAt: components["schemas"]["Timestamp"];
-            encryptedName?: string | null;
+            encryptedName: string | null;
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
             forceFullEncryption: boolean;
             icsShareEnabled: boolean;
-            icsShareToken?: string | null;
+            icsShareToken: string | null;
             id: components["schemas"]["CalendarId"];
             isDefault: boolean;
             isPublic: boolean;
@@ -184,9 +184,9 @@ export interface components {
             kind: string;
             /** @description Empty when the name is encrypted. */
             name: string;
-            stalwartAccountId?: string | null;
-            stalwartCalendarId?: string | null;
-            stalwartSyncedAt?: components["schemas"]["Timestamp"] | null;
+            stalwartAccountId: string | null;
+            stalwartCalendarId: string | null;
+            stalwartSyncedAt: components["schemas"]["Timestamp"] | null;
             updatedAt: components["schemas"]["Timestamp"];
             userId: components["schemas"]["UserId"];
         };
@@ -207,7 +207,7 @@ export interface components {
             /** @description The stored name, so empty for encrypted names. */
             calendarName: string;
             enabled: boolean;
-            shareUrl?: string | null;
+            shareUrl: string | null;
         };
         /** @description A feed subscription with its mirrored calendar; only the list carries `_count`. */
         CalendarSubscription: {
@@ -215,12 +215,12 @@ export interface components {
             calendar: components["schemas"]["SubscribedCalendar"];
             calendarId: components["schemas"]["CalendarId"];
             createdAt: components["schemas"]["Timestamp"];
-            etag?: string | null;
+            etag: string | null;
             id: components["schemas"]["SubscriptionId"];
             isActive: boolean;
-            lastErrorMessage?: string | null;
-            lastModified?: string | null;
-            lastSyncAt?: components["schemas"]["Timestamp"] | null;
+            lastErrorMessage: string | null;
+            lastModified: string | null;
+            lastSyncAt: components["schemas"]["Timestamp"] | null;
             /** @description `pending`, `success` or `error`. */
             lastSyncStatus: string;
             name: string;
@@ -232,10 +232,10 @@ export interface components {
         };
         Category: {
             /** @description A JSON array of blind-index tokens, stored as text. */
-            blindIndexTokens?: string | null;
+            blindIndexTokens: string | null;
             color: string;
             createdAt: components["schemas"]["Timestamp"];
-            encryptedName?: string | null;
+            encryptedName: string | null;
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
@@ -362,7 +362,7 @@ export interface components {
             calendars: components["schemas"]["EncryptionCalendar"][];
             devices: components["schemas"]["EncryptionDevice"][];
             enabled: boolean;
-            passwordEnvelope?: components["schemas"]["PasswordEnvelope"] | null;
+            passwordEnvelope: components["schemas"]["PasswordEnvelope"] | null;
             rolloutStage: string;
         };
         EditRecurringRequest: {
@@ -377,7 +377,7 @@ export interface components {
             code: components["schemas"]["EmailAvailabilityCode"];
             domain: string;
             email: string;
-            localPart?: string | null;
+            localPart: string | null;
             message: string;
             normalizedEmail: string;
         };
@@ -419,7 +419,7 @@ export interface components {
             blindIndexTokens: string[];
             color: string;
             createdAt: components["schemas"]["Timestamp"];
-            encryptedName?: string | null;
+            encryptedName: string | null;
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
@@ -434,7 +434,7 @@ export interface components {
             blindIndexTokens: string[];
             color: string;
             createdAt: components["schemas"]["Timestamp"];
-            encryptedName?: string | null;
+            encryptedName: string | null;
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
@@ -448,7 +448,7 @@ export interface components {
             createdAt: components["schemas"]["Timestamp"];
             /** @description Client-chosen device identifier. */
             deviceId: string;
-            deviceLabel?: string | null;
+            deviceLabel: string | null;
             id: string;
             /** Format: int32 */
             keyVersion: number;
@@ -465,23 +465,23 @@ export interface components {
             allDay: boolean;
             blindIndexTokens: string[];
             calendarId: components["schemas"]["CalendarId"];
-            categoryId?: components["schemas"]["CategoryId"] | null;
-            color?: string | null;
+            categoryId: components["schemas"]["CategoryId"] | null;
+            color: string | null;
             createdAt: components["schemas"]["Timestamp"];
-            description?: string | null;
-            encryptedContent?: string | null;
+            description: string | null;
+            encryptedContent: string | null;
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
             end: components["schemas"]["Timestamp"];
             id: components["schemas"]["EventId"];
-            location?: string | null;
-            parentEventId?: components["schemas"]["EventId"] | null;
-            recurrence?: string | null;
+            location: string | null;
+            parentEventId: components["schemas"]["EventId"] | null;
+            recurrence: string | null;
             /** Format: int32 */
-            reminder?: number | null;
+            reminder: number | null;
             start: components["schemas"]["Timestamp"];
-            timezone?: string | null;
+            timezone: string | null;
             title: string;
             updatedAt: components["schemas"]["Timestamp"];
         };
@@ -499,20 +499,20 @@ export interface components {
         Event: {
             allDay: boolean;
             /** @description A JSON array of blind-index tokens, stored as text. */
-            blindIndexTokens?: string | null;
+            blindIndexTokens: string | null;
             calendar: components["schemas"]["EventCalendar"];
             calendarId: components["schemas"]["CalendarId"];
-            category?: components["schemas"]["EventCategory"] | null;
-            categoryId?: components["schemas"]["CategoryId"] | null;
-            color?: string | null;
+            category: components["schemas"]["EventCategory"] | null;
+            categoryId: components["schemas"]["CategoryId"] | null;
+            color: string | null;
             createdAt: components["schemas"]["Timestamp"];
-            description?: string | null;
-            encryptedContent?: string | null;
+            description: string | null;
+            encryptedContent: string | null;
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
             end: components["schemas"]["Timestamp"];
-            externalId?: string | null;
+            externalId: string | null;
             /** @description A recurring instance in a list is `<seriesId>_<occurrence ISO instant>`. */
             id: components["schemas"]["EventId"];
             isCancelled: boolean;
@@ -520,24 +520,24 @@ export interface components {
             /** @description Set on recurring series rows in a list: `false` for the series row itself, `true` for generated instances. */
             isRecurringInstance?: boolean | null;
             isSynced: boolean;
-            location?: string | null;
-            parentEventId?: components["schemas"]["EventId"] | null;
+            location: string | null;
+            parentEventId: components["schemas"]["EventId"] | null;
             /** @description Absent only on whole-series recurring edits that carry no participants. */
             participants?: components["schemas"]["EventParticipant"][] | null;
             /** @description A JSON recurrence rule, stored as text. */
-            recurrence?: string | null;
+            recurrence: string | null;
             /** @description Present on recurring series rows and their instances in a list. */
             recurrenceExceptions?: components["schemas"]["RecurrenceException"][] | null;
             /** Format: int32 */
-            reminder?: number | null;
-            stalwartAccountId?: string | null;
-            stalwartCalendarId?: string | null;
-            stalwartEventId?: string | null;
-            stalwartSyncedAt?: components["schemas"]["Timestamp"] | null;
-            stalwartUid?: string | null;
+            reminder: number | null;
+            stalwartAccountId: string | null;
+            stalwartCalendarId: string | null;
+            stalwartEventId: string | null;
+            stalwartSyncedAt: components["schemas"]["Timestamp"] | null;
+            stalwartUid: string | null;
             start: components["schemas"]["Timestamp"];
-            subscriptionId?: components["schemas"]["SubscriptionId"] | null;
-            syncedAt?: components["schemas"]["Timestamp"] | null;
+            subscriptionId: components["schemas"]["SubscriptionId"] | null;
+            syncedAt: components["schemas"]["Timestamp"] | null;
             timezone: string;
             /** @description Empty for encrypted events: the content lives in `encryptedContent`. */
             title: string;
@@ -547,16 +547,16 @@ export interface components {
         };
         /** @description The full `calendar` row an event embeds. */
         EventCalendar: {
-            blindIndexTokens?: string | null;
+            blindIndexTokens: string | null;
             color: string;
             createdAt: components["schemas"]["Timestamp"];
-            encryptedName?: string | null;
+            encryptedName: string | null;
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
             forceFullEncryption: boolean;
             icsShareEnabled: boolean;
-            icsShareToken?: string | null;
+            icsShareToken: string | null;
             id: components["schemas"]["CalendarId"];
             isDefault: boolean;
             isPublic: boolean;
@@ -564,18 +564,18 @@ export interface components {
             isVisible: boolean;
             kind: string;
             name: string;
-            stalwartAccountId?: string | null;
-            stalwartCalendarId?: string | null;
-            stalwartSyncedAt?: components["schemas"]["Timestamp"] | null;
+            stalwartAccountId: string | null;
+            stalwartCalendarId: string | null;
+            stalwartSyncedAt: components["schemas"]["Timestamp"] | null;
             updatedAt: components["schemas"]["Timestamp"];
             userId: components["schemas"]["UserId"];
         };
         /** @description The full `event_category` row an event embeds. */
         EventCategory: {
-            blindIndexTokens?: string | null;
+            blindIndexTokens: string | null;
             color: string;
             createdAt: components["schemas"]["Timestamp"];
-            encryptedName?: string | null;
+            encryptedName: string | null;
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
@@ -629,17 +629,17 @@ export interface components {
             eventId: components["schemas"]["EventId"];
             id: components["schemas"]["EventParticipantId"];
             /** @description A Solace avatar path (`/api/profiles/avatars/:id`, or `/api/profiles/avatar?email=` for remote pictures), never a remote URL. */
-            image?: string | null;
+            image: string | null;
             role: string;
             status: string;
             updatedAt: components["schemas"]["Timestamp"];
-            userId?: components["schemas"]["UserId"] | null;
+            userId: components["schemas"]["UserId"] | null;
         };
         EventParticipantId: string;
         EventSearchCorpus: {
             events: components["schemas"]["Event"][];
             /** Format: int64 */
-            nextOffset?: number | null;
+            nextOffset: number | null;
             /** Format: int64 */
             total: number;
         };
@@ -714,7 +714,7 @@ export interface components {
             messagesScanned: number;
         };
         InvitationLookup: {
-            event?: components["schemas"]["Event"] | null;
+            event: components["schemas"]["Event"] | null;
         };
         Invite: {
             createdAt: components["schemas"]["Timestamp"];
@@ -760,7 +760,7 @@ export interface components {
         MailAccountId: string;
         /** @description `GET /api/mail/account`. */
         MailAccountStatus: {
-            displayName?: string | null;
+            displayName: string | null;
             email: string;
             mailboxApproved: boolean;
             provisioned: boolean;
@@ -808,7 +808,7 @@ export interface components {
             defaultDomain: string;
             discoveryBaseUrl: string;
             oauth: components["schemas"]["MailOAuthConfig"];
-            serverLimits?: components["schemas"]["MailServerLimits"] | null;
+            serverLimits: components["schemas"]["MailServerLimits"] | null;
             signupEnabled: boolean;
         };
         MailDefaultFolder: {
@@ -839,7 +839,7 @@ export interface components {
             /** Format: int32 */
             getMaxResults?: number | null;
             /** Format: int64 */
-            maxAttachmentSizeBytes?: number | null;
+            maxAttachmentSizeBytes: number | null;
             /** Format: int64 */
             maxBlobUploadBytes?: number | null;
             /** Format: int32 */
@@ -853,7 +853,7 @@ export interface components {
             /** Format: int32 */
             maxMailboxes?: number | null;
             /** Format: int64 */
-            maxMessageSizeBytes?: number | null;
+            maxMessageSizeBytes: number | null;
             /** Format: int32 */
             maxMethodCalls?: number | null;
             /** Format: int64 */
@@ -871,7 +871,7 @@ export interface components {
         };
         /** @description The provisioned mailbox returned by bootstrap. */
         MailSignup: {
-            displayName?: string | null;
+            displayName: string | null;
             email: string;
             encryptionAtRestEnabled: boolean;
             fingerprint: string;
@@ -883,7 +883,7 @@ export interface components {
             created: string[];
             destroyed: string[];
             newState: string;
-            oldState?: string | null;
+            oldState: string | null;
             records: unknown[];
             updated: string[];
         };
@@ -910,9 +910,9 @@ export interface components {
             kdfParams: components["schemas"]["MailVaultKdfParams"];
             /** Format: int32 */
             vaultVersion: number;
-            wrapAlgorithm?: string | null;
+            wrapAlgorithm: string | null;
             /** @description Null for legacy vaults sealed before the account-key seal existed. */
-            wrappedSecret?: string | null;
+            wrappedSecret: string | null;
         };
         /** @description `PUT /api/mail/account/vault-backup`; an omitted or null seal keeps the stored one. */
         MailVaultBackupRequest: {
@@ -936,7 +936,7 @@ export interface components {
         };
         /** @description `GET /api/me`: the session user, or null without a session. */
         MeResponse: {
-            user?: components["schemas"]["AuthUser"] | null;
+            user: components["schemas"]["AuthUser"] | null;
         };
         NotificationDeleteData: {
             /** Format: int64 */
@@ -1090,7 +1090,7 @@ export interface components {
             createdAt: components["schemas"]["Timestamp"];
             exceptionDate: components["schemas"]["Timestamp"];
             id: components["schemas"]["RecurrenceExceptionId"];
-            modifiedEventId?: components["schemas"]["EventId"] | null;
+            modifiedEventId: components["schemas"]["EventId"] | null;
             parentEventId: components["schemas"]["EventId"];
             /** @description `modified` or `deleted`. */
             type: string;
@@ -1130,7 +1130,7 @@ export interface components {
         /** @description A rule object, or the JSON text of one as events store it. */
         RecurrenceRuleInput: string | components["schemas"]["RecurrenceRule"];
         RecurrenceValidation: {
-            description?: string | null;
+            description: string | null;
             errors: string[];
             rule?: components["schemas"]["RecurrenceRule"] | null;
             valid: boolean;
@@ -1210,23 +1210,23 @@ export interface components {
         /** @description A search hit: a subset of the row with trimmed calendar and category. */
         SearchEvent: {
             allDay: boolean;
-            blindIndexTokens?: string | null;
-            calendar?: components["schemas"]["SearchLabel"] | null;
+            blindIndexTokens: string | null;
+            calendar: components["schemas"]["SearchLabel"] | null;
             calendarId: components["schemas"]["CalendarId"];
-            category?: components["schemas"]["SearchLabel"] | null;
-            categoryId?: components["schemas"]["CategoryId"] | null;
-            color?: string | null;
+            category: components["schemas"]["SearchLabel"] | null;
+            categoryId: components["schemas"]["CategoryId"] | null;
+            color: string | null;
             createdAt: components["schemas"]["Timestamp"];
-            description?: string | null;
-            encryptedContent?: string | null;
+            description: string | null;
+            encryptedContent: string | null;
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
             end: components["schemas"]["Timestamp"];
             id: components["schemas"]["EventId"];
-            location?: string | null;
+            location: string | null;
             participants: components["schemas"]["EventParticipant"][];
-            recurrence?: string | null;
+            recurrence: string | null;
             start: components["schemas"]["Timestamp"];
             timezone: string;
             title: string;
@@ -1235,7 +1235,7 @@ export interface components {
         };
         SearchLabel: {
             color: string;
-            encryptedName?: string | null;
+            encryptedName: string | null;
             /** Format: int32 */
             encryptionKeyVersion: number;
             id: string;
@@ -1286,16 +1286,16 @@ export interface components {
         /** @description The full calendar row behind a subscription, as stored. */
         SubscribedCalendar: {
             /** @description Raw stored JSON text, not a parsed list. */
-            blindIndexTokens?: string | null;
+            blindIndexTokens: string | null;
             color: string;
             createdAt: components["schemas"]["Timestamp"];
-            encryptedName?: string | null;
+            encryptedName: string | null;
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
             forceFullEncryption: boolean;
             icsShareEnabled: boolean;
-            icsShareToken?: string | null;
+            icsShareToken: string | null;
             id: components["schemas"]["CalendarId"];
             isDefault: boolean;
             isPublic: boolean;
@@ -1303,9 +1303,9 @@ export interface components {
             isVisible: boolean;
             kind: string;
             name: string;
-            stalwartAccountId?: string | null;
-            stalwartCalendarId?: string | null;
-            stalwartSyncedAt?: components["schemas"]["Timestamp"] | null;
+            stalwartAccountId: string | null;
+            stalwartCalendarId: string | null;
+            stalwartSyncedAt: components["schemas"]["Timestamp"] | null;
             updatedAt: components["schemas"]["Timestamp"];
             userId: components["schemas"]["UserId"];
         };
@@ -1411,7 +1411,7 @@ export interface components {
             browserNotifications: boolean;
             compactView: boolean;
             createdAt: components["schemas"]["Timestamp"];
-            defaultCalendarId?: components["schemas"]["CalendarId"] | null;
+            defaultCalendarId: components["schemas"]["CalendarId"] | null;
             /** Format: int32 */
             defaultEventDuration: number;
             defaultView: string;

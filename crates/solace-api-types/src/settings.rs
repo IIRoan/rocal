@@ -25,6 +25,7 @@ pub struct UserSettings {
     pub reminder_sound: bool,
     pub event_encryption_mode: String,
     pub default_event_duration: i32,
+    #[schema(required = true)]
     pub default_calendar_id: Option<CalendarId>,
     pub compact_view: bool,
     pub show_week_numbers: bool,

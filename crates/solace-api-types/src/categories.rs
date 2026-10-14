@@ -11,8 +11,10 @@ pub struct Category {
     pub id: CategoryId,
     /// Empty when the name is encrypted.
     pub name: String,
+    #[schema(required = true)]
     pub encrypted_name: Option<String>,
     /// A JSON array of blind-index tokens, stored as text.
+    #[schema(required = true)]
     pub blind_index_tokens: Option<String>,
     pub encryption_state: String,
     pub encryption_key_version: i32,

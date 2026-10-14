@@ -17,38 +17,56 @@ pub struct Event {
     pub id: EventId,
     /// Empty for encrypted events: the content lives in `encryptedContent`.
     pub title: String,
+    #[schema(required = true)]
     pub description: Option<String>,
+    #[schema(required = true)]
     pub encrypted_content: Option<String>,
     /// A JSON array of blind-index tokens, stored as text.
+    #[schema(required = true)]
     pub blind_index_tokens: Option<String>,
     pub encryption_state: String,
     pub encryption_key_version: i32,
     pub start: Timestamp,
     pub end: Timestamp,
     pub all_day: bool,
+    #[schema(required = true)]
     pub location: Option<String>,
+    #[schema(required = true)]
     pub color: Option<String>,
     pub timezone: String,
     pub is_private: bool,
+    #[schema(required = true)]
     pub reminder: Option<i32>,
     /// A JSON recurrence rule, stored as text.
+    #[schema(required = true)]
     pub recurrence: Option<String>,
+    #[schema(required = true)]
     pub parent_event_id: Option<EventId>,
     pub is_cancelled: bool,
     pub is_synced: bool,
+    #[schema(required = true)]
     pub external_id: Option<String>,
+    #[schema(required = true)]
     pub subscription_id: Option<SubscriptionId>,
+    #[schema(required = true)]
     pub synced_at: Option<Timestamp>,
+    #[schema(required = true)]
     pub stalwart_account_id: Option<String>,
+    #[schema(required = true)]
     pub stalwart_calendar_id: Option<String>,
+    #[schema(required = true)]
     pub stalwart_event_id: Option<String>,
+    #[schema(required = true)]
     pub stalwart_uid: Option<String>,
+    #[schema(required = true)]
     pub stalwart_synced_at: Option<Timestamp>,
     pub user_id: UserId,
     pub calendar_id: CalendarId,
+    #[schema(required = true)]
     pub category_id: Option<CategoryId>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+    #[schema(required = true)]
     pub category: Option<EventCategory>,
     pub calendar: EventCalendar,
     /// Absent only on whole-series recurring edits that carry no participants.
@@ -70,7 +88,9 @@ pub struct Event {
 pub struct EventCalendar {
     pub id: CalendarId,
     pub name: String,
+    #[schema(required = true)]
     pub encrypted_name: Option<String>,
+    #[schema(required = true)]
     pub blind_index_tokens: Option<String>,
     pub encryption_state: String,
     pub encryption_key_version: i32,
@@ -81,10 +101,14 @@ pub struct EventCalendar {
     pub is_visible: bool,
     pub is_default: bool,
     pub is_sync_only: bool,
+    #[schema(required = true)]
     pub ics_share_token: Option<String>,
     pub ics_share_enabled: bool,
+    #[schema(required = true)]
     pub stalwart_account_id: Option<String>,
+    #[schema(required = true)]
     pub stalwart_calendar_id: Option<String>,
+    #[schema(required = true)]
     pub stalwart_synced_at: Option<Timestamp>,
     pub user_id: UserId,
     pub created_at: Timestamp,
@@ -97,7 +121,9 @@ pub struct EventCalendar {
 pub struct EventCategory {
     pub id: CategoryId,
     pub name: String,
+    #[schema(required = true)]
     pub encrypted_name: Option<String>,
+    #[schema(required = true)]
     pub blind_index_tokens: Option<String>,
     pub encryption_state: String,
     pub encryption_key_version: i32,
@@ -114,10 +140,12 @@ pub struct EventParticipant {
     pub id: EventParticipantId,
     pub event_id: EventId,
     /// The Solace user behind the address, when there is one.
+    #[schema(required = true)]
     pub user_id: Option<UserId>,
     pub email: String,
     pub display_name: String,
     /// A Solace avatar path (`/api/profiles/avatars/:id`, or `/api/profiles/avatar?email=` for remote pictures), never a remote URL.
+    #[schema(required = true)]
     pub image: Option<String>,
     pub role: String,
     pub status: String,
@@ -131,6 +159,7 @@ pub struct RecurrenceException {
     pub id: RecurrenceExceptionId,
     pub parent_event_id: EventId,
     pub exception_date: Timestamp,
+    #[schema(required = true)]
     pub modified_event_id: Option<EventId>,
     /// `modified` or `deleted`.
     #[serde(rename = "type")]
@@ -161,22 +190,31 @@ pub struct EventSearchResults {
 pub struct SearchEvent {
     pub id: EventId,
     pub title: String,
+    #[schema(required = true)]
     pub description: Option<String>,
     pub start: Timestamp,
     pub end: Timestamp,
     pub all_day: bool,
+    #[schema(required = true)]
     pub location: Option<String>,
+    #[schema(required = true)]
     pub color: Option<String>,
     pub timezone: String,
+    #[schema(required = true)]
     pub recurrence: Option<String>,
+    #[schema(required = true)]
     pub encrypted_content: Option<String>,
+    #[schema(required = true)]
     pub blind_index_tokens: Option<String>,
     pub encryption_state: String,
     pub encryption_key_version: i32,
     pub calendar_id: CalendarId,
+    #[schema(required = true)]
     pub category_id: Option<CategoryId>,
     pub user_id: UserId,
+    #[schema(required = true)]
     pub calendar: Option<SearchLabel>,
+    #[schema(required = true)]
     pub category: Option<SearchLabel>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
@@ -188,6 +226,7 @@ pub struct SearchEvent {
 pub struct SearchLabel {
     pub id: String,
     pub name: String,
+    #[schema(required = true)]
     pub encrypted_name: Option<String>,
     pub encryption_key_version: i32,
     pub color: String,
@@ -198,6 +237,7 @@ pub struct SearchLabel {
 pub struct EventSearchCorpus {
     pub events: Vec<Event>,
     pub total: i64,
+    #[schema(required = true)]
     pub next_offset: Option<i64>,
 }
 
@@ -223,6 +263,7 @@ pub struct BulkEventResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InvitationLookup {
+    #[schema(required = true)]
     pub event: Option<Event>,
 }
 

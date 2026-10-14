@@ -11,8 +11,10 @@ pub struct Calendar {
     pub id: CalendarId,
     /// Empty when the name is encrypted.
     pub name: String,
+    #[schema(required = true)]
     pub encrypted_name: Option<String>,
     /// A JSON array of blind-index tokens, stored as text.
+    #[schema(required = true)]
     pub blind_index_tokens: Option<String>,
     pub encryption_state: String,
     pub encryption_key_version: i32,
@@ -23,10 +25,14 @@ pub struct Calendar {
     pub is_visible: bool,
     pub is_default: bool,
     pub is_sync_only: bool,
+    #[schema(required = true)]
     pub ics_share_token: Option<String>,
     pub ics_share_enabled: bool,
+    #[schema(required = true)]
     pub stalwart_account_id: Option<String>,
+    #[schema(required = true)]
     pub stalwart_calendar_id: Option<String>,
+    #[schema(required = true)]
     pub stalwart_synced_at: Option<Timestamp>,
     pub user_id: UserId,
     pub created_at: Timestamp,
@@ -110,6 +116,7 @@ pub struct CalendarShareLink {
     /// The stored name, so empty for encrypted names.
     pub calendar_name: String,
     pub enabled: bool,
+    #[schema(required = true)]
     pub share_url: Option<String>,
 }
 

@@ -49,6 +49,7 @@ pub struct ValidateRecurrenceRequest {
 pub struct RecurrenceValidation {
     pub valid: bool,
     pub errors: Vec<String>,
+    #[schema(required = true)]
     pub description: Option<String>,
     /// The parsed rule; absent when it could not be parsed.
     #[serde(default, skip_serializing_if = "Option::is_none")]

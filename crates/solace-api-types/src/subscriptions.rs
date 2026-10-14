@@ -15,11 +15,15 @@ pub struct CalendarSubscription {
     pub url: String,
     pub is_active: bool,
     pub sync_interval_minutes: i32,
+    #[schema(required = true)]
     pub last_sync_at: Option<Timestamp>,
     /// `pending`, `success` or `error`.
     pub last_sync_status: String,
+    #[schema(required = true)]
     pub last_error_message: Option<String>,
+    #[schema(required = true)]
     pub etag: Option<String>,
+    #[schema(required = true)]
     pub last_modified: Option<String>,
     pub user_id: UserId,
     pub calendar_id: CalendarId,
@@ -36,8 +40,10 @@ pub struct CalendarSubscription {
 pub struct SubscribedCalendar {
     pub id: CalendarId,
     pub name: String,
+    #[schema(required = true)]
     pub encrypted_name: Option<String>,
     /// Raw stored JSON text, not a parsed list.
+    #[schema(required = true)]
     pub blind_index_tokens: Option<String>,
     pub encryption_state: String,
     pub encryption_key_version: i32,
@@ -48,10 +54,14 @@ pub struct SubscribedCalendar {
     pub is_visible: bool,
     pub is_default: bool,
     pub is_sync_only: bool,
+    #[schema(required = true)]
     pub ics_share_token: Option<String>,
     pub ics_share_enabled: bool,
+    #[schema(required = true)]
     pub stalwart_account_id: Option<String>,
+    #[schema(required = true)]
     pub stalwart_calendar_id: Option<String>,
+    #[schema(required = true)]
     pub stalwart_synced_at: Option<Timestamp>,
     pub user_id: UserId,
     pub created_at: Timestamp,

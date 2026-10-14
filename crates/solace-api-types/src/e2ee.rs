@@ -12,6 +12,7 @@ pub struct E2eeBootstrap {
     pub rollout_stage: String,
     pub algorithms: E2eeAlgorithms,
     pub devices: Vec<EncryptionDevice>,
+    #[schema(required = true)]
     pub password_envelope: Option<PasswordEnvelope>,
     pub calendars: Vec<EncryptionCalendar>,
 }
@@ -33,6 +34,7 @@ pub struct EncryptionDevice {
     pub user_id: UserId,
     /// Client-chosen device identifier.
     pub device_id: String,
+    #[schema(required = true)]
     pub device_label: Option<String>,
     pub public_key: String,
     pub public_key_algorithm: String,
@@ -66,6 +68,7 @@ pub struct PasswordEnvelope {
 pub struct EncryptionCalendar {
     pub id: CalendarId,
     pub name: String,
+    #[schema(required = true)]
     pub encrypted_name: Option<String>,
     /// Parsed from the stored JSON; unreadable values become an empty list.
     pub blind_index_tokens: Vec<String>,
@@ -84,6 +87,7 @@ pub struct EncryptionCalendar {
 pub struct EncryptionCategory {
     pub id: CategoryId,
     pub name: String,
+    #[schema(required = true)]
     pub encrypted_name: Option<String>,
     pub blind_index_tokens: Vec<String>,
     pub encryption_state: String,
@@ -99,21 +103,30 @@ pub struct EncryptionCategory {
 pub struct EncryptionEvent {
     pub id: EventId,
     pub title: String,
+    #[schema(required = true)]
     pub description: Option<String>,
+    #[schema(required = true)]
     pub encrypted_content: Option<String>,
     pub blind_index_tokens: Vec<String>,
     pub encryption_state: String,
     pub encryption_key_version: i32,
     pub start: Timestamp,
     pub end: Timestamp,
+    #[schema(required = true)]
     pub timezone: Option<String>,
     pub all_day: bool,
+    #[schema(required = true)]
     pub location: Option<String>,
+    #[schema(required = true)]
     pub color: Option<String>,
     pub calendar_id: CalendarId,
+    #[schema(required = true)]
     pub category_id: Option<CategoryId>,
+    #[schema(required = true)]
     pub reminder: Option<i32>,
+    #[schema(required = true)]
     pub recurrence: Option<String>,
+    #[schema(required = true)]
     pub parent_event_id: Option<EventId>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,

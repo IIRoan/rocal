@@ -13,6 +13,7 @@ pub struct AuthUser {
     pub name: String,
     pub email: String,
     pub email_verified: bool,
+    #[schema(required = true)]
     pub image: Option<String>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
@@ -28,7 +29,9 @@ pub struct AuthSession {
     pub expires_at: Timestamp,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+    #[schema(required = true)]
     pub ip_address: Option<String>,
+    #[schema(required = true)]
     pub user_agent: Option<String>,
 }
 
@@ -78,5 +81,6 @@ pub struct StatusFlag {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MeResponse {
+    #[schema(required = true)]
     pub user: Option<AuthUser>,
 }

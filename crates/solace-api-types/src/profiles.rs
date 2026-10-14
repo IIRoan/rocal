@@ -51,5 +51,6 @@ pub struct UploadAvatarRequest {
 #[serde(rename_all = "camelCase")]
 pub struct AvatarResponse {
     /// `/api/profiles/avatars/<id>`, or null once removed.
+    #[schema(required = true)]
     pub image: Option<String>,
 }

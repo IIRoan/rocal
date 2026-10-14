@@ -24,6 +24,7 @@ pub enum EmailAvailabilityCode {
 #[serde(rename_all = "camelCase")]
 pub struct EmailAvailability {
     pub email: String,
+    #[schema(required = true)]
     pub local_part: Option<String>,
     pub domain: String,
     pub normalized_email: String,

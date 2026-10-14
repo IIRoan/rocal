@@ -15,6 +15,7 @@ crate::id_types!(
 #[serde(rename_all = "camelCase")]
 pub struct MailAccountStatus {
     pub email: String,
+    #[schema(required = true)]
     pub display_name: Option<String>,
     pub provisioned: bool,
     pub mailbox_approved: bool,
@@ -65,6 +66,7 @@ pub struct MailBootstrapRequest {
 #[serde(rename_all = "camelCase")]
 pub struct MailSignup {
     pub email: String,
+    #[schema(required = true)]
     pub display_name: Option<String>,
     pub stalwart_account_id: MailAccountId,
     pub stalwart_public_key_id: String,
@@ -106,7 +108,9 @@ pub struct MailVaultBackup {
     pub kdf: String,
     pub kdf_params: MailVaultKdfParams,
     /// Null for legacy vaults sealed before the account-key seal existed.
+    #[schema(required = true)]
     pub wrapped_secret: Option<String>,
+    #[schema(required = true)]
     pub wrap_algorithm: Option<String>,
 }
 
@@ -119,6 +123,7 @@ pub struct MailConfig {
     pub signup_enabled: bool,
     pub oauth: MailOAuthConfig,
     /// Null when Stalwart's limits could not be read.
+    #[schema(required = true)]
     pub server_limits: Option<MailServerLimits>,
 }
 
@@ -134,7 +139,9 @@ pub struct MailOAuthConfig {
 pub struct MailServerLimits {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_blob_upload_bytes: Option<u64>,
+    #[schema(required = true)]
     pub max_attachment_size_bytes: Option<u64>,
+    #[schema(required = true)]
     pub max_message_size_bytes: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_mailbox_depth: Option<u32>,
@@ -214,6 +221,7 @@ pub struct MailSyncResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MailSyncCollection {
+    #[schema(required = true)]
     pub old_state: Option<String>,
     pub new_state: String,
     pub created: Vec<String>,
