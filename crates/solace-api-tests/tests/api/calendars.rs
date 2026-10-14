@@ -54,6 +54,18 @@ pub async fn db_json(db: &PgPool, sql: &str, bind: &str) -> Option<Value> {
     text.map(|text| serde_json::from_str(&text).expect("row json"))
 }
 
+/// `created_at` and `updated_at` of a row as `toISOString()` writes them.
+pub async fn wire_timestamps(db: &PgPool, table: &str, id: &str) -> (String, String) {
+    let format = r#"'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'"#;
+    sqlx::query_as(&format!(
+        "SELECT to_char(created_at, {format}), to_char(updated_at, {format}) FROM {table} WHERE id = $1"
+    ))
+    .bind(id)
+    .fetch_one(db)
+    .await
+    .expect("timestamps")
+}
+
 pub async fn calendar_row(db: &PgPool, id: &str) -> Option<Value> {
     db_json(
         db,
@@ -407,6 +419,10 @@ async fn create_stores_a_trimmed_plaintext_calendar() {
     assert_eq!(row["user_id"], json!(user.id));
     assert_eq!(row["encryption_state"], json!("plaintext"));
     assert_eq!(row["force_full_encryption"], json!(true));
+    assert_eq!(
+        wire_timestamps(&app.db, "calendar", &created.id.0).await,
+        (created.created_at.0.clone(), created.updated_at.0.clone())
+    );
     assert_eq!(list_calendars(&mut user).await, [created]);
 }
 
@@ -1309,11 +1325,27 @@ async fn deleting_removes_the_calendar_and_its_events() {
     let second = create_calendar(&mut user, "Second", "blue").await;
     let empty = create_calendar(&mut user, "Empty", "blue").await;
     let keep = create_calendar(&mut user, "Keep", "blue").await;
-    for _ in 0..2 {
-        insert_event(&app.db, &user.id, &first.id.0, EventRow::default()).await;
-    }
+    let reminded = insert_event(&app.db, &user.id, &first.id.0, EventRow::default()).await;
+    insert_event(&app.db, &user.id, &first.id.0, EventRow::default()).await;
     insert_event(&app.db, &user.id, &second.id.0, EventRow::default()).await;
     let kept_event = insert_event(&app.db, &user.id, &keep.id.0, EventRow::default()).await;
+    let job = format!("suitejob{}", hex(8));
+    sqlx::query(
+        "INSERT INTO notification_job (id, user_id, kind, channel, event_id, payload, status, available_at, created_at, updated_at) \
+         VALUES ($1, $2, 'event_reminder', 'push', $3, '{}'::jsonb, 'pending', now() + interval '1 day', now(), now())",
+    )
+    .bind(&job)
+    .bind(&user.id)
+    .bind(&reminded)
+    .execute(&app.db)
+    .await
+    .expect("insert reminder job");
+    let jobs_before = count(
+        &app.db,
+        "SELECT count(*) FROM notification_job WHERE user_id = $1",
+        &user.id,
+    )
+    .await;
 
     let cases = [
         (
@@ -1358,6 +1390,23 @@ async fn deleting_removes_the_calendar_and_its_events() {
         );
     }
     assert!(event_row(&app.db, &kept_event).await.is_some());
+    // The outbox has no foreign key to events: pending reminders of deleted events stay queued.
+    let status: String = sqlx::query_scalar("SELECT status FROM notification_job WHERE id = $1")
+        .bind(&job)
+        .fetch_one(&app.db)
+        .await
+        .expect("reminder job");
+    assert_eq!(status, "pending");
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM notification_job WHERE user_id = $1",
+            &user.id
+        )
+        .await,
+        jobs_before,
+        "deletes write nothing to the outbox"
+    );
 }
 
 #[tokio::test]

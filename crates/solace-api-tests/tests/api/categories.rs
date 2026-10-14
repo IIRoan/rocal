@@ -7,7 +7,7 @@ use sqlx::PgPool;
 
 use crate::calendars::{
     COLOR_MESSAGE, EventRow, PLAINTEXT_BESIDE_CIPHERTEXT, add_encryption_device, create_calendar,
-    db_json, event_row, expect_field_error, expect_issue, insert_event,
+    db_json, event_row, expect_field_error, expect_issue, insert_event, wire_timestamps,
 };
 use crate::helpers::{
     TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
@@ -97,6 +97,10 @@ async fn create_trims_plaintext_names() {
     assert_eq!(
         (&row["name"], &row["user_id"], &row["encryption_state"]),
         (&json!("Work"), &json!(user.id), &json!("plaintext"))
+    );
+    assert_eq!(
+        wire_timestamps(&app.db, "event_category", &created.id.0).await,
+        (created.created_at.0.clone(), created.updated_at.0.clone())
     );
 }
 
