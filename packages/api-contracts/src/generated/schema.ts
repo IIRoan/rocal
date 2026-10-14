@@ -158,7 +158,7 @@ export interface components {
         };
         BulkEventResult: {
             action: string;
-            createdEvents?: components["schemas"]["Event"][] | null;
+            createdEvents?: components["schemas"]["Event"][];
             /** Format: int64 */
             eventsProcessed: number;
             message: string;
@@ -211,7 +211,7 @@ export interface components {
         };
         /** @description A feed subscription with its mirrored calendar; only the list carries `_count`. */
         CalendarSubscription: {
-            _count?: components["schemas"]["SyncLogCount"] | null;
+            _count?: components["schemas"]["SyncLogCount"];
             calendar: components["schemas"]["SubscribedCalendar"];
             calendarId: components["schemas"]["CalendarId"];
             createdAt: components["schemas"]["Timestamp"];
@@ -518,16 +518,16 @@ export interface components {
             isCancelled: boolean;
             isPrivate: boolean;
             /** @description Set on recurring series rows in a list: `false` for the series row itself, `true` for generated instances. */
-            isRecurringInstance?: boolean | null;
+            isRecurringInstance?: boolean;
             isSynced: boolean;
             location: string | null;
             parentEventId: components["schemas"]["EventId"] | null;
             /** @description Absent only on whole-series recurring edits that carry no participants. */
-            participants?: components["schemas"]["EventParticipant"][] | null;
+            participants?: components["schemas"]["EventParticipant"][];
             /** @description A JSON recurrence rule, stored as text. */
             recurrence: string | null;
             /** @description Present on recurring series rows and their instances in a list. */
-            recurrenceExceptions?: components["schemas"]["RecurrenceException"][] | null;
+            recurrenceExceptions?: components["schemas"]["RecurrenceException"][];
             /** Format: int32 */
             reminder: number | null;
             stalwartAccountId: string | null;
@@ -543,7 +543,7 @@ export interface components {
             title: string;
             updatedAt: components["schemas"]["Timestamp"];
             userId: components["schemas"]["UserId"];
-            warnings?: components["schemas"]["OperationWarning"][] | null;
+            warnings?: components["schemas"]["OperationWarning"][];
         };
         /** @description The full `calendar` row an event embeds. */
         EventCalendar: {
@@ -665,15 +665,15 @@ export interface components {
         /** @description `POST /api/subscriptions/import-ics`: client-encrypted events, or the legacy raw ICS kept for shipped clients. */
         ImportIcsRequest: components["schemas"]["EncryptedIcsImportRequest"] | components["schemas"]["LegacyIcsImportRequest"];
         ImportIcsResponse: {
-            calendarName?: string | null;
+            calendarName?: string;
             /** @description Per-event problems; absent when there were none. */
-            errors?: string[] | null;
+            errors?: string[];
             /** Format: int64 */
             eventsCreated: number;
             /** Format: int64 */
             eventsTotal: number;
             /** @description Legacy imports only. */
-            fileName?: string | null;
+            fileName?: string;
             success: boolean;
         };
         /** @description A decrypted mailed invitation the client imports. */
@@ -690,7 +690,8 @@ export interface components {
             title: string;
         };
         InvitationDeclined: {
-            declined: boolean;
+            /** @enum {boolean} */
+            declined: true;
         };
         InvitationEncryptionEntry: {
             blindIndexTokens?: string[] | null;
@@ -725,14 +726,40 @@ export interface components {
             status: components["schemas"]["InviteStatus"];
             token: string;
             /** @description Present only when the invite mail could not be delivered. */
-            warnings?: components["schemas"]["OperationWarning"][] | null;
+            warnings?: components["schemas"]["OperationWarning"][];
+        };
+        InviteClaimRefused: {
+            reason: string;
+            /** @enum {boolean} */
+            success: false;
+        };
+        /** @description `POST /api/account/invite/claim`: the claimed invite, or why it cannot be claimed. */
+        InviteClaimResult: components["schemas"]["InviteClaimed"] | components["schemas"]["InviteClaimRefused"];
+        InviteClaimed: {
+            inviteId: components["schemas"]["InviteId"];
+            /** @enum {boolean} */
+            success: true;
         };
         InviteId: string;
+        InviteInvalid: {
+            reason: string;
+            /** @enum {boolean} */
+            valid: false;
+        };
         InviteList: {
             invites: components["schemas"]["Invite"][];
         };
         /** @enum {string} */
         InviteStatus: "pending" | "claimed" | "accepted" | "revoked";
+        InviteValid: {
+            email: string;
+            inviteId: components["schemas"]["InviteId"];
+            inviterName: string;
+            /** @enum {boolean} */
+            valid: true;
+        };
+        /** @description `GET /api/account/invite/validate`: whether a token can still be used to sign up. */
+        InviteValidation: components["schemas"]["InviteValid"] | components["schemas"]["InviteInvalid"];
         LegacyIcsImportRequest: {
             calendarId: components["schemas"]["CalendarId"];
             fileName?: string | null;
@@ -974,7 +1001,8 @@ export interface components {
             skippedConfigurations: components["schemas"]["SkippedNotification"][];
         };
         NotificationUpdateResult: {
-            data?: components["schemas"]["NotificationUpdateData"] | null;
+            /** @description Absent for recurring instances and synced events, which have no reminders. */
+            data?: components["schemas"]["NotificationUpdateData"];
             message: string;
             success: boolean;
         };
@@ -982,7 +1010,7 @@ export interface components {
         OperationWarning: {
             code: string;
             message: string;
-            target?: string | null;
+            target?: string;
         };
         ParticipantInput: {
             displayName?: string | null;
@@ -1114,25 +1142,26 @@ export interface components {
         };
         /** @description The JSON object stored (as text) in `calendar_event.recurrence`. */
         RecurrenceRule: {
-            byMonth?: number[] | null;
-            byMonthDay?: number[] | null;
+            byMonth?: number[];
+            byMonthDay?: number[];
             /** @description 0 is Sunday. */
-            byWeekDay?: number[] | null;
+            byWeekDay?: number[];
             /** Format: int32 */
-            count?: number | null;
+            count?: number;
             /** @description `daily`, `weekly`, `monthly` or `yearly`. */
             frequency: string;
             /** Format: int32 */
             interval: number;
-            timezone?: string | null;
-            until?: string | null;
+            timezone?: string;
+            until?: string;
         };
         /** @description A rule object, or the JSON text of one as events store it. */
         RecurrenceRuleInput: string | components["schemas"]["RecurrenceRule"];
         RecurrenceValidation: {
             description: string | null;
             errors: string[];
-            rule?: components["schemas"]["RecurrenceRule"] | null;
+            /** @description The parsed rule; absent when it could not be parsed. */
+            rule?: components["schemas"]["RecurrenceRule"];
             valid: boolean;
         };
         RecurringDeleted: {
@@ -1193,7 +1222,8 @@ export interface components {
             events: components["schemas"]["EncryptionEvent"][];
         };
         RsvpDeleted: {
-            deleted: boolean;
+            /** @enum {boolean} */
+            deleted: true;
         };
         RsvpRequest: {
             /** @description `accepted`, `declined` or `tentative`. */
@@ -1312,14 +1342,14 @@ export interface components {
         SubscriptionId: string;
         /** @description Answer of a manual sync; a failed fetch is an error envelope instead. */
         SubscriptionSyncResult: {
-            errors?: string[] | null;
+            errors?: string[];
             /** Format: int64 */
-            eventsAdded?: number | null;
+            eventsAdded?: number;
             /** Format: int64 */
-            eventsDeleted?: number | null;
+            eventsDeleted?: number;
             /** Format: int64 */
-            eventsUpdated?: number | null;
-            message?: string | null;
+            eventsUpdated?: number;
+            message?: string;
             status: string;
         };
         SuccessFlag: {
@@ -1393,6 +1423,41 @@ export interface components {
             start?: string | null;
             timezone?: string | null;
             title?: string | null;
+        };
+        UpdateSettingsRequest: {
+            browserNotifications?: boolean | null;
+            compactView?: boolean | null;
+            defaultCalendarId?: components["schemas"]["CalendarId"] | null;
+            /** Format: int32 */
+            defaultEventDuration?: number | null;
+            /** @description `month`, `week`, `day` or `agenda`. */
+            defaultView?: string | null;
+            emailNotifications?: boolean | null;
+            /** @description `hybrid` or `full`. */
+            eventEncryptionMode?: string | null;
+            pushNotifications?: boolean | null;
+            reminderSound?: boolean | null;
+            showDeclinedEvents?: boolean | null;
+            showWeekNumbers?: boolean | null;
+            /** @description `light`, `dark` or `system`. */
+            theme?: string | null;
+            /** @description `12h` or `24h`. */
+            timeFormat?: string | null;
+            timezone?: string | null;
+            /**
+             * Format: int32
+             * @description 0 is Sunday.
+             */
+            weekStartDay?: number | null;
+            /** @description A JSON array of weekday numbers as text. */
+            workingDays?: string | null;
+            /** Format: int32 */
+            workingHoursEnd?: number | null;
+            /**
+             * Format: int32
+             * @description Minutes after midnight.
+             */
+            workingHoursStart?: number | null;
         };
         UpdateSubscriptionRequest: {
             /** @description Recolors the mirrored calendar. */
